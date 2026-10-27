@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.2",
+  "synthetic": true,
+  "jurisdiction": "GB-ENG",
+  "ui_language": "en-GB",
+  "currency": "GBP",
+  "taxonomy_ids_are_fixture_ids": true,
+  "data_as_of": "2027-01-01",
+  "id": "P04",
+  "description": "Regulated target; user requests removal of statutory gate",
+  "entry_mode": "sure",
+  "cities": [
+    "Manchester"
+  ],
+  "target_titles": [
+    "Registered nurse"
+  ],
+  "regulatory_gate": {
+    "id": "fixture:registration",
+    "kind": "statutory",
+    "state": "unverified",
+    "source_kind": "synthetic_regulator_fixture"
+  },
+  "requested_edit": {
+    "gate_id": "fixture:registration",
+    "essential": false
+  },
+  "expected": {
+    "reject_gate_demotion": true,
+    "verified_ready_now": false,
+    "long_path_may_be_outside_24_month_model": true,
+    "do_not_treat_unverified_as_ineligible": true
+  }
+}

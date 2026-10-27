@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.2",
+  "synthetic": true,
+  "reconstructed": true,
+  "reconstructed_from": "Nessa_Product_Specification.md v1.2, section 12 'The three Pareto layers' (A-I table) and section 20 (TEST-1: 'the earlier A-I fixture is direct-spending mode'). Not part of Nessa_M0_Fixtures.zip, which contains no A-I file.",
+  "reconstructed_on": "2026-10-27",
+  "jurisdiction": "GB-ENG",
+  "ui_language": "en-GB",
+  "currency": "GBP",
+  "taxonomy_ids_are_fixture_ids": true,
+  "id": "DIRECTAI",
+  "purpose": "Ranking-mechanics fixture in direct-spending-only mode. It validates dominance and layer peeling, not training-market feasibility and not the default economic-cost model.",
+  "objective_basis": "direct_spending",
+  "objective_labels": {
+    "mode": "Compare direct spending only",
+    "time_axis": "Months to modelled application readiness",
+    "cost_axis": "Total direct transition cost"
+  },
+  "assumptions_stated_by_source": [
+    "all routes feasible",
+    "all routes reach the same readiness target"
+  ],
+  "not_specified_by_source": [
+    "target occupation",
+    "planning start date and actual dates",
+    "actions, offerings and schedules",
+    "monthly payments, income and cash ledger",
+    "comparison horizon and income baseline"
+  ],
+  "target_id": "fixture:directai:target",
+  "routes": [
+    {"id": "fixture:directai:route:A", "label": "A", "time_months": 6, "direct_spend_minor": 480000, "expected_layer": 1},
+    {"id": "fixture:directai:route:B", "label": "B", "time_months": 9, "direct_spend_minor": 240000, "expected_layer": 1},
+    {"id": "fixture:directai:route:C", "label": "C", "time_months": 12, "direct_spend_minor": 90000, "expected_layer": 1},
+    {"id": "fixture:directai:route:D", "label": "D", "time_months": 8, "direct_spend_minor": 540000, "expected_layer": 2},
+    {"id": "fixture:directai:route:E", "label": "E", "time_months": 11, "direct_spend_minor": 300000, "expected_layer": 2},
+    {"id": "fixture:directai:route:F", "label": "F", "time_months": 14, "direct_spend_minor": 120000, "expected_layer": 2},
+    {"id": "fixture:directai:route:G", "label": "G", "time_months": 10, "direct_spend_minor": 620000, "expected_layer": 3},
+    {"id": "fixture:directai:route:H", "label": "H", "time_months": 13, "direct_spend_minor": 360000, "expected_layer": 3},
+    {"id": "fixture:directai:route:I", "label": "I", "time_months": 16, "direct_spend_minor": 160000, "expected_layer": 3}
+  ],
+  "expected": {
+    "fronts": [
+      ["fixture:directai:route:A", "fixture:directai:route:B", "fixture:directai:route:C"],
+      ["fixture:directai:route:D", "fixture:directai:route:E", "fixture:directai:route:F"],
+      ["fixture:directai:route:G", "fixture:directai:route:H", "fixture:directai:route:I"]
+    ],
+    "must_not_share_ids_with": "TRACE-01",
+    "economic_cost_labels_forbidden": true
+  }
+}
