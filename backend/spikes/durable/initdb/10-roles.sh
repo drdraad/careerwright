@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Separate application and DBOS system databases, each owned by its own non-superuser role.
+# Separate application and DBOS system databases, each with its own role. The passwords are
+# read from the environment inside psql (\getenv), never passed as command arguments.
 set -euo pipefail
 
-psql -v ON_ERROR_STOP=1 --username postgres \
-  -v app_password="$NESSA_SPIKE_APP_PASSWORD" \
-  -v dbos_password="$NESSA_SPIKE_DBOS_PASSWORD" <<'SQL'
+psql -v ON_ERROR_STOP=1 --username postgres <<'SQL'
+\getenv app_password NESSA_SPIKE_APP_PASSWORD
+\getenv dbos_password NESSA_SPIKE_DBOS_PASSWORD
 CREATE ROLE nessa_spike_app LOGIN PASSWORD :'app_password';
 CREATE ROLE nessa_spike_dbos LOGIN PASSWORD :'dbos_password';
 CREATE DATABASE nessa_spike_app OWNER nessa_spike_app;

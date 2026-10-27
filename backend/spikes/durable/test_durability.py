@@ -22,11 +22,14 @@ from pydantic import SecretStr
 
 from spikes.durable import stack
 from spikes.durable.leak_scan import Finding, Needle, scan
-from spikes.durable.models import FakeFailure
+from spikes.durable.live_run import PRIVATE_TEXT_FRAGMENT, run_live_check
+from spikes.durable.models import FAKE_MODEL_ID, FakeFailure
 from spikes.durable.stack import SpikeStack, Worker, query, start_worker, wait_for
 from spikes.durable.store import AppStore, OutboxEntry
 from spikes.durable.worker import keyring_from_file
 from spikes.durable.workflow import ACTIVITY_MAX_ATTEMPTS, ProfileProposal
+from spikes.meta.ledger import Ledger
+from spikes.meta.live_spike import BUDGET_SCOPE
 
 pytestmark = pytest.mark.integration
 
@@ -56,6 +59,7 @@ class Scenario:
     prompt_only_sentinel: str
     log_dir: Path
     logs: list[Path] = field(default_factory=list)
+    workers: list[Worker] = field(default_factory=list)
 
     def submit(self) -> OutboxEntry:
         return self.store.submit_run(self.workspace_id, self.credential_id, self.private_text)
@@ -63,7 +67,9 @@ class Scenario:
     def worker(self, name: str, **settings: str) -> Worker:
         log = self.log_dir / f"{name}.log"
         self.logs.append(log)
-        return start_worker(self.spike, log, **settings)
+        worker = start_worker(self.spike, log, **settings)
+        self.workers.append(worker)
+        return worker
 
     def run(self, run_id: str) -> dict[str, Any]:
         return query(self.spike.app_url, "SELECT * FROM runs WHERE run_id = %s", (run_id,))[0]
@@ -112,6 +118,7 @@ class Scenario:
             Needle("credential", self.api_key.get_secret_value(), fragment_length=12),
             Needle("private text", self.sentinel),
             Needle("prompt-only private text", self.prompt_only_sentinel),
+            Needle("private text window", self.private_text, fragment_length=PRIVATE_TEXT_FRAGMENT),
         ]
         cells = [
             *stack.database_cells(self.spike.superuser_url_for("nessa_spike_dbos")),
@@ -122,13 +129,13 @@ class Scenario:
 
 
 @pytest.fixture
-def scenario(spike: SpikeStack, tmp_path: Path) -> Scenario:
+def scenario(spike: SpikeStack, tmp_path: Path) -> Iterator[Scenario]:
     store = AppStore(spike.app_url, keyring_from_file(spike.master_key_file))
     workspace_id = str(uuid.uuid4())
     api_key = SecretStr("sk-spike-" + secrets.token_hex(16))
     sentinel = f"PRIVATE-SENTINEL-{secrets.token_hex(8)}"
     prompt_only_sentinel = f"PROMPT-ONLY-SENTINEL-{secrets.token_hex(8)}"
-    return Scenario(
+    started = Scenario(
         spike=spike,
         store=store,
         workspace_id=workspace_id,
@@ -142,6 +149,10 @@ def scenario(spike: SpikeStack, tmp_path: Path) -> Scenario:
         prompt_only_sentinel=prompt_only_sentinel,
         log_dir=tmp_path,
     )
+    yield started
+    # A failed assertion must not leave a worker running against the session stack.
+    for worker in started.workers:
+        worker.kill_if_running()
 
 
 def assert_identifier_only_journal(scenario: Scenario, entry: OutboxEntry) -> dict[str, Any]:
@@ -163,8 +174,8 @@ def test_worker_killed_mid_activity_recovers_to_one_accepted_output(scenario: Sc
     entry = scenario.submit()
     first = scenario.worker("first", fake_delay_s="30")
     wait_for(lambda: len(scenario.attempts(entry.run_id)) == 1, timeout_s=30, what="attempt")
-    # Dispatch was already recorded, so only DBOS recovery can finish this run.
-    assert not scenario.store.pending_outbox()
+    # Dispatch must already be recorded, so only DBOS recovery can finish this run.
+    wait_for(lambda: not scenario.store.pending_outbox(), timeout_s=10, what="dispatch mark")
     first.kill()
     assert scenario.run(entry.run_id)["status"] == "queued"
     assert scenario.journal(entry.workflow_id)["status"][0]["status"] == "PENDING"
@@ -311,6 +322,44 @@ def test_provider_error_echoing_the_key_is_not_journalled(scenario: Scenario) ->
     assert scenario.leaks() == []
 
 
+def test_connection_errors_are_retried_then_fail_visibly(scenario: Scenario) -> None:
+    entry = scenario.submit()
+    worker = scenario.worker("worker", fake_failure=FakeFailure.CONNECTION_ERROR.value)
+    run = scenario.wait_terminal(entry.run_id)
+    worker.stop()
+
+    assert (run["status"], run["failure_class"]) == ("failed", "provider_unavailable")
+    outcomes = [a["outcome"] for a in scenario.attempts(entry.run_id)]
+    assert outcomes == ["transient_connection"] * ACTIVITY_MAX_ATTEMPTS
+    assert assert_identifier_only_journal(scenario, entry) == {
+        "status": "failed",
+        "failure_class": "provider_unavailable",
+    }
+    # The connection error's message echoed the key; it must not reach the journal or logs.
+    assert scenario.leaks() == []
+
+
+def test_unexpected_error_fails_typed_without_its_message(scenario: Scenario) -> None:
+    entry = scenario.submit()
+    worker = scenario.worker("worker", fake_failure=FakeFailure.UNEXPECTED_ERROR.value)
+    run = scenario.wait_terminal(entry.run_id)
+    worker.stop()
+
+    assert (run["status"], run["failure_class"]) == ("failed", "unknown_failure")
+    [attempt] = scenario.attempts(entry.run_id)
+    assert attempt["outcome"] == "unknown_failure:RuntimeError"
+    assert attempt["finished_at"] is not None
+    assert assert_identifier_only_journal(scenario, entry) == {
+        "status": "failed",
+        "failure_class": "unknown_failure",
+    }
+    journal = scenario.journal(entry.workflow_id)
+    assert journal["status"][0]["status"] == "SUCCESS"
+    assert [step["error"] for step in journal["steps"]] == [None, None]
+    # The RuntimeError quoted the key and the private input; only its class name may persist.
+    assert scenario.leaks() == []
+
+
 def test_revoked_credential_stops_before_any_model_call(scenario: Scenario) -> None:
     scenario.store.revoke_credential(scenario.credential_id)
     entry = scenario.submit()
@@ -327,7 +376,10 @@ def test_revoked_credential_stops_before_any_model_call(scenario: Scenario) -> N
 def test_negative_control_durability_capability_journals_private_output(
     scenario: Scenario,
 ) -> None:
-    run_id = scenario.submit().run_id
+    entry = scenario.submit()
+    # The probe processes this run itself; mark it so no later worker dispatches it again.
+    scenario.store.mark_dispatched(entry.outbox_id)
+    run_id = entry.run_id
     log = scenario.log_dir / "probe.log"
     scenario.logs.append(log)
     env = {
@@ -354,3 +406,41 @@ def test_negative_control_durability_capability_journals_private_output(
     assert ("dbos.operation_outputs", "private text") in {
         (f.location, f.needle_label) for f in findings
     }
+
+
+def test_live_check_ledgers_every_attempt_even_when_the_run_fails(
+    spike: SpikeStack, tmp_path: Path
+) -> None:
+    # Deliberately last: it leaves PENDING workflows behind for the session stack teardown.
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+    newest = "SELECT coalesce(max(outbox_id), 0) AS newest FROM outbox"
+    before = query(spike.app_url, newest)[0]["newest"]
+
+    with pytest.raises(TimeoutError):
+        run_live_check(
+            spike,
+            ledger,
+            api_key=SecretStr("sk-spike-" + secrets.token_hex(16)),
+            model_id="muse-spark-1.3-contributor",  # priced for the reservation; never contacted
+            production_model="muse-spark-1.3",
+            log_dir=tmp_path,
+            run_timeout_s=10,
+            worker_overrides={"activity_model": FAKE_MODEL_ID, "fake_delay_s": "60"},
+            markdown_path=tmp_path / "live-usage.md",
+        )
+
+    attempts = query(  # attempts of the runs this live check submitted
+        spike.app_url,
+        "SELECT a.attempt_id FROM activity_attempts a JOIN outbox o USING (run_id) "
+        "WHERE o.outbox_id > %s",
+        (before,),
+    )
+    assert attempts  # calls were in flight when the run failed
+    records = ledger.records()
+    assert {json.loads(r.notes)["activity_attempt"] for r in records} == {
+        a["attempt_id"] for a in attempts
+    }
+    paid = [r for r in records if r.reserved_nano_usd > 0]
+    assert paid
+    assert all(r.estimated_cost_nano_usd is None for r in paid)  # in flight: unknown, not zero
+    assert ledger.spent(BUDGET_SCOPE).committed_nano_usd == sum(r.reserved_nano_usd for r in paid)

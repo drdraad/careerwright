@@ -95,6 +95,10 @@ def start(master_key_file: Path) -> SpikeStack:
     )
 
 
+class WorkerShutdownTimeoutError(RuntimeError):
+    """A worker did not exit after SIGTERM within the allowed time (it has been killed)."""
+
+
 @dataclass
 class Worker:
     process: subprocess.Popen[bytes]
@@ -106,11 +110,22 @@ class Worker:
         self.process.wait(timeout=10)
         self._log.close()
 
-    def stop(self) -> int:
+    def stop(self, timeout_s: float = 30.0) -> int:
+        """SIGTERM and wait. A worker that does not exit in time is killed, never left running."""
         self.process.terminate()
-        code = self.process.wait(timeout=30)
+        try:
+            code = self.process.wait(timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            self.kill()
+            raise WorkerShutdownTimeoutError(
+                f"worker ignored SIGTERM for {timeout_s}s and was killed; see {self.log_path}"
+            ) from None
         self._log.close()
         return code
+
+    def kill_if_running(self) -> None:
+        if self.process.poll() is None:
+            self.kill()
 
     def wait_exit(self, timeout_s: float) -> int:
         code = self.process.wait(timeout=timeout_s)

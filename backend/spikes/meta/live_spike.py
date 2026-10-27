@@ -22,6 +22,7 @@ from pydantic_ai import Agent, NativeOutput, capture_run_messages
 from pydantic_ai.capabilities import NativeTool
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import ModelMessage, ModelResponse, NativeToolCallPart
+from pydantic_ai.models import Model
 from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
 from pydantic_ai.native_tools import WebSearchTool
 from pydantic_ai.providers.meta import MetaProvider
@@ -284,7 +285,7 @@ async def check_invalid_key(settings: MetaSettings) -> CallReport:
         Ledger(LEDGER_PATH),
         purpose="invalid key fails visibly",
         model_id=settings.test_model,
-        is_production=False,
+        is_production=settings.is_production_model(settings.test_model),
         endpoint=RESPONSES_ENDPOINT,
         worst_case_nano_usd=0,
         call=call,
@@ -323,20 +324,29 @@ async def check_model_listing(settings: MetaSettings) -> CallReport:
     )
 
 
-async def check_structured(
-    settings: MetaSettings, *, production: bool, stream: bool, search: bool
-) -> CallReport:
-    model_id = settings.production_model if production else settings.test_model
+def qualification_agent(model: Model, *, search: bool) -> Agent[None, BaseModel]:
+    """The agent every structured check uses: native JSON-schema output, no output retries,
+    bounded output tokens, and Meta's native web search only when asked."""
     limits = SEARCH_LIMITS if search else SCHEMA_LIMITS
     output_type: type[BaseModel] = SearchFindings if search else CareerSuggestion
-    raw_bodies: list[dict[str, object]] = []
-    agent: Agent[None, BaseModel] = Agent(
-        meta_model(model_id, settings.api_key.get_secret_value(), raw_bodies),
+    return Agent(
+        model,
         output_type=NativeOutput(output_type),
         instructions=INSTRUCTIONS,
         model_settings=model_settings(limits, effort="low" if search else "minimal"),
         capabilities=[NativeTool(WebSearchTool(search_context_size="low"))] if search else None,
         retries=0,
+    )
+
+
+async def check_structured(
+    settings: MetaSettings, *, production: bool, stream: bool, search: bool
+) -> CallReport:
+    model_id = settings.production_model if production else settings.test_model
+    limits = SEARCH_LIMITS if search else SCHEMA_LIMITS
+    raw_bodies: list[dict[str, object]] = []
+    agent = qualification_agent(
+        meta_model(model_id, settings.api_key.get_secret_value(), raw_bodies), search=search
     )
     prompt = SEARCH_PROMPT if search else SYNTHETIC_PROFILE_PROMPT
     usage_limits = UsageLimits(request_limit=1)
@@ -388,7 +398,9 @@ async def check_structured(
         Ledger(LEDGER_PATH),
         purpose=purpose,
         model_id=model_id,
-        is_production=production,
+        # Follows the model, not the flag: a test model configured as the production model
+        # still counts against the production-call cap.
+        is_production=settings.is_production_model(model_id),
         endpoint=RESPONSES_ENDPOINT,
         worst_case_nano_usd=worst_case,
         call=call,
@@ -425,9 +437,12 @@ def write_markdown(ledger: Ledger, path: Path = MARKDOWN_PATH) -> None:
         "  reported usage, in USD before tax. `unknown` means the charge could not be determined;\n"
         "  the budget then counts the call's full reservation.\n"
         "- `In` includes cached tokens; `Out` includes reasoning tokens (Meta usage semantics).\n"
-        "- `Searches` counts billed `search` actions. Meta returned no `tool_usage` count and\n"
-        "  does not document whether `open_page`/`find_in_page` actions are billed; each call's\n"
-        "  JSONL `notes` list every action, so an upper bound adds $0.0025 per extra action.\n"
+        "- `Searches` is Pydantic AI's billed count: Meta's `tool_usage` count if present, else\n"
+        "  `search` actions. Whether Meta reports `tool_usage` for search calls was not captured,\n"
+        "  and Meta does not document whether other actions (`open_page`, `find_in_page`) are\n"
+        "  billed. An upper bound adds $0.0025 per uncounted `web_search_call` item (calls 5\n"
+        "  and 7: one each; see the JSONL `notes`). Rows 3-5 predate raw-usage and action-type\n"
+        "  capture in the tool; their request path was otherwise the same.\n"
         "- Remaining credit: not exposed by any documented Meta API endpoint; check the\n"
         "  developer dashboard.\n"
         f"- Budget `{BUDGET_SCOPE}`: at most {POLICY.max_calls} calls, "

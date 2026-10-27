@@ -28,6 +28,10 @@ class MetaSettings(BaseSettings):
         default="muse-spark-1.3", validation_alias="NESSA_META_PRODUCTION_MODEL"
     )
 
+    def is_production_model(self, model_id: str) -> bool:
+        """Whether a call on `model_id` counts against the production-call cap."""
+        return model_id == self.production_model
+
     @field_validator("production_model")
     @classmethod
     def _production_model_is_standard_mode(cls, value: str) -> str:

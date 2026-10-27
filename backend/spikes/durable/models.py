@@ -12,7 +12,7 @@ from collections.abc import Callable
 from enum import StrEnum
 
 from pydantic import SecretStr
-from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.exceptions import ModelConnectionError, ModelHTTPError
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.models import Model
 from pydantic_ai.models.function import AgentInfo, FunctionModel
@@ -29,6 +29,8 @@ class FakeFailure(StrEnum):
     AUTH_ECHO = "auth_echo"
     RATE_LIMIT_ONCE = "rate_limit_once"
     ALWAYS_UNAVAILABLE = "always_unavailable"
+    CONNECTION_ERROR = "connection_error"
+    UNEXPECTED_ERROR = "unexpected_error"
 
 
 def _prompt_text(messages: list[ModelMessage]) -> str:
@@ -61,6 +63,13 @@ def fake_model_builder(*, delay_s: float = 0.0, failure: FakeFailure | None = No
                 body = {"code": "backend_unavailable", "message": f"Unavailable for {echoed}"}
                 raise ModelHTTPError(503, FAKE_MODEL_ID, body, provider_error_code="unavailable")
             quote = _prompt_text(messages).splitlines()[0]
+            if failure is FakeFailure.CONNECTION_ERROR:
+                raise ModelConnectionError(
+                    FAKE_MODEL_ID, f"reset talking as {echoed}", phase="read"
+                )
+            if failure is FakeFailure.UNEXPECTED_ERROR:
+                # A bug whose message quotes both the key and the private input.
+                raise RuntimeError(f"bug handling {echoed} with input {quote!r}")
             answer = json.dumps({"proposed_title": FAKE_TITLE, "evidence_quote": quote})
             return ModelResponse(parts=[TextPart(answer)], model_name=FAKE_MODEL_ID)
 

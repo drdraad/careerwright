@@ -95,7 +95,9 @@ def main() -> None:
     while not stop.is_set():
         dispatch_outbox(store, crash_point)
         stop.wait(DISPATCH_INTERVAL_S)
+    print("worker stopping", flush=True)
     DBOS.destroy()
+    print("worker stopped", flush=True)
 
 
 if __name__ == "__main__":
