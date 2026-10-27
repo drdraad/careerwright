@@ -8,9 +8,12 @@ free calls (ruling R5). Generated from `live-usage.jsonl` by
   reported usage, in USD before tax. `unknown` means the charge could not be determined;
   the budget then counts the call's full reservation.
 - `In` includes cached tokens; `Out` includes reasoning tokens (Meta usage semantics).
-- `Searches` counts billed `search` actions. Meta returned no `tool_usage` count and
-  does not document whether `open_page`/`find_in_page` actions are billed; each call's
-  JSONL `notes` list every action, so an upper bound adds $0.0025 per extra action.
+- `Searches` is Pydantic AI's billed count: Meta's `tool_usage` count if present, else
+  `search` actions. Whether Meta reports `tool_usage` for search calls was not captured,
+  and Meta does not document whether other actions (`open_page`, `find_in_page`) are
+  billed. An upper bound adds $0.0025 per uncounted `web_search_call` item (calls 5
+  and 7: one each; see the JSONL `notes`). Rows 3-5 predate raw-usage and action-type
+  capture in the tool; their request path was otherwise the same.
 - Remaining credit: not exposed by any documented Meta API endpoint; check the
   developer dashboard.
 - Budget `task-1-sprint-0`: at most 15 calls, 5 on the production model, $0.300000 worst-case committed spend.

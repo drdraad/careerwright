@@ -31,7 +31,10 @@
     `firebase-tools@15.34.1`: `{"authEmulator":{"ready":true,...}}`. `accounts:signUp`
     returns an ID token with header `{"alg": "none", "typ": "JWT"}`,
     `iss: https://securetoken.google.com/demo-nessa`, and an empty signature. The container
-    has no Java: `command -v java` finds nothing.
+    has no Java: `command -v java` finds nothing. The container was started with
+    `docker run -p 127.0.0.1:59099:9099`, so the emulator was reachable from host loopback
+    only. `firebase.json` binds `0.0.0.0` inside the container's network namespace so that
+    the published port reaches it. The Dockerfile records the loopback-only publish rule.
 - amd64 has registry manifests only and was not executed.
 
 ## S0.2 Meta model qualification (Pydantic AI native Meta provider)
@@ -46,10 +49,13 @@ Docs checked on 2026-10-27, before any call:
 `supports_json_schema_output=True`, `supports_forced_tool_choice=False` and
 `supported_native_tools={WebSearchTool}`.
 
-Request shape, verified offline with a mock transport before any billable call:
-`POST https://api.meta.ai/v1/responses` with `text.format` set to
+Request shape: `POST https://api.meta.ai/v1/responses` with `text.format` set to
 `{"type": "json_schema", "strict": true, ...}`, `reasoning.effort`, `max_output_tokens`,
 `tools: [{"type": "web_search", "search_context_size": "low"}]` and `tool_choice: "auto"`.
+Before any billable call, I checked this offline with an uncommitted mock-transport script.
+That check is now committed as `backend/spikes/meta/test_request_shape.py`. It drives the
+same qualification agent (`qualification_agent`) through Pydantic AI's Meta provider over an
+`httpx2.MockTransport` and asserts the body.
 
 Calls, in order (`uv run python -m spikes.meta.live_spike <check> [--production-model]`):
 
@@ -59,9 +65,14 @@ Calls, in order (`uv run python -m spikes.meta.live_spike <check> [--production-
 | 2 | `GET /v1/models` (free) | n/a | 9 models; both Spark 1.3 variants are listed (all `created: 0`) |
 | 3 | schema | test | `CareerSuggestion` validated; 157 in / 254 out (208 reasoning); $0.0000665 |
 | 4 | streaming schema | test | 5 partial validated outputs, first at 2.43 s, done at 2.81 s; usage reported on the stream |
-| 5 | search + schema | test | 2 `web_search_call` items; validated `SearchFindings` with `https://www.gov.uk/advanced-learner-loan`; 9,993 in (1,107 cached) / 737 out |
-| 6 | schema | **production** | validated; Meta raw `usage` `{input 157, cached 0, output 145, reasoning 89}` matches Pydantic AI exactly; `tool_usage` absent |
+| 5 | search + schema | test | 2 `web_search_call` items (action types not captured); Pydantic AI counted 1 billed search; validated `SearchFindings` with `https://www.gov.uk/advanced-learner-loan`; 9,993 in (1,107 cached) / 737 out |
+| 6 | schema | **production** | validated; Meta raw `usage` `{input 157, cached 0, output 145, reasoning 89}` matches Pydantic AI exactly; `tool_usage` absent from this one captured raw body (not a search call) |
 | 7 | streaming + search + schema | **production** | 4 partial outputs; actions `search` and `open_page`; validated, same GOV.UK URL; 9,434 in / 482 out |
+
+Rows 3–5 came from an earlier revision of `live_spike.py`. Raw-usage capture and
+action-type recording were added after call 5, so for those rows the raw `usage` and
+`tool_usage` fields and the search action types were not captured. The agent, model
+settings and provider path were otherwise the same.
 
 Hand checks of the cost formula:
 - Call 3: 157 × $0.10/M + 254 × $0.20/M = $0.0000665.
@@ -86,7 +97,7 @@ Composition and rationale: `docs/adr/0002-durable-execution.md`. Code is under
 `backend/spikes/durable/`. Command (from `backend/`):
 
 ```text
-$ uv run pytest -m integration spikes/durable -v -s
+$ uv run pytest -m integration spikes/durable -v -s      # final tree after fix round 1
 test_worker_killed_mid_activity_recovers_to_one_accepted_output PASSED
 test_worker_killed_after_output_persisted_keeps_first_accepted_output PASSED
 test_outbox_replay_after_dispatch_crash_starts_one_workflow PASSED
@@ -94,11 +105,18 @@ test_replaying_a_completed_outbox_entry_has_no_effect PASSED
 test_transient_provider_error_is_retried_by_the_dbos_step_only PASSED
 test_exhausted_retries_fail_visibly_not_as_empty_success PASSED
 test_provider_error_echoing_the_key_is_not_journalled PASSED
+test_connection_errors_are_retried_then_fail_visibly PASSED
+test_unexpected_error_fails_typed_without_its_message PASSED
 test_revoked_credential_stops_before_any_model_call PASSED
 test_negative_control_durability_capability_journals_private_output
-  capability probe findings: [('dbos.operation_outputs', 'private text')]  PASSED
-9 passed, 14 deselected in 18.89s
+  capability probe findings: [('dbos.operation_outputs', 'private text'),
+                              ('dbos.operation_outputs', 'private text window')]  PASSED
+test_live_check_ledgers_every_attempt_even_when_the_run_fails PASSED
+12 passed, 32 deselected in 31.79s
 ```
+
+Across 19 full-suite runs in total, one failed intermittently; see "Blocked, not run, or
+limited". The 10 runs after the final code change all passed.
 
 What these establish:
 
@@ -112,9 +130,25 @@ What these establish:
 - **Outbox replay.** The worker is SIGKILLed after `start_workflow` but before marking the
   outbox entry. After restart there is one workflow for the run, one output, and the entry
   is marked. Re-delivering a completed entry changes nothing.
-- **Fail-visible paths.** HTTP 429 once: the DBOS step retries and the run succeeds. HTTP 503
-  every time: 3 attempts, then `failed/provider_unavailable` with no output. Revoked
-  credential: `failed/credential_unavailable` with no model call.
+- **Fail-visible paths.**
+  - HTTP 429 once: the DBOS step retries and the run succeeds.
+  - HTTP 503 every time: 3 attempts, then `failed/provider_unavailable` with no output.
+  - Connection error every time: 3 `transient_connection` attempts, then
+    `failed/provider_unavailable`.
+  - Unexpected `RuntimeError`: `failed/unknown_failure`. The attempt row holds
+    `unknown_failure:RuntimeError`, and no step error is journalled.
+  - Revoked credential: `failed/credential_unavailable` with no model call.
+
+  Against the pre-fix activity, the connection-error and unexpected-error scenarios both
+  timed out with the run stuck in `queued` (`TimeoutError: timed out after 60.0s waiting for
+  run`). That reproduces review finding I1; the fix makes them pass.
+- **Live calls are ledgered even when the durable live run fails.**
+  `test_live_check_ledgers_every_attempt_even_when_the_run_fails` drives the live-check
+  orchestration (`run_live_check`) with the fake model and a 10 s timeout while calls are in
+  flight. Every activity attempt still reaches the ledger, with unknown cost and its
+  reservation committed. Mutation check: when ledgering ran only on the success path, the
+  test failed (`set() == {1, 2}`). If the attempt rows cannot be read at all,
+  `test_live_ledger.py` shows the worst case being ledgered instead.
 
 Persisted workflow arguments and results, from the live run with the real key
 (`uv run python -m spikes.durable.live_run`, first run, ledger calls 8–9):
@@ -139,8 +173,8 @@ quote exists only sealed in the application database.
 - **Detector.** `spikes/durable/leak_scan.py` (unit-tested) reads every row of every user
   table in the DBOS and application databases (`row_to_json`) and every worker log. It
   searches the plain text, base64 (which catches pickled values) and Postgres bytea hex. The
-  credential needle matches any 12-character fragment; the private text needle matches a
-  per-test sentinel.
+  credential needle matches any 12-character fragment. The private-text needles match the
+  per-test sentinels and any 24-character window of the private text.
 - **Negative control.** Pydantic AI's `DBOSDurability` inside a workflow puts the private
   model output into `dbos.operation_outputs`, and the scan finds it. So a clean scan means
   something. The prompt-only sentinel (never echoed by the model) and the credential were
@@ -151,9 +185,14 @@ quote exists only sealed in the application database.
   DBOS's retry warning had logged the chained provider exception. I restored the line and
   the test passes.
 - **Live run with the real key**, ledger calls 10–11:
-  `leak scan: 24 rows/logs scanned, findings: []`, with needles for the real Meta key
-  (12-character fragments), the invalid key and the private text. That is 23 rows across the
-  two databases plus the worker log.
+  `leak scan: 24 rows/logs scanned, findings: []` across 23 rows in the two databases plus
+  the worker log. The needles were the real Meta key (12-character fragments), the invalid
+  key (12-character fragments) and the private-text **sentinel**. The real output did not
+  contain the sentinel, and that run did not scan for the opened output strings or for
+  windows of the private text. So it shows that neither key leaked and the sentinel did not
+  leak; it does not show that no private text leaked. The current `live_run.py` adds both
+  needles (opened output strings and 24-character private-text windows), but it has **not
+  been re-run live**. The integration suite does use the window needle, with the fake model.
 - **First live run, a false positive (calls 8–9).** That scan reported 4 fragment findings,
   all for the *invalid* key. They were in `dbos.workflow_status`, in
   `dbos.application_versions` and in the worker log. Cause: the invalid key began with the
@@ -163,13 +202,18 @@ quote exists only sealed in the application database.
   `"nessa-spike-1"` against that needle gives one finding; a prefix-free needle gives none).
   I changed the invalid key to a prefix-free random token and reran, which produced calls
   10–11 and the clean scan above. Neither run had any finding for the real key or the
-  private text.
+  private-text sentinel.
 
 ## Live usage (R5)
 
 - 11 calls, 2 of them on the production model, against caps of 15 and 5.
-- Estimated $0.019677 before tax. Calls 5 and 7 each made one `open_page` action, and Meta
-  does not document whether those are billed. The upper bound is therefore $0.024677.
+- Estimated $0.019677 before tax.
+- Calls 5 and 7 each had one `web_search_call` item that Pydantic AI did not count as a
+  billed search. In call 7 it was an `open_page` action; call 5's action types were not
+  captured. Whether Meta reports a `tool_usage` count on search calls was not captured
+  either. Meta does not document whether such actions are billed, so the upper bound is
+  $0.024677.
+- No live calls were made in fix round 1.
 - Remaining credit is not exposed by a documented API.
 - Full table: `docs/evidence/live-usage.md`; machine ledger: `docs/evidence/live-usage.jsonl`.
 
@@ -181,8 +225,38 @@ quote exists only sealed in the application database.
   were not exercised. Owners are listed in ADR 0002 and `docs/dependencies.md`.
 - Refusal, truncation and timeout contract tests for the Meta adapter: Sprint 2 (spec
   section 16).
-- `spikes/durable/live_run.py` changed after the live runs: `stack.start` moved inside the
-  cleanup `try`. The run path is otherwise unchanged. I did not rerun it, to save live calls.
+- `spikes/durable/live_run.py` changed after its live runs, and the changed version has
+  **not been re-run live**:
+  - `stack.start` moved inside the cleanup `try`;
+  - in fix round 1, the orchestration moved into `run_live_check`, which ledgers every
+    attempt in `finally`;
+  - the production cap now follows the model ID;
+  - the output-string and private-text-window needles were added.
+
+  The new orchestration is exercised offline by the integration suite, with the fake model.
+- The activity in `workflow.py` was rewritten in fix round 1 (the I1 error boundary). The
+  live calls 8–11 ran the earlier version. Its success and 401 paths behave the same, and
+  the fake-model suite covers the new branches.
+- **Intermittent worker shutdown hang.** One of 19 full-suite runs (the 9th) failed
+  `test_worker_killed_mid_activity_recovers_to_one_accepted_output` at the end. The
+  restarted worker had already completed the recovered run, and the accepted output was
+  correct. But it did not exit within 30 s of SIGTERM, and it logged nothing after
+  `worker ready`. Two readings fit:
+  - `DBOS.destroy()` blocks before its join loop. Its `_cleanup_connections()` closes the
+    notification listener's connection under DBOS's lock, while that listener is blocked
+    in a timeout-free `notifies()`.
+  - The main loop never reached `destroy()`.
+
+  The cause was not determined. It did not recur in 6 isolated repetitions of the scenario
+  or in 10 full-suite repetitions. On that run the harness left the worker running (killed by hand
+  afterwards). Fix round 1 changed this:
+  - `Worker.stop()` now kills on timeout and raises `WorkerShutdownTimeoutError`;
+  - every test kills its workers at teardown;
+  - the worker logs `worker stopping` and `worker stopped` around `DBOS.destroy()`, so a
+    recurrence shows which side hangs.
+
+  For L0, `make stop` must bound shutdown and fall back to SIGKILL (DBOS recovery covers
+  in-flight work). Owner: Task 3.
 - Human decision outstanding: Contributor mode for the test model (ADR 0003, R6).
 
 ## Reproduce

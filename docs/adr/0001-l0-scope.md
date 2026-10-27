@@ -24,7 +24,7 @@ adaptations and no others:
 |---|---|---|
 | Geography | England, en-GB, GBP; up to three cities and three active targets | Unchanged. Country-neutral identifiers and explicit unsupported-region states remain. |
 | Product journey | Sure/unsure entry through a printable plan | All six chapters (You, Roles, Skills, Options, Routes, Plan), including apply-now, conditional and unavailable outcomes. |
-| Planning model | 24 action concepts, two starts each, six selected actions, 24 months, one conditional bridge role | Unchanged. |
+| Planning model | Up to 24 reviewed action concepts, at most two explicit starts per action, six selected actions and 24 months; at most one conditional bridge-role transition | At most 24 action concepts, two reviewed starts per concept, six selected actions, 24 months and one conditional bridge-role transition. |
 | Hosted infrastructure | Cloud Run, GCE worker, Cloud SQL, Cloud Storage | Local processes under Docker Compose, PostgreSQL 16 and private local storage. No deployment, domain, public URL or Terraform work. |
 | Authentication | Firebase Authentication with Google sign-in and a verified invitation allowlist | Firebase Auth **emulator** with a `demo-` project and seeded identities. Invitation and ownership checks stay. Real Google OAuth qualification is deferred. |
 | Secrets | Versioned runtime key in GCP Secret Manager; AES-GCM credential records | Local runtime master key outside the repository and database; authenticated encryption for saved user keys. No Secret Manager or KMS. |

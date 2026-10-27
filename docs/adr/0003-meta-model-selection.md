@@ -37,6 +37,15 @@ Web search costs $2.50 per 1,000 queries on top of tokens. All Muse text models 
 1,048,576-token context. Meta's model page states no maximum output tokens or deprecation
 dates.
 
+The other models the key lists, from the same pricing page and https://dev.meta.ai/docs/models
+(both checked 2026-10-27). None of them was called, so access is listed, not proven:
+
+| Model | Input → output; capability | Published price | Published limits | Restrictions / not published |
+|---|---|---|---|---|
+| `muse-image-1.0` | text, image → image; generation and editing, with web search and code execution before rendering; Responses API, `/v1/images/generations`, `/v1/images/edits` | $0.01 per generated image, search included; failed or safety-removed images are not billed | 150 RPM | context and output limits not published; image generation is M1 per spec |
+| `muse-voice-transcribe-1.0` | audio → text transcript; streaming diarization, endpointing, VAD, keyword biasing, 25 evaluated languages, turn-level timestamps; `wss://api.meta.ai/v1/asr/realtime`, `POST /v1/asr/transcribe` | $0.18 per hour of audio, metered in whole seconds rounded down; streaming costs the same | 256 concurrent streams and 16,000 streams per hour, shared; no RPM/TPM | no word-level timestamps, sound events or emotion detection; not in L0 scope |
+| `sam-3.1` | text prompt, image, video → boxes and masks; `POST /v1/responses`, Files API for repeated clips | $2.50 per 1,000 images; $0.20 per 1,000 video frames, minimum 50 frames per video request | 3,000 RPM; no TPM | context limits not published; not in L0 scope |
+
 ## Decision
 
 - **Production model: `muse-spark-1.3` (Standard).** Qualified with two live calls. Call 6:
@@ -62,9 +71,17 @@ dates.
   - Smoke and qualification calls use `openai_reasoning_effort='minimal'`, or `'low'` with
     search, plus an explicit `max_tokens`.
 - **Cost discipline.** Live calls run only through explicit commands, never in `make check`
-  or `make acceptance`. A hard cap is checked before every call: call count, production-model
-  calls, and worst-case cost in integer nano-USD. Every call, free or failed, is appended to
-  `docs/evidence/live-usage.jsonl`.
+  or `make acceptance`. The hard cap covers call count, production-model calls, and
+  worst-case cost in integer nano-USD. A direct call (`live_spike.py`) is checked against the
+  cap just before it is sent. The durable worker's calls (`live_run.py`) cannot be checked
+  one by one from the CLI. They are pre-authorised as a batch before the worker starts: the
+  worst case of every allowed attempt, plus the free invalid-key call. A call counts as a
+  production call when its model ID is the configured production model, whatever flag
+  selected it. So setting the test model to `muse-spark-1.3` still counts against the
+  production cap. Every call, free or failed, is appended to
+  `docs/evidence/live-usage.jsonl`. That includes worker attempts interrupted by a failure:
+  they are written before the spike stack is removed, and the worst case is written if the
+  attempt rows cannot be read.
 
 ## Observed behaviour and restrictions
 
@@ -74,10 +91,17 @@ dates.
 - Usage arrives on both non-streamed and streamed responses: `input_tokens` (cached
   included), `cached_tokens`, `output_tokens` and `reasoning_tokens` (counted within output).
   Pydantic AI's mapping matched Meta's raw `usage` object exactly (call 6).
-- Each search call produced one `search` and one `open_page` action. Meta returned no
-  `tool_usage` count. Pydantic AI counts only `search` actions as billed, which is OpenAI's
-  semantics. Meta does not document whether `open_page` is billed, so the task's cost upper
-  bound adds $0.0025 per `open_page` action.
+- Search actions:
+  - Call 7 (streamed) made one `search` and one `open_page` action.
+  - Call 5 made two `web_search_call` items; their action types were not captured, because
+    that call predates action recording. Pydantic AI counted one of them as a billed search.
+  - Whether Meta reports a search count (`tool_usage`) is **unknown**. The only raw body
+    captured was call 6, a non-search call, where it was absent. Raw bodies of the search
+    calls were not captured: call 5 predates raw capture and call 7 was streamed.
+  - Pydantic AI counts as billed either Meta's `tool_usage` count, when present, or the
+    `search` actions (OpenAI's semantics). Meta does not document whether other actions are
+    billed, so the task's cost upper bound adds $0.0025 for each uncounted
+    `web_search_call` item (one in call 5 and one in call 7).
 - Remaining credit is not exposed by any documented API endpoint. It is visible only in the
   developer dashboard.
 - Search results are injected as input tokens: about 9,400–10,000 per search call against
@@ -87,7 +111,8 @@ dates.
 
 - The product owner must confirm, or reject, Contributor mode for synthetic-data testing.
   If rejected, set `NESSA_META_TEST_MODEL=muse-spark-1.3` (Standard, about 12–21× the cost).
-  Nothing else changes.
+  Every test call then counts against the production-call cap, because the cap follows the
+  model ID. Budgets for later tasks must allow for that. Nothing else changes.
 - Qualification covers only the tested versions and scope: Spark 1.3, Pydantic AI 2.62.0,
   `NativeOutput`, and the `low` search context. Refusal, truncation and timeout contract
   tests (spec section 16) remain for the Sprint 2 interview adapter.
