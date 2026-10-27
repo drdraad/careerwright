@@ -1,0 +1,30 @@
+# Live Meta usage log
+
+Every HTTP call to the Meta Model API made by Nessa tooling, including failures and
+free calls (ruling R5). Generated from `live-usage.jsonl` by
+`backend/spikes/meta/live_spike.py`; do not edit the table by hand.
+
+- Prices: https://dev.meta.ai/docs/pricing-rate-limits (checked 2026-10-27); costs are estimates from
+  reported usage, in USD before tax. `unknown` means the charge could not be determined;
+  the budget then counts the call's full reservation.
+- `In` includes cached tokens; `Out` includes reasoning tokens (Meta usage semantics).
+- `Searches` counts billed `search` actions. Meta returned no `tool_usage` count and
+  does not document whether `open_page`/`find_in_page` actions are billed; each call's
+  JSONL `notes` list every action, so an upper bound adds $0.0025 per extra action.
+- Remaining credit: not exposed by any documented Meta API endpoint; check the
+  developer dashboard.
+- Budget `task-1-sprint-0`: at most 15 calls, 5 on the production model, $0.300000 worst-case committed spend.
+
+| # | UTC time | Scope | Purpose | Model | Endpoint | Outcome | In (cached) | Out (reasoning) | Searches | Est. cost | Running total | Response ID |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 2026-10-27 22:18:51 | task-1-sprint-0 | invalid key fails visibly | `muse-spark-1.3-contributor` | POST /v1/responses | failed (401 invalid_api_key) | - (-) | - (-) | - | $0.000000 | $0.000000 | - |
+| 2 | 2026-10-27 22:19:06 | task-1-sprint-0 | list entitled models | `(none)` | GET /v1/models | ok | - (-) | - (-) | - | $0.000000 | $0.000000 | - |
+| 3 | 2026-10-27 22:19:23 | task-1-sprint-0 | schema output | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 157 (0) | 254 (208) | 0 | $0.000067 | $0.000067 | resp_6ae1236785b9eea8d283407f |
+| 4 | 2026-10-27 22:19:32 | task-1-sprint-0 | schema output + streaming | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 157 (0) | 194 (137) | 0 | $0.000055 | $0.000121 | resp_6ae1236ef16e9f605f1a45f1 |
+| 5 | 2026-10-27 22:19:47 | task-1-sprint-0 | schema output + web search | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 9,993 (1,107) | 737 (488) | 1 | $0.003538 | $0.003659 | resp_6ae123773c50371abe684266 |
+| 6 | 2026-10-27 22:21:31 | task-1-sprint-0 | schema output | `muse-spark-1.3` (production) | POST /v1/responses | ok | 157 (0) | 145 (89) | 0 | $0.000813 | $0.004472 | resp_6ae123e7859dcc32766745d5 |
+| 7 | 2026-10-27 22:21:48 | task-1-sprint-0 | schema output + streaming + web search | `muse-spark-1.3` (production) | POST /v1/responses | ok | 9,434 (1,107) | 482 (250) | 1 | $0.015123 | $0.019595 | resp_6ae123f50b40ed475967493f |
+| 8 | 2026-10-27 22:34:15 | task-1-sprint-0 | schema output inside DBOS activity (key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 131 (0) | 158 (124) | 0 | $0.000045 | $0.019640 | resp_6ae126e3b80ecd1fcda54d10 |
+| 9 | 2026-10-27 22:34:15 | task-1-sprint-0 | invalid key inside DBOS activity | `muse-spark-1.3-contributor` | POST /v1/responses | failed (401 provider_authentication) | - (-) | - (-) | - | $0.000000 | $0.019640 | - |
+| 10 | 2026-10-27 22:34:58 | task-1-sprint-0 | schema output inside DBOS activity (key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 133 (0) | 120 (83) | 0 | $0.000037 | $0.019677 | resp_6ae1270e13a2fda9d2124b7d |
+| 11 | 2026-10-27 22:34:58 | task-1-sprint-0 | invalid key inside DBOS activity | `muse-spark-1.3-contributor` | POST /v1/responses | failed (401 provider_authentication) | - (-) | - (-) | - | $0.000000 | $0.019677 | - |
