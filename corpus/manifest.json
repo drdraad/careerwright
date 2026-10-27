@@ -1,0 +1,145 @@
+{
+  "schema_version": "1.2",
+  "manifest_version": "0.1.0",
+  "updated": "2026-10-27",
+  "derived_from": {
+    "path": "fixtures/m0/source_corpus_manifest.json",
+    "sha256": "d6d5f68dbdaf46b65fd75e7df432413fb6415a7bdf3fa1a07c024f08033c5988"
+  },
+  "status": "required_corpus_not_collected",
+  "synthetic_personas_are_not_a_substitute_for_source_extraction_tests": true,
+  "policy": {
+    "rulings": ["R3 real source corpus", "R2 human-only gates", "R4 Adzuna"],
+    "public_pages_only": "Fetch only publicly accessible pages. Respect robots.txt and site terms. Nothing behind a sign-in, paywall or access control.",
+    "git_holds": "this manifest: URL, retrieval date, SHA-256 of the retained body, labelled spans as minimal excerpts, missingness, rights status",
+    "private_body_directory": "var/evidence/corpus/ (gitignored through /var/). Proposed here; Task 3 confirms the path in the runbook.",
+    "default_rights_status": "pending human rights review",
+    "rights_status_values": [
+      "pending human rights review",
+      "permitted: <licence or terms, quoted and dated>",
+      "reference only: retain minimal excerpts and hash, not the body",
+      "refused: do not retain"
+    ],
+    "counts": "Failure-only attempts (attempt_cases) do not count toward the 20/10/3 page minimums.",
+    "holdout_split": "Assign tuning or holdout by source/template family before any prompt or parser tuning, so near-duplicate pages never appear in both (plan section 9)."
+  },
+  "required_samples": {
+    "full_job_postings": 20,
+    "course_pages": 10,
+    "funding_pages": 3
+  },
+  "collected_samples": {
+    "full_job_postings": 0,
+    "course_pages": 0,
+    "funding_pages": 0
+  },
+  "required_labels": [
+    "source_permission",
+    "retrieved_at",
+    "source_hash",
+    "field_spans",
+    "expected_values",
+    "expected_unknowns",
+    "expected_failure_states",
+    "rights_status",
+    "missingness",
+    "template_family",
+    "split"
+  ],
+  "required_case_types": [
+    "duplicate_syndication",
+    "salary_predicted",
+    "salary_missing",
+    "closed_job",
+    "ambiguous_occupation_crosswalk",
+    "syllabus_mentions_without_assessment",
+    "tuition_vs_monthly_payment",
+    "deferred_grant",
+    "dead_url",
+    "prompt_injection",
+    "blocked_fetch",
+    "changed_dom"
+  ],
+  "additional_case_types_from_spec_and_plan": [
+    "snippet_only",
+    "agency_not_employer",
+    "multi_location_counted_once",
+    "misleading_course_title",
+    "teaching_without_assessment",
+    "missing_fee",
+    "conditional_grant",
+    "loan_not_grant"
+  ],
+  "slot_template": {
+    "url": null,
+    "retrieved_at": null,
+    "http_status": null,
+    "content_type": null,
+    "sha256": null,
+    "rights_status": "pending human rights review",
+    "robots_and_terms_checked_at": null,
+    "template_family": null,
+    "split": "unassigned",
+    "labels": null,
+    "missingness": null,
+    "label_review": "not run - requires human domain reviewer"
+  },
+  "slots": [
+    {"id": "J01", "class": "full_job_posting", "status": "not_collected", "intended_case_types": ["duplicate_syndication"], "note": "Same vacancy as J02 on a different source; keeps both source copies, counts once.", "owner": "Task 8 (Sprint 3)"},
+    {"id": "J02", "class": "full_job_posting", "status": "not_collected", "intended_case_types": ["duplicate_syndication"], "note": "Syndicated copy of J01.", "owner": "Task 8 (Sprint 3)"},
+    {"id": "J03", "class": "full_job_posting", "status": "not_collected", "intended_case_types": ["salary_predicted"], "note": "Needs a permitted public page that shows provider-predicted pay. Adzuna has no credentials (R4); if no such page exists, record this slot as blocked, never synthesise it.", "owner": "Task 8 (Sprint 3)"},
+    {"id": "J04", "class": "full_job_posting", "status": "not_collected", "intended_case_types": ["salary_missing"], "owner": "Task 8 (Sprint 3)"},
+    {"id": "J05", "class": "full_job_posting", "status": "not_collected", "intended_case_types": ["closed_job"], "note": "A posting observed open and later closed, or marked closed on the page.", "owner": "Task 8 (Sprint 3)"},
+    {"id": "J06", "class": "full_job_posting", "status": "not_collected", "intended_case_types": ["ambiguous_occupation_crosswalk"], "note": "Title that maps to more than one UK SOC 2020 unit group; unresolved alternatives retained.", "owner": "Task 8 (Sprint 3)"},
+    {"id": "J07", "class": "full_job_posting", "status": "not_collected", "intended_case_types": ["snippet_only"], "note": "Snippet and full text of the same posting; the snippet never becomes a full description.", "owner": "Task 8 (Sprint 3)"},
+    {"id": "J08", "class": "full_job_posting", "status": "not_collected", "intended_case_types": ["agency_not_employer"], "note": "Staffing agency advert; an undisclosed employer stays undisclosed.", "owner": "Task 8 (Sprint 3)"},
+    {"id": "J09", "class": "full_job_posting", "status": "not_collected", "intended_case_types": ["multi_location_counted_once"], "owner": "Task 8 (Sprint 3)"},
+    {"id": "J10", "class": "full_job_posting", "status": "not_collected", "intended_case_types": ["changed_dom"], "note": "Needs two retrievals of one template (or source) with a markup change; the second capture may fall in Sprint 5.", "owner": "Task 8 (Sprint 3); second capture Task 12 (Sprint 5)"},
+    {"id": "J11", "class": "full_job_posting", "status": "not_collected", "intended_case_types": ["prompt_injection"], "note": "A real public posting with model-directed instructions, if one is permitted. Otherwise record the real-corpus gap and cover the case with a labelled synthetic page on the controlled test server.", "owner": "Task 8 (Sprint 3)"},
+    {"id": "J12", "class": "full_job_posting", "status": "not_collected", "intended_case_types": [], "note": "Ordinary full posting with JSON-LD JobPosting.", "owner": "Task 8 (Sprint 3)"},
+    {"id": "J13", "class": "full_job_posting", "status": "not_collected", "intended_case_types": [], "note": "Ordinary full posting, HTML only (no structured data).", "owner": "Task 8 (Sprint 3)"},
+    {"id": "J14", "class": "full_job_posting", "status": "not_collected", "intended_case_types": [], "owner": "Task 8 (Sprint 3)"},
+    {"id": "J15", "class": "full_job_posting", "status": "not_collected", "intended_case_types": [], "owner": "Task 8 (Sprint 3)"},
+    {"id": "J16", "class": "full_job_posting", "status": "not_collected", "intended_case_types": [], "owner": "Task 8 (Sprint 3)"},
+    {"id": "J17", "class": "full_job_posting", "status": "not_collected", "intended_case_types": [], "owner": "Task 8 (Sprint 3)"},
+    {"id": "J18", "class": "full_job_posting", "status": "not_collected", "intended_case_types": [], "owner": "Task 8 (Sprint 3)"},
+    {"id": "J19", "class": "full_job_posting", "status": "not_collected", "intended_case_types": [], "owner": "Task 8 (Sprint 3)"},
+    {"id": "J20", "class": "full_job_posting", "status": "not_collected", "intended_case_types": [], "owner": "Task 8 (Sprint 3)"},
+    {"id": "C01", "class": "course_page", "status": "not_collected", "intended_case_types": ["syllabus_mentions_without_assessment"], "owner": "Task 10 (Sprint 4)"},
+    {"id": "C02", "class": "course_page", "status": "not_collected", "intended_case_types": ["teaching_without_assessment"], "owner": "Task 10 (Sprint 4)"},
+    {"id": "C03", "class": "course_page", "status": "not_collected", "intended_case_types": ["misleading_course_title"], "owner": "Task 10 (Sprint 4)"},
+    {"id": "C04", "class": "course_page", "status": "not_collected", "intended_case_types": ["tuition_vs_monthly_payment"], "note": "Total fee versus instalment or upfront schedule.", "owner": "Task 10 (Sprint 4)"},
+    {"id": "C05", "class": "course_page", "status": "not_collected", "intended_case_types": ["missing_fee"], "owner": "Task 10 (Sprint 4)"},
+    {"id": "C06", "class": "course_page", "status": "not_collected", "intended_case_types": [], "note": "Assessed work sample or exam that supports a level anchor.", "owner": "Task 10 (Sprint 4)"},
+    {"id": "C07", "class": "course_page", "status": "not_collected", "intended_case_types": [], "note": "Dated intakes and an application deadline.", "owner": "Task 10 (Sprint 4)"},
+    {"id": "C08", "class": "course_page", "status": "not_collected", "intended_case_types": [], "note": "Credential with an issuing or recognising body.", "owner": "Task 10 (Sprint 4)"},
+    {"id": "C09", "class": "course_page", "status": "not_collected", "intended_case_types": [], "note": "Apprenticeship or other composite work-and-learning offer.", "owner": "Task 10 (Sprint 4)"},
+    {"id": "C10", "class": "course_page", "status": "not_collected", "intended_case_types": [], "owner": "Task 10 (Sprint 4)"},
+    {"id": "F01", "class": "funding_page", "status": "not_collected", "intended_case_types": ["conditional_grant"], "discovery_source": "https://www.gov.uk/guidance/free-courses-for-jobs", "programme": "Free courses for jobs", "owner": "Task 12 (Sprint 5)"},
+    {"id": "F02", "class": "funding_page", "status": "not_collected", "intended_case_types": ["loan_not_grant"], "discovery_source": "https://www.gov.uk/advanced-learner-loan/eligibility", "programme": "Advanced Learner Loan", "owner": "Task 12 (Sprint 5)"},
+    {"id": "F03", "class": "funding_page", "status": "not_collected", "intended_case_types": ["deferred_grant"], "discovery_source": "https://nationalcareers.service.gov.uk/careers-advice/accessing-free-training-and-courses", "programme": "Skills Bootcamps", "note": "Capture an actual current Skills Bootcamps programme or eligibility page found through the discovery source, not the discovery page itself (pack funding_note).", "owner": "Task 12 (Sprint 5)"}
+  ],
+  "attempt_cases": [
+    {"id": "X01", "case_type": "dead_url", "status": "not_collected", "note": "A real URL that returns 404 or 410; recorded as a SourceAttempt, never as 'no vacancies'.", "owner": "Task 7 (Sprint 3)"},
+    {"id": "X02", "case_type": "blocked_fetch", "status": "not_collected", "note": "A fetch refused by robots policy, source policy or access control; recorded as a policy-denied SourceAttempt, never bypassed.", "owner": "Task 7 (Sprint 3)"}
+  ],
+  "funding_discovery_sources": [
+    {"programme": "Free courses for jobs", "url": "https://www.gov.uk/guidance/free-courses-for-jobs"},
+    {"programme": "Advanced Learner Loan", "url": "https://www.gov.uk/advanced-learner-loan/eligibility"},
+    {"programme": "Skills Bootcamps discovery", "url": "https://nationalcareers.service.gov.uk/careers-advice/accessing-free-training-and-courses"}
+  ],
+  "funding_note": "Capture an actual current Skills Bootcamps programme/eligibility page found through the official discovery source. Funding must be checked by course start date/provider; the three-page minimum is not a complete funding-rule corpus.",
+  "open_items": [
+    {"id": "OI-01", "item": "20 full job postings not collected", "owner": "Task 8 (Sprint 3), using the Task 7 acquisition pipeline", "disposition": "Curate under R3 in slots J01-J20. Prefer employer ATS and authorised board pages. No sign-in walls. LinkedIn and Indeed are excluded unless an integration permits them."},
+    {"id": "OI-02", "item": "10 course pages not collected", "owner": "Task 10 (Sprint 4)", "disposition": "Curate under R3 in slots C01-C10, including misleading titles and teaching without assessment (plan Sprint 4)."},
+    {"id": "OI-03", "item": "3 funding pages not collected", "owner": "Task 12 (Sprint 5)", "disposition": "Fetch from the three official discovery sources; F03 must be a real Skills Bootcamps programme page."},
+    {"id": "OI-04", "item": "Real provider-predicted salary case (J03)", "owner": "Task 8 (Sprint 3)", "disposition": "Adzuna has no credentials (R4). Use a permitted public page that labels pay as predicted if one exists; otherwise record J03 as blocked. The Adzuna adapter's predicted-pay contract is covered by its fixture contract, labelled synthetic."},
+    {"id": "OI-05", "item": "Real prompt-injection page (J11)", "owner": "Task 8 (Sprint 3)", "disposition": "Search for a permitted real example. If none, cover the case with a labelled synthetic page on the controlled test server and report the real-corpus gap; never present the synthetic page as real evidence."},
+    {"id": "OI-06", "item": "DOM drift needs two captures over time (J10)", "owner": "Task 8 (Sprint 3); Task 12 (Sprint 5)", "disposition": "Capture in Sprint 3, recapture in Sprint 5. If the markup has not changed, use a second page of the same template family that differs, or record the case as not yet observed."},
+    {"id": "OI-07", "item": "Rights review of every retained page", "owner": "Human: product owner or delegated rights reviewer", "disposition": "Not run - requires human (R2). Until reviewed, every slot stays 'pending human rights review'. Checklist: corpus/README.md."},
+    {"id": "OI-08", "item": "Review of consequential labels (salary basis, fees, deadlines, award status, outcome levels)", "owner": "Human: domain reviewer", "disposition": "Not run - requires human (R2). Agents label and record spans; any unsupported consequential outcome blocks the affected route (plan Sprint 4)."},
+    {"id": "OI-09", "item": "Tuning/holdout split by template family", "owner": "Task 7 (Sprint 3), before the first extraction tuning", "disposition": "Assign split per template family; record it in each slot; never move a case after tuning has used it."},
+    {"id": "OI-10", "item": "Private evidence directory path, backup and deletion", "owner": "Task 3 (Sprint 1) path and runbook; Task 16 (Sprint 9) backup and restore", "disposition": "Proposed var/evidence/corpus/ (gitignored). Corpus bodies are excluded from git and from database dumps unless the runbook says otherwise."},
+    {"id": "OI-11", "item": "Source permission manifest (spec section 6: permitted domains, robots and access decisions, rate limits, retained fields, attribution)", "owner": "Task 7 (Sprint 3)", "disposition": "Separate checked-in manifest created with the acquisition worker; this corpus manifest records per-page rights only."}
+  ]
+}
