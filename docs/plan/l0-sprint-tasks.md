@@ -104,10 +104,25 @@ These bind every task and every review.
   review" unless terms clearly permit retention.
 - R4 Adzuna: no credentials exist. Implement the adapter and its fixture contract; record
   the live integration as "unverified — no credentials".
-- R5 Live Meta usage is explicit and budget-capped (by call count and tokens, enforced in
-  code), never part of `make check` or `make acceptance`. Log every live run's model ID,
-  usage and outcome in `docs/evidence/live-usage.md`. If the key, entitlement or model is
-  unavailable, record the item as blocked; never substitute another provider or model.
+- R5 Live Meta usage (user instruction, 2026-10-27: "keep careful track of meta LLM
+  credits and costs during testing. Use sparingly, use cheaper models to confirm working,
+  and the most performant model only in production"):
+  - Live calls are explicit and budget-capped (call count, tokens and estimated cost,
+    enforced in code), never part of `make check` or `make acceptance`. Use as few calls
+    as will establish the fact; prefer recorded/fixture runs for everything else.
+  - Model choice is configuration, not code: a *test* model (the cheapest Meta model that
+    supports the needed capability) for smoke/eval/confirmation runs, and a *production*
+    model (the most performant qualified Meta model — `muse-spark-1.3` per the plan unless
+    Sprint 0 finds otherwise) for the real live-assisted product path. Default dev/test
+    commands use the test model. Run the production model only for the minimum calls
+    needed to qualify it (entitlement, schema output, streaming, search), behind an
+    explicit flag.
+  - Every live call is cost-tracked: model ID, input/output tokens, search/tool usage,
+    estimated cost from Meta's published pricing (cite the page and date), and remaining
+    credit if the API exposes it. Append each run to `docs/evidence/live-usage.md` with a
+    running total. Record charges you cannot determine as "unknown", never as zero.
+  - If the key, entitlement or a needed model is unavailable, record the item as blocked;
+    never substitute a non-Meta provider.
 - R6 Decisions the plan assigns to the product owner are taken by the controller (or by
   you, if trivial) and recorded in an ADR marked "provisional — needs product owner
   confirmation".
@@ -132,11 +147,16 @@ Deliver:
 - `docs/dependencies.md`: dependency matrix with exact versions to pin, checked against
   arm64 Docker images (PostgreSQL 16, Firebase Auth emulator container, Python 3.12, Node,
   pnpm).
-- S0.2: with the real key and a hard cap (≤ 15 live calls total for this task), prove
-  Standard-mode `muse-spark-1.3` access, structured (schema) output, search, streaming and
-  usage reporting through Pydantic AI's native Meta provider. Check the current docs
-  (plan section 12 links) first. Record model ID, capabilities and restrictions. An
-  invalid key must fail visibly. If entitlement/model is blocked, say so (R5).
+- S0.2: check the current docs (plan section 12 links) and Meta's model catalogue and
+  pricing first; record every Meta model the key can use with its capabilities, price and
+  restrictions, and choose the test model and production model per R5. With the real key
+  and a hard cap (≤ 15 live calls total for this task, of which ≤ 5 on the production
+  model), prove through Pydantic AI's native Meta provider: structured (schema) output,
+  search, streaming and usage reporting on the test model first, then confirm
+  Standard-mode `muse-spark-1.3` (or the production model you qualified) access, schema
+  output and streaming with the minimum calls. An invalid key must fail visibly (this
+  costs nothing — do it first). Start `docs/evidence/live-usage.md` with per-call cost
+  rows and a running total. If entitlement/model is blocked, say so (R5).
 - S0.3/S0.4: DBOS workflow against local PostgreSQL 16 (Docker). Kill and restart a
   worker mid-workflow; exercise an outbox replay; inspect persisted workflow
   arguments/results and prove no credential or private payload is journalled (workflows
