@@ -12,6 +12,7 @@ import secrets
 import time
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 import httpx2
@@ -177,7 +178,7 @@ def failure_from_http_error(error: ModelHTTPError) -> CallReport:
 
 
 async def run_guarded(
-    settings: MetaSettings,
+    ledger: Ledger,
     *,
     purpose: str,
     model_id: str,
@@ -185,14 +186,32 @@ async def run_guarded(
     endpoint: str,
     worst_case_nano_usd: int,
     call: Callable[[], Awaitable[CallReport]],
+    markdown_path: Path = MARKDOWN_PATH,
 ) -> CallReport:
-    ledger = Ledger(LEDGER_PATH)
     authorise_call(
         POLICY,
         ledger.spent(BUDGET_SCOPE),
         CallPlan(is_production_model=is_production, worst_case_nano_usd=worst_case_nano_usd),
     )
-    report = await call()
+    try:
+        report = await call()
+    except Exception as error:
+        # The request may have reached Meta, so the call is logged with an unknown cost (the
+        # budget commits its full reservation) before the error propagates.
+        ledger.append(
+            LiveCallEntry(
+                budget_scope=BUDGET_SCOPE,
+                purpose=purpose,
+                model_id=model_id,
+                is_production_model=is_production,
+                endpoint=endpoint,
+                outcome=CallOutcome.FAILED,
+                reserved_nano_usd=worst_case_nano_usd,
+                error_type=type(error).__name__,
+            )
+        )
+        write_markdown(ledger, markdown_path)
+        raise
     if report.usage is not None:
         cost: int | None = estimate_cost_nano_usd(model_id, report.usage)
     else:
@@ -218,7 +237,7 @@ async def run_guarded(
             notes=json.dumps(report.facts, sort_keys=True, default=str),
         )
     )
-    write_markdown(ledger)
+    write_markdown(ledger, markdown_path)
     print(f"call #{record.seq} {purpose}: {report.outcome.value}")
     print(f"  cost: {'unknown' if cost is None else format_usd(cost)}")
     print(f"  facts: {json.dumps(report.facts, sort_keys=True, default=str, indent=2)}")
@@ -262,7 +281,7 @@ async def check_invalid_key(settings: MetaSettings) -> CallReport:
         raise AssertionError("an invalid key produced a successful run")
 
     return await run_guarded(
-        settings,
+        Ledger(LEDGER_PATH),
         purpose="invalid key fails visibly",
         model_id=settings.test_model,
         is_production=False,
@@ -294,7 +313,7 @@ async def check_model_listing(settings: MetaSettings) -> CallReport:
         )
 
     return await run_guarded(
-        settings,
+        Ledger(LEDGER_PATH),
         purpose="list entitled models",
         model_id="(none)",
         is_production=False,
@@ -366,7 +385,7 @@ async def check_structured(
         if on
     )
     return await run_guarded(
-        settings,
+        Ledger(LEDGER_PATH),
         purpose=purpose,
         model_id=model_id,
         is_production=production,
@@ -396,8 +415,8 @@ async def _stream_output(
     return output
 
 
-def write_markdown(ledger: Ledger) -> None:
-    MARKDOWN_PATH.write_text(
+def write_markdown(ledger: Ledger, path: Path = MARKDOWN_PATH) -> None:
+    path.write_text(
         "# Live Meta usage log\n\n"
         "Every HTTP call to the Meta Model API made by Nessa tooling, including failures and\n"
         "free calls (ruling R5). Generated from `live-usage.jsonl` by\n"

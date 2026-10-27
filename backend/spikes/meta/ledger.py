@@ -93,7 +93,8 @@ class Ledger:
             running = format_usd(known_total) + (" + unknown" if unknown_seen else "")
             outcome = r.outcome.value
             if r.outcome is CallOutcome.FAILED:
-                outcome = f"failed ({r.http_status or '-'} {r.error_type or ''})".replace(" )", ")")
+                known = [str(part) for part in (r.http_status, r.error_type) if part]
+                outcome = f"failed ({' '.join(known) or 'no detail'})"
             rows.append(
                 f"| {r.seq} | {r.recorded_at:%Y-%m-%d %H:%M:%S} | {r.budget_scope} | {r.purpose} "
                 f"| `{r.model_id}`{' (production)' if r.is_production_model else ''} "

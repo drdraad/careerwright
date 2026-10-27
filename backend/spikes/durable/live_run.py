@@ -105,8 +105,8 @@ def main() -> None:
     reserved = _reserve(ledger, settings.test_model)
     with tempfile.TemporaryDirectory(prefix="nessa-spike-") as tmp:
         work = Path(tmp)
-        spike = stack.start(work / "master.key")
         try:
+            spike = stack.start(work / "master.key")
             store = AppStore(spike.app_url, keyring_from_file(spike.master_key_file))
             store.install_schema()
             sentinel = f"PRIVATE-SENTINEL-{secrets.token_hex(8)}"

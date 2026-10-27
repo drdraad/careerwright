@@ -35,8 +35,8 @@ RUN_TIMEOUT_S = 60.0
 
 @pytest.fixture(scope="session")
 def spike(tmp_path_factory: pytest.TempPathFactory) -> Iterator[SpikeStack]:
-    started = stack.start(tmp_path_factory.mktemp("keys") / "master.key")
     try:
+        started = stack.start(tmp_path_factory.mktemp("keys") / "master.key")
         AppStore(started.app_url, keyring_from_file(started.master_key_file)).install_schema()
         yield started
     finally:

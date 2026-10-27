@@ -67,5 +67,18 @@ def test_markdown_shows_running_total_and_marks_unknown_cost(tmp_path: Path) -> 
     assert "$0.003500 + unknown" in table
 
 
+def test_failed_calls_show_whatever_status_and_error_are_known(tmp_path: Path) -> None:
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+    ledger.append(entry(outcome=CallOutcome.FAILED, http_status=401, error_type="invalid_api_key"))
+    ledger.append(entry(outcome=CallOutcome.FAILED, error_type="ConnectError"))
+    ledger.append(entry(outcome=CallOutcome.FAILED))
+
+    table = ledger.render_markdown_table()
+
+    assert "| failed (401 invalid_api_key) |" in table
+    assert "| failed (ConnectError) |" in table
+    assert "| failed (no detail) |" in table
+
+
 def test_records_with_no_ledger_file_are_empty(tmp_path: Path) -> None:
     assert Ledger(tmp_path / "missing.jsonl").records() == []

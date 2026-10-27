@@ -37,12 +37,16 @@ class SpikeStack:
 
 
 def _compose(*args: str, env: dict[str, str]) -> None:
-    subprocess.run(  # noqa: S603 - fixed docker compose invocation, no shell
+    result = subprocess.run(  # noqa: S603 - fixed docker compose invocation, no shell
         ["docker", "compose", "-f", str(COMPOSE_FILE), *args],  # noqa: S607
-        check=True,
+        check=False,
         env=env,
         capture_output=True,
+        text=True,
     )
+    if result.returncode != 0:
+        # Passwords travel in the environment, so compose's stderr cannot contain them.
+        raise RuntimeError(f"docker compose {args[0]} failed: {result.stderr.strip()}")
 
 
 def _compose_env(passwords: dict[str, str]) -> dict[str, str]:
@@ -50,6 +54,7 @@ def _compose_env(passwords: dict[str, str]) -> dict[str, str]:
 
 
 def stop() -> None:
+    # Compose interpolates the required password variables even for `down`.
     placeholders = {
         name: "unused"
         for name in (
