@@ -1,0 +1,30 @@
+# Secrets and local runtime state (never commit)
+.env
+.env.*
+!.env.example
+*.key
+/var/
+/.nessa/
+
+# Agent workspaces
+.superpowers/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# Node
+node_modules/
+.next/
+storybook-static/
+coverage/
+playwright-report/
+test-results/
+
+# OS
+.DS_Store
