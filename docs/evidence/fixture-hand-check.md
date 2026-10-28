@@ -169,18 +169,24 @@ all routes are stated feasible and reach the same target. Rebuilt as
 | Route | Months | Direct cost | Dominated by (hand) | Layer |
 |---|---:|---:|---|---:|
 | A | 6 | £4,800 | none (fastest) | 1 |
-| B | 9 | £2,400 | none: A, D and G are faster, but all cost more | 1 |
+| B | 9 | £2,400 | none: only A and D are faster, and both cost more | 1 |
 | C | 12 | £900 | none (cheapest) | 1 |
 | D | 8 | £5,400 | A (6, £4,800) | 2 |
 | E | 11 | £3,000 | B (9, £2,400) | 2 |
 | F | 14 | £1,200 | C (12, £900) | 2 |
-| G | 10 | £6,200 | A; and D (8, £5,400) | 3 |
-| H | 13 | £3,600 | B; and E (11, £3,000) | 3 |
-| I | 16 | £1,600 | C; and F (14, £1,200) | 3 |
+| G | 10 | £6,200 | A (6, £4,800), B (9, £2,400), D (8, £5,400) | 3 |
+| H | 13 | £3,600 | B (9, £2,400), C (12, £900), E (11, £3,000) | 3 |
+| I | 16 | £1,600 | C (12, £900), F (14, £1,200) | 3 |
 
-Peeling: F1 = {A, B, C}. Among the rest, D is fastest and F is cheapest. Only D is
-faster than E, and it costs more, so E is not dominated. G, H and I are dominated by D, E
-and F. F2 = {D, E, F}. F3 = {G, H, I}: nothing remains to dominate them. This matches the
+The column lists every dominator in the full set. Peeling: F1 = {A, B, C}. Among the
+rest, D is fastest and F is cheapest. Only D is faster than E, and it costs more, so E is
+not dominated. Within the remainder G, H and I are dominated by D, E and F respectively.
+F2 = {D, E, F}. F3 = {G, H, I}: nothing remains to dominate them.
+
+Correction (2026-10-27, same task): the first version of this table listed only A and D
+for G and only B and E for H, and said G is faster than B. Those dominator lists were
+incomplete; the layers were right. The error surfaced when the route-comparison
+composition named B as G's comparator, and the arithmetic above was rechecked. This matches the
 spec table and the nine values hard-coded in the pack's validator. The JSON values equal
 both (checked by a one-off assertion over the file, 2026-10-27).
 
@@ -236,8 +242,10 @@ wrong implementation.
   would be £6,850 and the printed figure would be wrong.
 - **H6. Route A's cash minimum is in March, not January** (section 4). A checker must
   evaluate every month of the horizon.
-- **H7. E has two dominators** (B and D). The Sprint 7 comparator rule must choose
-  between them deterministically and expose the other.
+- **H7. Several routes have more than one dominator**: TRACE-01 E (B and D); DIRECTAI G
+  (A, B, D), H (B, C, E) and I (C, F). The Sprint 7 comparator rule must choose one
+  deterministically and expose the others. A dominator need not sit in the layer just
+  above: B (F1) dominates G (F3).
 - **H8. Namespacing.** TRACE-01 routes use bare IDs `A`–`E`. Any store holding both
   fixtures must qualify them by trace (for example `TRACE-01/B`). DIRECTAI IDs are already
   qualified.
