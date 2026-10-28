@@ -63,6 +63,20 @@ contacts nothing but the emulator. All of it installed and ran in the arm64 back
 (`make acceptance`, 2026-10-28). `make check` refuses excluded technologies found in the lock
 (ARC1-01).
 
+Licences of `firebase-admin` 7.7.0 and the 34 packages in its dependency tree (some shared
+with other dependencies), from each installed package's metadata (2026-10-28): Apache-2.0
+for `firebase-admin` and the Google stack
+(`google-api-core`, `google-auth`, `google-cloud-core`, `google-cloud-firestore`,
+`google-cloud-storage`, `google-crc32c`, `google-resumable-media`, `googleapis-common-protos`,
+`proto-plus`, `grpcio`, `grpcio-status`), and for `cachecontrol`, `msgpack`, `requests` and
+`opentelemetry-api`; BSD-3-Clause for `protobuf`, `httpx`, `httpcore`, `idna` and
+`pycparser`; BSD-2-Clause for `pyasn1` (`pyasn1-modules`: BSD); MIT for `pyjwt`, `anyio`,
+`charset-normalizer`, `h11`, `h2`, `hpack`, `hyperframe` and `urllib3`; MIT-0 for `cffi`;
+Apache-2.0 OR BSD-3-Clause for `cryptography`; PSF-2.0 for `typing-extensions`; MPL-2.0 for
+`certifi` (file-level copyleft; used unmodified, so it adds no obligation beyond keeping its
+notice). All are permissive or weak copyleft and compatible with local use. Not a legal
+review (the rights review is a human gate).
+
 Release cadence risk: Pydantic AI shipped 2.59.0 to 2.62.0 between 2026-10-21 and
 2026-10-27, and 2.62.0 was published on the check date. The ADR 0002 suite is the gate for
 any bump. `pytest` 9.2.0 was also published that day; it is tooling only, and the suite

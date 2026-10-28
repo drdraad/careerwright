@@ -22,7 +22,8 @@ router = APIRouter(prefix="/v1/workspaces/{workspace_id}", responses=ERROR_RESPO
 Limit = Annotated[int, Query(ge=1, le=MAX_LIMIT)]
 
 
-def _run_out(tx: Tx, keyring: Keyring, run: Run) -> RunOut:
+def run_out(tx: Tx, keyring: Keyring, run: Run) -> RunOut:
+    """A run with its attempts and, if accepted, its opened output (also used by export)."""
     return RunOut.of(run, run_store.attempts(tx, run.run_id), open_output(tx, keyring, run))
 
 
@@ -42,7 +43,7 @@ def submit(
             now=deps.clock(),
         )
         return CommandResult(
-            202, _run_out(tx, deps.keyring, run).model_dump(mode="json"), workspace_id
+            202, run_out(tx, deps.keyring, run).model_dump(mode="json"), workspace_id
         )
 
     request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
@@ -61,7 +62,7 @@ def submit(
 @router.get("/runs/{run_id}", response_model=RunOut)
 def get_run(workspace_id: uuid.UUID, run_id: uuid.UUID, caller: CallerDep, deps: Deps) -> RunOut:
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
-        return _run_out(tx, deps.keyring, visible_run(tx, workspace_id, run_id))
+        return run_out(tx, deps.keyring, visible_run(tx, workspace_id, run_id))
 
 
 @router.get("/runs", response_model=RunPage)
@@ -77,7 +78,7 @@ def list_runs(
         visible_workspace(tx, workspace_id)
         rows = run_store.runs(tx, workspace_id, before=before, limit=limit + 1)
         page, more = rows[:limit], len(rows) > limit
-        items = [_run_out(tx, deps.keyring, run) for run in page]
+        items = [run_out(tx, deps.keyring, run) for run in page]
     return RunPage(
         items=items,
         next_cursor=encode([page[-1].created_at.isoformat(), str(page[-1].run_id)])

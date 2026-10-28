@@ -9,7 +9,7 @@ executing (`nessa.run_id`), so a worker can never read another workspace's rows:
   (`nessa.authorised_run_workspace()`), so revoking access stops the next call.
 The outbox holds identifiers only and is the one table the dispatcher reads unscoped.
 
-Forward-only: restore from a backup instead of downgrading.
+Forward-only (see `docs/runbook.md`: backup and restore are not implemented yet).
 
 Revision ID: 0002
 """

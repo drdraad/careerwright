@@ -14,6 +14,8 @@ Everything runs on this machine (ADR 0001). Run commands from the repository roo
 | `make check` | Formatting, lint, types, fast tests and the fixture validator. No Docker. |
 | `make acceptance` | Integration and stack tests against real PostgreSQL 16, DBOS and the emulator, in separate Compose projects (`nessa-l0-test`, `nessa-l0-stacktest`) and ports. Removes them afterwards. |
 | `make live-smoke` | One real connection-check run on the test model through an isolated stack (`nessa-l0-smoke`), at most 3 calls, within the `live-smoke` scope's cumulative cap (9 calls, 3 production, $0.30 worst case by default; `NESSA_LIVE_SMOKE_*` changes it). The worker is stopped before the attempts are read, and every attempt is ledgered in `docs/evidence/live-usage.*`. Only `PRODUCTION=1` uses the production model. Reads `META_API_KEY` from `.env`. |
+| `make rotate-master-key` | With the stack running: adds master key `v<N+1>` to `NESSA_HOME/keys`, restarts the API and worker so they seal with it (their mode is kept), then reseals every sealed record (stored keys and run outputs). |
+| `make reseal` | Reseals every sealed record under the current master key, and fails if any record is left on an older version. Run it again if a rotation was interrupted. |
 | `make status` | `docker compose ps` for the stack. |
 
 ## Addresses (127.0.0.1 only)
@@ -46,11 +48,19 @@ in, is refused). These are local test credentials, not secrets.
 - A user's Meta key: `POST /v1/workspaces/{id}/credentials` with
   `consent_to_encrypted_storage: true`; rotate with `.../credentials/{cid}/rotate`, revoke
   with `.../revoke`. The key is never returned. Queued runs use the active key at call time.
-- Master-key rotation: `cd backend && uv run --locked python -m tools.localenv
-  --rotate-master-key`, restart (`make dev`), then `docker compose -p nessa-l0 run --rm
-  migrate python -m nessa.cli reseal-credentials`; afterwards the old `v<N>.key` can be
-  removed from `NESSA_HOME/keys`. Never delete a key file before resealing.
-- `NESSA_HOME` is not in database backups; back it up separately and keep it private.
+- Master-key rotation: `make rotate-master-key` while the stack runs. When it reports
+  success, nothing is sealed under the old version any more, so the old `v<N>.key` may be
+  removed from `NESSA_HOME/keys`; until then keep every key file. If it was interrupted,
+  run `make reseal` (it refuses to report success while any record is on an old version).
+- `NESSA_HOME` holds the only copy of the master keys and database passwords; keep it
+  private.
+
+## Upgrades and backups
+
+- Migrations are forward-only: an upgrade cannot be rolled back by a downgrade migration.
+- Backup and restore are not implemented yet (SEC-07 is open). Until they are, an upgrade
+  that goes wrong cannot be undone, and losing the Docker volumes or `NESSA_HOME` loses the
+  data.
 
 ## Troubleshooting
 

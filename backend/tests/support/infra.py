@@ -8,7 +8,6 @@ The test process plays the API and the worker (host processes, so failures can b
 import json
 import os
 import time
-import urllib.error
 import urllib.request
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -236,11 +235,3 @@ def revoke_tokens(uid: str) -> None:
         {"localId": uid, "validSince": str(int(time.time()))},
         owner=True,
     )
-
-
-def emulator_reachable() -> bool:
-    try:
-        urllib.request.urlopen(f"http://{HOST}:{TEST_PORTS.auth}/", timeout=2).close()
-    except (urllib.error.URLError, OSError):
-        return False
-    return True

@@ -24,15 +24,17 @@ from nessa.identity.spend_limits import SpendSummary
 from nessa.identity.workspaces import WorkspaceName
 from nessa.profile.commands import ProfileView
 from nessa.profile.document import ProfileDocument, ProfileInput
-from nessa.profile.records import SourceKind, SourceReference
+from nessa.profile.records import ProfileVersion, SourceKind, SourceReference
 from nessa.vocabulary import DataMode, WorkState
 
 
-class _Out(BaseModel):
+class ResponseModel(BaseModel):
+    """Base of every response body: closed and immutable."""
+
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class ActorOut(_Out):
+class ActorOut(ResponseModel):
     actor_id: uuid.UUID
     email: str
     display_name: str
@@ -42,7 +44,7 @@ class ActorOut(_Out):
         return cls(actor_id=actor.actor_id, email=actor.email, display_name=actor.display_name)
 
 
-class WorkspaceOut(_Out):
+class WorkspaceOut(ResponseModel):
     workspace_id: uuid.UUID
     name: str
     data_mode: DataMode
@@ -66,7 +68,7 @@ class WorkspaceOut(_Out):
         )
 
 
-class WorkspacePage(_Out):
+class WorkspacePage(ResponseModel):
     items: list[WorkspaceOut]
     next_cursor: str | None
 
@@ -78,7 +80,7 @@ class RenameWorkspaceIn(BaseModel):
     name: WorkspaceName
 
 
-class ProfileOut(_Out):
+class ProfileOut(ResponseModel):
     workspace_id: uuid.UUID
     version: int = Field(description="0 means nothing has been saved yet.")
     document: ProfileDocument
@@ -95,6 +97,16 @@ class ProfileOut(_Out):
             created_at=view.created_at,
         )
 
+    @classmethod
+    def of_version(cls, version: ProfileVersion) -> "ProfileOut":
+        return cls(
+            workspace_id=version.workspace_id,
+            version=version.version,
+            document=version.document,
+            created_by=version.created_by,
+            created_at=version.created_at,
+        )
+
 
 class ProfileWriteIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -103,12 +115,12 @@ class ProfileWriteIn(BaseModel):
     profile: ProfileInput
 
 
-class ProfileVersionPage(_Out):
+class ProfileVersionPage(ResponseModel):
     items: list[ProfileOut]
     next_cursor: str | None
 
 
-class SourceOut(_Out):
+class SourceOut(ResponseModel):
     source_ref_id: uuid.UUID
     kind: SourceKind
     label: str
@@ -132,12 +144,12 @@ class SourceOut(_Out):
         )
 
 
-class SourcePage(_Out):
+class SourcePage(ResponseModel):
     items: list[SourceOut]
     next_cursor: str | None
 
 
-class EventOut(_Out):
+class EventOut(ResponseModel):
     """One status event. The stream's SSE `id` is `seq`; reconnect with Last-Event-ID."""
 
     seq: int
@@ -159,16 +171,16 @@ class EventOut(_Out):
         )
 
 
-class EventPage(_Out):
+class EventPage(ResponseModel):
     items: list[EventOut]
     last_seq: int = Field(description="Pass as `after` (or Last-Event-ID) to continue.")
 
 
-class Health(_Out):
+class Health(ResponseModel):
     status: str
 
 
-class CredentialOut(_Out):
+class CredentialOut(ResponseModel):
     """Metadata only. No endpoint ever returns key material, or any part of it."""
 
     credential_id: uuid.UUID
@@ -194,11 +206,11 @@ class CredentialOut(_Out):
         )
 
 
-class CredentialList(_Out):
+class CredentialList(ResponseModel):
     items: list[CredentialOut]
 
 
-class SpendOut(_Out):
+class SpendOut(ResponseModel):
     """Provider spend in integer nano-USD (Meta bills in USD; never a float)."""
 
     run_limit_nano_usd: int
@@ -222,7 +234,7 @@ class SpendOut(_Out):
         )
 
 
-class AttemptOut(_Out):
+class AttemptOut(ResponseModel):
     attempt_id: int
     model_id: str
     started_at: datetime
@@ -250,7 +262,7 @@ class AttemptOut(_Out):
         )
 
 
-class RunOut(_Out):
+class RunOut(ResponseModel):
     """The authoritative run state. A failed or unavailable run never carries an output."""
 
     run_id: uuid.UUID
@@ -288,6 +300,6 @@ class RunOut(_Out):
         )
 
 
-class RunPage(_Out):
+class RunPage(ResponseModel):
     items: list[RunOut]
     next_cursor: str | None

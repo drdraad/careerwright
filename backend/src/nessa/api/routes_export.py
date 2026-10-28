@@ -10,26 +10,25 @@ from fastapi import APIRouter
 
 from nessa.api.deps import CallerDep, Deps
 from nessa.api.envelope import ERROR_RESPONSES
+from nessa.api.routes_runs import run_out
 from nessa.api.schemas import (
     CredentialOut,
     EventOut,
     ProfileOut,
+    ResponseModel,
     RunOut,
     SourceOut,
     SpendOut,
     WorkspaceOut,
-    _Out,
 )
 from nessa.db import Tx, actor_transaction
 from nessa.identity import credential_store, run_store
 from nessa.identity import store as identity_store
 from nessa.identity.keyring import Keyring
 from nessa.identity.records import Run, WorkspaceEvent
-from nessa.identity.runs import open_output
 from nessa.identity.spend_limits import spend_summary
 from nessa.identity.workspaces import visible_workspace
 from nessa.profile import store as profile_store
-from nessa.profile.commands import ProfileView
 from nessa.profile.records import ProfileVersion, SourceReference
 
 router = APIRouter(
@@ -38,7 +37,7 @@ router = APIRouter(
 PAGE = 500
 
 
-class WorkspaceExport(_Out):
+class WorkspaceExport(ResponseModel):
     format: Literal["nessa.workspace-export"] = "nessa.workspace-export"
     format_version: Literal[1] = 1
     exported_at: datetime
@@ -61,10 +60,7 @@ def _all_runs(tx: Tx, keyring: Keyring, workspace_id: uuid.UUID) -> list[RunOut]
         limit=PAGE,
     ):
         runs.extend(page)
-    return [
-        RunOut.of(run, run_store.attempts(tx, run.run_id), open_output(tx, keyring, run))
-        for run in reversed(runs)
-    ]
+    return [run_out(tx, keyring, run) for run in reversed(runs)]
 
 
 def _all_versions(tx: Tx, workspace_id: uuid.UUID) -> list[ProfileVersion]:
@@ -111,12 +107,7 @@ def export_workspace(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> 
         exported_at=deps.clock(),
         synthetic=workspace.synthetic,
         workspace=WorkspaceOut.of(workspace),
-        profile_versions=[
-            ProfileOut.of(
-                ProfileView(v.workspace_id, v.version, v.document, v.created_by, v.created_at)
-            )
-            for v in versions
-        ],
+        profile_versions=[ProfileOut.of_version(v) for v in versions],
         sources=[SourceOut.of(s) for s in sources],
         events=[EventOut.of(e) for e in events],
         credentials=[CredentialOut.of(c) for c in credentials],

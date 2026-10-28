@@ -3,7 +3,8 @@
 Costs are integer nano-USD. Meta bills in USD per million tokens, so one nano-USD per token is
 $1 per billion tokens: every published rate is an exact integer and no float touches a cost.
 Contributor models let Meta train on traffic; they are for synthetic or public inputs only
-(ADR 0003), which `nessa.identity.runs.select_run_model` enforces.
+(ADR 0003), which `nessa.identity.model_choice` enforces when a run is submitted and the
+activity checks again before the call.
 """
 
 from dataclasses import dataclass

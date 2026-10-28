@@ -29,6 +29,7 @@ class Scenario:
     log_dir: Path
     logs: list[Path] = field(default_factory=list)
     workers: list[Worker] = field(default_factory=list)
+    retired_keys: list[str] = field(default_factory=list)  # replaced keys, still scanned for
 
     def submit(self) -> str:
         response = self.api.write(
@@ -115,11 +116,14 @@ class Scenario:
         logs = [(log.name, log.read_text(encoding="utf-8")) for log in self.logs if log.exists()]
         dbos = self.infra.database_cells("nessa_dbos")
         app = self.infra.database_cells("nessa_app")
-        key = Needle("credential", self.api_key, fragment_length=12)
+        keys = [
+            Needle("credential", key, fragment_length=12)
+            for key in (self.api_key, *self.retired_keys)
+        ]
         output = Needle("model output", self.output_sentinel)
         profile = Needle("profile private text", self.profile_sentinel)
         return [
-            *scan([*app, *dbos, *logs], [key, output]),
+            *scan([*app, *dbos, *logs], [*keys, output]),
             *scan([*dbos, *logs], [profile]),
         ]
 

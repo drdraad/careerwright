@@ -72,7 +72,8 @@ def ensure_local_home(home: Path) -> list[str]:
 
 
 def add_master_key_version(home: Path) -> str:
-    """Rotation step 1: a new current master key. Step 2 is `make reseal-credentials`."""
+    """Rotation step 1: a new current master key. `make rotate-master-key` runs it, reloads
+    the API and worker, and reseals; `make reseal` alone finishes an interrupted rotation."""
     keys = home / "keys"
     version = max(_key_versions(keys), default=0) + 1
     if not _write_new(keys / f"v{version}.key", secrets.token_bytes(KEY_BYTES)):

@@ -407,5 +407,6 @@ def test_rotating_the_key_while_a_run_is_queued_uses_the_new_key(scenario: Scena
     assert run["status"] == "complete"
     shown = scenario.api_run(run_id)
     assert shown["output"]["reason"] == f"key fingerprint {key_fingerprint(SecretStr(new_key))}"
-    scenario.api_key = new_key  # the scan now looks for the new key too
-    assert scenario.leaks() == []
+    scenario.retired_keys.append(scenario.api_key)
+    scenario.api_key = new_key
+    assert scenario.leaks() == []  # neither the replaced key nor its successor anywhere

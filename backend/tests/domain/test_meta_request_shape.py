@@ -56,4 +56,16 @@ def test_the_request_goes_to_meta_with_strict_native_json_schema_and_bounded_out
 def test_the_prompt_carries_no_workspace_data() -> None:
     _, body, _ = captured_request()
 
-    assert "Synthetic test persona (not a real person)" in json.dumps(body)
+    # The fixed instructions and the fixed synthetic prompt are the only text sent.
+    assert body["instructions"] == connection_check.INSTRUCTIONS
+    assert body["input"] == [{"role": "user", "content": connection_check.PROMPT}]
+    assert set(body) == {
+        "include",
+        "input",
+        "instructions",
+        "max_output_tokens",
+        "model",
+        "reasoning",
+        "stream",
+        "text",
+    }

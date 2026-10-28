@@ -15,7 +15,7 @@ from nessa.errors import ErrorCode, ErrorStage, NessaError
 from nessa.identity.receipts import CommandResult, fingerprint, run_idempotent
 from nessa.identity.workspaces import visible_workspace
 from nessa.profile import store
-from nessa.profile.commands import ProfileView, current_profile, write_profile
+from nessa.profile.commands import current_profile, write_profile
 
 router = APIRouter(
     prefix="/v1/workspaces/{workspace_id}", responses=ERROR_RESPONSES, tags=["profile"]
@@ -76,12 +76,7 @@ def list_versions(
         rows = store.list_profile_versions(tx, workspace_id, before=before, limit=limit + 1)
     page, more = rows[:limit], len(rows) > limit
     return ProfileVersionPage(
-        items=[
-            ProfileOut.of(
-                ProfileView(v.workspace_id, v.version, v.document, v.created_by, v.created_at)
-            )
-            for v in page
-        ],
+        items=[ProfileOut.of_version(v) for v in page],
         next_cursor=encode(page[-1].version) if more else None,
     )
 
@@ -95,11 +90,7 @@ def get_version(
         found = store.profile_version(tx, workspace_id, version)
     if found is None:
         raise NessaError(ErrorCode.NOT_FOUND, "No such profile version.", stage=ErrorStage.PROFILE)
-    return ProfileOut.of(
-        ProfileView(
-            found.workspace_id, found.version, found.document, found.created_by, found.created_at
-        )
-    )
+    return ProfileOut.of_version(found)
 
 
 @router.get("/sources", response_model=SourcePage)

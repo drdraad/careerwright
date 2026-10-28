@@ -7,7 +7,7 @@ active. Every workspace-scoped table filters through the `workspaces` policy, so
 WHERE clause in application code cannot reach another workspace. The migration owner
 (`nessa_migrator`) owns every object and is used only by setup.
 
-Forward-only: restore from a backup instead of downgrading.
+Forward-only (see `docs/runbook.md`: backup and restore are not implemented yet).
 
 Revision ID: 0001
 """

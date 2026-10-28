@@ -80,16 +80,31 @@ records how they are realised, and the choices a later task must not undo silent
 7. **Idempotent consequential commands.** Every write carries an `Idempotency-Key`; the
    response is stored as a receipt in the same transaction. A retry returns the stored
    response, a concurrent duplicate is resolved to the first, and reusing a key for a
-   different request is refused. Receipts never fingerprint a key value.
+   different request is refused. Receipts never fingerprint a key value. Each receipt
+   belongs to its workspace and is deleted with it, so a deleted or reset workspace leaves
+   no copy of its responses.
+
+   Expected versions (GC7): a command that changes state derived from user input carries
+   the version it was based on (profile writes carry `expected_version`; a stale one is
+   `STALE_INPUT_VERSION`). Credential store, rotate and revoke carry none: the credential
+   ID is their precondition and a revoked key is `CREDENTIAL_REVOKED`. Run submission
+   carries none only because the connection check reads no workspace input. The first run
+   kind that reads the profile must take the profile version as an expected version and
+   pin it on the run, so a run never silently uses inputs newer or older than the client
+   saw.
 
 8. **Keys: consent, sealing, rotation, revocation.** Storing a key needs explicit consent
    to encrypted storage. It is sealed at once with AES-256-GCM under the current master-key
    version, with kind, workspace and credential ID as associated data. Master keys are
    `v<N>.key` files in `NESSA_HOME/keys` (default `~/.nessa/l0`, outside the repository and
-   the database), owner-only; the highest version seals. Rotation: add a version
-   (`tools.localenv --rotate-master-key`), then `nessa.cli reseal-credentials`, then retire
-   the old file. The worker resolves the workspace's active key just before each call, so a
-   revocation or user-key rotation applies to every queued run.
+   the database), owner-only; the highest version seals. Rotation (`make rotate-master-key`):
+   add a version, restart the API and worker so they load it, then reseal every sealed
+   record, stored keys and run outputs alike. Reseal finds every table with a key version
+   and fails while any row is left on an older one, so the old file may be retired only
+   after it succeeds. The worker resolves the workspace's active key just before each call,
+   so a revocation or user-key rotation applies to every queued run. A revocation and a
+   replacement are final: a database trigger refuses any update that clears or changes
+   them, so an application bug cannot undo one.
 
 9. **Runs: the first model run is a connection check.** It sends a fixed synthetic prompt
    and no workspace data (spec section 16: check availability at key setup), so it proves
