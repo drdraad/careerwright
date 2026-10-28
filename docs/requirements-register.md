@@ -615,7 +615,7 @@ checklist. An agent critique is never a review score.
 
 | ID | Gate | When | Status | Checklist |
 |---|---|---|---|---|
-| H-01 | Design-review scores (1–5 per category, every category ≥ 4 before release) | Sprints 1, 3, 7, 9 | not run — requires human | sprint review packages |
+| H-01 | Design-review scores (1–5 per category, every category ≥ 4 before release) | Sprints 1, 3, 7, 9 | Sprint 1 approved by the product owner on 2026-10-28, no category scores recorded; Sprints 3, 7, 9 not run — requires human | sprint review packages |
 | H-02 | Approval of the three Sprint 0 signature compositions | Sprint 0 | not run — requires human | `docs/reviews/sprint-0.md` |
 | H-03 | VoiceOver walkthrough on the target Mac | Sprint 9 | not run — requires human | T16 |
 | H-04 | Real Safari checks, including print | Sprints 8, 9 | not run — requires human | T15, T16 |
@@ -625,7 +625,7 @@ checklist. An agent critique is never a review score.
 | H-08 | Privacy assessment or DPIA decision before any real person's data is processed | before real data | not run — requires human | spec §19 |
 | H-09 | Product-owner confirmation of ADR 0003 (Contributor test model for synthetic data) | open | not run — requires human | ADR 0003 |
 | H-10 | Accountable review of each published AI Resilience range record | Sprint 3 onward | not run — requires human | AIR-1 step 3 |
-| H-11 | Rights and product-owner review of Task 5's reference data and provisional decisions: the ESCO licence reading and adapted-version marking, the city list and aliases, ONS regions, the hard-constraint set, the basis of no-value answers, concept-key folding | Sprint 2 | not run — requires human | ADR 0006, "Human review checklist" |
+| H-11 | Rights and product-owner review of Task 5's reference data and provisional decisions: the ESCO licence reading and adapted-version marking, the city list and aliases, ONS regions, the hard-constraint set, the basis of no-value answers, concept-key folding | Sprint 2 | reviewed by the product owner on 2026-10-28: all six confirmed; the hard-constraint set also gains a salary floor (open until implemented, T6) | ADR 0006, "Human review checklist" |
 
 ## 7 Not tested in L0, by decision
 

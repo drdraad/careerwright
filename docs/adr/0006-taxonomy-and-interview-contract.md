@@ -290,20 +290,23 @@ decision 7 requires the first run kind that reads the profile to pin the version
   the streamed reply (T6), an ESCO version-bump procedure beyond "new pin, reviewed
   migration".
 
-## Human review checklist (H-11, not run — requires human)
+## Human review checklist (H-11, reviewed by the product owner on 2026-10-28)
 
-Agents applied each item below as recorded; none is confirmed until a person signs it off
-(rulings R2, R6).
+Agents applied each item below as recorded. The product owner reviewed the checklist on
+2026-10-28: items 1–3, 5 and 6 are confirmed as recorded; item 4 is confirmed with one
+change (rulings R2, R6).
 
-- [ ] **ESCO licence reading** (rights review). Reuse under Commission Decision
+- [x] **ESCO licence reading** (rights review). Reuse under Commission Decision
   2011/833/EU on two conditions, read from the ESCO FAQ on 2026-10-28: the attribution
   sentence wherever ESCO content appears, and adapted versions marked as such. Confirm the
   reading, the attribution text, the `adaptation` statement and where the API shows them.
-- [ ] **City list and aliases.** The 55 cities, their stable IDs and the recorded aliases
+- [x] **City list and aliases.** The 55 cities, their stable IDs and the recorded aliases
   (decision 4), including the decision to refuse plain "Newcastle".
-- [ ] **ONS regions** assigned to each city by the implementing agent (decision 4).
-- [ ] **Hard-constraint set** (decision 6): cities, target titles, weekly study hours and
-  both spending limits.
-- [ ] **Basis of an answer with no value** (decision 8): shown as `inferred`.
-- [ ] **Concept-key folding** (decision 5): whether the plural heuristic refuses any title
+- [x] **ONS regions** assigned to each city by the implementing agent (decision 4).
+- [x] **Hard-constraint set** (decision 6): cities, target titles, weekly study hours and
+  both spending limits. **Changed by the product owner:** add a salary floor (the minimum
+  salary the person will accept, spec §4) as a hard constraint. Until it is implemented,
+  decision 6 describes the set without it.
+- [x] **Basis of an answer with no value** (decision 8): shown as `inferred`.
+- [x] **Concept-key folding** (decision 5): whether the plural heuristic refuses any title
   a person would expect to be accepted.

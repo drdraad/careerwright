@@ -406,7 +406,7 @@ whole-page reviews. In particular:
 
 | Item | Owner | Disposition |
 |---|---|---|
-| H-01 design-review scores for Sprint 1 | Product owner and design reviewer | Agent screenshot critique complete; scoring and approval not run — requires human. Checklist below |
+| H-01 design review for Sprint 1 | Product owner and design reviewer | Approved by the product owner on 2026-10-28, with V-01–V-10 open; no category scores recorded. Checklist below |
 | V-01–V-10 screenshot findings | Web owner; product/design reviewer for the visitation convention | Open. Prioritise V-01–V-06 and recapture affected views before visual acceptance; V-07–V-10 need polish/comprehension review |
 | Screenshot coverage gaps | Web owner | Add expanded phone sheets, scrolled conflict/save views and lower route layers; inspect long names and other supported states before claiming full visual coverage |
 | H-03 VoiceOver, H-04 Safari | Humans, Sprints 8–9 | Not run — requires human |
@@ -421,7 +421,7 @@ whole-page reviews. In particular:
 | After a full restart the Auth emulator re-imports its seed and ends earlier sessions: an open page refreshes its token and carries on, a page loaded before that asks to sign in again (then returns to the same address) | Emulator behaviour (L0 only) | Accepted; documented in the runbook |
 | amd64 images | T16 | Not built |
 
-## Human design-review checklist (H-01, Sprint 1, not run)
+## Human design-review checklist (H-01, Sprint 1, approved 2026-10-28 without scores)
 
 Use `docs/reviews/sprint-1/screenshots/` (or run `make demo` and open
 `http://127.0.0.1:53000`, signing in as Ada), alongside the Sprint 0 references in
@@ -485,4 +485,7 @@ Use the following observations to guide the live human check:
 | Responsive composition | Not run — requires human | Chapters reflow without visible page overflow. Phone Routes hierarchy (V-03), sheet figures (V-04), mode clipping (V-05) and form density (V-07) remain open. Expanded sheets and lower content are unreviewed |
 | Interaction continuity | Not run — requires human | B's selection and the stale notice are visible. Retry is absent (V-02), Plan's action does not match its next step (V-06), and reconnect moves content (V-08). Keyboard, drag, retained edits and motion need live checks |
 
-Approval: **not given — requires human (H-01)**. Approver and approval date: not recorded.
+Approval: **given by the product owner on 2026-10-28 (H-01, Sprint 1)**. No category
+scores were recorded, so the release rule that every category reaches at least 4 is still
+to be shown at a later H-01 review. V-01–V-10 stay open: V-02, V-07 and V-08 in Task 6,
+the rest in the visual-corrections batch after it.
