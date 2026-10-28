@@ -621,7 +621,7 @@ checklist. An agent critique is never a review score.
 | H-04 | Real Safari checks, including print | Sprints 8, 9 | not run — requires human | T15, T16 |
 | H-05 | Five formative task sessions (4 of 5 complete unaided; any dangerous misunderstanding blocks) | Sprint 9 | not run — requires human | T16 |
 | H-06 | Source rights review of every retained corpus page | Sprints 3–5 | not run — requires human | `corpus/README.md` |
-| H-07 | Domain reviewer sign-off on consequential requirement/outcome mappings and the financial worked examples, including the fixture hand check | Sprints 0, 4, 5 | not run — requires human | `docs/evidence/fixture-hand-check.md` |
+| H-07 | Domain reviewer sign-off on consequential requirement/outcome mappings and the financial worked examples, including the fixture hand check | Sprints 0, 4, 5 | Sprint 0 part (the fixture hand check's modelling rules) confirmed by the product owner on 2026-10-28; Sprints 4 and 5 not run — requires human | `docs/evidence/fixture-hand-check.md` |
 | H-08 | Privacy assessment or DPIA decision before any real person's data is processed | before real data | not run — requires human | spec §19 |
 | H-09 | Product-owner confirmation of ADR 0003 (Contributor test model for synthetic data) | open | confirmed by the product owner on 2026-10-28 | ADR 0003 |
 | H-10 | Accountable review of each published AI Resilience range record | Sprint 3 onward | not run — requires human | AIR-1 step 3 |

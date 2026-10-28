@@ -5,7 +5,13 @@
 - Inputs: `fixtures/m0/` (the supplied pack, byte-identical to `Nessa_M0_Fixtures.zip`;
   hashes in `fixtures/README.md`) and `fixtures/reconstructed/directai.json`.
 - Status: **passed, with findings for implementers** (section 11). Agent-performed (the
-  Task 2 implementing agent); domain-reviewer sign-off (H-07) **not run — requires human**.
+  Task 2 implementing agent). Domain-reviewer sign-off (H-07, Sprint 0 part): **confirmed
+  by the product owner on 2026-10-28.** They answered yes to six questions on the modelling
+  rules: lost pay counts in economic cost, cash is prefunded before a late-month wage with
+  the reserve kept, the weekly workload envelope holds in every week, a qualification is
+  usable from the next month boundary, unconfirmed money counts as zero with no borrowing
+  advice, and Pareto dominance needs no worse on both axes. The arithmetic was checked by
+  agents, not by the reviewer.
   Nothing in the pack contradicts the specification. Several expectations are
   under-specified in ways that would let a wrong implementation pass a naive test;
   section 11 says how to test them.
