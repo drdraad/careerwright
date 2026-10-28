@@ -8,17 +8,35 @@ request with the problems listed; a second failure ends the run `invalid_model_o
 That repair is the agent's output-retry budget, the only retry owner for invalid output;
 the DBOS step retries only transient provider failures (ADR 0002 decision 7). A response
 cut off at its token limit ends the run at once (`TruncationGuard`): never repaired.
+
+The reply streams (spec section 4: stream natural conversation, commit only after complete
+validation). `ReplyStream` reads the `reply` text out of the JSON as it arrives and hands
+each longer version to the activity's partial-reply sink; the proposals are never streamed,
+and nothing streamed is a proposal. A repair request streams its reply afresh.
 """
 
 import asyncio
+from collections.abc import AsyncIterator
+from typing import Any
 
-from pydantic_ai import Agent, ModelRetry, NativeOutput
-from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, UserPromptPart
-from pydantic_ai.models import Model
+import pydantic_core
+from pydantic_ai import Agent, ModelRetry, NativeOutput, RunContext
+from pydantic_ai.capabilities import AbstractCapability
+from pydantic_ai.messages import (
+    AgentStreamEvent,
+    ModelMessage,
+    ModelResponse,
+    PartDeltaEvent,
+    PartStartEvent,
+    TextPart,
+    TextPartDelta,
+    UserPromptPart,
+)
+from pydantic_ai.models import Model, ModelRequestContext
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import UsageLimits
 
-from nessa.identity.activity import RunTask, TruncationGuard
+from nessa.identity.activity import PartialSink, RunTask, TruncationGuard
 from nessa.identity.model_registry import FIXTURE_MODEL_ID, ModelMode
 from nessa.profile import interview
 from nessa.profile.fixture_interviewer import fixture_turn
@@ -35,8 +53,43 @@ from nessa.profile.interview import (
     render_prompt,
 )
 
+FIXTURE_STREAM_CHUNK = 32  # characters per delta the fixture interviewer streams
 
-def run_interview_turn(model: Model, mode: ModelMode, raw_input: bytes | None) -> InterviewProposal:
+
+class ReplyStream(AbstractCapability[Any]):
+    """Sends the reply so far to `sink` each time it grows, from the streamed JSON text."""
+
+    def __init__(self, sink: PartialSink) -> None:
+        self._sink = sink
+        self._text = ""
+        self._reply = ""
+
+    async def before_model_request(
+        self, ctx: RunContext[Any], request_context: ModelRequestContext
+    ) -> ModelRequestContext:
+        self._text, self._reply = "", ""  # a repair request answers with a new reply
+        return request_context
+
+    async def on_event(self, ctx: RunContext[Any], *, event: AgentStreamEvent) -> None:
+        if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
+            self._text = event.part.content
+        elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+            self._text += event.delta.content_delta
+        else:
+            return
+        try:
+            partial = pydantic_core.from_json(self._text, allow_partial="trailing-strings")
+        except ValueError:
+            return  # not yet a JSON prefix that parses
+        reply = partial.get("reply") if isinstance(partial, dict) else None
+        if isinstance(reply, str) and reply and reply != self._reply:
+            self._reply = reply
+            self._sink(reply)
+
+
+def run_interview_turn(
+    model: Model, mode: ModelMode, raw_input: bytes | None, on_reply: PartialSink
+) -> InterviewProposal:
     if raw_input is None:
         raise ValueError("an interview turn has a sealed input")
     context = TurnInput.model_validate_json(raw_input)
@@ -46,7 +99,7 @@ def run_interview_turn(model: Model, mode: ModelMode, raw_input: bytes | None) -
         output_type=NativeOutput(InterviewTurnOutput),
         instructions=INSTRUCTIONS,
         retries={"tools": 0, "output": MAX_REQUESTS - 1},
-        capabilities=[TruncationGuard()],
+        capabilities=[TruncationGuard(), ReplyStream(on_reply)],
     )
     accepted: list[InterviewProposal] = []
 
@@ -91,14 +144,21 @@ def _prompt_context(messages: list[ModelMessage]) -> PromptContext:
     raise ValueError("the prompt has no context")
 
 
+def _fixture_json(messages: list[ModelMessage]) -> str:
+    return fixture_turn(_prompt_context(messages)).model_dump_json()
+
+
 def fixture_interviewer_model() -> Model:
     """The deterministic demo interviewer behind Pydantic AI's model interface: no network,
-    no key; it answers from the prompt's context with `fixture_turn`."""
+    no key; it answers from the prompt's context with `fixture_turn`, whole or streamed in
+    pieces like a provider."""
 
     def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-        output = fixture_turn(_prompt_context(messages))
-        return ModelResponse(
-            parts=[TextPart(output.model_dump_json())], model_name=FIXTURE_MODEL_ID
-        )
+        return ModelResponse(parts=[TextPart(_fixture_json(messages))], model_name=FIXTURE_MODEL_ID)
 
-    return FunctionModel(respond, model_name=FIXTURE_MODEL_ID)
+    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        text = _fixture_json(messages)
+        for start in range(0, len(text), FIXTURE_STREAM_CHUNK):
+            yield text[start : start + FIXTURE_STREAM_CHUNK]
+
+    return FunctionModel(respond, stream_function=stream, model_name=FIXTURE_MODEL_ID)

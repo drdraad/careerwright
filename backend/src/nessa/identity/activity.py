@@ -16,6 +16,11 @@ that run:
    repair is one more request, owned by the agent's output-retry budget, never the step's);
 4. stores the validated output sealed and the usage on the attempt in one transaction.
 
+While a task's reply streams, the reply so far is sealed into the run's partial store
+(`run_partials`; its status events carry the run ID and a sequence only). The validated
+output supersedes it in the transaction that stores the output; a failure marks it
+incomplete. A partial reply is never validated, never a result, and never applied.
+
 Its own database work is retried through an outage for `store_retry_budget_s`, keeping a
 paid call's result in memory; past that budget the run fails `app_store_unavailable`,
 because a DBOS step retry would call the model again.
@@ -59,19 +64,23 @@ from nessa.identity.failures import (
 )
 from nessa.identity.keyring import Keyring, SealedValue
 from nessa.identity.model_registry import ModelMode, Usage, estimate_cost_nano_usd, model_entry
-from nessa.identity.records import EventKind, Run, RunKind
-from nessa.identity.runs import input_context, output_context
+from nessa.identity.records import EventKind, PartialCompleteness, Run, RunKind
+from nessa.identity.runs import end_partial, input_context, output_context, record_partial
 from nessa.identity.spend import SpendState, period_start, refused_scope
 from nessa.vocabulary import DataMode, WorkState
 
 Outcome = dict[str, str]
 # A model for a model ID; the key is None for the fixture interviewer, which needs none.
 ModelBuilder = Callable[[str, SecretStr | None], Model]
+# Where a task sends the natural-language reply so far while the output streams.
+PartialSink = Callable[[str], None]
 # How long the activity keeps retrying its own database work (the attempt row, the result)
 # through an outage before the run fails `app_store_unavailable`.
 STORE_RETRY_BUDGET_S = 60.0
 STORE_RETRY_FIRST_DELAY_S = 0.5
 STORE_RETRY_MAX_DELAY_S = 8.0
+# At most one partial-reply write (and status event) per interval while a reply streams.
+PARTIAL_WRITE_INTERVAL_S = 0.25
 _log = logging.getLogger("nessa.activity")
 
 
@@ -79,11 +88,13 @@ _log = logging.getLogger("nessa.activity")
 class RunTask:
     """How the activity runs one kind of run.
 
-    `call` gets the model, its privacy mode and the run's opened input (None for a kind
-    without one) and returns the validated output to seal, or raises. `worst_case_nano_usd`
-    bounds one attempt's cost (every request it may send) for a model ID."""
+    `call` gets the model, its privacy mode, the run's opened input (None for a kind
+    without one) and a sink for the streamed reply so far (a kind that streams nothing
+    ignores it), and returns the validated output to seal, or raises.
+    `worst_case_nano_usd` bounds one attempt's cost (every request it may send) for a
+    model ID."""
 
-    call: Callable[[Model, ModelMode, bytes | None], BaseModel]
+    call: Callable[[Model, ModelMode, bytes | None, PartialSink], BaseModel]
     worst_case_nano_usd: Callable[[str], int]
     has_input: bool
 
@@ -124,7 +135,45 @@ class _CallResult:
     reasoning_tokens: int | None
     response_id: str | None
     requests_sent: int
-    responses: int
+    responses: int  # that reported usage
+    partial: str | None  # the reply so far, if the task streamed one
+
+
+class _PartialWriter:
+    """The run's streamed reply while it arrives: sealed, written at most once per
+    `PARTIAL_WRITE_INTERVAL_S`, each write announced by an event with IDs only.
+
+    Streaming is for responsiveness only. A write that fails stops this attempt's streaming
+    and never fails or retries the call (a retry would pay again); settling the attempt
+    records the latest reply as superseded or incomplete either way."""
+
+    def __init__(self, rt: ActivityRuntime, run: Run) -> None:
+        self._rt = rt
+        self._run = run
+        self._written_at: float | None = None
+        self._stopped = False
+        self.latest: str | None = None
+
+    def __call__(self, text: str) -> None:
+        self.latest = text
+        now = time.monotonic()
+        if self._stopped or (
+            self._written_at is not None and now - self._written_at < PARTIAL_WRITE_INTERVAL_S
+        ):
+            return
+        self._written_at = now
+        try:
+            self._write(text)
+        except Exception as error:
+            self._stopped = True
+            _log.warning(
+                "partial reply not written",
+                extra={"run_id": str(self._run.run_id), "error_class": type(error).__name__},
+            )
+
+    def _write(self, text: str) -> None:
+        with run_transaction(self._rt.engine, self._run.run_id) as tx:
+            record_partial(tx, self._rt.keyring, self._run, text, PartialCompleteness.STREAMING)
 
 
 def succeeded(output_id: uuid.UUID) -> Outcome:
@@ -178,7 +227,7 @@ def run_connection_check(agent: Agent[None, ConnectionCheckResult]) -> Connectio
 
 
 CONNECTION_CHECK_TASK = RunTask(
-    call=lambda model, mode, _input: run_connection_check(connection_check_agent(model)),
+    call=lambda model, mode, _input, _sink: run_connection_check(connection_check_agent(model)),
     worst_case_nano_usd=connection_check.worst_case_nano_usd,
     has_input=False,
 )
@@ -288,8 +337,14 @@ def _prepare(rt: ActivityRuntime, run_id: uuid.UUID) -> _Ready | ActivityEnd:
     return _Ready(run, mode, attempt_id, key[0], key[1], sealed_input)
 
 
+def _measured(messages: list[ModelMessage]) -> list[ModelResponse]:
+    """The responses that reported usage. A failed streamed request still leaves a response
+    in the history, with no parts and no usage: its cost is unknown, never zero."""
+    return [m for m in messages if isinstance(m, ModelResponse) and m.usage.has_values()]
+
+
 def _usage(messages: list[ModelMessage]) -> tuple[Usage | None, int | None, str | None]:
-    responses = [m for m in messages if isinstance(m, ModelResponse)]
+    responses = _measured(messages)
     if not responses:
         return None, None, None
     usage = Usage(
@@ -325,11 +380,12 @@ def _open(rt: ActivityRuntime, ready: _Ready) -> tuple[SecretStr | None, bytes |
 
 def _call(rt: ActivityRuntime, ready: _Ready) -> _CallResult:
     task = rt.tasks[ready.run.kind]
+    partial = _PartialWriter(rt, ready.run)
     with capture_run_messages() as messages:
         try:
             api_key, opened = _open(rt, ready)
             output: BaseModel | None = task.call(
-                rt.build_model(ready.run.model_id, api_key), ready.mode, opened
+                rt.build_model(ready.run.model_id, api_key), ready.mode, opened, partial
             )
         except Exception as error:
             # Classify inside the handler but act outside it (see the module docstring).
@@ -342,9 +398,11 @@ def _call(rt: ActivityRuntime, ready: _Ready) -> _CallResult:
             if _truncated(messages):
                 classified, output = terminal(FailureClass.OUTPUT_TRUNCATED), None
         requests = sum(isinstance(m, ModelRequest) for m in messages)
-        responses = sum(isinstance(m, ModelResponse) for m in messages)
+        responses = len(_measured(messages))
         if ready.mode is ModelMode.FIXTURE:
-            return _CallResult(output, classified, None, None, None, requests, responses)
+            return _CallResult(
+                output, classified, None, None, None, requests, responses, partial.latest
+            )
         try:
             usage, reasoning, response_id = _usage(messages)
         except ValueError as error:
@@ -352,7 +410,9 @@ def _call(rt: ActivityRuntime, ready: _Ready) -> _CallResult:
             # report is inconsistent, so the cost is unknown and the output is not accepted.
             classified = classified or classify_failure(error)
             output, usage, reasoning, response_id = None, None, None, None
-    return _CallResult(output, classified, usage, reasoning, response_id, requests, responses)
+    return _CallResult(
+        output, classified, usage, reasoning, response_id, requests, responses, partial.latest
+    )
 
 
 def _spend(ready: _Ready, call: _CallResult) -> tuple[SpendState, int | None]:
@@ -372,6 +432,7 @@ def _settle(rt: ActivityRuntime, ready: _Ready, call: _CallResult) -> ActivityEn
         if call.output is None:
             classified = call.classified or terminal(FailureClass.UNKNOWN_FAILURE)
             end = _ended(classified)
+            end_partial(tx, rt.keyring, ready.run, call.partial)  # never a result
         else:
             output_id = uuid.uuid4()
             body = call.output.model_dump_json().encode()
@@ -383,6 +444,7 @@ def _settle(rt: ActivityRuntime, ready: _Ready, call: _CallResult) -> ActivityEn
                 content_sha256=hashlib.sha256(body).hexdigest(),
             )
             end = ActivityEnd("succeeded" if newly else "reused_accepted", succeeded(accepted))
+            run_store.delete_partial(tx, ready.run.run_id)  # superseded by the validated output
         # Usage is recorded in the same transaction as the accepted output (carry-forward M4).
         run_store.finish_attempt(
             tx,
@@ -445,6 +507,8 @@ def publish(rt: ActivityRuntime, run_id: uuid.UUID, outcome: Outcome) -> None:
         # A call whose result could not be stored (the database went away) is settled as an
         # unknown charge, never left looking in flight after the run has ended.
         run_store.interrupt_unfinished_attempts(tx, run_id)
+        if status is not WorkState.COMPLETE:  # a crash can leave a partial still streaming
+            end_partial(tx, rt.keyring, run, None)
         output = outcome.get("output_id")
         if run_store.finish_run(
             tx,

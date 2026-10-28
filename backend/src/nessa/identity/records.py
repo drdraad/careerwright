@@ -32,6 +32,7 @@ class EventKind(StrEnum):
     CREDENTIAL_REVOKED = "credential.revoked"
     SPEND_LIMITS_UPDATED = "spend_limits.updated"
     RUN_STATE_CHANGED = "run.state_changed"
+    RUN_PARTIAL_UPDATED = "run.partial_updated"  # detail: the partial's sequence number only
     PROVISIONAL_CONCEPT_CREATED = "concept.provisional_created"
     INTERVIEW_TURN_DECIDED = "interview.turn_decided"
 
@@ -78,6 +79,24 @@ class Credential:
 class RunKind(StrEnum):
     CONNECTION_CHECK = "connection_check"
     INTERVIEW_TURN = "interview_turn"
+
+
+class PartialCompleteness(StrEnum):
+    """How complete a run's streamed reply is (spec section 18: partial results carry
+    completeness and freshness). Streamed text is never validated and never a result."""
+
+    NONE = "none"  # no reply text has arrived
+    STREAMING = "streaming"  # the reply so far; more may follow
+    INCOMPLETE = "incomplete"  # it stopped and will not complete (that attempt or run failed)
+    SUPERSEDED = "superseded"  # the run completed: its validated output is authoritative
+
+
+@dataclass(frozen=True)
+class PartialReply:
+    seq: int | None  # the partial's write sequence, as its status events carry it
+    completeness: PartialCompleteness
+    text: str | None
+    updated_at: datetime | None
 
 
 @dataclass(frozen=True)

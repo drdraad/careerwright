@@ -1903,6 +1903,75 @@
         }
       }
     },
+    "/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/reply": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Get Turn Reply",
+        "description": "The reply as it streams; poll it when a `run.partial_updated` event names the turn.",
+        "operationId": "get_turn_reply",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "turn_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Turn Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartialReplyOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/decision": {
       "post": {
         "tags": [
@@ -3005,6 +3074,7 @@
           "credential.revoked",
           "spend_limits.updated",
           "run.state_changed",
+          "run.partial_updated",
           "concept.provisional_created",
           "interview.turn_decided"
         ],
@@ -3525,6 +3595,78 @@
         ],
         "title": "OccupationSearchOut",
         "description": "Exact label matches (all of them, when several occupations share a label), then\nranked full-text matches. `full_text_total` counts every other full-text match, so a\nlimited page is never mistaken for the whole result."
+      },
+      "PartialCompleteness": {
+        "type": "string",
+        "enum": [
+          "none",
+          "streaming",
+          "incomplete",
+          "superseded"
+        ],
+        "title": "PartialCompleteness",
+        "description": "How complete a run's streamed reply is (spec section 18: partial results carry\ncompleteness and freshness). Streamed text is never validated and never a result."
+      },
+      "PartialReplyOut": {
+        "properties": {
+          "turn_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Turn Id"
+          },
+          "completeness": {
+            "$ref": "#/components/schemas/PartialCompleteness",
+            "description": "none: no text yet; streaming: the reply so far; incomplete: it stopped and will not complete; superseded: the run completed, so read the proposal's reply."
+          },
+          "seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seq",
+            "description": "Matches the run.partial_updated event that announced it."
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text",
+            "description": "The reply so far; null when none or superseded."
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "When the text was last written (freshness)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "turn_id",
+          "completeness",
+          "seq",
+          "text",
+          "updated_at"
+        ],
+        "title": "PartialReplyOut",
+        "description": "The turn's reply as it streams: unvalidated text, never a proposal. The turn's run\nstate and, once complete, its proposal are authoritative."
       },
       "PlaceList": {
         "properties": {

@@ -13,7 +13,7 @@ from nessa.cli import ResealIncompleteError, migrate_app, reseal, seed
 from nessa.identity import credential_store
 from nessa.identity.credentials import credential_context
 from nessa.identity.keyring import Keyring, MasterKeyError, SealedValue, load_keyring
-from nessa.identity.runs import input_context, output_context
+from nessa.identity.runs import input_context, output_context, partial_context
 from nessa.seed import FIXTURE_OWNER
 from tests.support.infra import Infra, migrator_engine
 from tools.localenv import add_master_key_version, ensure_local_home
@@ -84,6 +84,24 @@ def add_sealed_input(
     return run_id
 
 
+def add_sealed_partial(tx: sa.Connection, keyring: Keyring, run_id: uuid.UUID, text: str) -> None:
+    workspace = tx.exec_driver_sql(
+        "SELECT workspace_id FROM nessa.runs WHERE run_id = %(run)s", {"run": run_id}
+    ).scalar_one()
+    sealed = keyring.seal(text.encode(), partial_context(workspace, run_id))
+    tx.exec_driver_sql(
+        "INSERT INTO nessa.run_partials (run_id, workspace_id, seq, completeness, key_version, "
+        "nonce, ciphertext) VALUES (%(run)s, %(ws)s, 1, 'streaming', %(v)s, %(n)s, %(c)s)",
+        {
+            "run": run_id,
+            "ws": workspace,
+            "v": sealed.key_version,
+            "n": sealed.nonce,
+            "c": sealed.ciphertext,
+        },
+    )
+
+
 @pytest.fixture
 def rotation(infra: Infra, tmp_path: Path) -> tuple[Infra, str, Path]:
     database = f"nessa_rotation_{uuid.uuid4().hex[:8]}"
@@ -126,6 +144,9 @@ def test_resealing_moves_every_sealed_record_to_the_new_master_key_version(
             for text in ('{"suggested_title": "A", "reason": "B"}', '{"x": 1}'):
                 outputs[add_sealed_output(tx, old, workspace, text)] = text
             inputs = {add_sealed_input(tx, old, workspace, '{"messages": []}'): '{"messages": []}'}
+            partials = {run_id: "Thanks for telling" for run_id in inputs}
+            for run_id, text in partials.items():
+                add_sealed_partial(tx, old, run_id, text)
 
         add_master_key_version(home)
         resealed = reseal(engine, load_keyring(home / "keys"))
@@ -133,8 +154,8 @@ def test_resealing_moves_every_sealed_record_to_the_new_master_key_version(
     finally:
         engine.dispose()
 
-    assert resealed == {"credentials": 2, "run_inputs": 1, "run_outputs": 2}
-    assert again == {"credentials": 0, "run_inputs": 0, "run_outputs": 0}
+    assert resealed == {"credentials": 2, "run_inputs": 1, "run_outputs": 2, "run_partials": 1}
+    assert again == {"credentials": 0, "run_inputs": 0, "run_outputs": 0, "run_partials": 0}
     # Retire version 1: the new key alone opens every sealed record.
     (home / "keys" / "v1.key").unlink()
     only_new = load_keyring(home / "keys")
@@ -162,6 +183,14 @@ def test_resealing_moves_every_sealed_record_to_the_new_master_key_version(
         sealed = SealedValue(2, bytes(row["nonce"]), bytes(row["ciphertext"]))
         opened = only_new.open(sealed, input_context(row["workspace_id"], row["run_id"]))
         assert opened.decode() == inputs[row["run_id"]]
+    for row in infra.query(
+        "SELECT run_id, workspace_id, key_version, nonce, ciphertext FROM nessa.run_partials",
+        database=database,
+    ):
+        assert row["key_version"] == 2
+        sealed = SealedValue(2, bytes(row["nonce"]), bytes(row["ciphertext"]))
+        opened = only_new.open(sealed, partial_context(row["workspace_id"], row["run_id"]))
+        assert opened.decode() == partials[row["run_id"]]
     with pytest.raises(MasterKeyError, match="version 1"):
         only_new.open(SealedValue(1, b"\0" * 12, b"\0" * 32), context)
 

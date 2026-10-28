@@ -4,7 +4,8 @@ Configured by environment only, like the product worker. Crash points are a real
 a named moment, so DBOS recovery is exercised rather than simulated:
 - `after_settle`: the attempt's result (an accepted output, or a terminal failure) and its
   usage are committed, the DBOS step is not;
-- `after_dispatch_before_mark`: the workflow started, its outbox entry not yet marked.
+- `after_dispatch_before_mark`: the workflow started, its outbox entry not yet marked;
+- `after_first_partial`: the first piece of a streamed reply is committed, mid-call.
 """
 
 import os
@@ -38,6 +39,14 @@ def install_crash_point(point: str) -> None:
         activity._settle = settle_then_die  # type: ignore[assignment]
     elif point == "after_dispatch_before_mark":
         run_store.mark_dispatched = lambda tx, outbox_id: _kill()
+    elif point == "after_first_partial":
+        write = activity._PartialWriter._write
+
+        def write_then_die(self: activity._PartialWriter, text: str) -> None:
+            write(self, text)
+            _kill()
+
+        activity._PartialWriter._write = write_then_die  # type: ignore[method-assign]
     elif point:
         raise ValueError(f"unknown crash point {point!r}")
 

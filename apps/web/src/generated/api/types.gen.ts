@@ -395,6 +395,7 @@ export const EventKind = {
     CREDENTIAL_REVOKED: 'credential.revoked',
     SPEND_LIMITS_UPDATED: 'spend_limits.updated',
     RUN_STATE_CHANGED: 'run.state_changed',
+    RUN_PARTIAL_UPDATED: 'run.partial_updated',
     CONCEPT_PROVISIONAL_CREATED: 'concept.provisional_created',
     INTERVIEW_TURN_DECIDED: 'interview.turn_decided'
 } as const;
@@ -731,6 +732,62 @@ export type OccupationSearchOut = {
      * Limit
      */
     limit: number;
+};
+
+/**
+ * PartialCompleteness
+ *
+ * How complete a run's streamed reply is (spec section 18: partial results carry
+ * completeness and freshness). Streamed text is never validated and never a result.
+ */
+export const PartialCompleteness = {
+    NONE: 'none',
+    STREAMING: 'streaming',
+    INCOMPLETE: 'incomplete',
+    SUPERSEDED: 'superseded'
+} as const;
+
+/**
+ * PartialCompleteness
+ *
+ * How complete a run's streamed reply is (spec section 18: partial results carry
+ * completeness and freshness). Streamed text is never validated and never a result.
+ */
+export type PartialCompleteness = typeof PartialCompleteness[keyof typeof PartialCompleteness];
+
+/**
+ * PartialReplyOut
+ *
+ * The turn's reply as it streams: unvalidated text, never a proposal. The turn's run
+ * state and, once complete, its proposal are authoritative.
+ */
+export type PartialReplyOut = {
+    /**
+     * Turn Id
+     */
+    turn_id: string;
+    /**
+     * none: no text yet; streaming: the reply so far; incomplete: it stopped and will not complete; superseded: the run completed, so read the proposal's reply.
+     */
+    completeness: PartialCompleteness;
+    /**
+     * Seq
+     *
+     * Matches the run.partial_updated event that announced it.
+     */
+    seq: number | null;
+    /**
+     * Text
+     *
+     * The reply so far; null when none or superseded.
+     */
+    text: string | null;
+    /**
+     * Updated At
+     *
+     * When the text was last written (freshness).
+     */
+    updated_at: string | null;
 };
 
 /**
@@ -2714,6 +2771,44 @@ export type GetTurnResponses = {
 };
 
 export type GetTurnResponse = GetTurnResponses[keyof GetTurnResponses];
+
+export type GetTurnReplyData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Turn Id
+         */
+        turn_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/reply';
+};
+
+export type GetTurnReplyErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetTurnReplyError = GetTurnReplyErrors[keyof GetTurnReplyErrors];
+
+export type GetTurnReplyResponses = {
+    /**
+     * Successful Response
+     */
+    200: PartialReplyOut;
+};
+
+export type GetTurnReplyResponse = GetTurnReplyResponses[keyof GetTurnReplyResponses];
 
 export type DecideTurnData = {
     body: DecideTurn;

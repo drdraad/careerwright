@@ -1,6 +1,6 @@
-"""Interview turns: send a message (202 + turn, run in the background), read turns, and
-decide on a turn's proposals (the profile changes only here, through the same command as
-a direct edit)."""
+"""Interview turns: send a message (202 + turn, run in the background), read turns and the
+reply as it streams, and decide on a turn's proposals (the profile changes only here,
+through the same command as a direct edit)."""
 
 import uuid
 from typing import Annotated
@@ -10,13 +10,20 @@ from fastapi.responses import JSONResponse
 
 from nessa.api.deps import CallerDep, Deps, IdempotencyKey
 from nessa.api.envelope import ERROR_RESPONSES
-from nessa.api.interview_schemas import DecisionOut, DecisionResult, TurnOut, TurnPage
+from nessa.api.interview_schemas import (
+    DecisionOut,
+    DecisionResult,
+    PartialReplyOut,
+    TurnOut,
+    TurnPage,
+)
 from nessa.api.pagination import DEFAULT_LIMIT, MAX_LIMIT, decode_timestamped, encode
 from nessa.api.routes_runs import run_out
 from nessa.api.schemas import ProfileOut
 from nessa.db import Tx, actor_transaction
 from nessa.identity.keyring import Keyring
 from nessa.identity.receipts import CommandResult, fingerprint, run_idempotent
+from nessa.identity.runs import partial_reply
 from nessa.identity.workspaces import visible_workspace
 from nessa.profile import interview_store
 from nessa.profile.conversation import (
@@ -76,6 +83,16 @@ def submit(
 def get_turn(workspace_id: uuid.UUID, turn_id: uuid.UUID, caller: CallerDep, deps: Deps) -> TurnOut:
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
         return turn_out(tx, deps.keyring, visible_turn(tx, deps.keyring, workspace_id, turn_id))
+
+
+@router.get("/turns/{turn_id}/reply", response_model=PartialReplyOut, operation_id="get_turn_reply")
+def get_turn_reply(
+    workspace_id: uuid.UUID, turn_id: uuid.UUID, caller: CallerDep, deps: Deps
+) -> PartialReplyOut:
+    """The reply as it streams; poll it when a `run.partial_updated` event names the turn."""
+    with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
+        view = visible_turn(tx, deps.keyring, workspace_id, turn_id)
+        return PartialReplyOut.of(turn_id, partial_reply(tx, deps.keyring, view.run))
 
 
 @router.get("/turns", response_model=TurnPage, operation_id="list_turns")

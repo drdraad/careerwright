@@ -174,13 +174,38 @@ decision 7 requires the first run kind that reads the profile to pin the version
     interview turns, which amends ADR 0004 decision 9: demo workspaces never call a
     *provider* model. A connection check in a demo workspace is still refused.
 
-13. **No token streaming in this slice.** The activity's requests are not streamed: nothing
-    could show a partial reply anyway, because the event stream carries identifiers only and
-    a partial reply is private content. A run output exists only after complete validation,
-    and the profile changes only through a decision on it, so partial or streamed JSON can
-    never commit (PROF-03). Responsiveness during a turn (stages, a progress state) is the
-    You chapter's work (T6); streaming the reply would need a sealed partial store and its
-    own ADR.
+13. **The reply streams; nothing streamed commits** (amended in fix round 1; the first
+    version deferred streaming). Spec section 4: stream natural conversation for
+    responsiveness, commit only after complete validation.
+    - *What streams.* Only the natural-language `reply`, never the proposals. The agent
+      streams its request (`ReplyStream`, an event capability), reads `reply` out of the
+      partial JSON as it arrives (`pydantic_core.from_json`, trailing strings allowed) and
+      hands each longer version to the activity. A repair request streams a new reply. The
+      fixture interviewer streams too, in fixed pieces, so demo turns and contract tests
+      exercise the same path.
+    - *Where it goes.* The activity seals the reply so far into `run_partials` (one row per
+      run, the run as associated data), at most once per 0.25 s, and announces each write
+      with a `run.partial_updated` event that carries the run ID and the write's sequence
+      only: the event stream stays identifiers-only. The worker may write only its own run's
+      row, and only while the requester may act; the API may only read it, for the
+      workspace's owner, through `GET .../interview/turns/{id}/reply`. `make reseal` covers
+      it.
+    - *Superseded, never mistaken for the result.* The row is deleted in the transaction
+      that stores the validated output; from then on the read path answers `superseded`
+      with no text, and the proposal's reply is authoritative. On a failed attempt or run
+      the row is marked `incomplete` with the latest text received (a crash is marked when
+      the run is published). The read path reports completeness (`none`, `streaming`,
+      `incomplete`, `superseded`) and `updated_at` (spec section 18: partial results carry
+      completeness and freshness). Partial text is never validated, never enters a later
+      turn's context, and never reaches the profile, which changes only through a decision
+      on a validated proposal (PROF-03).
+    - *Best effort.* Streaming is for responsiveness only: a partial write that fails stops
+      that attempt's streaming and is logged by error class; it never fails or retries the
+      paid call.
+    - *Cost.* A streamed request that fails leaves a response with no usage in the
+      history; only responses that reported usage count, so such an attempt stays
+      `unknown` (decision 9).
+    - Rendering the stream (the You chapter's conversation) is Task 6's part of MODEL-03.
 
 14. **Live qualification through the existing command.** `make live-smoke INTERVIEW=1` runs
     one interview turn on the test model with a fixed synthetic message and confirms its
@@ -197,16 +222,21 @@ decision 7 requires the first run kind that reads the profile to pin the version
     schema; one `PRODUCTION=1 INTERVIEW=1` run (worst case $0.049) would close that gap.
 
 15. **Export format 2.** The workspace export adds the interview turns (messages,
-    proposals, decisions) and provisional concepts.
+    proposals, decisions) and provisional concepts. Partial replies are not exported: they
+    are never data, and a completed turn's reply is in its proposal.
 
 ## Consequences
 
 - New error codes: `TAXONOMY_UNAVAILABLE`, `CONFIRMATION_REQUIRED`, `PROPOSAL_NOT_AVAILABLE`,
-  `ALREADY_DECIDED`; new failure classes: `model_refused`, `output_truncated`.
+  `ALREADY_DECIDED`; new failure classes: `model_refused`, `output_truncated`; new event
+  kind `run.partial_updated` and read path `GET .../interview/turns/{id}/reply` (decision
+  13); migrations 0006 (a known zero cost for attempts with no call) and 0007
+  (`run_partials`).
 - A city outside the list, which Sprint 1 accepted as free text, is now refused on save.
   Stored version 1 documents still read; a person re-saving one with an unlisted city must
   pick a listed city.
 - The You chapter (T6) builds the conversation, review tray and city picker on these
   endpoints; discovery (T6) uses the taxonomy search for its multi-query pool.
-- Not done here: residence and work-rights fields (BND1-04 stays open for them), streaming,
-  an ESCO version-bump procedure beyond "new pin, reviewed migration".
+- Not done here: residence and work-rights fields (BND1-04 stays open for them), rendering
+  the streamed reply (T6), an ESCO version-bump procedure beyond "new pin, reviewed
+  migration".

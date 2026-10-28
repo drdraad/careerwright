@@ -27,13 +27,14 @@ from nessa.identity.access import Actor
 from nessa.identity.keyring import Keyring, RecordContext
 from nessa.identity.model_choice import ModelChoice, assert_model_permitted, fixture_model
 from nessa.identity.model_registry import ModelEntry
-from nessa.identity.records import EventKind, Run, RunKind
+from nessa.identity.records import EventKind, PartialCompleteness, PartialReply, Run, RunKind
 from nessa.identity.spend import SpendLimits, budget_exceeded, period_start, refused_scope
 from nessa.identity.workspaces import visible_workspace
 from nessa.vocabulary import DataMode, WorkState
 
 OUTPUT_KIND = "run_output"
 INPUT_KIND = "run_input"
+PARTIAL_KIND = "run_partial"
 
 
 class SubmitRun(BaseModel):
@@ -67,6 +68,57 @@ def output_context(workspace_id: uuid.UUID, output_id: uuid.UUID) -> RecordConte
 
 def input_context(workspace_id: uuid.UUID, run_id: uuid.UUID) -> RecordContext:
     return RecordContext(INPUT_KIND, str(workspace_id), str(run_id))
+
+
+def partial_context(workspace_id: uuid.UUID, run_id: uuid.UUID) -> RecordContext:
+    return RecordContext(PARTIAL_KIND, str(workspace_id), str(run_id))
+
+
+def record_partial(
+    tx: Tx, keyring: Keyring, run: Run, text: str, completeness: PartialCompleteness
+) -> None:
+    """Worker: the streamed reply so far, sealed, and a status event that carries the run ID
+    and the partial's sequence only."""
+    sealed = keyring.seal(text.encode(), partial_context(run.workspace_id, run.run_id))
+    seq = run_store.upsert_partial(tx, run, sealed, completeness)
+    store.append_event(
+        tx, run.workspace_id, EventKind.RUN_PARTIAL_UPDATED, str(run.run_id), detail={"seq": seq}
+    )
+
+
+def end_partial(tx: Tx, keyring: Keyring, run: Run, latest: str | None) -> None:
+    """Worker: the attempt or run failed, so the streamed reply will not complete. `latest`
+    is the reply so far, if the attempt streamed any (it may be newer than the last write)."""
+    if latest is not None:
+        record_partial(tx, keyring, run, latest, PartialCompleteness.INCOMPLETE)
+        return
+    seq = run_store.mark_partial_incomplete(tx, run.run_id)
+    if seq is not None:
+        store.append_event(
+            tx,
+            run.workspace_id,
+            EventKind.RUN_PARTIAL_UPDATED,
+            str(run.run_id),
+            detail={"seq": seq},
+        )
+
+
+_FAILED = frozenset({WorkState.FAILED, WorkState.PROVIDER_UNAVAILABLE, WorkState.CANCELLED})
+
+
+def partial_reply(tx: Tx, keyring: Keyring, run: Run) -> PartialReply:
+    """The run's streamed reply for its owner: never validated and never a result. Once the
+    run is complete only its validated output counts, so no partial text is returned."""
+    if run.status is WorkState.COMPLETE:
+        return PartialReply(None, PartialCompleteness.SUPERSEDED, None, None)
+    found = run_store.partial(tx, run.run_id)
+    if found is None:
+        return PartialReply(None, PartialCompleteness.NONE, None, None)
+    seq, completeness, sealed, updated_at = found
+    if run.status in _FAILED:  # ended before its worker could mark it (a crash)
+        completeness = PartialCompleteness.INCOMPLETE
+    text = keyring.open(sealed, partial_context(run.workspace_id, run.run_id)).decode()
+    return PartialReply(seq, completeness, text, updated_at)
 
 
 def _provider_model(

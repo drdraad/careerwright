@@ -7,8 +7,8 @@
 - `seed`: invited identities and the fixture workspace, created only if missing.
 - `reset-demo`: recreate the named fixture workspace; no other workspace is touched.
 - `reseal`: master-key rotation step 2 (`make rotate-master-key` runs both steps):
-  re-encrypt every sealed record (keys, run inputs and run outputs) under the current key
-  version.
+  re-encrypt every sealed record (keys, run inputs, run outputs and partial replies) under
+  the current key version.
 """
 
 import argparse
@@ -32,7 +32,7 @@ from nessa.identity import store as identity_store
 from nessa.identity.credentials import credential_context
 from nessa.identity.keyring import Keyring, RecordContext, SealedValue, load_keyring
 from nessa.identity.records import EventKind
-from nessa.identity.runs import input_context, output_context
+from nessa.identity.runs import input_context, output_context, partial_context
 from nessa.logs import configure_logging
 from nessa.profile import store as profile_store
 from nessa.profile.commands import cited_sources
@@ -129,6 +129,12 @@ def reseal(engine: sa.Engine, keyring: Keyring) -> dict[str, int]:
                 run_store.all_sealed_outputs(tx),
                 output_context,
                 lambda record_id, sealed: run_store.replace_sealed_output(tx, record_id, sealed),
+            ),
+            "run_partials": _reseal_rows(
+                keyring,
+                run_store.all_sealed_partials(tx),
+                partial_context,
+                lambda record_id, sealed: run_store.replace_sealed_partial(tx, record_id, sealed),
             ),
         }
         stale = _tables_on_old_versions(tx, keyring.current_version)

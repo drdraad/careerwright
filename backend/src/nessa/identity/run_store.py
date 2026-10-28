@@ -1,4 +1,5 @@
-"""SQL for runs, the outbox, model attempts and sealed run outputs (adapter).
+"""SQL for runs, the outbox, model attempts, sealed run inputs and outputs, and the sealed
+partial reply a run streams (adapter).
 
 Under the worker role, every statement runs in a transaction scoped to one run
 (`run_transaction`), and row-level security limits it to that run's workspace.
@@ -13,7 +14,7 @@ from sqlalchemy import exc
 from nessa.db import Tx, is_unique_violation
 from nessa.identity.keyring import SealedValue
 from nessa.identity.model_registry import Usage
-from nessa.identity.records import Attempt, Run, RunKind
+from nessa.identity.records import Attempt, PartialCompleteness, Run, RunKind
 from nessa.identity.spend import SpendState
 from nessa.vocabulary import DataMode, WorkState
 
@@ -126,6 +127,94 @@ def replace_sealed_input(tx: Tx, run_id: uuid.UUID, sealed: SealedValue) -> None
     tx.execute(
         sa.text(
             "UPDATE nessa.run_inputs SET key_version = :version, nonce = :nonce, "
+            "ciphertext = :ciphertext WHERE run_id = :id"
+        ),
+        {
+            "id": run_id,
+            "version": sealed.key_version,
+            "nonce": sealed.nonce,
+            "ciphertext": sealed.ciphertext,
+        },
+    )
+
+
+def upsert_partial(tx: Tx, run: Run, sealed: SealedValue, completeness: PartialCompleteness) -> int:
+    """Worker: the run's streamed reply so far, replacing the last; returns its sequence."""
+    return int(
+        tx.execute(
+            sa.text(
+                "INSERT INTO nessa.run_partials (run_id, workspace_id, seq, completeness, "
+                "key_version, nonce, ciphertext) VALUES (:run, :ws, 1, :completeness, :version, "
+                ":nonce, :ciphertext) ON CONFLICT (run_id) DO UPDATE SET "
+                "seq = nessa.run_partials.seq + 1, completeness = EXCLUDED.completeness, "
+                "key_version = EXCLUDED.key_version, nonce = EXCLUDED.nonce, "
+                "ciphertext = EXCLUDED.ciphertext, updated_at = clock_timestamp() RETURNING seq"
+            ),
+            {
+                "run": run.run_id,
+                "ws": run.workspace_id,
+                "completeness": completeness.value,
+                "version": sealed.key_version,
+                "nonce": sealed.nonce,
+                "ciphertext": sealed.ciphertext,
+            },
+        ).scalar_one()
+    )
+
+
+def mark_partial_incomplete(tx: Tx, run_id: uuid.UUID) -> int | None:
+    """Worker: a streaming partial will not complete; its new sequence, or None if the run
+    has no streaming partial."""
+    seq = tx.execute(
+        sa.text(
+            "UPDATE nessa.run_partials SET seq = seq + 1, completeness = 'incomplete', "
+            "updated_at = clock_timestamp() WHERE run_id = :id AND completeness = 'streaming' "
+            "RETURNING seq"
+        ),
+        {"id": run_id},
+    ).scalar_one_or_none()
+    return None if seq is None else int(seq)
+
+
+def delete_partial(tx: Tx, run_id: uuid.UUID) -> None:
+    """Worker: the validated output supersedes the streamed reply (same transaction)."""
+    tx.execute(sa.text("DELETE FROM nessa.run_partials WHERE run_id = :id"), {"id": run_id})
+
+
+def partial(
+    tx: Tx, run_id: uuid.UUID
+) -> tuple[int, PartialCompleteness, SealedValue, datetime] | None:
+    row = tx.execute(
+        sa.text(
+            "SELECT seq, completeness, key_version, nonce, ciphertext, updated_at "
+            "FROM nessa.run_partials WHERE run_id = :id"
+        ),
+        {"id": run_id},
+    ).one_or_none()
+    if row is None:
+        return None
+    sealed = SealedValue(row.key_version, bytes(row.nonce), bytes(row.ciphertext))
+    return int(row.seq), PartialCompleteness(row.completeness), sealed, row.updated_at
+
+
+def all_sealed_partials(tx: Tx) -> list[tuple[uuid.UUID, uuid.UUID, SealedValue]]:
+    """Setup only (master-key rotation): every sealed partial reply, locked."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT run_id, workspace_id, key_version, nonce, ciphertext "
+            "FROM nessa.run_partials ORDER BY run_id FOR UPDATE"
+        )
+    )
+    return [
+        (r.run_id, r.workspace_id, SealedValue(r.key_version, bytes(r.nonce), bytes(r.ciphertext)))
+        for r in rows
+    ]
+
+
+def replace_sealed_partial(tx: Tx, run_id: uuid.UUID, sealed: SealedValue) -> None:
+    tx.execute(
+        sa.text(
+            "UPDATE nessa.run_partials SET key_version = :version, nonce = :nonce, "
             "ciphertext = :ciphertext WHERE run_id = :id"
         ),
         {

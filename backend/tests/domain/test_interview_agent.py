@@ -2,6 +2,7 @@
 schema, the deterministic check and its one bounded repair, on the fixture interviewer and
 on a fake provider (MODEL-03, PROF-02, PROF-05). No network, no database."""
 
+import itertools
 import uuid
 from datetime import UTC, datetime
 
@@ -17,6 +18,7 @@ from nessa.profile.document import empty_profile
 from nessa.profile.fixture_interviewer import REPLY_PREFIX, fixture_turn
 from nessa.profile.interview import (
     ContextMessage,
+    InterviewProposal,
     ProfileField,
     PromptContext,
     ProposalOrigin,
@@ -29,6 +31,10 @@ from nessa.profile.interview_agent import fixture_interviewer_model, run_intervi
 from tests.support.fake_models import FakeFailure, fake_model_builder
 
 AT = datetime(2027, 1, 1, tzinfo=UTC)
+
+
+def ignore(_reply: str) -> None:
+    """A partial-reply sink that keeps nothing."""
 
 
 def turn_input(*texts: str) -> TurnInput:
@@ -103,29 +109,80 @@ def test_the_fixture_through_the_agent_returns_a_validated_fixture_proposal() ->
     ctx = turn_input("I could work in Bristol.")
 
     proposal = run_interview_turn(
-        fixture_interviewer_model(), ModelMode.FIXTURE, ctx.model_dump_json().encode()
+        fixture_interviewer_model(), ModelMode.FIXTURE, ctx.model_dump_json().encode(), ignore
     )
 
     assert proposal.origin is ProposalOrigin.FIXTURE
     assert [(c.field, c.value) for c in proposal.changes] == [(ProfileField.CITIES, ["Bristol"])]
 
 
-def run_fake(failure: FakeFailure | None) -> tuple[object, list[object]]:
+def grows(replies: list[str]) -> bool:
+    """Each streamed reply extends the one before it."""
+    return all(later.startswith(earlier) for earlier, later in itertools.pairwise(replies))
+
+
+@pytest.mark.req("MODEL-03")
+def test_the_fixture_streams_its_reply_before_the_validated_proposal_arrives() -> None:
+    ctx = turn_input("I could work in Bristol, 5 hours a week.")
+    streamed: list[str] = []
+
+    proposal = run_interview_turn(
+        fixture_interviewer_model(),
+        ModelMode.FIXTURE,
+        ctx.model_dump_json().encode(),
+        streamed.append,
+    )
+
+    assert len(streamed) > 1  # in pieces, as it arrives
+    assert grows(streamed)
+    assert streamed[-1] == proposal.reply  # the whole reply, and only the reply
+
+
+def run_fake(failure: FakeFailure | None) -> tuple[object, list[object], list[str]]:
     model = fake_model_builder(failure=failure)("muse-spark-1.3-contributor", None)
     ctx = turn_input("I could work in Leeds and spend about £1,500.")
+    streamed: list[str] = []
     with capture_run_messages() as messages:
         try:
             result: object = run_interview_turn(
-                model, ModelMode.CONTRIBUTOR, ctx.model_dump_json().encode()
+                model, ModelMode.CONTRIBUTOR, ctx.model_dump_json().encode(), streamed.append
             )
         except Exception as error:  # the activity classifies this
             result = error
-    return result, list(messages)
+    return result, list(messages), streamed
+
+
+@pytest.mark.req("MODEL-03")
+def test_a_provider_reply_streams_and_a_repair_streams_afresh() -> None:
+    result, _, streamed = run_fake(FakeFailure.INVALID_ONCE)
+
+    assert isinstance(result, InterviewProposal)
+    restart = next(
+        i for i in range(1, len(streamed)) if not streamed[i].startswith(streamed[i - 1])
+    )
+    first, repaired = streamed[:restart], streamed[restart:]
+    assert grows(first)
+    assert grows(repaired)  # the repair's reply replaces the first one
+    assert first[-1] == repaired[-1] == result.reply
+
+
+@pytest.mark.req("MODEL-03")
+def test_a_stream_cut_off_part_way_is_a_transient_failure_with_only_part_of_the_reply() -> None:
+    result, _, streamed = run_fake(FakeFailure.CUT_MID_STREAM)
+
+    assert isinstance(result, Exception)
+    assert classify_failure(result).failure is None  # transient: the DBOS step retries
+    full = run_fake(None)[0]
+    assert isinstance(full, InterviewProposal)
+    assert streamed
+    assert grows(streamed)
+    assert full.reply.startswith(streamed[-1])
+    assert streamed[-1] != full.reply
 
 
 @pytest.mark.req("PROF-05", "MODEL-03")
 def test_an_invalid_output_is_repaired_once_with_the_problems_named() -> None:
-    result, messages = run_fake(FakeFailure.INVALID_ONCE)
+    result, messages, _ = run_fake(FakeFailure.INVALID_ONCE)
 
     assert not isinstance(result, Exception), result
     requests = [m for m in messages if isinstance(m, ModelRequest)]
@@ -136,7 +193,7 @@ def test_an_invalid_output_is_repaired_once_with_the_problems_named() -> None:
 
 @pytest.mark.req("PROF-05", "MODEL-03")
 def test_an_output_still_invalid_after_the_repair_fails_typed_with_no_proposal() -> None:
-    result, messages = run_fake(FakeFailure.INVALID_ALWAYS)
+    result, messages, _ = run_fake(FakeFailure.INVALID_ALWAYS)
 
     assert isinstance(result, UnexpectedModelBehavior)
     assert classify_failure(result).failure is FailureClass.INVALID_MODEL_OUTPUT
@@ -145,7 +202,7 @@ def test_an_output_still_invalid_after_the_repair_fails_typed_with_no_proposal()
 
 @pytest.mark.req("MODEL-03")
 def test_a_refusal_is_its_own_failure_not_a_retry() -> None:
-    result, messages = run_fake(FakeFailure.REFUSAL)
+    result, messages, _ = run_fake(FakeFailure.REFUSAL)
 
     assert isinstance(result, ContentFilterError)
     assert classify_failure(result).failure is FailureClass.MODEL_REFUSED
@@ -154,7 +211,7 @@ def test_a_refusal_is_its_own_failure_not_a_retry() -> None:
 
 @pytest.mark.req("MODEL-03", "PROF-03")
 def test_a_truncated_output_fails_at_once_and_is_never_parsed_or_repaired() -> None:
-    result, messages = run_fake(FakeFailure.TRUNCATED)
+    result, messages, _ = run_fake(FakeFailure.TRUNCATED)
 
     assert isinstance(result, Exception)
     assert classify_failure(result).failure is FailureClass.OUTPUT_TRUNCATED
@@ -166,7 +223,7 @@ def test_a_truncated_output_fails_at_once_and_is_never_parsed_or_repaired() -> N
 
 @pytest.mark.req("PROF-05", "MODEL-03")
 def test_a_complete_but_schema_invalid_output_is_repaired_once_then_fails_typed() -> None:
-    result, messages = run_fake(FakeFailure.SCHEMA_INVALID_ALWAYS)
+    result, messages, _ = run_fake(FakeFailure.SCHEMA_INVALID_ALWAYS)
 
     assert isinstance(result, UnexpectedModelBehavior)
     assert classify_failure(result).failure is FailureClass.INVALID_MODEL_OUTPUT

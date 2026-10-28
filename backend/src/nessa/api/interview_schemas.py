@@ -7,6 +7,7 @@ from datetime import datetime
 from pydantic import Field
 
 from nessa.api.schemas import ProfileOut, ResponseModel, RunOut
+from nessa.identity.records import PartialCompleteness, PartialReply
 from nessa.money import Money
 from nessa.profile.conversation import TurnView
 from nessa.profile.interview import (
@@ -52,6 +53,32 @@ class ProposedChangeOut(ResponseModel):
             message_ids=list(change.message_ids),
             reason=change.reason,
             hard_constraint=change.hard_constraint,
+        )
+
+
+class PartialReplyOut(ResponseModel):
+    """The turn's reply as it streams: unvalidated text, never a proposal. The turn's run
+    state and, once complete, its proposal are authoritative."""
+
+    turn_id: uuid.UUID
+    completeness: PartialCompleteness = Field(
+        description=(
+            "none: no text yet; streaming: the reply so far; incomplete: it stopped and will "
+            "not complete; superseded: the run completed, so read the proposal's reply."
+        )
+    )
+    seq: int | None = Field(description="Matches the run.partial_updated event that announced it.")
+    text: str | None = Field(description="The reply so far; null when none or superseded.")
+    updated_at: datetime | None = Field(description="When the text was last written (freshness).")
+
+    @classmethod
+    def of(cls, turn_id: uuid.UUID, partial: PartialReply) -> "PartialReplyOut":
+        return cls(
+            turn_id=turn_id,
+            completeness=partial.completeness,
+            seq=partial.seq,
+            text=partial.text,
+            updated_at=partial.updated_at,
         )
 
 

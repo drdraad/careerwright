@@ -8,6 +8,7 @@ for, through the same command as a direct edit, with hard constraints confirmed 
 
 import dataclasses
 import secrets
+import signal
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -22,6 +23,7 @@ from nessa.api.deps import ApiDependencies
 from nessa.config import RuntimeMode
 from tests.integration.durable import Scenario, make_scenario
 from tests.support.client import ApiClient, profile_with
+from tests.support.fake_models import interview_answer
 from tests.support.infra import API_BASE, Infra
 
 pytestmark = pytest.mark.integration
@@ -207,6 +209,87 @@ def test_an_output_invalid_once_is_repaired_by_one_more_request(scenario: Scenar
     assert turn["run"]["status"] == "complete"
     [attempt] = scenario.attempts(turn["turn_id"])
     assert (attempt["requests_sent"], attempt["spend_state"]) == (2, "reconciled")
+
+
+def reply_path(scenario: Scenario, turn_id: str) -> str:
+    return f"/v1/workspaces/{scenario.workspace_id}/interview/turns/{turn_id}/reply"
+
+
+def partial_events(scenario: Scenario, turn_id: str) -> list[dict[str, Any]]:
+    events = scenario.api.get(f"/v1/workspaces/{scenario.workspace_id}/events", scenario.token)
+    return [
+        e
+        for e in events.json()["items"]
+        if e["kind"] == "run.partial_updated" and e["subject_id"] == turn_id
+    ]
+
+
+@pytest.mark.req("MODEL-03", "DUR-03", "SEC-01")
+def test_a_turn_streams_its_reply_to_its_owner_and_the_validated_output_supersedes_it(
+    scenario: Scenario, ben: str
+) -> None:
+    secret = message_sentinel()
+    turn_id = scenario.submit_turn(f"I could work in Leeds and spend about £1,500. {secret}")[
+        "turn_id"
+    ]
+    crashed = scenario.worker("crashes", crash_at="after_first_partial")
+    assert crashed.wait_exit(60) == -signal.SIGKILL  # mid-call, after the first piece
+
+    streaming = scenario.api.get(reply_path(scenario, turn_id), scenario.token).json()
+    assert (streaming["completeness"], streaming["seq"]) == ("streaming", 1)
+    assert streaming["text"]
+    assert streaming["updated_at"]
+    assert scenario.turn(turn_id)["proposal"] is None  # the reply so far is never a proposal
+    # The status event names the run and the sequence, nothing else.
+    assert [(e["state"], e["detail"]) for e in partial_events(scenario, turn_id)] == [
+        (None, {"seq": 1})
+    ]
+    assert scenario.api.get(reply_path(scenario, turn_id), ben).status_code == 404
+    ben_id = scenario.api.get("/v1/me", ben).json()["actor_id"]
+    count = "SELECT count(*) AS n FROM nessa.run_partials"
+    assert scenario.infra.as_role("pg_api", count, actor=ben_id) == [{"n": 0}]
+
+    recovered = scenario.worker("recovers")
+    scenario.wait_terminal(turn_id)
+    assert recovered.stop() == 0
+
+    shown = scenario.turn(turn_id)
+    assert shown["run"]["status"] == "complete"
+    assert shown["proposal"]["reply"].startswith(streaming["text"])
+    done = scenario.api.get(reply_path(scenario, turn_id), scenario.token).json()
+    assert (done["completeness"], done["text"], done["seq"]) == ("superseded", None, None)
+    assert scenario.infra.query(
+        "SELECT count(*) AS n FROM nessa.run_partials WHERE run_id = %s", (turn_id,)
+    ) == [{"n": 0}]  # deleted with the validated output's arrival
+    assert scenario.leaks(secret) == []  # the streamed text is sealed, like the output
+
+
+@pytest.mark.req("MODEL-03", "PROF-03")
+def test_a_reply_cut_off_mid_stream_ends_observably_with_the_partial_marked_incomplete(
+    scenario: Scenario,
+) -> None:
+    before = scenario.profile()
+
+    turn = run_turn(scenario, "", fake_failure="cut_mid_stream")
+
+    assert (turn["run"]["status"], turn["run"]["failure_class"]) == (
+        "provider_unavailable",
+        "provider_unavailable",
+    )
+    assert turn["proposal"] is None
+    partial = scenario.api.get(reply_path(scenario, turn["turn_id"]), scenario.token).json()
+    assert partial["completeness"] == "incomplete"
+    full = interview_answer({"current_message": "m1"}, scenario.output_sentinel, valid=True)
+    assert partial["text"]
+    assert str(full["reply"]).startswith(partial["text"])
+    assert partial["text"] != full["reply"]  # only the part that arrived
+    seqs = [e["detail"]["seq"] for e in partial_events(scenario, turn["turn_id"])]
+    assert partial["seq"] == max(seqs)  # the last event announced the incomplete state
+    assert scenario.outputs(turn["turn_id"]) == []
+    refused = scenario.decide(turn["turn_id"], {"expected_version": 1, "accept": ["c1"]})
+    assert (refused.status_code, refused.json()["error"]["code"]) == (409, "PROPOSAL_NOT_AVAILABLE")
+    assert scenario.profile() == before  # nothing partial ever commits
+    assert scenario.leaks() == []
 
 
 @pytest.mark.req("MODEL-03", "PROF-03")
@@ -433,6 +516,11 @@ def test_a_demo_workspace_interviews_offline_with_the_labelled_fixture_interview
         "cities": ["Bristol"],
         "weekly_study_hours": 5.0,
     }
+    # The fixture streams its reply like a provider; the validated proposal supersedes it.
+    events = api.get(f"/v1/workspaces/{workspace}/events", ada).json()["items"]
+    assert any(e["kind"] == "run.partial_updated" for e in events)
+    reply = api.get(f"/v1/workspaces/{workspace}/interview/turns/{turn_id}/reply", ada).json()
+    assert (reply["completeness"], reply["text"]) == ("superseded", None)
     [attempt] = scenario.attempts(turn_id)
     assert (attempt["spend_state"], attempt["cost_nano_usd"], attempt["reserved_nano_usd"]) == (
         "none",
