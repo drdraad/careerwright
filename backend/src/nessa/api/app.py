@@ -1,6 +1,9 @@
 """FastAPI application assembly (composition root for HTTP)."""
 
+from typing import Any
+
 from fastapi import FastAPI
+from fastapi.routing import APIRoute
 
 from nessa.api import (
     routes_credentials,
@@ -19,9 +22,21 @@ API_TITLE = "Nessa local API"
 API_VERSION = "1"
 
 
-def create_app(deps: ApiDependencies) -> FastAPI:
-    app = FastAPI(title=API_TITLE, version=API_VERSION, docs_url=None, redoc_url=None)
-    app.state.deps = deps
+def _operation_id(route: APIRoute) -> str:
+    # The handler's name (or its explicit `operation_id`) names the generated client's
+    # function; FastAPI warns, and the tests fail, if two operations share one.
+    return route.name
+
+
+def _routes() -> FastAPI:
+    """Every route and error handler, with no runtime dependency attached."""
+    app = FastAPI(
+        title=API_TITLE,
+        version=API_VERSION,
+        docs_url=None,
+        redoc_url=None,
+        generate_unique_id_function=_operation_id,
+    )
     install_error_handlers(app)
     for module in (
         routes_health,
@@ -33,6 +48,12 @@ def create_app(deps: ApiDependencies) -> FastAPI:
         routes_export,
     ):
         app.include_router(module.router)
+    return app
+
+
+def create_app(deps: ApiDependencies) -> FastAPI:
+    app = _routes()
+    app.state.deps = deps
     app.add_middleware(
         RequestGuard,
         allowed_hosts=deps.settings.allowed_hosts,
@@ -40,3 +61,9 @@ def create_app(deps: ApiDependencies) -> FastAPI:
         client_networks=deps.client_networks,
     )
     return app
+
+
+def openapi_document() -> dict[str, Any]:
+    """The contract `/openapi.json` serves, built without configuration, database or keys,
+    so the web app's TypeScript client is generated from it offline (Global Constraint 10)."""
+    return _routes().openapi()

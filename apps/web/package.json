@@ -1,0 +1,57 @@
+{
+  "name": "nessa-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Nessa L0 web app: the six-chapter shell on the local API (Next.js, TypeScript strict).",
+  "type": "module",
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=24.11 <25"
+  },
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port 3000",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1 --port 3000",
+    "generate": "node scripts/generate-client.mjs",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "node scripts/generate-client.mjs --check && biome check . && tsc --noEmit && vitest run",
+    "storybook": "storybook dev --host 127.0.0.1 --port 6006 --no-open",
+    "build-storybook": "storybook build --quiet",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@firebase/app": "0.16.3",
+    "@firebase/auth": "1.13.7",
+    "@radix-ui/react-dialog": "1.3.1",
+    "@radix-ui/react-popover": "1.3.1",
+    "@tanstack/react-query": "5.104.2",
+    "next": "16.4.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@hey-api/openapi-ts": "0.99.0",
+    "@playwright/test": "1.64.0",
+    "@storybook/addon-a11y": "10.6.2",
+    "@storybook/nextjs-vite": "10.6.2",
+    "@tailwindcss/postcss": "4.3.3",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "axe-core": "4.14.0",
+    "jsdom": "30.1.2",
+    "storybook": "10.6.2",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vite": "8.3.4",
+    "vitest": "5.0.4"
+  }
+}

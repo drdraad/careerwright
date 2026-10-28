@@ -1,0 +1,171 @@
+"use client";
+// The six-chapter shell around one workspace (spec section 3, UI-09): chapter rail or menu,
+// workspace strip, the chapter's work area and the evidence drawer. It owns the session
+// checks (signed in, invited, workspace visible) and the workspace's live status events;
+// chapters read the same server state through `useWorkspaceData`.
+import { usePathname, useRouter, useSelectedLayoutSegment } from "next/navigation";
+import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
+import type { ProfileOut, WorkspaceOut } from "@/generated/api";
+import { ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { CHAPTERS, type ChapterId, type ChapterProgress, isChapter } from "@/lib/chapters";
+import type { StreamStatus } from "@/lib/events";
+import { useMe, useProfile, useWorkspace, useWorkspaceEvents, useWorkspaces } from "@/lib/queries";
+import { ChapterMenu, ChapterRail } from "./ChapterNav";
+import { EvidenceDrawer, useEvidence } from "./EvidenceDrawer";
+import { PageFrame, PageLoading, RequestFailure } from "./PageState";
+import { SyntheticLabel } from "./Status";
+import { WorkspaceStrip } from "./WorkspaceStrip";
+
+type WorkspaceData = {
+  workspace: WorkspaceOut;
+  profile: ProfileOut | undefined;
+  profileError: unknown;
+  events: StreamStatus;
+};
+
+const WorkspaceContext = createContext<WorkspaceData | null>(null);
+
+export function useWorkspaceData(): WorkspaceData {
+  const value = useContext(WorkspaceContext);
+  if (value === null) throw new Error("useWorkspaceData outside WorkspaceShell");
+  return value;
+}
+
+const CALM_KEY = "nessa.calm";
+
+/** Calm mode is a per-viewer convenience; storage may be unavailable, which only loses it. */
+function useCalmMode(): [boolean, (calm: boolean) => void] {
+  const [calm, setCalm] = useState(false);
+  useEffect(() => {
+    try {
+      setCalm(window.localStorage.getItem(CALM_KEY) === "true");
+    } catch {
+      // Private mode or blocked storage: calm mode simply starts off.
+    }
+  }, []);
+  useEffect(() => {
+    document.documentElement.dataset.calm = String(calm);
+  }, [calm]);
+  const update = (next: boolean) => {
+    setCalm(next);
+    try {
+      window.localStorage.setItem(CALM_KEY, String(next));
+    } catch {
+      // As above: the choice holds for this page only.
+    }
+  };
+  return [calm, update];
+}
+
+function progressOf(profile: ProfileOut | undefined): Partial<Record<ChapterId, ChapterProgress>> {
+  return profile !== undefined && profile.version > 0 ? { you: "done" } : {};
+}
+
+export function WorkspaceShell({
+  workspaceId,
+  children,
+}: {
+  workspaceId: string;
+  children: ReactNode;
+}) {
+  const segment = useSelectedLayoutSegment();
+  const chapter: ChapterId = segment !== null && isChapter(segment) ? segment : "you";
+  const auth = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { evidence, close } = useEvidence();
+  const [calm, setCalm] = useCalmMode();
+  const signedIn = auth.state.status === "signed_in";
+
+  useEffect(() => {
+    if (auth.state.status === "signed_out") {
+      router.replace(`/sign-in?next=${encodeURIComponent(pathname)}`);
+    }
+  }, [auth.state.status, pathname, router]);
+
+  // A drawer belongs to the chapter that opened it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: close only when the chapter changes
+  useEffect(() => close(), [chapter]);
+
+  const me = useMe(signedIn);
+  const invited = signedIn && me.isSuccess;
+  const workspace = useWorkspace(workspaceId, invited);
+  const profile = useProfile(workspaceId, invited && workspace.isSuccess);
+  const workspaces = useWorkspaces(invited);
+  const events = useWorkspaceEvents(workspaceId, invited && workspace.isSuccess);
+
+  if (auth.state.status !== "signed_in") return <PageLoading stage="Checking your sign-in" />;
+  if (me.isError || workspace.isError) {
+    const error = me.error ?? workspace.error;
+    const notInvited = error instanceof ApiError && error.code === "NOT_INVITED";
+    return (
+      <PageFrame>
+        <h1 className="page-title">
+          {notInvited ? "This account isn't invited" : "This workspace can't be shown"}
+        </h1>
+        <RequestFailure
+          error={error}
+          actions={
+            <>
+              {!notInvited && (
+                <a className="btn btn-secondary" href="/">
+                  Your workspaces
+                </a>
+              )}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => void auth.signOut()}
+              >
+                Sign out
+              </button>
+            </>
+          }
+        />
+      </PageFrame>
+    );
+  }
+  if (workspace.data === undefined) return <PageLoading stage="Opening your workspace" />;
+
+  const surface = CHAPTERS.find((item) => item.id === chapter)?.surface ?? "reading";
+  const progress = progressOf(profile.data);
+  const data: WorkspaceData = {
+    workspace: workspace.data,
+    profile: profile.data,
+    profileError: profile.error,
+    events,
+  };
+
+  return (
+    <WorkspaceContext.Provider value={data}>
+      <a
+        className="btn btn-primary sr-only focus:not-sr-only focus:absolute focus:left-16 focus:top-16 focus:z-40"
+        href="#main"
+      >
+        Skip to the chapter
+      </a>
+      <div className="app" data-drawer={evidence === null ? "closed" : "open"}>
+        <ChapterRail workspaceId={workspaceId} current={chapter} progress={progress} />
+        <div className="topbar on-space">
+          <ChapterMenu workspaceId={workspaceId} current={chapter} progress={progress} />
+          {workspace.data.synthetic && <SyntheticLabel />}
+        </div>
+        <WorkspaceStrip
+          workspace={workspace.data}
+          profile={profile.data}
+          workspaces={workspaces.data?.items ?? [workspace.data]}
+          events={events}
+          email={auth.state.email}
+          calm={calm}
+          onCalmChange={setCalm}
+          onSignOut={() => void auth.signOut()}
+        />
+        <main id="main" tabIndex={-1} className={`workarea on-${surface}`}>
+          {children}
+        </main>
+        <EvidenceDrawer />
+      </div>
+    </WorkspaceContext.Provider>
+  );
+}

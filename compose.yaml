@@ -4,7 +4,7 @@
 #
 # Every service sits on the `internal` network, which has no route out of the machine. The
 # `edge` relay is the only service also on a normal bridge: it publishes the API, the Auth
-# emulator, PostgreSQL and the web slot on 127.0.0.1 only. `compose.live.yaml` gives the
+# emulator, PostgreSQL and the web app on 127.0.0.1 only. `compose.live.yaml` gives the
 # worker (and nothing else) a route out, for Meta; demo mode omits it.
 name: nessa-l0
 
@@ -137,17 +137,30 @@ services:
       timeout: 3s
       retries: 30
 
-  # Next.js service slot (Task 4 adds apps/web). The edge already relays its port.
+  # The Next.js web app. The browser reaches it through the edge on 127.0.0.1; it forwards
+  # `/api/v1/*` to the API on this network (the browser's Origin unchanged) and answers only
+  # to the loopback Host values below. The Auth emulator URL is the browser's view of it.
   web:
-    profiles: [web]
     build: ./apps/web
     image: nessa-l0/web:local
     networks: [internal]
+    init: true
     environment:
       NESSA_API_INTERNAL_URL: http://api:8000
       NESSA_AUTH_EMULATOR_URL: http://127.0.0.1:${NESSA_AUTH_PORT:-59099}
+      NESSA_FIREBASE_PROJECT_ID: demo-nessa
+      NESSA_WEB_ALLOWED_HOSTS: 127.0.0.1:${NESSA_WEB_PORT:-53000},localhost:${NESSA_WEB_PORT:-53000}
+      NESSA_FIXTURES_DIR: /fixtures/m0
+    volumes:
+      - ./fixtures:/fixtures:ro
     depends_on:
       api: {condition: service_healthy}
+    stop_grace_period: 5s
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
 networks:
   internal:

@@ -210,6 +210,78 @@ def test_the_lockfile_holds_none_of_the_excluded_technologies() -> None:
     assert locked & EXCLUDED_PACKAGES == set()
 
 
+# The same exclusions for JavaScript (spec ARC-1, GC2): no other renderer (PixiJS, three.js),
+# workflow engine, Redis, vector database, embedding model, agent platform or scraping
+# browser. Playwright stays allowed: it is the plan's browser-test tool, never product code.
+EXCLUDED_JS_PACKAGES = frozenset(
+    {
+        "pixi.js",
+        "three",
+        "redis",
+        "ioredis",
+        "pgvector",
+        "chromadb",
+        "weaviate-client",
+        "weaviate-ts-client",
+        "faiss-node",
+        "langchain",
+        "llamaindex",
+        "puppeteer",
+        "puppeteer-core",
+        "or-tools",
+    }
+)
+EXCLUDED_JS_SCOPES = (
+    "@pixi/",
+    "@temporalio/",
+    "@redis/",
+    "@qdrant/",
+    "@pinecone-database/",
+    "@langchain/",
+    "@xenova/",
+    "@huggingface/",
+)
+PNPM_LOCKS = ("apps/web/pnpm-lock.yaml", "docs/design/pnpm-lock.yaml", "docker/auth/pnpm-lock.yaml")
+
+
+def pnpm_locked_names(path: Path) -> set[str]:
+    """Package names under `packages:` in a pnpm v9 lockfile (`  name@version:` keys)."""
+    names: set[str] = set()
+    in_packages = False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        if not line.startswith(" "):
+            in_packages = line.rstrip() == "packages:"
+            continue
+        key = re.match(r"^  '?(@?[^@\s']+)@", line)
+        if in_packages and key:
+            names.add(key.group(1))
+    return names
+
+
+def test_the_pnpm_lock_reader_finds_scoped_and_plain_names(tmp_path: Path) -> None:
+    lock = tmp_path / "pnpm-lock.yaml"
+    lock.write_text(
+        "lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies:\n      x: 1\n"
+        "packages:\n\n  '@pixi/core@8.0.0':\n    resolution: {}\n\n  react@19.3.0:\n"
+        "    resolution: {}\nsnapshots:\n  three@1.0.0: {}\n",
+        encoding="utf-8",
+    )
+
+    assert pnpm_locked_names(lock) == {"@pixi/core", "react"}
+
+
+@pytest.mark.req("ARC1-01", "ARC1-03")
+@pytest.mark.parametrize("lock", PNPM_LOCKS)
+def test_the_javascript_lockfiles_hold_none_of_the_excluded_technologies(lock: str) -> None:
+    names = pnpm_locked_names(REPO / lock)
+    excluded = {n for n in names if n in EXCLUDED_JS_PACKAGES or n.startswith(EXCLUDED_JS_SCOPES)}
+
+    assert len(names) > 0, f"{lock} has no packages: the reader is broken"
+    assert excluded == set()
+
+
 def published_ports(path: Path) -> list[str]:
     """Every list item under a `ports:` key (block style, as our compose files use)."""
     entries: list[str] = []

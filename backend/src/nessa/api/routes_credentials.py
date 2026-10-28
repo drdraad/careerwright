@@ -43,7 +43,12 @@ def list_credentials(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> 
         )
 
 
-@router.post("/credentials", status_code=201, response_model=CredentialOut)
+@router.post(
+    "/credentials",
+    status_code=201,
+    response_model=CredentialOut,
+    operation_id="store_credential",
+)
 def store(
     workspace_id: uuid.UUID, body: StoreKey, caller: CallerDep, deps: Deps, key: IdempotencyKey
 ) -> JSONResponse:
@@ -64,7 +69,12 @@ def store(
     return JSONResponse(response, status_code=status)
 
 
-@router.post("/credentials/{credential_id}/rotate", status_code=201, response_model=CredentialOut)
+@router.post(
+    "/credentials/{credential_id}/rotate",
+    status_code=201,
+    response_model=CredentialOut,
+    operation_id="rotate_credential",
+)
 def rotate(
     workspace_id: uuid.UUID,
     credential_id: uuid.UUID,
@@ -98,7 +108,11 @@ def rotate(
     return JSONResponse(response, status_code=status)
 
 
-@router.post("/credentials/{credential_id}/revoke", response_model=CredentialOut)
+@router.post(
+    "/credentials/{credential_id}/revoke",
+    response_model=CredentialOut,
+    operation_id="revoke_credential",
+)
 def revoke(
     workspace_id: uuid.UUID,
     credential_id: uuid.UUID,

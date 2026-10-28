@@ -27,7 +27,7 @@ def run_out(tx: Tx, keyring: Keyring, run: Run) -> RunOut:
     return RunOut.of(run, run_store.attempts(tx, run.run_id), open_output(tx, keyring, run))
 
 
-@router.post("/runs", status_code=202, response_model=RunOut)
+@router.post("/runs", status_code=202, response_model=RunOut, operation_id="submit_run")
 def submit(
     workspace_id: uuid.UUID, body: SubmitRun, caller: CallerDep, deps: Deps, key: IdempotencyKey
 ) -> JSONResponse:

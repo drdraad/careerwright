@@ -24,7 +24,7 @@ router = APIRouter(prefix="/v1", responses=ERROR_RESPONSES)
 Limit = Annotated[int, Query(ge=1, le=MAX_LIMIT)]
 
 
-@router.get("/me", response_model=ActorOut, tags=["identity"])
+@router.get("/me", response_model=ActorOut, tags=["identity"], operation_id="get_me")
 def me(caller: CallerDep) -> ActorOut:
     return ActorOut.of(caller.actor)
 
@@ -45,7 +45,13 @@ def list_workspaces(
     )
 
 
-@router.post("/workspaces", status_code=201, response_model=WorkspaceOut, tags=["workspaces"])
+@router.post(
+    "/workspaces",
+    status_code=201,
+    response_model=WorkspaceOut,
+    tags=["workspaces"],
+    operation_id="create_workspace",
+)
 def create(
     body: CreateWorkspace, caller: CallerDep, deps: Deps, key: IdempotencyKey
 ) -> JSONResponse:
@@ -66,13 +72,23 @@ def create(
     return JSONResponse(response, status_code=status)
 
 
-@router.get("/workspaces/{workspace_id}", response_model=WorkspaceOut, tags=["workspaces"])
+@router.get(
+    "/workspaces/{workspace_id}",
+    response_model=WorkspaceOut,
+    tags=["workspaces"],
+    operation_id="get_workspace",
+)
 def get(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> WorkspaceOut:
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
         return WorkspaceOut.of(visible_workspace(tx, workspace_id))
 
 
-@router.patch("/workspaces/{workspace_id}", response_model=WorkspaceOut, tags=["workspaces"])
+@router.patch(
+    "/workspaces/{workspace_id}",
+    response_model=WorkspaceOut,
+    tags=["workspaces"],
+    operation_id="rename_workspace",
+)
 def rename(
     workspace_id: uuid.UUID,
     body: RenameWorkspaceIn,

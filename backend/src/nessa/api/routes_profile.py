@@ -62,7 +62,11 @@ def put_profile(
     return JSONResponse(response, status_code=status)
 
 
-@router.get("/profile/versions", response_model=ProfileVersionPage)
+@router.get(
+    "/profile/versions",
+    response_model=ProfileVersionPage,
+    operation_id="list_profile_versions",
+)
 def list_versions(
     workspace_id: uuid.UUID,
     caller: CallerDep,
@@ -81,7 +85,11 @@ def list_versions(
     )
 
 
-@router.get("/profile/versions/{version}", response_model=ProfileOut)
+@router.get(
+    "/profile/versions/{version}",
+    response_model=ProfileOut,
+    operation_id="get_profile_version",
+)
 def get_version(
     workspace_id: uuid.UUID, version: Annotated[int, Path(ge=1)], caller: CallerDep, deps: Deps
 ) -> ProfileOut:

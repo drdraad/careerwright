@@ -22,7 +22,7 @@ from tools.localenv import REPO_ROOT, add_master_key_version, ensure_local_home,
 COMPOSE_FILE = REPO_ROOT / "compose.yaml"
 LIVE_OVERRIDE = REPO_ROOT / "compose.live.yaml"
 DEFAULT_PROJECT = "nessa-l0"
-CORE_SERVICES = ("postgres", "auth", "edge", "api", "worker")
+CORE_SERVICES = ("postgres", "auth", "edge", "api", "worker", "web")
 STOP_TIMEOUT_S = 10
 COMMAND_TIMEOUT_S = 600.0
 
@@ -169,11 +169,11 @@ def _start(stack: Stack, mode: str) -> None:
     ensure_local_home(stack.home)
     print(f"starting Nessa ({mode} mode, project {stack.project})...", flush=True)
     stack.up(*CORE_SERVICES)
+    print(f"Nessa:         {stack.web_origin}  (open this in a browser)")
     print(f"API:           {stack.api_url}  (OpenAPI at {stack.api_url}/openapi.json)")
     print(f"Auth emulator: {stack.auth_url}  (project demo-nessa)")
-    print(f"Web:           {stack.web_origin}  (the Next.js app arrives in Task 4)")
     print("Sign in as ada@nessa.test or ben@nessa.test (password: nessa-demo-<name>).")
-    print(f"Fixture workspace (owned by Ada): {stack.api_url}/v1/workspaces/{FIXTURE_WORKSPACE_ID}")
+    print(f"Fixture workspace (owned by Ada): {stack.web_origin}/w/{FIXTURE_WORKSPACE_ID}/you")
     if mode == "demo":
         print("Demo mode: no Nessa service has a route out of this machine.")
 
@@ -202,28 +202,43 @@ def main(argv: list[str] | None = None) -> None:
             "build",
             "reseal",
             "rotate-master-key",
+            "down",
         ),
     )
+    # A separate project and NESSA_HOME, for test harnesses (the browser journey); the make
+    # targets always use the defaults.
+    parser.add_argument("--project", default=DEFAULT_PROJECT)
+    parser.add_argument("--home", type=Path, default=None)
     args = parser.parse_args(argv)
     ports = ports_from_env()
+    home = args.home.resolve() if args.home is not None else nessa_home()
+
+    def stack(*, live: bool = True) -> Stack:
+        return Stack(project=args.project, home=home, ports=ports, live=live)
+
     match args.command:
         case "dev":
-            _start(Stack(ports=ports, live=True), "live")
+            _start(stack(live=True), "live")
         case "demo":
-            _start(Stack(ports=ports, live=False), "demo")
+            _start(stack(live=False), "demo")
         case "stop":
-            print(f"Nessa {Stack(ports=ports).stop()}; volumes and data are kept.")
+            print(f"Nessa {stack().stop()}; volumes and data are kept.")
         case "reset-demo":
-            Stack(ports=ports).run("migrate", "python", "-m", "nessa.cli", "reset-demo")
+            stack().run("migrate", "python", "-m", "nessa.cli", "reset-demo")
             print("fixture workspace reset; other workspaces untouched.")
         case "status":
-            print(Stack(ports=ports).compose("ps", "--all").stdout)
+            print(stack().compose("ps", "--all").stdout)
         case "build":
-            Stack(ports=ports).build()
+            stack().build()
+        case "down":
+            # Deletes the project's volumes: only for a test project, never the default one.
+            if args.project == DEFAULT_PROJECT:
+                raise SystemExit("`down` deletes data; it is refused for the default project")
+            stack().down()
         case "reseal":
-            print(reseal(Stack(ports=ports)))
+            print(reseal(stack()))
         case "rotate-master-key":
-            created = rotate_master_key(Stack(ports=ports))
+            created = rotate_master_key(stack())
             print(
                 f"{created} is now the current master key and every sealed record uses it. "
                 "Older v<N>.key files in NESSA_HOME/keys may now be removed."

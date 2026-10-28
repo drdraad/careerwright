@@ -2,3 +2,4 @@
 # normalisation.
 docs/design/fonts/** -text
 fixtures/m0/** -text
+apps/web/src/design/fonts/** -text

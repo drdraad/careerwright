@@ -1,0 +1,213 @@
+/*
+ * Nessa design tokens, v0.1.0 (Sprint 0 design reference).
+ *
+ * Canonical source for colour, type, space, radius and motion. Components use the
+ * semantic tokens (the second block) and the context aliases (.on-space / .on-reading),
+ * never the primitives. Every text and meaningful non-text pairing is measured by
+ * tools/contrast.mjs against contrast-pairs.json; results: contrast-report.md.
+ *
+ * Two surface contexts, not two themes: exploration happens on ink ("space"), reading
+ * and decisions on light canvas and cards ("reading"). Spec section 14 starting values
+ * are kept: ink #09121F, raised ink #142338, light canvas #F5F7FA, cards #FFFFFF,
+ * text #EEF4FC / #B1C1D6 on dark, #142338 on light, sea-glass #5DE0C1.
+ */
+
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("../fonts/source-sans-3/SourceSans3-Variable.ttf") format("truetype");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Newsreader";
+  src: url("../fonts/newsreader/Newsreader-Variable.ttf") format("truetype");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* ---- Primitives (do not use in components) ---- */
+  --ink-900: #09121F;
+  --ink-800: #142338;
+  --ink-700: #1C2F4A;
+  --ink-600: #2A4060;
+  --ink-500: #5C7394;
+  --mist-100: #EEF4FC;
+  --mist-300: #B1C1D6;
+  --mist-400: #93A6BF;
+  --paper-50: #F5F7FA;
+  --paper-0: #FFFFFF;
+  --paper-200: #E3E8EF;
+  --slate-400: #7A899E;
+  --slate-600: #4B5B72;
+  --seaglass-400: #5DE0C1;
+  --seaglass-700: #0A7360;
+  --crimson-300: #FF7D90;
+  --crimson-700: #B1243B;
+  --sand-300: #D6CBAE;
+  --sand-700: #665A40;
+
+  /* Industry hues: categorical only, never status (spec section 14). */
+  --industry-blue-on-space: #74ABFF;
+  --industry-amber-on-space: #E8B04F;
+  --industry-violet-on-space: #B49DFF;
+  --industry-coral-on-space: #F29470;
+  --industry-olive-on-space: #B0C15C;
+  --industry-other-on-space: #8E9DB3;
+  --industry-blue-on-reading: #2A61C2;
+  --industry-amber-on-reading: #865800;
+  --industry-violet-on-reading: #6849CF;
+  --industry-coral-on-reading: #B0452A;
+  --industry-olive-on-reading: #5A6A10;
+  --industry-other-on-reading: #5A6A80;
+
+  /* ---- Semantic tokens ---- */
+  /* Surfaces */
+  --surface-space: var(--ink-900);
+  --surface-space-raised: var(--ink-800);
+  --surface-space-raised-2: var(--ink-700);
+  --surface-reading: var(--paper-50);
+  --surface-card: var(--paper-0);
+  --surface-card-sunken: var(--paper-50);
+  --surface-band: var(--paper-200);
+
+  /* Text */
+  --text-on-space: var(--mist-100);
+  --text-on-space-muted: var(--mist-300);
+  --text-on-space-subtle: var(--mist-400);
+  --text-on-reading: var(--ink-800);
+  --text-on-reading-muted: var(--slate-600);
+  --text-on-action-space: var(--ink-900);
+  --text-on-action-reading: var(--paper-0);
+
+  /* Lines. "-control" lines identify a component boundary and must reach 3:1;
+     "-hairline" lines only separate content and are exempt from 1.4.11. */
+  --line-space-hairline: var(--ink-600);
+  --line-space-control: var(--ink-500);
+  --line-reading-hairline: var(--paper-200);
+  --line-reading-control: var(--slate-400);
+  --branch-space: var(--mist-300);
+
+  /* Action, selection and focus: sea-glass is reserved for these. */
+  --action-space: var(--seaglass-400);
+  --action-reading: var(--seaglass-700);
+  --selection-space: var(--seaglass-400);
+  --selection-reading: var(--seaglass-700);
+  --focus-ring-space: var(--seaglass-400);
+  --focus-ring-reading: var(--seaglass-700);
+
+  /* Status: carried by glyph and text first; only error and stale add a hue, and
+     neither hue is an industry hue. */
+  --status-error-on-space: var(--crimson-300);
+  --status-error-on-reading: var(--crimson-700);
+  --status-stale-on-space: var(--sand-300);
+  --status-stale-on-reading: var(--sand-700);
+  --status-neutral-on-space: var(--mist-100);
+  --status-neutral-on-reading: var(--ink-800);
+  --status-unknown-on-space: var(--mist-300);
+  --status-unknown-on-reading: var(--slate-600);
+
+  /* Data marks on space. Dominated layers stay readable grey, never disabled. */
+  --mark-front-1: var(--mist-100);
+  --mark-front-later: var(--mist-400);
+  --mark-selected: var(--seaglass-400);
+
+  /* ---- Type ---- */
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Newsreader", Georgia, serif;
+  /* Modular scale, ratio 1.25 from a 16px body (12px is the floor). */
+  --type-12: 0.75rem;
+  --type-14: 0.875rem;
+  --type-16: 1rem;
+  --type-20: 1.25rem;
+  --type-25: 1.5625rem;
+  --type-31: 1.953rem;
+  --type-39: 2.441rem;
+  --type-49: 3.052rem;
+  --leading-body: 1.5;
+  --leading-display: 1.15;
+  --measure: 66ch;
+
+  /* ---- Space, radius ---- */
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-48: 48px;
+  --radius-control: 12px;
+  --radius-card: 16px;
+  --radius-sheet: 24px;
+  /* Phone bottom sheets open at this height so the main task above stays visible. */
+  --sheet-peek: 212px;
+  --shadow-card-on-space: 0 18px 40px -18px rgb(3 8 15 / 0.75);
+
+  /* ---- Motion (spec section 14; plan section 5) ---- */
+  --motion-control: 150ms;
+  --motion-panel: 260ms;
+  --motion-graph-reveal: 420ms;
+  --ease-settle: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Context aliases: components read these generic names. */
+.on-space {
+  --fg: var(--text-on-space);
+  --fg-muted: var(--text-on-space-muted);
+  --fg-subtle: var(--text-on-space-subtle);
+  --bg: var(--surface-space);
+  --bg-raised: var(--surface-space-raised);
+  --line: var(--line-space-hairline);
+  --line-control: var(--line-space-control);
+  --action: var(--action-space);
+  --on-action: var(--text-on-action-space);
+  --selection: var(--selection-space);
+  --focus: var(--focus-ring-space);
+  --status-error: var(--status-error-on-space);
+  --status-stale: var(--status-stale-on-space);
+  --status-neutral: var(--status-neutral-on-space);
+  --status-unknown: var(--status-unknown-on-space);
+  --industry-blue: var(--industry-blue-on-space);
+  --industry-amber: var(--industry-amber-on-space);
+  --industry-violet: var(--industry-violet-on-space);
+  --industry-coral: var(--industry-coral-on-space);
+  --industry-olive: var(--industry-olive-on-space);
+  --industry-other: var(--industry-other-on-space);
+  color: var(--fg);
+}
+
+.on-reading {
+  --fg: var(--text-on-reading);
+  --fg-muted: var(--text-on-reading-muted);
+  --fg-subtle: var(--text-on-reading-muted);
+  --bg: var(--surface-reading);
+  --bg-raised: var(--surface-card);
+  --line: var(--line-reading-hairline);
+  --line-control: var(--line-reading-control);
+  --action: var(--action-reading);
+  --on-action: var(--text-on-action-reading);
+  --selection: var(--selection-reading);
+  --focus: var(--focus-ring-reading);
+  --status-error: var(--status-error-on-reading);
+  --status-stale: var(--status-stale-on-reading);
+  --status-neutral: var(--status-neutral-on-reading);
+  --status-unknown: var(--status-unknown-on-reading);
+  --industry-blue: var(--industry-blue-on-reading);
+  --industry-amber: var(--industry-amber-on-reading);
+  --industry-violet: var(--industry-violet-on-reading);
+  --industry-coral: var(--industry-coral-on-reading);
+  --industry-olive: var(--industry-olive-on-reading);
+  --industry-other: var(--industry-other-on-reading);
+  color: var(--fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-control: 0ms;
+    --motion-panel: 0ms;
+    --motion-graph-reveal: 0ms;
+  }
+}
