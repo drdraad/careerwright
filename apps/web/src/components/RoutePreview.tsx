@@ -6,7 +6,9 @@
 // A card or the phone sheet can be read with everything above it scrolled away, so each keeps
 // its own qualification: a conditional route says "Conditional" beside its readiness, with
 // the condition (V-01, S0-V03), and the sheet leads with the route's name, condition,
-// readiness and both costs (V-04). Computed routes (Task 14) keep the same rule.
+// readiness and both costs (V-04). Computed routes (Task 14) keep the same rule, taking the
+// qualification from their own computed readiness state, never from this fixture adapter's
+// words, and never show an unqualified "Ready in …" when that state carries a condition.
 import { useState } from "react";
 import type { Money } from "@/generated/api";
 import type { RoutePreview as Preview, PreviewRoute } from "@/lib/fixtures/trace";

@@ -101,7 +101,9 @@ Rules the compositions follow, which implementations must keep:
   away, so on a phone the first card of the list stays above the sheet (S0-V07).
 - **A card keeps its own qualification.** A conditional route says "Conditional" beside
   its readiness on the card itself, not only in a note above the list that can scroll
-  away (S0-V03).
+  away (S0-V03). Computed routes (Task 14) take that qualification from their own
+  computed readiness state, never from the fixture adapter's words, and never show an
+  unqualified "Ready in …" when that state carries a condition.
 - **AI Resilience is always marked Experimental** (spec AIR-1). Each display has a badge and
   a provenance line. Synthetic records say so. For a real record, the same line carries
   the review date, method version and inherited geography.

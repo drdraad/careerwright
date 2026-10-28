@@ -10,8 +10,9 @@
   There the product owner also asked for three phrases to be added to the support screen
   (decision 7). Decision 12 and evaluation case EXP-01 were not in session 1's package; the
   product owner accepted them on 2026-10-28 in the chat after it, as five questions put them
-  (the session 1 record's "Addendum"). Decision 12's claim and quotation bounds, its full
-  function-word list and the "first view" definition were not asked: they stay
+  (the session 1 record's "Addendum"). Decision 12's full readiness, pay and hiring word
+  lists, its claim and quotation bounds, its full function-word list and the "first view"
+  definition were not asked: they stay
   **provisional, need product owner and reviewed sign-off** (ruling R6; H-12). Decision 2's
   salary floor is the product owner's change to the hard-constraint set (H-11, 2026-10-28).
 - Date: 2026-10-28
@@ -470,12 +471,14 @@ inference, with at least 30 evaluation cases and a capped live run.
       "Your answers can't be quoted on their own", which holds for both causes (fix round
       1). The live evidence is single samples on the test model.
     - **Accepted by the product owner (2026-10-28, the session 1 record's "Addendum";
-      H-12):** the readiness, pay and hiring word lists and phrasings with the record-only
-      allowance, the content-word rule as asked (a one-word answer such as "art" is not
-      quotable alone), a claim quoting both the person and the record, asking for the note
-      without a click, and Try again only for a run that reached no model. **Still
-      provisional (R6, H-12), not asked:** the claim and quotation bounds, the full
-      function-word list and the "first view" definition of a slate.
+      H-12):** blocking readiness, pay and hiring claims unless the job's own record uses
+      the word, as answer 3 put it: the rule, with its examples ("qualified", "well-paid",
+      "in demand", "employers need") and the "employers need" false alarm; the content-word
+      rule as asked (a one-word answer such as "art" is not quotable alone), a claim quoting
+      both the person and the record, asking for the note without a click, and Try again
+      only for a run that reached no model. **Still provisional (R6, H-12), not asked:** the
+      full readiness, pay and hiring word lists and phrasings, the claim and quotation
+      bounds, the full function-word list and the "first view" definition of a slate.
 
 ## Consequences
 
@@ -491,8 +494,9 @@ inference, with at least 30 evaluation cases and a capped live run.
   current link per discovery), `retry_failed` and `can_retry`, error code
   `SLATE_ALREADY_EXPLAINED` (409).
 - Not done: applying the salary floor (Sprint 3, with pay evidence); a salary floor per
-  target; a human review of decision 12's claim and quotation bounds, function-word list and
-  "first view" definition (H-12; not asked at session 1 or in its addendum).
+  target; a human review of decision 12's full readiness, pay and hiring word lists, claim
+  and quotation bounds, function-word list and "first view" definition (H-12; not asked at
+  session 1 or in its addendum).
 
 ## Human review checklist (H-12, session 1: held by the product owner on 2026-10-28)
 
@@ -548,10 +552,12 @@ cover stays open: not run — requires human.
   call was made, Suggest again otherwise (answer 4); the note above "How Nessa found it",
   saying only the quoted words were checked, and evaluation case EXP-01 as written
   (answer 5).
-- [ ] **Not covered by the addendum's answers** (decisions 12 and 7): the claim and
-  quotation bounds (counts and lengths), the full function-word list, the "first view"
-  definition of a slate, and the support screen's three phrasings as built ("end it",
-  "carry on", "not exist", added after session 1). Not asked: not run — requires human.
+- [ ] **Not covered by the addendum's answers** (decisions 12 and 7): the full readiness,
+  pay and hiring word lists and phrasings (answer 3 accepted the rule with its examples),
+  the claim and quotation bounds (counts and lengths), the full function-word list, the
+  "first view" definition of a slate, and the support screen's three phrasings as built
+  ("end it", "carry on", "not exist", added after session 1). Not asked: not run — requires
+  human.
 - [x] **Evaluation cases** (decision 9): the 43 cases from before Task 6b and their
   semantic expectations. Of them, 20 (SUP-01..13, GRD-01..07) test deterministic code with
   canned inputs; the model's behaviour rests on the live cases alone, single samples so

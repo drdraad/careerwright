@@ -303,8 +303,10 @@ this review does not change the application.
    *Disposition (Task 6c): fixed.* Each card reads "Conditional: ready in 4 months, once its
    assessed report is passed"; a card says "Ready in …" alone only for a route the data
    says is ready, and the drawer leads with "Conditional: ready only once …". The rule is
-   written into `RoutePreview.tsx` for the computed routes of Task 14
-   (`RoutePreview.test.tsx`, "says Conditional beside each card's readiness" and "says
+   written into `RoutePreview.tsx` and `docs/design/README.md` for the computed routes of
+   Task 14: they take the qualification from their own computed readiness state, never from
+   the fixture adapter's words, and never show an unqualified "Ready in …" when that state
+   carries a condition (`RoutePreview.test.tsx`, "says Conditional beside each card's readiness" and "says
    Ready in without a qualification only …"; `routes` and `routes--layers` captures in
    `sprint-2/screenshots/`).
 2. **V-02 — Failed-load recovery has no action and ambiguous status (all sizes).**

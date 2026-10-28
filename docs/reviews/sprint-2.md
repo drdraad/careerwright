@@ -294,12 +294,12 @@ refusal names an earlier request format as a possible reason.
 |---|---|---|
 | H-01 Sprint 2 design scores | Product owner and design reviewer | Not run — requires human (checklist below) |
 | H-03 VoiceOver, H-04 Safari | Humans, Sprints 8-9 | Not run — requires human |
-| H-12 support policy, inference word lists, slate weights, evaluation cases | Reviewer and product owner | Not run — requires human (ADR 0007 checklist) |
+| H-12 support policy, inference word lists, slate weights, evaluation cases | Reviewer and product owner | Seven of the checklist's nine items closed by the product owner on 2026-10-28, at session 1 and in its item 7 addendum (`docs/reviews/session-1.md`; ADR 0007 checklist). Open, not run — requires human: the counterfactual tolerance (its pass rule and fields), and what the addendum did not ask (the note's full readiness, pay and hiring word lists, its claim and quotation bounds, the full function-word list, the "first view" definition, and the three support phrasings as built) |
 | A powered counterfactual comparison (several samples per arm, against an H-12 tolerance) | Release task (cost estimate in the Task 6 report) | Open: REC1-09 inconclusive |
 | An absolute relevance floor for weak queries (A-M4) | H-12 slate review, then evaluation | Open: needs calibration on the full release |
 | DIV1-08 baselines (relevance-only, common careers), exposure concentration, long-tail coverage | Later evaluation work | Open |
 | Applying the salary floor | T7/T8 with pay evidence | Recorded, not applied |
-| Remove the `next` 16.4.1 age exception | First task after 2026-10-28T17:43Z | Open: not yet 14 days old during Task 6 |
+| Remove the `next` 16.4.1 age exception | First task after 2026-10-28T17:43Z | Closed: removed in Task 6c (`ac94bf4`); `pnpm install --frozen-lockfile` passes with the lockfile unchanged (ADR 0005 decision 1) |
 | Showing a changed constraint's affected results before invalidating them (STATE-06) | T11 onward | Open: no planning results yet |
 
 ## Human design-review checklist (H-01, Sprint 2: not run — requires human)
@@ -461,7 +461,7 @@ only "practical"), the known limit in decision 12. No production-model call.
 
 | Item | Owner | State |
 |---|---|---|
-| H-12: the note's word lists and phrasings, the content-word rule, bounds, the first-view slate, Try again only for a run that reached no model, asking without a click | Reviewer and product owner | Not run — requires human (ADR 0007 checklist) |
+| H-12: the note's word lists and phrasings, the content-word rule, bounds, the first-view slate, Try again only for a run that reached no model, asking without a click | Reviewer and product owner | The written-explanation item closed by the product owner on 2026-10-28 in session 1's item 7 addendum, as its five questions put it (`docs/reviews/session-1.md`; ADR 0007 checklist); seven of the checklist's nine items are closed. Open, not run — requires human: the note's full readiness, pay and hiring word lists, its claim and quotation bounds, the full function-word list and the "first view" definition |
 | H-01: the note's wording, its place above "How Nessa found it", the missing-note notice and its length on a phone | Product owner and design reviewer | Not run — requires human |
 | Prose that says more than its quotations | Release evaluation, H-12 | Open: only the quoted words are checked, and the note says so |
 | The repair rate of the note on the production model | Release task | Not run: one test-model sample only |
