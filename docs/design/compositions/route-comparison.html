@@ -32,12 +32,14 @@
         <p data-show="unknown" data-derived="directai-sentence"></p>
       </header>
 
+      <!-- S0-V07: each notice keeps its label and a one-line summary; the explanation is one
+           tap away, so on a phone the first route stays above the sheet. -->
       <div class="routes-alerts">
         <div class="alert on-space" role="alert" data-show="failure">
           <span data-glyph="error"></span>
           <div>
             <p class="alert-title">The route search failed</p>
-            <p class="small">The search process stopped unexpectedly after your change to weekly hours (run 7, attempt 1). Nothing from that run is shown. This is not "no routes".</p>
+            <p class="small">The search stopped unexpectedly (run 7). This is not "no routes".</p>
             <div class="alert-actions">
               <button class="btn btn-primary" type="button">Run the search again</button>
               <button class="btn btn-secondary" type="button">Run details</button>
@@ -48,14 +50,20 @@
           <span data-glyph="stale"></span>
           <div>
             <p class="alert-title">Showing the previous comparison, version 14, from 2 days ago</p>
-            <p class="small">It was made before you changed your weekly hours, so it may not match your profile now. Its numbers are unchanged and still checkable.</p>
+            <details class="more-detail">
+              <summary>Why it may not match</summary>
+              <p class="small">The search that failed (run 7, attempt 1) followed your change to weekly hours. Version 14 was made before that change, so it may not match your profile now. Its numbers are unchanged and still checkable.</p>
+            </details>
           </div>
         </div>
         <div class="alert alert-unknown on-space" data-show="unknown">
           <span data-glyph="unknown"></span>
           <div>
             <p class="alert-title">Economic cost is unavailable: your baseline pay isn't confirmed</p>
-            <p class="small">You chose to compare direct spending only, so pay lost while training isn't counted. Routes that keep your earnings may look more expensive here than they are.</p>
+            <details class="more-detail">
+              <summary>What this changes</summary>
+              <p class="small">You chose to compare direct spending only, so pay lost while training isn't counted. Routes that keep your earnings may look more expensive here than they are.</p>
+            </details>
             <div class="alert-actions">
               <button class="btn btn-secondary" type="button">Add baseline pay</button>
             </div>
@@ -112,9 +120,10 @@
         </div>
       </section>
 
+      <!-- S0-V03: each TRACE-01 card carries its own condition beside its readiness, so the
+           list needs no group note that can scroll away from a card. -->
       <section class="cards" aria-label="Routes">
         <h2>Best trade-offs found</h2>
-        <p class="rule-note status" data-glyph="conditional" data-show="default failure">Every route here is conditional: you're ready only once its assessed report is passed.</p>
         <div id="cards-best" class="card-list"></div>
         <h2>Other routes</h2>
         <div id="cards-other" class="card-list"></div>
@@ -123,11 +132,19 @@
 
       <section class="journey card on-reading" aria-labelledby="journey-title" tabindex="0">
         <span class="sheet-handle" aria-hidden="true"></span>
-        <div class="journey-head" data-show="default failure">
+        <!-- One head in every state, so More is always there (S0-V06). The stale journey says
+             so itself, since the sheet outlives the page's notice when scrolled (S0-V04). -->
+        <div class="journey-head">
           <h2 id="journey-title">Route B: evening course, keeping full hours</h2>
           <button class="btn btn-secondary sheet-expand" type="button" aria-expanded="false" data-glyph="expand">More</button>
-          <span class="status" data-glyph="conditional">Conditional: ready only if the assessed report passes</span>
+          <span class="status status-stale" data-glyph="stale" data-show="failure">Previous comparison, version 14, 2 days old</span>
+          <span class="status" data-glyph="conditional" data-show="default failure">Conditional: ready only if the assessed report passes</span>
         </div>
+        <dl class="summary" data-show="unknown">
+          <div><dt>Ready in</dt><dd><span data-value="directai.routes.1.timeMonths"></span> months</dd></div>
+          <div><dt>Direct spending</dt><dd><span data-gbp="directai.routes.1.directMinor"></span></dd></div>
+          <div><dt>Economic cost</dt><dd class="summary-unknown"><span class="status status-unknown" data-glyph="unknown">Not available</span></dd></div>
+        </dl>
         <dl class="summary" data-show="default failure">
           <div><dt>Ready to apply in</dt><dd><span data-value="trace01.print.timeMonths"></span> months</dd></div>
           <div><dt>Direct spending</dt><dd><span data-gbp="trace01.print.directMinor"></span></dd></div>
@@ -138,12 +155,9 @@
         </dl>
         <svg id="gantt" role="img" data-show="default failure"></svg>
         <ol class="timeline-mobile" id="timeline-mobile" data-show="default failure"></ol>
-        <div data-show="unknown">
-          <h2 id="journey-title-unknown" class="section-title">Route B, selected</h2>
-          <div class="unknown-block">
-            <span class="status status-unknown" data-glyph="unknown">Schedule not available</span>
-            <p class="small">This comparison has months and direct cost for each route, nothing more. Dates, payments, workload and the month-by-month cash check aren't part of it, so none of them is shown or assumed.</p>
-          </div>
+        <div class="unknown-block" data-show="unknown">
+          <span class="status status-unknown" data-glyph="unknown">Schedule not available</span>
+          <p class="small">This comparison has months and direct cost for each route, nothing more. Dates, payments, workload and the month-by-month cash check aren't part of it, so none of them is shown or assumed.</p>
         </div>
       </section>
 

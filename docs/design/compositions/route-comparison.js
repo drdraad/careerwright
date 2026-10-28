@@ -161,6 +161,8 @@
     lines.push(`<span class="route-letter" aria-hidden="true"></span>`);
     lines.push(`<span class="route-name"></span>`);
     if (comp) lines.push(`<span class="route-margin"></span>`);
+    // S0-V03: every TRACE-01 route is conditional, so its readiness never stands alone.
+    if (economic) lines.push(`<span class="route-condition status">${window.NESSA.glyph("conditional")}<span class="glyph-text"></span></span>`);
     lines.push(`<span class="route-figures"></span>`);
     if (economic) lines.push(`<span class="route-detail"></span>`);
     if (comp && comp.others.length) lines.push(`<span class="route-detail" data-others></span>`);
@@ -169,7 +171,12 @@
     b.querySelector(".route-letter").textContent = r.id;
     b.querySelector(".route-name").textContent = economic ? `Route ${r.id}: ${r.name}` : r.name;
     if (comp) b.querySelector(".route-margin").textContent = comp.text;
-    b.querySelector(".route-figures").textContent = `Ready in ${r.timeMonths} months, ${gbp(r.cost)} ${economic ? "economic cost" : "direct spending"}`;
+    if (economic) {
+      b.querySelector(".route-condition .glyph-text").textContent = `Conditional: ready in ${r.timeMonths} months, if the assessed report passes`;
+      b.querySelector(".route-figures").textContent = `${gbp(r.cost)} economic cost`;
+    } else {
+      b.querySelector(".route-figures").textContent = `Ready in ${r.timeMonths} months, ${gbp(r.cost)} direct spending`;
+    }
     if (economic) {
       const lost = r.economicMinor - r.directMinor;
       b.querySelector(".route-detail").textContent = `${gbp(r.directMinor)} fees${lost ? ` plus ${gbp(lost)} pay lost` : ", no pay lost"}. ${paymentPattern(r)}.`;
@@ -327,9 +334,11 @@
     set("directai-sentence", `Synthetic fixture DIRECTAI: ${F.directai.routes.length} routes to one target, with months and direct cost only.`);
     set("directai-count", `${F.directai.routes.length}, all feasible, one target (fixture DIRECTAI)`);
     set("basis-summary", economic
-      ? `Economic cost over ${t.horizonMonths} months against ${gbp(t.baselineIncomeByMonthMinor[0])} a month take-home. Search complete: ${t.routes.length} schedules.`
+      ? `${t.region.split(",")[0]}. Economic cost over ${t.horizonMonths} months against ${gbp(t.baselineIncomeByMonthMinor[0])} a month take-home. Search complete: ${t.routes.length} schedules.`
       : `Direct spending only; pay lost while training isn't counted. ${F.directai.routes.length} routes from fixture DIRECTAI.`);
-    if (route) document.querySelector("#journey-title").textContent = `Route ${route.id}: ${TRACE_NAMES[route.id].charAt(0).toLowerCase()}${TRACE_NAMES[route.id].slice(1)}`;
+    document.querySelector("#journey-title").textContent = route
+      ? `Route ${route.id}: ${TRACE_NAMES[route.id].charAt(0).toLowerCase()}${TRACE_NAMES[route.id].slice(1)}`
+      : `Route ${selectedId}`;
   }
 
   // Slider bounds come from the data, so every plotted route is inside the default view.

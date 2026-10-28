@@ -437,9 +437,11 @@
 }
 
 @media (max-width: 760px) {
+  /* The bottom padding keeps the shared sheet clearance (a 0 here hid the last listings
+     under the sheet). */
   .roles {
-    padding: var(--space-16) var(--space-16) 0;
-    gap: var(--space-12);
+    padding: var(--space-16) var(--space-16) calc(var(--sheet-peek) + var(--space-16));
+    gap: var(--space-8);
     grid-template-areas: "head" "filters" "list";
   }
 

@@ -42,8 +42,11 @@ pnpm run screenshots     # runs check-data, then captures all states and writes 
 
 `screenshots` serves the folder on an ephemeral 127.0.0.1 port, never on a public
 interface. Its checks per capture: axe-core 4.14.0 (WCAG 2.0, 2.1 and 2.2, A and AA
-tags), no horizontal overflow, no console errors, both fonts loaded, and no chart label
-leaving its chart or overlapping another label or a data mark.
+tags), no horizontal overflow, no console errors, both fonts loaded, no chart label
+leaving its chart or overlapping another label or a data mark, and at most one filled
+primary action in view. Where a phone sheet is open it also checks that the first list
+card starts at least 40 px above the sheet, and that no control brought into view by
+focus is covered at its centre (by the sheet or the reply field).
 
 ## Visual direction: a calm observatory
 
@@ -90,12 +93,23 @@ Rules the compositions follow, which implementations must keep:
   main task stays in view: the question and its answer choices, the listing list, or the
   route cards. "More" raises the sheet to the viewport less 72 px and becomes "Less";
   dragging the handle does the same. Designed and built in Task 4 (ADR 0005 decision 8);
-  these static references show the peek only.
+  these static references show the peek only. The content keeps room below for the sheet
+  and the reply field rides above it, so anything brought into view stops above both. The
+  peek leads with what the selection is: the route's or field's name, its condition or
+  freshness, and its key figures, in every state (Task 6c, S0-V04, S0-V06).
+- **A notice leads with its label and a one-line summary;** its explanation is one tap
+  away, so on a phone the first card of the list stays above the sheet (S0-V07).
+- **A card keeps its own qualification.** A conditional route says "Conditional" beside
+  its readiness on the card itself, not only in a note above the list that can scroll
+  away (S0-V03).
 - **AI Resilience is always marked Experimental** (spec AIR-1). Each display has a badge and
   a provenance line. Synthetic records say so. For a real record, the same line carries
   the review date, method version and inherited geography.
 - **Chapters are not numbered.** The rail marks each chapter as visited, current or not
-  started. Chapters are navigable states, not a wizard (spec section 3).
+  started. Chapters are navigable states, not a wizard (spec section 3). A filled landmark
+  means the chapter's decisions are recorded (spec section 15), as these references show
+  for earlier chapters; a chapter that was only opened has a brighter ring, never a fill,
+  so visiting cannot read as finishing (Sprint 1 V-09).
 
 ### Tokens
 

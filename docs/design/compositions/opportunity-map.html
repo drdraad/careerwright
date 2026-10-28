@@ -37,11 +37,17 @@
         </div>
       </div>
 
+      <!-- S0-V07: the label and a one-line summary lead; the explanation is one tap away, so
+           on a phone the first listing stays above the sheet. -->
       <div class="alert on-space roles-alert" role="alert" data-show="failure">
         <span data-glyph="error"></span>
         <div>
           <p class="alert-title">The job board search failed, so coverage is reduced</p>
-          <p class="small">It didn't respond after 3 attempts at 09:12. The <span data-count="stale"></span> listings that came only from it are shown from 2 days ago and may have closed. This is not "no vacancies": the other 3 sources were checked today.</p>
+          <p class="small">This is not "no vacancies": the other 3 sources were checked today.</p>
+          <details class="more-detail">
+            <summary>What this means</summary>
+            <p class="small">The job board didn't respond after 3 attempts at 09:12. The <span data-count="stale"></span> listings that came only from it are shown from 2 days ago and may have closed.</p>
+          </details>
           <div class="alert-actions">
             <button class="btn btn-primary" type="button">Try the search again</button>
             <button class="btn btn-secondary" type="button">Source details</button>
@@ -126,8 +132,10 @@
           <dt>Checked</dt><dd>3 hours ago</dd>
         </dl>
         <p class="small muted">Missing pay is kept in its own lane. It never counts as the lowest pay.</p>
+        <!-- S0-V05: with too little to compare, the heading says fit is not assessed rather
+             than asserting a match. -->
         <div class="card-block">
-          <h3 class="section-title">Matches your preferences</h3>
+          <h3 class="section-title">Preference fit not assessed</h3>
           <p class="small">Only a short summary of this listing was available, so there's too little to compare. The full description may change this.</p>
         </div>
         <div class="card-block ai-range">
@@ -169,8 +177,10 @@
           <div class="ai-range-head"><span class="ai-range-value"><span data-value="trace01.aiScore.range.0"></span>–<span data-value="trace01.aiScore.range.1"></span> of 10</span><span class="small">five-year outlook</span></div>
           <span class="status ai-provenance" data-glyph="synthetic">Synthetic test record, not a real assessment</span>
         </div>
+        <!-- S0-V08: the page's one primary action is the search's "Try the search again";
+             checking this one listing is secondary. -->
         <div class="card-actions">
-          <button class="btn btn-primary" type="button">Check again</button>
+          <button class="btn btn-secondary" type="button">Check this listing again</button>
           <a class="btn btn-secondary" href="#">Open listing</a>
         </div>
       </article>

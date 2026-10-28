@@ -335,6 +335,18 @@ blockquote {
     padding-bottom: calc(var(--sheet-peek) + var(--space-16));
   }
 
+  /* Whatever is scrolled or tabbed into view stops above the open sheet, never under it
+     (WCAG 2.4.11). */
+  html {
+    scroll-padding-bottom: calc(var(--sheet-peek) + var(--space-16));
+  }
+
+  /* Narrower side padding, so a notice's two actions share one row. (Scoped to the work area
+     to outrank the component rule further down this file.) */
+  .workarea .alert {
+    padding: var(--space-16);
+  }
+
   .btn.sheet-expand {
     display: inline-flex;
   }
@@ -516,6 +528,18 @@ blockquote {
   flex-wrap: wrap;
   gap: var(--space-8);
   margin-top: var(--space-12);
+}
+
+/* A notice's secondary explanation, one tap away, so its short summary leads (S0-V07). */
+.more-detail summary {
+  font-size: var(--type-14);
+  font-weight: 600;
+  color: var(--action);
+  cursor: pointer;
+}
+
+.more-detail p {
+  margin-top: var(--space-4);
 }
 
 .alert-stale {

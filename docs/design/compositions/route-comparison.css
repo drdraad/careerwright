@@ -489,14 +489,27 @@
 }
 
 @media (max-width: 760px) {
+  /* The bottom padding keeps the shared sheet clearance (a 0 here hid the last cards under
+     the sheet). */
   .routes {
-    padding: var(--space-16) var(--space-16) 0;
-    gap: var(--space-12);
+    padding: var(--space-16) var(--space-16) calc(var(--sheet-peek) + var(--space-16));
+    gap: var(--space-8);
     grid-template-areas: "head" "alerts" "chart" "cards" "journey";
+  }
+
+  .routes-alerts {
+    gap: var(--space-8);
   }
 
   .routes-head h1 {
     font-size: var(--type-25);
+  }
+
+  /* S0-V07: the basis summary below states the region and horizon, so the sentence under the
+     title is the first secondary text to go, and the stale alert carries the version's age. */
+  .routes-head p,
+  .basis .status-stale {
+    display: none;
   }
 
   /* A phone leads with cards; the chart opens as a focused view (plan section 4). */
@@ -518,7 +531,8 @@
   }
 
   .basis {
-    padding-bottom: var(--space-8);
+    padding-bottom: 0;
+    border-bottom: 0;
   }
 
   .basis-summary {

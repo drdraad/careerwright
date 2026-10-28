@@ -33,6 +33,15 @@
           <button class="btn btn-secondary" type="button" data-glyph="pause">Pause</button>
         </div>
 
+        <!-- S0-V01: on narrower screens "What we know" stacks after the conversation; this
+             summary at the top says what waits there and links to it. -->
+        <a class="known-summary" href="#known-title">
+          <span data-show="default"><strong>What we know</strong>, 4 changes to review</span>
+          <span data-show="unknown"><strong>What we know</strong>, 2 to review, 4 not known</span>
+          <span data-show="failure"><strong>What we know</strong>, unchanged at version 7</span>
+          <span class="known-summary-go">Review</span>
+        </a>
+
         <!-- P01: sure entry. The opening question and first reply are collapsed so the
              latest turn and the current question are in view. -->
         <button class="btn btn-quiet earlier" type="button">Show earlier messages</button>
@@ -42,6 +51,21 @@
         <div class="turn-you older" data-show="default">
           <p>I work <span data-value="trace01.weeklyWorkAfterCompletion"></span> hours a week and could manage <span data-value="p01.weeklyTotalAvailabilityHours"></span> in total with study. I've got <span data-gbp="p01.openingCashMinor"></span> saved and won't go below <span data-gbp="p01.reserveMinor"></span>. I could put <span data-gbp="p01.directSpendCapMinor"></span> towards this, but no more than that in any one month either.</p>
           <span class="when">You, 10:42</span>
+        </div>
+
+        <!-- The failure comes before the message it is about, so its recovery is in the first
+             view on a phone (S0-V02). -->
+        <div class="alert on-reading" role="alert" data-show="failure">
+          <span data-glyph="error"></span>
+          <div>
+            <p class="alert-title">Nessa couldn't turn your last message into proposed changes</p>
+            <p class="small">Its reply failed validation twice, so nothing was saved. What we know is unchanged at version 7. Your message is kept below.</p>
+            <p class="small muted">Error SCHEMA_INVALID, interview turn, run 4f2c-91</p>
+            <div class="alert-actions">
+              <button class="btn btn-primary" type="button">Try again</button>
+              <button class="btn btn-secondary" type="button">Add the details yourself</button>
+            </div>
+          </div>
         </div>
         <div class="turn-you not-processed" data-show="failure">
           <p>I work <span data-value="trace01.weeklyWorkAfterCompletion"></span> hours a week and could manage <span data-value="p01.weeklyTotalAvailabilityHours"></span> in total with study. I've got <span data-gbp="p01.openingCashMinor"></span> saved and won't go below <span data-gbp="p01.reserveMinor"></span>. I could put <span data-gbp="p01.directSpendCapMinor"></span> towards this, but no more than that in any one month either.</p>
@@ -80,32 +104,12 @@
           </div>
         </div>
 
-        <div class="alert on-reading" role="alert" data-show="failure">
-          <span data-glyph="error"></span>
-          <div>
-            <p class="alert-title">Nessa couldn't turn your last message into proposed changes</p>
-            <p class="small">Its reply failed validation twice, so nothing was saved. What we know is unchanged at version 7. Your message is kept above.</p>
-            <p class="small muted">Error SCHEMA_INVALID, interview turn, run 4f2c-91</p>
-            <div class="alert-actions">
-              <button class="btn btn-primary" type="button">Try again</button>
-              <button class="btn btn-secondary" type="button">Add the details yourself</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="known-summary">
-          <span data-show="default"><strong>What we know</strong>, 4 changes to review</span>
-          <span data-show="unknown"><strong>What we know</strong>, 2 to review, 4 not known</span>
-          <span data-show="failure"><strong>What we know</strong>, unchanged at version 7</span>
-          <button class="btn btn-secondary" type="button">Open</button>
-        </div>
-
         <form class="composer" aria-label="Reply" onsubmit="return false">
           <label class="visually-hidden" for="reply">Reply to Nessa</label>
           <textarea id="reply" rows="1" placeholder="Reply in your own words"></textarea>
-          <!-- One primary action per state: in the failure state it is "Try again". -->
-          <button class="btn btn-primary" type="submit" data-show="default unknown">Send</button>
-          <button class="btn btn-secondary" type="submit" data-show="failure">Send</button>
+          <!-- One primary action per view (S0-V08): the decision in the drawer (Accept, Add an
+               amount) or, after a failure, Try again. Send stays secondary beside them. -->
+          <button class="btn btn-secondary" type="submit">Send</button>
         </form>
       </section>
 

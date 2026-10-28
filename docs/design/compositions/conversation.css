@@ -275,28 +275,76 @@
   margin-top: auto;
 }
 
+/* Shown where "What we know" is no longer beside the conversation (S0-V01). This rule comes
+   before the media queries that show it, so it cannot override them. */
+.known-summary {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  background: var(--surface-card);
+  border: 1px solid var(--line-reading-control);
+  border-radius: var(--radius-control);
+  font-size: var(--type-14);
+  color: var(--text-on-reading);
+  text-decoration: none;
+}
+
+.known-summary-go {
+  flex: none;
+  font-weight: 600;
+  color: var(--action-reading);
+}
+
 @media (max-width: 1280px) {
   .you {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  /* "What we know" stacks after the conversation; the summary at the top links to it. */
+  .known-summary {
+    display: flex;
+  }
 }
 
 @media (max-width: 760px) {
+  /* S0-V02: room below the work for the open sheet, so everything above it can be scrolled
+     clear of it. (The shorthand used to reset the shared sheet clearance to 0.) */
   .you {
-    padding: var(--space-16) var(--space-16) 0;
-    gap: var(--space-16);
+    padding: var(--space-16) var(--space-16) calc(var(--sheet-peek) + var(--space-16));
+    gap: var(--space-24);
+  }
+
+  /* Tighter spacing, so the question and its choices clear the reply field in the first view. */
+  .thread {
+    gap: var(--space-8);
+  }
+
+  .question {
+    padding-top: var(--space-12);
+  }
+
+  .question p {
+    margin-top: var(--space-8);
+  }
+
+  .choices {
+    margin-top: var(--space-12);
+  }
+
+  /* The reply field rides above the sheet's peek, never under it, and whatever is scrolled or
+     tabbed into view stops above both. */
+  .composer {
+    bottom: calc(var(--sheet-peek) + var(--space-16));
+  }
+
+  html {
+    scroll-padding-bottom: calc(var(--sheet-peek) + 96px);
   }
 
   .question h1 {
     font-size: var(--type-25);
-  }
-
-  .known {
-    display: none;
-  }
-
-  .known-summary {
-    display: flex;
   }
 
   .turn-you {
@@ -311,16 +359,4 @@
   [data-state="unknown"] .earlier {
     display: inline-flex;
   }
-}
-
-.known-summary {
-  display: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-  padding: var(--space-12) var(--space-16);
-  background: var(--surface-card);
-  border: 1px solid var(--line-reading-control);
-  border-radius: var(--radius-control);
-  font-size: var(--type-14);
 }
