@@ -7,6 +7,16 @@
 // costs and dates are the fixture's numbers: route ranks and affordability are computed by
 // deterministic Python, and the solver that will do so does not exist yet (Sprint 6).
 import type { Money, WorkState } from "@/generated/api";
+import type { SignedMoney } from "@/lib/money";
+
+/**
+ * The readiness states the fixture pack uses, in words (spec RDY-1). `null` means ready
+ * without a condition. A state not listed here is refused as malformed rather than guessed.
+ */
+const READINESS: Record<string, string | null> = {
+  conditional_on_assessed_completion: "ready only once its assessed report is passed",
+  ready: null,
+};
 
 export const TRACE_LOCATOR = "fixtures/m0/worked_trace.json";
 /** fixtures/README.md: the supplied pack is byte-identical and pinned by hash. */
@@ -25,13 +35,15 @@ export type PreviewRoute = {
   key: string;
   letter: string;
   timeMonths: number;
-  economicCost: Money;
+  /** Signed: fees plus pay lost against the baseline can be negative (a gain). */
+  economicCost: SignedMoney;
   directSpend: Money;
   paymentsByMonth: Money[];
   incomeByMonth: Money[];
   /** 1, 2 or 3: the layer the fixture states for this route. */
   layer: number;
-  conditional: boolean;
+  /** The route's readiness condition in words, from its readiness state; null if none. */
+  condition: string | null;
   start: string;
   finish: string;
 };
@@ -100,6 +112,10 @@ function isWholeNonNegative(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
+function isWhole(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value);
+}
+
 /** Maps verified file bytes (already hash-checked) to the preview, or a typed failure. */
 export function previewFromTrace(text: string, sha256: string): RoutePreview {
   if (sha256 !== TRACE_SHA256) return failed("checksum_mismatch");
@@ -120,23 +136,29 @@ export function previewFromTrace(text: string, sha256: string): RoutePreview {
   const routes: PreviewRoute[] = [];
   for (const route of trace.routes ?? []) {
     const layer = layerOf.get(route.id);
-    const money = [
-      route.economic_cost_minor,
+    const payments = [
       route.direct_spend_minor,
       ...route.payments_by_month_minor,
       ...route.income_by_month_minor,
     ];
-    if (layer === undefined || !money.every(isWholeNonNegative)) return failed("malformed");
+    if (
+      layer === undefined ||
+      !payments.every(isWholeNonNegative) ||
+      !isWhole(route.economic_cost_minor) ||
+      !Object.hasOwn(READINESS, route.readiness_status)
+    ) {
+      return failed("malformed");
+    }
     routes.push({
       key: `${trace.id}/${route.id}`,
       letter: route.id,
       timeMonths: route.time_months,
-      economicCost: gbp(route.economic_cost_minor),
+      economicCost: { minor_units: route.economic_cost_minor, currency: "GBP" },
       directSpend: gbp(route.direct_spend_minor),
       paymentsByMonth: route.payments_by_month_minor.map(gbp),
       incomeByMonth: route.income_by_month_minor.map(gbp),
       layer,
-      conditional: route.readiness_status.startsWith("conditional"),
+      condition: READINESS[route.readiness_status] ?? null,
       start: route.actual_start_date,
       finish: route.actual_finish_date,
     });

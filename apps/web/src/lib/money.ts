@@ -22,6 +22,22 @@ export function formatMoney(money: Money): string {
   return SYMBOL[money.currency] + body;
 }
 
+/**
+ * Economic values (spec section 18): signed, because a route can cost less than the baseline.
+ * The API has no SignedMoney yet (it arrives with the monthly compiler, T11); until then the
+ * fixture adapter uses this local shape, to be replaced by the generated type.
+ */
+export type SignedMoney = { minor_units: number; currency: Currency };
+
+/** "−£500" for a negative amount (a true minus sign), otherwise as `formatMoney`. */
+export function formatSignedMoney(money: SignedMoney): string {
+  const magnitude = formatMoney({
+    minor_units: Math.abs(money.minor_units),
+    currency: money.currency,
+  });
+  return money.minor_units < 0 ? `−${magnitude}` : magnitude;
+}
+
 export type MoneyInputProblem = "empty" | "negative" | "not_a_number" | "too_precise" | "too_large";
 
 export type ParsedMoney = { ok: true; money: Money } | { ok: false; reason: MoneyInputProblem };

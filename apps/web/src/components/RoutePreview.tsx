@@ -5,7 +5,7 @@
 import { useState } from "react";
 import type { Money } from "@/generated/api";
 import type { RoutePreview as Preview, PreviewRoute } from "@/lib/fixtures/trace";
-import { formatMoney } from "@/lib/money";
+import { formatMoney, formatSignedMoney } from "@/lib/money";
 import { Alert } from "./Alert";
 import { useEvidence } from "./EvidenceDrawer";
 import { StatusBadge, SyntheticLabel } from "./Status";
@@ -29,12 +29,13 @@ const shortMonth = new Intl.DateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
-const CONDITION = "ready only once its assessed report is passed";
-const LAYER_NAME: Record<number, string> = {
-  1: "Best trade-offs found",
-  2: "Layer 2",
-  3: "Layer 3",
-};
+const LAYER_NAME: Record<number, string> = { 1: "Best trade-offs found" };
+
+/** The condition every route shares, if the data gives them all the same one. */
+function sharedCondition(routes: PreviewRoute[]): string | null {
+  const first = routes[0]?.condition ?? null;
+  return first !== null && routes.every((route) => route.condition === first) ? first : null;
+}
 
 function monthLabel(planningStart: string, index: number): string {
   const start = new Date(`${planningStart}T00:00:00Z`);
@@ -98,7 +99,7 @@ function RouteDetails({ route, preview }: { route: PreviewRoute; preview: Comple
     <>
       <p className="section-title">Route {route.letter}</p>
       <SyntheticLabel text="Synthetic fixture route" />
-      {route.conditional && <StatusBadge state="conditional" detail={CONDITION} />}
+      {route.condition !== null && <StatusBadge state="conditional" detail={route.condition} />}
       <dl className="kv">
         <dt>Ready in</dt>
         <dd>{months(route.timeMonths)}</dd>
@@ -108,7 +109,7 @@ function RouteDetails({ route, preview }: { route: PreviewRoute; preview: Comple
           {longDate.format(new Date(`${route.finish}T00:00:00Z`))}
         </dd>
         <dt>Economic cost</dt>
-        <dd>{formatMoney(route.economicCost)}</dd>
+        <dd>{formatSignedMoney(route.economicCost)}</dd>
         <dt>Direct spending</dt>
         <dd>{formatMoney(route.directSpend)}</dd>
         <dt>Layer</dt>
@@ -128,10 +129,9 @@ function RouteDetails({ route, preview }: { route: PreviewRoute; preview: Comple
         <div className="grid gap-4">
           <p className="section-title">The fixture's selected route</p>
           <p className="small">
-            Its print snapshot states a highest monthly payment of{" "}
-            {formatMoney(preview.selected.peakMonthlyPayment)} and a lowest balance of{" "}
-            {formatMoney(preview.selected.lowestBalance)}, with every payment funded before it falls
-            due.
+            Its print snapshot states a peak monthly payment of{" "}
+            {formatMoney(preview.selected.peakMonthlyPayment)} and a minimum prefunded cash balance
+            of {formatMoney(preview.selected.lowestBalance)}.
           </p>
         </div>
       )}
@@ -157,7 +157,8 @@ function RouteCard({
         type="button"
         className="card-on-space route-card"
         data-selected={selected}
-        aria-pressed={selected}
+        aria-haspopup="dialog"
+        aria-expanded={selected}
         onClick={() => open(route)}
       >
         <span className="route-letter" data-layer={route.layer} aria-hidden="true">
@@ -166,7 +167,8 @@ function RouteCard({
         <span className="grid gap-4">
           <span className="font-semibold">Route {route.letter}</span>
           <span className="small tnum">
-            Ready in {months(route.timeMonths)}, {formatMoney(route.economicCost)} economic cost
+            Ready in {months(route.timeMonths)}, {formatSignedMoney(route.economicCost)} economic
+            cost
           </span>
           <span className="small tnum text-fg-muted">
             {formatMoney(route.directSpend)} direct spending
@@ -207,7 +209,8 @@ export function RoutePreview({ preview }: { preview: Preview }) {
     setInspected(null);
     evidence.open({ title: "Where this came from", body: <SourceDetails preview={preview} /> });
   };
-  const layers = [...new Set(preview.routes.map((route) => route.layer))].sort();
+  const layers = [...new Set(preview.routes.map((route) => route.layer))].sort((a, b) => a - b);
+  const shared = sharedCondition(preview.routes);
   const end = new Date(`${preview.planningStart}T00:00:00Z`);
   end.setUTCMonth(end.getUTCMonth() + preview.horizonMonths - 1);
 
@@ -255,7 +258,9 @@ export function RoutePreview({ preview }: { preview: Preview }) {
             <dd className="small">{preview.region}</dd>
           </div>
         </dl>
-        <StatusBadge state="conditional" detail={`every route here is ${CONDITION}`} />
+        {shared !== null && (
+          <StatusBadge state="conditional" detail={`every route here is ${shared}`} />
+        )}
       </section>
 
       {layers.map((layer) => (

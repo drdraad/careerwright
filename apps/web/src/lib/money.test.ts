@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { formatMoney, parseMoneyInput } from "./money";
+import { formatMoney, formatSignedMoney, parseMoneyInput } from "./money";
+
+describe("[API-04] economic cost is signed: a gain shows with a minus sign, never as zero", () => {
+  it.each([
+    [60000, "£600"],
+    [0, "£0"],
+    [-50000, "−£500"],
+    [-5, "−£0.05"],
+  ])("formats %i minor units as %s", (minor, shown) => {
+    expect(formatSignedMoney({ minor_units: minor, currency: "GBP" })).toBe(shown);
+  });
+});
 
 describe("[API-04] money is shown from integer minor units, never through floats", () => {
   it.each([
