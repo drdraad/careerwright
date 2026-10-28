@@ -300,6 +300,13 @@ this review does not change the application.
    "Conditional" beside each card's readiness, with the assessed-report requirement
    available there. Recheck cards with the summary off-screen; do not carry this wording
    into computed routes.
+   *Disposition (Task 6c): fixed.* Each card reads "Conditional: ready in 4 months, once its
+   assessed report is passed"; a card says "Ready in …" alone only for a route the data
+   says is ready, and the drawer leads with "Conditional: ready only once …". The rule is
+   written into `RoutePreview.tsx` for the computed routes of Task 14
+   (`RoutePreview.test.tsx`, "says Conditional beside each card's readiness" and "says
+   Ready in without a qualification only …"; `routes` and `routes--layers` captures in
+   `sprint-2/screenshots/`).
 2. **V-02 — Failed-load recovery has no action and ambiguous status (all sizes).**
    [Failed You](sprint-1/screenshots/you--failed--390x844.png) says "try again in a
    moment" but supplies no retry control. The strip simultaneously says "Live" and
@@ -318,6 +325,12 @@ this review does not change the application.
    shorten the introductory stack and move secondary context behind disclosure so that
    the first route appears in the initial viewport. The same stacking pushes tablet
    route C mostly below its viewport, although A and B remain visible.
+   *Disposition (Task 6c): fixed.* The fixture notice stays first and whole, in two
+   sentences; the cost basis, baseline and horizon are one line; their definitions and the
+   shared condition sit behind a "What's being compared" disclosure. At 390×844 route A's
+   whole card is in the first view, after the notice; at 768×1024 routes A to C are
+   (`e2e/layout.spec.ts`, both V-03 tests; `RoutePreview.test.tsx`, the disclosure test;
+   `routes` and `routes--compared` captures).
 4. **V-04 — The phone route-sheet peek omits the decision figures.** In
    [route B's peek](sprint-1/screenshots/routes--route-b--390x844.png), the 212 px sheet
    spends its height on a generic title, "Route B", the synthetic badge and condition;
@@ -326,18 +339,42 @@ this review does not change the application.
    Put the selected route and compact key figures in the peek, retaining fixture and
    condition labels. Capture both peek and expanded states; More alone does not establish
    that the expanded content fits or scrolls correctly.
+   *Disposition (Task 6c): fixed.* The sheet is titled with the route ("Route B"; its close
+   control is "Close route B"), and its 212 px peek holds the fixture label, the condition
+   and Ready in, Economic cost and Direct spending side by side; on a phone the sheet's
+   gaps are 12 px. Found while fixing it: with a route's sheet open, focus could bring a
+   lower route under the sheet (only You reserved scroll room for it); every chapter now
+   does (`e2e/layout.spec.ts`, the V-04 test measures the title and the figures inside the
+   peek, and "with the sheet open, a route brought into view by focus is not under it";
+   `RoutePreview.test.tsx`, the V-04 test; `routes--route-b` (peek) and
+   `routes--route-b-expanded` captures).
 5. **V-05 — The phone data-mode explanation is clipped.** On
    [empty home](sprint-1/screenshots/home--empty--390x844.png), the native select cuts off
    "Demo data: synthetic, nothing leaves this computer" at "…leaves thi". Page overflow
    remains zero, so that check misses the lost information. Keep the selected option
    short and place the complete explanation in wrapping helper text. Verify it at 390 px
    and 200 % zoom.
+   *Disposition (Task 6c): fixed.* The options read "Demo data" and "Live-assisted"; the
+   chosen mode's full explanation is wrapping helper text that describes the select
+   (`WorkspaceList.test.tsx`). The visual package now checks every select for a cut-off
+   chosen option (`clipped` in `checks-*.json`), which page overflow missed: none at any
+   size, nor on the home page at 200 % zoom (`home--empty` at three sizes;
+   `home--empty--1440x900-zoom200`, 720×450 CSS px, every check clean). At 200 % on a
+   390 px phone (195 CSS px, `home--empty--390x844-zoom200`) the select and its text are
+   whole, but the page overflows 51 px: the "Sign out ben@nessa.test" and "Create
+   workspace" buttons do not wrap. That width is below the 320 CSS px of WCAG 1.4.10, so
+   the overflow is recorded there, not gated; it is an open item for UI-06.
 6. **V-06 — Plan's stated next step and action disagree (all sizes).**
    [Empty Plan](sprint-1/screenshots/plan--390x844.png) says a plan starts from a route
    selected in Routes, but its only action is "Review what we know". Unlike the other
    planned chapters, it does not say plan selection is absent from this build. Explain
    that limitation and make the offered action's purpose explicit; do not imply that
    selecting a fixture preview creates a plan. Recheck the empty copy and destination.
+   *Disposition (Task 6c): fixed.* Plan says "Plan selection isn't part of this build yet,
+   so no plan has been made. When it is, a plan will start from a route Nessa computes
+   from your answers, never from a fixture preview." Its one action is "Review your
+   answers in You", to the You chapter (`ChapterView.test.tsx`, the V-06 test; `plan`
+   captures).
 7. **V-07 — The profile introduction outweighs the first task.** In
    [phone You](sprint-1/screenshots/you--390x844.png), the first field card starts around
    y=566; even "Add another target role" is cut by the bottom of the viewport. Repeated
@@ -366,11 +403,23 @@ this review does not change the application.
    comprehension risk, not evidence of a wrong stored state. Distinguish or explain
    visitation before adding completion indicators, and ask the human reviewer what the
    marks communicate.
+   *Disposition (Task 6c): distinguished.* A visited chapter now has a brighter ring and
+   never a fill; a filled landmark is kept for a chapter whose decisions are recorded
+   (spec section 15), which this build has none of. The rule is in
+   `docs/design/README.md`. Screen readers still hear "visited" or "not started"
+   (`e2e/layout.spec.ts`, the V-09 test compares the drawn marks; `ChapterNav.test.tsx`;
+   the rail in every 1440×900 and 768×1024 capture). What the marks communicate is still
+   a question for the human reviewer.
 10. **V-10 — The refused-account page repeats its headline.**
     [Not invited](sprint-1/screenshots/not-invited--390x844.png) uses "This account isn't
     invited" as both page heading and alert title. The repetition adds weight without a
     second piece of information. Retain one clear cause and the sign-out action; use
     supporting copy for the recovery instruction.
+    *Disposition (Task 6c): fixed.* The page has one headline, "This account isn't
+    invited"; the announced notice under it holds only "Sign in with an invited account.",
+    the reference and Sign out. The same on the home page and on a workspace address
+    (`PageState.test.tsx`, the V-10 test; `e2e/access.spec.ts` counts the cause once;
+    `not-invited` captures).
 
 **Limits of the image evidence.** These are viewport captures (`fullPage: false`), not
 whole-page reviews. In particular:
@@ -386,6 +435,8 @@ whole-page reviews. In particular:
   desktop shows only the layer 2 heading at the bottom. The package therefore cannot
   establish layer 2/3 differentiation. There are no application charts, Gantt or scenario
   whiskers yet; chart legibility is not assessable from the fixture cards.
+  *Task 6c:* `routes--layers` captures D's layer 2 disc and E's layer 3 ring with their
+  cards at all three sizes (`sprint-2/screenshots/`).
 - The no-producer states remain deferred: partial results, zero results and the 100-job
   limit. Long names, three targets, negative economic cost, unknown/skipped/prefer-not-to-say
   selections and the open phone chapter menu are not shown here. Storybook or test claims
@@ -417,15 +468,16 @@ whole-page reviews. In particular:
 | Item | Owner | Disposition |
 |---|---|---|
 | H-01 design review for Sprint 1 | Product owner and design reviewer | Approved by the product owner on 2026-10-28, with V-01–V-10 open; no category scores recorded. Checklist below |
-| V-01–V-10 screenshot findings | Web owner; product/design reviewer for the visitation convention | Open. Prioritise V-01–V-06 and recapture affected views before visual acceptance; V-07–V-10 need polish/comprehension review |
-| Screenshot coverage gaps | Web owner | Add expanded phone sheets, scrolled conflict/save views and lower route layers; inspect long names and other supported states before claiming full visual coverage |
+| V-01–V-10 screenshot findings | Web owner; product/design reviewer for the visitation convention | Fixed by agents, awaiting the human check: V-02, V-07 and V-08 in Task 6; V-01, V-03–V-06, V-09 and V-10 in Task 6c (dispositions above, captures in `sprint-2/screenshots/`). Agent pre-review only; the human design check is not run — requires human (H-01) |
+| Screenshot coverage gaps | Web owner | Expanded phone sheets and the scrolled conflict and Save captured in Task 6; the lower route layers (`routes--layers`) and the comparison's disclosure (`routes--compared`) in Task 6c. Still to inspect: long names and other supported states before claiming full visual coverage |
+| The home page at 200 % zoom on a 390 px phone (195 CSS px) | Web owner, UI-06 | Open: the select and its explanation are whole, but the page overflows 51 px because "Sign out <email>" and "Create workspace" do not wrap. Below WCAG 1.4.10's 320 CSS px, so recorded, not gated (`checks-zoom200.json`) |
 | H-03 VoiceOver, H-04 Safari | Humans, Sprints 8–9 | Not run — requires human |
 | MODEL-07 consent UI for storing a Meta key | T6 (assigned by the controller) | Not in the Task 4 brief; backend done; the error words exist |
 | UI-05 calm-mode test; graph reveal | T14 | Implemented, untested |
-| UI-06 200 % zoom | T8 onward | Not run |
+| UI-06 200 % zoom | T8 onward | Partly run in Task 6c, for the home page only: clean at 1440×900; on a 390 px phone, the overflow recorded above |
 | UI-09 focused graph views; UI-11 data-dependent states | T8, T14 | No graphs or such data yet |
 | DUR-03 partial results with completeness and freshness | first partial run kind | No producer yet |
-| `next` 16.4.1 pinned at 13.5 days for a critical security fix | Next dependency change after 2026-10-28T17:43Z | Accepted by the controller, provisional. Removal step: drop `minimumReleaseAgeExclude` once 16.4.1 is 14 days old (ADR 0005 decision 1) |
+| `next` 16.4.1 pinned at 13.5 days for a critical security fix | Task 6c | Closed: the exception was removed on 2026-10-28, after 16.4.1 turned 14 days old; the frozen install passes with the lockfile unchanged (ADR 0005 decision 1) |
 | `undici` advisories via `jsdom` (dev only) | next `jsdom` bump | Accepted; recheck with `pnpm audit` |
 | Gantt aria-label wording (carried from Task 2) | T14 | Unchanged: the Gantt is not built yet |
 | After a full restart the Auth emulator re-imports its seed and ends earlier sessions: an open page refreshes its token and carries on, a page loaded before that asks to sign in again (then returns to the same address) | Emulator behaviour (L0 only) | Accepted; documented in the runbook |
@@ -497,5 +549,6 @@ Use the following observations to guide the live human check:
 
 Approval: **given by the product owner on 2026-10-28 (H-01, Sprint 1)**. No category
 scores were recorded, so the release rule that every category reaches at least 4 is still
-to be shown at a later H-01 review. V-01–V-10 stay open: V-02, V-07 and V-08 in Task 6,
-the rest in the visual-corrections batch after it.
+to be shown at a later H-01 review. V-01–V-10 were left open then: V-02, V-07 and V-08
+were fixed in Task 6, the rest in Task 6c (the visual-corrections batch). Those fixes are
+an agent pre-review; their human check is **not run — requires human**.

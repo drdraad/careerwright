@@ -183,7 +183,10 @@ and the guards only.
 
 Captures: `docs/reviews/sprint-2/screenshots/` (all chapters and states at 1440×900,
 768×1024 and 390×844, with `checks-*.json`: axe, overflow, overprint, console and fonts all
-clean).
+clean). Task 6c, the Sprint 0–1 visual corrections, added `routes--compared`,
+`routes--layers` and the home page at 200 % zoom (`checks-zoom200.json`), a check for a
+select cutting off its chosen option, and recaptured the views its fixes touch; its
+dispositions are in `docs/reviews/sprint-1.md` and `docs/design/pre-review-sprint-0.md`.
 
 1. The phone slate shows about one suggestion card per screen: the three sections (why,
    might not, try it) are complete but long. A disclosure for "What might not suit you" and

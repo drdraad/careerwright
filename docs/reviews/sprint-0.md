@@ -229,6 +229,14 @@ all 18 PNGs and both generated reports match the committed files byte for byte. 
 layout probes reproduced the phone blockers and absent unknown-route expansion control.
 Passing the baseline checks does not establish task usability.
 
+**Task 6c (2026-10-28, agent pre-review — not the required human review):** the three
+compositions are corrected for S0-V01–S0-V08 and recaptured (`ba5be08`). The screenshot
+checker gained the checks these findings needed: at most one filled primary action in
+view, and, with a phone sheet open, the first list card at least 40 px above the sheet
+and no control covered at its centre once focus brings it into view. 18 of 18 captures
+pass them, 64 fixture assertions and 68 of 68 contrast pairs pass; each finding's
+disposition is in [the composition critique](../design/pre-review-sprint-0.md#open-findings).
+
 Coverage: all nine composition/state pairs at desktop and phone sizes, plus five default
 desktop section captures. No tablet, phone expanded sheet, focused chart/map view, 200 %
 zoom, keyboard journey, VoiceOver or Safari check was run. Dense data, negative economic
@@ -240,7 +248,7 @@ suite rerun for this design review.
 | Item | Owner | Disposition |
 |---|---|---|
 | H-02 design approval of the three compositions | Product owner and design reviewer | Approved by the product owner on 2026-10-28, with S0-V01–S0-V08 open; no category scores recorded. Checklist below |
-| S0-V01–S0-V08 composition findings | Web/design owner | Open. Task 6 avoids the phone conversation blockers (S0-V01/S0-V02) and S0-V05, S0-V07 (Roles), S0-V08 in the app; the visual-corrections batch after Task 6 fixes the rest and corrects the compositions |
+| S0-V01–S0-V08 composition findings | Web/design owner | Compositions corrected for all eight in Task 6c (`ba5be08`; dispositions in `docs/design/pre-review-sprint-0.md`), 18 of 18 captures and 68 of 68 contrast pairs pass. In the app: S0-V01, S0-V02, S0-V08 (You) and S0-V05's lesson (the slate) in Task 6; S0-V03 and the Routes part of S0-V07 in Task 6c; S0-V04 and S0-V06 have no app state yet (Task 14); the Roles parts of S0-V05, S0-V07 and S0-V08 are Task 8's. Agent pre-review only: the human check is not run — requires human |
 | H-07 domain-reviewer sign-off on the fixture hand check and financial worked examples | Domain reviewer | Sprint 0 part confirmed by the product owner on 2026-10-28 (`docs/evidence/fixture-hand-check.md`) |
 | H-09 confirm or reject the Contributor test model (ADR 0003) | Product owner | Confirmed by the product owner on 2026-10-28; ADR 0003 accepted |
 | Real-source corpus, 0 of 33 pages | Tasks 8, 10, 12 | Planned (`corpus/manifest.json`) |
@@ -268,4 +276,6 @@ are ready for the human review required by R2. Pending scores are not passes.
 | Interaction continuity | Not run — requires human | Phone review/input and stale context need correction; keyboard/expansion/focus checks remain |
 
 Approval: **given by the product owner on 2026-10-28 (H-02)**. No category scores were
-recorded. S0-V01–S0-V08 stay open and are assigned (see the table above).
+recorded. S0-V01–S0-V08 were left open and assigned (see the table above); Task 6c
+corrected the compositions for all eight, as an agent pre-review. Their human check is
+**not run — requires human**.

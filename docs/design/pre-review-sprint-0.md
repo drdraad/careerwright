@@ -93,7 +93,9 @@ are separate compositions, not evidence that transitions between them work.
 S0-V01 and S0-V02 block reuse of the phone conversation layout. S0-V03–S0-V07 concern
 clarity or access to the main task; S0-V08 is hierarchy polish. These findings concern the
 design references, not a qualification of the current application. No composition code
-was changed in this review.
+was changed in this review. Task 6c (2026-10-28, `ba5be08`) corrected the compositions for
+all eight and recaptured the 18 images; its disposition follows each finding. Those
+corrections are an agent pre-review too: their human check is not run — requires human.
 
 1. **S0-V01 — Phone You hides both profile-review views (all states).** The desktop
    proposal tray disappears on the phone, but its intended "What we know" summary and
@@ -103,6 +105,12 @@ was changed in this review.
    overrides the earlier mobile `display: flex` rule. Make the mobile summary visible
    and specify its review destination. Recheck that the phone can reach pending changes,
    confirmed answers and manual entry without relying on the selected evidence drawer.
+   *Disposition (Task 6c): fixed in the composition.* The summary rule now precedes the
+   rules that show it; below 1280 px "What we know" stacks after the conversation, and
+   the summary at the top of the thread says what waits there and links to it ("Review",
+   to `#known-title`). Pending changes, confirmed answers and "Add the details yourself"
+   are reachable without the drawer (`conversation--*--390x844`; the focus check above).
+   The app has done the same since Task 6.
 2. **S0-V02 — The phone sheet covers replying and failure recovery.** In every You state,
    the reply field occupies y=775–819 while the fixed sheet starts at y=632. A centre-point
    hit test reaches the sheet, not the composer; scrolling to the end leaves it covered
@@ -113,6 +121,14 @@ was changed in this review.
    and sticky composer, or dismiss/collapse the sheet when replying. Verify the reply
    field, Send, Try again and manual-entry action by hit testing and keyboard use;
    scrolling alone does not resolve this layout.
+   *Disposition (Task 6c): fixed in the composition, as the app does it (Task 6).* The phone
+   `.you` padding keeps room for the sheet, the reply field sticks above the sheet's peek,
+   and `scroll-padding-bottom` stops anything brought into view above both. The failure
+   notice now comes before the message it is about, so Try again and "Add the details
+   yourself" are in the first view. Checked by `tools/screenshots.mjs`: every control in
+   the work area, focused, is on top at its centre with the sheet open, in all three states
+   (`conversation--*--390x844`). In the unknown state the choices start under the reply
+   field in the first view; scrolling or focus brings them clear.
 3. **S0-V03 — Individual route cards lose the readiness condition.** TRACE-01 cards in
    [default](screenshots/route-comparison--default--1440x900.png) and failure say "Ready
    in … months", while the assessed-report condition sits above the whole group. It can
@@ -120,6 +136,10 @@ was changed in this review.
    and make the requirement available with it. The selected journey already does this
    well. This presentation risk also appears in Sprint 1's V-01; correct the reference
    before carrying it into computed routes.
+   *Disposition (Task 6c): fixed in the composition and the app.* Each TRACE-01 card reads
+   "Conditional: ready in 4 months, if the assessed report passes", and the group note that
+   could scroll away is gone (`route-comparison--default`, `--failure` at both sizes). In
+   the app the fixture cards do the same (V-01 in `docs/reviews/sprint-1.md`).
 4. **S0-V04 — The stale route journey looks current in the phone peek.** The
    [failure sheet](screenshots/route-comparison--failure--390x844.png) repeats default
    route B's 4 months and £600 figures without a stale/version marker of its own. The
@@ -128,12 +148,22 @@ was changed in this review.
    Carry "Previous comparison, version 14" and its stale status into the selected
    journey, including the peek; do not imply that its readiness is checked against the
    newer profile.
+   *Disposition (Task 6c): fixed in the composition.* The failure journey's head says
+   "Previous comparison, version 14, 2 days old" with the stale clock, above its
+   condition and figures, on desktop and in the phone peek
+   (`route-comparison--failure--390x844`). The app has no stale route comparison yet: its
+   Routes chapter shows only the fixture preview, which no profile version produces, so
+   the rule is carried to the computed routes (Task 14).
 5. **S0-V05 — The unknown Roles heading asserts a match it cannot support.** The
    [desktop unknown card](screenshots/opportunity-map--unknown--1440x900.png) is headed
    "Matches your preferences", immediately followed by "there's too little to compare".
    Change the heading to state that preference fit is not assessed; preserve the
    snippet-only explanation and full-listing action. The default card's distinction
    between preference fit and unchecked skills is useful and should remain.
+   *Disposition (Task 6c): fixed in the composition.* The unknown card's heading is
+   "Preference fit not assessed", with the snippet-only explanation and "Paste the full
+   listing" kept; the default card is unchanged (`opportunity-map--unknown--1440x900`).
+   Task 6 applied the lesson to the slate; the Roles card in the app is Task 8's.
 6. **S0-V06 — Unknown Routes drops known figures and the expansion affordance.** The
    [phone unknown sheet](screenshots/route-comparison--unknown--390x844.png) says only
    "Route B, selected" and "Schedule not available" with a long explanation. It omits
@@ -142,6 +172,13 @@ was changed in this review.
    objective values in the selected summary, state which schedule details are missing,
    and retain a consistent expansion affordance. Unknown dates and cash flow should not
    erase the comparison values that do exist.
+   *Disposition (Task 6c): fixed in the composition.* The journey has one head in every
+   state, so More is always there; unknown Routes' peek reads "Route B", then Ready in 9
+   months, Direct spending £2,400 (bound from the DIRECTAI fixture) and Economic cost "Not
+   available", with "Schedule not available" and what is missing below
+   (`route-comparison--unknown--390x844`). The app shows no direct-spending-only
+   comparison yet, so there is no such app state (Task 14); its sheet has More in every
+   state.
 7. **S0-V07 — Failure and unknown copy push phone lists behind the sheet.** With the peek
    starting at y=632, the first listing in
    [Roles failure](screenshots/opportunity-map--failure--390x844.png) starts at y=649.
@@ -150,12 +187,31 @@ was changed in this review.
    Default Roles and Routes do show a first card. Keep failure, freshness and cost-basis
    labels, but shorten their initial summaries and disclose secondary explanation so
    the retained list remains discoverable. Recapture all three affected states.
+   *Disposition (Task 6c): fixed in the composition.* Each notice keeps its label and one
+   line, with its explanation behind a disclosure ("What this means", "Why it may not
+   match", "What this changes"); on a phone the sentence under the Routes title gives way
+   to the basis summary (which now names the region), the panel's duplicate version label
+   and the redundant group note go, and the phone's gaps and notice padding are tighter.
+   The first card now starts at y=547 in failed Roles, y=537 in unknown Routes and y=587
+   in failed Routes, above the sheet at y=632 (was 649, 673 and 818). Checked by
+   `tools/screenshots.mjs` ("first card above the sheet", at least 40 px of it) in all
+   nine phone captures. The same pass found the phone `.routes` and `.roles` padding
+   shorthands resetting the sheet clearance to 0, so the last cards could not be scrolled
+   clear of the sheet; both keep it now. In the app, the Routes part is V-03 and V-04's
+   focus fix (`docs/reviews/sprint-1.md`); the app has no failed or unknown route list yet,
+   and the Roles part is Task 8's.
 8. **S0-V08 — More than one filled action competes for attention.** Desktop default You
    shows filled Send and Accept buttons. Roles failure offers both a filled global
    "Try the search again" and a filled selected-listing "Check again". This contradicts
    the reference's stated one-primary-action convention. Choose the primary action for
    the active task and use secondary styling for the other; the action labels and
    distinct recovery scopes should remain clear.
+   *Disposition (Task 6c): fixed in the composition.* You's Send is secondary in every
+   state, beside the drawer's decision (Accept, Add an amount) or Try again; failed Roles
+   keeps "Try the search again" filled and the listing's action is now a secondary "Check
+   this listing again". `tools/screenshots.mjs` counts the filled primaries in view: at most
+   one in all 18 captures. The app's You has done this since Task 6; failed Roles is
+   Task 8's.
 
 ### Rubric observations
 
