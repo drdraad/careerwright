@@ -49,7 +49,31 @@ export function configureApiClient(token: () => Promise<string | null>): void {
   }
 }
 
-/** A fresh key per intended change; a retry of the same change reuses it (ADR 0004 decision 7). */
-export function newIdempotencyKey(): string {
-  return crypto.randomUUID();
+/** Key order does not matter: the same fields and values are the same request. */
+function fingerprint(request: unknown): string {
+  return JSON.stringify(request, (_key, value: unknown) =>
+    value !== null && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+      : value,
+  );
+}
+
+/**
+ * Idempotency keys for one form (ADR 0004 decision 7): sending the same request again, after
+ * a failure or a lost response, reuses its key, so the API applies it at most once; a
+ * different request gets a new key; `settled()` after success starts the next change afresh.
+ */
+export class ChangeKeys {
+  private last: { fingerprint: string; key: string } | null = null;
+
+  keyFor(request: unknown): string {
+    const print = fingerprint(request);
+    if (this.last?.fingerprint !== print)
+      this.last = { fingerprint: print, key: crypto.randomUUID() };
+    return this.last.key;
+  }
+
+  settled(): void {
+    this.last = null;
+  }
 }

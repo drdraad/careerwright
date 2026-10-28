@@ -36,11 +36,23 @@ export type StreamDeps = {
 export type StreamHandle = { stop(): void; lastEventId(): number | undefined };
 
 const DEFAULT_RETRY_MS = 2000;
+// The server's `retry:` value is honoured, but never below this floor.
+const MIN_RETRY_MS = 1000;
 const MAX_RETRY_MS = 30_000;
 // A fresh token that is sent back for re-authentication within this time, with no event in
 // between, is not working (a clock or account problem): stop rather than refresh again.
 const REAUTH_SETTLE_MS = 10_000;
-const ACCESS_ENDED: ReadonlySet<string> = new Set(["NOT_INVITED", "NOT_FOUND"]);
+const ACCESS_ENDED: ReadonlySet<ErrorCode> = new Set<ErrorCode>(["NOT_INVITED", "NOT_FOUND"]);
+/**
+ * The control events the API's stream sends besides plain messages
+ * (backend/src/nessa/api/routes_events.py). They are not in the OpenAPI document, which
+ * describes only the `EventOut` messages, so they are named once here.
+ */
+const STREAM_EVENT = {
+  message: "message",
+  reauthenticate: "reauthenticate",
+  streamEnded: "stream_ended",
+} as const;
 
 type Outcome =
   | { kind: "reconnect" } // the stream ended or the transport failed: back off
@@ -72,8 +84,9 @@ export function openWorkspaceStream(
     deps.onStatus(status);
   };
 
-  // One connection: resolves with what to do next. `live` reports an accepted response (the
-  // backoff starts afresh); `progress` reports an event, which re-authentication waits for.
+  // One connection: resolves with what to do next. `live` reports the first bytes through the
+  // stream body (so a buffering hop can never pass for live; the backoff starts afresh);
+  // `progress` reports an event, which re-authentication waits for.
   async function connect(token: string, live: () => void, progress: () => void): Promise<Outcome> {
     const headers: Record<string, string> = {
       Accept: "text/event-stream",
@@ -101,21 +114,25 @@ export function openWorkspaceStream(
       }
       return { kind: "reconnect" };
     }
-    live();
-    deps.onStatus({ state: "live" });
     const parser = new SseParser();
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    let delivering = false;
     try {
       for (;;) {
         const { value, done } = await reader.read();
         if (done) return { kind: "reconnect" };
+        if (!delivering) {
+          delivering = true;
+          live();
+          deps.onStatus({ state: "live" });
+        }
         for (const item of parser.push(value)) {
           if (item.type === "retry") {
-            retryMs = item.ms;
+            retryMs = Math.max(MIN_RETRY_MS, item.ms);
             continue;
           }
-          if (item.event === "reauthenticate") return { kind: "reauthenticate" };
-          if (item.event === "stream_ended") {
+          if (item.event === STREAM_EVENT.reauthenticate) return { kind: "reauthenticate" };
+          if (item.event === STREAM_EVENT.streamEnded) {
             const code = (JSON.parse(item.data) as { code?: ErrorCode }).code;
             if (code === "UNAUTHENTICATED") return { kind: "reauthenticate", code };
             if (code !== undefined && ACCESS_ENDED.has(code)) {
@@ -123,7 +140,7 @@ export function openWorkspaceStream(
             }
             return { kind: "reconnect" };
           }
-          if (item.event !== "message") continue;
+          if (item.event !== STREAM_EVENT.message) continue;
           const received = JSON.parse(item.data) as EventOut;
           if (item.id !== undefined) lastEventId = Number(item.id);
           progress();

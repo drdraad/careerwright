@@ -58,8 +58,41 @@ function useCalmMode(): [boolean, (calm: boolean) => void] {
   return [calm, update];
 }
 
-function progressOf(profile: ProfileOut | undefined): Partial<Record<ChapterId, ChapterProgress>> {
-  return profile !== undefined && profile.version > 0 ? { you: "done" } : {};
+/**
+ * Chapters opened in this browser session, per workspace (a per-viewer convenience, so
+ * session storage; unavailable storage only forgets the marks).
+ */
+function useVisited(workspaceId: string, chapter: ChapterId): ReadonlySet<ChapterId> {
+  const key = `nessa.visited.${workspaceId}`;
+  const [visited, setVisited] = useState<ReadonlySet<ChapterId>>(new Set([chapter]));
+  useEffect(() => {
+    let stored: ChapterId[] = [];
+    try {
+      stored = (JSON.parse(window.sessionStorage.getItem(key) ?? "[]") as string[]).filter(
+        isChapter,
+      );
+    } catch {
+      // Blocked or corrupt storage: start with the current chapter only.
+    }
+    const next = new Set<ChapterId>([...stored, chapter]);
+    setVisited(next);
+    try {
+      window.sessionStorage.setItem(key, JSON.stringify([...next]));
+    } catch {
+      // As above.
+    }
+  }, [key, chapter]);
+  return visited;
+}
+
+function progressOf(
+  visited: ReadonlySet<ChapterId>,
+  profile: ProfileOut | undefined,
+): Partial<Record<ChapterId, ChapterProgress>> {
+  const progress: Partial<Record<ChapterId, ChapterProgress>> = {};
+  for (const chapter of visited) progress[chapter] = "visited";
+  if (profile !== undefined && profile.version > 0) progress.you = "visited";
+  return progress;
 }
 
 export function WorkspaceShell({
@@ -96,8 +129,13 @@ export function WorkspaceShell({
   const opened = invited && workspace.data !== undefined;
   const profile = useProfile(workspaceId, opened);
   const workspaces = useWorkspaces(invited);
-  const events = useWorkspaceEvents(workspaceId, opened);
-  const refreshFailed = me.isError || workspace.isError || profile.isError;
+  const events = useWorkspaceEvents(workspaceId, opened, workspace.data?.last_event_seq);
+  const visited = useVisited(workspaceId, chapter);
+  // "Showing what was last loaded" only when something was loaded and its refresh failed.
+  const refreshFailed =
+    (me.isError && me.data !== undefined) ||
+    (workspace.isError && workspace.data !== undefined) ||
+    (profile.isError && profile.data !== undefined);
 
   if (auth.state.status !== "signed_in") return <PageLoading stage="Checking your sign-in" />;
   // Only a first load that fails replaces the shell. A failed refresh (Nessa restarting) keeps
@@ -138,12 +176,12 @@ export function WorkspaceShell({
   if (workspace.data === undefined) return <PageLoading stage="Opening your workspace" />;
 
   const surface = CHAPTERS.find((item) => item.id === chapter)?.surface ?? "reading";
-  const progress = progressOf(profile.data);
+  const progress = progressOf(visited, profile.data);
   const data: WorkspaceData = {
     workspace: workspace.data,
     profile: profile.data,
     profileError: profile.error,
-    events,
+    events: events.status,
   };
 
   return (
@@ -163,8 +201,11 @@ export function WorkspaceShell({
         <WorkspaceStrip
           workspace={workspace.data}
           profile={profile.data}
-          workspaces={workspaces.data?.items ?? [workspace.data]}
-          events={events}
+          profileFailed={profile.isError}
+          workspaces={workspaces.data ?? [workspace.data]}
+          workspacesFailed={workspaces.isError}
+          events={events.status}
+          onReconnect={events.restart}
           refreshFailed={refreshFailed}
           email={auth.state.email}
           calm={calm}

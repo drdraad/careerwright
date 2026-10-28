@@ -8,7 +8,8 @@ type Props = {
 
 export function LoadingState({ stage, lines = 3 }: Props) {
   return (
-    <div className="grid gap-12" role="status" aria-busy="true">
+    // No aria-busy: on a live region it would hold back the very announcement of the stage.
+    <div className="grid gap-12" role="status">
       <span className="status">
         <Glyph name="running" />
         <span>{stage}</span>

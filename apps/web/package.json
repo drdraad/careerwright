@@ -9,19 +9,19 @@
     "node": ">=24.11 <25"
   },
   "scripts": {
-    "dev": "next dev --hostname 127.0.0.1 --port 3000",
-    "build": "next build",
-    "start": "next start --hostname 127.0.0.1 --port 3000",
+    "dev": "NEXT_TELEMETRY_DISABLED=1 next dev --hostname 127.0.0.1 --port 3000",
+    "build": "NEXT_TELEMETRY_DISABLED=1 next build",
+    "start": "NEXT_TELEMETRY_DISABLED=1 next start --hostname 127.0.0.1 --port 3000",
     "generate": "node scripts/generate-client.mjs",
     "lint": "biome check .",
     "format": "biome check --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "node scripts/generate-client.mjs --check && biome check . && tsc --noEmit && vitest run",
-    "storybook": "storybook dev --host 127.0.0.1 --port 6006 --no-open",
-    "build-storybook": "storybook build --quiet",
-    "e2e": "playwright test",
-    "review-screenshots": "NESSA_REVIEW_DIR=../../docs/reviews/sprint-1/screenshots playwright test e2e/visual.spec.ts"
+    "storybook": "STORYBOOK_DISABLE_TELEMETRY=1 storybook dev --host 127.0.0.1 --port 6006 --no-open",
+    "build-storybook": "STORYBOOK_DISABLE_TELEMETRY=1 storybook build --quiet",
+    "e2e": "NEXT_TELEMETRY_DISABLED=1 playwright test",
+    "review-screenshots": "NEXT_TELEMETRY_DISABLED=1 NESSA_REVIEW_DIR=../../docs/reviews/sprint-1/screenshots playwright test e2e/visual.spec.ts"
   },
   "dependencies": {
     "@firebase/app": "0.16.3",

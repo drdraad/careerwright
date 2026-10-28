@@ -33,7 +33,7 @@ export const ChapterRailOnRoutes: Story = {
       <ChapterRail
         workspaceId={fixtureWorkspace.workspace_id}
         current="routes"
-        progress={{ you: "done" }}
+        progress={{ you: "visited", roles: "visited" }}
       />
     </div>
   ),
@@ -44,7 +44,7 @@ export const ChapterMenuOnPhone: Story = {
     <ChapterMenu
       workspaceId={fixtureWorkspace.workspace_id}
       current="you"
-      progress={{ you: "done" }}
+      progress={{ you: "visited" }}
     />
   ),
 };
@@ -65,8 +65,11 @@ function Strip({
       <WorkspaceStrip
         workspace={long ? longWorkspace : fixtureWorkspace}
         profile={profile(document, 3)}
+        profileFailed={false}
         workspaces={[fixtureWorkspace]}
+        workspacesFailed={false}
         events={events}
+        onReconnect={() => {}}
         refreshFailed={refreshFailed}
         email="ada@nessa.test"
         calm={false}

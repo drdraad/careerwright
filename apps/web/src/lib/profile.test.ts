@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProfileDocument } from "@/generated/api";
-import { changedFields, describeField, draftFrom, inputFrom } from "./profile";
+import { changedFields, describeField, draftFrom, inputFrom, rebaseDraft } from "./profile";
 
 const SOURCE = "6f1d3c2a-0000-4000-8000-000000000001";
 
@@ -83,6 +83,29 @@ describe("[API-04] the profile form sends exactly what was answered, in integer 
         target_titles: { kind: "duplicate" },
       },
     });
+  });
+
+  it("rebases a draft on a newer version: untouched answers follow it, edits stay, clashes are named", () => {
+    const older = document();
+    const newer = document({
+      direct_spend_cap: {
+        state: "provided",
+        value: { minor_units: 90000, currency: "GBP" },
+        source_ref_id: SOURCE,
+      },
+      current_role: { state: "provided", value: "Analyst", source_ref_id: SOURCE },
+    });
+    const draft = draftFrom(older);
+    draft.cities = { state: "provided", text: "", items: ["Leeds"] };
+    draft.current_role = { state: "provided", text: "Data steward", items: [] };
+
+    const rebased = rebaseDraft(draft, older, newer);
+
+    expect(rebased.draft.cities.items).toEqual(["Leeds"]);
+    expect(rebased.draft.direct_spend_cap).toEqual({ state: "provided", text: "900", items: [] });
+    expect(rebased.draft.current_role.text).toBe("Data steward");
+    expect(rebased.changedThere).toEqual(["current_role", "direct_spend_cap"]);
+    expect(rebased.conflicts).toEqual(["current_role"]);
   });
 
   it("lists the fields a newer version changed", () => {

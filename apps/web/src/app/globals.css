@@ -189,8 +189,8 @@
     background: var(--surface-space);
   }
 
-  .rail-chapter[data-progress="done"] .landmark,
-  .menu-chapter[data-progress="done"] .landmark {
+  .rail-chapter[data-progress="visited"] .landmark,
+  .menu-chapter[data-progress="visited"] .landmark {
     background: var(--text-on-space-muted);
     border-color: var(--text-on-space-muted);
   }
@@ -278,7 +278,7 @@
     bottom: 0;
     width: min(368px, 92vw);
     z-index: 20;
-    box-shadow: -18px 0 40px -24px rgb(3 8 15 / 0.75);
+    box-shadow: var(--shadow-card-on-space);
   }
 
   .drawer-head {
@@ -482,9 +482,11 @@
     margin-top: var(--space-12);
   }
 
+  /* Labels take their own width and values wrap in the rest: an `auto` value column would
+     grow to the longest value and squeeze the labels until they overprint it. */
   .kv {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: max-content minmax(0, 1fr);
     gap: var(--space-4) var(--space-16);
     font-size: var(--type-14);
   }

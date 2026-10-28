@@ -6,9 +6,9 @@
 import { initializeApp } from "@firebase/app";
 import {
   type Auth,
-  browserLocalPersistence,
   connectAuthEmulator,
   signOut as endSession,
+  indexedDBLocalPersistence,
   initializeAuth,
   onIdTokenChanged,
   signInWithEmailAndPassword,
@@ -52,15 +52,33 @@ function emulatorAuth({ emulatorUrl, projectId }: AuthSettings): Auth {
     { apiKey: "local-emulator", projectId, authDomain: new URL(emulatorUrl).host },
     `nessa-${key}`,
   );
-  const auth = initializeAuth(app, { persistence: browserLocalPersistence });
+  // The session (ID and refresh tokens) lives in IndexedDB, never in localStorage (ADR 0005
+  // decision 9; e2e/session.spec.ts checks which store holds it).
+  const auth = initializeAuth(app, { persistence: indexedDBLocalPersistence });
   connectAuthEmulator(auth, emulatorUrl, { disableWarnings: true });
   instance = { key, auth };
   return auth;
 }
 
+function codeOf(error: unknown): string {
+  return typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+}
+
+/**
+ * Refresh failures that end the session for good. Anything else (the emulator restarting,
+ * too many requests, a server error) is transient: the caller retries, the person stays in.
+ */
+const SESSION_ENDED = new Set([
+  "auth/user-token-expired",
+  "auth/invalid-user-token",
+  "auth/user-disabled",
+  "auth/user-not-found",
+  "auth/invalid-refresh-token",
+  "auth/token-expired",
+]);
+
 function problemOf(error: unknown): SignInProblem {
-  const code =
-    typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+  const code = codeOf(error);
   if (
     [
       "auth/invalid-credential",
@@ -120,8 +138,8 @@ export function AuthProvider({
       try {
         return await user.getIdToken(forceRefresh);
       } catch (error) {
-        // Sign-in unreachable for now: a transient failure the caller retries.
-        if (problemOf(error) === "unreachable") throw error;
+        // A transient failure (unreachable, rate limited, a server error): the caller retries.
+        if (!SESSION_ENDED.has(codeOf(error))) throw error;
         // The session itself was refused (expired, disabled, or unknown to the emulator).
         await endSession(auth);
         return null;

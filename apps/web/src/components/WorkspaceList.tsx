@@ -130,7 +130,7 @@ export function WorkspaceList() {
       {workspaces.isPending && <LoadingState stage="Loading your workspaces" />}
       {workspaces.isError && <RequestFailure error={workspaces.error} />}
       {workspaces.data !== undefined &&
-        (workspaces.data.items.length === 0 ? (
+        (workspaces.data.length === 0 ? (
           <EmptyState state="notStarted" title="No workspaces yet">
             <p>
               A workspace holds one person's answers, research and plans. Create one below to start.
@@ -138,7 +138,7 @@ export function WorkspaceList() {
           </EmptyState>
         ) : (
           <ul className="grid gap-12">
-            {workspaces.data.items.map((workspace) => (
+            {workspaces.data.map((workspace) => (
               <li key={workspace.workspace_id}>
                 <Link
                   className="card grid gap-4 no-underline"

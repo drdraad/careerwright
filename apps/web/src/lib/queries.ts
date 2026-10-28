@@ -2,7 +2,7 @@
 // Server state (TanStack Query) over the generated client. Every workspace-scoped query shares
 // the `["ws", id]` prefix, so a status event refetches exactly what that workspace shows.
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type CreateWorkspace,
   createWorkspace,
@@ -16,7 +16,7 @@ import {
   putProfile,
   type SourceOut,
 } from "@/generated/api";
-import { API_BASE, ApiError, newIdempotencyKey } from "./api";
+import { API_BASE, ApiError, ChangeKeys } from "./api";
 import { useAuth } from "./auth";
 import { openWorkspaceStream, type StreamStatus } from "./events";
 
@@ -46,11 +46,28 @@ export function useMe(enabled = true) {
   });
 }
 
+type Page<T> = { items: T[]; next_cursor: string | null };
+type PageQuery = { limit: number; cursor?: string };
+
+/** Reads every page (a list the UI shows is never silently truncated). */
+async function allPages<T>(read: (query: PageQuery) => Promise<Page<T>>): Promise<T[]> {
+  const all: T[] = [];
+  let cursor: string | null = null;
+  do {
+    const query: PageQuery = { limit: PAGE };
+    if (cursor !== null) query.cursor = cursor;
+    const page: Page<T> = await read(query);
+    all.push(...page.items);
+    cursor = page.next_cursor;
+  } while (cursor !== null);
+  return all;
+}
+
 export function useWorkspaces(enabled = true) {
   return useQuery({
     queryKey: keys.workspaces,
-    queryFn: async () =>
-      (await listWorkspaces({ query: { limit: PAGE }, throwOnError: true })).data,
+    queryFn: () =>
+      allPages(async (query) => (await listWorkspaces({ query, throwOnError: true })).data),
     retry: retryable,
     enabled,
   });
@@ -80,26 +97,15 @@ export function useProfile(id: string, enabled = true) {
   return useQuery({ ...profileQuery(id), enabled });
 }
 
-/** Every source reference of the workspace, all pages (a provenance list is never truncated). */
+/** Every source reference of the workspace (a provenance list is never truncated). */
 export function useSources(id: string, enabled = true) {
   return useQuery({
     queryKey: keys.sources(id),
-    queryFn: async () => {
-      const all: SourceOut[] = [];
-      let cursor: string | null = null;
-      do {
-        const query: { limit: number; cursor?: string } = { limit: PAGE };
-        if (cursor !== null) query.cursor = cursor;
-        const { data } = await listSources({
-          path: { workspace_id: id },
-          query,
-          throwOnError: true,
-        });
-        all.push(...data.items);
-        cursor = data.next_cursor;
-      } while (cursor !== null);
-      return all;
-    },
+    queryFn: (): Promise<SourceOut[]> =>
+      allPages(
+        async (query) =>
+          (await listSources({ path: { workspace_id: id }, query, throwOnError: true })).data,
+      ),
     retry: retryable,
     enabled,
   });
@@ -130,18 +136,23 @@ export function useSaveProfile(id: string) {
   });
 }
 
+/** Creating a workspace; a retry of the same submission reuses its key, so it creates one. */
 export function useCreateWorkspace() {
   const queries = useQueryClient();
+  const [changes] = useState(() => new ChangeKeys());
   return useMutation({
     mutationFn: async (body: CreateWorkspace) =>
       (
         await createWorkspace({
           body,
-          headers: { "Idempotency-Key": newIdempotencyKey() },
+          headers: { "Idempotency-Key": changes.keyFor(body) },
           throwOnError: true,
         })
       ).data,
-    onSuccess: () => queries.invalidateQueries({ queryKey: keys.workspaces }),
+    onSuccess: () => {
+      changes.settled();
+      return queries.invalidateQueries({ queryKey: keys.workspaces });
+    },
   });
 }
 
@@ -170,25 +181,51 @@ const sleep = (ms: number, signal: AbortSignal) =>
   });
 
 /** Subscribes to the workspace's status events while mounted; returns the stream's status. */
-export function useWorkspaceEvents(id: string, enabled: boolean): StreamStatus {
+/** The last event each workspace's stream received on this page, for a remounted stream. */
+const lastSeen = new Map<string, number>();
+
+export type WorkspaceEvents = { status: StreamStatus; restart(): void };
+
+/**
+ * Subscribes to the workspace's status events while mounted. A stream opened again on this
+ * page resumes after the last event it saw; a newly opened page starts after `startAfter`,
+ * the workspace's `last_event_seq` read with the workspace, so nothing is replayed and
+ * nothing after that read is missed.
+ */
+export function useWorkspaceEvents(
+  id: string,
+  enabled: boolean,
+  startAfter: number | undefined,
+): WorkspaceEvents {
   const { token } = useAuth();
   const queries = useQueryClient();
   const [status, setStatus] = useState<StreamStatus>({ state: "connecting" });
+  const [generation, setGeneration] = useState(0);
+  // Read when the stream opens; a later workspace refetch must not restart it.
+  const start = useRef(startAfter);
+  start.current = startAfter;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `generation` restarts the stream
   useEffect(() => {
     if (!enabled) return;
     const changed = invalidator(queries, id);
-    const handle = openWorkspaceStream({
-      url: `${API_BASE}/v1/workspaces/${encodeURIComponent(id)}/events/stream`,
-      fetch: (url, init) => fetch(url, init),
-      token,
-      sleep,
-      onEvent: changed,
-      onStatus: (next) => {
-        setStatus(next);
-        if (next.state === "live") changed(); // reconnected: catch up on anything missed
+    const handle = openWorkspaceStream(
+      {
+        url: `${API_BASE}/v1/workspaces/${encodeURIComponent(id)}/events/stream`,
+        fetch: (url, init) => fetch(url, init),
+        token,
+        sleep,
+        onEvent: (event) => {
+          lastSeen.set(id, event.seq);
+          changed();
+        },
+        onStatus: (next) => {
+          setStatus(next);
+          if (next.state === "live") changed(); // reconnected: catch up on anything missed
+        },
       },
-    });
+      { lastEventId: lastSeen.get(id) ?? start.current },
+    );
     return () => handle.stop();
-  }, [id, enabled, token, queries]);
-  return status;
+  }, [id, enabled, token, queries, generation]);
+  return { status, restart: () => setGeneration((value) => value + 1) };
 }

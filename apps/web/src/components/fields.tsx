@@ -12,11 +12,16 @@ type ControlProps = {
   label: string;
   draft: FieldDraft;
   error?: string;
-  disabled?: boolean;
   onChange(next: FieldDraft): void;
 };
 
-export function FieldStateSelect({ label, draft, disabled, onChange }: ControlProps) {
+/** `disabledReason` disables the control and says why beside it (never disabled silently). */
+export function FieldStateSelect({
+  label,
+  draft,
+  disabledReason,
+  onChange,
+}: ControlProps & { disabledReason?: string }) {
   const id = useId();
   return (
     <div className="grid gap-4">
@@ -27,7 +32,8 @@ export function FieldStateSelect({ label, draft, disabled, onChange }: ControlPr
         id={id}
         className="select"
         value={draft.state}
-        disabled={disabled}
+        disabled={disabledReason !== undefined}
+        aria-describedby={disabledReason !== undefined ? `${id}-reason` : undefined}
         onChange={(event) => onChange({ ...draft, state: event.target.value as FieldState })}
       >
         {FIELD_STATE_ORDER.map((state) => (
@@ -36,6 +42,11 @@ export function FieldStateSelect({ label, draft, disabled, onChange }: ControlPr
           </option>
         ))}
       </select>
+      {disabledReason !== undefined && (
+        <p id={`${id}-reason`} className="small muted">
+          {disabledReason}
+        </p>
+      )}
     </div>
   );
 }
@@ -51,7 +62,7 @@ export function FieldError({ id, children }: { id: string; children: ReactNode }
 
 type ValueProps = ControlProps & { kind: "text" | "hours" | "money"; errorId: string };
 
-export function ValueInput({ label, kind, draft, error, errorId, disabled, onChange }: ValueProps) {
+export function ValueInput({ label, kind, draft, error, errorId, onChange }: ValueProps) {
   const id = useId();
   const prefix = kind === "money" ? "£" : undefined;
   return (
@@ -72,7 +83,6 @@ export function ValueInput({ label, kind, draft, error, errorId, disabled, onCha
           inputMode={kind === "text" ? "text" : "decimal"}
           autoComplete="off"
           value={draft.text}
-          disabled={disabled}
           aria-invalid={error !== undefined || undefined}
           aria-describedby={error !== undefined ? errorId : undefined}
           onChange={(event) => onChange({ ...draft, text: event.target.value })}
@@ -84,15 +94,7 @@ export function ValueInput({ label, kind, draft, error, errorId, disabled, onCha
 
 type ListProps = ControlProps & { itemLabel: string; errorId: string };
 
-export function ListInput({
-  label,
-  itemLabel,
-  draft,
-  error,
-  errorId,
-  disabled,
-  onChange,
-}: ListProps) {
+export function ListInput({ label, itemLabel, draft, error, errorId, onChange }: ListProps) {
   const items = draft.items.length === 0 ? [""] : draft.items;
   const full = items.length >= LIST_LIMIT;
   const set = (next: string[]) => onChange({ ...draft, items: next });
@@ -108,7 +110,6 @@ export function ListInput({
               className="input"
               aria-label={name}
               value={item}
-              disabled={disabled}
               aria-invalid={error !== undefined || undefined}
               onChange={(event) =>
                 set(items.map((value, at) => (at === index ? event.target.value : value)))
@@ -119,7 +120,6 @@ export function ListInput({
                 type="button"
                 className="btn btn-quiet"
                 aria-label={`Remove ${name}`}
-                disabled={disabled}
                 onClick={() => set(items.filter((_, at) => at !== index))}
               >
                 Remove

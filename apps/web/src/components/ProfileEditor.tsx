@@ -2,32 +2,42 @@
 // "What we know": the editable profile (spec section 3). Every answer has a state, so a
 // missing value is never a zero. Saving is an expected-version command with an idempotency
 // key (Global Constraint 7): a retry of the same change reuses its key, and a version saved
-// elsewhere meanwhile is refused (409 STALE_INPUT_VERSION). Then the edits are kept, rebased
-// on the latest version, and the fields that changed there are named for review: nothing is
-// merged silently.
+// elsewhere meanwhile is refused (409 STALE_INPUT_VERSION). Then the form moves to the newer
+// version: answers the person did not touch take its values (so saving never reverts them),
+// their edits stay, and a field both changed shows the newer value beside the edit. Nothing
+// is merged silently, and a newer version that cannot be loaded says so.
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState } from "react";
-import type { ProfileOut, SourceOut } from "@/generated/api";
-import { ApiError, newIdempotencyKey } from "@/lib/api";
+import { useEffect, useId, useState } from "react";
+import type { ProfileDocument, ProfileOut } from "@/generated/api";
+import { ApiError, ChangeKeys } from "@/lib/api";
 import {
-  changedFields,
   describeField,
   draftFrom,
   type FieldProblem,
   inputFrom,
   type ProfileDraft,
   problemText,
+  rebaseDraft,
 } from "@/lib/profile";
-import { profileQuery, useSaveProfile, useSources } from "@/lib/queries";
+import { profileQuery, useSaveProfile } from "@/lib/queries";
 import { PROFILE_FIELD_ORDER, PROFILE_FIELDS, type ProfileFieldName } from "@/lib/vocabulary";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { useEvidence } from "./EvidenceDrawer";
+import { FieldSource } from "./FieldSource";
 import { FieldError, FieldStateSelect, ListInput, ValueInput } from "./fields";
+import { Glyph } from "./Glyph";
 import { RequestFailure } from "./PageState";
-import { SourceEvidence } from "./SourceEvidence";
 
-type Stale = { from: number; to: number; changed: ProfileFieldName[] };
+type Stale =
+  | {
+      kind: "rebased";
+      to: number;
+      changed: ProfileFieldName[];
+      conflicts: ProfileFieldName[];
+      latest: ProfileDocument;
+    }
+  | { kind: "unloaded"; error: unknown };
 
 export function ProfileEditor({
   workspaceId,
@@ -38,14 +48,13 @@ export function ProfileEditor({
 }) {
   const queries = useQueryClient();
   const save = useSaveProfile(workspaceId);
-  const sources = useSources(workspaceId);
   const evidence = useEvidence();
   const [base, setBase] = useState(profile);
   const [draft, setDraft] = useState<ProfileDraft>(() => draftFrom(profile.document));
   const [problems, setProblems] = useState<Partial<Record<ProfileFieldName, FieldProblem>>>({});
   const [stale, setStale] = useState<Stale | null>(null);
   const [saved, setSaved] = useState<number | null>(null);
-  const attempt = useRef<{ fingerprint: string; key: string } | null>(null);
+  const [changes] = useState(() => new ChangeKeys());
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftFrom(base.document));
   const idPrefix = useId();
 
@@ -73,53 +82,50 @@ export function ProfileEditor({
       return;
     }
     setProblems({});
-    const fingerprint = JSON.stringify([base.version, result.input]);
-    if (attempt.current?.fingerprint !== fingerprint) {
-      attempt.current = { fingerprint, key: newIdempotencyKey() };
-    }
+    const request = { expected_version: base.version, profile: result.input };
     try {
       const stored = await save.mutateAsync({
         expectedVersion: base.version,
         profile: result.input,
-        idempotencyKey: attempt.current.key,
+        idempotencyKey: changes.keyFor(request),
       });
-      attempt.current = null;
+      changes.settled();
       setStale(null);
       setBase(stored);
       setDraft(draftFrom(stored.document));
       setSaved(stored.version);
     } catch (error) {
-      if (error instanceof ApiError && error.code === "STALE_INPUT_VERSION") {
-        const latest = await queries.fetchQuery({ ...profileQuery(workspaceId), staleTime: 0 });
-        setStale({
-          from: base.version,
-          to: latest.version,
-          changed: changedFields(base.document, latest.document),
+      if (!(error instanceof ApiError && error.code === "STALE_INPUT_VERSION")) return;
+      let latest: ProfileOut;
+      try {
+        // No silent retries here: the person sees at once that it failed and can save again.
+        latest = await queries.fetchQuery({
+          ...profileQuery(workspaceId),
+          staleTime: 0,
+          retry: false,
         });
-        setBase(latest);
+      } catch (loadError) {
+        setStale({ kind: "unloaded", error: loadError });
+        return;
       }
+      const rebased = rebaseDraft(draft, base.document, latest.document);
+      setStale({
+        kind: "rebased",
+        to: latest.version,
+        changed: rebased.changedThere,
+        conflicts: rebased.conflicts,
+        latest: latest.document,
+      });
+      setBase(latest);
+      setDraft(rebased.draft);
     }
   };
 
-  const showSource = (name: ProfileFieldName) => {
-    const field = base.document[name];
-    const source: SourceOut | undefined = sources.data?.find(
-      (item) => item.source_ref_id === field.source_ref_id,
-    );
+  const showSource = (name: ProfileFieldName) =>
     evidence.open({
       title: "Where this came from",
-      body: (
-        <SourceEvidence
-          fieldLabel={PROFILE_FIELDS[name].label}
-          value={describeField(field)}
-          lessPrecise={PROFILE_FIELDS[name].lessPrecise}
-          source={source}
-          loading={sources.isPending}
-          failed={sources.isError}
-        />
-      ),
+      body: <FieldSource workspaceId={workspaceId} name={name} shown={base.document[name]} />,
     });
-  };
 
   const failure =
     save.error !== null &&
@@ -149,15 +155,26 @@ export function ProfileEditor({
         save. Choose Unknown, Skip or Prefer not to say for anything you don't want to answer.
       </p>
 
-      {stale !== null && (
+      {stale?.kind === "rebased" && (
         <Alert tone="stale" title={`Version ${stale.to} was saved while you were editing`}>
           <p>
             Your edits are kept below, now based on version {stale.to}.{" "}
             {stale.changed.length > 0
-              ? `Version ${stale.to} changed: ${stale.changed.map((name) => PROFILE_FIELDS[name].label).join(", ")}. Check those answers, then save again.`
+              ? `Version ${stale.to} changed: ${stale.changed.map((name) => PROFILE_FIELDS[name].label).join(", ")}. Its answers are shown where you had not changed them; where you had, both are shown. Check them, then save again.`
               : "It changed nothing you are editing. Save again to keep your changes."}
           </p>
         </Alert>
+      )}
+      {stale?.kind === "unloaded" && (
+        <>
+          <Alert tone="stale" title="A newer version was saved, and it couldn't be loaded">
+            <p>
+              Your edits are kept below. Save again in a moment: Nessa loads the newer version
+              first.
+            </p>
+          </Alert>
+          <RequestFailure error={stale.error} />
+        </>
       )}
       {failure && <RequestFailure error={save.error} />}
       <p role="status" className="small">
@@ -184,7 +201,7 @@ export function ProfileEditor({
                 </h3>
                 {stored.state !== "unasked" && (
                   <button type="button" className="btn btn-quiet" onClick={() => showSource(name)}>
-                    Source<span className="sr-only"> for {meta.label.toLowerCase()}</span>
+                    Source <span className="sr-only">for {meta.label.toLowerCase()}</span>
                   </button>
                 )}
               </div>
@@ -218,6 +235,15 @@ export function ProfileEditor({
               </div>
               {field.state !== "provided" && field.state !== "unasked" && (
                 <p className="small muted">Less precise without it: {meta.lessPrecise}</p>
+              )}
+              {stale?.kind === "rebased" && stale.conflicts.includes(name) && (
+                <p className="status" data-tone="stale">
+                  <Glyph name="stale" />
+                  <span>
+                    Version {stale.to} has {describeField(stale.latest[name])} here. Saving keeps
+                    your answer instead.
+                  </span>
+                </p>
               )}
               {error !== undefined && <FieldError id={errorId}>{error}</FieldError>}
             </section>

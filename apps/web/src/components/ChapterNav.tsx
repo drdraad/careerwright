@@ -14,8 +14,10 @@ type Props = {
   progress: Partial<Record<ChapterId, ChapterProgress>>;
 };
 
-function Decided({ progress }: { progress: ChapterProgress | undefined }) {
-  return progress === "done" ? <span className="sr-only">, decisions recorded</span> : null;
+/** The mark in words; the current chapter is announced by `aria-current` instead. */
+function Mark({ progress, current }: { progress: ChapterProgress | undefined; current: boolean }) {
+  if (current) return null;
+  return <span className="sr-only">{progress === "visited" ? ", visited" : ", not started"}</span>;
 }
 
 export function ChapterRail({ workspaceId, current, progress }: Props) {
@@ -38,7 +40,7 @@ export function ChapterRail({ workspaceId, current, progress }: Props) {
               >
                 <span className="landmark" aria-hidden="true" />
                 {chapter.label}
-                <Decided progress={progress[chapter.id]} />
+                <Mark progress={progress[chapter.id]} current={chapter.id === current} />
               </Link>
             </li>
           ))}
@@ -72,7 +74,7 @@ export function ChapterMenu({ workspaceId, current, progress }: Props) {
                 >
                   <span className="landmark" aria-hidden="true" />
                   {chapter.label}
-                  <Decided progress={progress[chapter.id]} />
+                  <Mark progress={progress[chapter.id]} current={chapter.id === current} />
                 </Link>
               </li>
             ))}

@@ -54,47 +54,124 @@ export type DraftResult =
   | { ok: true; input: ProfileInput }
   | { ok: false; problems: Partial<Record<ProfileFieldName, FieldProblem>> };
 
+/** One field's API input, or why it cannot be sent as typed. */
+type Read<T> = { ok: true; input: T } | { ok: false; problem: FieldProblem };
+
+function unanswered(field: FieldDraft): { state: Exclude<FieldState, "provided"> } | null {
+  return field.state === "provided" ? null : { state: field.state };
+}
+
+function readText(field: FieldDraft): Read<ProfileInput["current_role"]> {
+  const other = unanswered(field);
+  if (other !== null) return { ok: true, input: other };
+  const text = field.text.trim();
+  if (text === "") return { ok: false, problem: { kind: "required" } };
+  return { ok: true, input: { state: "provided", value: text } };
+}
+
+function readList(field: FieldDraft): Read<ProfileInput["cities"]> {
+  const other = unanswered(field);
+  if (other !== null) return { ok: true, input: other };
+  const items = field.items.map((item) => item.trim()).filter((item) => item !== "");
+  const folded = items.map((item) => item.toLocaleLowerCase("en-GB"));
+  if (items.length === 0) return { ok: false, problem: { kind: "required" } };
+  if (items.length > LIST_LIMIT) {
+    return { ok: false, problem: { kind: "too_many", limit: LIST_LIMIT } };
+  }
+  if (new Set(folded).size !== folded.length) return { ok: false, problem: { kind: "duplicate" } };
+  return { ok: true, input: { state: "provided", value: items } };
+}
+
+function readHours(field: FieldDraft): Read<ProfileInput["weekly_study_hours"]> {
+  const other = unanswered(field);
+  if (other !== null) return { ok: true, input: other };
+  const text = field.text.trim();
+  if (text === "") return { ok: false, problem: { kind: "required" } };
+  const hours = Number(text);
+  if (!/^\d+(\.\d+)?$/.test(text) || hours > 168) return { ok: false, problem: { kind: "hours" } };
+  return { ok: true, input: { state: "provided", value: hours } };
+}
+
+function readMoney(field: FieldDraft): Read<ProfileInput["direct_spend_cap"]> {
+  const other = unanswered(field);
+  if (other !== null) return { ok: true, input: other };
+  const parsed = parseMoneyInput(field.text, "GBP");
+  if (parsed.ok) return { ok: true, input: { state: "provided", value: parsed.money } };
+  return {
+    ok: false,
+    problem:
+      parsed.reason === "empty" ? { kind: "required" } : { kind: "money", reason: parsed.reason },
+  };
+}
+
 /** Turns the draft into the API's input, or names each field that cannot be sent as typed. */
 export function inputFrom(draft: ProfileDraft): DraftResult {
+  const read = {
+    preferred_name: readText(draft.preferred_name),
+    current_role: readText(draft.current_role),
+    cities: readList(draft.cities),
+    target_titles: readList(draft.target_titles),
+    weekly_study_hours: readHours(draft.weekly_study_hours),
+    direct_spend_cap: readMoney(draft.direct_spend_cap),
+    monthly_payment_cap: readMoney(draft.monthly_payment_cap),
+  };
   const problems: Partial<Record<ProfileFieldName, FieldProblem>> = {};
-  const input = {} as Record<ProfileFieldName, { state: FieldState; value?: unknown }>;
-  for (const name of Object.keys(PROFILE_FIELDS) as ProfileFieldName[]) {
-    const field = draft[name];
-    if (field.state !== "provided") {
-      input[name] = { state: field.state };
-      continue;
-    }
-    const kind = PROFILE_FIELDS[name].kind;
-    if (kind === "list") {
-      const items = field.items.map((item) => item.trim()).filter((item) => item !== "");
-      const folded = items.map((item) => item.toLocaleLowerCase("en-GB"));
-      if (items.length === 0) problems[name] = { kind: "required" };
-      else if (items.length > LIST_LIMIT) problems[name] = { kind: "too_many", limit: LIST_LIMIT };
-      else if (new Set(folded).size !== folded.length) problems[name] = { kind: "duplicate" };
-      input[name] = { state: "provided", value: items };
-    } else if (kind === "money") {
-      const parsed = parseMoneyInput(field.text, "GBP");
-      if (!parsed.ok)
-        problems[name] =
-          parsed.reason === "empty"
-            ? { kind: "required" }
-            : { kind: "money", reason: parsed.reason };
-      else input[name] = { state: "provided", value: parsed.money };
-    } else if (kind === "hours") {
-      const text = field.text.trim();
-      const hours = Number(text);
-      if (text === "") problems[name] = { kind: "required" };
-      else if (!/^\d+(\.\d+)?$/.test(text) || hours > 168) problems[name] = { kind: "hours" };
-      else input[name] = { state: "provided", value: hours };
-    } else {
-      const text = field.text.trim();
-      if (text === "") problems[name] = { kind: "required" };
-      input[name] = { state: "provided", value: text };
-    }
+  for (const name of Object.keys(read) as ProfileFieldName[]) {
+    const field = read[name];
+    if (!field.ok) problems[name] = field.problem;
   }
-  return Object.keys(problems).length > 0
-    ? { ok: false, problems }
-    : { ok: true, input: input as unknown as ProfileInput };
+  if (
+    !read.preferred_name.ok ||
+    !read.current_role.ok ||
+    !read.cities.ok ||
+    !read.target_titles.ok ||
+    !read.weekly_study_hours.ok ||
+    !read.direct_spend_cap.ok ||
+    !read.monthly_payment_cap.ok
+  ) {
+    return { ok: false, problems };
+  }
+  const input: ProfileInput = {
+    preferred_name: read.preferred_name.input,
+    current_role: read.current_role.input,
+    cities: read.cities.input,
+    target_titles: read.target_titles.input,
+    weekly_study_hours: read.weekly_study_hours.input,
+    direct_spend_cap: read.direct_spend_cap.input,
+    monthly_payment_cap: read.monthly_payment_cap.input,
+  };
+  return { ok: true, input };
+}
+
+export type Rebased = {
+  draft: ProfileDraft;
+  /** Fields the newer version changed. */
+  changedThere: ProfileFieldName[];
+  /** Fields the person edited that the newer version also changed: their edit is kept. */
+  conflicts: ProfileFieldName[];
+};
+
+/**
+ * After a stale save (409): a draft on the newer version. Answers the person did not touch
+ * take the newer version's values, so saving never reverts them; the person's edits stay;
+ * a field both changed is named as a conflict. Nothing is merged silently.
+ */
+export function rebaseDraft(
+  draft: ProfileDraft,
+  base: ProfileDocument,
+  latest: ProfileDocument,
+): Rebased {
+  const before = draftFrom(base);
+  const after = draftFrom(latest);
+  const changedThere = changedFields(base, latest);
+  const next = { ...after };
+  const conflicts: ProfileFieldName[] = [];
+  for (const name of Object.keys(PROFILE_FIELDS) as ProfileFieldName[]) {
+    if (JSON.stringify(draft[name]) === JSON.stringify(before[name])) continue;
+    next[name] = draft[name];
+    if (changedThere.includes(name)) conflicts.push(name);
+  }
+  return { draft: next, changedThere, conflicts };
 }
 
 /** Fields whose answer differs between two stored versions (shown after a stale save). */

@@ -12,8 +12,11 @@ export const CHAPTERS = [
 
 export type ChapterId = (typeof CHAPTERS)[number]["id"];
 
-/** "done": decisions are recorded for it. Derived from server state, never stored separately. */
-export type ChapterProgress = "done" | "todo";
+/**
+ * How the rail marks a chapter besides "current" (docs/design/README.md: visited, current or
+ * not started). Visited means opened in this browser session, or You once answers are saved.
+ */
+export type ChapterProgress = "visited" | "todo";
 
 export function isChapter(value: string): value is ChapterId {
   return CHAPTERS.some((chapter) => chapter.id === value);

@@ -14,9 +14,13 @@ import { SyntheticLabel } from "./Status";
 type Props = {
   workspace: WorkspaceOut;
   profile: ProfileOut | undefined;
+  /** The profile's first load failed: nothing about it is shown. */
+  profileFailed: boolean;
   workspaces: WorkspaceOut[];
+  workspacesFailed: boolean;
   events: StreamStatus;
-  /** The last refresh failed: what is shown is what was last loaded. */
+  onReconnect(): void;
+  /** A refresh failed after a successful load: what is shown is what was last loaded. */
   refreshFailed: boolean;
   email: string | null;
   calm: boolean;
@@ -46,23 +50,32 @@ const EVENTS_TEXT: Record<StreamStatus["state"], string> = {
   stopped: "Updates stopped",
 };
 
-function LiveUpdates({ status }: { status: StreamStatus }) {
+const STOP_REASON: Record<Extract<StreamStatus, { state: "stopped" }>["reason"], string> = {
+  signed_out: ": sign in again",
+  reauthentication_failed: ": sign in again",
+  access_ended: ": access to this workspace ended",
+  closed: "",
+};
+
+/** Shown on every screen size: on a phone it is the only sign that updates stopped. */
+function LiveUpdates({ status, onReconnect }: { status: StreamStatus; onReconnect(): void }) {
   const glyph = status.state === "live" ? "live" : status.state === "stopped" ? "error" : "running";
   const tone = status.state === "stopped" && status.reason !== "closed" ? "error" : "neutral";
   return (
-    <span className="status" data-tone={tone} role="status" aria-live="polite">
-      <Glyph name={glyph} />
-      <span>
-        <span className="sr-only">Live updates: </span>
-        {EVENTS_TEXT[status.state]}
-        {status.state === "stopped" && status.reason === "signed_out" && ": sign in again"}
-        {status.state === "stopped" &&
-          status.reason === "access_ended" &&
-          ": access to this workspace ended"}
-        {status.state === "stopped" &&
-          status.reason === "reauthentication_failed" &&
-          ": sign in again"}
+    <span className="flex items-center gap-8">
+      <span className="status" data-tone={tone} role="status" aria-live="polite">
+        <Glyph name={glyph} />
+        <span>
+          <span className="sr-only">Live updates: </span>
+          {EVENTS_TEXT[status.state]}
+          {status.state === "stopped" && STOP_REASON[status.reason]}
+        </span>
       </span>
+      {status.state === "stopped" && status.reason !== "signed_out" && (
+        <button type="button" className="strip-switch" onClick={onReconnect}>
+          Reconnect <span className="sr-only">live updates</span>
+        </button>
+      )}
     </span>
   );
 }
@@ -70,8 +83,11 @@ function LiveUpdates({ status }: { status: StreamStatus }) {
 export function WorkspaceStrip({
   workspace,
   profile,
+  profileFailed,
   workspaces,
+  workspacesFailed,
   events,
+  onReconnect,
   refreshFailed,
   email,
   calm,
@@ -112,6 +128,11 @@ export function WorkspaceStrip({
                 </Link>
               </li>
             </ul>
+            {workspacesFailed && (
+              <p className="small px-12 py-8" role="alert">
+                Your other workspaces couldn't be loaded.
+              </p>
+            )}
           </nav>
         </Popover.Content>
       </Popover.Root>
@@ -129,21 +150,28 @@ export function WorkspaceStrip({
         </>
       )}
       <span className="strip-end flex flex-wrap items-center gap-16">
-        <span className="strip-item">
-          {profile === undefined
-            ? "Loading"
-            : profile.version === 0
-              ? "Nothing saved yet"
-              : `Saved, version ${profile.version}`}
-        </span>
+        {profileFailed && profile === undefined ? (
+          <span className="status" data-tone="error" role="alert">
+            <Glyph name="unavailable" />
+            <span>What we know couldn't be loaded</span>
+          </span>
+        ) : (
+          <span className="strip-item">
+            {profile === undefined
+              ? "Loading"
+              : profile.version === 0
+                ? "Nothing saved yet"
+                : `Saved, version ${profile.version}`}
+          </span>
+        )}
         {refreshFailed && (
           <span className="status" data-tone="error" role="alert">
             <Glyph name="unavailable" />
             <span>Couldn't refresh: showing what was last loaded</span>
           </span>
         )}
-        <span className="strip-item strip-optional">
-          <LiveUpdates status={events} />
+        <span className="strip-item">
+          <LiveUpdates status={events} onReconnect={onReconnect} />
         </span>
         <Popover.Root>
           <Popover.Trigger className="strip-switch" aria-label="Account and settings">

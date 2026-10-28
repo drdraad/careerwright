@@ -46,6 +46,7 @@ function harness(
   script: Array<Response | Error>,
   tokens: Array<string | null> = [],
   now: () => number = () => 0,
+  options: { lastEventId?: number } = {},
 ) {
   const calls: Call[] = [];
   const statuses: StreamStatus[] = [];
@@ -57,36 +58,41 @@ function harness(
   const finished = new Promise<void>((resolve) => {
     done = resolve;
   });
-  const handle = openWorkspaceStream({
-    url: URL,
-    fetch: async (url, init) => {
-      calls.push({ url, headers: { ...(init.headers as Record<string, string>) } });
-      const next = script.shift();
-      if (next === undefined) {
-        done();
-        return new Promise<Response>((_, reject) => {
-          init.signal?.addEventListener("abort", () => reject(new DOMException("", "AbortError")));
-        });
-      }
-      if (next instanceof Error) throw next;
-      return next;
+  const handle = openWorkspaceStream(
+    {
+      url: URL,
+      fetch: async (url, init) => {
+        calls.push({ url, headers: { ...(init.headers as Record<string, string>) } });
+        const next = script.shift();
+        if (next === undefined) {
+          done();
+          return new Promise<Response>((_, reject) => {
+            init.signal?.addEventListener("abort", () =>
+              reject(new DOMException("", "AbortError")),
+            );
+          });
+        }
+        if (next instanceof Error) throw next;
+        return next;
+      },
+      token: async (force) => {
+        refreshes.push(force);
+        if (!force) return "t0";
+        const next = tokens[token++];
+        return next === undefined ? `t${token}` : next;
+      },
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
+      onEvent: (e) => events.push(e.seq),
+      onStatus: (s) => {
+        statuses.push(s);
+        if (s.state === "stopped") done();
+      },
+      now,
     },
-    token: async (force) => {
-      refreshes.push(force);
-      if (!force) return "t0";
-      const next = tokens[token++];
-      return next === undefined ? `t${token}` : next;
-    },
-    sleep: async (ms) => {
-      sleeps.push(ms);
-    },
-    onEvent: (e) => events.push(e.seq),
-    onStatus: (s) => {
-      statuses.push(s);
-      if (s.state === "stopped") done();
-    },
-    now,
-  });
+    options,
+  );
   return { calls, statuses, events, sleeps, refreshes, handle, finished };
 }
 
@@ -105,23 +111,50 @@ describe("[DUR-03][STATE-07] the workspace event stream resumes and re-authentic
   });
 
   it("starts from a given event so a reopened page does not replay old events", async () => {
-    const h = harness([stream(frame(event(9)))]);
+    const h = harness([stream(frame(event(9)))], [], () => 0, { lastEventId: 8 });
+    await h.finished;
     h.handle.stop();
-    const resumed = openWorkspaceStream(
-      {
-        url: URL,
-        fetch: async (_url, init) => {
-          expect((init.headers as Record<string, string>)["Last-Event-ID"]).toBe("8");
-          return new Promise<Response>(() => {});
-        },
-        token: async () => "t",
-        sleep: async () => {},
-        onEvent: () => {},
-        onStatus: () => {},
-      },
-      { lastEventId: 8 },
-    );
-    resumed.stop();
+
+    expect(h.calls[0]?.headers["Last-Event-ID"]).toBe("8");
+    expect(h.calls[1]?.headers["Last-Event-ID"]).toBe("9");
+    expect(h.events).toEqual([9]);
+  });
+
+  it("says live only once something has arrived through the stream, not on headers alone", async () => {
+    const statuses: StreamStatus[] = [];
+    let release!: (controller: ReadableStreamDefaultController<Uint8Array>) => void;
+    const held = new Promise<ReadableStreamDefaultController<Uint8Array>>((resolve) => {
+      release = resolve;
+    });
+    const handle = openWorkspaceStream({
+      url: URL,
+      fetch: async () =>
+        new Response(new ReadableStream<Uint8Array>({ start: (c) => release(c) }), {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        }),
+      token: async () => "t",
+      sleep: async () => {},
+      onEvent: () => {},
+      onStatus: (s) => statuses.push(s),
+    });
+    const body = await held;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const beforeAnyFrame = statuses.map((s) => s.state);
+    body.enqueue(new TextEncoder().encode("retry: 2000\n\n"));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    handle.stop();
+
+    expect(beforeAnyFrame).not.toContain("live");
+    expect(statuses.map((s) => s.state)).toContain("live");
+  });
+
+  it("never reconnects faster than once a second, whatever retry the server sends", async () => {
+    const h = harness([stream("retry: 0\n\n", frame(event(1)))]);
+    await h.finished;
+    h.handle.stop();
+
+    expect(h.sleeps).toEqual([1000]);
   });
 
   it("re-authenticates with a refreshed token when told to, without waiting", async () => {

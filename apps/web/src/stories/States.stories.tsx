@@ -4,7 +4,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { Alert } from "@/components/Alert";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
-import { FieldStateSelect, ValueInput } from "@/components/fields";
+import { FieldError, FieldStateSelect, ValueInput } from "@/components/fields";
 import { LoadingState } from "@/components/LoadingState";
 import { StatusBadge } from "@/components/Status";
 import { describeField } from "@/lib/profile";
@@ -96,9 +96,7 @@ export const ErrorState: Story = {
           errorId="story-error"
           onChange={() => {}}
         />
-        <p id="story-error" className="field-error">
-          Enter an amount of £0 or more.
-        </p>
+        <FieldError id="story-error">Enter an amount of £0 or more.</FieldError>
       </div>
       <StatusBadge state="failed" detail="the reply didn't pass validation" />
       <StatusBadge state="provider_unavailable" detail="your work is kept" />
@@ -117,7 +115,7 @@ export const Disabled: Story = {
       <FieldStateSelect
         label="Weekly study hours"
         draft={{ state: "skipped", text: "", items: [] }}
-        disabled
+        disabledReason="Saving: you can change this again in a moment."
         onChange={() => {}}
       />
     </div>
