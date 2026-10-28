@@ -235,7 +235,13 @@ decision 7 requires the first run kind that reads the profile to pin the version
     $0.000251 against a $0.0035 reservation; five proposals (current role, two cities,
     6 hours, a £1,200 total limit, one enjoyed task), each stated and citing the message,
     confirmed and saved as profile version 1; the leak scan of both databases, every
-    container log and every API response found no part of the key. The production model
+    container log and every API response found no part of the key.
+    Streaming confirmation (ledger row 14, 2026-10-28, fix round 1, same model and message):
+    the turn streamed its reply into the partial store (one write, announced by one
+    `run.partial_updated` event), the validated output superseded it, usage arrived on the
+    streamed response (1 request, 1,147 input and 632 output tokens, 255 reasoning;
+    $0.000241, reconciled against a $0.0035 reservation), five proposals were confirmed into
+    profile version 1, and the leak scan found nothing. The production model
     was not called for this schema: Spark 1.3's strict schema output on the Standard ID was
     qualified in Sprint 0 (ADR 0003, ledger calls 6-7), and the same release accepted this
     schema; one `PRODUCTION=1 INTERVIEW=1` run (worst case $0.049) would close that gap.
