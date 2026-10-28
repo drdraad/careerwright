@@ -31,11 +31,11 @@ from nessa.profile.slate_explanation import (
     QuoteSource,
     RecordPart,
     SlateExplanation,
+    accepted_quotation,
     build_input,
     check_explanation,
     find_span,
     prompt_bytes,
-    quotable,
     render_prompt,
     repair_message,
     worst_case_nano_usd,
@@ -640,11 +640,21 @@ def test_answers_too_long_for_the_prompt_in_bytes_are_a_typed_refusal() -> None:
 
 
 @pytest.mark.req("REC1-11")
-def test_only_an_answer_with_a_content_word_can_be_quoted() -> None:
-    assert quotable("repairing bicycles")
-    assert quotable("teamwork")
-    assert not quotable("art")  # a short answer alone gives the note nothing to quote
-    assert not quotable("with them")
+def test_only_an_answer_the_check_accepts_as_a_quotation_of_itself_can_be_quoted() -> None:
+    # The pre-check before any run and the demo explainer read an answer the way the check
+    # reads a quotation (one function, `accepted_quotation`).
+    def can_quote(answer: str) -> bool:
+        return accepted_quotation(answer, answer)
+
+    assert can_quote("repairing bicycles")
+    assert can_quote("teamwork")
+    assert can_quote("'people person'")
+    assert not can_quote("art")  # a short answer alone gives the note nothing to quote
+    assert not can_quote("with them")
+    # Re-review 3 of Task 6b, Minor 1: a closing quote after an "s" reads as a plural
+    # possessive, so the answer quoted whole is no quotation of itself.
+    assert not can_quote("'odd jobs'")
+    assert not can_quote("\N{LEFT SINGLE QUOTATION MARK}odd jobs\N{RIGHT SINGLE QUOTATION MARK}")
 
 
 @pytest.mark.req("REC1-11")
@@ -816,6 +826,10 @@ _WORDS = st.sampled_from(
         "care",
         "teaching",
         "work",
+        "'odd",
+        "jobs'",
+        "\N{LEFT SINGLE QUOTATION MARK}side",
+        "gigs\N{RIGHT SINGLE QUOTATION MARK}",
     ]
 )
 _PHRASE = st.lists(_WORDS, min_size=1, max_size=6).map(" ".join)
@@ -827,9 +841,10 @@ _PHRASE = st.lists(_WORDS, min_size=1, max_size=6).map(" ".join)
 def test_whatever_the_answers_and_record_the_fixture_s_note_passes_the_check(
     answers: list[str], description: str, skill: str
 ) -> None:
-    # A demo workspace is refused before any run when no answer has a word to quote, so
-    # only answers with one are in scope; ESCO titles always have one.
-    assume(any(quotable(text) for text in answers))
+    # A demo workspace is refused before any run when no answer is one the note can quote,
+    # by the predicate the explainer uses, so only answer sets with one are in scope; every
+    # ESCO v1.2.1 title is a quotation of itself.
+    assume(any(accepted_quotation(text, text) for text in answers))
     assume(len({a.casefold() for a in answers}) == len(answers))  # a profile list holds each once
 
     assert fixture_problems(answers, facts("care worker", description, skill)) == []

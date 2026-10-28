@@ -72,7 +72,12 @@ from nessa.profile.slate import (
     build_pool,
     choose_slate,
 )
-from nessa.profile.slate_explanation import RECORD_STEPS, SlateExplanation, build_input, quotable
+from nessa.profile.slate_explanation import (
+    RECORD_STEPS,
+    SlateExplanation,
+    accepted_quotation,
+    build_input,
+)
 from nessa.profile.store import stale_version
 from nessa.vocabulary import WorkState
 
@@ -593,7 +598,8 @@ def submit_explanation(
 
     Refused before any run exists when the discovery has no validated searches, when the
     answers it pinned are not the current ones (it would quote answers since changed), when
-    no pinned answer holds a word to quote, or when its slate is empty."""
+    no pinned answer is one the note can quote (`accepted_quotation`, as the demo explainer
+    reads it), or when its slate is empty."""
     visible_workspace(tx, workspace_id, lock=True)
     view = visible_discovery(tx, keyring, workspace_id, discovery_id)
     existing = view.explanation
@@ -632,7 +638,7 @@ def submit_explanation(
         )
     document = _pinned_document(tx, view.run)
     answers = evidence_of(document)
-    if not any(quotable(item.text) for item in answers):
+    if not any(accepted_quotation(item.text, item.text) for item in answers):
         raise NessaError(
             ErrorCode.INSUFFICIENT_EVIDENCE,
             "None of your answers has a word the note could quote.",

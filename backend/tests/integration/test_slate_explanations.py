@@ -303,6 +303,37 @@ def test_an_explanation_is_refused_before_any_run_for_a_failed_discovery_or_chan
 
 
 @pytest.mark.req("REC1-11")
+@pytest.mark.parametrize(
+    "answer",
+    ["'odd jobs'", "\N{LEFT SINGLE QUOTATION MARK}odd jobs\N{RIGHT SINGLE QUOTATION MARK}"],
+    ids=["straight quotes", "curly quotes"],
+)
+def test_an_answer_the_check_cannot_quote_whole_is_refused_before_any_run(
+    explaining: Scenario, answer: str
+) -> None:
+    # Task 6b re-review 3, Minor 1: 'odd jobs' holds a content word, but its closing quote
+    # after an "s" reads as a plural possessive, so the answer quoted whole never verifies.
+    # The pre-check reads answers as the check does, so this costs no paid repair.
+    only = explaining.api.write(
+        "PUT",
+        f"{base(explaining)}/profile",
+        explaining.token,
+        {"expected_version": 2, "profile": profile_with(enjoyed_tasks=[answer])},
+    )
+    assert only.status_code == 201, only.text
+
+    refused = ask(explaining, discover(explaining, version=3)["discovery_id"], version=3)
+
+    assert (refused.status_code, refused.json()["error"]["code"]) == (
+        422,
+        "INSUFFICIENT_EVIDENCE",
+    )
+    assert refused.json()["error"]["details"]["reason"] == "no_quotable_answer"
+    runs = explaining.api.get(f"{base(explaining)}/runs", explaining.token).json()["items"]
+    assert {r["kind"] for r in runs} == {"discovery"}  # refused before any run
+
+
+@pytest.mark.req("REC1-11")
 def test_the_export_cites_the_deterministic_provenance_never_the_written_text(
     explaining: Scenario,
 ) -> None:

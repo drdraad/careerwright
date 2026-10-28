@@ -441,6 +441,15 @@ def quoted_span(quote: str, source: str) -> str | None:
     return find_span(text, source)
 
 
+def accepted_quotation(quote: str, source: str) -> bool:
+    """Whether the check takes `quote` as a quotation of `source` that says something: a
+    span of it (`quoted_span`) holding a content word (`quotable`). An answer the note can
+    quote is one accepted as a quotation of itself, so "'odd jobs'" is not: its closing quote
+    after an "s" reads as a plural possessive."""
+    span = quoted_span(quote, source)
+    return span is not None and quotable(span)
+
+
 def _verified(
     quote: ModelQuote, answers: Sequence[EvidenceItem], record: OccupationRecord
 ) -> Quotation | None:

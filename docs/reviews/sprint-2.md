@@ -405,7 +405,11 @@ on `42ef206`: `make check` exit 0 (581 fast tests; Vitest 201); `make acceptance
 (195 integration and stack tests, the Storybook build, 22 Playwright journeys); the note's
 captures recaptured with every shot's checks clean (30 per size). The live EXP-01 output
 (rows 25-26) predates the round; its stored claims and quotations were re-checked offline
-after round 1's rules, and again after fix round 3 (below). No new live call.
+after round 1's rules, and again after fix round 3 (below). Both re-checks read ESCO's full
+records as the evidence file keeps them, not the shortened copy the prompt carried: a
+quotation from beyond the description's cut or of an essential skill past the prompt's
+first ones would also have passed, and a readiness, pay or hiring word that only the uncut
+record uses would also have been allowed. No new live call.
 
 **Fix round 2 (re-review 1).** The function words are now a standard English stopword
 list's (four letters or more, with contraction stems), checked on the verified span as it
@@ -431,8 +435,12 @@ started ... Nessa didn't ask the model") instead of "Nothing from it was kept"; 
 want/need" is kept and listed as a known false positive for careers work (H-12). The
 stored live EXP-01 output (rows 25-26) was re-checked offline with the final checker: all
 six suggestions, seven claims and 16 quotations accepted. That check read ESCO's full
-records as the evidence file keeps them, not the shortened copy the prompt carried, so a
-quotation from beyond the cut would also have passed. No live call. Checks on `c937e6f`:
+records as the evidence file keeps them, not the shortened copy the prompt carried (its
+description cut and only its first essential skills). So it was wider than the run's own
+check in three ways: a quotation from beyond the cut, or of an essential skill past the
+prompt's first ones, would also have passed; and the record-only allowance for readiness,
+pay and hiring words read the whole record, so such a word that only the uncut record
+uses would also have been allowed. No live call. Checks on `c937e6f`:
 `make check` exit 0 (608 fast tests; Vitest 204); `make acceptance` exit 0 (195
 integration and stack tests, the Storybook build, 22 Playwright journeys, the demo
 journey's fixture note among them); the answers-too-short note recaptured at three sizes,

@@ -361,7 +361,7 @@ inference, with at least 30 evaluation cases and a capped live run.
       the expected version is stale or the discovery's pinned answers are not the current
       ones (`STALE_INPUT_VERSION`: the note would quote answers since changed), when the
       discovery has no validated searches (`PROPOSAL_NOT_AVAILABLE`), when no pinned answer
-      holds a content word to quote (`INSUFFICIENT_EVIDENCE`, `no_quotable_answer`) or the
+      is one the note can quote (`INSUFFICIENT_EVIDENCE`, `no_quotable_answer`) or the
       slate is empty (`INSUFFICIENT_EVIDENCE`, `no_suggestions`), when the answers are too
       long for the prompt in bytes (`LIMIT_EXCEEDED`, `answers_too_long`), and for the usual
       reasons any run is refused (no key, over budget, demo runtime).
@@ -410,9 +410,19 @@ inference, with at least 30 evaluation cases and a capped live run.
       deterministic fixture explainer (`nessa-fixture-explainer-1`, each claim labelled
       "Demo explainer (synthetic)"), which the database confines to demo workspaces and, with
       the other fixture models, to interview turns, discoveries and explanations. It reads
-      each quotation back as the check reads it (`quoted_span`) before writing it, quoting a
-      description's word as its whole token where the word alone is no span
-      ("children's"), so its note always passes the check (a property test, fix round 3).
+      each quotation back as the check reads it (`accepted_quotation`) before writing it,
+      quoting a description's word as its whole token where the word alone is no span
+      ("children's"), and quotes only answers the check accepts as quotations of
+      themselves. Until the session 1 transcription, the API's pre-check read answers
+      differently (any content word), so an answer set made only of single-quoted phrases
+      ending in "s" ("'odd jobs'", straight or curly) passed it, and the demo note then
+      failed its check (a live run would have spent a paid repair). The pre-check now uses
+      the same function, so an answer is "one the note can quote" in exactly the
+      explainer's sense. Every ESCO v1.2.1 title is a quotation of itself (an offline count
+      over all 3,043), so its last fallback, the title, is always accepted too. For every
+      slate the API lets it explain, then, each quotation it writes is one the check
+      accepts, by construction (a property test, fix round 3, widened to single-quoted
+      words by the session 1 transcription).
     - *Never a change.* The slate is computed without reading the note, and choosing a
       target records the `occupation_choice` source (ESCO URI and discovery) as before,
       never the note. The command answers with the run only (`ExplanationRunOut`): a
@@ -442,7 +452,11 @@ inference, with at least 30 evaluation cases and a capped live run.
       positives for the H-12 review: "employers want" or "employers need" is refused even
       where the occupation's work is employers' needs (a careers adviser "explains what
       employers need"), unless that record itself uses the phrase; a closing quotation mark
-      after a word ending in "s" ("'odd jobs'") reads as a plural possessive. The live
+      after a word ending in "s" ("'odd jobs'") reads as a plural possessive. An answer set
+      made only of such phrases is therefore refused before any run (`no_quotable_answer`),
+      although a quotation that drops the opening mark and keeps the closing one ("odd
+      jobs'") would verify; a model would rarely write one. The web app's words for that
+      refusal say the answers are too short to quote, which does not fit this case. The live
       evidence is single samples on the test model.
     - **Provisional (R6, H-12):** the readiness, affordability and hiring word lists and
       phrasings, the content-word rule and its function words, the claim and quotation
