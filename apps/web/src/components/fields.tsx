@@ -12,14 +12,20 @@ type ControlProps = {
   label: string;
   draft: FieldDraft;
   error?: string;
+  /** IDs of the notes that describe this control (its error, a conflict), space-separated. */
+  describedBy?: string;
   onChange(next: FieldDraft): void;
 };
+
+const ids = (...values: Array<string | undefined>) =>
+  values.filter((value) => value !== undefined).join(" ") || undefined;
 
 /** `disabledReason` disables the control and says why beside it (never disabled silently). */
 export function FieldStateSelect({
   label,
   draft,
   disabledReason,
+  describedBy,
   onChange,
 }: ControlProps & { disabledReason?: string }) {
   const id = useId();
@@ -33,7 +39,10 @@ export function FieldStateSelect({
         className="select"
         value={draft.state}
         disabled={disabledReason !== undefined}
-        aria-describedby={disabledReason !== undefined ? `${id}-reason` : undefined}
+        aria-describedby={ids(
+          disabledReason !== undefined ? `${id}-reason` : undefined,
+          describedBy,
+        )}
         onChange={(event) => onChange({ ...draft, state: event.target.value as FieldState })}
       >
         {FIELD_STATE_ORDER.map((state) => (
@@ -60,9 +69,9 @@ export function FieldError({ id, children }: { id: string; children: ReactNode }
   );
 }
 
-type ValueProps = ControlProps & { kind: "text" | "hours" | "money"; errorId: string };
+type ValueProps = ControlProps & { kind: "text" | "hours" | "money" };
 
-export function ValueInput({ label, kind, draft, error, errorId, onChange }: ValueProps) {
+export function ValueInput({ label, kind, draft, error, describedBy, onChange }: ValueProps) {
   const id = useId();
   const prefix = kind === "money" ? "£" : undefined;
   return (
@@ -84,7 +93,7 @@ export function ValueInput({ label, kind, draft, error, errorId, onChange }: Val
           autoComplete="off"
           value={draft.text}
           aria-invalid={error !== undefined || undefined}
-          aria-describedby={error !== undefined ? errorId : undefined}
+          aria-describedby={describedBy}
           onChange={(event) => onChange({ ...draft, text: event.target.value })}
         />
       </div>
@@ -92,14 +101,14 @@ export function ValueInput({ label, kind, draft, error, errorId, onChange }: Val
   );
 }
 
-type ListProps = ControlProps & { itemLabel: string; errorId: string };
+type ListProps = ControlProps & { itemLabel: string };
 
-export function ListInput({ label, itemLabel, draft, error, errorId, onChange }: ListProps) {
+export function ListInput({ label, itemLabel, draft, error, describedBy, onChange }: ListProps) {
   const items = draft.items.length === 0 ? [""] : draft.items;
   const full = items.length >= LIST_LIMIT;
   const set = (next: string[]) => onChange({ ...draft, items: next });
   return (
-    <fieldset className="grid gap-8" aria-describedby={error !== undefined ? errorId : undefined}>
+    <fieldset className="grid gap-8" aria-describedby={describedBy}>
       <legend className="small muted">{label}</legend>
       {items.map((item, index) => {
         const name = `${itemLabel} ${index + 1}`;

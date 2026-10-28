@@ -5,9 +5,10 @@
 // elsewhere meanwhile is refused (409 STALE_INPUT_VERSION). Then the form moves to the newer
 // version: answers the person did not touch take its values (so saving never reverts them),
 // their edits stay, and a field both changed shows the newer value beside the edit. Nothing
-// is merged silently, and a newer version that cannot be loaded says so.
+// is merged silently, and a newer version that cannot be loaded says so. Either notice is
+// announced and takes focus, and lists each answer the newer version changed (WCAG 4.1.3).
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { ProfileDocument, ProfileOut } from "@/generated/api";
 import { ApiError, ChangeKeys } from "@/lib/api";
 import {
@@ -57,10 +58,17 @@ export function ProfileEditor({
   const [changes] = useState(() => new ChangeKeys());
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftFrom(base.document));
   const idPrefix = useId();
+  const notice = useRef<HTMLDivElement>(null);
 
-  // Follow versions saved elsewhere while nothing is being edited here.
+  // A refused save moves focus to its notice, which is announced.
   useEffect(() => {
-    if (profile.version !== base.version && !dirty) {
+    if (stale !== null) notice.current?.focus();
+  }, [stale]);
+
+  // Follow newer versions saved elsewhere while nothing is being edited here (never an older
+  // one: after a stale save the form is already on the newer version).
+  useEffect(() => {
+    if (profile.version > base.version && !dirty) {
       setBase(profile);
       setDraft(draftFrom(profile.document));
     }
@@ -156,24 +164,43 @@ export function ProfileEditor({
       </p>
 
       {stale?.kind === "rebased" && (
-        <Alert tone="stale" title={`Version ${stale.to} was saved while you were editing`}>
+        <Alert
+          ref={notice}
+          tone="stale"
+          announce
+          title={`Version ${stale.to} was saved while you were editing`}
+        >
           <p>
             Your edits are kept below, now based on version {stale.to}.{" "}
             {stale.changed.length > 0
-              ? `Version ${stale.to} changed: ${stale.changed.map((name) => PROFILE_FIELDS[name].label).join(", ")}. Its answers are shown where you had not changed them; where you had, both are shown. Check them, then save again.`
+              ? `Version ${stale.to} changed: ${stale.changed
+                  .map(
+                    (name) =>
+                      `${PROFILE_FIELDS[name].label} to ${describeField(stale.latest[name])}`,
+                  )
+                  .join("; ")}. ${
+                  stale.conflicts.length > 0
+                    ? `Where you had changed an answer too, your answer is kept and version ${stale.to}'s is shown beside it. `
+                    : ""
+                }Check them, then save again.`
               : "It changed nothing you are editing. Save again to keep your changes."}
           </p>
         </Alert>
       )}
       {stale?.kind === "unloaded" && (
         <>
-          <Alert tone="stale" title="A newer version was saved, and it couldn't be loaded">
+          <Alert
+            ref={notice}
+            tone="stale"
+            announce
+            title="A newer version was saved, and it couldn't be loaded"
+          >
             <p>
               Your edits are kept below. Save again in a moment: Nessa loads the newer version
               first.
             </p>
           </Alert>
-          <RequestFailure error={stale.error} />
+          <RequestFailure error={stale.error} announce={false} />
         </>
       )}
       {failure && <RequestFailure error={save.error} />}
@@ -188,6 +215,12 @@ export function ProfileEditor({
           const problem = problems[name];
           const errorId = `${idPrefix}-${name}-error`;
           const error = problem === undefined ? undefined : problemText(problem);
+          const conflictId = `${idPrefix}-${name}-conflict`;
+          const conflict = stale?.kind === "rebased" && stale.conflicts.includes(name);
+          const describedBy =
+            [error !== undefined && errorId, conflict && conflictId]
+              .filter((id) => id !== false)
+              .join(" ") || undefined;
           const stored = base.document[name];
           return (
             <section
@@ -210,6 +243,7 @@ export function ProfileEditor({
                 <FieldStateSelect
                   label={meta.label}
                   draft={field}
+                  describedBy={conflict ? conflictId : undefined}
                   onChange={(next) => change(name, next)}
                 />
                 {field.state === "provided" &&
@@ -219,7 +253,7 @@ export function ProfileEditor({
                       itemLabel={name === "cities" ? "Work area" : "Target role"}
                       draft={field}
                       error={error}
-                      errorId={errorId}
+                      describedBy={describedBy}
                       onChange={(next) => change(name, next)}
                     />
                   ) : (
@@ -228,7 +262,7 @@ export function ProfileEditor({
                       kind={meta.kind}
                       draft={field}
                       error={error}
-                      errorId={errorId}
+                      describedBy={describedBy}
                       onChange={(next) => change(name, next)}
                     />
                   ))}
@@ -236,8 +270,8 @@ export function ProfileEditor({
               {field.state !== "provided" && field.state !== "unasked" && (
                 <p className="small muted">Less precise without it: {meta.lessPrecise}</p>
               )}
-              {stale?.kind === "rebased" && stale.conflicts.includes(name) && (
-                <p className="status" data-tone="stale">
+              {stale?.kind === "rebased" && conflict && (
+                <p id={conflictId} className="status" data-tone="stale">
                   <Glyph name="stale" />
                   <span>
                     Version {stale.to} has {describeField(stale.latest[name])} here. Saving keeps

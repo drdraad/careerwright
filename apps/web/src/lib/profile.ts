@@ -147,14 +147,15 @@ export type Rebased = {
   draft: ProfileDraft;
   /** Fields the newer version changed. */
   changedThere: ProfileFieldName[];
-  /** Fields the person edited that the newer version also changed: their edit is kept. */
+  /** Fields the person edited that the newer version changed differently: their edit is kept. */
   conflicts: ProfileFieldName[];
 };
 
 /**
  * After a stale save (409): a draft on the newer version. Answers the person did not touch
  * take the newer version's values, so saving never reverts them; the person's edits stay;
- * a field both changed is named as a conflict. Nothing is merged silently.
+ * a field both changed to different answers is named as a conflict. Nothing is merged
+ * silently.
  */
 export function rebaseDraft(
   draft: ProfileDraft,
@@ -167,7 +168,9 @@ export function rebaseDraft(
   const next = { ...after };
   const conflicts: ProfileFieldName[] = [];
   for (const name of Object.keys(PROFILE_FIELDS) as ProfileFieldName[]) {
-    if (JSON.stringify(draft[name]) === JSON.stringify(before[name])) continue;
+    const edit = JSON.stringify(draft[name]);
+    // Untouched, or edited to exactly what the newer version has: take the newer answer.
+    if (edit === JSON.stringify(before[name]) || edit === JSON.stringify(after[name])) continue;
     next[name] = draft[name];
     if (changedThere.includes(name)) conflicts.push(name);
   }

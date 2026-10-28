@@ -70,7 +70,7 @@ export const Notices: Story = {
       <Alert tone="stale" title="This changed since you loaded it">
         Review the latest version, then save again.
       </Alert>
-      <Alert tone="unknown" title="Not answered yet">
+      <Alert tone="unknown" title="Total spending limit: Unknown">
         The result is less precise, never filled in with a guess.
       </Alert>
       <Alert tone="error" title="Nessa's service isn't reachable">
@@ -93,14 +93,12 @@ export const FormControls: Story = {
         label="Weekly study hours"
         kind="hours"
         draft={{ state: "provided", text: "7.5", items: [] }}
-        errorId="hours-error"
         onChange={() => {}}
       />
       <ListInput
         label="Work areas"
         itemLabel="Work area"
         draft={{ state: "provided", text: "", items: ["Manchester", "Leeds", "York"] }}
-        errorId="cities-error"
         onChange={() => {}}
       />
     </div>

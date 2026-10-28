@@ -93,7 +93,7 @@ export const ErrorState: Story = {
           kind="money"
           draft={{ state: "provided", text: "-20", items: [] }}
           error="Enter an amount of £0 or more."
-          errorId="story-error"
+          describedBy="story-error"
           onChange={() => {}}
         />
         <FieldError id="story-error">Enter an amount of £0 or more.</FieldError>

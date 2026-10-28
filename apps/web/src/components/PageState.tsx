@@ -26,11 +26,20 @@ export function PageLoading({ stage }: { stage: string }) {
  * A refused request in the person's words and its state's tone: the code's statement, never
  * the raw message. Only real failures are red and announced as alerts.
  */
-export function RequestFailure({ error, actions }: { error: unknown; actions?: ReactNode }) {
+export function RequestFailure({
+  error,
+  actions,
+  announce,
+}: {
+  error: unknown;
+  actions?: ReactNode;
+  /** False when another notice already announces this failure (one announcement each). */
+  announce?: boolean;
+}) {
   if (error instanceof ApiError && error.body !== null) {
     const statement = ERROR_STATEMENT[error.body.code];
     return (
-      <Alert tone={statement.tone} title={statement.title} actions={actions}>
+      <Alert tone={statement.tone} title={statement.title} actions={actions} announce={announce}>
         <p>{statement.action}</p>
         <p className="muted">Reference {error.body.correlation_id}</p>
       </Alert>
@@ -42,6 +51,7 @@ export function RequestFailure({ error, actions }: { error: unknown; actions?: R
       glyph="unavailable"
       title="Nessa's service isn't reachable"
       actions={actions}
+      announce={announce}
     >
       <p>Nothing you saved is lost. If Nessa is restarting, try again in a moment.</p>
     </Alert>

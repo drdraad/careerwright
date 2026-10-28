@@ -108,6 +108,21 @@ describe("[API-04] the profile form sends exactly what was answered, in integer 
     expect(rebased.conflicts).toEqual(["current_role"]);
   });
 
+  it("names no conflict where the person's edit equals the newer version's answer", () => {
+    const older = document();
+    const newer = document({
+      current_role: { state: "provided", value: "Analyst", source_ref_id: SOURCE },
+    });
+    const draft = draftFrom(older);
+    draft.current_role = { state: "provided", text: "Analyst", items: [] };
+
+    const rebased = rebaseDraft(draft, older, newer);
+
+    expect(rebased.changedThere).toEqual(["current_role"]);
+    expect(rebased.conflicts).toEqual([]);
+    expect(rebased.draft).toEqual(draftFrom(newer));
+  });
+
   it("lists the fields a newer version changed", () => {
     const newer = document({
       cities: { state: "provided", value: ["Leeds"], source_ref_id: SOURCE },
