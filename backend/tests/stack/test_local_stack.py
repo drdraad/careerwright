@@ -17,6 +17,7 @@ import psycopg
 import pytest
 
 from nessa.seed import FIXTURE_WORKSPACE_ID
+from tools.localenv import REPO_ROOT as REPO
 from tools.localenv import add_master_key_version
 from tools.stack import CORE_SERVICES, Stack, reseal, rotate_master_key
 
@@ -133,10 +134,13 @@ print(json.dumps(result))
 """
 
 NODE_PROBE = (
-    "const net=require('net');const t=(h,p)=>new Promise(r=>{const s=net.connect({host:h,port:p,"
-    "timeout:4000});s.on('connect',()=>{s.destroy();r('connected')});s.on('error',e=>r(e.code));"
-    "s.on('timeout',()=>{s.destroy();r('timeout')})});Promise.all([t('TEST_NET',443),"
-    "t('host.docker.internal',PORT)]).then(([a,b])=>console.log(JSON.stringify({outside:a,host:b})))"
+    "const net=require('net'),dns=require('dns');const t=(h,p)=>new Promise(r=>{const s="
+    "net.connect({host:h,port:p,timeout:4000});s.on('connect',()=>{s.destroy();r('connected')});"
+    "s.on('error',"
+    "e=>r(e.code));s.on('timeout',()=>{s.destroy();r('timeout')})});const d=new Promise(r=>dns."
+    "lookup('example.com',e=>r(e?e.code:'resolved')));Promise.all([t('TEST_NET',443),"
+    "t('host.docker.internal',PORT),d]).then(([a,b,c])=>console.log(JSON.stringify({outside:a,"
+    "host:b,dns:c})))"
 )
 
 BASH_PROBE = (
@@ -156,7 +160,7 @@ def probe(stack: Stack, service: str, port: int, *, outside: bool = True) -> str
             targets.append(("outside", (TEST_NET, 443)))
         script = PYTHON_PROBE.replace("TARGETS", repr(targets)).replace("OUTSIDE", str(outside))
         command = ["python", "-c", script]
-    elif service == "auth":
+    elif service in ("auth", "web"):
         command = [
             "node",
             "-e",
@@ -184,15 +188,15 @@ def test_demo_mode_services_have_no_route_out_and_the_probe_can_see_one(
     assert accepted
 
     accepted.clear()
-    services = ("api", "worker", "auth", "postgres")
+    services = ("api", "worker", "auth", "web", "postgres")
     results = {service: probe(demo_stack, service, port) for service in services}
 
     assert "connected" not in results["postgres"], results
-    for service in ("api", "worker", "auth"):
+    for service in ("api", "worker", "auth", "web"):
         outcome = json.loads(results[service])
         assert outcome["outside"] != "connected", (service, outcome)
         assert outcome["host"] != "connected", (service, outcome)
-    for service in ("api", "worker"):
+    for service in ("api", "worker", "auth", "web"):
         assert json.loads(results[service])["dns"] != "resolved", service
     assert accepted == []  # nothing reached the host from inside the internal network
 
@@ -212,7 +216,9 @@ def test_live_mode_gives_the_worker_and_only_the_worker_a_route_out(
         assert accepted
         accepted.clear()
         api = json.loads(probe(live, "api", port, outside=False))
+        web = json.loads(probe(live, "web", port))
         assert api["host"] != "connected"
+        assert web["host"] != "connected"
         assert accepted == []
     finally:
         demo_stack.up(*CORE_SERVICES)  # back to demo for the remaining tests
@@ -326,22 +332,67 @@ def test_the_edge_relays_only_into_the_internal_network_and_refuses_an_absent_ta
         "client_networks(internal=ApiSettings().internal_network_clients)]))",
     )
 
-    # Task 3 has no web service, so the edge's web slot names an absent target: Docker's DNS
-    # would forward that name upstream, and the edge must refuse it, not follow the answer.
-    with socket.create_connection(("127.0.0.1", demo_stack.ports.web), timeout=5) as conn:
-        conn.settimeout(15)
-        conn.sendall(b"POST /v1/credentials HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
-        try:
-            answer = conn.recv(1)
-        except ConnectionResetError:
-            answer = b""
+    # With the web service running, the edge relays its port into the internal network.
+    served = httpx.get(f"{demo_stack.web_origin}/sign-in", timeout=20)
+    # Stopped, its name is absent: Docker's DNS would forward that name upstream, and the edge
+    # must refuse it, not follow the answer.
+    demo_stack.compose("stop", "web", timeout=60)
+    try:
+        with socket.create_connection(("127.0.0.1", demo_stack.ports.web), timeout=5) as conn:
+            conn.settimeout(15)
+            conn.sendall(b"POST /v1/credentials HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+            try:
+                answer = conn.recv(1)
+            except ConnectionResetError:
+                answer = b""
+    finally:
+        demo_stack.up("web")
 
+    assert served.status_code == 200
     assert json.loads(edge_view.stdout) == subnets
     assert json.loads(api_view.stdout) == ["127.0.0.0/8", "::1/128", *subnets]
     assert answer == b""
     assert "edge refused web:3000: unresolved or outside the internal network" in (
         demo_stack.logs("edge")
     )
+
+
+COMMITTED_OPENAPI = REPO / "apps" / "web" / "src" / "generated" / "openapi.json"
+
+
+@pytest.mark.req("BND1-13", "ARC1-10")
+def test_the_web_origin_serves_the_app_and_forwards_only_the_api_with_its_checks(
+    demo_stack: Stack,
+) -> None:
+    web = demo_stack.web_origin
+    page = httpx.get(f"{web}/sign-in", timeout=20)
+    rebound = httpx.get(f"{web}/sign-in", headers={"Host": "rebound.example"}, timeout=20)
+    unauthenticated = httpx.get(f"{web}/api/v1/me", timeout=20)
+    not_forwarded = httpx.get(f"{web}/api/openapi.json", timeout=20)
+    ada = sign_in(demo_stack, "ada")
+    foreign = httpx.put(
+        f"{web}/api/v1/workspaces/{FIXTURE_WORKSPACE_ID}/profile",
+        headers={
+            "Authorization": f"Bearer {ada}",
+            "Origin": "http://127.0.0.1:1",
+            "Idempotency-Key": str(uuid.uuid4()),
+        },
+        json={"expected_version": 1, "profile": {}},
+        timeout=20,
+    )
+    served_schema = httpx.get(f"{demo_stack.api_url}/openapi.json", timeout=20).json()
+
+    assert page.status_code == 200
+    assert "connect-src 'self' " + demo_stack.auth_url in page.headers["content-security-policy"]
+    assert rebound.status_code == 400
+    assert unauthenticated.status_code == 401
+    assert unauthenticated.json()["error"]["code"] == "UNAUTHENTICATED"
+    assert unauthenticated.headers["x-correlation-id"]
+    assert not_forwarded.status_code == 404
+    assert foreign.status_code == 403
+    assert foreign.json()["error"]["code"] == "ORIGIN_NOT_ALLOWED"
+    # The client was generated from exactly what the running API serves.
+    assert served_schema == json.loads(COMMITTED_OPENAPI.read_text(encoding="utf-8"))
 
 
 @pytest.mark.req("MODEL-05")

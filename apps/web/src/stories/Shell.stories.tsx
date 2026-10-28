@@ -53,10 +53,12 @@ function Strip({
   events,
   document = p01Document,
   long = false,
+  refreshFailed = false,
 }: {
   events: StreamStatus;
   document?: typeof p01Document;
   long?: boolean;
+  refreshFailed?: boolean;
 }) {
   return (
     <div className="app">
@@ -65,6 +67,7 @@ function Strip({
         profile={profile(document, 3)}
         workspaces={[fixtureWorkspace]}
         events={events}
+        refreshFailed={refreshFailed}
         email="ada@nessa.test"
         calm={false}
         onCalmChange={() => {}}
@@ -77,6 +80,11 @@ function Strip({
 export const StripLive: Story = { render: () => <Strip events={{ state: "live" }} /> };
 export const StripReconnecting: Story = {
   render: () => <Strip events={{ state: "reconnecting", attempt: 2, delayMs: 4000 }} />,
+};
+export const StripRefreshFailed: Story = {
+  render: () => (
+    <Strip events={{ state: "reconnecting", attempt: 3, delayMs: 8000 }} refreshFailed />
+  ),
 };
 export const StripStoppedSignedOut: Story = {
   render: () => <Strip events={{ state: "stopped", reason: "signed_out" }} />,

@@ -130,7 +130,7 @@ export function ChapterView({
   const surface = chapter === "roles" || chapter === "routes" ? "on-space" : "on-reading";
 
   let body: React.ReactNode;
-  if (profileError) body = <RequestFailure error={profileError} />;
+  if (profile === undefined && profileError) body = <RequestFailure error={profileError} />;
   else if (profile === undefined) body = <LoadingState stage="Loading what we know" />;
   else if (chapter === "you") {
     body = (

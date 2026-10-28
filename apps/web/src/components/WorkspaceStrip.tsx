@@ -16,6 +16,8 @@ type Props = {
   profile: ProfileOut | undefined;
   workspaces: WorkspaceOut[];
   events: StreamStatus;
+  /** The last refresh failed: what is shown is what was last loaded. */
+  refreshFailed: boolean;
   email: string | null;
   calm: boolean;
   onCalmChange(calm: boolean): void;
@@ -70,6 +72,7 @@ export function WorkspaceStrip({
   profile,
   workspaces,
   events,
+  refreshFailed,
   email,
   calm,
   onCalmChange,
@@ -133,6 +136,12 @@ export function WorkspaceStrip({
               ? "Nothing saved yet"
               : `Saved, version ${profile.version}`}
         </span>
+        {refreshFailed && (
+          <span className="status" data-tone="error" role="alert">
+            <Glyph name="unavailable" />
+            <span>Couldn't refresh: showing what was last loaded</span>
+          </span>
+        )}
         <span className="strip-item strip-optional">
           <LiveUpdates status={events} />
         </span>

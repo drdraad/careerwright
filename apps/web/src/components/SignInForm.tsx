@@ -59,7 +59,7 @@ export function SignInForm({ next }: { next: string }) {
             <li key={identity.handle}>
               <button
                 type="button"
-                className="btn btn-secondary w-full justify-start"
+                className="btn btn-secondary w-full flex-wrap justify-start whitespace-normal py-8 text-left"
                 onClick={() => {
                   setEmail(`${identity.handle}@nessa.test`);
                   setPassword(`nessa-demo-${identity.handle}`);

@@ -18,7 +18,7 @@ import {
   type ProfileDraft,
   problemText,
 } from "@/lib/profile";
-import { keys, useSaveProfile, useSources } from "@/lib/queries";
+import { profileQuery, useSaveProfile, useSources } from "@/lib/queries";
 import { PROFILE_FIELD_ORDER, PROFILE_FIELDS, type ProfileFieldName } from "@/lib/vocabulary";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
@@ -90,10 +90,7 @@ export function ProfileEditor({
       setSaved(stored.version);
     } catch (error) {
       if (error instanceof ApiError && error.code === "STALE_INPUT_VERSION") {
-        const latest = await queries.fetchQuery<ProfileOut>({
-          queryKey: keys.profile(workspaceId),
-          staleTime: 0,
-        });
+        const latest = await queries.fetchQuery({ ...profileQuery(workspaceId), staleTime: 0 });
         setStale({
           from: base.version,
           to: latest.version,
@@ -186,13 +183,8 @@ export function ProfileEditor({
                   {meta.label}
                 </h3>
                 {stored.state !== "unasked" && (
-                  <button
-                    type="button"
-                    className="btn btn-quiet"
-                    aria-label={`Where ${meta.label.toLowerCase()} came from`}
-                    onClick={() => showSource(name)}
-                  >
-                    Source
+                  <button type="button" className="btn btn-quiet" onClick={() => showSource(name)}>
+                    Source<span className="sr-only"> for {meta.label.toLowerCase()}</span>
                   </button>
                 )}
               </div>

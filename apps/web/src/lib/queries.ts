@@ -66,14 +66,18 @@ export function useWorkspace(id: string, enabled = true) {
   });
 }
 
-export function useProfile(id: string, enabled = true) {
-  return useQuery({
+/** The current profile; also used to fetch the latest version after a stale save. */
+export function profileQuery(id: string) {
+  return {
     queryKey: keys.profile(id),
-    queryFn: async () =>
+    queryFn: async (): Promise<ProfileOut> =>
       (await getProfile({ path: { workspace_id: id }, throwOnError: true })).data,
     retry: retryable,
-    enabled,
-  });
+  };
+}
+
+export function useProfile(id: string, enabled = true) {
+  return useQuery({ ...profileQuery(id), enabled });
 }
 
 /** Every source reference of the workspace, all pages (a provenance list is never truncated). */
@@ -151,6 +155,7 @@ function invalidator(queries: QueryClient, id: string): () => void {
       pending = false;
       void queries.invalidateQueries({ queryKey: keys.scope(id) });
       void queries.invalidateQueries({ queryKey: keys.workspaces });
+      void queries.invalidateQueries({ queryKey: keys.me });
     }, 50);
   };
 }

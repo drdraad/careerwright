@@ -20,7 +20,8 @@
     "check": "node scripts/generate-client.mjs --check && biome check . && tsc --noEmit && vitest run",
     "storybook": "storybook dev --host 127.0.0.1 --port 6006 --no-open",
     "build-storybook": "storybook build --quiet",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "review-screenshots": "NESSA_REVIEW_DIR=../../docs/reviews/sprint-1/screenshots playwright test e2e/visual.spec.ts"
   },
   "dependencies": {
     "@firebase/app": "0.16.3",

@@ -89,14 +89,23 @@ export function WorkspaceShell({
   useEffect(() => close(), [chapter]);
 
   const me = useMe(signedIn);
-  const invited = signedIn && me.isSuccess;
+  // Loaded once is enough to keep going: a failed refresh must not stop the event stream,
+  // which is what notices the API is back.
+  const invited = signedIn && me.data !== undefined;
   const workspace = useWorkspace(workspaceId, invited);
-  const profile = useProfile(workspaceId, invited && workspace.isSuccess);
+  const opened = invited && workspace.data !== undefined;
+  const profile = useProfile(workspaceId, opened);
   const workspaces = useWorkspaces(invited);
-  const events = useWorkspaceEvents(workspaceId, invited && workspace.isSuccess);
+  const events = useWorkspaceEvents(workspaceId, opened);
+  const refreshFailed = me.isError || workspace.isError || profile.isError;
 
   if (auth.state.status !== "signed_in") return <PageLoading stage="Checking your sign-in" />;
-  if (me.isError || workspace.isError) {
+  // Only a first load that fails replaces the shell. A failed refresh (Nessa restarting) keeps
+  // what was last loaded on screen and says so in the strip; the next event refreshes it.
+  if (
+    (me.isError && me.data === undefined) ||
+    (workspace.isError && workspace.data === undefined)
+  ) {
     const error = me.error ?? workspace.error;
     const notInvited = error instanceof ApiError && error.code === "NOT_INVITED";
     return (
@@ -156,6 +165,7 @@ export function WorkspaceShell({
           profile={profile.data}
           workspaces={workspaces.data?.items ?? [workspace.data]}
           events={events}
+          refreshFailed={refreshFailed}
           email={auth.state.email}
           calm={calm}
           onCalmChange={setCalm}
