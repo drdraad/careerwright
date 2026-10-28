@@ -31,7 +31,7 @@ import sys
 import tempfile
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -268,20 +268,34 @@ def ledger_possible_calls(
     ]
 
 
+def assert_attempt_bound(spend: Mapping[str, Any], per_attempt_nano_usd: int) -> int:
+    """How many attempts the smoke workspace's stored limits allow, refusing more than
+    MAX_CALLS. Each attempt reserves `per_attempt_nano_usd` and keeps it unless it reports
+    usage, which only a run's final attempt does (success or a terminal failure); so this
+    count bounds the calls the ledger's possible-call fallback has to cover."""
+    tighter = min(int(spend["run_limit_nano_usd"]), int(spend["period_limit_nano_usd"]))
+    allowed = tighter // per_attempt_nano_usd
+    if allowed > MAX_CALLS:
+        raise CapExceededError(
+            f"the smoke workspace's limits allow {allowed} attempts, more than {MAX_CALLS}"
+        )
+    return allowed
+
+
 def ledger_workspace_calls(
     ledger: Ledger,
     target: SmokeTarget,
     workspace_id: str,
     *,
     model_id: str,
-    worst_case: int,
     models: ModelChoice,
     scope: str,
     worker_stopped: bool,
 ) -> list[int]:
     """Every attempt the smoke workspace recorded. If the worker may still be running, also
-    every further call its spend limits allow (MAX_CALLS in all), as possible calls."""
-    per_call = worst_case // MAX_CALLS
+    every further call its spend limits allow (MAX_CALLS in all, `assert_attempt_bound`), as
+    possible calls at the product's own per-attempt reservation."""
+    per_call = connection_check.worst_case_nano_usd(model_id)
     try:
         attempts = _workspace_attempts(target, workspace_id)
     except psycopg.Error:
@@ -352,8 +366,9 @@ def smoke(
         {"name": "Live smoke (synthetic)", "data_mode": "live_assisted", "synthetic": True},
     )
     base = f"/v1/workspaces/{workspace['workspace_id']}"
-    # The product's own reservation then refuses any call beyond this invocation's cap.
-    api.call(
+    # The product's own reservation then refuses any call beyond this invocation's cap; the
+    # limits as stored must bound the attempts, or the key is never stored.
+    spend = api.call(
         "PUT",
         f"{base}/spend/limits",
         {
@@ -362,6 +377,7 @@ def smoke(
             "period_limit_nano_usd": worst_case,
         },
     )
+    assert_attempt_bound(spend, connection_check.worst_case_nano_usd(model_id))
     status = "not started"
     worker_stopped = True
     try:
@@ -370,7 +386,10 @@ def smoke(
             f"{base}/credentials",
             {"api_key": key.get_secret_value(), "consent_to_encrypted_storage": True},
         )
-        run_id = str(api.call("POST", f"{base}/runs", {"kind": "connection_check"})["run_id"])
+        submitted = api.call("POST", f"{base}/runs", {"kind": "connection_check"})
+        if submitted["model_id"] != model_id:  # the bound above priced this model's attempts
+            raise RuntimeError(f"the run uses {submitted['model_id']}, not {model_id}")
+        run_id = str(submitted["run_id"])
         deadline = time.monotonic() + run_timeout_s
         run = api.call("GET", f"{base}/runs/{run_id}")
         while run["status"] in ("queued", "running") and time.monotonic() < deadline:
@@ -383,30 +402,36 @@ def smoke(
             print(f"validated output: {run['output']}", flush=True)
     finally:
         # First: an attempt read while the worker runs could miss one.
+        interrupted: BaseException | None = None
         try:
             target.stop_worker()
         except Exception:  # any docker failure: the worker may still be calling
             worker_stopped = False
+        except BaseException as interrupt:  # Ctrl-C during the stop: ledger first, then obey
+            worker_stopped = False
+            interrupted = interrupt
         seqs = ledger_workspace_calls(
             ledger,
             target,
             workspace["workspace_id"],
             model_id=model_id,
-            worst_case=worst_case,
             models=models,
             scope=scope,
             worker_stopped=worker_stopped,
         )
         ledger.write_markdown()
         print(f"ledger rows appended: {seqs}", flush=True)
+        if interrupted is not None:
+            raise interrupted
+    # After the stop, so every log line the worker wrote is scanned; run even if the stop
+    # failed, so the result is never lost.
+    scanned, findings = leak_findings(target, api, key)
+    print(f"leak scan: {scanned} rows/logs/responses, findings: {findings}", flush=True)
     if not worker_stopped:
         raise WorkerNotStoppedError(
             "the worker could not be confirmed stopped; every call it could still make is "
-            "ledgered with an unknown cost"
+            f"ledgered with an unknown cost; leak scan findings: {findings}"
         )
-    # After the stop, so every log line the worker wrote is scanned.
-    scanned, findings = leak_findings(target, api, key)
-    print(f"leak scan: {scanned} rows/logs/responses, findings: {findings}", flush=True)
     return SmokeResult(status, findings, seqs)
 
 

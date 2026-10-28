@@ -6,7 +6,7 @@ fake model fails every call and logs each one; nothing contacts Meta."""
 import secrets
 import time
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
@@ -47,11 +47,17 @@ class IntegrationTarget:
         return self.worker.log_path.read_text(encoding="utf-8")
 
 
+@dataclass
 class UnstoppableTarget(IntegrationTarget):
-    """`compose stop` failed: the worker may still be calling."""
+    """The worker stop did not complete (`compose stop` failed, or Ctrl-C during it): the
+    worker may still be calling."""
+
+    failure: BaseException = field(
+        default_factory=lambda: RuntimeError("docker compose stop failed (1)")
+    )
 
     def stop_worker(self) -> None:
-        raise RuntimeError("docker compose stop failed (1)")
+        raise self.failure
 
 
 @pytest.fixture
@@ -110,11 +116,25 @@ def test_every_call_the_worker_made_is_ledgered_even_after_the_poll_gave_up(
 
 
 @pytest.mark.req("MODEL-09")
+@pytest.mark.parametrize(
+    ("failure", "raised"),
+    [
+        (RuntimeError("docker compose stop failed (1)"), WorkerNotStoppedError),
+        (KeyboardInterrupt(), KeyboardInterrupt),  # M1: Ctrl-C while `compose stop` runs
+    ],
+)
 def test_a_worker_that_cannot_be_stopped_still_leaves_every_possible_call_ledgered(
-    infra: Infra, api: ApiClient, ledger: Ledger, tmp_path: Path
+    infra: Infra,
+    api: ApiClient,
+    ledger: Ledger,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    failure: BaseException,
+    raised: type[BaseException],
 ) -> None:
-    """N1: the attempts are read and ledgered anyway, and every call the run could still
-    make (the workspace's limits allow MAX_CALLS) is ledgered with an unknown cost."""
+    """N1, M1: the attempts are read and ledgered anyway, and every call the run could still
+    make (the workspace's limits allow MAX_CALLS) is ledgered with an unknown cost, before
+    the failure (or the interrupt) propagates. M2: a failed stop still gets its leak scan."""
     calls = tmp_path / "calls.log"
     worker = start_worker(
         infra,
@@ -125,9 +145,9 @@ def test_a_worker_that_cannot_be_stopped_still_leaves_every_possible_call_ledger
     )
     models = ModelChoice.configure(TEST_MODEL, "muse-spark-1.3", "test")
     try:
-        with pytest.raises(WorkerNotStoppedError):
+        with pytest.raises(raised) as stopped:
             smoke(
-                UnstoppableTarget(infra, api.http, worker),
+                UnstoppableTarget(infra, api.http, worker, failure=failure),
                 SecretStr(f"sk-smoke-{secrets.token_urlsafe(32)}"),
                 model_id=TEST_MODEL,
                 worst_case=MAX_CALLS * connection_check.worst_case_nano_usd(TEST_MODEL),
@@ -145,3 +165,6 @@ def test_a_worker_that_cannot_be_stopped_still_leaves_every_possible_call_ledger
     assert len(records) == MAX_CALLS >= len(made) >= 1
     assert any("worker not confirmed stopped" in r.purpose for r in records)
     assert all(r.budget_scope == "integration-smoke" for r in records)
+    if raised is WorkerNotStoppedError:
+        assert "leak scan: " in capsys.readouterr().out
+        assert "leak scan findings: []" in str(stopped.value)

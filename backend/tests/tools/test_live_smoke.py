@@ -14,6 +14,7 @@ from tools.live_smoke import (
     CapExceededError,
     ScopeBudget,
     SmokeSettings,
+    assert_attempt_bound,
     authorise,
     ledger_attempts,
     ledger_possible_calls,
@@ -168,3 +169,36 @@ def test_a_concurrent_smoke_refuses_before_its_stack_starts(
 
     with Ledger(path).exclusive(), pytest.raises(LedgerBusyError):
         live_smoke.run_smoke(SmokeSettings(_env_file=None), production=False, ledger=Ledger(path))
+
+
+PER_ATTEMPT = 809_600  # the test model's per-attempt reservation
+
+
+@pytest.mark.req("MODEL-09")
+@pytest.mark.parametrize(
+    ("run_limit", "period_limit", "allowed"),
+    [
+        (MAX_CALLS * PER_ATTEMPT, MAX_CALLS * PER_ATTEMPT, MAX_CALLS),
+        (MAX_CALLS * PER_ATTEMPT, PER_ATTEMPT, 1),  # the tighter limit binds
+        ((MAX_CALLS + 1) * PER_ATTEMPT - 1, MAX_CALLS * PER_ATTEMPT, MAX_CALLS),
+    ],
+)
+def test_the_smoke_workspace_limits_allow_at_most_max_calls_attempts(
+    run_limit: int, period_limit: int, allowed: int
+) -> None:
+    """M3: the ledger's fallback (every further possible call, up to MAX_CALLS) is only an
+    upper bound if the product's reservations allow no more attempts than that."""
+    spend = {"run_limit_nano_usd": run_limit, "period_limit_nano_usd": period_limit}
+
+    assert assert_attempt_bound(spend, PER_ATTEMPT) == allowed
+
+
+@pytest.mark.req("MODEL-09")
+def test_limits_that_would_allow_a_fourth_attempt_stop_the_smoke_before_its_key_is_stored() -> None:
+    spend = {
+        "run_limit_nano_usd": (MAX_CALLS + 1) * PER_ATTEMPT,
+        "period_limit_nano_usd": 10 * PER_ATTEMPT,
+    }
+
+    with pytest.raises(CapExceededError, match="allow 4 attempts"):
+        assert_attempt_bound(spend, PER_ATTEMPT)
