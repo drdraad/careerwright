@@ -221,6 +221,8 @@ test.describe("phone", () => {
     );
     await page.reload();
     await expect(page.getByText("The reply didn't pass Nessa's checks twice")).toBeVisible();
+    // The sticky reply field must not cover Try again either, with the sheet closed.
+    await expectReachable(page, page.getByRole("button", { name: "Try again" }));
     await page.getByRole("button", { name: "Edit answers directly" }).click();
     await page.getByRole("button", { name: "Source for total spending limit" }).click();
     await expect(sheet).toBeVisible();

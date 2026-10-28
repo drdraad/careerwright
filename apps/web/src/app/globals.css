@@ -972,6 +972,13 @@
     border-radius: var(--radius-card);
   }
 
+  /* Whatever is scrolled or tabbed into view stops above the sticky reply field, never under
+     it (WCAG 2.4.11): the field's height (44px, padding, border), its offset and some room. */
+  html:has(.composer) {
+    --composer-reserve: 96px;
+    scroll-padding-bottom: var(--composer-reserve);
+  }
+
   .composer textarea {
     min-height: 44px;
     padding: var(--space-8) var(--space-12);
@@ -1154,6 +1161,10 @@
   /* S0-V02: the reply field rides above the bottom sheet's peek, never under it. */
   .app[data-drawer="open"] .composer {
     bottom: calc(var(--sheet-peek) + var(--space-16));
+  }
+
+  html:has(.app[data-drawer="open"] .composer) {
+    scroll-padding-bottom: calc(var(--sheet-peek) + var(--composer-reserve));
   }
 }
 
