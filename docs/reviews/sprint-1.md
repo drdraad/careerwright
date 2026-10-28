@@ -1,13 +1,15 @@
 # Sprint 1 review: a polished local walking skeleton
 
 - Date: 2026-10-28. Branch `l0-local-release`.
-- Reviewed revision: `94c0015`, the last Task 4 commit that changes code or tests (after
-  review fix round 1). `make check` and `make acceptance` ran on it. The screenshots were
-  captured from the same app code; `94c0015` changes one browser-test expectation. The
+- Reviewed revision: `283f45e`, the last Task 4 commit that changes code or tests (after
+  review fix round 2). `make check` and `make acceptance` ran on it. The `you--stale`
+  captures were taken on it; the other captures are from fix round 1 and render the same
+  (compared byte for byte, apart from the per-run reference on the refused pages). The
   commit that updates this review changes only docs.
 - Sprint 1 commits: `a31fd42`..`eb70b6a` (Task 3: S1.1–S1.3, the platform),
-  `a5d6a7c`..`a939024` (Task 4: S1.4–S1.5, the web shell, and this review) and
-  `aea2e32`..`94c0015` plus the docs update (Task 4 review fix round 1).
+  `a5d6a7c`..`a939024` (Task 4: S1.4–S1.5, the web shell, and this review),
+  `aea2e32`..`ccf3d05` (fix round 1) and `e96ae5f`..`283f45e` plus the docs update (fix
+  round 2).
 - Reviewer: the Task 4 implementing agent. It is not independent of the work reviewed. A
   separate reviewer is dispatched after this task, and the human gates below remain open.
 
@@ -57,18 +59,19 @@ pre-review below are evidence for that review, not the review itself (ruling R2)
 | Fixture mode makes no external request after setup | **Passed** | web container in the egress probe (BND1-11); the journey's request log; CSP |
 | The route preview is clearly fixture-driven and does not claim the production solver exists | **Passed** | "Fixture preview: not your routes" on the page and "Not a route Nessa computed for you" in every route's drawer; shown only in the fixture workspace |
 
-## Checks run on the final candidate (`94c0015`)
+## Checks run on the final candidate (`283f45e`)
 
 Machine: macOS arm64, Docker 29.1.2 (aarch64), Node 24.11.1 (host) and 24.22.1 (images),
 pnpm 10.33.2, uv 0.9.18, Playwright 1.64.0 with Chromium 1248.
 
 | Command | Result |
 |---|---|
-| `make check` | Backend: ruff format and lint clean, mypy clean (118 files), pytest 210 passed (115 deselected), fixture validator `passed`. Web: generated client matches the backend's OpenAPI document, Biome clean (91 files), `tsc` clean, Vitest 142 passed in 19 files. About 7 s |
-| `make acceptance` | pytest `-m "integration or stack"`: 115 passed in 190.8 s (real PostgreSQL 16.15, DBOS, the emulator, the Compose stack incl. the web container). Storybook build succeeded (26 stories). Playwright: 17 passed in 1.2 min on a fresh `nessa-l0-webtest` stack (access 5, journey 1, keyboard 4, session 3, Storybook 1, visual 3). No test project left behind. One line of noise: Node's notice that `NO_COLOR` (set in the host shell) is ignored because Playwright sets `FORCE_COLOR`. The run before it, on `be3e256`, failed only the journey, whose expected drawer wording was out of date; `94c0015` corrects it |
-| `cd apps/web && pnpm run review-screenshots e2e/session.spec.ts` | 6 passed: 48 captures (16 states × 3 viewports) with no axe violation, no horizontal overflow, no label overprinting its value, no unexpected console error and both fonts loaded (`checks-*.json`), plus the three session tests. Captured from the same app code as `94c0015` |
+| `make check` | Backend: ruff format and lint clean, mypy clean (118 files), pytest 210 passed (115 deselected), fixture validator `passed`. Web: generated client matches the backend's OpenAPI document, Biome clean (92 files), `tsc` clean, Vitest 154 passed in 20 files. About 7 s |
+| `make acceptance` | pytest `-m "integration or stack"`: 115 passed in 195.0 s (real PostgreSQL 16.15, DBOS, the emulator, the Compose stack incl. the web container). Storybook build succeeded (26 stories). Playwright: 17 passed in 1.3 min on a fresh `nessa-l0-webtest` stack (access 5, journey 1, keyboard 4, session 3, Storybook 1, visual 3). No test project left behind. One line of noise: Node's notice that `NO_COLOR` (set in the host shell) is ignored because Playwright sets `FORCE_COLOR`. In fix round 1, a run on `be3e256` failed only the journey, whose expected drawer wording was out of date; `94c0015` corrected it |
+| `playwright test e2e/visual.spec.ts e2e/session.spec.ts e2e/access.spec.ts` with `NESSA_REVIEW_DIR` set to a scratch folder (fix round 2) | 11 passed. All 48 captures pass every check (axe, overflow, label overprint, console, fonts); the `checks-*.json` files are byte-identical to the committed ones. Of the PNGs, only `you--stale` changed (copied in); `not-found` and `not-invited` differ only in their per-run reference (kept) |
+| `cd apps/web && pnpm run review-screenshots e2e/session.spec.ts` | Fix round 1 (`94c0015`'s app code): 6 passed, 48 captures (16 states × 3 viewports), every check clean |
 | `playwright test e2e/journey.spec.ts --repeat-each=4` | Earlier round (`1f76506`): 4 passed. This was run because an earlier `make acceptance` (on `a08643a`) failed the journey once: the test's live-state check matched "Reconnecting", the page reloaded before re-authenticating after the restart, and the restarted emulator, which re-imports its seed and ends earlier sessions, signed it out. The check is now exact and the journey starts from a reset fixture |
-| `cd docs/design && pnpm run contrast` | Earlier round: 68 of 68 pairs pass (three added for the shell). Fix round 1 adds no colour pairing |
+| `cd docs/design && pnpm run contrast` | Earlier round: 68 of 68 pairs pass (three added for the shell). Fix rounds 1 and 2 add no colour pairing |
 | `cd docs/design && pnpm run screenshots` | Earlier round: 18 of 18 captures pass after the conversation fix. `docs/design` is unchanged since |
 | `cd apps/web && pnpm audit` | Earlier round: 8 advisories remain, all in `undici` through `jsdom` (dev only, unit-test DOM); accepted in `docs/dependencies.md`. No dependency changed since |
 
@@ -90,7 +93,8 @@ WebKit and Safari, VoiceOver, amd64 images, 200 % zoom.
   - Another person's workspace is "not found".
   - A save based on an older version keeps the edits and names what changed. Answers the
     person did not edit take the newer version's values; where both changed, the edit is
-    kept and the newer value is shown beside it.
+    kept and the newer value is shown beside it. The refusal is announced and takes focus,
+    and it names each changed answer with its new value.
   - An unreachable API keeps the last loaded work on screen and says it could not refresh.
 
 The journey ends where the product currently ends: there is no conversation, research or
@@ -159,7 +163,7 @@ and now checked on every capture. Differences and defects are listed under "Visu
 findings". Keyboard focus is tested. Human scores: **not run — requires human (H-01)**.
 
 **6. What exact evidence establishes completion?** The commands and results above, on
-`94c0015`. Known gaps:
+`283f45e`. Known gaps:
 - the consent UI for keys (MODEL-07);
 - calm mode has no automated test (UI-05);
 - 200 % zoom;
@@ -251,7 +255,8 @@ Weak:
 - **Failed load:** "Nessa's service isn't reachable" says to try again in a moment but
   offers no Try again action; the person has to reload.
 - **Stale save:** in the captures, the field-level conflict ("Version 1 has … here") sits
-  below the fold; only the notice that names the changed answers is on the first screen.
+  below the fold. The notice on the first screen names each changed answer and its new
+  value, and it takes focus.
 - **Width:** at 1440 px without the drawer, reading chapters leave a wide empty right
   margin (content is held to 760–1080 px).
 - **Layers:** layers 2 and 3 share one grey and differ by shape and label (carried from
@@ -272,6 +277,11 @@ Found by the Task 4 review or by its new captures, not by this pre-review, and f
 - **A failed or loading chapter had no heading:** when "What we know" could not be loaded,
   the chapter showed only the failure notice. The new failed-state capture found it (its
   heading font never loaded). The chapter's heading now stays above the notice.
+- **A refused stale save was silent for screen readers** (found by the fix round 1
+  re-review): the notice was not announced, focus stayed on Save, and the conflict lines
+  were not tied to their fields. The notice is now an alert that takes focus and names each
+  changed answer with its new value. Each conflict line describes its field's controls. A
+  failed first load is announced once, by the chapter, not again by the strip.
 
 ## Accepted limitations and open items
 

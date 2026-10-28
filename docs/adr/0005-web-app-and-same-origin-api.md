@@ -87,8 +87,9 @@ loopback boundary the web service must join without weakening.
      reach the page through the web origin (the API sends a `retry:` frame at once), not
      when the response headers arrive. A browser test checks that a change saved by another
      client reaches an open page within 5 s without a reload.
-   - **Stopped:** the status is shown on every screen size, with a Reconnect action, so a
-     phone also says when updates have stopped.
+   - **Stopped:** the status is shown on every screen size, so a phone also says when
+     updates have stopped. Reconnect is offered only after a failed re-authentication, the
+     one stop that trying again can cure; it shows Connecting at once.
    - **Re-authentication:** `event: reauthenticate` reconnects at once with a force-refreshed
      token. Signed out, or a fresh token sent back again within 10 s with nothing delivered,
      stops the stream with a stated reason instead of looping.
