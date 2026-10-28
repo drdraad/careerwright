@@ -11,13 +11,20 @@ is a defect to fix.
 Created 2026-10-27 (Task 2, Sprint 0). Every task updates the rows it closes (implementer
 contract, step 4).
 
+**Fidelity.** Every row was checked mechanically for structure: unique IDs, valid statuses,
+and every spec ID and plan family present. On 2026-10-28 (Task 2, fix round 1) every row of
+the FIN1, TIME1, OPT1, ROU1, RDY1, OUT1, VIS1, VIS2, AIR1 and DIV1 families was compared
+against the specification text, and drift was corrected. The other rows have had the
+structural check only. Treat their wording as a pointer to the spec section, not a
+substitute for it.
+
 ## 1 How to use this register
 
 **Test IDs** are `<AREA>-<NN>` and never reused or renumbered:
 
 - `AREA` is a spec requirement ID without its hyphen (`RDY1-03` tests RDY-1), a plan
   section 8 regression family (`TRACE01-02`, `PAYCAP-01`), or a **register anchor** for an
-  untagged M0 section (`STATE`, `PROF`, `ACQ`, `JOB`, `ASSESS`, `OPTN`, `FRESH`, `PLAN`,
+  untagged M0 section (`STATE`, `PROF`, `ACQ`, `JOB`, `ASSESS`, `OPTN`, `FRESH`, `PLN`, `PLAN`,
   `EXP`, `MODEL`, `DUR`, `API`, `SEC`, `UI`). Anchors are this register's labels, not
   specification IDs.
 - Tag each test with its ID so the register can be checked mechanically. Proposed: a pytest
@@ -105,15 +112,18 @@ and recovery · DOC document or ADR evidence · H human.
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| DIV1-01 | Retrieval covers the full pinned English ESCO catalogue through PostgreSQL full-text search and alias lookup; no embeddings | P | T5 | planned | |
-| DIV1-02 | Several task, interest and skill queries; combined pool reranked; working pool 60–120 concepts where evidence permits (soft) | D, M | T6 | planned | |
+| DIV1-01 | A common-role template library is only a cache accelerator, never the set of recommendable careers; retrieval covers the full pinned English ESCO catalogue through PostgreSQL full-text search and alias lookup, with no embeddings, Career Causeways or extra taxonomy API | P | T5 | planned | |
+| DIV1-02 | Several task, interest and skill queries; the combined pool is reranked; the bounded working pool is initially 60–120 distinct concepts where evidence permits (soft) | D, M | T6 | planned | |
 | DIV1-03 | Verified user titles outside ESCO become provisional internal concepts, never fabricated ESCO records | D | T5 | planned | |
-| DIV1-04 | LLM-generated titles stay hypotheses until corroborated; duplicated adverts are not independent support | D | T6 | planned | |
-| DIV1-05 | Aliases and near-identical roles deduplicated before diversity is counted | D | T6 | planned | |
-| DIV1-06 | Slate respects a relevance floor and confirmed constraints; soft limit of two per family in six; fewer suggestions with a stated reason when evidence is thin; no implausible filler | D | T6 | planned | |
-| DIV1-07 | Salary, popularity and sparse AI evidence never silently remove long-tail careers; hard filters show counts | D, UI | T6 | planned | |
-| DIV1-08 | Evaluation reports grounded relevance, alias duplication, family/task coverage, exposure concentration and long-tail coverage against relevance-only and common-careers baselines on the same pool | M | T6 | planned | |
+| DIV1-04 | LLM-generated titles stay search hypotheses until corroborated by an authoritative occupational or professional source or independent employer evidence; duplicated adverts are not independent support | D | T6 | planned | |
+| DIV1-05 | Aliases, translated synonyms and near-identical roles are deduplicated before diversity is counted; rare-but-evidenced occupations stay distinct from unsupported titles | D | T6 | planned | |
+| DIV1-06 | The slate ranks for relevance and the additional information the user gains, with a constrained greedy reranker and no optimality claim; it respects a relevance floor and confirmed constraints, never fills a slot with an implausible or ineligible career, and returns fewer suggestions with the reason when evidence is thin | D | T6 | planned | |
+| DIV1-07 | Salary, popularity and sparse AI evidence never silently remove plausible long-tail careers; explicit hard user filters take precedence, with counts explaining their effect | D, UI | T6 | planned | |
+| DIV1-08 | Evaluation reports evidence-grounded relevance, alias duplication, family/task coverage, exposure concentration, long-tail catalogue coverage, useful unfamiliar discoveries and language/region disparities, against relevance-only and common-careers baselines on the same eligible pool | M | T6 | planned | |
 | DIV1-09 | No live vacancies is shown as a demand signal, not proof the occupation does not exist | UI | T6 | planned | |
+| DIV1-10 | The pool draws on the five channels of spec §4: task, interest and work-environment retrieval independent of vacancy frequency; adjacent roles through transferable skills; cross-industry roles sharing tasks; less-exposed specialist, vocational, regional and emerging roles; and user-proposed or "surprising but plausible" hypotheses under the same grounding. It samples across families and sectors before reranking and oversamples under-retrieved catalogue areas | D, M | T6 | planned | |
+| DIV1-11 | First slate shape, when qualified candidates exist: two close-to-current, two transferable-skill and two less-familiar but plausible directions, as overlapping channels rather than hard categories (P02 `include_less_familiar_grounded_role`); a soft limit of two per occupation family in a six-item slate, relaxed visibly when the user asks for depth in a narrow field | D, UI | T6 | planned | |
+| DIV1-12 | Novelty is relative to the user's familiarity, not population rarity; rarity and prestige are not rewarded and common work is not treated as bad work | M | T6 | planned | |
 
 ### TAX-1 Taxonomy and evidence packs (spec §5)
 
@@ -131,15 +141,19 @@ and recovery · DOC document or ADR evidence · H human.
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| AIR1-01 | Labelled "AI Resilience Score", 0–10, higher is more resilient, five-year outlook; range first; experimental badge; synthetic scores conspicuously labelled | UI | T8 | planned | |
-| AIR1-02 | Only reviewed range records with a reliable mapping, stated scope, ≥ 2 independent evidence families and recorded contradictions publish; otherwise null | D | T7 | planned | |
-| AIR1-03 | No automatic formula (for example 10 − exposure, products of indices, absence of AI usage read as protection) exists in code | D | T7 | planned | |
+| AIR1-01 | Labelled "AI Resilience Score", 0–10, higher is more resilient, five-year outlook, led by a range. M0 publishes the range only, marked experimental, with inherited geography and no unsupported seniority or local modifiers; the reference-score mode is M1. The range is sensitivity to scenarios and mapping, not a confidence interval. Synthetic scores are conspicuously labelled | UI | T8 | planned | |
+| AIR1-02 | Only reviewed range records publish: a reliable mapping, explicit technological and geographic scope, supporting evidence for the band, recorded contradictions and at least two independent evidence families; the reviewer's decision record holds scope, assumptions, method version, reasons and any widening; otherwise the assessment is null. The application performs matching, publication-state checks and filtering deterministically | D | T7 | planned | |
+| AIR1-03 | No automatic formula (for example 10 − exposure, a product of indices, or absence of AI usage read as protection) exists in code; where evidence supports exposure only, the exposure is shown and resilience stays unscored | D | T7 | planned | |
 | AIR1-04 | The LLM proposes a cited assessment record; it never publishes one | D | T7 | planned | |
-| AIR1-05 | Default filter "Any"; lower-bound filtering; unscored included by default in exploration; basis and excluded/unscored counts shown; unknown never becomes 0 or 10 | D, UI | T7, T8 | planned | |
-| AIR1-06 | A discovery filter never constrains optimisation; "Use this limit in my plan" creates an explicit, scoped constraint that excludes unscored, invalidated and out-of-horizon records; an accepted exception stays conditional | D | T11, T13 | planned | |
-| AIR1-07 | Reviewed pack pinned and dated per run; a known material correction invalidates affected records; a misleading record can be withdrawn | P | T7 | planned | |
-| AIR1-08 | Company clusters show their role distribution, never an average company score | UI | T8 | planned | |
+| AIR1-05 | Default filter "Minimum AI Resilience: Any / 0-10", applied to the lower end of the displayed range; unscored roles included by default in exploration; the active basis and excluded/unscored counts are shown; unknown never becomes 0 or 10 | D, UI | T7, T8 | planned | |
+| AIR1-06 | A discovery filter never constrains optimisation; "Use this limit in my plan" creates an explicit constraint with separate target and intermediate-role scope that excludes unscored, invalidated and out-of-horizon records; an accepted exception stays conditional and does not satisfy the limit; the chosen plan keeps its assessment version; a pathway ending beyond the horizon requires reassessment, never extrapolation | D | T11, T13 | planned | |
+| AIR1-07 | The reviewed pack is pinned and dated per run; known material corrections are checked before a session is enabled, and affected records are invalidated at once; a misleading record can be withdrawn | P | T7 | planned | |
+| AIR1-08 | Industry keeps the categorical colour and AI resilience uses a numbered range badge with text; company clusters show their visible role distribution, never an average company score; graph, pay lens, list and exports share one contract | UI | T8 | planned | |
 | AIR1-09 | Chosen plan and printout include the assessment snapshot and any unresolved review flag | D, UI | T15 | planned | |
+| AIR1-10 | The score describes pressure on demand for human work (including reduced staffing and entry-level hiring), never a probability that a person loses a job; general employment growth and personal skill readiness are shown separately; 0 is not certain elimination and 10 is not a guarantee | UI | T7, T8 | planned | |
+| AIR1-11 | ILO exposure and Anthropic observed-use data are pinned static imports in separate native-code tables, with source measures and missingness preserved; observed use is not replacement; two named sources are not automatically independent corroboration | P, D | T7 | planned | |
+| AIR1-12 | Ordinal rubric semantics (spec §5 bands): ratings are never averaged, subtracted or treated as probabilities; an integer within a band needs a documented anchor, otherwise band or range only; a missing observation of AI use never justifies a high score; physical-automation coverage is stated | D | T7 | planned | |
+| AIR1-13 | The role card explains tasks, main pressures and protections, source scope, range, dates, and why a junior role may differ from a senior one | UI | T8 | planned | |
 
 ### MAP-1 Provisional skills matrix (spec §8)
 
@@ -158,24 +172,25 @@ and recovery · DOC document or ADR evidence · H human.
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| OUT1-01 | `PlanAction.outcomes` carries skill ID, nullable level, evidence kind, categorical confidence (unsupported, provisional, corroborated), source span (ID, hash, offsets, date, excerpt), rubric version, claim state, review state and provenance | D | T9 | planned | |
-| OUT1-02 | Topic mention, practice and assessed demonstration are distinct; "introduction to SQL" never yields level 2; an unsupported level stays null | D, M | T9 | planned | |
+| OUT1-01 | `PlanAction.outcomes` carries skill ID, nullable level, evidence kind, categorical confidence (unsupported, provisional, corroborated; never an LLM probability), source span (source ID and hash, offsets or stable selector, retrieval date and the exact supporting extract within permitted retention), rubric version, claim state, review state and reviewer/edit provenance | D | T9 | planned | |
+| OUT1-02 | Extraction is per row: topic mention or teaching, practice and assessed demonstration are distinct, and the assessment must support the proposed behaviour anchor; "introduction to SQL" never yields independent level 2; an unsupported level or assessment stays null | D, M | T9 | planned | |
 | OUT1-03 | A user override is recorded as an assumption, never as a provider claim or expert validation | D | T9 | planned | |
 | OUT1-04 | An accepted provisional mapping supports only a conditional route; missing critical levels give a partial sketch or exclude the action from the numeric solve | D | T9, T11 | planned | |
 | OUT1-05 | Skill evidence changes only after an assessed completion event and evidence review, never on enrolment or completion alone | D, P | T9 | planned | |
-| OUT1-06 | Credentials and supervised experience are separate outcome types with issuer, jurisdiction and verification; course levels never satisfy a statutory gate | D | T9 | planned | |
+| OUT1-06 | Credentials and supervised experience are separate outcome types with issuing body, jurisdiction and verification requirements; no licence is ever manufactured, and accumulated course levels never substitute for a statutory gate | D | T9 | planned | |
 | OUT1-07 | Overlapping courses never award the same competency twice; two introductory courses never sum to competence | D | T9 | planned | |
 | OUT1-08 | Work-based actions need task/evidence mappings; wages alone give no experience credit | D | T11 | planned | |
 | OUT1-09 | Review shows "this option is expected to address these rows", assessment evidence, uncertain outcomes and omitted gaps | UI | T12 | planned | |
 | OUT1-10 | ≥ 10 real course pages labelled; false-positive readiness mappings reviewed individually; an unsupported consequential outcome blocks the affected route | M, H | T10 | planned | corpus slots C01–C10 |
+| OUT1-11 | Ownership: the capability-assessment module owns outcome semantics and rubrics, the opportunity catalogue stores the records and the review checkpoint owns acceptance of modelling assumptions; the LLM only proposes matches | S, D | T9 | planned | |
 
 ### RDY-1 Readiness and apply-now (spec §10)
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| RDY1-01 | Ready iff every essential row's evidenced level ≥ required and every gate is satisfied, for a fixed target/matrix version; unknown does not pass | D | T9 | planned | |
+| RDY1-01 | Ready iff every essential skill row's evidenced level ≥ its required level and all credential, experience and eligibility gates are satisfied, for a fixed target/matrix version; unknown does not pass | D | T9 | planned | |
 | RDY1-02 | A planned outcome counts only in a conditional scenario after its completion gate; the current profile is unchanged | D | T9, T11 | planned | |
-| RDY1-03 | When ready, lead with "You meet the modelled requirements - review current postings and apply."; no forced training; no degenerate frontier; recency, provisional-matrix and employer checks shown (P05) | UI, D | T9, T10 | planned | |
+| RDY1-03 | When ready, lead with "You meet the modelled requirements - review current postings and apply.", showing evidence recency, provisional-matrix status and employer-specific checks; no forced training; no degenerate frontier as the main result; optional development stays a separate goal; apply-now is never presented as a hiring guarantee (P05) | UI, D | T9, T10 | planned | |
 | RDY1-04 | Demoting a statutory gate is refused; an unresolved gate and an out-of-model pathway are distinct from ineligibility (P04) | D | T9 | planned | |
 | RDY1-05 | Readiness results carry their target and matrix versions | D | T9 | planned | |
 
@@ -183,53 +198,57 @@ and recovery · DOC document or ADR evidence · H human.
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| TIME1-01 | A month is a named calendar month in the work area's timezone; actual dates kept on cards and exports beside model months | D, UI | T11, T14, T15 | planned | |
+| TIME1-01 | A month is a named calendar month in the work area's timezone; actual start, finish, application and payment dates are kept on cards and exports and shown beside model months | D, UI | T11, T14, T15 | planned | |
 | TIME1-02 | Every touched month reserved; a prerequisite is usable only from the next month boundary after completion; no snapping earlier or rounding down | D | T11 | planned | see TIME family |
-| TIME1-03 | An application completes in a month strictly before the deadline month unless admission is verified in the initial state; otherwise `COARSE_MODEL_UNRESOLVED` ("not resolved by this monthly model"), never "ineligible" | D | T11 | planned | |
-| TIME1-04 | Workload envelope per active month: Σ maximum weekly loads ≤ minimum weekly availability, including work, study, commute and care; unknown timetable needs a confirmed assumption; a session clash fails separately | D | T11 | planned | see WORKLOAD |
-| TIME1-05 | Conservative prefunding each month: opening + early receipts − outflows ≥ reserve; later receipts roll to next month; no borrowing against unaccepted offers or unconfirmed grants; a conservative rejection is flagged for review, not "cannot afford" | D | T11 | planned | see PREFUND |
-| TIME1-06 | One common horizon; nominal integer GBP minor units; user-confirmed net incomes; no tax or benefit inference from gross pay | D | T11 | planned | see ECON |
+| TIME1-03 | An application completes in a month strictly before the deadline month unless a completed application or admission is verified in the initial state; otherwise `COARSE_MODEL_UNRESOLVED` ("not resolved by this monthly model"), never "ineligible"; a source deadline still cannot be ignored after the date passes | D | T11 | planned | |
+| TIME1-04 | Workload envelope, evaluated once per active month with no weekly start-decision variables: Σ maximum weekly loads ≤ minimum weekly availability, counting employment, study, commute and fixed care commitments consistently; total hours without a timetable leave the envelope unknown until an assumption is confirmed; a known session clash fails separately | D | T11 | planned | see WORKLOAD |
+| TIME1-05 | Conservative prefunding each month: opening cash + receipts proven available before the outflows − outflows (living costs, transition payments, debt service) ≥ reserve; other receipts roll to the next month; no borrowing against an unaccepted offer or unconfirmed grant; a conservative rejection is flagged for review, never "cannot afford" | D | T11 | planned | see PREFUND |
+| TIME1-06 | One common comparison horizon covering the whole bounded planning horizon of the comparison; costs or lost earnings deferred beyond the window never manufacture an advantage; income after readiness follows a stated continuation scenario; nominal integer GBP minor units; user-confirmed net incomes; no tax or benefit inference from gross pay | D | T11 | planned | see ECON |
 
 ### FIN-1 Objective definitions (spec §12)
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| FIN1-01 | Default objectives: months to the modelled application-readiness milestone and economic cost against a confirmed baseline over a common horizon; time to a job is a separate conditional result | D | T11 | planned | |
-| FIN1-02 | Direct cost covers tuition, assessment, materials, equipment, extra travel or childcare, relocation and financing charges, less confirmed non-repayable support; post-horizon contractual liabilities included with timing; loan principal is liquidity, not a discount | D | T11 | planned | |
+| FIN1-01 | Default objectives: months to the modelled application-readiness milestone (required evidence, credentials, experience and waits; not an employment guarantee) and economic cost against a confirmed baseline over a common horizon; time to a target job is a separate conditional result | D | T11 | planned | |
+| FIN1-02 | Direct cost covers tuition, assessment, materials, necessary equipment, additional travel or childcare, relocation and financing charges, less confirmed applicable non-repayable support; contractual liabilities extending past the horizon are included with their timing disclosed; loan principal is a liquidity source, not a discount or an additional copy of tuition cost | D | T11 | planned | |
 | FIN1-03 | Economic cost = direct + Σ (baseline − route income); wages counted once | D | T11 | planned | TRACE01-01 |
 | FIN1-04 | Offer earnings start only at the offer gate; delay and no-offer change both time and income; unaccepted offers and possible funding are labelled conditions | D | T11 | planned | |
 | FIN1-05 | Negative economic cost supported (`SignedMoney`) and never shown as cash available today; no fee-churning or artificial job switches | D, UI | T11, T14 | planned | |
 | FIN1-06 | Direct-spend and monthly-payment caps are hard; an economic-cost cap is optional and distinct; a deficit cap is separately named | D | T11 | planned | see PAYCAP |
-| FIN1-07 | Missing baseline gives an unresolved economic comparison; "Compare direct spending only" is an explicit, labelled mode; never a silent switch (P02) | D, UI | T11, T14 | planned | |
+| FIN1-07 | A missing baseline gives an unresolved economic comparison; "Compare direct spending only" is an explicit mode whose wording appears on charts and dominance explanations; only economic mode addresses lost earnings; never a silent switch (P02) | D, UI | T11, T14 | planned | |
 | FIN1-08 | Direct expenditure, income change, peak payments, cash reserve and debt always shown separately | UI | T14, T15 | planned | |
-| FIN1-09 | Scenarios carry no probabilities; scenario-wise dominance only if no worse in every scenario; base-case dominance labelled "better in the base scenario" | D | T11, T14 | planned | |
-| FIN1-10 | Liquid-balance ledger with income, grants, loan draws, living, payments and repayments; B ≥ reserve; payments + repayments ≤ monthly cap; provider-paid support counted once; debt balance tracked separately | D | T11 | planned | |
+| FIN1-09 | Favourable, base and adverse scenarios carry no probabilities unless empirically calibrated; p is scenario-wise dominant over q only if it is no worse on time and cost in every declared scenario, with at least one strict comparison; base-case dominance alone is labelled "better in the base scenario", with reversals or unresolved scenarios marked; worst-case-vector dominance is not dominance in every paired scenario; no invented percentile labels | D | T11, T14 | planned | |
+| FIN1-10 | Liquid-balance ledger with take-home income, cash grants, loan draws, committed living outgoings, direct payments and loan repayments; balance ≥ reserve; payments + repayments ≤ monthly cap; provider-paid support counted on both sides or neither; the debt balance is tracked separately, with interest accrual and principal repayment | D | T11 | planned | |
+| FIN1-11 | The baseline is a user-confirmed counterfactual (staying in the current role, continuing a job search or another), never assumed to be staying put | D | T11 | planned | |
+| FIN1-12 | Every route in a panel uses the same start, horizon, currency, baseline and scenario definitions; no earnings window ends at a route's own completion; immediate target employment is never inferred; amounts are nominal by default, and any inflation or discounting mode states its common assumptions | D | T11, T14 | planned | |
 
 ### ROU-1 Route families and schedule identity (spec §12)
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| ROU1-01 | Family identity from the canonical action/prerequisite DAG, provider choices, delivery mode, job-role sequence and financing/conditional gates; part-time vs full-time is a different family; a later intake is a schedule variant | D | T13 | planned | |
-| ROU1-02 | A family keeps every efficient schedule; no fixed cost per structure | D | T13 | planned | see FAMILY |
-| ROU1-03 | A family's displayed best rank is the lowest rank among its retained variants, labelled so; no invented grey families or relabelled ranks | D, UI | T13, T14 | planned | |
+| ROU1-01 | Family identity comes from the canonical action/prerequisite DAG, learning and provider choices, delivery mode, the relevant job-role sequence and material financing or conditional gates; part-time versus full-time, or a different substantive bridge role, is a different family; a later intake is normally a schedule variant; precedence and parallelism are preserved, and an unordered action set is not an identity | D | T13 | planned | |
+| ROU1-02 | A family keeps its meaningful efficient schedules, grouped under one family card with dates as expandable variants; no single best schedule or fixed cost per structure is assumed | D | T13 | planned | see FAMILY |
+| ROU1-03 | A family's displayed best rank is the lowest rank among its retained variants, labelled so; a layer may contain no new family after deduplication; no invented grey families or relabelled ranks | D, UI | T13, T14 | planned | |
 | ROU1-04 | Overview shows distinct families first; suppresses repeat cards, never evidence | UI | T14 | planned | |
 
 ### OPT-1 Solver architecture (spec §12)
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| OPT1-01 | Deterministic exhaustive DFS in canonical action order: skip or one reviewed start per concept; each selected offering set visited once; no equivalent permutations | A | T13 | planned | |
-| OPT1-02 | Prune only irreparable violations or certified bounds, each documented with its proof; never on first-front dominance, dominator count, current readiness or accumulated economic cost | A, DOC | T13 | planned | |
+| OPT1-01 | Deterministic exhaustive DFS over the reviewed finite monthly catalogue in canonical action order: per concept, skip or one reviewed start; mutually exclusive variants, prerequisites, capacity, cash and target gates enforced; each allowed selected offering set visited exactly once; order and parallelism come from dates and the action DAG, never from permuting lists | A | T13 | planned | |
+| OPT1-02 | Prune only irreparable violations or certified bounds under the actual model, each documented with its proof; never on first-front dominance, dominator count, current readiness or accumulated economic cost; lower bounds never ignore future funding; stop-at-readiness pruning only under a proved rule that puts every extension outside the route scope | A, DOC | T13 | planned | |
 | OPT1-03 | Every distinct feasible schedule encountered, dominated ones included, is persisted to a versioned disk-backed archive with atomic checkpoints and an idempotent solve identity; recovery resumes a proven checkpoint or restarts under a new attempt ID | P | T13 | planned | |
 | OPT1-04 | Caps: 30 s, 1,000,000 expanded states, 50,000 archived feasible schedules per target; archive persistence counts in the budget; exact stop reason recorded | A, P | T13 | planned | see LIMITS |
 | OPT1-05 | `search_coverage` is `complete` only after exhausting the declared tree with sound pruning, else `budget_truncated`; operational states queued, running, succeeded, failed, cancelled, invalid-input stay distinct; a crash is failed | P | T13 | planned | |
-| OPT1-06 | Runs record expanded states, feasible count, remaining-work indicator, limits, pruning-rule version, truncation reason, canonical order and model/data versions | P | T13 | planned | |
-| OPT1-07 | `NO_ROUTE_IN_BOUNDED_MODEL` only with complete coverage; a truncated empty archive means none found before the limit | API | T13 | planned | |
+| OPT1-06 | Runs record expanded states, feasible count, remaining-work indicator, limits, pruning-rule version, truncation reason, canonical order and model/data versions; each stored route keeps its identity, schedule, objective values, feasibility report, objective definitions, dataset and profile versions, algorithm version, ordering, scenario set, runtime, search bounds and coverage status | P | T13 | planned | |
+| OPT1-07 | `NO_ROUTE_IN_BOUNDED_MODEL` only with complete coverage, meaning no feasible route in this bounded monthly model and catalogue; a truncated empty archive means none found before the limit; a complete run proves the layers only over the declared model and catalogue, never global optimality, and the result states that scope | API | T13 | planned | |
 | OPT1-08 | DFS agrees with an independent Cartesian-product oracle on tiny instances (feasible sets, objectives, layers); oracle and route checker share no code with the candidate | A | T13 | planned | |
 | OPT1-09 | Candidate evaluation has no network, LLM or ORM access; the optimiser is a cancellable child process | S | T13 | planned | |
 | OPT1-10 | A complete run on the same immutable input reproduces the same result; state-limited replay is reproducible; wall-time truncation is not promised bit-identical | A | T13 | planned | |
 | OPT1-11 | Ranking is a separate observable stage finished before ranked completion is claimed; efficient two-objective ranking qualified against simple peeling; 50,000-point benchmark recorded | A | T13 | planned | |
 | OPT1-12 | Profile or input changes cannot alter an in-flight solve snapshot | P | T13 | planned | |
+| OPT1-13 | Information-gathering and work actions remain eligible wherever they affect feasibility; the search never reduces to a minimal skill cover | A | T13 | planned | |
+| OPT1-14 | Layer results record whether their scope is exact or approximate; the three layers are labelled exact only with complete coverage (or a separately proven layer-preserving method); results lead with "Best trade-offs found" or a concrete better-route margin, with layer numbers as secondary detail | D, UI | T13, T14 | planned | |
 
 ### VIS-1 Dendrite graph (spec §7)
 
@@ -237,14 +256,15 @@ and recovery · DOC document or ADR evidence · H human.
 |---|---|---|---|---|---|
 | VIS1-01 | Up to three work areas are stable anchors; companies cluster within them; branches end in jobs; remote is its own area labelled with jurisdiction and timezone | UI | T8 | planned | |
 | VIS1-02 | Industry sets node/branch colour; role family and work mode use shape, icon and label; colour is never the only channel | UI, A11Y | T8 | planned | |
-| VIS1-03 | Static SVG hierarchy with expand/select, source counts, favourites and the list's filters, including numeric salary and AI range | UI | T8 | planned | |
-| VIS1-04 | At most 100 visible job nodes with explicit aggregation counts; the list keeps the full result set | UI | T8 | planned | |
+| VIS1-03 | Static SVG hierarchy with city anchors, company groups, job nodes, industry labels and colours, basic expand/select, source counts and favourites, using the list's filters including numeric salary and AI range; no semantic zoom, mini-map, halo or animated layout in M0 | UI | T8 | planned | |
+| VIS1-04 | The default view surfaces a few dozen relevant nodes; at most 100 visible job nodes, with large branches aggregated by company or role and explicit aggregation counts; the list keeps the full result set | UI | T8 | planned | |
 | VIS1-05 | Result count, deduplication count and coverage status shown outside the canvas | UI | T8 | planned | |
-| VIS1-06 | Pay and location lens: area rows, a declared common pay basis, predicted-pay styling, a separate unknown-pay lane, currencies and contract bases kept apart; focus highlights same-company jobs | UI | T8 | planned | |
-| VIS1-07 | Graph, list and pay lens share one selection and filter contract | UI | T8 | planned | |
-| VIS1-08 | Graph distance never implies commute feasibility or hiring probability | UI | T8 | planned | |
+| VIS1-06 | Pay and location lens: area rows, advertised ranges on a common declared pay basis, explicit predicted-pay styling and a separate unknown-pay lane; currencies and contract bases stay separate unless a labelled conversion is selected; hover or focus highlights every job from the same company | UI | T8 | planned | |
+| VIS1-07 | Graph, list/table and pay lens share one selection and filter contract, with identical filtering, ranking, selection and comparison; salary, location and AI filters stay synchronised | UI | T8 | planned | |
+| VIS1-08 | Graph distance is a layout device: it never implies geographic distance, commute feasibility or hiring probability; commute feasibility is user-confirmed | UI | T8 | planned | |
 | VIS1-09 | Mobile defaults to the list, with an optional graph overview | UI | T8 | planned | |
 | VIS1-10 | Missing values remain selectable as "not specified" in filters | UI | T8 | planned | |
+| VIS1-11 | Filters: target role, city or remote, industry, employer, salary, minimum AI Resilience Score (lower bound by default, unscored inclusion per AIR-1), seniority, contract, working hours, sponsorship, commute, posting age, skill readiness, source quality and favourite status | UI | T8 | planned | |
 
 ### VIS-2 Coordinated comparison and journey (spec §13)
 
@@ -252,13 +272,13 @@ and recovery · DOC document or ADR evidence · H human.
 |---|---|---|---|---|---|
 | VIS2-01 | One panel per target and level; shared axes only when currency, horizon, baseline and objective agree; no cross-target dominance; each target keeps its own filters and selection | UI, D | T14 | planned | |
 | VIS2-02 | Time horizontal, selected cost vertical, discrete points; nondominated points highlighted; any boundary labelled "comparison boundary"; no smooth interpolated frontier | UI | T14 | planned | |
-| VIS2-03 | Whiskers only for supported scenario estimates; missing scenario evidence shown as unknown, never zero width; no probabilities | UI | T14 | planned | |
-| VIS2-04 | F2 and F3 readable grey; cards lead with a concrete margin naming currency and cost basis; one declared comparator rule; extra dominators exposed; layer and family in accessible text | UI, A11Y | T14 | planned | |
-| VIS2-05 | Static selected-route Gantt: work/study bands, overlapping parallel bands, waits, gates, actual dates beside model months | UI | T14 | planned | |
-| VIS2-06 | Time and cost sliders with exact numeric inputs and keyboard control; economic cost labelled with baseline and horizon; direct-spend budget is a separate control | UI, A11Y | T14 | planned | |
+| VIS2-03 | Every point with supported scenario estimates has labelled time and cost whiskers or an expandable scenario envelope; focus reveals the joint scenario points and the assumptions that move them; no probability is implied; absent scenario evidence is shown as unknown, never as zero-width uncertainty; independent marginal ranges never imply combinations that do not exist | UI | T14 | planned | |
+| VIS2-04 | Layers 2 and 3 stay readable grey; cards lead with a concrete margin naming currency and cost basis; one declared comparator rule; extra dominators are exposed; layer and family identity are in accessible text; focus raises contrast without hiding dominance status | UI, A11Y | T14 | planned | |
+| VIS2-05 | Static selected-route Gantt: work and study bands, overlapping bands for parallel work, waits and gates, actual dates beside model months; branches represent actual alternatives or conditional events; the complete archive stays available in a grouped list | UI | T14 | planned | |
+| VIS2-06 | Time and cost sliders with exact numeric inputs and keyboard control; economic cost labelled with baseline and horizon; the direct-spend budget is a separate control; monthly payments, hours, borrowing and scenarios are exposed in the practical-limits panel | UI, A11Y | T14 | planned | |
 | VIS2-07 | View filters never change recorded ranks; explicit reranking uses the eligible retained archive; changed constraints create a new solve version; a hidden dominator never makes a route optimal; pinned out-of-range routes keep a badge | D, UI | T14 | planned | |
-| VIS2-08 | Step cards show action, provider or role class, dates, workload, outlay and payment timing, income effect, funding status, requirements gained, evidence to produce, prerequisites, freshness and action link; job steps separate search/travel cost from net pay after an accepted offer; fixed licensed icons | UI | T14 | planned | |
-| VIS2-09 | Paginated archive and bounded projection with shown/total counts; extremes and selection preserved; a sample is never labelled the full frontier | UI, API | T14 | planned | |
+| VIS2-08 | Clicking a route dims the others and reveals step cards showing action, provider or role class, dates, workload, outlay and payment timing, income effect, funding status, requirements gained, evidence to produce, prerequisites, freshness and action link; job steps separate search/travel cost from net pay after an accepted offer; conditions carry clear gate markers; fixed licensed icons | UI | T14 | planned | |
+| VIS2-09 | Paginated archive and bounded projection with shown/total counts; the lowest-cost, shortest-time and structurally distinct alternatives and the selection are preserved; every retained route stays reachable in the list; a sample is never labelled the full frontier | UI, API | T14 | planned | |
 | VIS2-10 | Earlier results stay readable during recomputation; an inspected route is never replaced silently | UI | T14 | planned | |
 | VIS2-11 | A "balanced route" is a declared preference rule, never a universal knee point | UI | T14 | planned | |
 
@@ -346,6 +366,7 @@ route fixtures separately.
 | PARETO-01 | (1,3), (2,2), (3,1) all dominate (4,4), which is F2 | OPT1-08 | spec §12 | T13 | planned |
 | PARETO-02 | Equal objective pairs do not dominate each other | OPT1-08 | spec §12 | T13 | planned |
 | PARETO-03 | No dominance across targets | VIS2-01 | constructed | T13, T14 | planned |
+| PARETO-04 | A dominated route that lies on the comparison boundary (an equal-time tie, as TRACE-01 D with B at 4 months) is drawn and labelled as bettered, never as a best trade-off | VIS2-02, VIS2-04 | TRACE-01 | T14 | planned |
 | FAMILY-01 | Schedules in one family can hold different ranks; the family shows its lowest rank, labelled | ROU1-03 | constructed | T13 | planned |
 | FAMILY-02 | Grouping, pagination and display filters never change the archive or proof scope | ROU1-04, VIS2-07 | constructed | T13, T14 | planned |
 | LIMITS-01 | State cap: stops with the exact reason, keeps every encountered record, coverage `budget_truncated` | OPT1-04 | constructed | T13 | planned |
@@ -449,6 +470,7 @@ Generated properties (plan section 8):
 | OPTN-04 | A future job is a role class plus a search/review gate, never a named vacancy presumed open | D | T11 | planned |
 | OPTN-05 | Provider employment-outcome marketing stays an unverified claim | D | T11, T12 | planned |
 | OPTN-06 | No finance applications, creditworthiness checks or regulated credit recommendations; grants and employer support shown before debt, with total charges | UI | T12 | planned |
+| OPTN-07 | The options include "remain in the current job while studying" and "apply now while building evidence" explicitly, where constraints permit | D, UI | T11, T12 | planned |
 
 ### FRESH Cache, freshness and evidence lifecycle (spec §11)
 
@@ -460,6 +482,21 @@ Generated properties (plan section 8):
 | FRESH-04 | Concurrent refreshes deduplicated; errors back off | P | T7 | planned |
 | FRESH-05 | Computed objects store dependency versions; a changed price marks dependants stale; a closed job changes status; a revised requirement flags routes | D, P | T11, T15 | planned |
 | FRESH-06 | Stale data used anywhere is visibly labelled with its date | UI | T8, T12, T14 | planned |
+
+### PLN Planning model (spec §12, untagged subsections)
+
+| ID | Requirement | Layer | Owner | Status |
+|---|---|---|---|---|
+| PLN-01 | The catalogue includes information-gathering, application and waiting actions, so time is never free | D | T11 | planned |
+| PLN-02 | Current commitments and completed prerequisites are part of the initial state, never hidden free actions; a retained current job is a commitment, and any resignation date is an explicit user decision, never a side effect | D | T11 | planned |
+| PLN-03 | Entry predicates support any-of/all-of credentials, proficiency thresholds, experience types, employment offers and location eligibility; every selected precedence a → b satisfies finish(a) ≤ start(b); selection chooses reviewed records and invokes no interval solver | D | T11, T13 | planned |
+| PLN-04 | Learning outcomes are thresholds tied to an assessed completion event, with an uncertainty flag and a verification milestone; experience accrues only from relevant tasks at the appropriate responsibility level after the employment gate | D | T9, T11 | planned |
+| PLN-05 | An intermediate job is a conditional event: application effort, an uncertain wait, then an offer/acceptance gate; no assumed wages are spent before the gate | D | T11 | planned |
+| PLN-06 | Every returned route passes the hard checks of spec §12: prerequisites and legal, regulatory, recognition, residence/work-permission and entry gates; confirmed intakes, application dates, location consistency and a finite horizon; the weekly availability ceiling without double-counted time; direct-spend and monthly-payment caps; minimum reserve, maximum drawdown, borrowing consent, debt limits and financing compatibility; minimum target salary or work-quality filters; funding exclusivity, eligible-cost caps, disbursement delays and conditions; explicitly enabled AI thresholds; no redundant credentials, fee-churning, negative-cost loops or artificial job switches | D | T11, T13 | planned |
+| PLN-07 | Verified inputs, modelled outcomes and conditions to resolve stay distinct; conditional branches ("if funding is approved", "if an intermediate offer is accepted") are never shown as simultaneously affordable | D, UI | T11, T14 | planned |
+| PLN-08 | Stress cases (no award, missed intake, slower learning, longer job search, reduced study capacity, higher commute cost) are reused across competing routes; M0 evaluates fixed plans under the base case and explicit delay, no-award and no-offer cases, reports failed readiness or cash checks, and optimises no adaptive policy | D | T11 | planned |
+| PLN-09 | No individual hiring probability is learned from convenience samples or extrapolated across demographic groups; uncalibrated uncertainty stays as scenario ranges and reviewable assumptions | D, M | T11 | planned |
+| PLN-10 | Each target role, seniority and target-quality specification has its own feasible set; a cross-career comparison keeps target identity, preference fit and job-quality differences | D, UI | T13, T14 | planned |
 
 ### PLAN Progress and the chosen plan (spec §15)
 
@@ -557,7 +594,7 @@ Generated properties (plan section 8):
 | Check | M0 pass condition | Covered by |
 |---|---|---|
 | Readiness/outcomes | Inspectable OUT-1 spans and rubrics; planned ≠ demonstrated; statutory gates cannot be demoted | OUT1-01–07, RDY1-01–04, MAP1-05, READINESS-01–04 |
-| Money/time | TRACE-01 and FIN-1 arithmetic; prefunding counterexample; workload envelope; original dates | TRACE01-01/02/07/08, FIN1-01–10, PREFUND-01–03, WORKLOAD-01–04, TIME-01–04 |
+| Money/time | TRACE-01 and FIN-1 arithmetic; prefunding counterexample; workload envelope; original dates | TRACE01-01/02/07/08, FIN1-01–12, TIME1-01–06, PLN-01–08, PREFUND-01–03, WORKLOAD-01–04, TIME-01–04 |
 | Search correctness | DFS agrees with oracle; F1–F3, equal points, family variants, three-dominator case | OPT1-08, PARETO-01–03, FAMILY-01/02, TRACE01-03, DIRECTAI-01 |
 | Failure semantics | Limits, failed source, cancellation, crash and true empty complete archive distinct | LIMITS-01–06, STATE-02/03, OPT1-05 |
 | Permissions | Uninvited and cross-workspace access fail everywhere | SEC-01, SEC-02 |
