@@ -9,6 +9,8 @@ test("[SEC-01] an uninvited account can sign in but is refused, and says so", as
   await signIn(page, "uninvited");
   await expect(page.getByRole("heading", { name: "This account isn't invited" })).toBeVisible();
   await expect(page.getByText("Sign in with an invited account.")).toBeVisible();
+  // V-10: the cause is the one headline; the notice holds only the recovery.
+  await expect(page.getByText("This account isn't invited")).toHaveCount(1);
 });
 
 test("[SEC-01] another person's workspace is not shown, and an empty home says what to do", async ({

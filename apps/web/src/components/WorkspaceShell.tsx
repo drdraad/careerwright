@@ -21,7 +21,7 @@ import {
 } from "@/lib/queries";
 import { ChapterMenu, ChapterRail } from "./ChapterNav";
 import { EvidenceDrawer, useEvidence } from "./EvidenceDrawer";
-import { PageFrame, PageLoading, RequestFailure } from "./PageState";
+import { NotInvited, PageFrame, PageLoading, RequestFailure } from "./PageState";
 import { SyntheticLabel } from "./Status";
 import { WorkspaceStrip } from "./WorkspaceStrip";
 
@@ -152,28 +152,29 @@ export function WorkspaceShell({
   // what was last loaded on screen and says so in the strip; the next event refreshes it.
   if (firstLoadFailed(me, workspace)) {
     const error = me.error ?? workspace.error;
-    const notInvited = error instanceof ApiError && error.code === "NOT_INVITED";
+    const signOut = (
+      <button type="button" className="btn btn-secondary" onClick={() => void auth.signOut()}>
+        Sign out
+      </button>
+    );
+    if (error instanceof ApiError && error.code === "NOT_INVITED") {
+      return (
+        <PageFrame>
+          <NotInvited error={error} actions={signOut} />
+        </PageFrame>
+      );
+    }
     return (
       <PageFrame>
-        <h1 className="page-title">
-          {notInvited ? "This account isn't invited" : "This workspace can't be shown"}
-        </h1>
+        <h1 className="page-title">This workspace can't be shown</h1>
         <RequestFailure
           error={error}
           actions={
             <>
-              {!notInvited && (
-                <a className="btn btn-secondary" href="/">
-                  Your workspaces
-                </a>
-              )}
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => void auth.signOut()}
-              >
-                Sign out
-              </button>
+              <a className="btn btn-secondary" href="/">
+                Your workspaces
+              </a>
+              {signOut}
             </>
           }
         />

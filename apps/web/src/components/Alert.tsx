@@ -11,7 +11,8 @@ const GLYPH: Record<Tone, GlyphName> = {
 
 type Props = {
   tone: Tone;
-  title: string;
+  /** Omitted only where the page's own heading already states the cause (V-10). */
+  title?: string;
   children?: ReactNode;
   actions?: ReactNode;
   glyph?: GlyphName;
@@ -41,7 +42,7 @@ export function Alert({
     >
       <Glyph name={glyph ?? GLYPH[tone]} />
       <div className="grid gap-4">
-        <p className="alert-title">{title}</p>
+        {title !== undefined && <p className="alert-title">{title}</p>}
         {children !== undefined && <div className="small">{children}</div>}
         {actions !== undefined && <div className="alert-actions">{actions}</div>}
       </div>

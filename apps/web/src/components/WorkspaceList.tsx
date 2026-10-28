@@ -13,12 +13,19 @@ import { DATA_MODE } from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
-import { RequestFailure } from "./PageState";
+import { NotInvited, RequestFailure } from "./PageState";
 import { SyntheticLabel } from "./Status";
 
 const updated = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
 
-function CreateWorkspace({ onCreated }: { onCreated(id: string): void }) {
+/** What each mode means, beside the select (V-05): a native option label cannot wrap. */
+const MODE_HINT: Record<Extract<DataMode, "demo" | "live_assisted">, string> = {
+  demo: "Synthetic data only. Nothing leaves this computer.",
+  live_assisted:
+    "Uses your Meta API key for the interview and suggestions, so what you write is sent to Meta's model.",
+};
+
+export function CreateWorkspace({ onCreated }: { onCreated(id: string): void }) {
   const create = useCreateWorkspace();
   const [name, setName] = useState("");
   const [mode, setMode] = useState<Extract<DataMode, "demo" | "live_assisted">>("demo");
@@ -56,11 +63,15 @@ function CreateWorkspace({ onCreated }: { onCreated(id: string): void }) {
           id={`${id}-mode`}
           className="select"
           value={mode}
+          aria-describedby={`${id}-mode-hint`}
           onChange={(e) => setMode(e.target.value as typeof mode)}
         >
-          <option value="demo">{DATA_MODE.demo}: synthetic, nothing leaves this computer</option>
-          <option value="live_assisted">{DATA_MODE.live_assisted}: uses your Meta key</option>
+          <option value="demo">{DATA_MODE.demo}</option>
+          <option value="live_assisted">{DATA_MODE.live_assisted}</option>
         </select>
+        <p id={`${id}-mode-hint`} className="field-hint">
+          {MODE_HINT[mode]}
+        </p>
       </div>
       {mode === "live_assisted" && (
         <label className="flex items-center gap-8 small">
@@ -101,20 +112,18 @@ export function WorkspaceList() {
 
   if (!signedIn || me.isPending) return <LoadingState stage="Checking your sign-in" />;
   if (me.isError) {
-    const notInvited = me.error instanceof ApiError && me.error.code === "NOT_INVITED";
+    const signOut = (
+      <button type="button" className="btn btn-secondary" onClick={() => void auth.signOut()}>
+        Sign out
+      </button>
+    );
+    if (me.error instanceof ApiError && me.error.code === "NOT_INVITED") {
+      return <NotInvited error={me.error} actions={signOut} />;
+    }
     return (
       <>
-        <h1 className="page-title">
-          {notInvited ? "This account isn't invited" : "Nessa can't load your account"}
-        </h1>
-        <RequestFailure
-          error={me.error}
-          actions={
-            <button type="button" className="btn btn-secondary" onClick={() => void auth.signOut()}>
-              Sign out
-            </button>
-          }
-        />
+        <h1 className="page-title">Nessa can't load your account</h1>
+        <RequestFailure error={me.error} actions={signOut} />
       </>
     );
   }

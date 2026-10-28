@@ -57,3 +57,20 @@ export function RequestFailure({
     </Alert>
   );
 }
+
+/**
+ * The refused-account page (NOT_INVITED, V-10): the cause is the page's one headline, and the
+ * notice under it holds only the recovery and the reference, so the cause is not said twice.
+ */
+export function NotInvited({ error, actions }: { error: ApiError; actions: ReactNode }) {
+  const statement = ERROR_STATEMENT.NOT_INVITED;
+  return (
+    <>
+      <h1 className="page-title">{statement.title}</h1>
+      <Alert tone={statement.tone} actions={actions}>
+        <p>{statement.action}</p>
+        {error.body !== null && <p className="muted">Reference {error.body.correlation_id}</p>}
+      </Alert>
+    </>
+  );
+}
