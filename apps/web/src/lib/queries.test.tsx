@@ -1,11 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceOut } from "@/generated/api";
 import { client } from "@/generated/api/client.gen";
 import { configureApiClient } from "./api";
-import { useCreateWorkspace, useWorkspaces } from "./queries";
+import {
+  firstLoadFailed,
+  refreshFailed,
+  useCreateWorkspace,
+  useWorkspaceEvents,
+  useWorkspaces,
+} from "./queries";
 
 function workspace(n: number): WorkspaceOut {
   return {
@@ -79,5 +85,90 @@ describe("[API-01] the workspace list is never silently truncated", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.map((w) => w.workspace_id)).toEqual(["w1", "w2", "w3"]);
     expect(cursors).toEqual([null, "c2"]);
+  });
+});
+
+describe("[STATE-07][UI-09] a failed first load and a failed refresh are told apart", () => {
+  const loaded = { isError: false, data: workspace(1) };
+  const refreshFailedAfterLoad = { isError: true, data: workspace(1) };
+  const neverLoaded = { isError: true, data: undefined };
+
+  it("replaces the page only when a first load failed", () => {
+    expect(firstLoadFailed(loaded, neverLoaded)).toBe(true);
+    expect(firstLoadFailed(loaded, refreshFailedAfterLoad)).toBe(false);
+    expect(firstLoadFailed(loaded, { isError: false, data: undefined })).toBe(false);
+  });
+
+  it("says 'showing what was last loaded' only when something was loaded", () => {
+    expect(refreshFailed(loaded, refreshFailedAfterLoad)).toBe(true);
+    expect(refreshFailed(loaded, neverLoaded)).toBe(false);
+    expect(refreshFailed(loaded)).toBe(false);
+  });
+});
+
+/** An open event stream: the given frames, then it stays open until the page closes it. */
+function openStream(frames: string): Response {
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(frames));
+    },
+  });
+  return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+}
+
+function eventFrame(seq: number, workspaceId: string): string {
+  const event = {
+    seq,
+    kind: "profile.version_created",
+    subject_id: workspaceId,
+    state: null,
+    detail: {},
+    created_at: "2027-01-01T00:00:00Z",
+  };
+  return `id: ${seq}\ndata: ${JSON.stringify(event)}\n\n`;
+}
+
+describe("[STATE-07][DUR-03] a workspace's stream on one page", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("resumes after the last event it saw when it is opened again, not from the workspace read", async () => {
+    const id = "w-remount";
+    const sent: Array<string | null> = [];
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      sent.push(new Headers(init.headers).get("Last-Event-ID"));
+      return openStream(`retry: 1000\n\n${eventFrame(5, id)}`);
+    });
+    const options = { enabled: true, startAfter: 2, token: async () => "token" };
+
+    const first = renderHook(() => useWorkspaceEvents(id, options), { wrapper });
+    await waitFor(() => expect(first.result.current.status.state).toBe("live"));
+    await waitFor(() => expect(sent).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 20)); // the event is read
+    first.unmount();
+    renderHook(() => useWorkspaceEvents(id, options), { wrapper });
+
+    await waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent).toEqual(["2", "5"]);
+  });
+
+  it("says it is connecting again as soon as Reconnect opens a new stream", async () => {
+    vi.stubGlobal(
+      "fetch",
+      async () =>
+        new Response(JSON.stringify({ error: { code: "NOT_FOUND" } }), {
+          status: 404,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    const options = { enabled: true, startAfter: 0, token: async () => "token" };
+    const { result } = renderHook(() => useWorkspaceEvents("w-restart", options), { wrapper });
+    await waitFor(() => expect(result.current.status.state).toBe("stopped"));
+
+    vi.stubGlobal("fetch", () => new Promise<Response>(() => {}));
+    act(() => result.current.restart());
+
+    expect(result.current.status.state).toBe("connecting");
   });
 });

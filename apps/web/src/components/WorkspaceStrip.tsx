@@ -71,7 +71,9 @@ function LiveUpdates({ status, onReconnect }: { status: StreamStatus; onReconnec
           {status.state === "stopped" && STOP_REASON[status.reason]}
         </span>
       </span>
-      {status.state === "stopped" && status.reason !== "signed_out" && (
+      {/* Only a failed re-authentication can be cured by trying again from here; signed out
+          needs sign-in, ended access cannot come back, and closed is a normal restart. */}
+      {status.state === "stopped" && status.reason === "reauthentication_failed" && (
         <button type="button" className="strip-switch" onClick={onReconnect}>
           Reconnect <span className="sr-only">live updates</span>
         </button>
@@ -151,7 +153,8 @@ export function WorkspaceStrip({
       )}
       <span className="strip-end flex flex-wrap items-center gap-16">
         {profileFailed && profile === undefined ? (
-          <span className="status" data-tone="error" role="alert">
+          // Not announced: the chapter announces this failure with its cause.
+          <span className="status" data-tone="error">
             <Glyph name="unavailable" />
             <span>What we know couldn't be loaded</span>
           </span>

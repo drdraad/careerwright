@@ -17,7 +17,6 @@ import {
   type SourceOut,
 } from "@/generated/api";
 import { API_BASE, ApiError, ChangeKeys } from "./api";
-import { useAuth } from "./auth";
 import { openWorkspaceStream, type StreamStatus } from "./events";
 
 const PAGE = 200; // the API's maximum page size
@@ -35,6 +34,18 @@ export const keys = {
 function retryable(failures: number, error: unknown): boolean {
   if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false;
   return failures < 2;
+}
+
+type Load = { isError: boolean; data: unknown };
+
+/** A first load failed: there is nothing to show, so the failure takes the page. */
+export function firstLoadFailed(...loads: Load[]): boolean {
+  return loads.some((load) => load.isError && load.data === undefined);
+}
+
+/** A refresh failed after a first load: what was last loaded stays on screen, marked. */
+export function refreshFailed(...loads: Load[]): boolean {
+  return loads.some((load) => load.isError && load.data !== undefined);
 }
 
 export function useMe(enabled = true) {
@@ -180,24 +191,28 @@ const sleep = (ms: number, signal: AbortSignal) =>
     });
   });
 
-/** Subscribes to the workspace's status events while mounted; returns the stream's status. */
 /** The last event each workspace's stream received on this page, for a remounted stream. */
 const lastSeen = new Map<string, number>();
 
 export type WorkspaceEvents = { status: StreamStatus; restart(): void };
 
+type EventsOptions = {
+  enabled: boolean;
+  /** The workspace's `last_event_seq`, read with the workspace. */
+  startAfter: number | undefined;
+  /** The signed-in user's ID token (`useAuth().token`). */
+  token: (forceRefresh: boolean) => Promise<string | null>;
+};
+
 /**
  * Subscribes to the workspace's status events while mounted. A stream opened again on this
  * page resumes after the last event it saw; a newly opened page starts after `startAfter`,
- * the workspace's `last_event_seq` read with the workspace, so nothing is replayed and
- * nothing after that read is missed.
+ * so nothing is replayed and nothing after that read is missed.
  */
 export function useWorkspaceEvents(
   id: string,
-  enabled: boolean,
-  startAfter: number | undefined,
+  { enabled, startAfter, token }: EventsOptions,
 ): WorkspaceEvents {
-  const { token } = useAuth();
   const queries = useQueryClient();
   const [status, setStatus] = useState<StreamStatus>({ state: "connecting" });
   const [generation, setGeneration] = useState(0);

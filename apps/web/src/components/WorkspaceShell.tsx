@@ -10,7 +10,15 @@ import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { CHAPTERS, type ChapterId, type ChapterProgress, isChapter } from "@/lib/chapters";
 import type { StreamStatus } from "@/lib/events";
-import { useMe, useProfile, useWorkspace, useWorkspaceEvents, useWorkspaces } from "@/lib/queries";
+import {
+  firstLoadFailed,
+  refreshFailed,
+  useMe,
+  useProfile,
+  useWorkspace,
+  useWorkspaceEvents,
+  useWorkspaces,
+} from "@/lib/queries";
 import { ChapterMenu, ChapterRail } from "./ChapterNav";
 import { EvidenceDrawer, useEvidence } from "./EvidenceDrawer";
 import { PageFrame, PageLoading, RequestFailure } from "./PageState";
@@ -129,21 +137,17 @@ export function WorkspaceShell({
   const opened = invited && workspace.data !== undefined;
   const profile = useProfile(workspaceId, opened);
   const workspaces = useWorkspaces(invited);
-  const events = useWorkspaceEvents(workspaceId, opened, workspace.data?.last_event_seq);
+  const events = useWorkspaceEvents(workspaceId, {
+    enabled: opened,
+    startAfter: workspace.data?.last_event_seq,
+    token: auth.token,
+  });
   const visited = useVisited(workspaceId, chapter);
-  // "Showing what was last loaded" only when something was loaded and its refresh failed.
-  const refreshFailed =
-    (me.isError && me.data !== undefined) ||
-    (workspace.isError && workspace.data !== undefined) ||
-    (profile.isError && profile.data !== undefined);
 
   if (auth.state.status !== "signed_in") return <PageLoading stage="Checking your sign-in" />;
   // Only a first load that fails replaces the shell. A failed refresh (Nessa restarting) keeps
   // what was last loaded on screen and says so in the strip; the next event refreshes it.
-  if (
-    (me.isError && me.data === undefined) ||
-    (workspace.isError && workspace.data === undefined)
-  ) {
+  if (firstLoadFailed(me, workspace)) {
     const error = me.error ?? workspace.error;
     const notInvited = error instanceof ApiError && error.code === "NOT_INVITED";
     return (
@@ -206,7 +210,7 @@ export function WorkspaceShell({
           workspacesFailed={workspaces.isError}
           events={events.status}
           onReconnect={events.restart}
-          refreshFailed={refreshFailed}
+          refreshFailed={refreshFailed(me, workspace, profile)}
           email={auth.state.email}
           calm={calm}
           onCalmChange={setCalm}
