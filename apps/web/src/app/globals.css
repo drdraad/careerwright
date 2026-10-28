@@ -841,11 +841,48 @@
     max-width: 1240px;
   }
 
+  /* Wide: the conversation and directions on the left, "What we know" beside both. Stacked:
+     the conversation, then "What we know", then directions. */
   .you {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 360px;
+    grid-template-areas:
+      "thread known"
+      "directions known";
     align-items: start;
     gap: var(--space-32);
+  }
+
+  .you > .thread {
+    grid-area: thread;
+  }
+
+  .you > .known {
+    grid-area: known;
+  }
+
+  .you > .directions {
+    grid-area: directions;
+    min-width: 0;
+    max-width: 66ch;
+  }
+
+  .thread-meta .select {
+    width: auto;
+  }
+
+  .known-summary {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-12);
+    padding: var(--space-12) var(--space-16);
+    background: var(--surface-card);
+    border: 1px solid var(--line-reading-control);
+    border-radius: var(--radius-control);
+    font-size: var(--type-14);
+    color: var(--text-on-reading);
+    text-decoration: none;
   }
 
   .thread {
@@ -1094,6 +1131,14 @@
 @media (max-width: 1280px) {
   .you {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "thread"
+      "known"
+      "directions";
+  }
+
+  .known-summary {
+    display: flex;
   }
 }
 

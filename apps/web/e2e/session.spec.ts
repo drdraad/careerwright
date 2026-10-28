@@ -84,7 +84,7 @@ test("[STATE-07][BND1-13] a change saved elsewhere reaches an open page through 
   await expect(watcher.getByRole("banner").getByText("Saved, version 2")).toBeVisible({
     timeout: 5_000,
   });
-  await expect(watcher.getByRole("textbox", { name: "Current role", exact: true })).toHaveValue(
+  await expect(watcher.getByRole("complementary", { name: "What we know" })).toContainText(
     "Saved from another tab",
   );
   expect(

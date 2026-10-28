@@ -87,6 +87,7 @@ test("[DUR-04][VERSIONS-01] a save based on an older version is refused and the 
   await signIn(second, "ada", chapterUrl("you", workspace));
   for (const page of [first, second]) {
     await expect(page.getByText("Nothing saved yet").first()).toBeVisible();
+    await page.getByRole("button", { name: "Edit answers directly" }).click();
     await page.getByLabel("How you answer current role").selectOption("provided");
   }
   const role = { name: "Current role", exact: true } as const;

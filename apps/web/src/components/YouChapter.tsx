@@ -109,6 +109,17 @@ export function YouChapter({
       <h1 className="page-title">You</h1>
       <div className="you">
         <div className="thread">
+          {/* Stacked screens: "What we know" follows the conversation; this says what waits
+              there and goes to it, before anything else (S0-V01). */}
+          <a className="known-summary" href="#known-title">
+            <span>
+              <strong>What we know</strong>
+              {pending !== null && !pending.stale
+                ? `, ${pending.turn.proposal?.changes.length ?? 0} to review`
+                : `, version ${profile.version}`}
+            </span>
+            <span className="btn btn-secondary">Open</span>
+          </a>
           {!demo && (
             <KeySetup
               workspace={workspace}
@@ -129,23 +140,6 @@ export function YouChapter({
             <div id="edit-answers">
               <ProfileEditor key={id} workspaceId={id} profile={profile} />
             </div>
-          )}
-          {sure && !exploring ? (
-            <p className="small">
-              You know your direction, so suggestions are optional.{" "}
-              <Button variant="quiet" onClick={() => setExploring(true)}>
-                Help me explore instead
-              </Button>
-            </p>
-          ) : (
-            preferences.data.entry_mode !== null && (
-              <Directions
-                workspaceId={id}
-                profile={profile}
-                discovery={discovery.data}
-                unavailable={unavailable}
-              />
-            )
           )}
         </div>
         <aside className="known" aria-labelledby="known-title">
@@ -176,6 +170,25 @@ export function YouChapter({
           />
           <SketchCard workspaceId={id} profile={profile} />
         </aside>
+        <div className="directions">
+          {sure && !exploring ? (
+            <p className="small">
+              You know your direction, so suggestions are optional.{" "}
+              <Button variant="quiet" onClick={() => setExploring(true)}>
+                Help me explore instead
+              </Button>
+            </p>
+          ) : (
+            preferences.data.entry_mode !== null && (
+              <Directions
+                workspaceId={id}
+                profile={profile}
+                discovery={discovery.data}
+                unavailable={unavailable}
+              />
+            )
+          )}
+        </div>
       </div>
     </>
   );
