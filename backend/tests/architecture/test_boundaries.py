@@ -30,6 +30,11 @@ VENDORS = frozenset(
         "openai",
         "httpx",
         "httpx2",
+        "httpcore",
+        "httpcore2",
+        "certifi",
+        "scrapling",
+        "lxml",
         "fastapi",
         "starlette",
         "uvicorn",
@@ -62,6 +67,9 @@ ADAPTERS: dict[str, frozenset[str]] = {
     "nessa.profile.discovery_agent": frozenset({"pydantic_ai"}),
     "nessa.profile.slate_explanation_agent": frozenset({"pydantic_ai"}),
     "nessa.worker": frozenset({"pydantic_ai"}),
+    # Evidence and acquisition (Task 7, ADR 0009): the guarded HTTP client and the parser.
+    "nessa.evidence.fetcher": frozenset({"httpcore2", "certifi"}),
+    "nessa.evidence.pages": frozenset({"scrapling"}),
     "nessa.api.": frozenset({"fastapi", "starlette", "anyio"}),
 }
 EXCLUDED_PACKAGES = frozenset(

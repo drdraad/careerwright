@@ -1,0 +1,91 @@
+{
+  "__CLASS__": "Adzuna::API::Response::JobSearchResults",
+  "_synthetic": "Synthetic fixture: not a real Adzuna response, advert or employer (fixtures/acquisition/README.md).",
+  "count": 6,
+  "mean": 34120.5,
+  "results": [
+    {
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "id": "5000000001",
+      "adref": "synthetic-ref-1",
+      "title": "Data Quality <strong>Analyst</strong>",
+      "description": "We are looking for a data quality analyst to join our team. You will profile datasets, write validation rules and fix issues at source. Experience with SQL is…",
+      "created": "2026-10-21T08:15:00Z",
+      "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/5000000001?se=synthetic",
+      "company": {"__CLASS__": "Adzuna::API::Response::Company", "display_name": "Northwind Analytics Ltd"},
+      "location": {
+        "__CLASS__": "Adzuna::API::Response::Location",
+        "display_name": "Manchester, Greater Manchester",
+        "area": ["UK", "North West England", "Greater Manchester", "Manchester"]
+      },
+      "salary_min": 32000,
+      "salary_max": 36500.5,
+      "salary_is_predicted": "0",
+      "contract_type": "permanent",
+      "contract_time": "full_time",
+      "category": {"__CLASS__": "Adzuna::API::Response::Category", "label": "IT Jobs", "tag": "it-jobs"}
+    },
+    {
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "id": "5000000002",
+      "title": "Facilities Technician",
+      "description": "Maintain building services across a city-centre site. Shift pattern applies.",
+      "created": "2026-10-19T12:00:00Z",
+      "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/5000000002?se=synthetic",
+      "company": {"display_name": "Southwind Estates"},
+      "location": {"display_name": "Leeds, West Yorkshire", "area": ["UK", "Yorkshire And The Humber", "West Yorkshire", "Leeds"]},
+      "salary_min": 28650,
+      "salary_max": 28650,
+      "salary_is_predicted": "1",
+      "contract_time": "full_time"
+    },
+    {
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "id": "5000000003",
+      "title": "Data Steward",
+      "description": "A short advert with a salary but no prediction flag.",
+      "created": "2026-10-18T09:30:00Z",
+      "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/5000000003?se=synthetic",
+      "company": {"display_name": "Eastwind Health"},
+      "location": {"display_name": "Manchester", "area": ["UK", "North West England", "Greater Manchester", "Manchester"]},
+      "salary_min": 30000
+    },
+    {
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "id": "5000000004",
+      "title": "Data Engineer",
+      "description": "No salary is given for this synthetic advert.",
+      "created": "2026-10-17T16:45:00Z",
+      "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/5000000004?se=synthetic",
+      "company": {"display_name": "Westwind Logistics"},
+      "location": {"display_name": "Leeds", "area": ["UK", "Yorkshire And The Humber", "West Yorkshire", "Leeds"]},
+      "contract_type": "contract"
+    },
+    {
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "id": "5000000005",
+      "title": "Data Analyst",
+      "description": "Our client, a leading retailer, is looking for a data analyst. Apply through us.",
+      "created": "2026-10-20T10:00:00Z",
+      "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/5000000005?se=synthetic",
+      "company": {"display_name": "Harbour Recruitment Ltd"},
+      "location": {"display_name": "Manchester", "area": ["UK", "North West England", "Greater Manchester", "Manchester"]},
+      "salary_min": 30000,
+      "salary_max": 34000,
+      "salary_is_predicted": 0
+    },
+    {
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "id": "5000000006",
+      "title": "Junior Data Analyst",
+      "description": "A junior role, materially different from the data analyst advert above.",
+      "created": "2026-10-20T10:05:00Z",
+      "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/5000000006?se=synthetic",
+      "company": {"display_name": "Harbour Recruitment Ltd"},
+      "location": {"display_name": "Manchester", "area": ["UK", "North West England", "Greater Manchester", "Manchester"]},
+      "salary_min": 24000,
+      "salary_max": 26000,
+      "salary_is_predicted": "0"
+    }
+  ]
+}

@@ -19,6 +19,9 @@ dependencies = [
     "fastapi==0.162.0",
     "uvicorn==0.54.0",
     "firebase-admin==7.7.0",
+    # Parser only (spec section 6): its HTTP fetcher imports Playwright, which the backend
+    # excludes, so retrieval is Nessa's own guarded client (ADR 0009).
+    "scrapling==0.4.15",
 ]
 
 [dependency-groups]
@@ -73,4 +76,8 @@ markers = [
     "stack: drives the full Docker Compose stack (make acceptance)",
     "req(id): the requirements-register test ID(s) this test establishes",
 ]
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # Scrapling 0.4.15 passes lxml an option lxml 6.1 deprecates as a no-op (docs/dependencies.md).
+    "ignore:The 'strip_cdata' option of HTMLParser:DeprecationWarning",
+]
