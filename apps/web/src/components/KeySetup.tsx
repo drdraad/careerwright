@@ -2,11 +2,13 @@
 // Connecting a Meta key (spec section 16, MODEL-07): explicit consent to encrypted storage,
 // in plain words about what is stored, where, what it is used for and what it is not, before
 // the key is sent. Declining keeps editing and saved results usable. A stored key is never
-// shown again; it can be rotated or revoked here, and a revoked key is replaced by a new one.
+// shown again; it can be rotated or revoked (once confirmed) here, and a key found already
+// revoked is replaced by storing a new one. A typed key is cleared only once it is stored.
+import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import type { CredentialOut, WorkspaceOut } from "@/generated/api";
 import { ApiError } from "@/lib/api";
-import { useKeyChange } from "@/lib/queries";
+import { keys, useKeyChange } from "@/lib/queries";
 import { Button } from "./Button";
 import { RequestFailure } from "./PageState";
 
@@ -22,7 +24,8 @@ function KeyForm({
   workspace: WorkspaceOut;
   primary: boolean;
   submitLabel: string;
-  onSubmit(key: string): Promise<void>;
+  /** Resolves whether the key was stored. */
+  onSubmit(key: string): Promise<boolean>;
   pending: boolean;
 }) {
   const id = useId();
@@ -33,7 +36,11 @@ function KeyForm({
       className="grid gap-12"
       onSubmit={(event) => {
         event.preventDefault();
-        if (consent && key.trim() !== "") void onSubmit(key.trim()).then(() => setKey(""));
+        if (consent && key.trim() !== "") {
+          void onSubmit(key.trim()).then((stored) => {
+            if (stored) setKey("");
+          });
+        }
       }}
     >
       <ul className="plain-list">
@@ -48,8 +55,8 @@ function KeyForm({
         </li>
         <li>
           It is not end-to-end encrypted: Nessa's own worker opens it just before each call. It is
-          never shown again, never kept in your browser, and it leaves this computer only in those
-          calls to Meta.
+          never shown again and Nessa never keeps it in your browser; if your browser offers to save
+          it, choose not to. It leaves this computer only in those calls to Meta.
         </li>
         {workspace.synthetic && (
           <li>
@@ -69,7 +76,11 @@ function KeyForm({
           id={`${id}-key`}
           className="input"
           type="password"
-          autoComplete="off"
+          // Not a login password: ask password managers not to offer to save it.
+          autoComplete="new-password"
+          data-1p-ignore="true"
+          data-lpignore="true"
+          data-bwignore="true"
           spellCheck={false}
           value={key}
           onChange={(event) => setKey(event.target.value)}
@@ -115,37 +126,54 @@ export function KeySetup({
   credentials: CredentialOut[];
   primary: boolean;
 }) {
-  const change = useKeyChange(workspace.workspace_id);
+  const id = workspace.workspace_id;
+  const queries = useQueryClient();
+  const change = useKeyChange(id);
   const [rotating, setRotating] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
   const active = credentials.find((credential) => credential.active);
-  const revokedError =
-    change.error instanceof ApiError && change.error.code === "CREDENTIAL_REVOKED";
+  const revoked = change.error instanceof ApiError && change.error.code === "CREDENTIAL_REVOKED";
 
-  if (active === undefined) {
+  // A key found already revoked: refresh the list (it is out of date) and offer a new key.
+  const attempt = (pending: Promise<unknown>) =>
+    pending.then(
+      () => true,
+      (error: unknown) => {
+        if (error instanceof ApiError && error.code === "CREDENTIAL_REVOKED") {
+          void queries.invalidateQueries({ queryKey: keys.credentials(id) });
+        }
+        return false;
+      },
+    );
+
+  if (active === undefined || revoked) {
     return (
       <section className="card grid gap-12" aria-labelledby="key-title">
         <h2 id="key-title" className="section-title">
           Connect your Meta API key to talk with Nessa
         </h2>
-        <p className="small">
-          Not now? You can still edit your answers directly, and everything saved stays available.
-        </p>
+        {revoked ? (
+          <p className="small">That key was already revoked. Store a new key to continue.</p>
+        ) : (
+          <p className="small">
+            Not now? You can still edit your answers directly, and everything saved stays available.
+          </p>
+        )}
         <KeyForm
           workspace={workspace}
           primary={primary}
           submitLabel="Store the key"
           pending={change.isPending}
           onSubmit={(key) =>
-            change
-              .mutateAsync({
+            attempt(
+              change.mutateAsync({
                 action: "store",
                 body: { api_key: key, consent_to_encrypted_storage: true },
-              })
-              .then(() => undefined)
-              .catch(() => undefined)
+              }),
+            )
           }
         />
-        {change.error !== null && <RequestFailure error={change.error} />}
+        {change.error !== null && !revoked && <RequestFailure error={change.error} />}
       </section>
     );
   }
@@ -160,38 +188,52 @@ export function KeySetup({
             submitLabel="Replace the key"
             pending={change.isPending}
             onSubmit={(key) =>
-              change
-                .mutateAsync({
+              attempt(
+                change.mutateAsync({
                   action: "rotate",
                   credentialId: active.credential_id,
                   body: { api_key: key, consent_to_encrypted_storage: true },
-                })
-                .then(() => setRotating(false))
-                .catch(() => undefined)
+                }),
+              ).then((stored) => {
+                if (stored) setRotating(false);
+                return stored;
+              })
             }
           />
+        ) : confirmRevoke ? (
+          <div className="grid gap-8">
+            <p>
+              Revoke this key? Calls that haven't started will stop, and Nessa can't reply until you
+              store a new key.
+            </p>
+            <div className="flex flex-wrap gap-8">
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  void attempt(
+                    change.mutateAsync({ action: "revoke", credentialId: active.credential_id }),
+                  ).then(() => setConfirmRevoke(false))
+                }
+                disabledReason={change.isPending ? "Revoking…" : undefined}
+              >
+                Yes, revoke the key
+              </Button>
+              <Button variant="quiet" onClick={() => setConfirmRevoke(false)}>
+                Keep the key
+              </Button>
+            </div>
+          </div>
         ) : (
           <div className="flex flex-wrap gap-8">
             <Button variant="secondary" onClick={() => setRotating(true)}>
               Rotate the key
             </Button>
-            <Button
-              variant="quiet"
-              onClick={() =>
-                void change
-                  .mutateAsync({ action: "revoke", credentialId: active.credential_id })
-                  .catch(() => undefined)
-              }
-            >
+            <Button variant="quiet" onClick={() => setConfirmRevoke(true)}>
               Revoke the key
             </Button>
           </div>
         )}
-        {revokedError ? (
-          <p className="small">That key was already revoked. Store a new key to continue.</p>
-        ) : (
-          change.error !== null && <RequestFailure error={change.error} />
-        )}
+        {change.error !== null && <RequestFailure error={change.error} />}
       </div>
     </details>
   );

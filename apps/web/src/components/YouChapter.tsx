@@ -7,15 +7,20 @@
 //
 // One filled primary action per view (docs/design/README.md): the answer form's Save while
 // it is open, else connecting a key when none is stored, else Try again after a failed reply,
-// else saving the review tray when it has proposals, else Send.
-import { useState } from "react";
-import type { ProfileDocument, ProfileOut, WorkspaceOut } from "@/generated/api";
-import { reviewable } from "@/lib/conversation";
+// else saving the review tray when it has proposals, else Send. The entry choice has none:
+// its two choices are equal.
+//
+// Screen readers hear what changed (UI-06): each new checked reply, a save and an undo, in
+// one live region that stays mounted; after a save or an undo focus moves to "What we know".
+import { useRef, useState } from "react";
+import type { ProfileOut, WorkspaceOut } from "@/generated/api";
+import { reviewable, turnFailed, turnRunning } from "@/lib/conversation";
 import {
   useCredentials,
   useLatestDiscovery,
   usePreferences,
-  useSubmitTurn,
+  useSendMessage,
+  useSetPreferences,
   useTurns,
 } from "@/lib/queries";
 import { Button } from "./Button";
@@ -41,13 +46,23 @@ export function YouChapter({
   const id = workspace.workspace_id;
   const demo = workspace.data_mode === "demo";
   const preferences = usePreferences(id);
+  const setPreferences = useSetPreferences(id);
   const turns = useTurns(id);
   const credentials = useCredentials(id, !demo);
   const discovery = useLatestDiscovery(id);
-  const resend = useSubmitTurn(id);
+  const sender = useSendMessage(id);
   const [editing, setEditing] = useState(false);
   const [lastSave, setLastSave] = useState<LastSave | null>(null);
-  const [exploring, setExploring] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const knownTitle = useRef<HTMLHeadingElement>(null);
+
+  // A repeated announcement still changes the region's text, so it is read again.
+  const announce = (text: string) =>
+    setAnnouncement((current) => (current === text ? `${text} ` : text));
+  const settle = (text: string) => {
+    announce(text);
+    knownTitle.current?.focus();
+  };
 
   const loads = [preferences, turns, discovery, ...(demo ? [] : [credentials])];
   const failed = loads.find((load) => load.data === undefined && load.error);
@@ -87,10 +102,16 @@ export function YouChapter({
   const unavailable = keyStored ? undefined : NO_KEY;
   const pending = reviewable(turns.data, profile.version);
   const latest = turns.data.at(-1);
-  const latestFailed =
-    latest !== undefined &&
-    latest.proposal === null &&
-    ["failed", "provider_unavailable", "cancelled"].includes(latest.run.status);
+  const latestFailed = latest !== undefined && turnFailed(latest);
+  // Every way of sending a message says why it can't (never disabled silently).
+  const sendBlocked = preferences.data.paused
+    ? "Paused: resume to send."
+    : (unavailable ??
+      (latest !== undefined && turnRunning(latest)
+        ? "Nessa is still replying."
+        : sender.pending
+          ? "Sending…"
+          : undefined));
   const primary = editing
     ? "edit"
     : !keyStored
@@ -101,12 +122,14 @@ export function YouChapter({
           ? "review"
           : "send";
   const sure = preferences.data.entry_mode === "sure";
-  const saved = (before: ProfileDocument, after: ProfileOut) =>
-    setLastSave(after.version !== profile.version ? { before, version: after.version } : null);
+  const current = preferences.data;
 
   return (
     <>
       <h1 className="page-title">You</h1>
+      <p role="status" className="sr-only" data-testid="you-announcer">
+        {announcement}
+      </p>
       <div className="you">
         <div className="thread">
           {/* Stacked screens: "What we know" follows the conversation; this says what waits
@@ -130,10 +153,12 @@ export function YouChapter({
           <Conversation
             workspace={workspace}
             profile={profile}
-            preferences={preferences.data}
+            preferences={current}
             turns={turns.data}
-            unavailable={unavailable}
+            sender={sender}
+            sendBlocked={sendBlocked}
             primary={primary}
+            announce={announce}
             onEditAnswers={() => setEditing(true)}
           />
           {editing && (
@@ -143,7 +168,7 @@ export function YouChapter({
           )}
         </div>
         <aside className="known" aria-labelledby="known-title">
-          <h2 id="known-title" className="display text-25">
+          <h2 id="known-title" className="display text-25" tabIndex={-1} ref={knownTitle}>
             What we know
           </h2>
           {pending !== null && (
@@ -154,32 +179,54 @@ export function YouChapter({
               turn={pending.turn}
               stale={pending.stale}
               primary={primary === "review"}
+              resendBlocked={sendBlocked}
               onResend={(message) =>
-                resend.mutate({ expected_profile_version: profile.version, message })
+                void sender.send({ expected_profile_version: profile.version, message })
               }
-              onSaved={saved}
+              onSaved={(after) => {
+                if (after.version !== profile.version) setLastSave({ version: after.version });
+                settle(
+                  after.version !== profile.version
+                    ? `Saved as version ${after.version}.`
+                    : "Nothing was saved.",
+                );
+              }}
             />
           )}
           <WhatWeKnow
             workspaceId={id}
             profile={profile}
             lastSave={lastSave}
-            onUndone={() => setLastSave(null)}
+            onUndone={(restored) => {
+              setLastSave(null);
+              settle(`Undone: version ${restored.version} has your answers from before the save.`);
+            }}
             editing={editing}
             onEdit={() => setEditing((open) => !open)}
           />
           <SketchCard workspaceId={id} profile={profile} />
         </aside>
         <div className="directions">
-          {sure && !exploring ? (
+          {sure ? (
             <p className="small">
               You know your direction, so suggestions are optional.{" "}
-              <Button variant="quiet" onClick={() => setExploring(true)}>
+              <Button
+                variant="quiet"
+                onClick={() =>
+                  setPreferences.mutate({
+                    expected_version: current.version,
+                    entry_mode: "unsure",
+                    conversation_mode: current.conversation_mode,
+                    paused: current.paused,
+                  })
+                }
+                disabledReason={setPreferences.isPending ? "Saving…" : undefined}
+              >
                 Help me explore instead
               </Button>
             </p>
           ) : (
-            preferences.data.entry_mode !== null && (
+            current.entry_mode !== null && (
               <Directions
                 workspaceId={id}
                 profile={profile}
@@ -188,6 +235,7 @@ export function YouChapter({
               />
             )
           )}
+          {setPreferences.error !== null && <RequestFailure error={setPreferences.error} />}
         </div>
       </div>
     </>

@@ -1,25 +1,27 @@
 "use client";
 // The review tray (spec section 3, STATE-06): the newest reply's proposed changes, each to
 // accept, edit or skip; a limit or target is saved only once confirmed by name (PROF-04).
-// Facts the person stated and Nessa's readings look different (a dashed edge). One decision
-// saves the chosen ones as a new version; an edited value is then saved as a direct edit,
-// through the same command. Nothing changes until the person saves.
+// Facts the person stated and Nessa's readings look different (a dashed edge). Edits are
+// checked before anything is sent; then one decision saves the accepted proposals and the
+// person's own answers together, as one version, or nothing at all (the tray and its edits
+// stay, with the reason). Nothing changes until the person saves.
 import { useState } from "react";
-import type {
-  DecisionResult,
-  ProfileDocument,
-  ProfileOut,
-  ProposedChangeOut,
-  TurnOut,
-} from "@/generated/api";
+import type { ProfileDocument, ProfileOut, ProposedChangeOut, TurnOut } from "@/generated/api";
 import { ApiError } from "@/lib/api";
-import { type Choice, type Choices, decisionFor } from "@/lib/conversation";
-import { describeValue, draftFrom, type FieldDraft, fieldDraft, inputFrom } from "@/lib/profile";
-import { useDecideTurn, useWriteProfile } from "@/lib/queries";
+import { type Choice, type Choices, decisionFor, type Edits } from "@/lib/conversation";
+import {
+  describeValue,
+  type FieldDraft,
+  type FieldProblem,
+  fieldDraft,
+  problemText,
+  readField,
+} from "@/lib/profile";
+import { useDecideTurn } from "@/lib/queries";
 import { PROFILE_FIELDS, type ProfileFieldName } from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { useEvidence } from "./EvidenceDrawer";
-import { AnswerControl } from "./fields";
+import { AnswerControl, FieldError, FieldStateSelect } from "./fields";
 import { RequestFailure } from "./PageState";
 
 type Props = {
@@ -29,13 +31,16 @@ type Props = {
   /** The profile moved on after the message was sent: its proposals can't be applied. */
   stale: boolean;
   primary: boolean;
+  /** Why the message can't be sent again now (paused, no key, a reply on its way), if so. */
+  resendBlocked: string | undefined;
   onResend(message: string): void;
-  onSaved(before: ProfileDocument, after: ProfileOut): void;
+  onSaved(after: ProfileOut): void;
 };
 
 function kindOf(change: ProposedChangeOut): string {
-  if (change.hard_constraint) return "A limit or target: needs your confirmation";
-  return change.basis === "stated" ? "You said" : "Nessa's reading, not a fact until you accept it";
+  const basis =
+    change.basis === "stated" ? "You said" : "Nessa's reading, not a fact until you accept it";
+  return change.hard_constraint ? `A limit or target: needs your confirmation. ${basis}` : basis;
 }
 
 function proposedValue(change: ProposedChangeOut): string {
@@ -50,21 +55,34 @@ function proposedValue(change: ProposedChangeOut): string {
   return describeValue(change.value);
 }
 
+/** Where an edit starts: the proposal's own answer, or an empty answer to type into when
+ *  the proposal was Unknown, Skipped or Prefer not to say. */
+function editDraft(change: ProposedChangeOut): FieldDraft {
+  const proposed = {
+    state: change.state,
+    value: change.value,
+    source_ref_id: null,
+  } as ProfileDocument[ProfileFieldName];
+  const draft = fieldDraft(proposed);
+  return change.state === "provided" ? draft : { ...draft, state: "provided" };
+}
+
 export function ReviewTray({
   workspaceId,
   profile,
   turn,
   stale,
   primary,
+  resendBlocked,
   onResend,
   onSaved,
 }: Props) {
   const decide = useDecideTurn(workspaceId);
-  const write = useWriteProfile(workspaceId);
   const evidence = useEvidence();
   const changes = turn.proposal?.changes ?? [];
   const [choices, setChoices] = useState<Choices>({});
-  const [edits, setEdits] = useState<Record<string, FieldDraft>>({});
+  const [drafts, setDrafts] = useState<Record<string, FieldDraft>>({});
+  const [problems, setProblems] = useState<Record<string, FieldProblem>>({});
   const chosen = changes.filter(
     (c) => choices[c.change_id] !== undefined && choices[c.change_id] !== "skip",
   );
@@ -76,43 +94,32 @@ export function ReviewTray({
     }));
 
   const startEdit = (change: ProposedChangeOut) => {
-    const proposed = {
-      state: change.state,
-      value: change.value,
-      source_ref_id: null,
-    } as ProfileDocument[ProfileFieldName];
-    setEdits((current) => ({ ...current, [change.change_id]: fieldDraft(proposed) }));
+    setDrafts((current) => ({
+      ...current,
+      [change.change_id]: current[change.change_id] ?? editDraft(change),
+    }));
     setChoices((current) => ({ ...current, [change.change_id]: "edit" }));
   };
 
   const save = async () => {
-    const before = profile.document;
-    let result: DecisionResult;
-    try {
-      result = await decide.mutateAsync({
+    const answers: Edits = {};
+    const found: Record<string, FieldProblem> = {};
+    for (const change of changes) {
+      const draft = drafts[change.change_id];
+      if (choices[change.change_id] !== "edit" || draft === undefined) continue;
+      const read = readField(change.field as ProfileFieldName, draft);
+      if (read.ok) answers[change.change_id] = read.input;
+      else found[change.change_id] = read.problem;
+    }
+    setProblems(found);
+    if (Object.keys(found).length > 0) return; // nothing is sent until every edit is valid
+    const after = await decide
+      .mutateAsync({
         turnId: turn.turn_id,
-        body: decisionFor(changes, choices, profile.version),
-      });
-    } catch {
-      return;
-    }
-    let after = result.profile;
-    const edited = changes.filter((c) => choices[c.change_id] === "edit");
-    if (edited.length > 0) {
-      const draft = draftFrom(after.document);
-      for (const change of edited) {
-        const edit = edits[change.change_id];
-        if (edit !== undefined) draft[change.field as ProfileFieldName] = edit;
-      }
-      const input = inputFrom(draft);
-      if (!input.ok) return; // the inline field shows the problem; the decision is kept
-      try {
-        after = await write.mutateAsync({ expected_version: after.version, profile: input.input });
-      } catch {
-        return;
-      }
-    }
-    onSaved(before, after);
+        body: decisionFor(changes, choices, profile.version, answers),
+      })
+      .catch(() => null);
+    if (after !== null) onSaved(after.profile);
   };
 
   const showSource = (change: ProposedChangeOut) =>
@@ -149,7 +156,11 @@ export function ReviewTray({
           changes can't be applied to them. Send it again to get proposals for your latest answers.
         </p>
         <div>
-          <Button variant="secondary" onClick={() => onResend(turn.message)}>
+          <Button
+            variant="secondary"
+            onClick={() => onResend(turn.message)}
+            disabledReason={resendBlocked}
+          >
             Send it again
           </Button>
         </div>
@@ -157,7 +168,7 @@ export function ReviewTray({
     );
   }
 
-  const failure = decide.error ?? write.error;
+  const failure = decide.error;
   return (
     <section className="known-group" aria-labelledby="tray-title">
       <h3 id="tray-title">
@@ -169,6 +180,11 @@ export function ReviewTray({
         const choice = choices[change.change_id];
         const editing = choice === "edit";
         const label = PROFILE_FIELDS[field].label;
+        const draft = drafts[change.change_id] ?? editDraft(change);
+        const problem = problems[change.change_id];
+        const errorId = `edit-${change.change_id}-error`;
+        const setDraft = (next: FieldDraft) =>
+          setDrafts((current) => ({ ...current, [change.change_id]: next }));
         return (
           <div
             key={change.change_id}
@@ -181,20 +197,24 @@ export function ReviewTray({
               {label}: {proposedValue(change)}
             </span>
             {editing && (
-              <AnswerControl
-                name={field}
-                draft={
-                  edits[change.change_id] ??
-                  fieldDraft({
-                    state: "provided",
-                    value: null,
-                    source_ref_id: null,
-                  } as ProfileDocument[ProfileFieldName])
-                }
-                onChange={(next) =>
-                  setEdits((current) => ({ ...current, [change.change_id]: next }))
-                }
-              />
+              <div className="grid gap-8">
+                <FieldStateSelect
+                  label={label}
+                  draft={draft}
+                  describedBy={problem ? errorId : undefined}
+                  onChange={setDraft}
+                />
+                {draft.state === "provided" && (
+                  <AnswerControl
+                    name={field}
+                    draft={draft}
+                    error={problem ? problemText(problem) : undefined}
+                    describedBy={problem ? errorId : undefined}
+                    onChange={setDraft}
+                  />
+                )}
+                {problem && <FieldError id={errorId}>{problemText(problem)}</FieldError>}
+              </div>
             )}
             <div className="proposal-actions">
               {change.hard_constraint ? (
@@ -246,7 +266,7 @@ export function ReviewTray({
           variant={primary ? "primary" : "secondary"}
           onClick={() => void save()}
           disabledReason={
-            decide.isPending || write.isPending
+            decide.isPending
               ? "Saving…"
               : chosen.length === 0
                 ? "Accept, confirm or edit at least one first."
@@ -261,11 +281,7 @@ export function ReviewTray({
             void decide
               .mutateAsync({
                 turnId: turn.turn_id,
-                body: {
-                  expected_version: profile.version,
-                  accept: [],
-                  confirm_hard_constraints: [],
-                },
+                body: decisionFor(changes, {}, profile.version),
               })
               .catch(() => null)
           }
@@ -274,7 +290,8 @@ export function ReviewTray({
         </Button>
       </div>
       <p className="small muted">
-        Skipped changes are not saved. Every saved answer keeps where it came from.
+        Skipped changes are not saved. Every saved answer keeps where it came from; an answer you
+        edit is saved as yours.
       </p>
     </section>
   );

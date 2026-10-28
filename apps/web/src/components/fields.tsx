@@ -123,7 +123,8 @@ export function SalaryInput({ label, draft, error, describedBy, onChange }: Cont
       />
       <div className="grid gap-4">
         <label htmlFor={id} className="small muted">
-          Per
+          <span aria-hidden="true">Per</span>
+          <span className="sr-only">{label}, per</span>
         </label>
         <select
           id={id}

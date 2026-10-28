@@ -170,7 +170,7 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
   minimum_salary: {
     label: "Lowest pay you'd accept",
     kind: "salary",
-    hint: "Before tax, with its period. A firm limit once you confirm it.",
+    hint: "Before tax, with its period. Recorded as a firm limit, but not applied to anything until pay is researched.",
     lessPrecise:
       "No route is checked against pay. Unknown pay is never treated as below your limit.",
   },
@@ -217,13 +217,16 @@ export const OPENING_QUESTION: Record<EntryMode, string> = {
 };
 
 /** A streamed reply's state in words. Only "incomplete" is final; nothing streamed is saved. */
-export const PARTIAL_REPLY: Record<PartialCompleteness, { label: string; tone: Tone }> = {
-  none: { label: "Nessa is reading your message", tone: "neutral" },
-  streaming: { label: "Writing a reply, not checked yet", tone: "neutral" },
-  stopped: { label: "The reply stopped. Nessa is trying again", tone: "stale" },
-  incomplete: { label: "This reply didn't finish and wasn't checked", tone: "error" },
-  superseded: { label: "Checked reply", tone: "neutral" },
+export const PARTIAL_REPLY: Record<PartialCompleteness, { label: string }> = {
+  none: { label: "Nessa is reading your message" },
+  streaming: { label: "Writing a reply, not checked yet" },
+  stopped: { label: "The reply stopped. Nessa is trying again" },
+  incomplete: { label: "This reply didn't finish and wasn't checked" },
+  // Its text is never served; the checked reply replaces it.
+  superseded: { label: "Replaced by the checked reply" },
 };
+/** A failed turn's reply so far: shown, never saved (MODEL-03). */
+export const FAILED_REPLY_LABEL = "Stopped: not checked, nothing saved";
 
 /** Why a model run ended without a result, in the person's words (failure classes). */
 export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string }> = {

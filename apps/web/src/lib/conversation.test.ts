@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { PartialReplyOut, ProposedChangeOut, RunOut, TurnOut } from "@/generated/api";
-import { type Choices, decisionFor, replyView, reviewable } from "./conversation";
+import {
+  type Choices,
+  decisionFor,
+  replyView,
+  reviewable,
+  turnFailed,
+  turnRunning,
+} from "./conversation";
 
 function run(status: RunOut["status"], failure: RunOut["failure_class"] = null): RunOut {
   return {
@@ -115,19 +122,43 @@ describe("[STATE-06][PROF-04] the review tray saves only what the person chose",
       expected_version: 1,
       accept: ["c1"],
       confirm_hard_constraints: [],
+      edits: [],
     });
     expect(decisionFor(changes, confirmed, 1)).toEqual({
       expected_version: 1,
       accept: ["c1", "c2"],
       confirm_hard_constraints: ["cities"],
+      edits: [],
     });
   });
 
-  it("records an edited or skipped proposal as not accepted (an edit is saved directly)", () => {
-    expect(decisionFor(changes, { c1: "edit", c2: "skip" }, 1).accept).toEqual([]);
+  it("sends an edited proposal's new answer in the same decision, not as an acceptance", () => {
+    const edits = { c1: { state: "provided" as const, value: "Night manager" } };
+
+    expect(decisionFor(changes, { c1: "edit", c2: "confirm" }, 1, edits)).toEqual({
+      expected_version: 1,
+      accept: ["c2"],
+      confirm_hard_constraints: ["cities"],
+      edits: [{ field: "current_role", answer: { state: "provided", value: "Night manager" } }],
+    });
+    expect(decisionFor(changes, { c1: "edit", c2: "skip" }, 1, edits).accept).toEqual([]);
   });
 
-  it("reviews the newest decided-on-nothing turn, and calls it stale on a newer profile", () => {
+  it("accepts an edit that leaves the proposal as it was, so its source is kept", () => {
+    const unchanged = {
+      c1: { state: "provided" as const, value: "Shift supervisor" },
+      c2: { state: "provided" as const, value: ["Leeds"] },
+    };
+
+    expect(decisionFor(changes, { c1: "edit", c2: "edit" }, 1, unchanged)).toEqual({
+      expected_version: 1,
+      accept: ["c1", "c2"],
+      confirm_hard_constraints: ["cities"],
+      edits: [],
+    });
+  });
+
+  it("reviews the newest turn with proposals, and calls it stale on a newer profile", () => {
     const pending = turn("complete", changes);
     const decided = {
       ...turn("complete", changes),
@@ -139,5 +170,25 @@ describe("[STATE-06][PROF-04] the review tray saves only what the person chose",
     expect(reviewable([decided, pending], 2)).toEqual({ turn: pending, stale: true });
     expect(reviewable([decided], 1)).toBeNull();
     expect(reviewable([turn("complete", [])], 1)).toBeNull(); // nothing proposed
+  });
+
+  it("never brings back an older tray, and hides a stale one once a newer message is sent", () => {
+    const older = { ...turn("complete", changes), turn_id: "t0" };
+    const decided = { ...turn("complete", changes), decision: {} as TurnOut["decision"] };
+    const resent = { ...turn("running"), turn_id: "t2" };
+
+    expect(reviewable([older, decided], 2)).toBeNull(); // B-M10
+    expect(reviewable([older, resent], 2)).toBeNull(); // B-I2: the resend is under way
+  });
+});
+
+describe("[MODEL-03] run states come from the generated enum, in one place", () => {
+  it("tells a turn still running from one that ended with or without a checked reply", () => {
+    expect(turnRunning(turn("queued"))).toBe(true);
+    expect(turnRunning(turn("running"))).toBe(true);
+    expect(turnFailed(turn("failed"))).toBe(true);
+    expect(turnFailed({ ...turn("complete"), proposal: null })).toBe(true); // no checked reply
+    expect(turnFailed(turn("complete"))).toBe(false);
+    expect(turnRunning(turn("complete"))).toBe(false);
   });
 });

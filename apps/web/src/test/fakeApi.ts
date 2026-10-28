@@ -44,7 +44,8 @@ export function fakeApi(routes: Route[]): Sent[] {
           },
         });
       }
-      const body = typeof route.answer === "function" ? route.answer(record) : route.answer;
+      // An answer may be a promise, to hold a request open while the test acts.
+      const body = await (typeof route.answer === "function" ? route.answer(record) : route.answer);
       return json(route.status ?? 200, body);
     },
   });

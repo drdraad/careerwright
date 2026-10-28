@@ -2,7 +2,7 @@
 // streamed reply is provisional until checked, the review tray saves only chosen and confirmed
 // changes, explicit distress gets the support response, and one action is the primary.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type {
@@ -13,6 +13,7 @@ import type {
   TurnOut,
   WorkspaceOut,
 } from "@/generated/api";
+import { useProfile } from "@/lib/queries";
 import { fakeApi, type Route } from "@/test/fakeApi";
 import { EvidenceProvider } from "./EvidenceDrawer";
 import { YouChapter } from "./YouChapter";
@@ -157,6 +158,52 @@ function renderYou() {
   return userEvent.setup();
 }
 
+/** The chapter reading its profile from the (scripted) API, as the workspace shell does. */
+function LiveProfile() {
+  const current = useProfile(WS);
+  return current.data === undefined ? null : (
+    <YouChapter workspace={workspace} profile={current.data} />
+  );
+}
+
+function renderLive() {
+  const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={queries}>
+      <EvidenceProvider>
+        <LiveProfile />
+      </EvidenceProvider>
+    </QueryClientProvider>,
+  );
+  return { user: userEvent.setup(), queries };
+}
+
+const unknownHours: TurnOut["proposal"] = {
+  ...(proposal as NonNullable<TurnOut["proposal"]>),
+  changes: [
+    {
+      change_id: "c3",
+      field: "weekly_study_hours",
+      state: "unknown",
+      value: null,
+      basis: "stated",
+      message_ids: ["m1"],
+      reason: "You said you don't know yet.",
+      hard_constraint: true,
+    },
+  ],
+};
+
+type Live = { preferences: PreferencesOut; turns: TurnOut[]; profile: ProfileOut };
+
+function liveRoutes(state: Live, extra: Route[] = []): Route[] {
+  return [
+    ...extra,
+    { method: "GET", path: /\/profile$/, answer: () => state.profile },
+    ...routes(state),
+  ];
+}
+
 describe("[PROF-08][REC1-10] the chapter leads with how to start", () => {
   it("asks first whether the person knows their direction, and saves the choice", async () => {
     const state = { preferences: prefs(null), turns: [] as TurnOut[] };
@@ -259,7 +306,278 @@ describe("[STATE-06][PROF-04] the review tray saves only what the person chose a
       expected_version: 1,
       accept: ["c1", "c2"],
       confirm_hard_constraints: ["cities"],
+      edits: [],
     });
+  });
+});
+
+describe("[STATE-06] an edit in the tray is checked first and saved with the decision", () => {
+  const decided = (state: Live): Route => ({
+    method: "POST",
+    path: /\/turns\/t1\/decision$/,
+    status: 201,
+    answer: () => {
+      state.profile = { ...state.profile, version: 2 };
+      state.turns = [
+        {
+          ...turn("complete", state.turns[0]?.proposal ?? null),
+          decision: {} as TurnOut["decision"],
+        },
+      ];
+      return { turn_id: "t1", decision: {}, profile: state.profile };
+    },
+  });
+
+  it("shows an invalid edit's problem and sends nothing", async () => {
+    const state: Live = {
+      preferences: prefs("unsure"),
+      turns: [turn("complete", proposal)],
+      profile,
+    };
+    const sent = fakeApi(liveRoutes(state, [decided(state)]));
+    const { user } = renderLive();
+    const tray = await screen.findByRole("region", { name: /To review: 2 changes/ });
+
+    await user.click(within(tray).getByRole("button", { name: "Edit current role" }));
+    await user.clear(within(tray).getByLabelText("Current role"));
+    await user.click(within(tray).getByRole("button", { name: /Save 1 to What we know/ }));
+
+    expect(await within(tray).findByText(/Enter an answer/)).toBeVisible();
+    expect(sent.some((s) => s.path.endsWith("/decision"))).toBe(false);
+  });
+
+  it("keeps what was typed when an Unknown proposal is edited, and saves it in one request", async () => {
+    const state: Live = {
+      preferences: prefs("unsure"),
+      turns: [turn("complete", unknownHours)],
+      profile,
+    };
+    const sent = fakeApi(liveRoutes(state, [decided(state)]));
+    const { user } = renderLive();
+    const tray = await screen.findByRole("region", { name: /To review: 1 change/ });
+
+    await user.click(within(tray).getByRole("button", { name: "Edit weekly study hours" }));
+    await user.type(within(tray).getByLabelText(/Weekly study hours, hours a week/), "6");
+    await user.click(within(tray).getByRole("button", { name: /Save 1 to What we know/ }));
+
+    await waitFor(() => expect(sent.some((s) => s.path.endsWith("/decision"))).toBe(true));
+    expect(sent.filter((s) => s.method !== "GET")).toHaveLength(1); // decision and edit together
+    expect(sent.find((s) => s.path.endsWith("/decision"))?.body).toEqual({
+      expected_version: 1,
+      accept: [],
+      confirm_hard_constraints: [],
+      edits: [{ field: "weekly_study_hours", answer: { state: "provided", value: 6 } }],
+    });
+  });
+
+  it("keeps the edit and says why when saving fails", async () => {
+    const state: Live = {
+      preferences: prefs("unsure"),
+      turns: [turn("complete", proposal)],
+      profile,
+    };
+    fakeApi(
+      liveRoutes(state, [
+        {
+          method: "POST",
+          path: /\/turns\/t1\/decision$/,
+          status: 503,
+          answer: {
+            error: {
+              code: "STORE_UNAVAILABLE",
+              message: "The database is unavailable.",
+              retryable: true,
+              stage: "storage",
+              correlation_id: "c1",
+              details: {},
+            },
+          },
+        },
+      ]),
+    );
+    const { user } = renderLive();
+    const tray = await screen.findByRole("region", { name: /To review: 2 changes/ });
+
+    await user.click(within(tray).getByRole("button", { name: "Edit current role" }));
+    const field = within(tray).getByLabelText("Current role");
+    await user.clear(field);
+    await user.type(field, "Night manager");
+    await user.click(within(tray).getByRole("button", { name: /Save 1 to What we know/ }));
+
+    expect(await within(tray).findByRole("alert")).toBeVisible();
+    expect(within(tray).getByLabelText("Current role")).toHaveValue("Night manager");
+  });
+});
+
+describe("[STATE-06][PROF-01] undo restores the earlier answers with their sources", () => {
+  it("reverts to the version before the save, then says so and returns focus", async () => {
+    const state: Live = {
+      preferences: prefs("unsure"),
+      turns: [turn("complete", proposal)],
+      profile,
+    };
+    const sent = fakeApi(
+      liveRoutes(state, [
+        {
+          method: "POST",
+          path: /\/turns\/t1\/decision$/,
+          status: 201,
+          answer: () => {
+            state.profile = { ...state.profile, version: 2 };
+            state.turns = [{ ...turn("complete", proposal), decision: {} as TurnOut["decision"] }];
+            return { turn_id: "t1", decision: {}, profile: state.profile };
+          },
+        },
+        {
+          method: "POST",
+          path: /\/profile\/revert$/,
+          status: 201,
+          answer: () => {
+            state.profile = { ...state.profile, version: 3 };
+            return state.profile;
+          },
+        },
+      ]),
+    );
+    const { user } = renderLive();
+    const tray = await screen.findByRole("region", { name: /To review: 2 changes/ });
+    await user.click(within(tray).getByRole("button", { name: "Accept current role" }));
+    await user.click(within(tray).getByRole("button", { name: /Save 1 to What we know/ }));
+
+    // B-I4: the save is announced and focus lands on What we know, not on nothing.
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "What we know" })).toHaveFocus(),
+    );
+    expect(screen.getByTestId("you-announcer")).toHaveTextContent("Saved as version 2.");
+    await user.click(await screen.findByRole("button", { name: "Undo the last save" }));
+
+    await waitFor(() => expect(sent.some((s) => s.path.endsWith("/profile/revert"))).toBe(true));
+    expect(sent.find((s) => s.path.endsWith("/profile/revert"))?.body).toEqual({
+      expected_version: 2,
+      to_version: 1,
+    });
+    expect(sent.some((s) => s.method === "PUT" && s.path.endsWith("/profile"))).toBe(false);
+    await waitFor(() =>
+      expect(screen.getByTestId("you-announcer")).toHaveTextContent(
+        "Undone: version 3 has your answers from before the save.",
+      ),
+    );
+    expect(screen.getByRole("heading", { name: "What we know" })).toHaveFocus();
+  });
+});
+
+describe("[UI-06] each new reply is announced once, and focus follows the first task", () => {
+  it("moves focus to the first question once the person chooses how to start", async () => {
+    const state = { preferences: prefs(null), turns: [] as TurnOut[] };
+    fakeApi(
+      routes(state, [
+        {
+          method: "PUT",
+          path: /\/interview\/preferences$/,
+          answer: () => {
+            state.preferences = prefs("unsure");
+            return state.preferences;
+          },
+        },
+      ]),
+    );
+    const user = renderYou();
+
+    await user.click(await screen.findByRole("button", { name: "Help me explore" }));
+
+    const question = await screen.findByRole("heading", {
+      name: "What would you most like to be different about your working life?",
+    });
+    await waitFor(() => expect(question).toHaveFocus());
+  });
+
+  it("says nothing on load, then announces every new checked reply", async () => {
+    const state: Live = {
+      preferences: prefs("unsure"),
+      turns: [turn("complete", proposal)],
+      profile,
+    };
+    fakeApi(liveRoutes(state));
+    const { queries } = renderLive();
+    await screen.findByText("Thanks. I noted two things for you to review.");
+    const announcer = screen.getByTestId("you-announcer");
+    expect(announcer).toHaveTextContent(/^$/); // an old reply is not news
+
+    const second = {
+      ...turn("complete", { ...unknownHours, reply: "Thanks, noted." } as TurnOut["proposal"]),
+      turn_id: "t2",
+    };
+    state.turns = [{ ...turn("complete", proposal), decision: {} as TurnOut["decision"] }, second];
+    await queries.invalidateQueries();
+    await waitFor(() => expect(announcer).toHaveTextContent("Nessa replied: 1 change to review."));
+
+    const third = {
+      ...turn("complete", { ...proposal, reply: "Good." } as TurnOut["proposal"]),
+      turn_id: "t3",
+    };
+    state.turns = [
+      ...state.turns.slice(0, 1),
+      { ...second, decision: {} as TurnOut["decision"] },
+      third,
+    ];
+    await queries.invalidateQueries();
+    await waitFor(() => expect(announcer).toHaveTextContent("Nessa replied: 2 changes to review."));
+  });
+});
+
+describe("[STATE-06][PROF-08] sending a stale tray's message again goes through the send path", () => {
+  const stale = { ...turn("complete", proposal), profile_version: 0 };
+
+  it("sends once, says when it can't, and shows a support response", async () => {
+    const state: Live = { preferences: prefs("unsure"), turns: [stale], profile };
+    let release: () => void = () => undefined;
+    const sent = fakeApi(
+      liveRoutes(state, [
+        {
+          method: "POST",
+          path: /\/interview\/turns$/,
+          answer: async () => {
+            await new Promise<void>((resolve) => {
+              release = resolve;
+            });
+            return {
+              policy: "acute_distress",
+              policy_version: "support-policy-1",
+              review_status: "provisional",
+              message: "I'm sorry things feel this hard.",
+              resources: [],
+              sent_to_interviewer: false,
+            };
+          },
+        },
+      ]),
+    );
+    const { user } = renderLive();
+    const again = await screen.findByRole("button", { name: "Send it again" });
+
+    await user.click(again);
+    await user.click(again); // still sending: no second request
+    release();
+
+    expect(await screen.findByText("Support is available now")).toBeVisible();
+    expect(sent.filter((s) => s.method === "POST")).toHaveLength(1);
+    expect(sent.find((s) => s.method === "POST")?.body).toMatchObject({ message: stale.message });
+  });
+
+  it("can't send while paused, and says so", async () => {
+    const state: Live = {
+      preferences: { ...prefs("unsure"), paused: true },
+      turns: [stale],
+      profile,
+    };
+    const sent = fakeApi(liveRoutes(state));
+    const { user } = renderLive();
+
+    const again = await screen.findByRole("button", { name: "Send it again" });
+    expect(again).toHaveAttribute("aria-disabled", "true"); // focusable, with its reason
+    expect(screen.getAllByText("Paused: resume to send.").length).toBeGreaterThan(0);
+    await user.click(again);
+    expect(sent.some((s) => s.method === "POST")).toBe(false);
   });
 });
 
@@ -332,5 +650,36 @@ describe("[UI-06][STATE-01] a failed reply says why and keeps one primary action
     expect(screen.getByRole("button", { name: "Try again" })).toHaveClass("btn-primary");
     expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-secondary");
     expect(document.querySelectorAll(".btn-primary")).toHaveLength(1);
+    // MODEL-03: what streamed before the failure stays visible, marked not saved.
+    expect(await screen.findByText("Thanks")).toBeVisible();
+    expect(screen.getByText("Stopped: not checked, nothing saved")).toBeVisible();
+  });
+});
+
+describe("[UI-04][S0-V08] one filled primary action in each state of the chapter", () => {
+  const count = () => document.querySelectorAll(".btn-primary").length;
+
+  it("is Send when nothing waits, the tray's Save while reviewing, and none at the entry", async () => {
+    fakeApi(routes({ preferences: prefs(null), turns: [] }));
+    renderYou();
+    await screen.findByRole("button", { name: "Help me explore" });
+    expect(count()).toBe(0); // two equal choices: neither is pushed
+
+    cleanup();
+    fakeApi(routes({ preferences: prefs("unsure"), turns: [] }));
+    renderYou();
+    await screen.findByRole("button", { name: "Send" });
+    expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-primary");
+    expect(count()).toBe(1);
+
+    cleanup();
+    fakeApi(routes({ preferences: prefs("unsure"), turns: [turn("complete", proposal)] }));
+    const user = renderYou();
+    await screen.findByRole("region", { name: /To review/ });
+    expect(count()).toBe(1);
+
+    await user.click(screen.getByRole("button", { name: "Edit answers directly" }));
+    expect(await screen.findByRole("button", { name: "Save changes" })).toBeVisible();
+    expect(count()).toBe(1); // the form's Save while it is open
   });
 });

@@ -2,14 +2,15 @@
 // "What we know" in brief (spec section 3): the answers so far and what is not known yet,
 // each in words (Unknown, Skipped and Prefer not to say are answers, never blanks), with
 // the way in to edit them and to undo the last save from the conversation.
-import type { ProfileDocument, ProfileOut } from "@/generated/api";
-import { describeField, inputOf } from "@/lib/profile";
-import { useWriteProfile } from "@/lib/queries";
+import type { ProfileOut } from "@/generated/api";
+import { describeField } from "@/lib/profile";
+import { useRevertProfile } from "@/lib/queries";
 import { PROFILE_FIELD_ORDER, PROFILE_FIELDS } from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { RequestFailure } from "./PageState";
 
-export type LastSave = { before: ProfileDocument; version: number };
+/** The version the last save from the conversation created. */
+export type LastSave = { version: number };
 
 export function WhatWeKnow({
   workspaceId,
@@ -22,40 +23,40 @@ export function WhatWeKnow({
   workspaceId: string;
   profile: ProfileOut;
   lastSave: LastSave | null;
-  onUndone(): void;
+  onUndone(restored: ProfileOut): void;
   onEdit(): void;
   editing: boolean;
 }) {
-  const write = useWriteProfile(workspaceId);
+  const revert = useRevertProfile(workspaceId);
   const known = PROFILE_FIELD_ORDER.filter((name) => profile.document[name].state !== "unasked");
   const open = PROFILE_FIELD_ORDER.filter((name) => profile.document[name].state === "unasked");
-  // Undo restores the answers from before the last save, as a direct edit, while nothing
-  // newer has been saved.
+  // Undo restores the version before the last save, each answer with the source it had (a
+  // revert, never a direct edit), while nothing newer has been saved.
   const undoable = lastSave !== null && lastSave.version === profile.version;
 
   return (
     <>
       {undoable && lastSave !== null && (
-        <div className="known-group" aria-live="polite">
+        <div className="known-group">
           <p className="small">Saved as version {lastSave.version}.</p>
           <div>
             <Button
               variant="secondary"
               onClick={() =>
-                void write
+                void revert
                   .mutateAsync({
                     expected_version: profile.version,
-                    profile: inputOf(lastSave.before),
+                    to_version: lastSave.version - 1,
                   })
                   .then(onUndone)
                   .catch(() => null)
               }
-              disabledReason={write.isPending ? "Undoing…" : undefined}
+              disabledReason={revert.isPending ? "Undoing…" : undefined}
             >
               Undo the last save
             </Button>
           </div>
-          {write.error !== null && <RequestFailure error={write.error} />}
+          {revert.error !== null && <RequestFailure error={revert.error} />}
         </div>
       )}
       <section className="known-group" aria-labelledby="known-answers">

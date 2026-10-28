@@ -15,6 +15,7 @@ import type {
   SuggestionOut,
 } from "@/generated/api";
 import { listLimit } from "@/lib/bounds";
+import { stillRunning } from "@/lib/conversation";
 import { type SlateControls, useChooseTarget, useSlate, useSubmitDiscovery } from "@/lib/queries";
 import { DIRECTION, EMPHASIS, FAILURE_CLASS, NOT_INCLUDED } from "@/lib/vocabulary";
 import { Alert } from "./Alert";
@@ -32,7 +33,6 @@ const EVIDENCE = [
   "work_style",
 ] as const;
 const ORDER: Direction[] = ["close_to_current", "transferable", "less_familiar"];
-const TERMINAL = new Set(["complete", "failed", "provider_unavailable", "cancelled"]);
 const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 const NO_CONTROLS: SlateControls = {
   emphasis: "balanced",
@@ -333,7 +333,7 @@ export function Directions({
       : submit.isPending
         ? "Starting…"
         : undefined);
-  const running = discovery !== null && !TERMINAL.has(discovery.run.status);
+  const running = discovery !== null && stillRunning(discovery.run.status);
   const stale = discovery !== null && discovery.profile_version < profile.version;
 
   return (
@@ -367,7 +367,7 @@ export function Directions({
       )}
       {discovery !== null &&
         discovery.run.status !== "complete" &&
-        TERMINAL.has(discovery.run.status) && (
+        !stillRunning(discovery.run.status) && (
           <Alert
             tone={discovery.run.status === "provider_unavailable" ? "stale" : "error"}
             title={FAILURE_CLASS[discovery.run.failure_class ?? "unknown_failure"].title}

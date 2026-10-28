@@ -1,6 +1,7 @@
 // Reading and editing the profile document (generated types only). A missing answer is shown
 // in words by its state, never as a zero, a blank or a guess (spec section 3, STATE-08).
 import type {
+  FieldEdit,
   FieldState,
   Money,
   PayPeriod,
@@ -94,7 +95,8 @@ export type DraftResult =
   | { ok: false; problems: Partial<Record<ProfileFieldName, FieldProblem>> };
 
 /** One field's API input, or why it cannot be sent as typed. */
-type Read<T> = { ok: true; input: T } | { ok: false; problem: FieldProblem };
+export type Read<T> = { ok: true; input: T } | { ok: false; problem: FieldProblem };
+export type FieldAnswer = FieldEdit["answer"];
 
 function unanswered(field: FieldDraft): { state: Exclude<FieldState, "provided"> } | null {
   return field.state === "provided" ? null : { state: field.state };
@@ -161,6 +163,22 @@ function readSalary(field: FieldDraft): Read<ProfileInput["minimum_salary"]> {
     problem:
       parsed.reason === "empty" ? { kind: "required" } : { kind: "money", reason: parsed.reason },
   };
+}
+
+/** One field's answer as the API takes it, or why it cannot be sent as typed. */
+export function readField(name: ProfileFieldName, draft: FieldDraft): Read<FieldAnswer> {
+  switch (PROFILE_FIELDS[name].kind) {
+    case "list":
+      return readList(draft, listLimit(name));
+    case "salary":
+      return readSalary(draft);
+    case "hours":
+      return readHours(draft);
+    case "money":
+      return readMoney(draft);
+    default:
+      return readText(draft);
+  }
 }
 
 /** Turns the draft into the API's input, or names each field that cannot be sent as typed. */

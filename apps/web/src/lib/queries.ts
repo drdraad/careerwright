@@ -30,9 +30,10 @@ import {
   type PreferencesOut,
   type ProfileInput,
   type ProfileOut,
-  type ProfileWriteIn,
   putPreferences,
   putProfile,
+  type RevertProfile,
+  revertProfile,
   revokeCredential,
   rotateCredential,
   type SetPreferences,
@@ -327,13 +328,36 @@ export function useDecideTurn(id: string) {
   );
 }
 
-/** A direct edit of the whole profile, as a command (the review tray's edits and undo). */
-export function useWriteProfile(id: string) {
+/** Sending a message: a turn, or the support response for it. The support response is kept
+ *  with the message it answered, so "send it anyway" sends that message, not whatever is in
+ *  the reply field now. Resolves whether a turn was sent. */
+export function useSendMessage(id: string) {
+  const submit = useSubmitTurn(id);
+  const [support, setSupport] = useState<{
+    response: SupportResponseOut;
+    message: string;
+  } | null>(null);
+  const send = async (body: SubmitTurn): Promise<boolean> => {
+    const sent = await submit.mutateAsync(body).catch(() => null);
+    if (sent === null) return false;
+    if (sent.kind === "support") {
+      setSupport({ response: sent.support, message: body.message });
+      return false;
+    }
+    setSupport(null);
+    return true;
+  };
+  return { send, support, pending: submit.isPending, error: submit.error };
+}
+export type MessageSender = ReturnType<typeof useSendMessage>;
+
+/** Undo: an earlier version's answers, each with its own source, as a new version. */
+export function useRevertProfile(id: string) {
   return useCommand(
     id,
-    async (body: ProfileWriteIn, key: string) =>
+    async (body: RevertProfile, key: string) =>
       (
-        await putProfile({
+        await revertProfile({
           path: path(id),
           body,
           headers: { "Idempotency-Key": key },

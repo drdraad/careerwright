@@ -5,6 +5,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type { CredentialOut, WorkspaceOut } from "@/generated/api";
+import { keys } from "@/lib/queries";
 import { fakeApi } from "@/test/fakeApi";
 import { KeySetup } from "./KeySetup";
 
@@ -30,8 +31,7 @@ const stored: CredentialOut = {
   replaced_by: null,
 };
 
-function renderKey(credentials: CredentialOut[]) {
-  const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderKey(credentials: CredentialOut[], queries = new QueryClient()) {
   render(
     <QueryClientProvider client={queries}>
       <KeySetup workspace={workspace} credentials={credentials} primary />
@@ -63,18 +63,86 @@ describe("[MODEL-07] a key is stored only after explicit consent to encrypted st
     expect(document.body.textContent).not.toContain(secret);
   });
 
-  it("offers rotate and revoke for a stored key, which is never shown", async () => {
+  it("offers rotate and revoke for a stored key, and revokes only once confirmed", async () => {
     const sent = fakeApi([
       { method: "POST", path: /\/credentials\/c1\/revoke$/, answer: { ...stored, active: false } },
     ]);
     const user = renderKey([stored]);
 
     await user.click(screen.getByText(/Meta key: stored/));
+    expect(screen.getByRole("button", { name: "Rotate the key" })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Revoke the key" }));
+    expect(sent.filter((s) => s.method === "POST")).toEqual([]); // not yet: it asks first
+    expect(screen.getByText(/Calls that haven't started will stop/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Yes, revoke the key" }));
 
     await waitFor(() =>
-      expect(sent.map((s) => s.path)).toEqual(["/v1/workspaces/w-key/credentials/c1/revoke"]),
+      expect(sent.filter((s) => s.method === "POST").map((s) => s.path)).toEqual([
+        "/v1/workspaces/w-key/credentials/c1/revoke",
+      ]),
     );
-    expect(screen.getByRole("button", { name: "Rotate the key" })).toBeVisible();
+  });
+
+  it("answers an already revoked key in words and offers to store a new one", async () => {
+    const sent = fakeApi([
+      {
+        method: "POST",
+        path: /\/credentials\/c1\/revoke$/,
+        status: 409,
+        answer: {
+          error: {
+            code: "CREDENTIAL_REVOKED",
+            message: "That key was already revoked.",
+            retryable: false,
+            stage: "request",
+            correlation_id: "c2",
+            details: {},
+          },
+        },
+      },
+    ]);
+    const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queries.setQueryData(keys.credentials("w-key"), [stored]);
+    const user = renderKey([stored], queries);
+
+    await user.click(screen.getByText(/Meta key: stored/));
+    await user.click(screen.getByRole("button", { name: "Revoke the key" }));
+    await user.click(screen.getByRole("button", { name: "Yes, revoke the key" }));
+
+    expect(await screen.findByText(/already revoked\. Store a new key/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Store the key" })).toBeVisible();
+    expect(sent.filter((s) => s.method === "POST")).toHaveLength(1);
+    // The stored list is out of date: it is marked for a refresh.
+    expect(queries.getQueryState(keys.credentials("w-key"))?.isInvalidated).toBe(true);
+  });
+
+  it("keeps the typed key when storing it fails, and never offers it to the browser", async () => {
+    fakeApi([
+      {
+        method: "POST",
+        path: /\/credentials$/,
+        status: 503,
+        answer: {
+          error: {
+            code: "STORE_UNAVAILABLE",
+            message: "The database is unavailable.",
+            retryable: true,
+            stage: "storage",
+            correlation_id: "c3",
+            details: {},
+          },
+        },
+      },
+    ]);
+    const user = renderKey([]);
+    const field = screen.getByLabelText("Meta API key");
+
+    expect(field).toHaveAttribute("autocomplete", "new-password");
+    await user.type(field, "test-key-not-real-0123456789");
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Store the key" }));
+
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(field).toHaveValue("test-key-not-real-0123456789");
   });
 });
