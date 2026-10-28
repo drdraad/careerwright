@@ -24,6 +24,8 @@ type Planned = {
   purpose: string;
   /** Why it is empty now, when nothing it starts from is missing. */
   notYet: string;
+  /** The one action's label, saying what it is for. */
+  next: string;
 };
 
 const PLANNED: Record<Exclude<ChapterId, "you" | "routes">, Planned> = {
@@ -33,6 +35,7 @@ const PLANNED: Record<Exclude<ChapterId, "you" | "routes">, Planned> = {
       "Role cards and a map of employers and listings for your targets in your work areas, with the sources checked and their coverage.",
     notYet:
       "Role research isn't part of this build yet, so no listings have been searched. When it arrives, a search that finds nothing will say which sources it checked.",
+    next: "Review what we know",
   },
   skills: {
     title: "Skills",
@@ -40,6 +43,7 @@ const PLANNED: Record<Exclude<ChapterId, "you" | "routes">, Planned> = {
       "What each target requires, what you have shown, what is planned and what is still unresolved, with the evidence behind each.",
     notYet:
       "The skills matrix isn't part of this build yet. Nothing has been assessed, so nothing is marked missing.",
+    next: "Review what we know",
   },
   options: {
     title: "Options",
@@ -47,12 +51,16 @@ const PLANNED: Record<Exclude<ChapterId, "you" | "routes">, Planned> = {
       "Courses, work routes and funding for each gap, with provider, dates, cost and evidence to review.",
     notYet:
       "Option research isn't part of this build yet. No courses or funding have been searched.",
+    next: "Review what we know",
   },
   plan: {
     title: "Plan",
     purpose:
       "The route you choose, as a dated plan with its conditions, costs and one next action.",
-    notYet: "No plan has been chosen. A plan starts from a route you select in Routes.",
+    // V-06: the limitation in words, and never a hint that a fixture preview becomes a plan.
+    notYet:
+      "Plan selection isn't part of this build yet, so no plan has been made. When it is, a plan will start from a route Nessa computes from your answers, never from a fixture preview.",
+    next: "Review your answers in You",
   },
 };
 
@@ -96,7 +104,7 @@ export function PlannedChapter({
   const needs = chapterNeeds(id, profile.document);
   const you = (
     <Link className="btn btn-secondary" href={chapterHref(workspaceId, "you")}>
-      Review what we know
+      {planned.next}
     </Link>
   );
   return (

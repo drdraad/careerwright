@@ -62,6 +62,19 @@ describe("[STATE-01][UI-04] a planned chapter treats every chosen state as an an
     expect(screen.getByText(/Not asked yet: target roles/)).toBeInTheDocument();
   });
 
+  it("says plan selection isn't built, and what its one action is for (V-06)", () => {
+    render(<PlannedChapter id="plan" profile={profile({})} workspaceId="w1" />);
+
+    expect(screen.getByText("No plan yet")).toBeInTheDocument();
+    expect(screen.getByText(/Plan selection isn't part of this build yet/)).toBeVisible();
+    expect(screen.getByText(/never from a fixture preview/)).toBeVisible();
+    expect(screen.queryByText(/route you select in Routes/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review your answers in You" })).toHaveAttribute(
+      "href",
+      "/w/w1/you",
+    );
+  });
+
   it("says an Unknown target leaves nothing to start from, without blocking", () => {
     render(
       <PlannedChapter
