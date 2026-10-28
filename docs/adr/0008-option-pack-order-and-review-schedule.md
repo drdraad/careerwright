@@ -7,7 +7,8 @@
 - Source: [`docs/plan/l0-assessment-handover.md`](../plan/l0-assessment-handover.md), an
   assessment of the specification and the plan against the repository at `cfdae68`, after
   Sprints 0–2. Applied as product specification v1.3, development plan v1.1, the task file
-  (`docs/plan/l0-sprint-tasks.md`, rulings R4, R9 and R10, Tasks 6b, 6c, 7b, 13a and 13b)
+  (`docs/plan/l0-sprint-tasks.md`, rulings R4, R9 and R10, Tasks 6b, 6c, 7b, 7c, 13a and
+  13b)
   and the register.
 - Requirements: OPTN-08..10, TEST1-09, TEST1-13, TEST1-14, OUT1-10, OPT1-15, OPT1-16,
   REC1-11, H-01, H-06, H-07, H-12, H-13; spec sections 4 (REC-1), 10, 11, 12 (OPT-1) and
@@ -57,20 +58,27 @@ ADR 0007 decision 6 chose explanations built from facts only, with no model pros
      unqualified "affordable and feasible" recommendation until reviewed, which is the
      option review checkpoint rule (spec section 10).
    - *Use.* Task 7b curates and labels the pack with the Task 7 pipeline and defines its
-     file format; Tasks 9 and 11 load it; Tasks 10 and 12 consume it instead of curating
-     pages; Task 8 consumes its job postings; Task 11 runs the TRACE-01 checker on a real
-     option set for P01's target from it. The live path, pointed at the same provider pages,
-     is scored field by field against the reviewed values (correct, incorrect, missing,
+     file format; Tasks 9 and 11 load it; Task 11 runs the TRACE-01 checker on a real
+     option set for P01's target from it. After session 2, Task 7c applies the product
+     owner's H-07 record and publishes a new dated, versioned pack: accepted records carry
+     `review_state: reviewed`, rejected ones are left out, every corrected value is
+     span-cited, and undecided records stay `proposed`. Tasks 10 and 12 consume that
+     reviewed version instead of curating pages, Task 8 consumes its job postings and Task
+     13a solves on its instances. The live path, pointed at the same provider pages, is
+     scored field by field against the reviewed values (correct, incorrect, missing,
      unsupported, with denominators) in Tasks 8, 10 and 12.
 
 2. **The remaining work follows the critical chain, and Sprint 6 is split (D2).**
-   - *Order.* After Tasks 6b and 6c: 7 → 7b → 9 → 11 → session 2 → 10 → 12 → 8 → 13a →
-     13b → 14 → 15 → 16, with session 1 before Task 8. The Sprint 4 and 5 backends run
-     before the Roles chapter UI. The dependency rules are in the task file.
+   - *Order.* After Tasks 6b and 6c: 7 → 7b → 9 → 11 → session 2 → 7c → 10 → 12 → 8 →
+     13a → 13b → 14 → 15 → 16, with session 1 before Task 8. The Sprint 4 and 5 backends
+     run before the Roles chapter UI. Task 16 waits for every other remaining task and for
+     all three sessions, because release qualification needs all six chapters. The
+     dependency rules are in the task file.
    - *Sequential execution* (controller ruling). One implementer runs at a time. Where the
-     handover marks tasks as parallel (∥: "7b ∥ 9", "10 and 12 may run in parallel with
-     8"), they have no dependency on each other and run one after the other, in either
-     order.
+     handover marks tasks as parallel ("10 and 12 may run in parallel with 8"), they have
+     no dependency on each other and run one after the other, in either order. The
+     handover's "7b ∥ 9" runs 7b first: Task 9 loads the pack in the format Task 7b
+     defines.
    - *Sprint 3.* S3.6 delivers the assessment record model, its publication-state checks,
      the lower-bound filter and the unscored state, qualified with one labelled fixture
      record; the review pipeline is data entry through that record model; L0 publishes no
@@ -94,14 +102,17 @@ ADR 0007 decision 6 chose explanations built from facts only, with no model pros
    - *Session 1* (about 2 h; before Task 8 and before any page body is retained beyond the
      classes it permits): H-06 as a rights *policy* for the permitted source classes of the
      corpus and the pack, so agents can classify pages themselves, and the H-12 checklist in
-     ADR 0007. D1–D3 were confirmed outside the session. Ruling R2 still holds: a person
-     sets the policy, an agent records the class and the terms it relied on for each page,
-     and a page outside the permitted classes, or not clearly within one, stays "pending
-     human rights review" for a person. Until session 1, ruling R3 governs retention.
+     ADR 0007. D1–D3 were confirmed outside the session. The first task dispatched after
+     the session transcribes its outcome (Task 8 at the latest). Ruling R2 still holds, and
+     says so: a person sets the policy, an agent records the class and the terms it relied
+     on for each page, and a page outside the permitted classes, or not clearly within one,
+     stays "pending human rights review" for a person. Until session 1, ruling R3 governs
+     retention.
    - *Session 2* (about 2 h; after Task 11): H-07 for Sprints 4–5 on the option pack and the
      TRACE-01 checker run on P01's real option set, and the formative comprehension session
-     (decision 6, H-13). It precedes Tasks 10, 12 and 8 (they score the live path against
-     the reviewed values), Task 13a and the start of Task 14.
+     (decision 6, H-13). It precedes Task 7c, which publishes the reviewed pack, and through
+     it Tasks 10, 12 and 8 (they score the live path against the reviewed values) and Task
+     13a; it also precedes the start of Task 14.
    - *Session 3* (about 1 h; before Task 14 closes): the Sprint 7 design review (H-01)
      against what session 2 showed.
    - The other human gates (H-01 for Sprints 3 and 9, H-03, H-04, H-05, H-08, H-10) keep
@@ -114,10 +125,12 @@ ADR 0007 decision 6 chose explanations built from facts only, with no model pros
    `invalid_model_output`) and adds no readiness or affordability claim. The deterministic
    provenance of ADR 0007 decision 6 stays underneath, is shown in every case and is what
    exports cite; a failed explanation is shown as unavailable, never hidden. This
-   supersedes the last two sentences of ADR 0007 decision 6 ("Model-written explanations
-   are not used in L0 …"); Task 6b implements it and amends ADR 0007 to point here. Live
-   calls use the test model with synthetic data only, budget-capped and ledgered (ruling
-   R5).
+   supersedes two parts of ADR 0007 decision 6: its title ("A suggestion's words come from
+   facts, not model prose") and its last sentence ("Model-written explanations are not
+   used in L0: grounding by construction was preferred to a second paid call whose prose
+   would need its own checks."). Task 6b implements it and amends ADR 0007 to point here.
+   Live calls use the test model with synthetic data only, budget-capped and ledgered
+   (ruling R5).
 
 5. **The OPT-1 limits are disclosed (spec sections 12 and 18).** `budget_truncated` is the
    expected coverage for large catalogues and `NO_ROUTE_IN_BOUNDED_MODEL` is
@@ -138,11 +151,13 @@ ADR 0007 decision 6 chose explanations built from facts only, with no model pros
    under `NESSA_HOME` before Task 7 is dispatched, S3.3 qualifies the live integration;
    otherwise it stays "unverified — no credentials". It is external data, still a local run.
 
-8. **Two tasks added by the controller.** Task 6b implements decision 4. Task 6c is the
+8. **Three tasks added by the controller.** Task 6b implements decision 4. Task 6c is the
    visual-corrections batch (Sprint 1 findings V-01, V-03–V-06, V-09, V-10; Sprint 0 findings
    S0-V03, S0-V04, S0-V06 and the Routes part of S0-V07; the Sprint 0 compositions corrected
    and recaptured) and removes the `next` 16.4.1 `minimumReleaseAgeExclude` exception, which
-   became eligible at 2026-10-28T17:43Z (ADR 0005 decision 1).
+   became eligible at 2026-10-28T17:43Z (ADR 0005 decision 1). The Roles app parts of
+   S0-V05, S0-V07 and S0-V08 stay with Task 8. Task 7c, added after the plan update's
+   review, publishes the reviewed option pack from session 2's record (decision 1).
 
 ## What does not change
 
@@ -156,16 +171,18 @@ the handover's section 7 were considered and not adopted.
 
 ## Consequences
 
-- Specification v1.3 (sections 1, 4, 11, 12, 18, 22), plan v1.1 (sections 1, 5, 6, 9–12 and
-  the Sprint 2, 3, 4, 5, 6a, 6b, 7 and 8 cards), the task file and the register change
-  together. No code, test, fixture or configuration changes with this ADR.
+- Specification v1.3 (sections 1, 4, 11, 12, 18, 22), plan v1.1 (the preamble: header,
+  "Delivery envelope" and "How to use this plan"; sections 5, 6, 9–12; and the Sprint 2, 3,
+  4, 5, 6a, 6b, 7 and 8 cards), the task file and the register change together. No code, test, fixture or configuration changes with this ADR.
 - Sprint reviews are written when a sprint's last task finishes, so `sprint-3.md` (Task 8)
   follows `sprint-4.md` (Task 10) and `sprint-5.md` (Task 12); `sprint-6.md` (Task 13b)
   covers 6a and 6b.
 - Elapsed time now depends on when the sessions are held. A task waiting for one is
   recorded "blocked: awaiting session N", never started early or self-certified.
 - The pack's file format is owned by Task 7b; Tasks 9 and 11 load it through their domain
-  models, and a format change needs a pack version bump.
+  models, and a format change needs a pack version bump. In L0 the pack has at least two
+  versions: Task 7b's, all `proposed`, and Task 7c's reviewed one, which every later task
+  pins by version and hash.
 - Live calls added: Task 6b's explanation checks and the live-versus-reviewed scoring in
   Tasks 8, 10 and 12. Each runs on the test model with synthetic or public inputs, behind
   an explicit cap, and is ledgered (R5).

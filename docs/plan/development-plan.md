@@ -209,7 +209,7 @@ The critical chain is validated inputs → evidence and outcomes → monthly fea
 2. Sprint 3 acquisition backend (S3.1–S3.4 and the reduced S3.6).
 3. The England option pack (section 9).
 4. Sprint 4 backend, then Sprint 5 backend.
-5. Review session 2.
+5. Review session 2, then the reviewed option pack published from its record.
 6. Sprint 4 Skills chapter and review, then Sprint 5 Options chapter and review.
 7. Sprint 3 Roles chapter (S3.5), job scoring and review, after review session 1.
 8. Sprints 6a, 6b, 7 (closing after review session 3), 8 and 9.
@@ -634,7 +634,7 @@ Split cases by source/template family so near-duplicate pages do not leak into b
 
 ## The England option pack (v1.1, D1)
 
-Choose the 20 job postings, 10 course pages and three funding pages for the five personas' targets (P01–P05), still covering the case types above, and deliver the labelled result as a **reviewed, versioned, dated England option pack**. Its records take the specification section 18 shapes: LearningOption and Offering, FundingInstrument, SkillRequirement rows and `PlanAction.outcomes` (OUT-1), each with its SourceClaims, rights status, `review_state` and dates. Every record starts `proposed`; a human review at review session 2 (H-07) moves it to reviewed.
+Choose the 20 job postings, 10 course pages and three funding pages for the five personas' targets (P01–P05), still covering the case types above, and deliver the labelled result as a **reviewed, versioned, dated England option pack**. Its records take the specification section 18 shapes: LearningOption and Offering, FundingInstrument, SkillRequirement rows and `PlanAction.outcomes` (OUT-1), each with its SourceClaims, rights status, `review_state` and dates. Every record starts `proposed`. After the human review at review session 2 (H-07), a new dated pack version is published from the reviewer's record: accepted records carry `review_state: reviewed`, rejected ones are left out, every corrected value is span-cited, and undecided records stay `proposed`. The later sprints score and solve against that reviewed version.
 
 The pack is an immutable public evidence pack (specification section 11): fetched and hash-checked like ESCO (ruling R7), or committed if it is small and its rights permit under the session 1 policy. Its labelling rules:
 
@@ -689,7 +689,7 @@ Human review is scheduled as three fixed sessions, about five hours in all. Each
 | Session | When | Gates it closes | Precondition for |
 |---|---|---|---|
 | 1, about 2 hours | Before the Sprint 3 Roles chapter (S3.5) and before any page body is retained beyond the source classes it permits | H-06 as a rights policy for the permitted source classes of the corpus and the option pack, so agents can then classify pages themselves (a page outside those classes stays with a person); the H-12 checklist in ADR 0007 | The Roles chapter and job corpus; retaining or committing page bodies beyond ruling R3 |
-| 2, about 2 hours | After the Sprint 5 backend | H-07 for Sprints 4 and 5, on the option pack and the TRACE-01 checker run on P01's real option set; the formative comprehension session (section 5, H-13) | Sprint 6a; the start of Sprint 7; the Skills, Options and Roles chapters' scoring against reviewed values |
+| 2, about 2 hours | After the Sprint 5 backend | H-07 for Sprints 4 and 5, on the option pack and the TRACE-01 checker run on P01's real option set; the formative comprehension session (section 5, H-13) | Publishing the reviewed option pack, and through it Sprint 6a and the Skills, Options and Roles chapters' scoring against reviewed values; the start of Sprint 7 |
 | 3, about 1 hour | Before Sprint 7 closes | H-01 for Sprint 7, the design review, against what session 2 showed | Closing Sprint 7, and so Sprint 8 |
 
 ## Use the supplied Claude Code starter kit
