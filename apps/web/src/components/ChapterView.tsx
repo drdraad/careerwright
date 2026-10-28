@@ -4,9 +4,10 @@
 // answers they depend on, and what to do next (spec section 3: useful, honest empty states).
 import Link from "next/link";
 import type { ProfileOut } from "@/generated/api";
-import { type ChapterId, chapterHref } from "@/lib/chapters";
+import { CHAPTERS, type ChapterId, chapterHref } from "@/lib/chapters";
 import type { RoutePreview as Preview } from "@/lib/fixtures/trace";
 import { describeField } from "@/lib/profile";
+import { type ChapterNeeds, chapterNeeds } from "@/lib/readiness";
 import { PROFILE_FIELDS, type ProfileFieldName } from "@/lib/vocabulary";
 import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
@@ -18,17 +19,15 @@ import { useWorkspaceData } from "./WorkspaceShell";
 
 type Planned = {
   title: string;
-  needs: ProfileFieldName[];
   /** What the chapter will hold, in one or two sentences. */
   purpose: string;
-  /** Why it is empty now, when nothing it needs is missing. */
+  /** Why it is empty now, when nothing it starts from is missing. */
   notYet: string;
 };
 
 const PLANNED: Record<Exclude<ChapterId, "you" | "routes">, Planned> = {
   roles: {
     title: "Roles",
-    needs: ["target_titles", "cities"],
     purpose:
       "Role cards and a map of employers and listings for your targets in your work areas, with the sources checked and their coverage.",
     notYet:
@@ -36,7 +35,6 @@ const PLANNED: Record<Exclude<ChapterId, "you" | "routes">, Planned> = {
   },
   skills: {
     title: "Skills",
-    needs: ["target_titles", "current_role"],
     purpose:
       "What each target requires, what you have shown, what is planned and what is still unresolved, with the evidence behind each.",
     notYet:
@@ -44,7 +42,6 @@ const PLANNED: Record<Exclude<ChapterId, "you" | "routes">, Planned> = {
   },
   options: {
     title: "Options",
-    needs: ["target_titles", "weekly_study_hours", "direct_spend_cap", "monthly_payment_cap"],
     purpose:
       "Courses, work routes and funding for each gap, with provider, dates, cost and evidence to review.",
     notYet:
@@ -52,26 +49,34 @@ const PLANNED: Record<Exclude<ChapterId, "you" | "routes">, Planned> = {
   },
   plan: {
     title: "Plan",
-    needs: [],
     purpose:
       "The route you choose, as a dated plan with its conditions, costs and one next action.",
     notYet: "No plan has been chosen. A plan starts from a route you select in Routes.",
   },
 };
 
-function Needs({ profile, needs }: { profile: ProfileOut; needs: ProfileFieldName[] }) {
-  if (needs.length === 0) return null;
+const labels = (names: ProfileFieldName[]) =>
+  names.map((name) => PROFILE_FIELDS[name].label.toLowerCase()).join(", ");
+
+function Needs({ profile, needs }: { profile: ProfileOut; needs: ChapterNeeds }) {
+  if (needs.uses.length === 0) return null;
   return (
     <div className="grid gap-8">
       <p className="section-title">Uses these answers from You</p>
       <dl className="kv">
-        {needs.map((name) => (
+        {needs.uses.map((name) => (
           <div key={name} className="contents">
             <dt>{PROFILE_FIELDS[name].label}</dt>
             <dd>{describeField(profile.document[name])}</dd>
           </div>
         ))}
       </dl>
+      {needs.lessPrecise.map((name) => (
+        <p key={name} className="small">
+          Less precise without {PROFILE_FIELDS[name].label.toLowerCase()} (
+          {describeField(profile.document[name])}): {PROFILE_FIELDS[name].lessPrecise}
+        </p>
+      ))}
     </div>
   );
 }
@@ -86,7 +91,7 @@ function PlannedChapter({
   workspaceId: string;
 }) {
   const planned = PLANNED[id];
-  const missing = planned.needs.filter((name) => profile.document[name].state !== "provided");
+  const needs = chapterNeeds(id, profile.document);
   const you = (
     <Link className="btn btn-secondary" href={chapterHref(workspaceId, "you")}>
       Review what we know
@@ -96,23 +101,28 @@ function PlannedChapter({
     <>
       <h1 className="page-title">{planned.title}</h1>
       <p className="measure">{planned.purpose}</p>
-      {missing.length > 0 ? (
+      {needs.notAsked.length > 0 ? (
         <EmptyState
           state="blocked_missing_information"
           title="Needs answers in You first"
           next={you}
         >
           <p>
-            Not answered yet:{" "}
-            {missing.map((name) => PROFILE_FIELDS[name].label.toLowerCase()).join(", ")}. Each can
-            also be marked Unknown; the result is then less precise, never filled in with a guess.
+            Not asked yet: {labels(needs.notAsked)}. This chapter starts from them. Unknown is an
+            answer too: it is never filled in with a guess.
           </p>
-          <Needs profile={profile} needs={planned.needs} />
+          <Needs profile={profile} needs={needs} />
         </EmptyState>
       ) : (
         <EmptyState state="notStarted" title={`No ${planned.title.toLowerCase()} yet`} next={you}>
           <p>{planned.notYet}</p>
-          <Needs profile={profile} needs={planned.needs} />
+          {needs.withoutStart.length > 0 && (
+            <p>
+              Your answer for {labels(needs.withoutStart)} is not a specific one, so there is
+              nothing to start from yet. Helping you choose arrives with the interview.
+            </p>
+          )}
+          <Needs profile={profile} needs={needs} />
         </EmptyState>
       )}
     </>
@@ -129,10 +139,26 @@ export function ChapterView({
   const { workspace, profile, profileError } = useWorkspaceData();
   const surface = chapter === "roles" || chapter === "routes" ? "on-space" : "on-reading";
 
+  // While loading or after a failed load the page still says which chapter it is.
+  const title = (
+    <h1 className="page-title">{CHAPTERS.find((item) => item.id === chapter)?.label}</h1>
+  );
   let body: React.ReactNode;
-  if (profile === undefined && profileError) body = <RequestFailure error={profileError} />;
-  else if (profile === undefined) body = <LoadingState stage="Loading what we know" />;
-  else if (chapter === "you") {
+  if (profile === undefined && profileError) {
+    body = (
+      <>
+        {title}
+        <RequestFailure error={profileError} />
+      </>
+    );
+  } else if (profile === undefined) {
+    body = (
+      <>
+        {title}
+        <LoadingState stage="Loading what we know" />
+      </>
+    );
+  } else if (chapter === "you") {
     body = (
       <>
         <h1 className="page-title">You</h1>
