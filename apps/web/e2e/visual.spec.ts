@@ -8,7 +8,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { type AxeViolation, axe, chapterUrl, signIn } from "./helpers";
+import { type AxeViolation, axe, chapterUrl, liveUpdates, signIn } from "./helpers";
 import { stack } from "./stack";
 
 const VIEWPORTS = [
@@ -32,7 +32,7 @@ const heading = (name: string) => async (page: Page) => {
   await expect(page.getByRole("banner").getByText(/^Saved, version \d+$/)).toBeVisible();
   // The live-update state is in the strip on wider screens; phones show the saved state only.
   if ((page.viewportSize()?.width ?? 0) > 760) {
-    await expect(page.getByRole("status").filter({ hasText: "Live" })).toBeVisible();
+    await expect(liveUpdates(page, "Live")).toBeVisible();
   }
 };
 

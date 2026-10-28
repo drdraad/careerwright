@@ -94,6 +94,10 @@ with the browser's Origin unchanged.
 - Port already in use: another local project holds 58000/59099/56432/53000; stop it or set
   `NESSA_API_PORT`, `NESSA_AUTH_PORT`, `NESSA_PG_PORT` or `NESSA_WEB_PORT` for every
   `make` command (the API and the web app then allow that port as their Host and origin).
+- Asked to sign in again after `make stop` and `make demo`: the Auth emulator re-imports its
+  seed on start, which ends sessions issued before. A page that stayed open refreshes its
+  token by itself and reconnects; a page loaded before that asks you to sign in, then returns
+  to the same address.
 - The page says "This server answers only on its local address": the browser used another
   name for the web app. Open `http://127.0.0.1:53000` or `http://localhost:53000`.
 - The strip says "Couldn't refresh: showing what was last loaded" or "Reconnecting": the API

@@ -72,6 +72,15 @@ export async function expectNoHorizontalOverflow(page: Page) {
   expect(overflow).toBeLessThanOrEqual(0);
 }
 
+/**
+ * The strip's live-update state, matched exactly: its accessible text is "Live updates:
+ * <state>", so a loose match on "Live" would also match "Live updates: Reconnecting".
+ */
+export function liveUpdates(page: Page, state: "Live" | "Connecting" | "Reconnecting" | RegExp) {
+  const pattern = state instanceof RegExp ? state : new RegExp(`^Live updates: ${state}$`);
+  return page.getByRole("status").filter({ hasText: pattern });
+}
+
 /** The shell is ready: the chapter heading is shown and live updates are connected. */
 export async function expectChapter(page: Page, heading: string) {
   await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();

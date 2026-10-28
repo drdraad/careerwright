@@ -139,4 +139,7 @@ test("[DUR-04][VERSIONS-01] a save based on an older version is refused and the 
   await expect(second.getByText("Version 1 was saved while you were editing")).toBeVisible();
   await expect(second.getByText(/Version 1 changed: Current role/)).toBeVisible();
   await expect(second.getByRole("textbox", role)).toHaveValue("Second tab's answer");
+  // Close both tabs: open pages would keep streaming into the next test's restart.
+  await first.close();
+  await second.close();
 });
