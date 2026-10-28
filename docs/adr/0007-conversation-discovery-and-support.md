@@ -1,13 +1,15 @@
 # ADR 0007: The You chapter's conversation, grounded discovery and the support policy
 
-- Status: Accepted (Task 6, Sprint 2: S2.3-S2.6). Decision 7 (the support policy, redesigned
-  in fix rounds 4 and 5: its word lists and windows, its wording and its resources) and decision 5's slate
-  weights are **provisional, need product owner and reviewed sign-off** (ruling R6; human
-  gate H-12). Decision 2's salary floor is
+- Status: Accepted (Task 6, Sprint 2: S2.3-S2.6; decision 12 and the amendment to decision 6:
+  Task 6b, S2.7). Decision 7 (the support policy, redesigned
+  in fix rounds 4 and 5: its word lists and windows, its wording and its resources), decision 5's slate
+  weights and decision 12's word lists and bounds are **provisional, need product owner and
+  reviewed sign-off** (ruling R6; human gate H-12). Decision 2's salary floor is
   the product owner's change to the hard-constraint set (H-11, 2026-10-28).
 - Date: 2026-10-28
-- Requirements: REC1-01..10, DIV1-02, DIV1-04..12, STATE-05, STATE-06, STATE-08, PROF-04,
-  PROF-07..09, MODEL-03, MODEL-07, TEST1-10; spec sections 3, 4 and 16; ADR 0006
+- Requirements: REC1-01..11, DIV1-02, DIV1-04..12, STATE-05, STATE-06, STATE-08, PROF-04,
+  PROF-07..09, MODEL-03, MODEL-07, TEST1-10; spec sections 3, 4 and 16; ADR 0006; ADR 0008
+  decision 4
 
 ## Context
 
@@ -130,7 +132,8 @@ inference, with at least 30 evaluation cases and a capped live run.
      any-word match scores at most 0.5). An absolute rank floor needs calibrating on the
      full release; it is not set in L0 and is listed for H-12.
 
-6. **A suggestion's words come from facts, not model prose.** "Why this could suit you"
+6. **A suggestion's words come from facts; a written note may stand beside them (ADR 0008
+   decision 4; Task 6b, decision 12).** "Why this could suit you"
    quotes the answers that found it and the search that matched ESCO's record; "What might
    not suit you" names ESCO's essential skills (not yet compared with experience), a
    regulated-profession mark and, when familiarity is known, a different kind of work;
@@ -142,8 +145,9 @@ inference, with at least 30 evaluation cases and a capped live run.
    the person chooses it (`POST .../targets`, REC1-07): the one write path, with an
    `occupation_choice` source naming the ESCO URI and the discovery. The same command
    resolves an ambiguous target title to the occupation the person means (`replaces`).
-   Model-written explanations are not used in L0: grounding by construction was preferred
-   to a second paid call whose prose would need its own checks.
+   Since ADR 0008 decision 4 (D3), a model-written "Why this could suit you" may stand
+   beside these words, never in their place: decision 12 (Task 6b) records how. These words
+   remain the deterministic provenance, shown in every case and cited by exports.
 
 7. **The minimal support policy** (`nessa.profile.safety`, `support-policy-5`): one
    deterministic, recall-first screen over normalised words (controller rulings, Task 6 fix
@@ -300,6 +304,71 @@ inference, with at least 30 evaluation cases and a capped live run.
     confirmed reading keeps its basis and turn), as a new version; undo uses it, never a
     direct edit.
 
+12. **The written "Why this could suit you" (Task 6b, S2.7; ADR 0008 decision 4; REC1-11).**
+    A run kind on the one activity (`slate_explanation`, prompt `slate-explanation-1`,
+    migration 0011; ADR 0002, ADR 0006 decision 10), so one bounded call with at most one
+    repair, like a discovery.
+    - *What a slate is* (ruling). A discovery's first view: balanced emphasis, no
+      exclusions, computed when the explanation is asked for. A changed view (emphasis,
+      exclusions) is never a new slate and never makes a call: a suggestion it shows that
+      the note covers keeps its note, and any other says it has none. A new discovery
+      ("Suggest again") is a new slate. `slate_explanations` holds at most one explanation
+      per discovery (a unique key); asking again, from any view or with any idempotency key,
+      answers 200 with the same run, whatever its state, so a failed note is never retried
+      for the same slate.
+    - *When.* The web app asks once, when a slate first shows for the current answers and a
+      key is stored (or the workspace is a demo). The API refuses before any run exists when
+      the expected version is stale or the discovery's pinned answers are not the current
+      ones (`STALE_INPUT_VERSION`: the note would quote answers since changed), when the
+      discovery has no validated searches (`PROPOSAL_NOT_AVAILABLE`) or an empty slate
+      (`INSUFFICIENT_EVIDENCE`), and for the usual reasons any run is refused (no key, over
+      budget, demo runtime).
+    - *Input* (SEC-05). The answers the discovery pinned that describe work (decision 4),
+      each whole, and ESCO's record of each suggestion: its title, its description cut at a
+      word, and its first essential skills (ESCO's order is alphabetical). The record steps
+      down (600 characters and 6 skills, then 400/4, 250/3, 150/2, 100/1) until the prompt
+      fits 8,500 bytes; the cut record is what the model reads and what quotations are
+      checked against. No name, place, money, hours, ID or link is sent. Two requests at
+      their bounds reserve $0.0034 on the test model and $0.0495 on the production model,
+      so three step attempts fit the default $0.15 run limit.
+    - *Output and check* (`check_explanation`). Every suggestion once, with 1-2 distinct
+      claims; a claim is one sentence of 20-240 characters with no quotation marks of its
+      own, resting on 1-3 distinct quotations, at least one of the person's answers and at
+      least one of that occupation's record. Each quotation must be an exact span of its source at word
+      boundaries (case, spacing and apostrophe or dash forms aside) and is stored in the
+      source's own characters, with the answer's field or the record's part. Refused: a
+      misquotation, an invented answer, a fact the record lacks (another suggestion's record
+      included), readiness, affordability or hiring words or a currency sign that neither
+      the record nor the answers use, and a health condition, type, protected
+      characteristic or percentage that neither the answers nor that record name (decision
+      7's guard; the record's words describe the work, not the person). One repair, then
+      `invalid_model_output`; a cut-off response is `output_truncated` at once; nothing is
+      stored as checked.
+    - *Models* (MODEL-02, as for every run). The Standard production model for
+      non-synthetic workspaces, the test model for synthetic ones; demo workspaces use the
+      deterministic fixture explainer (`nessa-fixture-explainer-1`, each claim labelled
+      "Demo explainer (synthetic)"), which the database confines to demo workspaces and, with
+      the other fixture models, to interview turns, discoveries and explanations.
+    - *Never a change.* The slate is computed without reading the note, and choosing a
+      target records the `occupation_choice` source (ESCO URI and discovery) as before,
+      never the note. The command answers with the run only (`ExplanationRunOut`): a
+      command's answer is kept as its receipt, and model output stays sealed, so the text is
+      read with the discovery (`DiscoveryOut.explanation`). Export format 4 carries it beside
+      the provenance, which is what exports cite.
+    - *UI.* "Why this could suit you" shows the note (each claim, then each quotation after
+      "You said" or the part of ESCO's record), says who wrote it, and then "How Nessa found
+      it" (decision 6's words), shown in every case. Pending, unavailable (the failure
+      class's words, or a refused request's error-code words) and not-covered states say so;
+      a polite status line announces the change.
+    - *The support screen* (decision 7) is neither read nor written: the note sees only the
+      pinned answers and ESCO, and an answer holding a listed word is quoted like any other.
+    - *Known limits.* The claim's prose is model prose: only its quotations are verified, so
+      a sentence may still say, in other words, more than its quotations support; the word
+      screens catch readiness, money, hiring and the sensitive terms only. The live
+      evidence is single samples on the test model.
+    - **Provisional (R6, H-12):** the readiness, affordability and hiring word lists, the
+      claim and quotation bounds, and asking for the note without a click.
+
 ## Consequences
 
 - Migration 0010; new run kind `discovery`; new event kind `interview.preferences_updated`;
@@ -308,9 +377,11 @@ inference, with at least 30 evaluation cases and a capped live run.
   panel when the message triggers the support screen, and a refusal of such a message
   carries the panel too (`TurnRefusedOut`; fix rounds 4 and 5: no 200 response and no
   `send_after_support` any more); a turn decision may carry edits.
-- Not done: model-written suggestion explanations; applying the salary floor (Sprint 3,
-  with pay evidence); a salary floor per target; a human review of the evaluation cases
-  and of the support policy (H-12).
+- Task 6b (decision 12): migration 0011; new run kind `slate_explanation` and fixture model
+  `nessa-fixture-explainer-1`; `POST .../discoveries/{id}/explanation`; `DiscoveryOut`
+  gains `explanation`; export format 4.
+- Not done: applying the salary floor (Sprint 3, with pay evidence); a salary floor per
+  target; a human review of the evaluation cases and of the support policy (H-12).
 
 ## Human review checklist (H-12, not run — requires human)
 
@@ -340,7 +411,13 @@ inference, with at least 30 evaluation cases and a capped live run.
   round-robin pool.
 - [ ] **Interview repair rate** (decision 3): how often the one-question rule costs a paid
   repair, from the release evaluation.
-- [ ] **Evaluation cases** (decision 9): the 43 cases and their semantic expectations. Of
+- [ ] **Written explanation** (decision 12): the readiness, affordability and hiring word
+  lists and the record allowance, the claim and quotation bounds, that a claim must quote
+  both the person and the record, the "first view" definition of a slate and no retry of
+  a failed note, asking for the note without a click, and the note's wording and placement
+  above "How Nessa found it".
+- [ ] **Evaluation cases** (decision 9): the 44 cases (EXP-01 added by Task 6b) and their
+  semantic expectations. Of
   them, 20 (SUP-01..13, GRD-01..07) test deterministic code with canned inputs; the model's
   behaviour rests on the live cases alone, single samples so far.
 - [ ] **Counterfactual tolerance** (decision 9): which fields must not change with an

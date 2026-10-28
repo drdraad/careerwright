@@ -327,3 +327,80 @@ refusal names an earlier request format as a possible reason.
 | Uncertainty communication | Not run — requires human | Unchecked reply, sketch, salary floor not applied |
 | Responsive composition | Not run — requires human | S0-V01/V02 fixes |
 | Interaction continuity | Not run — requires human | Undo, stale tray, exclusions as a view |
+
+## Addendum: Task 6b, the written "Why this could suit you" (S2.7, D3)
+
+- Date: 2026-10-28. Commits `300eb4a`..`a8584a1` and the commit that adds this addendum.
+  Reviewer: the Task 6b implementing agent, not independent of the work; an **agent
+  pre-review, not the required human review** (R2).
+- What changed: plan v1.1 added S2.7 after this review (ADR 0008 decision 4). A slate's
+  suggestions may now carry a model-written note beside the deterministic words of ADR 0007
+  decision 6, which stay underneath in every case and are what exports cite. ADR 0007
+  decision 12 records the design; decision 6's title and last sentence now point to ADR
+  0008 and to it.
+
+**Demonstrated journey.** In the demo browser journey (`e2e/conversation.spec.ts`), the
+slate appears, asks once for its note, and each card then shows "Why this could suit you"
+with the demo explainer's labelled note (a claim, then "You said: “…”" and the part of
+ESCO's record it quotes), followed by "How Nessa found it"; the journey records no request
+outside the web origin and the Auth emulator. Live, EXP-01 ran a discovery and its note on
+the test model with synthetic answers: six suggestions, each with one or two claims whose
+quotations are spans of the answers or of that occupation's ESCO description, checked
+independently against the taxonomy API (passed after one repair).
+
+**The card's coherence question, for this addition.** The chain from statement to
+suggestion is unchanged: the note is computed after the slate, from the answers the
+discovery pinned and ESCO's records only, and nothing reads it back. The slate, a
+suggestion's grounding, its place, the profile and a target's `occupation_choice` source
+are the same with or without it (`test_slate_explanations.py` compares the slate before
+and after). A view change never makes a call; a failed note is shown as unavailable and is
+never asked again for the same slate. No exploratory filter became a constraint.
+
+**Six questions, briefly.**
+
+1. Journey: as above; the failure path (invalid twice, cut off, refused before a run) is
+   shown in the UI with its words and the provenance kept.
+2. Shared concepts: a failed note uses the failure-class words, a refused request the
+   error code's words, both from the generated client; "pending" uses the running status.
+3. Traceability: each quotation names its source (an answer's field, or a part of ESCO's
+   record) and is stored in the source's own characters; the export cites the ESCO URI and
+   the discovery.
+4. Boundaries: a run kind on the one activity (`SLATE_EXPLANATION_TASK`), a new adapter
+   (`explanation_store`, listed in the architecture test); identity imports nothing new; the
+   workflow's step sequence is unchanged, so the DBOS `application_version` stays
+   `nessa-l0-1`. Found and fixed during the work: the submission first answered with the
+   written text, which the command receipt then kept unsealed (the leak scan caught it);
+   it now answers with the run only.
+5. Interface: captures `you--slate` (written), `you--slate-note-pending` and
+   `you--slate-note-unavailable` at 1440×900, 768×1024 and 390×844, with axe, overflow,
+   console and font checks clean on all 29 shots per size; no new colour pairing (existing
+   text tokens on cards, a hairline rule).
+6. Evidence: see "Checks" below.
+
+**Checks on the final candidate** (`9929707`, plus a comment-only edit and these docs).
+`make check`: exit 0 (ruff format and lint, mypy, 567 fast tests, the fixture validator;
+web: client matches, Biome, `tsc`, Vitest 199 tests). `make acceptance`: exit 0, 193
+integration and stack tests on PostgreSQL 16 and DBOS (among them the six of
+`test_slate_explanations.py`, EXP-01 over the full ESCO release and the live-eval
+orchestration with EXP-01 on the fake provider), the Storybook build, and 22 Playwright
+journeys (the demo journey shows the fixture explainer's note with no outside request;
+every story passes axe; the visual package's 29 shots at each size pass its checks).
+`pnpm run review-screenshots` wrote the committed captures (before a refinement of the
+check that refuses a claim or quotation given twice; the UI did not change).
+
+**Live (R5).** Scope `live-eval-6b`, test model `muse-spark-1.3-contributor`, synthetic
+case EXP-01: ledger rows 25 (discovery, 1 request, $0.000205) and 26 (explanation, 2
+requests, one repair, $0.000453); $0.000658 in all, 3 of the scope's 9 requests. The
+repair's reason is not recorded (errors are classified, messages discarded). Reading the
+output by hand: every claim linked a quoted answer to a quoted span of the description,
+but the prose sometimes says more than its quotations ("practical outdoor work" quoting
+only "practical"), the known limit in decision 12. No production-model call.
+
+**Open (added).**
+
+| Item | Owner | State |
+|---|---|---|
+| H-12: the note's word lists, bounds, the first-view slate, no retry, asking without a click | Reviewer and product owner | Not run — requires human (ADR 0007 checklist) |
+| H-01: the note's wording, its place above "How Nessa found it" and its length on a phone | Product owner and design reviewer | Not run — requires human |
+| Prose that says more than its quotations | Release evaluation, H-12 | Open: only quotations are verified |
+| The repair rate of the note on the production model | Release task | Not run: one test-model sample only |

@@ -329,8 +329,8 @@ function Slate({
   const explanation = discovery.explanation ?? null;
   const asked = useRef<string | null>(null);
   const shown = slate.data !== undefined && slate.data.suggestions.length > 0;
-  // One request per slate, when it first shows for the current answers: a view change, a
-  // remount or a refresh never asks again (and the API answers a repeat with the same run).
+  // One request per slate, when it first shows for the current answers: a view change or a
+  // refresh never asks again here, and the API answers any repeat with the same run.
   const wanted =
     canWrite && shown && explanation === null && discovery.profile_version === profile.version;
   const askForNote = explain.mutate;
