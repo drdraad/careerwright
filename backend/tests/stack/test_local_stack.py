@@ -219,6 +219,8 @@ def test_live_mode_gives_the_worker_and_only_the_worker_a_route_out(
         web = json.loads(probe(live, "web", port))
         assert api["host"] != "connected"
         assert web["host"] != "connected"
+        assert web["outside"] != "connected"
+        assert web["dns"] != "resolved"
         assert accepted == []
     finally:
         demo_stack.up(*CORE_SERVICES)  # back to demo for the remaining tests

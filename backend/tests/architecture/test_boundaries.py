@@ -260,6 +260,7 @@ def pnpm_locked_names(path: Path) -> set[str]:
     return names
 
 
+@pytest.mark.req("ARC1-01")
 def test_the_pnpm_lock_reader_finds_scoped_and_plain_names(tmp_path: Path) -> None:
     lock = tmp_path / "pnpm-lock.yaml"
     lock.write_text(
