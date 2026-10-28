@@ -1,9 +1,10 @@
 # Sprint 0 review: resolve the expensive uncertainties
 
 - Date: 2026-10-28. Branch `l0-local-release`.
-- Reviewed revision: `943663c` plus the commit that adds this review, which changes only
-  documentation. Sprint 0 commits: `e32fb12`..`2bb36e5` (Task 1: S0.1–S0.4) and
-  `e925c57`..`943663c` (Task 2: S0.5, S0.6).
+- Reviewed revision: `25bdb1b`, the last Task 2 commit that changes code or data (after
+  fix round 1). Every check below ran on it. The commit that updates this review changes
+  only this file. Sprint 0 commits: `e32fb12`..`2bb36e5` (Task 1: S0.1–S0.4) and
+  `e925c57`..`25bdb1b` (Task 2: S0.5, S0.6 and fix round 1).
 - Reviewer: the Task 2 implementing agent. It is not independent of the work reviewed. A
   separate reviewer is dispatched after this task, and the human gates below remain open.
 
@@ -16,7 +17,10 @@ Sprint 0 delivered its technical decisions and evidence:
 - The L0 boundary and the dependency pins are recorded.
 - The supplied fixture pack is placed and independently hand-checked.
 - The real-source corpus has a manifest with owners.
-- Every specification requirement has a planned test and an owner.
+- Every M0 requirement ID, every plan section 8 regression family and the untagged M0
+  sections have register rows with planned test IDs and owners. The rows paraphrase the
+  specification. Ten families were compared line by line against the specification text;
+  the rest have had a structural check only.
 - Three signature compositions exist in honest default, unknown-data and failure states.
 
 **No application exists yet.** No journey can be demonstrated from a product UI, and that
@@ -43,9 +47,9 @@ human gates are **not run** (ruling R2).
 | S0.5 fixtures | Done. The plan said to reconstruct P01–P05 and TRACE-01, but ruling R1 used the supplied original pack instead (byte-identical, hashes recorded). The A–I fixture is absent from the pack, so it was reconstructed and labelled | `fixtures/` |
 | S0.6 corpus manifest | Done as a scaffold: 33 page slots and 2 failure cases with owners. **0 of 33 pages collected**, as planned (Sprints 3–5) | `corpus/` |
 | S0.6 design references | Done; 18 of 18 automated captures pass. Human approval **not run** (H-02) | `docs/design/` |
-| S0.6 requirement-to-test register | Done: 330 IDs covering all 16 M0 requirement IDs, all 14 regression families, the untagged M0 sections and 10 human gates | `docs/requirements-register.md` |
+| S0.6 requirement-to-test register | Done: 355 IDs covering all 16 M0 requirement IDs, all 14 regression families, the untagged M0 sections (including a `PLN` anchor for spec §12) and 10 human gates. Ten families were fidelity-checked against the spec text in fix round 1; the rest have a structural check only | `docs/requirements-register.md` |
 
-## Checks run on the final candidate
+## Checks run on the final candidate (`25bdb1b`)
 
 | Command | Result |
 |---|---|
@@ -54,12 +58,12 @@ human gates are **not run** (ruling R2).
 | `uv run --locked ruff check .` | All checks passed |
 | `uv run --locked mypy` | No issues in 29 source files |
 | `uv run --locked pytest` | 63 passed, 12 deselected (integration) |
-| `uv run --locked pytest -m integration spikes/durable` (Docker 29.1.2 aarch64, PostgreSQL 16.15) | 12 passed in 31.87 s; no spike container left behind |
+| `uv run --locked pytest -m integration spikes/durable` (Docker 29.1.2 aarch64, PostgreSQL 16.15) | 12 passed in 31.61 s; no spike container left behind |
 | `uv run --locked python -I ../fixtures/m0/validate_fixtures.py` | `"status": "passed"`. The validator also rejected all 9 single-value mutations (hand check §1) |
 | `cd docs/design && pnpm install --frozen-lockfile` | lockfile current |
-| `pnpm run contrast` | 64 of 64 pairs pass |
-| `pnpm run check-data` | 59 fixture assertions pass. Mutations of three values each failed it |
-| `pnpm run screenshots` | 18 of 18 captures pass: axe 4.14.0 (WCAG 2.0, 2.1 and 2.2 A/AA), overflow, console, fonts, label collisions |
+| `pnpm run contrast` | 65 of 65 pairs pass |
+| `pnpm run check-data` | 64 fixture assertions pass. Mutations of three values each failed it (first round) |
+| `pnpm run screenshots` | 18 of 18 captures pass: axe 4.14.0 (WCAG 2.0, 2.1 and 2.2 A/AA), overflow, console, fonts, label collisions. The re-shot PNGs were byte-identical to the committed ones |
 
 Not run in Task 2: live Meta calls (none were needed, and none were made); amd64 images;
 WebKit or Safari; a 768×1024 tablet layout.
@@ -127,7 +131,7 @@ pre-review. **Design-review scores: not run — requires human (H-02).** The che
 follows below.
 
 **6. What exact evidence establishes completion?** The commands and results above, on
-revision `943663c`. Known gaps:
+revision `25bdb1b`. Known gaps:
 - Corpus: 0 of 33 pages.
 - Human gates: H-02, H-07, H-09, and later H-06 and H-08.
 - Design references cover no tablet layout, no phone focused-chart or map-overview layout
@@ -172,15 +176,29 @@ versioned result without the LLM owning a transaction?** Partly established:
 Building the route comparison also exposed a real error in the hand check (incomplete
 dominator lists for DIRECTAI G and H). It was corrected in `f5b73d1`.
 
+The independent review of Task 2 (fix round 1) found that the route reference itself
+undercut this answer:
+- The key said every route in the shaded area is bettered by a route on the line, yet D
+  sits on the line and is bettered by B.
+- Layers 2 and 3 looked the same.
+- AI Resilience lacked its Experimental marker.
+
+All three are fixed in `25bdb1b`. Dominated points are lifted off the line by a halo, a
+note names the equal-time tie, layers are a disc and a ring with labels, and every AI
+display carries the badge.
+
 ## Visual findings
 
 From the agent pre-review, not a score:
 
 - Strong: one structural motif across pages, one primary action per view, distinct
-  failed, stale, unknown and conditional states, and readable grey layers.
+  failed, stale, unknown and conditional states, and layers 2 and 3 told apart by shape
+  and label. Dashes now mean only provisional or reading aid.
 - Weak:
   - The phone's focused chart and map overview are not composed.
-  - The bottom sheet has no designed "peek" height.
+  - The bottom sheet opens at a 212 px peek; its expanded height and swipe are not
+    designed. In the phone failure state of Routes, the failure and stale notices lead and
+    the route cards start below the fold.
   - SVG labels at 13 px shrink on narrower desktops.
   - The early sketch's provisional status relies on a dashed edge.
   - No scenario whiskers are demonstrated, because the fixtures carry no scenario data.
