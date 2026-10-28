@@ -6,11 +6,12 @@ The cases are those marked `live` in `tools/evaluation_cases.json` (at most
 `MAX_LIVE_CASES`), or a chosen subset (`CASES=INT-01,DSC-01`). Each runs in its own
 synthetic workspace in the isolated live stack (`tools.live_smoke.smoke_stack`): the key is
 stored through the API with consent, the case's preferences and answers are saved, then one
-interview turn or one discovery runs on the test model, and its result is checked with the
-same semantic checks as the offline run. Only synthetic inputs are sent (the test model is a
-Contributor model). Each workspace's run limit allows exactly one attempt (two requests at
-most: the call and one validation repair), so the product's own reservation refuses any
-retry at cost.
+interview turn or one discovery runs on the test model (an explanation case, not in the
+default run, runs a discovery and then its slate's written explanation), and its result is
+checked with the same semantic checks as the offline run. Only synthetic inputs are sent
+(the test model is a Contributor model). Each workspace's limits allow exactly one attempt
+per run (two requests at most: the call and one validation repair), so the product's own
+reservation refuses any retry at cost.
 
 Caps, checked before the stack starts, under the ledger's exclusive lock:
 - per invocation: at most `MAX_LIVE_CASES` cases, no production model, and a worst-case cost
@@ -41,7 +42,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.model_registry import format_usd
-from nessa.profile import discovery, interview
+from nessa.profile import discovery, interview, slate_explanation
 from tools.evaluation import (
     Case,
     CaseKind,
@@ -90,7 +91,23 @@ EVAL_DISCOVERY = SmokeKind(
     "live evaluation: one discovery case via API and DBOS worker (synthetic case; key "
     "opened just in time)",
 )
-KINDS = {CaseKind.INTERVIEW: EVAL_INTERVIEW, CaseKind.DISCOVERY: EVAL_DISCOVERY}
+# A discovery, then its slate's written explanation: two runs of one attempt each, each
+# reserved at the larger of the two kinds' worst cases.
+EVAL_EXPLANATION = SmokeKind(
+    "eval_explanation",
+    2,
+    max(discovery.MAX_REQUESTS, slate_explanation.MAX_REQUESTS),
+    lambda model_id: max(
+        discovery.worst_case_nano_usd(model_id), slate_explanation.worst_case_nano_usd(model_id)
+    ),
+    "live evaluation: one discovery and its slate's written explanation via API and DBOS "
+    "worker (synthetic case; key opened just in time)",
+)
+KINDS = {
+    CaseKind.INTERVIEW: EVAL_INTERVIEW,
+    CaseKind.DISCOVERY: EVAL_DISCOVERY,
+    CaseKind.EXPLANATION: EVAL_EXPLANATION,
+}
 
 
 class EvalSettings(BaseSettings):
@@ -130,7 +147,7 @@ def select(cases: list[Case], chosen: list[str] | None) -> list[Case]:
         picked = [by_id[case_id] for case_id in chosen]
     wrong = [case.id for case in picked if case.kind not in KINDS]
     if wrong:
-        raise CapExceededError(f"only interview and discovery cases run live: {wrong}")
+        raise CapExceededError(f"only interview, discovery and explanation cases run live: {wrong}")
     return picked
 
 
@@ -152,7 +169,10 @@ def authorise_eval(
     if models.is_production(model_id):
         raise CapExceededError("the test model is the production model: refusing")
     calls = sum(KINDS[case.kind].calls() for case in cases)
-    worst = sum(KINDS[case.kind].per_attempt_nano_usd(model_id) for case in cases)
+    worst = sum(
+        KINDS[case.kind].attempts * KINDS[case.kind].per_attempt_nano_usd(model_id)
+        for case in cases
+    )
     if worst > MAX_COST_NANO_USD:
         raise CapExceededError(
             f"worst case {format_usd(worst)} exceeds the cap {format_usd(MAX_COST_NANO_USD)}"
@@ -200,7 +220,13 @@ def _prepare(api: Api, case: Case, model_id: str, key: SecretStr) -> CaseRun:
     )
     run = CaseRun(case, workspace["workspace_id"])
     base = f"/v1/workspaces/{run.workspace_id}"
-    per_attempt = KINDS[case.kind].per_attempt_nano_usd(model_id)
+    # An explanation case's first run is its discovery; the explanation gets limits of its
+    # own once the discovery has settled (`_explain`).
+    per_attempt = (
+        discovery.worst_case_nano_usd(model_id)
+        if case.kind is CaseKind.EXPLANATION
+        else KINDS[case.kind].per_attempt_nano_usd(model_id)
+    )
     spend = api.call(
         "PUT",
         f"{base}/spend/limits",
@@ -236,7 +262,7 @@ def _prepare(api: Api, case: Case, model_id: str, key: SecretStr) -> CaseRun:
     return run
 
 
-def _drive(api: Api, run: CaseRun) -> None:
+def _drive(api: Api, run: CaseRun, model_id: str) -> None:
     base = f"/v1/workspaces/{run.workspace_id}"
     version = api.call("GET", f"{base}/profile")["version"]
     if run.case.kind is CaseKind.INTERVIEW:
@@ -251,8 +277,53 @@ def _drive(api: Api, run: CaseRun) -> None:
     submitted = api.call("POST", f"{base}/discoveries", {"expected_profile_version": version})
     found = _wait(api, f"{base}/discoveries/{submitted['discovery_id']}", lambda b: b["run"])
     run.status = found["run"]["status"]
-    if run.status == "complete":
-        run.observed = api.call("GET", f"{base}/discoveries/{submitted['discovery_id']}/slate")
+    if run.status != "complete":
+        return
+    first_view = api.call("GET", f"{base}/discoveries/{submitted['discovery_id']}/slate")
+    if run.case.kind is CaseKind.DISCOVERY:
+        run.observed = first_view
+        return
+    explained = _explain(api, run, version, first_view, model_id)
+    run.status = f"discovery complete, explanation {explained}"
+
+
+def _explain(
+    api: Api, run: CaseRun, version: int, first_view: dict[str, Any], model_id: str
+) -> str:
+    """The slate's explanation, after limits that allow exactly one attempt of it; returns
+    its run's status, and keeps the observation with ESCO's records from the taxonomy."""
+    base = f"/v1/workspaces/{run.workspace_id}"
+    worst = slate_explanation.worst_case_nano_usd(model_id)
+    spend = api.call("GET", f"{base}/spend")
+    limits = api.call(
+        "PUT",
+        f"{base}/spend/limits",
+        {
+            "expected_version": spend["version"],
+            "run_limit_nano_usd": worst,
+            "period_limit_nano_usd": spend["period_committed_nano_usd"] + worst,
+        },
+    )
+    assert_attempt_bound(limits, worst, 1)
+    discovery_id = first_view["discovery_id"]
+    api.call(
+        "POST",
+        f"{base}/discoveries/{discovery_id}/explanation",
+        {"expected_profile_version": version},
+    )
+    found = _wait(api, f"{base}/discoveries/{discovery_id}", lambda b: b["explanation"]["run"])
+    records = {}
+    for suggestion in first_view["suggestions"]:
+        detail = api.call("GET", f"/v1/taxonomy/occupations/{suggestion['concept_id']}")
+        essential = [s["preferred_label"] for s in detail["skills"] if s["relation"] == "essential"]
+        records[suggestion["concept_id"]] = [
+            detail["preferred_label"],
+            detail["description"],
+            *essential,
+        ]
+    run.observed = {"slate": first_view, "explanation": found["explanation"], "records": records}
+    status: str = found["explanation"]["run"]["status"]
+    return status
 
 
 def results_of(runs: list[CaseRun]) -> dict[str, list[Failure]]:
@@ -351,7 +422,7 @@ def live_eval(
         for case in plan.cases:
             run = _prepare(api, case, plan.model_id, key)
             runs.append(run)
-            _drive(api, run)
+            _drive(api, run, plan.model_id)
             print(f"{case.id}: {run.status}", flush=True)
     finally:
         interrupted: BaseException | None = None

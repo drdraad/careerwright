@@ -59,10 +59,26 @@ def test_more_cases_a_used_up_scope_or_a_non_model_case_are_refused() -> None:
     tight = ScopeBudget("live-eval", 99, 0, max_cost_nano_usd=10_000_000)
     with pytest.raises(CapExceededError, match="committed"):
         authorise_eval(MODELS, live, budget=tight, spent=NOTHING_SPENT)
-    with pytest.raises(CapExceededError, match="only interview and discovery"):
+    with pytest.raises(CapExceededError, match="only interview, discovery and explanation"):
         select(cases, ["SUP-01"])
     with pytest.raises(CapExceededError, match="no such cases"):
         select(cases, ["NOPE-1"])
+
+
+@pytest.mark.req("MODEL-09", "REC1-11")
+def test_the_explanation_case_runs_only_when_named_within_the_controller_s_cap() -> None:
+    # Task 6b: a discovery then its slate's explanation, two runs of one attempt each.
+    cases = select(load_cases(), ["EXP-01"])
+    cap = ScopeBudget("live-eval-6b", SCOPE_MAX_CALLS, 0, 300_000_000)
+
+    plan = authorise_eval(MODELS, cases, budget=cap, spent=NOTHING_SPENT)
+
+    assert "EXP-01" not in [case.id for case in select(load_cases(), None)]
+    assert plan.calls == 4  # two runs, each the call and at most one repair
+    # Each run reserved at the larger worst case: the explanation's $0.0034.
+    assert plan.worst_case_nano_usd == 2 * 3_400_000
+    with pytest.raises(CapExceededError, match="calls used"):
+        authorise_eval(MODELS, cases, budget=cap, spent=ScopeSpend(6, 0, 0))
 
 
 @pytest.mark.req("MODEL-09")

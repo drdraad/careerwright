@@ -25,6 +25,7 @@ from tools.evaluation import (
     failures_by_type,
     load_cases,
     observe_discovery_offline,
+    observe_explanation_offline,
 )
 
 pytestmark = pytest.mark.integration
@@ -65,3 +66,18 @@ def test_every_discovery_case_passes_on_the_full_release(full_release: sa.Engine
     # P02's answers retrieve more than the bound, so the working pool is full (DIV1-02).
     assert (p02["pool_size"], p02["beyond_pool_limit"] > 0) == (POOL_LIMIT, True)
     assert p02["release"]["sample"] is False  # the real catalogue, not the test subset
+
+
+@pytest.mark.req("REC1-11", "TEST1-10")
+def test_every_explanation_case_passes_on_the_full_release(full_release: sa.Engine) -> None:
+    # The fixture explainer over real ESCO records: the prompt fits its bound, every
+    # quotation is a span of the record or the answers, and the API shape holds.
+    cases = [case for case in load_cases() if case.kind is CaseKind.EXPLANATION]
+    with system_transaction(full_release) as tx:
+        observed = {case.id: observe_explanation_offline(tx, case) for case in cases}
+
+    results = {case.id: evaluate(case, observed[case.id], observed) for case in cases}
+
+    print(f"explanation cases: {len(cases)}, failures by type: {failures_by_type(results)}")
+    assert cases
+    assert {case_id: failures for case_id, failures in results.items() if failures} == {}

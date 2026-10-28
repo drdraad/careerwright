@@ -31,7 +31,7 @@ def test_every_case_attempt_is_ledgered_and_the_results_are_written(
     results = tmp_path / "live-eval.md"
     private = tmp_path / "nessa-home" / "evidence" / "live-eval.jsonl"
     models = ModelChoice.configure(TEST_MODEL, "muse-spark-1.3", "test")
-    cases = select(load_cases(), ["INT-01", "DSC-01"])
+    cases = select(load_cases(), ["INT-01", "DSC-01", "EXP-01"])
     plan = authorise_eval(
         models, cases, budget=ScopeBudget("eval-test", 99, 0, 10**9), spent=ScopeSpend(0, 0, 0)
     )
@@ -52,18 +52,20 @@ def test_every_case_attempt_is_ledgered_and_the_results_are_written(
 
     records = ledger.records()
     assert code == 0  # no leak
-    assert len(records) == 2  # one attempt per case, each reconciled
+    assert len(records) == 4  # one attempt per run (EXP-01 has two), each reconciled
     assert {r.budget_scope for r in records} == {"eval-test"}
     assert all(r.estimated_cost_nano_usd is not None for r in records)
     written = results.read_text(encoding="utf-8")
     assert "| INT-01 " in written
     assert "| DSC-01 " in written
+    assert "| EXP-01 " in written
+    assert "explanation complete" in written
     assert "Failures by type:" in written
     assert "scope `eval-test`" in written  # re-review N-M5: each run names its budget scope
     # Each case's output is kept for inspection in the private evidence directory, never
     # beside the committed results (plan section 2; Task 6 review A-I-6).
     observed = private.read_text(encoding="utf-8").splitlines()
-    assert len(observed) == 2
+    assert len(observed) == 3
     assert not results.with_suffix(".jsonl").exists()
     assert private.parent.stat().st_mode & 0o777 == 0o700
     assert str(private) in written

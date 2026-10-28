@@ -201,3 +201,45 @@ def test_the_discovery_checks_name_the_failure_they_find() -> None:
     assert [f.type for f in evaluate(BY_ID["DSC-06"], slate(), {})] == [
         FailureType.THIN_EVIDENCE
     ]  # fewer than six with no reason given
+
+
+def explained(*quotations: tuple[str, str], status: str = "complete") -> dict[str, Any]:
+    """A slate of one suggestion, its explanation (one claim) and ESCO's record of it."""
+    shown = suggestion("bicycle mechanic", "723", "less_familiar", why_it_could_suit=["Found"])
+    written = {
+        "suggestions": [
+            {
+                "concept_id": "bicycle mechanic",
+                "title": "bicycle mechanic",
+                "claims": [
+                    {
+                        "text": "You enjoy repairs, and this work repairs bicycles.",
+                        "quotations": [{"source": s, "text": t} for s, t in quotations],
+                    }
+                ],
+            }
+        ]
+    }
+    return {
+        "slate": slate(shown),
+        "explanation": {
+            "run": {"status": status},
+            "written": written if status == "complete" else None,
+        },
+        "records": {"bicycle mechanic": ["bicycle mechanic", "Mechanics repair bicycles."]},
+    }
+
+
+@pytest.mark.req("REC1-11", "TEST1-10")
+def test_the_explanation_checks_name_the_failure_they_find() -> None:
+    p02 = BY_ID["EXP-01"]
+    good = explained(("answer", "repairing physical objects"), ("esco", "repair bicycles"))
+    misquoted = explained(("answer", "repairing physical objects"), ("esco", "repairs bikes"))
+    one_sided = explained(("esco", "repair bicycles"))
+    failed = explained(status="failed")
+
+    assert evaluate(p02, good, {}) == []
+    assert [f.type for f in evaluate(p02, misquoted, {})] == [FailureType.GROUNDING]
+    assert [f.type for f in evaluate(p02, one_sided, {})] == [FailureType.GROUNDING]
+    # A failed explanation fails every check but the deterministic provenance, which stays.
+    assert failures_by_type({"failed": evaluate(p02, failed, {})}) == {"schema_invalid": 4}

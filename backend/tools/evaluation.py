@@ -4,10 +4,12 @@ REC1-09): reviewed synthetic cases with semantic expectations, never exact prose
 `evaluation_cases.json` holds the cases. Each names what it exercises (`kind`), its synthetic
 input and its expectations; every expectation has a failure type, so a run reports failures
 by type. The same checks read API-shaped JSON, so the offline run (deterministic subjects:
-the support screen, the output guard, and discovery with the fixture proposer over the full
-ESCO release) and the live run (`tools.live_eval`, the test model through the product) share
-them. Model behaviour is evidenced only by the live run: the deterministic subjects certify
-the pipeline and its guards, not the model (plan section 9).
+the support screen, the output guard, discovery with the fixture proposer and the slate
+explanation with the fixture explainer over the full ESCO release) and the live run
+(`tools.live_eval`, the test model through the product) share them. An explanation's
+quotations are checked against ESCO's records as the taxonomy serves them, independently
+of the product's own span check. Model behaviour is evidenced only by the live run: the
+deterministic subjects certify the pipeline and its guards, not the model (plan section 9).
 
 Case review: written and checked against spec section 4 by the implementing agent on
 2026-10-28; a human review of the case set is still to do (see the Sprint 2 review).
@@ -25,7 +27,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from nessa.api.discovery_schemas import SlateOut
+from nessa.api.discovery_schemas import SlateOut, WrittenExplanationOut
+from nessa.catalogue import taxonomy_store
 from nessa.db import Tx
 from nessa.identity.model_registry import FIXTURE_DISCOVERY_MODEL_ID
 from nessa.identity.records import Run, RunKind
@@ -43,8 +46,10 @@ from nessa.profile.document import (
     apply_profile_input,
     empty_profile,
 )
-from nessa.profile.exploration import DiscoveryView, compute_slate
+from nessa.profile.exploration import DiscoveryView, SlateView, compute_slate
 from nessa.profile.fixture_discovery import fixture_queries, prompt_context
+from nessa.profile.fixture_explainer import fixture_explanation
+from nessa.profile.fixture_explainer import prompt_context as explainer_context
 from nessa.profile.interview import (
     ContextMessage,
     InterviewTurnOutput,
@@ -55,6 +60,8 @@ from nessa.profile.interview import (
 )
 from nessa.profile.safety import has_risk_stem
 from nessa.profile.slate import Emphasis, SlateControls
+from nessa.profile.slate_explanation import RECORD_STEPS, build_input, check_explanation
+from nessa.profile.slate_explanation import render_prompt as render_explanation_prompt
 from nessa.vocabulary import DataMode, WorkState
 
 CASES_PATH = Path(__file__).with_name("evaluation_cases.json")
@@ -64,6 +71,7 @@ Json = dict[str, Any]
 class CaseKind(StrEnum):
     INTERVIEW = "interview"  # one interview turn: model behaviour (live only)
     DISCOVERY = "discovery"  # the confirmed answers to a slate
+    EXPLANATION = "explanation"  # a slate's first view and its written explanation
     SUPPORT = "support"  # the support screen: whether the message triggers the support flow
     GUARD = "guard"  # a canned model output against the deterministic output checks
 
@@ -279,6 +287,54 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
     raise ValueError(f"unknown discovery check {e.check!r}")
 
 
+# Explanation checks: `observed` holds the first view's slate (`SlateOut`), the explanation
+# as the discovery carries it (`SlateExplanationOut`) and, for each suggestion, ESCO's record
+# texts as the taxonomy serves them (an independent source for the quotations).
+def _explanation(observed: Json, e: Expectation, answers: list[str]) -> Failure | None:
+    explanation = observed.get("explanation") or {}
+    written = explanation.get("written")
+    shown = observed["slate"]["suggestions"]
+    if e.check == "provenance_kept":
+        bare = [s["title"] for s in shown if not (s["why_it_could_suit"] and s["linked_evidence"])]
+        return Failure(FailureType.GROUNDING, f"no provenance for {bare}") if bare else None
+    if written is None:
+        status = explanation.get("run", {}).get("status", "never asked")
+        return Failure(FailureType.SCHEMA_INVALID, f"explanation {status}")
+    claims = [(s["concept_id"], c) for s in written["suggestions"] for c in s["claims"]]
+    if e.check == "written_for_each":
+        explained = [s["concept_id"] for s in written["suggestions"]]
+        wanted = [s["concept_id"] for s in shown]
+        empty = [s["title"] for s in written["suggestions"] if not s["claims"]]
+        if explained != wanted or empty:
+            return Failure(FailureType.GROUNDING, f"explained {len(explained)} of {len(wanted)}")
+        return None
+    if e.check == "both_sources":
+        one_sided = [c["text"] for _, c in claims if {"answer", "esco"} - _sources(c)]
+        return Failure(FailureType.GROUNDING, f"{one_sided}") if one_sided else None
+    if e.check == "quotations_are_spans":
+        records: Mapping[str, list[str]] = observed["records"]
+        unfound = [
+            q["text"]
+            for concept, c in claims
+            for q in c["quotations"]
+            if not any(
+                q["text"] in text
+                for text in (answers if q["source"] == "answer" else records[concept])
+            )
+        ]
+        return (
+            Failure(FailureType.GROUNDING, f"not in their sources: {unfound}") if unfound else None
+        )
+    if e.check == "no_percentage":
+        percent = re.search(r"\d\s?(?:%|per ?cent)", json.dumps(written), re.IGNORECASE)
+        return Failure(FailureType.INFERENCE, percent.group(0)) if percent else None
+    raise ValueError(f"unknown explanation check {e.check!r}")
+
+
+def _sources(claim: Json) -> set[str]:
+    return {q["source"] for q in claim["quotations"]}
+
+
 def _pool(slate: Json) -> set[str]:
     return {s["concept_id"] for s in slate["suggestions"]} | {
         n["concept_id"] for n in slate["not_included"]
@@ -339,6 +395,8 @@ def evaluate(case: Case, observed: Json, others: Mapping[str, Json]) -> list[Fai
             failure = _interview(observed, e)
         elif case.kind is CaseKind.DISCOVERY:
             failure = _discovery(observed, e, answers_of(case))
+        elif case.kind is CaseKind.EXPLANATION:
+            failure = _explanation(observed, e, [text for _, text in answers_of(case)])
         elif case.kind is CaseKind.SUPPORT:
             # `support_shown`: the support flow (the panel beside the sent message).
             shown = bool(observed[e.check])
@@ -413,6 +471,41 @@ def observe_discovery_offline(tx: Tx, case: Case, *, release: str | None = None)
     """The slate the fixture proposer's queries give over the held taxonomy: the pipeline
     and its rules are under test, not a model. `release`: the release the searches are
     recorded as chosen for (none: not recorded)."""
+    view = _offline_slate(tx, case, release)
+    return SlateOut.of(view, Emphasis.BALANCED).model_dump(mode="json")
+
+
+def observe_explanation_offline(tx: Tx, case: Case) -> Json:
+    """The fixture explainer over that slate's first view: the input's bounds, the
+    quotation check and the API shape are under test, not a model's writing."""
+    view = _offline_slate(tx, case, None)
+    concepts = [s.candidate.occupation.concept_id for s in view.suggestions]
+    records = taxonomy_store.occupation_facts(tx, concepts, skills_shown=RECORD_STEPS[0][1])
+    context = build_input(
+        discovery_id=_SOURCE,
+        profile_version=1,
+        release=view.release.dataset_id,
+        answers=evidence_of(document_of(case)),
+        occupations=[records[concept] for concept in concepts],
+    )
+    output = fixture_explanation(explainer_context(render_explanation_prompt(context)))
+    written, problems = check_explanation(output, context, ProposalOrigin.FIXTURE)
+    if written is None:
+        raise ValueError(f"{case.id}: the fixture explanation failed its check: {problems}")
+    return {
+        "slate": SlateOut.of(view, Emphasis.BALANCED).model_dump(mode="json"),
+        "explanation": {
+            "run": {"status": "complete"},
+            "written": WrittenExplanationOut.of(written).model_dump(mode="json"),
+        },
+        "records": {
+            str(concept): [fact.preferred_label, fact.description, *fact.essential_skills]
+            for concept, fact in records.items()
+        },
+    }
+
+
+def _offline_slate(tx: Tx, case: Case, release: str | None) -> SlateView:
     document = document_of(case)
     context = DiscoveryInput(profile_version=1, evidence=evidence_of(document), release=release)
     output = fixture_queries(prompt_context(render_discovery_prompt(context)))
@@ -436,8 +529,7 @@ def observe_discovery_offline(tx: Tx, case: Case, *, release: str | None = None)
         finished_at=_AT,
         profile_version=1,
     )
-    view = compute_slate(tx, DiscoveryView(run, proposal), proposal, document, SlateControls())
-    return SlateOut.of(view, Emphasis.BALANCED).model_dump(mode="json")
+    return compute_slate(tx, DiscoveryView(run, proposal), proposal, document, SlateControls())
 
 
 def failures_by_type(results: Mapping[str, list[Failure]]) -> dict[str, int]:
