@@ -332,6 +332,20 @@ def test_claim_and_quotation_counts_and_lengths_are_bounded() -> None:
         assert problems(output(("o1", bad), ("o2", [GOOD_GARDENER])))
 
 
+@pytest.mark.req("REC1-11")
+def test_a_claim_or_a_quotation_given_twice_is_refused() -> None:
+    twice = claim(
+        "You enjoy fixing bikes, and this work is mostly maintaining and repairing them.",
+        quote("answer", "repairing bicycles"),
+        quote("answer", "Repairing bicycles"),  # the same passage of the same source
+        quote("esco", "repair bicycles"),
+    )
+
+    assert any("once" in p for p in problems(output(("o1", [twice]), ("o2", [GOOD_GARDENER]))))
+    repeated = [GOOD_MECHANIC, GOOD_MECHANIC]
+    assert any("once" in p for p in problems(output(("o1", repeated), ("o2", [GOOD_GARDENER]))))
+
+
 @pytest.mark.req("REC1-02", "REC1-11")
 @pytest.mark.parametrize(
     "text",

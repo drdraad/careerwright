@@ -93,7 +93,7 @@ function Source({ suggestion, slate }: { suggestion: SuggestionOut; slate: Slate
 }
 
 /** What the slate's written note holds for one suggestion. */
-export type WrittenState =
+type WrittenState =
   | { kind: "none" } // never asked for (an earlier discovery, changed answers, no key)
   | { kind: "pending" }
   | { kind: "written"; why: WrittenWhyOut; origin: ProposalOrigin }
@@ -109,7 +109,7 @@ const WRITTEN_BY: Record<ProposalOrigin, string> = {
 
 /** The note's state for one suggestion: `asked` while the request is on its way or before
  *  the discovery shows it; `refused` names a request the API turned down. */
-export function writtenState(
+function writtenState(
   suggestion: SuggestionOut,
   explanation: SlateExplanationOut | null,
   asked: boolean,

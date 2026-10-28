@@ -385,6 +385,8 @@ def _checked_claim(
             )
         else:
             quotations.append(found)
+    if len(set(quotations)) != len(quotations):
+        problems.append(f"{where}: quote each passage once")
     sources = {quotation.source for quotation in quotations}
     if QuoteSource.ANSWER not in sources:
         problems.append(f"{where}: quote at least one of the person's answers (source answer)")
@@ -417,6 +419,8 @@ def check_explanation(
             )
             for n, claim in enumerate(explanation.claims, start=1)
         ]
+        if len({claim.text.casefold() for claim in claims}) != len(claims):
+            problems.append(f"{explanation.occupation}: make each claim once")
         inferred = inferred_sensitive_terms(
             [claim.text for claim in claims],
             [item.text for item in context.answers] + [s for _, s in _record_parts(record)],
