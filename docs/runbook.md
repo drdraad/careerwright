@@ -48,10 +48,10 @@ in, is refused). These are local test credentials, not secrets.
    explore** suggests up to six ESCO occupations from your answers (no score or
    percentage), with view-only controls; "Make this a target" is the only way one becomes
    a target. The early sketch lists what a target usually asks for, every step unresolved.
-   A message that uses words about dying, suicide or self-harm is sent as usual, with a
-   calm note of UK support services beside it, and Nessa's reply that turn offers a
-   smaller step and asks no career question. The note is shown for such words whatever
-   they are about, and is never stored.
+   A message that uses listed words about dying, suicide or self-harm is sent as usual,
+   with a calm note of UK support services beside it (also if the send is refused), and
+   Nessa's reply that turn offers a smaller step and asks no career question. The note is
+   shown for such words whatever they are about, and is never stored.
 4. **Routes** in the fixture workspace shows the TRACE-01 fixture preview, labelled as such.
    Select a route to inspect it. The route search itself is not built yet, so the other
    chapters show what they will hold and which answers they need.
@@ -95,14 +95,17 @@ with the browser's Origin unchanged.
   sources (undo).
 - Interview preferences (ADR 0007): `GET`/`PUT .../interview/preferences` with
   `{expected_version, entry_mode: sure|unsure|null, conversation_mode:
-  practical|gentle|challenge|null, paused}`. `POST .../interview/turns` always answers
-  `202` with the turn. When the message holds a listed risk stem (ADR 0007 decision 7),
+  practical|gentle|challenge|null, paused}`. `POST .../interview/turns` answers `202` with
+  the turn. When the message triggers the support screen (ADR 0007 decision 7),
   `support_note` carries the support panel (`policy_version`, wording, the UK resources and
-  when they were checked) to show beside it, and that turn's interviewer gets the
-  smaller-step instruction; otherwise `support_note` is null. Both are derived from the
-  message every time (a replay with the same idempotency key gets the panel too) and are
-  never stored. A request still carrying the removed `send_after_support` is refused as
-  invalid (`422 VALIDATION_FAILED`).
+  when they were checked) to show beside it, that turn's interviewer gets the smaller-step
+  instruction, and any next question is dropped; otherwise `support_note` is null. A
+  refusal of such a message (any error envelope the command raises: stale version, too
+  long, over budget, no key, key reused, ...) carries the same panel as a top-level
+  `support_note` beside `error`, worded as not sent. All of it is derived from the message
+  every time (a replay with the same idempotency key gets the panel too) and never stored.
+  A request still carrying the removed `send_after_support` is refused as invalid (`422
+  VALIDATION_FAILED`) before the message is read, so with no panel.
 - Discovery (ADR 0007): `POST .../discoveries` with `{expected_profile_version}` returns `202`
   (`INSUFFICIENT_EVIDENCE` if no answer describes work yet); `GET .../discoveries` (newest
   first), `GET .../discoveries/{id}`; `GET .../discoveries/{id}/slate?emphasis=&exclude_concept=

@@ -33,8 +33,10 @@ fresh demo stack (`apps/web/e2e/conversation.spec.ts`), and against the live tes
 P02 (unsure, unemployed) explores without an income baseline (none exists in the profile,
 and no budget or salary value was proposed live: INT-01) and without any personality test
 (work style is optional and skippable). The minimal support policy is one recall-first
-screen (since fix round 4): a message holding any listed risk stem is sent as usual, with a
-calm support panel beside it and a smaller step, no career question, in that turn's reply.
+screen (since fix round 4; by normalised words and proximity since round 5): a message with
+a listed risk word or construction is sent as usual, with a calm support panel beside it
+(beside the refusal, if the send is refused) and a smaller step, no career question, in
+that turn's reply.
 
 Not shown: a person with a real key on the production model (the release task owns the one
 production qualification call); listings, pay or skills comparison (Sprints 3-4).
@@ -64,21 +66,22 @@ backend tests, 176 Vitest, 178 integration and stack, 21 Playwright); its first 
 run caught the sticky composer covering Try again (axe `target-size` at 390×844), fixed and
 rerun clean.
 
-After fix round 4 (final code, `16ee339`):
+After fix round 5 (final code, `3289169`):
 
 - `make check`: exit 0. Backend: ruff format (175 files) and ruff check clean, mypy clean
-  (175 files), 1,072 fast tests passed (the support table alone is 692 rows), fixture
-  validator passed. Web: client drift, Biome (108 files), `tsc`, Vitest 191 tests in 24
-  files passed.
-- `make acceptance`: exit 0. 185 integration and stack tests passed on PostgreSQL 16.15 and
+  (175 files), 513 fast tests passed, fixture validator passed. Web: client drift, Biome
+  (108 files), `tsc`, Vitest 192 tests in 24 files passed.
+- `make acceptance`: exit 0. 186 integration and stack tests passed on PostgreSQL 16.15 and
   DBOS (including the full ESCO import and offline evaluation), the Storybook build, and 22
   Playwright tests passed (journeys, keyboard, session, recovery in place, Storybook axe,
   the visual package at three viewports).
-- `pnpm run review-screenshots`: 3 passed; 81 captures (the blocking `you--support`
-  capture is gone with the response it showed; `you--support-note` recaptured) with axe,
-  overflow, overprint, console and font checks clean at every viewport (`checks-*.json`).
+- `pnpm run review-screenshots` (fix round 4; the panel's look is unchanged since): 3
+  passed; 81 captures (the blocking `you--support` capture is gone with the response it
+  showed; `you--support-note` recaptured) with axe, overflow, overprint, console and font
+  checks clean at every viewport (`checks-*.json`). The panel beside a refused send has no
+  capture.
 - Live: `make live-eval` twice in all (rows 15-20, then the fix-round 1 run, rows 21-24);
-  none in fix rounds 2 to 4. Not run: VoiceOver, Safari, 200 % zoom, the production model.
+  none in fix rounds 2 to 5. Not run: VoiceOver, Safari, 200 % zoom, the production model.
 
 ## The six questions
 
@@ -267,10 +270,20 @@ all (Critical), fired on career text with no risk stem ("lifeguard", "without me
 and uncontracted negations reached neither tier. Two failed fixes in one direction showed
 that intent cannot be classified precisely by pattern, so by the controller's ruling the
 classifier is gone: one recall-first screen sends every message as usual and shows the
-support panel for any listed stem in any form, with a smaller-step instruction for that
-turn only; nothing of it is stored. Stems inside career phrasing now show the panel, an
-accepted false positive listed for H-12. The blocking response and "Send my message
-anyway" are removed.
+support panel for a listed stem, with a smaller-step instruction for that turn only;
+nothing of it is stored. Stems inside career phrasing now show the panel, an accepted false
+positive listed for H-12. The blocking response and "Send my message anyway" are removed.
+
+**Re-review 4 and fix round 5.** The fourth re-review found the redesign right but the
+matching still phrase-by-phrase: forms one family accepted were missing from another
+("hadn't wanted to live", "can no longer go on", "isn't any reason to go on", "wish I'd
+died"), and a refused send showed no panel. By the controller's ruling the screen now
+reads normalised words (Unicode apostrophes and hyphens, case, contractions spelt out) and
+flags listed words, or a construction's core word with its marker within a small window;
+the table is now hand-written from every shape the reviewers reported, plus their career
+examples. The message is screened before anything can refuse it, so a refused send
+carries the panel; the server drops any next question on a flagged turn; and a key-reuse
+refusal names an earlier request format as a possible reason.
 
 ## Accepted limitations and open items
 
@@ -297,9 +310,10 @@ anyway" are removed.
    limits and "Accept" for facts understood; is Undo discoverable?
 4. **Slate:** are the cards' three sections helpful or too long on a phone; is "no score or
    percentage" understood; do the controls read as a view, not a filter on the profile?
-5. **Support panel:** is the panel beside a sent message calm rather than alarming, clear
-   and actionable, and easy to dismiss; does the question stepping aside while it shows
-   read well; is it acceptable on a career phrase that only shares a stem (also H-12)?
+5. **Support panel:** is the panel beside a sent message, or beside a refused one, calm
+   rather than alarming, clear and actionable, and easy to dismiss; does the question
+   stepping aside while it shows read well; is it acceptable on a career phrase that only
+   shares a stem (also H-12)?
 6. **Key consent:** is what is stored, where and its limits clear before consent?
 7. **Phone:** What we know, the reply field and Try again beside the sheet (S0-V01/V02).
 

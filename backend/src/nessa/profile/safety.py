@@ -144,7 +144,8 @@ def _go_on(words: Words, k: int) -> bool:
 
 
 def _risk_word(words: Words, i: int) -> bool:
-    """suicid-, overdos- and self-harm in any form ("self harm" spelt apart too)."""
+    """A word starting suicid-, overdos-, self-harm or selfharm, or "self" followed by a word
+    starting harm."""
     word = words[i]
     if word.startswith(("suicid", "overdos", "self-harm", "selfharm")):
         return True
