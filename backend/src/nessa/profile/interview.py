@@ -351,19 +351,22 @@ def _inference_problems(output: InterviewTurnOutput, person: list[str]) -> list[
 def check_turn(
     output: InterviewTurnOutput, context: TurnInput, origin: ProposalOrigin
 ) -> tuple[InterviewProposal | None, list[str]]:
-    """The validated proposal, or the problems that prevent it (never both)."""
+    """The validated proposal, or the problems that prevent it (never both). On a turn whose
+    message triggers the support screen, any next question is dropped, never repaired: that
+    turn asks no career question (`nessa.profile.safety`; recomputed, never stored)."""
     problems: list[str] = []
+    question = None if has_risk_stem(context.messages[-1].text) else output.next_question
     if not _bounded(output.reply, MAX_REPLY):
         problems.append(f"reply: 1-{MAX_REPLY} characters")
-    if output.next_question is not None and not _bounded(output.next_question, MAX_QUESTION):
+    if question is not None and not _bounded(question, MAX_QUESTION):
         problems.append(f"next_question: 1-{MAX_QUESTION} characters, or null")
     # One question at a time (PROF-08), asked once: the reply and the question are shown apart,
     # so a question in the reply is refused only beside a next question (with none, there is
     # nothing to repeat, and a rhetorical "?" is not worth a paid repair).
-    if output.next_question is not None:
+    if question is not None:
         if "?" in output.reply:
             problems.append("reply: no question here; ask the one question only in next_question")
-        if output.next_question.count("?") > 1:
+        if question.count("?") > 1:
             problems.append("next_question: one question only")
     if len(set(output.missing_critical_fields)) != len(output.missing_critical_fields):
         problems.append("missing_critical_fields: name each field once")
@@ -419,7 +422,7 @@ def check_turn(
             profile_version=context.profile_version,
             reply=output.reply.strip(),
             changes=changes,
-            next_question=output.next_question.strip() if output.next_question else None,
+            next_question=question.strip() if question else None,
             missing_critical_fields=output.missing_critical_fields,
             ready_for_review=output.ready_for_review,
         ),

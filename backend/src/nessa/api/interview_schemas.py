@@ -6,6 +6,7 @@ from datetime import datetime
 
 from pydantic import Field
 
+from nessa.api.envelope import ErrorEnvelope
 from nessa.api.schemas import ProfileOut, ResponseModel, RunOut
 from nessa.identity.records import PartialCompleteness, PartialReply
 from nessa.money import Money
@@ -181,22 +182,22 @@ class SupportResourceOut(ResponseModel):
 
 
 class SupportNoteOut(ResponseModel):
-    """The support panel, shown beside a turn whose message holds a risk stem
-    (`nessa.profile.safety`): the message was sent as usual. Kept apart from career
-    suitability. Derived from the request on every response, a replay included; never
-    stored, not even in the idempotency receipt."""
+    """The support panel, shown beside a message that triggers the support screen
+    (`nessa.profile.safety`), whether the send was accepted or refused. Kept apart from
+    career suitability. Derived from the request on every response, a replay included;
+    never stored, not even in the idempotency receipt."""
 
     policy_version: str
     review_status: str = Field(description="The policy is provisional until reviewed.")
-    message: str
+    message: str = Field(description="Says whether the message was sent.")
     resources: list[SupportResourceOut]
 
     @classmethod
-    def current(cls) -> "SupportNoteOut":
+    def current(cls, *, sent: bool) -> "SupportNoteOut":
         return cls(
             policy_version=safety.POLICY_VERSION,
             review_status=safety.REVIEW_STATUS,
-            message=safety.SUPPORT_NOTE,
+            message=safety.SUPPORT_NOTE if sent else safety.SUPPORT_NOTE_NOT_SENT,
             resources=[
                 SupportResourceOut(
                     name=r.name,
@@ -217,7 +218,15 @@ class TurnSubmittedOut(TurnOut):
 
     @classmethod
     def sent(cls, turn: TurnOut, *, support: bool) -> "TurnSubmittedOut":
-        return cls(**turn.model_dump(), support_note=SupportNoteOut.current() if support else None)
+        note = SupportNoteOut.current(sent=True) if support else None
+        return cls(**turn.model_dump(), support_note=note)
+
+
+class TurnRefusedOut(ErrorEnvelope):
+    """A refused send. When its message triggers the support screen, the panel comes with
+    the refusal, since the message was screened before anything could refuse it."""
+
+    support_note: SupportNoteOut | None = None
 
 
 class PreferencesOut(ResponseModel):

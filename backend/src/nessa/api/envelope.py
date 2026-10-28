@@ -66,20 +66,24 @@ def correlation_id(request: Request) -> str:
     return str(getattr(request.state, "correlation_id", "unknown"))
 
 
+def error_body(error: NessaError, correlation: str) -> ErrorBody:
+    return ErrorBody(
+        code=error.code,
+        message=error.message,
+        retryable=error.retryable,
+        stage=error.stage,
+        correlation_id=correlation,
+        details=error.details,
+    )
+
+
+def error_status(error: NessaError) -> int:
+    return STATUS.get(error.code, DEFAULT_STATUS)
+
+
 def envelope(error: NessaError, correlation: str) -> JSONResponse:
-    body = ErrorEnvelope(
-        error=ErrorBody(
-            code=error.code,
-            message=error.message,
-            retryable=error.retryable,
-            stage=error.stage,
-            correlation_id=correlation,
-            details=error.details,
-        )
-    )
-    return JSONResponse(
-        body.model_dump(mode="json"), status_code=STATUS.get(error.code, DEFAULT_STATUS)
-    )
+    body = ErrorEnvelope(error=error_body(error, correlation))
+    return JSONResponse(body.model_dump(mode="json"), status_code=error_status(error))
 
 
 UNEXPECTED_FIELD = "<unexpected field>"

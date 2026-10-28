@@ -2310,10 +2310,10 @@ export type SuggestionOut = {
 /**
  * SupportNoteOut
  *
- * The support panel, shown beside a turn whose message holds a risk stem
- * (`nessa.profile.safety`): the message was sent as usual. Kept apart from career
- * suitability. Derived from the request on every response, a replay included; never
- * stored, not even in the idempotency receipt.
+ * The support panel, shown beside a message that triggers the support screen
+ * (`nessa.profile.safety`), whether the send was accepted or refused. Kept apart from
+ * career suitability. Derived from the request on every response, a replay included;
+ * never stored, not even in the idempotency receipt.
  */
 export type SupportNoteOut = {
     /**
@@ -2328,6 +2328,8 @@ export type SupportNoteOut = {
     review_status: string;
     /**
      * Message
+     *
+     * Says whether the message was sent.
      */
     message: string;
     /**
@@ -2612,6 +2614,17 @@ export type TurnPage = {
      * Next Cursor
      */
     next_cursor: string | null;
+};
+
+/**
+ * TurnRefusedOut
+ *
+ * A refused send. When its message triggers the support screen, the panel comes with
+ * the refusal, since the message was screened before anything could refuse it.
+ */
+export type TurnRefusedOut = {
+    error: ErrorBody;
+    support_note?: SupportNoteOut | null;
 };
 
 /**
@@ -3793,11 +3806,11 @@ export type SubmitTurnErrors = {
     /**
      * Typed error envelope
      */
-    '4XX': ErrorEnvelope;
+    '4XX': TurnRefusedOut;
     /**
      * Typed error envelope
      */
-    '5XX': ErrorEnvelope;
+    '5XX': TurnRefusedOut;
 };
 
 export type SubmitTurnError = SubmitTurnErrors[keyof SubmitTurnErrors];

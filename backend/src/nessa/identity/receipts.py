@@ -41,7 +41,10 @@ def _replay(receipt: Receipt, command: str, request_sha256: str) -> tuple[int, d
     if (receipt.command, receipt.request_sha256) != (command, request_sha256):
         raise NessaError(
             ErrorCode.IDEMPOTENCY_KEY_REUSED,
-            "This idempotency key was already used for a different request.",
+            # The fingerprint covers the request's format too, so a retry sent across a change
+            # to that format (fix round 4 removed `send_after_support`) lands here as well.
+            "This idempotency key was already used for a different request, or for this "
+            "request in an earlier request format. Send it again with a new key.",
             stage=ErrorStage.REQUEST,
         )
     return receipt.status_code, receipt.response

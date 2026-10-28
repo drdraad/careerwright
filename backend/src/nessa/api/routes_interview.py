@@ -5,24 +5,27 @@ through the same command as a direct edit)."""
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 
 from nessa.api.deps import CallerDep, Deps, IdempotencyKey
-from nessa.api.envelope import ERROR_RESPONSES
+from nessa.api.envelope import ERROR_RESPONSES, correlation_id, error_body, error_status
 from nessa.api.interview_schemas import (
     DecisionOut,
     DecisionResult,
     PartialReplyOut,
     PreferencesOut,
+    SupportNoteOut,
     TurnOut,
     TurnPage,
+    TurnRefusedOut,
     TurnSubmittedOut,
 )
 from nessa.api.pagination import DEFAULT_LIMIT, MAX_LIMIT, decode_timestamped, encode
 from nessa.api.routes_runs import run_out
 from nessa.api.schemas import ProfileOut
 from nessa.db import Tx, actor_transaction
+from nessa.errors import NessaError
 from nessa.identity.keyring import Keyring
 from nessa.identity.receipts import CommandResult, fingerprint, run_idempotent
 from nessa.identity.runs import partial_reply
@@ -50,10 +53,27 @@ def turn_out(tx: Tx, keyring: Keyring, view: TurnView) -> TurnOut:
     return TurnOut.of(view, run_out(tx, keyring, view.run))
 
 
-@router.post("/turns", status_code=202, response_model=TurnSubmittedOut, operation_id="submit_turn")
+@router.post(
+    "/turns",
+    status_code=202,
+    response_model=TurnSubmittedOut,
+    responses={
+        "4XX": {"model": TurnRefusedOut, "description": "Typed error envelope"},
+        "5XX": {"model": TurnRefusedOut, "description": "Typed error envelope"},
+    },
+    operation_id="submit_turn",
+)
 def submit(
-    workspace_id: uuid.UUID, body: SubmitTurn, caller: CallerDep, deps: Deps, key: IdempotencyKey
+    workspace_id: uuid.UUID,
+    body: SubmitTurn,
+    caller: CallerDep,
+    deps: Deps,
+    key: IdempotencyKey,
+    http: Request,
 ) -> JSONResponse:
+    # Screened before anything can refuse the send, so a refusal shows the panel too.
+    support = has_risk_stem(body.message)
+
     def execute(tx: Tx) -> CommandResult:
         sent = submit_turn(
             tx,
@@ -72,18 +92,25 @@ def submit(
         )
 
     request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
-    status, response = run_idempotent(
-        deps.engine,
-        caller.actor.actor_id,
-        key,
-        "submit_turn",
-        fingerprint("submit_turn", request),
-        execute,
-    )
+    try:
+        status, response = run_idempotent(
+            deps.engine,
+            caller.actor.actor_id,
+            key,
+            "submit_turn",
+            fingerprint("submit_turn", request),
+            execute,
+        )
+    except NessaError as error:
+        if not support:
+            raise
+        refused = TurnRefusedOut(
+            error=error_body(error, correlation_id(http)),
+            support_note=SupportNoteOut.current(sent=False),
+        )
+        return JSONResponse(refused.model_dump(mode="json"), status_code=error_status(error))
     # A replay has the same request (by fingerprint), so the same panel is derived again.
-    submitted = TurnSubmittedOut.sent(
-        TurnOut.model_validate(response), support=has_risk_stem(body.message)
-    )
+    submitted = TurnSubmittedOut.sent(TurnOut.model_validate(response), support=support)
     location = f"/v1/workspaces/{workspace_id}/interview/turns/{response['turn_id']}"
     return JSONResponse(
         submitted.model_dump(mode="json"), status_code=status, headers={"Location": location}

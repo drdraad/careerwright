@@ -35,6 +35,7 @@ CONTEXT_MARKER = "Context (JSON):\n"
 STREAM_CHUNK = 24  # characters per streamed delta
 PROPOSALS_KEY = '"proposed_updates"'
 PAUSE_S = 4.0  # PAUSE_AFTER_REPLY: long enough for a test to read the stored partial
+SMALLER_STEP_MARK = " One small step at a time."  # the reply's end under the instruction
 
 
 class FakeFailure(StrEnum):
@@ -107,9 +108,10 @@ def discovery_answer(
 def interview_answer(
     context: dict[str, object], sentinel: str, *, valid: bool, smaller_step: bool = False
 ) -> dict[str, object]:
-    """A proposal for the current message: a stated city and an inferred spending limit;
-    with no next question when the instructions carry the smaller-step instruction
-    (`smaller_step`), as they ask.
+    """A proposal for the current message: a stated city and an inferred spending limit.
+    When the instructions carry the smaller-step instruction (`smaller_step`), the reply
+    ends with `SMALLER_STEP_MARK`, so a test can see the instruction arrived; the next
+    question is kept, as a model ignoring the instruction would, for the server to drop.
 
     The reply starts with `sentinel`, so even the first streamed pieces of it carry the
     sentinel into the partial store, where leak scans must find it sealed."""
@@ -138,7 +140,7 @@ def interview_answer(
     return {
         "reply": (
             f"{sentinel} Thanks for telling me. I have noted where you could work and roughly "
-            "what you could spend, for you to review."
+            "what you could spend, for you to review." + (SMALLER_STEP_MARK if smaller_step else "")
         ).strip(),
         "proposed_updates": [
             *salary,
@@ -161,9 +163,7 @@ def interview_answer(
                 "reason": "You mentioned about 1,500 pounds.",
             },
         ],
-        "next_question": None
-        if smaller_step
-        else "How many hours a week could you give to learning?",
+        "next_question": "How many hours a week could you give to learning?",
         "missing_critical_fields": ["weekly_study_hours"],
         "ready_for_review": True,
     }

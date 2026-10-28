@@ -331,19 +331,24 @@ export function useDecideTurn(id: string) {
 /** Sending a message. Resolves whether a turn was sent. */
 export function useSendMessage(id: string) {
   const submit = useSubmitTurn(id);
-  // The support panel beside a sent message that holds a risk stem; kept until dismissed or
-  // the next message is sent. It is never stored.
-  const [note, setNote] = useState<SupportNoteOut | null>(null);
+  // The support panel the API sent with the last attempt, whether the message was sent or
+  // refused; kept until dismissed or the next attempt. It is never stored.
+  const [support, setSupport] = useState<{ note: SupportNoteOut; sent: boolean } | null>(null);
   const send = async (body: SubmitTurn): Promise<boolean> => {
-    const sent = await submit.mutateAsync(body).catch(() => null);
-    if (sent === null) return false;
-    setNote(sent.support_note);
-    return true;
+    try {
+      const sent = await submit.mutateAsync(body);
+      setSupport(sent.support_note === null ? null : { note: sent.support_note, sent: true });
+      return true;
+    } catch (error) {
+      const note = error instanceof ApiError ? error.supportNote : null;
+      setSupport(note === null ? null : { note, sent: false });
+      return false;
+    }
   };
   return {
     send,
-    note,
-    dismissNote: () => setNote(null),
+    support,
+    dismissNote: () => setSupport(null),
     pending: submit.isPending,
     error: submit.error,
   };

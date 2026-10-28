@@ -19,6 +19,7 @@ from nessa.identity.runs import input_context
 from nessa.profile import safety
 from tests.integration.durable import Scenario, make_scenario
 from tests.support.client import ApiClient, profile_with
+from tests.support.fake_models import SMALLER_STEP_MARK
 from tests.support.infra import Infra
 from tools.leak_scan import Needle, scan
 
@@ -133,18 +134,22 @@ def test_a_message_with_a_risk_stem_is_sent_with_the_support_panel_and_none_of_i
 
     assert flagged.status_code == 202, flagged.text  # sent: no hold, no extra step
     panel = flagged.json()["support_note"]
-    assert panel["policy_version"] == safety.POLICY_VERSION == "support-policy-4"
+    assert panel["policy_version"] == safety.POLICY_VERSION == "support-policy-5"
     assert "provisional" in panel["review_status"]
     assert {r["name"] for r in panel["resources"]} == SERVICES
-    assert "sent to Nessa as usual" in panel["message"]
+    assert panel["message"] == safety.SUPPORT_NOTE  # "...sent to Nessa as usual."
     assert (ordinary.status_code, ordinary.json()["support_note"]) == (202, None)
     assert replayed.json()["turn_id"] == flagged.json()["turn_id"]  # the same turn, replayed
     assert replayed.json()["support_note"] == panel  # recomputed from the request
-    # Only that turn had the smaller step: the interviewer asked no question in it.
+    # Only that turn had the smaller step: the worker's model got the instruction (its reply
+    # says so), and the server dropped the question the model still asked (fix round 5).
     by_message = {t["message"]: t for t in listed}
     assert by_message.keys() == {DISTRESS, plain}
-    assert by_message[DISTRESS]["proposal"]["next_question"] is None
-    assert by_message[plain]["proposal"]["next_question"] is not None
+    flagged_turn, plain_turn = by_message[DISTRESS]["proposal"], by_message[plain]["proposal"]
+    assert flagged_turn["reply"].endswith(SMALLER_STEP_MARK.strip())
+    assert flagged_turn["next_question"] is None
+    assert not plain_turn["reply"].endswith(SMALLER_STEP_MARK.strip())
+    assert plain_turn["next_question"] is not None
     assert all("support_note" not in t for t in listed)
     # Nothing of the flow is stored or logged: no receipt, turn, run, event, journal, export
     # or log holds the panel's words, its services, the policy or the turn's instruction.
@@ -171,14 +176,84 @@ def test_a_message_with_a_risk_stem_is_sent_with_the_support_panel_and_none_of_i
     assert not [r for r in receipts if "support" in r["response"]]
 
 
+def set_run_limit(scenario: Scenario, run_limit: int) -> None:
+    base = f"/v1/workspaces/{scenario.workspace_id}/spend"
+    current = scenario.api.get(base, scenario.token).json()["version"]
+    limits = {
+        "expected_version": current,
+        "run_limit_nano_usd": run_limit,
+        "period_limit_nano_usd": 1_000_000_000,
+    }
+    response = scenario.api.write("PUT", f"{base}/limits", scenario.token, limits)
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.req("PROF-09")
+def test_every_refused_send_of_a_message_with_a_risk_stem_still_shows_the_support_panel(
+    scenario: Scenario, ben: str
+) -> None:
+    # Re-review 4, I-2: the message is screened before anything can refuse it, so a refused
+    # send carries the panel beside its refusal; nothing is sent or stored either way.
+    turns = f"/v1/workspaces/{scenario.workspace_id}/interview/turns"
+    no_key = scenario.api.create_workspace(scenario.token, "No key (synthetic)")["workspace_id"]
+    flagged = {"expected_profile_version": 1, "message": DISTRESS}
+    too_long = DISTRESS + " " + "\N{EURO SIGN}" * (2_000 - len(DISTRESS) - 1)  # 3 bytes each
+    key = uuid.uuid4()
+    first = scenario.api.write("POST", turns, scenario.token, flagged, key=key)
+
+    def send(
+        body: dict[str, Any], *, path: str = turns, token: str = "", key: uuid.UUID | None = None
+    ) -> Any:
+        return scenario.api.write("POST", path, token or scenario.token, body, key=key)
+
+    refused = {
+        "stale version": send({**flagged, "expected_profile_version": 7}),
+        "too long": send({**flagged, "message": too_long}),
+        "key reused": send({**flagged, "message": DISTRESS + " Again."}, key=key),
+        "no key": send(
+            {**flagged, "expected_profile_version": 0},
+            path=f"/v1/workspaces/{no_key}/interview/turns",
+        ),
+        "another account": send(flagged, token=ben),
+    }
+    set_run_limit(scenario, 1_000_000)  # below one attempt's worst case
+    refused["over budget"] = send(flagged)
+    ordinary = send({**flagged, "message": "I could work in Leeds."})
+    set_run_limit(scenario, 100_000_000)
+
+    assert first.status_code == 202, first.text
+    codes = {name: (r.status_code, r.json()["error"]["code"]) for name, r in refused.items()}
+    assert codes == {
+        "stale version": (409, "STALE_INPUT_VERSION"),
+        "too long": (422, "VALIDATION_FAILED"),
+        "key reused": (422, "IDEMPOTENCY_KEY_REUSED"),
+        "no key": (422, "CREDENTIAL_REQUIRED"),
+        "another account": (404, "NOT_FOUND"),
+        "over budget": (402, "BUDGET_EXCEEDED"),
+    }
+    for name, response in refused.items():
+        panel = response.json()["support_note"]
+        assert panel["message"] == safety.SUPPORT_NOTE_NOT_SENT, name
+        assert {r["name"] for r in panel["resources"]} == SERVICES, name
+    assert ordinary.status_code == 402
+    assert "support_note" not in ordinary.json()  # an ordinary refusal has no panel
+    listed = scenario.api.get(turns, scenario.token).json()["items"]
+    assert [t["turn_id"] for t in listed] == [first.json()["turn_id"]]  # nothing else sent
+    worker = scenario.worker("worker")
+    scenario.wait_terminal(first.json()["turn_id"])
+    assert worker.stop() == 0
+
+
 @pytest.mark.req("PROF-09")
 def test_a_turn_receipt_stored_before_the_redesign_is_refused_never_a_500(
     scenario: Scenario,
 ) -> None:
     # Re-review 3, M-b: a round-2 receipt holds the support note beside the turn, and its
     # request carried `send_after_support`. That field is gone, so the request a client sends
-    # now is a different request: refused with the key-reuse error. An old client still
-    # sending the field is refused as invalid. Neither is a 500.
+    # now has another fingerprint: refused with the key-reuse error, whose reason names an
+    # earlier request format (re-review 4, M-5), and with the panel, as any refusal of a
+    # message with a stem. An old client still sending the field is refused as invalid.
+    # Neither is a 500.
     turns = f"/v1/workspaces/{scenario.workspace_id}/interview/turns"
     message = "I volunteer on a suicide prevention helpline and want paid work like it."
     turn = scenario.submit_turn(message)
@@ -231,6 +306,8 @@ def test_a_turn_receipt_stored_before_the_redesign_is_refused_never_a_500(
         422,
         "IDEMPOTENCY_KEY_REUSED",
     )
+    assert "earlier request format" in replayed.json()["error"]["message"]
+    assert replayed.json()["support_note"]["message"] == safety.SUPPORT_NOTE_NOT_SENT
     assert (old_client.status_code, old_client.json()["error"]["code"]) == (
         422,
         "VALIDATION_FAILED",

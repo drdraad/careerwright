@@ -436,6 +436,30 @@ def test_the_smaller_step_instruction_is_added_only_for_a_turn_whose_message_has
         assert label not in added, label
 
 
+@pytest.mark.req("PROF-09")
+def test_a_turn_whose_message_has_a_risk_stem_never_keeps_a_next_question() -> None:
+    # Fix round 5: the server drops it, whatever the model wrote, and spends no repair on
+    # it; the rest of the proposal is kept. Only the current message counts.
+    asked = output(update("cities", items=["Leeds"]), reply="Thanks. Where next? We'll see.")
+    flagged = context("I could work in Leeds. I took my life savings out to retrain.")
+    earlier = context("I took my life savings out to retrain.", "I could work in Leeds.")
+
+    dropped, problems_found = check_turn(asked, flagged, ProposalOrigin.MODEL)
+    kept, _ = check_turn(
+        output(update("cities", items=["Leeds"], message_refs=["m2"])),
+        earlier,
+        ProposalOrigin.MODEL,
+    )
+
+    assert problems_found == []
+    assert dropped is not None
+    assert dropped.next_question is None
+    assert [c.field for c in dropped.changes] == [ProfileField.CITIES]
+    assert dropped.missing_critical_fields == [ProfileField.WEEKLY_STUDY_HOURS]
+    assert kept is not None
+    assert kept.next_question == "How many hours a week could you study?"
+
+
 def test_an_input_sealed_before_preferences_existed_still_opens() -> None:
     sealed = context("Hi").model_dump(mode="json")
     del sealed["entry_mode"], sealed["conversation_mode"]

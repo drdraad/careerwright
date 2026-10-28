@@ -1,7 +1,7 @@
 // The generated API client, configured for the browser: same-origin `/api` (the web server
 // forwards to the API on the internal network), the signed-in user's ID token, and failures
 // as typed `ApiError`s. Failure is never an empty success: every non-2xx response throws.
-import type { ErrorBody } from "@/generated/api";
+import type { ErrorBody, SupportNoteOut } from "@/generated/api";
 import { client } from "@/generated/api/client.gen";
 
 export const API_BASE = "/api";
@@ -12,6 +12,8 @@ export class ApiError extends Error {
     readonly status: number,
     /** The API's typed envelope; null when the API was not reached (the web server answered). */
     readonly body: ErrorBody | null,
+    /** The support panel a refused message send carries (`TurnRefusedOut`), if any. */
+    readonly supportNote: SupportNoteOut | null = null,
   ) {
     super(body === null ? `API unreachable (${status})` : `${body.code} (${status})`);
     this.name = "ApiError";
@@ -29,9 +31,15 @@ function envelopeOf(error: unknown): ErrorBody | null {
   return body as ErrorBody;
 }
 
+function supportNoteOf(error: unknown): SupportNoteOut | null {
+  if (typeof error !== "object" || error === null || !("support_note" in error)) return null;
+  const note = (error as { support_note: unknown }).support_note;
+  return typeof note === "object" && note !== null ? (note as SupportNoteOut) : null;
+}
+
 export function toApiError(error: unknown, response: Response | undefined): ApiError {
   if (error instanceof ApiError) return error;
-  return new ApiError(response?.status ?? 0, envelopeOf(error));
+  return new ApiError(response?.status ?? 0, envelopeOf(error), supportNoteOf(error));
 }
 
 let configured = false;

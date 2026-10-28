@@ -3562,7 +3562,8 @@ export const SupportNoteOutSchema = {
         },
         message: {
             type: 'string',
-            title: 'Message'
+            title: 'Message',
+            description: 'Says whether the message was sent.'
         },
         resources: {
             items: {
@@ -3581,7 +3582,7 @@ export const SupportNoteOutSchema = {
         'resources'
     ],
     title: 'SupportNoteOut',
-    description: 'The support panel, shown beside a turn whose message holds a risk stem\n(`nessa.profile.safety`): the message was sent as usual. Kept apart from career\nsuitability. Derived from the request on every response, a replay included; never\nstored, not even in the idempotency receipt.'
+    description: 'The support panel, shown beside a message that triggers the support screen\n(`nessa.profile.safety`), whether the send was accepted or refused. Kept apart from\ncareer suitability. Derived from the request on every response, a replay included;\nnever stored, not even in the idempotency receipt.'
 } as const;
 
 export const SupportResourceOutSchema = {
@@ -4091,6 +4092,31 @@ export const TurnPageSchema = {
         'next_cursor'
     ],
     title: 'TurnPage'
+} as const;
+
+export const TurnRefusedOutSchema = {
+    properties: {
+        error: {
+            $ref: '#/components/schemas/ErrorBody'
+        },
+        support_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SupportNoteOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'error'
+    ],
+    title: 'TurnRefusedOut',
+    description: 'A refused send. When its message triggers the support screen, the panel comes with\nthe refusal, since the message was screened before anything could refuse it.'
 } as const;
 
 export const TurnSubmittedOutSchema = {

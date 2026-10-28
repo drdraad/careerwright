@@ -3,9 +3,10 @@
 // choice of entry and tone, pause and resume, and the reply as it streams. A streamed reply
 // is marked not checked until the validated turn replaces it; a failed turn says why, keeps
 // what streamed marked as not saved, and saves nothing. A message with a risk stem is sent
-// as usual, and the API's calm support panel is shown beside it (ADR 0007 decision 7):
-// announced politely, focus left where it is, dismissible, and the question steps aside
-// while it is shown (no career question that turn).
+// as usual, and the API's calm support panel is shown beside it, or beside its refusal if
+// the send is refused (ADR 0007 decision 7): announced politely, focus left where it is,
+// dismissible, and the question steps aside while it is shown (no career question that
+// turn).
 import { useEffect, useId, useRef, useState } from "react";
 import type {
   ConversationMode,
@@ -205,7 +206,8 @@ export function Conversation({
   const replyField = useRef<HTMLTextAreaElement>(null);
   const modeId = useId();
   const demo = workspace.data_mode === "demo";
-  const note = sender.note;
+  const support = sender.support;
+  const note = support?.note ?? null;
 
   const latest = turns.at(-1);
   const latestFailed = latest !== undefined && turnFailed(latest);
@@ -232,13 +234,16 @@ export function Conversation({
   }, [answeredId, answered, announce]);
 
   // A new support note is announced politely; focus stays where the person is (I-4).
-  const announcedNote = useRef<typeof note>(null);
+  const announcedNote = useRef<typeof support>(null);
   useEffect(() => {
-    if (note !== null && note !== announcedNote.current) {
-      announcedNote.current = note; // once per note, however often the chapter renders
-      announce("Your message was sent. Support information is shown above the reply field.");
+    if (support !== null && support !== announcedNote.current) {
+      announcedNote.current = support; // once per note, however often the chapter renders
+      announce(
+        `Your message was ${support.sent ? "sent" : "not sent"}. Support information is shown ` +
+          "above the reply field.",
+      );
     }
-  }, [note, announce]);
+  }, [support, announce]);
 
   // After choosing how to start, the first question takes focus (it replaced the choice).
   useEffect(() => {

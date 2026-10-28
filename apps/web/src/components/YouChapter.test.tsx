@@ -198,7 +198,7 @@ const unknownHours: TurnOut["proposal"] = {
 
 /** The API's support panel (`nessa.profile.safety.SUPPORT_NOTE`, one of its resources). */
 const panel: SupportNoteOut = {
-  policy_version: "support-policy-4",
+  policy_version: "support-policy-5",
   review_status: "provisional: needs reviewed sign-off (human gate H-12)",
   message:
     "If anything you mentioned is about how you are feeling, support is available any time, " +
@@ -637,6 +637,50 @@ describe("[PROF-09] a message with a risk stem is sent as usual, with the suppor
     await user.click(within(shown).getByRole("button", { name: "Dismiss the support note" }));
     expect(screen.queryByRole("region", { name: "Support is available" })).toBeNull();
     expect(field).toHaveFocus(); // M-1: back to the reply field, not lost
+  });
+
+  it("shows the panel with a refused send too, and says the message was not sent", async () => {
+    // Re-review 4, I-2: the API screens the message before anything can refuse it.
+    const notSent = {
+      ...panel,
+      message:
+        "If anything you mentioned is about how you are feeling, support is available any " +
+        "time, from people trained to help. Your message was not sent; the reason is shown below.",
+    };
+    fakeApi(
+      routes({ preferences: prefs("unsure"), turns: [] }, [
+        {
+          method: "POST",
+          path: /\/interview\/turns$/,
+          status: 402,
+          answer: {
+            error: {
+              code: "BUDGET_EXCEEDED",
+              message: "This call would exceed the run spend limit for your key.",
+              retryable: false,
+              stage: "spend",
+              correlation_id: "c1",
+              details: { scope: "run" },
+            },
+            support_note: notSent,
+          },
+        },
+      ]),
+    );
+    const user = renderYou();
+
+    const field = await screen.findByLabelText("Reply to Nessa");
+    await user.type(field, "I volunteer on a suicide prevention helpline.");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    const shown = await screen.findByRole("region", { name: "Support is available" });
+    expect(shown).toHaveTextContent("Your message was not sent");
+    expect(shown).toHaveTextContent("Samaritans: Call 116 123");
+    expect(await screen.findByText(/The spending limit for model calls/)).toBeVisible();
+    expect(field).toHaveValue("I volunteer on a suicide prevention helpline."); // kept
+    expect(screen.getByTestId("you-announcer")).toHaveTextContent(
+      "Your message was not sent. Support information is shown above the reply field.",
+    );
   });
 });
 
