@@ -27,9 +27,11 @@ inference, with at least 30 evaluation cases and a capped live run.
    null means not chosen (the interviewer then keeps to `practical`). Each turn seals them
    into its input, so the prompt (now `interview-turn-2`) tells the model how to proceed:
    a sure person confirms the target and its level and is not asked to explore; an unsure
-   person is asked about tasks before any career is named. Pause is honoured by the web app
-   (nothing is asked; the composer gives way to Resume); the API does not refuse a message
-   while paused, because the person can only send one by resuming.
+   person is asked about tasks before any career is named. Pause is honoured by the web app:
+   nothing is asked, and every way of sending (Send, Try again, Send it again, Send my
+   message anyway) is disabled with the reason "Paused: resume to send." until Resume; the
+   composer stays in place. The API does not refuse a message while paused: pause is the
+   person's own setting, not a lock. "Help me explore instead" saves the entry as `unsure`.
 
 2. **Profile schema 3** adds two fields; older documents read them as not asked.
    - `work_style`: how the person says they like to work, a list of their own phrases. It
@@ -40,15 +42,21 @@ inference, with at least 30 evaluation cases and a capped live run.
      unless they say otherwise; `month`, `week` or `hour` as given; never annualised, spec
      section 5). It is a **hard constraint** (the product owner's change to ADR 0006 decision
      6): the interview may propose it, only explicit confirmation establishes it, and
-     Unknown, Skipped and Prefer not to say are answers, never 0. Until regional pay
+     Unknown, Skipped and Prefer not to say are answers, never 0 (a floor is more than £0;
+     "no floor" is Unknown or Skipped). The period is part of the value: a proposal is
+     `stated` only when the cited words give both the amount and that period ("an hour",
+     "weekly", "annually"); a defaulted or different period is `inferred`. Until regional pay
      evidence exists (Sprint 3), nothing can apply it: the slate says so in
      `limits_not_applied` and removes nothing for pay, and unknown pay is never treated as
      below it.
 
-3. **One useful question at a time** is the interviewer's job (its instructions: one
-   question, never ask again for what the profile holds) and is checked semantically by the
-   evaluation (`one_question`, `missing_excludes`), never by exact prose. The web app shows
-   only the latest question; earlier turns stay one action away.
+3. **One useful question at a time** is the interviewer's job and part of the contract
+   (`interview-turn-3`): the question lives only in `next_question`, which holds at most one
+   question mark, and the reply holds none (a validation problem, so the one repair
+   applies). The web app shows the reply and the question apart, so it is asked once. The
+   evaluation checks each field on its own (`one_question`, which also counts a second ask
+   joined to the first in one sentence) and `missing_excludes`, never exact prose. Earlier
+   turns stay one action away.
 
 4. **Discovery is a run kind on the one activity** (`discovery`; ADR 0002, ADR 0006
    decision 10). The model proposes **searches, never suggestions** (`discovery-queries-1`):
@@ -67,17 +75,27 @@ inference, with at least 30 evaluation cases and a capped live run.
 
 5. **The slate is deterministic code** (`nessa.profile.slate`), recomputed on each read
    (`GET .../discoveries/{id}/slate`) from the stored searches, the pinned answers and the
-   held ESCO release, so it is reproducible without storing a second copy.
+   held ESCO release, so it is reproducible without storing a second copy. The searches
+   record the release they were chosen for; a slate read against another release says so
+   in a note.
    - *Retrieval.* Each query runs twice against ESCO's English full-text index: occupations
      matching every word score their rank over the best such rank; those matching only some
      words score at most half that (any-word search ranks a common word in a title highly).
      Nessa adds the current role (searched) and the person's own target titles (exact label
      matches). A model title becomes a candidate only if ESCO holds it as a label (DIV1-04);
      otherwise it is listed as an unsupported hypothesis, never suggested.
-   - *Pool.* Hits are pooled by concept (an alias is the same concept); occupations sharing
-     any non-hidden label (as a concept key) are near-identical and count once, the most
-     relevant representing them (DIV1-05). The pool is bounded at 120 (the soft 60-120
-     target), and the excess is counted.
+   - *Pool.* Hits are pooled by concept (an alias is the same concept). An occupation whose
+     preferred label is one of another's non-hidden labels (as a concept key), or that has
+     the same labels, is near-identical to it and counts once, the most relevant
+     representing them (DIV1-05). Folding is never transitive: a candidate joins a group
+     only through its lead, because ESCO gives many distinct occupations a shared label
+     ("geologist", "facility manager"), and chains of them once folded quarry engineers
+     with building cleaners. The pool is bounded at 120 (the soft 60-120 target), filled
+     round-robin across ISCO minor groups in relevance order so every retrieved family is
+     sampled before relevance cuts any (spec section 4, DIV-1), and the excess is counted.
+     Oversampling catalogue areas the search under-retrieves is not done.
+   - *Unsearchable* queries (no searchable word), the model's or the current role, are
+     listed as such, never run as a search that found nothing.
    - *Relevance* is the best channel-weighted score plus 0.2 per further query that found
      it. Work-style hits count 0.6, cross-industry, less-familiar and hypothesis hits 0.9,
      the rest 1. No pay, popularity, prestige or AI figure enters (DIV1-07); no percentage
@@ -98,7 +116,10 @@ inference, with at least 30 evaluation cases and a capped live run.
      `excluded`. Excluding a title never excludes its family. Every pooled occupation not
      shown says why ("show why this wasn't included").
    - **Provisional (R6, H-12):** every weight, quota and floor above is product policy to
-     be evaluated, not an estimate of fit.
+     be evaluated, not an estimate of fit. Known limit: ranks are normalised to each query's
+     own best hit, so a query's best match clears the floor however weak the query is (an
+     any-word match scores at most 0.5). An absolute rank floor needs calibrating on the
+     full release; it is not set in L0 and is listed for H-12.
 
 6. **A suggestion's words come from facts, not model prose.** "Why this could suit you"
    quotes the answers that found it and the search that matched ESCO's record; "What might
@@ -120,55 +141,91 @@ inference, with at least 30 evaluation cases and a capped live run.
      screened before any model call: `POST .../interview/turns` answers 200 with a fixed
      support response and four UK services, checked on their own pages on 2026-10-28
      (999 or A&E; NHS 111, mental health option; Samaritans 116 123; Shout 85258), and
-     nothing is sent to the interviewer or stored. It is kept apart from career
-     suitability: it scores and remembers nothing. Only explicit wording counts, so a
-     figure of speech does not; a mention in another context (a suicide-prevention
-     volunteer) does, by design, and the person can then send the message anyway
-     (`send_after_support`).
+     nothing is sent to the interviewer or stored, not even an idempotency receipt (it would
+     keep a fingerprint of the message). It is kept apart from career suitability: it scores
+     and remembers nothing. Only explicit wording counts, and each phrase needs its meaning:
+     an object that is the person's life, or the end of the clause. So career talk does not
+     trigger it ("take my life in a new direction", "my life savings", "I don't want to live
+     in London", "I hurt myself lifting boxes", "no reason to go on with the course",
+     "suicide prevention work", "self-harm support services"). If it does by mistake, the
+     person can send the message anyway (`send_after_support`); the web app sends the
+     message that was screened. Known misses (H-12): "I can't go on", and anything
+     indirect.
    - *Inappropriate inference.* Model output may not name a health condition, a diagnosis,
      a personality type (or MBTI code), a protected characteristic or a percentage that the
      person's own messages never used; a condition the person names may be acknowledged,
-     to ask which adjustment would help, but is never recorded in a career field. Both are
-     validation problems, so the one bounded repair applies.
+     to ask which adjustment would help, but is never recorded in a career field. A word the
+     person used, singular or plural, or a kindred one ("mothers", so "women" or "maternity
+     work for women") may be used: naming who the work serves is not a guess about the
+     person. Both are validation problems, so the one bounded repair applies.
    - **Provisional, needs reviewed sign-off (R6; H-12):** the wording, the phrase lists and
      the resources. Clinical screening is out of scope; this is not one.
 
 8. **The early requirement sketch** (`GET .../sketch`, STATE-05) resolves each target
-   title against ESCO: one occupation gives its essential skills (the first six and the
-   count); several give a choice (nothing guessed); none gives the nearest occupations and
-   "not researched". Three generic steps (compare, find options, check time and cost)
+   title: first by the occupation the person chose for it (`occupation_choice`, by its
+   ESCO URI in the held release), else against ESCO's labels: one occupation gives its
+   essential skills (the first six and the count); several give a choice (nothing
+   guessed); none gives the nearest occupations and "not researched". About 260 ESCO
+   preferred labels are also another occupation's label, so re-matching a chosen title
+   would ask the person to choose again forever. Three generic steps (compare, find options, check time and cost)
    are always `unresolved`. It is labelled "Early sketch, not a checked route", names no
    provider, price or date, and lists which minimum inputs are not asked yet.
 
 9. **The live evaluation is its own capped command** (`make live-eval`,
-   `tools/live_eval.py`) on the existing usage ledger: the cases marked live (at most 6),
-   one synthetic workspace each with a run limit of exactly one attempt, the test model
-   only, the `live-eval` scope's cumulative cap (24 requests, no production request, $0.05
-   worst case), every attempt ledgered after the worker stops, a leak scan, and results
-   with failures by type appended to `docs/evidence/live-eval.md`. It is never part of
-   `make check` or `make acceptance`. The offline evaluation runs the deterministic
-   subjects (support screen, output guard, discovery with the fixture proposer over the
-   full release); it certifies the pipeline, not the model.
+   `tools/live_eval.py`) on the existing usage ledger: the cases marked live (four:
+   INT-01..03 and DSC-01; at most 6 per invocation), one synthetic workspace each with a
+   run limit of exactly one attempt, the test model only, a per-scope cumulative cap of the
+   controller's 9 requests (R5; no production request, $0.05 worst case), so a scope holds
+   one default run and a further authorised run gets its own scope
+   (`NESSA_LIVE_EVAL_SCOPE`). Every attempt is ledgered after the worker stops, the key is
+   leak-scanned, results with failures by type are appended to
+   `docs/evidence/live-eval.md`, and each case's output is kept in the private evidence
+   directory (`NESSA_HOME/evidence/live-eval.jsonl`, never committed) so a failure can be
+   diagnosed. It is never part of `make check` or `make acceptance`. The counterfactual pair
+   (INT-04/05) is not in the default run: one sample per arm cannot separate a demographic
+   effect from run-to-run variation, so it compares only the fields the message states
+   unambiguously, and a powered comparison (several samples per arm) belongs to the
+   release task. The offline evaluation runs the deterministic subjects (support screen,
+   output guard, discovery with the fixture proposer over the full release); it certifies
+   the pipeline, not the model.
 
 10. **Export format 3** adds the discoveries (with their validated searches; slates are
     recomputed) and the interview preferences.
+
+11. **A decision carries the person's edits; undo is a revert** (Task 6 review). The review
+    tray's edited answers go in the turn's one decision (`edits`: a proposed field each,
+    not also accepted), checked like a direct edit and saved as direct entries in the same
+    version as the accepted proposals, so a failure saves nothing and loses nothing. An edit
+    that leaves the proposal as it was is sent as an acceptance and keeps its source.
+    `POST .../profile/revert` (`expected_version`, `to_version`) restores an earlier
+    version's answers, each citing the source it had (a fixture stays a fixture; a
+    confirmed reading keeps its basis and turn), as a new version; undo uses it, never a
+    direct edit.
 
 ## Consequences
 
 - Migration 0010; new run kind `discovery`; new event kind `interview.preferences_updated`;
   new source kind `occupation_choice`; new endpoints for preferences, discoveries, slates,
-  targets and the sketch; `submit_turn` may answer 200 with the support response.
+  targets, the sketch and the profile revert; `submit_turn` may answer 200 with the
+  support response; a turn decision may carry edits.
 - Not done: model-written suggestion explanations; applying the salary floor (Sprint 3,
   with pay evidence); a salary floor per target; a human review of the evaluation cases
   and of the support policy (H-12).
 
 ## Human review checklist (H-12, not run — requires human)
 
-- [ ] **Support policy** (decision 7): the fixed wording, the explicit-distress phrase list,
-  the decision not to send or store the message, the "send anyway" path, and the four
-  resources and their wording (checked against the services' pages on 2026-10-28).
+- [ ] **Support policy** (decision 7): the fixed wording, the explicit-distress phrase list
+  and its meaning rules (object and clause end; the career-context words after "suicide"
+  and "self-harm"), the known misses ("I can't go on", indirect wording), the decision not
+  to send or store the message, the "send anyway" path, and the four resources and their
+  wording (checked against the services' pages on 2026-10-28).
 - [ ] **Inference rules** (decision 7): the health, type and protected-characteristic word
-  lists, and refusing a condition in a career field.
-- [ ] **Slate policy** (decision 5): channel weights, the partial-match weight, the floor,
-  the bonuses, quotas and the family limit.
-- [ ] **Evaluation cases** (decision 9): the 39 cases and their semantic expectations.
+  lists, the kindred-word groups, and refusing a condition in a career field.
+- [ ] **Slate policy** (decision 5): channel weights, the partial-match weight, the floor
+  (and whether an absolute rank floor is needed), the bonuses, quotas, the family limit,
+  alias-only folding and the family round-robin pool.
+- [ ] **Evaluation cases** (decision 9): the 43 cases and their semantic expectations. Of
+  them, 20 (SUP-01..13, GRD-01..07) test deterministic code with canned inputs; the model's
+  behaviour rests on the live cases alone, single samples so far.
+- [ ] **Counterfactual tolerance** (decision 9): which fields must not change with an
+  irrelevant cue, and how many samples per arm the release task's comparison needs.

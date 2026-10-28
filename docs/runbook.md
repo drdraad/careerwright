@@ -14,7 +14,7 @@ Everything runs on this machine (ADR 0001). Run commands from the repository roo
 | `make check` | Backend: formatting, lint, types, fast tests and the fixture validator. Web (`apps/web`, `pnpm run check`): generated-client drift, Biome, `tsc`, Vitest. No Docker, no network. |
 | `make acceptance` | Integration and stack tests against real PostgreSQL 16, DBOS and the emulator, in separate Compose projects (`nessa-l0-test`, `nessa-l0-stacktest`) and ports; then the Storybook build and the Playwright suite on its own demo stack (`nessa-l0-webtest`, web on `127.0.0.1:57600`): the browser journey with a full restart, keyboard, access and visual checks. Removes them afterwards. |
 | `make live-smoke` | One real connection-check run on the test model through an isolated stack (`nessa-l0-smoke`), at most 3 calls, within the `live-smoke` scope's cumulative cap (9 calls, 3 production, $0.30 worst case by default; `NESSA_LIVE_SMOKE_*` changes it). `INTERVIEW=1` runs one interview turn instead, with a fixed synthetic message, checks that its reply streamed and was superseded by the validated output, and confirms its proposals into the profile: one attempt, at most 2 calls (the call and one validation repair). One invocation at a time: a second refuses while the ledger is held. The worker is stopped before the attempts are read, and every attempt is ledgered in `docs/evidence/live-usage.*` with its request count; if the worker cannot be confirmed stopped, every further call it could make is ledgered with an unknown cost and the command fails. Only `PRODUCTION=1` uses the production model. Reads `META_API_KEY` from `.env`. |
-| `make live-eval` | The representative evaluation cases (those marked `live` in `backend/tools/evaluation_cases.json`, at most 6; `CASES=INT-01,DSC-01` runs a chosen subset) through the isolated live stack on the test model only: one synthetic workspace per case whose run limit allows exactly one attempt (at most 2 requests), within the `live-eval` scope's cumulative cap (24 requests, no production request, $0.05 worst case; `NESSA_LIVE_EVAL_*` changes it). Every attempt is ledgered in `docs/evidence/live-usage.*` after the worker stops; results with failures by type are appended to `docs/evidence/live-eval.md`, each case's output to `live-eval.jsonl`; the key is leak-scanned. Reads `META_API_KEY` from `.env`. Never part of `make check` or `make acceptance`. |
+| `make live-eval` | The representative evaluation cases (those marked `live` in `backend/tools/evaluation_cases.json`: INT-01..03 and DSC-01; at most 6 per invocation; `CASES=INT-01,DSC-01` runs a chosen subset) through the isolated live stack on the test model only: one synthetic workspace per case whose run limit allows exactly one attempt (at most 2 requests), within the budget scope's cumulative cap (the controller's 9 requests, no production request, $0.05 worst case; `NESSA_LIVE_EVAL_*` changes it). A scope holds one default run; a further authorised run gets its own scope (`NESSA_LIVE_EVAL_SCOPE=...`). Every attempt is ledgered in `docs/evidence/live-usage.*` after the worker stops; results with failures by type are appended to `docs/evidence/live-eval.md`, and each case's output to the private evidence directory (`NESSA_HOME/evidence/live-eval.jsonl`, owner-only, never committed); the key is leak-scanned. Reads `META_API_KEY` from `.env`. Never part of `make check` or `make acceptance`. |
 | `make rotate-master-key` | With the stack running: adds master key `v<N+1>` to `NESSA_HOME/keys`, then runs `make reseal`. The only way to rotate the master key. |
 | `make reseal` | Restarts a running API and worker so they load every key version (their mode is kept), then reseals every sealed record (stored keys, run inputs, run outputs and partial replies) under the newest key, and fails if any record is left on an older version. Run it again if a rotation was interrupted. Restarting the worker recovers an in-flight run, whose model call may then be made again, within its spend reservation. |
 | `make status` | `docker compose ps` for the stack. |
@@ -84,15 +84,19 @@ with the browser's Origin unchanged.
   {turn_id}` shows its run and, once complete, its validated proposals (`proposal.changes`,
   each with a `change_id`, the messages it cites and `hard_constraint`). Nothing is saved
   until `POST .../interview/turns/{turn_id}/decision` with `{expected_version, accept:
-  [change IDs], confirm_hard_constraints: [fields]}`: every accepted limit or target must be
-  named in `confirm_hard_constraints`, and the profile must still be the version the message
-  was sent with (`409 STALE_INPUT_VERSION` otherwise: send the message again).
+  [change IDs], confirm_hard_constraints: [fields], edits: [{field, answer}]}`: every
+  accepted limit or target must be named in `confirm_hard_constraints`; an edit is the
+  person's own answer for a proposed field not also accepted, saved as a direct entry in the
+  same version; and the profile must still be the version the message was sent with (`409
+  STALE_INPUT_VERSION` otherwise: send the message again). `POST .../profile/revert` with
+  `{expected_version, to_version}` restores an earlier version's answers with their own
+  sources (undo).
 - Interview preferences (ADR 0007): `GET`/`PUT .../interview/preferences` with
   `{expected_version, entry_mode: sure|unsure|null, conversation_mode:
   practical|gentle|challenge|null, paused}`. A turn whose message explicitly expresses acute
   distress answers `200` with the support response (`policy: "acute_distress"`, UK
-  resources) instead of `202`: nothing was sent or stored; resend with
-  `send_after_support: true` to send it anyway.
+  resources) instead of `202`: nothing was sent or stored, not even an idempotency receipt;
+  resend with `send_after_support: true` to send it anyway.
 - Discovery (ADR 0007): `POST .../discoveries` with `{expected_profile_version}` returns `202`
   (`INSUFFICIENT_EVIDENCE` if no answer describes work yet); `GET .../discoveries` (newest
   first), `GET .../discoveries/{id}`; `GET .../discoveries/{id}/slate?emphasis=&exclude_concept=
