@@ -27,7 +27,8 @@ MINUS_SIGN = "\N{MINUS SIGN}"
 
 # One hand-written table (controller ruling, fix round 5): every shape the reviewers
 # reported in re-reviews 2, 3 and 4 must trigger the flow; the reviewers' career examples
-# with no stem must not. Each row names where it comes from. Fragments are minimal.
+# with no stem must not. Session 1 added the controller's rows for three phrases. Each row
+# names where it comes from. Fragments are minimal.
 CORPUS: list[tuple[str, str, bool]] = [
     # The corpus from before re-review 2 (re-review 1's misses and the first tier).
     ("rr1", "I want to kill myself over this.", FLOW),
@@ -157,6 +158,22 @@ CORPUS: list[tuple[str, str, bool]] = [
     ("rr5 N-I1", "I have anti-self-harm awareness training from my NHS role.", FLOW),
     ("rr5 N-I1", "I have non-suicidal awareness training from my NHS role.", FLOW),
     ("rr5 N-I1", f"I have drug{EM_DASH}overdose awareness training from my NHS role.", FLOW),
+    # Session 1 (2026-10-28): the product owner asked for "carry on", "end it" and "not
+    # exist" (Part B line 1). These rows are the controller's, verbatim.
+    ("session1", "I can't carry on.", FLOW),
+    ("session1", "There's no reason to carry on.", FLOW),
+    ("session1", "I want to end it.", FLOW),
+    ("session1", "Sometimes I want to not exist.", FLOW),
+    ("session1", "I wish I didn't exist.", FLOW),
+    ("session1", "I'd like to carry on working in healthcare.", NO_FLOW),
+    ("session1", "Jobs like that don't exist here.", NO_FLOW),
+    ("session1", "The course ended and I want to start a new one.", NO_FLOW),
+    # Career wording those constructions also catch: known false positives (ADR 0007
+    # decision 7), pinned so a change to them is seen.
+    ("session1 limit", "I can't carry on working nights.", FLOW),
+    ("session1 limit", "I'm on a zero-hours contract and I want to end it.", FLOW),
+    ("session1 limit", "That job is not going to exist in ten years.", FLOW),
+    ("session1 limit", "I wish commutes didn't exist.", FLOW),
     # The reviewers' career examples with no stem, and guards for the windows: nothing.
     ("rr3 N-I1", "I am planning to end my lifeguard job this summer.", NO_FLOW),
     ("rr3 N-I1", "I want to end my lifelong career in retail.", NO_FLOW),

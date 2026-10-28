@@ -156,15 +156,17 @@ inference, with at least 30 evaluation cases and a capped live run.
    beside these words, never in their place: decision 12 (Task 6b) records how. These words
    remain the deterministic provenance, shown in every case and cited by exports.
 
-7. **The minimal support policy** (`nessa.profile.safety`, `support-policy-5`): one
+7. **The minimal support policy** (`nessa.profile.safety`, `support-policy-6`): one
    deterministic, recall-first screen over normalised words (controller rulings, Task 6 fix
-   rounds 4 and 5). It is kept apart from career suitability: it scores, labels and
-   remembers nothing. The four UK services were checked on their own pages on 2026-10-28
-   (999 or A&E; NHS 111, mental health option; Samaritans 116 123; Shout 85258). One
-   hand-written table is the test (`tests/domain/test_safety.py::CORPUS`): every shape the
-   reviewers reported in re-reviews 2 to 4 must trigger the flow, and their career examples
-   with no listed word must not; each row is also checked inside other text and in capitals.
-   It shows that those shapes are caught, not that every possible wording is.
+   rounds 4 and 5; three phrases added after session 1). It is kept apart from career
+   suitability: it scores, labels and remembers nothing. The four UK services were checked
+   on their own pages on 2026-10-28 (999 or A&E; NHS 111, mental health option; Samaritans
+   116 123; Shout 85258). One hand-written table is the test
+   (`tests/domain/test_safety.py::CORPUS`): every shape the reviewers reported in re-reviews
+   2 to 4 must trigger the flow, and their career examples with no listed word must not;
+   the session 1 rows (source `session1`, the controller's) say which of their messages
+   must and must not; each row is also checked inside other text and in capitals. It shows
+   that those shapes are caught, not that every possible wording is.
    - *Why one screen.* Fix rounds 1 to 3 tried to tell intent apart with hand-written
      patterns: a blocking tier for first-person present intent, a note for every other
      mention. Each round traded false positives for false negatives: re-review 3 found
@@ -195,13 +197,20 @@ inference, with at least 30 evaluation cases and a capped live run.
      or take (-s, -ed, -ing, -en, took) with "life" or "lives" within 3 words after and a
      possessive between (my, your, his, her, our, their, own, or any word ending 's); an
      intent or wish (want, going, ready, tempted, urge, plan, try, intend, decide, wish, in
-     the forms listed in the code) with die, dies, died or dead within 4 words after; think,
-     thinks, thinking, thought or thoughts with "dying" within 4 words after; want (-s, -ed,
-     -ing) with a negation (not, never, no longer) within 3 words before and live, alive or
+     the forms listed in the code) with die, dies, died or dead within 4 words after; the
+     same intent or wish with end (-s, -ed, -ing) followed by "it" within 4 words after
+     (session 1: "want to end it"); exist, exists or existed with an intent or wish and a
+     negation (not, never, no longer) within 4 words before (session 1: "want to not exist",
+     "wish I didn't exist", "don't want to exist"; not "existing", mostly an adjective in
+     career text); think, thinks, thinking, thought or thoughts with "dying" within 4 words
+     after; want (-s, -ed, -ing) with a negation within 3 words before and live, alive or
      "be here" within 3 after; reason(s) with no, not or never within 3 words before and
-     live, living, alive or "go on" within 4 after; "go on" (go, goes, going, went, gone)
-     with a negation within 3 words before and can or could within 4 before; "better off"
-     with dead, or without + me / you / him / her / us / them, within 4 words after.
+     live, living, alive, "go on" or "carry on" within 4 after; "go on" (go, goes, going,
+     went, gone) or "carry on" (carry, carries, carried, carrying; session 1) with a
+     negation within 3 words before and can or could within 4 before; "better off" with
+     dead, or without + me / you / him / her / us / them, within 4 words after. Session 1's
+     three phrases are constructions, not bare words, because bare "carry on" and "end it"
+     are ordinary career wording (controller ruling).
    - *The support flow.* The message is screened before anything else. When it triggers the
      screen, the panel accompanies an accepted send and every refusal the command (or the
      replay of its receipt) raises; it does not accompany an unexpected server failure (a
@@ -237,11 +246,11 @@ inference, with at least 30 evaluation cases and a capped live run.
      request format, never a 500; some may still hold the old note, in pre-release local
      data only. Receipts from before Task 6 had today's request shape and replay normally.
    - *Known limits (H-12):* a finite English list of words and constructions, so wording
-     outside it gets nothing ("my friend wants to end things", "what's the point", "I just
-     want to end it", "can't carry on", method words), and a construction whose words are
-     further apart than its window gets nothing: extending either is the reviewer's
-     decision. Two known gaps of this kind: the wish shape "wish that I'd ... die" can fall
-     past the window of 4 words once "I'd" is spelt out, and an apostrophe-like character
+     outside it gets nothing ("my friend wants to end things", "what's the point", method
+     words), and a construction whose words are further apart than its window gets
+     nothing: extending either is the reviewer's decision. Two known gaps of this kind: the
+     wish shape "wish that I'd ... die" can fall past the window of 4 words once "I'd" is
+     spelt out, and an apostrophe-like character
      outside the mapped list (such as U+2032) or a reflexive spelt apart other than after
      my / your / him / her / our / them / one ("our selves" is not matched; "ourself" and
      plural "selves" after an owner are not listed) is not read. A dash written without
@@ -251,8 +260,13 @@ inference, with at least 30 evaluation cases and a capped live run.
      savings", "ending my life sciences career", "end my working life", "better off without
      me" about a team, "hurt myself lifting", "cut yourself some slack", "I cut costs
      myself", "don't want to live in London", "don't want to be here in five years", "going
-     to die of boredom", "can't go on holiday", "the meeting would die"), and some people
-     may find that unwelcome. Only the next question is dropped: the model's reply text is
+     to die of boredom", "can't go on holiday", "the meeting would die"). Session 1's
+     constructions add their own ("I can't carry on working nights", "I want to end it"
+     about a zero-hours contract, "that job is not going to exist in ten years", "I wish
+     commutes didn't exist"; pinned in `CORPUS` as `session1 limit`). The third matters
+     here: a prediction that a job will not exist is ordinary talk about work and AI, and
+     "going" is one of the listed intents. Some people may find these panels unwelcome.
+     Only the next question is dropped: the model's reply text is
      not checked for a career question. A message is screened only when it reaches the API:
      while sending is unavailable in the web app (paused, no key stored, a reply still on its
      way), nothing is sent, so nothing is screened, and a request the API refuses before
@@ -268,7 +282,10 @@ inference, with at least 30 evaluation cases and a capped live run.
      validation problems, so the one bounded repair applies.
    - **Accepted for L0 as built (product owner, session 1, 2026-10-28; H-12):** the
      wording, the word lists, the windows and the resources, and the inference word lists.
-     Clinical screening is out of scope; this is not one.
+     The product owner also asked there for "end it", "carry on" and "not exist". They were
+     added after the session as the constructions above (`support-policy-6`), in a form the
+     controller ruled; the product owner has not seen them as built. Clinical screening is
+     out of scope; this is not one.
 
 8. **The early requirement sketch** (`GET .../sketch`, STATE-05) resolves each target
    title: first by the occupation the person chose for it (`occupation_choice`, by its

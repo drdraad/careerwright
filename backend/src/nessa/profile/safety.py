@@ -4,7 +4,8 @@ section 4, "Uncertainty and emotional comfort"; S2.6; PROF-09, REC1-02).
 It is kept apart from career suitability: nothing here scores, labels or remembers the
 person, and nothing it sees reaches the profile, a proposal or a suggestion.
 
-- **One recall-first screen** (controller rulings, Task 6 fix rounds 4 and 5). The message
+- **One recall-first screen** (controller rulings, Task 6 fix rounds 4 and 5; three phrases
+  added after session 1: "carry on", "end it", "not exist"). The message
   is first normalised to words (`words_of`: compatibility forms, the listed apostrophe,
   hyphen and dash characters, case, hyphenated compounds split, contractions and a few
   informal forms spelt out). It triggers the support
@@ -25,9 +26,11 @@ person, and nothing it sees reaches the profile, a proposal or a suggestion.
   not use (no "92% match"). A condition the person names may be acknowledged, to ask which
   adjustment would help, but is never recorded in a career field.
 
-**Provisional, needs reviewed sign-off (ruling R6; human gate H-12):** the wording, the word
-lists, the windows and the resources. The resources were checked on the services' own pages on
-`CHECKED_ON`; nothing here is invented, and anything not on those pages is left out.
+**Accepted for L0 as built by the product owner at session 1 (2026-10-28; human gate H-12):**
+the wording, the word lists, the windows and the resources. The three phrases they asked for
+there were added afterwards, as constructions (a controller ruling), and have not been seen
+by them as built. The resources were checked on the services' own pages on `CHECKED_ON`;
+nothing here is invented, and anything not on those pages is left out.
 """
 
 import re
@@ -35,7 +38,7 @@ import unicodedata
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-POLICY_VERSION = "support-policy-5"
+POLICY_VERSION = "support-policy-6"
 CHECKED_ON = "2026-10-28"
 REVIEW_STATUS = "provisional: needs reviewed sign-off (human gate H-12)"
 
@@ -137,7 +140,8 @@ _INTENTS |= {"deciding", "wish", "wishes", "wished", "wishing"}
 _DEATH = {"die", "dies", "died", "dead"}
 _THINKING = {"think", "thinks", "thinking", "thought", "thoughts"}
 _WANT = {"want", "wants", "wanted", "wanting"}
-_GO = {"go", "goes", "going", "went", "gone"}
+_GO_OR_CARRY = {"go", "goes", "going", "went", "gone", "carry", "carries", "carried", "carrying"}
+_EXIST = {"exist", "exists", "existed"}  # not "existing", mostly an adjective in career text
 _PRONOUNS = {"me", "you", "him", "her", "us", "them"}
 
 Words = list[str]
@@ -161,8 +165,8 @@ def _reflexive(words: Words, k: int) -> bool:
     )
 
 
-def _go_on(words: Words, k: int) -> bool:
-    return words[k] in _GO and words[k + 1 : k + 2] == ["on"]
+def _go_or_carry_on(words: Words, k: int) -> bool:
+    return words[k] in _GO_OR_CARRY and words[k + 1 : k + 2] == ["on"]
 
 
 def _risk_word(words: Words, i: int) -> bool:
@@ -181,6 +185,14 @@ def _self_injury(words: Words, i: int) -> bool:
 
 def _end_it_all(words: Words, i: int) -> bool:
     return words[i] in _END and words[i + 1 : i + 3] == ["it", "all"]
+
+
+def _to_end_it(words: Words, i: int) -> bool:
+    """An intent or a wish, then end (-s, -ed, -ing) and "it" within 4 words ("want to end
+    it"). "end it all" needs no intent (`_end_it_all`)."""
+    return words[i] in _INTENTS and any(
+        words[k] in _END and words[k + 1 : k + 2] == ["it"] for k in _after(words, i, 4)
+    )
 
 
 def _a_life(words: Words, i: int) -> bool:
@@ -219,23 +231,36 @@ def _not_living(words: Words, i: int) -> bool:
     )
 
 
+def _not_exist(words: Words, i: int) -> bool:
+    """exist, exists or existed, with an intent or a wish and a negation within 4 words
+    before it ("want to not exist", "wish I didn't exist", "don't want to exist")."""
+    before = _before(words, i, 4)
+    return (
+        words[i] in _EXIST
+        and any(words[k] in _INTENTS for k in before)
+        and any(_negation(words, k) for k in before)
+    )
+
+
 def _no_reason(words: Words, i: int) -> bool:
     """The word reason(s), with no, not or never within 3 words before it, and live, living,
-    alive or "go on" within 4 after ("isn't any reason to go on", "no real reason to live")."""
+    alive, "go on" or "carry on" within 4 after ("isn't any reason to go on", "no real reason
+    to live")."""
     return (
         words[i] in {"reason", "reasons"}
         and any(words[k] in {"no", "not", "never"} for k in _before(words, i, 3))
         and any(
-            words[k] in {"live", "living", "alive"} or _go_on(words, k) for k in _after(words, i, 4)
+            words[k] in {"live", "living", "alive"} or _go_or_carry_on(words, k)
+            for k in _after(words, i, 4)
         )
     )
 
 
 def _cannot_go_on(words: Words, i: int) -> bool:
-    """The words go on, with a negation within 3 words before them and can or could within 4
-    ("can no longer go on", "can't really go on")."""
+    """The words go on or carry on, with a negation within 3 words before them and can or
+    could within 4 ("can no longer go on", "can't really go on", "can't carry on")."""
     return (
-        _go_on(words, i)
+        _go_or_carry_on(words, i)
         and any(_negation(words, k) for k in _before(words, i, 3))
         and any(words[k] in {"can", "could"} for k in _before(words, i, 4))
     )
@@ -260,10 +285,12 @@ _RULES: tuple[Callable[[Words, int], bool], ...] = (
     _risk_word,
     _self_injury,
     _end_it_all,
+    _to_end_it,
     _a_life,
     _to_die,
     _dying,
     _not_living,
+    _not_exist,
     _no_reason,
     _cannot_go_on,
     _better_off,

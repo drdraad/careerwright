@@ -134,7 +134,7 @@ def test_a_message_with_a_risk_stem_is_sent_with_the_support_panel_and_none_of_i
 
     assert flagged.status_code == 202, flagged.text  # sent: no hold, no extra step
     panel = flagged.json()["support_note"]
-    assert panel["policy_version"] == safety.POLICY_VERSION == "support-policy-5"
+    assert panel["policy_version"] == safety.POLICY_VERSION == "support-policy-6"
     assert "provisional" in panel["review_status"]
     assert {r["name"] for r in panel["resources"]} == SERVICES
     assert panel["message"] == safety.SUPPORT_NOTE  # "...sent to Nessa as usual."

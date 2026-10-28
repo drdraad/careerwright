@@ -198,7 +198,7 @@ const unknownHours: TurnOut["proposal"] = {
 
 /** The API's support panel (`nessa.profile.safety.SUPPORT_NOTE`, one of its resources). */
 const panel: SupportNoteOut = {
-  policy_version: "support-policy-5",
+  policy_version: "support-policy-6",
   review_status: "provisional: needs reviewed sign-off (human gate H-12)",
   message:
     "If anything you mentioned is about how you are feeling, support is available any time, " +
