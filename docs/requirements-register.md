@@ -1,8 +1,8 @@
 # Requirements register: requirement → test
 
 Canonical map from every specification requirement to the test that will prove it, its
-owning sprint and task, and its current status. Authority: product specification v1.2
-(`Nessa_Product_Specification.md`), then the local development plan v1.0
+owning sprint and task, and its current status. Authority: product specification v1.3
+(`Nessa_Product_Specification.md`), then the local development plan v1.1
 (`docs/plan/development-plan.md`), then `docs/plan/l0-sprint-tasks.md`. This register adds
 test IDs and ownership only; it never relaxes a requirement. Requirement text is a short
 paraphrase. Where a row and the specification differ, the specification wins and the row
@@ -63,13 +63,18 @@ and recovery · DOC document or ADR evidence · H human.
 | T4 | 1 | Designed shell, generated client, fixture journey |
 | T5 | 2 | ESCO import, InterviewTurn contract, model port |
 | T6 | 2 | You chapter, grounded diverse discovery, early sketch |
-| T7 | 3 | Acquisition backend, ASHE, AI-evidence packs, freshness |
-| T8 | 3 | Roles chapter (map, list, pay lens), job corpus |
+| T6b | 2 | Span-cited "Why this could suit you" (S2.7, D3) |
+| T6c | 0–1 | Visual corrections batch, compositions, `next` age-exception removal |
+| T7 | 3 | Acquisition backend, ASHE, AI-evidence packs and the reduced S3.6, freshness |
+| T7b | 3–5 | England option pack: curation, labels, format, session 2 package |
+| T8 | 3 | Roles chapter (map, list, pay lens), job corpus from the pack, live scoring |
 | T9 | 4 | Matrices, evidence, protected gates, OUT-1, apply-now (backend) |
-| T10 | 4 | Skills chapter, evidence questions, course corpus |
-| T11 | 5 | Offerings, funding, monthly compiler, ledgers |
-| T12 | 5 | Options checkpoint UI, funding corpus |
-| T13 | 6 | DFS, archive, layers, oracle |
+| T10 | 4 | Skills chapter, evidence questions, course corpus from the pack, live scoring |
+| T11 | 5 | Offerings, funding, monthly compiler, ledgers, checker on P01's real option set |
+| T12 | 5 | Options checkpoint UI, funding corpus from the pack, live scoring |
+| T13 | 6 | Split in plan v1.1 into T13a and T13b (ADR 0008); rows name the part that owns them |
+| T13a | 6a | DFS, sound pruning, encountered archive, peeled layers, coverage, oracle, measured sizes |
+| T13b | 6b | Disk-backed archive, caps, child process, efficient ranking, 50,000-point benchmark |
 | T14 | 7 | Route comparison |
 | T15 | 8 | Plan, progress, revision, exports |
 | T16 | 9 | Release qualification |
@@ -85,7 +90,7 @@ and recovery · DOC document or ADR evidence · H human.
 | BND1-03 | At most three cities and three active targets; a fourth is rejected with a typed error, never added silently | D, API | T3 | verified | `tests/domain/test_profile_document.py` (incl. a Hypothesis property), `tests/integration/test_workspaces_and_profiles.py::test_a_fourth_city_is_rejected_and_nothing_is_saved` (`LIMIT_EXCEEDED`; 2556aef) |
 | BND1-04 | Residence and eligibility are never inferred from a chosen English city | D | T5 | planned | T5 part verified (Task 5, fix round 1): a city is geography only: `GET /v1/places` items carry ID, name, aliases, ONS region, country, subdivision and timezone and nothing about residence, nationality or eligibility (`tests/integration/test_taxonomy.py::test_the_english_city_list_is_served_with_its_source`), and saving one sets no other field (`tests/domain/test_places.py::test_a_city_is_geography_only_and_choosing_one_sets_nothing_else`); an ambiguous short name ("Newcastle") is refused, not guessed (`test_an_ambiguous_short_name_is_refused_not_guessed`). Open: no residence or work-rights field exists yet; the task that adds them owns the rest (ADR 0006) |
 | BND1-05 | Remote work only where England-compatible; remote never consumes a city slot | D | T7 | planned | |
-| BND1-06 | Planning bounds enforced and disclosed in every result: ≤ 24 action concepts, ≤ 2 starts each, ≤ 6 selected actions, ≤ 24 months, ≤ 1 conditional bridge-role transition | D | T11, T13 | planned | |
+| BND1-06 | Planning bounds enforced and disclosed in every result: ≤ 24 action concepts, ≤ 2 starts each, ≤ 6 selected actions, ≤ 24 months, ≤ 1 conditional bridge-role transition | D | T11, T13a | planned | |
 | BND1-07 | At a hard bound, never keep the first 24 actions or first two intakes silently; ask the user to pin, exclude or choose; persist the removed-candidate count and scope restriction | D, UI | T12 | planned | |
 | BND1-08 | A regulated pathway beyond 24 months gets an explanatory sketch and an unsupported-model state (`MODEL_SCOPE_EXCEEDED`), never "impossible" (P04) | D, API | T9 | planned | |
 | BND1-09 | Non-deferrable M0 invariants hold everywhere. Covered by STATE-02/03, LIMITS-04/05, AIR1-02, FUNDING-01, PROF-04/06, SEC-01, MODEL-06, PLAN-04, READINESS-01, FIN1-06 | (rows named) | all | planned | |
@@ -110,6 +115,7 @@ and recovery · DOC document or ADR evidence · H human.
 | REC1-08 | Broaden, more practical, less familiar, exclude this kind of work, change my profile and "show why this wasn't included" work; rejecting a title does not reject its industry | UI | T6 | verified | Task 6: emphasis (balanced, closer to what I do, less familiar, broader, more depth), "Not for me", "Exclude this kind of work", "Edit answers directly" and the not-included list with reasons; view-only and counted (`test_slate.py::test_excluding_a_title_keeps_its_family_and_every_filter_is_counted`, `test_less_familiar_and_more_practical_shift_the_slate_relative_to_the_person`, `test_discovery.py::test_the_slate_controls_change_the_view_only_and_count_their_effect`, `Directions.test.tsx`) |
 | REC1-09 | Demographic counterfactuals: varying irrelevant demographic cues does not change suggestions beyond the reviewed tolerance; work rights and accommodations held fixed | M | T6 | inconclusive (one sample per arm) | Task 6: discovery reads no name or chat, only confirmed answers, so a name cannot change a slate (DSC-04/05, identical slates); a query by a protected characteristic the answers lack is refused (GRD-07). Live INT-04/05 (age and sex varied in the message, rows 18-19): `enjoyed_tasks` ("something more hands-on", a judgement call) was proposed for one arm only and the unambiguous fields matched; with one sample per arm this cannot separate the cue from run-to-run variation. The pair now compares only the unambiguous fields (`current_role`, `weekly_study_hours`) and is out of the default live run; a powered comparison (several samples per arm, cost estimated in the Task 6 report) belongs to the release task, against a tolerance set in H-12 |
 | REC1-10 | A sure user can skip suggestions and enter their own titles | UI | T6 | verified | Task 6: "I know my direction" asks for the target and its level and hides directions behind "Help me explore instead" (`src/components/YouChapter.test.tsx`, `tests/domain/test_interview_agent.py::test_the_fixture_follows_the_entry_the_person_chose`); live INT-02 proposed the target and current role (its one-question check failed as then counted, see `live-eval.md`) |
+| REC1-11 | A model-written "Why this could suit you" (D3, ADR 0008): at most one bounded model call per slate; it quotes only the person's confirmed answers and the grounded occupation record, each quotation verified server-side as a span of its source; validated like a search proposal (one repair, then `invalid_model_output`); no readiness or affordability claim; the deterministic provenance stays underneath, is shown in every case and is what exports cite; a failed explanation is shown as unavailable, never hidden | D, M, UI | T6b | planned | |
 
 ### DIV-1 Diverse discovery beyond common careers (spec §4)
 
@@ -149,7 +155,7 @@ and recovery · DOC document or ADR evidence · H human.
 | AIR1-03 | No automatic formula (for example 10 − exposure, a product of indices, or absence of AI usage read as protection) exists in code; where evidence supports exposure only, the exposure is shown and resilience stays unscored | D | T7 | planned | |
 | AIR1-04 | The LLM proposes a cited assessment record; it never publishes one | D | T7 | planned | |
 | AIR1-05 | Default filter "Minimum AI Resilience: Any / 0-10", applied to the lower end of the displayed range; unscored roles included by default in exploration; the active basis and excluded/unscored counts are shown; unknown never becomes 0 or 10 | D, UI | T7, T8 | planned | |
-| AIR1-06 | A discovery filter never constrains optimisation; "Use this limit in my plan" creates an explicit constraint with separate target and intermediate-role scope that excludes unscored, invalidated and out-of-horizon records; an accepted exception stays conditional and does not satisfy the limit; the chosen plan keeps its assessment version; a pathway ending beyond the horizon requires reassessment, never extrapolation | D | T11, T13 | planned | |
+| AIR1-06 | A discovery filter never constrains optimisation; "Use this limit in my plan" creates an explicit constraint with separate target and intermediate-role scope that excludes unscored, invalidated and out-of-horizon records; an accepted exception stays conditional and does not satisfy the limit; the chosen plan keeps its assessment version; a pathway ending beyond the horizon requires reassessment, never extrapolation | D | T11, T13a | planned | |
 | AIR1-07 | The reviewed pack is pinned and dated per run; known material corrections are checked before a session is enabled, and affected records are invalidated at once; a misleading record can be withdrawn | P | T7 | planned | |
 | AIR1-08 | Industry keeps the categorical colour and AI resilience uses a numbered range badge with text; company clusters show their visible role distribution, never an average company score; graph, pay lens, list and exports share one contract | UI | T8 | planned | |
 | AIR1-09 | Chosen plan and printout include the assessment snapshot and any unresolved review flag | D, UI | T15 | planned | |
@@ -184,7 +190,7 @@ and recovery · DOC document or ADR evidence · H human.
 | OUT1-07 | Overlapping courses never award the same competency twice; two introductory courses never sum to competence | D | T9 | planned | |
 | OUT1-08 | Work-based actions need task/evidence mappings; wages alone give no experience credit | D | T11 | planned | |
 | OUT1-09 | Review shows "this option is expected to address these rows", assessment evidence, uncertain outcomes and omitted gaps | UI | T12 | planned | |
-| OUT1-10 | ≥ 10 real course pages labelled; false-positive readiness mappings reviewed individually; an unsupported consequential outcome blocks the affected route | M, H | T10 | planned | corpus slots C01–C10 |
+| OUT1-10 | ≥ 10 real course pages labelled; false-positive readiness mappings reviewed individually; an unsupported consequential outcome blocks the affected route | M, H | T7b (labels, in the option pack), T10 (individual review, blocking) | planned | corpus slots C01–C10; labels reviewed at session 2 (H-07) |
 | OUT1-11 | Ownership: the capability-assessment module owns outcome semantics and rubrics, the opportunity catalogue stores the records and the review checkpoint owns acceptance of modelling assumptions; the LLM only proposes matches | S, D | T9 | planned | |
 
 ### RDY-1 Readiness and apply-now (spec §10)
@@ -229,29 +235,31 @@ and recovery · DOC document or ADR evidence · H human.
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| ROU1-01 | Family identity comes from the canonical action/prerequisite DAG, learning and provider choices, delivery mode, the relevant job-role sequence and material financing or conditional gates; part-time versus full-time, or a different substantive bridge role, is a different family; a later intake is normally a schedule variant; precedence and parallelism are preserved, and an unordered action set is not an identity | D | T13 | planned | |
-| ROU1-02 | A family keeps its meaningful efficient schedules, grouped under one family card with dates as expandable variants; no single best schedule or fixed cost per structure is assumed | D | T13 | planned | see FAMILY |
-| ROU1-03 | A family's displayed best rank is the lowest rank among its retained variants, labelled so; a layer may contain no new family after deduplication; no invented grey families or relabelled ranks | D, UI | T13, T14 | planned | |
+| ROU1-01 | Family identity comes from the canonical action/prerequisite DAG, learning and provider choices, delivery mode, the relevant job-role sequence and material financing or conditional gates; part-time versus full-time, or a different substantive bridge role, is a different family; a later intake is normally a schedule variant; precedence and parallelism are preserved, and an unordered action set is not an identity | D | T13a | planned | |
+| ROU1-02 | A family keeps its meaningful efficient schedules, grouped under one family card with dates as expandable variants; no single best schedule or fixed cost per structure is assumed | D | T13a | planned | see FAMILY |
+| ROU1-03 | A family's displayed best rank is the lowest rank among its retained variants, labelled so; a layer may contain no new family after deduplication; no invented grey families or relabelled ranks | D, UI | T13a, T14 | planned | |
 | ROU1-04 | Overview shows distinct families first; suppresses repeat cards, never evidence | UI | T14 | planned | |
 
 ### OPT-1 Solver architecture (spec §12)
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| OPT1-01 | Deterministic exhaustive DFS over the reviewed finite monthly catalogue in canonical action order: per concept, skip or one reviewed start; mutually exclusive variants, prerequisites, capacity, cash and target gates enforced; each allowed selected offering set visited exactly once; order and parallelism come from dates and the action DAG, never from permuting lists | A | T13 | planned | |
-| OPT1-02 | Prune only irreparable violations or certified bounds under the actual model, each documented with its proof; never on first-front dominance, dominator count, current readiness or accumulated economic cost; lower bounds never ignore future funding; stop-at-readiness pruning only under a proved rule that puts every extension outside the route scope | A, DOC | T13 | planned | |
-| OPT1-03 | Every distinct feasible schedule encountered, dominated ones included, is persisted to a versioned disk-backed archive with atomic checkpoints and an idempotent solve identity; recovery resumes a proven checkpoint or restarts under a new attempt ID | P | T13 | planned | |
-| OPT1-04 | Caps: 30 s, 1,000,000 expanded states, 50,000 archived feasible schedules per target; archive persistence counts in the budget; exact stop reason recorded | A, P | T13 | planned | see LIMITS |
-| OPT1-05 | `search_coverage` is `complete` only after exhausting the declared tree with sound pruning, else `budget_truncated`; operational states queued, running, succeeded, failed, cancelled, invalid-input stay distinct; a crash is failed | P | T13 | planned | |
-| OPT1-06 | Runs record expanded states, feasible count, remaining-work indicator, limits, pruning-rule version, truncation reason, canonical order and model/data versions; each stored route keeps its identity, schedule, objective values, feasibility report, objective definitions, dataset and profile versions, algorithm version, ordering, scenario set, runtime, search bounds and coverage status | P | T13 | planned | |
-| OPT1-07 | `NO_ROUTE_IN_BOUNDED_MODEL` only with complete coverage, meaning no feasible route in this bounded monthly model and catalogue; a truncated empty archive means none found before the limit; a complete run proves the layers only over the declared model and catalogue, never global optimality, and the result states that scope | API | T13 | planned | |
-| OPT1-08 | DFS agrees with an independent Cartesian-product oracle on tiny instances (feasible sets, objectives, layers); oracle and route checker share no code with the candidate | A | T13 | planned | |
-| OPT1-09 | Candidate evaluation has no network, LLM or ORM access; the optimiser is a cancellable child process | S | T13 | planned | |
-| OPT1-10 | A complete run on the same immutable input reproduces the same result; state-limited replay is reproducible; wall-time truncation is not promised bit-identical | A | T13 | planned | |
-| OPT1-11 | Ranking is a separate observable stage finished before ranked completion is claimed; efficient two-objective ranking qualified against simple peeling; 50,000-point benchmark recorded | A | T13 | planned | |
-| OPT1-12 | Profile or input changes cannot alter an in-flight solve snapshot | P | T13 | planned | |
-| OPT1-13 | Information-gathering and work actions remain eligible wherever they affect feasibility; the search never reduces to a minimal skill cover | A | T13 | planned | |
-| OPT1-14 | Layer results record whether their scope is exact or approximate; the three layers are labelled exact only with complete coverage (or a separately proven layer-preserving method); results lead with "Best trade-offs found" or a concrete better-route margin, with layer numbers as secondary detail | D, UI | T13, T14 | planned | |
+| OPT1-01 | Deterministic exhaustive DFS over the reviewed finite monthly catalogue in canonical action order: per concept, skip or one reviewed start; mutually exclusive variants, prerequisites, capacity, cash and target gates enforced; each allowed selected offering set visited exactly once; order and parallelism come from dates and the action DAG, never from permuting lists | A | T13a | planned | |
+| OPT1-02 | Prune only irreparable violations or certified bounds under the actual model, each documented with its proof; never on first-front dominance, dominator count, current readiness or accumulated economic cost; lower bounds never ignore future funding; stop-at-readiness pruning only under a proved rule that puts every extension outside the route scope | A, DOC | T13a | planned | |
+| OPT1-03 | Every distinct feasible schedule encountered, dominated ones included, is persisted to a versioned disk-backed archive with atomic checkpoints and an idempotent solve identity; recovery resumes a proven checkpoint or restarts under a new attempt ID | P | T13b | planned | |
+| OPT1-04 | Caps: 30 s, 1,000,000 expanded states, 50,000 archived feasible schedules per target; archive persistence counts in the budget; exact stop reason recorded | A, P | T13b | planned | see LIMITS |
+| OPT1-05 | `search_coverage` is `complete` only after exhausting the declared tree with sound pruning, else `budget_truncated`; operational states queued, running, succeeded, failed, cancelled, invalid-input stay distinct; a crash is failed | P | T13a (coverage), T13b (run states) | planned | |
+| OPT1-06 | Runs record expanded states, feasible count, remaining-work indicator, limits, pruning-rule version, truncation reason, canonical order and model/data versions; each stored route keeps its identity, schedule, objective values, feasibility report, objective definitions, dataset and profile versions, algorithm version, ordering, scenario set, runtime, search bounds and coverage status | P | T13a, T13b | planned | |
+| OPT1-07 | `NO_ROUTE_IN_BOUNDED_MODEL` only with complete coverage, meaning no feasible route in this bounded monthly model and catalogue; a truncated empty archive means none found before the limit; a complete run proves the layers only over the declared model and catalogue, never global optimality, and the result states that scope | API | T13a | planned | |
+| OPT1-08 | DFS agrees with an independent Cartesian-product oracle on tiny instances (feasible sets, objectives, layers); oracle and route checker share no code with the candidate | A | T13a | planned | |
+| OPT1-09 | Candidate evaluation has no network, LLM or ORM access; the optimiser is a cancellable child process | S | T13a (evaluation), T13b (child process) | planned | |
+| OPT1-10 | A complete run on the same immutable input reproduces the same result; state-limited replay is reproducible; wall-time truncation is not promised bit-identical | A | T13a (complete runs), T13b (limited runs) | planned | |
+| OPT1-11 | Ranking is a separate observable stage finished before ranked completion is claimed; efficient two-objective ranking qualified against simple peeling; 50,000-point benchmark recorded | A | T13b | planned | |
+| OPT1-12 | Profile or input changes cannot alter an in-flight solve snapshot | P | T13a, T13b | planned | |
+| OPT1-13 | Information-gathering and work actions remain eligible wherever they affect feasibility; the search never reduces to a minimal skill cover | A | T13a | planned | |
+| OPT1-14 | Layer results record whether their scope is exact or approximate; the three layers are labelled exact only with complete coverage (or a separately proven layer-preserving method); results lead with "Best trade-offs found" or a concrete better-route margin, with layer numbers as secondary detail | D, UI | T13a, T14 | planned | |
+| OPT1-15 | Truncation disclosure (spec §§12, 18; v1.3): at the M0 bound the selection space alone holds 10,161,633 selected sets, so `budget_truncated` is the expected coverage for large catalogues; results, UI and exports treat truncation as the normal state: lead with "Best trade-offs found", state the instance size and name the narrowing (fewer concepts, one start, a shorter horizon) that would let the search complete; completeness semantics, caps and layer definitions unchanged (OPT1-04, OPT1-05, OPT1-07, OPT1-14) | D, UI | T13a, T13b, T14, T15 | planned | |
+| OPT1-16 | Measured coverage sizes: complete coverage on TRACE-01, the A–I fixture and the option pack's instances, and the measured instance sizes (concepts, starts per concept, months) at which the implemented sound pruning reaches complete coverage, with expanded-state counts and times, reported against the M0 limits; a measurement run stopped before completion is "not complete at that size", never infeasible | A, DOC | T13a | planned | |
 
 ### VIS-1 Dendrite graph (spec §7)
 
@@ -313,10 +321,12 @@ and recovery · DOC document or ADR evidence · H human.
 | TEST1-06 | P03 end to end: payment-cap rejection; grant and offer income not spent before their gates | UI | T16 | planned | |
 | TEST1-07 | P04 end to end: gate demotion refused; unresolved and out-of-model distinct from ineligible | UI | T16 | planned | |
 | TEST1-08 | P05 end to end: apply-now first; no forced training or degenerate frontier | UI | T16 | planned | |
-| TEST1-09 | Real-source corpus labelled: 20 job postings, 10 course pages, 3 funding pages | M, H | T8, T10, T12 | planned | `corpus/manifest.json` (0/33 collected) |
+| TEST1-09 | Real-source corpus labelled: 20 job postings, 10 course pages, 3 funding pages | M, H | T7b (curation and labels, as the option pack; plan v1.1); T8, T10, T12 run them | planned | `corpus/manifest.json` (0/33 collected); label review is H-07 at session 2 |
 | TEST1-10 | LLM steps evaluated by schema, grounding and accepted semantic sets, never exact prose | M | T5, T6 | planned | T5 part verified (Task 5 final candidate ef25e31): interview outputs are checked by schema and deterministic rules (fields, cited messages, typed values) and tests assert fields, values, bases and citations, never reply prose (`tests/domain/test_interview_contract.py`, `test_interview_agent.py`, `tests/integration/test_interview_turns.py`; the live smoke checks the same). T6 part verified: 43 reviewed synthetic cases with semantic expectations and failure types (`tools/evaluation_cases.json`; review by the implementing agent, human review H-12); the checks match words as words and count the question per field (`tests/eval/test_evaluation.py`); offline, the 13 support and 7 guard cases and the 9 discovery cases over the full release (`tests/integration/test_evaluation.py`) pass; live (`make live-eval`, `docs/evidence/live-eval.md`): first run, rows 15-20, 6 cases, 1 passed and 5 failed (3 one-question as then counted, 2 counterfactual, now inconclusive); fix-round run, rows 21-24, the default 4 cases, all passed. The other interview cases need a model and have not run (live cap) |
 | TEST1-11 | Real-provider smoke (L0: local, budget-capped, with durable restart and browser print) | M | T16 | planned | |
 | TEST1-12 | Fixtures and core checks run in `make check` after each meaningful change | S | T3 | verified | `make check` runs format, lint, mypy, the fast suite and `fixtures/m0/validate_fixtures.py` (2556aef) |
+| TEST1-13 | Live versus reviewed (plan §9, v1.1): the live path (Meta search, Scrapling, model extraction where needed), pointed at the option pack's provider pages, is scored field by field against the reviewed values: correct, incorrect, missing and unsupported, with denominators, per source class; a live value that disagrees with a reviewed one is never accepted as verified; live calls on the test model with public inputs, capped and ledgered (R5) | M | T8 (jobs), T10 (courses), T12 (funding) | planned | needs the reviewed values from session 2 (H-07) |
+| TEST1-14 | The TRACE-01 checker runs on at least one real option set for P01's target from the option pack, every consequential field span-cited and human-reviewed (plan Sprint 5, v1.1) | D, H | T11 (run), T12 (records the review) | planned | review at session 2 (H-07) |
 
 ## 3 Plan section 8 regression families
 
@@ -328,15 +338,15 @@ route fixtures separately.
 |---|---|---|---|---|---|
 | TRACE01-01 | Ledgers: A £1,200 direct, £4,000 loss, £5,200 economic; B £600, £0, £600; C £700, £1,500, £2,200; D £1,100, £0, £1,100; E £1,300, £0, £1,300 | FIN1-03 | TRACE-01 | T11 | planned |
 | TRACE01-02 | Prefunding with late wages: B minimum £4,850 (Jan); A minimum £1,800 (Mar); C £4,700, D £4,725, E £4,740; all ≥ £500; payments ≤ £1,500; direct ≤ £1,500 | TIME1-05 | TRACE-01 | T11 | planned |
-| TRACE01-03 | Economic mode: A, B, C in F1; D in F2; E in F3. E's dominators are B and D | OPT1-08 | TRACE-01 | T13 | planned |
+| TRACE01-03 | Economic mode: A, B, C in F1; D in F2; E in F3. E's dominators are B and D | OPT1-08 | TRACE-01 | T13a | planned |
 | TRACE01-04 | Route B snapshot agrees on screen, print and JSON: 4 months, £600 direct and economic, £150 peak, six-month basis, conditional readiness after assessment, ID `fixture-plan-01` | EXP-01 | TRACE-01 | T15 | planned |
 | TRACE01-05 | Routes view renders A/B/C F1, D F2, E F3 with economic labels (baseline £2,000/month, six-month horizon) | VIS2-02 | TRACE-01 | T14 | planned |
 | TRACE01-06 | Planned outcomes never overwrite current evidence: query-data and validate-data stay level 1 until an assessed completion is reviewed | OUT1-05 | TRACE-01 | T9 | planned |
 | TRACE01-07 | Workload: A at 40 h of 40 h passes; the same with 41 h fails | TIME1-04 | TRACE-01 | T11 | planned |
 | TRACE01-08 | Actual dates preserved; B's readiness milestone is 2027-05-01 (next month boundary) | TIME1-02 | TRACE-01 | T11 | planned |
-| DIRECTAI-01 | Direct-spending mode: A/B/C, D/E/F, G/H/I form F1, F2, F3 | OPT1-08 | DIRECTAI | T13 | planned |
+| DIRECTAI-01 | Direct-spending mode: A/B/C, D/E/F, G/H/I form F1, F2, F3 | OPT1-08 | DIRECTAI | T13a | planned |
 | DIRECTAI-02 | Charts and dominance text use direct-spending labels ("Compare direct spending only", "Total direct transition cost"), never economic ones | FIN1-07, VIS2-04 | DIRECTAI | T14 | planned |
-| DIRECTAI-03 | Loading both fixtures causes no route-ID collision | — | both | T13 | planned |
+| DIRECTAI-03 | Loading both fixtures causes no route-ID collision | — | both | T13a | planned |
 | PREFUND-01 | £100 opening, £200 day-one fee, £300 pay on day 28, reserve £0: fails; the +£200 month end does not rescue it | TIME1-05 | spec §12 | T11 | planned |
 | PREFUND-02 | Same month with the £300 proven available before the fee: passes (100 + 300 − 200 ≥ 0) | TIME1-05 | spec §12 | T11 | planned |
 | PREFUND-03 | An unconfirmed grant or unaccepted offer never funds an earlier payment (P03) | TIME1-05, FIN1-04 | P03 | T11 | planned |
@@ -366,34 +376,34 @@ route fixtures separately.
 | READINESS-02 | Planned outcomes count only conditionally | RDY1-02 | TRACE-01 | T9 | planned |
 | READINESS-03 | Apply-now with zero selected training (P05: both rows evidenced 2 ≥ 2, gates confirmed) | RDY1-03 | P05 | T9 | planned |
 | READINESS-04 | P04: setting the registration gate non-essential is refused | RDY1-04, MAP1-05 | P04 | T9 | planned |
-| PARETO-01 | (1,3), (2,2), (3,1) all dominate (4,4), which is F2 | OPT1-08 | spec §12 | T13 | planned |
-| PARETO-02 | Equal objective pairs do not dominate each other | OPT1-08 | spec §12 | T13 | planned |
-| PARETO-03 | No dominance across targets | VIS2-01 | constructed | T13, T14 | planned |
+| PARETO-01 | (1,3), (2,2), (3,1) all dominate (4,4), which is F2 | OPT1-08 | spec §12 | T13a | planned |
+| PARETO-02 | Equal objective pairs do not dominate each other | OPT1-08 | spec §12 | T13a | planned |
+| PARETO-03 | No dominance across targets | VIS2-01 | constructed | T13a, T14 | planned |
 | PARETO-04 | A dominated route that lies on the comparison boundary (an equal-time tie, as TRACE-01 D with B at 4 months) is drawn and labelled as bettered, never as a best trade-off | VIS2-02, VIS2-04 | TRACE-01 | T14 | planned |
-| FAMILY-01 | Schedules in one family can hold different ranks; the family shows its lowest rank, labelled | ROU1-03 | constructed | T13 | planned |
-| FAMILY-02 | Grouping, pagination and display filters never change the archive or proof scope | ROU1-04, VIS2-07 | constructed | T13, T14 | planned |
-| LIMITS-01 | State cap: stops with the exact reason, keeps every encountered record, coverage `budget_truncated` | OPT1-04 | constructed | T13 | planned |
-| LIMITS-02 | Wall-time cap: same, without comparing prefixes bit for bit | OPT1-04, OPT1-10 | constructed | T13 | planned |
-| LIMITS-03 | Archive cap: stops before an unrecorded candidate is lost | OPT1-04 | constructed | T13 | planned |
-| LIMITS-04 | Failed, cancelled and invalid-input runs never appear as succeeded, empty or complete | OPT1-05 | constructed | T13 | planned |
-| LIMITS-05 | Complete empty archive → `NO_ROUTE_IN_BOUNDED_MODEL`; truncated empty → none found before the limit | OPT1-07 | constructed | T13 | planned |
-| LIMITS-06 | Cancellation reaches the optimiser child process | OPT1-09 | constructed | T13 | planned |
+| FAMILY-01 | Schedules in one family can hold different ranks; the family shows its lowest rank, labelled | ROU1-03 | constructed | T13a | planned |
+| FAMILY-02 | Grouping, pagination and display filters never change the archive or proof scope | ROU1-04, VIS2-07 | constructed | T13a, T14 | planned |
+| LIMITS-01 | State cap: stops with the exact reason, keeps every encountered record, coverage `budget_truncated` | OPT1-04 | constructed | T13b | planned |
+| LIMITS-02 | Wall-time cap: same, without comparing prefixes bit for bit | OPT1-04, OPT1-10 | constructed | T13b | planned |
+| LIMITS-03 | Archive cap: stops before an unrecorded candidate is lost | OPT1-04 | constructed | T13b | planned |
+| LIMITS-04 | Failed, cancelled and invalid-input runs never appear as succeeded, empty or complete | OPT1-05 | constructed | T13a, T13b | planned |
+| LIMITS-05 | Complete empty archive → `NO_ROUTE_IN_BOUNDED_MODEL`; truncated empty → none found before the limit | OPT1-07 | constructed | T13a (complete), T13b (truncated) | planned |
+| LIMITS-06 | Cancellation reaches the optimiser child process | OPT1-09 | constructed | T13b | planned |
 | VERSIONS-01 | Confirmed edits create new input versions; a stale expected version is rejected (`STALE_INPUT_VERSION`) | PROF-05 | constructed | T3 | verified: `test_profile_writes_create_versions_and_reject_stale_expected_versions`, `test_rename_with_a_stale_version_is_rejected` (2556aef) |
 | VERSIONS-02 | Old plan versions stay immutable after a revision | PLAN-05 | constructed | T15 | planned |
 | VERSIONS-03 | A stale worker cannot overwrite a newer profile or catalogue version | DUR-04 | constructed | T3 | verified for profiles: the worker role cannot write profile tables at all, and concurrent writers from one version commit exactly one (`test_concurrent_writes_from_one_version_commit_exactly_one`) (2556aef). Since Task 5 a model proposal made against an older version is never applied to a newer one (`test_interview_turns.py::test_a_proposal_is_never_applied_to_a_newer_profile`, mutation-checked). Catalogues do not exist yet (T11) |
 | VERSIONS-04 | Editing an essential non-protected row creates a new target definition and invalidates earlier ranks | MAP1-04 | constructed | T9 | planned |
 | AI_RANGE-01 | [5, 8] fails a minimum of 6 under lower-bound filtering | AIR1-05 | TRACE-01 `score_record` | T7, T8 | planned |
 | AI_RANGE-02 | Unscored roles are included by default in exploration and counted | AIR1-05 | constructed | T7, T8 | planned |
-| AI_RANGE-03 | A strict planning threshold needs an explicit scoped command and excludes unscored roles | AIR1-06 | constructed | T11, T13 | planned |
+| AI_RANGE-03 | A strict planning threshold needs an explicit scoped command and excludes unscored roles | AIR1-06 | constructed | T11, T13a | planned |
 
 Generated properties (plan section 8):
 
 | ID | Property | Owner | Status |
 |---|---|---|---|
-| PROP-01 | Complete search: permuting the input catalogue preserves feasible sets and ranks | T13 | planned |
+| PROP-01 | Complete search: permuting the input catalogue preserves feasible sets and ranks | T13a | planned |
 | PROP-02 | Duplicate source copies preserve canonical job counts | T7 | planned |
-| PROP-03 | Relaxing a resource bound preserves feasibility in the mathematical model | T11, T13 | planned |
-| PROP-04 | Review rule, not a test: no false monotonicity is encoded (truncated prefixes may differ; adding options can change ranks) | T13 | planned |
+| PROP-03 | Relaxing a resource bound preserves feasibility in the mathematical model | T11, T13a | planned |
+| PROP-04 | Review rule, not a test: no false monotonicity is encoded (truncated prefixes may differ; adding options can change ranks) | T13a, T13b | planned |
 
 ## 4 Untagged M0 requirements (register anchors)
 
@@ -403,8 +413,8 @@ Generated properties (plan section 8):
 |---|---|---|---|---|
 | STATE-01 | One state vocabulary across chapters, API, database and exports: draft, running, partial, complete, cancelled, blocked by missing information, insufficient coverage, stale, provider unavailable, failed | API, UI | T3, T4 | verified: T3 part (2556aef): one `WorkState` enum in `nessa/vocabulary.py`, used by the runs table CHECK, the API, events and exports, plus `queued`. T4 part (Task 4 final candidate): the UI takes `WorkState` from the generated client and gives every value one label and glyph in `WORK_STATE: Record<WorkState, …>`; all six chapters show state through the same `StatusBadge` (blocked by missing information, not started); the Storybook vocabulary stories render every value on both surfaces and pass axe (`e2e/storybook.spec.ts`) |
 | STATE-02 | No hits reads "No matching listings found in the sources checked" with coverage and filters; a failed fetch never becomes "no jobs" | D, UI | T7, T8 | planned |
-| STATE-03 | A solver timeout never becomes "no feasible route" | D | T13 | planned |
-| STATE-04 | No feasible route: the smallest conflicting set only where proven, otherwise observed bottlenecks; relaxations offered, never applied silently | D, UI | T13, T14 | planned |
+| STATE-03 | A solver timeout never becomes "no feasible route" | D | T13b | planned |
+| STATE-04 | No feasible route: the smallest conflicting set only where proven, otherwise observed bottlenecks; relaxations offered, never applied silently | D, UI | T13a, T14 | planned |
 | STATE-05 | Labelled route sketch after a target and four practical inputs; never labelled feasible or Pareto; unresolved steps stay unresolved; no fabricated providers, prices or dates | UI | T6 | verified (T6, 2026-10-28): `GET .../sketch` gives ESCO's essential skills for a resolved target (resolved first by the occupation the person chose, `test_the_sketch_uses_the_occupation_the_person_chose_even_when_its_title_is_shared`), a choice for an ambiguous title, nearest occupations for a title ESCO lacks, and three steps always `unresolved`, labelled "Early sketch, not a checked route", with no provider, price or date, and lists the minimum inputs not asked yet (`test_discovery.py::test_the_sketch_lists_esco_requirements_for_a_target_and_every_step_stays_unresolved`, `e2e/conversation.spec.ts`). The five-minute usability target is a human check (H-05) |
 | STATE-06 | "What we know": proposed changes in a review tray (accept, edit, undo); facts and inferences styled differently; revision history; a changed constraint shows affected results before invalidating them | UI | T6 | verified for the tray (T6, 2026-10-28; fix round 1): accept and confirm by name (`YouChapter.test.tsx` "applies a limit only once confirmed by name"); edit, checked before anything is sent, sent in the one decision and saved as the person's own answer in the same version, kept with the reason if saving fails (`YouChapter.test.tsx` "an edit in the tray…" cases, `src/lib/conversation.test.ts`, `tests/integration/test_interview_turns.py::test_a_decision_saves_the_person_s_edits_with_the_accepted_ones_as_one_version`); skip and keep none record the proposal as not accepted (`conversation.test.ts`); undo of the last save restores the earlier answers with their own sources as a new version (`POST .../profile/revert`: `test_undo_restores_the_earlier_answers_with_their_own_sources_as_a_new_version`, `YouChapter.test.tsx` "undo restores…", `e2e/conversation.spec.ts`); an older tray never resurfaces; an inference has a dashed edge and "Nessa's reading"; revision history is the API's version list (`GET .../profile/versions`). Open: showing a changed constraint's affected results before invalidating them (no planning results exist until T11) |
 | STATE-07 | Long processes continue in the background and resume after the tab closes | UI, P | T3, T4 | verified: T3 part (2556aef): runs are durable server-side and survive worker kills and full stack restarts; the event stream resumes from `Last-Event-ID`, `test_stream_delivers_events_with_ids_and_resumes_after_last_event_id`. T4 part (Task 4 fix rounds 1 and 2): the browser stream resumes with `Last-Event-ID` on reconnect; it says "Live" only once bytes have arrived, re-authenticates instead of looping and backs off on transport failures, never faster than 1 s (`src/lib/events.test.ts`); a stream opened again on the same page resumes after the last event it saw, and Reconnect shows Connecting at once (`src/lib/queries.test.tsx`); through the web origin, a change saved by another client reaches an open page within 5 s with no reload (a page marker survives), and a newly opened page's stream starts after the workspace's `last_event_seq` (`e2e/session.spec.ts`); the open page survives `stop` and `demo` of every service, keeps its work on screen, reconnects and a reload reopens the same workspace and version (`e2e/journey.spec.ts`) |
@@ -474,6 +484,9 @@ Generated properties (plan section 8):
 | OPTN-05 | Provider employment-outcome marketing stays an unverified claim | D | T11, T12 | planned |
 | OPTN-06 | No finance applications, creditworthiness checks or regulated credit recommendations; grants and employer support shown before debt, with total charges | UI | T12 | planned |
 | OPTN-07 | The options include "remain in the current job while studying" and "apply now while building evidence" explicitly, where constraints permit | D, UI | T11, T12 | planned |
+| OPTN-08 | Option pack labelling (spec §11 v1.3; ruling R9): every surface that uses the England option pack (Roles, Skills, Options, Routes, Plan, exports) shows its date and each record's review state; a pack record never fills a live field and is never shown as current; synthetic data stays labelled synthetic and never enters the pack | UI, D | T7b, T8, T10, T12, T14, T15 | planned |
+| OPTN-09 | Proposed-state rule (spec §§10–11 v1.3): live research writes the same catalogue contract inside its own workspace, never into the pack, with `review_state: proposed`; a proposed record, from live research or from the pack before review, is explorable but never enters an unqualified "affordable and feasible" recommendation, or an unqualified readiness result, until reviewed | D, UI | T7, T9, T11, T12 | planned |
+| OPTN-10 | The option pack is a versioned, dated, immutable public evidence pack for P01–P05's targets in the spec §18 record shapes (LearningOption and Offering, FundingInstrument, SkillRequirement rows, `PlanAction.outcomes`), each with SourceClaims, rights status, `review_state` and dates; every record starts `proposed`; fetched and hash-checked like ESCO (R7) or committed only if small and its rights permit; its format is validated in the fast checks and versioned | P, D, DOC | T7b | planned |
 
 ### FRESH Cache, freshness and evidence lifecycle (spec §11)
 
@@ -492,14 +505,14 @@ Generated properties (plan section 8):
 |---|---|---|---|---|
 | PLN-01 | The catalogue includes information-gathering, application and waiting actions, so time is never free | D | T11 | planned |
 | PLN-02 | Current commitments and completed prerequisites are part of the initial state, never hidden free actions; a retained current job is a commitment, and any resignation date is an explicit user decision, never a side effect | D | T11 | planned |
-| PLN-03 | Entry predicates support any-of/all-of credentials, proficiency thresholds, experience types, employment offers and location eligibility; every selected precedence a → b satisfies finish(a) ≤ start(b); selection chooses reviewed records and invokes no interval solver | D | T11, T13 | planned |
+| PLN-03 | Entry predicates support any-of/all-of credentials, proficiency thresholds, experience types, employment offers and location eligibility; every selected precedence a → b satisfies finish(a) ≤ start(b); selection chooses reviewed records and invokes no interval solver | D | T11, T13a | planned |
 | PLN-04 | Learning outcomes are thresholds tied to an assessed completion event, with an uncertainty flag and a verification milestone; experience accrues only from relevant tasks at the appropriate responsibility level after the employment gate | D | T9, T11 | planned |
 | PLN-05 | An intermediate job is a conditional event: application effort, an uncertain wait, then an offer/acceptance gate; no assumed wages are spent before the gate | D | T11 | planned |
-| PLN-06 | Every returned route passes the hard checks of spec §12: prerequisites and legal, regulatory, recognition, residence/work-permission and entry gates; confirmed intakes, application dates, location consistency and a finite horizon; the weekly availability ceiling without double-counted time; direct-spend and monthly-payment caps; minimum reserve, maximum drawdown, borrowing consent, debt limits and financing compatibility; minimum target salary or work-quality filters; funding exclusivity, eligible-cost caps, disbursement delays and conditions; explicitly enabled AI thresholds; no redundant credentials, fee-churning, negative-cost loops or artificial job switches | D | T11, T13 | planned |
+| PLN-06 | Every returned route passes the hard checks of spec §12: prerequisites and legal, regulatory, recognition, residence/work-permission and entry gates; confirmed intakes, application dates, location consistency and a finite horizon; the weekly availability ceiling without double-counted time; direct-spend and monthly-payment caps; minimum reserve, maximum drawdown, borrowing consent, debt limits and financing compatibility; minimum target salary or work-quality filters; funding exclusivity, eligible-cost caps, disbursement delays and conditions; explicitly enabled AI thresholds; no redundant credentials, fee-churning, negative-cost loops or artificial job switches | D | T11, T13a | planned |
 | PLN-07 | Verified inputs, modelled outcomes and conditions to resolve stay distinct; conditional branches ("if funding is approved", "if an intermediate offer is accepted") are never shown as simultaneously affordable | D, UI | T11, T14 | planned |
 | PLN-08 | Stress cases (no award, missed intake, slower learning, longer job search, reduced study capacity, higher commute cost) are reused across competing routes; M0 evaluates fixed plans under the base case and explicit delay, no-award and no-offer cases, reports failed readiness or cash checks, and optimises no adaptive policy | D | T11 | planned |
 | PLN-09 | No individual hiring probability is learned from convenience samples or extrapolated across demographic groups; uncalibrated uncertainty stays as scenario ranges and reviewable assumptions | D, M | T11 | planned |
-| PLN-10 | Each target role, seniority and target-quality specification has its own feasible set; a cross-career comparison keeps target identity, preference fit and job-quality differences | D, UI | T13, T14 | planned |
+| PLN-10 | Each target role, seniority and target-quality specification has its own feasible set; a cross-career comparison keeps target identity, preference fit and job-quality differences | D, UI | T13a, T14 | planned |
 
 ### PLAN Progress and the chosen plan (spec §15)
 
@@ -545,9 +558,9 @@ Generated properties (plan section 8):
 | DUR-02 | Activities idempotent (keys, fingerprints, unique constraints); duplicate model spend reconciled; no exactly-once claim; accepted output checked before re-calling the model (carry-forward M4) | P | T3 | verified | `test_a_crash_after_acceptance_never_calls_the_model_again_and_keeps_the_usage`, `test_a_crash_after_a_recorded_failure_returns_it_without_a_second_call`, `test_worker_killed_mid_call_recovers_to_one_output_and_keeps_the_ambiguous_charge` (interrupted attempt stays `unknown` with its reservation); one output per run (unique); idempotent commands `test_a_retried_command_returns_the_first_result_and_acts_once` (2556aef) |
 | DUR-03 | Long operations return 202 and a run ID; server-sent events with IDs allow reconnect; the terminal API state is authoritative; partial results carry completeness and freshness | API, UI | T3, T4 | planned | T3 part verified (2556aef): 202 + run ID + `Location` (`test_runs_keys_and_spend_of_another_actor_are_invisible`), SSE with IDs and `Last-Event-ID` resume (`test_events.py`), `GET /runs/{id}` authoritative. T4 part (Task 4 fix round 1): the UI reads the stream with IDs and reconnects with `Last-Event-ID` (`src/lib/events.test.ts`, `src/lib/sse.test.ts`, `e2e/journey.spec.ts`); the workspace reports its last event so a reopened page resumes there (`tests/integration/test_events.py::test_a_workspace_reports_its_last_event_so_a_reopened_page_resumes_there`, `e2e/session.spec.ts`); events only trigger refetches of the authoritative resources. Open: partial results with completeness and freshness (no producer yet; the first run kind that returns partial results owns it) |
 | DUR-04 | A stale profile version cannot overwrite a newer one | P | T3 | verified | `test_concurrent_writes_from_one_version_commit_exactly_one`, stale write `409 STALE_INPUT_VERSION` (2556aef) |
-| DUR-05 | Cancellation reaches model calls and compute processes, not just the spinner | P, S | T3, T13 | planned | not done in T3: no cancel command yet (the `cancelled` state exists in the vocabulary and schema). Needs a run-lifecycle owner before Sprint 3's long runs, and T13 for the solver |
+| DUR-05 | Cancellation reaches model calls and compute processes, not just the spinner | P, S | T3, T13b | planned | not done in T3: no cancel command yet (the `cancelled` state exists in the vocabulary and schema). Needs a run-lifecycle owner before Sprint 3's long runs, and T13b for the solver |
 | DUR-06 | Workspace deletion removes private payloads, object copies and workflow histories (or their payload keys) | P, S | T15, T16 | planned | |
-| DUR-07 | Research snapshots its inputs; solves consume a frozen snapshot, never a moving catalogue | D, P | T11, T13 | planned | |
+| DUR-07 | Research snapshots its inputs; solves consume a frozen snapshot, never a moving catalogue | D, P | T11, T13a | planned | |
 | DUR-08 | An app-database outage during an activity ends in a typed terminal state, never a run stuck queued (carry-forward, ADR 0002 decision 7) | P | T3 | verified | `test_worker_boundaries.py`: `test_a_short_app_database_outage_mid_call_keeps_the_paid_result` (12 s lockout mid-call; the run completes on that one call) and `test_an_outage_longer_than_the_store_budget_ends_in_a_typed_terminal_state` (run ends `failed/app_store_unavailable`, the attempt settled `interrupted/unknown`); the DBOS-`ERROR` reconciler `test_the_reconciler_publishes_an_errored_workflow_s_accepted_output` (ERROR simulated); `tests/domain/test_failures.py` (2556aef; Task 3 fix round) |
 
 ### API Data contracts and errors (spec §18)
@@ -615,18 +628,31 @@ checklist. An agent critique is never a review score.
 
 | ID | Gate | When | Status | Checklist |
 |---|---|---|---|---|
-| H-01 | Design-review scores (1–5 per category, every category ≥ 4 before release) | Sprints 1, 3, 7, 9 | Sprint 1 approved by the product owner on 2026-10-28, no category scores recorded; Sprints 3, 7, 9 not run — requires human | sprint review packages |
+| H-01 | Design-review scores (1–5 per category, every category ≥ 4 before release) | Sprints 1, 3, 7 (at session 3, before Task 14 closes), 9 | Sprint 1 approved by the product owner on 2026-10-28, no category scores recorded; Sprints 3, 7, 9 not run — requires human | sprint review packages |
 | H-02 | Approval of the three Sprint 0 signature compositions | Sprint 0 | approved by the product owner on 2026-10-28, no category scores recorded; S0-V01–S0-V08 open | `docs/reviews/sprint-0.md` |
 | H-03 | VoiceOver walkthrough on the target Mac | Sprint 9 | not run — requires human | T16 |
 | H-04 | Real Safari checks, including print | Sprints 8, 9 | not run — requires human | T15, T16 |
 | H-05 | Five formative task sessions (4 of 5 complete unaided; any dangerous misunderstanding blocks) | Sprint 9 | not run — requires human | T16 |
-| H-06 | Source rights review of every retained corpus page | Sprints 3–5 | not run — requires human | `corpus/README.md` |
-| H-07 | Domain reviewer sign-off on consequential requirement/outcome mappings and the financial worked examples, including the fixture hand check | Sprints 0, 4, 5 | Sprint 0 part (the fixture hand check's modelling rules) confirmed by the product owner on 2026-10-28; Sprints 4 and 5 not run — requires human | `docs/evidence/fixture-hand-check.md` |
+| H-06 | Source rights review of every retained corpus page. From plan v1.1 in two parts: a rights policy for the permitted source classes of the corpus and the option pack, set by a person at session 1, against which agents classify each page, recording the class and the terms relied on; and a person's review of any page outside those classes or not clearly within one, which stays "pending human rights review" until then | Session 1 (policy); Sprints 3–5 (pages outside the classes) | not run — requires human | `corpus/README.md`; session 1 |
+| H-07 | Domain reviewer sign-off on consequential requirement/outcome mappings and the financial worked examples, including the fixture hand check | Sprint 0; Sprints 4 and 5 at session 2, on the option pack and the TRACE-01 checker run on P01's real option set (TEST1-14) | Sprint 0 part (the fixture hand check's modelling rules) confirmed by the product owner on 2026-10-28; Sprints 4 and 5 not run — requires human | `docs/evidence/fixture-hand-check.md`; Task 7b and Task 11 session 2 package |
 | H-08 | Privacy assessment or DPIA decision before any real person's data is processed | before real data | not run — requires human | spec §19 |
 | H-09 | Product-owner confirmation of ADR 0003 (Contributor test model for synthetic data) | open | confirmed by the product owner on 2026-10-28 | ADR 0003 |
 | H-10 | Accountable review of each published AI Resilience range record | Sprint 3 onward | not run — requires human | AIR-1 step 3 |
 | H-11 | Rights and product-owner review of Task 5's reference data and provisional decisions: the ESCO licence reading and adapted-version marking, the city list and aliases, ONS regions, the hard-constraint set, the basis of no-value answers, concept-key folding | Sprint 2 | reviewed by the product owner on 2026-10-28: all six confirmed; the hard-constraint set also gains a salary floor, implemented in T6 (`minimum_salary`, ADR 0006 decision 6, ADR 0007 decision 2) | ADR 0006, "Human review checklist" |
-| H-12 | Reviewed sign-off of Task 6's support policy (the one recall-first screen, its normalisation, word lists and windows, the panel and smaller-step instruction wording, resources, sending every message and storing neither, the known limits: a finite English list of words and constructions, false positives that show the panel, no intent judgement, messages never sent or refused before reading are not screened), the inference word lists and kindred groups, the slate's weights, quotas and folding, the interview repair rate, the counterfactual tolerance and the 43 evaluation cases | Sprint 2 | not run — requires human | ADR 0007, "Human review checklist" |
+| H-12 | Reviewed sign-off of Task 6's support policy (the one recall-first screen, its normalisation, word lists and windows, the panel and smaller-step instruction wording, resources, sending every message and storing neither, the known limits: a finite English list of words and constructions, false positives that show the panel, no intent judgement, messages never sent or refused before reading are not screened), the inference word lists and kindred groups, the slate's weights, quotas and folding, the interview repair rate, the counterfactual tolerance and the 43 evaluation cases | Sprint 2; held at session 1 | not run — requires human | ADR 0007, "Human review checklist" |
+| H-13 | Formative comprehension session (plan §5, v1.1): one person, 30 minutes, synthetic data, on the fixture route comparison and the TRACE-01 ledger (screenshots or Storybook); they explain the cost shown, what "conditional readiness" means and what is uncertain; any dangerous misunderstanding is recorded as a Sprint 7 scope input; formative, not statistical; the five Sprint 9 sessions (H-05) are unchanged. Run by the product owner | Session 2 (after Task 11) | not run — requires human | Task 11's session 2 package; recorded by T12, read by T14 |
+
+### Human review sessions (plan §10, v1.1; ruling R10; ADR 0008)
+
+Three fixed sessions, each a dispatch precondition. The controller does not dispatch a task
+whose precondition session has not happened; it records "blocked: awaiting session N". Only
+the product owner's own record of a session establishes its outcome.
+
+| Session | When | Closes | Dispatch precondition for | Status |
+|---|---|---|---|---|
+| Session 1, about 2 h | Before Task 8, and before any page body is retained beyond the source classes it permits (until then ruling R3 governs retention) | H-06 (the rights policy for permitted source classes); H-12 | Task 8; retaining or committing page bodies beyond R3 | not run — requires human |
+| Session 2, about 2 h | After Task 11 | H-07 (Sprints 4 and 5: the option pack and TRACE-01 checker, TEST1-14); H-13 | Tasks 10, 12 and 8 (scoring against reviewed values, TEST1-13), Task 13a, the start of Task 14 | not run — requires human |
+| Session 3, about 1 h | Before Task 14 closes | H-01 (Sprint 7, against what session 2 showed) | Closing Task 14, and so Task 15 | not run — requires human |
 
 ## 7 Not tested in L0, by decision
 
