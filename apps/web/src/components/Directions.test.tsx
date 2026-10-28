@@ -324,6 +324,7 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     const notice = screen.getByText(/These suggestions have had their one written note\./);
     expect(notice).toHaveTextContent(/would be replaced/); // it says what Suggest again does
     expect(screen.queryByRole("button", { name: /Try again/ })).toBeNull();
+    expect(screen.queryByText(/Try again, or add the details yourself/)).toBeNull(); // not offered
     await user.click(screen.getByRole("button", { name: "Suggest again" }));
 
     await waitFor(() => expect(sent.some((s) => s.path.endsWith("/discoveries"))).toBe(true));

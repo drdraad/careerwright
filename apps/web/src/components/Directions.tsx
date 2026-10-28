@@ -362,7 +362,9 @@ function NoteRecovery({
         )
       }
     >
-      <p>{state.action}</p>
+      {/* Once the slate has had its call, only Suggest again is offered, so a failure's
+          own advice (which may say "try again") is not repeated. */}
+      {!again && <p>{state.action}</p>}
       <p>
         {again
           ? NOTE_RECOVERY.suggestAgain

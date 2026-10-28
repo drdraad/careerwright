@@ -215,8 +215,10 @@ const slateNote =
     const anchor = notice
       ? directions.getByText(/^No written note:/)
       : first.getByText("Why this could suit you");
-    await anchor.evaluate((element) =>
-      element.scrollIntoView({ block: notice ? "start" : "center" }),
+    // The callback runs in the page, so the block is passed to it.
+    await anchor.evaluate(
+      (element, block) => element.scrollIntoView({ block }),
+      notice ? ("start" as const) : ("center" as const),
     );
   };
 
