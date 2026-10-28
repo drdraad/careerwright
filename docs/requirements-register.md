@@ -623,7 +623,7 @@ checklist. An agent critique is never a review score.
 | H-06 | Source rights review of every retained corpus page | Sprints 3–5 | not run — requires human | `corpus/README.md` |
 | H-07 | Domain reviewer sign-off on consequential requirement/outcome mappings and the financial worked examples, including the fixture hand check | Sprints 0, 4, 5 | not run — requires human | `docs/evidence/fixture-hand-check.md` |
 | H-08 | Privacy assessment or DPIA decision before any real person's data is processed | before real data | not run — requires human | spec §19 |
-| H-09 | Product-owner confirmation of ADR 0003 (Contributor test model for synthetic data) | open | not run — requires human | ADR 0003 |
+| H-09 | Product-owner confirmation of ADR 0003 (Contributor test model for synthetic data) | open | confirmed by the product owner on 2026-10-28 | ADR 0003 |
 | H-10 | Accountable review of each published AI Resilience range record | Sprint 3 onward | not run — requires human | AIR-1 step 3 |
 | H-11 | Rights and product-owner review of Task 5's reference data and provisional decisions: the ESCO licence reading and adapted-version marking, the city list and aliases, ONS regions, the hard-constraint set, the basis of no-value answers, concept-key folding | Sprint 2 | reviewed by the product owner on 2026-10-28: all six confirmed; the hard-constraint set also gains a salary floor (open until implemented, T6) | ADR 0006, "Human review checklist" |
 

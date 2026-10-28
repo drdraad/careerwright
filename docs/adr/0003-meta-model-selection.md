@@ -1,7 +1,8 @@
 # ADR 0003: Meta model selection, test and production
 
-- Status: **Provisional, needs product owner confirmation** (ruling R6). The data-use choice
-  for the test model is a product decision.
+- Status: **Accepted.** Confirmed by the product owner on 2026-10-28 (H-09): the test model
+  `muse-spark-1.3-contributor` is used for synthetic or public inputs only, and production
+  uses `muse-spark-1.3`. The data-use choice for the test model is a product decision.
 - Date: 2026-10-27
 - Requirements: spec section 16 (Current Meta choices, Privacy mode, Spend controls), ARC-1,
   ruling R5
