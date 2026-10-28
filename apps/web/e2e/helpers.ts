@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { AUTH_ORIGIN, FIXTURE_WORKSPACE, WEB_ORIGIN } from "./stack";
 
 const require = createRequire(import.meta.url);
@@ -65,13 +65,6 @@ export async function axe(page: Page): Promise<AxeViolation[]> {
   });
 }
 
-export async function expectNoHorizontalOverflow(page: Page) {
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - window.innerWidth,
-  );
-  expect(overflow).toBeLessThanOrEqual(0);
-}
-
 /**
  * The strip's live-update state, matched exactly: its accessible text is "Live updates:
  * <state>", so a loose match on "Live" would also match "Live updates: Reconnecting".
@@ -79,9 +72,4 @@ export async function expectNoHorizontalOverflow(page: Page) {
 export function liveUpdates(page: Page, state: "Live" | "Connecting" | "Reconnecting" | RegExp) {
   const pattern = state instanceof RegExp ? state : new RegExp(`^Live updates: ${state}$`);
   return page.getByRole("status").filter({ hasText: pattern });
-}
-
-/** The shell is ready: the chapter heading is shown and live updates are connected. */
-export async function expectChapter(page: Page, heading: string) {
-  await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
 }

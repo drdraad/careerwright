@@ -1,49 +1,9 @@
 // The request boundary through the web origin (BND1-13, SEC-01, DUR-04): identity and
 // invitation, another person's workspace, foreign Host and Origin values, and a stale save.
-import { request as httpRequest } from "node:http";
 import { expect, test } from "@playwright/test";
+import { WEB_HOST as HOST, raw, emulatorToken as token } from "./api";
 import { chapterUrl, signIn } from "./helpers";
-import { AUTH_ORIGIN, FIXTURE_WORKSPACE, PORTS, WEB_ORIGIN } from "./stack";
-
-type Raw = { status: number; body: string };
-
-/** A raw HTTP call to the web origin, so Host and Origin are exactly what the test says. */
-function raw(method: string, path: string, headers: Record<string, string>, body?: string) {
-  return new Promise<Raw>((resolve, reject) => {
-    const call = httpRequest(
-      { host: "127.0.0.1", port: PORTS.web, method, path, headers },
-      (response) => {
-        let text = "";
-        response.setEncoding("utf8");
-        response.on("data", (chunk: string) => {
-          text += chunk;
-        });
-        response.on("end", () => resolve({ status: response.statusCode ?? 0, body: text }));
-      },
-    );
-    call.on("error", reject);
-    if (body !== undefined) call.write(body);
-    call.end();
-  });
-}
-
-async function token(handle: string): Promise<string> {
-  const response = await fetch(
-    `${AUTH_ORIGIN}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=emulator`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        email: `${handle}@nessa.test`,
-        password: `nessa-demo-${handle}`,
-        returnSecureToken: true,
-      }),
-    },
-  );
-  return ((await response.json()) as { idToken: string }).idToken;
-}
-
-const HOST = `127.0.0.1:${PORTS.web}`;
+import { FIXTURE_WORKSPACE, PORTS, WEB_ORIGIN } from "./stack";
 
 test("[SEC-01] an uninvited account can sign in but is refused, and says so", async ({ page }) => {
   await signIn(page, "uninvited");
