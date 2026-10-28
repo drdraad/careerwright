@@ -27,6 +27,7 @@ from nessa.profile.records import (
     InterviewPreferences,
     TurnDecision,
 )
+from nessa.profile.safety import SupportConcern
 
 
 class ProposedChangeOut(ResponseModel):
@@ -173,6 +174,39 @@ class TurnOut(ResponseModel):
         )
 
 
+class SupportNoteOut(ResponseModel):
+    """Shown beside a turn whose message used a risk word without stating acute distress in
+    the first person: the message was sent as usual. Nothing about it is stored."""
+
+    policy: Literal["risk_mention", "acute_distress"]
+    policy_version: str
+    review_status: str = Field(description="The policy is provisional until reviewed.")
+    message: str
+    resources: list["SupportResourceOut"]
+
+    @classmethod
+    def of(cls, concern: SupportConcern) -> "SupportNoteOut":
+        return cls(
+            policy=concern.tier.value,
+            policy_version=concern.policy_version,
+            review_status=safety.REVIEW_STATUS,
+            message=safety.SUPPORT_NOTE,
+            resources=_resources(),
+        )
+
+
+class TurnSubmittedOut(TurnOut):
+    """A new turn, with the support note when its message used a risk word."""
+
+    support_note: SupportNoteOut | None
+
+    @classmethod
+    def sent(cls, turn: TurnOut, note: SupportConcern | None) -> "TurnSubmittedOut":
+        return cls(
+            **turn.model_dump(), support_note=None if note is None else SupportNoteOut.of(note)
+        )
+
+
 class SupportResourceOut(ResponseModel):
     name: str
     contact: str
@@ -200,17 +234,24 @@ class SupportResponseOut(ResponseModel):
             policy_version=shown.concern.policy_version,
             review_status=safety.REVIEW_STATUS,
             message=safety.SUPPORT_MESSAGE,
-            resources=[
-                SupportResourceOut(
-                    name=r.name,
-                    contact=r.contact,
-                    when=r.when,
-                    source_url=r.source_url,
-                    checked_on=r.checked_on,
-                )
-                for r in safety.SUPPORT_RESOURCES
-            ],
+            resources=_resources(),
         )
+
+
+def _resources() -> list[SupportResourceOut]:
+    return [
+        SupportResourceOut(
+            name=r.name,
+            contact=r.contact,
+            when=r.when,
+            source_url=r.source_url,
+            checked_on=r.checked_on,
+        )
+        for r in safety.SUPPORT_RESOURCES
+    ]
+
+
+SupportNoteOut.model_rebuild()
 
 
 class PreferencesOut(ResponseModel):

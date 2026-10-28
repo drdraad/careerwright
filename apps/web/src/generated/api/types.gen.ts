@@ -1763,6 +1763,9 @@ export type SalaryFloor = {
 
 /**
  * SalaryInput
+ *
+ * A new answer: a floor is more than £0. Checked on input only, so a version stored
+ * before the rule still opens (read, history, export).
  */
 export type SalaryInput = {
     state: FieldState;
@@ -2311,6 +2314,37 @@ export type SuggestionOut = {
 };
 
 /**
+ * SupportNoteOut
+ *
+ * Shown beside a turn whose message used a risk word without stating acute distress in
+ * the first person: the message was sent as usual. Nothing about it is stored.
+ */
+export type SupportNoteOut = {
+    /**
+     * Policy
+     */
+    policy: 'risk_mention' | 'acute_distress';
+    /**
+     * Policy Version
+     */
+    policy_version: string;
+    /**
+     * Review Status
+     *
+     * The policy is provisional until reviewed.
+     */
+    review_status: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Resources
+     */
+    resources: Array<SupportResourceOut>;
+};
+
+/**
  * SupportResourceOut
  */
 export type SupportResourceOut = {
@@ -2622,6 +2656,40 @@ export type TurnPage = {
      * Next Cursor
      */
     next_cursor: string | null;
+};
+
+/**
+ * TurnSubmittedOut
+ *
+ * A new turn, with the support note when its message used a risk word.
+ */
+export type TurnSubmittedOut = {
+    /**
+     * Turn Id
+     */
+    turn_id: string;
+    /**
+     * Message Id
+     */
+    message_id: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Profile Version
+     *
+     * The profile version the message was sent with.
+     */
+    profile_version: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    run: RunOut;
+    proposal: ProposalOut | null;
+    decision: DecisionOut | null;
+    support_note: SupportNoteOut | null;
 };
 
 /**
@@ -3780,13 +3848,13 @@ export type SubmitTurnError = SubmitTurnErrors[keyof SubmitTurnErrors];
 
 export type SubmitTurnResponses = {
     /**
-     * The message explicitly expresses acute distress: the support response, with nothing sent to the interviewer or stored.
+     * The message states acute distress in the first person: the support response, with nothing sent to the interviewer or stored.
      */
     200: SupportResponseOut;
     /**
      * Successful Response
      */
-    202: TurnOut;
+    202: TurnSubmittedOut;
 };
 
 export type SubmitTurnResponse = SubmitTurnResponses[keyof SubmitTurnResponses];

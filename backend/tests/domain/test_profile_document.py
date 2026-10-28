@@ -243,6 +243,23 @@ def test_the_salary_floor_is_gross_pay_with_its_period_and_unknown_is_never_zero
         )
 
 
+@pytest.mark.req("STATE-08", "VERSIONS-01")
+def test_a_stored_floor_of_nothing_from_before_the_rule_still_reads() -> None:
+    # Re-review N-M2: "more than £0" is an input rule; a version saved before it still
+    # opens (read, history, export and revert would otherwise fail).
+    stored = empty_profile().model_dump(mode="json")
+    stored["minimum_salary"] = {
+        "state": "provided",
+        "value": {"amount": {"minor_units": 0, "currency": "GBP"}, "period": "year"},
+        "source_ref_id": str(SOURCE),
+    }
+
+    document = ProfileDocument.model_validate(stored)
+
+    assert document.minimum_salary.value is not None
+    assert document.minimum_salary.value.amount.minor_units == 0
+
+
 @pytest.mark.req("REC1-01", "REC1-03")
 def test_work_style_is_an_optional_described_preference_never_a_limit() -> None:
     new = profile_input(work_style=provided(["outdoors", "a small team"]))

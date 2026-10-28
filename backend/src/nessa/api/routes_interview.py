@@ -18,6 +18,7 @@ from nessa.api.interview_schemas import (
     SupportResponseOut,
     TurnOut,
     TurnPage,
+    TurnSubmittedOut,
 )
 from nessa.api.pagination import DEFAULT_LIMIT, MAX_LIMIT, decode_timestamped, encode
 from nessa.api.routes_runs import run_out
@@ -53,12 +54,12 @@ def turn_out(tx: Tx, keyring: Keyring, view: TurnView) -> TurnOut:
 @router.post(
     "/turns",
     status_code=202,
-    response_model=TurnOut,
+    response_model=TurnSubmittedOut,
     responses={
         200: {
             "model": SupportResponseOut,
-            "description": "The message explicitly expresses acute distress: the support "
-            "response, with nothing sent to the interviewer or stored.",
+            "description": "The message states acute distress in the first person: the "
+            "support response, with nothing sent to the interviewer or stored.",
         }
     },
     operation_id="submit_turn",
@@ -67,7 +68,7 @@ def submit(
     workspace_id: uuid.UUID, body: SubmitTurn, caller: CallerDep, deps: Deps, key: IdempotencyKey
 ) -> JSONResponse:
     def execute(tx: Tx) -> CommandResult:
-        view = submit_turn(
+        sent = submit_turn(
             tx,
             caller.actor,
             workspace_id,
@@ -78,16 +79,15 @@ def submit(
             defaults=deps.spend_defaults,
             now=deps.clock(),
         )
-        if isinstance(view, SupportShown):
+        if isinstance(sent, SupportShown):
             return CommandResult(
                 200,
-                SupportResponseOut.of(view).model_dump(mode="json"),
+                SupportResponseOut.of(sent).model_dump(mode="json"),
                 workspace_id,
                 record=False,
             )
-        return CommandResult(
-            202, turn_out(tx, deps.keyring, view).model_dump(mode="json"), workspace_id
-        )
+        submitted = TurnSubmittedOut.sent(turn_out(tx, deps.keyring, sent.view), sent.note)
+        return CommandResult(202, submitted.model_dump(mode="json"), workspace_id)
 
     request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
     status, response = run_idempotent(

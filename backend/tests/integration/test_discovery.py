@@ -16,11 +16,14 @@ from fastapi.testclient import TestClient
 
 from nessa.api.app import create_app
 from nessa.api.deps import ApiDependencies
+from nessa.catalogue.taxonomy import held_release
 from nessa.config import RuntimeMode
+from nessa.db import system_transaction
 from tests.integration.durable import Scenario, make_scenario
 from tests.support.client import ApiClient, profile_with
 from tests.support.esco import SAMPLE_RELEASE
-from tests.support.infra import API_BASE, Infra
+from tests.support.infra import API_BASE, Infra, migrator_engine
+from tools.evaluation import load_cases, observe_discovery_offline
 
 pytestmark = pytest.mark.integration
 
@@ -380,6 +383,25 @@ def test_the_sketch_uses_the_occupation_the_person_chose_even_when_its_title_is_
     assert target["requirements"]
 
 
+@pytest.mark.req("TAX1-01", "DIV1-04")
+def test_a_slate_read_against_another_release_than_its_searches_says_so(infra: Infra) -> None:
+    # Re-review N-M9: the note reaches a computed slate, not only the pure function.
+    case = next(c for c in load_cases() if c.id == "DSC-01")
+    engine = migrator_engine(infra)
+    try:
+        with system_transaction(engine) as tx:
+            held = held_release(tx).dataset_id
+            same = observe_discovery_offline(tx, case, release=held)
+            other = observe_discovery_offline(tx, case, release="esco-v1.1.1-en-csv")
+    finally:
+        engine.dispose()
+
+    assert not [note for note in same["notes"] if "were chosen when" in note]
+    [note] = [note for note in other["notes"] if "were chosen when" in note]
+    assert "esco-v1.1.1-en-csv" in note
+    assert held in note
+
+
 @pytest.mark.req("SEC-02", "API-01")
 def test_another_account_or_a_missing_workspace_is_not_found_never_an_empty_result(
     api: ApiClient, ada: str, ben: str, scenario: Scenario
@@ -405,6 +427,7 @@ def test_another_account_or_a_missing_workspace_is_not_found_never_an_empty_resu
     writes = [
         ("POST", f"{mine}/discoveries", {"expected_profile_version": 2}),
         ("POST", f"{mine}/targets", {"expected_version": 2, "concept_id": real}),
+        ("POST", f"{mine}/profile/revert", {"expected_version": 2, "to_version": 1}),  # N-M1
         (
             "PUT",
             f"{mine}/interview/preferences",

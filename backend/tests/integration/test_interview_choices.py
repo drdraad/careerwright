@@ -141,6 +141,41 @@ def test_explicit_acute_distress_gets_support_before_any_model_call_and_nothing_
     assert worker.stop() == 0
 
 
+@pytest.mark.req("PROF-09")
+def test_any_other_risk_word_is_sent_as_usual_with_a_support_note(scenario: Scenario) -> None:
+    # Tier 2 (controller ruling, fix round 2): never blocked, never silently dropped.
+    turns = f"/v1/workspaces/{scenario.workspace_id}/interview/turns"
+    mention = "I volunteer on a suicide prevention helpline and want paid work like it."
+    plain = "I could work in Leeds."
+
+    noted = scenario.api.write(
+        "POST", turns, scenario.token, {"expected_profile_version": 1, "message": mention}
+    )
+    ordinary = scenario.api.write(
+        "POST", turns, scenario.token, {"expected_profile_version": 1, "message": plain}
+    )
+
+    assert noted.status_code == 202, noted.text  # sent to the interviewer as usual
+    note = noted.json()["support_note"]
+    assert (note["policy"], note["policy_version"]) == ("risk_mention", "support-policy-2")
+    assert {r["name"] for r in note["resources"]} == {
+        "Emergency services",
+        "NHS 111",
+        "Samaritans",
+        "Shout",
+    }
+    assert "sent to Nessa as usual" in note["message"]
+    assert ordinary.status_code == 202
+    assert ordinary.json()["support_note"] is None
+    listed = scenario.api.get(turns, scenario.token).json()["items"]
+    assert {t["message"] for t in listed} == {mention, plain}
+    assert all("support_note" not in t for t in listed)  # nothing about it is stored
+    worker = scenario.worker("worker")
+    for body in (noted.json(), ordinary.json()):
+        scenario.wait_terminal(body["turn_id"])
+    assert worker.stop() == 0
+
+
 @pytest.mark.req("PROF-04", "STATE-08", "PROF-05")
 def test_a_salary_floor_is_saved_only_when_confirmed_and_unknown_is_never_zero(
     scenario: Scenario,

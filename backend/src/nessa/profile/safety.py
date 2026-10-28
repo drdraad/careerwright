@@ -4,12 +4,19 @@ section 4, "Uncertainty and emotional comfort"; S2.6; PROF-09, REC1-02).
 It is kept apart from career suitability: nothing here scores, labels or remembers the
 person, and nothing it sees reaches the profile or a suggestion.
 
-- **Explicit acute distress.** A message that says so in so many words (wanting to die,
-  suicide, self-harm) is answered at once with a fixed support response and the UK services
-  below, before any model call: it is not sent to the interviewer, not stored as a turn and
-  never used for suggestions. Only explicit wording counts, so ordinary figures of speech
-  ("this commute is killing me") do not; a person shown the response by mistake can choose
-  to send the message anyway. Clinical screening is out of scope; this is not one.
+- **A two-tier screen** (controller ruling, Task 6 fix round 2):
+  - *Acute* (tier 1): a first-person statement of intent or distress ("I want to die", "I
+    feel suicidal", "I've been self-harming", "I don't want to live any more") is answered
+    at once with a fixed support response and the UK services below, before any model
+    call: it is not sent to the interviewer, not stored as a turn and never used for
+    suggestions. A person shown it by mistake can choose to send the message anyway.
+  - *Mention* (tier 2): any other use of a risk word ("suicide prevention work", "I took my
+    life savings", "killing myself with overtime") is sent as usual, and the person sees a
+    calm support note with the same services beside it. No risk word is ever silently
+    dropped, and ordinary career talk is never blocked.
+  Only words count, so figures of speech without a risk word ("this commute is killing me")
+  get nothing. Tier 1 rests on positive evidence only (who and what), never on a list of
+  words that excuse a match. Clinical screening is out of scope; this is not one.
 - **Inference.** Model output may not suggest a health condition, a diagnosis or a
   personality type the person never mentioned, and never gives a percentage the person did
   not use (no "92% match"). A condition the person names may be acknowledged, to ask which
@@ -23,33 +30,54 @@ phrase lists and the resources. The resources were checked on the services' own 
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from enum import StrEnum
 
-POLICY_VERSION = "support-policy-1"
+POLICY_VERSION = "support-policy-2"
 CHECKED_ON = "2026-10-28"
 REVIEW_STATUS = "provisional: needs reviewed sign-off (human gate H-12)"
 
-# Explicit statements only, matched case-insensitively on whole words. Career talk uses the
-# same words with another meaning ("take my life in a new direction", "my life savings",
-# "I don't want to live in London", "suicide prevention work"), so each phrase also needs
-# its meaning: an object that is the person's life, or the end of the clause.
-_CLAUSE_END = r"(?=\s*(?:any ?more|now)?\s*(?:[.!?,;:]|$|\s(?:and|but|because|so|if)\b))"
-_CAREER_CONTEXT = (
-    r"(?!\s+(?:prevention|awareness|helplines?|lines?|bereavement|support|services?|"
-    r"charit(?:y|ies)|research|risk|clients|patients|callers|training))"
+_A = r"[^\w\s]?"  # an apostrophe, straight or curly, or none ("don't", "dont")
+_END = r"(?=\s*(?:[.!?,;:]|$))"  # the end of a clause
+_MORE = r"(?:\s+any\s?more)?"
+# Tier 1: first-person intent or distress, from positive evidence only.
+_INTENT = (
+    r"(?:want(?:ed)?\s+to|wanna|going\s+to|gonna|plan(?:ning)?\s+to|tempted\s+to|"
+    r"try(?:ing)?\s+to|ready\s+to|decided\s+to|(?:thinking|thought|think)\s+(?:about|of)|"
+    r"thoughts\s+of|urges?\s+to)"
 )
-_ACUTE_DISTRESS = re.compile(
+_ACT = (
+    r"(?:die|dying|kill(?:ing)?\s+myself|end(?:ing)?\s+(?:it\s+all|my\s+(?:own\s+)?life)|"
+    r"tak(?:e|ing)\s+my\s+own\s+life|hurt(?:ing)?\s+myself|harm(?:ing)?\s+myself|suicide)"
+)
+_ACUTE = re.compile(
     r"\b(?:"
-    r"kill(?:ing)? myself(?!\s+(?:with|over|at|for|trying|working|laughing))|"
-    r"end(?:ing)? (?:it all|my (?:own )?life)|"
-    r"t(?:ake|aking|ook) my (?:own )?life(?!\s+(?:savings|in|into|back|forward|around|over|"
-    r"apart|elsewhere|somewhere|to|on|seriously)\b)(?![^\w\s]s\b)|"  # not "my life's work"
-    rf"suicid(?:e|al){_CAREER_CONTEXT}|self[- ]?harm(?:ing|ed)?{_CAREER_CONTEXT}|"
-    r"harm(?:ing|ed)? myself|"
-    r"(?:want(?:ed)?|wanting|going|tempted|urges?|plan(?:ning)?|thinking about|thoughts of) "
-    r"(?:to )?hurt(?:ing)? myself|"
-    r"(?:want(?:ed)? to|wanna) die|wish(?:ed)? (?:i|I) (?:was|were) dead|better off dead|"
-    rf"(?:do not|don't|dont) want to (?:be alive|live{_CLAUSE_END}|be here any ?more)|"
-    rf"no reason to (?:live|go on){_CLAUSE_END}"
+    rf"{_INTENT}\s+(?:just\s+)?{_ACT}|"
+    rf"(?:I{_A}m|I\s+am|I\s+feel|I\s+felt|I{_A}ve\s+(?:been|felt)|I\s+have\s+(?:been|felt)|"
+    rf"I\s+was|feeling)\s+(?:so\s+|really\s+|very\s+)?suicidal|"
+    rf"I(?:{_A}ve|\s+have)?\s+(?:been\s+|started\s+|keep\s+|kept\s+)?"
+    r"(?:self[- ]?harm(?:ing|ed)?|harm(?:ing|ed)?\s+myself)|"
+    rf"I(?:{_A}ve|\s+have)?\s+(?:been|keep|kept|started)\s+(?:hurting|cutting)\s+myself|"
+    r"t(?:ake|aking|ook)\s+my\s+own\s+life|"
+    r"wish(?:ed)?\s+I\s+(?:was|were)\s+dead|better\s+off\s+dead|better\s+off\s+without\s+me|"
+    rf"don{_A}t\s+want\s+to\s+(?:be\s+alive|be\s+here{_MORE}{_END}|"
+    rf"live(?:\s+like\s+this|\s+this\s+way)?{_MORE}{_END})|"
+    rf"do\s+not\s+want\s+to\s+(?:be\s+alive|live(?:\s+like\s+this)?{_MORE}{_END})|"
+    rf"no\s+reason\s+to\s+(?:live|go\s+on){_MORE}{_END}|"
+    rf"can{_A}t\s+go\s+on{_MORE}{_END}"
+    r")\b",
+    re.IGNORECASE,
+)
+# Tier 2: every risk word or phrase, whatever surrounds it.
+_RISK = re.compile(
+    r"\b(?:"
+    r"suicid\w*|self[- ]?harm\w*|overdos\w*|"
+    r"(?:kill|hurt|harm|cut)(?:s|ing|ed)?\s+myself|"
+    r"end(?:s|ing|ed)?\s+(?:it\s+all|my\s+(?:own\s+)?life)|"
+    r"t(?:ake|akes|aking|ook)\s+my\s+(?:own\s+)?life|"
+    r"(?:want(?:ed)?\s+to|wanna)\s+die|wish(?:ed)?\s+I\s+(?:was|were)\s+dead|"
+    r"better\s+off\s+(?:dead|without\s+me)|"
+    rf"(?:don{_A}t|do\s+not)\s+want\s+to\s+(?:be\s+alive|live|be\s+here)|"
+    rf"no\s+reason\s+to\s+(?:live|go\s+on)|can{_A}t\s+go\s+on"
     r")\b",
     re.IGNORECASE,
 )
@@ -104,18 +132,35 @@ SUPPORT_RESOURCES: tuple[SupportResource, ...] = (
 )
 
 
+SUPPORT_NOTE = (
+    "If anything you mentioned is about how you are feeling, support is available any time, "
+    "from people trained to help. Your message was sent to Nessa as usual."
+)
+
+
+class SupportTier(StrEnum):
+    ACUTE = "acute_distress"  # the support response; the message is not sent
+    MENTION = "risk_mention"  # sent as usual, with a support note beside it
+
+
 @dataclass(frozen=True)
 class SupportConcern:
-    """Why the support response was shown instead of sending the message on."""
+    """What the screen found in a message, and so what the person sees."""
 
-    policy: str
+    tier: SupportTier
     policy_version: str
+
+    @property
+    def policy(self) -> str:
+        return self.tier.value
 
 
 def screen_message(message: str) -> SupportConcern | None:
-    """The support response's policy if the message explicitly expresses acute distress."""
-    if _ACUTE_DISTRESS.search(message):
-        return SupportConcern("acute_distress", POLICY_VERSION)
+    """Tier 1 for first-person acute distress, tier 2 for any other risk word, else None."""
+    if _ACUTE.search(message):
+        return SupportConcern(SupportTier.ACUTE, POLICY_VERSION)
+    if _RISK.search(message):
+        return SupportConcern(SupportTier.MENTION, POLICY_VERSION)
     return None
 
 
@@ -216,7 +261,7 @@ def _found(text: str) -> list[str]:
     return terms
 
 
-def _said(term: str, person: str) -> bool:
+def _said(term: str, person: str, kindred: bool) -> bool:
     if _MBTI.fullmatch(term):
         return re.search(rf"\b{term}\b", person, re.IGNORECASE) is not None
     if _PERCENT.fullmatch(term):
@@ -228,18 +273,23 @@ def _said(term: str, person: str) -> bool:
             )
             is not None
         )
-    kindred = next((group for group in _KINDRED if term in group), frozenset({term}))
-    return _said_any(kindred, person)
+    group = next((group for group in _KINDRED if term in group), None) if kindred else None
+    return _said_any(group or frozenset({term}), person)
 
 
-def inferred_sensitive_terms(model_texts: Iterable[str], person_texts: Iterable[str]) -> list[str]:
+def inferred_sensitive_terms(
+    model_texts: Iterable[str], person_texts: Iterable[str], *, kindred: bool = False
+) -> list[str]:
     """Health conditions, diagnoses, type labels, protected characteristics and percentages
-    in the model's text that the person's own words never used, in order of appearance."""
+    in the model's text that the person's own words never used, in order of appearance.
+    `kindred` (searches only): a kindred word counts as the person's own, since a search
+    naming who the work serves is not a guess about the person; a reply about the person
+    gets no such allowance."""
     person = "\n".join(person_texts)
     found: list[str] = []
     for text in model_texts:
         for term in _found(text):
-            if term not in found and not _said(term, person):
+            if term not in found and not _said(term, person, kindred):
                 found.append(term)
     return found
 

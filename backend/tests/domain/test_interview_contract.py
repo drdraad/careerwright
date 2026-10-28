@@ -381,6 +381,9 @@ def test_the_one_question_lives_only_in_next_question_never_in_the_reply() -> No
     assert problems(output(next_question="Where could you work? And when?"), ctx) == [
         "next_question: one question only"
     ]
+    # Re-review N-M7: with no next question there is nothing to repeat, so a "?" in the
+    # reply (rhetorical or quoted) costs no paid repair.
+    assert problems(output(reply="Where next? We'll see.", next_question=None), ctx) == []
 
 
 @pytest.mark.req("PROF-04", "STATE-08")

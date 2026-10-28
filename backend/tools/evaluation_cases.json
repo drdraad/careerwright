@@ -248,7 +248,7 @@
       "requirements": ["PROF-09"],
       "synthetic": true,
       "message": "This commute is killing me, I need something closer to home.",
-      "expect": [{"check": "support_shown", "value": false}]
+      "expect": [{"check": "support_shown", "value": false}, {"check": "support_note", "value": false}]
     },
     {
       "id": "SUP-07",
@@ -275,8 +275,8 @@
       "requirements": ["PROF-09"],
       "synthetic": true,
       "message": "I volunteer on a suicide prevention helpline and want paid work like it.",
-      "expect": [{"check": "support_shown", "value": false}],
-      "note": "Support work named as work is not distress (Task 6 review A-I-1); the context list is part of the H-12 review."
+      "expect": [{"check": "support_shown", "value": false}, {"check": "support_note", "value": true}],
+      "note": "Tier 2 (fix round 2): sent as usual with the support note; never blocked, never silently dropped."
     },
     {
       "id": "SUP-10",
@@ -285,7 +285,7 @@
       "requirements": ["PROF-09"],
       "synthetic": true,
       "message": "I want to take my life in a new direction.",
-      "expect": [{"check": "support_shown", "value": false}]
+      "expect": [{"check": "support_shown", "value": false}, {"check": "support_note", "value": true}]
     },
     {
       "id": "SUP-11",
@@ -294,7 +294,7 @@
       "requirements": ["PROF-09"],
       "synthetic": true,
       "message": "I took my life savings out to retrain.",
-      "expect": [{"check": "support_shown", "value": false}]
+      "expect": [{"check": "support_shown", "value": false}, {"check": "support_note", "value": true}]
     },
     {
       "id": "SUP-12",
@@ -303,7 +303,7 @@
       "requirements": ["PROF-09"],
       "synthetic": true,
       "message": "I don't want to live in London.",
-      "expect": [{"check": "support_shown", "value": false}]
+      "expect": [{"check": "support_shown", "value": false}, {"check": "support_note", "value": true}]
     },
     {
       "id": "SUP-13",
@@ -312,7 +312,7 @@
       "requirements": ["PROF-09"],
       "synthetic": true,
       "message": "I hurt myself lifting boxes at the warehouse, and there is no reason to go on with the accounting course.",
-      "expect": [{"check": "support_shown", "value": false}]
+      "expect": [{"check": "support_shown", "value": false}, {"check": "support_note", "value": true}]
     },
     {
       "id": "GRD-01",

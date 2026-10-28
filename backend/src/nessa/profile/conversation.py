@@ -55,7 +55,7 @@ from nessa.profile.records import (
     SourceKind,
     TurnDecision,
 )
-from nessa.profile.safety import SupportConcern, screen_message
+from nessa.profile.safety import SupportConcern, SupportTier, screen_message
 from nessa.profile.store import stale_version
 from nessa.vocabulary import WorkState
 
@@ -86,6 +86,15 @@ class SupportShown:
     """The support response, given instead of a turn: nothing was sent or stored."""
 
     concern: SupportConcern
+
+
+@dataclass(frozen=True)
+class TurnSent:
+    """A new turn. `note` is set when the message used a risk word: the person sees the
+    support note beside it (it is never stored)."""
+
+    view: "TurnView"
+    note: SupportConcern | None
 
 
 class DecideTurn(BaseModel):
@@ -214,13 +223,14 @@ def submit_turn(
     runtime_mode: RuntimeMode,
     defaults: SpendLimits,
     now: datetime,
-) -> TurnView | SupportShown:
-    """A new turn and its run; or, for a message that explicitly expresses acute distress,
+) -> TurnSent | SupportShown:
+    """A new turn and its run; or, for a message stating acute distress in the first person,
     the support response instead, with nothing sent to the model and nothing stored
-    (`nessa.profile.safety`), unless the person has seen it and chose to send the message."""
+    (`nessa.profile.safety`, tier 1), unless the person has seen it and chose to send the
+    message. Any other risk word is sent as usual, with the support note (tier 2)."""
     visible_workspace(tx, workspace_id, lock=True)
     concern = screen_message(command.message)
-    if concern is not None and not command.send_after_support:
+    if concern is not None and concern.tier is SupportTier.ACUTE and not command.send_after_support:
         return SupportShown(concern)
     profile = current_profile(tx, workspace_id)
     if command.expected_profile_version != profile.version:
@@ -261,7 +271,7 @@ def submit_turn(
         created_at=now,
     )
     interview_store.insert_turn(tx, turn)
-    return TurnView(turn, run, None, None)
+    return TurnSent(TurnView(turn, run, None, None), concern)
 
 
 def _refusal(code: ErrorCode, message: str, **details: str | int | list[str]) -> NessaError:

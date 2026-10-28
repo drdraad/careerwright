@@ -282,10 +282,12 @@ def write_results(
     runs: list[CaseRun],
     results: dict[str, list[Failure]],
     seqs: list[int],
+    scope: str,
 ) -> None:
     lines = [
         f"## Live evaluation, {datetime.now(UTC):%Y-%m-%d %H:%M} UTC",
         "",
+        f"Budget scope `{scope}`. "
         f"Model `{plan.model_id}` (test model, synthetic cases only); {len(runs)} cases; at most "
         f"{plan.calls} requests, worst case {format_usd(plan.worst_case_nano_usd)}; ledger rows "
         f"{seqs}. Failures by type: {failures_by_type(results) or 'none'}. Each case's output "
@@ -378,7 +380,7 @@ def live_eval(
             raise interrupted
     results = results_of(runs)
     observed_at = observations_path or nessa_home() / "evidence" / "live-eval.jsonl"
-    write_results(results_path, observed_at, plan, runs, results, seqs)
+    write_results(results_path, observed_at, plan, runs, results, seqs, scope)
     print(f"failures by type: {failures_by_type(results)}", flush=True)
     scanned, findings = leak_findings(target, api, key)
     print(f"leak scan: {scanned} rows/logs/responses, findings: {findings}", flush=True)

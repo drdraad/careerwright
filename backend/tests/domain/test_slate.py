@@ -169,13 +169,65 @@ def test_folding_never_chains_unrelated_work_through_shared_labels() -> None:
     pool = build_pool([query], chained, frozenset())
 
     folded = {c.occupation.title: c.duplicate_of for c in pool}
+    # Nothing folds across kinds of work (ISCO minor groups 214, 132, 515, 911; re-review
+    # N-M3), so the chain is gone. Within 132, "quarry manager" is a name of the mine manager.
     assert folded == {
         "Quarry engineer": None,
         "Building cleaner": None,
-        "Mine manager": None,  # shares labels with both sides, aliases neither lead
-        "Building caretaker": concept("Building cleaner"),
-        "Quarry manager": concept("Quarry engineer"),
+        "Mine manager": None,
+        "Building caretaker": None,
+        "Quarry manager": concept("Mine manager"),
     }
+
+    # Within one kind of work a chain is still never followed: the groundskeeper is a name of
+    # the gardener, the park keeper a name of the groundskeeper, not of the gardener.
+    in_one_family = {
+        o.concept_id: o
+        for o in (
+            occupation("Gardener", "921", "groundskeeper"),
+            occupation("Groundskeeper", "921", "park keeper"),
+            occupation("Park keeper", "921"),
+        )
+    }
+    query = pool_query(
+        "q2", SlateChannel.TASKS, ("Gardener", 0.9), ("Park keeper", 0.8), ("Groundskeeper", 0.7)
+    )
+    folded = {
+        c.occupation.title: c.duplicate_of for c in build_pool([query], in_one_family, frozenset())
+    }
+    assert folded == {
+        "Gardener": None,
+        "Park keeper": None,
+        "Groundskeeper": concept("Gardener"),
+    }
+
+
+@pytest.mark.req("DIV1-05")
+def test_an_alias_from_another_kind_of_work_is_not_a_duplicate() -> None:
+    # Re-review N-M3: ESCO lists "biochemist" as a label of chemist, but they are
+    # different ISCO minor groups (211, 213): related work, not the same role.
+    related = {
+        o.concept_id: o
+        for o in (
+            occupation("Chemist", "211", "biochemist"),
+            occupation("Biochemist", "213"),
+            occupation("Groundsperson", "921", "grounds maintenance worker"),
+            occupation("Grounds maintenance worker", "921"),
+        )
+    }
+    query = pool_query(
+        "q1",
+        SlateChannel.TASKS,
+        ("Chemist", 0.9),
+        ("Biochemist", 0.8),
+        ("Groundsperson", 0.7),
+        ("Grounds maintenance worker", 0.6),
+    )
+
+    folded = {c.occupation.title: c.duplicate_of for c in build_pool([query], related, frozenset())}
+
+    assert folded["Biochemist"] is None
+    assert folded["Grounds maintenance worker"] == concept("Groundsperson")
 
 
 @pytest.mark.req("DIV1-02", "DIV1-10")

@@ -229,10 +229,12 @@ def _order(candidate: Candidate) -> tuple[float, str, str]:
 
 
 def _aliases(a: Occupation, b: Occupation) -> bool:
-    """One is a name of the other: its preferred label is one of the other's labels, or they
-    have the same labels. Merely sharing some third label is not enough: ESCO gives many
-    distinct occupations a common label ("geologist", "facility manager")."""
-    return (
+    """One is a name of the other within the same kind of work (ISCO minor group): its
+    preferred label is one of the other's labels, or they have the same labels. Merely
+    sharing some third label is not enough (ESCO gives many distinct occupations a common
+    label: "geologist", "facility manager"), and an alias across kinds of work names related
+    work, not the same role (ESCO lists "biochemist" as a chemist)."""
+    return a.family_code == b.family_code and (
         a.preferred_key in b.label_keys
         or b.preferred_key in a.label_keys
         or a.label_keys == b.label_keys

@@ -107,6 +107,11 @@ def test_the_question_is_counted_where_it_lives_one_in_next_question_none_in_the
     assert evaluate(p02, one, {}) == []
     for observed in (in_reply, two, two_asks):
         assert [f.type for f in evaluate(p02, observed, {})] == [FailureType.QUESTION]
+    # With no next question the reply may hold the one question, but not two (N-M7).
+    only_reply = turn(noted, reply="Which machines did you fix?", question="")
+    assert evaluate(p02, only_reply, {}) == []
+    two_in_reply = turn(noted, reply="Which machines? Outdoors?", question="")
+    assert [f.type for f in evaluate(p02, two_in_reply, {})] == [FailureType.QUESTION]
 
 
 @pytest.mark.req("TEST1-10")

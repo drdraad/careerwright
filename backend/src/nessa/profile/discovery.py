@@ -188,6 +188,7 @@ def check_discovery(
     inferred = inferred_sensitive_terms(
         [q.text for q in output.queries] + [h.title for h in output.hypotheses],
         [item.text for item in context.evidence],
+        kindred=True,  # a search may name who the work serves (not so a reply)
     )
     if inferred:
         problems.append(

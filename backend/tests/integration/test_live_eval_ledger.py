@@ -59,6 +59,7 @@ def test_every_case_attempt_is_ledgered_and_the_results_are_written(
     assert "| INT-01 " in written
     assert "| DSC-01 " in written
     assert "Failures by type:" in written
+    assert "scope `eval-test`" in written  # re-review N-M5: each run names its budget scope
     # Each case's output is kept for inspection in the private evidence directory, never
     # beside the committed results (plan section 2; Task 6 review A-I-6).
     observed = private.read_text(encoding="utf-8").splitlines()

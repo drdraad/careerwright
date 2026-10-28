@@ -351,11 +351,14 @@ def check_turn(
         problems.append(f"reply: 1-{MAX_REPLY} characters")
     if output.next_question is not None and not _bounded(output.next_question, MAX_QUESTION):
         problems.append(f"next_question: 1-{MAX_QUESTION} characters, or null")
-    # One question at a time (PROF-08), asked once: the reply and the question are shown apart.
-    if "?" in output.reply:
-        problems.append("reply: no question here; ask the one question only in next_question")
-    if output.next_question is not None and output.next_question.count("?") > 1:
-        problems.append("next_question: one question only")
+    # One question at a time (PROF-08), asked once: the reply and the question are shown apart,
+    # so a question in the reply is refused only beside a next question (with none, there is
+    # nothing to repeat, and a rhetorical "?" is not worth a paid repair).
+    if output.next_question is not None:
+        if "?" in output.reply:
+            problems.append("reply: no question here; ask the one question only in next_question")
+        if output.next_question.count("?") > 1:
+            problems.append("next_question: one question only")
     if len(set(output.missing_critical_fields)) != len(output.missing_critical_fields):
         problems.append("missing_critical_fields: name each field once")
     if len(output.proposed_updates) > MAX_UPDATES:

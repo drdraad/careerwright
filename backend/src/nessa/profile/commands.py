@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from nessa.db import Tx
 from nessa.errors import ErrorCode, ErrorStage, NessaError
@@ -202,15 +202,19 @@ def revert_profile(
         )
     earlier = store.profile_version(tx, workspace_id, command.to_version)
     document = empty_profile() if earlier is None else earlier.document
-    updates = {
-        name: FieldUpdate(
-            input_type(name).model_validate(
-                {"state": getattr(document, name).state, "value": getattr(document, name).value}
-            ),
-            ExistingSource(getattr(document, name).source_ref_id),
-        )
-        for name in FIELD_NAMES
-    }
+    updates: dict[str, FieldUpdate] = {}
+    for name in FIELD_NAMES:
+        field = getattr(document, name)
+        try:  # an answer stored before a newer input rule (a £0 floor) is refused, not saved
+            answer = input_type(name).model_validate({"state": field.state, "value": field.value})
+        except ValidationError:
+            raise NessaError(
+                ErrorCode.VALIDATION_FAILED,
+                "An answer in that version can't be saved any more; edit it directly instead.",
+                stage=ErrorStage.PROFILE,
+                details={"field": name, "reason": "no_longer_valid"},
+            ) from None
+        updates[name] = FieldUpdate(answer, ExistingSource(field.source_ref_id))
     view, changed = commit_profile_version(
         tx, actor, workspace_id, command.expected_version, updates
     )

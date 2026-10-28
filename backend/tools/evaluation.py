@@ -53,7 +53,7 @@ from nessa.profile.interview import (
     check_turn,
     context_profile,
 )
-from nessa.profile.safety import screen_message
+from nessa.profile.safety import SupportTier, screen_message
 from nessa.profile.slate import Emphasis, SlateControls
 from nessa.vocabulary import DataMode, WorkState
 
@@ -203,11 +203,13 @@ def _interview(observed: Json, e: Expectation) -> Failure | None:
         hit = [t for t in texts if _has(t, e.words, whole=e.whole_words)]
         return Failure(FailureType.INFERENCE, f"values {hit}") if hit else None
     if e.check == "one_question":
-        # Each field on its own: the question lives only in next_question (the contract).
-        if "?" in proposal["reply"]:
+        # Each field on its own: beside a next question the reply asks nothing (the contract);
+        # with none, the reply may hold the one question.
+        if question and "?" in proposal["reply"]:
             return Failure(FailureType.QUESTION, f"a question in the reply: {proposal['reply']!r}")
-        asks = _asks(question)
-        return Failure(FailureType.QUESTION, f"{asks} asks: {question!r}") if asks > 1 else None
+        asked = question or proposal["reply"]
+        asks = _asks(asked)
+        return Failure(FailureType.QUESTION, f"{asks} asks: {asked!r}") if asks > 1 else None
     if e.check == "question_mentions_any":
         ok = _has(question + " " + proposal["reply"], e.words, whole=e.whole_words)
         return None if ok else Failure(FailureType.QUESTION, f"asked {question!r}")
@@ -338,14 +340,16 @@ def evaluate(case: Case, observed: Json, others: Mapping[str, Json]) -> list[Fai
         elif case.kind is CaseKind.DISCOVERY:
             failure = _discovery(observed, e, answers_of(case))
         elif case.kind is CaseKind.SUPPORT:
-            shown = bool(observed["support_shown"])
+            # `support_shown`: tier 1, the support response instead of sending; `support_note`:
+            # tier 2, sent as usual with the support note beside it.
+            shown = bool(observed[e.check])
             want = bool(e.value)
             failure = (
                 None
                 if shown == want
                 else Failure(
                     FailureType.SUPPORT_MISSED if want else FailureType.SUPPORT_FALSE_POSITIVE,
-                    case.message or "",
+                    f"{e.check}: {case.message or ''}",
                 )
             )
         else:
@@ -380,7 +384,12 @@ def document_of(case: Case) -> ProfileDocument:
 
 
 def observe_support(case: Case) -> Json:
-    return {"support_shown": screen_message(case.message or "") is not None}
+    concern = screen_message(case.message or "")
+    tier = None if concern is None else concern.tier
+    return {
+        "support_shown": tier is SupportTier.ACUTE,
+        "support_note": tier is SupportTier.MENTION,
+    }
 
 
 def observe_guard(case: Case) -> Json:
@@ -406,11 +415,12 @@ def observe_guard(case: Case) -> Json:
     return {"problems": problems, "changes": changes}
 
 
-def observe_discovery_offline(tx: Tx, case: Case) -> Json:
+def observe_discovery_offline(tx: Tx, case: Case, *, release: str | None = None) -> Json:
     """The slate the fixture proposer's queries give over the held taxonomy: the pipeline
-    and its rules are under test, not a model."""
+    and its rules are under test, not a model. `release`: the release the searches are
+    recorded as chosen for (none: not recorded)."""
     document = document_of(case)
-    context = DiscoveryInput(profile_version=1, evidence=evidence_of(document))
+    context = DiscoveryInput(profile_version=1, evidence=evidence_of(document), release=release)
     output = fixture_queries(prompt_context(render_discovery_prompt(context)))
     proposal, problems = check_discovery(output, context, ProposalOrigin.FIXTURE)
     if proposal is None:

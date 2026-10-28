@@ -2729,7 +2729,8 @@ export const SalaryInputSchema = {
     required: [
         'state'
     ],
-    title: 'SalaryInput'
+    title: 'SalaryInput',
+    description: 'A new answer: a floor is more than £0. Checked on input only, so a version stored\nbefore the rule still opens (read, history, export).'
 } as const;
 
 export const SearchMatchSchema = {
@@ -3554,6 +3555,50 @@ export const SuggestionOutSchema = {
     description: 'A career hypothesis (spec section 4\'s `CareerSuggestion`): an ESCO occupation, the\nanswers that found it and ESCO\'s facts about it, in words. Becoming a target needs the\nperson\'s choice (`POST .../targets`).'
 } as const;
 
+export const SupportNoteOutSchema = {
+    properties: {
+        policy: {
+            type: 'string',
+            enum: [
+                'risk_mention',
+                'acute_distress'
+            ],
+            title: 'Policy'
+        },
+        policy_version: {
+            type: 'string',
+            title: 'Policy Version'
+        },
+        review_status: {
+            type: 'string',
+            title: 'Review Status',
+            description: 'The policy is provisional until reviewed.'
+        },
+        message: {
+            type: 'string',
+            title: 'Message'
+        },
+        resources: {
+            items: {
+                $ref: '#/components/schemas/SupportResourceOut'
+            },
+            type: 'array',
+            title: 'Resources'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'policy',
+        'policy_version',
+        'review_status',
+        'message',
+        'resources'
+    ],
+    title: 'SupportNoteOut',
+    description: 'Shown beside a turn whose message used a risk word without stating acute distress in\nthe first person: the message was sent as usual. Nothing about it is stored.'
+} as const;
+
 export const SupportResourceOutSchema = {
     properties: {
         name: {
@@ -4108,6 +4153,83 @@ export const TurnPageSchema = {
         'next_cursor'
     ],
     title: 'TurnPage'
+} as const;
+
+export const TurnSubmittedOutSchema = {
+    properties: {
+        turn_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Turn Id'
+        },
+        message_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Message Id'
+        },
+        message: {
+            type: 'string',
+            title: 'Message'
+        },
+        profile_version: {
+            type: 'integer',
+            title: 'Profile Version',
+            description: 'The profile version the message was sent with.'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        run: {
+            $ref: '#/components/schemas/RunOut'
+        },
+        proposal: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ProposalOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        decision: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/DecisionOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        support_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SupportNoteOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'turn_id',
+        'message_id',
+        'message',
+        'profile_version',
+        'created_at',
+        'run',
+        'proposal',
+        'decision',
+        'support_note'
+    ],
+    title: 'TurnSubmittedOut',
+    description: 'A new turn, with the support note when its message used a risk word.'
 } as const;
 
 export const WorkStateSchema = {

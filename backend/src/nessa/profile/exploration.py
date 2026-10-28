@@ -294,7 +294,8 @@ _VOWEL_SOUND = re.compile(r"^(?:hour|honest|honou?r|heir|[AEFHILMNORSX][A-Z])")
 
 def with_article(title: str) -> str:
     """The title after "a" or "an", as it is said."""
-    vowel = title[:1].casefold() in "aeiou" and not _CONSONANT_SOUND.match(title)
+    said_as_you = _CONSONANT_SOUND.match(title) or re.match(r"U[A-Z]", title)  # "a UX designer"
+    vowel = title[:1].casefold() in "aeiou" and not said_as_you
     return f"{'an' if vowel or _VOWEL_SOUND.match(title) else 'a'} {title}"
 
 

@@ -111,6 +111,15 @@ def test_an_occupation_gets_the_article_its_sound_needs() -> None:
     assert with_article("ICT help desk agent") == "an ICT help desk agent"
     assert with_article("university lecturer") == "a university lecturer"
     assert with_article("hour-glass maker") == "an hour-glass maker"
+    assert with_article("UX designer") == "a UX designer"  # re-review N-M8
+
+
+@pytest.mark.req("REC1-02")
+def test_a_search_may_name_who_the_work_serves_in_a_kindred_word() -> None:
+    carer = document(enjoyed_tasks=["helping new mothers"])
+    out = output(query("maternity support work for women", "tasks", "helping new mothers"))
+
+    assert problems(out, context(carer)) == []
 
 
 @pytest.mark.req("TAX1-01", "DIV1-04")
