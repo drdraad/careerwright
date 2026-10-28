@@ -2,9 +2,11 @@
 
 Each SSE message has `id: <seq>`; a client that reconnects with `Last-Event-ID` receives
 everything after it, because sequence numbers increase in commit order. The stream re-reads
-through row-level security on every poll, so revoked access ends it, and it ends when the
-ID token expires (the client reconnects with a fresh token). The terminal state of a run is
-always available from the runs API; events only tell the client when to look.
+through row-level security on every poll, so a revoked invitation ends it at once; it
+re-verifies the ID token with the Auth emulator every `REVERIFY_S`, so a revoked or disabled
+account ends it within that bound; and it ends when the token expires (the client reconnects
+with a fresh token). The terminal state of a run is always available from the runs API;
+events only tell the client when to look.
 """
 
 import time
@@ -32,6 +34,7 @@ router = APIRouter(
 PAGE = 200
 POLL_INTERVAL_S = 0.5
 HEARTBEAT_S = 15.0
+REVERIFY_S = 60.0
 RETRY_MS = 2000
 
 
@@ -98,12 +101,16 @@ async def stream_events(
     async def generate() -> AsyncIterator[str]:
         cursor = start
         last_sent = time.monotonic()
+        next_verify = last_sent + REVERIFY_S
         yield f"retry: {RETRY_MS}\n\n"
         while not await request.is_disconnected():
             if time.time() >= caller.identity.expires_at:
                 yield "event: reauthenticate\ndata: {}\n\n"
                 return
             try:
+                if time.monotonic() >= next_verify:
+                    await run_in_threadpool(deps.verifier.verify, caller.token.get_secret_value())
+                    next_verify = time.monotonic() + REVERIFY_S
                 events = await run_in_threadpool(_events, deps.engine, caller, workspace_id, cursor)
             except NessaError as error:
                 yield f'event: stream_ended\ndata: {{"code": "{error.code.value}"}}\n\n'

@@ -2,7 +2,6 @@
 correlation ID. Messages come from our code only; request input, provider text and exception
 messages never appear, so an envelope cannot echo a key back."""
 
-import logging
 from collections.abc import Mapping
 
 from fastapi import FastAPI, Request
@@ -13,13 +12,14 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from nessa.errors import ErrorCode, ErrorStage, NessaError
 
-_log = logging.getLogger("nessa.api")
-
 STATUS: dict[ErrorCode, int] = {
     ErrorCode.UNAUTHENTICATED: 401,
     ErrorCode.NOT_INVITED: 403,
     ErrorCode.ORIGIN_NOT_ALLOWED: 403,
+    ErrorCode.CLIENT_NOT_ALLOWED: 403,
     ErrorCode.NOT_FOUND: 404,
+    ErrorCode.METHOD_NOT_ALLOWED: 405,
+    ErrorCode.REQUEST_REJECTED: 400,
     ErrorCode.HOST_NOT_ALLOWED: 400,
     ErrorCode.IDEMPOTENCY_KEY_REQUIRED: 400,
     ErrorCode.STALE_INPUT_VERSION: 409,
@@ -114,26 +114,35 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request: Request, error: StarletteHTTPException) -> JSONResponse:
-        response = envelope(
-            NessaError(ErrorCode.NOT_FOUND, "No such resource.", stage=ErrorStage.REQUEST),
-            correlation_id(request),
-        )
+        response = envelope(framework_error(error.status_code), correlation_id(request))
         response.status_code = error.status_code
         return response
 
-    @app.exception_handler(Exception)
-    async def unexpected(request: Request, error: Exception) -> JSONResponse:
-        _log.error(
-            "unexpected error",
-            exc_info=error,
-            extra={"correlation_id": correlation_id(request), "path": request.url.path},
+    # Unexpected exceptions are answered by `RequestGuard`, which sits inside Starlette's
+    # server-error middleware and so can still attach the correlation ID and log the status.
+
+
+def framework_error(status: int) -> NessaError:
+    """A routing-level error whose code agrees with its status."""
+    if status == 404:
+        return NessaError(ErrorCode.NOT_FOUND, "No such resource.", stage=ErrorStage.REQUEST)
+    if status == 405:
+        return NessaError(
+            ErrorCode.METHOD_NOT_ALLOWED,
+            "This resource does not support that method.",
+            stage=ErrorStage.REQUEST,
         )
-        return envelope(
-            NessaError(
-                ErrorCode.INTERNAL_ERROR,
-                "Something went wrong on our side. Quote the correlation ID if you report it.",
-                stage=ErrorStage.INTERNAL,
-                retryable=True,
-            ),
-            correlation_id(request),
-        )
+    if status >= 500:
+        return internal_error()
+    return NessaError(
+        ErrorCode.REQUEST_REJECTED, "The request was rejected.", stage=ErrorStage.REQUEST
+    )
+
+
+def internal_error() -> NessaError:
+    return NessaError(
+        ErrorCode.INTERNAL_ERROR,
+        "Something went wrong on our side. Quote the correlation ID if you report it.",
+        stage=ErrorStage.INTERNAL,
+        retryable=True,
+    )

@@ -4,8 +4,9 @@ Docker does not publish ports of a container attached only to an `internal` netw
 Docker Desktop no other network setting blocks egress. So every Nessa service sits on an
 internal network with no route out, and this small TCP relay, the only service also on a
 normal bridge, accepts the host-published ports and forwards each to one fixed target
-(`compose.yaml` publishes its ports on 127.0.0.1 only). It never opens any other
-connection. Standard library only.
+(`compose.yaml` publishes its ports on 127.0.0.1 only). It connects only to addresses
+inside the internal network (`nessa.localnet`) and never opens any other connection.
+Standard library only.
 
 Run: `python -m nessa.edge` with `NESSA_EDGE_ROUTES="8000=api:8000,9099=auth:9099"`, or
 `python -m nessa.edge --check` as the health check.
@@ -18,6 +19,8 @@ import signal
 import socket
 import sys
 from dataclasses import dataclass
+
+from nessa.localnet import ROUTE_TABLE, Networks, internal_networks, is_permitted
 
 CONNECT_TIMEOUT_S = 5.0
 CHUNK_BYTES = 65_536
@@ -53,12 +56,41 @@ async def _pipe(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> N
         writer.close()
 
 
+async def _internal_address(route: Route, allowed: Networks) -> str | None:
+    """The target's address, only if it lies inside the internal network. The edge is the
+    one container with a route out, and Docker's DNS forwards unknown names (an absent
+    `web`, say) to the host's resolver; a name that resolves outside must not be followed."""
+    try:
+        resolved = await asyncio.get_running_loop().getaddrinfo(
+            route.target_host, route.target_port, type=socket.SOCK_STREAM
+        )
+    except OSError:
+        return None
+    for _family, _type, _proto, _name, sockaddr in resolved:
+        if is_permitted(str(sockaddr[0]), allowed):
+            return str(sockaddr[0])
+    return None
+
+
 async def _relay(
-    route: Route, client_reader: asyncio.StreamReader, client_writer: asyncio.StreamWriter
+    route: Route,
+    allowed: Networks,
+    client_reader: asyncio.StreamReader,
+    client_writer: asyncio.StreamWriter,
 ) -> None:
+    address = await _internal_address(route, allowed)
+    if address is None:
+        print(
+            f"edge refused {route.target_host}:{route.target_port}: unresolved or outside the "
+            "internal network",
+            file=sys.stderr,
+            flush=True,
+        )
+        client_writer.close()
+        return
     try:
         upstream_reader, upstream_writer = await asyncio.wait_for(
-            asyncio.open_connection(route.target_host, route.target_port), CONNECT_TIMEOUT_S
+            asyncio.open_connection(address, route.target_port), CONNECT_TIMEOUT_S
         )
     except (OSError, TimeoutError):
         client_writer.close()
@@ -70,26 +102,36 @@ async def _relay(
         writer.close()
 
 
-async def serve(routes: list[Route], *, host: str = "0.0.0.0") -> list[asyncio.Server]:  # noqa: S104 - inside the container; published on 127.0.0.1 only
+async def serve(
+    routes: list[Route],
+    *,
+    allowed: Networks,
+    host: str = "0.0.0.0",  # noqa: S104 - inside the container; published on 127.0.0.1 only
+) -> list[asyncio.Server]:
+    allowed = tuple(allowed)
     servers = []
     for route in routes:
 
         async def handle(
             reader: asyncio.StreamReader, writer: asyncio.StreamWriter, route: Route = route
         ) -> None:
-            await _relay(route, reader, writer)
+            await _relay(route, allowed, reader, writer)
 
         servers.append(await asyncio.start_server(handle, host, route.listen_port))
     return servers
 
 
 async def _run(routes: list[Route]) -> None:
-    servers = await serve(routes)
+    # Targets must be on the internal network itself; loopback is not a target here.
+    internal = internal_networks(ROUTE_TABLE.read_text(encoding="ascii"))
+    if not internal:
+        raise SystemExit("edge: no internal network found; refusing to relay")
+    servers = await serve(routes, allowed=internal)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
-    print(f"edge relaying {len(routes)} routes", flush=True)
+    print(f"edge relaying {len(routes)} routes into {', '.join(map(str, internal))}", flush=True)
     await stop.wait()
     for server in servers:
         server.close()

@@ -1,11 +1,15 @@
 """Status events: commit-ordered sequence numbers and a stream that resumes from Last-Event-ID."""
 
 import json
+import time
+import uuid
 from typing import Any
 
 import pytest
 
+from nessa.api import routes_events
 from tests.support.client import ApiClient, profile_with
+from tests.support.infra import Infra, create_emulator_user, revoke_tokens, sign_in
 
 pytestmark = pytest.mark.integration
 
@@ -55,6 +59,40 @@ def test_stream_delivers_events_with_ids_and_resumes_after_last_event_id(
     assert [e["kind"] for e in first] == ["workspace.created"] + ["profile.version_created"] * 3
     assert [e["seq"] for e in resumed] == [3, 4]
     assert first[3]["detail"] == {"version": 3, "changed_fields": "cities"}
+
+
+@pytest.mark.req("SEC-01")
+def test_the_stream_ends_once_the_firebase_token_is_revoked(
+    api: ApiClient, infra: Infra, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(routes_events, "REVERIFY_S", 0.3)
+    monkeypatch.setattr(routes_events, "HEARTBEAT_S", 0.2)  # lines keep coming, so no hang
+    uid = f"stream-{uuid.uuid4().hex[:8]}"
+    email = f"{uid}@nessa.test"
+    create_emulator_user(uid, email, "password-123456")
+    token = sign_in(email, "password-123456")
+    infra.query(
+        "INSERT INTO nessa.actors (actor_id, email, display_name, access) "
+        "VALUES (%s, %s, 'Streams until revoked', 'active')",
+        (uuid.uuid4(), email),
+    )
+    workspace_id = api.create_workspace(token)["workspace_id"]
+    deadline = time.monotonic() + 20
+    lines: list[str] = []
+
+    with api.http.stream(
+        "GET",
+        f"/v1/workspaces/{workspace_id}/events/stream",
+        headers={"Authorization": f"Bearer {token}"},
+    ) as response:
+        for line in response.iter_lines():
+            lines.append(line)
+            if line.startswith("id: "):  # the workspace.created event: the stream is live
+                revoke_tokens(uid)
+            if lines[-2:-1] == ["event: stream_ended"] or time.monotonic() > deadline:
+                break
+
+    assert lines[-2:] == ["event: stream_ended", 'data: {"code": "UNAUTHENTICATED"}']
 
 
 def test_event_page_and_bad_last_event_id(api: ApiClient, ada: str) -> None:

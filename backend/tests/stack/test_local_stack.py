@@ -109,44 +109,64 @@ def host_listener() -> Iterator[tuple[int, list[bool]]]:
     server.close()
 
 
+# RFC 5737 documentation address: never routed anywhere, so a probe never contacts the
+# internet. Only a container with no route at all fails it at once ("unreachable").
+TEST_NET = "192.0.2.1"
+
 PYTHON_PROBE = """
 import json, socket
 result = {}
-for name, target in (("public_ip", ("1.1.1.1", 443)), ("host", ("host.docker.internal", PORT))):
+for name, target in TARGETS:
     try:
         socket.create_connection(target, timeout=4).close()
         result[name] = "connected"
     except OSError as error:
         result[name] = type(error).__name__
-try:
-    socket.getaddrinfo("example.com", 443)
-    result["dns"] = "resolved"
-except OSError as error:
-    result["dns"] = type(error).__name__
+if OUTSIDE:
+    try:
+        socket.getaddrinfo("example.com", 443)
+        result["dns"] = "resolved"
+    except OSError as error:
+        result["dns"] = type(error).__name__
 print(json.dumps(result))
 """
 
 NODE_PROBE = (
     "const net=require('net');const t=(h,p)=>new Promise(r=>{const s=net.connect({host:h,port:p,"
     "timeout:4000});s.on('connect',()=>{s.destroy();r('connected')});s.on('error',e=>r(e.code));"
-    "s.on('timeout',()=>{s.destroy();r('timeout')})});Promise.all([t('1.1.1.1',443),"
-    "t('host.docker.internal',PORT)]).then(([a,b])=>console.log(JSON.stringify({public_ip:a,host:b})))"
+    "s.on('timeout',()=>{s.destroy();r('timeout')})});Promise.all([t('TEST_NET',443),"
+    "t('host.docker.internal',PORT)]).then(([a,b])=>console.log(JSON.stringify({outside:a,host:b})))"
 )
 
 BASH_PROBE = (
-    "for t in 1.1.1.1/443 host.docker.internal/PORT; do "
+    "for t in TEST_NET/443 host.docker.internal/PORT; do "
     'if timeout 4 bash -c "exec 3<>/dev/tcp/$t" 2>/dev/null; then echo "$t connected"; '
     'else echo "$t blocked"; fi; done'
 )
 
 
-def probe(stack: Stack, service: str, port: int) -> str:
+def probe(stack: Stack, service: str, port: int, *, outside: bool = True) -> str:
+    """Connect to the host listener and, when `outside`, to TEST_NET and resolve a public
+    name through the container's resolver. The host listener is the egress evidence; the
+    edge control and the live-mode worker have a real route, so they probe the host only."""
     if service in ("api", "edge", "worker"):
-        command = ["python", "-c", PYTHON_PROBE.replace("PORT", str(port))]
+        targets = [("host", ("host.docker.internal", port))]
+        if outside:
+            targets.append(("outside", (TEST_NET, 443)))
+        script = PYTHON_PROBE.replace("TARGETS", repr(targets)).replace("OUTSIDE", str(outside))
+        command = ["python", "-c", script]
     elif service == "auth":
-        command = ["node", "-e", NODE_PROBE.replace("PORT", str(port))]
+        command = [
+            "node",
+            "-e",
+            NODE_PROBE.replace("PORT", str(port)).replace("TEST_NET", TEST_NET),
+        ]
     else:
-        command = ["bash", "-c", BASH_PROBE.replace("PORT", str(port))]
+        command = [
+            "bash",
+            "-c",
+            BASH_PROBE.replace("PORT", str(port)).replace("TEST_NET", TEST_NET),
+        ]
     return stack.exec(service, *command, timeout=60).stdout.strip()
 
 
@@ -158,7 +178,7 @@ def test_demo_mode_services_have_no_route_out_and_the_probe_can_see_one(
 
     # Positive control: the same probe from the edge, the one container on a normal bridge,
     # reaches the host listener. So a "blocked" result below is not a broken probe.
-    control = json.loads(probe(demo_stack, "edge", port))
+    control = json.loads(probe(demo_stack, "edge", port, outside=False))
     assert control["host"] == "connected"
     assert accepted
 
@@ -169,7 +189,7 @@ def test_demo_mode_services_have_no_route_out_and_the_probe_can_see_one(
     assert "connected" not in results["postgres"], results
     for service in ("api", "worker", "auth"):
         outcome = json.loads(results[service])
-        assert outcome["public_ip"] != "connected", (service, outcome)
+        assert outcome["outside"] != "connected", (service, outcome)
         assert outcome["host"] != "connected", (service, outcome)
     for service in ("api", "worker"):
         assert json.loads(results[service])["dns"] != "resolved", service
@@ -186,17 +206,16 @@ def test_live_mode_gives_the_worker_and_only_the_worker_a_route_out(
     )
     live.up(*CORE_SERVICES)
     try:
-        worker = json.loads(probe(live, "worker", port))
+        worker = json.loads(probe(live, "worker", port, outside=False))
         assert worker["host"] == "connected"
         assert accepted
         accepted.clear()
-        api = json.loads(probe(live, "api", port))
+        api = json.loads(probe(live, "api", port, outside=False))
         assert api["host"] != "connected"
-        assert api["public_ip"] != "connected"
         assert accepted == []
     finally:
         demo_stack.up(*CORE_SERVICES)  # back to demo for the remaining tests
-    assert json.loads(probe(demo_stack, "worker", port))["host"] != "connected"
+    assert json.loads(probe(demo_stack, "worker", port, outside=False))["host"] != "connected"
 
 
 @pytest.mark.req("ARC1-08")
@@ -268,6 +287,57 @@ def networks_of(stack: Stack, service: str) -> set[str]:
         check=True,
     )
     return set(json.loads(inspected.stdout)[0]["NetworkSettings"]["Networks"])
+
+
+NETWORKS_SEEN_BY = (
+    "import json; from nessa.localnet import {name}, ROUTE_TABLE; "
+    "print(json.dumps([str(n) for n in {call}]))"
+)
+
+
+@pytest.mark.req("BND1-13")
+def test_the_edge_relays_only_into_the_internal_network_and_refuses_an_absent_target(
+    demo_stack: Stack,
+) -> None:
+    inspected = subprocess.run(  # noqa: S603
+        ["docker", "network", "inspect", f"{demo_stack.project}_internal"],  # noqa: S607
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    subnets = [c["Subnet"] for c in json.loads(inspected.stdout)[0]["IPAM"]["Config"]]
+    edge_view = demo_stack.exec(
+        "edge",
+        "python",
+        "-c",
+        NETWORKS_SEEN_BY.format(
+            name="internal_networks", call="internal_networks(ROUTE_TABLE.read_text())"
+        ),
+    )
+    api_view = demo_stack.exec(
+        "api",
+        "python",
+        "-c",
+        NETWORKS_SEEN_BY.format(name="local_networks", call="local_networks()"),
+    )
+
+    # Task 3 has no web service, so the edge's web slot names an absent target: Docker's DNS
+    # would forward that name upstream, and the edge must refuse it, not follow the answer.
+    with socket.create_connection(("127.0.0.1", demo_stack.ports.web), timeout=5) as conn:
+        conn.settimeout(15)
+        conn.sendall(b"POST /v1/credentials HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+        try:
+            answer = conn.recv(1)
+        except ConnectionResetError:
+            answer = b""
+
+    assert json.loads(edge_view.stdout) == subnets
+    assert json.loads(api_view.stdout) == ["127.0.0.0/8", "::1/128", *subnets]
+    assert answer == b""
+    assert "edge refused web:3000: unresolved or outside the internal network" in (
+        demo_stack.logs("edge")
+    )
 
 
 @pytest.mark.req("MODEL-05")

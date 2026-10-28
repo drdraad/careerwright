@@ -21,17 +21,25 @@ records how they are realised, and the choices a later task must not undo silent
    it also stops Docker publishing ports. So a small standard-library TCP relay
    (`nessa.edge`) is the one container also on a normal bridge: it publishes the API, the
    emulator, PostgreSQL and the web slot on `127.0.0.1` only, forwarding each port to one
-   fixed internal target and opening no other connection. `compose.live.yaml` (`make dev`)
+   fixed internal target and opening no other connection. It resolves a target by name but
+   connects only to an address inside the internal subnet (read from its route table), so
+   an absent target such as Task 3's `web`, which Docker's DNS would forward upstream, is
+   refused rather than followed off the machine. `compose.live.yaml` (`make dev`)
    adds an egress network to the worker alone, because only its model activity calls Meta.
    `make demo` omits it. The acceptance suite proves both: probes from the API, worker,
    emulator and database fail, and the same probe from the edge (positive control) reaches
    a listener on the host; in live mode the worker reaches it and the API still cannot.
 
-2. **Loopback requests only.** The API rejects any Host header outside a configured list
-   of local `host:port` values (defeats DNS rebinding), any request carrying an Origin other
-   than the Nessa web origin, and any state-changing request without an Origin. A different
+2. **Loopback requests only.** The API rejects any client whose address is outside
+   loopback and its own internal subnet, so the emulator's unsigned tokens are unusable from
+   the LAN even if the API were started on a public interface. It rejects any Host header
+   outside a configured list of local `host:port` values (defeats DNS rebinding), any
+   request carrying an Origin other than the Nessa web origin, any state-changing request
+   without an Origin, and every WebSocket (close code 1008; the API has none). A different
    app on `127.0.0.1` therefore cannot trigger an authenticated change even with a token.
-   No CORS headers are ever sent; the web app reaches the API through its own origin.
+   No CORS headers are ever sent; the web app reaches the API through its own origin. The
+   event stream re-verifies its token with the emulator every minute and ends when the
+   account is revoked or disabled, or when the token expires.
 
 3. **Fail closed at startup.** Configuration is refused unless `NESSA_ENVIRONMENT=local`,
    the Firebase project is a `demo-` project, the emulator host and every allowed host are

@@ -1,10 +1,15 @@
-"""The loopback edge relays bytes both ways and parses only fixed internal routes (BND1-13)."""
+"""The loopback edge relays bytes both ways, only to fixed routes, and only to targets inside
+the internal network (BND1-13, A-M1)."""
 
 import asyncio
+from ipaddress import ip_network
 
 import pytest
 
 from nessa.edge import Route, parse_routes, serve
+from nessa.localnet import LOOPBACK
+
+ONLY_TEN = (ip_network("10.0.0.0/8"),)
 
 
 def test_routes_parse_from_listen_port_to_internal_target() -> None:
@@ -31,7 +36,9 @@ def test_bytes_are_relayed_both_ways_and_eof_propagates() -> None:
     async def scenario() -> tuple[bytes, bytes]:
         upstream = await asyncio.start_server(_echo, "127.0.0.1", 0)
         upstream_port = upstream.sockets[0].getsockname()[1]
-        servers = await serve([Route(0, "127.0.0.1", upstream_port)], host="127.0.0.1")
+        servers = await serve(
+            [Route(0, "127.0.0.1", upstream_port)], host="127.0.0.1", allowed=LOOPBACK
+        )
         edge_port = servers[0].sockets[0].getsockname()[1]
 
         reader, writer = await asyncio.open_connection("127.0.0.1", edge_port)
@@ -54,7 +61,7 @@ def test_bytes_are_relayed_both_ways_and_eof_propagates() -> None:
 
 def test_an_unreachable_target_closes_the_client_connection() -> None:
     async def scenario() -> bytes:
-        servers = await serve([Route(0, "127.0.0.1", 1)], host="127.0.0.1")
+        servers = await serve([Route(0, "127.0.0.1", 1)], host="127.0.0.1", allowed=LOOPBACK)
         edge_port = servers[0].sockets[0].getsockname()[1]
         reader, writer = await asyncio.open_connection("127.0.0.1", edge_port)
         data = await asyncio.wait_for(reader.read(), timeout=10)
@@ -64,3 +71,47 @@ def test_an_unreachable_target_closes_the_client_connection() -> None:
         return data
 
     assert asyncio.run(scenario()) == b""
+
+
+def relay_attempt(target_host: str, allowed: tuple[object, ...]) -> tuple[bytes, list[bool]]:
+    """Connect through the edge to a listening upstream; report what the upstream saw."""
+    reached: list[bool] = []
+
+    async def note(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        reached.append(True)
+        writer.close()
+
+    async def scenario() -> bytes:
+        upstream = await asyncio.start_server(note, "127.0.0.1", 0)
+        port = upstream.sockets[0].getsockname()[1]
+        servers = await serve(
+            [Route(0, target_host, port)],
+            host="127.0.0.1",
+            allowed=allowed,  # type: ignore[arg-type]
+        )
+        edge_port = servers[0].sockets[0].getsockname()[1]
+        reader, writer = await asyncio.open_connection("127.0.0.1", edge_port)
+        writer.write(b"Authorization: Bearer must-not-leave")
+        await writer.drain()
+        data = await asyncio.wait_for(reader.read(), timeout=10)
+        writer.close()
+        await asyncio.sleep(0.1)
+        for server in (*servers, upstream):
+            server.close()
+        return data
+
+    return asyncio.run(scenario()), reached
+
+
+@pytest.mark.req("BND1-11")
+def test_a_target_resolving_outside_the_internal_network_is_never_contacted() -> None:
+    data, reached = relay_attempt("127.0.0.1", ONLY_TEN)
+
+    assert (data, reached) == (b"", [])
+
+
+@pytest.mark.req("BND1-11")
+def test_an_unresolvable_target_is_refused() -> None:
+    data, reached = relay_attempt("nessa-absent-target.invalid", LOOPBACK)
+
+    assert (data, reached) == (b"", [])

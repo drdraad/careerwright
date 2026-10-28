@@ -4,10 +4,12 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from ipaddress import IPv4Network, IPv6Network
 from typing import Annotated, Protocol
 
 from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import SecretStr
 
 from nessa.config import ApiSettings
 from nessa.db import Engine, system_transaction
@@ -17,6 +19,7 @@ from nessa.identity.access import Actor, VerifiedIdentity, not_invited, unauthen
 from nessa.identity.keyring import Keyring
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.spend import SpendLimits
+from nessa.localnet import LOOPBACK
 
 
 class TokenVerifier(Protocol):
@@ -35,6 +38,9 @@ class ApiDependencies:
     keyring: Keyring
     models: ModelChoice
     clock: Callable[[], datetime] = _utc_now
+    # Clients the API serves: loopback, plus the internal network inside a container
+    # (`nessa.localnet.local_networks()` at the composition root).
+    client_networks: tuple[IPv4Network | IPv6Network, ...] = LOOPBACK
 
     @property
     def spend_defaults(self) -> SpendLimits:
@@ -48,6 +54,7 @@ class ApiDependencies:
 class Caller:
     actor: Actor
     identity: VerifiedIdentity
+    token: SecretStr  # for long-lived responses that re-verify it; never logged or stored
 
 
 def dependencies(request: Request) -> ApiDependencies:
@@ -71,7 +78,7 @@ def caller(
         actor = store.resolve_active_actor(tx, identity.firebase_uid, identity.email)
     if actor is None:
         raise not_invited()
-    return Caller(actor, identity)
+    return Caller(actor, identity, SecretStr(credentials.credentials))
 
 
 def idempotency_key(

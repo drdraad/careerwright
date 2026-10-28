@@ -1,21 +1,30 @@
-"""Loopback request guard (Global Constraint 9): Host and Origin allowlists, correlation IDs
-and the access log. Pure ASGI, so streamed responses pass through untouched.
+"""Loopback request guard (Global Constraint 9): client address, Host and Origin allowlists,
+correlation IDs, the access log and the last-resort error envelope. Pure ASGI, so streamed
+responses pass through untouched.
 
+- The client must be on loopback or the API's own internal network (`nessa.localnet`). The
+  emulator's tokens are unsigned, so this keeps them out of reach of the LAN even if the API
+  were ever started on a public interface, whatever Host header a client forges.
 - The Host header must be one of the configured local `host:port` values, which defeats DNS
   rebinding: a hostile page cannot address the API under another name.
 - A request that carries an Origin must come from the Nessa web origin, and a state-changing
   request must carry one. Another local origin, such as a different app on 127.0.0.1, cannot
   trigger authenticated changes even if it obtained a token.
+- WebSocket scopes are refused: the API has none, so none may slip past these checks.
+- An unexpected exception becomes the `INTERNAL_ERROR` envelope here, inside Starlette's
+  server-error middleware, so a 500 still carries its correlation ID and is logged as 500.
 """
 
 import logging
 import time
 import uuid
 from collections.abc import Awaitable, Callable, MutableMapping
+from ipaddress import IPv4Network, IPv6Network
 from typing import Any
 
-from nessa.api.envelope import envelope
+from nessa.api.envelope import envelope, internal_error
 from nessa.errors import ErrorCode, ErrorStage, NessaError
+from nessa.localnet import is_permitted
 
 Scope = MutableMapping[str, Any]
 Message = MutableMapping[str, Any]
@@ -24,12 +33,24 @@ Send = Callable[[Message], Awaitable[None]]
 ASGIApp = Callable[[Scope, Receive, Send], Awaitable[None]]
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+POLICY_VIOLATION = 1008  # WebSocket close code
 _log = logging.getLogger("nessa.api.access")
+_errors = logging.getLogger("nessa.api")
 
 
 def rejection(
-    scope: Scope, allowed_hosts: frozenset[str], allowed_origins: frozenset[str]
+    scope: Scope,
+    allowed_hosts: frozenset[str],
+    allowed_origins: frozenset[str],
+    client_networks: tuple[IPv4Network | IPv6Network, ...],
 ) -> NessaError | None:
+    client = scope.get("client")
+    if client is None or not is_permitted(str(client[0]), client_networks):
+        return NessaError(
+            ErrorCode.CLIENT_NOT_ALLOWED,
+            "This API serves only this machine.",
+            stage=ErrorStage.REQUEST,
+        )
     headers = {key.lower(): value for key, value in scope.get("headers", [])}
     host = headers.get(b"host", b"").decode("latin-1").strip().lower()
     if host not in allowed_hosts:
@@ -56,15 +77,26 @@ def rejection(
 
 class RequestGuard:
     def __init__(
-        self, app: ASGIApp, *, allowed_hosts: frozenset[str], allowed_origins: frozenset[str]
+        self,
+        app: ASGIApp,
+        *,
+        allowed_hosts: frozenset[str],
+        allowed_origins: frozenset[str],
+        client_networks: tuple[IPv4Network | IPv6Network, ...],
     ) -> None:
         self._app = app
         self._hosts = allowed_hosts
         self._origins = allowed_origins
+        self._clients = client_networks
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
+        if scope["type"] == "lifespan":
             await self._app(scope, receive, send)
+            return
+        if scope["type"] != "http":
+            if scope["type"] == "websocket":
+                await receive()  # websocket.connect
+                await send({"type": "websocket.close", "code": POLICY_VIOLATION})
             return
         correlation = uuid.uuid4().hex
         scope.setdefault("state", {})["correlation_id"] = correlation
@@ -79,12 +111,21 @@ class RequestGuard:
                 )
             await send(message)
 
-        refused = rejection(scope, self._hosts, self._origins)
+        refused = rejection(scope, self._hosts, self._origins, self._clients)
         try:
             if refused is not None:
                 await envelope(refused, correlation)(scope, receive, send_with_id)
             else:
                 await self._app(scope, receive, send_with_id)
+        except Exception as error:
+            _errors.error(
+                "unexpected error",
+                exc_info=error,
+                extra={"correlation_id": correlation, "path": scope["path"]},
+            )
+            if status:
+                raise  # the response has started; the server closes the connection
+            await envelope(internal_error(), correlation)(scope, receive, send_with_id)
         finally:
             # Path only: no query string, headers or body ever reach the access log.
             _log.info(

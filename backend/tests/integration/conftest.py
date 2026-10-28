@@ -57,7 +57,10 @@ def api_deps(infra: Infra) -> Iterator[ApiDependencies]:
 @pytest.fixture(scope="session")
 def api(api_deps: ApiDependencies) -> Iterator[ApiClient]:
     with TestClient(
-        create_app(api_deps), base_url=API_BASE, raise_server_exceptions=False
+        create_app(api_deps),
+        base_url=API_BASE,
+        raise_server_exceptions=False,
+        client=("127.0.0.1", 57001),
     ) as client:
         yield ApiClient(client)
 

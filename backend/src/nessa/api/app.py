@@ -37,5 +37,6 @@ def create_app(deps: ApiDependencies) -> FastAPI:
         RequestGuard,
         allowed_hosts=deps.settings.allowed_hosts,
         allowed_origins=deps.settings.allowed_origins,
+        client_networks=deps.client_networks,
     )
     return app
