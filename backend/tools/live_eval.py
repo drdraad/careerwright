@@ -268,6 +268,13 @@ def results_of(runs: list[CaseRun]) -> dict[str, list[Failure]]:
     return results
 
 
+def _shown(path: Path) -> str:
+    """A private path as the committed results name it: relative to NESSA_HOME, so no
+    machine's home directory is written into the repository."""
+    home = nessa_home()
+    return f"NESSA_HOME/{path.relative_to(home)}" if path.is_relative_to(home) else str(path)
+
+
 def write_results(
     path: Path,
     observations_path: Path,
@@ -282,7 +289,8 @@ def write_results(
         f"Model `{plan.model_id}` (test model, synthetic cases only); {len(runs)} cases; at most "
         f"{plan.calls} requests, worst case {format_usd(plan.worst_case_nano_usd)}; ledger rows "
         f"{seqs}. Failures by type: {failures_by_type(results) or 'none'}. Each case's output "
-        f"is kept in the private evidence directory (`{observations_path}`, not committed).",
+        f"is kept in the private evidence directory (`{_shown(observations_path)}`, not "
+        "committed).",
         "",
         "| Case | Kind | Run | Result | Failures |",
         "|---|---|---|---|---|",
