@@ -25,7 +25,9 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, inspect a fixture rout
   await expect(page.getByRole("banner").getByText("Synthetic demo")).toBeVisible();
   await expect(liveUpdates(page, "Live")).toBeVisible();
 
-  // Edit: a second work area and weekly study hours, saved as the next version.
+  // Edit: a second work area and weekly study hours, saved as the next version. The form
+  // opens from "What we know"; the conversation leads the chapter.
+  await page.getByRole("button", { name: "Edit answers directly" }).click();
   await page.getByRole("button", { name: "Add another work area" }).click();
   await page.getByRole("textbox", { name: "Work area 2" }).fill("Leeds");
   await page.getByLabel("How you answer weekly study hours").selectOption("provided");
@@ -67,7 +69,7 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, inspect a fixture rout
   const stopped = Date.now();
   stack("stop");
   const stopSeconds = (Date.now() - stopped) / 1000;
-  await expect(liveUpdates(page, /^Live updates: (Reconnecting|Connecting)$/)).toBeVisible({
+  await expect(liveUpdates(page, /^Updates: (Reconnecting|Connecting)$/)).toBeVisible({
     timeout: 60_000,
   });
   // While Nessa is down the work stays on screen, and the strip's live-update state (checked
@@ -85,6 +87,7 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, inspect a fixture rout
   // Reopen the same work: a fresh load of the same address shows the saved version.
   await page.goto(chapterUrl("you"));
   await expect(page.getByRole("banner").getByText(`Saved, version ${version + 1}`)).toBeVisible();
+  await page.getByRole("button", { name: "Edit answers directly" }).click();
   await expect(page.getByRole("textbox", { name: "Work area 2" })).toHaveValue("Leeds");
   await expect(page.getByLabel("Weekly study hours, hours a week")).toHaveValue("6");
   expect(page.url()).toContain(FIXTURE_WORKSPACE);

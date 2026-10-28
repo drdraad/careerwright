@@ -1,7 +1,8 @@
 "use client";
-// What each chapter shows in this build. You edits the real profile; Routes shows the labelled
-// fixture preview in the fixture workspace; the other chapters say what they will hold, which
-// answers they depend on, and what to do next (spec section 3: useful, honest empty states).
+// What each chapter shows in this build. You holds the conversation, what we know and the
+// directions to explore; Routes shows the labelled fixture preview in the fixture workspace;
+// the other chapters say what they will hold, which answers they depend on, and what to do
+// next (spec section 3: useful, honest empty states).
 import Link from "next/link";
 import type { ProfileOut } from "@/generated/api";
 import { CHAPTERS, type ChapterId, chapterHref } from "@/lib/chapters";
@@ -9,13 +10,13 @@ import type { RoutePreview as Preview } from "@/lib/fixtures/trace";
 import { describeField } from "@/lib/profile";
 import { type ChapterNeeds, chapterNeeds } from "@/lib/readiness";
 import { PROFILE_FIELDS, type ProfileFieldName } from "@/lib/vocabulary";
+import { Button } from "./Button";
 import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
-import { ProfileEditor } from "./ProfileEditor";
 import { RoutePreview } from "./RoutePreview";
-import { StatusBadge } from "./Status";
 import { useWorkspaceData } from "./WorkspaceShell";
+import { YouChapter } from "./YouChapter";
 
 type Planned = {
   title: string;
@@ -137,7 +138,7 @@ export function ChapterView({
   chapter: ChapterId;
   routePreview: Preview | null;
 }) {
-  const { workspace, profile, profileError } = useWorkspaceData();
+  const { workspace, profile, profileError, retryProfile } = useWorkspaceData();
   const surface = chapter === "roles" || chapter === "routes" ? "on-space" : "on-reading";
 
   // While loading or after a failed load the page still says which chapter it is.
@@ -149,7 +150,14 @@ export function ChapterView({
     body = (
       <>
         {title}
-        <RequestFailure error={profileError} />
+        <RequestFailure
+          error={profileError}
+          actions={
+            <Button variant="secondary" onClick={retryProfile}>
+              Try again
+            </Button>
+          }
+        />
       </>
     );
   } else if (profile === undefined) {
@@ -160,26 +168,7 @@ export function ChapterView({
       </>
     );
   } else if (chapter === "you") {
-    body = (
-      <>
-        <h1 className="page-title">You</h1>
-        <section className="grid gap-12" aria-labelledby="conversation">
-          <h2 id="conversation" className="section-title">
-            Conversation
-          </h2>
-          <StatusBadge state="notStarted" detail="the interview isn't part of this build yet" />
-          <p className="small measure">
-            Answer directly below instead. Later, Nessa will ask one question at a time and propose
-            changes here for you to accept, edit or undo.
-          </p>
-        </section>
-        <ProfileEditor
-          key={workspace.workspace_id}
-          workspaceId={workspace.workspace_id}
-          profile={profile}
-        />
-      </>
-    );
+    body = <YouChapter workspace={workspace} profile={profile} />;
   } else if (chapter === "routes") {
     body = (
       <>
@@ -208,5 +197,7 @@ export function ChapterView({
     body = <PlannedChapter id={chapter} profile={profile} workspaceId={workspace.workspace_id} />;
   }
 
-  return <div className={`chapter ${surface}`}>{body}</div>;
+  return (
+    <div className={`chapter ${surface}${chapter === "you" ? " chapter-you" : ""}`}>{body}</div>
+  );
 }

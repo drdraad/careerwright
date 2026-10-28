@@ -121,7 +121,7 @@ def test_a_discovery_runs_durably_and_its_slate_is_grounded_in_esco_and_the_answ
     [unsupported] = result["unsupported_hypotheses"]
     assert unsupported.endswith("orbital gardener")
     assert unsupported not in {s["title"] for s in result["suggestions"]}
-    assert not re.search(r"\d\s?%|per ?cent", json.dumps(result))  # no match percentage
+    assert not re.search(r"\d\s?(?:%|per ?cent)", json.dumps(result), re.IGNORECASE)  # none
     families = [s["family"]["code"] for s in result["suggestions"]]
     assert max(families.count(f) for f in families) <= result["family_limit"]
     assert result["pool_size"] >= len(result["suggestions"])

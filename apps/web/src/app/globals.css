@@ -831,6 +831,297 @@
   font-weight: 600;
 }
 
+/* ---------- You: the conversation beside "What we know" (docs/design/compositions/
+   conversation.css, the reviewed Sprint 0 reference). The conversation stays on the light
+   reading surface: quiet and human. A dashed edge means provisional only (a proposal not yet
+   a fact, a reply not yet checked, the early sketch). ---------- */
+
+@layer components {
+  .chapter-you {
+    max-width: 1240px;
+  }
+
+  .you {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    align-items: start;
+    gap: var(--space-32);
+  }
+
+  .thread {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-24);
+    min-width: 0;
+    max-width: 66ch;
+  }
+
+  .thread-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-8) var(--space-16);
+    color: var(--fg-muted);
+    font-size: var(--type-14);
+  }
+
+  .turn-nessa {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: var(--space-12);
+  }
+
+  .turn-nessa > .glyph {
+    width: 24px;
+    height: 24px;
+    color: var(--fg-muted);
+    margin-top: 2px;
+  }
+
+  .turn-you {
+    align-self: flex-end;
+    max-width: 88%;
+    padding: var(--space-16) var(--space-24);
+    background: var(--surface-card);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-card) var(--radius-card) 4px var(--radius-card);
+    overflow-wrap: anywhere;
+  }
+
+  .turn-you .when {
+    display: block;
+    margin-top: var(--space-8);
+    font-size: var(--type-14);
+    color: var(--fg-muted);
+  }
+
+  .turn-you[data-processed="false"] {
+    border-color: var(--status-error);
+  }
+
+  .reply-provisional {
+    padding: var(--space-12) var(--space-16);
+    border: 1px dashed var(--line-reading-control);
+    border-radius: var(--radius-control);
+  }
+
+  .question {
+    padding-top: var(--space-16);
+    border-top: 1px solid var(--line-reading-hairline);
+  }
+
+  .question .display {
+    font-size: var(--type-31);
+    max-width: 26ch;
+  }
+
+  .choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-8);
+    margin-top: var(--space-16);
+  }
+
+  .composer {
+    position: sticky;
+    bottom: var(--space-16);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: var(--space-8);
+    padding: var(--space-8);
+    background: var(--surface-card);
+    border: 1px solid var(--line-reading-control);
+    border-radius: var(--radius-card);
+  }
+
+  .composer textarea {
+    min-height: 44px;
+    padding: var(--space-8) var(--space-12);
+    border: 0;
+    resize: vertical;
+    background: transparent;
+    color: var(--text-on-reading);
+    font: inherit;
+  }
+
+  .composer textarea::placeholder {
+    color: var(--text-on-reading-muted);
+  }
+
+  .known {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-16);
+    min-width: 0;
+  }
+
+  .known-group {
+    display: grid;
+    gap: var(--space-8);
+  }
+
+  .known-group > h3 {
+    font-size: var(--type-14);
+    font-weight: 600;
+    color: var(--fg-muted);
+  }
+
+  .proposal {
+    display: grid;
+    gap: var(--space-8);
+    padding: var(--space-12) var(--space-16);
+    background: var(--surface-card);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-control);
+  }
+
+  /* An inference is drawn with a dashed edge: Nessa's reading, not a fact until accepted. */
+  .proposal[data-basis="inferred"] {
+    border-style: dashed;
+    border-color: var(--line-reading-control);
+  }
+
+  .proposal[data-chosen="true"] {
+    border-color: var(--selection-reading);
+    box-shadow: inset 3px 0 0 var(--selection-reading);
+  }
+
+  .proposal-kind {
+    font-size: var(--type-14);
+    color: var(--fg-muted);
+  }
+
+  .proposal-value {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .proposal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4) var(--space-8);
+  }
+
+  .proposal-actions .btn {
+    min-height: 32px;
+    padding: 0 var(--space-12);
+  }
+
+  .fact-list {
+    display: grid;
+    gap: 2px;
+    background: var(--line-reading-hairline);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-control);
+    overflow: hidden;
+  }
+
+  .fact {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+    gap: var(--space-4) var(--space-12);
+    padding: var(--space-8) var(--space-16);
+    background: var(--surface-card);
+    font-size: var(--type-14);
+  }
+
+  .fact dt {
+    color: var(--fg-muted);
+  }
+
+  .fact dd {
+    text-align: right;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .fact dd[data-open="true"] {
+    font-weight: 400;
+    color: var(--status-unknown);
+  }
+
+  .sketch {
+    display: grid;
+    gap: var(--space-12);
+    padding: var(--space-16);
+    border: 1px dashed var(--line-reading-control);
+    border-radius: var(--radius-card);
+    background: var(--surface-card);
+  }
+
+  .plain-list {
+    display: grid;
+    gap: var(--space-8);
+    padding-left: var(--space-24);
+    list-style: disc;
+    font-size: var(--type-14);
+  }
+
+  .suggestions {
+    display: grid;
+    gap: var(--space-16);
+  }
+
+  .suggestion {
+    display: grid;
+    gap: var(--space-12);
+  }
+
+  .suggestion h4 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: var(--type-25);
+  }
+
+  .segmented {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+  }
+
+  .segmented .btn[aria-pressed="true"] {
+    border-color: var(--selection-reading);
+    box-shadow: inset 0 -3px 0 var(--selection-reading);
+  }
+
+  .details summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+}
+
+@media (max-width: 1280px) {
+  .you {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .question .display {
+    font-size: var(--type-25);
+  }
+
+  .turn-you {
+    max-width: 100%;
+  }
+
+  /* S0-V02: the reply field rides above the bottom sheet's peek, never under it. */
+  .app[data-drawer="open"] .composer {
+    bottom: calc(var(--sheet-peek) + var(--space-16));
+  }
+}
+
+/* V-08: on wide screens the strip's states sit on their own row, so a longer state (a
+   failed refresh, reconnecting) never wraps the strip and moves the work below it. */
+@media (min-width: 1180px) {
+  .strip-end {
+    flex-basis: 100%;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+}
+
 /* Calm mode (spec section 14) does what prefers-reduced-motion does: spatial motion goes,
    information stays. */
 :root[data-calm="true"] {

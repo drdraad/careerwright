@@ -66,10 +66,10 @@ export async function axe(page: Page): Promise<AxeViolation[]> {
 }
 
 /**
- * The strip's live-update state, matched exactly: its accessible text is "Live updates:
- * <state>", so a loose match on "Live" would also match "Live updates: Reconnecting".
+ * The strip's live-update state, matched exactly: its text is "Updates: <state>", so a loose
+ * match on "Live" would also match other states.
  */
 export function liveUpdates(page: Page, state: "Live" | "Connecting" | "Reconnecting" | RegExp) {
-  const pattern = state instanceof RegExp ? state : new RegExp(`^Live updates: ${state}$`);
+  const pattern = state instanceof RegExp ? state : new RegExp(`^Updates: ${state}$`);
   return page.getByRole("status").filter({ hasText: pattern });
 }

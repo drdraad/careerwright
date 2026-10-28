@@ -253,7 +253,7 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         twice = len(set(titles)) != len(titles) or len(set(ids)) != len(ids)
         return Failure(FailureType.DUPLICATE, f"{titles}") if twice else None
     if e.check == "no_percentage":
-        percent = re.search(r"\d\s?%|per ?cent", json.dumps(observed), re.IGNORECASE)
+        percent = re.search(r"\d\s?(?:%|per ?cent)", json.dumps(observed), re.IGNORECASE)
         return Failure(FailureType.INFERENCE, percent.group(0)) if percent else None
     if e.check == "unsupported_not_suggested":
         shown = {s["title"].casefold() for s in suggestions}

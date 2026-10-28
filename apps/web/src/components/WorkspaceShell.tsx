@@ -29,6 +29,8 @@ type WorkspaceData = {
   workspace: WorkspaceOut;
   profile: ProfileOut | undefined;
   profileError: unknown;
+  /** Load the profile again after a failed load, in place (V-02). */
+  retryProfile(): void;
   events: StreamStatus;
 };
 
@@ -141,6 +143,7 @@ export function WorkspaceShell({
     enabled: opened,
     startAfter: workspace.data?.last_event_seq,
     token: auth.token,
+    session: auth.state.status === "signed_in" ? auth.state.uid : "",
   });
   const visited = useVisited(workspaceId, chapter);
 
@@ -185,6 +188,7 @@ export function WorkspaceShell({
     workspace: workspace.data,
     profile: profile.data,
     profileError: profile.error,
+    retryProfile: () => void profile.refetch(),
     events: events.status,
   };
 

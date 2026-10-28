@@ -50,7 +50,9 @@ describe("[STATE-07][UI-09] the strip states what it has, including what failed 
   it("says the profile could not be loaded, not 'Loading' or 'showing what was last loaded'", () => {
     strip({ profileFailed: true });
 
-    expect(screen.getByText("What we know couldn't be loaded")).toBeInTheDocument();
+    expect(screen.getByText("Your answers couldn't be loaded")).toBeInTheDocument();
+    // V-02: the live-update state names itself, so it never reads as the profile's state.
+    expect(screen.getByRole("status")).toHaveTextContent(/^Updates: Live$/);
     expect(screen.queryByText("Loading")).not.toBeInTheDocument();
     expect(screen.queryByText(/showing what was last loaded/)).not.toBeInTheDocument();
     // The chapter announces the failure with its cause; the strip does not announce it again.
@@ -58,13 +60,13 @@ describe("[STATE-07][UI-09] the strip states what it has, including what failed 
   });
 
   it.each([
-    ["access_ended", "Updates stopped: access to this workspace ended"],
-    ["closed", "Updates stopped"],
-    ["signed_out", "Updates stopped: sign in again"],
+    ["access_ended", "Stopped: access to this workspace ended"],
+    ["closed", "Stopped"],
+    ["signed_out", "Stopped: sign in again"],
   ] as const)("offers no Reconnect where it cannot help (%s)", (reason, words) => {
     strip({ events: { state: "stopped", reason } });
 
-    expect(screen.getByRole("status")).toHaveTextContent(`Live updates: ${words}`);
+    expect(screen.getByRole("status")).toHaveTextContent(`Updates: ${words}`);
     expect(screen.queryByRole("button", { name: /Reconnect/ })).not.toBeInTheDocument();
   });
 
@@ -76,7 +78,7 @@ describe("[STATE-07][UI-09] the strip states what it has, including what failed 
     });
 
     const status = screen.getByRole("status");
-    expect(status).toHaveTextContent("Live updates: Updates stopped: sign in again");
+    expect(status).toHaveTextContent("Updates: Stopped: sign in again");
     expect(status.closest(".strip-optional")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Reconnect live updates" }));
     expect(onReconnect).toHaveBeenCalledOnce();

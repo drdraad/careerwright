@@ -47,7 +47,7 @@ const EVENTS_TEXT: Record<StreamStatus["state"], string> = {
   connecting: "Connecting",
   live: "Live",
   reconnecting: "Reconnecting",
-  stopped: "Updates stopped",
+  stopped: "Stopped",
 };
 
 const STOP_REASON: Record<Extract<StreamStatus, { state: "stopped" }>["reason"], string> = {
@@ -65,9 +65,9 @@ function LiveUpdates({ status, onReconnect }: { status: StreamStatus; onReconnec
     <span className="flex items-center gap-8">
       <span className="status" data-tone={tone} role="status" aria-live="polite">
         <Glyph name={glyph} />
+        {/* Named in words, so it is never read as the state of what the page loaded (V-02). */}
         <span>
-          <span className="sr-only">Live updates: </span>
-          {EVENTS_TEXT[status.state]}
+          Updates: {EVENTS_TEXT[status.state]}
           {status.state === "stopped" && STOP_REASON[status.reason]}
         </span>
       </span>
@@ -156,7 +156,7 @@ export function WorkspaceStrip({
           // Not announced: the chapter announces this failure with its cause.
           <span className="status" data-tone="error">
             <Glyph name="unavailable" />
-            <span>What we know couldn't be loaded</span>
+            <span>Your answers couldn't be loaded</span>
           </span>
         ) : (
           <span className="strip-item">

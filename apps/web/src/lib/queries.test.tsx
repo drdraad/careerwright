@@ -141,7 +141,7 @@ describe("[STATE-07][DUR-03] a workspace's stream on one page", () => {
       sent.push(new Headers(init.headers).get("Last-Event-ID"));
       return openStream(`retry: 1000\n\n${eventFrame(5, id)}`);
     });
-    const options = { enabled: true, startAfter: 2, token: async () => "token" };
+    const options = { enabled: true, startAfter: 2, token: async () => "token", session: "ada" };
 
     const first = renderHook(() => useWorkspaceEvents(id, options), { wrapper });
     await waitFor(() => expect(first.result.current.status.state).toBe("live"));
@@ -152,6 +152,27 @@ describe("[STATE-07][DUR-03] a workspace's stream on one page", () => {
 
     await waitFor(() => expect(sent).toHaveLength(2));
     expect(sent).toEqual(["2", "5"]);
+  });
+
+  it("never resumes another signed-in session's place in the stream", async () => {
+    const id = "w-sessions";
+    const sent: Array<string | null> = [];
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      sent.push(new Headers(init.headers).get("Last-Event-ID"));
+      return openStream(`retry: 1000\n\n${eventFrame(9, id)}`);
+    });
+    const ada = { enabled: true, startAfter: 2, token: async () => "token", session: "ada" };
+
+    const first = renderHook(() => useWorkspaceEvents(id, ada), { wrapper });
+    await waitFor(() => expect(first.result.current.status.state).toBe("live"));
+    await new Promise((resolve) => setTimeout(resolve, 20)); // the event is read
+    first.unmount();
+    renderHook(() => useWorkspaceEvents(id, { ...ada, session: "ben", startAfter: 3 }), {
+      wrapper,
+    });
+
+    await waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent).toEqual(["2", "3"]); // Ben starts from his own read, not Ada's last event
   });
 
   it("refreshes only the turn's reply on a streamed-reply event, not the whole workspace", async () => {
@@ -178,7 +199,7 @@ describe("[STATE-07][DUR-03] a workspace's stream on one page", () => {
     const own = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={queries}>{children}</QueryClientProvider>
     );
-    const options = { enabled: true, startAfter: 0, token: async () => "token" };
+    const options = { enabled: true, startAfter: 0, token: async () => "token", session: "ada" };
 
     renderHook(() => useWorkspaceEvents(id, options), { wrapper: own });
 
@@ -199,7 +220,7 @@ describe("[STATE-07][DUR-03] a workspace's stream on one page", () => {
           headers: { "content-type": "application/json" },
         }),
     );
-    const options = { enabled: true, startAfter: 0, token: async () => "token" };
+    const options = { enabled: true, startAfter: 0, token: async () => "token", session: "ada" };
     const { result } = renderHook(() => useWorkspaceEvents("w-restart", options), { wrapper });
     await waitFor(() => expect(result.current.status.state).toBe("stopped"));
 

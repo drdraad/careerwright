@@ -1,5 +1,5 @@
 "use client";
-// "What we know": the editable profile (spec section 3). Every answer has a state, so a
+// "What we know", edited directly (spec section 3). Every answer has a state, so a
 // missing value is never a zero. Saving is an expected-version command with an idempotency
 // key (Global Constraint 7): a retry of the same change reuses its key, and a version saved
 // elsewhere meanwhile is refused (409 STALE_INPUT_VERSION). Then the form moves to the newer
@@ -151,7 +151,7 @@ export function ProfileEditor({
     >
       <div className="flex flex-wrap items-baseline justify-between gap-12">
         <h2 id={`${idPrefix}-title`} className="display text-25">
-          What we know
+          Edit your answers
         </h2>
         <p className="small muted tnum">
           {base.version === 0 ? "Nothing saved yet" : `Version ${base.version}`}
@@ -159,8 +159,7 @@ export function ProfileEditor({
         </p>
       </div>
       <p className="small muted measure">
-        Each answer keeps where it came from. Saving makes a new version; nothing changes until you
-        save. Choose Unknown, Skip or Prefer not to say for anything you don't want to answer.
+        Saving makes a new version. Unknown, Skipped and Prefer not to say are answers too.
       </p>
 
       {stale?.kind === "rebased" && (
