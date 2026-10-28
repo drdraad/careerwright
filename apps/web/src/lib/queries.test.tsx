@@ -7,6 +7,7 @@ import { client } from "@/generated/api/client.gen";
 import { configureApiClient } from "./api";
 import {
   firstLoadFailed,
+  keys,
   refreshFailed,
   useCreateWorkspace,
   useWorkspaceEvents,
@@ -116,10 +117,10 @@ function openStream(frames: string): Response {
   return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
 }
 
-function eventFrame(seq: number, workspaceId: string): string {
+function eventFrame(seq: number, workspaceId: string, kind = "profile.version_created"): string {
   const event = {
     seq,
-    kind: "profile.version_created",
+    kind,
     subject_id: workspaceId,
     state: null,
     detail: {},
@@ -151,6 +152,42 @@ describe("[STATE-07][DUR-03] a workspace's stream on one page", () => {
 
     await waitFor(() => expect(sent).toHaveLength(2));
     expect(sent).toEqual(["2", "5"]);
+  });
+
+  it("refreshes only the turn's reply on a streamed-reply event, not the whole workspace", async () => {
+    const id = "w-partial";
+    const turn = "t-1";
+    vi.stubGlobal("fetch", async () => {
+      // The event arrives after the stream's own catch-up refresh has gone out.
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("retry: 1000\n\n"));
+          setTimeout(() => {
+            const frame = eventFrame(7, id, "run.partial_updated").replace(`"${id}"`, `"${turn}"`);
+            controller.enqueue(new TextEncoder().encode(frame));
+          }, 120);
+        },
+      });
+      return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+    });
+    const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidated: unknown[] = [];
+    vi.spyOn(queries, "invalidateQueries").mockImplementation(async (filters) => {
+      invalidated.push(filters?.queryKey);
+    });
+    const own = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queries}>{children}</QueryClientProvider>
+    );
+    const options = { enabled: true, startAfter: 0, token: async () => "token" };
+
+    renderHook(() => useWorkspaceEvents(id, options), { wrapper: own });
+
+    await waitFor(() => expect(invalidated).toContainEqual(keys.turnReply(id, turn)));
+    await new Promise((resolve) => setTimeout(resolve, 100)); // any coalesced refresh is out
+    // The workspace was refreshed once, when the stream went live; the event added nothing.
+    expect(
+      invalidated.filter((key) => JSON.stringify(key) === JSON.stringify(keys.scope(id))),
+    ).toHaveLength(1);
   });
 
   it("says it is connecting again as soon as Reconnect opens a new stream", async () => {

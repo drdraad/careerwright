@@ -1,15 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ProfileDocument } from "@/generated/api";
 import openapi from "@/generated/openapi.json";
-import {
-  changedFields,
-  describeField,
-  draftFrom,
-  inputFrom,
-  listLimit,
-  rebaseDraft,
-} from "./profile";
-import type { ProfileFieldName } from "./vocabulary";
+import { listLimit } from "./bounds";
+import { changedFields, describeField, draftFrom, inputFrom, rebaseDraft } from "./profile";
+import { PROFILE_FIELDS, type ProfileFieldName } from "./vocabulary";
 
 const SOURCE = "6f1d3c2a-0000-4000-8000-000000000001";
 
@@ -105,6 +99,12 @@ describe("[API-04] the profile form sends exactly what was answered, in integer 
       "evidenced_tasks",
     ]);
     for (const [name, published, used] of lists) expect([name, used]).toEqual([name, published]);
+  });
+
+  it("states a list's bound in its hint from the same published schema", () => {
+    for (const name of ["cities", "target_titles"] as const) {
+      expect(PROFILE_FIELDS[name].hint).toContain(`Up to ${listLimit(name)} `);
+    }
   });
 
   it("reads typed pounds and pence as integer minor units", () => {

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   type CreateWorkspace,
   createWorkspace,
+  EventKind,
   getMe,
   getProfile,
   getWorkspace,
@@ -28,6 +29,9 @@ export const keys = {
   profile: (id: string) => ["ws", id, "profile"] as const,
   sources: (id: string) => ["ws", id, "sources"] as const,
   scope: (id: string) => ["ws", id] as const,
+  /** A turn's streamed reply (`GET .../interview/turns/{id}/reply`; its view is T6's). */
+  turnReply: (id: string, turnId: string) =>
+    ["ws", id, "interview", "turns", turnId, "reply"] as const,
 };
 
 /** An access failure is final for this page; retrying cannot help. */
@@ -231,6 +235,11 @@ export function useWorkspaceEvents(
         sleep,
         onEvent: (event) => {
           lastSeen.set(id, event.seq);
+          if (event.kind === EventKind.RUN_PARTIAL_UPDATED) {
+            // A streamed reply moved (up to a few times a second): only that turn's reply.
+            void queries.invalidateQueries({ queryKey: keys.turnReply(id, event.subject_id) });
+            return;
+          }
           changed();
         },
         onStatus: (next) => {

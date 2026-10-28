@@ -4,6 +4,7 @@
 
 import type { GlyphName } from "@/components/Glyph";
 import type { DataMode, ErrorCode, FieldState, ProfileInput, WorkState } from "@/generated/api";
+import { listLimit } from "./bounds";
 
 /** Only error and stale add a hue; everything else is carried by glyph and words. */
 export type Tone = "neutral" | "unknown" | "stale" | "error";
@@ -87,14 +88,14 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
     label: "Work areas",
     kind: "list",
     itemLabel: "Work area",
-    hint: "Up to three English cities, such as Leeds or Bristol.",
+    hint: `Up to ${listLimit("cities")} English cities, such as Leeds or Bristol.`,
     lessPrecise: "Roles, pay and listings: none can be searched without a work area.",
   },
   target_titles: {
     label: "Target roles",
     kind: "list",
     itemLabel: "Target role",
-    hint: "Up to three roles you are considering.",
+    hint: `Up to ${listLimit("target_titles")} roles you are considering.`,
     lessPrecise: "Every later chapter: requirements, options and routes start from a target.",
   },
   weekly_study_hours: {

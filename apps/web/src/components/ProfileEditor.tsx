@@ -11,12 +11,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
 import type { ProfileDocument, ProfileOut } from "@/generated/api";
 import { ApiError, ChangeKeys } from "@/lib/api";
+import { listLimit } from "@/lib/bounds";
 import {
   describeField,
   draftFrom,
   type FieldProblem,
   inputFrom,
-  listLimit,
   type ProfileDraft,
   problemText,
   rebaseDraft,

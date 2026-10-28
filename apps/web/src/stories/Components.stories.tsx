@@ -6,7 +6,7 @@ import { Button } from "@/components/Button";
 import { FieldStateSelect, ListInput, ValueInput } from "@/components/fields";
 import { StatusBadge, SyntheticLabel } from "@/components/Status";
 import { WorkState } from "@/generated/api";
-import { listLimit } from "@/lib/profile";
+import { listLimit } from "@/lib/bounds";
 import { DISPLAY_STATE } from "@/lib/vocabulary";
 
 const meta: Meta = { title: "Components" };
