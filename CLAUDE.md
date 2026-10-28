@@ -34,8 +34,9 @@ Run from the repository root (details: `docs/runbook.md`).
   `workflow.py` beside it: the pinned durable-activity pattern (ADR 0002, ADR 0004).
   Workflows carry IDs only; one bounded activity re-checks access, model, key and budget,
   opens the sealed key just in time and stores the output sealed with its usage; failures
-  are classified from type and status with the message discarded; the DBOS step is the
-  only retry owner. `nessa/profile/commands.py` shows an expected-version command.
+  are classified from type and status with the message discarded; each transient failure
+  class has one retry owner: the DBOS step for provider failures, the activity's store
+  budget for store failures. `nessa/profile/commands.py` shows an expected-version command.
 - Layout: `nessa/identity` (identity and execution: access, workspaces, keys, runs,
   spend), `nessa/profile`, `nessa/api` (HTTP only), `nessa/migrations` (forward-only SQL).
   Vendor and SQL imports are allowed only in the adapters listed in
