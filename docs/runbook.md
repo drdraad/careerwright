@@ -46,9 +46,12 @@ in, is refused). These are local test credentials, not secrets.
 6. Calm mode (account menu) turns off motion; `prefers-reduced-motion` does the same.
 
 For UI work without Docker: `cd apps/web && pnpm storybook` (component states on
-`127.0.0.1:6006`). `pnpm run review-screenshots` (with the toolchain from `make setup`)
-regenerates the visual review package in `docs/reviews/sprint-1/`. After an API change, run
-`pnpm run generate` in `apps/web` and commit the regenerated client.
+`127.0.0.1:6006`). After an API change, run `pnpm run generate` in `apps/web` and commit the
+regenerated client.
+
+`cd apps/web && pnpm run review-screenshots` regenerates the visual review package in
+`docs/reviews/sprint-1/screenshots/`. It needs Docker: like `make acceptance`, it builds and
+starts its own stack (`nessa-l0-webtest`) and removes it afterwards.
 
 ## Calling the API (what the web app does)
 

@@ -137,7 +137,9 @@ Exceptions and accepted advisories (`pnpm audit`, 2026-10-28):
   to 16.4.0 is affected by GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr (critical, remote
   code execution) and GHSA-p3m5-59mp-jv5r (high). `minimumReleaseAgeExclude` names
   `next@16.4.1` and its `@next/*` 16.4.1 packages only. It reaches 14 days on
-  2026-10-28T17:43Z.
+  2026-10-28T17:43Z. The exception is accepted and **provisional**: after that time, delete
+  `minimumReleaseAgeExclude`, check that `pnpm install --frozen-lockfile` passes with no
+  lockfile change, and remove this entry (ADR 0005 decision 1).
 - `sharp` (Next.js's optional image optimiser, with LGPL libvips binaries) is not installed
   (`ignoredOptionalDependencies`). The app serves no optimised images (`images.unoptimized`).
 - `js-yaml` is overridden from 4.2.0 to 4.3.2 (2026-08-26) for three CPU-exhaustion

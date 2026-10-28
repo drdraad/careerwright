@@ -83,8 +83,9 @@ Run from the repository root (details: `docs/runbook.md`).
     itself; its CSP allows only the web origin and the Auth emulator.
 - Compatibility boundary: the exact pins in `backend/pyproject.toml` and
   `backend/uv.lock` (bump only by re-running `make acceptance`), the exact pins in
-  `apps/web/package.json` and its lockfile (at least 14 days old, enforced by pnpm; record
-  each in `docs/dependencies.md`), pnpm 10.33.2, Node 24, Python
+  `apps/web/package.json` and its lockfile (at least 14 days old, enforced by pnpm; one
+  provisional exception, `next` 16.4.1, to remove per ADR 0005 decision 1; record each in
+  `docs/dependencies.md`), pnpm 10.33.2, Node 24, Python
   3.12, PostgreSQL 16, and the DBOS `application_version` `nessa-l0-1` (change it when the
   workflow's step sequence changes). Code goes in `backend/src/nessa/<domain module>` (plan
   section 3) and `apps/web`. No empty layer scaffolding.

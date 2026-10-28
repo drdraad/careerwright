@@ -1,6 +1,7 @@
 # ADR 0005: The web app, its toolchain and same-origin access to the API
 
-- Status: Accepted (Task 4, Sprint 1; evidence: `make check`, `make acceptance`)
+- Status: Accepted (Task 4, Sprint 1; evidence: `make check`, `make acceptance`). Decision 1's
+  age exception for Next.js 16.4.1 is provisional until its removal step is done.
 - Date: 2026-10-28
 - Requirements: S1.4, S1.5, ARC1-01/03/10, BND1-11/12/13, UI-04/05/06/09/11, STATE-01/07,
   DUR-03, SEC-04; Global Constraints 2, 9, 10 and 11
@@ -24,7 +25,12 @@ loopback boundary the web service must join without weakening.
      is affected by GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr (critical, remote code
      execution) and GHSA-p3m5-59mp-jv5r (high), so the age rule's purpose (avoiding a fresh,
      unproven release) loses to a known critical defect. The exception names that version
-     only (`apps/web/pnpm-workspace.yaml`).
+     only (`apps/web/pnpm-workspace.yaml`). It was accepted by the controller in the Task 4
+     review, and it is **provisional**: 16.4.1 turns 14 days old at 2026-10-28T17:43Z.
+   - **Removal step (after 2026-10-28T17:43Z):** delete `minimumReleaseAgeExclude` from
+     `apps/web/pnpm-workspace.yaml`; `cd apps/web && pnpm install --frozen-lockfile` must
+     pass with no lockfile change; then delete this exception here, in
+     `docs/dependencies.md` and in `CLAUDE.md`'s compatibility boundary.
    - **TypeScript 6, not 7.** TypeScript 7 ships no JavaScript compiler API; the client
      generator uses it. 6.0.3 is the newest release that has it. Next.js type-checks with it.
    - **The Firebase packages, not the `firebase` umbrella.** Only app and auth are used; the
@@ -74,14 +80,22 @@ loopback boundary the web service must join without weakening.
 
 5. **Status events.** EventSource cannot send an Authorization header, so the stream is
    read with `fetch` and parsed (`src/lib/sse.ts`).
-   - **Resume:** every reconnect sends `Last-Event-ID`.
+   - **Resume:** every reconnect sends `Last-Event-ID`, the last event the page received. A
+     newly opened page starts after the workspace's `last_event_seq` (returned with the
+     workspace), so a reopened page neither replays old events nor misses new ones.
+   - **"Live" means delivered:** the status turns Live when the first bytes of the stream
+     reach the page through the web origin (the API sends a `retry:` frame at once), not
+     when the response headers arrive. A browser test checks that a change saved by another
+     client reaches an open page within 5 s without a reload.
+   - **Stopped:** the status is shown on every screen size, with a Reconnect action, so a
+     phone also says when updates have stopped.
    - **Re-authentication:** `event: reauthenticate` reconnects at once with a force-refreshed
      token. Signed out, or a fresh token sent back again within 10 s with nothing delivered,
      stops the stream with a stated reason instead of looping.
    - **Access ends:** `stream_ended` with NOT_INVITED or NOT_FOUND, or a 403/404 envelope,
      stops it for good.
-   - **Transport failures:** they back off from the server's retry interval, doubling, capped
-     at 30 s.
+   - **Transport failures:** they back off from the server's retry interval (never below
+     1 s), doubling, capped at 30 s.
    - **What events do:** they only invalidate queries; the API's resources stay authoritative.
      A refresh that fails while the API restarts keeps what was last loaded and says so in
      the strip.
@@ -115,10 +129,14 @@ loopback boundary the web service must join without weakening.
    - The sheet is non-modal like the desktop drawer. Escape or Close dismisses it, and
      focus returns to the control that opened it.
 
-9. **Browser storage.** The Firebase SDK keeps the emulator session in IndexedDB (its
-   default local persistence). Calm mode is a per-viewer preference in `localStorage`.
-   Nothing else is stored, and no Meta key is ever handled by the web app (MODEL-06 for
-   browser storage and URLs).
+9. **Browser storage.** The Firebase SDK keeps the emulator session in IndexedDB
+   (`indexedDBLocalPersistence`, set explicitly). A browser test checks that the session is
+   in IndexedDB and that no `firebase:` key is in `localStorage` or `sessionStorage`.
+   - Calm mode is a per-viewer preference in `localStorage`.
+   - The chapters this tab has visited are kept in `sessionStorage`, per workspace, for the
+     rail's marks.
+   - Nothing else is stored, and no Meta key is ever handled by the web app (MODEL-06 for
+     browser storage and URLs).
 
 ## Consequences
 
