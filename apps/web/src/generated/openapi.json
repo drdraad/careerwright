@@ -2663,6 +2663,113 @@
         }
       }
     },
+    "/v1/workspaces/{workspace_id}/discoveries/{discovery_id}/explanation": {
+      "post": {
+        "tags": [
+          "discovery"
+        ],
+        "summary": "Explain",
+        "description": "The written \"Why this could suit you\" for the slate's first view, as one bounded\nrun. A slate has at most one: asking again, from any view, answers 200 with its run. The\nanswer never holds the written text (it is kept as the command's receipt); the\ndiscovery carries it.",
+        "operationId": "submit_explanation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "discovery_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Discovery Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitExplanation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplanationRunOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already asked for: the slate's one explanation's run, in its state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplanationRunOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/workspaces/{workspace_id}/targets": {
       "post": {
         "tags": [
@@ -3499,6 +3606,29 @@
         ],
         "title": "CityListInput"
       },
+      "ClaimOut": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Written by the model (or the demo explainer): one sentence resting on its quotations, which quote you and ESCO's record."
+          },
+          "quotations": {
+            "items": {
+              "$ref": "#/components/schemas/QuotationOut"
+            },
+            "type": "array",
+            "title": "Quotations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "quotations"
+        ],
+        "title": "ClaimOut"
+      },
       "ConnectionCheckResult": {
         "properties": {
           "suggested_title": {
@@ -3807,6 +3937,17 @@
                 "type": "null"
               }
             ]
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SlateExplanationOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its slate's written explanation; null: never asked for."
           }
         },
         "additionalProperties": false,
@@ -3815,7 +3956,8 @@
           "discovery_id",
           "profile_version",
           "run",
-          "proposal"
+          "proposal",
+          "explanation"
         ],
         "title": "DiscoveryOut",
         "description": "One discovery. `run` is authoritative for its state; `proposal` exists only once the\nrun is complete, and a failed run's failure class says why there is none."
@@ -4168,6 +4310,32 @@
           "families"
         ],
         "title": "ExcludedOut"
+      },
+      "ExplanationRunOut": {
+        "properties": {
+          "explanation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Explanation Id"
+          },
+          "discovery_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Discovery Id"
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunOut"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "explanation_id",
+          "discovery_id",
+          "run"
+        ],
+        "title": "ExplanationRunOut",
+        "description": "A slate explanation's run, as asking for it answers: never what it wrote, since a\ncommand's answer is kept as its receipt and model output is kept sealed. The discovery\n(`GET .../discoveries/{id}`) carries the written text."
       },
       "FailureClass": {
         "type": "string",
@@ -5576,6 +5744,66 @@
         ],
         "title": "QueryOut"
       },
+      "QuotationOut": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/QuoteSource"
+          },
+          "answer_field": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProfileField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which of your answers, for a quotation of yours."
+          },
+          "record_part": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecordPart"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which part of ESCO's record, for a quotation of ESCO's."
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "The source's own words, checked as an exact span of it."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "answer_field",
+          "record_part",
+          "text"
+        ],
+        "title": "QuotationOut"
+      },
+      "QuoteSource": {
+        "type": "string",
+        "enum": [
+          "answer",
+          "esco"
+        ],
+        "title": "QuoteSource"
+      },
+      "RecordPart": {
+        "type": "string",
+        "enum": [
+          "title",
+          "description",
+          "essential_skill"
+        ],
+        "title": "RecordPart"
+      },
       "RegisterProvisionalConcept": {
         "properties": {
           "title": {
@@ -5687,7 +5915,8 @@
         "enum": [
           "connection_check",
           "interview_turn",
-          "discovery"
+          "discovery",
+          "slate_explanation"
         ],
         "title": "RunKind"
       },
@@ -6109,6 +6338,43 @@
         ],
         "title": "SlateChannel",
         "description": "How a candidate was found: the model's channels plus Nessa's own."
+      },
+      "SlateExplanationOut": {
+        "properties": {
+          "explanation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Explanation Id"
+          },
+          "discovery_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Discovery Id"
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunOut"
+          },
+          "written": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WrittenExplanationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "explanation_id",
+          "discovery_id",
+          "run",
+          "written"
+        ],
+        "title": "SlateExplanationOut",
+        "description": "The written \"Why this could suit you\" of a discovery's slate: at most one per\ndiscovery, whatever view is shown. `run` is authoritative for its state; `written`\nexists only once the run is complete, and a failed run's failure class says why there is\nnone. It changes no suggestion; the deterministic provenance beside it (each\nsuggestion's linked answers, searches and ESCO source) is what exports cite."
       },
       "SlateOut": {
         "properties": {
@@ -6555,6 +6821,22 @@
           "expected_profile_version"
         ],
         "title": "SubmitDiscovery"
+      },
+      "SubmitExplanation": {
+        "properties": {
+          "expected_profile_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Profile Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_profile_version"
+        ],
+        "title": "SubmitExplanation",
+        "description": "Ask for the written explanation of a discovery's slate, made against these answers."
       },
       "SubmitRun": {
         "properties": {
@@ -7386,9 +7668,9 @@
           },
           "format_version": {
             "type": "integer",
-            "const": 3,
+            "const": 4,
             "title": "Format Version",
-            "default": 3
+            "default": 4
           },
           "exported_at": {
             "type": "string",
@@ -7458,7 +7740,7 @@
             },
             "type": "array",
             "title": "Discoveries",
-            "description": "Oldest first; slates are recomputed."
+            "description": "Oldest first; slates are recomputed. A discovery's provenance is its searches and the answers they cite; a written explanation is never cited as one."
           },
           "interview_preferences": {
             "$ref": "#/components/schemas/PreferencesOut"
@@ -7573,6 +7855,74 @@
           "next_cursor"
         ],
         "title": "WorkspacePage"
+      },
+      "WrittenExplanationOut": {
+        "properties": {
+          "origin": {
+            "$ref": "#/components/schemas/ProposalOrigin",
+            "description": "fixture: the deterministic demo explainer (synthetic), never a live model."
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version"
+          },
+          "profile_version": {
+            "type": "integer",
+            "title": "Profile Version",
+            "description": "The discovery's pinned version it quotes."
+          },
+          "release": {
+            "type": "string",
+            "title": "Release",
+            "description": "The ESCO release whose records it quotes."
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/WrittenWhyOut"
+            },
+            "type": "array",
+            "title": "Suggestions",
+            "description": "The first view's suggestions (balanced, no exclusions), in its order. A suggestion another view shows that is not here has no written explanation."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "origin",
+          "prompt_version",
+          "profile_version",
+          "release",
+          "suggestions"
+        ],
+        "title": "WrittenExplanationOut"
+      },
+      "WrittenWhyOut": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimOut"
+            },
+            "type": "array",
+            "title": "Claims"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "title",
+          "claims"
+        ],
+        "title": "WrittenWhyOut"
       }
     },
     "securitySchemes": {

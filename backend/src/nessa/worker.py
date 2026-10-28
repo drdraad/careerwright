@@ -2,8 +2,8 @@
 model each run's pinned ID names, and the DBOS worker loop (`nessa.identity.worker`).
 
 Configuration comes from the environment and files only. A Meta model is built with the
-key the activity opened just in time; the fixture interviewer and query proposer (demo
-workspaces only) need no key and make no network call.
+key the activity opened just in time; the fixture interviewer, query proposer and explainer
+(demo workspaces only) need no key and make no network call.
 
 Run: `python -m nessa.worker`; health check: `python -m nessa.worker --check`.
 """
@@ -24,6 +24,7 @@ from nessa.identity.meta import meta_model
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.model_registry import (
     FIXTURE_DISCOVERY_MODEL_ID,
+    FIXTURE_EXPLAINER_MODEL_ID,
     FIXTURE_MODEL_ID,
     ModelMode,
     model_entry,
@@ -32,16 +33,19 @@ from nessa.identity.records import RunKind
 from nessa.logs import configure_logging
 from nessa.profile.discovery_agent import DISCOVERY_TASK, fixture_discovery_model
 from nessa.profile.interview_agent import INTERVIEW_TURN_TASK, fixture_interviewer_model
+from nessa.profile.slate_explanation_agent import SLATE_EXPLANATION_TASK, fixture_explainer_model
 
 TASKS: Mapping[RunKind, RunTask] = {
     RunKind.CONNECTION_CHECK: CONNECTION_CHECK_TASK,
     RunKind.INTERVIEW_TURN: INTERVIEW_TURN_TASK,
     RunKind.DISCOVERY: DISCOVERY_TASK,
+    RunKind.SLATE_EXPLANATION: SLATE_EXPLANATION_TASK,
 }
 # The deterministic stand-ins for demo workspaces, by model ID.
 FIXTURE_MODELS: Mapping[str, Callable[[], Model]] = {
     FIXTURE_MODEL_ID: fixture_interviewer_model,
     FIXTURE_DISCOVERY_MODEL_ID: fixture_discovery_model,
+    FIXTURE_EXPLAINER_MODEL_ID: fixture_explainer_model,
 }
 
 

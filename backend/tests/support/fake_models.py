@@ -2,11 +2,12 @@
 cost nothing and run offline. Its failure modes deliberately echo part of the key in the
 provider error, the worst realistic case for what could leak into a journal or log.
 
-It answers whichever schema the agent asks for: the connection check, or an interview turn
-(a proposal for the current message, citing it), non-streamed or streamed in small chunks
-(interview turns stream their reply). Interview failure modes cover the contract tests:
-invalid output once (repaired) or always, a complete but schema-invalid object, a refusal,
-truncation, a repair request that fails without usage, and a stream cut off part-way.
+It answers whichever schema the agent asks for: the connection check, an interview turn
+(a proposal for the current message, citing it), a discovery or a slate explanation,
+non-streamed or streamed in small chunks (interview turns stream their reply). Interview
+failure modes cover the contract tests: invalid output once (repaired) or always, a complete
+but schema-invalid object, a refusal, truncation, a repair request that fails without usage,
+and a stream cut off part-way.
 """
 
 import asyncio
@@ -102,6 +103,49 @@ def discovery_answer(
             for text in texts
         ],
         "hypotheses": [{"title": f"{sentinel} orbital gardener".strip(), "based_on": texts[:1]}],
+    }
+
+
+EXPLANATION_MARKER = "Explanation context (JSON):\n"
+
+
+def _explanation_context(messages: list[ModelMessage]) -> dict[str, object] | None:
+    for message in messages:
+        for part in getattr(message, "parts", ()):
+            content = part.content if isinstance(part, UserPromptPart) else None
+            if isinstance(content, str) and content.startswith(EXPLANATION_MARKER):
+                loaded: dict[str, object] = json.loads(content[len(EXPLANATION_MARKER) :])
+                return loaded
+    return None
+
+
+def explanation_answer(
+    context: dict[str, object], sentinel: str, *, valid: bool
+) -> dict[str, object]:
+    """One claim per occupation carrying the sentinel, quoting the person's first answer
+    (an invalid answer quotes something never said) and the occupation's title."""
+    answers = context["answers"]
+    occupations = context["occupations"]
+    assert isinstance(answers, dict)
+    assert isinstance(occupations, list)
+    first = next(str(text) for texts in answers.values() for text in texts)
+    return {
+        "explanations": [
+            {
+                "occupation": occupation["ref"],
+                "claims": [
+                    {
+                        "text": f"{sentinel} What you told Nessa matches how ESCO describes "
+                        "this work.".strip(),
+                        "quotes": [
+                            {"source": "answer", "text": first if valid else "never said this"},
+                            {"source": "esco", "text": occupation["title"]},
+                        ],
+                    }
+                ],
+            }
+            for occupation in occupations
+        ]
     }
 
 
@@ -259,11 +303,15 @@ def fake_model_builder(
                 )
             context = _context(messages)
             found = _discovery_context(messages)
+            explaining = _explanation_context(messages)
             invalid = failure in (
                 FakeFailure.INVALID_ALWAYS,
                 FakeFailure.INVALID_THEN_UNAVAILABLE,
             ) or (failure is FakeFailure.INVALID_ONCE and call == 0)
-            if found is not None:
+            if explaining is not None:
+                answer = explanation_answer(explaining, output_sentinel, valid=not invalid)
+                text = json.dumps(answer)
+            elif found is not None:
                 text = json.dumps(discovery_answer(found, output_sentinel, valid=not invalid))
             elif context is not None:
                 valid = not (

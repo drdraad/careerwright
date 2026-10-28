@@ -17,6 +17,13 @@ The slate's controls (emphasis, excluded titles and kinds of work) are view para
 they never change the profile and never become a planning limit. A suggestion becomes a
 target only when the person chooses it (REC1-07), through the one profile write path, with
 an `occupation_choice` source naming the ESCO occupation and the discovery.
+
+A discovery's slate may also have one written "Why this could suit you" (S2.7, ADR 0007
+decision 12): a model run over its first view (balanced, no exclusions) whose every
+quotation is checked against the pinned answers and ESCO's records
+(`nessa.profile.slate_explanation`). A changed view is never a new slate, so it never makes
+a call. The written text is shown beside the words above, never instead of them, and
+changes no suggestion.
 """
 
 import re
@@ -40,7 +47,7 @@ from nessa.identity.records import Run, RunKind
 from nessa.identity.runs import RunRequest, open_output, submit_run
 from nessa.identity.spend import SpendLimits
 from nessa.identity.workspaces import visible_workspace
-from nessa.profile import discovery
+from nessa.profile import discovery, explanation_store, slate_explanation
 from nessa.profile import store as profile_store
 from nessa.profile.commands import (
     FieldUpdate,
@@ -52,7 +59,7 @@ from nessa.profile.commands import (
 from nessa.profile.discovery import DiscoveryInput, DiscoveryProposal, EvidenceItem, evidence_of
 from nessa.profile.document import FieldState, ProfileDocument, TextListInput, TextValue
 from nessa.profile.interview import ProfileField
-from nessa.profile.records import SourceKind
+from nessa.profile.records import ExplanationRequest, SourceKind
 from nessa.profile.slate import (
     Candidate,
     Direction,
@@ -65,6 +72,7 @@ from nessa.profile.slate import (
     build_pool,
     choose_slate,
 )
+from nessa.profile.slate_explanation import RECORD_STEPS, SlateExplanation, build_input
 from nessa.profile.store import stale_version
 from nessa.vocabulary import WorkState
 
@@ -112,10 +120,26 @@ class ChooseTarget(BaseModel):
     )
 
 
+class SubmitExplanation(BaseModel):
+    """Ask for the written explanation of a discovery's slate, made against these answers."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    expected_profile_version: int = Field(ge=0)
+
+
+@dataclass(frozen=True)
+class ExplanationView:
+    request: ExplanationRequest
+    run: Run
+    written: SlateExplanation | None  # only once the run is complete
+
+
 @dataclass(frozen=True)
 class DiscoveryView:
     run: Run
     proposal: DiscoveryProposal | None  # only once the run is complete
+    explanation: ExplanationView | None = None  # its slate's one written explanation, if asked
 
 
 @dataclass(frozen=True)
@@ -157,6 +181,29 @@ def _proposal(tx: Tx, keyring: Keyring, run: Run) -> DiscoveryProposal | None:
     return None if plaintext is None else DiscoveryProposal.model_validate_json(plaintext)
 
 
+def _written(tx: Tx, keyring: Keyring, run: Run) -> SlateExplanation | None:
+    if run.kind is not RunKind.SLATE_EXPLANATION or run.status is not WorkState.COMPLETE:
+        return None
+    plaintext = open_output(tx, keyring, run)
+    return None if plaintext is None else SlateExplanation.model_validate_json(plaintext)
+
+
+def _explanation(tx: Tx, keyring: Keyring, discovery_run: Run) -> ExplanationView | None:
+    request = explanation_store.for_discovery(tx, discovery_run.workspace_id, discovery_run.run_id)
+    if request is None:
+        return None
+    run = run_store.run(tx, request.explanation_id)
+    if run is None:  # the run and its link are written together; never show half of one
+        raise NessaError(
+            ErrorCode.INTERNAL_ERROR, "The explanation has no run.", stage=ErrorStage.PROFILE
+        )
+    return ExplanationView(request, run, _written(tx, keyring, run))
+
+
+def _view(tx: Tx, keyring: Keyring, run: Run) -> DiscoveryView:
+    return DiscoveryView(run, _proposal(tx, keyring, run), _explanation(tx, keyring, run))
+
+
 def visible_discovery(
     tx: Tx, keyring: Keyring, workspace_id: uuid.UUID, discovery_id: uuid.UUID
 ) -> DiscoveryView:
@@ -164,7 +211,7 @@ def visible_discovery(
     run = run_store.run(tx, discovery_id)
     if run is None or run.workspace_id != workspace_id or run.kind is not RunKind.DISCOVERY:
         raise NessaError(ErrorCode.NOT_FOUND, "No such discovery.", stage=ErrorStage.PROFILE)
-    return DiscoveryView(run, _proposal(tx, keyring, run))
+    return _view(tx, keyring, run)
 
 
 def discoveries(
@@ -178,7 +225,7 @@ def discoveries(
     """Newest first."""
     visible_workspace(tx, workspace_id)
     runs = run_store.runs(tx, workspace_id, before=before, limit=limit, kind=RunKind.DISCOVERY)
-    return [DiscoveryView(run, _proposal(tx, keyring, run)) for run in runs]
+    return [_view(tx, keyring, run) for run in runs]
 
 
 def submit_discovery(
@@ -493,6 +540,97 @@ def compute_slate(
             else []
         ),
     )
+
+
+def submit_explanation(
+    tx: Tx,
+    actor: Actor,
+    workspace_id: uuid.UUID,
+    discovery_id: uuid.UUID,
+    command: SubmitExplanation,
+    *,
+    models: ModelChoice,
+    keyring: Keyring,
+    runtime_mode: RuntimeMode,
+    defaults: SpendLimits,
+    now: datetime,
+) -> tuple[ExplanationView, bool]:
+    """The slate's one written explanation, and whether this request started it. A slate is
+    a discovery's first view (balanced, no exclusions): asking again, from any view, returns
+    the explanation already asked for, in whatever state, so a slate never has a second call.
+
+    Refused before any run exists when the discovery has no validated searches, when the
+    answers it pinned are not the current ones (it would quote answers since changed), or
+    when its slate is empty."""
+    visible_workspace(tx, workspace_id, lock=True)
+    view = visible_discovery(tx, keyring, workspace_id, discovery_id)
+    if view.explanation is not None:
+        return view.explanation, False
+    profile = current_profile(tx, workspace_id)
+    if command.expected_profile_version != profile.version:
+        raise stale_version(profile.version)
+    proposal = view.proposal
+    if proposal is None:
+        raise NessaError(
+            ErrorCode.PROPOSAL_NOT_AVAILABLE,
+            "This discovery has no validated queries yet.",
+            stage=ErrorStage.PROFILE,
+            details={
+                "run_status": view.run.status.value,
+                "failure_class": view.run.failure_class or "",
+            },
+        )
+    pinned = view.run.profile_version or 0
+    if pinned != profile.version:
+        raise NessaError(
+            ErrorCode.STALE_INPUT_VERSION,
+            "Your answers changed after these suggestions were made. Suggest again first.",
+            stage=ErrorStage.PROFILE,
+            details={"current_version": profile.version, "discovery_version": pinned},
+        )
+    document = _pinned_document(tx, view.run)
+    shown = compute_slate(tx, view, proposal, document, SlateControls())
+    if not shown.suggestions:
+        raise NessaError(
+            ErrorCode.INSUFFICIENT_EVIDENCE,
+            "This slate has no suggestions to explain.",
+            stage=ErrorStage.PROFILE,
+            details={"reason": "no_suggestions"},
+        )
+    concepts = [s.candidate.occupation.concept_id for s in shown.suggestions]
+    records = taxonomy_store.occupation_facts(tx, concepts, skills_shown=RECORD_STEPS[0][1])
+    context = build_input(
+        discovery_id=discovery_id,
+        profile_version=pinned,
+        release=shown.release.dataset_id,
+        answers=evidence_of(document),
+        occupations=[records[concept] for concept in concepts],
+    )
+    run = submit_run(
+        tx,
+        actor,
+        workspace_id,
+        RunRequest(
+            RunKind.SLATE_EXPLANATION,
+            slate_explanation.worst_case_nano_usd,
+            profile_version=pinned,
+            input=context.model_dump_json().encode(),
+        ),
+        models=models,
+        keyring=keyring,
+        runtime_mode=runtime_mode,
+        defaults=defaults,
+        now=now,
+    )
+    request = ExplanationRequest(
+        explanation_id=run.run_id,
+        workspace_id=workspace_id,
+        discovery_id=discovery_id,
+        created_by=actor.actor_id,
+        created_at=now,
+    )
+    explanation_store.insert(tx, request)
+    return ExplanationView(request, run, None), True
 
 
 def choose_target(

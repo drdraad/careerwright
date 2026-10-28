@@ -81,6 +81,7 @@ class RunKind(StrEnum):
     CONNECTION_CHECK = "connection_check"
     INTERVIEW_TURN = "interview_turn"
     DISCOVERY = "discovery"  # search queries for career suggestions, from the confirmed profile
+    SLATE_EXPLANATION = "slate_explanation"  # the written "Why this could suit you" of a slate
 
 
 class PartialCompleteness(StrEnum):

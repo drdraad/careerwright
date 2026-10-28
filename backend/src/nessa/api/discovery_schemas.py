@@ -1,5 +1,6 @@
-"""API contract for career discovery (slates, targets chosen from ESCO) and the early
-requirement sketch. No suggestion carries a percentage, score or rank meant as fit."""
+"""API contract for career discovery (slates, their written explanation, targets chosen
+from ESCO) and the early requirement sketch. No suggestion carries a percentage, score or
+rank meant as fit."""
 
 import uuid
 from typing import Literal
@@ -25,6 +26,7 @@ from nessa.profile.slate import (
     PoolQuery,
     SlateChannel,
 )
+from nessa.profile.slate_explanation import QuoteSource, RecordPart, SlateExplanation
 
 
 class EvidenceOut(ResponseModel):
@@ -81,6 +83,87 @@ class DiscoveryProposalOut(ResponseModel):
         )
 
 
+class QuotationOut(ResponseModel):
+    source: QuoteSource
+    answer_field: ProfileField | None = Field(
+        description="Which of your answers, for a quotation of yours."
+    )
+    record_part: RecordPart | None = Field(
+        description="Which part of ESCO's record, for a quotation of ESCO's."
+    )
+    text: str = Field(description="The source's own words, checked as an exact span of it.")
+
+
+class ClaimOut(ResponseModel):
+    text: str = Field(
+        description="Written by the model (or the demo explainer): one sentence resting on "
+        "its quotations, which quote you and ESCO's record."
+    )
+    quotations: list[QuotationOut]
+
+
+class WrittenWhyOut(ResponseModel):
+    concept_id: uuid.UUID
+    title: str
+    claims: list[ClaimOut]
+
+
+class WrittenExplanationOut(ResponseModel):
+    origin: ProposalOrigin = Field(
+        description="fixture: the deterministic demo explainer (synthetic), never a live model."
+    )
+    prompt_version: str
+    profile_version: int = Field(description="The discovery's pinned version it quotes.")
+    release: str = Field(description="The ESCO release whose records it quotes.")
+    suggestions: list[WrittenWhyOut] = Field(
+        description="The first view's suggestions (balanced, no exclusions), in its order. A "
+        "suggestion another view shows that is not here has no written explanation."
+    )
+
+    @classmethod
+    def of(cls, written: SlateExplanation) -> "WrittenExplanationOut":
+        return cls(
+            origin=written.origin,
+            prompt_version=written.prompt_version,
+            profile_version=written.profile_version,
+            release=written.release,
+            suggestions=[
+                WrittenWhyOut(
+                    concept_id=s.concept_id,
+                    title=s.title,
+                    claims=[
+                        ClaimOut(
+                            text=c.text,
+                            quotations=[QuotationOut(**q.model_dump()) for q in c.quotations],
+                        )
+                        for c in s.claims
+                    ],
+                )
+                for s in written.suggestions
+            ],
+        )
+
+
+class ExplanationRunOut(ResponseModel):
+    """A slate explanation's run, as asking for it answers: never what it wrote, since a
+    command's answer is kept as its receipt and model output is kept sealed. The discovery
+    (`GET .../discoveries/{id}`) carries the written text."""
+
+    explanation_id: uuid.UUID
+    discovery_id: uuid.UUID
+    run: RunOut
+
+
+class SlateExplanationOut(ExplanationRunOut):
+    """The written "Why this could suit you" of a discovery's slate: at most one per
+    discovery, whatever view is shown. `run` is authoritative for its state; `written`
+    exists only once the run is complete, and a failed run's failure class says why there is
+    none. It changes no suggestion; the deterministic provenance beside it (each
+    suggestion's linked answers, searches and ESCO source) is what exports cite."""
+
+    written: WrittenExplanationOut | None
+
+
 class DiscoveryOut(ResponseModel):
     """One discovery. `run` is authoritative for its state; `proposal` exists only once the
     run is complete, and a failed run's failure class says why there is none."""
@@ -89,6 +172,9 @@ class DiscoveryOut(ResponseModel):
     profile_version: int = Field(description="The profile version it read, pinned.")
     run: RunOut
     proposal: DiscoveryProposalOut | None
+    explanation: SlateExplanationOut | None = Field(
+        description="Its slate's written explanation; null: never asked for."
+    )
 
 
 class DiscoveryPage(ResponseModel):

@@ -7,8 +7,9 @@ the Contributor model on non-synthetic data, a call that cannot fit the spend li
 the worker re-checks everything before the call, because keys, access and budgets can
 change while a run is queued.
 
-A demo workspace never reaches a provider: its interview turns and discoveries use the
-fixture models (no key, no spend, no network), and every other kind is refused.
+A demo workspace never reaches a provider: its interview turns, discoveries and slate
+explanations use the fixture models (no key, no spend, no network), and every other kind is
+refused.
 """
 
 import uuid

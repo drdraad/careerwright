@@ -426,6 +426,11 @@ def test_another_account_or_a_missing_workspace_is_not_found_never_an_empty_resu
         assert absent.status_code == 404, path
     writes = [
         ("POST", f"{mine}/discoveries", {"expected_profile_version": 2}),
+        (
+            "POST",
+            f"{mine}/discoveries/{discovery_id}/explanation",
+            {"expected_profile_version": 2},
+        ),
         ("POST", f"{mine}/targets", {"expected_version": 2, "concept_id": real}),
         ("POST", f"{mine}/profile/revert", {"expected_version": 2, "to_version": 1}),  # N-M1
         (

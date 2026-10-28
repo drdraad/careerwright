@@ -147,6 +147,22 @@ export type CityListInput = {
 };
 
 /**
+ * ClaimOut
+ */
+export type ClaimOut = {
+    /**
+     * Text
+     *
+     * Written by the model (or the demo explainer): one sentence resting on its quotations, which quote you and ESCO's record.
+     */
+    text: string;
+    /**
+     * Quotations
+     */
+    quotations: Array<QuotationOut>;
+};
+
+/**
  * ConnectionCheckResult
  *
  * What the model proposes for the synthetic persona. Structurally valid is not true.
@@ -373,6 +389,10 @@ export type DiscoveryOut = {
     profile_version: number;
     run: RunOut;
     proposal: DiscoveryProposalOut | null;
+    /**
+     * Its slate's written explanation; null: never asked for.
+     */
+    explanation: SlateExplanationOut | null;
 };
 
 /**
@@ -650,6 +670,25 @@ export type ExcludedOut = {
      * Pooled occupations your excluded kinds of work removed.
      */
     families: number;
+};
+
+/**
+ * ExplanationRunOut
+ *
+ * A slate explanation's run, as asking for it answers: never what it wrote, since a
+ * command's answer is kept as its receipt and model output is kept sealed. The discovery
+ * (`GET .../discoveries/{id}`) carries the written text.
+ */
+export type ExplanationRunOut = {
+    /**
+     * Explanation Id
+     */
+    explanation_id: string;
+    /**
+     * Discovery Id
+     */
+    discovery_id: string;
+    run: RunOut;
 };
 
 /**
@@ -1568,6 +1607,51 @@ export type QueryOut = {
 };
 
 /**
+ * QuotationOut
+ */
+export type QuotationOut = {
+    source: QuoteSource;
+    /**
+     * Which of your answers, for a quotation of yours.
+     */
+    answer_field: ProfileField | null;
+    /**
+     * Which part of ESCO's record, for a quotation of ESCO's.
+     */
+    record_part: RecordPart | null;
+    /**
+     * Text
+     *
+     * The source's own words, checked as an exact span of it.
+     */
+    text: string;
+};
+
+/**
+ * QuoteSource
+ */
+export const QuoteSource = { ANSWER: 'answer', ESCO: 'esco' } as const;
+
+/**
+ * QuoteSource
+ */
+export type QuoteSource = typeof QuoteSource[keyof typeof QuoteSource];
+
+/**
+ * RecordPart
+ */
+export const RecordPart = {
+    TITLE: 'title',
+    DESCRIPTION: 'description',
+    ESSENTIAL_SKILL: 'essential_skill'
+} as const;
+
+/**
+ * RecordPart
+ */
+export type RecordPart = typeof RecordPart[keyof typeof RecordPart];
+
+/**
  * RegisterProvisionalConcept
  */
 export type RegisterProvisionalConcept = {
@@ -1658,7 +1742,8 @@ export type RevertProfile = {
 export const RunKind = {
     CONNECTION_CHECK: 'connection_check',
     INTERVIEW_TURN: 'interview_turn',
-    DISCOVERY: 'discovery'
+    DISCOVERY: 'discovery',
+    SLATE_EXPLANATION: 'slate_explanation'
 } as const;
 
 /**
@@ -1905,6 +1990,28 @@ export const SlateChannel = {
  * How a candidate was found: the model's channels plus Nessa's own.
  */
 export type SlateChannel = typeof SlateChannel[keyof typeof SlateChannel];
+
+/**
+ * SlateExplanationOut
+ *
+ * The written "Why this could suit you" of a discovery's slate: at most one per
+ * discovery, whatever view is shown. `run` is authoritative for its state; `written`
+ * exists only once the run is complete, and a failed run's failure class says why there is
+ * none. It changes no suggestion; the deterministic provenance beside it (each
+ * suggestion's linked answers, searches and ESCO source) is what exports cite.
+ */
+export type SlateExplanationOut = {
+    /**
+     * Explanation Id
+     */
+    explanation_id: string;
+    /**
+     * Discovery Id
+     */
+    discovery_id: string;
+    run: RunOut;
+    written: WrittenExplanationOut | null;
+};
 
 /**
  * SlateOut
@@ -2190,6 +2297,18 @@ export type StoreKey = {
  * SubmitDiscovery
  */
 export type SubmitDiscovery = {
+    /**
+     * Expected Profile Version
+     */
+    expected_profile_version: number;
+};
+
+/**
+ * SubmitExplanation
+ *
+ * Ask for the written explanation of a discovery's slate, made against these answers.
+ */
+export type SubmitExplanation = {
     /**
      * Expected Profile Version
      */
@@ -2698,7 +2817,7 @@ export type WorkspaceExport = {
     /**
      * Format Version
      */
-    format_version?: 3;
+    format_version?: 4;
     /**
      * Exported At
      */
@@ -2741,7 +2860,7 @@ export type WorkspaceExport = {
     /**
      * Discoveries
      *
-     * Oldest first; slates are recomputed.
+     * Oldest first; slates are recomputed. A discovery's provenance is its searches and the answers they cite; a written explanation is never cited as one.
      */
     discoveries: Array<DiscoveryOut>;
     interview_preferences: PreferencesOut;
@@ -2805,6 +2924,56 @@ export type WorkspacePage = {
      * Next Cursor
      */
     next_cursor: string | null;
+};
+
+/**
+ * WrittenExplanationOut
+ */
+export type WrittenExplanationOut = {
+    /**
+     * fixture: the deterministic demo explainer (synthetic), never a live model.
+     */
+    origin: ProposalOrigin;
+    /**
+     * Prompt Version
+     */
+    prompt_version: string;
+    /**
+     * Profile Version
+     *
+     * The discovery's pinned version it quotes.
+     */
+    profile_version: number;
+    /**
+     * Release
+     *
+     * The ESCO release whose records it quotes.
+     */
+    release: string;
+    /**
+     * Suggestions
+     *
+     * The first view's suggestions (balanced, no exclusions), in its order. A suggestion another view shows that is not here has no written explanation.
+     */
+    suggestions: Array<WrittenWhyOut>;
+};
+
+/**
+ * WrittenWhyOut
+ */
+export type WrittenWhyOut = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Claims
+     */
+    claims: Array<ClaimOut>;
 };
 
 /**
@@ -4196,6 +4365,56 @@ export type GetSlateResponses = {
 };
 
 export type GetSlateResponse = GetSlateResponses[keyof GetSlateResponses];
+
+export type SubmitExplanationData = {
+    body: SubmitExplanation;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Discovery Id
+         */
+        discovery_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/discoveries/{discovery_id}/explanation';
+};
+
+export type SubmitExplanationErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type SubmitExplanationError = SubmitExplanationErrors[keyof SubmitExplanationErrors];
+
+export type SubmitExplanationResponses = {
+    /**
+     * Already asked for: the slate's one explanation's run, in its state.
+     */
+    200: ExplanationRunOut;
+    /**
+     * Successful Response
+     */
+    202: ExplanationRunOut;
+};
+
+export type SubmitExplanationResponse = SubmitExplanationResponses[keyof SubmitExplanationResponses];
 
 export type ChooseTargetData = {
     body: ChooseTarget;

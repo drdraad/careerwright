@@ -98,6 +98,17 @@ class InterviewTurn:
 
 
 @dataclass(frozen=True)
+class ExplanationRequest:
+    """The one written explanation a discovery's slate may have; its run (same ID) writes it."""
+
+    explanation_id: uuid.UUID
+    workspace_id: uuid.UUID
+    discovery_id: uuid.UUID
+    created_by: uuid.UUID
+    created_at: datetime
+
+
+@dataclass(frozen=True)
 class TurnDecision:
     turn_id: uuid.UUID
     decided_by: uuid.UUID

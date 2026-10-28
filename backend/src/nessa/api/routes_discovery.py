@@ -1,5 +1,6 @@
 """Career discovery: start a discovery (202 + run, in the background), read it and its
-slate, choose an ESCO occupation as a target, and read the early requirement sketch."""
+slate, ask for its slate's one written explanation (202 + run), choose an ESCO occupation as
+a target, and read the early requirement sketch."""
 
 import uuid
 from typing import Annotated
@@ -12,8 +13,11 @@ from nessa.api.discovery_schemas import (
     DiscoveryOut,
     DiscoveryPage,
     DiscoveryProposalOut,
+    ExplanationRunOut,
     SketchOut,
+    SlateExplanationOut,
     SlateOut,
+    WrittenExplanationOut,
 )
 from nessa.api.envelope import ERROR_RESPONSES
 from nessa.api.pagination import DEFAULT_LIMIT, MAX_LIMIT, decode_timestamped, encode
@@ -25,11 +29,14 @@ from nessa.identity.receipts import CommandResult, fingerprint, run_idempotent
 from nessa.profile.exploration import (
     ChooseTarget,
     DiscoveryView,
+    ExplanationView,
     SubmitDiscovery,
+    SubmitExplanation,
     choose_target,
     discoveries,
     discovery_slate,
     submit_discovery,
+    submit_explanation,
     visible_discovery,
 )
 from nessa.profile.sketch import requirement_sketch
@@ -42,12 +49,22 @@ Limit = Annotated[int, Query(ge=1, le=MAX_LIMIT)]
 FamilyCode = Annotated[str, Query(pattern=r"^[0-9]{3}$")]
 
 
+def explanation_out(tx: Tx, keyring: Keyring, view: ExplanationView) -> SlateExplanationOut:
+    return SlateExplanationOut(
+        explanation_id=view.request.explanation_id,
+        discovery_id=view.request.discovery_id,
+        run=run_out(tx, keyring, view.run),
+        written=WrittenExplanationOut.of(view.written) if view.written else None,
+    )
+
+
 def discovery_out(tx: Tx, keyring: Keyring, view: DiscoveryView) -> DiscoveryOut:
     return DiscoveryOut(
         discovery_id=view.run.run_id,
         profile_version=view.run.profile_version or 0,
         run=run_out(tx, keyring, view.run),
         proposal=DiscoveryProposalOut.of(view.proposal) if view.proposal else None,
+        explanation=explanation_out(tx, keyring, view.explanation) if view.explanation else None,
     )
 
 
@@ -144,6 +161,68 @@ def get_slate(
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
         view = discovery_slate(tx, deps.keyring, workspace_id, discovery_id, controls)
         return SlateOut.of(view, emphasis)
+
+
+@router.post(
+    "/discoveries/{discovery_id}/explanation",
+    status_code=202,
+    response_model=ExplanationRunOut,
+    responses={
+        200: {
+            "model": ExplanationRunOut,
+            "description": "Already asked for: the slate's one explanation's run, in its state.",
+        }
+    },
+    operation_id="submit_explanation",
+)
+def explain(
+    workspace_id: uuid.UUID,
+    discovery_id: uuid.UUID,
+    body: SubmitExplanation,
+    caller: CallerDep,
+    deps: Deps,
+    key: IdempotencyKey,
+) -> JSONResponse:
+    """The written "Why this could suit you" for the slate's first view, as one bounded
+    run. A slate has at most one: asking again, from any view, answers 200 with its run. The
+    answer never holds the written text (it is kept as the command's receipt); the
+    discovery carries it."""
+
+    def execute(tx: Tx) -> CommandResult:
+        view, started = submit_explanation(
+            tx,
+            caller.actor,
+            workspace_id,
+            discovery_id,
+            body,
+            models=deps.models,
+            keyring=deps.keyring,
+            runtime_mode=deps.settings.runtime_mode,
+            defaults=deps.spend_defaults,
+            now=deps.clock(),
+        )
+        answer = ExplanationRunOut(
+            explanation_id=view.request.explanation_id,
+            discovery_id=view.request.discovery_id,
+            run=run_out(tx, deps.keyring, view.run),
+        )
+        return CommandResult(202 if started else 200, answer.model_dump(mode="json"), workspace_id)
+
+    request = {
+        "workspace_id": str(workspace_id),
+        "discovery_id": str(discovery_id),
+        **body.model_dump(mode="json"),
+    }
+    status, response = run_idempotent(
+        deps.engine,
+        caller.actor.actor_id,
+        key,
+        "submit_explanation",
+        fingerprint("submit_explanation", request),
+        execute,
+    )
+    location = f"/v1/workspaces/{workspace_id}/discoveries/{discovery_id}"
+    return JSONResponse(response, status_code=status, headers={"Location": location})
 
 
 @router.post(

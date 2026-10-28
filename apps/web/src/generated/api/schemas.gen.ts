@@ -237,6 +237,30 @@ export const CityListInputSchema = {
     title: 'CityListInput'
 } as const;
 
+export const ClaimOutSchema = {
+    properties: {
+        text: {
+            type: 'string',
+            title: 'Text',
+            description: 'Written by the model (or the demo explainer): one sentence resting on its quotations, which quote you and ESCO\'s record.'
+        },
+        quotations: {
+            items: {
+                $ref: '#/components/schemas/QuotationOut'
+            },
+            type: 'array',
+            title: 'Quotations'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'text',
+        'quotations'
+    ],
+    title: 'ClaimOut'
+} as const;
+
 export const ConnectionCheckResultSchema = {
     properties: {
         suggested_title: {
@@ -555,6 +579,17 @@ export const DiscoveryOutSchema = {
                     type: 'null'
                 }
             ]
+        },
+        explanation: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SlateExplanationOut'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Its slate\'s written explanation; null: never asked for.'
         }
     },
     additionalProperties: false,
@@ -563,7 +598,8 @@ export const DiscoveryOutSchema = {
         'discovery_id',
         'profile_version',
         'run',
-        'proposal'
+        'proposal',
+        'explanation'
     ],
     title: 'DiscoveryOut',
     description: 'One discovery. `run` is authoritative for its state; `proposal` exists only once the\nrun is complete, and a failed run\'s failure class says why there is none.'
@@ -929,6 +965,33 @@ export const ExcludedOutSchema = {
         'families'
     ],
     title: 'ExcludedOut'
+} as const;
+
+export const ExplanationRunOutSchema = {
+    properties: {
+        explanation_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Explanation Id'
+        },
+        discovery_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Discovery Id'
+        },
+        run: {
+            $ref: '#/components/schemas/RunOut'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'explanation_id',
+        'discovery_id',
+        'run'
+    ],
+    title: 'ExplanationRunOut',
+    description: 'A slate explanation\'s run, as asking for it answers: never what it wrote, since a\ncommand\'s answer is kept as its receipt and model output is kept sealed. The discovery\n(`GET .../discoveries/{id}`) carries the written text.'
 } as const;
 
 export const FailureClassSchema = {
@@ -2377,6 +2440,69 @@ export const QueryOutSchema = {
     title: 'QueryOut'
 } as const;
 
+export const QuotationOutSchema = {
+    properties: {
+        source: {
+            $ref: '#/components/schemas/QuoteSource'
+        },
+        answer_field: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ProfileField'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Which of your answers, for a quotation of yours.'
+        },
+        record_part: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/RecordPart'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Which part of ESCO\'s record, for a quotation of ESCO\'s.'
+        },
+        text: {
+            type: 'string',
+            title: 'Text',
+            description: 'The source\'s own words, checked as an exact span of it.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'source',
+        'answer_field',
+        'record_part',
+        'text'
+    ],
+    title: 'QuotationOut'
+} as const;
+
+export const QuoteSourceSchema = {
+    type: 'string',
+    enum: [
+        'answer',
+        'esco'
+    ],
+    title: 'QuoteSource'
+} as const;
+
+export const RecordPartSchema = {
+    type: 'string',
+    enum: [
+        'title',
+        'description',
+        'essential_skill'
+    ],
+    title: 'RecordPart'
+} as const;
+
 export const RegisterProvisionalConceptSchema = {
     properties: {
         title: {
@@ -2493,7 +2619,8 @@ export const RunKindSchema = {
     enum: [
         'connection_check',
         'interview_turn',
-        'discovery'
+        'discovery',
+        'slate_explanation'
     ],
     title: 'RunKind'
 } as const;
@@ -2926,6 +3053,44 @@ export const SlateChannelSchema = {
     ],
     title: 'SlateChannel',
     description: 'How a candidate was found: the model\'s channels plus Nessa\'s own.'
+} as const;
+
+export const SlateExplanationOutSchema = {
+    properties: {
+        explanation_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Explanation Id'
+        },
+        discovery_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Discovery Id'
+        },
+        run: {
+            $ref: '#/components/schemas/RunOut'
+        },
+        written: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/WrittenExplanationOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'explanation_id',
+        'discovery_id',
+        'run',
+        'written'
+    ],
+    title: 'SlateExplanationOut',
+    description: 'The written "Why this could suit you" of a discovery\'s slate: at most one per\ndiscovery, whatever view is shown. `run` is authoritative for its state; `written`\nexists only once the run is complete, and a failed run\'s failure class says why there is\nnone. It changes no suggestion; the deterministic provenance beside it (each\nsuggestion\'s linked answers, searches and ESCO source) is what exports cite.'
 } as const;
 
 export const SlateOutSchema = {
@@ -3375,6 +3540,23 @@ export const SubmitDiscoverySchema = {
         'expected_profile_version'
     ],
     title: 'SubmitDiscovery'
+} as const;
+
+export const SubmitExplanationSchema = {
+    properties: {
+        expected_profile_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Profile Version'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_profile_version'
+    ],
+    title: 'SubmitExplanation',
+    description: 'Ask for the written explanation of a discovery\'s slate, made against these answers.'
 } as const;
 
 export const SubmitRunSchema = {
@@ -4225,9 +4407,9 @@ export const WorkspaceExportSchema = {
         },
         format_version: {
             type: 'integer',
-            const: 3,
+            const: 4,
             title: 'Format Version',
-            default: 3
+            default: 4
         },
         exported_at: {
             type: 'string',
@@ -4297,7 +4479,7 @@ export const WorkspaceExportSchema = {
             },
             type: 'array',
             title: 'Discoveries',
-            description: 'Oldest first; slates are recomputed.'
+            description: 'Oldest first; slates are recomputed. A discovery\'s provenance is its searches and the answers they cite; a written explanation is never cited as one.'
         },
         interview_preferences: {
             $ref: '#/components/schemas/PreferencesOut'
@@ -4414,6 +4596,76 @@ export const WorkspacePageSchema = {
         'next_cursor'
     ],
     title: 'WorkspacePage'
+} as const;
+
+export const WrittenExplanationOutSchema = {
+    properties: {
+        origin: {
+            $ref: '#/components/schemas/ProposalOrigin',
+            description: 'fixture: the deterministic demo explainer (synthetic), never a live model.'
+        },
+        prompt_version: {
+            type: 'string',
+            title: 'Prompt Version'
+        },
+        profile_version: {
+            type: 'integer',
+            title: 'Profile Version',
+            description: 'The discovery\'s pinned version it quotes.'
+        },
+        release: {
+            type: 'string',
+            title: 'Release',
+            description: 'The ESCO release whose records it quotes.'
+        },
+        suggestions: {
+            items: {
+                $ref: '#/components/schemas/WrittenWhyOut'
+            },
+            type: 'array',
+            title: 'Suggestions',
+            description: 'The first view\'s suggestions (balanced, no exclusions), in its order. A suggestion another view shows that is not here has no written explanation.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'origin',
+        'prompt_version',
+        'profile_version',
+        'release',
+        'suggestions'
+    ],
+    title: 'WrittenExplanationOut'
+} as const;
+
+export const WrittenWhyOutSchema = {
+    properties: {
+        concept_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Concept Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        claims: {
+            items: {
+                $ref: '#/components/schemas/ClaimOut'
+            },
+            type: 'array',
+            title: 'Claims'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concept_id',
+        'title',
+        'claims'
+    ],
+    title: 'WrittenWhyOut'
 } as const;
 
 export const StoreKeyWritableSchema = {

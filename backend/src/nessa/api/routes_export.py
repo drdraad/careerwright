@@ -51,7 +51,8 @@ PAGE = 500
 
 class WorkspaceExport(ResponseModel):
     format: Literal["nessa.workspace-export"] = "nessa.workspace-export"
-    format_version: Literal[3] = 3
+    # 4 (Task 6b): each discovery carries its slate's written explanation, if asked for.
+    format_version: Literal[4] = 4
     exported_at: datetime
     synthetic: bool
     workspace: WorkspaceOut
@@ -62,7 +63,10 @@ class WorkspaceExport(ResponseModel):
     runs: list[RunOut]
     interview_turns: list[TurnOut] = Field(description="Oldest first.")
     provisional_concepts: list[ProvisionalConceptOut]
-    discoveries: list[DiscoveryOut] = Field(description="Oldest first; slates are recomputed.")
+    discoveries: list[DiscoveryOut] = Field(
+        description="Oldest first; slates are recomputed. A discovery's provenance is its "
+        "searches and the answers they cite; a written explanation is never cited as one."
+    )
     interview_preferences: PreferencesOut
     spend: SpendOut
 

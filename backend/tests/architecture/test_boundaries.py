@@ -49,6 +49,7 @@ ADAPTERS: dict[str, frozenset[str]] = {
     "nessa.identity.run_store": frozenset({"sqlalchemy"}),
     "nessa.profile.store": frozenset({"sqlalchemy"}),
     "nessa.profile.interview_store": frozenset({"sqlalchemy"}),
+    "nessa.profile.explanation_store": frozenset({"sqlalchemy"}),
     "nessa.catalogue.taxonomy_store": frozenset({"sqlalchemy"}),
     "nessa.identity.keyring": frozenset({"cryptography"}),
     "nessa.identity.firebase": frozenset({"firebase_admin"}),
@@ -59,6 +60,7 @@ ADAPTERS: dict[str, frozenset[str]] = {
     "nessa.identity.worker": frozenset({"dbos"}),
     "nessa.profile.interview_agent": frozenset({"pydantic_ai"}),
     "nessa.profile.discovery_agent": frozenset({"pydantic_ai"}),
+    "nessa.profile.slate_explanation_agent": frozenset({"pydantic_ai"}),
     "nessa.worker": frozenset({"pydantic_ai"}),
     "nessa.api.": frozenset({"fastapi", "starlette", "anyio"}),
 }
