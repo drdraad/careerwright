@@ -28,7 +28,15 @@ decision 7 requires the first run kind that reads the profile to pin the version
    database holds one release; importing a different one is refused, so a version bump is
    a reviewed change. The import manifest records dataset, version, URL, hash, size, licence,
    attribution, native code version, transformation version (`nessa-esco-import-1`), counts
-   and the repeated rows collapsed (TAX1-04).
+   and the repeated rows collapsed (TAX1-04). "Already imported" means the same dataset, the
+   same hash **and** the same transformation version; the same release built by another
+   transformation is refused like a different release (its stored labels and search vectors
+   would be stale), pointing at the reviewed-migration step (fix round 1).
+   - The import is itself an adapted version of ESCO: 6 of the release's 19 CSV files
+     (no skill groups, skill hierarchy, collections, dictionary, concept schemes or green
+     share), labels trimmed and de-duplicated, repeated rows merged. The manifest, every
+     release in the API and every occupation detail carry an `adaptation` statement that
+     says so (ESCO's second reuse condition), beside the attribution.
    - The release lists 4 occupations and 21 skills twice, identical except `modifiedDate`.
      Such a repeat is imported once (the later date kept) and counted; a repeat that differs
      in anything else is refused as conflicting data.
@@ -57,7 +65,11 @@ decision 7 requires the first run kind that reads the profile to pin the version
      match, for broad task and interest queries (DIV-1: several queries, reranked later).
    - A query with no searchable words is refused (`VALIDATION_FAILED`, `no_search_terms`),
      and a database without the taxonomy refuses searches (`TAXONOMY_UNAVAILABLE`): neither
-     is an empty result. Hidden labels match but are never displayed.
+     is an empty result. If such a query matches a label, the label matches are returned
+     with `full_text_total: null`: full-text search did not run, which is not zero. Hidden
+     labels match but are never displayed. Every occupation in a result carries
+     `concept_kind: "esco"`; a provisional concept carries `"provisional"`, so an ID's kind
+     is clear from the object alone (spec section 4).
    - Endpoints: `GET /v1/taxonomy` (manifest), `GET /v1/taxonomy/occupations?q=&match=&limit=`,
      `GET /v1/taxonomy/occupations/{concept_id}` (ISCO chain, alternative labels, skills,
      attribution).
@@ -67,8 +79,10 @@ decision 7 requires the first run kind that reads the profile to pin the version
    stable ID (`gb-eng-<name>`), country and subdivision (GB, GB-ENG), ONS region and
    timezone; served by `GET /v1/places`. A profile's cities must resolve to the list and are
    stored by the list's own name; unknown names are refused (`unknown_city`), never guessed.
-   A few unambiguous aliases are recorded (Hull, Newcastle, Brighton, Stoke-on-Trent,
-   Southend, St. Albans, City of London, City of Westminster); no alias names two cities.
+   A few unambiguous aliases are recorded (Hull, Newcastle upon Tyne, Brighton,
+   Stoke-on-Trent, Southend, St. Albans, City of London, City of Westminster); no alias names
+   two cities. Plain "Newcastle" is not an alias: it also names Newcastle-under-Lyme, which
+   is not on the list, so it is refused rather than guessed (fix round 1).
    London and Westminster stay separate, as on the official list. A city is geography only:
    it implies no residence or right to work (BND1-04). **Provisional:** the ONS region of
    each city was assigned by the implementing agent; a reviewer should confirm it.
@@ -76,10 +90,15 @@ decision 7 requires the first run kind that reads the profile to pin the version
 5. **Provisional concepts for verified titles outside ESCO** (DIV1-03).
    `POST /v1/workspaces/{id}/occupations/provisional` records a title the person confirmed as
    an internal concept private to the workspace, citing a direct-entry source. It has no ESCO
-   URI or ISCO group by construction; a title that is any ESCO label is refused with the
-   occupations that hold it, and a database trigger refuses one too. Titles a model suggests
-   are not accepted here: they stay search hypotheses until corroborated (DIV1-04, the
-   discovery task).
+   URI or ISCO group by construction; a title that is any ESCO label as a concept is refused
+   with the occupations that hold it. "As a concept" is `nessa.concept_key`, one SQL
+   function used by the API and by the database trigger, which derives it from the title
+   itself: case, punctuation and hyphens folded, and a simple English plural folded per word
+   ("ICT help-desk agent", "Data analyst." and "data analysts" are refused; fix round 1). A
+   title that only resembles a label ("senior data analyst") is accepted: offering the
+   full-text matches first is discovery's work (DIV1-05, T6). Titles a model suggests are
+   not accepted here: they stay search hypotheses until corroborated (DIV1-04, the discovery
+   task).
 
 6. **Profile schema version 2.** Three separate fields: `enjoyed_tasks` (interest),
    `confident_tasks` (what the person believes they can do) and `evidenced_tasks` (what they
@@ -230,8 +249,9 @@ decision 7 requires the first run kind that reads the profile to pin the version
 - New error codes: `TAXONOMY_UNAVAILABLE`, `CONFIRMATION_REQUIRED`, `PROPOSAL_NOT_AVAILABLE`,
   `ALREADY_DECIDED`; new failure classes: `model_refused`, `output_truncated`; new event
   kind `run.partial_updated` and read path `GET .../interview/turns/{id}/reply` (decision
-  13); migrations 0006 (a known zero cost for attempts with no call) and 0007
-  (`run_partials`).
+  13); migrations 0006 (a known zero cost for attempts with no call), 0007
+  (`run_partials`) and 0008 (the manifest's `adaptation`, `nessa.concept_key` and the
+  trigger that uses it).
 - A city outside the list, which Sprint 1 accepted as free text, is now refused on save.
   Stored version 1 documents still read; a person re-saving one with an unlisted city must
   pick a listed city.
@@ -240,3 +260,21 @@ decision 7 requires the first run kind that reads the profile to pin the version
 - Not done here: residence and work-rights fields (BND1-04 stays open for them), rendering
   the streamed reply (T6), an ESCO version-bump procedure beyond "new pin, reviewed
   migration".
+
+## Human review checklist (H-11, not run — requires human)
+
+Agents applied each item below as recorded; none is confirmed until a person signs it off
+(rulings R2, R6).
+
+- [ ] **ESCO licence reading** (rights review). Reuse under Commission Decision
+  2011/833/EU on two conditions, read from the ESCO FAQ on 2026-10-28: the attribution
+  sentence wherever ESCO content appears, and adapted versions marked as such. Confirm the
+  reading, the attribution text, the `adaptation` statement and where the API shows them.
+- [ ] **City list and aliases.** The 55 cities, their stable IDs and the recorded aliases
+  (decision 4), including the decision to refuse plain "Newcastle".
+- [ ] **ONS regions** assigned to each city by the implementing agent (decision 4).
+- [ ] **Hard-constraint set** (decision 6): cities, target titles, weekly study hours and
+  both spending limits.
+- [ ] **Basis of an answer with no value** (decision 8): shown as `inferred`.
+- [ ] **Concept-key folding** (decision 5): whether the plural heuristic refuses any title
+  a person would expect to be accepted.

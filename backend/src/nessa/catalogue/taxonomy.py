@@ -12,7 +12,12 @@ import uuid
 from dataclasses import dataclass
 
 from nessa.catalogue import taxonomy_store
-from nessa.catalogue.esco import EscoCatalogue, normalise_label
+from nessa.catalogue.esco import (
+    TRANSFORMATION_VERSION,
+    EscoCatalogue,
+    ReleasePin,
+    normalise_label,
+)
 from nessa.catalogue.records import LabelMatch, OccupationDetail, OccupationHit, TaxonomyRelease
 from nessa.db import Tx
 from nessa.errors import ErrorCode, ErrorStage, NessaError
@@ -22,18 +27,31 @@ MAX_LIMIT = 50
 
 
 class TaxonomyMismatchError(RuntimeError):
-    """A different release is already imported; changing it needs a reviewed migration."""
+    """A different release, or the same one built by another transformation, is already
+    imported; changing it needs a reviewed migration."""
+
+
+def is_held(held: TaxonomyRelease, pin: ReleasePin) -> bool:
+    """The held import is exactly this release, built by this code's transformation (an
+    older transformation's stored labels and search vectors would be stale)."""
+    return (held.dataset_id, held.sha256, held.transformation_version) == (
+        pin.dataset_id,
+        pin.sha256,
+        TRANSFORMATION_VERSION,
+    )
 
 
 def import_release(tx: Tx, catalogue: EscoCatalogue) -> str:
-    """Setup only. Imports the release unless it is already held; refuses a different one."""
+    """Setup only. Imports the release unless it is already held; refuses anything else."""
     taxonomy_store.lock_releases(tx)
     held = taxonomy_store.release(tx)
     if held is not None:
-        if (held.dataset_id, held.sha256) == (catalogue.pin.dataset_id, catalogue.pin.sha256):
+        if is_held(held, catalogue.pin):
             return "already imported"
         raise TaxonomyMismatchError(
-            f"{held.dataset_id} is imported; {catalogue.pin.dataset_id} cannot replace it"
+            f"{held.dataset_id} (transformation {held.transformation_version}) is imported; "
+            f"{catalogue.pin.dataset_id} (transformation {TRANSFORMATION_VERSION}) cannot "
+            "replace it without a reviewed migration (docs/runbook.md)"
         )
     taxonomy_store.import_catalogue(tx, catalogue)
     return "imported"
@@ -56,7 +74,9 @@ class OccupationSearch:
     any_word: bool
     label_matches: list[LabelMatch]  # exact preferred, alternative or hidden label
     full_text: list[OccupationHit]  # ranked; excludes the label matches
-    full_text_total: int  # every other occupation the full-text query matches
+    # Every other occupation the full-text query matches; None when it did not run (the
+    # query has no searchable word but matched a label): not searched is never zero.
+    full_text_total: int | None
     limit: int
 
 
@@ -77,7 +97,7 @@ def search_occupations(
     labels = taxonomy_store.label_matches(tx, normalise_label(text))
     if taxonomy_store.search_terms(tx, text) == 0:
         if labels:
-            return OccupationSearch(release, any_word, labels, [], 0, limit)
+            return OccupationSearch(release, any_word, labels, [], None, limit)
         raise NessaError(
             ErrorCode.VALIDATION_FAILED,
             "The search has no searchable words (only common words or punctuation).",

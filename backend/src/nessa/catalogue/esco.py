@@ -24,11 +24,22 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-# Transformation: released concepts only; labels trimmed and de-duplicated per concept
-# (case- and space-insensitively); concept rows repeated with only `modifiedDate` changed
-# collapsed to the latest; internal IDs derived from URIs; full-text vectors built at import.
+# Transformation: 6 of the release's 19 CSV files (ISCO groups, occupations, skills,
+# occupation-skill and skill-skill relations, the occupation hierarchy; left out: skill
+# groups, the skills hierarchy and skill-pillar broader relations, the seven collections, the
+# dictionary, concept schemes and the green share of occupations); released concepts only;
+# labels trimmed and de-duplicated per concept (case- and space-insensitively); concept
+# rows repeated with only `modifiedDate` changed collapsed to the latest; internal IDs
+# derived from URIs; full-text vectors built at import.
 TRANSFORMATION_VERSION = "nessa-esco-import-1"
 ATTRIBUTION = "This service uses the ESCO classification of the European Commission."
+# ESCO's second reuse condition: an adapted version is marked as such, wherever it is shown.
+ADAPTATION = (
+    "Adapted from ESCO: Nessa imports occupations, skills, their relations and ISCO-08 "
+    "groups only (not skill groups, the skill hierarchy, collections, the dictionary or "
+    "green-share data), with labels trimmed and de-duplicated and repeated rows merged "
+    f"(transformation {TRANSFORMATION_VERSION}). It is not the official ESCO release."
+)
 LICENCE = (
     "Commission Decision 2011/833/EU on the reuse of Commission documents: free reuse with "
     "the ESCO acknowledgement; modified or adapted versions must be marked as such"

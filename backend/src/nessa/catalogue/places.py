@@ -88,7 +88,8 @@ ENGLISH_CITIES: tuple[Place, ...] = (
     _place("London", LDN, "City of London"),
     _place("Manchester", NW),
     _place("Milton Keynes", SE),
-    _place("Newcastle-upon-Tyne", NE, "Newcastle upon Tyne", "Newcastle"),
+    # Not plain "Newcastle": it also names Newcastle-under-Lyme, which is not a listed city.
+    _place("Newcastle-upon-Tyne", NE, "Newcastle upon Tyne"),
     _place("Norwich", EE),
     _place("Nottingham", EM),
     _place("Oxford", SE),
@@ -132,13 +133,8 @@ def _index(places: tuple[Place, ...]) -> dict[str, Place]:
 
 
 _BY_NAME = _index(ENGLISH_CITIES)
-_BY_ID = {place.place_id: place for place in ENGLISH_CITIES}
 
 
 def resolve_city(name: str) -> Place | None:
     """The listed English city this name (or a recorded alias) means, or None."""
     return _BY_NAME.get(_key(name))
-
-
-def place(place_id: str) -> Place | None:
-    return _BY_ID.get(place_id)

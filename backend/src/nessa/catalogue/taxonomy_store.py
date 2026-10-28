@@ -12,7 +12,13 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy import exc
 
-from nessa.catalogue.esco import ATTRIBUTION, LICENCE, TRANSFORMATION_VERSION, EscoCatalogue
+from nessa.catalogue.esco import (
+    ADAPTATION,
+    ATTRIBUTION,
+    LICENCE,
+    TRANSFORMATION_VERSION,
+    EscoCatalogue,
+)
 from nessa.catalogue.esco import label_rows as esco_label_rows
 from nessa.catalogue.records import (
     IscoGroupRef,
@@ -27,7 +33,7 @@ from nessa.db import Tx, is_unique_violation
 
 _RELEASE_COLUMNS = (
     "release_id, dataset_id, version, language, source_url, sha256, size_bytes, "
-    "native_code_version, transformation_version, licence, attribution, sample, "
+    "native_code_version, transformation_version, licence, attribution, adaptation, sample, "
     "isco_group_count, occupation_count, skill_count, repeated_rows_collapsed, imported_at"
 )
 _PROVISIONAL_COLUMNS = "concept_id, workspace_id, title, source_ref_id, created_by, created_at"
@@ -62,10 +68,11 @@ def import_catalogue(tx: Tx, catalogue: EscoCatalogue) -> uuid.UUID:
         sa.text(
             "INSERT INTO nessa.taxonomy_releases (release_id, taxonomy, dataset_id, version, "
             "language, source_url, sha256, size_bytes, native_code_version, "
-            "transformation_version, licence, attribution, sample, isco_group_count, "
-            "occupation_count, skill_count, repeated_rows_collapsed) VALUES (:id, 'esco', "
-            ":dataset, :version, :language, :url, :sha, :size, :native, :transform, :licence, "
-            ":attribution, :sample, :groups, :occupations, :skills, :collapsed)"
+            "transformation_version, licence, attribution, adaptation, sample, "
+            "isco_group_count, occupation_count, skill_count, repeated_rows_collapsed) VALUES "
+            "(:id, 'esco', :dataset, :version, :language, :url, :sha, :size, :native, "
+            ":transform, :licence, :attribution, :adaptation, :sample, :groups, :occupations, "
+            ":skills, :collapsed)"
         ),
         {
             "id": release_id,
@@ -79,6 +86,7 @@ def import_catalogue(tx: Tx, catalogue: EscoCatalogue) -> uuid.UUID:
             "transform": TRANSFORMATION_VERSION,
             "licence": LICENCE,
             "attribution": ATTRIBUTION,
+            "adaptation": ADAPTATION,
             "sample": pin.sample,
             "groups": len(catalogue.isco_groups),
             "occupations": len(catalogue.occupations),
@@ -236,6 +244,25 @@ def label_matches(tx: Tx, normalised: str) -> list[LabelMatch]:
             "WHERE l.normalised = :n ORDER BY o.preferred_label, l.concept_id"
         ),
         {"n": normalised},
+    ).mappings()
+    return [LabelMatch(**dict(row)) for row in rows]
+
+
+def concept_key_matches(tx: Tx, title: str) -> list[LabelMatch]:
+    """Every occupation with a label that is this title as a concept (`nessa.concept_key`:
+    case, punctuation, hyphens and simple plurals folded). Hidden labels match but their
+    text is not returned."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT l.concept_id, CASE WHEN l.kind = 'hidden' THEN NULL ELSE l.label END "
+            "AS label, l.kind, o.preferred_label, o.isco_code, g.label AS isco_label "
+            "FROM nessa.occupation_labels l "
+            "JOIN nessa.occupation_concepts o ON o.concept_id = l.concept_id "
+            "JOIN nessa.isco_groups g ON g.code = o.isco_code "
+            "WHERE nessa.concept_key(l.label) = nessa.concept_key(:title) "
+            "ORDER BY o.preferred_label, l.concept_id"
+        ),
+        {"title": title},
     ).mappings()
     return [LabelMatch(**dict(row)) for row in rows]
 

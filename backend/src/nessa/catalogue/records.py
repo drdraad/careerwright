@@ -3,6 +3,15 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
+
+
+class ConceptKind(StrEnum):
+    """Which kind of occupation concept an ID names (spec section 4: a suggestion holds a
+    canonical concept or a provisional concept)."""
+
+    ESCO = "esco"  # an occupation of the pinned ESCO release
+    PROVISIONAL = "provisional"  # a title a person verified that ESCO does not hold
 
 
 @dataclass(frozen=True)
@@ -20,6 +29,7 @@ class TaxonomyRelease:
     transformation_version: str
     licence: str
     attribution: str
+    adaptation: str  # how this import adapts the release (ESCO's second reuse condition)
     sample: bool
     isco_group_count: int
     occupation_count: int

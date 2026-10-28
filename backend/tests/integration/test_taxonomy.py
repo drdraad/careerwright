@@ -6,7 +6,6 @@ The session database holds the committed sample. One test imports the full pinne
 """
 
 import dataclasses
-import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -57,6 +56,11 @@ def test_the_manifest_records_release_hash_licence_attribution_and_versions(
     assert release["attribution"] == (
         "This service uses the ESCO classification of the European Commission."
     )
+    # The import is itself a reduced, transformed version: marked as adapted (reuse
+    # condition 2), naming what it leaves out and the transformation.
+    assert release["adaptation"].startswith("Adapted from ESCO")
+    assert "nessa-esco-import-1" in release["adaptation"]
+    assert "skill hierarchy" in release["adaptation"]
     assert (release["occupation_count"], release["isco_group_count"]) == (30, 70)
 
 
@@ -73,6 +77,28 @@ def test_an_alias_finds_its_occupation_before_the_ranked_full_text_matches(
         "alternative",
     )
     assert match["concept_id"] not in {h["concept_id"] for h in found["full_text"]}
+    # Each result says it is an ESCO concept, never a provisional one.
+    assert {m["concept_kind"] for m in [match, *found["full_text"]]} == {"esco"}
+
+
+def test_a_label_match_with_no_searchable_words_reports_full_text_as_not_run(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    holder = search(api, ada, "bicycle mechanic")["label_matches"][0]["concept_id"]
+    # A hidden label of stop words only: it matches as a label, but full-text search has
+    # no word to look for. (The sample has none, so the test adds one and removes it.)
+    infra.query(
+        "INSERT INTO nessa.occupation_labels (concept_id, label, normalised, kind) "
+        "VALUES (%s, 'Of The', 'of the', 'hidden')",
+        (holder,),
+    )
+    try:
+        found = search(api, ada, "of the")
+    finally:
+        infra.query("DELETE FROM nessa.occupation_labels WHERE label = 'Of The'")
+
+    assert [m["concept_id"] for m in found["label_matches"]] == [holder]
+    assert (found["full_text"], found["full_text_total"]) == ([], None)  # not run, not zero
 
 
 @pytest.mark.req("DIV1-01")
@@ -143,6 +169,8 @@ def test_an_occupation_shows_its_isco_chain_skills_and_attribution(
     assert any(s["relation"] == "essential" for s in detail["skills"])
     assert "IT support technician" in detail["alternative_labels"]
     assert detail["attribution"].startswith("This service uses the ESCO classification")
+    assert detail["adaptation"].startswith("Adapted from ESCO")  # shown with the data
+    assert detail["concept_kind"] == "esco"
     manager = search(api, ada, "ICT help desk manager")["label_matches"][0]
     assert manager["isco_code"] == agent["isco_code"]  # same ISCO group, distinct concepts
     assert manager["concept_id"] != agent["concept_id"]
@@ -155,6 +183,7 @@ def test_the_taxonomy_needs_an_invited_caller(api: ApiClient) -> None:
     assert api.get("/v1/places", None).status_code == 401
 
 
+@pytest.mark.req("BND1-04")
 def test_the_english_city_list_is_served_with_its_source(api: ApiClient, ada: str) -> None:
     places = api.get("/v1/places", ada).json()
 
@@ -167,6 +196,17 @@ def test_the_english_city_list_is_served_with_its_source(api: ApiClient, ada: st
         "Yorkshire and The Humber",
         "Europe/London",
     )
+    # A city is geography only: nothing about residence, nationality or work rights.
+    assert {key for p in places["items"] for key in p} == {
+        "place_id",
+        "label",
+        "aliases",
+        "region",
+        "region_code",
+        "country_code",
+        "subdivision_code",
+        "timezone",
+    }
 
 
 def test_the_api_role_reads_but_cannot_change_the_taxonomy(infra: Infra) -> None:
@@ -187,11 +227,82 @@ def test_importing_again_changes_nothing_and_another_release_is_refused(infra: I
     engine = migrator_engine(infra)
     try:
         assert import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE) == "already imported"
+        # The check after the lock, for an import that raced past the first one.
+        with engine.begin() as tx:
+            assert import_release(tx, catalogue) == "already imported"
         with engine.begin() as tx, pytest.raises(TaxonomyMismatchError):
             import_release(tx, other)
     finally:
         engine.dispose()
     assert infra.query("SELECT count(*) AS n FROM nessa.taxonomy_releases") == [{"n": 1}]
+
+
+TAXONOMY_TABLES = (
+    "taxonomy_releases",
+    "isco_groups",
+    "occupation_concepts",
+    "occupation_labels",
+    "occupation_broader",
+    "skills",
+    "skill_labels",
+    "occupation_skills",
+    "skill_relations",
+)
+
+
+def migrated_database(infra: Infra, prefix: str) -> str:
+    database = f"nessa_{prefix}_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    owner = migrator_engine(infra, database)
+    try:
+        migrate_app(owner)
+    finally:
+        owner.dispose()
+    return database
+
+
+@pytest.mark.req("TAX1-04")
+def test_a_release_imported_by_another_transformation_is_refused_not_kept(infra: Infra) -> None:
+    database = migrated_database(infra, "transform")
+    owner = migrator_engine(infra, database)
+    try:
+        assert import_taxonomy(owner, SAMPLE_PATH, SAMPLE_RELEASE) == "imported"
+        with owner.begin() as tx:  # as if an earlier transformation had built it
+            tx.exec_driver_sql(
+                "UPDATE nessa.taxonomy_releases SET transformation_version = 'nessa-esco-import-0'"
+            )
+
+        # The same release bytes are not enough: its stored labels and vectors are stale.
+        with pytest.raises(TaxonomyMismatchError, match="transformation"):
+            import_taxonomy(owner, SAMPLE_PATH, SAMPLE_RELEASE)
+    finally:
+        owner.dispose()
+
+
+@pytest.mark.req("TAX1-04")
+def test_an_import_that_fails_part_way_leaves_no_taxonomy_rows(infra: Infra) -> None:
+    database = migrated_database(infra, "atomic")
+    catalogue = parse_release(read_verified(SAMPLE_PATH, SAMPLE_RELEASE), SAMPLE_RELEASE)
+    # Past the parser's checks: a relation naming a skill the catalogue does not hold.
+    broken = dataclasses.replace(
+        catalogue,
+        occupation_skills=(
+            *catalogue.occupation_skills,
+            dataclasses.replace(catalogue.occupation_skills[0], skill_id=uuid.uuid4()),
+        ),
+    )
+    owner = migrator_engine(infra, database)
+    try:
+        with pytest.raises(errors.ForeignKeyViolation), owner.begin() as tx:
+            import_release(tx, broken)
+    finally:
+        owner.dispose()
+
+    for table in TAXONOMY_TABLES:
+        assert infra.query(
+            f"SELECT count(*) AS n FROM nessa.{table}",  # noqa: S608 - fixed names
+            database=database,
+        ) == [{"n": 0}], table
 
 
 def test_a_database_without_the_taxonomy_refuses_searches(infra: Infra) -> None:
@@ -221,13 +332,10 @@ def test_the_full_pinned_release_imports_and_is_searchable(infra: Infra) -> None
     owner = migrator_engine(infra, database)
     try:
         migrate_app(owner)
-        started = time.monotonic()
         assert import_taxonomy(owner, release) == "imported"
-        elapsed = time.monotonic() - started
         assert import_taxonomy(owner, release) == "already imported"
     finally:
         owner.dispose()
-    print(f"full ESCO import: {elapsed:.1f} s")  # recorded in the task report
 
     counts = infra.query(
         "SELECT (SELECT count(*) FROM nessa.occupation_concepts) AS occupations, "
@@ -282,6 +390,7 @@ def test_the_full_pinned_release_imports_and_is_searchable(infra: Infra) -> None
     ]
     # Every word: a complete, honest zero. Any word: a ranked page that says it is a page.
     assert (every_word.full_text, every_word.full_text_total) == ([], 0)
+    assert tasks.full_text_total is not None
     assert tasks.full_text_total > len(tasks.full_text) == 20
     assert [g.code for g in detail.isco_groups] == ["2", "22", "222", "2221"]
     assert any(s.relation == "essential" for s in detail.skills)

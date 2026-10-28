@@ -3,10 +3,13 @@
 internal concepts, not fabricated ESCO records"; DIV1-03).
 
 The person's explicit confirmation is the verification, recorded as a direct-entry source.
-A title that is an ESCO label (preferred, alternative or hidden) is refused with the
-matching occupations, so a provisional concept never duplicates or stands in for an ESCO
-record. Model-suggested titles are not accepted here: they stay search hypotheses until
-corroborated by independent evidence (DIV1-04, Sprint 2 discovery).
+A title that is an ESCO label (preferred, alternative or hidden) as a concept, with case,
+punctuation, hyphens and simple plurals folded (`nessa.concept_key`), is refused with the
+matching occupations; the database trigger applies the same rule to the title itself. A
+title that only resembles an ESCO label ("senior data analyst") is not refused: offering
+the person the full-text matches first is discovery's work (DIV1-05, T6). Model-suggested
+titles are not accepted here: they stay search hypotheses until corroborated by
+independent evidence (DIV1-04, Sprint 2 discovery).
 """
 
 import uuid
@@ -53,7 +56,7 @@ def register_provisional_concept(
     visible_workspace(tx, workspace_id, lock=True)
     held_release(tx)  # without the taxonomy, "not in ESCO" cannot be established
     normalised = normalise_label(command.title)
-    in_esco = taxonomy_store.label_matches(tx, normalised)
+    in_esco = taxonomy_store.concept_key_matches(tx, command.title)
     if in_esco:
         raise NessaError(
             ErrorCode.VALIDATION_FAILED,

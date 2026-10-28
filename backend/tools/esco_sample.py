@@ -4,8 +4,9 @@ The test suite runs without the network, so it imports a small, labelled subset 
 official ESCO v1.2.1 English CSV package instead of the release itself: the occupations
 whose preferred label is in `SELECTED`, their ISCO-08 groups with every ancestor, their
 broader occupations, a bounded number of their skills and the relations among what is
-kept. Every kept row is byte-for-byte the release's row (all columns). The output is
-deterministic (sorted, fixed timestamps), so rebuilding gives the same SHA-256.
+kept. Every kept row is value-for-value the release's row (all columns; the CSV is written
+again, so quoting and line endings may differ). The output is deterministic (sorted, fixed
+timestamps), so rebuilding gives the same SHA-256.
 
 The sample is a modified (reduced) version of ESCO and says so (ESCO's reuse condition 2).
 It is for tests only: the product imports the full release (`nessa.catalogue.esco`).

@@ -24,7 +24,7 @@ from dbos import DBOS
 
 from nessa.catalogue import taxonomy_store
 from nessa.catalogue.esco import ESCO_RELEASE, ReleasePin, parse_release, read_verified
-from nessa.catalogue.taxonomy import import_release
+from nessa.catalogue.taxonomy import import_release, is_held
 from nessa.config import OpsSettings
 from nessa.db import Tx, create_engine, url_with_password
 from nessa.identity import credential_store, run_store
@@ -189,7 +189,7 @@ def import_taxonomy(engine: sa.Engine, path: Path, pin: ReleasePin = ESCO_RELEAS
     verified against the pin before it is parsed; a different release is refused."""
     with engine.begin() as tx:
         held = taxonomy_store.release(tx)
-    if held is not None and (held.dataset_id, held.sha256) == (pin.dataset_id, pin.sha256):
+    if held is not None and is_held(held, pin):
         return "already imported"
     catalogue = parse_release(read_verified(path, pin), pin)
     with engine.begin() as tx:

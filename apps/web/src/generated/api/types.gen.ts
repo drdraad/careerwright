@@ -549,6 +549,10 @@ export type LabelMatchOut = {
      */
     concept_id: string;
     /**
+     * Concept Kind
+     */
+    concept_kind: 'esco';
+    /**
      * Label
      *
      * null when a hidden (search-only) label matched.
@@ -631,6 +635,10 @@ export type OccupationHitOut = {
      */
     concept_id: string;
     /**
+     * Concept Kind
+     */
+    concept_kind: 'esco';
+    /**
      * Preferred Label
      */
     preferred_label: string;
@@ -660,6 +668,10 @@ export type OccupationOut = {
      * Nessa's internal concept ID (stable per URI).
      */
     concept_id: string;
+    /**
+     * Concept Kind
+     */
+    concept_kind: 'esco';
     /**
      * Esco Uri
      */
@@ -704,6 +716,10 @@ export type OccupationOut = {
      * Attribution
      */
     attribution: string;
+    /**
+     * Adaptation
+     */
+    adaptation: string;
 };
 
 /**
@@ -726,8 +742,10 @@ export type OccupationSearchOut = {
     full_text: Array<OccupationHitOut>;
     /**
      * Full Text Total
+     *
+     * null: full-text search did not run (the query has no searchable word but matched a label), which is not the same as no match.
      */
-    full_text_total: number;
+    full_text_total: number | null;
     /**
      * Limit
      */
@@ -1098,6 +1116,12 @@ export type ProvisionalConceptOut = {
      */
     concept_id: string;
     /**
+     * Concept Kind
+     *
+     * provisional: Nessa's own concept for a verified title, never an ESCO one.
+     */
+    concept_kind: 'provisional';
+    /**
      * Title
      */
     title: string;
@@ -1448,8 +1472,8 @@ export type SubmitTurn = {
 /**
  * TaxonomyReleaseOut
  *
- * The import manifest of the ESCO release in use (TAX1-04). Show `attribution` wherever
- * ESCO content appears (ESCO's reuse condition).
+ * The import manifest of the ESCO release in use (TAX1-04). Show `attribution` and
+ * `adaptation` wherever ESCO content appears (ESCO's two reuse conditions).
  */
 export type TaxonomyReleaseOut = {
     /**
@@ -1492,6 +1516,12 @@ export type TaxonomyReleaseOut = {
      * Attribution
      */
     attribution: string;
+    /**
+     * Adaptation
+     *
+     * How this import adapts the release: it is marked so.
+     */
+    adaptation: string;
     /**
      * Sample
      *

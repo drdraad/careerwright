@@ -3294,6 +3294,11 @@
             "format": "uuid",
             "title": "Concept Id"
           },
+          "concept_kind": {
+            "type": "string",
+            "const": "esco",
+            "title": "Concept Kind"
+          },
           "label": {
             "anyOf": [
               {
@@ -3327,6 +3332,7 @@
         "type": "object",
         "required": [
           "concept_id",
+          "concept_kind",
           "label",
           "label_kind",
           "preferred_label",
@@ -3431,6 +3437,11 @@
             "format": "uuid",
             "title": "Concept Id"
           },
+          "concept_kind": {
+            "type": "string",
+            "const": "esco",
+            "title": "Concept Kind"
+          },
           "preferred_label": {
             "type": "string",
             "title": "Preferred Label"
@@ -3453,6 +3464,7 @@
         "type": "object",
         "required": [
           "concept_id",
+          "concept_kind",
           "preferred_label",
           "isco_code",
           "isco_label",
@@ -3467,6 +3479,11 @@
             "format": "uuid",
             "title": "Concept Id",
             "description": "Nessa's internal concept ID (stable per URI)."
+          },
+          "concept_kind": {
+            "type": "string",
+            "const": "esco",
+            "title": "Concept Kind"
           },
           "esco_uri": {
             "type": "string",
@@ -3533,12 +3550,17 @@
           "attribution": {
             "type": "string",
             "title": "Attribution"
+          },
+          "adaptation": {
+            "type": "string",
+            "title": "Adaptation"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "concept_id",
+          "concept_kind",
           "esco_uri",
           "esco_code",
           "preferred_label",
@@ -3548,7 +3570,8 @@
           "isco_groups",
           "broader_concept_id",
           "skills",
-          "attribution"
+          "attribution",
+          "adaptation"
         ],
         "title": "OccupationOut"
       },
@@ -3575,8 +3598,16 @@
             "title": "Full Text"
           },
           "full_text_total": {
-            "type": "integer",
-            "title": "Full Text Total"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Text Total",
+            "description": "null: full-text search did not run (the query has no searchable word but matched a label), which is not the same as no match."
           },
           "limit": {
             "type": "integer",
@@ -4148,6 +4179,12 @@
             "format": "uuid",
             "title": "Concept Id"
           },
+          "concept_kind": {
+            "type": "string",
+            "const": "provisional",
+            "title": "Concept Kind",
+            "description": "provisional: Nessa's own concept for a verified title, never an ESCO one."
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -4172,6 +4209,7 @@
         "type": "object",
         "required": [
           "concept_id",
+          "concept_kind",
           "title",
           "source_ref_id",
           "created_by",
@@ -4771,6 +4809,11 @@
             "type": "string",
             "title": "Attribution"
           },
+          "adaptation": {
+            "type": "string",
+            "title": "Adaptation",
+            "description": "How this import adapts the release: it is marked so."
+          },
           "sample": {
             "type": "boolean",
             "title": "Sample",
@@ -4812,6 +4855,7 @@
           "transformation_version",
           "licence",
           "attribution",
+          "adaptation",
           "sample",
           "isco_group_count",
           "occupation_count",
@@ -4820,7 +4864,7 @@
           "imported_at"
         ],
         "title": "TaxonomyReleaseOut",
-        "description": "The import manifest of the ESCO release in use (TAX1-04). Show `attribution` wherever\nESCO content appears (ESCO's reuse condition)."
+        "description": "The import manifest of the ESCO release in use (TAX1-04). Show `attribution` and\n`adaptation` wherever ESCO content appears (ESCO's two reuse conditions)."
       },
       "TextField": {
         "properties": {

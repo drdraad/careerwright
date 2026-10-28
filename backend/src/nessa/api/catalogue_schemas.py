@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import Field
 
@@ -17,6 +18,7 @@ from nessa.catalogue.places import (
     Place,
 )
 from nessa.catalogue.records import (
+    ConceptKind,
     IscoGroupRef,
     LabelMatch,
     OccupationDetail,
@@ -33,9 +35,12 @@ class SearchMatch(StrEnum):
     ANY = "any"  # any word, ranked by how many match: for broad task and interest queries
 
 
+EscoKind = Literal[ConceptKind.ESCO]  # "esco": an occupation of the pinned ESCO release
+
+
 class TaxonomyReleaseOut(ResponseModel):
-    """The import manifest of the ESCO release in use (TAX1-04). Show `attribution` wherever
-    ESCO content appears (ESCO's reuse condition)."""
+    """The import manifest of the ESCO release in use (TAX1-04). Show `attribution` and
+    `adaptation` wherever ESCO content appears (ESCO's two reuse conditions)."""
 
     dataset_id: str
     version: str
@@ -47,6 +52,7 @@ class TaxonomyReleaseOut(ResponseModel):
     transformation_version: str
     licence: str
     attribution: str
+    adaptation: str = Field(description="How this import adapts the release: it is marked so.")
     sample: bool = Field(description="A reduced test copy: never the catalogue a person sees.")
     isco_group_count: int
     occupation_count: int
@@ -70,6 +76,7 @@ class TaxonomyReleaseOut(ResponseModel):
             transformation_version=release.transformation_version,
             licence=release.licence,
             attribution=release.attribution,
+            adaptation=release.adaptation,
             sample=release.sample,
             isco_group_count=release.isco_group_count,
             occupation_count=release.occupation_count,
@@ -81,6 +88,7 @@ class TaxonomyReleaseOut(ResponseModel):
 
 class LabelMatchOut(ResponseModel):
     concept_id: uuid.UUID
+    concept_kind: EscoKind
     label: str | None = Field(description="null when a hidden (search-only) label matched.")
     label_kind: str
     preferred_label: str
@@ -91,6 +99,7 @@ class LabelMatchOut(ResponseModel):
     def of(cls, match: LabelMatch) -> "LabelMatchOut":
         return cls(
             concept_id=match.concept_id,
+            concept_kind=ConceptKind.ESCO,
             label=match.label,
             label_kind=match.kind,
             preferred_label=match.preferred_label,
@@ -101,6 +110,7 @@ class LabelMatchOut(ResponseModel):
 
 class OccupationHitOut(ResponseModel):
     concept_id: uuid.UUID
+    concept_kind: EscoKind
     preferred_label: str
     isco_code: str
     isco_label: str
@@ -110,6 +120,7 @@ class OccupationHitOut(ResponseModel):
     def of(cls, hit: OccupationHit) -> "OccupationHitOut":
         return cls(
             concept_id=hit.concept_id,
+            concept_kind=ConceptKind.ESCO,
             preferred_label=hit.preferred_label,
             isco_code=hit.isco_code,
             isco_label=hit.isco_label,
@@ -126,7 +137,10 @@ class OccupationSearchOut(ResponseModel):
     match: SearchMatch
     label_matches: list[LabelMatchOut]
     full_text: list[OccupationHitOut]
-    full_text_total: int
+    full_text_total: int | None = Field(
+        description="null: full-text search did not run (the query has no searchable word "
+        "but matched a label), which is not the same as no match."
+    )
     limit: int
 
     @classmethod
@@ -168,6 +182,7 @@ class SkillRefOut(ResponseModel):
 
 class OccupationOut(ResponseModel):
     concept_id: uuid.UUID = Field(description="Nessa's internal concept ID (stable per URI).")
+    concept_kind: EscoKind
     esco_uri: str
     esco_code: str
     preferred_label: str
@@ -180,11 +195,13 @@ class OccupationOut(ResponseModel):
     broader_concept_id: uuid.UUID | None
     skills: list[SkillRefOut]
     attribution: str
+    adaptation: str
 
     @classmethod
     def of(cls, detail: OccupationDetail, release: TaxonomyRelease) -> "OccupationOut":
         return cls(
             concept_id=detail.concept_id,
+            concept_kind=ConceptKind.ESCO,
             esco_uri=detail.esco_uri,
             esco_code=detail.esco_code,
             preferred_label=detail.preferred_label,
@@ -195,6 +212,7 @@ class OccupationOut(ResponseModel):
             broader_concept_id=detail.broader_concept_id,
             skills=[SkillRefOut.of(s) for s in detail.skills],
             attribution=release.attribution,
+            adaptation=release.adaptation,
         )
 
 
@@ -239,6 +257,9 @@ class ProvisionalConceptOut(ResponseModel):
     """A title the person verified that ESCO does not hold: no ESCO URI, no ISCO group."""
 
     concept_id: uuid.UUID
+    concept_kind: Literal[ConceptKind.PROVISIONAL] = Field(
+        description="provisional: Nessa's own concept for a verified title, never an ESCO one."
+    )
     title: str
     source_ref_id: uuid.UUID
     created_by: uuid.UUID
@@ -248,6 +269,7 @@ class ProvisionalConceptOut(ResponseModel):
     def of(cls, concept: ProvisionalConcept) -> "ProvisionalConceptOut":
         return cls(
             concept_id=concept.concept_id,
+            concept_kind=ConceptKind.PROVISIONAL,
             title=concept.title,
             source_ref_id=concept.source_ref_id,
             created_by=concept.created_by,

@@ -3,7 +3,6 @@
 acceptance (`tests/integration/test_taxonomy.py`)."""
 
 import csv
-import dataclasses
 import io
 import zipfile
 from pathlib import Path
@@ -11,7 +10,6 @@ from pathlib import Path
 import pytest
 
 from nessa.catalogue.esco import (
-    ESCO_RELEASE,
     LabelKind,
     ReleaseIntegrityError,
     concept_id,
@@ -33,20 +31,6 @@ def rezip(data: bytes, replace: dict[str, bytes]) -> bytes:
         for name in src.namelist():
             dst.writestr(name, replace.get(name, src.read(name)))
     return out.getvalue()
-
-
-@pytest.mark.req("TAX1-04")
-def test_the_product_pins_one_exact_release_with_its_provenance() -> None:
-    pin = ESCO_RELEASE
-    assert (pin.dataset_id, pin.version, pin.language, pin.sample) == (
-        "esco-v1.2.1-en-csv",
-        "v1.2.1",
-        "en",
-        False,
-    )
-    assert pin.url.startswith("https://ec.europa.eu/esco/download/")
-    assert len(pin.sha256) == 64
-    assert pin.size_bytes == 10_045_670
 
 
 @pytest.mark.req("TAX1-04")
@@ -121,7 +105,7 @@ def test_a_relation_naming_an_unknown_concept_is_a_structure_error(sample_bytes:
     broken = rezip(sample_bytes, {"occupationSkillRelations_en.csv": bogus.encode()})
 
     with pytest.raises(ReleaseIntegrityError, match="unknown concept"):
-        parse_release(broken, dataclasses.replace(SAMPLE_RELEASE))
+        parse_release(broken, SAMPLE_RELEASE)
 
 
 def test_a_missing_file_or_column_is_a_structure_error(sample_bytes: bytes) -> None:

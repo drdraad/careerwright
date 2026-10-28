@@ -15,7 +15,7 @@ Decision 2011/833/EU on the reuse of Commission documents.
 | SHA-256 | `747c5638653e0594c0ae4210db1ee0c90eccb5c872f356fdfa36116bb56f955d` (pinned in `backend/tests/support/esco.py`) |
 | Built from | `esco-v1.2.1-classification-en-csv.zip`, SHA-256 `f9761b0b…deb3e` |
 | Built by | `cd backend && uv run --locked python -m tools.esco_sample` (deterministic: sorted members, fixed timestamps; rebuilding gives the same hash) |
-| Contents | 6 of the release's CSV files, every kept row byte-for-byte the release's, all columns |
+| Contents | 6 of the release's CSV files, every kept row value-for-value the release's, all columns (re-serialised: quoting and line endings may differ) |
 
 What it keeps (`SELECTED` in `backend/tools/esco_sample.py`):
 

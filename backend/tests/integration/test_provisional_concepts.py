@@ -27,7 +27,15 @@ def test_a_title_esco_lacks_becomes_a_provisional_concept_citing_the_confirmatio
 
     assert status == 201
     assert concept["title"] == "Drone survey pilot"
-    assert set(concept) == {"concept_id", "title", "source_ref_id", "created_by", "created_at"}
+    assert set(concept) == {
+        "concept_id",
+        "concept_kind",
+        "title",
+        "source_ref_id",
+        "created_by",
+        "created_at",
+    }
+    assert concept["concept_kind"] == "provisional"  # tells it apart from an ESCO concept
     [row] = infra.query(
         "SELECT * FROM nessa.provisional_concepts WHERE concept_id = %s", (concept["concept_id"],)
     )
@@ -63,14 +71,36 @@ def test_an_esco_title_or_alias_is_refused_with_the_occupations_that_hold_it(
     assert api.get(f"/v1/workspaces/{workspace}/occupations/provisional", ada).json()["items"] == []
 
 
+@pytest.mark.req("DIV1-03")
+@pytest.mark.parametrize("title", ["ICT help-desk agent", "Data analyst.", "data analysts"])
+def test_a_near_duplicate_of_an_esco_label_is_refused_too(
+    api: ApiClient, ada: str, title: str
+) -> None:
+    workspace = api.create_workspace(ada, "Near duplicates")["workspace_id"]
+
+    status, refused = register(api, ada, workspace, title)
+
+    # Hyphens, punctuation and plurals aside, ESCO already lists it.
+    assert status == 422, refused
+    assert refused["error"]["details"]["reason"] == "in_taxonomy"
+    assert refused["error"]["details"]["concept_ids"]
+
+
+@pytest.mark.req("SEC-01")
 def test_another_account_cannot_see_or_add_to_a_workspace_s_concepts(
-    api: ApiClient, ada: str, ben: str
+    api: ApiClient, ada: str, ben: str, infra: Infra
 ) -> None:
     workspace = api.create_workspace(ada, "Private concepts")["workspace_id"]
     register(api, ada, workspace, "Heritage roof thatcher apprentice")
 
     assert api.get(f"/v1/workspaces/{workspace}/occupations/provisional", ben).status_code == 404
     assert register(api, ben, workspace, "Anything")[0] == 404
+    # And below the API: the API role's row-level security shows the rows to the owner only.
+    count = "SELECT count(*) AS n FROM nessa.provisional_concepts WHERE workspace_id = %s"
+    owner_id = api.get("/v1/me", ada).json()["actor_id"]
+    other_id = api.get("/v1/me", ben).json()["actor_id"]
+    assert infra.as_role("pg_api", count, (workspace,), actor=owner_id) == [{"n": 1}]
+    assert infra.as_role("pg_api", count, (workspace,), actor=other_id) == [{"n": 0}]
 
 
 def test_the_database_refuses_a_provisional_concept_with_an_esco_title(
@@ -82,10 +112,13 @@ def test_the_database_refuses_a_provisional_concept_with_an_esco_title(
         "SELECT * FROM nessa.provisional_concepts WHERE concept_id = %s", (concept["concept_id"],)
     )
 
-    with pytest.raises(errors.CheckViolation):
-        infra.query(
-            "INSERT INTO nessa.provisional_concepts (concept_id, workspace_id, title, "
-            "normalised_title, source_ref_id, created_by) VALUES (gen_random_uuid(), %s, "
-            "'plumber', 'plumber', %s, %s)",
-            (workspace, row["source_ref_id"], row["created_by"]),
-        )
+    for title, claimed in (("plumber", "plumber"), ("Plumbers!", "anything else")):
+        # The trigger derives the comparison from the title itself, not from the caller's
+        # normalised form, and folds plurals and punctuation as the API does.
+        with pytest.raises(errors.CheckViolation):
+            infra.query(
+                "INSERT INTO nessa.provisional_concepts (concept_id, workspace_id, title, "
+                "normalised_title, source_ref_id, created_by) VALUES (gen_random_uuid(), %s, "
+                "%s, %s, %s, %s)",
+                (workspace, title, claimed, row["source_ref_id"], row["created_by"]),
+            )
