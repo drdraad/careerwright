@@ -26,6 +26,11 @@ async function send(page: Page, message: string) {
 /** In the viewport and on top at its centre: nothing (such as the sheet) covers it. */
 async function expectReachable(page: Page, target: Locator) {
   await target.scrollIntoViewIfNeeded();
+  await expectOnTop(page, target);
+}
+
+/** Where it is now (after focus scrolled it, say): in the viewport and uncovered. */
+async function expectOnTop(page: Page, target: Locator) {
   const box = await target.boundingBox();
   const viewport = page.viewportSize();
   expect(box).not.toBeNull();
@@ -222,11 +227,46 @@ test.describe("phone", () => {
     await page.reload();
     await expect(page.getByText("The reply didn't pass Nessa's checks twice")).toBeVisible();
     // The sticky reply field must not cover Try again either, with the sheet closed.
-    await expectReachable(page, page.getByRole("button", { name: "Try again" }));
+    const tryAgain = page.getByRole("button", { name: "Try again" });
+    const yourself = page.getByRole("button", { name: "Add the details yourself" });
+    await expectReachable(page, tryAgain);
+    await expectReachable(page, yourself);
+    // Keyboard (B-M6): focus alone brings Try again into view, uncovered.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await tryAgain.focus();
+    await expectOnTop(page, tryAgain);
     await page.getByRole("button", { name: "Edit answers directly" }).click();
     await page.getByRole("button", { name: "Source for total spending limit" }).click();
     await expect(sheet).toBeVisible();
-    await expectReachable(page, page.getByRole("button", { name: "Try again" }));
+    await expectReachable(page, tryAgain);
+    await expectReachable(page, yourself);
     await expectReachable(page, page.getByRole("textbox", { name: "Reply to Nessa" }));
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await tryAgain.focus();
+    await expectOnTop(page, tryAgain);
+    const sent = page.waitForRequest(
+      (request) => request.method() === "POST" && request.url().endsWith("/interview/turns"),
+    );
+    await page.keyboard.press("Enter");
+    await sent; // Enter on the focused Try again sends the message again
   });
+});
+
+test("[UI-09] V-02: a failed profile load recovers in place with Try again", async ({ page }) => {
+  let failing = true;
+  await page.route("**/v1/workspaces/*/profile", (route) =>
+    failing ? route.abort() : route.continue(),
+  );
+  await signIn(page, "ada", chapterUrl("you"));
+  await expect(page.getByRole("banner").getByText("Your answers couldn't be loaded")).toBeVisible({
+    timeout: 30_000,
+  });
+  const where = page.url();
+
+  failing = false;
+  await page.getByRole("button", { name: "Try again" }).click();
+
+  await expect(page.getByRole("heading", { name: "What we know" })).toBeVisible();
+  await expect(page.getByRole("banner").getByText(/^Saved, version \d+$/)).toBeVisible();
+  expect(page.url()).toBe(where); // recovered without navigating away
 });

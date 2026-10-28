@@ -191,6 +191,7 @@ const shots = (scratch: Scratch): Shot[] => [
       await expect(
         page.getByRole("heading", { name: "How would you like to start?" }),
       ).toBeVisible();
+      await expect(page.getByText("Loading the early sketch")).toHaveCount(0); // B-M5
     },
   },
   {
@@ -223,12 +224,32 @@ const shots = (scratch: Scratch): Shot[] => [
     ready: async (page) => {
       await heading("You")(page);
       await page.getByRole("button", { name: "Edit answers directly" }).click();
-      await page.getByLabel("How you answer current role").selectOption("unknown");
-      await page.getByLabel("How you answer weekly study hours").selectOption("skipped");
+      // Three neighbouring answers, so all three states are in view at every size (B-M5).
+      await page.getByLabel("How you answer total spending limit").selectOption("unknown");
+      await page.getByLabel("How you answer monthly payment limit").selectOption("skipped");
       await page
         .getByLabel("How you answer lowest pay you'd accept")
         .selectOption("prefer_not_to_say");
-      await page.getByLabel("How you answer current role").scrollIntoViewIfNeeded();
+      await page
+        .getByLabel("How you answer monthly payment limit")
+        .evaluate((element) => element.scrollIntoView({ block: "center" }));
+    },
+  },
+  {
+    name: "you--salary-floor",
+    as: "ada",
+    url: chapterUrl("you"),
+    ready: async (page) => {
+      await heading("You")(page);
+      await page.getByRole("button", { name: "Edit answers directly" }).click();
+      await page
+        .getByLabel("How you answer lowest pay you'd accept")
+        .selectOption("provided");
+      await page.getByLabel("Lowest pay you'd accept, in pounds").fill("2,100");
+      await page.getByLabel("Lowest pay you'd accept, per").selectOption("month");
+      await page
+        .getByLabel("Lowest pay you'd accept, in pounds")
+        .evaluate((element) => element.scrollIntoView({ block: "center" }));
     },
   },
   {
