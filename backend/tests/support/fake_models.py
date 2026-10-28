@@ -3,27 +3,33 @@ cost nothing and run offline. Its failure modes deliberately echo part of the ke
 provider error, the worst realistic case for what could leak into a journal or log.
 
 It answers whichever schema the agent asks for: the connection check, or an interview turn
-(a proposal for the current message, citing it). Interview failure modes cover the
-contract tests: invalid output once (repaired) or always, a refusal, and truncation.
+(a proposal for the current message, citing it), non-streamed or streamed in small chunks
+(interview turns stream their reply). Interview failure modes cover the contract tests:
+invalid output once (repaired) or always, a complete but schema-invalid object, a refusal,
+truncation, a repair request that fails without usage, and a stream cut off part-way.
 """
 
 import hashlib
 import itertools
 import json
 import time
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 
 from pydantic import SecretStr
 from pydantic_ai.exceptions import ModelConnectionError, ModelHTTPError
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, UserPromptPart
-from pydantic_ai.models import Model
+from pydantic_ai.models import Model, StreamedResponse
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RequestUsage
 
 FAKE_MODEL_NAME = "fake-function-model"
 CONTEXT_MARKER = "Context (JSON):\n"
+STREAM_CHUNK = 24  # characters per streamed delta
 
 
 class FakeFailure(StrEnum):
@@ -35,8 +41,11 @@ class FakeFailure(StrEnum):
     INCONSISTENT_USAGE = "inconsistent_usage"  # more cached than total input tokens
     INVALID_ONCE = "invalid_once"  # an interview output citing no message, then a valid one
     INVALID_ALWAYS = "invalid_always"
+    SCHEMA_INVALID_ALWAYS = "schema_invalid_always"  # complete JSON, wrong type for a field
+    INVALID_THEN_UNAVAILABLE = "invalid_then_unavailable"  # every repair request gets a 503
     REFUSAL = "refusal"  # the provider's content filter answers with a refusal
     TRUNCATED = "truncated"  # the output stops at its token limit, mid-JSON
+    CUT_MID_STREAM = "cut_mid_stream"  # the stream breaks after part of the reply
 
 
 def key_fingerprint(api_key: SecretStr | None) -> str:
@@ -61,7 +70,10 @@ def interview_answer(
     """A proposal for the current message: a stated city and an inferred spending limit."""
     current = str(context["current_message"])
     return {
-        "reply": f"Thanks for telling me. {sentinel}".strip(),
+        "reply": (
+            "Thanks for telling me. I have noted where you could work and roughly what you "
+            f"could spend, for you to review. {sentinel}"
+        ).strip(),
         "proposed_updates": [
             {
                 "field": "cities",
@@ -88,6 +100,44 @@ def interview_answer(
     }
 
 
+@dataclass
+class _Ending:
+    """How the response being streamed ends: what a provider reports after its last delta."""
+
+    finish_reason: Any = None
+    provider_details: dict[str, Any] | None = None
+    break_after: int | None = None  # deltas sent before the connection breaks
+
+
+class _StreamingFunctionModel(FunctionModel):
+    """A `FunctionModel` whose streamed responses can end the way a provider's do: with a
+    finish reason, provider details or a broken connection."""
+
+    def __init__(self, respond: Callable[..., ModelResponse], ending: _Ending) -> None:
+        self._respond = respond
+        self._ending = ending
+        super().__init__(respond, stream_function=self._stream, model_name=FAKE_MODEL_NAME)
+
+    async def _stream(self, messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        response = self._respond(messages, info)  # raises for request-level failures
+        self._ending.finish_reason = response.finish_reason
+        self._ending.provider_details = response.provider_details
+        text = "".join(p.content for p in response.parts if isinstance(p, TextPart))
+        chunks = [text[i : i + STREAM_CHUNK] for i in range(0, len(text), STREAM_CHUNK)] or [""]
+        for index, chunk in enumerate(chunks):
+            if self._ending.break_after is not None and index == self._ending.break_after:
+                raise ModelConnectionError(FAKE_MODEL_NAME, "stream broken", phase="read")
+            yield chunk
+
+    @asynccontextmanager
+    async def request_stream(self, *args: Any, **kwargs: Any) -> AsyncIterator[StreamedResponse]:
+        async with super().request_stream(*args, **kwargs) as streamed:
+            # The stream function has started (its first item is peeked), so the ending is set.
+            streamed.finish_reason = self._ending.finish_reason
+            streamed.provider_details = self._ending.provider_details
+            yield streamed
+
+
 def fake_model_builder(
     *,
     delay_s: float = 0.0,
@@ -100,6 +150,7 @@ def fake_model_builder(
 
     def build(model_id: str, api_key: SecretStr | None) -> Model:
         echoed = api_key.get_secret_value()[:20] if api_key else ""
+        ending = _Ending()
 
         def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
             call = next(calls)
@@ -107,12 +158,15 @@ def fake_model_builder(
                 with call_log.open("a", encoding="utf-8") as log:
                     log.write(f"call {call}\n")
             time.sleep(delay_s)
+            ending.break_after = None
             if failure is FakeFailure.AUTH_ECHO:
                 body = {"code": "invalid_api_key", "message": f"Incorrect API key {echoed}..."}
                 raise ModelHTTPError(401, model_id, body)
             if failure is FakeFailure.RATE_LIMIT_ONCE and call == 0:
                 raise ModelHTTPError(429, model_id, {"message": f"Slow down, key {echoed}"})
-            if failure is FakeFailure.ALWAYS_UNAVAILABLE:
+            if failure is FakeFailure.ALWAYS_UNAVAILABLE or (
+                failure is FakeFailure.INVALID_THEN_UNAVAILABLE and call % 2 == 1
+            ):
                 raise ModelHTTPError(503, model_id, {"message": f"Unavailable for {echoed}"})
             if failure is FakeFailure.CONNECTION_ERROR:
                 raise ModelConnectionError(model_id, f"reset talking as {echoed}", phase="read")
@@ -128,10 +182,16 @@ def fake_model_builder(
             context = _context(messages)
             if context is not None:
                 valid = not (
-                    failure is FakeFailure.INVALID_ALWAYS
+                    failure in (FakeFailure.INVALID_ALWAYS, FakeFailure.INVALID_THEN_UNAVAILABLE)
                     or (failure is FakeFailure.INVALID_ONCE and call == 0)
                 )
-                text = json.dumps(interview_answer(context, output_sentinel, valid=valid))
+                answer = interview_answer(context, output_sentinel, valid=valid)
+                if failure is FakeFailure.SCHEMA_INVALID_ALWAYS:
+                    answer["ready_for_review"] = "yes"  # complete JSON, wrong type
+                    del answer["missing_critical_fields"]
+                if failure is FakeFailure.CUT_MID_STREAM:
+                    ending.break_after = 3
+                text = json.dumps(answer)
             else:
                 title = f"Workforce Training Coordinator {output_sentinel}".strip()
                 text = json.dumps(
@@ -152,6 +212,6 @@ def fake_model_builder(
                 response.usage = RequestUsage(input_tokens=5, cache_read_tokens=9, output_tokens=7)
             return response
 
-        return FunctionModel(respond, model_name=FAKE_MODEL_NAME)
+        return _StreamingFunctionModel(respond, ending)
 
     return build

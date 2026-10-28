@@ -240,14 +240,15 @@ def insert_attempt(
     credential_id: uuid.UUID | None = None,
     outcome: str | None = None,
 ) -> int:
+    """An attempt that makes no provider call (`SpendState.NONE`) records a known zero cost."""
     finished = "clock_timestamp()" if outcome is not None else "NULL"
     return int(
         tx.execute(
             sa.text(
                 "INSERT INTO nessa.model_attempts (run_id, workspace_id, model_id, credential_id, "
-                "period_start, reserved_nano_usd, spend_state, outcome, finished_at) VALUES "
-                "(:run, :ws, :model, :credential, :period, :reserved, :state, :outcome, "
-                f"{finished}) RETURNING attempt_id"
+                "period_start, reserved_nano_usd, spend_state, cost_nano_usd, outcome, "
+                "finished_at) VALUES (:run, :ws, :model, :credential, :period, :reserved, "
+                f":state, :cost, :outcome, {finished}) RETURNING attempt_id"
             ),
             {
                 "run": run.run_id,
@@ -257,6 +258,7 @@ def insert_attempt(
                 "period": period,
                 "reserved": reserved_nano_usd,
                 "state": spend_state.value,
+                "cost": 0 if spend_state is SpendState.NONE else None,
                 "outcome": outcome,
             },
         ).scalar_one()

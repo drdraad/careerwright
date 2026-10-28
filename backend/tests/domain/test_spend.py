@@ -6,6 +6,8 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from nessa.config import ApiSettings
+from nessa.identity.records import RunKind
 from nessa.identity.spend import (
     BudgetScope,
     SpendLimits,
@@ -14,6 +16,8 @@ from nessa.identity.spend import (
     period_start,
     refused_scope,
 )
+from nessa.identity.workflow import ACTIVITY_MAX_ATTEMPTS
+from nessa.worker import TASKS
 
 LIMITS = SpendLimits(run_limit_nano_usd=1_000, period_limit_nano_usd=5_000)
 
@@ -67,6 +71,20 @@ def test_the_spend_period_is_the_utc_calendar_month() -> None:
 def test_limits_cannot_be_negative() -> None:
     with pytest.raises(ValueError, match="negative"):
         SpendLimits(run_limit_nano_usd=-1, period_limit_nano_usd=0)
+
+
+@pytest.mark.req("MODEL-04", "MODEL-08")
+@pytest.mark.parametrize("kind", list(TASKS))
+def test_the_default_run_limit_fits_every_step_retry_on_the_production_model(
+    kind: RunKind,
+) -> None:
+    # Retried attempts that fail without usage each keep their full reservation; if they
+    # did not all fit, a provider outage would be reported as an exceeded budget.
+    default = ApiSettings.model_fields["default_run_spend_limit_nano_usd"].default
+    production = ApiSettings.model_fields["meta_production_model"].default
+    worst_case = TASKS[kind].worst_case_nano_usd(production)
+
+    assert ACTIVITY_MAX_ATTEMPTS * worst_case <= default
 
 
 @given(

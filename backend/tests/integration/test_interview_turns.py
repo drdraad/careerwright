@@ -244,6 +244,43 @@ def test_an_unavailable_model_ends_provider_unavailable_with_the_profile_intact(
     assert scenario.profile()["version"] == 1
 
 
+@pytest.mark.req("MODEL-04", "MODEL-08")
+def test_a_standard_model_outage_ends_provider_unavailable_within_the_default_limits(
+    infra: Infra, api: ApiClient, ada: str, tmp_path: Path
+) -> None:
+    personal = make_scenario(infra, api, ada, tmp_path, synthetic=False)
+
+    turn = run_turn(personal, "", fake_failure="always_unavailable")
+
+    assert turn["run"]["model_id"] == "muse-spark-1.3"
+    assert (turn["run"]["status"], turn["run"]["failure_class"]) == (
+        "provider_unavailable",
+        "provider_unavailable",
+    )  # the outage, never "over budget": every retry fits the default run limit
+    attempts = personal.attempts(turn["turn_id"])
+    assert [a["spend_state"] for a in attempts] == ["unknown"] * 3
+    assert all(a["reserved_nano_usd"] == 49_000_000 for a in attempts)
+
+
+@pytest.mark.req("MODEL-08")
+def test_a_repair_request_that_fails_without_usage_keeps_the_whole_reservation(
+    scenario: Scenario,
+) -> None:
+    turn = run_turn(scenario, "", fake_failure="invalid_then_unavailable")
+
+    assert turn["run"]["status"] == "provider_unavailable"
+    attempts = scenario.attempts(turn["turn_id"])
+    assert len(attempts) == 3
+    for attempt in attempts:
+        # The first request reported usage; the repair may have been billed but reported
+        # nothing, so the attempt's cost is unknown and its full reservation stays committed.
+        assert attempt["requests_sent"] == 2
+        assert (attempt["spend_state"], attempt["cost_nano_usd"]) == ("unknown", None)
+        assert attempt["reserved_nano_usd"] == 3_500_000
+    spend = scenario.api.get(f"/v1/workspaces/{scenario.workspace_id}/spend", scenario.token)
+    assert spend.json()["period_committed_nano_usd"] == 3 * 3_500_000
+
+
 def set_limits(scenario: Scenario, run_limit: int) -> None:
     base = f"/v1/workspaces/{scenario.workspace_id}/spend"
     current = scenario.api.get(base, scenario.token).json()["version"]
@@ -287,7 +324,8 @@ def test_budget_exhaustion_refuses_a_turn_before_and_after_it_is_queued(
     shown = scenario.turn(turn["turn_id"])
     assert (shown["run"]["status"], shown["run"]["failure_class"]) == ("failed", "budget_exceeded")
     [attempt] = scenario.attempts(turn["turn_id"])
-    assert attempt["spend_state"] == "none"  # refused before any call
+    # Refused before any call: a known zero, not an unknown cost.
+    assert (attempt["spend_state"], attempt["cost_nano_usd"]) == ("none", 0)
     assert scenario.profile()["version"] == 1
 
 
@@ -395,9 +433,9 @@ def test_a_demo_workspace_interviews_offline_with_the_labelled_fixture_interview
     [attempt] = scenario.attempts(turn_id)
     assert (attempt["spend_state"], attempt["cost_nano_usd"], attempt["reserved_nano_usd"]) == (
         "none",
-        None,
         0,
-    )  # no provider, no key, no charge
+        0,
+    )  # no provider, no key: a known zero charge
     decided = demo_runtime_api.write(
         "POST",
         f"/v1/workspaces/{workspace}/interview/turns/{turn_id}/decision",

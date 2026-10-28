@@ -167,8 +167,12 @@ class Scenario:
         ]
 
 
-def make_scenario(infra: Infra, api: ApiClient, token: str, log_dir: Path) -> Scenario:
-    workspace_id = api.create_workspace(token, "Durable run (synthetic)")["workspace_id"]
+def make_scenario(
+    infra: Infra, api: ApiClient, token: str, log_dir: Path, *, synthetic: bool = True
+) -> Scenario:
+    """`synthetic=False` makes a personal-data workspace, whose runs use the Standard model."""
+    name = "Durable run (synthetic)" if synthetic else "Durable run (personal)"
+    workspace_id = api.create_workspace(token, name, synthetic=synthetic)["workspace_id"]
     # No fixed prefix: every 12-character window must be secret material, or the fragment
     # scan matches public strings (a Sprint 0 false positive).
     api_key = secrets.token_urlsafe(32)

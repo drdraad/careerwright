@@ -121,6 +121,7 @@ class _CallResult:
     reasoning_tokens: int | None
     response_id: str | None
     requests_sent: int
+    responses: int
 
 
 def succeeded(output_id: uuid.UUID) -> Outcome:
@@ -318,8 +319,9 @@ def _call(rt: ActivityRuntime, ready: _Ready) -> _CallResult:
             if _truncated(messages):  # never accept an output cut off at its limit
                 classified, output = terminal(FailureClass.OUTPUT_TRUNCATED), None
         requests = sum(isinstance(m, ModelRequest) for m in messages)
+        responses = sum(isinstance(m, ModelResponse) for m in messages)
         if ready.mode is ModelMode.FIXTURE:
-            return _CallResult(output, classified, None, None, None, requests)
+            return _CallResult(output, classified, None, None, None, requests, responses)
         try:
             usage, reasoning, response_id = _usage(messages)
         except ValueError as error:
@@ -327,18 +329,22 @@ def _call(rt: ActivityRuntime, ready: _Ready) -> _CallResult:
             # report is inconsistent, so the cost is unknown and the output is not accepted.
             classified = classified or classify_failure(error)
             output, usage, reasoning, response_id = None, None, None, None
-    return _CallResult(output, classified, usage, reasoning, response_id, requests)
+    return _CallResult(output, classified, usage, reasoning, response_id, requests, responses)
 
 
-def _spend_state(ready: _Ready, cost: int | None) -> SpendState:
+def _spend(ready: _Ready, call: _CallResult) -> tuple[SpendState, int | None]:
+    """The attempt's spend state and cost (None: unknown)."""
     if ready.mode is ModelMode.FIXTURE:
-        return SpendState.NONE  # no provider call was made
-    # No reported usage: the request may still have been billed, so the cost stays unknown.
-    return SpendState.RECONCILED if cost is not None else SpendState.UNKNOWN
+        return SpendState.NONE, 0  # no provider call was made
+    # A request with no reported usage may still have been billed, so the cost stays unknown
+    # and the whole reservation stays committed, even when an earlier request reported usage.
+    if call.usage is None or call.responses < call.requests_sent:
+        return SpendState.UNKNOWN, None
+    return SpendState.RECONCILED, estimate_cost_nano_usd(ready.run.model_id, call.usage)
 
 
 def _settle(rt: ActivityRuntime, ready: _Ready, call: _CallResult) -> ActivityEnd:
-    cost = estimate_cost_nano_usd(ready.run.model_id, call.usage) if call.usage else None
+    spend_state, cost = _spend(ready, call)
     with run_transaction(rt.engine, ready.run.run_id) as tx:
         if call.output is None:
             classified = call.classified or terminal(FailureClass.UNKNOWN_FAILURE)
@@ -363,7 +369,7 @@ def _settle(rt: ActivityRuntime, ready: _Ready, call: _CallResult) -> ActivityEn
             reasoning_tokens=call.reasoning_tokens,
             provider_response_id=call.response_id,
             cost_nano_usd=cost,
-            spend_state=_spend_state(ready, cost),
+            spend_state=spend_state,
             requests_sent=call.requests_sent,
         )
     return end

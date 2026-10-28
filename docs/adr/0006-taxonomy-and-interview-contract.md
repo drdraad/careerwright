@@ -117,8 +117,12 @@ decision 7 requires the first run kind that reads the profile to pin the version
    only transient provider failures and the activity's store budget only store failures. An
    attempt can therefore send two requests: its spend reservation covers both at their
    bounds (input 14,500 tokens, output 1,500), $0.049 on the Standard model and $0.0035 on
-   the test model, and the attempt records the requests it sent (`requests_sent`). Under the
-   default $0.10 run limit two Standard attempts fit; a third would be refused by the budget.
+   the test model, and the attempt records the requests it sent (`requests_sent`). An
+   attempt that sent more requests than it got responses (a repair that failed without
+   usage) is `unknown` and keeps its whole reservation, never part-reconciled (MODEL-08).
+   The default run limit is $0.15 so that all three of the DBOS step's attempts fit on the
+   Standard model: a Meta outage ends `provider_unavailable`, never `budget_exceeded` (fix
+   round 1). An attempt that makes no provider call records a known cost of 0.
    A response cut off at its token limit is `output_truncated` from its typed finish reason,
    never parsed or stored; a content-filter refusal is `model_refused` and is not retried.
 

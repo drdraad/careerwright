@@ -256,7 +256,9 @@ class AttemptOut(ResponseModel):
     outcome: str | None
     spend_state: SpendState
     reserved_nano_usd: int
-    cost_nano_usd: int | None = Field(description="null: unknown, never zero.")
+    cost_nano_usd: int | None = Field(
+        description="0 when no provider call was made (spend_state none); null: unknown."
+    )
     input_tokens: int | None
     output_tokens: int | None
     requests_sent: int | None = Field(

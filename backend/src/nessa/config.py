@@ -115,8 +115,11 @@ class ApiSettings(_LocalSettings, _ModelSettings):
     internal_network_clients: bool = Field(
         default=False, validation_alias="NESSA_API_INTERNAL_NETWORK_CLIENTS"
     )
+    # $0.15: the DBOS step's three attempts of the costliest run kind (an interview turn,
+    # $0.049 worst case on the production model) all fit, so an outage is never reported as
+    # an exceeded budget.
     default_run_spend_limit_nano_usd: int = Field(
-        default=100_000_000, ge=0, validation_alias="NESSA_DEFAULT_RUN_SPEND_LIMIT_NANO_USD"
+        default=150_000_000, ge=0, validation_alias="NESSA_DEFAULT_RUN_SPEND_LIMIT_NANO_USD"
     )
     default_period_spend_limit_nano_usd: int = Field(
         default=1_000_000_000, ge=0, validation_alias="NESSA_DEFAULT_PERIOD_SPEND_LIMIT_NANO_USD"

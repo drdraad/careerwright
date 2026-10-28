@@ -9,7 +9,6 @@ from typing import Any
 
 import pytest
 
-from nessa.identity.model_registry import ModelMode
 from nessa.money import Money
 from nessa.profile.document import (
     FIELD_NAMES,
@@ -248,12 +247,11 @@ def test_the_output_schema_stays_within_strict_mode() -> None:
 
 
 @pytest.mark.req("MODEL-08")
-def test_an_attempt_reserves_both_requests_at_their_bounds_within_the_default_run_limit() -> None:
+def test_an_attempt_reserves_both_requests_at_their_bounds() -> None:
     # Input bound 8,500 + 2,500 + 1,500 + 2,000 = 14,500 tokens, output 1,500, two requests.
     # Contributor: (14,500 x 100 + 1,500 x 200) x 2 = 3,500,000 nano-USD ($0.0035).
     # Standard: (14,500 x 1,250 + 1,500 x 4,250) x 2 = 49,000,000 nano-USD ($0.049).
+    # (That every step retry fits the default run limit: tests/domain/test_spend.py.)
     assert worst_case_nano_usd("muse-spark-1.3-contributor") == 3_500_000
     assert worst_case_nano_usd("muse-spark-1.3") == 49_000_000
-    assert 2 * worst_case_nano_usd("muse-spark-1.3") <= 100_000_000  # two attempts fit $0.10
-    assert ModelMode.FIXTURE.value == "fixture"
     assert worst_case_nano_usd("nessa-fixture-interviewer-1") == 0

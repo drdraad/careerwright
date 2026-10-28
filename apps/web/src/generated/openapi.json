@@ -2551,7 +2551,7 @@
               }
             ],
             "title": "Cost Nano Usd",
-            "description": "null: unknown, never zero."
+            "description": "0 when no provider call was made (spend_state none); null: unknown."
           },
           "input_tokens": {
             "anyOf": [

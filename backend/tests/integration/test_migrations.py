@@ -184,3 +184,47 @@ def add_edited_workspace(tx: sa.Connection) -> uuid.UUID:
             tx, workspace.workspace_id, EventKind.PROFILE_VERSION_CREATED, str(version)
         )
     return workspace.workspace_id
+
+
+@pytest.mark.req("MODEL-08")
+def test_attempts_that_made_no_call_upgrade_to_a_known_zero_cost(infra: Infra) -> None:
+    database = f"nessa_zero_cost_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    engine = migrator_engine(infra, database)
+    try:
+        migrate_app(engine, "0005")
+        seed(engine, infra.ops_settings(database))
+        with engine.begin() as tx:
+            workspace = add_edited_workspace(tx)
+            for state, cost in (("none", None), ("reconciled", 40_000), ("unknown", None)):
+                run = uuid.uuid4()
+                tx.exec_driver_sql(
+                    "INSERT INTO nessa.runs (run_id, workspace_id, data_mode, synthetic, kind, "
+                    "requested_by, model_id, model_mode, status) SELECT %(run)s, workspace_id, "
+                    "data_mode, synthetic, 'connection_check', owner_actor_id, "
+                    "'muse-spark-1.3-contributor', 'contributor', 'queued' "
+                    "FROM nessa.workspaces WHERE workspace_id = %(ws)s",
+                    {"run": run, "ws": workspace},
+                )
+                tx.exec_driver_sql(
+                    "INSERT INTO nessa.model_attempts (run_id, workspace_id, model_id, "
+                    "period_start, spend_state, cost_nano_usd, finished_at, outcome) VALUES "
+                    "(%(run)s, %(ws)s, 'muse-spark-1.3-contributor', date '2026-10-01', "
+                    "%(state)s, %(cost)s, clock_timestamp(), 'x')",
+                    {"run": run, "ws": workspace, "state": state, "cost": cost},
+                )
+
+        migrate_app(engine)
+    finally:
+        engine.dispose()
+
+    rows = infra.query(
+        "SELECT spend_state, cost_nano_usd FROM nessa.model_attempts ORDER BY spend_state",
+        database=database,
+    )
+    # No call was made, so the cost is known: zero. Unknown stays unknown.
+    assert rows == [
+        {"spend_state": "none", "cost_nano_usd": 0},
+        {"spend_state": "reconciled", "cost_nano_usd": 40_000},
+        {"spend_state": "unknown", "cost_nano_usd": None},
+    ]

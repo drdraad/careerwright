@@ -73,7 +73,7 @@ export type AttemptOut = {
     /**
      * Cost Nano Usd
      *
-     * null: unknown, never zero.
+     * 0 when no provider call was made (spend_state none); null: unknown.
      */
     cost_nano_usd: number | null;
     /**
