@@ -21,7 +21,9 @@ free calls (ruling R5). Generated from `live-usage.jsonl` by
 - Budgets: `task-1-sprint-0` (Sprint 0 spike): at most 15 calls, 5 on the production
   model, $0.30 worst case. `live-smoke` (`make live-smoke`): each invocation at most
   3 calls, none on the production model unless `PRODUCTION=1`, and a worst-case cost
-  cap; both enforced in `backend/tools/live_smoke.py` before the stack starts.
+  cap; cumulatively at most 9 calls, 3 on the production model and $0.30 worst case
+  (unknown costs count their full reservation; `NESSA_LIVE_SMOKE_*` changes them).
+  Both are enforced in `backend/tools/live_smoke.py` before the stack starts.
 
 | # | UTC time | Scope | Purpose | Model | Endpoint | Outcome | In (cached) | Out (reasoning) | Searches | Est. cost | Running total | Response ID |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|

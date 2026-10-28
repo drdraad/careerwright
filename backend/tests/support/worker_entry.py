@@ -10,6 +10,7 @@ a named moment, so DBOS recovery is exercised rather than simulated:
 import os
 import signal
 from datetime import UTC, datetime
+from pathlib import Path
 
 from nessa.config import WorkerSettings
 from nessa.db import create_engine, url_with_password
@@ -51,6 +52,7 @@ def main() -> None:
             delay_s=float(os.environ.get("NESSA_TEST_FAKE_DELAY_S", "0")),
             failure=FakeFailure(failure) if failure else None,
             output_sentinel=os.environ.get("NESSA_TEST_OUTPUT_SENTINEL", ""),
+            call_log=Path(log) if (log := os.environ.get("NESSA_TEST_CALL_LOG")) else None,
         ),
         clock=lambda: datetime.now(UTC),
         store_retry_budget_s=float(

@@ -4,14 +4,20 @@ Ruling R5. The key is read from the repository's gitignored `.env` into a `Secre
 is never a command argument and never printed. An isolated stack (its own Compose project,
 ports, NESSA_HOME and volumes, removed afterwards) runs in live mode. The key travels the
 product path: stored through the API with consent, sealed at once, opened only inside the
-worker's bounded activity, which makes the call. Afterwards every attempt is appended to
+worker's bounded activity, which makes the call. Afterwards the worker is stopped, so no
+further call can start, and then every attempt of the smoke workspace is appended to
 `docs/evidence/live-usage.jsonl` (and the Markdown table) with its cost, even if the run
-failed, and both databases, every container log and the API's own responses are scanned
-for the key.
+failed. Both databases, every container log and the API's own responses are scanned for
+the key.
 
-Caps, checked before anything starts: at most ACTIVITY_MAX_ATTEMPTS calls (the run's retry
-budget), none on the production model unless `--production-model` (`PRODUCTION=1`), and a
-worst-case cost cap. The test model is a Contributor model, so the workspace is synthetic.
+Caps, checked before anything starts:
+- per invocation: at most ACTIVITY_MAX_ATTEMPTS calls (the run's retry budget, also set as
+  the workspace's run spend limit, so the product's own reservation enforces it), none on
+  the production model unless `--production-model` (`PRODUCTION=1`), and a worst-case cost
+  cap;
+- per budget scope, cumulative over the ledger: calls, production calls and worst-case cost
+  (`ScopeBudget`; conservative defaults, configurable through `NESSA_LIVE_SMOKE_*`).
+The test model is a Contributor model, so the workspace is synthetic.
 
 Run from `backend/`: `uv run --locked python -m tools.live_smoke [--production-model]`.
 """
@@ -23,8 +29,11 @@ import sys
 import tempfile
 import time
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import httpx2
 import psycopg
@@ -34,19 +43,31 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from nessa.identity import connection_check
+from nessa.identity.activity import STORE_RETRY_BUDGET_S
+from nessa.identity.meta import REQUEST_TIMEOUT_S
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.model_registry import format_usd
-from nessa.identity.workflow import ACTIVITY_MAX_ATTEMPTS
+from nessa.identity.workflow import (
+    ACTIVITY_BACKOFF_RATE,
+    ACTIVITY_INTERVAL_S,
+    ACTIVITY_MAX_ATTEMPTS,
+)
 from tools.leak_scan import Finding, Needle, scan
 from tools.localenv import REPO_ROOT, ensure_local_home
 from tools.stack import CORE_SERVICES, Ports, Stack
-from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry
+from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry, ScopeSpend
 
-BUDGET_SCOPE = "live-smoke"
 MAX_CALLS = ACTIVITY_MAX_ATTEMPTS
 MAX_COST_NANO_USD = 100_000_000  # $0.10 worst case per invocation
 SMOKE_PORTS = Ports(api=57800, auth=57899, postgres=57832, web=57900)
-RUN_TIMEOUT_S = 240.0
+# The run's worst case: every attempt times out, with the step's backoff between attempts
+# and the activity's store budget, plus a minute for the stack's own latency.
+RUN_TIMEOUT_S = (
+    MAX_CALLS * REQUEST_TIMEOUT_S
+    + sum(ACTIVITY_INTERVAL_S * ACTIVITY_BACKOFF_RATE**i for i in range(MAX_CALLS - 1))
+    + STORE_RETRY_BUDGET_S
+    + 60.0
+)
 RESPONSES_ENDPOINT = "POST /v1/responses"
 PURPOSE = "connection check via API, outbox and DBOS worker (key opened just in time)"
 
@@ -63,14 +84,43 @@ class SmokeSettings(BaseSettings):
     meta_production_model: str = Field(
         default="muse-spark-1.3", validation_alias="NESSA_META_PRODUCTION_MODEL"
     )
+    # The cumulative budget scope (ruling R5). Defaults: three smoke invocations, one of them
+    # on the production model, and $0.30 worst case in all.
+    budget_scope: str = Field(default="live-smoke", validation_alias="NESSA_LIVE_SMOKE_SCOPE")
+    scope_max_calls: int = Field(default=9, ge=0, validation_alias="NESSA_LIVE_SMOKE_MAX_CALLS")
+    scope_max_production_calls: int = Field(
+        default=3, ge=0, validation_alias="NESSA_LIVE_SMOKE_MAX_PRODUCTION_CALLS"
+    )
+    scope_max_cost_nano_usd: int = Field(
+        default=300_000_000, ge=0, validation_alias="NESSA_LIVE_SMOKE_MAX_COST_NANO_USD"
+    )
+
+    def budget(self) -> "ScopeBudget":
+        return ScopeBudget(
+            self.budget_scope,
+            self.scope_max_calls,
+            self.scope_max_production_calls,
+            self.scope_max_cost_nano_usd,
+        )
+
+
+@dataclass(frozen=True)
+class ScopeBudget:
+    scope: str
+    max_calls: int
+    max_production_calls: int
+    max_cost_nano_usd: int  # known costs plus the full reservation of every unknown one
 
 
 class CapExceededError(SystemExit):
     pass
 
 
-def authorise(models: ModelChoice, *, production: bool) -> tuple[str, int]:
-    """The model this invocation may use and its worst case, or refuse before any call."""
+def authorise(
+    models: ModelChoice, *, production: bool, budget: ScopeBudget, spent: ScopeSpend
+) -> tuple[str, int]:
+    """The model this invocation may use and its worst case, or refuse before any call:
+    both this invocation's caps and what is left of the scope's cumulative budget."""
     model_id = models.production.model_id if production else models.test.model_id
     if models.is_production(model_id) and not production:
         raise CapExceededError("the test model is the production model: pass --production-model")
@@ -79,33 +129,57 @@ def authorise(models: ModelChoice, *, production: bool) -> tuple[str, int]:
         raise CapExceededError(
             f"worst case {format_usd(worst_case)} exceeds the cap {format_usd(MAX_COST_NANO_USD)}"
         )
+    if spent.calls + MAX_CALLS > budget.max_calls:
+        raise CapExceededError(
+            f"scope {budget.scope}: {spent.calls} of {budget.max_calls} calls used, "
+            f"{MAX_CALLS} more needed"
+        )
+    if models.is_production(model_id) and (
+        spent.production_calls + MAX_CALLS > budget.max_production_calls
+    ):
+        raise CapExceededError(
+            f"scope {budget.scope}: {spent.production_calls} of {budget.max_production_calls} "
+            f"production calls used, {MAX_CALLS} more needed"
+        )
+    if spent.committed_nano_usd + worst_case > budget.max_cost_nano_usd:
+        raise CapExceededError(
+            f"scope {budget.scope}: {format_usd(spent.committed_nano_usd)} of "
+            f"{format_usd(budget.max_cost_nano_usd)} committed, worst case "
+            f"{format_usd(worst_case)} more"
+        )
     return model_id, worst_case
 
 
-def _sign_in(stack: Stack) -> str:
-    response = httpx2.post(
-        f"{stack.auth_url}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword",
-        params={"key": "emulator"},
-        json={"email": "ada@nessa.test", "password": "nessa-demo-ada", "returnSecureToken": True},
-        timeout=20,
-    )
-    response.raise_for_status()
-    return str(response.json()["idToken"])
+class SmokeTarget(Protocol):
+    """A running Nessa the smoke drives: the isolated Compose stack (`StackTarget`), or in
+    tests the integration stack with a fake-model worker."""
+
+    @property
+    def http(self) -> httpx2.Client: ...  # base URL: the API
+
+    @property
+    def web_origin(self) -> str: ...
+
+    def sign_in(self) -> str: ...
+
+    def superuser_url(self, database: str) -> str: ...
+
+    def stop_worker(self) -> None: ...  # no model call can start after this returns
+
+    def logs(self) -> str: ...
 
 
 class Api:
-    def __init__(self, stack: Stack, token: str) -> None:
-        self._stack = stack
+    def __init__(self, target: SmokeTarget, token: str) -> None:
+        self._target = target
         self._token = token
         self.responses: list[tuple[str, str]] = []
 
     def call(self, method: str, path: str, body: object = None) -> dict[str, Any]:
         headers = {"Authorization": f"Bearer {self._token}"}
         if method != "GET":
-            headers |= {"Origin": self._stack.web_origin, "Idempotency-Key": str(uuid.uuid4())}
-        response = httpx2.request(
-            method, f"{self._stack.api_url}{path}", json=body, headers=headers, timeout=30
-        )
+            headers |= {"Origin": self._target.web_origin, "Idempotency-Key": str(uuid.uuid4())}
+        response = self._target.http.request(method, path, json=body, headers=headers)
         self.responses.append((f"{method} {path} -> {response.status_code}", response.text))
         if response.status_code >= 400:
             raise RuntimeError(f"{method} {path} failed: {response.json()['error']['code']}")
@@ -113,20 +187,18 @@ class Api:
         return result
 
 
-def _superuser(stack: Stack, database: str) -> str:
-    password = (stack.home / "secrets" / "pg_superuser").read_text().strip()
-    return f"postgresql://postgres:{password}@127.0.0.1:{stack.ports.postgres}/{database}"
-
-
-def _all_attempts(stack: Stack) -> list[dict[str, Any]]:
-    """Every attempt in the smoke database, which exists for this invocation only, so no call
-    escapes the ledger even if the client never learned its run ID."""
-    with psycopg.connect(_superuser(stack, "nessa_app"), row_factory=dict_row) as conn:
-        return conn.execute("SELECT * FROM nessa.model_attempts ORDER BY attempt_id").fetchall()
+def _workspace_attempts(target: SmokeTarget, workspace_id: str) -> list[dict[str, Any]]:
+    """Every attempt of the smoke workspace, whichever run made it, so no call escapes the
+    ledger even if the client never learned its run ID."""
+    with psycopg.connect(target.superuser_url("nessa_app"), row_factory=dict_row) as conn:
+        return conn.execute(
+            "SELECT * FROM nessa.model_attempts WHERE workspace_id = %s ORDER BY attempt_id",
+            (workspace_id,),
+        ).fetchall()
 
 
 def ledger_attempts(
-    ledger: Ledger, attempts: list[dict[str, Any]], *, production_model: str
+    ledger: Ledger, attempts: list[dict[str, Any]], *, scope: str, production_model: str
 ) -> list[int]:
     """One ledger row per attempt that reached the provider (a reservation was taken)."""
     seqs = []
@@ -136,7 +208,7 @@ def ledger_attempts(
         outcome = attempt["outcome"] or "unfinished"
         record = ledger.append(
             LiveCallEntry(
-                budget_scope=BUDGET_SCOPE,
+                budget_scope=scope,
                 purpose=PURPOSE,
                 model_id=attempt["model_id"],
                 is_production_model=attempt["model_id"] == production_model,
@@ -161,14 +233,14 @@ def ledger_attempts(
 
 
 def ledger_possible_calls(
-    ledger: Ledger, model_id: str, reserved_nano_usd: int, models: ModelChoice
+    ledger: Ledger, model_id: str, reserved_nano_usd: int, models: ModelChoice, *, scope: str
 ) -> list[int]:
     """The attempts could not be read: record every call the run was allowed to make, with an
     unknown cost, rather than nothing."""
     return [
         ledger.append(
             LiveCallEntry(
-                budget_scope=BUDGET_SCOPE,
+                budget_scope=scope,
                 purpose=f"{PURPOSE} (possible call; attempts unreadable)",
                 model_id=model_id,
                 is_production_model=models.is_production(model_id),
@@ -182,10 +254,10 @@ def ledger_possible_calls(
     ]
 
 
-def leak_findings(stack: Stack, api: Api, key: SecretStr) -> tuple[int, list[Finding]]:
+def leak_findings(target: SmokeTarget, api: Api, key: SecretStr) -> tuple[int, list[Finding]]:
     cells: list[tuple[str, str]] = list(api.responses)
     for database in ("nessa_app", "nessa_dbos"):
-        with psycopg.connect(_superuser(stack, database), row_factory=dict_row) as conn:
+        with psycopg.connect(target.superuser_url(database), row_factory=dict_row) as conn:
             tables = conn.execute(
                 "SELECT table_schema, table_name FROM information_schema.tables "
                 "WHERE table_type = 'BASE TABLE' "
@@ -199,54 +271,59 @@ def leak_findings(stack: Stack, api: Api, key: SecretStr) -> tuple[int, list[Fin
                 ).fetchall()
                 name = f"{database}:{table['table_schema']}.{table['table_name']}"
                 cells += [(name, str(row["row"])) for row in rows]
-    cells.append(("container logs", stack.logs()))
+    cells.append(("container logs", target.logs()))
     needles = [Needle("Meta key", key.get_secret_value(), fragment_length=12)]
     return len(cells), scan(cells, needles)
 
 
-def run_smoke(settings: SmokeSettings, *, production: bool, ledger: Ledger) -> int:
-    models = ModelChoice.configure(
-        settings.meta_test_model,
-        settings.meta_production_model,
-        "production" if production else "test",
+@dataclass(frozen=True)
+class SmokeResult:
+    status: str  # the run's final status, or why there is none
+    findings: list[Finding]
+    ledger_seqs: list[int]
+
+
+def smoke(
+    target: SmokeTarget,
+    key: SecretStr,
+    *,
+    model_id: str,
+    worst_case: int,
+    models: ModelChoice,
+    ledger: Ledger,
+    scope: str,
+    run_timeout_s: float = RUN_TIMEOUT_S,
+) -> SmokeResult:
+    """One connection-check run through the product, then the ledger. Once the key is stored
+    the worker may call Meta, so from then on the attempts are ledgered whatever happens,
+    after the worker has stopped."""
+    api = Api(target, target.sign_in())
+    workspace = api.call(
+        "POST",
+        "/v1/workspaces",
+        {"name": "Live smoke (synthetic)", "data_mode": "live_assisted", "synthetic": True},
     )
-    model_id, worst_case = authorise(models, production=production)
-    print(
-        f"live smoke: model {model_id} ({'production' if production else 'test'}); "
-        f"at most {MAX_CALLS} calls, worst case {format_usd(worst_case)}",
-        flush=True,
+    base = f"/v1/workspaces/{workspace['workspace_id']}"
+    # The product's own reservation then refuses any call beyond this invocation's cap.
+    api.call(
+        "PUT",
+        f"{base}/spend/limits",
+        {
+            "expected_version": 0,
+            "run_limit_nano_usd": worst_case,
+            "period_limit_nano_usd": worst_case,
+        },
     )
-    home = Path(tempfile.mkdtemp(prefix="nessa-smoke-"))
-    ensure_local_home(home)
-    stack = Stack(
-        project="nessa-l0-smoke",
-        home=home,
-        ports=SMOKE_PORTS,
-        live=True,
-        overrides=(("NESSA_SYNTHETIC_MODEL_ROLE", "production" if production else "test"),),
-    )
-    key_sent = False
     status = "not started"
     findings: list[Finding] = []
     try:
-        stack.down()
-        stack.build()
-        stack.up(*CORE_SERVICES)
-        api = Api(stack, _sign_in(stack))
-        workspace = api.call(
-            "POST",
-            "/v1/workspaces",
-            {"name": "Live smoke (synthetic)", "data_mode": "live_assisted", "synthetic": True},
-        )
-        base = f"/v1/workspaces/{workspace['workspace_id']}"
-        key_sent = True  # from here on the worker may call Meta
         api.call(
             "POST",
             f"{base}/credentials",
-            {"api_key": settings.api_key.get_secret_value(), "consent_to_encrypted_storage": True},
+            {"api_key": key.get_secret_value(), "consent_to_encrypted_storage": True},
         )
         run_id = str(api.call("POST", f"{base}/runs", {"kind": "connection_check"})["run_id"])
-        deadline = time.monotonic() + RUN_TIMEOUT_S
+        deadline = time.monotonic() + run_timeout_s
         run = api.call("GET", f"{base}/runs/{run_id}")
         while run["status"] in ("queued", "running") and time.monotonic() < deadline:
             time.sleep(1)
@@ -256,24 +333,108 @@ def run_smoke(settings: SmokeSettings, *, production: bool, ledger: Ledger) -> i
         print(f"run {run_id}: {status} {run['failure_class'] or ''}".rstrip(), flush=True)
         if run["output"]:
             print(f"validated output: {run['output']}", flush=True)
-        scanned, findings = leak_findings(stack, api, settings.api_key)
+        scanned, findings = leak_findings(target, api, key)
         print(f"leak scan: {scanned} rows/logs/responses, findings: {findings}", flush=True)
     finally:
-        if key_sent:
-            try:
-                attempts = _all_attempts(stack)
-            except psycopg.Error:
-                seqs = ledger_possible_calls(ledger, model_id, worst_case // MAX_CALLS, models)
-            else:
-                seqs = ledger_attempts(
-                    ledger, attempts, production_model=models.production.model_id
-                )
-            ledger.write_markdown()
-            print(f"ledger rows appended: {seqs}", flush=True)
+        target.stop_worker()  # first: an attempt read while the worker runs could miss one
+        try:
+            attempts = _workspace_attempts(target, workspace["workspace_id"])
+        except psycopg.Error:
+            per_call = worst_case // MAX_CALLS
+            seqs = ledger_possible_calls(ledger, model_id, per_call, models, scope=scope)
+        else:
+            seqs = ledger_attempts(
+                ledger, attempts, scope=scope, production_model=models.production.model_id
+            )
+        ledger.write_markdown()
+        print(f"ledger rows appended: {seqs}", flush=True)
+    return SmokeResult(status, findings, seqs)
+
+
+@dataclass(frozen=True)
+class StackTarget:
+    stack: Stack
+    http: httpx2.Client
+
+    @property
+    def web_origin(self) -> str:
+        return self.stack.web_origin
+
+    def sign_in(self) -> str:
+        response = httpx2.post(
+            f"{self.stack.auth_url}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword",
+            params={"key": "emulator"},
+            json={
+                "email": "ada@nessa.test",
+                "password": "nessa-demo-ada",
+                "returnSecureToken": True,
+            },
+            timeout=20,
+        )
+        response.raise_for_status()
+        return str(response.json()["idToken"])
+
+    def superuser_url(self, database: str) -> str:
+        password = (self.stack.home / "secrets" / "pg_superuser").read_text().strip()
+        return f"postgresql://postgres:{password}@127.0.0.1:{self.stack.ports.postgres}/{database}"
+
+    def stop_worker(self) -> None:
+        self.stack.stop(("worker",))
+
+    def logs(self) -> str:
+        return self.stack.logs()
+
+
+@contextmanager
+def smoke_stack(*, production: bool) -> Iterator[StackTarget]:
+    """An isolated live-mode stack (own project, ports, NESSA_HOME, volumes), removed after."""
+    home = Path(tempfile.mkdtemp(prefix="nessa-smoke-"))
+    ensure_local_home(home)
+    stack = Stack(
+        project="nessa-l0-smoke",
+        home=home,
+        ports=SMOKE_PORTS,
+        live=True,
+        overrides=(("NESSA_SYNTHETIC_MODEL_ROLE", "production" if production else "test"),),
+    )
+    try:
+        stack.down()
+        stack.build()
+        stack.up(*CORE_SERVICES)
+        with httpx2.Client(base_url=stack.api_url, timeout=30) as http:
+            yield StackTarget(stack, http)
+    finally:
         stack.down()
         shutil.rmtree(home, ignore_errors=True)
         print("smoke stack, volumes and keys removed", flush=True)
-    return 0 if status == "complete" and not findings else 1
+
+
+def run_smoke(settings: SmokeSettings, *, production: bool, ledger: Ledger) -> int:
+    models = ModelChoice.configure(
+        settings.meta_test_model,
+        settings.meta_production_model,
+        "production" if production else "test",
+    )
+    budget = settings.budget()
+    model_id, worst_case = authorise(
+        models, production=production, budget=budget, spent=ledger.spent(budget.scope)
+    )
+    print(
+        f"live smoke: model {model_id} ({'production' if production else 'test'}); "
+        f"at most {MAX_CALLS} calls, worst case {format_usd(worst_case)}",
+        flush=True,
+    )
+    with smoke_stack(production=production) as target:
+        result = smoke(
+            target,
+            settings.api_key,
+            model_id=model_id,
+            worst_case=worst_case,
+            models=models,
+            ledger=ledger,
+            scope=budget.scope,
+        )
+    return 0 if result.status == "complete" and not result.findings else 1
 
 
 def main(argv: list[str] | None = None) -> None:

@@ -8,6 +8,7 @@ import json
 import time
 from collections.abc import Callable
 from enum import StrEnum
+from pathlib import Path
 
 from pydantic import SecretStr
 from pydantic_ai.exceptions import ModelConnectionError, ModelHTTPError
@@ -33,8 +34,13 @@ def key_fingerprint(api_key: SecretStr) -> str:
 
 
 def fake_model_builder(
-    *, delay_s: float = 0.0, failure: FakeFailure | None = None, output_sentinel: str = ""
+    *,
+    delay_s: float = 0.0,
+    failure: FakeFailure | None = None,
+    output_sentinel: str = "",
+    call_log: Path | None = None,
 ) -> Callable[[str, SecretStr], Model]:
+    """`call_log`, if given, gets one line per request the moment it "reaches the provider"."""
     calls = itertools.count()
 
     def build(model_id: str, api_key: SecretStr) -> Model:
@@ -42,6 +48,9 @@ def fake_model_builder(
 
         def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
             call = next(calls)
+            if call_log is not None:
+                with call_log.open("a", encoding="utf-8") as log:
+                    log.write(f"call {call}\n")
             time.sleep(delay_s)
             if failure is FakeFailure.AUTH_ECHO:
                 body = {"code": "invalid_api_key", "message": f"Incorrect API key {echoed}..."}

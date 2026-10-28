@@ -13,7 +13,7 @@ Everything runs on this machine (ADR 0001). Run commands from the repository roo
 | `make reset-demo` | Recreates the fixture workspace "P01 demo (synthetic)" only. Event numbers continue, so a resumed stream sees the reset. |
 | `make check` | Formatting, lint, types, fast tests and the fixture validator. No Docker. |
 | `make acceptance` | Integration and stack tests against real PostgreSQL 16, DBOS and the emulator, in separate Compose projects (`nessa-l0-test`, `nessa-l0-stacktest`) and ports. Removes them afterwards. |
-| `make live-smoke` | One real connection-check run on the test model through an isolated stack (`nessa-l0-smoke`), at most 3 calls; ledgered in `docs/evidence/live-usage.*`. `PRODUCTION=1` uses the production model. Reads `META_API_KEY` from `.env`. |
+| `make live-smoke` | One real connection-check run on the test model through an isolated stack (`nessa-l0-smoke`), at most 3 calls, within the `live-smoke` scope's cumulative cap (9 calls, 3 production, $0.30 worst case by default; `NESSA_LIVE_SMOKE_*` changes it). The worker is stopped before the attempts are read, and every attempt is ledgered in `docs/evidence/live-usage.*`. Only `PRODUCTION=1` uses the production model. Reads `META_API_KEY` from `.env`. |
 | `make status` | `docker compose ps` for the stack. |
 
 ## Addresses (127.0.0.1 only)

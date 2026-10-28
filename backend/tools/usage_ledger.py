@@ -4,6 +4,7 @@ is recorded, free and failed calls included. A charge that cannot be determined 
 `unknown` (null), never zero, and counts its full reservation in the running total's caveat.
 """
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -13,7 +14,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from nessa.identity.model_registry import PRICE_SOURCE, format_usd
 
 LEDGER_PATH = Path(__file__).resolve().parents[2] / "docs" / "evidence" / "live-usage.jsonl"
-MARKDOWN_PATH = LEDGER_PATH.with_suffix(".md")
 PRICES_CHECKED_ON = "2026-10-27"
 
 
@@ -51,9 +51,31 @@ class LiveCallRecord(LiveCallEntry):
     recorded_at: datetime
 
 
+@dataclass(frozen=True)
+class ScopeSpend:
+    """What a budget scope has used so far, from the ledger."""
+
+    calls: int
+    production_calls: int
+    committed_nano_usd: int  # known costs plus the full reservation of every unknown one
+
+
 class Ledger:
     def __init__(self, path: Path = LEDGER_PATH) -> None:
         self._path = path
+
+    def spent(self, scope: str) -> ScopeSpend:
+        rows = [r for r in self.records() if r.budget_scope == scope]
+        return ScopeSpend(
+            calls=len(rows),
+            production_calls=sum(r.is_production_model for r in rows),
+            committed_nano_usd=sum(
+                r.reserved_nano_usd
+                if r.estimated_cost_nano_usd is None
+                else r.estimated_cost_nano_usd
+                for r in rows
+            ),
+        )
 
     def records(self) -> list[LiveCallRecord]:
         if not self._path.exists():
@@ -102,8 +124,9 @@ class Ledger:
             )
         return "\n".join([header, *rows])
 
-    def write_markdown(self, path: Path = MARKDOWN_PATH) -> None:
-        path.write_text(
+    def write_markdown(self) -> None:
+        """Render next to the ledger (`live-usage.md` for the real one)."""
+        self._path.with_suffix(".md").write_text(
             "# Live Meta usage log\n\n"
             "Every HTTP call to the Meta Model API made by Nessa tooling, including failures and\n"
             "free calls (ruling R5). Generated from `live-usage.jsonl` by\n"
@@ -125,7 +148,9 @@ class Ledger:
             "- Budgets: `task-1-sprint-0` (Sprint 0 spike): at most 15 calls, 5 on the production\n"
             "  model, $0.30 worst case. `live-smoke` (`make live-smoke`): each invocation at most\n"
             "  3 calls, none on the production model unless `PRODUCTION=1`, and a worst-case cost\n"
-            "  cap; both enforced in `backend/tools/live_smoke.py` before the stack starts.\n\n"
+            "  cap; cumulatively at most 9 calls, 3 on the production model and $0.30 worst case\n"
+            "  (unknown costs count their full reservation; `NESSA_LIVE_SMOKE_*` changes them).\n"
+            "  Both are enforced in `backend/tools/live_smoke.py` before the stack starts.\n\n"
             f"{self.render_markdown_table()}\n",
             encoding="utf-8",
         )
