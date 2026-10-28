@@ -106,12 +106,17 @@ records how they are realised, and the choices a later task must not undo silent
     reconciles it; a failed or interrupted call without reported usage stays `unknown` and
     keeps its full reservation committed. The same rows are the reconciliation record.
 
-11. **Database outage during a run ends typed.** Store failures are transient for the DBOS
-    step (label-only `AppStoreUnavailableError`). When retries run out the run is published
-    `failed/app_store_unavailable` by a step that keeps retrying for about 34 minutes, and an
-    attempt whose result could not be stored is settled as an unknown charge. A workflow that
-    still ends in DBOS `ERROR` is reconciled to a failed run when the worker next passes
-    (implemented, but no test reaches it: that takes more than half an hour of outage).
+11. **Database outage during a run ends typed.** The activity retries its own database
+    work (the attempt row, then the result) for up to 60 seconds, keeping a paid call's
+    result in memory, so a short restart costs nothing and the run completes on that call.
+    Past that budget the store failure is terminal (a step retry would call the model
+    again): the run is published `failed/app_store_unavailable` by a step that keeps
+    retrying for about 34 minutes, and an attempt whose result could not be stored is
+    settled as an unknown charge. A workflow that still ends in DBOS `ERROR` is reconciled
+    on the worker's next reconciliation pass (every 60 seconds, even after a failed pass):
+    a run that has an accepted output is published `complete` with it, otherwise its
+    recorded failure or `unknown_failure`; runs already terminal are left alone. Tested by
+    simulating the `ERROR` state, since reaching it for real takes over half an hour.
 
 12. **Logs.** JSON lines with identifiers and error classes; exception messages are dropped
     (class and frames kept); bearer tokens, JWTs, URL passwords and every process secret are

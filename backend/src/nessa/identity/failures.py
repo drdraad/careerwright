@@ -22,6 +22,7 @@ from pydantic_ai.exceptions import (
 from nessa.db import StoreUnavailableError
 
 TRANSIENT_STATUSES = frozenset({429, 500, 503})
+STORE_LABEL = "transient_store"  # the activity retries it within its own store budget
 
 
 class FailureClass(StrEnum):
@@ -52,13 +53,6 @@ class TransientProviderError(Exception):
     def __init__(self, label: str) -> None:
         super().__init__(f"transient provider failure ({label})")
         self.label = label
-
-
-class AppStoreUnavailableError(Exception):
-    """The application database could not be reached; the DBOS step retries."""
-
-    def __init__(self) -> None:
-        super().__init__("application store unavailable")
 
 
 class LabelledError(Exception):
@@ -98,8 +92,8 @@ def classify_failure(error: BaseException) -> Classified:
         return Classified("transient_request_timeout", None)
     if isinstance(error, UsageLimitExceeded | UnexpectedModelBehavior):
         return terminal(FailureClass.INVALID_MODEL_OUTPUT)
-    if isinstance(error, StoreUnavailableError | AppStoreUnavailableError):
-        return Classified("transient_store", None)
+    if isinstance(error, StoreUnavailableError):
+        return Classified(STORE_LABEL, None)
     return Classified(
         f"{FailureClass.UNKNOWN_FAILURE.value}:{type(error).__name__}", FailureClass.UNKNOWN_FAILURE
     )
@@ -109,8 +103,15 @@ def classify_exhausted(errors: Sequence[BaseException]) -> FailureClass:
     """The failure class once the step's retries are spent, from the last attempt's cause."""
     if not errors:
         return FailureClass.UNKNOWN_FAILURE
-    if isinstance(errors[-1], AppStoreUnavailableError):
-        return FailureClass.APP_STORE_UNAVAILABLE
     if isinstance(errors[-1], TransientProviderError):
         return FailureClass.PROVIDER_UNAVAILABLE
     return FailureClass.UNKNOWN_FAILURE
+
+
+def recorded_failure(label: str | None) -> FailureClass | None:
+    """The terminal failure class an attempt's recorded outcome names, if it names one
+    (`unknown_failure:<class>` included); transient and success labels name none."""
+    try:
+        return FailureClass((label or "").partition(":")[0])
+    except ValueError:
+        return None

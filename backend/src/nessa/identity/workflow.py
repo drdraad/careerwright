@@ -2,10 +2,11 @@
 
 The journal holds the run ID, the outcome (`{"status", "output_id"}` or
 `{"status", "failure_class"}`) and label-only errors. The bounded activity step is the
-only retry owner. When its retries run out, the run ends failed with the class of what was
-unavailable (the provider, or the application database), never as an empty success. The
-outcome is published by a step that keeps retrying through a database outage, so a run
-reaches a typed terminal state once the database is back.
+only retry owner for provider failures; when its retries run out, the run ends
+`provider_unavailable`, never as an empty success. The activity rides out a database
+outage itself (a step retry would call the model again) and ends `app_store_unavailable`
+past its store budget. The outcome is published by a step that keeps retrying through a
+database outage, so a run reaches a typed terminal state once the database is back.
 """
 
 import uuid
@@ -16,7 +17,6 @@ from dbos import error as dbos_error
 from nessa.identity import activity
 from nessa.identity.activity import ActivityRuntime, Outcome
 from nessa.identity.failures import (
-    AppStoreUnavailableError,
     LabelledError,
     TransientProviderError,
     classify_exhausted,
@@ -25,8 +25,9 @@ from nessa.identity.failures import (
 
 WORKFLOW_NAME = "nessa.model_run"
 ACTIVITY_MAX_ATTEMPTS = 3
+ACTIVITY_INTERVAL_S = 1.0
+ACTIVITY_BACKOFF_RATE = 2.0
 PUBLISH_MAX_ATTEMPTS = 12  # backoff 1 s doubling: about 34 minutes of outage
-STORE_LABEL = "transient_store"
 
 _runtime: ActivityRuntime | None = None
 
@@ -43,15 +44,15 @@ def _rt() -> ActivityRuntime:
 
 
 def _is_transient(error: BaseException) -> bool:
-    return isinstance(error, TransientProviderError | AppStoreUnavailableError)
+    return isinstance(error, TransientProviderError)
 
 
 @DBOS.step(
     name="nessa.bounded_model_activity",
     retries_allowed=True,
     max_attempts=ACTIVITY_MAX_ATTEMPTS,
-    interval_seconds=1.0,
-    backoff_rate=2.0,
+    interval_seconds=ACTIVITY_INTERVAL_S,
+    backoff_rate=ACTIVITY_BACKOFF_RATE,
     should_retry=_is_transient,
 )
 def bounded_model_activity(run_id: str) -> Outcome:
@@ -59,8 +60,6 @@ def bounded_model_activity(run_id: str) -> Outcome:
     if end.outcome is not None:
         return end.outcome
     # Raised outside any handler: the exception carries a label and nothing else.
-    if end.label == STORE_LABEL:
-        raise AppStoreUnavailableError()
     raise TransientProviderError(end.label)
 
 

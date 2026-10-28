@@ -2,14 +2,19 @@
 
 ADR 0002's pattern, as product code. The workflow carries only the run ID. This activity,
 under the worker role and row-level security scoped to that run:
-1. ends at once if the run already has an accepted output (a crash after acceptance never
-   re-calls the model, and the first call's usage is already recorded with it);
+1. ends at once if the run already has an accepted output or a recorded terminal failure
+   (a crash after either never re-calls the model, and the first call's usage is already
+   recorded with it);
 2. re-checks that the requester still owns the workspace and is invited, that the pinned
    model is allowed for the workspace's data (Contributor only for synthetic), that an
    unrevoked key exists, and reserves the call's worst-case cost within the spend limits;
 3. records the attempt (the reservation) before the call, then opens the sealed key just in
    time and calls Meta with a plain Pydantic AI agent: no durability capability, no retries;
 4. stores the validated output sealed and the usage on the attempt in one transaction.
+
+Its own database work is retried through an outage for `store_retry_budget_s`, keeping a
+paid call's result in memory; past that budget the run fails `app_store_unavailable`,
+because a DBOS step retry would call the model again.
 
 Every exception is classified from its type alone and its message discarded. Classification
 happens inside the handler; the caller raises outside it, so no provider exception rides
@@ -19,6 +24,7 @@ along as context into DBOS's step-error record or retry log.
 import asyncio
 import hashlib
 import logging
+import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -30,11 +36,18 @@ from pydantic_ai.messages import ModelMessage, ModelResponse
 from pydantic_ai.models import Model
 from pydantic_ai.usage import UsageLimits
 
-from nessa.db import Engine, run_transaction
+from nessa.db import Engine, StoreUnavailableError, Tx, run_transaction
 from nessa.identity import connection_check, credential_store, run_store, store
 from nessa.identity.connection_check import ConnectionCheckResult
 from nessa.identity.credentials import credential_context
-from nessa.identity.failures import Classified, FailureClass, classify_failure, terminal
+from nessa.identity.failures import (
+    STORE_LABEL,
+    Classified,
+    FailureClass,
+    classify_failure,
+    recorded_failure,
+    terminal,
+)
 from nessa.identity.keyring import Keyring, SealedValue
 from nessa.identity.model_registry import ModelMode, Usage, estimate_cost_nano_usd, model_entry
 from nessa.identity.records import EventKind, Run
@@ -44,6 +57,11 @@ from nessa.vocabulary import WorkState
 
 Outcome = dict[str, str]
 ModelBuilder = Callable[[str, SecretStr], Model]
+# How long the activity keeps retrying its own database work (the attempt row, the result)
+# through an outage before the run fails `app_store_unavailable`.
+STORE_RETRY_BUDGET_S = 60.0
+STORE_RETRY_FIRST_DELAY_S = 0.5
+STORE_RETRY_MAX_DELAY_S = 8.0
 _log = logging.getLogger("nessa.activity")
 
 
@@ -55,6 +73,7 @@ class ActivityRuntime:
     keyring: Keyring
     build_model: ModelBuilder
     clock: Callable[[], datetime]
+    store_retry_budget_s: float = STORE_RETRY_BUDGET_S
 
 
 @dataclass(frozen=True)
@@ -116,6 +135,14 @@ def _ended(classified: Classified) -> ActivityEnd:
     )
 
 
+def _recorded_failure(tx: Tx, run_id: uuid.UUID) -> FailureClass | None:
+    for attempt in run_store.attempts(tx, run_id):
+        failure = recorded_failure(attempt.outcome)
+        if failure is not None:
+            return failure
+    return None
+
+
 def _prepare(rt: ActivityRuntime, run_id: uuid.UUID) -> _Ready | ActivityEnd:
     now = rt.clock()
     with run_transaction(rt.engine, run_id) as tx:
@@ -145,6 +172,12 @@ def _prepare(rt: ActivityRuntime, run_id: uuid.UUID) -> _Ready | ActivityEnd:
                 tx, run=run, period=period, spend_state=SpendState.NONE, outcome="reused_accepted"
             )
             return ActivityEnd("reused_accepted", succeeded(existing))
+        recorded = _recorded_failure(tx, run_id)
+        if recorded is not None:
+            run_store.insert_attempt(
+                tx, run=run, period=period, spend_state=SpendState.NONE, outcome="reused_failure"
+            )
+            return ActivityEnd("reused_failure", failed(recorded))
         if run_store.authorised_workspace(tx) != run.workspace_id:
             return refuse(FailureClass.ACCESS_REVOKED)
         if model_entry(run.model_id).mode is ModelMode.CONTRIBUTOR and not run.synthetic:
@@ -208,7 +241,13 @@ def _call(rt: ActivityRuntime, ready: _Ready) -> _CallResult:
             output = None
         else:
             classified = None
-    usage, reasoning, response_id = _usage(messages)
+        try:
+            usage, reasoning, response_id = _usage(messages)
+        except ValueError as error:
+            # Counts the registry rejects (more cached than input tokens): the provider's own
+            # report is inconsistent, so the cost is unknown and the output is not accepted.
+            classified = classified or classify_failure(error)
+            output, usage, reasoning, response_id = None, None, None, None
     return _CallResult(output, classified, usage, reasoning, response_id)
 
 
@@ -245,23 +284,39 @@ def _settle(rt: ActivityRuntime, ready: _Ready, call: _CallResult) -> ActivityEn
     return end
 
 
+def _retrying_store[T](rt: ActivityRuntime, operation: Callable[[], T]) -> T:
+    """Run one transaction, retrying a store failure with backoff until the budget is spent."""
+    deadline = time.monotonic() + rt.store_retry_budget_s
+    delay = STORE_RETRY_FIRST_DELAY_S
+    while True:
+        try:
+            return operation()
+        except StoreUnavailableError:
+            if time.monotonic() + delay > deadline:
+                raise
+        time.sleep(delay)
+        delay = min(delay * 2, STORE_RETRY_MAX_DELAY_S)
+
+
+def _attempt(rt: ActivityRuntime, run_id: uuid.UUID) -> ActivityEnd:
+    prepared = _retrying_store(rt, lambda: _prepare(rt, run_id))
+    if isinstance(prepared, ActivityEnd):
+        return prepared
+    call = _call(rt, prepared)
+    # If storing never succeeds, the attempt stays unfinished and publication settles it as
+    # an unknown charge (the call may have been billed).
+    return _retrying_store(rt, lambda: _settle(rt, prepared, call))
+
+
 def execute(rt: ActivityRuntime, run_id: uuid.UUID) -> ActivityEnd:
     """Never raises: every failure becomes a label and, unless transient, an outcome."""
     try:
-        prepared = _prepare(rt, run_id)
+        end = _attempt(rt, run_id)
     except Exception as error:
-        end = _ended(classify_failure(error))
-    else:
-        if isinstance(prepared, ActivityEnd):
-            end = prepared
-        else:
-            call = _call(rt, prepared)
-            try:
-                end = _settle(rt, prepared, call)
-            except Exception as error:
-                # The call happened but its result could not be stored. The attempt stays
-                # unfinished; the retry marks it interrupted with an unknown cost.
-                end = _ended(classify_failure(error))
+        classified = classify_failure(error)
+        if classified.label == STORE_LABEL:  # the store budget is spent: terminal
+            classified = terminal(FailureClass.APP_STORE_UNAVAILABLE)
+        end = _ended(classified)
     _log.info("activity attempt finished", extra={"run_id": str(run_id), "outcome": end.label})
     return end
 
@@ -295,3 +350,18 @@ def publish(rt: ActivityRuntime, run_id: uuid.UUID, outcome: Outcome) -> None:
                 state=status,
                 detail=detail,
             )
+
+
+def reconcile(rt: ActivityRuntime, run_id: uuid.UUID) -> bool:
+    """Publish the outcome of a run whose workflow ended in DBOS `ERROR`, from the run's own
+    records: its accepted output, else its recorded failure, else `unknown_failure`. A run
+    that is already terminal is left alone. Never calls the model. Returns whether it
+    published."""
+    with run_transaction(rt.engine, run_id) as tx:
+        run = run_store.run(tx, run_id)
+        if run is None or run.status not in (WorkState.QUEUED, WorkState.RUNNING):
+            return False
+        output = run_store.accepted_output(tx, run_id)
+        failure = _recorded_failure(tx, run_id) or FailureClass.UNKNOWN_FAILURE
+    publish(rt, run_id, succeeded(output) if output is not None else failed(failure))
+    return True

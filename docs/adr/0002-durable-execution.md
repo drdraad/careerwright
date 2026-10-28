@@ -61,7 +61,8 @@ Pin this composition for every workflow that touches private data or a credentia
       provider: `NativeOutput` schema mode, `request_limit=1`, output retries 0, OpenAI
       client `max_retries=0`;
    4. persists the validated output sealed, idempotently (one accepted output per run; a
-      re-executed activity reuses the first one and never overwrites it);
+      re-executed activity reuses the first one and never overwrites it, and likewise
+      returns a terminal failure an earlier execution already recorded);
    5. records usage on the attempt row and returns the reference.
 6. **Typed, message-free error boundary.** Every exception inside the activity is
    classified from its type and HTTP status alone (`classify_failure`); its message is
@@ -96,12 +97,19 @@ Pin this composition for every workflow that touches private data or a credentia
    an empty success. Exceptions outside the activity's control (for example, the
    application database being down while the attempt row or the outcome is written)
    still escape the step and leave the workflow in DBOS `ERROR`, with the run `queued`.
-   Task 3 closed this: store failures are a second label-only transient error for the same
-   step (`AppStoreUnavailableError`), exhausted retries publish
-   `failed/app_store_unavailable`, publication retries through an outage, and an errored
-   workflow is reconciled to a failed run (ADR 0004 decision 11; acceptance test
-   `test_an_app_database_outage_mid_run_ends_in_a_typed_terminal_state`). Transient provider
-   exhaustion now publishes the run state `provider_unavailable` with that failure class.
+   Task 3 closed this (ADR 0004 decision 11). The activity retries its own store work
+   within a separate 60-second budget, keeping a paid call's result, and past it ends
+   `failed/app_store_unavailable` without a step retry, because a retry would call the
+   model again; so `should_retry` still accepts only `TransientProviderError`. Publication
+   retries through an outage. Acceptance tests:
+   `test_a_short_app_database_outage_mid_call_keeps_the_paid_result` and
+   `test_an_outage_longer_than_the_store_budget_ends_in_a_typed_terminal_state`. A workflow
+   that still ends in DBOS `ERROR` is reconciled from the application's own records: the
+   accepted output if there is one, otherwise the recorded failure or `unknown_failure`.
+   That path is tested separately by simulating the `ERROR` state
+   (`test_the_reconciler_publishes_an_errored_workflow_s_accepted_output`). Transient
+   provider exhaustion publishes the run state `provider_unavailable` with that failure
+   class.
 8. **Transactional outbox.** The domain write and its outbox row commit in one application
    transaction. The dispatcher starts the workflow with `SetWorkflowID(outbox.workflow_id)`
    and then marks the row dispatched. Dispatch is at least once; the workflow ID makes the
@@ -178,7 +186,10 @@ leaked and no sentinel leaked; it does not prove that no private text leaked. Th
 - Resolved in Task 3 (carry-forward M4): the activity checks for an accepted output before
   anything else and records the call's usage in the same transaction as the accept, so a
   crash after acceptance neither re-calls the model nor loses the first attempt's usage
-  (`test_a_crash_after_acceptance_never_calls_the_model_again_and_keeps_the_usage`).
+  (`test_a_crash_after_acceptance_never_calls_the_model_again_and_keeps_the_usage`). The
+  same holds on the failure branch: a crash after a terminal failure is recorded publishes
+  that failure on re-execution with a `reused_failure` attempt and no second call
+  (`test_a_crash_after_a_recorded_failure_returns_it_without_a_second_call`).
 - Task 3 runs the agent with `asyncio.run(agent.run(...))` on the DBOS step thread instead
   of `run_sync`, which calls the deprecated `asyncio.get_event_loop()`.
 - The Sprint 0 shutdown hang (1 in 19 runs) was not reproduced. Shutdown is now bounded: the

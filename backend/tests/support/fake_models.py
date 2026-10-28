@@ -14,6 +14,7 @@ from pydantic_ai.exceptions import ModelConnectionError, ModelHTTPError
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models import Model
 from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.usage import RequestUsage
 
 FAKE_MODEL_NAME = "fake-function-model"
 
@@ -24,6 +25,7 @@ class FakeFailure(StrEnum):
     ALWAYS_UNAVAILABLE = "always_unavailable"
     CONNECTION_ERROR = "connection_error"
     UNEXPECTED_ERROR = "unexpected_error"
+    INCONSISTENT_USAGE = "inconsistent_usage"  # more cached than total input tokens
 
 
 def key_fingerprint(api_key: SecretStr) -> str:
@@ -57,7 +59,12 @@ def fake_model_builder(
                 # Which key the activity opened, without revealing it.
                 "reason": f"key fingerprint {key_fingerprint(api_key)}",
             }
-            return ModelResponse(parts=[TextPart(json.dumps(answer))], model_name=FAKE_MODEL_NAME)
+            response = ModelResponse(
+                parts=[TextPart(json.dumps(answer))], model_name=FAKE_MODEL_NAME
+            )
+            if failure is FakeFailure.INCONSISTENT_USAGE:
+                response.usage = RequestUsage(input_tokens=5, cache_read_tokens=9, output_tokens=7)
+            return response
 
         return FunctionModel(respond, model_name=FAKE_MODEL_NAME)
 

@@ -2,7 +2,8 @@
 
 Configured by environment only, like the product worker. Crash points are a real SIGKILL at
 a named moment, so DBOS recovery is exercised rather than simulated:
-- `after_output_accepted`: the output and usage are committed, the DBOS step is not;
+- `after_settle`: the attempt's result (an accepted output, or a terminal failure) and its
+  usage are committed, the DBOS step is not;
 - `after_dispatch_before_mark`: the workflow started, its outbox entry not yet marked.
 """
 
@@ -24,7 +25,7 @@ def _kill() -> None:
 
 
 def install_crash_point(point: str) -> None:
-    if point == "after_output_accepted":
+    if point == "after_settle":
         settle = activity._settle
 
         def settle_then_die(*args: object) -> activity.ActivityEnd:
@@ -52,6 +53,9 @@ def main() -> None:
             output_sentinel=os.environ.get("NESSA_TEST_OUTPUT_SENTINEL", ""),
         ),
         clock=lambda: datetime.now(UTC),
+        store_retry_budget_s=float(
+            os.environ.get("NESSA_TEST_STORE_RETRY_BUDGET_S", activity.STORE_RETRY_BUDGET_S)
+        ),
     )
     install_crash_point(os.environ.get("NESSA_TEST_CRASH_AT", ""))
     worker.run(runtime.engine, runtime, url_with_password(settings.dbos_database))

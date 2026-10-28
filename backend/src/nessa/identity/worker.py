@@ -29,7 +29,6 @@ from nessa.config import WorkerSettings
 from nessa.db import Engine, create_engine, system_transaction, url_with_password
 from nessa.identity import activity, connection_check, run_store, workflow
 from nessa.identity.activity import ActivityRuntime
-from nessa.identity.failures import FailureClass
 from nessa.identity.keyring import load_keyring
 from nessa.identity.meta import meta_model
 from nessa.identity.model_choice import ModelChoice
@@ -75,16 +74,16 @@ def dispatch_outbox(engine: Engine) -> int:
 
 def reconcile_errored_runs(runtime: ActivityRuntime) -> int:
     """A workflow that ended in DBOS ERROR (its outcome could not be published for longer
-    than the publish retries allow) still leaves a typed terminal run, never a queued one."""
+    than the publish retries allow) still leaves a typed terminal run, never a queued one,
+    and a run whose output was accepted ends complete with it (`activity.reconcile`). Runs
+    already terminal cost one lookup each: errored workflows are rare and never re-run."""
     errored = DBOS.list_workflows(
         status="ERROR", name=workflow.WORKFLOW_NAME, load_input=False, load_output=False
     )
-    fixed = 0
-    for status in errored:
-        run_id = uuid.UUID(status.workflow_id.removeprefix("nessa-run-"))
-        activity.publish(runtime, run_id, activity.failed(FailureClass.UNKNOWN_FAILURE))
-        fixed += 1
-    return fixed
+    return sum(
+        activity.reconcile(runtime, uuid.UUID(status.workflow_id.removeprefix("nessa-run-")))
+        for status in errored
+    )
 
 
 def _heartbeat() -> None:
@@ -97,6 +96,21 @@ def check() -> int:
     except OSError:
         return 1
     return 0 if age < HEARTBEAT_STALE_S else 1
+
+
+def loop_pass(engine: Engine, runtime: ActivityRuntime, *, next_reconcile: float) -> float:
+    """One pass of the worker loop; returns when reconciliation is next due. A failure is
+    logged by class and the outbox retried next pass; reconciliation waits its interval even
+    after a failed pass, so it never spins."""
+    try:
+        dispatch_outbox(engine)
+        if time.monotonic() >= next_reconcile:
+            next_reconcile = time.monotonic() + RECONCILE_INTERVAL_S
+            reconcile_errored_runs(runtime)
+        _heartbeat()
+    except Exception as error:
+        _log.warning("worker pass failed", extra={"error_class": type(error).__name__})
+    return next_reconcile
 
 
 def run(engine: Engine, runtime: ActivityRuntime, system_database_url: str) -> None:
@@ -114,15 +128,7 @@ def run(engine: Engine, runtime: ActivityRuntime, system_database_url: str) -> N
     _log.info("worker ready", extra={"application_version": APPLICATION_VERSION})
     next_reconcile = 0.0
     while not stop.is_set():
-        try:
-            dispatch_outbox(engine)
-            if time.monotonic() >= next_reconcile:
-                reconcile_errored_runs(runtime)
-                next_reconcile = time.monotonic() + RECONCILE_INTERVAL_S
-            _heartbeat()
-        except Exception as error:
-            # The outbox stays pending and is retried next pass; only the class is logged.
-            _log.warning("worker pass failed", extra={"error_class": type(error).__name__})
+        next_reconcile = loop_pass(engine, runtime, next_reconcile=next_reconcile)
         stop.wait(DISPATCH_INTERVAL_S)
     _log.info("worker stopping")
     watchdog = threading.Timer(SHUTDOWN_DEADLINE_S, os._exit, args=(EXIT_SHUTDOWN_TIMEOUT,))

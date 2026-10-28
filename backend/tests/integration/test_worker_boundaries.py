@@ -184,27 +184,58 @@ def test_concurrent_calls_cannot_reserve_past_the_period_limit(scenario: Scenari
     assert summary["unknown_cost_attempts"] == 0
 
 
-@pytest.mark.req("DUR-08")
-def test_an_app_database_outage_mid_run_ends_in_a_typed_terminal_state(
-    scenario: Scenario, infra: Infra
-) -> None:
-    """The worker's database role loses its connections while the model call is in flight
-    (DBOS's own database stays up). The run must not be left queued or running."""
-    run_id = scenario.submit()
-    worker = scenario.worker("worker", fake_delay_s="3")
-    wait_for(lambda: len(scenario.attempts(run_id)) == 1, timeout_s=30, what="attempt")
-
+def cut_worker_database_for(infra: Infra, seconds: float) -> threading.Thread:
+    """The worker's database role loses its connections for `seconds` (DBOS's own database
+    stays up), as in a restart of the application database."""
     infra.query("ALTER ROLE nessa_worker NOLOGIN")
     infra.query(
         "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = 'nessa_worker'"
     )
 
     def restore() -> None:
-        time.sleep(12)
+        time.sleep(seconds)
         infra.query("ALTER ROLE nessa_worker LOGIN")
 
     restorer = threading.Thread(target=restore)
     restorer.start()
+    return restorer
+
+
+@pytest.mark.req("DUR-08")
+def test_a_short_app_database_outage_mid_call_keeps_the_paid_result(
+    scenario: Scenario, infra: Infra
+) -> None:
+    """B-M5: the call succeeds while the database is away; the activity keeps its result and
+    retries storing it within its store budget, so the run completes on that one call."""
+    run_id = scenario.submit()
+    worker = scenario.worker("worker", fake_delay_s="3")
+    wait_for(lambda: len(scenario.attempts(run_id)) == 1, timeout_s=30, what="attempt")
+
+    restorer = cut_worker_database_for(infra, 12)
+    try:
+        run = scenario.wait_terminal(run_id, timeout_s=120)
+    finally:
+        restorer.join()
+        infra.query("ALTER ROLE nessa_worker LOGIN")
+    worker.stop()
+
+    assert (run["status"], run["failure_class"]) == ("complete", None)
+    [attempt] = scenario.attempts(run_id)
+    assert (attempt["outcome"], attempt["spend_state"]) == ("succeeded", "reconciled")
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("DUR-08")
+def test_an_outage_longer_than_the_store_budget_ends_in_a_typed_terminal_state(
+    scenario: Scenario, infra: Infra
+) -> None:
+    """Past the store budget the run fails `app_store_unavailable` once the database is back
+    (publication keeps retrying), never left queued or running, and never re-calls."""
+    run_id = scenario.submit()
+    worker = scenario.worker("worker", fake_delay_s="3", store_retry_budget_s="2")
+    wait_for(lambda: len(scenario.attempts(run_id)) == 1, timeout_s=30, what="attempt")
+
+    restorer = cut_worker_database_for(infra, 12)
     try:
         run = scenario.wait_terminal(run_id, timeout_s=120)
     finally:

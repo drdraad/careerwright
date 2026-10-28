@@ -110,7 +110,7 @@ def test_a_crash_after_acceptance_never_calls_the_model_again_and_keeps_the_usag
     """Carry-forward M4: the accepted output is found before anything else, and the first
     call's usage was committed with it."""
     run_id = scenario.submit()
-    first = scenario.worker("first", crash_at="after_output_accepted")
+    first = scenario.worker("first", crash_at="after_settle")
     assert first.wait_exit(60) == -signal.SIGKILL
     [accepted] = scenario.outputs(run_id)
     [paid] = scenario.attempts(run_id)
@@ -131,6 +131,96 @@ def test_a_crash_after_acceptance_never_calls_the_model_again_and_keeps_the_usag
         "none",
         None,
     )
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("DUR-02")
+def test_a_crash_after_a_recorded_failure_returns_it_without_a_second_call(
+    scenario: Scenario,
+) -> None:
+    """B-M4: a terminal failure is committed (and may have been billed), the DBOS step is
+    not. Re-execution must publish that failure, not reserve and call the model again."""
+    run_id = scenario.submit()
+    first = scenario.worker(
+        "first", crash_at="after_settle", fake_failure=FakeFailure.AUTH_ECHO.value
+    )
+    assert first.wait_exit(60) == -signal.SIGKILL
+    [failed] = scenario.attempts(run_id)
+
+    second = scenario.worker("second", fake_failure=FakeFailure.AUTH_ECHO.value)
+    run = scenario.wait_terminal(run_id)
+    second.stop()
+
+    assert (run["status"], run["failure_class"]) == ("failed", "provider_authentication")
+    first_attempt, reused = scenario.attempts(run_id)
+    assert first_attempt == failed
+    assert (failed["outcome"], failed["spend_state"]) == ("provider_authentication", "unknown")
+    assert (reused["outcome"], reused["spend_state"], reused["reserved_nano_usd"]) == (
+        "reused_failure",
+        "none",
+        0,
+    )
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("ARC1-07")
+def test_inconsistent_provider_usage_fails_typed_with_an_unknown_cost(
+    scenario: Scenario,
+) -> None:
+    """B-M3: usage the registry rejects (more cached than input tokens) must not escape the
+    activity as an untyped step error that leaves the run running."""
+    run_id = scenario.submit()
+    worker = scenario.worker("worker", fake_failure=FakeFailure.INCONSISTENT_USAGE.value)
+    run = scenario.wait_terminal(run_id)
+    worker.stop()
+
+    assert (run["status"], run["failure_class"], run["output_id"]) == (
+        "failed",
+        "unknown_failure",
+        None,
+    )
+    [attempt] = scenario.attempts(run_id)
+    assert (attempt["outcome"], attempt["spend_state"], attempt["cost_nano_usd"]) == (
+        "unknown_failure:ValueError",
+        "unknown",
+        None,
+    )
+    assert scenario.journal(run_id)["status"][0]["status"] == "SUCCESS"
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("DUR-08")
+def test_the_reconciler_publishes_an_errored_workflow_s_accepted_output(
+    scenario: Scenario,
+) -> None:
+    """B-M1: a workflow left in DBOS ERROR after its call was accepted (its publication
+    outlived the retries) is reconciled to `complete` with that output, never to a failure.
+    The ERROR state is simulated: an outage longer than the publish retries takes 34 min."""
+    run_id = scenario.submit()
+    first = scenario.worker("first")
+    done = scenario.wait_terminal(run_id)
+    first.stop()
+    scenario.infra.query(
+        "UPDATE nessa.runs SET status = 'running', output_id = NULL, finished_at = NULL "
+        "WHERE run_id = %s",
+        (run_id,),
+    )
+    scenario.infra.query(
+        "UPDATE dbos.workflow_status SET status = 'ERROR' WHERE workflow_uuid = %s",
+        (f"nessa-run-{run_id}",),
+        database="nessa_dbos",
+    )
+
+    second = scenario.worker("second")  # reconciles on its first pass
+    run = scenario.wait_terminal(run_id, timeout_s=30)
+    second.stop()
+
+    assert (run["status"], run["output_id"], run["failure_class"]) == (
+        "complete",
+        done["output_id"],
+        None,
+    )
+    assert len(scenario.attempts(run_id)) == 1  # reconciliation never calls the model
     assert scenario.leaks() == []
 
 
