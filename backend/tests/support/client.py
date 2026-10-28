@@ -72,6 +72,9 @@ def unasked_profile() -> dict[str, dict[str, Any]]:
             "weekly_study_hours",
             "direct_spend_cap",
             "monthly_payment_cap",
+            "enjoyed_tasks",
+            "confident_tasks",
+            "evidenced_tasks",
         )
     }
 

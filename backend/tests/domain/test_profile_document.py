@@ -8,11 +8,19 @@ from pydantic import ValidationError
 from nessa.errors import ErrorCode, NessaError
 from nessa.money import Money
 from nessa.profile.document import (
+    FIELD_NAMES,
+    HARD_CONSTRAINTS,
     MAX_CITIES,
     MAX_TARGETS,
+    MAX_TASKS,
+    VERSION_2_FIELDS,
     FieldState,
+    ProfileDocument,
     ProfileInput,
+    TextInput,
+    TextListInput,
     apply_profile_input,
+    apply_updates,
     empty_profile,
 )
 
@@ -21,16 +29,7 @@ LATER_SOURCE = uuid.UUID("00000000-0000-4000-8000-000000000002")
 
 
 def profile_input(**fields: object) -> ProfileInput:
-    unasked = {"state": "unasked"}
-    values: dict[str, object] = {
-        "preferred_name": unasked,
-        "current_role": unasked,
-        "cities": unasked,
-        "target_titles": unasked,
-        "weekly_study_hours": unasked,
-        "direct_spend_cap": unasked,
-        "monthly_payment_cap": unasked,
-    }
+    values: dict[str, object] = {name: {"state": "unasked"} for name in FIELD_NAMES}
     values.update(fields)
     return ProfileInput.model_validate(values)
 
@@ -117,12 +116,129 @@ def test_a_fourth_target_is_rejected_with_a_typed_error() -> None:
 @pytest.mark.req("BND1-03")
 def test_three_cities_and_three_targets_are_accepted() -> None:
     new = profile_input(
-        cities=provided(["Leeds", "York", "Hull"]), target_titles=provided(["A", "B", "C"])
+        cities=provided(["Leeds", "York", "Bath"]), target_titles=provided(["A", "B", "C"])
     )
 
     document = apply_profile_input(empty_profile(), new, SOURCE)
 
-    assert document.cities.value == ["Leeds", "York", "Hull"]
+    assert document.cities.value == ["Leeds", "York", "Bath"]
+
+
+def test_a_city_is_stored_by_the_list_s_own_name_whatever_the_spelling() -> None:
+    new = profile_input(cities=provided(["hull", "Newcastle upon Tyne", "stoke-on-trent"]))
+
+    document = apply_profile_input(empty_profile(), new, SOURCE)
+
+    assert document.cities.value == ["Kingston-upon-Hull", "Newcastle-upon-Tyne", "Stoke on Trent"]
+
+
+def test_a_place_that_is_not_a_listed_english_city_is_refused_never_guessed() -> None:
+    for name in ("Atlantis", "Cardiff", "Shoreditch", "Leeds UK"):
+        with pytest.raises(NessaError) as raised:
+            apply_profile_input(empty_profile(), profile_input(cities=provided([name])), SOURCE)
+
+        assert raised.value.code is ErrorCode.VALIDATION_FAILED
+        assert raised.value.details == {"field": "cities", "reason": "unknown_city"}
+
+
+def test_two_spellings_of_one_city_are_a_duplicate() -> None:
+    with pytest.raises(NessaError) as raised:
+        apply_profile_input(
+            empty_profile(), profile_input(cities=provided(["Hull", "Kingston upon Hull"])), SOURCE
+        )
+
+    assert raised.value.details == {"field": "cities", "reason": "duplicate"}
+
+
+@pytest.mark.req("REC1-04")
+def test_enjoying_believing_and_evidencing_a_task_are_three_separate_fields() -> None:
+    new = profile_input(
+        enjoyed_tasks=provided(["fixing bikes"]),
+        confident_tasks=provided(["training new starters"]),
+        evidenced_tasks={"state": "unknown"},
+    )
+
+    document = apply_profile_input(empty_profile(), new, SOURCE)
+
+    assert document.enjoyed_tasks.value == ["fixing bikes"]
+    assert document.confident_tasks.value == ["training new starters"]
+    assert document.evidenced_tasks.state is FieldState.UNKNOWN
+    assert document.evidenced_tasks.value is None
+
+
+def test_task_lists_are_bounded_with_a_typed_error() -> None:
+    tasks = [f"task {n}" for n in range(MAX_TASKS + 1)]
+
+    with pytest.raises(NessaError) as raised:
+        apply_profile_input(empty_profile(), profile_input(enjoyed_tasks=provided(tasks)), SOURCE)
+
+    assert raised.value.details == {"field": "enjoyed_tasks", "limit": MAX_TASKS}
+
+
+def test_a_version_1_document_reads_with_the_new_fields_not_asked() -> None:
+    stored = {
+        "schema_version": "1",
+        **{name: {"state": "unasked"} for name in FIELD_NAMES if name not in VERSION_2_FIELDS},
+        "cities": {"state": "provided", "value": ["Leeds"], "source_ref_id": str(SOURCE)},
+    }
+
+    document = ProfileDocument.model_validate(stored)
+
+    assert document.schema_version == "2"
+    assert document.cities.value == ["Leeds"]
+    for name in VERSION_2_FIELDS:
+        assert getattr(document, name).state is FieldState.UNASKED
+
+
+@pytest.mark.req("PROF-07")
+def test_a_partial_update_changes_only_its_fields_and_cites_only_its_source() -> None:
+    first = apply_profile_input(
+        empty_profile(),
+        profile_input(current_role=provided("Shift supervisor"), cities=provided(["Leeds"])),
+        SOURCE,
+    )
+
+    second, changed = apply_updates(
+        first,
+        {
+            "cities": (
+                TextListInput(state=FieldState.PROVIDED, value=["Leeds", "York"]),
+                LATER_SOURCE,
+            ),
+            # The same answer again.
+            "current_role": (
+                TextInput(state=FieldState.PROVIDED, value="Shift supervisor"),
+                LATER_SOURCE,
+            ),
+        },
+    )
+
+    assert changed == ["cities"]
+    assert second.cities.source_ref_id == LATER_SOURCE
+    assert second.current_role.source_ref_id == SOURCE  # unchanged answers keep their source
+    assert second.target_titles == first.target_titles
+
+
+def test_an_update_naming_something_that_is_not_a_profile_field_is_refused() -> None:
+    with pytest.raises(NessaError) as raised:
+        apply_updates(
+            empty_profile(),
+            {"api_key": (TextListInput(state=FieldState.UNKNOWN), SOURCE)},
+        )
+
+    assert raised.value.details == {"field": "api_key", "reason": "not_a_field"}
+
+
+@pytest.mark.req("PROF-04")
+def test_limits_targets_work_areas_and_hours_are_the_hard_constraints() -> None:
+    expected = {
+        "cities",
+        "target_titles",
+        "weekly_study_hours",
+        "direct_spend_cap",
+        "monthly_payment_cap",
+    }
+    assert expected == HARD_CONSTRAINTS
 
 
 def test_duplicate_cities_differing_only_in_case_are_rejected() -> None:
@@ -161,7 +277,7 @@ def test_returning_a_field_to_unasked_drops_its_source() -> None:
     assert (second.cities.state, second.cities.source_ref_id) == (FieldState.UNASKED, None)
 
 
-@given(st.lists(st.sampled_from(["Leeds", "York", "Hull", "Bath", "Ely"]), unique=True))
+@given(st.lists(st.sampled_from(["Leeds", "York", "Wells", "Bath", "Ely"]), unique=True))
 def test_city_count_property_accepts_at_most_three(cities: list[str]) -> None:
     new = profile_input(cities=provided(cities))
 

@@ -1,24 +1,29 @@
 """The bounded model activity: one provider call for one run, with everything checked first.
 
-ADR 0002's pattern, as product code. The workflow carries only the run ID. This activity,
-under the worker role and row-level security scoped to that run:
+ADR 0002's pattern, as product code, for every run kind (`RunTask`). The workflow carries
+only the run ID. This activity, under the worker role and row-level security scoped to
+that run:
 1. ends at once if the run already has an accepted output or a recorded terminal failure
    (a crash after either never re-calls the model, and the first call's usage is already
    recorded with it);
 2. re-checks that the requester still owns the workspace and is invited, that the pinned
-   model is allowed for the workspace's data (Contributor only for synthetic), that an
-   unrevoked key exists, and reserves the call's worst-case cost within the spend limits;
-3. records the attempt (the reservation) before the call, then opens the sealed key just in
-   time and calls Meta with a plain Pydantic AI agent: no durability capability, no retries;
+   model is allowed for the workspace's data (Contributor only for synthetic, the fixture
+   interviewer only for demo), that an unrevoked key exists, and reserves the attempt's
+   worst-case cost within the spend limits;
+3. records the attempt (the reservation) before the call, then opens the sealed input and
+   the sealed key just in time and runs the kind's task: a plain Pydantic AI agent, no
+   durability capability, no transport retries, at most the task's requests (a validation
+   repair is one more request, owned by the agent's output-retry budget, never the step's);
 4. stores the validated output sealed and the usage on the attempt in one transaction.
 
 Its own database work is retried through an outage for `store_retry_budget_s`, keeping a
 paid call's result in memory; past that budget the run fails `app_store_unavailable`,
 because a DBOS step retry would call the model again.
 
-Every exception is classified from its type alone and its message discarded. Classification
-happens inside the handler; the caller raises outside it, so no provider exception rides
-along as context into DBOS's step-error record or retry log.
+Every exception is classified from its type alone and its message discarded; an output cut
+off at its token limit is `output_truncated` (from the typed finish reason), never parsed.
+Classification happens inside the handler; the caller raises outside it, so no provider
+exception rides along as context into DBOS's step-error record or retry log.
 """
 
 import asyncio
@@ -26,13 +31,14 @@ import hashlib
 import logging
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
-from pydantic import SecretStr
+from pydantic import BaseModel, SecretStr
 from pydantic_ai import Agent, NativeOutput, capture_run_messages
-from pydantic_ai.messages import ModelMessage, ModelResponse
+from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse
 from pydantic_ai.models import Model
 from pydantic_ai.usage import UsageLimits
 
@@ -50,19 +56,33 @@ from nessa.identity.failures import (
 )
 from nessa.identity.keyring import Keyring, SealedValue
 from nessa.identity.model_registry import ModelMode, Usage, estimate_cost_nano_usd, model_entry
-from nessa.identity.records import EventKind, Run
-from nessa.identity.runs import output_context
+from nessa.identity.records import EventKind, Run, RunKind
+from nessa.identity.runs import input_context, output_context
 from nessa.identity.spend import SpendState, period_start, refused_scope
-from nessa.vocabulary import WorkState
+from nessa.vocabulary import DataMode, WorkState
 
 Outcome = dict[str, str]
-ModelBuilder = Callable[[str, SecretStr], Model]
+# A model for a model ID; the key is None for the fixture interviewer, which needs none.
+ModelBuilder = Callable[[str, SecretStr | None], Model]
 # How long the activity keeps retrying its own database work (the attempt row, the result)
 # through an outage before the run fails `app_store_unavailable`.
 STORE_RETRY_BUDGET_S = 60.0
 STORE_RETRY_FIRST_DELAY_S = 0.5
 STORE_RETRY_MAX_DELAY_S = 8.0
 _log = logging.getLogger("nessa.activity")
+
+
+@dataclass(frozen=True)
+class RunTask:
+    """How the activity runs one kind of run.
+
+    `call` gets the model, its privacy mode and the run's opened input (None for a kind
+    without one) and returns the validated output to seal, or raises. `worst_case_nano_usd`
+    bounds one attempt's cost (every request it may send) for a model ID."""
+
+    call: Callable[[Model, ModelMode, bytes | None], BaseModel]
+    worst_case_nano_usd: Callable[[str], int]
+    has_input: bool
 
 
 @dataclass(frozen=True)
@@ -73,6 +93,7 @@ class ActivityRuntime:
     keyring: Keyring
     build_model: ModelBuilder
     clock: Callable[[], datetime]
+    tasks: Mapping[RunKind, RunTask]
     store_retry_budget_s: float = STORE_RETRY_BUDGET_S
 
 
@@ -85,18 +106,21 @@ class ActivityEnd:
 @dataclass(frozen=True)
 class _Ready:
     run: Run
+    mode: ModelMode
     attempt_id: int
-    credential_id: uuid.UUID
-    sealed_key: SealedValue
+    credential_id: uuid.UUID | None
+    sealed_key: SealedValue | None
+    sealed_input: SealedValue | None
 
 
 @dataclass(frozen=True)
 class _CallResult:
-    output: ConnectionCheckResult | None
+    output: BaseModel | None
     classified: Classified | None
     usage: Usage | None
     reasoning_tokens: int | None
     response_id: str | None
+    requests_sent: int
 
 
 def succeeded(output_id: uuid.UUID) -> Outcome:
@@ -129,6 +153,13 @@ def run_connection_check(agent: Agent[None, ConnectionCheckResult]) -> Connectio
     return result.output
 
 
+CONNECTION_CHECK_TASK = RunTask(
+    call=lambda model, mode, _input: run_connection_check(connection_check_agent(model)),
+    worst_case_nano_usd=connection_check.worst_case_nano_usd,
+    has_input=False,
+)
+
+
 def _ended(classified: Classified) -> ActivityEnd:
     return ActivityEnd(
         classified.label, None if classified.failure is None else failed(classified.failure)
@@ -140,6 +171,16 @@ def _recorded_failure(tx: Tx, run_id: uuid.UUID) -> FailureClass | None:
         failure = recorded_failure(attempt.outcome)
         if failure is not None:
             return failure
+    return None
+
+
+def _model_refusal(run: Run, mode: ModelMode) -> FailureClass | None:
+    """Defence in depth for the submission rule and the database CHECKs: Contributor only for
+    synthetic data, the fixture interviewer only for demo workspaces and vice versa."""
+    if mode is ModelMode.CONTRIBUTOR and not run.synthetic:
+        return FailureClass.MODEL_NOT_PERMITTED
+    if (mode is ModelMode.FIXTURE) != (run.data_mode is DataMode.DEMO):
+        return FailureClass.MODEL_NOT_PERMITTED
     return None
 
 
@@ -180,14 +221,28 @@ def _prepare(rt: ActivityRuntime, run_id: uuid.UUID) -> _Ready | ActivityEnd:
             return ActivityEnd("reused_failure", failed(recorded))
         if run_store.authorised_workspace(tx) != run.workspace_id:
             return refuse(FailureClass.ACCESS_REVOKED)
-        if model_entry(run.model_id).mode is ModelMode.CONTRIBUTOR and not run.synthetic:
-            return refuse(FailureClass.MODEL_NOT_PERMITTED)
+        task = rt.tasks.get(run.kind)
+        if task is None:
+            return refuse(FailureClass.UNKNOWN_FAILURE)
+        mode = model_entry(run.model_id).mode
+        refusal = _model_refusal(run, mode)
+        if refusal is not None:
+            return refuse(refusal)
+        sealed_input = run_store.sealed_input(tx, run_id) if task.has_input else None
+        if task.has_input and sealed_input is None:
+            return refuse(FailureClass.UNKNOWN_FAILURE)
+        if mode is ModelMode.FIXTURE:
+            # No provider, key or charge: the attempt still records that it ran.
+            attempt_id = run_store.insert_attempt(
+                tx, run=run, period=period, spend_state=SpendState.NONE
+            )
+            return _Ready(run, mode, attempt_id, None, None, sealed_input)
         key = credential_store.sealed_active_credential(tx, run.workspace_id)
         if key is None:
             return refuse(FailureClass.CREDENTIAL_UNAVAILABLE)
         run_store.lock_spend(tx, run.workspace_id)
         limits = credential_store.spend_limits(tx, run.workspace_id)
-        worst_case = connection_check.worst_case_nano_usd(run.model_id)
+        worst_case = task.worst_case_nano_usd(run.model_id)
         period_committed, run_committed = run_store.committed_spend(
             tx, run.workspace_id, run_id, period
         )
@@ -206,7 +261,7 @@ def _prepare(rt: ActivityRuntime, run_id: uuid.UUID) -> _Ready | ActivityEnd:
             reserved_nano_usd=worst_case,
             credential_id=key[0],
         )
-    return _Ready(run, attempt_id, key[0], key[1])
+    return _Ready(run, mode, attempt_id, key[0], key[1], sealed_input)
 
 
 def _usage(messages: list[ModelMessage]) -> tuple[Usage | None, int | None, str | None]:
@@ -223,24 +278,48 @@ def _usage(messages: list[ModelMessage]) -> tuple[Usage | None, int | None, str 
     return usage, reasoning, responses[-1].provider_response_id
 
 
+def _truncated(messages: list[ModelMessage]) -> bool:
+    """The last response stopped at its token limit: whatever it holds is incomplete."""
+    responses = [m for m in messages if isinstance(m, ModelResponse)]
+    return bool(responses) and responses[-1].finish_reason == "length"
+
+
+def _open(rt: ActivityRuntime, ready: _Ready) -> tuple[SecretStr | None, bytes | None]:
+    run = ready.run
+    api_key = None
+    if ready.sealed_key is not None and ready.credential_id is not None:
+        api_key = SecretStr(
+            rt.keyring.open(
+                ready.sealed_key, credential_context(run.workspace_id, ready.credential_id)
+            ).decode()
+        )
+    opened = None
+    if ready.sealed_input is not None:
+        opened = rt.keyring.open(ready.sealed_input, input_context(run.workspace_id, run.run_id))
+    return api_key, opened
+
+
 def _call(rt: ActivityRuntime, ready: _Ready) -> _CallResult:
+    task = rt.tasks[ready.run.kind]
     with capture_run_messages() as messages:
         try:
-            api_key = SecretStr(
-                rt.keyring.open(
-                    ready.sealed_key,
-                    credential_context(ready.run.workspace_id, ready.credential_id),
-                ).decode()
-            )
-            output = run_connection_check(
-                connection_check_agent(rt.build_model(ready.run.model_id, api_key))
+            api_key, opened = _open(rt, ready)
+            output: BaseModel | None = task.call(
+                rt.build_model(ready.run.model_id, api_key), ready.mode, opened
             )
         except Exception as error:
             # Classify inside the handler but act outside it (see the module docstring).
             classified: Classified | None = classify_failure(error)
             output = None
+            if isinstance(error, UnexpectedModelBehavior) and _truncated(messages):
+                classified = terminal(FailureClass.OUTPUT_TRUNCATED)
         else:
             classified = None
+            if _truncated(messages):  # never accept an output cut off at its limit
+                classified, output = terminal(FailureClass.OUTPUT_TRUNCATED), None
+        requests = sum(isinstance(m, ModelRequest) for m in messages)
+        if ready.mode is ModelMode.FIXTURE:
+            return _CallResult(output, classified, None, None, None, requests)
         try:
             usage, reasoning, response_id = _usage(messages)
         except ValueError as error:
@@ -248,13 +327,18 @@ def _call(rt: ActivityRuntime, ready: _Ready) -> _CallResult:
             # report is inconsistent, so the cost is unknown and the output is not accepted.
             classified = classified or classify_failure(error)
             output, usage, reasoning, response_id = None, None, None, None
-    return _CallResult(output, classified, usage, reasoning, response_id)
+    return _CallResult(output, classified, usage, reasoning, response_id, requests)
+
+
+def _spend_state(ready: _Ready, cost: int | None) -> SpendState:
+    if ready.mode is ModelMode.FIXTURE:
+        return SpendState.NONE  # no provider call was made
+    # No reported usage: the request may still have been billed, so the cost stays unknown.
+    return SpendState.RECONCILED if cost is not None else SpendState.UNKNOWN
 
 
 def _settle(rt: ActivityRuntime, ready: _Ready, call: _CallResult) -> ActivityEnd:
     cost = estimate_cost_nano_usd(ready.run.model_id, call.usage) if call.usage else None
-    # No reported usage: the request may still have been billed, so the cost stays unknown.
-    spend_state = SpendState.RECONCILED if cost is not None else SpendState.UNKNOWN
     with run_transaction(rt.engine, ready.run.run_id) as tx:
         if call.output is None:
             classified = call.classified or terminal(FailureClass.UNKNOWN_FAILURE)
@@ -279,7 +363,8 @@ def _settle(rt: ActivityRuntime, ready: _Ready, call: _CallResult) -> ActivityEn
             reasoning_tokens=call.reasoning_tokens,
             provider_response_id=call.response_id,
             cost_nano_usd=cost,
-            spend_state=spend_state,
+            spend_state=_spend_state(ready, cost),
+            requests_sent=call.requests_sent,
         )
     return end
 

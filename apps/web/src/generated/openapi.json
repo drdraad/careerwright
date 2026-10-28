@@ -691,6 +691,186 @@
         }
       }
     },
+    "/v1/workspaces/{workspace_id}/occupations/provisional": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Register Provisional",
+        "operationId": "register_provisional_concept",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterProvisionalConcept"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionalConceptOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already registered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionalConceptOut"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "List Provisional",
+        "operationId": "list_provisional_concepts",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionalConceptPage"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/workspaces/{workspace_id}/sources": {
       "get": {
         "tags": [
@@ -1485,6 +1665,580 @@
         }
       }
     },
+    "/v1/workspaces/{workspace_id}/interview/turns": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Submit",
+        "operationId": "submit_turn",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitTurn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "List Turns",
+        "operationId": "list_turns",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnPage"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/interview/turns/{turn_id}": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Get Turn",
+        "operationId": "get_turn",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "turn_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Turn Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/decision": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Decide",
+        "operationId": "decide_turn",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "turn_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Turn Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideTurn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionResult"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Decided; no field changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/taxonomy": {
+      "get": {
+        "tags": [
+          "taxonomy"
+        ],
+        "summary": "Get Taxonomy",
+        "operationId": "get_taxonomy",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxonomyReleaseOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/taxonomy/occupations": {
+      "get": {
+        "tags": [
+          "taxonomy"
+        ],
+        "summary": "Search",
+        "operationId": "search_occupations",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "match",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SearchMatch",
+              "default": "all"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OccupationSearchOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/taxonomy/occupations/{concept_id}": {
+      "get": {
+        "tags": [
+          "taxonomy"
+        ],
+        "summary": "Get Occupation",
+        "operationId": "get_occupation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "concept_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Concept Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OccupationOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/places": {
+      "get": {
+        "tags": [
+          "taxonomy"
+        ],
+        "summary": "List Places",
+        "operationId": "list_places",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceList"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/v1/workspaces/{workspace_id}/events": {
       "get": {
         "tags": [
@@ -1731,6 +2485,17 @@
         ],
         "title": "ActorOut"
       },
+      "AnsweredState": {
+        "type": "string",
+        "enum": [
+          "provided",
+          "unknown",
+          "skipped",
+          "prefer_not_to_say"
+        ],
+        "title": "AnsweredState",
+        "description": "A proposal answers a field; it never returns one to \"not asked\"."
+      },
       "AttemptOut": {
         "properties": {
           "attempt_id": {
@@ -1809,6 +2574,18 @@
               }
             ],
             "title": "Output Tokens"
+          },
+          "requests_sent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requests Sent",
+            "description": "Provider requests in the attempt; a validation repair adds one."
           }
         },
         "additionalProperties": false,
@@ -1826,6 +2603,15 @@
           "output_tokens"
         ],
         "title": "AttemptOut"
+      },
+      "Basis": {
+        "type": "string",
+        "enum": [
+          "stated",
+          "inferred"
+        ],
+        "title": "Basis",
+        "description": "How an answer relates to what the person said (spec section 3: factual confirmations\nand inferences are styled differently)."
       },
       "ConnectionCheckResult": {
         "properties": {
@@ -1969,6 +2755,120 @@
         "title": "DataMode",
         "description": "Recorded on every workspace and run (Global Constraint 5, plan section 2)."
       },
+      "DecideTurn": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version"
+          },
+          "accept": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Accept"
+          },
+          "confirm_hard_constraints": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileField"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Confirm Hard Constraints"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version"
+        ],
+        "title": "DecideTurn",
+        "description": "Which proposals to apply. A hard-constraint field is applied only if it is also named\nin `confirm_hard_constraints`; proposals not accepted are recorded as rejected."
+      },
+      "DecisionOut": {
+        "properties": {
+          "decided_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Decided By"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Decided At"
+          },
+          "accepted_change_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Accepted Change Ids"
+          },
+          "rejected_change_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rejected Change Ids"
+          },
+          "confirmed_hard_constraints": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileField"
+            },
+            "type": "array",
+            "title": "Confirmed Hard Constraints"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version",
+            "description": "The profile version the decision created; null when it changed nothing."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decided_by",
+          "decided_at",
+          "accepted_change_ids",
+          "rejected_change_ids",
+          "confirmed_hard_constraints",
+          "profile_version"
+        ],
+        "title": "DecisionOut"
+      },
+      "DecisionResult": {
+        "properties": {
+          "turn_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Turn Id"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionOut"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileOut"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "turn_id",
+          "decision",
+          "profile"
+        ],
+        "title": "DecisionResult",
+        "description": "The decision and the resulting profile. The proposals are read from the turn: this\nresponse is stored as the command's receipt, and model output is kept sealed."
+      },
       "ErrorBody": {
         "properties": {
           "code": {
@@ -2056,7 +2956,11 @@
           "MODE_NOT_SUPPORTED",
           "STORE_UNAVAILABLE",
           "AUTH_UNAVAILABLE",
-          "INTERNAL_ERROR"
+          "INTERNAL_ERROR",
+          "TAXONOMY_UNAVAILABLE",
+          "CONFIRMATION_REQUIRED",
+          "PROPOSAL_NOT_AVAILABLE",
+          "ALREADY_DECIDED"
         ],
         "title": "ErrorCode"
       },
@@ -2080,6 +2984,7 @@
           "identity",
           "workspace",
           "profile",
+          "catalogue",
           "credential",
           "execution",
           "spend",
@@ -2099,7 +3004,9 @@
           "credential.rotated",
           "credential.revoked",
           "spend_limits.updated",
-          "run.state_changed"
+          "run.state_changed",
+          "concept.provisional_created",
+          "interview.turn_decided"
         ],
         "title": "EventKind"
       },
@@ -2195,6 +3102,8 @@
           "provider_request_rejected",
           "provider_unavailable",
           "invalid_model_output",
+          "model_refused",
+          "output_truncated",
           "app_store_unavailable",
           "unknown_failure"
         ],
@@ -2289,11 +3198,79 @@
         ],
         "title": "HoursInput"
       },
+      "IscoGroupOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "IscoGroupOut"
+      },
+      "LabelMatchOut": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "null when a hidden (search-only) label matched."
+          },
+          "label_kind": {
+            "type": "string",
+            "title": "Label Kind"
+          },
+          "preferred_label": {
+            "type": "string",
+            "title": "Preferred Label"
+          },
+          "isco_code": {
+            "type": "string",
+            "title": "Isco Code"
+          },
+          "isco_label": {
+            "type": "string",
+            "title": "Isco Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "label",
+          "label_kind",
+          "preferred_label",
+          "isco_code",
+          "isco_label"
+        ],
+        "title": "LabelMatchOut"
+      },
       "ModelMode": {
         "type": "string",
         "enum": [
           "standard",
-          "contributor"
+          "contributor",
+          "fixture"
         ],
         "title": "ModelMode"
       },
@@ -2377,13 +3354,286 @@
         ],
         "title": "MoneyInput"
       },
+      "OccupationHitOut": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "preferred_label": {
+            "type": "string",
+            "title": "Preferred Label"
+          },
+          "isco_code": {
+            "type": "string",
+            "title": "Isco Code"
+          },
+          "isco_label": {
+            "type": "string",
+            "title": "Isco Label"
+          },
+          "text_rank": {
+            "type": "number",
+            "title": "Text Rank",
+            "description": "PostgreSQL ts_rank_cd; orders this result only."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "preferred_label",
+          "isco_code",
+          "isco_label",
+          "text_rank"
+        ],
+        "title": "OccupationHitOut"
+      },
+      "OccupationOut": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id",
+            "description": "Nessa's internal concept ID (stable per URI)."
+          },
+          "esco_uri": {
+            "type": "string",
+            "title": "Esco Uri"
+          },
+          "esco_code": {
+            "type": "string",
+            "title": "Esco Code"
+          },
+          "preferred_label": {
+            "type": "string",
+            "title": "Preferred Label"
+          },
+          "alternative_labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alternative Labels"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "regulated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regulated",
+            "description": "null: ESCO records no regulation note."
+          },
+          "isco_groups": {
+            "items": {
+              "$ref": "#/components/schemas/IscoGroupOut"
+            },
+            "type": "array",
+            "title": "Isco Groups",
+            "description": "ISCO-08 from the major group down to the unit group (the grouping pivot)."
+          },
+          "broader_concept_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broader Concept Id"
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/SkillRefOut"
+            },
+            "type": "array",
+            "title": "Skills"
+          },
+          "attribution": {
+            "type": "string",
+            "title": "Attribution"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "esco_uri",
+          "esco_code",
+          "preferred_label",
+          "alternative_labels",
+          "description",
+          "regulated",
+          "isco_groups",
+          "broader_concept_id",
+          "skills",
+          "attribution"
+        ],
+        "title": "OccupationOut"
+      },
+      "OccupationSearchOut": {
+        "properties": {
+          "release": {
+            "$ref": "#/components/schemas/TaxonomyReleaseOut"
+          },
+          "match": {
+            "$ref": "#/components/schemas/SearchMatch"
+          },
+          "label_matches": {
+            "items": {
+              "$ref": "#/components/schemas/LabelMatchOut"
+            },
+            "type": "array",
+            "title": "Label Matches"
+          },
+          "full_text": {
+            "items": {
+              "$ref": "#/components/schemas/OccupationHitOut"
+            },
+            "type": "array",
+            "title": "Full Text"
+          },
+          "full_text_total": {
+            "type": "integer",
+            "title": "Full Text Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "release",
+          "match",
+          "label_matches",
+          "full_text",
+          "full_text_total",
+          "limit"
+        ],
+        "title": "OccupationSearchOut",
+        "description": "Exact label matches (all of them, when several occupations share a label), then\nranked full-text matches. `full_text_total` counts every other full-text match, so a\nlimited page is never mistaken for the whole result."
+      },
+      "PlaceList": {
+        "properties": {
+          "country_code": {
+            "type": "string",
+            "title": "Country Code",
+            "default": "GB"
+          },
+          "subdivision_code": {
+            "type": "string",
+            "title": "Subdivision Code",
+            "default": "GB-ENG"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url",
+            "default": "https://www.gov.uk/government/publications/list-of-cities/list-of-cities-html"
+          },
+          "retrieved": {
+            "type": "string",
+            "title": "Retrieved",
+            "default": "2026-10-28"
+          },
+          "source_sha256": {
+            "type": "string",
+            "title": "Source Sha256",
+            "default": "7da9d66117dc3cc23dbb8e1614d1229adab5cac7b045140d96fb3cb3b7d05afe"
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence",
+            "default": "Open Government Licence v3.0"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlaceOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "PlaceList",
+        "description": "The finite list of English cities a work area can name. A city is geography only:\nit never implies residence or the right to work."
+      },
+      "PlaceOut": {
+        "properties": {
+          "place_id": {
+            "type": "string",
+            "title": "Place Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases"
+          },
+          "country_code": {
+            "type": "string",
+            "title": "Country Code"
+          },
+          "subdivision_code": {
+            "type": "string",
+            "title": "Subdivision Code"
+          },
+          "region_code": {
+            "type": "string",
+            "title": "Region Code",
+            "description": "ONS region (E12) code."
+          },
+          "region": {
+            "type": "string",
+            "title": "Region"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "place_id",
+          "label",
+          "aliases",
+          "country_code",
+          "subdivision_code",
+          "region_code",
+          "region",
+          "timezone"
+        ],
+        "title": "PlaceOut"
+      },
       "ProfileDocument": {
         "properties": {
           "schema_version": {
             "type": "string",
-            "const": "1",
+            "const": "2",
             "title": "Schema Version",
-            "default": "1"
+            "default": "2"
           },
           "preferred_name": {
             "$ref": "#/components/schemas/TextField"
@@ -2405,6 +3655,15 @@
           },
           "monthly_payment_cap": {
             "$ref": "#/components/schemas/MoneyField"
+          },
+          "enjoyed_tasks": {
+            "$ref": "#/components/schemas/TextListField"
+          },
+          "confident_tasks": {
+            "$ref": "#/components/schemas/TextListField"
+          },
+          "evidenced_tasks": {
+            "$ref": "#/components/schemas/TextListField"
           }
         },
         "additionalProperties": false,
@@ -2416,10 +3675,30 @@
           "target_titles",
           "weekly_study_hours",
           "direct_spend_cap",
-          "monthly_payment_cap"
+          "monthly_payment_cap",
+          "enjoyed_tasks",
+          "confident_tasks",
+          "evidenced_tasks"
         ],
         "title": "ProfileDocument",
         "description": "A stored profile version's content: each field with the source that established it."
+      },
+      "ProfileField": {
+        "type": "string",
+        "enum": [
+          "preferred_name",
+          "current_role",
+          "cities",
+          "target_titles",
+          "weekly_study_hours",
+          "direct_spend_cap",
+          "monthly_payment_cap",
+          "enjoyed_tasks",
+          "confident_tasks",
+          "evidenced_tasks"
+        ],
+        "title": "ProfileField",
+        "description": "The only names a proposal may use: the profile's own fields."
       },
       "ProfileInput": {
         "properties": {
@@ -2431,7 +3710,7 @@
           },
           "cities": {
             "$ref": "#/components/schemas/TextListInput",
-            "description": "At most 3 distinct cities."
+            "description": "At most 3 distinct cities from `GET /v1/places`."
           },
           "target_titles": {
             "$ref": "#/components/schemas/TextListInput",
@@ -2445,6 +3724,18 @@
           },
           "monthly_payment_cap": {
             "$ref": "#/components/schemas/MoneyInput"
+          },
+          "enjoyed_tasks": {
+            "$ref": "#/components/schemas/TextListInput",
+            "description": "Tasks the person enjoys (interest), at most 8."
+          },
+          "confident_tasks": {
+            "$ref": "#/components/schemas/TextListInput",
+            "description": "Tasks the person believes they can do (confidence), at most 8."
+          },
+          "evidenced_tasks": {
+            "$ref": "#/components/schemas/TextListInput",
+            "description": "Tasks the person has evidence they can do, at most 8."
           }
         },
         "additionalProperties": false,
@@ -2456,7 +3747,10 @@
           "target_titles",
           "weekly_study_hours",
           "direct_spend_cap",
-          "monthly_payment_cap"
+          "monthly_payment_cap",
+          "enjoyed_tasks",
+          "confident_tasks",
+          "evidenced_tasks"
         ],
         "title": "ProfileInput",
         "description": "What a client submits: states and values only."
@@ -2560,6 +3854,235 @@
         ],
         "title": "ProfileWriteIn"
       },
+      "ProposalOrigin": {
+        "type": "string",
+        "enum": [
+          "model",
+          "fixture"
+        ],
+        "title": "ProposalOrigin"
+      },
+      "ProposalOut": {
+        "properties": {
+          "origin": {
+            "$ref": "#/components/schemas/ProposalOrigin",
+            "description": "fixture: the deterministic demo interviewer (synthetic), never a live model."
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version"
+          },
+          "profile_version": {
+            "type": "integer",
+            "title": "Profile Version",
+            "description": "The profile version the proposals were made for."
+          },
+          "reply": {
+            "type": "string",
+            "title": "Reply"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedChangeOut"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "next_question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Question"
+          },
+          "missing_critical_fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileField"
+            },
+            "type": "array",
+            "title": "Missing Critical Fields"
+          },
+          "ready_for_review": {
+            "type": "boolean",
+            "title": "Ready For Review"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "origin",
+          "prompt_version",
+          "profile_version",
+          "reply",
+          "changes",
+          "next_question",
+          "missing_critical_fields",
+          "ready_for_review"
+        ],
+        "title": "ProposalOut",
+        "description": "A complete, validated interview output. Nothing in it is saved until decided."
+      },
+      "ProposedChangeOut": {
+        "properties": {
+          "change_id": {
+            "type": "string",
+            "title": "Change Id"
+          },
+          "field": {
+            "$ref": "#/components/schemas/ProfileField"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AnsweredState"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "The proposed answer, typed as the field's input; null unless provided."
+          },
+          "basis": {
+            "$ref": "#/components/schemas/Basis",
+            "description": "stated (the person said it) or inferred (implied)."
+          },
+          "message_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Message Ids",
+            "description": "The person's messages it rests on."
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "hard_constraint": {
+            "type": "boolean",
+            "title": "Hard Constraint",
+            "description": "A limit or target: applied only if named in confirm_hard_constraints."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "change_id",
+          "field",
+          "state",
+          "value",
+          "basis",
+          "message_ids",
+          "reason",
+          "hard_constraint"
+        ],
+        "title": "ProposedChangeOut"
+      },
+      "ProvisionalConceptOut": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source_ref_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Ref Id"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "title",
+          "source_ref_id",
+          "created_by",
+          "created_at"
+        ],
+        "title": "ProvisionalConceptOut",
+        "description": "A title the person verified that ESCO does not hold: no ESCO URI, no ISCO group."
+      },
+      "ProvisionalConceptPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProvisionalConceptOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "ProvisionalConceptPage"
+      },
+      "RegisterProvisionalConcept": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "RegisterProvisionalConcept"
+      },
       "RenameWorkspaceIn": {
         "properties": {
           "expected_version": {
@@ -2585,7 +4108,8 @@
       "RunKind": {
         "type": "string",
         "enum": [
-          "connection_check"
+          "connection_check",
+          "interview_turn"
         ],
         "title": "RunKind"
       },
@@ -2670,7 +4194,20 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "A connection check's result. An interview turn's proposals are read through the turn (`GET .../interview/turns/{turn_id}`)."
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version",
+            "description": "The profile version the run read, pinned at submission."
           }
         },
         "additionalProperties": false,
@@ -2722,6 +4259,14 @@
         ],
         "title": "RunPage"
       },
+      "SearchMatch": {
+        "type": "string",
+        "enum": [
+          "all",
+          "any"
+        ],
+        "title": "SearchMatch"
+      },
       "SetSpendLimits": {
         "properties": {
           "expected_version": {
@@ -2750,11 +4295,50 @@
         ],
         "title": "SetSpendLimits"
       },
+      "SkillRefOut": {
+        "properties": {
+          "skill_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Skill Id"
+          },
+          "preferred_label": {
+            "type": "string",
+            "title": "Preferred Label"
+          },
+          "skill_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Type"
+          },
+          "relation": {
+            "type": "string",
+            "title": "Relation",
+            "description": "essential or optional (ESCO's occupation-skill link)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "skill_id",
+          "preferred_label",
+          "skill_type",
+          "relation"
+        ],
+        "title": "SkillRefOut"
+      },
       "SourceKind": {
         "type": "string",
         "enum": [
           "direct_entry",
-          "fixture"
+          "fixture",
+          "conversation"
         ],
         "title": "SourceKind"
       },
@@ -2815,6 +4399,36 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "message_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Message Ids"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Basis"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -2829,7 +4443,8 @@
           "observed_at",
           "created_at"
         ],
-        "title": "SourceOut"
+        "title": "SourceOut",
+        "description": "Where an answer came from. A conversation source also names the turn that proposed\nit, the person's messages it cites and its basis; `recorded_by` confirmed it."
       },
       "SourcePage": {
         "properties": {
@@ -2937,7 +4552,9 @@
       "SubmitRun": {
         "properties": {
           "kind": {
-            "$ref": "#/components/schemas/RunKind"
+            "type": "string",
+            "const": "connection_check",
+            "title": "Kind"
           }
         },
         "additionalProperties": false,
@@ -2945,7 +4562,123 @@
         "required": [
           "kind"
         ],
-        "title": "SubmitRun"
+        "title": "SubmitRun",
+        "description": "`POST /runs` starts the runs that need no input; interview turns have their own\nendpoint, which records the person's message with the run."
+      },
+      "SubmitTurn": {
+        "properties": {
+          "expected_profile_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Profile Version"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_profile_version",
+          "message"
+        ],
+        "title": "SubmitTurn"
+      },
+      "TaxonomyReleaseOut": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "title": "Dataset Id"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "native_code_version": {
+            "type": "string",
+            "title": "Native Code Version"
+          },
+          "transformation_version": {
+            "type": "string",
+            "title": "Transformation Version"
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence"
+          },
+          "attribution": {
+            "type": "string",
+            "title": "Attribution"
+          },
+          "sample": {
+            "type": "boolean",
+            "title": "Sample",
+            "description": "A reduced test copy: never the catalogue a person sees."
+          },
+          "isco_group_count": {
+            "type": "integer",
+            "title": "Isco Group Count"
+          },
+          "occupation_count": {
+            "type": "integer",
+            "title": "Occupation Count"
+          },
+          "skill_count": {
+            "type": "integer",
+            "title": "Skill Count"
+          },
+          "repeated_rows_collapsed": {
+            "type": "integer",
+            "title": "Repeated Rows Collapsed",
+            "description": "Concept rows the release repeats with only their modified date changed, imported once (part of the transformation)."
+          },
+          "imported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Imported At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "version",
+          "language",
+          "source_url",
+          "sha256",
+          "size_bytes",
+          "native_code_version",
+          "transformation_version",
+          "licence",
+          "attribution",
+          "sample",
+          "isco_group_count",
+          "occupation_count",
+          "skill_count",
+          "repeated_rows_collapsed",
+          "imported_at"
+        ],
+        "title": "TaxonomyReleaseOut",
+        "description": "The import manifest of the ESCO release in use (TAX1-04). Show `attribution` wherever\nESCO content appears (ESCO's reuse condition)."
       },
       "TextField": {
         "properties": {
@@ -3081,6 +4814,101 @@
         ],
         "title": "TextListInput"
       },
+      "TurnOut": {
+        "properties": {
+          "turn_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Turn Id"
+          },
+          "message_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Message Id"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "profile_version": {
+            "type": "integer",
+            "title": "Profile Version",
+            "description": "The profile version the message was sent with."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunOut"
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposalOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "turn_id",
+          "message_id",
+          "message",
+          "profile_version",
+          "created_at",
+          "run",
+          "proposal",
+          "decision"
+        ],
+        "title": "TurnOut",
+        "description": "One interview turn. `run` is authoritative for its state: `proposal` exists only when\nthe run is complete, and a failed run's failure class says why there is none."
+      },
+      "TurnPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TurnOut"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Newest first."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "TurnPage"
+      },
       "WorkState": {
         "type": "string",
         "enum": [
@@ -3109,9 +4937,9 @@
           },
           "format_version": {
             "type": "integer",
-            "const": 1,
+            "const": 2,
             "title": "Format Version",
-            "default": 1
+            "default": 2
           },
           "exported_at": {
             "type": "string",
@@ -3160,6 +4988,21 @@
             "type": "array",
             "title": "Runs"
           },
+          "interview_turns": {
+            "items": {
+              "$ref": "#/components/schemas/TurnOut"
+            },
+            "type": "array",
+            "title": "Interview Turns",
+            "description": "Oldest first."
+          },
+          "provisional_concepts": {
+            "items": {
+              "$ref": "#/components/schemas/ProvisionalConceptOut"
+            },
+            "type": "array",
+            "title": "Provisional Concepts"
+          },
           "spend": {
             "$ref": "#/components/schemas/SpendOut"
           }
@@ -3175,6 +5018,8 @@
           "events",
           "credentials",
           "runs",
+          "interview_turns",
+          "provisional_concepts",
           "spend"
         ],
         "title": "WorkspaceExport"

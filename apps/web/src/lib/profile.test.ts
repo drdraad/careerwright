@@ -6,7 +6,7 @@ const SOURCE = "6f1d3c2a-0000-4000-8000-000000000001";
 
 function document(overrides: Partial<ProfileDocument> = {}): ProfileDocument {
   return {
-    schema_version: "1",
+    schema_version: "2",
     preferred_name: { state: "unasked", value: null, source_ref_id: null },
     current_role: { state: "unknown", value: null, source_ref_id: SOURCE },
     cities: { state: "provided", value: ["Manchester"], source_ref_id: SOURCE },
@@ -18,6 +18,9 @@ function document(overrides: Partial<ProfileDocument> = {}): ProfileDocument {
       source_ref_id: SOURCE,
     },
     monthly_payment_cap: { state: "prefer_not_to_say", value: null, source_ref_id: SOURCE },
+    enjoyed_tasks: { state: "unasked", value: null, source_ref_id: null },
+    confident_tasks: { state: "unasked", value: null, source_ref_id: null },
+    evidenced_tasks: { state: "unasked", value: null, source_ref_id: null },
     ...overrides,
   };
 }
@@ -47,8 +50,26 @@ describe("[API-04] the profile form sends exactly what was answered, in integer 
         weekly_study_hours: { state: "skipped" },
         direct_spend_cap: { state: "provided", value: { minor_units: 150000, currency: "GBP" } },
         monthly_payment_cap: { state: "prefer_not_to_say" },
+        enjoyed_tasks: { state: "unasked" },
+        confident_tasks: { state: "unasked" },
+        evidenced_tasks: { state: "unasked" },
       },
     });
+  });
+
+  it("bounds each list by its own limit: three work areas, eight tasks", () => {
+    const draft = draftFrom(document());
+    draft.cities = { state: "provided", text: "", items: ["Leeds", "York", "Bath", "Ely"] };
+    draft.enjoyed_tasks = {
+      state: "provided",
+      text: "",
+      items: Array.from({ length: 8 }, (_, n) => `task ${n}`),
+    };
+
+    const result = inputFrom(draft);
+
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.problems).toEqual({ cities: { kind: "too_many", limit: 3 } });
   });
 
   it("reads typed pounds and pence as integer minor units", () => {

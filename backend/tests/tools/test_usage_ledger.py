@@ -85,6 +85,17 @@ def test_a_scope_s_spend_counts_its_calls_and_every_unknown_cost_at_its_reservat
     assert ledger.spent("unused") == ScopeSpend(0, 0, 0)
 
 
+@pytest.mark.req("MODEL-09")
+def test_a_row_for_an_attempt_with_a_repair_counts_both_requests(tmp_path: Path) -> None:
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+    ledger.append(entry(http_requests=2, is_production_model=True))
+    ledger.append(entry())
+
+    assert ledger.spent("live-smoke").calls == 3
+    assert ledger.spent("live-smoke").production_calls == 2
+    assert "POST /v1/responses x 2" in ledger.render_markdown_table()
+
+
 def test_the_markdown_is_written_next_to_its_ledger(tmp_path: Path) -> None:
     ledger = Ledger(tmp_path / "live-usage.jsonl")
     ledger.append(entry())

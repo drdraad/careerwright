@@ -32,6 +32,9 @@ class LiveCallEntry(BaseModel):
 
     budget_scope: str
     purpose: str
+    # HTTP requests the row stands for: one, or an activity attempt's call and its validation
+    # repair (tokens and cost are the attempt's total). The caps count requests.
+    http_requests: int = Field(default=1, ge=1)
     model_id: str
     is_production_model: bool
     endpoint: str
@@ -62,7 +65,7 @@ class LedgerBusyError(SystemExit):
 class ScopeSpend:
     """What a budget scope has used so far, from the ledger."""
 
-    calls: int
+    calls: int  # HTTP requests
     production_calls: int
     committed_nano_usd: int  # known costs plus the full reservation of every unknown one
 
@@ -92,8 +95,8 @@ class Ledger:
     def spent(self, scope: str) -> ScopeSpend:
         rows = [r for r in self.records() if r.budget_scope == scope]
         return ScopeSpend(
-            calls=len(rows),
-            production_calls=sum(r.is_production_model for r in rows),
+            calls=sum(r.http_requests for r in rows),
+            production_calls=sum(r.http_requests for r in rows if r.is_production_model),
             committed_nano_usd=sum(
                 r.reserved_nano_usd
                 if r.estimated_cost_nano_usd is None
@@ -138,10 +141,11 @@ class Ledger:
             if r.outcome is CallOutcome.FAILED:
                 known = [str(part) for part in (r.http_status, r.error_type) if part]
                 outcome = f"failed ({' '.join(known) or 'no detail'})"
+            endpoint = r.endpoint + (f" x {r.http_requests}" if r.http_requests > 1 else "")
             rows.append(
                 f"| {r.seq} | {r.recorded_at:%Y-%m-%d %H:%M:%S} | {r.budget_scope} | {r.purpose} "
                 f"| `{r.model_id}`{' (production)' if r.is_production_model else ''} "
-                f"| {r.endpoint} | {outcome} "
+                f"| {endpoint} | {outcome} "
                 f"| {_count(r.input_tokens)} ({_count(r.cached_input_tokens)}) "
                 f"| {_count(r.output_tokens)} ({_count(r.reasoning_tokens)}) "
                 f"| {_count(r.web_search_queries)} | {cost} | {running} "
@@ -172,10 +176,15 @@ class Ledger:
             "  developer dashboard.\n"
             "- Budgets: `task-1-sprint-0` (Sprint 0 spike): at most 15 calls, 5 on the production\n"
             "  model, $0.30 worst case. `live-smoke` (`make live-smoke`): each invocation at most\n"
-            "  3 calls, none on the production model unless `PRODUCTION=1`, and a worst-case cost\n"
-            "  cap; cumulatively at most 9 calls, 3 on the production model and $0.30 worst case\n"
-            "  (unknown costs count their full reservation; `NESSA_LIVE_SMOKE_*` changes them).\n"
-            "  Both are enforced in `backend/tools/live_smoke.py` before the stack starts.\n\n"
+            "  3 calls (a connection check) or 2 (`INTERVIEW=1`: one interview attempt and at\n"
+            "  most one validation repair), none on the production model unless\n"
+            "  `PRODUCTION=1`, and a worst-case cost cap; cumulatively at most 9 calls, 3 on the\n"
+            "  production model and $0.30 worst case (unknown costs count their full\n"
+            "  reservation; `NESSA_LIVE_SMOKE_*` changes them). Both are enforced in\n"
+            "  `backend/tools/live_smoke.py` before the stack starts.\n"
+            "- A row for an activity attempt that sent more than one request (the call and its\n"
+            "  validation repair) shows `x N` after the endpoint; its tokens and cost are the\n"
+            "  attempt's total, and the caps count every request.\n\n"
             f"{self.render_markdown_table()}\n",
             encoding="utf-8",
         )

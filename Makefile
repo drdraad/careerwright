@@ -1,12 +1,14 @@
 # Nessa L0 command contract (development plan section 2). Run from the repository root.
-#   make setup              check prerequisites, install locked dependencies, create local config, build images
+#   make setup              check prerequisites, install locked dependencies, create local config,
+#                           fetch and verify the pinned ESCO release, build images
 #   make dev                start the live stack (the worker may reach Meta), migrate, seed, print URLs
 #   make demo               start the stack with no route out of the machine (fixture workspace)
 #   make check              format, lint, types and fast deterministic tests, backend and web (no Docker)
 #   make acceptance         full offline suite against real PostgreSQL 16, DBOS and the Auth emulator,
 #                           then the Storybook build and the browser journeys on their own stack
 #   make live-smoke         budget-capped real Meta smoke on the test model; PRODUCTION=1 (exactly)
-#                           qualifies the production model
+#                           qualifies the production model; INTERVIEW=1 (exactly) runs one
+#                           interview turn and confirms its proposals instead of a connection check
 #   make stop               stop every service, bounded; persisted work is kept
 #   make reset-demo         recreate the named fixture workspace only
 #   make rotate-master-key  add a master key version, reload it, reseal every sealed record
@@ -48,7 +50,7 @@ acceptance:
 
 # Only PRODUCTION=1 opts in to the production model; any other value (0, false, no) does not.
 live-smoke:
-	$(BACKEND) $(UV) python -m tools.live_smoke $(if $(filter 1,$(PRODUCTION)),--production-model,)
+	$(BACKEND) $(UV) python -m tools.live_smoke $(if $(filter 1,$(PRODUCTION)),--production-model,) $(if $(filter 1,$(INTERVIEW)),--interview,)
 
 stop:
 	$(BACKEND) $(UV) python -m tools.stack stop

@@ -1,14 +1,21 @@
 """Run commands: submit a run (202 + run ID) through the transactional outbox, and read it.
 
 Submission records the run, its pinned model, the workspace's data mode and synthetic label,
-and the outbox entry in one transaction. It refuses early what the worker would refuse
-anyway (demo runtime or workspace, no key, the Contributor model on non-synthetic data, a
-call that cannot fit the spend limits), but the worker re-checks everything before the
-call, because keys, access and budgets can change while a run is queued.
+the profile version it read (if any), its sealed input (if any) and the outbox entry in one
+transaction. It refuses early what the worker would refuse anyway (demo runtime, no key,
+the Contributor model on non-synthetic data, a call that cannot fit the spend limits), but
+the worker re-checks everything before the call, because keys, access and budgets can
+change while a run is queued.
+
+A demo workspace never reaches a provider: its interview turns use the fixture
+interviewer (no key, no spend, no network), and every other kind is refused.
 """
 
 import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -18,19 +25,36 @@ from nessa.errors import ErrorCode, ErrorStage, NessaError
 from nessa.identity import connection_check, credential_store, run_store, store
 from nessa.identity.access import Actor
 from nessa.identity.keyring import Keyring, RecordContext
-from nessa.identity.model_choice import ModelChoice, assert_model_permitted
+from nessa.identity.model_choice import ModelChoice, assert_model_permitted, fixture_model
+from nessa.identity.model_registry import ModelEntry
 from nessa.identity.records import EventKind, Run, RunKind
 from nessa.identity.spend import SpendLimits, budget_exceeded, period_start, refused_scope
 from nessa.identity.workspaces import visible_workspace
 from nessa.vocabulary import DataMode, WorkState
 
 OUTPUT_KIND = "run_output"
+INPUT_KIND = "run_input"
 
 
 class SubmitRun(BaseModel):
+    """`POST /runs` starts the runs that need no input; interview turns have their own
+    endpoint, which records the person's message with the run."""
+
     model_config = ConfigDict(extra="forbid")
 
+    kind: Literal[RunKind.CONNECTION_CHECK]
+
+
+@dataclass(frozen=True)
+class RunRequest:
     kind: RunKind
+    worst_case_nano_usd: Callable[[str], int]  # one attempt, for a model ID
+    profile_version: int | None = None  # the profile version the run reads, pinned
+    input: bytes | None = None  # sealed into the run; opened only by the worker's activity
+
+
+def connection_check_request() -> RunRequest:
+    return RunRequest(RunKind.CONNECTION_CHECK, connection_check.worst_case_nano_usd)
 
 
 def workflow_id(run_id: uuid.UUID) -> str:
@@ -41,32 +65,22 @@ def output_context(workspace_id: uuid.UUID, output_id: uuid.UUID) -> RecordConte
     return RecordContext(OUTPUT_KIND, str(workspace_id), str(output_id))
 
 
-def submit_run(
+def input_context(workspace_id: uuid.UUID, run_id: uuid.UUID) -> RecordContext:
+    return RecordContext(INPUT_KIND, str(workspace_id), str(run_id))
+
+
+def _provider_model(
     tx: Tx,
-    actor: Actor,
     workspace_id: uuid.UUID,
-    command: SubmitRun,
+    synthetic: bool,
+    request: RunRequest,
     *,
     models: ModelChoice,
-    runtime_mode: RuntimeMode,
     defaults: SpendLimits,
     now: datetime,
-) -> Run:
-    workspace = visible_workspace(tx, workspace_id, lock=True)
-    if runtime_mode is RuntimeMode.DEMO:
-        raise NessaError(
-            ErrorCode.MODEL_UNAVAILABLE,
-            "Nessa is running in offline demo mode, so no model calls are made.",
-            stage=ErrorStage.EXECUTION,
-        )
-    if workspace.data_mode is DataMode.DEMO:
-        raise NessaError(
-            ErrorCode.MODE_NOT_SUPPORTED,
-            "Demo workspaces run on fixtures only and never call a model.",
-            stage=ErrorStage.EXECUTION,
-        )
-    model = models.for_workspace(synthetic=workspace.synthetic)
-    assert_model_permitted(model, synthetic=workspace.synthetic)
+) -> ModelEntry:
+    model = models.for_workspace(synthetic=synthetic)
+    assert_model_permitted(model, synthetic=synthetic)
     if not any(c.revoked_at is None for c in credential_store.credentials(tx, workspace_id)):
         raise NessaError(
             ErrorCode.CREDENTIAL_REQUIRED,
@@ -80,14 +94,57 @@ def submit_run(
         limits,
         period_committed=committed,
         run_committed=0,
-        worst_case=connection_check.worst_case_nano_usd(model.model_id),
+        worst_case=request.worst_case_nano_usd(model.model_id),
     )
     if scope is not None:
         raise budget_exceeded(scope)
+    return model
+
+
+def submit_run(
+    tx: Tx,
+    actor: Actor,
+    workspace_id: uuid.UUID,
+    request: RunRequest,
+    *,
+    models: ModelChoice,
+    keyring: Keyring,
+    runtime_mode: RuntimeMode,
+    defaults: SpendLimits,
+    now: datetime,
+) -> Run:
+    workspace = visible_workspace(tx, workspace_id, lock=True)
+    uses_fixture = workspace.data_mode is DataMode.DEMO and request.kind is RunKind.INTERVIEW_TURN
+    if not uses_fixture:
+        if runtime_mode is RuntimeMode.DEMO:
+            raise NessaError(
+                ErrorCode.MODEL_UNAVAILABLE,
+                "Nessa is running in offline demo mode, so no model calls are made.",
+                stage=ErrorStage.EXECUTION,
+            )
+        if workspace.data_mode is DataMode.DEMO:
+            raise NessaError(
+                ErrorCode.MODE_NOT_SUPPORTED,
+                "Demo workspaces run on fixtures only and never call a model.",
+                stage=ErrorStage.EXECUTION,
+            )
+    model = (
+        fixture_model()
+        if uses_fixture
+        else _provider_model(
+            tx,
+            workspace_id,
+            workspace.synthetic,
+            request,
+            models=models,
+            defaults=defaults,
+            now=now,
+        )
+    )
     run = Run(
         run_id=uuid.uuid4(),
         workspace_id=workspace_id,
-        kind=command.kind,
+        kind=request.kind,
         data_mode=workspace.data_mode,
         synthetic=workspace.synthetic,
         requested_by=actor.actor_id,
@@ -99,8 +156,14 @@ def submit_run(
         created_at=now,
         started_at=None,
         finished_at=None,
+        profile_version=request.profile_version,
     )
-    run_store.insert_run(tx, run, workflow_id(run.run_id))
+    sealed = (
+        None
+        if request.input is None
+        else keyring.seal(request.input, input_context(workspace_id, run.run_id))
+    )
+    run_store.insert_run(tx, run, workflow_id(run.run_id), sealed)
     store.append_event(
         tx,
         workspace_id,
@@ -125,12 +188,21 @@ def visible_run(tx: Tx, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Run:
     return found
 
 
-def open_output(
-    tx: Tx, keyring: Keyring, run: Run
-) -> connection_check.ConnectionCheckResult | None:
+def open_output(tx: Tx, keyring: Keyring, run: Run) -> bytes | None:
+    """The run's accepted output (its validated JSON), or None if it has none."""
     sealed = run_store.sealed_output(tx, run.run_id)
     if sealed is None:
         return None
     output_id, value = sealed
-    plaintext = keyring.open(value, output_context(run.workspace_id, output_id))
+    return keyring.open(value, output_context(run.workspace_id, output_id))
+
+
+def connection_check_output(
+    tx: Tx, keyring: Keyring, run: Run
+) -> connection_check.ConnectionCheckResult | None:
+    if run.kind is not RunKind.CONNECTION_CHECK:
+        return None
+    plaintext = open_output(tx, keyring, run)
+    if plaintext is None:
+        return None
     return connection_check.ConnectionCheckResult.model_validate_json(plaintext)

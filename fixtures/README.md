@@ -41,6 +41,13 @@ TRACE-01 (plan section 8). It holds only what the specification states: months, 
 direct cost and expected layer. Schedules, dates and ledgers are listed as not specified
 rather than invented.
 
+## `esco-sample/`: a reduced copy of ESCO for tests
+
+Not synthetic: a labelled, hash-pinned subset of the official ESCO v1.2.1 release, so the
+test suite imports a taxonomy without the network. The product imports the full release,
+which `make setup` fetches (ruling R7). Details, licence and derivation:
+`esco-sample/README.md`.
+
 ## Rules for using these fixtures
 
 - Namespace the two route fixtures separately: `TRACE-01` routes are economic-cost mode,

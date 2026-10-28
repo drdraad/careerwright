@@ -15,7 +15,13 @@ from nessa.identity import run_store
 from nessa.identity.keyring import Keyring
 from nessa.identity.receipts import CommandResult, fingerprint, run_idempotent
 from nessa.identity.records import Run
-from nessa.identity.runs import SubmitRun, open_output, submit_run, visible_run
+from nessa.identity.runs import (
+    SubmitRun,
+    connection_check_output,
+    connection_check_request,
+    submit_run,
+    visible_run,
+)
 from nessa.identity.workspaces import visible_workspace
 
 router = APIRouter(prefix="/v1/workspaces/{workspace_id}", responses=ERROR_RESPONSES, tags=["runs"])
@@ -23,8 +29,11 @@ Limit = Annotated[int, Query(ge=1, le=MAX_LIMIT)]
 
 
 def run_out(tx: Tx, keyring: Keyring, run: Run) -> RunOut:
-    """A run with its attempts and, if accepted, its opened output (also used by export)."""
-    return RunOut.of(run, run_store.attempts(tx, run.run_id), open_output(tx, keyring, run))
+    """A run with its attempts and, for a connection check, its opened output (also used by
+    export and by interview turns, whose proposal is read through the turn)."""
+    return RunOut.of(
+        run, run_store.attempts(tx, run.run_id), connection_check_output(tx, keyring, run)
+    )
 
 
 @router.post("/runs", status_code=202, response_model=RunOut, operation_id="submit_run")
@@ -36,8 +45,9 @@ def submit(
             tx,
             caller.actor,
             workspace_id,
-            body,
+            connection_check_request(),
             models=deps.models,
+            keyring=deps.keyring,
             runtime_mode=deps.settings.runtime_mode,
             defaults=deps.spend_defaults,
             now=deps.clock(),

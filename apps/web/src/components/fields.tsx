@@ -3,7 +3,7 @@
 // answered, the value. Native controls, labelled and described, with errors announced.
 import { type ReactNode, useId } from "react";
 import type { FieldState } from "@/generated/api";
-import { type FieldDraft, LIST_LIMIT } from "@/lib/profile";
+import type { FieldDraft } from "@/lib/profile";
 import { FIELD_STATE, FIELD_STATE_ORDER } from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { Glyph } from "./Glyph";
@@ -101,11 +101,19 @@ export function ValueInput({ label, kind, draft, error, describedBy, onChange }:
   );
 }
 
-type ListProps = ControlProps & { itemLabel: string };
+type ListProps = ControlProps & { itemLabel: string; limit: number };
 
-export function ListInput({ label, itemLabel, draft, error, describedBy, onChange }: ListProps) {
+export function ListInput({
+  label,
+  itemLabel,
+  limit,
+  draft,
+  error,
+  describedBy,
+  onChange,
+}: ListProps) {
   const items = draft.items.length === 0 ? [""] : draft.items;
-  const full = items.length >= LIST_LIMIT;
+  const full = items.length >= limit;
   const set = (next: string[]) => onChange({ ...draft, items: next });
   return (
     <fieldset className="grid gap-8" aria-describedby={describedBy}>
@@ -140,7 +148,7 @@ export function ListInput({ label, itemLabel, draft, error, describedBy, onChang
       <div className="flex flex-wrap items-center gap-8">
         <Button
           variant="quiet"
-          disabledReason={full ? `At most ${LIST_LIMIT} are supported.` : undefined}
+          disabledReason={full ? `At most ${limit} are supported.` : undefined}
           onClick={() => set([...items, ""])}
         >
           Add another {itemLabel.toLowerCase()}

@@ -2,4 +2,5 @@
 # normalisation.
 docs/design/fonts/** -text
 fixtures/m0/** -text
+fixtures/esco-sample/*.zip binary
 apps/web/src/design/fonts/** -text

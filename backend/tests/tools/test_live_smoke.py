@@ -10,6 +10,7 @@ import pytest
 from nessa.identity.model_choice import ModelChoice
 from tools import live_smoke
 from tools.live_smoke import (
+    INTERVIEW_TURN,
     MAX_CALLS,
     CapExceededError,
     ScopeBudget,
@@ -34,6 +35,69 @@ def test_the_test_model_fits_the_cap_and_is_not_a_production_call() -> None:
 
     assert model_id == "muse-spark-1.3-contributor"
     assert worst_case == MAX_CALLS * 809_600  # 4,000 in x $0.10/M + 2,048 out x $0.20/M
+
+
+@pytest.mark.req("MODEL-09")
+def test_an_interview_smoke_is_one_attempt_of_at_most_two_requests() -> None:
+    models = ModelChoice.configure("muse-spark-1.3-contributor", "muse-spark-1.3", "test")
+
+    test_model = authorise(
+        models, production=False, budget=ROOMY, spent=NOTHING_SPENT, kind=INTERVIEW_TURN
+    )
+    production = authorise(
+        models, production=True, budget=ROOMY, spent=NOTHING_SPENT, kind=INTERVIEW_TURN
+    )
+
+    assert INTERVIEW_TURN.calls() == 2
+    assert test_model == ("muse-spark-1.3-contributor", 3_500_000)  # $0.0035 worst case
+    assert production == ("muse-spark-1.3", 49_000_000)  # $0.049 worst case
+    with pytest.raises(CapExceededError, match="2 more needed"):
+        authorise(
+            models,
+            production=True,
+            budget=ROOMY,
+            spent=ScopeSpend(0, 98, 0),
+            kind=INTERVIEW_TURN,
+        )
+
+
+@pytest.mark.req("MODEL-09")
+def test_an_interview_attempt_is_ledgered_with_its_requests(tmp_path: Path) -> None:
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+    attempts = [attempt(requests_sent=2), attempt(attempt_id=2, requests_sent=None)]
+
+    ledger_attempts(
+        ledger, attempts, scope="live-smoke", production_model="muse-spark-1.3", kind=INTERVIEW_TURN
+    )
+
+    # A request count that was not recorded counts every request the attempt could send.
+    assert [r.http_requests for r in ledger.records()] == [2, 2]
+    assert ledger.spent("live-smoke").calls == 4
+    assert all(r.purpose == INTERVIEW_TURN.purpose for r in ledger.records())
+
+
+@pytest.mark.req("MODEL-09")
+def test_the_interview_smoke_workspace_allows_one_attempt_only() -> None:
+    per_attempt = INTERVIEW_TURN.per_attempt_nano_usd("muse-spark-1.3-contributor")
+    spend = {"run_limit_nano_usd": 2 * per_attempt, "period_limit_nano_usd": 2 * per_attempt}
+
+    with pytest.raises(CapExceededError, match="allow 2 attempts, more than 1"):
+        assert_attempt_bound(spend, per_attempt, INTERVIEW_TURN.attempts)
+
+
+@pytest.mark.req("MODEL-09")
+@pytest.mark.parametrize(("value", "interview"), [("1", True), ("0", False), ("", False)])
+def test_only_interview_equals_one_runs_the_interview_smoke(value: str, interview: bool) -> None:
+    dry_run = subprocess.run(  # noqa: S603 - fixed make dry run, nothing executes
+        ["make", "-n", "live-smoke", f"INTERVIEW={value}"],  # noqa: S607
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+
+    assert ("--interview" in dry_run.stdout) is interview
 
 
 @pytest.mark.req("MODEL-09")

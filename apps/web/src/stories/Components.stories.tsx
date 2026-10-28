@@ -98,6 +98,7 @@ export const FormControls: Story = {
       <ListInput
         label="Work areas"
         itemLabel="Work area"
+        limit={3}
         draft={{ state: "provided", text: "", items: ["Manchester", "Leeds", "York"] }}
         onChange={() => {}}
       />

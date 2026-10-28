@@ -75,6 +75,9 @@ def fixture_profile(fixtures_dir: Path) -> FixtureProfile:
             "weekly_study_hours": unasked,
             "direct_spend_cap": money("direct_spend_cap_minor"),
             "monthly_payment_cap": money("monthly_payment_cap_minor"),
+            "enjoyed_tasks": unasked,
+            "confident_tasks": unasked,
+            "evidenced_tasks": unasked,
         }
     )
     return FixtureProfile(

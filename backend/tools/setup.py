@@ -1,7 +1,9 @@
-"""`make setup`: check prerequisites, create the local configuration, build the images.
+"""`make setup`: check prerequisites, create the local configuration, fetch and verify the
+pinned datasets (ESCO), build the images.
 
 Run from `backend/` after `uv sync --locked`: `uv run --locked python -m tools.setup`.
-Network access is allowed here (image builds); nothing after setup needs it in demo mode.
+Network access is allowed here (downloads, image builds); nothing after setup needs it in
+demo mode.
 """
 
 import re
@@ -9,6 +11,7 @@ import shutil
 import subprocess
 import sys
 
+from tools import datasets
 from tools.localenv import ensure_local_home, nessa_home
 from tools.stack import Stack
 
@@ -50,6 +53,7 @@ def main() -> None:
         raise SystemExit(1)
     created = ensure_local_home(nessa_home())
     print(f"local configuration in {nessa_home()}: {', '.join(created) or 'already complete'}")
+    datasets.main([])  # exits non-zero, with the manual step, if a pinned file cannot be had
     print("building images (locked dependencies)...", flush=True)
     Stack().build()
     print("setup complete. Next: `make dev` (live) or `make demo` (offline).")

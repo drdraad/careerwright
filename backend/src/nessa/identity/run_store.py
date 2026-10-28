@@ -19,12 +19,12 @@ from nessa.vocabulary import DataMode, WorkState
 
 _RUN_COLUMNS = (
     "run_id, workspace_id, kind, data_mode, synthetic, requested_by, model_id, model_mode, "
-    "status, failure_class, output_id, created_at, started_at, finished_at"
+    "status, failure_class, output_id, created_at, started_at, finished_at, profile_version"
 )
 _ATTEMPT_COLUMNS = (
     "attempt_id, model_id, started_at, finished_at, outcome, spend_state, reserved_nano_usd, "
     "cost_nano_usd, input_tokens, cached_input_tokens, output_tokens, reasoning_tokens, "
-    "web_search_queries, provider_response_id"
+    "web_search_queries, provider_response_id, requests_sent"
 )
 # The committed cost of an attempt (nessa.identity.spend.committed_cost, in SQL).
 _COMMITTED = (
@@ -49,16 +49,18 @@ def _run(row: sa.RowMapping) -> Run:
         created_at=row["created_at"],
         started_at=row["started_at"],
         finished_at=row["finished_at"],
+        profile_version=row["profile_version"],
     )
 
 
-def insert_run(tx: Tx, run: Run, workflow_id: str) -> None:
-    """The run and its outbox entry, in the caller's transaction (transactional outbox)."""
+def insert_run(tx: Tx, run: Run, workflow_id: str, sealed_input: SealedValue | None) -> None:
+    """The run, its sealed input (if it has one) and its outbox entry, in the caller's
+    transaction (transactional outbox)."""
     tx.execute(
         sa.text(
             "INSERT INTO nessa.runs (run_id, workspace_id, data_mode, synthetic, kind, "
-            "requested_by, model_id, model_mode, status) VALUES (:id, :ws, :mode, :synthetic, "
-            ":kind, :by, :model, :model_mode, 'queued')"
+            "requested_by, model_id, model_mode, status, profile_version) VALUES (:id, :ws, "
+            ":mode, :synthetic, :kind, :by, :model, :model_mode, 'queued', :profile_version)"
         ),
         {
             "id": run.run_id,
@@ -69,14 +71,69 @@ def insert_run(tx: Tx, run: Run, workflow_id: str) -> None:
             "by": run.requested_by,
             "model": run.model_id,
             "model_mode": run.model_mode,
+            "profile_version": run.profile_version,
         },
     )
+    if sealed_input is not None:
+        tx.execute(
+            sa.text(
+                "INSERT INTO nessa.run_inputs (run_id, workspace_id, key_version, nonce, "
+                "ciphertext) VALUES (:id, :ws, :version, :nonce, :ciphertext)"
+            ),
+            {
+                "id": run.run_id,
+                "ws": run.workspace_id,
+                "version": sealed_input.key_version,
+                "nonce": sealed_input.nonce,
+                "ciphertext": sealed_input.ciphertext,
+            },
+        )
     tx.execute(
         sa.text(
             "INSERT INTO nessa.outbox (workspace_id, run_id, workflow_id) "
             "VALUES (:ws, :id, :workflow)"
         ),
         {"ws": run.workspace_id, "id": run.run_id, "workflow": workflow_id},
+    )
+
+
+def sealed_input(tx: Tx, run_id: uuid.UUID) -> SealedValue | None:
+    """Worker: the run's sealed input, visible only while its requester may still act."""
+    row = tx.execute(
+        sa.text("SELECT key_version, nonce, ciphertext FROM nessa.run_inputs WHERE run_id = :id"),
+        {"id": run_id},
+    ).one_or_none()
+    if row is None:
+        return None
+    return SealedValue(row.key_version, bytes(row.nonce), bytes(row.ciphertext))
+
+
+def all_sealed_inputs(tx: Tx) -> list[tuple[uuid.UUID, uuid.UUID, SealedValue]]:
+    """Setup only (master-key rotation): every sealed run input, locked."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT run_id, workspace_id, key_version, nonce, ciphertext "
+            "FROM nessa.run_inputs ORDER BY run_id FOR UPDATE"
+        )
+    )
+    return [
+        (r.run_id, r.workspace_id, SealedValue(r.key_version, bytes(r.nonce), bytes(r.ciphertext)))
+        for r in rows
+    ]
+
+
+def replace_sealed_input(tx: Tx, run_id: uuid.UUID, sealed: SealedValue) -> None:
+    tx.execute(
+        sa.text(
+            "UPDATE nessa.run_inputs SET key_version = :version, nonce = :nonce, "
+            "ciphertext = :ciphertext WHERE run_id = :id"
+        ),
+        {
+            "id": run_id,
+            "version": sealed.key_version,
+            "nonce": sealed.nonce,
+            "ciphertext": sealed.ciphertext,
+        },
     )
 
 
@@ -216,6 +273,7 @@ def finish_attempt(
     provider_response_id: str | None,
     cost_nano_usd: int | None,
     spend_state: SpendState,
+    requests_sent: int | None,
 ) -> None:
     tx.execute(
         sa.text(
@@ -223,7 +281,7 @@ def finish_attempt(
             "spend_state = :state, cost_nano_usd = :cost, input_tokens = :input, "
             "cached_input_tokens = :cached, output_tokens = :output, "
             "reasoning_tokens = :reasoning, web_search_queries = :searches, "
-            "provider_response_id = :response "
+            "provider_response_id = :response, requests_sent = :requests "
             "WHERE attempt_id = :id"
         ),
         {
@@ -237,6 +295,7 @@ def finish_attempt(
             "reasoning": reasoning_tokens,
             "searches": usage.web_search_queries if usage else None,
             "response": provider_response_id,
+            "requests": requests_sent,
         },
     )
 

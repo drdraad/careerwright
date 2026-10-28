@@ -1,12 +1,15 @@
-"""Profile commands: an expected-version write creates the next immutable profile version.
+"""Profile commands: one expected-version write path for direct edits and confirmed chat
+proposals (spec section 4: "Direct editing and chat use the same application commands").
 
-A workspace starts at version 0, the empty profile, with nothing stored. Each accepted write
-whose content differs inserts `expected_version + 1`, records a direct-entry source for the
-changed answers and appends a status event, all in the caller's transaction. A write against
-an older version is rejected as stale, never merged silently (VERSIONS-01).
+A workspace starts at version 0, the empty profile, with nothing stored. An accepted write
+that changes a field inserts `expected_version + 1`, records a source for each changed
+answer and appends a status event, all in the caller's transaction. A write against an
+older version is rejected as stale, never merged silently (VERSIONS-01), so the previous
+version survives every refused or failed write.
 """
 
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -18,13 +21,13 @@ from nessa.identity.workspaces import visible_workspace
 from nessa.profile import store
 from nessa.profile.document import (
     FIELD_NAMES,
+    FieldInput,
     ProfileDocument,
     ProfileInput,
-    apply_profile_input,
-    changed_fields,
+    apply_updates,
     empty_profile,
 )
-from nessa.profile.records import SourceKind
+from nessa.profile.records import Basis, SourceKind
 from nessa.profile.store import stale_version
 
 DIRECT_ENTRY_LABEL = "Direct entry"
@@ -39,6 +42,26 @@ class ProfileView:
     document: ProfileDocument
     created_by: uuid.UUID | None
     created_at: datetime | None
+
+
+@dataclass(frozen=True)
+class NewSource:
+    """A source reference to record if an update citing it changes the profile."""
+
+    source_ref_id: uuid.UUID
+    kind: SourceKind
+    label: str
+    observed_at: datetime
+    recorded_by: uuid.UUID
+    run_id: uuid.UUID | None = None
+    message_ids: tuple[uuid.UUID, ...] = ()
+    basis: Basis | None = None
+
+
+@dataclass(frozen=True)
+class FieldUpdate:
+    value: FieldInput
+    source: NewSource
 
 
 def current_profile(tx: Tx, workspace_id: uuid.UUID) -> ProfileView:
@@ -59,37 +82,47 @@ def cited_sources(document: ProfileDocument) -> set[uuid.UUID]:
     }
 
 
-def write_profile(
+def commit_profile_version(
     tx: Tx,
     actor: Actor,
     workspace_id: uuid.UUID,
     expected_version: int,
-    new: ProfileInput,
-    now: datetime,
-) -> tuple[ProfileView, bool]:
-    """Returns the resulting profile and whether a new version was created."""
+    updates: Mapping[str, FieldUpdate],
+) -> tuple[ProfileView, list[str]]:
+    """The one write path. Returns the resulting profile and the fields it changed (none:
+    no new version)."""
     visible_workspace(tx, workspace_id, lock=True)
     current = current_profile(tx, workspace_id)
     if expected_version != current.version:
         raise stale_version(current.version)
-    changed = changed_fields(current.document, new)
-    if not changed:
-        return current, False
-    source_id = uuid.uuid4()
-    store.insert_source(
-        tx,
-        source_ref_id=source_id,
-        workspace_id=workspace_id,
-        kind=SourceKind.DIRECT_ENTRY,
-        label=DIRECT_ENTRY_LABEL,
-        recorded_by=actor.actor_id,
-        observed_at=now,
+    document, changed = apply_updates(
+        current.document,
+        {name: (u.value, u.source.source_ref_id) for name, u in updates.items()},
     )
-    document = apply_profile_input(current.document, new, source_id)
+    if not changed:
+        return current, []
+    cited = cited_sources(document)
+    recorded: set[uuid.UUID] = set()
+    for name in changed:
+        source = updates[name].source
+        if source.source_ref_id in cited and source.source_ref_id not in recorded:
+            recorded.add(source.source_ref_id)
+            store.insert_source(
+                tx,
+                source_ref_id=source.source_ref_id,
+                workspace_id=workspace_id,
+                kind=source.kind,
+                label=source.label,
+                recorded_by=source.recorded_by,
+                observed_at=source.observed_at,
+                run_id=source.run_id,
+                message_ids=source.message_ids,
+                basis=source.basis,
+            )
     created = store.insert_profile_version(
         tx, workspace_id, expected_version + 1, document, actor.actor_id
     )
-    store.link_sources(tx, workspace_id, created.version, cited_sources(document))
+    store.link_sources(tx, workspace_id, created.version, cited)
     identity_store.append_event(
         tx,
         workspace_id,
@@ -100,4 +133,26 @@ def write_profile(
     view = ProfileView(
         workspace_id, created.version, created.document, created.created_by, created.created_at
     )
-    return view, True
+    return view, changed
+
+
+def write_profile(
+    tx: Tx,
+    actor: Actor,
+    workspace_id: uuid.UUID,
+    expected_version: int,
+    new: ProfileInput,
+    now: datetime,
+) -> tuple[ProfileView, bool]:
+    """A direct edit of the whole profile. Returns the profile and whether a version was
+    created; changed answers cite one new direct-entry source."""
+    source = NewSource(
+        source_ref_id=uuid.uuid4(),
+        kind=SourceKind.DIRECT_ENTRY,
+        label=DIRECT_ENTRY_LABEL,
+        observed_at=now,
+        recorded_by=actor.actor_id,
+    )
+    updates = {name: FieldUpdate(getattr(new, name), source) for name in FIELD_NAMES}
+    view, changed = commit_profile_version(tx, actor, workspace_id, expected_version, updates)
+    return view, bool(changed)

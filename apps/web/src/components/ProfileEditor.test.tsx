@@ -15,7 +15,7 @@ const SRC = "8d1f6f8e-46a1-5c2b-9d0e-3f7a1b2c4d5e";
 
 function documentWith(cities: string[]): ProfileDocument {
   return {
-    schema_version: "1",
+    schema_version: "2",
     preferred_name: { state: "unasked", value: null, source_ref_id: null },
     current_role: { state: "unasked", value: null, source_ref_id: null },
     cities: { state: "provided", value: cities, source_ref_id: SRC },
@@ -27,6 +27,9 @@ function documentWith(cities: string[]): ProfileDocument {
       source_ref_id: SRC,
     },
     monthly_payment_cap: { state: "unknown", value: null, source_ref_id: SRC },
+    enjoyed_tasks: { state: "unasked", value: null, source_ref_id: null },
+    confident_tasks: { state: "unasked", value: null, source_ref_id: null },
+    evidenced_tasks: { state: "unasked", value: null, source_ref_id: null },
   };
 }
 

@@ -65,10 +65,17 @@ TABLES_0001 = (
 RECEIPT_COLUMNS_0001 = "actor_id, idempotency_key, command, request_sha256, status_code, response"
 
 
+# Columns later revisions add to 0001 tables (0005: a source's turn, messages and basis).
+ADDED_SINCE_0001 = {"source_references": ["run_id", "message_ids", "basis"]}
+
+
 def snapshot(infra: Infra, database: str) -> dict[str, list[dict[str, object]]]:
+    """Every 0001 row with its 0001 columns, exactly."""
     return {
         table: infra.query(
-            f"SELECT row_to_json(t)::text AS row FROM nessa.{table} t ORDER BY 1",  # noqa: S608
+            f"SELECT (to_jsonb(t) - %s::text[])::text AS row FROM nessa.{table} t "  # noqa: S608
+            "ORDER BY 1",
+            (ADDED_SINCE_0001.get(table, []),),
             database=database,
         )
         for table in TABLES_0001
@@ -118,6 +125,12 @@ def test_a_populated_database_upgrades_to_head_without_losing_data(infra: Infra)
         engine.dispose()
 
     assert snapshot(infra, database) == before
+    # 0005's source columns are empty for every upgraded source: nothing is invented.
+    assert infra.query(
+        "SELECT count(*) AS n FROM nessa.source_references "
+        "WHERE run_id IS NOT NULL OR message_ids IS NOT NULL OR basis IS NOT NULL",
+        database=database,
+    ) == [{"n": 0}]
     # 0003: a receipt is kept and attributed to the workspace its response names; a retry
     # cache that names none is dropped (documented in the migration).
     receipts = infra.query(

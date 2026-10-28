@@ -1,10 +1,12 @@
-"""Registry of Meta models Nessa may call: privacy mode and published price (spec section 16).
+"""Registry of the models Nessa may call (spec section 16, MODEL-01): exact ID, privacy mode,
+published price and its version, qualified capabilities and evaluation status.
 
 Costs are integer nano-USD. Meta bills in USD per million tokens, so one nano-USD per token is
 $1 per billion tokens: every published rate is an exact integer and no float touches a cost.
 Contributor models let Meta train on traffic; they are for synthetic or public inputs only
 (ADR 0003), which `nessa.identity.model_choice` enforces when a run is submitted and the
-activity checks again before the call.
+activity checks again before the call. The fixture interviewer is not a provider model: it
+answers demo workspaces only, deterministically and offline.
 """
 
 from dataclasses import dataclass
@@ -21,6 +23,9 @@ WEB_SEARCH_NANO_USD_PER_QUERY = 2_500_000  # $2.50 per 1,000 queries
 class ModelMode(StrEnum):
     STANDARD = "standard"
     CONTRIBUTOR = "contributor"
+    # Nessa's deterministic stand-in for demo workspaces: no provider, no key, no network,
+    # no cost. Its proposals are labelled synthetic and pass the same validation.
+    FIXTURE = "fixture"
 
 
 @dataclass(frozen=True)
@@ -30,25 +35,56 @@ class TokenPrice:
     output_nano_usd_per_token: int
 
 
+class Capability(StrEnum):
+    SCHEMA_OUTPUT = "schema_output"  # strict JSON-schema output (`NativeOutput`)
+    STREAMING = "streaming"
+    WEB_SEARCH = "web_search"
+
+
 @dataclass(frozen=True)
 class ModelEntry:
     model_id: str
     mode: ModelMode
     price: TokenPrice
+    # Capabilities established on this exact ID by a recorded live call, and where; a model
+    # listed but never called has none (being listed does not prove it can be called).
+    capabilities: frozenset[Capability] = frozenset()
+    evaluation: str = "not evaluated"
 
 
 _STANDARD_SPARK = TokenPrice(1_250, 150, 4_250)  # $1.25 / $0.15 cached / $4.25 per M
 _CONTRIBUTOR_SPARK = TokenPrice(100, 2, 200)  # $0.10 / $0.002 cached / $0.20 per M
+_SPARK_1_3 = frozenset(Capability)
+FIXTURE_MODEL_ID = "nessa-fixture-interviewer-1"
 
 _REGISTRY = {
     entry.model_id: entry
     for entry in (
-        ModelEntry("muse-spark-1.3", ModelMode.STANDARD, _STANDARD_SPARK),
+        ModelEntry(
+            "muse-spark-1.3",
+            ModelMode.STANDARD,
+            _STANDARD_SPARK,
+            _SPARK_1_3,
+            "production: qualified, ADR 0003 (ledger calls 6-7)",
+        ),
         ModelEntry("muse-spark-1.2", ModelMode.STANDARD, _STANDARD_SPARK),
         ModelEntry("muse-spark-1.1", ModelMode.STANDARD, _STANDARD_SPARK),
-        ModelEntry("muse-spark-1.3-contributor", ModelMode.CONTRIBUTOR, _CONTRIBUTOR_SPARK),
+        ModelEntry(
+            "muse-spark-1.3-contributor",
+            ModelMode.CONTRIBUTOR,
+            _CONTRIBUTOR_SPARK,
+            _SPARK_1_3,
+            "test model, synthetic data only: qualified, ADR 0003 (ledger calls 3-5, 8, 10)",
+        ),
         ModelEntry("muse-spark-1.2-contributor", ModelMode.CONTRIBUTOR, _CONTRIBUTOR_SPARK),
         ModelEntry("muse-wonder-1.0", ModelMode.STANDARD, TokenPrice(4_000, 200, 20_000)),
+        ModelEntry(
+            FIXTURE_MODEL_ID,
+            ModelMode.FIXTURE,
+            TokenPrice(0, 0, 0),
+            frozenset({Capability.SCHEMA_OUTPUT}),
+            "deterministic demo interviewer; tested offline (ADR 0006)",
+        ),
     )
 }
 

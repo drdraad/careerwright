@@ -48,7 +48,11 @@ export type FieldProblem =
   | { kind: "too_many"; limit: number }
   | { kind: "duplicate" };
 
-export const LIST_LIMIT = 3; // spec BND-1: three cities, three active targets
+/** How many entries a list field takes (the API's bound; spec BND-1 for cities and targets). */
+export function listLimit(name: ProfileFieldName): number {
+  const meta = PROFILE_FIELDS[name];
+  return meta.kind === "list" ? meta.limit : 0;
+}
 
 export type DraftResult =
   | { ok: true; input: ProfileInput }
@@ -69,14 +73,14 @@ function readText(field: FieldDraft): Read<ProfileInput["current_role"]> {
   return { ok: true, input: { state: "provided", value: text } };
 }
 
-function readList(field: FieldDraft): Read<ProfileInput["cities"]> {
+function readList(field: FieldDraft, limit: number): Read<ProfileInput["cities"]> {
   const other = unanswered(field);
   if (other !== null) return { ok: true, input: other };
   const items = field.items.map((item) => item.trim()).filter((item) => item !== "");
   const folded = items.map((item) => item.toLocaleLowerCase("en-GB"));
   if (items.length === 0) return { ok: false, problem: { kind: "required" } };
-  if (items.length > LIST_LIMIT) {
-    return { ok: false, problem: { kind: "too_many", limit: LIST_LIMIT } };
+  if (items.length > limit) {
+    return { ok: false, problem: { kind: "too_many", limit } };
   }
   if (new Set(folded).size !== folded.length) return { ok: false, problem: { kind: "duplicate" } };
   return { ok: true, input: { state: "provided", value: items } };
@@ -106,14 +110,18 @@ function readMoney(field: FieldDraft): Read<ProfileInput["direct_spend_cap"]> {
 
 /** Turns the draft into the API's input, or names each field that cannot be sent as typed. */
 export function inputFrom(draft: ProfileDraft): DraftResult {
+  const list = (name: ProfileFieldName) => readList(draft[name], listLimit(name));
   const read = {
     preferred_name: readText(draft.preferred_name),
     current_role: readText(draft.current_role),
-    cities: readList(draft.cities),
-    target_titles: readList(draft.target_titles),
+    cities: list("cities"),
+    target_titles: list("target_titles"),
     weekly_study_hours: readHours(draft.weekly_study_hours),
     direct_spend_cap: readMoney(draft.direct_spend_cap),
     monthly_payment_cap: readMoney(draft.monthly_payment_cap),
+    enjoyed_tasks: list("enjoyed_tasks"),
+    confident_tasks: list("confident_tasks"),
+    evidenced_tasks: list("evidenced_tasks"),
   };
   const problems: Partial<Record<ProfileFieldName, FieldProblem>> = {};
   for (const name of Object.keys(read) as ProfileFieldName[]) {
@@ -127,7 +135,10 @@ export function inputFrom(draft: ProfileDraft): DraftResult {
     !read.target_titles.ok ||
     !read.weekly_study_hours.ok ||
     !read.direct_spend_cap.ok ||
-    !read.monthly_payment_cap.ok
+    !read.monthly_payment_cap.ok ||
+    !read.enjoyed_tasks.ok ||
+    !read.confident_tasks.ok ||
+    !read.evidenced_tasks.ok
   ) {
     return { ok: false, problems };
   }
@@ -139,6 +150,9 @@ export function inputFrom(draft: ProfileDraft): DraftResult {
     weekly_study_hours: read.weekly_study_hours.input,
     direct_spend_cap: read.direct_spend_cap.input,
     monthly_payment_cap: read.monthly_payment_cap.input,
+    enjoyed_tasks: read.enjoyed_tasks.input,
+    confident_tasks: read.confident_tasks.input,
+    evidenced_tasks: read.evidenced_tasks.input,
   };
   return { ok: true, input };
 }

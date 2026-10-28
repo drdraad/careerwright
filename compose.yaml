@@ -61,9 +61,12 @@ services:
       NESSA_DBOS_OWNER_DATABASE_PASSWORD_FILE: /run/secrets/pg_dbos_owner
       NESSA_FIXTURES_DIR: /fixtures/m0
       NESSA_MASTER_KEY_DIR: /run/nessa/keys
+      # The pinned ESCO release `make setup` fetched (verified again before it is imported).
+      NESSA_DATASETS_DIR: /datasets
     secrets: [pg_migrator, pg_dbos_owner]
     volumes:
       - ./fixtures:/fixtures:ro
+      - ./var/datasets:/datasets:ro
       - ${NESSA_HOME:?run make setup}/keys:/run/nessa/keys:ro
     depends_on:
       postgres: {condition: service_healthy}
@@ -98,7 +101,7 @@ services:
 
   worker:
     <<: *backend
-    command: ["python", "-m", "nessa.identity.worker"]
+    command: ["python", "-m", "nessa.worker"]
     environment:
       <<: [*local, *models]
       NESSA_APP_DATABASE_URL: postgresql+psycopg://nessa_worker@postgres:5432/nessa_app
@@ -114,7 +117,7 @@ services:
     # The worker exits within its own shutdown deadline; Docker kills it after this grace.
     stop_grace_period: 15s
     healthcheck:
-      test: ["CMD", "python", "-m", "nessa.identity.worker", "--check"]
+      test: ["CMD", "python", "-m", "nessa.worker", "--check"]
       interval: 2s
       timeout: 3s
       retries: 30

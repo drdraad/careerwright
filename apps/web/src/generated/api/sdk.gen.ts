@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, ExportWorkspaceData, ExportWorkspaceErrors, ExportWorkspaceResponses, GetMeData, GetMeErrors, GetMeResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetProfileVersionData, GetProfileVersionErrors, GetProfileVersionResponses, GetRunData, GetRunErrors, GetRunResponses, GetSpendData, GetSpendErrors, GetSpendResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, HealthzData, HealthzResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListEventsData, ListEventsErrors, ListEventsResponses, ListProfileVersionsData, ListProfileVersionsErrors, ListProfileVersionsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, PutProfileData, PutProfileErrors, PutProfileResponses, PutSpendLimitsData, PutSpendLimitsErrors, PutSpendLimitsResponses, ReadyzData, ReadyzResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, RevokeCredentialData, RevokeCredentialErrors, RevokeCredentialResponses, RotateCredentialData, RotateCredentialErrors, RotateCredentialResponses, StoreCredentialData, StoreCredentialErrors, StoreCredentialResponses, StreamEventsData, StreamEventsErrors, StreamEventsResponse, StreamEventsResponses, SubmitRunData, SubmitRunErrors, SubmitRunResponses } from './types.gen';
+import type { CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, DecideTurnData, DecideTurnErrors, DecideTurnResponses, ExportWorkspaceData, ExportWorkspaceErrors, ExportWorkspaceResponses, GetMeData, GetMeErrors, GetMeResponses, GetOccupationData, GetOccupationErrors, GetOccupationResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetProfileVersionData, GetProfileVersionErrors, GetProfileVersionResponses, GetRunData, GetRunErrors, GetRunResponses, GetSpendData, GetSpendErrors, GetSpendResponses, GetTaxonomyData, GetTaxonomyErrors, GetTaxonomyResponses, GetTurnData, GetTurnErrors, GetTurnResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, HealthzData, HealthzResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListEventsData, ListEventsErrors, ListEventsResponses, ListPlacesData, ListPlacesErrors, ListPlacesResponses, ListProfileVersionsData, ListProfileVersionsErrors, ListProfileVersionsResponses, ListProvisionalConceptsData, ListProvisionalConceptsErrors, ListProvisionalConceptsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListTurnsData, ListTurnsErrors, ListTurnsResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, PutProfileData, PutProfileErrors, PutProfileResponses, PutSpendLimitsData, PutSpendLimitsErrors, PutSpendLimitsResponses, ReadyzData, ReadyzResponses, RegisterProvisionalConceptData, RegisterProvisionalConceptErrors, RegisterProvisionalConceptResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, RevokeCredentialData, RevokeCredentialErrors, RevokeCredentialResponses, RotateCredentialData, RotateCredentialErrors, RotateCredentialResponses, SearchOccupationsData, SearchOccupationsErrors, SearchOccupationsResponses, StoreCredentialData, StoreCredentialErrors, StoreCredentialResponses, StreamEventsData, StreamEventsErrors, StreamEventsResponse, StreamEventsResponses, SubmitRunData, SubmitRunErrors, SubmitRunResponses, SubmitTurnData, SubmitTurnErrors, SubmitTurnResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -122,6 +122,28 @@ export const getProfileVersion = <ThrowOnError extends boolean = false>(options:
 });
 
 /**
+ * List Provisional
+ */
+export const listProvisionalConcepts = <ThrowOnError extends boolean = false>(options: Options<ListProvisionalConceptsData, ThrowOnError>): RequestResult<ListProvisionalConceptsResponses, ListProvisionalConceptsErrors, ThrowOnError> => (options.client ?? client).get<ListProvisionalConceptsResponses, ListProvisionalConceptsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/occupations/provisional',
+    ...options
+});
+
+/**
+ * Register Provisional
+ */
+export const registerProvisionalConcept = <ThrowOnError extends boolean = false>(options: Options<RegisterProvisionalConceptData, ThrowOnError>): RequestResult<RegisterProvisionalConceptResponses, RegisterProvisionalConceptErrors, ThrowOnError> => (options.client ?? client).post<RegisterProvisionalConceptResponses, RegisterProvisionalConceptErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/occupations/provisional',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * List Sources
  */
 export const listSources = <ThrowOnError extends boolean = false>(options: Options<ListSourcesData, ThrowOnError>): RequestResult<ListSourcesResponses, ListSourcesErrors, ThrowOnError> => (options.client ?? client).get<ListSourcesResponses, ListSourcesErrors, ThrowOnError>({
@@ -224,6 +246,86 @@ export const submitRun = <ThrowOnError extends boolean = false>(options: Options
 export const getRun = <ThrowOnError extends boolean = false>(options: Options<GetRunData, ThrowOnError>): RequestResult<GetRunResponses, GetRunErrors, ThrowOnError> => (options.client ?? client).get<GetRunResponses, GetRunErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/workspaces/{workspace_id}/runs/{run_id}',
+    ...options
+});
+
+/**
+ * List Turns
+ */
+export const listTurns = <ThrowOnError extends boolean = false>(options: Options<ListTurnsData, ThrowOnError>): RequestResult<ListTurnsResponses, ListTurnsErrors, ThrowOnError> => (options.client ?? client).get<ListTurnsResponses, ListTurnsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/interview/turns',
+    ...options
+});
+
+/**
+ * Submit
+ */
+export const submitTurn = <ThrowOnError extends boolean = false>(options: Options<SubmitTurnData, ThrowOnError>): RequestResult<SubmitTurnResponses, SubmitTurnErrors, ThrowOnError> => (options.client ?? client).post<SubmitTurnResponses, SubmitTurnErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/interview/turns',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get Turn
+ */
+export const getTurn = <ThrowOnError extends boolean = false>(options: Options<GetTurnData, ThrowOnError>): RequestResult<GetTurnResponses, GetTurnErrors, ThrowOnError> => (options.client ?? client).get<GetTurnResponses, GetTurnErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/interview/turns/{turn_id}',
+    ...options
+});
+
+/**
+ * Decide
+ */
+export const decideTurn = <ThrowOnError extends boolean = false>(options: Options<DecideTurnData, ThrowOnError>): RequestResult<DecideTurnResponses, DecideTurnErrors, ThrowOnError> => (options.client ?? client).post<DecideTurnResponses, DecideTurnErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/decision',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get Taxonomy
+ */
+export const getTaxonomy = <ThrowOnError extends boolean = false>(options?: Options<GetTaxonomyData, ThrowOnError>): RequestResult<GetTaxonomyResponses, GetTaxonomyErrors, ThrowOnError> => (options?.client ?? client).get<GetTaxonomyResponses, GetTaxonomyErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/taxonomy',
+    ...options
+});
+
+/**
+ * Search
+ */
+export const searchOccupations = <ThrowOnError extends boolean = false>(options: Options<SearchOccupationsData, ThrowOnError>): RequestResult<SearchOccupationsResponses, SearchOccupationsErrors, ThrowOnError> => (options.client ?? client).get<SearchOccupationsResponses, SearchOccupationsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/taxonomy/occupations',
+    ...options
+});
+
+/**
+ * Get Occupation
+ */
+export const getOccupation = <ThrowOnError extends boolean = false>(options: Options<GetOccupationData, ThrowOnError>): RequestResult<GetOccupationResponses, GetOccupationErrors, ThrowOnError> => (options.client ?? client).get<GetOccupationResponses, GetOccupationErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/taxonomy/occupations/{concept_id}',
+    ...options
+});
+
+/**
+ * List Places
+ */
+export const listPlaces = <ThrowOnError extends boolean = false>(options?: Options<ListPlacesData, ThrowOnError>): RequestResult<ListPlacesResponses, ListPlacesErrors, ThrowOnError> => (options?.client ?? client).get<ListPlacesResponses, ListPlacesErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/places',
     ...options
 });
 

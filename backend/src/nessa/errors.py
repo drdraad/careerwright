@@ -43,6 +43,11 @@ class ErrorCode(StrEnum):
     STORE_UNAVAILABLE = "STORE_UNAVAILABLE"
     AUTH_UNAVAILABLE = "AUTH_UNAVAILABLE"
     INTERNAL_ERROR = "INTERNAL_ERROR"
+    # Catalogue and interview codes (Task 5).
+    TAXONOMY_UNAVAILABLE = "TAXONOMY_UNAVAILABLE"
+    CONFIRMATION_REQUIRED = "CONFIRMATION_REQUIRED"
+    PROPOSAL_NOT_AVAILABLE = "PROPOSAL_NOT_AVAILABLE"
+    ALREADY_DECIDED = "ALREADY_DECIDED"
 
 
 class ErrorStage(StrEnum):
@@ -52,6 +57,7 @@ class ErrorStage(StrEnum):
     IDENTITY = "identity"
     WORKSPACE = "workspace"
     PROFILE = "profile"
+    CATALOGUE = "catalogue"
     CREDENTIAL = "credential"
     EXECUTION = "execution"
     SPEND = "spend"

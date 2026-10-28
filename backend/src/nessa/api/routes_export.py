@@ -7,9 +7,13 @@ from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter
+from pydantic import Field
 
+from nessa.api.catalogue_schemas import ProvisionalConceptOut
 from nessa.api.deps import CallerDep, Deps
 from nessa.api.envelope import ERROR_RESPONSES
+from nessa.api.interview_schemas import TurnOut
+from nessa.api.routes_interview import turn_out
 from nessa.api.routes_runs import run_out
 from nessa.api.schemas import (
     CredentialOut,
@@ -21,6 +25,8 @@ from nessa.api.schemas import (
     SpendOut,
     WorkspaceOut,
 )
+from nessa.catalogue import taxonomy_store
+from nessa.catalogue.records import ProvisionalConcept
 from nessa.db import Tx, actor_transaction
 from nessa.identity import credential_store, run_store
 from nessa.identity import store as identity_store
@@ -28,8 +34,10 @@ from nessa.identity.keyring import Keyring
 from nessa.identity.records import Run, WorkspaceEvent
 from nessa.identity.spend_limits import spend_summary
 from nessa.identity.workspaces import visible_workspace
+from nessa.profile import interview_store
 from nessa.profile import store as profile_store
-from nessa.profile.records import ProfileVersion, SourceReference
+from nessa.profile.conversation import turn_view
+from nessa.profile.records import InterviewTurn, ProfileVersion, SourceReference
 
 router = APIRouter(
     prefix="/v1/workspaces/{workspace_id}", responses=ERROR_RESPONSES, tags=["export"]
@@ -39,7 +47,7 @@ PAGE = 500
 
 class WorkspaceExport(ResponseModel):
     format: Literal["nessa.workspace-export"] = "nessa.workspace-export"
-    format_version: Literal[1] = 1
+    format_version: Literal[2] = 2
     exported_at: datetime
     synthetic: bool
     workspace: WorkspaceOut
@@ -48,6 +56,8 @@ class WorkspaceExport(ResponseModel):
     events: list[EventOut]
     credentials: list[CredentialOut]
     runs: list[RunOut]
+    interview_turns: list[TurnOut] = Field(description="Oldest first.")
+    provisional_concepts: list[ProvisionalConceptOut]
     spend: SpendOut
 
 
@@ -84,6 +94,30 @@ def _all_sources(tx: Tx, workspace_id: uuid.UUID) -> list[SourceReference]:
     return sources
 
 
+def _all_turns(tx: Tx, keyring: Keyring, workspace_id: uuid.UUID) -> list[TurnOut]:
+    turns: list[InterviewTurn] = []
+    while page := interview_store.turns(
+        tx,
+        workspace_id,
+        before=(turns[-1].created_at, turns[-1].turn_id) if turns else None,
+        limit=PAGE,
+    ):
+        turns.extend(page)
+    return [turn_out(tx, keyring, turn_view(tx, keyring, t)) for t in reversed(turns)]
+
+
+def _all_concepts(tx: Tx, workspace_id: uuid.UUID) -> list[ProvisionalConcept]:
+    concepts: list[ProvisionalConcept] = []
+    while page := taxonomy_store.provisional_concepts(
+        tx,
+        workspace_id,
+        after=(concepts[-1].created_at, concepts[-1].concept_id) if concepts else None,
+        limit=PAGE,
+    ):
+        concepts.extend(page)
+    return concepts
+
+
 def _all_events(tx: Tx, workspace_id: uuid.UUID) -> list[WorkspaceEvent]:
     events: list[WorkspaceEvent] = []
     while page := identity_store.events_after(
@@ -102,6 +136,8 @@ def export_workspace(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> 
         events = _all_events(tx, workspace_id)
         credentials = credential_store.credentials(tx, workspace_id)
         runs = _all_runs(tx, deps.keyring, workspace_id)
+        turns = _all_turns(tx, deps.keyring, workspace_id)
+        concepts = _all_concepts(tx, workspace_id)
         spend = spend_summary(tx, workspace_id, deps.clock(), deps.spend_defaults)
     return WorkspaceExport(
         exported_at=deps.clock(),
@@ -112,5 +148,7 @@ def export_workspace(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> 
         events=[EventOut.of(e) for e in events],
         credentials=[CredentialOut.of(c) for c in credentials],
         runs=runs,
+        interview_turns=turns,
+        provisional_concepts=[ProvisionalConceptOut.of(c) for c in concepts],
         spend=SpendOut.of(spend),
     )

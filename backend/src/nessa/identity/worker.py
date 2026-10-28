@@ -1,38 +1,27 @@
-"""The DBOS worker process: recovers pending workflows, drains the outbox, reports health.
+"""The DBOS worker loop: recovers pending workflows, drains the outbox, reports health.
 
-Configuration comes from the environment and files only. The worker never receives a Meta
-key from its environment: the activity opens the workspace's sealed key just in time.
-Shutdown is bounded: after SIGTERM the loop stops, DBOS is destroyed without waiting for
-workflows, and a watchdog exits the process if that ever hangs (Sprint 0 saw one unexplained
-hang in 19 runs). DBOS recovers whatever was in flight on the next start.
-
-Run: `python -m nessa.identity.worker`; health check: `python -m nessa.identity.worker --check`.
+The worker never receives a Meta key from its environment: the activity opens the
+workspace's sealed key just in time. Shutdown is bounded: after SIGTERM the loop stops,
+DBOS is destroyed without waiting for workflows, and a watchdog exits the process if that
+ever hangs (Sprint 0 saw one unexplained hang in 19 runs). DBOS recovers whatever was in
+flight on the next start. The process entry point, which composes the run tasks of every
+module, is `nessa.worker`.
 """
 
 import logging
 import os
 import signal
-import sys
 import threading
 import time
 import uuid
-from collections.abc import Callable
-from datetime import UTC, datetime
 from pathlib import Path
 from types import FrameType
 
 from dbos import DBOS, DBOSConfig, DBOSPortableJSONSerializer, SetWorkflowID
-from pydantic import SecretStr
-from pydantic_ai.models import Model
 
-from nessa.config import WorkerSettings
-from nessa.db import Engine, create_engine, system_transaction, url_with_password
-from nessa.identity import activity, connection_check, run_store, workflow
+from nessa.db import Engine, system_transaction
+from nessa.identity import activity, run_store, workflow
 from nessa.identity.activity import ActivityRuntime
-from nessa.identity.keyring import load_keyring
-from nessa.identity.meta import meta_model
-from nessa.identity.model_choice import ModelChoice
-from nessa.logs import configure_logging
 
 APP_NAME = "nessa"
 # Pinned: DBOS recovers only workflows of the same version. Changing the workflow's step
@@ -137,42 +126,3 @@ def run(engine: Engine, runtime: ActivityRuntime, system_database_url: str) -> N
     DBOS.destroy()
     watchdog.cancel()
     _log.info("worker stopped")
-
-
-def meta_model_builder() -> Callable[[str, SecretStr], Model]:
-    def build(model_id: str, api_key: SecretStr) -> Model:
-        return meta_model(
-            model_id,
-            api_key,
-            max_output_tokens=connection_check.LIMITS.max_output_tokens,
-            effort="minimal",
-        )
-
-    return build
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
-
-
-def main() -> None:
-    if sys.argv[1:] == ["--check"]:
-        sys.exit(check())
-    configure_logging("worker")
-    settings = WorkerSettings()
-    # Fail closed on an unusable model configuration before any work is accepted.
-    ModelChoice.configure(
-        settings.meta_test_model, settings.meta_production_model, settings.synthetic_model_role
-    )
-    engine = create_engine(settings.app_database, application_name="nessa-worker")
-    runtime = ActivityRuntime(
-        engine=engine,
-        keyring=load_keyring(settings.master_key_dir),
-        build_model=meta_model_builder(),
-        clock=_utc_now,
-    )
-    run(engine, runtime, url_with_password(settings.dbos_database))
-
-
-if __name__ == "__main__":
-    main()

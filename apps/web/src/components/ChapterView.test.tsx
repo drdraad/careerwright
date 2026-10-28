@@ -15,7 +15,7 @@ function profile(changes: Partial<ProfileDocument>): ProfileOut {
     created_by: null,
     created_at: "2027-01-01T00:00:00Z",
     document: {
-      schema_version: "1",
+      schema_version: "2",
       preferred_name: { state: "unasked", value: null, source_ref_id: null },
       current_role: { state: "unasked", value: null, source_ref_id: null },
       cities: { state: "provided", value: ["Leeds"], source_ref_id: SRC },
@@ -23,6 +23,9 @@ function profile(changes: Partial<ProfileDocument>): ProfileOut {
       weekly_study_hours: { state: "unknown", value: null, source_ref_id: SRC },
       direct_spend_cap: { state: "skipped", value: null, source_ref_id: SRC },
       monthly_payment_cap: { state: "prefer_not_to_say", value: null, source_ref_id: SRC },
+      enjoyed_tasks: { state: "unasked", value: null, source_ref_id: null },
+      confident_tasks: { state: "unasked", value: null, source_ref_id: null },
+      evidenced_tasks: { state: "unasked", value: null, source_ref_id: null },
       ...changes,
     },
   };

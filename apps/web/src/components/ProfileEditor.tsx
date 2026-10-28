@@ -250,7 +250,8 @@ export function ProfileEditor({
                   (meta.kind === "list" ? (
                     <ListInput
                       label={meta.label}
-                      itemLabel={name === "cities" ? "Work area" : "Target role"}
+                      itemLabel={meta.itemLabel}
+                      limit={meta.limit}
                       draft={field}
                       error={error}
                       describedBy={describedBy}

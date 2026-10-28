@@ -1,4 +1,6 @@
-"""`make live-smoke`: one real connection-check run through the whole product, budget-capped.
+"""`make live-smoke`: one real run through the whole product, budget-capped: a connection
+check, or with `--interview` (`INTERVIEW=1`) one interview turn whose proposals are then
+confirmed into the profile, proving the InterviewTurn schema round-trips.
 
 Ruling R5. The key is read from the repository's gitignored `.env` into a `SecretStr`; it
 is never a command argument and never printed. An isolated stack (its own Compose project,
@@ -6,22 +8,26 @@ ports, NESSA_HOME and volumes, removed afterwards) runs in live mode. The key tr
 product path: stored through the API with consent, sealed at once, opened only inside the
 worker's bounded activity, which makes the call. Afterwards the worker is stopped, so no
 further call can start, and then every attempt of the smoke workspace is appended to
-`docs/evidence/live-usage.jsonl` (and the Markdown table) with its cost, even if the run
-failed; if the worker cannot be confirmed stopped, every further call its spend limits
-allow is ledgered too, with an unknown cost. Then both databases, every container log and
-the API's own responses are scanned for the key.
+`docs/evidence/live-usage.jsonl` (and the Markdown table) with its cost and its number of
+provider requests, even if the run failed; if the worker cannot be confirmed stopped, every
+further call its spend limits allow is ledgered too, with an unknown cost. Then both
+databases, every container log and the API's own responses are scanned for the key.
 
 Caps, checked before anything starts:
-- per invocation: at most ACTIVITY_MAX_ATTEMPTS calls (the run's retry budget, also set as
-  the workspace's run spend limit, so the product's own reservation enforces it), none on
-  the production model unless `--production-model` (`PRODUCTION=1`), and a worst-case cost
-  cap;
-- per budget scope, cumulative over the ledger: calls, production calls and worst-case cost
-  (`ScopeBudget`; conservative defaults, configurable through `NESSA_LIVE_SMOKE_*`), checked
-  and spent under an exclusive lock on the ledger, so a concurrent invocation refuses.
-The test model is a Contributor model, so the workspace is synthetic.
+- per invocation: the kind's attempts (the connection check's retry budget; one interview
+  attempt, of at most two requests: the call and one validation repair), enforced by the
+  workspace's run spend limit, so the product's own reservation refuses any further
+  attempt; none on the production model unless `--production-model` (`PRODUCTION=1`); and a
+  worst-case cost cap;
+- per budget scope, cumulative over the ledger: provider requests, production requests and
+  worst-case cost (`ScopeBudget`; conservative defaults, configurable through
+  `NESSA_LIVE_SMOKE_*`), checked and spent under an exclusive lock on the ledger, so a
+  concurrent invocation refuses.
+The test model is a Contributor model, so the workspace is synthetic, and the interview
+message is a fixed synthetic persona.
 
-Run from `backend/`: `uv run --locked python -m tools.live_smoke [--production-model]`.
+Run from `backend/`: `uv run --locked python -m tools.live_smoke [--production-model]
+[--interview]`.
 """
 
 import argparse
@@ -31,7 +37,7 @@ import sys
 import tempfile
 import time
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -54,25 +60,66 @@ from nessa.identity.workflow import (
     ACTIVITY_INTERVAL_S,
     ACTIVITY_MAX_ATTEMPTS,
 )
+from nessa.profile import interview
 from tools.leak_scan import Finding, Needle, scan
 from tools.localenv import REPO_ROOT, ensure_local_home
 from tools.stack import CORE_SERVICES, Ports, Stack
 from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry, ScopeSpend
 
-MAX_CALLS = ACTIVITY_MAX_ATTEMPTS
+MAX_CALLS = ACTIVITY_MAX_ATTEMPTS  # the connection check's attempts
 MAX_COST_NANO_USD = 100_000_000  # $0.10 worst case per invocation
 SMOKE_PORTS = Ports(api=57800, auth=57899, postgres=57832, web=57900)
-# How long the smoke waits for the run: its worst case, where every attempt times out and
-# both of its store transactions (prepare, settle) spend the whole store budget, with the
-# step's backoff between attempts, plus a minute for the stack. Ledger completeness does not
-# depend on it: the worker is stopped before the attempts are read.
-RUN_TIMEOUT_S = (
-    MAX_CALLS * (REQUEST_TIMEOUT_S + 2 * STORE_RETRY_BUDGET_S)
-    + sum(ACTIVITY_INTERVAL_S * ACTIVITY_BACKOFF_RATE**i for i in range(MAX_CALLS - 1))
-    + 60.0
-)
 RESPONSES_ENDPOINT = "POST /v1/responses"
 PURPOSE = "connection check via API, outbox and DBOS worker (key opened just in time)"
+INTERVIEW_PURPOSE = (
+    "interview turn via API, outbox and DBOS worker; proposals confirmed into the profile "
+    "(synthetic message; key opened just in time)"
+)
+# A fixed synthetic persona (ADR 0003: the test model takes synthetic inputs only).
+SYNTHETIC_MESSAGE = (
+    "Synthetic test persona, not a real person: I'm a warehouse shift supervisor and I "
+    "could work in Leeds or York. I could give about 6 hours a week to learning and spend "
+    "up to £1,200 in total. I enjoy training new starters."
+)
+
+
+@dataclass(frozen=True)
+class SmokeKind:
+    """What one invocation runs, and its bounds."""
+
+    name: str
+    attempts: int  # attempts the workspace's run limit allows
+    requests_per_attempt: int  # provider requests one attempt may send
+    per_attempt_nano_usd: Callable[[str], int]
+    purpose: str
+
+    def calls(self) -> int:
+        return self.attempts * self.requests_per_attempt
+
+    def run_timeout_s(self) -> float:
+        """Its worst case, where every request times out and both store transactions of
+        every attempt (prepare, settle) spend the whole store budget, with the step's
+        backoff between attempts, plus a minute for the stack. Ledger completeness does not
+        depend on it: the worker is stopped before the attempts are read."""
+        return (
+            self.attempts
+            * (self.requests_per_attempt * REQUEST_TIMEOUT_S + 2 * STORE_RETRY_BUDGET_S)
+            + sum(ACTIVITY_INTERVAL_S * ACTIVITY_BACKOFF_RATE**i for i in range(self.attempts - 1))
+            + 60.0
+        )
+
+
+CONNECTION_CHECK = SmokeKind(
+    "connection_check", MAX_CALLS, 1, connection_check.worst_case_nano_usd, PURPOSE
+)
+INTERVIEW_TURN = SmokeKind(
+    "interview_turn",
+    1,  # a transient failure is then refused by the budget, never retried at cost
+    interview.MAX_REQUESTS,
+    interview.worst_case_nano_usd,
+    INTERVIEW_PURPOSE,
+)
+RUN_TIMEOUT_S = CONNECTION_CHECK.run_timeout_s()
 
 
 class SmokeSettings(BaseSettings):
@@ -124,29 +171,36 @@ class WorkerNotStoppedError(RuntimeError):
 
 
 def authorise(
-    models: ModelChoice, *, production: bool, budget: ScopeBudget, spent: ScopeSpend
+    models: ModelChoice,
+    *,
+    production: bool,
+    budget: ScopeBudget,
+    spent: ScopeSpend,
+    kind: SmokeKind = CONNECTION_CHECK,
 ) -> tuple[str, int]:
     """The model this invocation may use and its worst case, or refuse before any call:
-    both this invocation's caps and what is left of the scope's cumulative budget."""
+    both this invocation's caps and what is left of the scope's cumulative budget. Calls are
+    provider requests: every request each allowed attempt may send."""
     model_id = models.production.model_id if production else models.test.model_id
     if models.is_production(model_id) and not production:
         raise CapExceededError("the test model is the production model: pass --production-model")
-    worst_case = MAX_CALLS * connection_check.worst_case_nano_usd(model_id)
+    worst_case = kind.attempts * kind.per_attempt_nano_usd(model_id)
+    calls = kind.calls()
     if worst_case > MAX_COST_NANO_USD:
         raise CapExceededError(
             f"worst case {format_usd(worst_case)} exceeds the cap {format_usd(MAX_COST_NANO_USD)}"
         )
-    if spent.calls + MAX_CALLS > budget.max_calls:
+    if spent.calls + calls > budget.max_calls:
         raise CapExceededError(
             f"scope {budget.scope}: {spent.calls} of {budget.max_calls} calls used, "
-            f"{MAX_CALLS} more needed"
+            f"{calls} more needed"
         )
     if models.is_production(model_id) and (
-        spent.production_calls + MAX_CALLS > budget.max_production_calls
+        spent.production_calls + calls > budget.max_production_calls
     ):
         raise CapExceededError(
             f"scope {budget.scope}: {spent.production_calls} of {budget.max_production_calls} "
-            f"production calls used, {MAX_CALLS} more needed"
+            f"production calls used, {calls} more needed"
         )
     if spent.committed_nano_usd + worst_case > budget.max_cost_nano_usd:
         raise CapExceededError(
@@ -205,18 +259,27 @@ def _workspace_attempts(target: SmokeTarget, workspace_id: str) -> list[dict[str
 
 
 def ledger_attempts(
-    ledger: Ledger, attempts: list[dict[str, Any]], *, scope: str, production_model: str
+    ledger: Ledger,
+    attempts: list[dict[str, Any]],
+    *,
+    scope: str,
+    production_model: str,
+    kind: SmokeKind = CONNECTION_CHECK,
 ) -> list[int]:
-    """One ledger row per attempt that reached the provider (a reservation was taken)."""
+    """One ledger row per attempt that reached the provider (a reservation was taken), with
+    the requests it sent; an attempt whose request count was not recorded counts every
+    request it could send."""
     seqs = []
     for attempt in attempts:
         if attempt["spend_state"] == "none":
             continue  # refused before any call: nothing was sent to Meta
         outcome = attempt["outcome"] or "unfinished"
+        requests = attempt.get("requests_sent") or kind.requests_per_attempt
         record = ledger.append(
             LiveCallEntry(
                 budget_scope=scope,
-                purpose=PURPOSE,
+                purpose=kind.purpose,
+                http_requests=requests,
                 model_id=attempt["model_id"],
                 is_production_model=attempt["model_id"] == production_model,
                 endpoint=RESPONSES_ENDPOINT,
@@ -248,14 +311,16 @@ def ledger_possible_calls(
     scope: str,
     count: int = MAX_CALLS,
     reason: str = "attempts unreadable",
+    kind: SmokeKind = CONNECTION_CHECK,
 ) -> list[int]:
-    """Calls that may have reached Meta but cannot be read back: record each one, with an
-    unknown cost, rather than nothing."""
+    """Attempts that may have reached Meta but cannot be read back: record each one, with
+    an unknown cost and every request it could send, rather than nothing."""
     return [
         ledger.append(
             LiveCallEntry(
                 budget_scope=scope,
-                purpose=f"{PURPOSE} (possible call; {reason})",
+                purpose=f"{kind.purpose} (possible call; {reason})",
+                http_requests=kind.requests_per_attempt,
                 model_id=model_id,
                 is_production_model=models.is_production(model_id),
                 endpoint=RESPONSES_ENDPOINT,
@@ -268,16 +333,18 @@ def ledger_possible_calls(
     ]
 
 
-def assert_attempt_bound(spend: Mapping[str, Any], per_attempt_nano_usd: int) -> int:
+def assert_attempt_bound(
+    spend: Mapping[str, Any], per_attempt_nano_usd: int, max_attempts: int = MAX_CALLS
+) -> int:
     """How many attempts the smoke workspace's stored limits allow, refusing more than
-    MAX_CALLS. Each attempt reserves `per_attempt_nano_usd` and keeps it unless it reports
-    usage, which only a run's final attempt does (success or a terminal failure); so this
-    count bounds the calls the ledger's possible-call fallback has to cover."""
+    `max_attempts`. Each attempt reserves `per_attempt_nano_usd` and keeps it unless it
+    reports usage, which only a run's final attempt does (success or a terminal failure);
+    so this count bounds the calls the ledger's possible-call fallback has to cover."""
     tighter = min(int(spend["run_limit_nano_usd"]), int(spend["period_limit_nano_usd"]))
     allowed = tighter // per_attempt_nano_usd
-    if allowed > MAX_CALLS:
+    if allowed > max_attempts:
         raise CapExceededError(
-            f"the smoke workspace's limits allow {allowed} attempts, more than {MAX_CALLS}"
+            f"the smoke workspace's limits allow {allowed} attempts, more than {max_attempts}"
         )
     return allowed
 
@@ -291,27 +358,31 @@ def ledger_workspace_calls(
     models: ModelChoice,
     scope: str,
     worker_stopped: bool,
+    kind: SmokeKind = CONNECTION_CHECK,
 ) -> list[int]:
     """Every attempt the smoke workspace recorded. If the worker may still be running, also
-    every further call its spend limits allow (MAX_CALLS in all, `assert_attempt_bound`), as
-    possible calls at the product's own per-attempt reservation."""
-    per_call = connection_check.worst_case_nano_usd(model_id)
+    every further attempt its spend limits allow (the kind's attempts in all,
+    `assert_attempt_bound`), as possible calls at the product's own per-attempt reservation."""
+    per_attempt = kind.per_attempt_nano_usd(model_id)
     try:
         attempts = _workspace_attempts(target, workspace_id)
     except psycopg.Error:
-        return ledger_possible_calls(ledger, model_id, per_call, models, scope=scope)
+        return ledger_possible_calls(
+            ledger, model_id, per_attempt, models, scope=scope, count=kind.attempts, kind=kind
+        )
     seqs = ledger_attempts(
-        ledger, attempts, scope=scope, production_model=models.production.model_id
+        ledger, attempts, scope=scope, production_model=models.production.model_id, kind=kind
     )
     if not worker_stopped:
         seqs += ledger_possible_calls(
             ledger,
             model_id,
-            per_call,
+            per_attempt,
             models,
             scope=scope,
-            count=max(0, MAX_CALLS - len(seqs)),
+            count=max(0, kind.attempts - len(seqs)),
             reason="worker not confirmed stopped",
+            kind=kind,
         )
     return seqs
 
@@ -345,6 +416,65 @@ class SmokeResult:
     ledger_seqs: list[int]
 
 
+def _wait(
+    api: Api, path: str, run_of: Callable[[dict[str, Any]], dict[str, Any]], timeout_s: float
+) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout_s
+    body = api.call("GET", path)
+    while run_of(body)["status"] in ("queued", "running") and time.monotonic() < deadline:
+        time.sleep(1)
+        body = api.call("GET", path)
+    return body
+
+
+def _connection_check(api: Api, base: str, model_id: str, timeout_s: float) -> str:
+    submitted = api.call("POST", f"{base}/runs", {"kind": "connection_check"})
+    if submitted["model_id"] != model_id:  # the bound above priced this model's attempts
+        raise RuntimeError(f"the run uses {submitted['model_id']}, not {model_id}")
+    run = _wait(api, f"{base}/runs/{submitted['run_id']}", lambda body: body, timeout_s)
+    print(f"run {run['run_id']}: {run['status']} {run['failure_class'] or ''}".rstrip(), flush=True)
+    if run["output"]:
+        print(f"validated output: {run['output']}", flush=True)
+    return str(run["status"])
+
+
+def _interview_turn(api: Api, base: str, model_id: str, timeout_s: float) -> str:
+    """One turn with the synthetic message; then every proposal is accepted (limits and
+    targets confirmed explicitly) through the decision command, so the schema round-trips
+    from model output to a new profile version."""
+    submitted = api.call(
+        "POST",
+        f"{base}/interview/turns",
+        {"expected_profile_version": 0, "message": SYNTHETIC_MESSAGE},
+    )
+    if submitted["run"]["model_id"] != model_id:
+        raise RuntimeError(f"the run uses {submitted['run']['model_id']}, not {model_id}")
+    path = f"{base}/interview/turns/{submitted['turn_id']}"
+    turn = _wait(api, path, lambda body: body["run"], timeout_s)
+    run = turn["run"]
+    print(f"turn {turn['turn_id']}: {run['status']} {run['failure_class'] or ''}".rstrip())
+    proposal = turn["proposal"]
+    if run["status"] != "complete" or proposal is None:
+        return str(run["status"])
+    changes = proposal["changes"]
+    print(f"validated proposal: {json.dumps(changes, ensure_ascii=False)}", flush=True)
+    if not changes or any(c["message_ids"] != [turn["message_id"]] for c in changes):
+        return "complete without proposals citing the message"
+    decided = api.call(
+        "POST",
+        f"{path}/decision",
+        {
+            "expected_version": 0,
+            "accept": [c["change_id"] for c in changes],
+            "confirm_hard_constraints": [c["field"] for c in changes if c["hard_constraint"]],
+        },
+    )
+    document = decided["profile"]["document"]
+    saved = {c["field"]: document[c["field"]]["value"] for c in changes}
+    print(f"profile version {decided['profile']['version']}: {saved}", flush=True)
+    return "complete" if decided["profile"]["version"] == 1 else "decision changed nothing"
+
+
 def smoke(
     target: SmokeTarget,
     key: SecretStr,
@@ -355,10 +485,11 @@ def smoke(
     ledger: Ledger,
     scope: str,
     run_timeout_s: float = RUN_TIMEOUT_S,
+    kind: SmokeKind = CONNECTION_CHECK,
 ) -> SmokeResult:
-    """One connection-check run through the product, then the ledger. Once the key is stored
-    the worker may call Meta, so from then on the attempts are ledgered whatever happens,
-    after the worker has stopped."""
+    """One run of `kind` through the product, then the ledger. Once the key is stored the
+    worker may call Meta, so from then on the attempts are ledgered whatever happens, after
+    the worker has stopped."""
     api = Api(target, target.sign_in())
     workspace = api.call(
         "POST",
@@ -377,7 +508,7 @@ def smoke(
             "period_limit_nano_usd": worst_case,
         },
     )
-    assert_attempt_bound(spend, connection_check.worst_case_nano_usd(model_id))
+    assert_attempt_bound(spend, kind.per_attempt_nano_usd(model_id), kind.attempts)
     status = "not started"
     worker_stopped = True
     try:
@@ -386,20 +517,9 @@ def smoke(
             f"{base}/credentials",
             {"api_key": key.get_secret_value(), "consent_to_encrypted_storage": True},
         )
-        submitted = api.call("POST", f"{base}/runs", {"kind": "connection_check"})
-        if submitted["model_id"] != model_id:  # the bound above priced this model's attempts
-            raise RuntimeError(f"the run uses {submitted['model_id']}, not {model_id}")
-        run_id = str(submitted["run_id"])
-        deadline = time.monotonic() + run_timeout_s
-        run = api.call("GET", f"{base}/runs/{run_id}")
-        while run["status"] in ("queued", "running") and time.monotonic() < deadline:
-            time.sleep(1)
-            run = api.call("GET", f"{base}/runs/{run_id}")
-        status = str(run["status"])
+        drive = _interview_turn if kind is INTERVIEW_TURN else _connection_check
+        status = drive(api, base, model_id, run_timeout_s)
         api.call("GET", f"{base}/export")
-        print(f"run {run_id}: {status} {run['failure_class'] or ''}".rstrip(), flush=True)
-        if run["output"]:
-            print(f"validated output: {run['output']}", flush=True)
     finally:
         # First: an attempt read while the worker runs could miss one.
         interrupted: BaseException | None = None
@@ -418,6 +538,7 @@ def smoke(
             models=models,
             scope=scope,
             worker_stopped=worker_stopped,
+            kind=kind,
         )
         ledger.write_markdown()
         print(f"ledger rows appended: {seqs}", flush=True)
@@ -495,7 +616,13 @@ def smoke_stack(*, production: bool) -> Iterator[StackTarget]:
         print("smoke stack, volumes and keys removed", flush=True)
 
 
-def run_smoke(settings: SmokeSettings, *, production: bool, ledger: Ledger) -> int:
+def run_smoke(
+    settings: SmokeSettings,
+    *,
+    production: bool,
+    ledger: Ledger,
+    kind: SmokeKind = CONNECTION_CHECK,
+) -> int:
     models = ModelChoice.configure(
         settings.meta_test_model,
         settings.meta_production_model,
@@ -505,11 +632,16 @@ def run_smoke(settings: SmokeSettings, *, production: bool, ledger: Ledger) -> i
     # One invocation at a time, from the budget check to the last ledger row (N6).
     with ledger.exclusive():
         model_id, worst_case = authorise(
-            models, production=production, budget=budget, spent=ledger.spent(budget.scope)
+            models,
+            production=production,
+            budget=budget,
+            spent=ledger.spent(budget.scope),
+            kind=kind,
         )
         print(
-            f"live smoke: model {model_id} ({'production' if production else 'test'}); "
-            f"at most {MAX_CALLS} calls, worst case {format_usd(worst_case)}",
+            f"live smoke ({kind.name}): model {model_id} "
+            f"({'production' if production else 'test'}); at most {kind.calls()} calls, "
+            f"worst case {format_usd(worst_case)}",
             flush=True,
         )
         with smoke_stack(production=production) as target:
@@ -521,6 +653,8 @@ def run_smoke(settings: SmokeSettings, *, production: bool, ledger: Ledger) -> i
                 models=models,
                 ledger=ledger,
                 scope=budget.scope,
+                run_timeout_s=kind.run_timeout_s(),
+                kind=kind,
             )
     return 0 if result.status == "complete" and not result.findings else 1
 
@@ -532,8 +666,16 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="qualify the production model (counts as production calls)",
     )
+    parser.add_argument(
+        "--interview",
+        action="store_true",
+        help="one interview turn, its proposals confirmed, instead of a connection check",
+    )
     args = parser.parse_args(argv)
-    sys.exit(run_smoke(SmokeSettings(), production=args.production_model, ledger=Ledger()))
+    kind = INTERVIEW_TURN if args.interview else CONNECTION_CHECK
+    sys.exit(
+        run_smoke(SmokeSettings(), production=args.production_model, ledger=Ledger(), kind=kind)
+    )
 
 
 if __name__ == "__main__":

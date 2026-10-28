@@ -1,6 +1,10 @@
 import pytest
 
+from nessa.identity.model_choice import ModelChoice, ModelConfigurationError
 from nessa.identity.model_registry import (
+    FIXTURE_MODEL_ID,
+    PRICE_VERSION,
+    Capability,
     ModelMode,
     UnknownModelError,
     Usage,
@@ -69,6 +73,32 @@ def test_worst_case_assumes_every_input_token_is_uncached() -> None:
 )
 def test_every_registered_model_records_its_privacy_mode(model_id: str, mode: ModelMode) -> None:
     assert model_entry(model_id).mode is mode
+
+
+@pytest.mark.req("MODEL-01")
+def test_the_registry_records_capabilities_and_evaluation_only_where_a_call_established_them() -> (
+    None
+):
+    production, test = model_entry("muse-spark-1.3"), model_entry("muse-spark-1.3-contributor")
+
+    for entry in (production, test):
+        assert entry.capabilities == frozenset(Capability)  # schema, streaming, search: ADR 0003
+        assert "ADR 0003" in entry.evaluation
+    for listed_only in ("muse-spark-1.2", "muse-spark-1.1", "muse-wonder-1.0"):
+        entry = model_entry(listed_only)
+        assert (entry.capabilities, entry.evaluation) == (frozenset(), "not evaluated")
+    assert PRICE_VERSION == "meta-2026-10-27"
+
+
+def test_the_fixture_interviewer_is_free_and_not_a_meta_model() -> None:
+    fixture = model_entry(FIXTURE_MODEL_ID)
+
+    assert fixture.mode is ModelMode.FIXTURE
+    assert estimate_cost_nano_usd(FIXTURE_MODEL_ID, Usage(1_000, 0, 1_000)) == 0
+    with pytest.raises(ModelConfigurationError, match="Meta model"):
+        ModelChoice.configure(FIXTURE_MODEL_ID, "muse-spark-1.3", "test")
+    with pytest.raises(ModelConfigurationError, match="Standard"):
+        ModelChoice.configure("muse-spark-1.3-contributor", FIXTURE_MODEL_ID, "test")
 
 
 @pytest.mark.parametrize(

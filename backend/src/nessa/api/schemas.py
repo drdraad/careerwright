@@ -24,7 +24,7 @@ from nessa.identity.spend_limits import SpendSummary
 from nessa.identity.workspaces import WorkspaceName
 from nessa.profile.commands import ProfileView
 from nessa.profile.document import ProfileDocument, ProfileInput
-from nessa.profile.records import ProfileVersion, SourceKind, SourceReference
+from nessa.profile.records import Basis, ProfileVersion, SourceKind, SourceReference
 from nessa.vocabulary import DataMode, WorkState
 
 
@@ -126,6 +126,9 @@ class ProfileVersionPage(ResponseModel):
 
 
 class SourceOut(ResponseModel):
+    """Where an answer came from. A conversation source also names the turn that proposed
+    it, the person's messages it cites and its basis; `recorded_by` confirmed it."""
+
     source_ref_id: uuid.UUID
     kind: SourceKind
     label: str
@@ -134,6 +137,9 @@ class SourceOut(ResponseModel):
     recorded_by: uuid.UUID | None
     observed_at: datetime
     created_at: datetime
+    turn_id: uuid.UUID | None = None
+    message_ids: list[uuid.UUID] = Field(default_factory=list)
+    basis: Basis | None = None
 
     @classmethod
     def of(cls, source: SourceReference) -> "SourceOut":
@@ -146,6 +152,9 @@ class SourceOut(ResponseModel):
             recorded_by=source.recorded_by,
             observed_at=source.observed_at,
             created_at=source.created_at,
+            turn_id=source.run_id,
+            message_ids=list(source.message_ids),
+            basis=source.basis,
         )
 
 
@@ -250,6 +259,9 @@ class AttemptOut(ResponseModel):
     cost_nano_usd: int | None = Field(description="null: unknown, never zero.")
     input_tokens: int | None
     output_tokens: int | None
+    requests_sent: int | None = Field(
+        default=None, description="Provider requests in the attempt; a validation repair adds one."
+    )
 
     @classmethod
     def of(cls, attempt: Attempt) -> "AttemptOut":
@@ -264,6 +276,7 @@ class AttemptOut(ResponseModel):
             cost_nano_usd=attempt.cost_nano_usd,
             input_tokens=attempt.input_tokens,
             output_tokens=attempt.output_tokens,
+            requests_sent=attempt.requests_sent,
         )
 
 
@@ -282,7 +295,13 @@ class RunOut(ResponseModel):
     started_at: datetime | None
     finished_at: datetime | None
     attempts: list[AttemptOut]
-    output: ConnectionCheckResult | None
+    output: ConnectionCheckResult | None = Field(
+        description="A connection check's result. An interview turn's proposals are read "
+        "through the turn (`GET .../interview/turns/{turn_id}`)."
+    )
+    profile_version: int | None = Field(
+        default=None, description="The profile version the run read, pinned at submission."
+    )
 
     @classmethod
     def of(
@@ -302,6 +321,7 @@ class RunOut(ResponseModel):
             finished_at=run.finished_at,
             attempts=[AttemptOut.of(a) for a in attempts],
             output=output,
+            profile_version=run.profile_version,
         )
 
 

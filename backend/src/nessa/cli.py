@@ -1,24 +1,30 @@
 """Setup-only commands. They connect with the migration-owner roles, which runtime never uses.
 
 - `setup-database`: migrate the application database, migrate DBOS's system database and
-  grant its runtime role, then seed (idempotent; `make dev` and `make demo` run it).
+  grant its runtime role, seed, then import the pinned ESCO release from the datasets
+  directory if it is not imported yet (idempotent; `make dev` and `make demo` run it).
 - `migrate [--revision R]`: application database only (tests use it to stop part-way).
 - `seed`: invited identities and the fixture workspace, created only if missing.
 - `reset-demo`: recreate the named fixture workspace; no other workspace is touched.
 - `reseal`: master-key rotation step 2 (`make rotate-master-key` runs both steps):
-  re-encrypt every sealed record (keys and run outputs) under the current key version.
+  re-encrypt every sealed record (keys, run inputs and run outputs) under the current key
+  version.
 """
 
 import argparse
 import logging
 import uuid
 from collections.abc import Callable
+from pathlib import Path
 
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
 from dbos import DBOS
 
+from nessa.catalogue import taxonomy_store
+from nessa.catalogue.esco import ESCO_RELEASE, ReleasePin, parse_release, read_verified
+from nessa.catalogue.taxonomy import import_release
 from nessa.config import OpsSettings
 from nessa.db import Tx, create_engine, url_with_password
 from nessa.identity import credential_store, run_store
@@ -26,7 +32,7 @@ from nessa.identity import store as identity_store
 from nessa.identity.credentials import credential_context
 from nessa.identity.keyring import Keyring, RecordContext, SealedValue, load_keyring
 from nessa.identity.records import EventKind
-from nessa.identity.runs import output_context
+from nessa.identity.runs import input_context, output_context
 from nessa.logs import configure_logging
 from nessa.profile import store as profile_store
 from nessa.profile.commands import cited_sources
@@ -112,6 +118,12 @@ def reseal(engine: sa.Engine, keyring: Keyring) -> dict[str, int]:
                 credential_context,
                 lambda record_id, sealed: credential_store.replace_sealed(tx, record_id, sealed),
             ),
+            "run_inputs": _reseal_rows(
+                keyring,
+                run_store.all_sealed_inputs(tx),
+                input_context,
+                lambda record_id, sealed: run_store.replace_sealed_input(tx, record_id, sealed),
+            ),
             "run_outputs": _reseal_rows(
                 keyring,
                 run_store.all_sealed_outputs(tx),
@@ -166,6 +178,18 @@ def seed(engine: sa.Engine, settings: OpsSettings) -> None:
             _create_fixture_workspace(tx, settings, last_event_seq=0)
 
 
+def import_taxonomy(engine: sa.Engine, path: Path, pin: ReleasePin = ESCO_RELEASE) -> str:
+    """Import the pinned ESCO release at `path` unless it is imported already. The file is
+    verified against the pin before it is parsed; a different release is refused."""
+    with engine.begin() as tx:
+        held = taxonomy_store.release(tx)
+    if held is not None and (held.dataset_id, held.sha256) == (pin.dataset_id, pin.sha256):
+        return "already imported"
+    catalogue = parse_release(read_verified(path, pin), pin)
+    with engine.begin() as tx:
+        return import_release(tx, catalogue)
+
+
 def reset_demo(engine: sa.Engine, settings: OpsSettings) -> None:
     with engine.begin() as tx:
         existing = identity_store.fixture_workspace(tx, FIXTURE_KEY)
@@ -195,6 +219,12 @@ def main(argv: list[str] | None = None) -> None:
                 migrate_app(engine)
                 migrate_dbos(settings)
                 seed(engine, settings)
+                if settings.datasets_dir is None:
+                    raise SystemExit("NESSA_DATASETS_DIR is required to import the taxonomy")
+                outcome = import_taxonomy(engine, settings.datasets_dir / ESCO_RELEASE.file_name)
+                _log.info(
+                    "taxonomy", extra={"dataset": ESCO_RELEASE.dataset_id, "outcome": outcome}
+                )
             case "migrate":
                 migrate_app(engine, args.revision)
             case "seed":

@@ -1,25 +1,35 @@
-"""The profile document: practical inputs, each with an explicit field state and its source.
+"""The profile document: practical inputs and interests, each with a field state and a source.
 
 A field state keeps "not yet asked", "unknown", "skipped" and "prefer not to say" apart, so
 a missing value is never read as zero (spec section 3, API-04). Every answered field cites
 the source reference that established it; the server assigns sources, never the client.
-This is the Sprint 1 subset of the profile; the interview contract (Task 5) extends it
-through a new schema version.
+The source carries the rest of the field's provenance: how it was obtained (direct entry,
+a confirmed conversation proposal, a fixture), its basis (stated or inferred), when it was
+observed and who confirmed it (PROF-01).
+
+Schema version 2 (Task 5) adds three separate interest and capability fields: what the
+person enjoys, what they believe they can do and what they have evidence they can do
+(spec section 4, REC1-04). Version 1 documents read as version 2 with those unasked.
+Cities must be on the finite English list and are stored by its name for the city.
 """
 
 import uuid
+from collections.abc import Mapping
+from dataclasses import dataclass
 from enum import StrEnum
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from nessa.catalogue.places import resolve_city
 from nessa.errors import ErrorCode, ErrorStage, NessaError
 from nessa.money import Money
 
 # Spec BND-1: up to three cities and three active targets; a fourth is never added silently.
 MAX_CITIES = 3
 MAX_TARGETS = 3
-PROFILE_SCHEMA_VERSION: Literal["1"] = "1"
+MAX_TASKS = 8
+PROFILE_SCHEMA_VERSION: Literal["2"] = "2"
 
 TextValue = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 HoursValue = Annotated[float, Field(ge=0, le=168)]
@@ -90,6 +100,9 @@ class MoneyField(_Field[Money]):
     pass
 
 
+FieldInput = TextInput | TextListInput | HoursInput | MoneyInput
+
+
 class ProfileInput(BaseModel):
     """What a client submits: states and values only."""
 
@@ -97,11 +110,22 @@ class ProfileInput(BaseModel):
 
     preferred_name: TextInput
     current_role: TextInput
-    cities: TextListInput = Field(description=f"At most {MAX_CITIES} distinct cities.")
+    cities: TextListInput = Field(
+        description=f"At most {MAX_CITIES} distinct cities from `GET /v1/places`."
+    )
     target_titles: TextListInput = Field(description=f"At most {MAX_TARGETS} active targets.")
     weekly_study_hours: HoursInput
     direct_spend_cap: MoneyInput
     monthly_payment_cap: MoneyInput
+    enjoyed_tasks: TextListInput = Field(
+        description=f"Tasks the person enjoys (interest), at most {MAX_TASKS}."
+    )
+    confident_tasks: TextListInput = Field(
+        description=f"Tasks the person believes they can do (confidence), at most {MAX_TASKS}."
+    )
+    evidenced_tasks: TextListInput = Field(
+        description=f"Tasks the person has evidence they can do, at most {MAX_TASKS}."
+    )
 
 
 class ProfileDocument(BaseModel):
@@ -109,7 +133,7 @@ class ProfileDocument(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["1"] = PROFILE_SCHEMA_VERSION
+    schema_version: Literal["2"] = PROFILE_SCHEMA_VERSION
     preferred_name: TextField
     current_role: TextField
     cities: TextListField
@@ -117,9 +141,67 @@ class ProfileDocument(BaseModel):
     weekly_study_hours: HoursField
     direct_spend_cap: MoneyField
     monthly_payment_cap: MoneyField
+    enjoyed_tasks: TextListField
+    confident_tasks: TextListField
+    evidenced_tasks: TextListField
+
+    @model_validator(mode="before")
+    @classmethod
+    def _read_version_1(cls, data: Any) -> Any:
+        """Version 1 had no interest or capability fields: they were never asked."""
+        if isinstance(data, dict) and data.get("schema_version") == "1":
+            unasked = {"state": FieldState.UNASKED.value}
+            return {
+                **{name: unasked for name in VERSION_2_FIELDS},
+                **data,
+                "schema_version": PROFILE_SCHEMA_VERSION,
+            }
+        return data
 
 
 FIELD_NAMES = tuple(ProfileInput.model_fields)
+VERSION_2_FIELDS = ("enjoyed_tasks", "confident_tasks", "evidenced_tasks")
+
+
+class FieldKind(StrEnum):
+    TEXT = "text"
+    LIST = "list"
+    HOURS = "hours"
+    MONEY = "money"
+
+
+@dataclass(frozen=True)
+class FieldSpec:
+    kind: FieldKind
+    max_items: int | None = None
+    # Spec section 4: the assistant may propose these, but only the person's explicit
+    # confirmation establishes them, because search and planning treat them as limits.
+    hard_constraint: bool = False
+
+
+FIELD_SPECS: Mapping[str, FieldSpec] = {
+    "preferred_name": FieldSpec(FieldKind.TEXT),
+    "current_role": FieldSpec(FieldKind.TEXT),
+    "cities": FieldSpec(FieldKind.LIST, MAX_CITIES, hard_constraint=True),
+    "target_titles": FieldSpec(FieldKind.LIST, MAX_TARGETS, hard_constraint=True),
+    "weekly_study_hours": FieldSpec(FieldKind.HOURS, hard_constraint=True),
+    "direct_spend_cap": FieldSpec(FieldKind.MONEY, hard_constraint=True),
+    "monthly_payment_cap": FieldSpec(FieldKind.MONEY, hard_constraint=True),
+    "enjoyed_tasks": FieldSpec(FieldKind.LIST, MAX_TASKS),
+    "confident_tasks": FieldSpec(FieldKind.LIST, MAX_TASKS),
+    "evidenced_tasks": FieldSpec(FieldKind.LIST, MAX_TASKS),
+}
+HARD_CONSTRAINTS = frozenset(name for name, spec in FIELD_SPECS.items() if spec.hard_constraint)
+_INPUT_TYPES: Mapping[FieldKind, type[FieldInput]] = {
+    FieldKind.TEXT: TextInput,
+    FieldKind.LIST: TextListInput,
+    FieldKind.HOURS: HoursInput,
+    FieldKind.MONEY: MoneyInput,
+}
+
+
+def input_type(name: str) -> type[FieldInput]:
+    return _INPUT_TYPES[FIELD_SPECS[name].kind]
 
 
 def empty_profile() -> ProfileDocument:
@@ -128,49 +210,78 @@ def empty_profile() -> ProfileDocument:
     )
 
 
-def _check_bounds(new: ProfileInput) -> None:
-    for name, limit in (("cities", MAX_CITIES), ("target_titles", MAX_TARGETS)):
-        values: list[str] = getattr(new, name).value or []
-        if len(values) > limit:
-            raise NessaError(
-                ErrorCode.LIMIT_EXCEEDED,
-                f"At most {limit} {name.replace('_', ' ')} are supported; remove one first.",
-                stage=ErrorStage.PROFILE,
-                details={"field": name, "limit": limit},
+def _invalid(name: str, reason: str, message: str) -> NessaError:
+    return NessaError(
+        ErrorCode.VALIDATION_FAILED,
+        message,
+        stage=ErrorStage.PROFILE,
+        details={"field": name, "reason": reason},
+    )
+
+
+def checked_input(name: str, field: FieldInput) -> FieldInput:
+    """One field's input after the cross-value rules: list bounds and duplicates, and cities
+    resolved to the finite English list (stored by the list's own name)."""
+    spec = FIELD_SPECS[name]
+    if spec.kind is not FieldKind.LIST or not isinstance(field.value, list):
+        return field
+    values: list[str] = field.value
+    if spec.max_items is not None and len(values) > spec.max_items:
+        raise NessaError(
+            ErrorCode.LIMIT_EXCEEDED,
+            f"At most {spec.max_items} {name.replace('_', ' ')} are supported; remove one first.",
+            stage=ErrorStage.PROFILE,
+            details={"field": name, "limit": spec.max_items},
+        )
+    if name == "cities":
+        places = [resolve_city(value) for value in values]
+        if any(place is None for place in places):
+            raise _invalid(
+                name, "unknown_city", "Each work area must be an English city on the list."
             )
-        folded = [value.casefold() for value in values]
-        if len(set(folded)) != len(folded):
-            raise NessaError(
-                ErrorCode.VALIDATION_FAILED,
-                f"The same entry appears twice in {name.replace('_', ' ')}.",
-                stage=ErrorStage.PROFILE,
-                details={"field": name, "reason": "duplicate"},
-            )
+        values = [place.label for place in places if place is not None]
+    folded = [value.casefold() for value in values]
+    if len(set(folded)) != len(folded):
+        raise _invalid(
+            name, "duplicate", f"The same entry appears twice in {name.replace('_', ' ')}."
+        )
+    return TextListInput(state=field.state, value=values)
+
+
+def apply_updates(
+    previous: ProfileDocument, updates: Mapping[str, tuple[FieldInput, uuid.UUID]]
+) -> tuple[ProfileDocument, list[str]]:
+    """The next document and the fields it changes. Each updated field that changes cites
+    its update's source; every other field keeps its value and its source."""
+    unknown = set(updates) - set(FIELD_NAMES)
+    if unknown:
+        raise _invalid(sorted(unknown)[0], "not_a_field", "That is not a profile field.")
+    fields: dict[str, dict[str, object]] = {}
+    changed: list[str] = []
+    for name in FIELD_NAMES:
+        before = getattr(previous, name)
+        if name not in updates:
+            fields[name] = before.model_dump()
+            continue
+        raw, source_ref_id = updates[name]
+        after = checked_input(name, input_type(name).model_validate(raw.model_dump()))
+        if (before.state, before.value) == (after.state, after.value):
+            fields[name] = before.model_dump()
+            continue
+        changed.append(name)
+        source = None if after.state is FieldState.UNASKED else source_ref_id
+        fields[name] = {"state": after.state, "value": after.value, "source_ref_id": source}
+    return ProfileDocument.model_validate(fields), changed
 
 
 def apply_profile_input(
     previous: ProfileDocument, new: ProfileInput, source_ref_id: uuid.UUID
 ) -> ProfileDocument:
-    """The next document: changed answers cite `source_ref_id`, unchanged ones keep theirs."""
-    _check_bounds(new)
-    fields: dict[str, dict[str, object]] = {}
-    for name in FIELD_NAMES:
-        before = getattr(previous, name)
-        after = getattr(new, name)
-        if after.state is FieldState.UNASKED:
-            source = None
-        elif (before.state, before.value) == (after.state, after.value):
-            source = before.source_ref_id
-        else:
-            source = source_ref_id
-        fields[name] = {"state": after.state, "value": after.value, "source_ref_id": source}
-    return ProfileDocument.model_validate(fields)
+    """A whole-profile edit: changed answers cite `source_ref_id`, unchanged ones keep theirs."""
+    return apply_updates(previous, whole_input(new, source_ref_id))[0]
 
 
-def changed_fields(previous: ProfileDocument, new: ProfileInput) -> list[str]:
-    return [
-        name
-        for name in FIELD_NAMES
-        if (getattr(previous, name).state, getattr(previous, name).value)
-        != (getattr(new, name).state, getattr(new, name).value)
-    ]
+def whole_input(
+    new: ProfileInput, source_ref_id: uuid.UUID
+) -> dict[str, tuple[FieldInput, uuid.UUID]]:
+    return {name: (getattr(new, name), source_ref_id) for name in FIELD_NAMES}

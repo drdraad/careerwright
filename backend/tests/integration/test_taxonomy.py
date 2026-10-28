@@ -1,0 +1,287 @@
+"""The ESCO taxonomy in PostgreSQL 16: import manifest, full-text retrieval, alias lookup,
+ISCO grouping and provisional concepts (TAX1-01, TAX1-04, DIV1-01, DIV1-03).
+
+The session database holds the committed sample. One test imports the full pinned release
+(fetched by `make setup`) into its own database: acceptance needs `make setup` first.
+"""
+
+import dataclasses
+import time
+import uuid
+from pathlib import Path
+from typing import Any
+
+import pytest
+from psycopg import errors
+
+from nessa.catalogue.esco import ESCO_RELEASE, concept_id, parse_release, read_verified
+from nessa.catalogue.taxonomy import (
+    TaxonomyMismatchError,
+    import_release,
+    occupation_detail,
+    search_occupations,
+)
+from nessa.cli import import_taxonomy, migrate_app
+from nessa.db import create_engine, system_transaction
+from nessa.errors import ErrorCode, NessaError
+from tests.support.client import ApiClient
+from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
+from tests.support.infra import Infra, migrator_engine
+from tools.datasets import DATASETS_DIR
+
+pytestmark = pytest.mark.integration
+
+
+def search(api: ApiClient, token: str, q: str, **params: object) -> dict[str, Any]:
+    response = api.get("/v1/taxonomy/occupations", token, q=q, **params)
+    assert response.status_code == 200, response.text
+    body: dict[str, Any] = response.json()
+    return body
+
+
+@pytest.mark.req("TAX1-04")
+def test_the_manifest_records_release_hash_licence_attribution_and_versions(
+    api: ApiClient, ada: str
+) -> None:
+    response = api.get("/v1/taxonomy", ada)
+
+    assert response.status_code == 200, response.text
+    release = response.json()
+    assert release["dataset_id"] == SAMPLE_RELEASE.dataset_id
+    assert release["sample"] is True  # the test copy says so, everywhere it is shown
+    assert release["sha256"] == SAMPLE_RELEASE.sha256
+    assert release["version"] == "v1.2.1"
+    assert release["transformation_version"] == "nessa-esco-import-1"
+    assert "ISCO-08" in release["native_code_version"]
+    assert "2011/833/EU" in release["licence"]
+    assert release["attribution"] == (
+        "This service uses the ESCO classification of the European Commission."
+    )
+    assert (release["occupation_count"], release["isco_group_count"]) == (30, 70)
+
+
+@pytest.mark.req("DIV1-01")
+def test_an_alias_finds_its_occupation_before_the_ranked_full_text_matches(
+    api: ApiClient, ada: str
+) -> None:
+    found = search(api, ada, "IT support technician")
+
+    [match] = found["label_matches"]
+    assert (match["preferred_label"], match["label"], match["label_kind"]) == (
+        "ICT help desk agent",
+        "IT support technician",
+        "alternative",
+    )
+    assert match["concept_id"] not in {h["concept_id"] for h in found["full_text"]}
+
+
+@pytest.mark.req("DIV1-01")
+def test_full_text_search_ranks_by_task_words_and_counts_every_match(
+    api: ApiClient, ada: str
+) -> None:
+    found = search(api, ada, "repair bicycles", limit=1)
+
+    assert found["label_matches"] == []
+    [best] = found["full_text"]
+    assert best["preferred_label"] == "bicycle mechanic"
+    assert found["full_text_total"] >= 1
+    assert found["limit"] == 1
+    helpdesk = search(api, ada, "help desk")
+    labels = [h["preferred_label"] for h in helpdesk["full_text"]]
+    assert {"ICT help desk agent", "ICT help desk manager"} <= set(labels)
+    assert helpdesk["full_text_total"] == len(labels)  # a page never hides a remainder
+    assert helpdesk["match"] == "all"
+    broad = search(api, ada, "fixing bicycles outdoors gardens", match="any")
+    assert broad["match"] == "any"
+    assert {"bicycle mechanic", "landscape gardener"} <= {
+        h["preferred_label"] for h in broad["full_text"]
+    }
+    assert search(api, ada, "fixing bicycles outdoors gardens")["full_text"] == []
+
+
+def test_a_label_two_occupations_share_returns_both_never_one_silently(
+    api: ApiClient, ada: str
+) -> None:
+    found = search(api, ada, "Bus Operator")
+
+    labels = sorted(m["preferred_label"] for m in found["label_matches"])
+    assert labels == ["bus driver", "trolley bus driver"]
+
+
+def test_a_hidden_label_matches_without_its_text_being_shown(api: ApiClient, ada: str) -> None:
+    found = search(api, ada, "g.p.")
+
+    [match] = found["label_matches"]
+    assert (match["preferred_label"], match["label"], match["label_kind"]) == (
+        "general practitioner",
+        None,
+        "hidden",
+    )
+
+
+def test_a_query_with_no_searchable_words_is_refused_not_answered_empty(
+    api: ApiClient, ada: str
+) -> None:
+    response = api.get("/v1/taxonomy/occupations", ada, q="the and of")
+
+    assert response.status_code == 422
+    assert response.json()["error"]["details"] == {"field": "q", "reason": "no_search_terms"}
+
+
+@pytest.mark.req("TAX1-01")
+def test_an_occupation_shows_its_isco_chain_skills_and_attribution(
+    api: ApiClient, ada: str
+) -> None:
+    agent = search(api, ada, "ICT help desk agent")["label_matches"][0]
+
+    detail = api.get(f"/v1/taxonomy/occupations/{agent['concept_id']}", ada).json()
+
+    assert [g["code"] for g in detail["isco_groups"]] == ["3", "35", "351", "3512"]
+    assert detail["esco_uri"].startswith("http://data.europa.eu/esco/occupation/")
+    assert detail["concept_id"] == str(concept_id(detail["esco_uri"]))
+    assert {s["relation"] for s in detail["skills"]} <= {"essential", "optional"}
+    assert any(s["relation"] == "essential" for s in detail["skills"])
+    assert "IT support technician" in detail["alternative_labels"]
+    assert detail["attribution"].startswith("This service uses the ESCO classification")
+    manager = search(api, ada, "ICT help desk manager")["label_matches"][0]
+    assert manager["isco_code"] == agent["isco_code"]  # same ISCO group, distinct concepts
+    assert manager["concept_id"] != agent["concept_id"]
+    missing = api.get(f"/v1/taxonomy/occupations/{uuid.uuid4()}", ada)
+    assert missing.status_code == 404
+
+
+def test_the_taxonomy_needs_an_invited_caller(api: ApiClient) -> None:
+    assert api.get("/v1/taxonomy", None).status_code == 401
+    assert api.get("/v1/places", None).status_code == 401
+
+
+def test_the_english_city_list_is_served_with_its_source(api: ApiClient, ada: str) -> None:
+    places = api.get("/v1/places", ada).json()
+
+    assert len(places["items"]) == 55
+    assert places["source_url"].startswith("https://www.gov.uk/")
+    assert places["licence"] == "Open Government Licence v3.0"
+    leeds = next(p for p in places["items"] if p["label"] == "Leeds")
+    assert (leeds["place_id"], leeds["region"], leeds["timezone"]) == (
+        "gb-eng-leeds",
+        "Yorkshire and The Humber",
+        "Europe/London",
+    )
+
+
+def test_the_api_role_reads_but_cannot_change_the_taxonomy(infra: Infra) -> None:
+    with pytest.raises(errors.InsufficientPrivilege):
+        infra.as_role("pg_api", "DELETE FROM nessa.occupation_labels")
+    with pytest.raises(errors.InsufficientPrivilege):
+        infra.as_role("pg_api", "UPDATE nessa.taxonomy_releases SET sample = false")
+    assert infra.as_role("pg_api", "SELECT count(*) AS n FROM nessa.occupation_concepts") == [
+        {"n": 30}
+    ]
+
+
+def test_importing_again_changes_nothing_and_another_release_is_refused(infra: Infra) -> None:
+    catalogue = parse_release(read_verified(SAMPLE_PATH, SAMPLE_RELEASE), SAMPLE_RELEASE)
+    other = dataclasses.replace(
+        catalogue, pin=dataclasses.replace(SAMPLE_RELEASE, dataset_id="esco-v9.9.9-en-csv")
+    )
+    engine = migrator_engine(infra)
+    try:
+        assert import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE) == "already imported"
+        with engine.begin() as tx, pytest.raises(TaxonomyMismatchError):
+            import_release(tx, other)
+    finally:
+        engine.dispose()
+    assert infra.query("SELECT count(*) AS n FROM nessa.taxonomy_releases") == [{"n": 1}]
+
+
+def test_a_database_without_the_taxonomy_refuses_searches(infra: Infra) -> None:
+    database = f"nessa_empty_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    owner = migrator_engine(infra, database)
+    try:
+        migrate_app(owner)
+    finally:
+        owner.dispose()
+    engine = create_engine(infra.api_settings(database).app_database, application_name="t")
+    try:
+        with system_transaction(engine) as tx, pytest.raises(NessaError) as raised:
+            search_occupations(tx, "data analyst", 5)
+    finally:
+        engine.dispose()
+
+    assert raised.value.code is ErrorCode.TAXONOMY_UNAVAILABLE
+
+
+@pytest.mark.req("TAX1-04", "DIV1-01", "TAX1-01")
+def test_the_full_pinned_release_imports_and_is_searchable(infra: Infra) -> None:
+    release = Path(DATASETS_DIR) / ESCO_RELEASE.file_name
+    assert release.is_file(), f"run `make setup` first: {release} is missing"
+    database = f"nessa_esco_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    owner = migrator_engine(infra, database)
+    try:
+        migrate_app(owner)
+        started = time.monotonic()
+        assert import_taxonomy(owner, release) == "imported"
+        elapsed = time.monotonic() - started
+        assert import_taxonomy(owner, release) == "already imported"
+    finally:
+        owner.dispose()
+    print(f"full ESCO import: {elapsed:.1f} s")  # recorded in the task report
+
+    counts = infra.query(
+        "SELECT (SELECT count(*) FROM nessa.occupation_concepts) AS occupations, "
+        "(SELECT count(*) FROM nessa.occupation_labels) AS labels, "
+        "(SELECT count(*) FROM nessa.skills) AS skills, "
+        "(SELECT count(*) FROM nessa.skill_labels) AS skill_labels, "
+        "(SELECT count(*) FROM nessa.occupation_skills) AS occupation_skills, "
+        "(SELECT count(*) FROM nessa.skill_relations) AS skill_relations, "
+        "(SELECT count(*) FROM nessa.isco_groups) AS isco, "
+        "(SELECT count(*) FROM nessa.occupation_broader) AS broader, "
+        "(SELECT count(*) FROM nessa.occupation_concepts WHERE search_vector IS NULL) AS unindexed",
+        database=database,
+    )
+    # 3,043 occupation rows and 13,960 skill rows, of which 4 and 21 repeat a concept with
+    # only `modifiedDate` changed (counted by hand from the CSVs, 2026-10-28).
+    assert counts == [
+        {
+            "occupations": 3_039,
+            "labels": 33_498,
+            "skills": 13_939,
+            "skill_labels": 100_886,
+            "occupation_skills": 126_051,
+            "skill_relations": 5_818,
+            "isco": 619,
+            "broader": 3_039,
+            "unindexed": 0,
+        }
+    ]
+    [manifest] = infra.query(
+        "SELECT dataset_id, sha256, sample, repeated_rows_collapsed FROM nessa.taxonomy_releases",
+        database=database,
+    )
+    assert manifest == {
+        "dataset_id": ESCO_RELEASE.dataset_id,
+        "sha256": ESCO_RELEASE.sha256,
+        "sample": False,
+        "repeated_rows_collapsed": 25,
+    }
+    engine = create_engine(infra.api_settings(database).app_database, application_name="t")
+    try:
+        with system_transaction(engine) as tx:
+            shared = search_occupations(tx, "clinical research assistant", 10)
+            every_word = search_occupations(tx, "repairing physical objects outdoors", 20)
+            tasks = search_occupations(tx, "repairing physical objects outdoors", 20, any_word=True)
+            nurse = search_occupations(tx, "nurse responsible for general care", 5)
+            detail = occupation_detail(tx, nurse.label_matches[0].concept_id)
+    finally:
+        engine.dispose()
+    assert sorted(m.preferred_label for m in shared.label_matches) == [
+        "clinical trial assistant",
+        "medical laboratory assistant",
+    ]
+    # Every word: a complete, honest zero. Any word: a ranked page that says it is a page.
+    assert (every_word.full_text, every_word.full_text_total) == ([], 0)
+    assert tasks.full_text_total > len(tasks.full_text) == 20
+    assert [g.code for g in detail.isco_groups] == ["2", "22", "222", "2221"]
+    assert any(s.relation == "essential" for s in detail.skills)

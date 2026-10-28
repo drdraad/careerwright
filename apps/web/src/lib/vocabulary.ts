@@ -63,11 +63,14 @@ export type ProfileFieldName = keyof ProfileInput;
 
 type FieldKind = "text" | "list" | "hours" | "money";
 
+type FieldWords = { label: string; hint: string; lessPrecise: string } & (
+  | { kind: Exclude<FieldKind, "list"> }
+  // A list's bound is the API's (spec BND-1: three cities and three targets; eight tasks).
+  | { kind: "list"; limit: number; itemLabel: string }
+);
+
 /** Words for each profile field and, per spec section 3, what a missing answer makes less precise. */
-export const PROFILE_FIELDS: Record<
-  ProfileFieldName,
-  { label: string; kind: FieldKind; hint: string; lessPrecise: string }
-> = {
+export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
   preferred_name: {
     label: "Preferred name",
     kind: "text",
@@ -83,12 +86,16 @@ export const PROFILE_FIELDS: Record<
   cities: {
     label: "Work areas",
     kind: "list",
-    hint: "Up to three English cities.",
+    limit: 3,
+    itemLabel: "Work area",
+    hint: "Up to three English cities, such as Leeds or Bristol.",
     lessPrecise: "Roles, pay and listings: none can be searched without a work area.",
   },
   target_titles: {
     label: "Target roles",
     kind: "list",
+    limit: 3,
+    itemLabel: "Target role",
     hint: "Up to three roles you are considering.",
     lessPrecise: "Every later chapter: requirements, options and routes start from a target.",
   },
@@ -110,6 +117,30 @@ export const PROFILE_FIELDS: Record<
     hint: "The most you could pay in any one month.",
     lessPrecise: "Whether a route's payments fit any single month.",
   },
+  enjoyed_tasks: {
+    label: "Tasks you enjoy",
+    kind: "list",
+    limit: 8,
+    itemLabel: "Task you enjoy",
+    hint: "Work you find satisfying, whether or not you are good at it yet.",
+    lessPrecise: "Which directions are suggested: suggestions lean on your experience alone.",
+  },
+  confident_tasks: {
+    label: "Tasks you believe you can do",
+    kind: "list",
+    limit: 8,
+    itemLabel: "Task you believe you can do",
+    hint: "Things you are confident about, even without proof yet.",
+    lessPrecise: "Which gaps are worth checking first.",
+  },
+  evidenced_tasks: {
+    label: "Tasks you can show you have done",
+    kind: "list",
+    limit: 8,
+    itemLabel: "Task you can show",
+    hint: "Things you have done and could point to, such as work, a course or a reference.",
+    lessPrecise: "Which requirements count as demonstrated rather than unresolved.",
+  },
 };
 
 export const PROFILE_FIELD_ORDER: readonly ProfileFieldName[] = [
@@ -119,6 +150,9 @@ export const PROFILE_FIELD_ORDER: readonly ProfileFieldName[] = [
   "weekly_study_hours",
   "direct_spend_cap",
   "monthly_payment_cap",
+  "enjoyed_tasks",
+  "confident_tasks",
+  "evidenced_tasks",
   "preferred_name",
 ];
 
@@ -163,6 +197,10 @@ const ERROR_TONE: Record<ErrorCode, Tone> = {
   STORE_UNAVAILABLE: "error",
   AUTH_UNAVAILABLE: "error",
   INTERNAL_ERROR: "error",
+  TAXONOMY_UNAVAILABLE: "error",
+  CONFIRMATION_REQUIRED: "neutral",
+  PROPOSAL_NOT_AVAILABLE: "neutral",
+  ALREADY_DECIDED: "neutral",
 };
 
 /** What the person sees for each API error code. The API's own message is never shown. */
@@ -270,6 +308,22 @@ const ERROR_WORDS: Record<ErrorCode, Omit<ErrorStatement, "tone">> = {
   INTERNAL_ERROR: {
     title: "Something went wrong on our side",
     action: "Try again. Quote the reference below if you report it.",
+  },
+  TAXONOMY_UNAVAILABLE: {
+    title: "The occupation list isn't loaded",
+    action: "Run the setup step again, then restart Nessa. Your work is kept.",
+  },
+  CONFIRMATION_REQUIRED: {
+    title: "Confirm each limit or target first",
+    action: "Tick the confirmation beside each one you want saved.",
+  },
+  PROPOSAL_NOT_AVAILABLE: {
+    title: "There is nothing from this reply to save",
+    action: "The reply didn't finish or didn't pass its checks. Send your message again.",
+  },
+  ALREADY_DECIDED: {
+    title: "You already chose what to keep from this reply",
+    action: "Edit the answers directly if you want to change them.",
   },
 };
 

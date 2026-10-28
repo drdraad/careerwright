@@ -201,6 +201,8 @@ class OpsSettings(BaseSettings):
     )
     fixtures_dir: Path = Field(validation_alias="NESSA_FIXTURES_DIR")
     master_key_dir: Path | None = Field(default=None, validation_alias="NESSA_MASTER_KEY_DIR")
+    # Where `make setup` put the pinned third-party datasets (ESCO); `setup-database` needs it.
+    datasets_dir: Path | None = Field(default=None, validation_alias="NESSA_DATASETS_DIR")
 
     _no_inline_password = field_validator("migrator_database_url", "dbos_owner_database_url")(
         _passwordless

@@ -21,11 +21,13 @@ def test_export_holds_every_version_source_and_event_with_its_synthetic_label(
 
     export = api.get(f"/v1/workspaces/{workspace_id}/export", ada).json()
 
+    # Format 2 (Task 5) adds the interview turns and provisional concepts.
     assert (export["format"], export["format_version"], export["synthetic"]) == (
         "nessa.workspace-export",
-        1,
+        2,
         True,
     )
     assert [v["version"] for v in export["profile_versions"]] == [1, 2]
     assert len(export["sources"]) == 2
     assert [e["seq"] for e in export["events"]] == [1, 2, 3]
+    assert (export["interview_turns"], export["provisional_concepts"]) == ([], [])

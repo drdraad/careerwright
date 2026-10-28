@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import httpx2 as httpx
+
 from tests.support.client import ApiClient, profile_with
 from tests.support.infra import Infra
 from tests.support.workers import Worker, start_worker, wait_for
@@ -40,6 +42,42 @@ class Scenario:
         )
         assert response.status_code == 202, response.text
         return str(response.json()["run_id"])
+
+    def submit_turn(self, message: str, expected_profile_version: int = 1) -> dict[str, Any]:
+        response = self.api.write(
+            "POST",
+            f"/v1/workspaces/{self.workspace_id}/interview/turns",
+            self.token,
+            {"expected_profile_version": expected_profile_version, "message": message},
+        )
+        assert response.status_code == 202, response.text
+        body: dict[str, Any] = response.json()
+        return body
+
+    def turn(self, turn_id: str) -> dict[str, Any]:
+        response = self.api.get(
+            f"/v1/workspaces/{self.workspace_id}/interview/turns/{turn_id}", self.token
+        )
+        assert response.status_code == 200, response.text
+        body: dict[str, Any] = response.json()
+        return body
+
+    def decide(
+        self, turn_id: str, body: dict[str, Any], *, key: uuid.UUID | None = None
+    ) -> httpx.Response:
+        return self.api.write(
+            "POST",
+            f"/v1/workspaces/{self.workspace_id}/interview/turns/{turn_id}/decision",
+            self.token,
+            body,
+            key=key,
+        )
+
+    def profile(self) -> dict[str, Any]:
+        body: dict[str, Any] = self.api.get(
+            f"/v1/workspaces/{self.workspace_id}/profile", self.token
+        ).json()
+        return body
 
     def worker(self, name: str, **settings: str) -> Worker:
         log = self.log_dir / f"{name}.log"
@@ -110,9 +148,10 @@ class Scenario:
         }
         return output
 
-    def leaks(self) -> list[Finding]:
-        """The key nowhere; the profile's private text never outside the application tables
-        that own it; the model's output only sealed."""
+    def leaks(self, *private: str) -> list[Finding]:
+        """The key nowhere; the profile's private text (and any other `private` text, such
+        as a message) never outside the application tables that own it; the model's output
+        only sealed."""
         logs = [(log.name, log.read_text(encoding="utf-8")) for log in self.logs if log.exists()]
         dbos = self.infra.database_cells("nessa_dbos")
         app = self.infra.database_cells("nessa_app")
@@ -121,10 +160,10 @@ class Scenario:
             for key in (self.api_key, *self.retired_keys)
         ]
         output = Needle("model output", self.output_sentinel)
-        profile = Needle("profile private text", self.profile_sentinel)
+        owned = [Needle("private text", text) for text in (self.profile_sentinel, *private)]
         return [
             *scan([*app, *dbos, *logs], [*keys, output]),
-            *scan([*dbos, *logs], [profile]),
+            *scan([*dbos, *logs], owned),
         ]
 
 

@@ -16,6 +16,7 @@ import httpx2 as httpx
 import psycopg
 import pytest
 
+from nessa.profile.document import FIELD_NAMES
 from nessa.seed import FIXTURE_WORKSPACE_ID
 from tools.localenv import REPO_ROOT as REPO
 from tools.localenv import add_master_key_version
@@ -23,15 +24,7 @@ from tools.stack import CORE_SERVICES, Stack, reseal, rotate_master_key
 
 pytestmark = pytest.mark.stack
 
-PROFILE_FIELDS = (
-    "preferred_name",
-    "current_role",
-    "cities",
-    "target_titles",
-    "weekly_study_hours",
-    "direct_spend_cap",
-    "monthly_payment_cap",
-)
+PROFILE_FIELDS = FIELD_NAMES
 
 
 def sign_in(stack: Stack, handle: str) -> str:
@@ -238,10 +231,7 @@ def test_the_containerised_worker_runs_dbos_as_the_non_owner_runtime_role(
     assert '"msg": "worker ready"' in logs
     assert "nessa_dbos_runtime:[redacted]@postgres:5432/nessa_dbos" in logs
     assert password not in logs
-    assert (
-        demo_stack.exec("worker", "python", "-m", "nessa.identity.worker", "--check").returncode
-        == 0
-    )
+    assert demo_stack.exec("worker", "python", "-m", "nessa.worker", "--check").returncode == 0
 
 
 @pytest.mark.req("BND1-14", "STATE-07")
@@ -278,6 +268,54 @@ def test_a_profile_edit_survives_a_full_stop_and_start(demo_stack: Stack) -> Non
     )
     assert outcome == "stopped"
     assert stopped_in < 60
+
+
+@pytest.mark.req("TAX1-04", "DIV1-01")
+def test_setup_imports_the_full_pinned_esco_release_into_the_stack(demo_stack: Stack) -> None:
+    ada = sign_in(demo_stack, "ada")
+
+    release = call(demo_stack, "GET", "/v1/taxonomy", ada).json()
+    found = call(demo_stack, "GET", "/v1/taxonomy/occupations?q=plumber", ada).json()
+
+    assert (release["dataset_id"], release["sample"], release["occupation_count"]) == (
+        "esco-v1.2.1-en-csv",
+        False,
+        3_039,
+    )
+    assert release["sha256"] == "f9761b0b52be1828b38a3e5e0ae59a93a7b0ce358bc800f52f57a8b002adeb3e"
+    # "plumber" is an occupation and an alternative label of another (pipe welder): both.
+    assert {m["preferred_label"] for m in found["label_matches"]} == {"plumber", "pipe welder"}
+
+
+@pytest.mark.req("BND1-11", "TEST1-10")
+def test_a_demo_workspace_interviews_through_the_offline_worker(demo_stack: Stack) -> None:
+    ada = sign_in(demo_stack, "ada")
+    workspace = call(
+        demo_stack,
+        "POST",
+        "/v1/workspaces",
+        ada,
+        {"name": "Offline interview", "data_mode": "demo", "synthetic": True},
+    ).json()["workspace_id"]
+
+    submitted = call(
+        demo_stack,
+        "POST",
+        f"/v1/workspaces/{workspace}/interview/turns",
+        ada,
+        {"expected_profile_version": 0, "message": "I could work in York, 4 hours a week."},
+    )
+    assert submitted.status_code == 202, submitted.text
+    path = f"/v1/workspaces/{workspace}/interview/turns/{submitted.json()['turn_id']}"
+    deadline = time.monotonic() + 60
+    turn = call(demo_stack, "GET", path, ada).json()
+    while turn["run"]["status"] in ("queued", "running") and time.monotonic() < deadline:
+        time.sleep(0.5)
+        turn = call(demo_stack, "GET", path, ada).json()
+
+    assert (turn["run"]["status"], turn["run"]["model_mode"]) == ("complete", "fixture")
+    assert turn["proposal"]["origin"] == "fixture"
+    assert {c["field"] for c in turn["proposal"]["changes"]} == {"cities", "weekly_study_hours"}
 
 
 def superuser_query(stack: Stack, statement: str) -> list[tuple[Any, ...]]:
@@ -492,7 +530,7 @@ def test_reset_demo_restores_the_fixture_and_touches_nothing_else(demo_stack: St
         "PUT",
         f"{fixture}/profile",
         ada,
-        {"expected_version": 1, "profile": profile(["Edited"])},
+        {"expected_version": 1, "profile": profile(["York"])},
     )
     other_id = call(
         demo_stack,
@@ -506,7 +544,7 @@ def test_reset_demo_restores_the_fixture_and_touches_nothing_else(demo_stack: St
         "PUT",
         f"/v1/workspaces/{other_id}/profile",
         ada,
-        {"expected_version": 0, "profile": profile(["Kept"])},
+        {"expected_version": 0, "profile": profile(["Bath"])},
     )
     events_before = call(demo_stack, "GET", f"{fixture}/events", ada).json()["last_seq"]
 
@@ -515,7 +553,7 @@ def test_reset_demo_restores_the_fixture_and_touches_nothing_else(demo_stack: St
     restored = call(demo_stack, "GET", f"{fixture}/profile", ada).json()
     assert (restored["version"], restored["document"]["cities"]["value"]) == (1, ["Manchester"])
     kept = call(demo_stack, "GET", f"/v1/workspaces/{other_id}/profile", ada).json()
-    assert kept["document"]["cities"]["value"] == ["Kept"]
+    assert kept["document"]["cities"]["value"] == ["Bath"]
     events = call(
         demo_stack,
         "GET",

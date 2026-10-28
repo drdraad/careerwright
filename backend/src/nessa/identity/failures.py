@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from pydantic_ai.exceptions import (
+    ContentFilterError,
     ModelConnectionError,
     ModelHTTPError,
     ModelRequestTimeout,
@@ -37,7 +38,9 @@ class FailureClass(StrEnum):
     PROVIDER_PERMISSION = "provider_permission"
     PROVIDER_REQUEST_REJECTED = "provider_request_rejected"
     PROVIDER_UNAVAILABLE = "provider_unavailable"
-    INVALID_MODEL_OUTPUT = "invalid_model_output"
+    INVALID_MODEL_OUTPUT = "invalid_model_output"  # still invalid after the bounded repair
+    MODEL_REFUSED = "model_refused"  # the provider's content filter refused to answer
+    OUTPUT_TRUNCATED = "output_truncated"  # the output hit its token limit: never used
     APP_STORE_UNAVAILABLE = "app_store_unavailable"
     UNKNOWN_FAILURE = "unknown_failure"
 
@@ -92,6 +95,8 @@ def classify_failure(error: BaseException) -> Classified:
         return Classified("transient_connection", None)
     if isinstance(error, ModelRequestTimeout):
         return Classified("transient_request_timeout", None)
+    if isinstance(error, ContentFilterError):  # an UnexpectedModelBehavior: test it first
+        return terminal(FailureClass.MODEL_REFUSED)
     if isinstance(error, UsageLimitExceeded | UnexpectedModelBehavior):
         return terminal(FailureClass.INVALID_MODEL_OUTPUT)
     if isinstance(error, StoreUnavailableError):

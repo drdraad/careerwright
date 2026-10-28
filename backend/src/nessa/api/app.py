@@ -10,8 +10,10 @@ from nessa.api import (
     routes_events,
     routes_export,
     routes_health,
+    routes_interview,
     routes_profile,
     routes_runs,
+    routes_taxonomy,
     routes_workspaces,
 )
 from nessa.api.deps import ApiDependencies
@@ -44,6 +46,8 @@ def _routes() -> FastAPI:
         routes_profile,
         routes_credentials,
         routes_runs,
+        routes_interview,
+        routes_taxonomy,
         routes_events,
         routes_export,
     ):

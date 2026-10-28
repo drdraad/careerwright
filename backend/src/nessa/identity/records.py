@@ -32,6 +32,8 @@ class EventKind(StrEnum):
     CREDENTIAL_REVOKED = "credential.revoked"
     SPEND_LIMITS_UPDATED = "spend_limits.updated"
     RUN_STATE_CHANGED = "run.state_changed"
+    PROVISIONAL_CONCEPT_CREATED = "concept.provisional_created"
+    INTERVIEW_TURN_DECIDED = "interview.turn_decided"
 
 
 @dataclass(frozen=True)
@@ -75,6 +77,7 @@ class Credential:
 
 class RunKind(StrEnum):
     CONNECTION_CHECK = "connection_check"
+    INTERVIEW_TURN = "interview_turn"
 
 
 @dataclass(frozen=True)
@@ -93,6 +96,9 @@ class Run:
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    # The profile version a run read, pinned at submission (ADR 0004 decision 7); None for
+    # a run that reads no workspace input (the connection check).
+    profile_version: int | None = None
 
 
 @dataclass(frozen=True)
@@ -111,3 +117,4 @@ class Attempt:
     reasoning_tokens: int | None
     web_search_queries: int | None
     provider_response_id: str | None
+    requests_sent: int | None = None  # provider requests in the attempt (a repair adds one)

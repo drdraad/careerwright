@@ -10,11 +10,11 @@ from sqlalchemy import exc
 from nessa.db import Tx, is_unique_violation
 from nessa.errors import ErrorCode, ErrorStage, NessaError
 from nessa.profile.document import ProfileDocument
-from nessa.profile.records import ProfileVersion, SourceKind, SourceReference
+from nessa.profile.records import Basis, ProfileVersion, SourceKind, SourceReference
 
 _SOURCE_COLUMNS = (
     "source_ref_id, workspace_id, kind, label, locator, content_sha256, recorded_by, "
-    "observed_at, created_at"
+    "observed_at, created_at, run_id, message_ids, basis"
 )
 _VERSION_COLUMNS = "workspace_id, version, document, created_by, created_at"
 
@@ -50,6 +50,9 @@ def _source(row: sa.RowMapping) -> SourceReference:
         recorded_by=row["recorded_by"],
         observed_at=row["observed_at"],
         created_at=row["created_at"],
+        run_id=row["run_id"],
+        message_ids=tuple(row["message_ids"] or ()),
+        basis=Basis(row["basis"]) if row["basis"] else None,
     )
 
 
@@ -64,12 +67,20 @@ def insert_source(
     recorded_by: uuid.UUID | None = None,
     locator: str | None = None,
     content_sha256: str | None = None,
+    run_id: uuid.UUID | None = None,
+    message_ids: tuple[uuid.UUID, ...] = (),
+    basis: Basis | None = None,
 ) -> None:
+    # Only a conversation source names a turn, messages and a basis (a CHECK holds the
+    # others to NULL), so other kinds are written without those columns.
+    conversation = kind is SourceKind.CONVERSATION
+    extra = ", run_id, message_ids, basis" if conversation else ""
+    extra_values = ", :run, :messages, :basis" if conversation else ""
     tx.execute(
         sa.text(
             "INSERT INTO nessa.source_references (source_ref_id, workspace_id, kind, label, "
-            "locator, content_sha256, recorded_by, observed_at) VALUES (:id, :ws, :kind, "
-            ":label, :locator, :sha, :by, :observed)"
+            f"locator, content_sha256, recorded_by, observed_at{extra}) VALUES (:id, :ws, "
+            f":kind, :label, :locator, :sha, :by, :observed{extra_values})"
         ),
         {
             "id": source_ref_id,
@@ -80,6 +91,15 @@ def insert_source(
             "sha": content_sha256,
             "by": recorded_by,
             "observed": observed_at,
+            **(
+                {
+                    "run": run_id,
+                    "messages": list(message_ids),
+                    "basis": basis.value if basis else None,
+                }
+                if conversation
+                else {}
+            ),
         },
     )
 

@@ -23,6 +23,25 @@ export type ActorOut = {
 };
 
 /**
+ * AnsweredState
+ *
+ * A proposal answers a field; it never returns one to "not asked".
+ */
+export const AnsweredState = {
+    PROVIDED: 'provided',
+    UNKNOWN: 'unknown',
+    SKIPPED: 'skipped',
+    PREFER_NOT_TO_SAY: 'prefer_not_to_say'
+} as const;
+
+/**
+ * AnsweredState
+ *
+ * A proposal answers a field; it never returns one to "not asked".
+ */
+export type AnsweredState = typeof AnsweredState[keyof typeof AnsweredState];
+
+/**
  * AttemptOut
  */
 export type AttemptOut = {
@@ -65,7 +84,29 @@ export type AttemptOut = {
      * Output Tokens
      */
     output_tokens: number | null;
+    /**
+     * Requests Sent
+     *
+     * Provider requests in the attempt; a validation repair adds one.
+     */
+    requests_sent?: number | null;
 };
+
+/**
+ * Basis
+ *
+ * How an answer relates to what the person said (spec section 3: factual confirmations
+ * and inferences are styled differently).
+ */
+export const Basis = { STATED: 'stated', INFERRED: 'inferred' } as const;
+
+/**
+ * Basis
+ *
+ * How an answer relates to what the person said (spec section 3: factual confirmations
+ * and inferences are styled differently).
+ */
+export type Basis = typeof Basis[keyof typeof Basis];
 
 /**
  * ConnectionCheckResult
@@ -170,6 +211,74 @@ export const DataMode = {
 export type DataMode = typeof DataMode[keyof typeof DataMode];
 
 /**
+ * DecideTurn
+ *
+ * Which proposals to apply. A hard-constraint field is applied only if it is also named
+ * in `confirm_hard_constraints`; proposals not accepted are recorded as rejected.
+ */
+export type DecideTurn = {
+    /**
+     * Expected Version
+     */
+    expected_version: number;
+    /**
+     * Accept
+     */
+    accept?: Array<string>;
+    /**
+     * Confirm Hard Constraints
+     */
+    confirm_hard_constraints?: Array<ProfileField>;
+};
+
+/**
+ * DecisionOut
+ */
+export type DecisionOut = {
+    /**
+     * Decided By
+     */
+    decided_by: string;
+    /**
+     * Decided At
+     */
+    decided_at: string;
+    /**
+     * Accepted Change Ids
+     */
+    accepted_change_ids: Array<string>;
+    /**
+     * Rejected Change Ids
+     */
+    rejected_change_ids: Array<string>;
+    /**
+     * Confirmed Hard Constraints
+     */
+    confirmed_hard_constraints: Array<ProfileField>;
+    /**
+     * Profile Version
+     *
+     * The profile version the decision created; null when it changed nothing.
+     */
+    profile_version: number | null;
+};
+
+/**
+ * DecisionResult
+ *
+ * The decision and the resulting profile. The proposals are read from the turn: this
+ * response is stored as the command's receipt, and model output is kept sealed.
+ */
+export type DecisionResult = {
+    /**
+     * Turn Id
+     */
+    turn_id: string;
+    decision: DecisionOut;
+    profile: ProfileOut;
+};
+
+/**
  * ErrorBody
  */
 export type ErrorBody = {
@@ -230,7 +339,11 @@ export const ErrorCode = {
     MODE_NOT_SUPPORTED: 'MODE_NOT_SUPPORTED',
     STORE_UNAVAILABLE: 'STORE_UNAVAILABLE',
     AUTH_UNAVAILABLE: 'AUTH_UNAVAILABLE',
-    INTERNAL_ERROR: 'INTERNAL_ERROR'
+    INTERNAL_ERROR: 'INTERNAL_ERROR',
+    TAXONOMY_UNAVAILABLE: 'TAXONOMY_UNAVAILABLE',
+    CONFIRMATION_REQUIRED: 'CONFIRMATION_REQUIRED',
+    PROPOSAL_NOT_AVAILABLE: 'PROPOSAL_NOT_AVAILABLE',
+    ALREADY_DECIDED: 'ALREADY_DECIDED'
 } as const;
 
 /**
@@ -255,6 +368,7 @@ export const ErrorStage = {
     IDENTITY: 'identity',
     WORKSPACE: 'workspace',
     PROFILE: 'profile',
+    CATALOGUE: 'catalogue',
     CREDENTIAL: 'credential',
     EXECUTION: 'execution',
     SPEND: 'spend',
@@ -280,7 +394,9 @@ export const EventKind = {
     CREDENTIAL_ROTATED: 'credential.rotated',
     CREDENTIAL_REVOKED: 'credential.revoked',
     SPEND_LIMITS_UPDATED: 'spend_limits.updated',
-    RUN_STATE_CHANGED: 'run.state_changed'
+    RUN_STATE_CHANGED: 'run.state_changed',
+    CONCEPT_PROVISIONAL_CREATED: 'concept.provisional_created',
+    INTERVIEW_TURN_DECIDED: 'interview.turn_decided'
 } as const;
 
 /**
@@ -346,6 +462,8 @@ export const FailureClass = {
     PROVIDER_REQUEST_REJECTED: 'provider_request_rejected',
     PROVIDER_UNAVAILABLE: 'provider_unavailable',
     INVALID_MODEL_OUTPUT: 'invalid_model_output',
+    MODEL_REFUSED: 'model_refused',
+    OUTPUT_TRUNCATED: 'output_truncated',
     APP_STORE_UNAVAILABLE: 'app_store_unavailable',
     UNKNOWN_FAILURE: 'unknown_failure'
 } as const;
@@ -408,9 +526,59 @@ export type HoursInput = {
 };
 
 /**
+ * IscoGroupOut
+ */
+export type IscoGroupOut = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Label
+     */
+    label: string;
+};
+
+/**
+ * LabelMatchOut
+ */
+export type LabelMatchOut = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Label
+     *
+     * null when a hidden (search-only) label matched.
+     */
+    label: string | null;
+    /**
+     * Label Kind
+     */
+    label_kind: string;
+    /**
+     * Preferred Label
+     */
+    preferred_label: string;
+    /**
+     * Isco Code
+     */
+    isco_code: string;
+    /**
+     * Isco Label
+     */
+    isco_label: string;
+};
+
+/**
  * ModelMode
  */
-export const ModelMode = { STANDARD: 'standard', CONTRIBUTOR: 'contributor' } as const;
+export const ModelMode = {
+    STANDARD: 'standard',
+    CONTRIBUTOR: 'contributor',
+    FIXTURE: 'fixture'
+} as const;
 
 /**
  * ModelMode
@@ -454,6 +622,195 @@ export type MoneyInput = {
 };
 
 /**
+ * OccupationHitOut
+ */
+export type OccupationHitOut = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Preferred Label
+     */
+    preferred_label: string;
+    /**
+     * Isco Code
+     */
+    isco_code: string;
+    /**
+     * Isco Label
+     */
+    isco_label: string;
+    /**
+     * Text Rank
+     *
+     * PostgreSQL ts_rank_cd; orders this result only.
+     */
+    text_rank: number;
+};
+
+/**
+ * OccupationOut
+ */
+export type OccupationOut = {
+    /**
+     * Concept Id
+     *
+     * Nessa's internal concept ID (stable per URI).
+     */
+    concept_id: string;
+    /**
+     * Esco Uri
+     */
+    esco_uri: string;
+    /**
+     * Esco Code
+     */
+    esco_code: string;
+    /**
+     * Preferred Label
+     */
+    preferred_label: string;
+    /**
+     * Alternative Labels
+     */
+    alternative_labels: Array<string>;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Regulated
+     *
+     * null: ESCO records no regulation note.
+     */
+    regulated: boolean | null;
+    /**
+     * Isco Groups
+     *
+     * ISCO-08 from the major group down to the unit group (the grouping pivot).
+     */
+    isco_groups: Array<IscoGroupOut>;
+    /**
+     * Broader Concept Id
+     */
+    broader_concept_id: string | null;
+    /**
+     * Skills
+     */
+    skills: Array<SkillRefOut>;
+    /**
+     * Attribution
+     */
+    attribution: string;
+};
+
+/**
+ * OccupationSearchOut
+ *
+ * Exact label matches (all of them, when several occupations share a label), then
+ * ranked full-text matches. `full_text_total` counts every other full-text match, so a
+ * limited page is never mistaken for the whole result.
+ */
+export type OccupationSearchOut = {
+    release: TaxonomyReleaseOut;
+    match: SearchMatch;
+    /**
+     * Label Matches
+     */
+    label_matches: Array<LabelMatchOut>;
+    /**
+     * Full Text
+     */
+    full_text: Array<OccupationHitOut>;
+    /**
+     * Full Text Total
+     */
+    full_text_total: number;
+    /**
+     * Limit
+     */
+    limit: number;
+};
+
+/**
+ * PlaceList
+ *
+ * The finite list of English cities a work area can name. A city is geography only:
+ * it never implies residence or the right to work.
+ */
+export type PlaceList = {
+    /**
+     * Country Code
+     */
+    country_code?: string;
+    /**
+     * Subdivision Code
+     */
+    subdivision_code?: string;
+    /**
+     * Source Url
+     */
+    source_url?: string;
+    /**
+     * Retrieved
+     */
+    retrieved?: string;
+    /**
+     * Source Sha256
+     */
+    source_sha256?: string;
+    /**
+     * Licence
+     */
+    licence?: string;
+    /**
+     * Items
+     */
+    items: Array<PlaceOut>;
+};
+
+/**
+ * PlaceOut
+ */
+export type PlaceOut = {
+    /**
+     * Place Id
+     */
+    place_id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Aliases
+     */
+    aliases: Array<string>;
+    /**
+     * Country Code
+     */
+    country_code: string;
+    /**
+     * Subdivision Code
+     */
+    subdivision_code: string;
+    /**
+     * Region Code
+     *
+     * ONS region (E12) code.
+     */
+    region_code: string;
+    /**
+     * Region
+     */
+    region: string;
+    /**
+     * Timezone
+     */
+    timezone: string;
+};
+
+/**
  * ProfileDocument
  *
  * A stored profile version's content: each field with the source that established it.
@@ -462,7 +819,7 @@ export type ProfileDocument = {
     /**
      * Schema Version
      */
-    schema_version?: '1';
+    schema_version?: '2';
     preferred_name: TextField;
     current_role: TextField;
     cities: TextListField;
@@ -470,7 +827,35 @@ export type ProfileDocument = {
     weekly_study_hours: HoursField;
     direct_spend_cap: MoneyField;
     monthly_payment_cap: MoneyField;
+    enjoyed_tasks: TextListField;
+    confident_tasks: TextListField;
+    evidenced_tasks: TextListField;
 };
+
+/**
+ * ProfileField
+ *
+ * The only names a proposal may use: the profile's own fields.
+ */
+export const ProfileField = {
+    PREFERRED_NAME: 'preferred_name',
+    CURRENT_ROLE: 'current_role',
+    CITIES: 'cities',
+    TARGET_TITLES: 'target_titles',
+    WEEKLY_STUDY_HOURS: 'weekly_study_hours',
+    DIRECT_SPEND_CAP: 'direct_spend_cap',
+    MONTHLY_PAYMENT_CAP: 'monthly_payment_cap',
+    ENJOYED_TASKS: 'enjoyed_tasks',
+    CONFIDENT_TASKS: 'confident_tasks',
+    EVIDENCED_TASKS: 'evidenced_tasks'
+} as const;
+
+/**
+ * ProfileField
+ *
+ * The only names a proposal may use: the profile's own fields.
+ */
+export type ProfileField = typeof ProfileField[keyof typeof ProfileField];
 
 /**
  * ProfileInput
@@ -481,7 +866,7 @@ export type ProfileInput = {
     preferred_name: TextInput;
     current_role: TextInput;
     /**
-     * At most 3 distinct cities.
+     * At most 3 distinct cities from `GET /v1/places`.
      */
     cities: TextListInput;
     /**
@@ -491,6 +876,18 @@ export type ProfileInput = {
     weekly_study_hours: HoursInput;
     direct_spend_cap: MoneyInput;
     monthly_payment_cap: MoneyInput;
+    /**
+     * Tasks the person enjoys (interest), at most 8.
+     */
+    enjoyed_tasks: TextListInput;
+    /**
+     * Tasks the person believes they can do (confidence), at most 8.
+     */
+    confident_tasks: TextListInput;
+    /**
+     * Tasks the person has evidence they can do, at most 8.
+     */
+    evidenced_tasks: TextListInput;
 };
 
 /**
@@ -544,6 +941,148 @@ export type ProfileWriteIn = {
 };
 
 /**
+ * ProposalOrigin
+ */
+export const ProposalOrigin = { MODEL: 'model', FIXTURE: 'fixture' } as const;
+
+/**
+ * ProposalOrigin
+ */
+export type ProposalOrigin = typeof ProposalOrigin[keyof typeof ProposalOrigin];
+
+/**
+ * ProposalOut
+ *
+ * A complete, validated interview output. Nothing in it is saved until decided.
+ */
+export type ProposalOut = {
+    /**
+     * fixture: the deterministic demo interviewer (synthetic), never a live model.
+     */
+    origin: ProposalOrigin;
+    /**
+     * Prompt Version
+     */
+    prompt_version: string;
+    /**
+     * Profile Version
+     *
+     * The profile version the proposals were made for.
+     */
+    profile_version: number;
+    /**
+     * Reply
+     */
+    reply: string;
+    /**
+     * Changes
+     */
+    changes: Array<ProposedChangeOut>;
+    /**
+     * Next Question
+     */
+    next_question: string | null;
+    /**
+     * Missing Critical Fields
+     */
+    missing_critical_fields: Array<ProfileField>;
+    /**
+     * Ready For Review
+     */
+    ready_for_review: boolean;
+};
+
+/**
+ * ProposedChangeOut
+ */
+export type ProposedChangeOut = {
+    /**
+     * Change Id
+     */
+    change_id: string;
+    field: ProfileField;
+    state: AnsweredState;
+    /**
+     * Value
+     *
+     * The proposed answer, typed as the field's input; null unless provided.
+     */
+    value: Money | Array<string> | number | string | null;
+    /**
+     * stated (the person said it) or inferred (implied).
+     */
+    basis: Basis;
+    /**
+     * Message Ids
+     *
+     * The person's messages it rests on.
+     */
+    message_ids: Array<string>;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Hard Constraint
+     *
+     * A limit or target: applied only if named in confirm_hard_constraints.
+     */
+    hard_constraint: boolean;
+};
+
+/**
+ * ProvisionalConceptOut
+ *
+ * A title the person verified that ESCO does not hold: no ESCO URI, no ISCO group.
+ */
+export type ProvisionalConceptOut = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Source Ref Id
+     */
+    source_ref_id: string;
+    /**
+     * Created By
+     */
+    created_by: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+};
+
+/**
+ * ProvisionalConceptPage
+ */
+export type ProvisionalConceptPage = {
+    /**
+     * Items
+     */
+    items: Array<ProvisionalConceptOut>;
+    /**
+     * Next Cursor
+     */
+    next_cursor: string | null;
+};
+
+/**
+ * RegisterProvisionalConcept
+ */
+export type RegisterProvisionalConcept = {
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
  * RenameWorkspaceIn
  */
 export type RenameWorkspaceIn = {
@@ -560,7 +1099,7 @@ export type RenameWorkspaceIn = {
 /**
  * RunKind
  */
-export const RunKind = { CONNECTION_CHECK: 'connection_check' } as const;
+export const RunKind = { CONNECTION_CHECK: 'connection_check', INTERVIEW_TURN: 'interview_turn' } as const;
 
 /**
  * RunKind
@@ -606,7 +1145,16 @@ export type RunOut = {
      * Attempts
      */
     attempts: Array<AttemptOut>;
+    /**
+     * A connection check's result. An interview turn's proposals are read through the turn (`GET .../interview/turns/{turn_id}`).
+     */
     output: ConnectionCheckResult | null;
+    /**
+     * Profile Version
+     *
+     * The profile version the run read, pinned at submission.
+     */
+    profile_version?: number | null;
 };
 
 /**
@@ -622,6 +1170,16 @@ export type RunPage = {
      */
     next_cursor: string | null;
 };
+
+/**
+ * SearchMatch
+ */
+export const SearchMatch = { ALL: 'all', ANY: 'any' } as const;
+
+/**
+ * SearchMatch
+ */
+export type SearchMatch = typeof SearchMatch[keyof typeof SearchMatch];
 
 /**
  * SetSpendLimits
@@ -644,9 +1202,37 @@ export type SetSpendLimits = {
 };
 
 /**
+ * SkillRefOut
+ */
+export type SkillRefOut = {
+    /**
+     * Skill Id
+     */
+    skill_id: string;
+    /**
+     * Preferred Label
+     */
+    preferred_label: string;
+    /**
+     * Skill Type
+     */
+    skill_type: string | null;
+    /**
+     * Relation
+     *
+     * essential or optional (ESCO's occupation-skill link).
+     */
+    relation: string;
+};
+
+/**
  * SourceKind
  */
-export const SourceKind = { DIRECT_ENTRY: 'direct_entry', FIXTURE: 'fixture' } as const;
+export const SourceKind = {
+    DIRECT_ENTRY: 'direct_entry',
+    FIXTURE: 'fixture',
+    CONVERSATION: 'conversation'
+} as const;
 
 /**
  * SourceKind
@@ -655,6 +1241,9 @@ export type SourceKind = typeof SourceKind[keyof typeof SourceKind];
 
 /**
  * SourceOut
+ *
+ * Where an answer came from. A conversation source also names the turn that proposed
+ * it, the person's messages it cites and its basis; `recorded_by` confirmed it.
  */
 export type SourceOut = {
     /**
@@ -686,6 +1275,15 @@ export type SourceOut = {
      * Created At
      */
     created_at: string;
+    /**
+     * Turn Id
+     */
+    turn_id?: string | null;
+    /**
+     * Message Ids
+     */
+    message_ids?: Array<string>;
+    basis?: Basis | null;
 };
 
 /**
@@ -765,9 +1363,106 @@ export type StoreKey = {
 
 /**
  * SubmitRun
+ *
+ * `POST /runs` starts the runs that need no input; interview turns have their own
+ * endpoint, which records the person's message with the run.
  */
 export type SubmitRun = {
-    kind: RunKind;
+    /**
+     * Kind
+     */
+    kind: 'connection_check';
+};
+
+/**
+ * SubmitTurn
+ */
+export type SubmitTurn = {
+    /**
+     * Expected Profile Version
+     */
+    expected_profile_version: number;
+    /**
+     * Message
+     */
+    message: string;
+};
+
+/**
+ * TaxonomyReleaseOut
+ *
+ * The import manifest of the ESCO release in use (TAX1-04). Show `attribution` wherever
+ * ESCO content appears (ESCO's reuse condition).
+ */
+export type TaxonomyReleaseOut = {
+    /**
+     * Dataset Id
+     */
+    dataset_id: string;
+    /**
+     * Version
+     */
+    version: string;
+    /**
+     * Language
+     */
+    language: string;
+    /**
+     * Source Url
+     */
+    source_url: string;
+    /**
+     * Sha256
+     */
+    sha256: string;
+    /**
+     * Size Bytes
+     */
+    size_bytes: number;
+    /**
+     * Native Code Version
+     */
+    native_code_version: string;
+    /**
+     * Transformation Version
+     */
+    transformation_version: string;
+    /**
+     * Licence
+     */
+    licence: string;
+    /**
+     * Attribution
+     */
+    attribution: string;
+    /**
+     * Sample
+     *
+     * A reduced test copy: never the catalogue a person sees.
+     */
+    sample: boolean;
+    /**
+     * Isco Group Count
+     */
+    isco_group_count: number;
+    /**
+     * Occupation Count
+     */
+    occupation_count: number;
+    /**
+     * Skill Count
+     */
+    skill_count: number;
+    /**
+     * Repeated Rows Collapsed
+     *
+     * Concept rows the release repeats with only their modified date changed, imported once (part of the transformation).
+     */
+    repeated_rows_collapsed: number;
+    /**
+     * Imported At
+     */
+    imported_at: string;
 };
 
 /**
@@ -823,6 +1518,56 @@ export type TextListInput = {
 };
 
 /**
+ * TurnOut
+ *
+ * One interview turn. `run` is authoritative for its state: `proposal` exists only when
+ * the run is complete, and a failed run's failure class says why there is none.
+ */
+export type TurnOut = {
+    /**
+     * Turn Id
+     */
+    turn_id: string;
+    /**
+     * Message Id
+     */
+    message_id: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Profile Version
+     *
+     * The profile version the message was sent with.
+     */
+    profile_version: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    run: RunOut;
+    proposal: ProposalOut | null;
+    decision: DecisionOut | null;
+};
+
+/**
+ * TurnPage
+ */
+export type TurnPage = {
+    /**
+     * Items
+     *
+     * Newest first.
+     */
+    items: Array<TurnOut>;
+    /**
+     * Next Cursor
+     */
+    next_cursor: string | null;
+};
+
+/**
  * WorkState
  *
  * One state vocabulary (spec section 3, STATE-01). A failure is never an empty success.
@@ -859,7 +1604,7 @@ export type WorkspaceExport = {
     /**
      * Format Version
      */
-    format_version?: 1;
+    format_version?: 2;
     /**
      * Exported At
      */
@@ -889,6 +1634,16 @@ export type WorkspaceExport = {
      * Runs
      */
     runs: Array<RunOut>;
+    /**
+     * Interview Turns
+     *
+     * Oldest first.
+     */
+    interview_turns: Array<TurnOut>;
+    /**
+     * Provisional Concepts
+     */
+    provisional_concepts: Array<ProvisionalConceptOut>;
     spend: SpendOut;
 };
 
@@ -1338,6 +2093,95 @@ export type GetProfileVersionResponses = {
 
 export type GetProfileVersionResponse = GetProfileVersionResponses[keyof GetProfileVersionResponses];
 
+export type ListProvisionalConceptsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: {
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/v1/workspaces/{workspace_id}/occupations/provisional';
+};
+
+export type ListProvisionalConceptsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ListProvisionalConceptsError = ListProvisionalConceptsErrors[keyof ListProvisionalConceptsErrors];
+
+export type ListProvisionalConceptsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProvisionalConceptPage;
+};
+
+export type ListProvisionalConceptsResponse = ListProvisionalConceptsResponses[keyof ListProvisionalConceptsResponses];
+
+export type RegisterProvisionalConceptData = {
+    body: RegisterProvisionalConcept;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/occupations/provisional';
+};
+
+export type RegisterProvisionalConceptErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type RegisterProvisionalConceptError = RegisterProvisionalConceptErrors[keyof RegisterProvisionalConceptErrors];
+
+export type RegisterProvisionalConceptResponses = {
+    /**
+     * Already registered.
+     */
+    200: ProvisionalConceptOut;
+    /**
+     * Successful Response
+     */
+    201: ProvisionalConceptOut;
+};
+
+export type RegisterProvisionalConceptResponse = RegisterProvisionalConceptResponses[keyof RegisterProvisionalConceptResponses];
+
 export type ListSourcesData = {
     body?: never;
     path: {
@@ -1747,6 +2591,310 @@ export type GetRunResponses = {
 };
 
 export type GetRunResponse = GetRunResponses[keyof GetRunResponses];
+
+export type ListTurnsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: {
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/v1/workspaces/{workspace_id}/interview/turns';
+};
+
+export type ListTurnsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ListTurnsError = ListTurnsErrors[keyof ListTurnsErrors];
+
+export type ListTurnsResponses = {
+    /**
+     * Successful Response
+     */
+    200: TurnPage;
+};
+
+export type ListTurnsResponse = ListTurnsResponses[keyof ListTurnsResponses];
+
+export type SubmitTurnData = {
+    body: SubmitTurn;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/interview/turns';
+};
+
+export type SubmitTurnErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type SubmitTurnError = SubmitTurnErrors[keyof SubmitTurnErrors];
+
+export type SubmitTurnResponses = {
+    /**
+     * Successful Response
+     */
+    202: TurnOut;
+};
+
+export type SubmitTurnResponse = SubmitTurnResponses[keyof SubmitTurnResponses];
+
+export type GetTurnData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Turn Id
+         */
+        turn_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/interview/turns/{turn_id}';
+};
+
+export type GetTurnErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetTurnError = GetTurnErrors[keyof GetTurnErrors];
+
+export type GetTurnResponses = {
+    /**
+     * Successful Response
+     */
+    200: TurnOut;
+};
+
+export type GetTurnResponse = GetTurnResponses[keyof GetTurnResponses];
+
+export type DecideTurnData = {
+    body: DecideTurn;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Turn Id
+         */
+        turn_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/decision';
+};
+
+export type DecideTurnErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type DecideTurnError = DecideTurnErrors[keyof DecideTurnErrors];
+
+export type DecideTurnResponses = {
+    /**
+     * Decided; no field changed.
+     */
+    200: DecisionResult;
+    /**
+     * Successful Response
+     */
+    201: DecisionResult;
+};
+
+export type DecideTurnResponse = DecideTurnResponses[keyof DecideTurnResponses];
+
+export type GetTaxonomyData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/taxonomy';
+};
+
+export type GetTaxonomyErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetTaxonomyError = GetTaxonomyErrors[keyof GetTaxonomyErrors];
+
+export type GetTaxonomyResponses = {
+    /**
+     * Successful Response
+     */
+    200: TaxonomyReleaseOut;
+};
+
+export type GetTaxonomyResponse = GetTaxonomyResponses[keyof GetTaxonomyResponses];
+
+export type SearchOccupationsData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Q
+         */
+        q: string;
+        /**
+         * Limit
+         */
+        limit?: number;
+        match?: SearchMatch;
+    };
+    url: '/v1/taxonomy/occupations';
+};
+
+export type SearchOccupationsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type SearchOccupationsError = SearchOccupationsErrors[keyof SearchOccupationsErrors];
+
+export type SearchOccupationsResponses = {
+    /**
+     * Successful Response
+     */
+    200: OccupationSearchOut;
+};
+
+export type SearchOccupationsResponse = SearchOccupationsResponses[keyof SearchOccupationsResponses];
+
+export type GetOccupationData = {
+    body?: never;
+    path: {
+        /**
+         * Concept Id
+         */
+        concept_id: string;
+    };
+    query?: never;
+    url: '/v1/taxonomy/occupations/{concept_id}';
+};
+
+export type GetOccupationErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetOccupationError = GetOccupationErrors[keyof GetOccupationErrors];
+
+export type GetOccupationResponses = {
+    /**
+     * Successful Response
+     */
+    200: OccupationOut;
+};
+
+export type GetOccupationResponse = GetOccupationResponses[keyof GetOccupationResponses];
+
+export type ListPlacesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v1/places';
+};
+
+export type ListPlacesErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ListPlacesError = ListPlacesErrors[keyof ListPlacesErrors];
+
+export type ListPlacesResponses = {
+    /**
+     * Successful Response
+     */
+    200: PlaceList;
+};
+
+export type ListPlacesResponse = ListPlacesResponses[keyof ListPlacesResponses];
 
 export type ListEventsData = {
     body?: never;
