@@ -616,13 +616,18 @@ describe("[PROF-09] explicit distress gets the support response instead of the i
     expect(alert).toHaveTextContent("Support is available now");
     expect(alert).toHaveTextContent("Samaritans: Call 116 123");
     expect(screen.getByLabelText("Reply to Nessa")).toHaveValue("Some days I just want to die.");
+    // B-M9: the question steps aside, the date reads as a date, and what is sent anyway is
+    // the message that was screened, even if the reply field has changed since.
+    expect(screen.queryByRole("heading", { name: /What would you most like/ })).toBeNull();
+    expect(alert).toHaveTextContent("checked on their own websites on 28 October 2026");
+    await user.type(screen.getByLabelText("Reply to Nessa"), " Also, I like gardens.");
     await user.click(screen.getByRole("button", { name: "Send my message to Nessa anyway" }));
     await waitFor(() => expect(sent.filter((s) => s.method === "POST")).toHaveLength(2));
+    const posts = sent.filter((s) => s.method === "POST");
     expect(
-      sent
-        .filter((s) => s.method === "POST")
-        .map((s) => (s.body as { send_after_support: boolean }).send_after_support),
+      posts.map((s) => (s.body as { send_after_support: boolean }).send_after_support),
     ).toEqual([false, true]);
+    expect(posts[1]?.body).toMatchObject({ message: "Some days I just want to die." });
   });
 });
 

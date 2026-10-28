@@ -242,9 +242,7 @@ const shots = (scratch: Scratch): Shot[] => [
     ready: async (page) => {
       await heading("You")(page);
       await page.getByRole("button", { name: "Edit answers directly" }).click();
-      await page
-        .getByLabel("How you answer lowest pay you'd accept")
-        .selectOption("provided");
+      await page.getByLabel("How you answer lowest pay you'd accept").selectOption("provided");
       await page.getByLabel("Lowest pay you'd accept, in pounds").fill("2,100");
       await page.getByLabel("Lowest pay you'd accept, per").selectOption("month");
       await page
