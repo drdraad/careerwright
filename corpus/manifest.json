@@ -1,7 +1,7 @@
 {
   "schema_version": "1.2",
-  "manifest_version": "0.1.0",
-  "updated": "2026-10-27",
+  "manifest_version": "0.2.0",
+  "updated": "2026-10-28",
   "derived_from": {
     "path": "fixtures/m0/source_corpus_manifest.json",
     "sha256": "d6d5f68dbdaf46b65fd75e7df432413fb6415a7bdf3fa1a07c024f08033c5988"
@@ -9,7 +9,7 @@
   "status": "required_corpus_not_collected",
   "synthetic_personas_are_not_a_substitute_for_source_extraction_tests": true,
   "policy": {
-    "rulings": ["R3 real source corpus", "R2 human-only gates", "R4 Adzuna"],
+    "rulings": ["R3 real source corpus", "R2 human-only gates", "R4 Adzuna", "R10 session 1 rights policy (H-06)"],
     "public_pages_only": "Fetch only publicly accessible pages. Respect robots.txt and site terms. Nothing behind a sign-in, paywall or access control.",
     "git_holds": "this manifest: URL, retrieval date, SHA-256 of the retained body, labelled spans as minimal excerpts, missingness, rights status",
     "private_body_directory": "var/evidence/corpus/ (gitignored through /var/). Proposed here; Task 3 confirms the path in the runbook.",
@@ -18,8 +18,27 @@
       "pending human rights review",
       "permitted: <licence or terms, quoted and dated>",
       "reference only: retain minimal excerpts and hash, not the body",
-      "refused: do not retain"
+      "refused: do not retain",
+      "<rights_policy class id>: <the terms relied on, quoted and dated>"
     ],
+    "rights_policy": {
+      "set_by": "the product owner at session 1, 2026-10-28 (H-06; the answers in docs/reviews/session-1.md, Part A)",
+      "always": "Public pages only, nothing behind a login, robots.txt and site terms respected, a third party's personal details (recruiter names, phone numbers) never kept, and for each page the class and the terms relied on recorded in rights_status.",
+      "retention_kinds": {
+        "keep_privately": "the full page body in the gitignored var/evidence/ folder on this machine, for local testing only",
+        "commit_excerpts": "git holds only the URL, date, hash and the short quoted spans that prove each extracted value",
+        "commit_full_text": "the full text in git, with the attribution its licence requires"
+      },
+      "classes": [
+        {"id": "govuk", "line": "A1", "pages": "GOV.UK pages (Open Government Licence v3.0)", "permitted": ["keep_privately", "commit_excerpts", "commit_full_text"], "conditions": "Full text only if the option pack needs it, with the OGL attribution."},
+        {"id": "public-sector", "line": "A2", "pages": "National Careers Service, Skills England, ONS, Find an Apprenticeship pages (public sector, OGL where they say so)", "permitted": ["keep_privately", "commit_excerpts", "commit_full_text"], "conditions": "As govuk. Full text only for a page that says it is under the OGL, only if the option pack needs it, with the OGL attribution."},
+        {"id": "course-provider", "line": "A3", "pages": "College, university and training-provider course pages", "permitted": ["keep_privately", "commit_excerpts"], "conditions": "Never the full text."},
+        {"id": "professional-body", "line": "A4", "pages": "Professional bodies and regulators (for example HCPC, NMC)", "permitted": ["keep_privately", "commit_excerpts"], "conditions": "As course-provider: never the full text."},
+        {"id": "employer-posting", "line": "A5", "pages": "Employer job postings on their own careers site or applicant-tracking page", "permitted": ["keep_privately", "commit_excerpts"], "conditions": "Excerpts only, never the full text."},
+        {"id": "job-board", "line": "A6", "pages": "Job-board and aggregator pages (for example Indeed, Reed, Totaljobs)", "permitted": ["commit_excerpts"], "conditions": "Reference only: hash and excerpts, never the body, unless the site's terms clearly allow more. If it is not clear what they allow, the page stays reference only."},
+        {"id": "other", "line": "A7", "pages": "Anything else, or a page not clearly within one class above", "permitted": [], "conditions": "rights_status stays 'pending human rights review' for the product owner, page by page (OI-07)."}
+      ]
+    },
     "counts": "Failure-only attempts (attempt_cases) do not count toward the 20/10/3 page minimums.",
     "holdout_split": "Assign tuning or holdout by source/template family before any prompt or parser tuning, so near-duplicate pages never appear in both (plan section 9)."
   },
@@ -136,7 +155,7 @@
     {"id": "OI-04", "item": "Real provider-predicted salary case (J03)", "owner": "Task 8 (Sprint 3)", "disposition": "Adzuna has no credentials (R4). Use a permitted public page that labels pay as predicted if one exists; otherwise record J03 as blocked. The Adzuna adapter's predicted-pay contract is covered by its fixture contract, labelled synthetic."},
     {"id": "OI-05", "item": "Real prompt-injection page (J11)", "owner": "Task 8 (Sprint 3)", "disposition": "Search for a permitted real example. If none, cover the case with a labelled synthetic page on the controlled test server and report the real-corpus gap; never present the synthetic page as real evidence."},
     {"id": "OI-06", "item": "DOM drift needs two captures over time (J10)", "owner": "Task 8 (Sprint 3); Task 12 (Sprint 5)", "disposition": "Capture in Sprint 3, recapture in Sprint 5. If the markup has not changed, use a second page of the same template family that differs, or record the case as not yet observed."},
-    {"id": "OI-07", "item": "Rights review of every retained page", "owner": "Human: product owner or delegated rights reviewer", "disposition": "Not run - requires human (R2). Until reviewed, every slot stays 'pending human rights review'. Checklist: corpus/README.md."},
+    {"id": "OI-07", "item": "Rights review of every retained page outside the rights policy's classes", "owner": "Human: product owner or delegated rights reviewer", "disposition": "The rights policy was set by the product owner at session 1 (2026-10-28, policy.rights_policy): agents classify each page against its classes and record the class and the terms relied on. A page outside the classes, or not clearly within one, stays 'pending human rights review' until a person reviews it: not run - requires human (R2). Checklist: corpus/README.md."},
     {"id": "OI-08", "item": "Review of consequential labels (salary basis, fees, deadlines, award status, outcome levels)", "owner": "Human: domain reviewer", "disposition": "Not run - requires human (R2). Agents label and record spans; any unsupported consequential outcome blocks the affected route (plan Sprint 4)."},
     {"id": "OI-09", "item": "Tuning/holdout split by template family", "owner": "Task 7 (Sprint 3), before the first extraction tuning", "disposition": "Assign split per template family; record it in each slot; never move a case after tuning has used it."},
     {"id": "OI-10", "item": "Private evidence directory path, backup and deletion", "owner": "Task 3 (Sprint 1) path and runbook; Task 16 (Sprint 9) backup and restore", "disposition": "Proposed var/evidence/corpus/ (gitignored). Corpus bodies are excluded from git and from database dumps unless the runbook says otherwise."},

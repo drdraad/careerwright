@@ -1,11 +1,16 @@
 # ADR 0007: The You chapter's conversation, grounded discovery and the support policy
 
 - Status: Accepted (Task 6, Sprint 2: S2.3-S2.6; decision 12 and the amendment to decision 6:
-  Task 6b, S2.7). Decision 7 (the support policy, redesigned
-  in fix rounds 4 and 5: its word lists and windows, its wording and its resources), decision 5's slate
-  weights and decision 12's word lists and bounds are **provisional, need product owner and
-  reviewed sign-off** (ruling R6; human gate H-12). Decision 2's salary floor is
-  the product owner's change to the hard-constraint set (H-11, 2026-10-28).
+  Task 6b, S2.7). Decision 7 (the support policy, redesigned in fix rounds 4 and 5: its word
+  lists and windows, its wording and its resources), decision 5's slate weights, folding and
+  floor, decision 3's repair-rate tracking, the 43 evaluation cases of decision 9 and its
+  powered counterfactual comparison were **accepted for L0 as built by the product owner at
+  session 1** on 2026-10-28 (`docs/reviews/session-1.md`; H-12, checklist below). There
+  the product owner also asked for three phrases to be added to the support screen
+  (decision 7). Decision 12's word lists and bounds, and evaluation case EXP-01, were not in
+  session 1's package: they stay **provisional, need product owner and reviewed sign-off**
+  (ruling R6; H-12). Decision 2's salary floor is the product owner's change to the
+  hard-constraint set (H-11, 2026-10-28).
 - Date: 2026-10-28
 - Requirements: REC1-01..11, DIV1-02, DIV1-04..12, STATE-05, STATE-06, STATE-08, PROF-04,
   PROF-07..09, MODEL-03, MODEL-07, TEST1-10; spec sections 3, 4 and 16; ADR 0006; ADR 0008
@@ -61,8 +66,8 @@ inference, with at least 30 evaluation cases and a capped live run.
    costs no repair. The web app shows the reply and the question apart, so it is asked once.
    The evaluation checks each field on its own (`one_question`, which also counts a second
    ask joined to the first in one sentence) and `missing_excludes`, never exact prose; the
-   repair rate is for the H-12 and release evaluations to track. Earlier turns stay one
-   action away.
+   repair rate is for the release evaluation to track, with no target yet (accepted by the
+   product owner at session 1, H-12). Earlier turns stay one action away.
 
 4. **Discovery is a run kind on the one activity** (`discovery`; ADR 0002, ADR 0006
    decision 10). The model proposes **searches, never suggestions** (`discovery-queries-1`):
@@ -101,7 +106,8 @@ inference, with at least 30 evaluation cases and a capped live run.
      role. By an offline count (Python approximation of `nessa.concept_key` over ESCO
      v1.2.1's preferred and alternative labels), 319 occupation pairs are one alias apart:
      155 across minor groups no longer fold, and 164 within one still do (for example
-     physiotherapist and occupational therapist; H-12). The pool is bounded at 120 (the soft 60-120 target), filled
+     physiotherapist and occupational therapist): the product owner confirmed at session 1
+     that these are the same role for a slate (H-12). The pool is bounded at 120 (the soft 60-120 target), filled
      round-robin across ISCO minor groups in relevance order so every retrieved family is
      sampled before relevance cuts any (spec section 4, DIV-1), and the excess is counted.
      Oversampling catalogue areas the search under-retrieves is not done.
@@ -126,11 +132,12 @@ inference, with at least 30 evaluation cases and a capped live run.
      4 per family, stated in a note) and exclusions of titles or kinds of work, counted in
      `excluded`. Excluding a title never excludes its family. Every pooled occupation not
      shown says why ("show why this wasn't included").
-   - **Provisional (R6, H-12):** every weight, quota and floor above is product policy to
-     be evaluated, not an estimate of fit. Known limit: ranks are normalised to each query's
+   - **Accepted for L0 as built (product owner, session 1, 2026-10-28; H-12):** every
+     weight, quota and floor above. Each is product policy to be evaluated, not an estimate
+     of fit. Known limit: ranks are normalised to each query's
      own best hit, so a query's best match clears the floor however weak the query is (an
      any-word match scores at most 0.5). An absolute rank floor needs calibrating on the
-     full release; it is not set in L0 and is listed for H-12.
+     full release; it is not set in L0, and session 1 accepted the floor as built.
 
 6. **A suggestion's words come from facts; a written note may stand beside them (ADR 0008
    decision 4; Task 6b, decision 12).** "Why this could suit you"
@@ -259,8 +266,9 @@ inference, with at least 30 evaluation cases and a capped live run.
      word may be too ("mothers", so "maternity work for women"): naming who the work serves
      is not a guess about the person, while in an interview reply it would be. Both are
      validation problems, so the one bounded repair applies.
-   - **Provisional, needs reviewed sign-off (R6; H-12):** the wording, the word lists, the
-     windows and the resources. Clinical screening is out of scope; this is not one.
+   - **Accepted for L0 as built (product owner, session 1, 2026-10-28; H-12):** the
+     wording, the word lists, the windows and the resources, and the inference word lists.
+     Clinical screening is out of scope; this is not one.
 
 8. **The early requirement sketch** (`GET .../sketch`, STATE-05) resolves each target
    title: first by the occupation the person chose for it (`occupation_choice`, by its
@@ -287,7 +295,11 @@ inference, with at least 30 evaluation cases and a capped live run.
    (INT-04/05) is not in the default run: one sample per arm cannot separate a demographic
    effect from run-to-run variation, so it compares only the fields the message states
    unambiguously, and a powered comparison (several samples per arm) belongs to the
-   release task. The offline evaluation runs the deterministic subjects (support screen,
+   release task. At session 1 (2026-10-28; H-12) the product owner approved that comparison
+   for the release task (Task 16): at most $0.07 on the test model. That is the Task 6
+   estimate for about 10 samples per arm, so at most 40 requests, and it needs its own
+   scope with a cap above 9 requests. It has not run, and no live call was made for it.
+   The offline evaluation runs the deterministic subjects (support screen,
    output guard, discovery with the fixture proposer over the full release); it certifies
    the pipeline, not the model.
 
@@ -434,11 +446,19 @@ inference, with at least 30 evaluation cases and a capped live run.
   current link per discovery), `retry_failed` and `can_retry`, error code
   `SLATE_ALREADY_EXPLAINED` (409).
 - Not done: applying the salary floor (Sprint 3, with pay evidence); a salary floor per
-  target; a human review of the evaluation cases and of the support policy (H-12).
+  target; a human review of decision 12 and evaluation case EXP-01 (H-12; not in session
+  1's package).
 
-## Human review checklist (H-12, not run — requires human)
+## Human review checklist (H-12, session 1: held by the product owner on 2026-10-28)
 
-- [ ] **Support policy** (decision 7): the one recall-first screen in place of an intent
+Agents applied each item below as recorded. At session 1 the product owner answered an
+agent-prepared package (`docs/reviews/session-1.md`, Part B; their answers are the record,
+rulings R2 and R10) and accepted the ticked items for L0 as built, each as the package line
+cited beside it puts it. The package was drafted before Task 6b added the written
+explanation (decision 12) and evaluation case EXP-01. Neither was put to the product owner,
+so that item stays open: not run — requires human.
+
+- [x] **Support policy** (decision 7): the one recall-first screen in place of an intent
   judgement; the normalisation, the listed words, the constructions and their windows
   (`safety.py`; the reported shapes in `test_safety.py::CORPUS`), and whether to add wording
   they miss ("end it", "carry on", "not exist", method words) or widen a window; the
@@ -453,27 +473,42 @@ inference, with at least 30 evaluation cases and a capped live run.
   refused before the message was read; an unexpected server failure, which carries no
   panel; the window-of-4 wish shape and the rare apostrophe characters and spelt-apart
   reflexives the screen does not read; and the four resources and their wording (checked
-  against the services' pages on 2026-10-28).
-- [ ] **Inference rules** (decision 7): the health, type and protected-characteristic word
+  against the services' pages on 2026-10-28). **Accepted for L0 as built** by the product
+  owner on 2026-10-28 (session 1, Part B line 1). They also answered yes to adding "end it",
+  "carry on" and "not exist", which were added after the session (decision 7).
+- [x] **Inference rules** (decision 7): the health, type and protected-characteristic word
   lists, the kindred-word groups (discovery searches only), and refusing a condition in a
-  career field.
-- [ ] **Slate policy** (decision 5): channel weights, the partial-match weight, the floor
+  career field. **Accepted for L0 as built** by the product owner on 2026-10-28 (session 1,
+  Part B line 2: the current word lists).
+- [x] **Slate policy** (decision 5): channel weights, the partial-match weight, the floor
   (and whether an absolute rank floor is needed), the bonuses, quotas, the family limit,
   alias-only folding within a minor group (164 ESCO pairs still fold, for example
   physiotherapist and occupational therapist: are they the same role?) and the family
-  round-robin pool.
-- [ ] **Interview repair rate** (decision 3): how often the one-question rule costs a paid
-  repair, from the release evaluation.
+  round-robin pool. **Accepted for L0 as built** by the product owner on 2026-10-28
+  (session 1, Part B line 3): the weights, quotas, family limit and relevance floor as
+  built, so no absolute rank floor in L0; the 164 within-group pairs are the same role for
+  a slate and keep folding.
+- [x] **Interview repair rate** (decision 3): how often the one-question rule costs a paid
+  repair, from the release evaluation. **Accepted** by the product owner on 2026-10-28
+  (session 1, Part B line 4): tracking only, at release, no target yet.
 - [ ] **Written explanation** (decision 12): the readiness, affordability and hiring word
   lists and phrasings and the record-only allowance, the content-word rule and its function
   words (short answers such as "art" cannot be quoted alone), the claim and quotation
   bounds, that a claim must quote both the person and the record, the "first view"
   definition of a slate, Try again only for a run that reached no model and Suggest again
   otherwise, asking for the note without a click, and the note's wording (only the quoted
-  words were checked) and placement above "How Nessa found it".
-- [ ] **Evaluation cases** (decision 9): the 44 cases (EXP-01 added by Task 6b) and their
-  semantic expectations. Of
-  them, 20 (SUP-01..13, GRD-01..07) test deterministic code with canned inputs; the model's
-  behaviour rests on the live cases alone, single samples so far.
-- [ ] **Counterfactual tolerance** (decision 9): which fields must not change with an
+  words were checked) and placement above "How Nessa found it"; and evaluation case EXP-01
+  (added by Task 6b, making 44 cases) with its semantic expectations. Not in session 1's
+  package: not run — requires human.
+- [x] **Evaluation cases** (decision 9): the 43 cases from before Task 6b and their
+  semantic expectations. Of them, 20 (SUP-01..13, GRD-01..07) test deterministic code with
+  canned inputs; the model's behaviour rests on the live cases alone, single samples so
+  far. **Accepted for L0** by the product owner on 2026-10-28 (session 1, Part B line 5).
+  EXP-01 is in the open item above.
+- [x] **Counterfactual tolerance** (decision 9): which fields must not change with an
   irrelevant cue, and how many samples per arm the release task's comparison needs.
+  **Approved** by the product owner on 2026-10-28 (session 1, Part B line 6): the powered
+  comparison runs at release (Task 16), at most $0.07 on the test model. The line asked for
+  approval of that run and the answer covers it as built: the pair compares INT-04/05's
+  unambiguous fields (`current_role`, `weekly_study_hours`), with the samples per arm that
+  $0.07 covers (the Task 6 estimate: about 10 per arm, at most 40 requests).
