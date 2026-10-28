@@ -394,6 +394,19 @@ every story passes axe; the visual package's 29 shots at each size pass its chec
 `pnpm run review-screenshots` wrote the committed captures (before a refinement of the
 check that refuses a claim or quotation given twice; the UI did not change).
 
+**Fix round 1 (independent review: three Important, four Minor).** Screened readiness,
+pay and hiring words are allowed only by the occupation's ESCO record, never by an answer;
+every quotation needs a content word and keeps a leading apostrophe; the note says only
+the quoted words were checked; a note whose run reached no model may be tried again by a
+click (migration 0012), and otherwise Suggest again is offered; more hiring and demand
+phrasings; the repair message is capped to its allowance; answers too long for the prompt
+in bytes are a typed refusal; the length, not "one sentence", is what is checked. Checks
+on `42ef206`: `make check` exit 0 (581 fast tests; Vitest 201); `make acceptance` exit 0
+(195 integration and stack tests, the Storybook build, 22 Playwright journeys); the note's
+captures recaptured with every shot's checks clean (30 per size). The live EXP-01 output
+(rows 25-26) predates the round; its stored claims and quotations also pass the final
+rules. No new live call.
+
 **Live (R5).** Scope `live-eval-6b`, test model `muse-spark-1.3-contributor`, synthetic
 case EXP-01: ledger rows 25 (discovery, 1 request, $0.000205) and 26 (explanation, 2
 requests, one repair, $0.000453); $0.000658 in all, 3 of the scope's 9 requests. The
