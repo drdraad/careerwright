@@ -198,8 +198,10 @@ const unknownHours: TurnOut["proposal"] = {
 
 /** The API's support panel (`nessa.profile.safety.SUPPORT_NOTE`, one of its resources). */
 const panel: SupportNoteOut = {
-  policy_version: "support-policy-6",
-  review_status: "provisional: needs reviewed sign-off (human gate H-12)",
+  policy_version: "support-policy-7",
+  review_status:
+    "accepted for L0 at session 1 (human gate H-12); the three phrasings added on 2026-10-28 " +
+    "are not yet reviewed as built",
   message:
     "If anything you mentioned is about how you are feeling, support is available any time, " +
     "from people trained to help. Your message was sent to Nessa as usual.",
@@ -627,6 +629,8 @@ describe("[PROF-09] a message with a risk stem is sent as usual, with the suppor
     expect(shown).toHaveTextContent("Samaritans: Call 116 123");
     expect(shown).toHaveTextContent("sent to Nessa as usual");
     expect(shown).toHaveTextContent("checked on their own websites on 28 October 2026");
+    // Session 1 accepted the panel; its review state is not for someone who may be in distress.
+    expect(shown).not.toHaveTextContent(/provisional|reviewed/);
     // No career question this turn: the question steps aside while the panel is shown.
     expect(screen.queryByRole("heading", { name: /What would you most like/ })).toBeNull();
     // Announced politely; focus left where it was (re-review 2, I-4).

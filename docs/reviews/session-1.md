@@ -63,6 +63,9 @@ Answer "yes = accept for L0 as built" or "no = change it (say what)".
   `corpus/README.md` and `corpus/manifest.json` (`policy.rights_policy`). A page outside the
   classes, or not clearly within one, stays "pending human rights review": not run —
   requires human.
+- Part A line 2: "full text only for a page that says it is under the OGL" (in
+  `corpus/README.md` and the manifest's `public-sector` class) is the transcriber's reading
+  of "OGL where they say so", not the product owner's words. The product owner may widen it.
 - H-12: the six lines of Part B are ticked in ADR 0007's "Human review checklist", each as
   the line above puts it. The package was drafted before Task 6b added two things to that
   checklist: the written "Why this could suit you" (ADR 0007 decision 12) and evaluation
@@ -71,5 +74,7 @@ Answer "yes = accept for L0 as built" or "no = change it (say what)".
 - Part B line 1, the optional addition: the three phrases were added to the support screen
   after the session. Their form, as constructions in the screen's proximity design rather
   than bare words, is a controller ruling. The product owner has not seen them as built.
-- Part B line 6: the comparison is approved for the release task (Task 16). No live call
-  was made for it.
+- Part B line 6: the comparison is approved for the release task (Task 16). Its sample
+  and request counts come from the Task 6 report, and the pass rule across several samples
+  per arm is still open: it must be decided before Task 16 runs the comparison. No live
+  call was made for it.

@@ -544,7 +544,7 @@ export type NoteRefusalWords = {
 /** Such refusals of a slate's note, by the error's `details.reason`. */
 export const NOTE_REFUSAL_REASON = {
   no_quotable_answer: {
-    title: "Your answers are too short to quote",
+    title: "Your answers can't be quoted on their own",
     action:
       "Add a few words to what you enjoy, can do or have done with Edit answers directly. Nessa then offers Suggest again.",
     recovery: "edit_answers",

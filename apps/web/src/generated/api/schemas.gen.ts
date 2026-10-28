@@ -3759,7 +3759,7 @@ export const SupportNoteOutSchema = {
         review_status: {
             type: 'string',
             title: 'Review Status',
-            description: 'The policy is provisional until reviewed.'
+            description: 'How far the policy is reviewed (gate H-12).'
         },
         message: {
             type: 'string',

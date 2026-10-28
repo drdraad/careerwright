@@ -27,10 +27,11 @@ person, and nothing it sees reaches the profile, a proposal or a suggestion.
   adjustment would help, but is never recorded in a career field.
 
 **Accepted for L0 as built by the product owner at session 1 (2026-10-28; human gate H-12):**
-the wording, the word lists, the windows and the resources. The three phrases they asked for
-there were added afterwards, as constructions (a controller ruling), and have not been seen
-by them as built. The resources were checked on the services' own pages on `CHECKED_ON`;
-nothing here is invented, and anything not on those pages is left out.
+the wording, the word lists, the windows and the resources. The three phrasings they asked
+for there were added on 2026-10-28 after the session, as constructions (a controller
+ruling), and are not yet reviewed as built (`REVIEW_STATUS`). The resources were checked on
+the services' own pages on `CHECKED_ON`; nothing here is invented, and anything not on those
+pages is left out.
 """
 
 import re
@@ -38,9 +39,12 @@ import unicodedata
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-POLICY_VERSION = "support-policy-6"
+POLICY_VERSION = "support-policy-7"
 CHECKED_ON = "2026-10-28"
-REVIEW_STATUS = "provisional: needs reviewed sign-off (human gate H-12)"
+REVIEW_STATUS = (
+    "accepted for L0 at session 1 (human gate H-12); the three phrasings added on 2026-10-28 "
+    "are not yet reviewed as built"
+)
 
 # Normalisation: the listed apostrophe variants to `'`, the hyphens U+2010 and U+2011 to `-`,
 # the dashes U+2012 to U+2015 and U+2212 to a space; invisible characters (soft hyphen,
@@ -140,6 +144,7 @@ _INTENTS |= {"deciding", "wish", "wishes", "wished", "wishing"}
 _DEATH = {"die", "dies", "died", "dead"}
 _THINKING = {"think", "thinks", "thinking", "thought", "thoughts"}
 _WANT = {"want", "wants", "wanted", "wanting"}
+_WANT_OR_WISH = _WANT | {"wish", "wishes", "wished", "wishing"}
 _GO_OR_CARRY = {"go", "goes", "going", "went", "gone", "carry", "carries", "carried", "carrying"}
 _EXIST = {"exist", "exists", "existed"}  # not "existing", mostly an adjective in career text
 _PRONOUNS = {"me", "you", "him", "her", "us", "them"}
@@ -232,12 +237,14 @@ def _not_living(words: Words, i: int) -> bool:
 
 
 def _not_exist(words: Words, i: int) -> bool:
-    """exist, exists or existed, with an intent or a wish and a negation within 4 words
-    before it ("want to not exist", "wish I didn't exist", "don't want to exist")."""
+    """exist, exists or existed, with want or wish (any form) and a negation within 4 words
+    before it ("want to not exist", "wish I didn't exist", "don't want to exist"). Only want
+    and wish: with the other intents, "isn't going to exist" about a job would trigger it
+    (fix round 1)."""
     before = _before(words, i, 4)
     return (
         words[i] in _EXIST
-        and any(words[k] in _INTENTS for k in before)
+        and any(words[k] in _WANT_OR_WISH for k in before)
         and any(_negation(words, k) for k in before)
     )
 

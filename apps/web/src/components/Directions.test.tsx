@@ -405,7 +405,8 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
       code: "INSUFFICIENT_EVIDENCE",
       status: 422,
       reason: "no_quotable_answer",
-      words: /No written note: Your answers are too short to quote/,
+      // Neutral for both causes: no content word ("art"), or a quoted phrase such as 'odd jobs'.
+      words: /No written note: Your answers can't be quoted on their own/,
       button: null,
     },
     {

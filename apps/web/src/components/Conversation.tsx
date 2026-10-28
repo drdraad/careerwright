@@ -130,8 +130,7 @@ function SupportNote({ note, onDismiss }: { note: SupportNoteOut; onDismiss(): v
       {checked !== undefined && (
         <p className="muted">
           These services were checked on their own websites on{" "}
-          {day.format(new Date(`${checked}T12:00:00Z`))}. This note is provisional until it is
-          reviewed.
+          {day.format(new Date(`${checked}T12:00:00Z`))}.
         </p>
       )}
       <div>

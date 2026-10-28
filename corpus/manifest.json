@@ -11,7 +11,7 @@
   "policy": {
     "rulings": ["R3 real source corpus", "R2 human-only gates", "R4 Adzuna", "R10 session 1 rights policy (H-06)"],
     "public_pages_only": "Fetch only publicly accessible pages. Respect robots.txt and site terms. Nothing behind a sign-in, paywall or access control.",
-    "git_holds": "this manifest: URL, retrieval date, SHA-256 of the retained body, labelled spans as minimal excerpts, missingness, rights status",
+    "git_holds": "this manifest: URL, retrieval date, SHA-256 of the retained body, labelled spans as minimal excerpts, missingness, rights status; and, for the OGL classes only (rights_policy govuk and public-sector), a page's full text committed for the option pack if the pack needs it, with the OGL attribution",
     "private_body_directory": "var/evidence/corpus/ (gitignored through /var/). Proposed here; Task 3 confirms the path in the runbook.",
     "default_rights_status": "pending human rights review",
     "rights_status_values": [
@@ -19,7 +19,7 @@
       "permitted: <licence or terms, quoted and dated>",
       "reference only: retain minimal excerpts and hash, not the body",
       "refused: do not retain",
-      "<rights_policy class id>: <the terms relied on, quoted and dated>"
+      "<rights_policy class id other than other>: <the terms relied on, quoted and dated> (a page of class other stays 'pending human rights review')"
     ],
     "rights_policy": {
       "set_by": "the product owner at session 1, 2026-10-28 (H-06; the answers in docs/reviews/session-1.md, Part A)",
@@ -36,7 +36,7 @@
         {"id": "professional-body", "line": "A4", "pages": "Professional bodies and regulators (for example HCPC, NMC)", "permitted": ["keep_privately", "commit_excerpts"], "conditions": "As course-provider: never the full text."},
         {"id": "employer-posting", "line": "A5", "pages": "Employer job postings on their own careers site or applicant-tracking page", "permitted": ["keep_privately", "commit_excerpts"], "conditions": "Excerpts only, never the full text."},
         {"id": "job-board", "line": "A6", "pages": "Job-board and aggregator pages (for example Indeed, Reed, Totaljobs)", "permitted": ["commit_excerpts"], "conditions": "Reference only: hash and excerpts, never the body, unless the site's terms clearly allow more. If it is not clear what they allow, the page stays reference only."},
-        {"id": "other", "line": "A7", "pages": "Anything else, or a page not clearly within one class above", "permitted": [], "conditions": "rights_status stays 'pending human rights review' for the product owner, page by page (OI-07)."}
+        {"id": "other", "line": "A7", "pages": "Anything else, or a page not clearly within one class above", "permitted": [], "conditions": "Never named in rights_status: it stays 'pending human rights review' for the product owner, page by page (OI-07)."}
       ]
     },
     "counts": "Failure-only attempts (attempt_cases) do not count toward the 20/10/3 page minimums.",

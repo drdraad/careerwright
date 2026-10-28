@@ -168,11 +168,14 @@ CORPUS: list[tuple[str, str, bool]] = [
     ("session1", "I'd like to carry on working in healthcare.", NO_FLOW),
     ("session1", "Jobs like that don't exist here.", NO_FLOW),
     ("session1", "The course ended and I want to start a new one.", NO_FLOW),
+    # Fix round 1 (controller ruling): "not exist" takes want or wish only, so a prediction
+    # about work is not caught.
+    ("session1 fix1", "That job is not going to exist in ten years.", NO_FLOW),
+    ("session1 fix1", "Those roles aren't going to exist.", NO_FLOW),
     # Career wording those constructions also catch: known false positives (ADR 0007
     # decision 7), pinned so a change to them is seen.
     ("session1 limit", "I can't carry on working nights.", FLOW),
     ("session1 limit", "I'm on a zero-hours contract and I want to end it.", FLOW),
-    ("session1 limit", "That job is not going to exist in ten years.", FLOW),
     ("session1 limit", "I wish commutes didn't exist.", FLOW),
     # The reviewers' career examples with no stem, and guards for the windows: nothing.
     ("rr3 N-I1", "I am planning to end my lifeguard job this summer.", NO_FLOW),

@@ -134,8 +134,11 @@ def test_a_message_with_a_risk_stem_is_sent_with_the_support_panel_and_none_of_i
 
     assert flagged.status_code == 202, flagged.text  # sent: no hold, no extra step
     panel = flagged.json()["support_note"]
-    assert panel["policy_version"] == safety.POLICY_VERSION == "support-policy-6"
-    assert "provisional" in panel["review_status"]
+    assert panel["policy_version"] == safety.POLICY_VERSION == "support-policy-7"
+    # Accepted at session 1; the three phrasings added after it are not yet reviewed.
+    assert panel["review_status"] == safety.REVIEW_STATUS
+    assert panel["review_status"].startswith("accepted for L0 at session 1")
+    assert "not yet reviewed as built" in panel["review_status"]
     assert {r["name"] for r in panel["resources"]} == SERVICES
     assert panel["message"] == safety.SUPPORT_NOTE  # "...sent to Nessa as usual."
     assert (ordinary.status_code, ordinary.json()["support_note"]) == (202, None)

@@ -47,7 +47,8 @@ and the short quoted spans that prove each extracted value.
 2. Fetch with the acquisition pipeline once it exists (Task 7). Record `retrieved_at`,
    `http_status`, `content_type` and `sha256` of the exact bytes kept.
 3. Set `rights_status` from the rights policy above. Name the page's class and the terms
-   relied on, quoted and dated: `<class id>: <terms, quoted and dated>`, for example
+   relied on, quoted and dated: `<class id>: <terms, quoted and dated>` for any class but
+   `other`, for example
    `govuk: "<the licence statement as the page words it>" (<where on the page>, read
    <date>)`. Keep only what that class permits. A page outside the classes, or not clearly
    within one, stays `pending human rights review`.

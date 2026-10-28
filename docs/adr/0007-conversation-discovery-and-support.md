@@ -3,10 +3,11 @@
 - Status: Accepted (Task 6, Sprint 2: S2.3-S2.6; decision 12 and the amendment to decision 6:
   Task 6b, S2.7). Decision 7 (the support policy, redesigned in fix rounds 4 and 5: its word
   lists and windows, its wording and its resources), decision 5's slate weights, folding and
-  floor, decision 3's repair-rate tracking, the 43 evaluation cases of decision 9 and its
-  powered counterfactual comparison were **accepted for L0 as built by the product owner at
-  session 1** on 2026-10-28 (`docs/reviews/session-1.md`; H-12, checklist below). There
-  the product owner also asked for three phrases to be added to the support screen
+  floor, decision 3's repair-rate tracking and the 43 evaluation cases of decision 9 were
+  **accepted for L0 as built by the product owner at session 1** on 2026-10-28
+  (`docs/reviews/session-1.md`; H-12, checklist below), and decision 9's powered
+  counterfactual comparison was approved to run at release (its pass rule is still open).
+  There the product owner also asked for three phrases to be added to the support screen
   (decision 7). Decision 12's word lists and bounds, and evaluation case EXP-01, were not in
   session 1's package: they stay **provisional, need product owner and reviewed sign-off**
   (ruling R6; H-12). Decision 2's salary floor is the product owner's change to the
@@ -156,7 +157,7 @@ inference, with at least 30 evaluation cases and a capped live run.
    beside these words, never in their place: decision 12 (Task 6b) records how. These words
    remain the deterministic provenance, shown in every case and cited by exports.
 
-7. **The minimal support policy** (`nessa.profile.safety`, `support-policy-6`): one
+7. **The minimal support policy** (`nessa.profile.safety`, `support-policy-7`): one
    deterministic, recall-first screen over normalised words (controller rulings, Task 6 fix
    rounds 4 and 5; three phrases added after session 1). It is kept apart from career
    suitability: it scores, labels and remembers nothing. The four UK services were checked
@@ -199,10 +200,12 @@ inference, with at least 30 evaluation cases and a capped live run.
      intent or wish (want, going, ready, tempted, urge, plan, try, intend, decide, wish, in
      the forms listed in the code) with die, dies, died or dead within 4 words after; the
      same intent or wish with end (-s, -ed, -ing) followed by "it" within 4 words after
-     (session 1: "want to end it"); exist, exists or existed with an intent or wish and a
-     negation (not, never, no longer) within 4 words before (session 1: "want to not exist",
-     "wish I didn't exist", "don't want to exist"; not "existing", mostly an adjective in
-     career text); think, thinks, thinking, thought or thoughts with "dying" within 4 words
+     (session 1: "want to end it"); exist, exists or existed with want or wish (any of
+     their forms) and a negation (not, never, no longer) within 4 words before (session 1:
+     "want to not exist", "wish I didn't exist", "don't want to exist"; not "existing",
+     mostly an adjective in career text; only want and wish here, by the fix round 1
+     ruling, so "isn't going to exist" about a job does not trigger it); think, thinks,
+     thinking, thought or thoughts with "dying" within 4 words
      after; want (-s, -ed, -ing) with a negation within 3 words before and live, alive or
      "be here" within 3 after; reason(s) with no, not or never within 3 words before and
      live, living, alive, "go on" or "carry on" within 4 after; "go on" (go, goes, going,
@@ -248,12 +251,15 @@ inference, with at least 30 evaluation cases and a capped live run.
    - *Known limits (H-12):* a finite English list of words and constructions, so wording
      outside it gets nothing ("my friend wants to end things", "what's the point", method
      words), and a construction whose words are further apart than its window gets
-     nothing: extending either is the reviewer's decision. Two known gaps of this kind: the
+     nothing: extending either is the reviewer's decision. Known gaps of this kind: the
      wish shape "wish that I'd ... die" can fall past the window of 4 words once "I'd" is
-     spelt out, and an apostrophe-like character
-     outside the mapped list (such as U+2032) or a reflexive spelt apart other than after
-     my / your / him / her / our / them / one ("our selves" is not matched; "ourself" and
-     plural "selves" after an owner are not listed) is not read. A dash written without
+     spelt out; the "not exist" construction counts only want and wish, so another listed
+     intent word before a negation and "exist" gets nothing (recall given up so that
+     predictions about work, such as "that job is not going to exist in ten years", show no
+     panel; pinned as must-not-flow rows); and an apostrophe-like character outside the
+     mapped list (such as U+2032) or a reflexive spelt apart other than after my / your /
+     him / her / our / them / one ("our selves" is not matched; "ourself" and plural
+     "selves" after an owner are not listed) is not read. A dash written without
      spaces is read as a space, so "self—esteem" after "my" reads as "my self esteem" and
      triggers. False positives show the panel, since the screen makes no intent judgement:
      listed words in career, workplace or figurative phrasing trigger it ("took my life
@@ -262,10 +268,8 @@ inference, with at least 30 evaluation cases and a capped live run.
      myself", "don't want to live in London", "don't want to be here in five years", "going
      to die of boredom", "can't go on holiday", "the meeting would die"). Session 1's
      constructions add their own ("I can't carry on working nights", "I want to end it"
-     about a zero-hours contract, "that job is not going to exist in ten years", "I wish
-     commutes didn't exist"; pinned in `CORPUS` as `session1 limit`). The third matters
-     here: a prediction that a job will not exist is ordinary talk about work and AI, and
-     "going" is one of the listed intents. Some people may find these panels unwelcome.
+     about a zero-hours contract, "I wish commutes didn't exist"; pinned in `CORPUS` as
+     `session1 limit`). Some people may find these panels unwelcome.
      Only the next question is dropped: the model's reply text is
      not checked for a career question. A message is screened only when it reaches the API:
      while sending is unavailable in the web app (paused, no key stored, a reply still on its
@@ -283,7 +287,8 @@ inference, with at least 30 evaluation cases and a capped live run.
    - **Accepted for L0 as built (product owner, session 1, 2026-10-28; H-12):** the
      wording, the word lists, the windows and the resources, and the inference word lists.
      The product owner also asked there for "end it", "carry on" and "not exist". They were
-     added after the session as the constructions above (`support-policy-6`), in a form the
+     added after the session as the constructions above (`support-policy-6`; `-7` after fix
+     round 1 narrowed "not exist" to want and wish), in a form the
      controller ruled; the product owner has not seen them as built. Clinical screening is
      out of scope; this is not one.
 
@@ -312,10 +317,14 @@ inference, with at least 30 evaluation cases and a capped live run.
    (INT-04/05) is not in the default run: one sample per arm cannot separate a demographic
    effect from run-to-run variation, so it compares only the fields the message states
    unambiguously, and a powered comparison (several samples per arm) belongs to the
-   release task. At session 1 (2026-10-28; H-12) the product owner approved that comparison
-   for the release task (Task 16): at most $0.07 on the test model. That is the Task 6
-   estimate for about 10 samples per arm, so at most 40 requests, and it needs its own
-   scope with a cap above 9 requests. It has not run, and no live call was made for it.
+   release task. At session 1 (2026-10-28; H-12) the product owner approved it as the
+   package put it: "run the powered comparison at release, estimated at most $0.07 on the
+   test model" (Task 16). Derived from the Task 6 report, not asked at the session: about 10
+   samples per arm, so at most 40 requests; its own scope with a cap above 9 requests; and
+   the fields the pair compares as built (`current_role`, `weekly_study_hours`). Still
+   open, and to be decided before Task 16 runs it: the pass rule across several samples per
+   arm (how much the arms may differ before it counts as a change). It has not run, and no
+   live call was made for it.
    The offline evaluation runs the deterministic subjects (support screen,
    output guard, discovery with the fixture proposer over the full release); it certifies
    the pipeline, not the model.
@@ -455,9 +464,9 @@ inference, with at least 30 evaluation cases and a capped live run.
       after a word ending in "s" ("'odd jobs'") reads as a plural possessive. An answer set
       made only of such phrases is therefore refused before any run (`no_quotable_answer`),
       although a quotation that drops the opening mark and keeps the closing one ("odd
-      jobs'") would verify; a model would rarely write one. The web app's words for that
-      refusal say the answers are too short to quote, which does not fit this case. The live
-      evidence is single samples on the test model.
+      jobs'") would verify; a model would rarely write one. The web app titles that refusal
+      "Your answers can't be quoted on their own", which holds for both causes (fix round
+      1). The live evidence is single samples on the test model.
     - **Provisional (R6, H-12):** the readiness, affordability and hiring word lists and
       phrasings, the content-word rule and its function words, the claim and quotation
       bounds, asking for the note without a click, and Try again only for a run that
@@ -538,8 +547,9 @@ so that item stays open: not run — requires human.
   EXP-01 is in the open item above.
 - [x] **Counterfactual tolerance** (decision 9): which fields must not change with an
   irrelevant cue, and how many samples per arm the release task's comparison needs.
-  **Approved** by the product owner on 2026-10-28 (session 1, Part B line 6): the powered
-  comparison runs at release (Task 16), at most $0.07 on the test model. The line asked for
-  approval of that run and the answer covers it as built: the pair compares INT-04/05's
-  unambiguous fields (`current_role`, `weekly_study_hours`), with the samples per arm that
-  $0.07 covers (the Task 6 estimate: about 10 per arm, at most 40 requests).
+  **Run approved** by the product owner on 2026-10-28 (session 1, Part B line 6): "run the
+  powered comparison at release, estimated at most $0.07 on the test model" (Task 16).
+  Derived from the Task 6 report, not asked at the session: about 10 samples per arm, at
+  most 40 requests, its own scope above the 9-request cap, and INT-04/05's fields as built
+  (`current_role`, `weekly_study_hours`). Still open, to be decided before Task 16 runs it:
+  the pass rule across several samples per arm (decision 9).

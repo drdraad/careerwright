@@ -2461,7 +2461,7 @@ export type SupportNoteOut = {
     /**
      * Review Status
      *
-     * The policy is provisional until reviewed.
+     * How far the policy is reviewed (gate H-12).
      */
     review_status: string;
     /**

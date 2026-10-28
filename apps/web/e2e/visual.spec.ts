@@ -165,8 +165,10 @@ const FAILED_TURN = {
 
 /** The API's support panel (`nessa.profile.safety.SUPPORT_NOTE` and its resources). */
 const SUPPORT_NOTE = {
-  policy_version: "support-policy-6",
-  review_status: "provisional: needs reviewed sign-off (human gate H-12)",
+  policy_version: "support-policy-7",
+  review_status:
+    "accepted for L0 at session 1 (human gate H-12); the three phrasings added on 2026-10-28 " +
+    "are not yet reviewed as built",
   message:
     "If anything you mentioned is about how you are feeling, support is available any time, " +
     "from people trained to help. Your message was sent to Nessa as usual.",
@@ -408,15 +410,18 @@ const shots = (scratch: Scratch): Shot[] => [
     ready: slateNote(/The spending limit for model calls is reached\. Nothing from it/, true),
   },
   {
-    // Refused because no answer has a word to quote: asking again would repeat it, so the
-    // notice says to change the answers and offers no Try again.
+    // Refused because no answer can be quoted: asking again would repeat it, so the notice
+    // says to change the answers and offers no Try again.
     name: "you--slate-note-too-short",
     as: "ada",
     context: "note-too-short",
     url: chapterUrl("you", scratch.talked),
     prepare: noteRefused("INSUFFICIENT_EVIDENCE", "no_quotable_answer"),
     refused: true, // the intercepted 422 is logged as a failed load
-    ready: slateNote(/Your answers are too short to quote\. Nessa didn't ask the model/, true),
+    ready: slateNote(
+      /Your answers can't be quoted on their own\. Nessa didn't ask the model/,
+      true,
+    ),
   },
   {
     // A message with a risk stem is sent as usual, with the support panel beside it. The

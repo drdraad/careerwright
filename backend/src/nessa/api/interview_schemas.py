@@ -188,7 +188,7 @@ class SupportNoteOut(ResponseModel):
     never stored, not even in the idempotency receipt."""
 
     policy_version: str
-    review_status: str = Field(description="The policy is provisional until reviewed.")
+    review_status: str = Field(description="How far the policy is reviewed (gate H-12).")
     message: str = Field(description="Says whether the message was sent.")
     resources: list[SupportResourceOut]
 
