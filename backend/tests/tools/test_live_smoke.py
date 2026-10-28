@@ -7,11 +7,10 @@ from typing import Any
 
 import pytest
 
-from nessa.identity.meta import REQUEST_TIMEOUT_S
 from nessa.identity.model_choice import ModelChoice
+from tools import live_smoke
 from tools.live_smoke import (
     MAX_CALLS,
-    RUN_TIMEOUT_S,
     CapExceededError,
     ScopeBudget,
     SmokeSettings,
@@ -20,7 +19,7 @@ from tools.live_smoke import (
     ledger_possible_calls,
 )
 from tools.localenv import REPO_ROOT
-from tools.usage_ledger import CallOutcome, Ledger, ScopeSpend
+from tools.usage_ledger import CallOutcome, Ledger, LedgerBusyError, ScopeSpend
 
 ROOMY = ScopeBudget("live-smoke", max_calls=99, max_production_calls=99, max_cost_nano_usd=10**12)
 NOTHING_SPENT = ScopeSpend(0, 0, 0)
@@ -96,11 +95,6 @@ def test_the_scope_s_cumulative_budget_refuses_once_the_next_invocation_would_br
     assert authorise(models, production=production, budget=budget, spent=NOTHING_SPENT)
 
 
-def test_the_smoke_waits_out_the_run_s_worst_case() -> None:
-    # Three attempts that each time out, plus the step's 1 s and 2 s backoff.
-    assert RUN_TIMEOUT_S > MAX_CALLS * REQUEST_TIMEOUT_S + 3
-
-
 def attempt(**values: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
         "attempt_id": 1,
@@ -156,3 +150,21 @@ def test_unreadable_attempts_are_ledgered_as_every_possible_call_with_unknown_co
     assert len(seqs) == MAX_CALLS
     assert all(r.estimated_cost_nano_usd is None for r in records)
     assert all(r.reserved_nano_usd == 809_600 for r in records)
+
+
+@pytest.mark.req("MODEL-09")
+def test_a_concurrent_smoke_refuses_before_its_stack_starts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """N6: the scope check and the final append happen under one lock, so two invocations
+    cannot both pass the cap. The stack is the system edge: it must never start here."""
+
+    def no_stack(**_: object) -> None:
+        raise AssertionError("the smoke stack must not start")
+
+    monkeypatch.setenv("META_API_KEY", "not-a-real-key")
+    monkeypatch.setattr(live_smoke, "smoke_stack", no_stack)
+    path = tmp_path / "live-usage.jsonl"
+
+    with Ledger(path).exclusive(), pytest.raises(LedgerBusyError):
+        live_smoke.run_smoke(SmokeSettings(_env_file=None), production=False, ledger=Ledger(path))

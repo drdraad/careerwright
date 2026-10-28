@@ -4,6 +4,9 @@ is recorded, free and failed calls included. A charge that cannot be determined 
 `unknown` (null), never zero, and counts its full reservation in the running total's caveat.
 """
 
+import fcntl
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -51,6 +54,10 @@ class LiveCallRecord(LiveCallEntry):
     recorded_at: datetime
 
 
+class LedgerBusyError(SystemExit):
+    """Another live invocation holds the ledger."""
+
+
 @dataclass(frozen=True)
 class ScopeSpend:
     """What a budget scope has used so far, from the ledger."""
@@ -63,6 +70,24 @@ class ScopeSpend:
 class Ledger:
     def __init__(self, path: Path = LEDGER_PATH) -> None:
         self._path = path
+
+    @contextmanager
+    def exclusive(self) -> Iterator[None]:
+        """Hold the ledger for one live invocation, from its budget check to its last row
+        (an advisory `flock` on the ledger file). A second invocation refuses at once, so
+        two cannot both pass a scope's cap."""
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        with self._path.open("a", encoding="utf-8") as handle:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise LedgerBusyError(
+                    "another live call holds the usage ledger; wait for it to finish"
+                ) from None
+            try:
+                yield
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
 
     def spent(self, scope: str) -> ScopeSpend:
         rows = [r for r in self.records() if r.budget_scope == scope]

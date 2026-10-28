@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry, ScopeSpend
+from tools.usage_ledger import CallOutcome, Ledger, LedgerBusyError, LiveCallEntry, ScopeSpend
 
 
 def entry(**overrides: object) -> LiveCallEntry:
@@ -92,3 +92,17 @@ def test_the_markdown_is_written_next_to_its_ledger(tmp_path: Path) -> None:
     ledger.write_markdown()
 
     assert "| 1 |" in (tmp_path / "live-usage.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.req("MODEL-09")
+def test_one_live_invocation_holds_the_ledger_at_a_time(tmp_path: Path) -> None:
+    path = tmp_path / "live-usage.jsonl"
+
+    with Ledger(path).exclusive():
+        with pytest.raises(LedgerBusyError), Ledger(path).exclusive():
+            pass
+        Ledger(path).append(entry())  # appends inside the holder's own run still work
+
+    with Ledger(path).exclusive():  # released: the next invocation may proceed
+        pass
+    assert len(Ledger(path).records()) == 1

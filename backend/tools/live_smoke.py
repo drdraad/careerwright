@@ -7,8 +7,9 @@ product path: stored through the API with consent, sealed at once, opened only i
 worker's bounded activity, which makes the call. Afterwards the worker is stopped, so no
 further call can start, and then every attempt of the smoke workspace is appended to
 `docs/evidence/live-usage.jsonl` (and the Markdown table) with its cost, even if the run
-failed. Both databases, every container log and the API's own responses are scanned for
-the key.
+failed; if the worker cannot be confirmed stopped, every further call its spend limits
+allow is ledgered too, with an unknown cost. Then both databases, every container log and
+the API's own responses are scanned for the key.
 
 Caps, checked before anything starts:
 - per invocation: at most ACTIVITY_MAX_ATTEMPTS calls (the run's retry budget, also set as
@@ -16,7 +17,8 @@ Caps, checked before anything starts:
   the production model unless `--production-model` (`PRODUCTION=1`), and a worst-case cost
   cap;
 - per budget scope, cumulative over the ledger: calls, production calls and worst-case cost
-  (`ScopeBudget`; conservative defaults, configurable through `NESSA_LIVE_SMOKE_*`).
+  (`ScopeBudget`; conservative defaults, configurable through `NESSA_LIVE_SMOKE_*`), checked
+  and spent under an exclusive lock on the ledger, so a concurrent invocation refuses.
 The test model is a Contributor model, so the workspace is synthetic.
 
 Run from `backend/`: `uv run --locked python -m tools.live_smoke [--production-model]`.
@@ -60,12 +62,13 @@ from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry, ScopeSpend
 MAX_CALLS = ACTIVITY_MAX_ATTEMPTS
 MAX_COST_NANO_USD = 100_000_000  # $0.10 worst case per invocation
 SMOKE_PORTS = Ports(api=57800, auth=57899, postgres=57832, web=57900)
-# The run's worst case: every attempt times out, with the step's backoff between attempts
-# and the activity's store budget, plus a minute for the stack's own latency.
+# How long the smoke waits for the run: its worst case, where every attempt times out and
+# both of its store transactions (prepare, settle) spend the whole store budget, with the
+# step's backoff between attempts, plus a minute for the stack. Ledger completeness does not
+# depend on it: the worker is stopped before the attempts are read.
 RUN_TIMEOUT_S = (
-    MAX_CALLS * REQUEST_TIMEOUT_S
+    MAX_CALLS * (REQUEST_TIMEOUT_S + 2 * STORE_RETRY_BUDGET_S)
     + sum(ACTIVITY_INTERVAL_S * ACTIVITY_BACKOFF_RATE**i for i in range(MAX_CALLS - 1))
-    + STORE_RETRY_BUDGET_S
     + 60.0
 )
 RESPONSES_ENDPOINT = "POST /v1/responses"
@@ -114,6 +117,10 @@ class ScopeBudget:
 
 class CapExceededError(SystemExit):
     pass
+
+
+class WorkerNotStoppedError(RuntimeError):
+    """The worker could not be confirmed stopped; every possible call has been ledgered."""
 
 
 def authorise(
@@ -233,15 +240,22 @@ def ledger_attempts(
 
 
 def ledger_possible_calls(
-    ledger: Ledger, model_id: str, reserved_nano_usd: int, models: ModelChoice, *, scope: str
+    ledger: Ledger,
+    model_id: str,
+    reserved_nano_usd: int,
+    models: ModelChoice,
+    *,
+    scope: str,
+    count: int = MAX_CALLS,
+    reason: str = "attempts unreadable",
 ) -> list[int]:
-    """The attempts could not be read: record every call the run was allowed to make, with an
+    """Calls that may have reached Meta but cannot be read back: record each one, with an
     unknown cost, rather than nothing."""
     return [
         ledger.append(
             LiveCallEntry(
                 budget_scope=scope,
-                purpose=f"{PURPOSE} (possible call; attempts unreadable)",
+                purpose=f"{PURPOSE} (possible call; {reason})",
                 model_id=model_id,
                 is_production_model=models.is_production(model_id),
                 endpoint=RESPONSES_ENDPOINT,
@@ -250,8 +264,42 @@ def ledger_possible_calls(
                 error_type="attempts_unreadable",
             )
         ).seq
-        for _ in range(MAX_CALLS)
+        for _ in range(count)
     ]
+
+
+def ledger_workspace_calls(
+    ledger: Ledger,
+    target: SmokeTarget,
+    workspace_id: str,
+    *,
+    model_id: str,
+    worst_case: int,
+    models: ModelChoice,
+    scope: str,
+    worker_stopped: bool,
+) -> list[int]:
+    """Every attempt the smoke workspace recorded. If the worker may still be running, also
+    every further call its spend limits allow (MAX_CALLS in all), as possible calls."""
+    per_call = worst_case // MAX_CALLS
+    try:
+        attempts = _workspace_attempts(target, workspace_id)
+    except psycopg.Error:
+        return ledger_possible_calls(ledger, model_id, per_call, models, scope=scope)
+    seqs = ledger_attempts(
+        ledger, attempts, scope=scope, production_model=models.production.model_id
+    )
+    if not worker_stopped:
+        seqs += ledger_possible_calls(
+            ledger,
+            model_id,
+            per_call,
+            models,
+            scope=scope,
+            count=max(0, MAX_CALLS - len(seqs)),
+            reason="worker not confirmed stopped",
+        )
+    return seqs
 
 
 def leak_findings(target: SmokeTarget, api: Api, key: SecretStr) -> tuple[int, list[Finding]]:
@@ -315,7 +363,7 @@ def smoke(
         },
     )
     status = "not started"
-    findings: list[Finding] = []
+    worker_stopped = True
     try:
         api.call(
             "POST",
@@ -333,21 +381,32 @@ def smoke(
         print(f"run {run_id}: {status} {run['failure_class'] or ''}".rstrip(), flush=True)
         if run["output"]:
             print(f"validated output: {run['output']}", flush=True)
-        scanned, findings = leak_findings(target, api, key)
-        print(f"leak scan: {scanned} rows/logs/responses, findings: {findings}", flush=True)
     finally:
-        target.stop_worker()  # first: an attempt read while the worker runs could miss one
+        # First: an attempt read while the worker runs could miss one.
         try:
-            attempts = _workspace_attempts(target, workspace["workspace_id"])
-        except psycopg.Error:
-            per_call = worst_case // MAX_CALLS
-            seqs = ledger_possible_calls(ledger, model_id, per_call, models, scope=scope)
-        else:
-            seqs = ledger_attempts(
-                ledger, attempts, scope=scope, production_model=models.production.model_id
-            )
+            target.stop_worker()
+        except Exception:  # any docker failure: the worker may still be calling
+            worker_stopped = False
+        seqs = ledger_workspace_calls(
+            ledger,
+            target,
+            workspace["workspace_id"],
+            model_id=model_id,
+            worst_case=worst_case,
+            models=models,
+            scope=scope,
+            worker_stopped=worker_stopped,
+        )
         ledger.write_markdown()
         print(f"ledger rows appended: {seqs}", flush=True)
+    if not worker_stopped:
+        raise WorkerNotStoppedError(
+            "the worker could not be confirmed stopped; every call it could still make is "
+            "ledgered with an unknown cost"
+        )
+    # After the stop, so every log line the worker wrote is scanned.
+    scanned, findings = leak_findings(target, api, key)
+    print(f"leak scan: {scanned} rows/logs/responses, findings: {findings}", flush=True)
     return SmokeResult(status, findings, seqs)
 
 
@@ -380,6 +439,8 @@ class StackTarget:
 
     def stop_worker(self) -> None:
         self.stack.stop(("worker",))
+        if "worker" in self.stack.running():  # `stop` falls back to an unchecked `kill`
+            raise RuntimeError("the worker is still running after stop")
 
     def logs(self) -> str:
         return self.stack.logs()
@@ -416,24 +477,26 @@ def run_smoke(settings: SmokeSettings, *, production: bool, ledger: Ledger) -> i
         "production" if production else "test",
     )
     budget = settings.budget()
-    model_id, worst_case = authorise(
-        models, production=production, budget=budget, spent=ledger.spent(budget.scope)
-    )
-    print(
-        f"live smoke: model {model_id} ({'production' if production else 'test'}); "
-        f"at most {MAX_CALLS} calls, worst case {format_usd(worst_case)}",
-        flush=True,
-    )
-    with smoke_stack(production=production) as target:
-        result = smoke(
-            target,
-            settings.api_key,
-            model_id=model_id,
-            worst_case=worst_case,
-            models=models,
-            ledger=ledger,
-            scope=budget.scope,
+    # One invocation at a time, from the budget check to the last ledger row (N6).
+    with ledger.exclusive():
+        model_id, worst_case = authorise(
+            models, production=production, budget=budget, spent=ledger.spent(budget.scope)
         )
+        print(
+            f"live smoke: model {model_id} ({'production' if production else 'test'}); "
+            f"at most {MAX_CALLS} calls, worst case {format_usd(worst_case)}",
+            flush=True,
+        )
+        with smoke_stack(production=production) as target:
+            result = smoke(
+                target,
+                settings.api_key,
+                model_id=model_id,
+                worst_case=worst_case,
+                models=models,
+                ledger=ledger,
+                scope=budget.scope,
+            )
     return 0 if result.status == "complete" and not result.findings else 1
 
 
