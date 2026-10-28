@@ -81,7 +81,8 @@ function Needs({ profile, needs }: { profile: ProfileOut; needs: ChapterNeeds })
   );
 }
 
-function PlannedChapter({
+/** A chapter whose feature belongs to a later sprint: its purpose and the answers it uses. */
+export function PlannedChapter({
   id,
   profile,
   workspaceId,
