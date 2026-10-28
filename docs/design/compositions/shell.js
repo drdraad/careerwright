@@ -25,12 +25,13 @@
     conditional: '<path d="M12 3.2L20.8 12 12 20.8 3.2 12z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/>',
     stale: '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5.2l3.4 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
     error: '<path d="M12 3.5L21.5 20h-19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 9.5v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1.1" fill="currentColor"/>',
-    unknown: '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.6"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2.9-1.2 1.7v.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="16.9" r="1" fill="currentColor"/>',
+    unknown: '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2.9-1.2 1.7v.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="16.9" r="1" fill="currentColor"/>',
     synthetic: '<path d="M9.5 3.5h5M10.5 3.5v5.8L5.6 17.8a2 2 0 0 0 1.7 3h9.4a2 2 0 0 0 1.7-3l-4.9-8.5V3.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M7.8 14.5h8.4" stroke="currentColor" stroke-width="1.7"/>',
     source: '<path d="M7 3.5h7l4 4v13H7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 3.5v4h4M9.5 12h6M9.5 15.5h6" fill="none" stroke="currentColor" stroke-width="1.7"/>',
     close: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
     menu: '<path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
     pause: '<path d="M9 6.5v11M15 6.5v11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    expand: '<path d="M7 14.5l5-5 5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
     star: '<path d="M12 4l2.4 5 5.3.6-3.9 3.7 1 5.3L12 16l-4.8 2.6 1-5.3L4.3 9.6l5.3-.6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   };
 

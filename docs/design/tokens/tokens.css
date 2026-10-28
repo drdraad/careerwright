@@ -142,6 +142,8 @@
   --radius-control: 12px;
   --radius-card: 16px;
   --radius-sheet: 24px;
+  /* Phone bottom sheets open at this height so the main task above stays visible. */
+  --sheet-peek: 212px;
   --shadow-card-on-space: 0 18px 40px -18px rgb(3 8 15 / 0.75);
 
   /* ---- Motion (spec section 14; plan section 5) ---- */

@@ -71,6 +71,7 @@
       <!-- Selected role: default (j1) -->
       <article class="role-card card on-reading" data-show="default" aria-labelledby="role-j1" tabindex="0">
         <div>
+          <button class="btn btn-secondary sheet-expand" type="button" aria-expanded="false" data-glyph="expand" style="float: right">More</button>
           <h2 id="role-j1">Data quality analyst, customer and policy records</h2>
           <p class="role-employer"><span class="industry-dot" style="background: var(--industry-blue)"></span>Kestrel Lane Insurance Services, finance and insurance</p>
         </div>
@@ -91,17 +92,17 @@
           <p class="small muted">Your skills aren't compared yet. The Skills chapter checks this listing's requirements against your evidence.</p>
         </div>
         <div class="card-block ai-range">
-          <h3 class="section-title">AI Resilience Score for the role</h3>
+          <div class="drawer-head"><h3 class="section-title">AI Resilience Score for the role</h3><span class="badge-experimental">Experimental</span></div>
           <div class="ai-range-head"><span class="ai-range-value"><span data-value="trace01.aiScore.range.0"></span>–<span data-value="trace01.aiScore.range.1"></span> of 10</span><span class="small">mixed to comparatively resilient, five-year outlook</span></div>
           <div class="ai-scale" aria-hidden="true"><span style="left: 50%; width: 30%"></span></div>
           <div class="ai-scale-ticks" aria-hidden="true"><span>0</span><span>5</span><span>10</span></div>
-          <span class="status" data-glyph="synthetic">Synthetic test record, not a real assessment</span>
+          <span class="status ai-provenance" data-glyph="synthetic">Synthetic test record, not a real assessment</span>
           <p class="small muted">It describes the occupation, not this employer. With a minimum of <span data-value="trace01.aiScore.minimumFilter"></span>, this role would be hidden because its range starts at <span data-value="trace01.aiScore.range.0"></span>.</p>
         </div>
         <div class="card-block">
           <dl class="kv">
-            <dt>Official pay benchmark</dt><dd class="status-unknown">Not available</dd>
-            <dt>Hiring trend</dt><dd class="status-unknown">No history yet</dd>
+            <dt>Official pay benchmark</dt><dd><span class="status status-unknown" data-glyph="unknown">Not available</span></dd>
+            <dt>Hiring trend</dt><dd><span class="status status-unknown" data-glyph="unknown">No history yet</span></dd>
           </dl>
         </div>
         <div class="card-actions">
@@ -114,12 +115,13 @@
       <!-- Selected role: unknown-data state (j4) -->
       <article class="role-card card on-reading" data-show="unknown" aria-labelledby="role-j4" tabindex="0">
         <div>
+          <button class="btn btn-secondary sheet-expand" type="button" aria-expanded="false" data-glyph="expand" style="float: right">More</button>
           <h2 id="role-j4">Information and data quality officer</h2>
           <p class="role-employer"><span class="industry-dot" style="background: var(--industry-coral)"></span>Northmoor Clinical Records Partnership, health and care</p>
         </div>
         <dl class="kv">
           <dt>Where</dt><dd>Manchester, hybrid</dd>
-          <dt>Pay</dt><dd class="status-unknown">Not stated in the listing</dd>
+          <dt>Pay</dt><dd><span class="status status-unknown" data-glyph="unknown">Not stated in the listing</span></dd>
           <dt>Posted</dt><dd>4 days ago</dd>
           <dt>Checked</dt><dd>3 hours ago</dd>
         </dl>
@@ -129,10 +131,10 @@
           <p class="small">Only a short summary of this listing was available, so there's too little to compare. The full description may change this.</p>
         </div>
         <div class="card-block ai-range">
-          <h3 class="section-title">AI Resilience Score for the role</h3>
+          <div class="drawer-head"><h3 class="section-title">AI Resilience Score for the role</h3><span class="badge-experimental">Experimental</span></div>
           <div class="ai-range-head"><span class="ai-range-value"><span data-value="trace01.aiScore.range.0"></span>–<span data-value="trace01.aiScore.range.1"></span> of 10</span><span class="small">five-year outlook</span></div>
           <div class="ai-scale" aria-hidden="true"><span style="left: 50%; width: 30%"></span></div>
-          <span class="status" data-glyph="synthetic">Synthetic test record, not a real assessment</span>
+          <span class="status ai-provenance" data-glyph="synthetic">Synthetic test record, not a real assessment</span>
         </div>
         <div class="card-block">
           <h3 class="section-title">Evidence that's thin here</h3>
@@ -151,6 +153,7 @@
       <!-- Selected role: failure state (j9, stale copy from the failed source) -->
       <article class="role-card card on-reading" data-show="failure" aria-labelledby="role-j9" tabindex="0">
         <div>
+          <button class="btn btn-secondary sheet-expand" type="button" aria-expanded="false" data-glyph="expand" style="float: right">More</button>
           <h2 id="role-j9">Data quality analyst, mortgage and savings data</h2>
           <p class="role-employer"><span class="industry-dot" style="background: var(--industry-blue)"></span>Hollin Brook Mutual Building Society, finance and insurance</p>
         </div>
@@ -162,9 +165,9 @@
         </dl>
         <p class="small">Nessa kept the last version it saw instead of dropping the listing. Check it again before you rely on it or apply.</p>
         <div class="card-block ai-range">
-          <h3 class="section-title">AI Resilience Score for the role</h3>
+          <div class="drawer-head"><h3 class="section-title">AI Resilience Score for the role</h3><span class="badge-experimental">Experimental</span></div>
           <div class="ai-range-head"><span class="ai-range-value"><span data-value="trace01.aiScore.range.0"></span>–<span data-value="trace01.aiScore.range.1"></span> of 10</span><span class="small">five-year outlook</span></div>
-          <span class="status" data-glyph="synthetic">Synthetic test record, not a real assessment</span>
+          <span class="status ai-provenance" data-glyph="synthetic">Synthetic test record, not a real assessment</span>
         </div>
         <div class="card-actions">
           <button class="btn btn-primary" type="button">Check again</button>
@@ -174,14 +177,14 @@
 
       <section class="lens" aria-labelledby="lens-title">
         <h2 id="lens-title">Pay and location</h2>
-        <p>Annual pay before tax, as each listing states it. Dashed bars are estimates by the listing site, not the employer.</p>
+        <p>Annual pay before tax, as each listing states it. Solid bars are advertised by the employer; hollow bars are estimates by the listing site. Pay not stated has its own column.</p>
         <svg id="lens-svg" viewBox="0 0 860 200" role="img" aria-label="Pay ranges by work area. The same figures are in the list below."></svg>
       </section>
 
       <section class="listings" aria-labelledby="list-title">
         <h2 id="list-title">All <span data-count="shown"></span> listings</h2>
         <table class="listing-table">
-          <thead><tr><th scope="col">Role</th><th scope="col">Employer</th><th scope="col">Where</th><th scope="col">Pay a year</th><th scope="col">AI Resilience</th><th scope="col">Age</th></tr></thead>
+          <thead><tr><th scope="col">Role</th><th scope="col">Employer</th><th scope="col">Where</th><th scope="col">Pay a year</th><th scope="col">AI Resilience (experimental)</th><th scope="col">Age</th></tr></thead>
           <tbody id="listing-rows"></tbody>
         </table>
         <div class="cards-mobile" id="listing-cards"></div>

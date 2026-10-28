@@ -23,6 +23,7 @@
     {"fg": "--mark-selected", "bg": "--surface-space", "kind": "non-text", "use": "selected mark"},
     {"fg": "--mark-front-later", "bg": "--surface-space-raised", "kind": "text", "use": "fronts 2 and 3 marks and letters inside the chart panel and route cards"},
     {"fg": "--mark-front-1", "bg": "--surface-space-raised", "kind": "non-text", "use": "front 1 marks inside the chart panel"},
+    {"fg": "--surface-space-raised", "bg": "--mark-front-later", "kind": "text", "use": "route letter on a layer 2 (filled grey) card disc"},
     {"fg": "--mark-selected", "bg": "--surface-space-raised", "kind": "non-text", "use": "selected mark and card edge on raised ink"},
     {"fg": "--branch-space", "bg": "--surface-space", "kind": "non-text", "use": "map branches (they encode hierarchy)"},
     {"fg": "--line-space-control", "bg": "--surface-space", "kind": "non-text", "use": "control boundary on ink"},

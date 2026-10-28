@@ -28,8 +28,8 @@
       <header class="routes-head">
         <h1 class="display" data-show="default failure">Routes to data quality analyst</h1>
         <h1 class="display" data-show="unknown">Routes compared by direct spending</h1>
-        <p data-show="default failure">Manchester. Every route is compared over the same 6 months, January to June 2027.</p>
-        <p data-show="unknown">Synthetic fixture DIRECTAI: nine routes to one target, with months and direct cost only.</p>
+        <p data-show="default failure" data-derived="horizon-sentence"></p>
+        <p data-show="unknown" data-derived="directai-sentence"></p>
       </header>
 
       <div class="routes-alerts">
@@ -72,34 +72,41 @@
             <div><dt>Cost shown</dt><dd>Economic cost: fees plus pay lost against your baseline</dd></div>
             <div><dt>Baseline</dt><dd><span data-gbp="p01.currentNetIncomeMinor"></span> a month take-home, confirmed by you</dd></div>
             <div><dt>Horizon</dt><dd><span data-value="trace01.horizonMonths"></span> months for every route, in pounds, not adjusted for inflation</dd></div>
-            <div><dt>Search</dt><dd>Complete for this model: 5 schedules in 5 route families</dd></div>
+            <div><dt>Search</dt><dd data-derived="search-coverage"></dd></div>
           </dl>
           <dl data-show="unknown">
             <div><dt>Cost shown</dt><dd>Direct spending only: fees and costs you pay</dd></div>
             <div><dt>Not counted</dt><dd>Pay lost while training</dd></div>
-            <div><dt>Routes</dt><dd>9, all feasible, one target (fixture DIRECTAI)</dd></div>
+            <div><dt>Routes</dt><dd data-derived="directai-count"></dd></div>
             <div><dt>Not known</dt><dd>Dates, payments and the cash check</dd></div>
           </dl>
+          <p class="basis-summary" data-derived="basis-summary"></p>
           <button class="btn btn-secondary mobile-chart-button" type="button">Open the time and cost chart</button>
         </aside>
         <svg id="tradeoff" data-check-labels role="group" aria-label="Each route plotted by months until you can apply and cost. The same routes are listed as cards."></svg>
         <div class="controls" role="group" aria-label="Filter the routes shown">
           <label class="range">Ready within
-            <input type="range" min="1" max="6" value="6" aria-label="Ready within, months">
-            <input type="number" min="1" max="24" value="6" aria-label="Ready within, months, exact"> months
+            <input id="time-range" type="range" min="1" aria-label="Ready within, months">
+            <input id="time-number" type="number" min="1" max="24" aria-label="Ready within, months, exact"> months
           </label>
           <label class="range" data-show="default failure">Economic cost up to
-            <input type="range" min="0" max="6000" step="100" value="6000" aria-label="Economic cost up to, pounds">
-            £<input type="number" min="0" step="100" value="6000" aria-label="Economic cost up to, pounds, exact">
+            <input class="cost-range" type="range" min="0" step="100" aria-label="Economic cost up to, pounds">
+            £<input class="cost-number" type="number" min="0" step="100" aria-label="Economic cost up to, pounds, exact">
           </label>
           <label class="range" data-show="unknown">Direct spending up to
-            <input type="range" min="0" max="7000" step="100" value="7000" aria-label="Direct spending up to, pounds">
-            £<input type="number" min="0" step="100" value="7000" aria-label="Direct spending up to, pounds, exact">
+            <input class="cost-range" type="range" min="0" step="100" aria-label="Direct spending up to, pounds">
+            £<input class="cost-number" type="number" min="0" step="100" aria-label="Direct spending up to, pounds, exact">
           </label>
           <span>Filters hide routes from view. They never change the ranking.</span>
         </div>
         <div class="chart-key">
-          <p>Dashed line: a comparison boundary to help reading. There are no routes between the points. Every route in the shaded area is bettered by a route on the line.</p>
+          <p class="legend-line">
+            <span class="legend-mark"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5" class="point-f1"/></svg>Best trade-offs found (layer 1)</span>
+            <span class="legend-mark"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="4.5" class="point-f2"/></svg>Layer 2</span>
+            <span class="legend-mark"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="4.5" class="point-f3"/></svg>Layer 3</span>
+          </p>
+          <p>Every layer 2 and layer 3 route is bettered by at least one other route, even when it sits on the dashed line. The dashed line and the shading are a reading aid: there are no routes between the points.</p>
+          <p id="tie-note" hidden></p>
           <p data-show="default failure">Model limits: up to 6 actions, 24 months and 2 start dates per option. Courses are a synthetic catalogue (TRACE-01).</p>
           <p class="status status-unknown" data-glyph="unknown">Delay, no-award and no-offer scenarios weren't evaluated, so their ranges are unknown, not zero.</p>
         </div>
@@ -118,6 +125,7 @@
         <span class="sheet-handle" aria-hidden="true"></span>
         <div class="journey-head" data-show="default failure">
           <h2 id="journey-title">Route B: evening course, keeping full hours</h2>
+          <button class="btn btn-secondary sheet-expand" type="button" aria-expanded="false" data-glyph="expand">More</button>
           <span class="status" data-glyph="conditional">Conditional: ready only if the assessed report passes</span>
         </div>
         <dl class="summary" data-show="default failure">
@@ -128,7 +136,7 @@
           <div><dt>Lowest balance</dt><dd><span data-gbp="trace01.print.minimumPrefundedCashMinor"></span></dd></div>
           <div><dt>Hours a week</dt><dd><span id="hours-used"></span> of <span data-value="trace01.availableWeeklyHours"></span></dd></div>
         </dl>
-        <svg id="gantt" role="img" aria-label="Route B schedule: current job kept throughout; evening course from 1 January to 30 April 2027; four payments of £150; assessed report at the end of April; ready to apply from 1 May 2027 if the report passes." data-show="default failure"></svg>
+        <svg id="gantt" role="img" data-show="default failure"></svg>
         <ol class="timeline-mobile" id="timeline-mobile" data-show="default failure"></ol>
         <div data-show="unknown">
           <h2 id="journey-title-unknown" class="section-title">Route B, selected</h2>

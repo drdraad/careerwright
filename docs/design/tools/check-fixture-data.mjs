@@ -62,6 +62,7 @@ for (const route of t.routes) {
   const source = trace.routes.find((r) => r.id === route.id);
   const action = trace.catalogue.actions.find((a) => a.id === source.action_ids[0]);
   eq([route.timeMonths, route.directMinor, route.economicMinor], [source.time_months, source.direct_spend_minor, source.economic_cost_minor], `route ${route.id} objectives`);
+  eq(route.familyId, source.family_id, `route ${route.id} family`);
   eq(route.paymentsMinor, source.payments_by_month_minor, `route ${route.id} payments`);
   eq(route.incomeMinor, source.income_by_month_minor, `route ${route.id} income`);
   eq([route.start, route.finish], [source.actual_start_date, source.actual_finish_date], `route ${route.id} dates`);

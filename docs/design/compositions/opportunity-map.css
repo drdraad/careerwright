@@ -198,13 +198,16 @@
   stroke-width: 1.4;
 }
 
-.area-ring.remote {
-  stroke-dasharray: 4 4;
+/* Remote is a double ring; an area with no listings found uses the unknown colour.
+   Neither uses dashes (dashes mean provisional or a reading aid). */
+.area-ring-inner {
+  fill: none;
+  stroke: var(--branch-space);
+  stroke-width: 1;
 }
 
 .area-ring.empty {
   stroke: var(--status-unknown-on-space);
-  stroke-dasharray: 2 5;
 }
 
 .branch {
@@ -232,8 +235,11 @@
   stroke: transparent;
 }
 
-.job.stale .job-mark {
-  stroke-dasharray: 2 2;
+/* Stale: a solid sand ring around the node, matching the stale status colour. */
+.stale-ring {
+  fill: none;
+  stroke: var(--status-stale-on-space);
+  stroke-width: 1.6;
 }
 
 .selected-ring {
@@ -458,7 +464,7 @@
     right: 0;
     bottom: 0;
     z-index: 10;
-    max-height: 46vh;
+    max-height: var(--sheet-peek);
     overflow-y: auto;
     padding: var(--space-16);
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;

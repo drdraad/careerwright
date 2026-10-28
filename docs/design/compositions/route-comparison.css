@@ -155,10 +155,43 @@
   stroke-width: 2.2;
 }
 
-.point-later {
+/* Layer 2 is a filled grey disc, layer 3 a grey ring: distinguishable without colour.
+   A halo in the panel colour lifts every dominated mark off the comparison line. */
+.point-f2 {
+  fill: var(--mark-front-later);
+  stroke: var(--mark-front-later);
+  stroke-width: 1.2;
+}
+
+.point-f3 {
   fill: var(--surface-space-raised);
   stroke: var(--mark-front-later);
-  stroke-width: 1.6;
+  stroke-width: 1.8;
+}
+
+.point-halo {
+  fill: var(--surface-space-raised);
+}
+
+.legend-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-16);
+}
+
+.legend-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-mark svg {
+  width: 16px;
+  height: 16px;
+}
+
+.basis-summary {
+  display: none;
 }
 
 .point-label {
@@ -169,6 +202,11 @@
 
 .point-label.later {
   fill: var(--mark-front-later);
+}
+
+.point-label .layer-note {
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .point-value {
@@ -247,7 +285,14 @@
   font-weight: 600;
 }
 
-.route-card.later .route-letter {
+.route-card.layer-2 .route-letter {
+  border-width: 1.5px;
+  border-color: var(--mark-front-later);
+  background: var(--mark-front-later);
+  color: var(--surface-space-raised);
+}
+
+.route-card.layer-3 .route-letter {
   border-width: 1.5px;
   border-color: var(--mark-front-later);
   color: var(--mark-front-later);
@@ -348,7 +393,6 @@
 .ready-line {
   stroke: var(--selection-reading);
   stroke-width: 1.6;
-  stroke-dasharray: 4 3;
 }
 
 .ready-text {
@@ -425,7 +469,7 @@
   display: grid;
   gap: var(--space-8);
   padding: var(--space-16);
-  border: 1px dashed var(--line-reading-control);
+  border: 1px solid var(--line-reading-control);
   border-radius: var(--radius-control);
 }
 
@@ -467,8 +511,18 @@
     display: none;
   }
 
-  .basis dl {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* The full basis stays one tap away; a one-line summary keeps the route cards in view. */
+  .basis dl,
+  .basis h2 {
+    display: none;
+  }
+
+  .basis {
+    padding-bottom: var(--space-8);
+  }
+
+  .basis-summary {
+    display: block;
   }
 
   .mobile-chart-button {
@@ -485,7 +539,7 @@
     right: 0;
     bottom: 0;
     z-index: 10;
-    max-height: 46vh;
+    max-height: var(--sheet-peek);
     overflow-y: auto;
     padding: var(--space-16);
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
@@ -494,6 +548,17 @@
 
   .journey > svg {
     display: none;
+  }
+
+  .journey-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--space-8);
+  }
+
+  .journey-head .status {
+    grid-column: 1 / -1;
   }
 
   .journey-head h2 {

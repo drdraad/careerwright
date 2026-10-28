@@ -64,14 +64,34 @@ Rules the compositions follow, which implementations must keep:
 - **Industry colour is categorical only.** It is never status. Status is carried by a
   glyph and words first, and only error and stale add a hue. Neither hue is an industry
   hue: the closest pair is error against coral on light, ΔE76 20.9.
-- **Unknown is drawn, not omitted.** Dashed outlines and the dashed-circle glyph mark
-  unknown values ("Not confirmed, not £0", "Pay not stated", "none found"). A missing value
-  is never a zero, a blank or a lowest rank.
+- **Unknown is drawn, not omitted.** The question-mark glyph, the words, and solid lines
+  in the unknown colour mark unknown values ("Not confirmed, not £0", "Pay not stated",
+  "none found"). A missing value is never a zero, a blank or a lowest rank.
+- **Dashes mean only "provisional" or "reading aid".** A dashed edge marks a proposal or a
+  sketch that is not yet a fact (Nessa's inference, the early sketch). A dashed line in a
+  chart is a reading aid (the comparison boundary). Unknown, stale, remote, estimated and
+  synthetic never use dashes:
+  - stale map nodes: a solid sand ring;
+  - the remote area: a double ring;
+  - an area with none found: a solid ring in the unknown colour;
+  - estimated pay: a hollow bar;
+  - the synthetic label: a solid pill with the flask glyph.
 - **Failure, stale and conditional look different.** Failure has a red edge and a cause
   and keeps earlier results. Stale is sand, with a clock and an age. Conditional is a gate
   diamond with its condition in words.
-- **Synthetic data is always labelled.** A dashed "Synthetic demo" label sits in every
-  workspace strip and mobile top bar.
+- **Synthetic data is always labelled.** A "Synthetic demo" label with the flask glyph
+  sits in every workspace strip and mobile top bar.
+- **Layers are told apart without colour.** Layer 1 is a bright open ring, layer 2 a grey
+  disc and layer 3 a grey ring, and later layers are labelled "layer 2" and "layer 3" on
+  the chart and the cards. A dominated point drawn on the comparison line gets a halo that
+  breaks the line around it. A generated note names the equal-time tie: TRACE-01 D sits
+  on the line at 4 months, and B is as fast and £500 cheaper.
+- **Phone sheets open at a peek** (`--sheet-peek`, 212 px) with a "More" control, so the
+  main task stays in view: the question and its answer choices, the listing list, or the
+  route cards.
+- **AI Resilience is always marked Experimental** (spec AIR-1). Each display has a badge and
+  a provenance line. Synthetic records say so. For a real record, the same line carries
+  the review date, method version and inherited geography.
 - **Chapters are not numbered.** The rail marks each chapter as visited, current or not
   started. Chapters are navigable states, not a wizard (spec section 3).
 
@@ -128,7 +148,7 @@ length is held to about 62–66 characters in reading columns.
 | Conditional | diamond gate | "Conditional: ready only if the assessed report passes" |
 | Stale | clock | "Last checked 2 days ago; may have closed" |
 | Failed | triangle with a mark | "Failed: reply didn't pass validation" |
-| Unknown | dashed circle with a question mark | "Not confirmed, not £0" |
+| Unknown | circle with a question mark | "Not confirmed, not £0" |
 | Synthetic | flask | "Synthetic demo", "Synthetic test record" |
 
 The glyphs were drawn for this reference as simple SVG paths, so no third-party icon
@@ -146,8 +166,8 @@ fixture is a console error, which fails the screenshot run.
 | Composition | Default | Unknown data | Failure |
 |---|---|---|---|
 | You | P01 (sure entry). Review tray with facts, a hard limit needing confirmation and a dashed inference. Evidence drawer quoting the exact span behind "£2,000 a month". Early requirement sketch from the TRACE-01 target rows, labelled "not a checked route" | P02. Baseline pay "Not confirmed, not £0", with the explicit "Compare direct spending only" choice; personality skipped; budget "prefer not to say"; no sketch until a target exists | The last reply failed validation twice (`SCHEMA_INVALID`). The message is kept and marked not processed; What we know is unchanged at version 7 |
-| Roles | Target from P01. P01 lists only Manchester; the default and failure states add Leeds and a remote area to show the three-area maximum, and the unknown state uses P02's Leeds and Manchester. AI range 5–8 with minimum 6 from the TRACE-01 score record, explained as failing the lower-bound filter. Pay benchmark and trend shown as not available (`role_card` nulls). **Listings, employers and salaries are invented for design review** (the pack has none) and labelled synthetic | Three listings, pay not stated, a snippet-only listing, Leeds "none found in the 4 sources checked", unresolved occupation mapping | The job-board source failed. Its four listings are kept from 2 days ago, drawn dashed and labelled stale; coverage says 3 of 4 sources responded |
-| Routes | TRACE-01, economic cost: A, B, C in front 1, D in 2, E in 3; staircase and shaded bettered region; route B selected, with the Gantt (actual dates, parallel work and study, four £150 payments, gate, ready from 1 May 2027) and its ledger (lowest point £4,850 in January) | DIRECTAI in explicit direct-spending mode, with direct-spending labels throughout. Nine routes in three layers. The schedule is shown as not available, because the fixture defines months and cost only | The search failed (run 7). The previous comparison stays readable as version 14, with a stale label |
+| Roles | Target from P01. P01 lists only Manchester; the default and failure states add Leeds and a remote area to show the three-area maximum, and the unknown state uses P02's Leeds and Manchester. AI range 5–8 with minimum 6 from the TRACE-01 score record, explained as failing the lower-bound filter. Pay benchmark and trend shown as not available (`role_card` nulls). **Listings, employers and salaries are invented for design review** (the pack has none) and labelled synthetic | Three listings, pay not stated, a snippet-only listing, Leeds "none found in the 4 sources checked", unresolved occupation mapping | The job-board source failed. Its four listings are kept from 2 days ago, ringed in sand and labelled stale; coverage says 3 of 4 sources responded |
+| Routes | TRACE-01, economic cost: A, B, C in front 1, D in 2 (on the line, an equal-time tie with B), E in 3; staircase and shaded bettered region; route B selected, with the Gantt (actual dates, parallel work and study, four £150 payments, gate, ready from 1 May 2027) and its ledger (lowest point £4,850 in January) | DIRECTAI in explicit direct-spending mode, with direct-spending labels throughout. Nine routes in three layers. The schedule is shown as not available, because the fixture defines months and cost only | The search failed (run 7). The previous comparison stays readable as version 14, with a stale label |
 
 Comparator rule shown on the cards (a proposal for Sprint 7): a bettered route names its
 **cheapest dominator**, with ties going to the shorter time and then the route ID; any

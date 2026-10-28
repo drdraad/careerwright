@@ -105,8 +105,9 @@
       const g = el("g", { role: "img", "aria-label": `Route ${r.id}, ${r.name}: ${r.timeMonths} months, ${gbp(r.cost)}${r.layer > 1 ? `, layer ${r.layer}` : ", best trade-off"}${r.id === selectedId ? ", selected" : ""}` }, svg);
       const cx = x(r.timeMonths), cy = y(r.cost);
       if (r.layer === 1) el("circle", { cx, cy, r: 13, class: "glow" }, g);
+      else el("circle", { cx, cy, r: 9.5, class: "point-halo" }, g);
       if (r.id === selectedId) el("circle", { cx, cy, r: 15, class: "point-selected", "data-mark": "" }, g);
-      el("circle", { cx, cy, r: r.layer === 1 ? 7 : 5.5, class: r.layer === 1 ? "point-f1" : "point-later", "data-mark": "" }, g);
+      el("circle", { cx, cy, r: r.layer === 1 ? 7 : 5.5, class: r.layer === 1 ? "point-f1" : r.layer === 2 ? "point-f2" : "point-f3", "data-mark": "" }, g);
       groups.set(r.id, { g, cx, cy });
     }
     // A chart hidden by the phone layout has no geometry to measure; it is drawn when opened.
@@ -136,6 +137,9 @@
         if (r.layer === 1) {
           const value = el("tspan", { class: "point-value", dx: 6 }, label);
           value.textContent = `${r.timeMonths} months, ${gbp(r.cost)}`;
+        } else {
+          const note = el("tspan", { class: "layer-note", dx: 4 }, label);
+          note.textContent = `layer ${r.layer}`;
         }
         if (clear(label.getBBox())) break;
         label.remove();
@@ -150,7 +154,7 @@
   function card(r) {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = `route-card${r.layer > 1 ? " later" : ""}`;
+    b.className = `route-card layer-${r.layer}`;
     b.setAttribute("aria-pressed", String(r.id === selectedId));
     const comp = comparison(r);
     const lines = [];
@@ -194,6 +198,9 @@
     const W = 1200, LABEL = 250, COL = (W - LABEL - 40) / (t.horizonMonths + 1);
     const H = 236;
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    const pays = route.paymentsMinor.filter((x) => x > 0);
+    const readyLabel = `1 ${fmt.monthName(startMonth + readyIndex)} ${startYear + Math.floor((startMonth + readyIndex) / 12)}`;
+    svg.setAttribute("aria-label", `Route ${route.id} schedule: current job kept throughout at ${route.workHoursWhileActive} hours a week; evening course from ${fmt.longDate(route.start)} to ${fmt.longDate(route.finish)} at ${route.studyHours} hours a week; ${pays.length} payments, ${paymentPattern(route)}; assessed report at the end of the course; ready to apply from ${readyLabel} if the report passes.`);
     const defs = el("defs", {}, svg);
     const pat = el("pattern", { id: "hatch", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, defs);
     el("rect", { width: 6, height: 6, fill: "var(--surface-card)" }, pat);
@@ -287,7 +294,64 @@
 
   if (route) document.querySelector("#hours-used").textContent = String(route.studyHours + route.workHoursWhileActive);
 
+  // Dominated routes that lie exactly on the comparison line (for example an equal-time
+  // tie with a better route) are named, so the line is never read as "all best".
+  function onBoundary(r) {
+    const f1 = routes.filter((q) => q.layer === 1).sort((a, b) => a.timeMonths - b.timeMonths);
+    for (let i = 1; i < f1.length; i += 1) {
+      const [a, b] = [f1[i - 1], f1[i]];
+      if (r.cost === a.cost && r.timeMonths > a.timeMonths && r.timeMonths < b.timeMonths) return true;
+      if (r.timeMonths === b.timeMonths && r.cost < a.cost && r.cost > b.cost) return true;
+    }
+    const last = f1[f1.length - 1];
+    return r.cost === last.cost && r.timeMonths > last.timeMonths;
+  }
+  function renderTieNote() {
+    const ties = routes.filter((r) => r.layer > 1 && onBoundary(r));
+    const node = document.querySelector("#tie-note");
+    if (!ties.length) return;
+    node.textContent = ties.map((r) => {
+      const c = routes.filter((p) => dominates(p, r)).sort((a, b) => a.cost - b.cost)[0];
+      return `Route ${r.id} sits on the line at ${r.timeMonths} months, but route ${c.id} ${c.timeMonths === r.timeMonths ? "is as fast" : "is faster"} and costs ${gbp(r.cost - c.cost)} less, so ${r.id} is layer ${r.layer}.`;
+    }).join(" ");
+    node.hidden = false;
+  }
+
+  // Prose that states fixture numbers is generated here from the checked data.
+  function renderDerivedText() {
+    const set = (key, value) => { for (const n of document.querySelectorAll(`[data-derived="${key}"]`)) n.textContent = value; };
+    const families = new Set(t.routes.map((r) => r.familyId)).size;
+    const endMonth = startMonth + t.horizonMonths - 1;
+    set("horizon-sentence", `${t.region.split(",")[0]}. Every route is compared over the same ${t.horizonMonths} months, ${fmt.monthName(startMonth)} to ${fmt.monthName(endMonth)} ${startYear + Math.floor(endMonth / 12)}.`);
+    set("search-coverage", `Complete for this model: ${t.routes.length} schedules in ${families} route families`);
+    set("directai-sentence", `Synthetic fixture DIRECTAI: ${F.directai.routes.length} routes to one target, with months and direct cost only.`);
+    set("directai-count", `${F.directai.routes.length}, all feasible, one target (fixture DIRECTAI)`);
+    set("basis-summary", economic
+      ? `Economic cost over ${t.horizonMonths} months against ${gbp(t.baselineIncomeByMonthMinor[0])} a month take-home. Search complete: ${t.routes.length} schedules.`
+      : `Direct spending only; pay lost while training isn't counted. ${F.directai.routes.length} routes from fixture DIRECTAI.`);
+    if (route) document.querySelector("#journey-title").textContent = `Route ${route.id}: ${TRACE_NAMES[route.id].charAt(0).toLowerCase()}${TRACE_NAMES[route.id].slice(1)}`;
+  }
+
+  // Slider bounds come from the data, so every plotted route is inside the default view.
+  function renderControls() {
+    const xMax = Math.max(...routes.map((r) => r.timeMonths));
+    const monthsMax = economic ? t.horizonMonths : Math.ceil(xMax / 2) * 2;
+    const costMax = Math.ceil(Math.max(...routes.map((r) => r.cost)) / 100000) * 1000;
+    for (const id of ["#time-range", "#time-number"]) {
+      const n = document.querySelector(id);
+      n.max = String(id === "#time-range" ? monthsMax : 24);
+      n.value = String(monthsMax);
+    }
+    for (const n of document.querySelectorAll(".cost-range, .cost-number")) {
+      if (n.classList.contains("cost-range")) n.max = String(costMax);
+      n.value = String(costMax);
+    }
+  }
+
+  renderDerivedText();
+  renderControls();
   renderChart();
+  renderTieNote();
   renderCards();
   renderGantt();
   renderTimelineMobile();

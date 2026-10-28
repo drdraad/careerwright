@@ -143,7 +143,8 @@
       }
       // Area anchor: the open-circle motif holding the area's name and count, so no
       // branch ever crosses an area label. The region note is in the key below.
-      el("circle", { cx: anchor[0], cy: anchor[1], r: AREA_R, class: `area-ring${areaId === "remote" ? " remote" : ""}${view.empty.includes(areaId) ? " empty" : ""}`, "aria-hidden": "true" }, svg);
+      el("circle", { cx: anchor[0], cy: anchor[1], r: AREA_R, class: `area-ring${view.empty.includes(areaId) ? " empty" : ""}`, "aria-hidden": "true" }, svg);
+      if (areaId === "remote") el("circle", { cx: anchor[0], cy: anchor[1], r: AREA_R - 5, class: "area-ring-inner", "aria-hidden": "true" }, svg);
       const n = areaJobs.length;
       const empty = view.empty.includes(areaId);
       label(svg, anchor[0], anchor[1] - 2, [[a.label, "area-label"], [empty ? "none found" : `${n} listing${n === 1 ? "" : "s"}`, "area-count"]], "middle");
@@ -153,6 +154,7 @@
       const c = company[job.company];
       const g = el("g", { class: `job${isStale(job) ? " stale" : ""}`, tabindex: "0", role: "button", "aria-pressed": String(job.id === view.selected), "aria-label": `${job.title}, ${employerText(c)}, ${payText(job.pay)}${isStale(job) ? ", last checked 2 days ago" : ""}` }, svg);
       jobMark(g, p, job);
+      if (isStale(job)) el("circle", { cx: p[0], cy: p[1], r: 9, class: "stale-ring" }, g);
       if (job.id === view.selected) {
         el("circle", { cx: p[0], cy: p[1], r: 11, class: "selected-ring" }, g);
         el("circle", { cx: p[0], cy: p[1], r: 17, class: "selected-ring", opacity: 0.4 }, g);
@@ -199,7 +201,12 @@
         if (job.pay.min === job.pay.max) {
           el("circle", { cx: x(job.pay.min), cy: yy, r: 3.5, fill: c, opacity }, svg);
         } else {
-          el("line", { x1: x(job.pay.min), x2: x(job.pay.max), y1: yy, y2: yy, stroke: c, "stroke-width": width, "stroke-linecap": "round", "stroke-dasharray": job.pay.kind === "predicted" ? "2 4" : "none", opacity }, svg);
+          if (job.pay.kind === "predicted") {
+            // Estimated by the listing site: a hollow bar, not a dashed one.
+            el("rect", { x: x(job.pay.min), y: yy - width / 2 - 1, width: x(job.pay.max) - x(job.pay.min), height: width + 2, rx: (width + 2) / 2, fill: "var(--surface-space-raised)", stroke: c, "stroke-width": 1.4, opacity }, svg);
+          } else {
+            el("line", { x1: x(job.pay.min), x2: x(job.pay.max), y1: yy, y2: yy, stroke: c, "stroke-width": width, "stroke-linecap": "round", opacity }, svg);
+          }
         }
         if (job.id === view.selected) el("rect", { x: x(job.pay.min) - 6, y: yy - 6, width: x(job.pay.max) - x(job.pay.min) + 12, height: 12, rx: 6, fill: "none", stroke: "var(--selection-space)", "stroke-width": 1.5 }, svg);
       });
@@ -236,7 +243,7 @@
       const card = document.createElement("article");
       card.className = "listing-card";
       if (job.id === view.selected) card.setAttribute("aria-current", "true");
-      card.innerHTML = `<span class="listing-title"></span><span class="role-employer"><span class="industry-dot" style="background:${colour(c.industry)}"></span><span class="emp"></span></span><span class="listing-meta"><span class="where"></span><span class="pay tnum"></span><span>AI <span class="ai tnum"></span></span><span class="age"></span></span>`;
+      card.innerHTML = `<span class="listing-title"></span><span class="role-employer"><span class="industry-dot" style="background:${colour(c.industry)}"></span><span class="emp"></span></span><span class="listing-meta"><span class="where"></span><span class="pay tnum"></span><span>AI Resilience <span class="ai tnum"></span></span><span class="age"></span></span>`;
       fill(card, job, c);
       cards.appendChild(card);
     }
@@ -245,9 +252,11 @@
   function fill(node, job, c) {
     node.querySelector(".listing-title").textContent = job.title;
     node.querySelector(".emp").textContent = employerText(c);
-    node.querySelector(".where").textContent = `${area[c.area].label}, ${job.mode === "onsite" ? "on site" : job.mode}`;
+    node.querySelector(".where").textContent = c.area === "remote" ? "Remote, employed in England" : `${area[c.area].label}, ${job.mode === "onsite" ? "on site" : job.mode}`;
     node.querySelector(".pay").textContent = job.pay.kind === "unknown" ? "Pay not stated" : payText(job.pay).replace(", advertised", "").replace(", estimated by the listing site", " (estimated)");
-    node.querySelector(".ai").textContent = aiText(job);
+    // Phone cards have no column header, so a published range carries its experimental
+    // marker inline; an unscored role has no record to mark.
+    node.querySelector(".ai").textContent = aiText(job) + (node.classList.contains("listing-card") && job.ai === "range" ? ", experimental" : "");
     const age = node.querySelector(".age");
     age.textContent = ageText(job);
     if (isStale(job)) age.className = "age status status-stale";

@@ -9,7 +9,18 @@ review can use the same frame. The automated checks behind it are in
 `screenshots/checks.md` (18 of 18 captures pass) and `tokens/contrast-report.md` (64 of 64
 pairs pass).
 
-**Defects found and fixed while iterating.** These are recorded because each was found by
+**Fix round 1 (2026-10-28), from the independent review:**
+
+- A dominated route on the comparison line contradicted the key. The key was rewritten,
+  dominated marks got a halo, and a generated equal-time-tie note was added.
+- Layers 2 and 3 were indistinguishable. They are now a disc and a ring, with layer labels.
+- The phone sheets hid the main task. They now open at a peek height.
+- AI Resilience displays lacked the Experimental marker.
+- Dashes carried six meanings; now there are two.
+- The failure state had two filled "Try again" buttons.
+- Slider bounds and some prose numbers were hard-coded; they now come from the data.
+
+**Defects found and fixed while iterating (first pass).** These are recorded because each was found by
 looking at a render, not by a passing check:
 
 - State switching failed twice:
@@ -39,9 +50,9 @@ looking at a render, not by a passing check:
 | Typography | Newsreader at light weight beside Source Sans 3 gives a calm editorial voice. Tabular figures line up in the ledger. Line lengths stay under about 66 characters | The 13 px SVG labels are near the lower comfortable limit at 1440 px. They scale down further on narrower desktops because the SVGs scale with their containers |
 | Spacing | Consistent 4/8/12/16/24/32 rhythm. Radius follows hierarchy | The conversation's review tray is dense at 1440×900. The Roles filter bar is one line at 1366 px but wraps to two at 1300 px (measured) |
 | Visual identity | The open-circle anchors, fine branches and route staircase make one recognisable motif across pages without decoration | The map's background glow is faint enough that the ink can look flat on low-quality displays. It is not tested on other screens |
-| Chart legibility | Discrete points; a staircase labelled "comparison boundary"; the bettered region shaded and explained; front 1 values on the chart, later fronts as readable grey letters with their figures on cards; greedy label placement with no collisions | No scenario whiskers are shown, because no scenario data exists in the fixtures. The unknown-scenario line is the only treatment. A cluttered real archive (hundreds of points) is not composed |
+| Chart legibility | Discrete points; a staircase labelled "comparison boundary"; the bettered region shaded and explained; front 1 values on the chart; layers 2 and 3 as a grey disc and a grey ring, each labelled with its layer, their figures on cards; a halo lifting a dominated point off the line, with a note for the equal-time tie (D and B); greedy label placement with no collisions | No scenario whiskers are shown, because no scenario data exists in the fixtures. The unknown-scenario line is the only treatment. A cluttered real archive (hundreds of points) is not composed |
 | Uncertainty communication | "Not confirmed, not £0"; a dashed inference with "not a fact until you accept it"; snippet-only and pay-not-stated stated plainly; failed, stale and conditional drawn differently; synthetic labels everywhere | The conversation's early sketch is a text card. It may read as more settled than it is. Spec section 3 wants it visibly provisional, and a human should judge whether the dashed edge is enough |
-| Responsive composition | Phones lead with the question, the list or the cards. The evidence becomes a bottom sheet. No horizontal overflow at 390 px | The phone's focused chart view and map overview are not composed (entry points only). The bottom sheet covers about half the screen in every state, and a collapsed "peek" height is not designed |
+| Responsive composition | Phones lead with the question, the list or the cards. The evidence becomes a bottom sheet. No horizontal overflow at 390 px | The phone's focused chart view and map overview are not composed (entry points only). The sheet opens at a 212 px peek with a "More" control; the expanded height and swipe behaviour are not designed |
 | Interaction continuity | Selection is shown the same way everywhere: a sea-glass edge on cards and rows, a ring on marks. Selected marks use `aria-pressed`. Filters state that they never change ranks | Static references: no hover, focus-return, keyboard path or transitions are demonstrated. axe passing does not establish keyboard usability |
 
 ## Human review checklist (not run — requires human)
