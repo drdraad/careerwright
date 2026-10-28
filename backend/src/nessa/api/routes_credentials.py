@@ -16,7 +16,7 @@ from nessa.identity.credentials import (
     rotate_credential,
     store_credential,
 )
-from nessa.identity.receipts import fingerprint, run_idempotent
+from nessa.identity.receipts import CommandResult, fingerprint, run_idempotent
 from nessa.identity.spend_limits import SetSpendLimits, set_spend_limits, spend_summary
 from nessa.identity.workspaces import visible_workspace
 
@@ -47,11 +47,11 @@ def list_credentials(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> 
 def store(
     workspace_id: uuid.UUID, body: StoreKey, caller: CallerDep, deps: Deps, key: IdempotencyKey
 ) -> JSONResponse:
-    def execute(tx: Tx) -> tuple[int, dict[str, object]]:
+    def execute(tx: Tx) -> CommandResult:
         stored = store_credential(
             tx, caller.actor, workspace_id, body, deps.keyring, deps.clock(), deps.spend_defaults
         )
-        return 201, CredentialOut.of(stored).model_dump(mode="json")
+        return CommandResult(201, CredentialOut.of(stored).model_dump(mode="json"), workspace_id)
 
     status, response = run_idempotent(
         deps.engine,
@@ -73,7 +73,7 @@ def rotate(
     deps: Deps,
     key: IdempotencyKey,
 ) -> JSONResponse:
-    def execute(tx: Tx) -> tuple[int, dict[str, object]]:
+    def execute(tx: Tx) -> CommandResult:
         rotated = rotate_credential(
             tx,
             caller.actor,
@@ -84,7 +84,7 @@ def rotate(
             deps.clock(),
             deps.spend_defaults,
         )
-        return 201, CredentialOut.of(rotated).model_dump(mode="json")
+        return CommandResult(201, CredentialOut.of(rotated).model_dump(mode="json"), workspace_id)
 
     request = _key_request(workspace_id, body, credential_id=str(credential_id))
     status, response = run_idempotent(
@@ -106,9 +106,9 @@ def revoke(
     deps: Deps,
     key: IdempotencyKey,
 ) -> JSONResponse:
-    def execute(tx: Tx) -> tuple[int, dict[str, object]]:
+    def execute(tx: Tx) -> CommandResult:
         revoked = revoke_credential(tx, caller.actor, workspace_id, credential_id)
-        return 200, CredentialOut.of(revoked).model_dump(mode="json")
+        return CommandResult(200, CredentialOut.of(revoked).model_dump(mode="json"), workspace_id)
 
     request = {"workspace_id": str(workspace_id), "credential_id": str(credential_id)}
     status, response = run_idempotent(
@@ -136,9 +136,9 @@ def put_spend_limits(
     deps: Deps,
     key: IdempotencyKey,
 ) -> JSONResponse:
-    def execute(tx: Tx) -> tuple[int, dict[str, object]]:
+    def execute(tx: Tx) -> CommandResult:
         summary = set_spend_limits(tx, workspace_id, body, deps.clock(), deps.spend_defaults)
-        return 200, SpendOut.of(summary).model_dump(mode="json")
+        return CommandResult(200, SpendOut.of(summary).model_dump(mode="json"), workspace_id)
 
     request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
     status, response = run_idempotent(

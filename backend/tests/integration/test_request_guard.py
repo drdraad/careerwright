@@ -99,3 +99,21 @@ def test_validation_errors_never_echo_request_input(api: ApiClient, ada: str) ->
     assert (response.status_code, body["error"]["code"]) == (422, "VALIDATION_FAILED")
     assert secret_like not in response.text
     assert "body.name: string_too_long" in body["error"]["details"]["errors"]
+
+
+@pytest.mark.req("SEC-04", "MODEL-06")
+def test_validation_errors_never_echo_client_supplied_field_names(api: ApiClient, ada: str) -> None:
+    secret_like = f"sk-pasted-as-a-key-{uuid.uuid4().hex}"
+
+    response = api.write(
+        "POST",
+        "/v1/workspaces",
+        ada,
+        {"name": "ok", "data_mode": "live_assisted", "synthetic": True, secret_like: "x"},
+    )
+
+    assert response.json()["error"]["code"] == "VALIDATION_FAILED"
+    assert secret_like not in response.text
+    assert (
+        "body.<unexpected field>: extra_forbidden" in response.json()["error"]["details"]["errors"]
+    )

@@ -4,18 +4,20 @@ Every docker call runs with a timeout, so no command can hang (`make stop` inclu
 service that ignores SIGTERM is killed, and DBOS recovers its in-flight work on the next
 start). Secrets travel only as files under NESSA_HOME; compose output never contains them.
 
-Run from `backend/`: `uv run python -m tools.stack {dev,demo,stop,reset-demo,status}`.
+Run from `backend/`: `uv run python -m tools.stack <command>` (see `main`).
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from nessa.seed import FIXTURE_WORKSPACE_ID
-from tools.localenv import REPO_ROOT, ensure_local_home, nessa_home
+from tools.localenv import REPO_ROOT, add_master_key_version, ensure_local_home, nessa_home
 
 COMPOSE_FILE = REPO_ROOT / "compose.yaml"
 LIVE_OVERRIDE = REPO_ROOT / "compose.live.yaml"
@@ -125,6 +127,38 @@ class Stack:
     def container_id(self, service: str) -> str:
         return self.compose("ps", "--all", "--quiet", service, timeout=30).stdout.strip()
 
+    def running(self) -> set[str]:
+        listed = self.compose("ps", "--status", "running", "--services", timeout=30).stdout
+        return set(listed.split())
+
+    def wait_healthy(self, *services: str, timeout_s: float = 120.0) -> None:
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            rows = self.compose("ps", "--format", "json", *services, timeout=30).stdout
+            states = [json.loads(line) for line in rows.splitlines() if line.strip()]
+            if len(states) == len(services) and all(s.get("Health") == "healthy" for s in states):
+                return
+            time.sleep(1)
+        raise TimeoutError(f"{', '.join(services)} not healthy after {timeout_s}s")
+
+
+def reseal(stack: Stack) -> str:
+    """Re-encrypt every sealed record under the current master key (setup role)."""
+    result = stack.run("migrate", "python", "-m", "nessa.cli", "reseal")
+    return result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
+
+
+def rotate_master_key(stack: Stack) -> str:
+    """Add a master key version, restart the API and worker so they load it, then reseal.
+    `restart` keeps each container's configuration, so a demo stack stays offline."""
+    if not {"postgres", "api", "worker"} <= stack.running():
+        raise SystemExit("start Nessa first (`make dev` or `make demo`)")
+    created = add_master_key_version(stack.home)
+    stack.compose("restart", "--timeout", str(STOP_TIMEOUT_S), "api", "worker", timeout=120)
+    stack.wait_healthy("api", "worker")
+    reseal(stack)
+    return created
+
 
 def _start(stack: Stack, mode: str) -> None:
     ensure_local_home(stack.home)
@@ -152,7 +186,19 @@ def ports_from_env() -> Ports:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("dev", "demo", "stop", "reset-demo", "status", "build"))
+    parser.add_argument(
+        "command",
+        choices=(
+            "dev",
+            "demo",
+            "stop",
+            "reset-demo",
+            "status",
+            "build",
+            "reseal",
+            "rotate-master-key",
+        ),
+    )
     args = parser.parse_args(argv)
     ports = ports_from_env()
     match args.command:
@@ -169,6 +215,14 @@ def main(argv: list[str] | None = None) -> None:
             print(Stack(ports=ports).compose("ps", "--all").stdout)
         case "build":
             Stack(ports=ports).build()
+        case "reseal":
+            print(reseal(Stack(ports=ports)))
+        case "rotate-master-key":
+            created = rotate_master_key(Stack(ports=ports))
+            print(
+                f"{created} is now the current master key and every sealed record uses it. "
+                "Older v<N>.key files in NESSA_HOME/keys may now be removed."
+            )
     sys.stdout.flush()
 
 

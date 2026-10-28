@@ -1,6 +1,7 @@
 """The live smoke's caps refuse before any call, and every provider attempt is ledgered
 (ruling R5). Offline: nothing here contacts Meta."""
 
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,7 @@ from tools.live_smoke import (
     ledger_attempts,
     ledger_possible_calls,
 )
+from tools.localenv import REPO_ROOT
 from tools.usage_ledger import CallOutcome, Ledger
 
 
@@ -34,6 +36,26 @@ def test_a_production_model_configured_as_the_test_model_needs_the_explicit_flag
     with pytest.raises(CapExceededError, match="--production-model"):
         authorise(models, production=False)
     assert authorise(models, production=True)[0] == "muse-spark-1.3"
+
+
+@pytest.mark.req("MODEL-09")
+@pytest.mark.parametrize(
+    ("value", "production"),
+    [("1", True), ("0", False), ("false", False), ("yes", False), ("", False)],
+)
+def test_only_production_equals_one_opts_in_to_the_production_model(
+    value: str, production: bool
+) -> None:
+    dry_run = subprocess.run(  # noqa: S603 - fixed make dry run, nothing executes
+        ["make", "-n", "live-smoke", f"PRODUCTION={value}"],  # noqa: S607
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+
+    assert ("--production-model" in dry_run.stdout) is production
 
 
 @pytest.mark.req("MODEL-09")

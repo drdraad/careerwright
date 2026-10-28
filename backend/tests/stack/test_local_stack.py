@@ -13,10 +13,11 @@ from collections.abc import Iterator
 from typing import Any
 
 import httpx2 as httpx
+import psycopg
 import pytest
 
 from nessa.seed import FIXTURE_WORKSPACE_ID
-from tools.stack import CORE_SERVICES, Stack
+from tools.stack import CORE_SERVICES, Stack, rotate_master_key
 
 pytestmark = pytest.mark.stack
 
@@ -249,6 +250,73 @@ def test_a_profile_edit_survives_a_full_stop_and_start(demo_stack: Stack) -> Non
     )
     assert outcome == "stopped"
     assert stopped_in < 60
+
+
+def superuser_query(stack: Stack, statement: str) -> list[tuple[Any, ...]]:
+    password = (stack.home / "secrets" / "pg_superuser").read_text().strip()
+    url = f"postgresql://postgres:{password}@127.0.0.1:{stack.ports.postgres}/nessa_app"
+    with psycopg.connect(url) as conn:
+        return conn.execute(statement.encode()).fetchall()
+
+
+def networks_of(stack: Stack, service: str) -> set[str]:
+    inspected = subprocess.run(  # noqa: S603
+        ["docker", "inspect", stack.container_id(service)],  # noqa: S607
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    return set(json.loads(inspected.stdout)[0]["NetworkSettings"]["Networks"])
+
+
+@pytest.mark.req("MODEL-05")
+def test_master_key_rotation_reloads_the_running_api_reseals_and_keeps_demo_offline(
+    demo_stack: Stack,
+) -> None:
+    ada = sign_in(demo_stack, "ada")
+    workspace_id = call(
+        demo_stack,
+        "POST",
+        "/v1/workspaces",
+        ada,
+        {"name": "Rotation", "data_mode": "live_assisted", "synthetic": True},
+    ).json()["workspace_id"]
+    base = f"/v1/workspaces/{workspace_id}/credentials"
+    first = call(
+        demo_stack,
+        "POST",
+        base,
+        ada,
+        {"api_key": "a" * 40, "consent_to_encrypted_storage": True},
+    ).json()
+    assert {
+        row[0] for row in superuser_query(demo_stack, "SELECT key_version FROM nessa.credentials")
+    } == {1}
+
+    created = rotate_master_key(demo_stack)
+
+    assert created == "keys/v2.key"
+    assert {
+        row[0] for row in superuser_query(demo_stack, "SELECT key_version FROM nessa.credentials")
+    } == {2}
+    # The restarted API seals with the new version: a rotated user key lands on v2 too.
+    rotated = call(
+        demo_stack,
+        "POST",
+        f"{base}/{first['credential_id']}/rotate",
+        sign_in(demo_stack, "ada"),
+        {"api_key": "b" * 40, "consent_to_encrypted_storage": True},
+    )
+    assert rotated.status_code == 201
+    new_id = uuid.UUID(rotated.json()["credential_id"])  # parsed, so safe to embed
+    versions = superuser_query(
+        demo_stack,
+        f"SELECT key_version FROM nessa.credentials WHERE credential_id = '{new_id}'",  # noqa: S608
+    )
+    assert versions == [(2,)]
+    # `restart` kept the demo configuration: the worker still has no route out.
+    assert networks_of(demo_stack, "worker") == {f"{demo_stack.project}_internal"}
 
 
 @pytest.mark.req("BND1-14")

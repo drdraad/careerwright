@@ -1,6 +1,7 @@
 """Migrations against real PostgreSQL 16: a fresh database reaches head; a populated database
 at every earlier revision upgrades to head without losing data (plan Sprint 1 acceptance)."""
 
+import json
 import uuid
 from datetime import UTC, datetime
 
@@ -60,8 +61,8 @@ TABLES_0001 = (
     "profile_versions",
     "profile_version_sources",
     "workspace_events",
-    "command_receipts",
 )
+RECEIPT_COLUMNS_0001 = "actor_id, idempotency_key, command, request_sha256, status_code, response"
 
 
 def snapshot(infra: Infra, database: str) -> dict[str, list[dict[str, object]]]:
@@ -74,6 +75,25 @@ def snapshot(infra: Infra, database: str) -> dict[str, list[dict[str, object]]]:
     }
 
 
+def add_receipts(tx: sa.Connection, workspace_id: uuid.UUID) -> None:
+    """One receipt whose response names its workspace, and one retry cache that does not."""
+    owner = INVITED_ACTORS[0].actor_id
+    for key, response in (
+        (ATTRIBUTABLE, {"workspace_id": str(workspace_id), "version": 2}),
+        (UNATTRIBUTABLE, {"credential_id": str(uuid.uuid4())}),
+    ):
+        tx.exec_driver_sql(
+            "INSERT INTO nessa.command_receipts (actor_id, idempotency_key, command, "
+            "request_sha256, status_code, response) VALUES (%(actor)s, %(key)s, 'cmd', "
+            "repeat('a', 64), 200, %(response)s::jsonb)",
+            {"actor": owner, "key": key, "response": json.dumps(response)},
+        )
+
+
+ATTRIBUTABLE = uuid.UUID("00000000-0000-4000-8000-0000000000a1")
+UNATTRIBUTABLE = uuid.UUID("00000000-0000-4000-8000-0000000000a2")
+
+
 @pytest.mark.req("BND1-14")
 def test_a_populated_database_upgrades_to_head_without_losing_data(infra: Infra) -> None:
     database = f"nessa_upgrade_{uuid.uuid4().hex[:8]}"
@@ -83,14 +103,28 @@ def test_a_populated_database_upgrades_to_head_without_losing_data(infra: Infra)
         migrate_app(engine, "0001")
         seed(engine, infra.ops_settings(database))  # the fixture workspace with its profile
         with engine.begin() as tx:
-            add_edited_workspace(tx)
+            edited = add_edited_workspace(tx)
+            add_receipts(tx, edited)
         before = snapshot(infra, database)
+        receipt_before = infra.query(
+            f"SELECT {RECEIPT_COLUMNS_0001} FROM nessa.command_receipts "  # noqa: S608
+            "WHERE idempotency_key = %s",
+            (ATTRIBUTABLE,),
+            database=database,
+        )
 
         migrate_app(engine)
     finally:
         engine.dispose()
 
     assert snapshot(infra, database) == before
+    # 0003: a receipt is kept and attributed to the workspace its response names; a retry
+    # cache that names none is dropped (documented in the migration).
+    receipts = infra.query(
+        f"SELECT {RECEIPT_COLUMNS_0001}, workspace_id FROM nessa.command_receipts",  # noqa: S608
+        database=database,
+    )
+    assert receipts == [{**receipt_before[0], "workspace_id": edited}]
     [version] = infra.query("SELECT version_num FROM alembic_version", database=database)
     assert version["version_num"] == head()
     # The upgraded data is still reachable through row-level security, and only by its owner.
@@ -100,7 +134,7 @@ def test_a_populated_database_upgrades_to_head_without_losing_data(infra: Infra)
     assert (owner, other) == ([{"n": 3}], [{"n": 0}])
 
 
-def add_edited_workspace(tx: sa.Connection) -> None:
+def add_edited_workspace(tx: sa.Connection) -> uuid.UUID:
     """A second workspace with two profile versions, written through the 0001-era stores."""
     owner = INVITED_ACTORS[0].actor_id
     workspace = identity_store.insert_workspace(
@@ -136,3 +170,4 @@ def add_edited_workspace(tx: sa.Connection) -> None:
         identity_store.append_event(
             tx, workspace.workspace_id, EventKind.PROFILE_VERSION_CREATED, str(version)
         )
+    return workspace.workspace_id

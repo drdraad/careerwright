@@ -3,6 +3,7 @@ correlation ID. Messages come from our code only; request input, provider text a
 messages never appear, so an envelope cannot echo a key back."""
 
 import logging
+from collections.abc import Mapping
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -23,6 +24,7 @@ STATUS: dict[ErrorCode, int] = {
     ErrorCode.IDEMPOTENCY_KEY_REQUIRED: 400,
     ErrorCode.STALE_INPUT_VERSION: 409,
     ErrorCode.CREDENTIAL_EXISTS: 409,
+    ErrorCode.CREDENTIAL_REVOKED: 409,
     ErrorCode.BUDGET_EXCEEDED: 402,
     ErrorCode.FEATURE_NOT_IN_M0: 501,
     ErrorCode.STORE_UNAVAILABLE: 503,
@@ -76,13 +78,21 @@ def envelope(error: NessaError, correlation: str) -> JSONResponse:
     )
 
 
+UNEXPECTED_FIELD = "<unexpected field>"
+
+
+def _location(item: Mapping[str, object]) -> str:
+    parts = [str(part) for part in item.get("loc", ())]  # type: ignore[attr-defined]
+    if item.get("type") == "extra_forbidden" and parts:
+        # The last part is a name the client chose; it could be a pasted key.
+        parts[-1] = UNEXPECTED_FIELD
+    return ".".join(parts)
+
+
 def _validation_details(error: RequestValidationError) -> list[str]:
     # Location and error type only: pydantic's default response would echo the input,
     # which for a credential request is the key itself.
-    return [
-        ".".join(str(part) for part in item.get("loc", ())) + f": {item.get('type', 'invalid')}"
-        for item in error.errors()
-    ][:20]
+    return [f"{_location(item)}: {item.get('type', 'invalid')}" for item in error.errors()][:20]
 
 
 def install_error_handlers(app: FastAPI) -> None:

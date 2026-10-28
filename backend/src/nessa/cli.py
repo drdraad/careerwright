@@ -5,12 +5,14 @@
 - `migrate [--revision R]`: application database only (tests use it to stop part-way).
 - `seed`: invited identities and the fixture workspace, created only if missing.
 - `reset-demo`: recreate the named fixture workspace; no other workspace is touched.
-- `reseal-credentials`: after `tools.localenv --rotate-master-key`, re-encrypt stored keys
-  under the new master key version.
+- `reseal`: master-key rotation step 2 (`make rotate-master-key` runs both steps):
+  re-encrypt every sealed record (keys and run outputs) under the current key version.
 """
 
 import argparse
 import logging
+import uuid
+from collections.abc import Callable
 
 import sqlalchemy as sa
 from alembic import command
@@ -19,11 +21,12 @@ from dbos import DBOS
 
 from nessa.config import OpsSettings
 from nessa.db import Tx, create_engine, url_with_password
-from nessa.identity import credential_store
+from nessa.identity import credential_store, run_store
 from nessa.identity import store as identity_store
 from nessa.identity.credentials import credential_context
-from nessa.identity.keyring import Keyring, load_keyring
+from nessa.identity.keyring import Keyring, RecordContext, SealedValue, load_keyring
 from nessa.identity.records import EventKind
+from nessa.identity.runs import output_context
 from nessa.logs import configure_logging
 from nessa.profile import store as profile_store
 from nessa.profile.commands import cited_sources
@@ -57,19 +60,71 @@ def migrate_dbos(settings: OpsSettings) -> None:
     )
 
 
-def reseal_credentials(engine: sa.Engine, keyring: Keyring) -> int:
-    """Master-key rotation, step 2: re-encrypt every stored key under the current master key
-    version, in one transaction. Afterwards older key files can be retired."""
-    resealed = 0
+class ResealIncompleteError(RuntimeError):
+    """A sealed table still holds an older key version: the old key file must be kept."""
+
+
+def _reseal_rows(
+    keyring: Keyring,
+    rows: list[tuple[uuid.UUID, uuid.UUID, SealedValue]],
+    context: Callable[[uuid.UUID, uuid.UUID], RecordContext],
+    replace: Callable[[uuid.UUID, SealedValue], None],
+) -> int:
+    count = 0
+    for record_id, workspace_id, sealed in rows:
+        if sealed.key_version == keyring.current_version:
+            continue
+        record = context(workspace_id, record_id)
+        replace(record_id, keyring.seal(keyring.open(sealed, record), record))
+        count += 1
+    return count
+
+
+def _tables_on_old_versions(tx: Tx, current_version: int) -> list[str]:
+    """Every application table with a `key_version` column, so a sealed table added later
+    but missing from `reseal` blocks retirement instead of passing silently."""
+    tables = tx.execute(
+        sa.text(
+            "SELECT table_name FROM information_schema.columns "
+            "WHERE table_schema = 'nessa' AND column_name = 'key_version' ORDER BY table_name"
+        )
+    ).scalars()
+    stale = []
+    for table in tables:
+        old = tx.execute(
+            sa.text(f"SELECT count(*) FROM nessa.{table} WHERE key_version <> :v"),  # noqa: S608 - names from the catalogue
+            {"v": current_version},
+        ).scalar_one()
+        if old:
+            stale.append(f"nessa.{table}")
+    return stale
+
+
+def reseal(engine: sa.Engine, keyring: Keyring) -> dict[str, int]:
+    """Master-key rotation, step 2: re-encrypt everything the master key seals under its
+    current version, in one transaction. Succeeds only when no sealed row is left on an
+    older version; only then may older key files be retired."""
     with engine.begin() as tx:
-        for credential_id, workspace_id, sealed in credential_store.all_sealed(tx):
-            if sealed.key_version == keyring.current_version:
-                continue
-            context = credential_context(workspace_id, credential_id)
-            fresh = keyring.seal(keyring.open(sealed, context), context)
-            credential_store.replace_sealed(tx, credential_id, fresh)
-            resealed += 1
-    return resealed
+        counts = {
+            "credentials": _reseal_rows(
+                keyring,
+                credential_store.all_sealed(tx),
+                credential_context,
+                lambda record_id, sealed: credential_store.replace_sealed(tx, record_id, sealed),
+            ),
+            "run_outputs": _reseal_rows(
+                keyring,
+                run_store.all_sealed_outputs(tx),
+                output_context,
+                lambda record_id, sealed: run_store.replace_sealed_output(tx, record_id, sealed),
+            ),
+        }
+        stale = _tables_on_old_versions(tx, keyring.current_version)
+        if stale:
+            raise ResealIncompleteError(
+                f"still sealed with an older master key: {', '.join(stale)}; keep the old key"
+            )
+    return counts
 
 
 def _create_fixture_workspace(tx: Tx, settings: OpsSettings, *, last_event_seq: int) -> None:
@@ -128,7 +183,7 @@ def main(argv: list[str] | None = None) -> None:
     migrate.add_argument("--revision", default="head")
     sub.add_parser("seed")
     sub.add_parser("reset-demo")
-    sub.add_parser("reseal-credentials")
+    sub.add_parser("reseal")
     args = parser.parse_args(argv)
 
     configure_logging("setup")
@@ -146,11 +201,15 @@ def main(argv: list[str] | None = None) -> None:
                 seed(engine, settings)
             case "reset-demo":
                 reset_demo(engine, settings)
-            case "reseal-credentials":
+            case "reseal":
                 if settings.master_key_dir is None:
-                    raise SystemExit("NESSA_MASTER_KEY_DIR is required to reseal credentials")
-                count = reseal_credentials(engine, load_keyring(settings.master_key_dir))
-                _log.info("credentials resealed", extra={"count": count})
+                    raise SystemExit("NESSA_MASTER_KEY_DIR is required to reseal")
+                keyring = load_keyring(settings.master_key_dir)
+                counts = reseal(engine, keyring)
+                _log.info(
+                    "sealed records resealed",
+                    extra={**counts, "current_key_version": keyring.current_version},
+                )
         _log.info("setup command finished", extra={"command": args.command})
     finally:
         engine.dispose()

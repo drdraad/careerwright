@@ -121,6 +121,61 @@ def test_rotation_replaces_the_active_key_and_revocation_retires_it(
     assert kinds[-3:] == ["credential.stored", "credential.rotated", "credential.revoked"]
 
 
+@pytest.mark.req("MODEL-05", "SEC-02")
+def test_the_database_keeps_a_revocation_final_even_for_the_api_role(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    workspace_id = api.create_workspace(ada)["workspace_id"]
+    base = f"/v1/workspaces/{workspace_id}/credentials"
+    first = store_key(api, ada, workspace_id, new_key()).json()
+    rotated = api.write(
+        "POST",
+        f"{base}/{first['credential_id']}/rotate",
+        ada,
+        {"api_key": new_key(), "consent_to_encrypted_storage": True},
+    ).json()
+
+    for statement in (
+        "UPDATE nessa.credentials SET revoked_at = NULL, revoked_by = NULL "
+        "WHERE credential_id = %s",
+        "UPDATE nessa.credentials SET revoked_at = now() - interval '1 day' "
+        "WHERE credential_id = %s",
+        "UPDATE nessa.credentials SET replaced_by = credential_id WHERE credential_id = %s",
+    ):
+        with pytest.raises(psycopg.errors.CheckViolation, match="final"):
+            infra.as_role("pg_api", statement, (first["credential_id"],), actor=ADA)
+    with pytest.raises(psycopg.errors.CheckViolation, match="replacements_are_revoked"):
+        infra.as_role(
+            "pg_api",
+            "UPDATE nessa.credentials SET replaced_by = %s WHERE credential_id = %s",
+            (first["credential_id"], rotated["credential_id"]),
+            actor=ADA,
+        )
+
+
+@pytest.mark.req("MODEL-05")
+def test_rotating_or_revoking_a_revoked_key_is_a_distinct_conflict(
+    api: ApiClient, ada: str
+) -> None:
+    workspace_id = api.create_workspace(ada)["workspace_id"]
+    base = f"/v1/workspaces/{workspace_id}/credentials"
+    stored = store_key(api, ada, workspace_id, new_key()).json()
+    api.write("POST", f"{base}/{stored['credential_id']}/revoke", ada)
+
+    again = api.write("POST", f"{base}/{stored['credential_id']}/revoke", ada)
+    rotate = api.write(
+        "POST",
+        f"{base}/{stored['credential_id']}/rotate",
+        ada,
+        {"api_key": new_key(), "consent_to_encrypted_storage": True},
+    )
+    missing = api.write("POST", f"{base}/{uuid.uuid4()}/revoke", ada)
+
+    assert (again.status_code, again.json()["error"]["code"]) == (409, "CREDENTIAL_REVOKED")
+    assert (rotate.status_code, rotate.json()["error"]["code"]) == (409, "CREDENTIAL_REVOKED")
+    assert (missing.status_code, missing.json()["error"]["code"]) == (404, "NOT_FOUND")
+
+
 def test_demo_workspaces_never_take_a_key(api: ApiClient, ada: str) -> None:
     response = store_key(api, ada, str(FIXTURE_WORKSPACE_ID), new_key())
 

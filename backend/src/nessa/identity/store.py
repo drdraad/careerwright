@@ -224,16 +224,14 @@ def events_after(
 def read_receipt(tx: Tx, actor_id: uuid.UUID, key: uuid.UUID) -> Receipt | None:
     row = tx.execute(
         sa.text(
-            "SELECT command, request_sha256, status_code, response FROM nessa.command_receipts "
-            "WHERE actor_id = :actor AND idempotency_key = :key"
+            "SELECT command, request_sha256, status_code, response, workspace_id "
+            "FROM nessa.command_receipts WHERE actor_id = :actor AND idempotency_key = :key"
         ),
         {"actor": actor_id, "key": key},
     ).one_or_none()
-    return (
-        None
-        if row is None
-        else Receipt(row.command, row.request_sha256, row.status_code, row.response)
-    )
+    if row is None:
+        return None
+    return Receipt(row.command, row.request_sha256, row.status_code, row.response, row.workspace_id)
 
 
 def write_receipt(tx: Tx, actor_id: uuid.UUID, key: uuid.UUID, receipt: Receipt) -> None:
@@ -242,8 +240,8 @@ def write_receipt(tx: Tx, actor_id: uuid.UUID, key: uuid.UUID, receipt: Receipt)
             tx.execute(
                 sa.text(
                     "INSERT INTO nessa.command_receipts (actor_id, idempotency_key, command, "
-                    "request_sha256, status_code, response) VALUES (:actor, :key, :command, "
-                    ":sha, :status, CAST(:response AS jsonb))"
+                    "request_sha256, status_code, response, workspace_id) VALUES (:actor, :key, "
+                    ":command, :sha, :status, CAST(:response AS jsonb), :ws)"
                 ),
                 {
                     "actor": actor_id,
@@ -252,6 +250,7 @@ def write_receipt(tx: Tx, actor_id: uuid.UUID, key: uuid.UUID, receipt: Receipt)
                     "sha": receipt.request_sha256,
                     "status": receipt.status_code,
                     "response": json.dumps(receipt.response),
+                    "ws": receipt.workspace_id,
                 },
             )
     except exc.IntegrityError as error:

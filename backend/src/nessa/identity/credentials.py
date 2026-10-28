@@ -96,6 +96,19 @@ def _found(tx: Tx, workspace_id: uuid.UUID, credential_id: uuid.UUID) -> Credent
     return found
 
 
+def _active(tx: Tx, workspace_id: uuid.UUID, credential_id: uuid.UUID) -> Credential:
+    found = _found(tx, workspace_id, credential_id)
+    if found.revoked_at is not None:
+        # Distinct from "no such key" (Global Constraint 6): the key exists and is retired.
+        raise NessaError(
+            ErrorCode.CREDENTIAL_REVOKED,
+            "That key is already revoked. Store a new key instead.",
+            stage=ErrorStage.CREDENTIAL,
+            details={"credential_id": str(credential_id)},
+        )
+    return found
+
+
 def store_credential(
     tx: Tx,
     actor: Actor,
@@ -132,13 +145,7 @@ def rotate_credential(
 ) -> Credential:
     workspace = visible_workspace(tx, workspace_id, lock=True)
     _accepts_keys(workspace, command)
-    current = _found(tx, workspace_id, credential_id)
-    if current.revoked_at is not None:
-        raise NessaError(
-            ErrorCode.NOT_FOUND,
-            "That key is already revoked; store a new key instead.",
-            stage=ErrorStage.CREDENTIAL,
-        )
+    _active(tx, workspace_id, credential_id)
     # One active key per provider: retire the old one before the new one exists.
     credential_store.revoke(tx, credential_id, revoked_by=actor.actor_id)
     new_id = _insert(tx, actor, workspace, command, keyring, now, defaults)
@@ -157,8 +164,7 @@ def revoke_credential(
     tx: Tx, actor: Actor, workspace_id: uuid.UUID, credential_id: uuid.UUID
 ) -> Credential:
     visible_workspace(tx, workspace_id, lock=True)
-    current = _found(tx, workspace_id, credential_id)
-    if current.revoked_at is None:
-        credential_store.revoke(tx, credential_id, revoked_by=actor.actor_id)
-        store.append_event(tx, workspace_id, EventKind.CREDENTIAL_REVOKED, str(credential_id))
+    _active(tx, workspace_id, credential_id)
+    credential_store.revoke(tx, credential_id, revoked_by=actor.actor_id)
+    store.append_event(tx, workspace_id, EventKind.CREDENTIAL_REVOKED, str(credential_id))
     return _found(tx, workspace_id, credential_id)

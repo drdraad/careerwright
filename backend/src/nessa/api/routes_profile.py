@@ -12,7 +12,7 @@ from nessa.api.pagination import DEFAULT_LIMIT, MAX_LIMIT, decode_int, decode_ti
 from nessa.api.schemas import ProfileOut, ProfileVersionPage, ProfileWriteIn, SourceOut, SourcePage
 from nessa.db import Tx, actor_transaction
 from nessa.errors import ErrorCode, ErrorStage, NessaError
-from nessa.identity.receipts import fingerprint, run_idempotent
+from nessa.identity.receipts import CommandResult, fingerprint, run_idempotent
 from nessa.identity.workspaces import visible_workspace
 from nessa.profile import store
 from nessa.profile.commands import ProfileView, current_profile, write_profile
@@ -42,11 +42,13 @@ def put_profile(
     deps: Deps,
     key: IdempotencyKey,
 ) -> JSONResponse:
-    def execute(tx: Tx) -> tuple[int, dict[str, object]]:
+    def execute(tx: Tx) -> CommandResult:
         view, created = write_profile(
             tx, caller.actor, workspace_id, body.expected_version, body.profile, deps.clock()
         )
-        return (201 if created else 200), ProfileOut.of(view).model_dump(mode="json")
+        return CommandResult(
+            201 if created else 200, ProfileOut.of(view).model_dump(mode="json"), workspace_id
+        )
 
     request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
     status, response = run_idempotent(

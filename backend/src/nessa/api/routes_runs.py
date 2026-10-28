@@ -13,7 +13,7 @@ from nessa.api.schemas import RunOut, RunPage
 from nessa.db import Tx, actor_transaction
 from nessa.identity import run_store
 from nessa.identity.keyring import Keyring
-from nessa.identity.receipts import fingerprint, run_idempotent
+from nessa.identity.receipts import CommandResult, fingerprint, run_idempotent
 from nessa.identity.records import Run
 from nessa.identity.runs import SubmitRun, open_output, submit_run, visible_run
 from nessa.identity.workspaces import visible_workspace
@@ -30,7 +30,7 @@ def _run_out(tx: Tx, keyring: Keyring, run: Run) -> RunOut:
 def submit(
     workspace_id: uuid.UUID, body: SubmitRun, caller: CallerDep, deps: Deps, key: IdempotencyKey
 ) -> JSONResponse:
-    def execute(tx: Tx) -> tuple[int, dict[str, object]]:
+    def execute(tx: Tx) -> CommandResult:
         run = submit_run(
             tx,
             caller.actor,
@@ -41,7 +41,9 @@ def submit(
             defaults=deps.spend_defaults,
             now=deps.clock(),
         )
-        return 202, _run_out(tx, deps.keyring, run).model_dump(mode="json")
+        return CommandResult(
+            202, _run_out(tx, deps.keyring, run).model_dump(mode="json"), workspace_id
+        )
 
     request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
     status, response = run_idempotent(

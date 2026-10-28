@@ -7,6 +7,7 @@ import psycopg
 import pytest
 
 from nessa.seed import FIXTURE_WORKSPACE_ID, INVITED_ACTORS
+from tests.integration.durable import make_scenario
 from tests.support.client import ApiClient, profile_with
 from tests.support.infra import Infra
 
@@ -101,6 +102,48 @@ def test_the_api_role_sees_no_rows_of_another_actors_workspace(infra: Infra, tab
     with_no_actor = infra.as_role("pg_api", statement, (FIXTURE_WORKSPACE_ID,))
 
     assert int(str(as_owner[0]["n"])) >= 1
+    assert as_other[0]["n"] == with_no_actor[0]["n"] == 0
+
+
+EXECUTION_TABLES = (
+    "credentials",
+    "spend_limits",
+    "runs",
+    "run_outputs",
+    "model_attempts",
+    "outbox",
+)
+
+
+@pytest.fixture(scope="module")
+def completed_run_workspace(
+    infra: Infra, api: ApiClient, ada: str, tmp_path_factory: pytest.TempPathFactory
+) -> str:
+    """Ada's workspace holding a key, spend limits, and a completed run with its output,
+    attempts and outbox entry: a row in every execution table."""
+    scenario = make_scenario(infra, api, ada, tmp_path_factory.mktemp("isolation-run"))
+    run_id = scenario.submit()
+    worker = scenario.worker("worker")
+    try:
+        assert scenario.wait_terminal(run_id)["status"] == "complete"
+    finally:
+        worker.stop()
+    return scenario.workspace_id
+
+
+@pytest.mark.req("SEC-02", "ARC1-08")
+@pytest.mark.parametrize("table", EXECUTION_TABLES)
+def test_the_api_role_sees_no_execution_rows_of_another_actors_workspace(
+    infra: Infra, completed_run_workspace: str, table: str
+) -> None:
+    # count(workspace_id): the API role holds column-level SELECT on credentials.
+    statement = f"SELECT count(workspace_id) AS n FROM nessa.{table} WHERE workspace_id = %s"  # noqa: S608
+
+    as_owner = infra.as_role("pg_api", statement, (completed_run_workspace,), actor=ADA)
+    as_other = infra.as_role("pg_api", statement, (completed_run_workspace,), actor=BEN)
+    with_no_actor = infra.as_role("pg_api", statement, (completed_run_workspace,))
+
+    assert int(as_owner[0]["n"]) >= 1
     assert as_other[0]["n"] == with_no_actor[0]["n"] == 0
 
 

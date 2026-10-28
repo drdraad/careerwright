@@ -12,7 +12,7 @@ from nessa.api.pagination import DEFAULT_LIMIT, MAX_LIMIT, decode_timestamped, e
 from nessa.api.schemas import ActorOut, RenameWorkspaceIn, WorkspaceOut, WorkspacePage
 from nessa.db import Tx, actor_transaction
 from nessa.identity import store
-from nessa.identity.receipts import fingerprint, run_idempotent
+from nessa.identity.receipts import CommandResult, fingerprint, run_idempotent
 from nessa.identity.workspaces import (
     CreateWorkspace,
     create_workspace,
@@ -49,9 +49,11 @@ def list_workspaces(
 def create(
     body: CreateWorkspace, caller: CallerDep, deps: Deps, key: IdempotencyKey
 ) -> JSONResponse:
-    def execute(tx: Tx) -> tuple[int, dict[str, object]]:
+    def execute(tx: Tx) -> CommandResult:
         workspace = create_workspace(tx, caller.actor, body)
-        return 201, WorkspaceOut.of(workspace).model_dump(mode="json")
+        return CommandResult(
+            201, WorkspaceOut.of(workspace).model_dump(mode="json"), workspace.workspace_id
+        )
 
     status, response = run_idempotent(
         deps.engine,
@@ -78,9 +80,9 @@ def rename(
     deps: Deps,
     key: IdempotencyKey,
 ) -> JSONResponse:
-    def execute(tx: Tx) -> tuple[int, dict[str, object]]:
+    def execute(tx: Tx) -> CommandResult:
         workspace = rename_workspace(tx, workspace_id, body.expected_version, body.name)
-        return 200, WorkspaceOut.of(workspace).model_dump(mode="json")
+        return CommandResult(200, WorkspaceOut.of(workspace).model_dump(mode="json"), workspace_id)
 
     request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
     status, response = run_idempotent(

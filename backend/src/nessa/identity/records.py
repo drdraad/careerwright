@@ -48,10 +48,13 @@ class WorkspaceEvent:
 
 @dataclass(frozen=True)
 class Receipt:
+    """A command's recorded response. It is deleted with its workspace (it holds copies)."""
+
     command: str
     request_sha256: str
     status_code: int
     response: dict[str, object]
+    workspace_id: uuid.UUID
 
 
 @dataclass(frozen=True)

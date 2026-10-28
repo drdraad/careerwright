@@ -10,6 +10,7 @@ import hashlib
 import json
 import uuid
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 
 from nessa.db import Engine, Tx, actor_transaction
 from nessa.errors import ErrorCode, ErrorStage, NessaError
@@ -17,7 +18,15 @@ from nessa.identity import store
 from nessa.identity.records import Receipt
 from nessa.identity.store import DuplicateReceiptError
 
-Execute = Callable[[Tx], tuple[int, dict[str, object]]]
+
+@dataclass(frozen=True)
+class CommandResult:
+    status_code: int
+    response: dict[str, object]
+    workspace_id: uuid.UUID  # the receipt is deleted with this workspace
+
+
+Execute = Callable[[Tx], CommandResult]
 
 
 def fingerprint(command: str, request: Mapping[str, object]) -> str:
@@ -51,11 +60,20 @@ def run_idempotent(
             receipt = store.read_receipt(tx, actor_id, key)
             if receipt is not None:
                 return _replay(receipt, command, request_sha256)
-            status, response = execute(tx)
+            result = execute(tx)
             store.write_receipt(
-                tx, actor_id, key, Receipt(command, request_sha256, status, response)
+                tx,
+                actor_id,
+                key,
+                Receipt(
+                    command,
+                    request_sha256,
+                    result.status_code,
+                    result.response,
+                    result.workspace_id,
+                ),
             )
-            return status, response
+            return result.status_code, result.response
     except (DuplicateReceiptError, NessaError):
         # A concurrent duplicate may have committed first (it then made this attempt stale
         # or took the receipt); if so, the command already happened: return its result.

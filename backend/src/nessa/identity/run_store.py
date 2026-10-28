@@ -308,6 +308,39 @@ def sealed_output(tx: Tx, run_id: uuid.UUID) -> tuple[uuid.UUID, SealedValue] | 
     return row.output_id, SealedValue(row.key_version, bytes(row.nonce), bytes(row.ciphertext))
 
 
+def all_sealed_outputs(tx: Tx) -> list[tuple[uuid.UUID, uuid.UUID, SealedValue]]:
+    """Setup only (master-key rotation): every sealed run output, locked."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT output_id, workspace_id, key_version, nonce, ciphertext "
+            "FROM nessa.run_outputs ORDER BY output_id FOR UPDATE"
+        )
+    )
+    return [
+        (
+            r.output_id,
+            r.workspace_id,
+            SealedValue(r.key_version, bytes(r.nonce), bytes(r.ciphertext)),
+        )
+        for r in rows
+    ]
+
+
+def replace_sealed_output(tx: Tx, output_id: uuid.UUID, sealed: SealedValue) -> None:
+    tx.execute(
+        sa.text(
+            "UPDATE nessa.run_outputs SET key_version = :version, nonce = :nonce, "
+            "ciphertext = :ciphertext WHERE output_id = :id"
+        ),
+        {
+            "id": output_id,
+            "version": sealed.key_version,
+            "nonce": sealed.nonce,
+            "ciphertext": sealed.ciphertext,
+        },
+    )
+
+
 def attempts(tx: Tx, run_id: uuid.UUID) -> list[Attempt]:
     rows = tx.execute(
         sa.text(
