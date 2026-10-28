@@ -6,8 +6,12 @@
 - Receipts hold copies of command responses (profile documents among them), so they gain a
   `workspace_id` that cascades: deleting a workspace, or `reset-demo`, leaves none behind.
   Existing receipts are attributed from their response where it names the workspace; the
-  rest are dropped. They are retry caches only: a dropped one means a retry with that key
-  runs the command again, and every command checks its version or state first.
+  rest (run submission, credential and spend-limit receipts, whose responses carry no
+  workspace ID) are dropped. They are retry caches only: a dropped one means a retry with
+  that key runs the command again. Profile and spend-limit writes then meet their expected
+  version and credential commands the credential's state, but run submission has no
+  precondition, so a retried pre-upgrade submission would create a second run. Accepted
+  because no released install has receipts to upgrade.
 
 Forward-only (see `docs/runbook.md`).
 

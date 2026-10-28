@@ -91,8 +91,10 @@ Pin this composition for every workflow that touches private data or a credentia
    - By DBOS's code, the raw exception text would then be stored in the step and workflow
      error records and logged with its traceback. That journal was not inspected in the
      reproduction.
-7. **One retry owner: the DBOS step.** `retries_allowed=True`, `max_attempts=3`, and
-   `should_retry` accepts only `TransientProviderError`. Client and agent retries are off.
+7. **One retry owner per failure class.** The DBOS step owns provider transients; the
+   activity's store budget owns store transients; they never overlap. For the step,
+   `retries_allowed=True`, `max_attempts=3`, and `should_retry` accepts only
+   `TransientProviderError`. Client and agent retries are off.
    When retries are exhausted, the workflow publishes `failed/provider_unavailable`, never
    an empty success. Exceptions outside the activity's control (for example, the
    application database being down while the attempt row or the outcome is written)

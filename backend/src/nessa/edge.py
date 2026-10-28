@@ -61,10 +61,14 @@ async def _internal_address(route: Route, allowed: Networks) -> str | None:
     one container with a route out, and Docker's DNS forwards unknown names (an absent
     `web`, say) to the host's resolver; a name that resolves outside must not be followed."""
     try:
-        resolved = await asyncio.get_running_loop().getaddrinfo(
-            route.target_host, route.target_port, type=socket.SOCK_STREAM
+        # Bounded like the connect, so a slow resolver cannot hold client connections.
+        resolved = await asyncio.wait_for(
+            asyncio.get_running_loop().getaddrinfo(
+                route.target_host, route.target_port, type=socket.SOCK_STREAM
+            ),
+            CONNECT_TIMEOUT_S,
         )
-    except OSError:
+    except (OSError, TimeoutError):
         return None
     for _family, _type, _proto, _name, sockaddr in resolved:
         if is_permitted(str(sockaddr[0]), allowed):

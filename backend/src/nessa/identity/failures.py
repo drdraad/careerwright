@@ -1,9 +1,11 @@
 """Typed, message-free failure classification for the bounded model activity (ADR 0002).
 
 Every exception is classified from its type and HTTP status alone and its message is
-discarded, because provider errors can echo the key and ours can quote private input. A
-transient failure becomes a label-only exception for the DBOS step, the single retry owner;
-everything else is a terminal failure class recorded on the run.
+discarded, because provider errors can echo the key and ours can quote private input. Each
+transient class has one retry owner, and they never overlap: a transient provider failure
+becomes a label-only exception for the DBOS step, which owns provider retries; a store
+failure is retried by the activity itself within its store budget. Everything else is a
+terminal failure class recorded on the run.
 """
 
 from collections.abc import Sequence

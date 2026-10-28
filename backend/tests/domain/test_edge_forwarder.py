@@ -2,10 +2,12 @@
 the internal network (BND1-13, A-M1)."""
 
 import asyncio
+import time
 from ipaddress import ip_network
 
 import pytest
 
+from nessa import edge
 from nessa.edge import Route, parse_routes, serve
 from nessa.localnet import LOOPBACK
 
@@ -115,3 +117,24 @@ def test_an_unresolvable_target_is_refused() -> None:
     data, reached = relay_attempt("nessa-absent-target.invalid", LOOPBACK)
 
     assert (data, reached) == (b"", [])
+
+
+@pytest.mark.req("BND1-11")
+def test_a_resolver_that_never_answers_releases_the_client_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """N7: resolution is bounded like the connect, so a slow resolver cannot hold relays.
+    Numeric addresses (the test's own sockets) never reach `getaddrinfo`."""
+
+    async def never_answers(*args: object, **kwargs: object) -> list[object]:
+        await asyncio.sleep(60)
+        return []
+
+    monkeypatch.setattr(asyncio.BaseEventLoop, "getaddrinfo", never_answers)
+    monkeypatch.setattr(edge, "CONNECT_TIMEOUT_S", 0.2)
+    started = time.monotonic()
+
+    data, reached = relay_attempt("api", LOOPBACK)
+
+    assert (data, reached) == (b"", [])
+    assert time.monotonic() - started < 5
