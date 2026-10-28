@@ -14,7 +14,8 @@ export type ChapterId = (typeof CHAPTERS)[number]["id"];
 
 /**
  * How the rail marks a chapter besides "current" (docs/design/README.md: visited, current or
- * not started). Visited means opened in this browser session, or You once answers are saved.
+ * not started). Visited means opened in this browser session, or You once answers are saved;
+ * it is drawn as a ring, never as the filled mark of a completed chapter (V-09).
  */
 export type ChapterProgress = "visited" | "todo";
 

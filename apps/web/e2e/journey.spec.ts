@@ -52,17 +52,18 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, inspect a fixture rout
   await expect(page.getByText("Fixture preview: not your routes")).toBeVisible();
   const routeB = page.getByRole("button", { name: /^Route B/ });
   await routeB.click();
-  await expect(drawer.getByText("Synthetic fixture route")).toBeVisible();
+  const routeDrawer = page.getByRole("dialog", { name: "Route B" });
+  await expect(routeDrawer.getByText("Synthetic fixture route")).toBeVisible();
   await expect(
-    drawer.getByText("minimum prefunded cash balance of £4,850", { exact: false }),
+    routeDrawer.getByText("minimum prefunded cash balance of £4,850", { exact: false }),
   ).toBeVisible();
   await expect(
-    drawer
+    routeDrawer
       .getByRole("definition")
       .filter({ hasText: /^£600$/ })
       .first(),
   ).toBeVisible();
-  await drawer.getByRole("button", { name: "Close where this came from" }).click();
+  await routeDrawer.getByRole("button", { name: "Close route B" }).click();
   await expect(routeB).toBeFocused();
 
   // Restart every service. The open page notices, reconnects, and keeps working.

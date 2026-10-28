@@ -3,10 +3,11 @@
 // (the start, a reply to review, the slate with its written note written, pending and
 // unavailable, the support panel, a failed reply, key
 // consent, Unknown/Skipped/Prefer not to say, the scrolled stale conflict and its Save, and
-// expanded phone sheets), at 1440×900, 390×844 and 768×1024, each with the automatable
+// expanded phone sheets), and the route comparison's disclosure and lower layers (Task 6c), at
+// 1440×900, 390×844 and 768×1024, plus the home page at 200 % zoom, each with the automatable
 // checks: axe (WCAG 2.0, 2.1 and 2.2 A/AA), horizontal overflow, a label overprinting its
-// value, console errors and font loading. These checks are evidence for a human review, not
-// the review itself (ruling R2).
+// value, a select cutting off its chosen option, console errors and font loading. These
+// checks are evidence for a human review, not the review itself (ruling R2).
 //
 // `pnpm run review-screenshots` writes the PNGs and checks-<viewport>.json to
 // docs/reviews/sprint-2/screenshots/; otherwise (make acceptance) they go to the test output
@@ -127,8 +128,8 @@ async function talkedWorkspace(token: string): Promise<string> {
 }
 
 /** Opens the phone and tablet sheet to its full height; on a wide screen it is a column. */
-async function expandSheet(page: Page) {
-  const more = page.getByRole("dialog", { name: "Where this came from" }).getByRole("button", {
+async function expandSheet(page: Page, title = "Where this came from") {
+  const more = page.getByRole("dialog", { name: title }).getByRole("button", {
     name: "More",
   });
   if (await more.isVisible()) {
@@ -489,6 +490,29 @@ const shots = (scratch: Scratch): Shot[] => [
   { name: "options", as: "ada", url: chapterUrl("options"), ready: heading("Options") },
   { name: "routes", as: "ada", url: chapterUrl("routes"), ready: heading("Routes") },
   {
+    // The comparison's definitions, opened from their disclosure (V-03).
+    name: "routes--compared",
+    as: "ada",
+    url: chapterUrl("routes"),
+    ready: async (page) => {
+      await heading("Routes")(page);
+      await page.getByText("What's being compared").click();
+      await expect(page.getByText(/every route here is ready only once/)).toBeVisible();
+    },
+  },
+  {
+    // The lower layers: route D's layer 2 disc and route E's layer 3 ring, with their cards.
+    name: "routes--layers",
+    as: "ada",
+    url: chapterUrl("routes"),
+    ready: async (page) => {
+      await heading("Routes")(page);
+      await page
+        .getByRole("heading", { name: /^Layer 3/ })
+        .evaluate((element) => element.scrollIntoView({ block: "center" }));
+    },
+  },
+  {
     name: "routes--route-b",
     as: "ada",
     url: chapterUrl("routes"),
@@ -506,7 +530,7 @@ const shots = (scratch: Scratch): Shot[] => [
       await heading("Routes")(page);
       await page.getByRole("button", { name: /^Route B/ }).click();
       await expect(page.getByText("Synthetic fixture route")).toBeVisible();
-      await expandSheet(page);
+      await expandSheet(page, "Route B");
     },
   },
   { name: "plan", as: "ada", url: chapterUrl("plan"), ready: heading("Plan") },
@@ -619,11 +643,72 @@ type Result = {
   overflow: number;
   /** Description-list labels whose text overprints their value's text. */
   overprinted: string[];
+  /** Selects whose chosen option is cut off (page overflow stays zero when it is: V-05). */
+  clipped: string[];
   axe: AxeViolation[];
   errors: string[];
 };
 
 const target = process.env.NESSA_REVIEW_DIR;
+
+/**
+ * The chosen option of each visible select that is wider than the select can show it: a copy
+ * holding only that option, sized to fit it (padding and the native arrow included), is
+ * compared with the select's real width.
+ */
+function clippedSelects(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const found: string[] = [];
+    for (const select of document.querySelectorAll("select")) {
+      if (select.getClientRects().length === 0 || select.parentElement === null) continue;
+      const text = select.selectedOptions[0]?.textContent ?? "";
+      const copy = select.cloneNode(false) as HTMLSelectElement;
+      copy.removeAttribute("id");
+      copy.append(new Option(text));
+      Object.assign(copy.style, {
+        position: "absolute",
+        visibility: "hidden",
+        width: "auto",
+        minWidth: "0",
+        maxWidth: "none",
+      });
+      select.parentElement.append(copy);
+      const needed = copy.getBoundingClientRect().width;
+      copy.remove();
+      if (needed > select.getBoundingClientRect().width + 0.5) found.push(text);
+    }
+    return found;
+  });
+}
+
+/** The automatable checks on the page as it is, and its screenshot at `path`. */
+async function measure(page: Page, path: string): Promise<Omit<Result, "file" | "errors">> {
+  await page.evaluate(() => document.fonts.ready);
+  const fonts = await page.evaluate(
+    () => document.fonts.check('16px "Source Sans 3"') && document.fonts.check('31px "Newsreader"'),
+  );
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+  const overprinted = await overprintedLabels(page);
+  const clipped = await clippedSelects(page);
+  await page.screenshot({ path, fullPage: false });
+  return { fonts, overflow, overprinted, clipped, axe: await axe(page) };
+}
+
+/** `reflow: false` only below 320 CSS px, where WCAG 1.4.10 no longer asks for one column. */
+function expectClean(results: Result[], reflow = true) {
+  for (const result of results) {
+    expect.soft(result.axe, `${result.file}: axe`).toEqual([]);
+    if (reflow) {
+      expect.soft(result.overflow, `${result.file}: horizontal overflow`).toBeLessThanOrEqual(0);
+    }
+    expect.soft(result.overprinted, `${result.file}: labels over values`).toEqual([]);
+    expect.soft(result.clipped, `${result.file}: clipped select options`).toEqual([]);
+    expect.soft(result.errors, `${result.file}: console errors`).toEqual([]);
+    expect.soft(result.fonts, `${result.file}: fonts loaded`).toBe(true);
+  }
+}
 
 /** Each `dt` whose painted text meets the painted text of the `dd` after it. */
 function overprintedLabels(page: Page): Promise<string[]> {
@@ -702,30 +787,12 @@ for (const viewport of VIEWPORTS) {
         errors.length = 0;
         await page.goto(shot.url);
         await shot.ready(page);
-        await page.evaluate(() => document.fonts.ready);
-        const fonts = await page.evaluate(
-          () =>
-            document.fonts.check('16px "Source Sans 3"') &&
-            document.fonts.check('31px "Newsreader"'),
-        );
-        const overflow = await page.evaluate(
-          () => document.documentElement.scrollWidth - window.innerWidth,
-        );
-        const overprinted = await overprintedLabels(page);
         const file = `${shot.name}--${viewport.name}.png`;
-        await page.screenshot({ path: join(directory, file), fullPage: false });
-        const violations = await axe(page);
+        const checks = await measure(page, join(directory, file));
         const unexpected = errors.filter(
           (line) => !(shot.refused && line.startsWith("Failed to load resource")),
         );
-        results.push({
-          file,
-          fonts,
-          overflow,
-          overprinted,
-          axe: violations,
-          errors: [...unexpected],
-        });
+        results.push({ file, ...checks, errors: [...unexpected] });
       }
 
       for (const page of pages.values()) await page.context().close();
@@ -733,13 +800,46 @@ for (const viewport of VIEWPORTS) {
         join(directory, `checks-${viewport.name}.json`),
         `${JSON.stringify(results, null, 2)}\n`,
       );
-      for (const result of results) {
-        expect.soft(result.axe, `${result.file}: axe`).toEqual([]);
-        expect.soft(result.overflow, `${result.file}: horizontal overflow`).toBeLessThanOrEqual(0);
-        expect.soft(result.overprinted, `${result.file}: labels over values`).toEqual([]);
-        expect.soft(result.errors, `${result.file}: console errors`).toEqual([]);
-        expect.soft(result.fonts, `${result.file}: fonts loaded`).toBe(true);
-      }
+      expectClean(results);
     });
   });
 }
+
+/** 200 % browser zoom: the same screen with half the CSS pixels at twice the density. */
+const ZOOMED = [
+  { name: "1440x900-zoom200", width: 720, height: 450 },
+  { name: "390x844-zoom200", width: 195, height: 422 },
+] as const;
+
+test("[UI-06] the data mode's choice and its explanation at 200 % zoom (V-05)", async ({
+  browser,
+}, testInfo) => {
+  const directory = target ?? testInfo.outputPath("screenshots");
+  mkdirSync(directory, { recursive: true });
+  const results: Result[] = [];
+  for (const zoom of ZOOMED) {
+    const context = await browser.newContext({
+      viewport: { width: zoom.width, height: zoom.height },
+      deviceScaleFactor: 2,
+      reducedMotion: "reduce",
+    });
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    await signIn(page, "ben", "/");
+    await expect(page.getByText("No workspaces yet")).toBeVisible();
+    await page
+      .getByRole("combobox", { name: "Data mode" })
+      .evaluate((element) => element.scrollIntoView({ block: "center" }));
+    const file = `home--empty--${zoom.name}.png`;
+    results.push({ file, ...(await measure(page, join(directory, file))), errors });
+    await context.close();
+  }
+  writeFileSync(join(directory, "checks-zoom200.json"), `${JSON.stringify(results, null, 2)}\n`);
+  for (const [index, zoom] of ZOOMED.entries()) {
+    const result = results[index];
+    if (result !== undefined) expectClean([result], zoom.width >= 320);
+  }
+});

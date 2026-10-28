@@ -59,6 +59,9 @@ export function useEvidence(): DrawerContextValue {
 
 const DRAG_THRESHOLD_PX = 40;
 
+/** "Where this came from" reads "Close where this came from"; "Route B", "Close route B". */
+const lowerFirst = (title: string) => `${title.charAt(0).toLowerCase()}${title.slice(1)}`;
+
 export function EvidenceDrawer() {
   const { evidence, close } = useEvidence();
   const returnTo = useContext(ReturnFocus);
@@ -132,7 +135,10 @@ export function EvidenceDrawer() {
               <Glyph name={expanded ? "collapse" : "expand"} />
               {expanded ? "Less" : "More"}
             </button>
-            <Dialog.Close className="btn btn-icon" aria-label="Close where this came from">
+            <Dialog.Close
+              className="btn btn-icon"
+              aria-label={`Close ${lowerFirst(evidence.title)}`}
+            >
               <Glyph name="close" />
             </Dialog.Close>
           </div>

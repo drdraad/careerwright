@@ -38,7 +38,7 @@ describe("[BND1-12] the route preview comes from the pinned TRACE-01 fixture, la
       timeMonths: 4,
       economicCost: { minor_units: 60000, currency: "GBP" },
       directSpend: { minor_units: 60000, currency: "GBP" },
-      condition: "ready only once its assessed report is passed",
+      condition: "once its assessed report is passed",
       start: "2027-01-01",
       finish: "2027-04-30",
     });
@@ -71,7 +71,7 @@ describe("[BND1-12] the route preview comes from the pinned TRACE-01 fixture, la
 
     expect(preview.routes[0]?.economicCost).toEqual({ minor_units: -50000, currency: "GBP" });
     expect(preview.routes.map((route) => route.condition)).toEqual(
-      Array(5).fill("ready only once its assessed report is passed"),
+      Array(5).fill("once its assessed report is passed"),
     );
   });
 

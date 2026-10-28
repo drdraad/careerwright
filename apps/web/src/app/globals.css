@@ -189,10 +189,12 @@
     background: var(--surface-space);
   }
 
+  /* V-09: a visited chapter has a brighter ring, never a fill. A filled landmark is kept for a
+     chapter whose decisions are recorded (spec section 15), which this build has none of, so
+     having opened a chapter cannot read as having finished it. */
   .rail-chapter[data-progress="visited"] .landmark,
   .menu-chapter[data-progress="visited"] .landmark {
-    background: var(--text-on-space-muted);
-    border-color: var(--text-on-space-muted);
+    border: 2px solid var(--text-on-space-muted);
   }
 
   .rail-chapter[aria-current="page"] {
@@ -645,6 +647,25 @@
     text-align: left;
     cursor: pointer;
   }
+
+  /* A route's decision figures side by side, label above value (the Sprint 0 summary row). */
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4) var(--space-12);
+    font-size: var(--type-14);
+  }
+
+  .figures dt {
+    color: var(--fg-muted);
+  }
+
+  .figures dd {
+    font-size: var(--type-16);
+    font-weight: 600;
+    line-height: 1.3;
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* ---------- Tablet and wide desktop ---------- */
@@ -709,6 +730,12 @@
     padding-bottom: calc(var(--sheet-peek) + var(--space-16));
   }
 
+  /* Whatever is scrolled or tabbed into view stops above the open sheet, never under it
+     (WCAG 2.4.11). You's rule below also clears its sticky reply field. */
+  html:has(.app[data-drawer="open"]) {
+    scroll-padding-bottom: calc(var(--sheet-peek) + var(--space-16));
+  }
+
   /* The bottom sheet opens at a peek so the main task stays in view; "More" (or dragging the
      handle up) raises it to most of the screen, leaving a band of the page visible above. */
   .drawer {
@@ -716,6 +743,8 @@
     left: 0;
     width: auto;
     height: var(--sheet-peek);
+    /* Tighter than the side sheet, so a route's figures fit in the peek (V-04). */
+    gap: var(--space-12);
     padding: var(--space-12) var(--space-16) var(--space-24);
     border-left: 0;
     border-top: 1px solid var(--line-reading-hairline);

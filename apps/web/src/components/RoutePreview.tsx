@@ -2,6 +2,11 @@
 // The fixture-driven route preview (S1.5). Every number is the TRACE-01 fixture's own; the
 // layers are the ones the fixture states. Nothing is computed here, and the page says plainly
 // that Nessa's route search does not exist yet: this is not the production solver's output.
+//
+// A card or the phone sheet can be read with everything above it scrolled away, so each keeps
+// its own qualification: a conditional route says "Conditional" beside its readiness, with
+// the condition (V-01, S0-V03), and the sheet leads with the route's name, condition,
+// readiness and both costs (V-04). Computed routes (Task 14) keep the same rule.
 import { useState } from "react";
 import type { Money } from "@/generated/api";
 import type { RoutePreview as Preview, PreviewRoute } from "@/lib/fixtures/trace";
@@ -18,6 +23,7 @@ const longDate = new Intl.DateTimeFormat("en-GB", {
   year: "numeric",
   timeZone: "UTC",
 });
+const monthOnly = new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "UTC" });
 const monthYear = new Intl.DateTimeFormat("en-GB", {
   month: "long",
   year: "numeric",
@@ -93,25 +99,44 @@ function MonthlyList({
   );
 }
 
+/** What fits in the phone sheet's peek: the fixture label, the condition and the figures. */
+function RouteLead({ route }: { route: PreviewRoute }) {
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a group of facts, not a form fieldset
+    <div role="group" aria-label={`Route ${route.letter} at a glance`} className="grid gap-8">
+      <SyntheticLabel text="Synthetic fixture route" />
+      {route.condition !== null && (
+        <StatusBadge state="conditional" detail={`ready only ${route.condition}`} />
+      )}
+      <dl className="figures">
+        <div>
+          <dt>Ready in</dt>
+          <dd>{months(route.timeMonths)}</dd>
+        </div>
+        <div>
+          <dt>Economic cost</dt>
+          <dd>{formatSignedMoney(route.economicCost)}</dd>
+        </div>
+        <div>
+          <dt>Direct spending</dt>
+          <dd>{formatMoney(route.directSpend)}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
 function RouteDetails({ route, preview }: { route: PreviewRoute; preview: Complete }) {
   const selected = route.letter === preview.selected.letter;
   return (
     <>
-      <p className="section-title">Route {route.letter}</p>
-      <SyntheticLabel text="Synthetic fixture route" />
-      {route.condition !== null && <StatusBadge state="conditional" detail={route.condition} />}
+      <RouteLead route={route} />
       <dl className="kv">
-        <dt>Ready in</dt>
-        <dd>{months(route.timeMonths)}</dd>
         <dt>Dates</dt>
         <dd>
           {longDate.format(new Date(`${route.start}T00:00:00Z`))} to{" "}
           {longDate.format(new Date(`${route.finish}T00:00:00Z`))}
         </dd>
-        <dt>Economic cost</dt>
-        <dd>{formatSignedMoney(route.economicCost)}</dd>
-        <dt>Direct spending</dt>
-        <dd>{formatMoney(route.directSpend)}</dd>
         <dt>Layer</dt>
         <dd>{route.layer === 1 ? "Best trade-offs found (layer 1)" : `Layer ${route.layer}`}</dd>
       </dl>
@@ -166,14 +191,19 @@ function RouteCard({
         </span>
         <span className="grid gap-4">
           <span className="font-semibold">Route {route.letter}</span>
+          {route.condition === null ? (
+            <span className="small tnum">Ready in {months(route.timeMonths)}</span>
+          ) : (
+            <StatusBadge
+              state="conditional"
+              detail={`ready in ${months(route.timeMonths)}, ${route.condition}`}
+            />
+          )}
           <span className="small tnum">
-            Ready in {months(route.timeMonths)}, {formatSignedMoney(route.economicCost)} economic
-            cost
+            {formatSignedMoney(route.economicCost)} economic cost, {formatMoney(route.directSpend)}{" "}
+            direct spending
           </span>
-          <span className="small tnum text-fg-muted">
-            {formatMoney(route.directSpend)} direct spending
-            {route.layer > 1 && `. Layer ${route.layer}`}
-          </span>
+          {route.layer > 1 && <span className="small text-fg-muted">Layer {route.layer}</span>}
         </span>
       </button>
     </li>
@@ -201,7 +231,7 @@ export function RoutePreview({ preview }: { preview: Preview }) {
   const openRoute = (route: PreviewRoute) => {
     setInspected(route.key);
     evidence.open({
-      title: "Where this came from",
+      title: `Route ${route.letter}`,
       body: <RouteDetails route={route} preview={preview} />,
     });
   };
@@ -211,11 +241,15 @@ export function RoutePreview({ preview }: { preview: Preview }) {
   };
   const layers = [...new Set(preview.routes.map((route) => route.layer))].sort((a, b) => a - b);
   const shared = sharedCondition(preview.routes);
-  const end = new Date(`${preview.planningStart}T00:00:00Z`);
+  const start = new Date(`${preview.planningStart}T00:00:00Z`);
+  const end = new Date(start);
   end.setUTCMonth(end.getUTCMonth() + preview.horizonMonths - 1);
+  const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
 
+  // V-03: on a phone the first route card is in the first view. The synthetic notice stays
+  // first and whole; the cost basis and horizon are one line, their definitions a disclosure.
   return (
-    <div className="grid gap-24">
+    <div className="grid gap-16 sm:gap-24">
       <Alert
         tone="neutral"
         glyph="synthetic"
@@ -228,39 +262,46 @@ export function RoutePreview({ preview }: { preview: Preview }) {
         }
       >
         <p>
-          These {preview.routes.length} routes come from the synthetic {preview.traceId} worked
-          trace in the supplied fixture pack. Nessa's route search isn't built yet, so nothing here
-          was computed from your profile.
+          Synthetic {preview.traceId} routes from the supplied fixture pack. Nessa's route search
+          isn't built yet, so none was computed from your profile.
         </p>
       </Alert>
 
-      <section className="card-on-space grid gap-16" aria-labelledby="compared">
-        <h2 id="compared" className="section-title">
-          What's being compared
-        </h2>
-        <dl className="grid gap-16 sm:grid-cols-3">
-          <div className="grid gap-4">
-            <dt className="small text-fg-muted">Cost shown</dt>
-            <dd className="small">
-              Economic cost: fees plus pay lost against the fixture's baseline
-            </dd>
-          </div>
-          <div className="grid gap-4">
-            <dt className="small text-fg-muted">Horizon</dt>
-            <dd className="small">
-              {months(preview.horizonMonths)} for every route,{" "}
-              {monthYear.format(new Date(`${preview.planningStart}T00:00:00Z`))} to{" "}
-              {monthYear.format(end)}
-            </dd>
-          </div>
-          <div className="grid gap-4">
-            <dt className="small text-fg-muted">Where</dt>
-            <dd className="small">{preview.region}</dd>
-          </div>
-        </dl>
-        {shared !== null && (
-          <StatusBadge state="conditional" detail={`every route here is ${shared}`} />
-        )}
+      <section className="grid gap-8" aria-label="What's being compared">
+        <p className="small">
+          Economic cost against the fixture's baseline, over the same{" "}
+          {months(preview.horizonMonths)} for every route (
+          {sameYear ? monthOnly.format(start) : monthYear.format(start)} to {monthYear.format(end)}
+          ).
+        </p>
+        <details className="details small">
+          <summary>What's being compared</summary>
+          <dl className="grid gap-12 pt-12 sm:grid-cols-3">
+            <div className="grid gap-4">
+              <dt className="text-fg-muted">Cost shown</dt>
+              <dd>Economic cost: fees plus pay lost against the fixture's baseline</dd>
+            </div>
+            <div className="grid gap-4">
+              <dt className="text-fg-muted">Horizon</dt>
+              <dd>
+                {months(preview.horizonMonths)} for every route, {monthYear.format(start)} to{" "}
+                {monthYear.format(end)}
+              </dd>
+            </div>
+            <div className="grid gap-4">
+              <dt className="text-fg-muted">Where</dt>
+              <dd>{preview.region}</dd>
+            </div>
+          </dl>
+          {shared !== null && (
+            <p className="pt-12">
+              <StatusBadge
+                state="conditional"
+                detail={`every route here is ready only ${shared}`}
+              />
+            </p>
+          )}
+        </details>
       </section>
 
       {layers.map((layer) => (

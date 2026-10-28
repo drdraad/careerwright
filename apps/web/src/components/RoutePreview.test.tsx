@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type { RoutePreview as Preview, PreviewRoute } from "@/lib/fixtures/trace";
-import { EvidenceProvider } from "./EvidenceDrawer";
+import { EvidenceDrawer, EvidenceProvider } from "./EvidenceDrawer";
 import { RoutePreview } from "./RoutePreview";
 
 const gbp = (minor: number) => ({ minor_units: minor, currency: "GBP" as const });
@@ -16,7 +17,7 @@ function route(letter: string, layer: number, overrides: Partial<PreviewRoute> =
     paymentsByMonth: [gbp(15000)],
     incomeByMonth: [gbp(200000)],
     layer,
-    condition: "ready only once its assessed report is passed",
+    condition: "once its assessed report is passed",
     start: "2027-01-01",
     finish: "2027-04-30",
     ...overrides,
@@ -47,6 +48,7 @@ function show(routes: PreviewRoute[]) {
   render(
     <EvidenceProvider>
       <RoutePreview preview={preview(routes)} />
+      <EvidenceDrawer />
     </EvidenceProvider>,
   );
 }
@@ -82,5 +84,57 @@ describe("[BND1-12] the fixture preview states only what the fixture's data says
 
     expect(card).toHaveAttribute("aria-haspopup", "dialog");
     expect(card).not.toHaveAttribute("aria-pressed");
+  });
+});
+
+describe("[BND1-12][UI-09] each route keeps its condition and decision figures with it", () => {
+  it("says Conditional beside each card's readiness, with its condition (V-01)", () => {
+    show([route("A", 1, { timeMonths: 2 }), route("B", 1)]);
+
+    for (const [letter, readiness] of [
+      ["A", "2 months"],
+      ["B", "4 months"],
+    ]) {
+      expect(
+        screen.getByRole("button", { name: new RegExp(`^Route ${letter}`) }),
+      ).toHaveTextContent(`Conditional: ready in ${readiness}, once its assessed report is passed`);
+    }
+    expect(screen.queryByText(/^Ready in/)).not.toBeInTheDocument();
+  });
+
+  it("says Ready in without a qualification only for a route the data says is ready", () => {
+    show([route("A", 1, { condition: null })]);
+    const card = screen.getByRole("button", { name: /^Route A/ });
+
+    expect(card).toHaveTextContent("Ready in 4 months");
+    expect(card).not.toHaveTextContent("Conditional");
+  });
+
+  it("states the cost, its baseline and horizon up front and keeps the rest behind a disclosure (V-03)", () => {
+    show([route("A", 1)]);
+
+    expect(
+      screen.getByText(
+        "Economic cost against the fixture's baseline, over the same 6 months for every route (January to June 2027).",
+      ),
+    ).toBeVisible();
+    const details = screen.getByText("What's being compared").closest("details");
+    expect(details).not.toHaveAttribute("open");
+    expect(details).toHaveTextContent("fees plus pay lost against the fixture's baseline");
+  });
+
+  it("opens a route titled by its name, leading with its label, condition, readiness and costs (V-04)", async () => {
+    show([route("A", 1), route("B", 1)]);
+    await userEvent.setup().click(screen.getByRole("button", { name: /^Route B/ }));
+    const drawer = screen.getByRole("dialog", { name: "Route B" });
+    const lead = within(drawer).getByRole("group", { name: "Route B at a glance" });
+
+    expect(within(lead).getByText("Synthetic fixture route")).toBeVisible();
+    expect(lead).toHaveTextContent("Conditional: ready only once its assessed report is passed");
+    const figures = within(lead)
+      .getAllByRole("term")
+      .map((term) => `${term.textContent} ${term.nextElementSibling?.textContent}`);
+    expect(figures).toEqual(["Ready in 4 months", "Economic cost £600", "Direct spending £600"]);
+    expect(within(drawer).getByRole("button", { name: "Close route B" })).toBeVisible();
   });
 });

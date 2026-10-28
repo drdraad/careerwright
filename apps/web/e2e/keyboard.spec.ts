@@ -48,9 +48,9 @@ test("[UI-06] the drawer opens from the keyboard and returns focus when it close
   const routeA = page.getByRole("button", { name: /^Route A/ });
   await tabTo(page, routeA);
   await page.keyboard.press("Enter");
-  const drawer = page.getByRole("dialog", { name: "Where this came from" });
-  await expect(drawer.getByRole("heading", { name: "Where this came from" })).toBeFocused();
-  await tabTo(page, drawer.getByRole("button", { name: "Close where this came from" }), 20);
+  const drawer = page.getByRole("dialog", { name: "Route A" });
+  await expect(drawer.getByRole("heading", { name: "Route A" })).toBeFocused();
+  await tabTo(page, drawer.getByRole("button", { name: "Close route A" }), 20);
   await page.keyboard.press("Enter");
   await expect(drawer).toBeHidden();
   await expect(routeA).toBeFocused();
@@ -83,7 +83,7 @@ test.describe("phone", () => {
     const routeB = page.getByRole("button", { name: /^Route B/ });
     await tabTo(page, routeB);
     await page.keyboard.press("Enter");
-    const drawer = page.getByRole("dialog", { name: "Where this came from" });
+    const drawer = page.getByRole("dialog", { name: "Route B" });
     const more = drawer.getByRole("button", { name: "More" });
     await expect(more).toHaveAttribute("aria-expanded", "false");
     const peek = (await drawer.boundingBox())?.height ?? 0;

@@ -10,11 +10,13 @@ import type { Money, WorkState } from "@/generated/api";
 import type { SignedMoney } from "@/lib/money";
 
 /**
- * The readiness states the fixture pack uses, in words (spec RDY-1). `null` means ready
- * without a condition. A state not listed here is refused as malformed rather than guessed.
+ * The readiness states the fixture pack uses, as the words that follow "ready" (spec RDY-1),
+ * so a card can say "ready in 4 months, once …" and the drawer "ready only once …". `null`
+ * means ready without a condition. A state not listed here is refused as malformed rather
+ * than guessed.
  */
 const READINESS: Record<string, string | null> = {
-  conditional_on_assessed_completion: "ready only once its assessed report is passed",
+  conditional_on_assessed_completion: "once its assessed report is passed",
   ready: null,
 };
 
@@ -42,7 +44,8 @@ export type PreviewRoute = {
   incomeByMonth: Money[];
   /** 1, 2 or 3: the layer the fixture states for this route. */
   layer: number;
-  /** The route's readiness condition in words, from its readiness state; null if none. */
+  /** When the route is ready, in words that follow "ready", from its readiness state; null if
+   *  it is ready without a condition. */
   condition: string | null;
   start: string;
   finish: string;
