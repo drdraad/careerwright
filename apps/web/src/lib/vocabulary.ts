@@ -122,10 +122,51 @@ export const PROFILE_FIELD_ORDER: readonly ProfileFieldName[] = [
   "preferred_name",
 ];
 
-export type ErrorStatement = { title: string; action: string };
+/** An error code in the status vocabulary: its words and its tone (STATE-01). */
+export type ErrorStatement = { title: string; action: string; tone: Tone };
+
+/**
+ * The tone each code takes. Only real failures are red: a stale version reads as stale, a
+ * search limit as a partial result, missing evidence as unknown, and a refusal by policy or a
+ * missing prerequisite as a plain notice.
+ */
+const ERROR_TONE: Record<ErrorCode, Tone> = {
+  SOURCE_BLOCKED: "neutral",
+  RETRIEVAL_FAILED: "error",
+  INSUFFICIENT_EVIDENCE: "unknown",
+  SCHEMA_INVALID: "error",
+  MODEL_UNAVAILABLE: "error",
+  BUDGET_EXCEEDED: "neutral",
+  SOLVE_LIMIT_REACHED: "neutral",
+  STALE_INPUT_VERSION: "stale",
+  FEATURE_NOT_IN_M0: "neutral",
+  MODEL_SCOPE_EXCEEDED: "neutral",
+  COARSE_MODEL_UNRESOLVED: "unknown",
+  NO_ROUTE_IN_BOUNDED_MODEL: "neutral",
+  UNAUTHENTICATED: "neutral",
+  NOT_INVITED: "error",
+  NOT_FOUND: "error",
+  METHOD_NOT_ALLOWED: "error",
+  REQUEST_REJECTED: "error",
+  CLIENT_NOT_ALLOWED: "error",
+  HOST_NOT_ALLOWED: "error",
+  ORIGIN_NOT_ALLOWED: "error",
+  VALIDATION_FAILED: "error",
+  LIMIT_EXCEEDED: "error",
+  IDEMPOTENCY_KEY_REQUIRED: "error",
+  IDEMPOTENCY_KEY_REUSED: "error",
+  CONSENT_REQUIRED: "neutral",
+  CREDENTIAL_EXISTS: "neutral",
+  CREDENTIAL_REVOKED: "neutral",
+  CREDENTIAL_REQUIRED: "neutral",
+  MODE_NOT_SUPPORTED: "neutral",
+  STORE_UNAVAILABLE: "error",
+  AUTH_UNAVAILABLE: "error",
+  INTERNAL_ERROR: "error",
+};
 
 /** What the person sees for each API error code. The API's own message is never shown. */
-export const ERROR_STATEMENT: Record<ErrorCode, ErrorStatement> = {
+const ERROR_WORDS: Record<ErrorCode, Omit<ErrorStatement, "tone">> = {
   SOURCE_BLOCKED: {
     title: "That source can't be used",
     action: "Its access rules don't allow it. Choose another source.",
@@ -231,3 +272,10 @@ export const ERROR_STATEMENT: Record<ErrorCode, ErrorStatement> = {
     action: "Try again. Quote the reference below if you report it.",
   },
 };
+
+export const ERROR_STATEMENT = Object.fromEntries(
+  (Object.keys(ERROR_WORDS) as ErrorCode[]).map((code) => [
+    code,
+    { ...ERROR_WORDS[code], tone: ERROR_TONE[code] },
+  ]),
+) as Record<ErrorCode, ErrorStatement>;

@@ -22,12 +22,15 @@ export function PageLoading({ stage }: { stage: string }) {
   );
 }
 
-/** A failed request in the person's words: the code's statement, never the raw message. */
+/**
+ * A refused request in the person's words and its state's tone: the code's statement, never
+ * the raw message. Only real failures are red and announced as alerts.
+ */
 export function RequestFailure({ error, actions }: { error: unknown; actions?: ReactNode }) {
   if (error instanceof ApiError && error.body !== null) {
     const statement = ERROR_STATEMENT[error.body.code];
     return (
-      <Alert tone="error" title={statement.title} actions={actions}>
+      <Alert tone={statement.tone} title={statement.title} actions={actions}>
         <p>{statement.action}</p>
         <p className="muted">Reference {error.body.correlation_id}</p>
       </Alert>
