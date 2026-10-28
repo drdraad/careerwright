@@ -8,10 +8,12 @@
   (`docs/reviews/session-1.md`; H-12, checklist below), and decision 9's powered
   counterfactual comparison was approved to run at release (its pass rule is still open).
   There the product owner also asked for three phrases to be added to the support screen
-  (decision 7). Decision 12's word lists and bounds, and evaluation case EXP-01, were not in
-  session 1's package: they stay **provisional, need product owner and reviewed sign-off**
-  (ruling R6; H-12). Decision 2's salary floor is the product owner's change to the
-  hard-constraint set (H-11, 2026-10-28).
+  (decision 7). Decision 12 and evaluation case EXP-01 were not in session 1's package; the
+  product owner accepted them on 2026-10-28 in the chat after it, as five questions put them
+  (the session 1 record's "Addendum"). Decision 12's claim and quotation bounds, its full
+  function-word list and the "first view" definition were not asked: they stay
+  **provisional, need product owner and reviewed sign-off** (ruling R6; H-12). Decision 2's
+  salary floor is the product owner's change to the hard-constraint set (H-11, 2026-10-28).
 - Date: 2026-10-28
 - Requirements: REC1-01..11, DIV1-02, DIV1-04..12, STATE-05, STATE-06, STATE-08, PROF-04,
   PROF-07..09, MODEL-03, MODEL-07, TEST1-10; spec sections 3, 4 and 16; ADR 0006; ADR 0008
@@ -467,10 +469,13 @@ inference, with at least 30 evaluation cases and a capped live run.
       jobs'") would verify; a model would rarely write one. The web app titles that refusal
       "Your answers can't be quoted on their own", which holds for both causes (fix round
       1). The live evidence is single samples on the test model.
-    - **Provisional (R6, H-12):** the readiness, affordability and hiring word lists and
-      phrasings, the content-word rule and its function words, the claim and quotation
-      bounds, asking for the note without a click, and Try again only for a run that
-      reached no model.
+    - **Accepted by the product owner (2026-10-28, the session 1 record's "Addendum";
+      H-12):** the readiness, pay and hiring word lists and phrasings with the record-only
+      allowance, the content-word rule as asked (a one-word answer such as "art" is not
+      quotable alone), a claim quoting both the person and the record, asking for the note
+      without a click, and Try again only for a run that reached no model. **Still
+      provisional (R6, H-12), not asked:** the claim and quotation bounds, the full
+      function-word list and the "first view" definition of a slate.
 
 ## Consequences
 
@@ -486,8 +491,8 @@ inference, with at least 30 evaluation cases and a capped live run.
   current link per discovery), `retry_failed` and `can_retry`, error code
   `SLATE_ALREADY_EXPLAINED` (409).
 - Not done: applying the salary floor (Sprint 3, with pay evidence); a salary floor per
-  target; a human review of decision 12 and evaluation case EXP-01 (H-12; not in session
-  1's package).
+  target; a human review of decision 12's claim and quotation bounds, function-word list and
+  "first view" definition (H-12; not asked at session 1 or in its addendum).
 
 ## Human review checklist (H-12, session 1: held by the product owner on 2026-10-28)
 
@@ -495,8 +500,9 @@ Agents applied each item below as recorded. At session 1 the product owner answe
 agent-prepared package (`docs/reviews/session-1.md`, Part B; their answers are the record,
 rulings R2 and R10) and accepted the ticked items for L0 as built, each as the package line
 cited beside it puts it. The package was drafted before Task 6b added the written
-explanation (decision 12) and evaluation case EXP-01. Neither was put to the product owner,
-so that item stays open: not run — requires human.
+explanation (decision 12) and evaluation case EXP-01. Both were asked in the chat after the
+package, on 2026-10-28 (the session 1 record's "Addendum"); what those questions did not
+cover stays open: not run — requires human.
 
 - [x] **Support policy** (decision 7): the one recall-first screen in place of an intent
   judgement; the normalisation, the listed words, the constructions and their windows
@@ -531,20 +537,26 @@ so that item stays open: not run — requires human.
 - [x] **Interview repair rate** (decision 3): how often the one-question rule costs a paid
   repair, from the release evaluation. **Accepted** by the product owner on 2026-10-28
   (session 1, Part B line 4): tracking only, at release, no target yet.
-- [ ] **Written explanation** (decision 12): the readiness, affordability and hiring word
-  lists and phrasings and the record-only allowance, the content-word rule and its function
-  words (short answers such as "art" cannot be quoted alone), the claim and quotation
-  bounds, that a claim must quote both the person and the record, the "first view"
-  definition of a slate, Try again only for a run that reached no model and Suggest again
-  otherwise, asking for the note without a click, and the note's wording (only the quoted
-  words were checked) and placement above "How Nessa found it"; and evaluation case EXP-01
-  (added by Task 6b, making 44 cases) with its semantic expectations. Not in session 1's
-  package: not run — requires human.
+- [x] **Written explanation** (decision 12): **Accepted** by the product owner on
+  2026-10-28, asked in the chat after the package (`docs/reviews/session-1.md`, "Addendum",
+  answers 1-5), as those questions put it: asking for the note automatically when
+  suggestions first appear, one paid call per set, the test model for synthetic data and
+  the production model otherwise (answer 1); every sentence quoting both the person and the
+  job's official record, and a one-word answer such as "art" not quotable on its own
+  (answer 2); readiness, pay and hiring claims blocked unless the job's own record uses the
+  word, with the known false alarm "employers need" (answer 3); Try again only if no paid
+  call was made, Suggest again otherwise (answer 4); the note above "How Nessa found it",
+  saying only the quoted words were checked, and evaluation case EXP-01 as written
+  (answer 5).
+- [ ] **Not covered by the addendum's answers** (decisions 12 and 7): the claim and
+  quotation bounds (counts and lengths), the full function-word list, the "first view"
+  definition of a slate, and the support screen's three phrasings as built ("end it",
+  "carry on", "not exist", added after session 1). Not asked: not run — requires human.
 - [x] **Evaluation cases** (decision 9): the 43 cases from before Task 6b and their
   semantic expectations. Of them, 20 (SUP-01..13, GRD-01..07) test deterministic code with
   canned inputs; the model's behaviour rests on the live cases alone, single samples so
   far. **Accepted for L0** by the product owner on 2026-10-28 (session 1, Part B line 5).
-  EXP-01 is in the open item above.
+  EXP-01 was accepted as written in the addendum (Written explanation, answer 5).
 - [x] **Counterfactual comparison run** (decision 9): **Approved** by the product owner on
   2026-10-28 (session 1, Part B line 6): "run the powered comparison at release, estimated
   at most $0.07 on the test model" (Task 16).
