@@ -6,13 +6,13 @@ Everything runs on this machine (ADR 0001). Run commands from the repository roo
 
 | Command | What it does |
 |---|---|
-| `make setup` | Checks Docker (Compose v2), uv, pnpm 10.33.2 and Node 24; installs the locked backend and design-tooling dependencies; creates `NESSA_HOME` (default `~/.nessa/l0`) with generated database passwords and master key `v1`, all owner-only; builds the images. Network is needed here only. Safe to re-run: it never replaces an existing password or key. |
-| `make dev` | Starts the stack in **live** mode and waits until healthy: migrates, seeds, prints the URLs. Only the worker can reach the internet (for Meta). |
+| `make setup` | Checks Docker (Compose v2), uv, pnpm 10.33.2 and Node 24; installs the locked backend, web-app and design-tooling dependencies and Playwright's Chromium; creates `NESSA_HOME` (default `~/.nessa/l0`) with generated database passwords and master key `v1`, all owner-only; builds the images (backend, Auth emulator, web). Network is needed here only. Safe to re-run: it never replaces an existing password or key. |
+| `make dev` | Starts the stack in **live** mode and waits until healthy: migrates, seeds, starts the web app, prints the URLs. Only the worker can reach the internet (for Meta). |
 | `make demo` | Same, in **demo** mode: no Nessa service has a route out of the machine. Model runs are refused. |
 | `make stop` | Stops every service within a bound (SIGTERM, then SIGKILL after the grace period). Volumes and `NESSA_HOME` are kept; DBOS recovers in-flight runs on the next start. |
 | `make reset-demo` | Recreates the fixture workspace "P01 demo (synthetic)" only. Event numbers continue, so a resumed stream sees the reset. |
-| `make check` | Formatting, lint, types, fast tests and the fixture validator. No Docker. |
-| `make acceptance` | Integration and stack tests against real PostgreSQL 16, DBOS and the emulator, in separate Compose projects (`nessa-l0-test`, `nessa-l0-stacktest`) and ports. Removes them afterwards. |
+| `make check` | Backend: formatting, lint, types, fast tests and the fixture validator. Web (`apps/web`, `pnpm run check`): generated-client drift, Biome, `tsc`, Vitest. No Docker, no network. |
+| `make acceptance` | Integration and stack tests against real PostgreSQL 16, DBOS and the emulator, in separate Compose projects (`nessa-l0-test`, `nessa-l0-stacktest`) and ports; then the Storybook build and the Playwright suite on its own demo stack (`nessa-l0-webtest`, web on `127.0.0.1:57600`): the browser journey with a full restart, keyboard, access and visual checks. Removes them afterwards. |
 | `make live-smoke` | One real connection-check run on the test model through an isolated stack (`nessa-l0-smoke`), at most 3 calls, within the `live-smoke` scope's cumulative cap (9 calls, 3 production, $0.30 worst case by default; `NESSA_LIVE_SMOKE_*` changes it). One invocation at a time: a second refuses while the ledger is held. The worker is stopped before the attempts are read, and every attempt is ledgered in `docs/evidence/live-usage.*`; if the worker cannot be confirmed stopped, every further call it could make is ledgered with an unknown cost and the command fails. Only `PRODUCTION=1` uses the production model. Reads `META_API_KEY` from `.env`. |
 | `make rotate-master-key` | With the stack running: adds master key `v<N+1>` to `NESSA_HOME/keys`, then runs `make reseal`. The only way to rotate the master key. |
 | `make reseal` | Restarts a running API and worker so they load every key version (their mode is kept), then reseals every sealed record (stored keys and run outputs) under the newest key, and fails if any record is left on an older version. Run it again if a rotation was interrupted. Restarting the worker recovers an in-flight run, whose model call may then be made again, within its spend reservation. |
@@ -25,13 +25,35 @@ Everything runs on this machine (ADR 0001). Run commands from the repository roo
 | API | `http://127.0.0.1:58000` (`/openapi.json`, `/healthz`, `/readyz`) |
 | Firebase Auth emulator | `http://127.0.0.1:59099` (project `demo-nessa`) |
 | PostgreSQL | `127.0.0.1:56432` (`nessa_app`, `nessa_dbos`; passwords in `NESSA_HOME/secrets`) |
-| Web (Task 4) | `http://127.0.0.1:53000`; the API accepts this origin only |
+| **Nessa (web app)** | `http://127.0.0.1:53000` (open this). It answers only to `127.0.0.1:53000` and `localhost:53000` as Host, and forwards `/api/v1/*` to the API |
 
 Seeded identities (emulator, password `nessa-demo-<name>`): `ada@nessa.test` (invited;
 owns the fixture workspace), `ben@nessa.test` (invited), `uninvited@nessa.test` (can sign
 in, is refused). These are local test credentials, not secrets.
 
-## Calling the API (what the web app must do)
+## Using the web app
+
+1. `make demo` (or `make dev`), then open `http://127.0.0.1:53000`.
+2. Sign in: the page offers the three seeded identities. Ada owns "P01 demo (synthetic)".
+3. **You** edits what Nessa knows. Each answer is Answered, Unknown, Skipped, Prefer not to
+   say or Not asked yet, never a blank standing in for zero. Saving makes a new version;
+   **Source** shows where an answer came from.
+4. **Routes** in the fixture workspace shows the TRACE-01 fixture preview, labelled as such.
+   Select a route to inspect it. The route search itself is not built yet, so the other
+   chapters show what they will hold and which answers they need.
+5. The strip shows the saved version and the live-update state. After `make stop` and
+   `make demo` the open page reconnects by itself, and a reload reopens the same work.
+6. Calm mode (account menu) turns off motion; `prefers-reduced-motion` does the same.
+
+For UI work without Docker: `cd apps/web && pnpm storybook` (component states on
+`127.0.0.1:6006`). `pnpm run review-screenshots` (with the toolchain from `make setup`)
+regenerates the visual review package in `docs/reviews/sprint-1/`. After an API change, run
+`pnpm run generate` in `apps/web` and commit the regenerated client.
+
+## Calling the API (what the web app does)
+
+The web app calls these through its own origin (`/api/v1/...`). Its server forwards them
+with the browser's Origin unchanged.
 
 - `Authorization: Bearer <emulator ID token>` on every `/v1` request.
 - State-changing requests need `Origin: http://127.0.0.1:53000` (or `localhost`) and an
@@ -71,6 +93,14 @@ in, is refused). These are local test credentials, not secrets.
   python -m tools.stack build`) rebuilds the images; the tests rebuild them automatically.
 - Port already in use: another local project holds 58000/59099/56432/53000; stop it or set
   `NESSA_API_PORT`, `NESSA_AUTH_PORT`, `NESSA_PG_PORT` or `NESSA_WEB_PORT` for every
-  `make` command (the API then allows that port as its Host and origin).
+  `make` command (the API and the web app then allow that port as their Host and origin).
+- The page says "This server answers only on its local address": the browser used another
+  name for the web app. Open `http://127.0.0.1:53000` or `http://localhost:53000`.
+- The strip says "Couldn't refresh: showing what was last loaded" or "Reconnecting": the API
+  is restarting or stopped. Nothing is lost; the page catches up when it is back. "Updates
+  stopped: sign in again" means the session ended; sign in again.
+- The web container refuses to serve and its log says "refuses to serve": a `NESSA_*`
+  variable is unsafe (a non-loopback host or emulator, or a non-`demo-` project).
+- The client is out of date (`make check` says so): run `pnpm run generate` in `apps/web`.
 - Linux hosts are unverified: Compose file secrets are bind mounts, and owner-only files
   may not be readable by the container users there (Docker Desktop maps ownership).

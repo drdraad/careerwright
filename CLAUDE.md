@@ -1,21 +1,27 @@
 # Repository contract
 
 Nessa L0: a local career-planning app (FastAPI, Pydantic AI, DBOS and PostgreSQL 16
-backend; Next.js web app to come). Authority order: `Nessa_Product_Specification.md`
+backend; Next.js web app in `apps/web`). Authority order: `Nessa_Product_Specification.md`
 (v1.2), then `docs/plan/development-plan.md` (v1.0), then `docs/plan/l0-sprint-tasks.md`.
 Decisions live in `docs/adr/`; the latest sprint review is in `docs/reviews/`.
 
 ## Commands
 Run from the repository root (details: `docs/runbook.md`).
-- Setup: `make setup` (prerequisites, `uv sync --locked` on uv-managed Python 3.12, design
-  tooling, local secrets and master key in `NESSA_HOME`, default `~/.nessa/l0`, and the
-  Docker images). The host Python is 3.14; never use it for the backend.
+- Setup: `make setup` (prerequisites, `uv sync --locked` on uv-managed Python 3.12, the
+  web app and design tooling with Playwright's Chromium, local secrets and master key in
+  `NESSA_HOME`, default `~/.nessa/l0`, and the Docker images). The host Python is 3.14;
+  never use it for the backend. pnpm only, never npm.
 - Run: `make dev` (live: only the worker may reach Meta), `make demo` (no service has a
-  route out), `make stop` (bounded; keeps data), `make reset-demo` (fixture workspace only).
-- Fast checks: `make check` (ruff format and lint, mypy, fast pytest, fixture validator).
-  No Docker, no network.
+  route out), then open `http://127.0.0.1:53000`; `make stop` (bounded; keeps data),
+  `make reset-demo` (fixture workspace only).
+- Fast checks: `make check` (backend: ruff format and lint, mypy, fast pytest, fixture
+  validator; web: generated-client drift, Biome, `tsc`, Vitest). No Docker, no network.
 - Full acceptance checks: `make acceptance`, the command CI uses: real PostgreSQL 16.15,
-  DBOS, the Auth emulator and the Compose stack, in their own projects and ports.
+  DBOS, the Auth emulator and the Compose stack, then the Storybook build and the Playwright
+  journeys, each in their own projects and ports.
+- Web app (`cd apps/web`): `pnpm storybook` (component states), `pnpm run generate` after
+  any API change (commit the regenerated client), `pnpm run review-screenshots` (visual
+  review package).
 - Design references: `cd docs/design && pnpm run contrast && pnpm run screenshots`.
 - Live Meta calls run only through explicit, budget-capped commands, never from the checks
   above: `make live-smoke` (test model; `PRODUCTION=1` qualifies the production model).
@@ -34,6 +40,12 @@ Run from the repository root (details: `docs/runbook.md`).
   spend), `nessa/profile`, `nessa/api` (HTTP only), `nessa/migrations` (forward-only SQL).
   Vendor and SQL imports are allowed only in the adapters listed in
   `backend/tests/architecture/test_boundaries.py`; add new ones there.
+- Web layout (`apps/web`, ADR 0005): `src/app` (routes; `api/[...path]` forwards `/api/v1`
+  to the API), `src/components` (shell and components; `WorkspaceShell.tsx` owns session,
+  queries and events), `src/lib` (client wiring, events, vocabulary, the fixture adapter),
+  `src/stories` (Storybook), `e2e` (Playwright on its own stack). `src/generated` is the
+  generated client and `src/design` a byte-identical mirror of `docs/design`: never edit
+  either by hand.
 - Non-obvious invariants:
   - The model proposes; validated application commands commit. Readiness, affordability
     and route ranks are computed by deterministic Python, never by the model.
@@ -64,8 +76,15 @@ Run from the repository root (details: `docs/runbook.md`).
   - UI uses the semantic tokens in `docs/design/tokens/tokens.css`. Sea-glass means
     selection or action only, and industry colour never means status. Every new colour
     pairing goes into `contrast-pairs.json` and is measured.
+  - The UI takes enums, money and error codes only from the generated client, shows an
+    error code's words (`src/lib/vocabulary.ts`), never the API's message, and computes no
+    rank, layer or affordability. Fixture content is shown only in the fixture workspace,
+    labelled. The web server forwards the browser's Origin unchanged and checks Host
+    itself; its CSP allows only the web origin and the Auth emulator.
 - Compatibility boundary: the exact pins in `backend/pyproject.toml` and
-  `backend/uv.lock` (bump only by re-running `make acceptance`), pnpm 10.33.2, Python
+  `backend/uv.lock` (bump only by re-running `make acceptance`), the exact pins in
+  `apps/web/package.json` and its lockfile (at least 14 days old, enforced by pnpm; record
+  each in `docs/dependencies.md`), pnpm 10.33.2, Node 24, Python
   3.12, PostgreSQL 16, and the DBOS `application_version` `nessa-l0-1` (change it when the
   workflow's step sequence changes). Code goes in `backend/src/nessa/<domain module>` (plan
   section 3) and `apps/web`. No empty layer scaffolding.

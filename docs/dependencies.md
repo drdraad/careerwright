@@ -92,8 +92,67 @@ the application and ships nothing.
 | `playwright` | 1.64.1 (published 2026-10-14), Chromium build 1248 (Chrome for Testing 156.0.8078.4) | screenshots at 1440×900 and 390×844 | Verified: 18 captures (`docs/design/screenshots/checks.md`) |
 | `axe-core` | 4.14.0 (published 2026-10-05), MPL-2.0 | automated WCAG A/AA checks on each capture | Verified: same run |
 
-The web app (Task 4) pins its own copies in `apps/web`. These match the candidates below,
-so the two stay aligned unless Task 4 records a reason to differ.
+The web app (Task 4) pins its own copies in `apps/web`: axe-core 4.14.0 (the same) and
+`@playwright/test` 1.64.0, not 1.64.1, because 1.64.1 was under 14 days old when the web
+app was pinned. Both releases use the same Chromium build (1248, 156.0.8078.4, checked in
+each package's `browsers.json`), so one browser download serves both.
+
+## Web app (`apps/web/pnpm-lock.yaml`, Task 4)
+
+Installed with pnpm 10.33.2 from the committed lockfile (`pnpm install --frozen-lockfile`).
+`apps/web/pnpm-workspace.yaml` enforces `minimumReleaseAge: 20160` (14 days) for every
+resolved version, direct or transitive. Decisions: ADR 0005. Publish dates are from the npm
+registry, checked 2026-10-28.
+
+| Package | Version | Published | Licence | Why |
+|---|---|---|---|---|
+| `next` | 16.4.1 | 2026-10-14 | MIT | the web framework (spec ARC-1). **Age exception**, below |
+| `react`, `react-dom` | 19.3.0 | 2026-09-09 | MIT | UI |
+| `@tanstack/react-query` | 5.104.2 | 2026-10-11 | MIT | server state (spec ARC-1) |
+| `@radix-ui/react-dialog`, `@radix-ui/react-popover` | 1.3.1 | 2026-10-12 | MIT | the evidence drawer, chapter menu and account menu (spec: Radix controls). Single primitives rather than the 55-package `radix-ui` bundle |
+| `@firebase/app`, `@firebase/auth` | 0.16.3, 1.13.7 | 2026-10-07 | Apache-2.0 | emulator sign-in. These are the versions `firebase` 13.0.0 uses; the umbrella package is not used because it also installs Firestore's gRPC stack |
+| dev: `typescript` | 6.0.3 | 2026-04-16 | Apache-2.0 | strict type checking. Not 7.0.2: TypeScript 7 has no JavaScript compiler API, which the client generator needs |
+| dev: `@biomejs/biome` | 2.5.15 | 2026-09-30 | MIT OR Apache-2.0 | the one lint and format toolchain (ADR 0005) |
+| dev: `@hey-api/openapi-ts` | 0.99.0 | 2026-06-22 | MIT | generates the TypeScript client from the OpenAPI document (ADR 0005) |
+| dev: `tailwindcss`, `@tailwindcss/postcss` | 4.3.3 | 2026-07-16 | MIT | utilities on a theme rebuilt from the design tokens |
+| dev: `storybook`, `@storybook/nextjs-vite`, `@storybook/addon-a11y` | 10.6.2 | 2026-10-12 | MIT | component states (UI-04) |
+| dev: `vite` | 8.3.4 | 2026-10-08 | MIT | build tool for Vitest and Storybook (peer) |
+| dev: `vitest` | 5.0.4 | 2026-10-12 | MIT | unit and component tests |
+| dev: `jsdom` | 30.1.2 | 2026-10-04 | MIT | the DOM for component tests |
+| dev: `@testing-library/react`, `/dom`, `/user-event`, `/jest-dom` | 16.3.3, 10.4.2, 14.6.8, 7.0.1 | 2026-08-27, 09-13, 10-13, 08-09 | MIT | component tests |
+| dev: `@playwright/test` | 1.64.0 | 2026-10-07 | Apache-2.0 | browser journeys and visual checks (Chromium 1248) |
+| dev: `axe-core` | 4.14.0 | 2026-10-05 | MPL-2.0 | automated WCAG checks, as in the design tooling |
+| dev: `@types/node`, `@types/react`, `@types/react-dom` | 24.19.2, 19.3.0, 19.3.0 | 2026-10-09, 09-09, 09-09 | MIT | types (Node 24 runtime) |
+
+Lockfile: 438 packages. Licences across the whole tree (`pnpm licenses list`, 2026-10-28):
+MIT (271), Apache-2.0 (16), ISC (11), BlueOak-1.0.0 (6), BSD-2-Clause (5), BSD-3-Clause
+(3), MPL-2.0 (3: `axe-core`, `lightningcss` and its arm64 binary, both build or test tools,
+used unmodified), MIT OR Apache-2.0 (2), MIT-0 (2), CC-BY-4.0 (1: `caniuse-lite`, browser
+data used by the build), CC0-1.0 (1), Python-2.0 (1), 0BSD (1). All are permissive or weak
+copyleft and compatible with local use. Not a legal review.
+
+Exceptions and accepted advisories (`pnpm audit`, 2026-10-28):
+
+- **`next` 16.4.1 was 13.5 days old when pinned** (published 2026-10-14T17:43Z). Every 16.x up
+  to 16.4.0 is affected by GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr (critical, remote
+  code execution) and GHSA-p3m5-59mp-jv5r (high). `minimumReleaseAgeExclude` names
+  `next@16.4.1` and its `@next/*` 16.4.1 packages only. It reaches 14 days on
+  2026-10-28T17:43Z.
+- `sharp` (Next.js's optional image optimiser, with LGPL libvips binaries) is not installed
+  (`ignoredOptionalDependencies`). The app serves no optimised images (`images.unoptimized`).
+- `js-yaml` is overridden from 4.2.0 to 4.3.2 (2026-08-26) for three CPU-exhaustion
+  advisories. It is used by the client generator only.
+- **Accepted, dev only:** `undici` 8.11.2 through `jsdom` (8 advisories: 4 high and 4
+  moderate, fixed in 8.12.2, which was published 2026-10-15 and was under 14 days old). It is
+  jsdom's network layer in unit tests, which make no network request, and it is not in the
+  web image's runtime. Recheck it when `jsdom` is bumped.
+- Install scripts stay off (`ignoredBuiltDependencies`: `esbuild`, whose binary comes as an
+  optional platform package, and `@firebase/util`, whose script only probes the environment).
+
+Runtime image: `nessa-l0/web:local`, built from `apps/web/Dockerfile` on
+`node:24.22.1-bookworm-slim@sha256:55fb5f5a…d205` (the same digest as the emulator). It runs
+the Next.js standalone server as the `node` user. Verified on arm64 by `make acceptance`
+(2026-10-28); amd64 is not built.
 
 ## Not yet introduced (owner and disposition)
 
@@ -105,13 +164,7 @@ qualified pins.
 | Dependency | Candidate | Owner (task / sprint) | Disposition |
 |---|---|---|---|
 | Scrapling (HTTP fetch only) | 0.5 | Sprint 3 acquisition task | restricted worker without model or master key; verify licence and arm64 |
-| Next.js / React / TypeScript | 16.4.3 / 19.3.1 / 7.0.2 | Task 4 / Sprint 1 | TypeScript 7 is a major release; confirm Next.js support before pinning |
-| D3 | 7.9.0 | Sprint 3 map task | SVG rendering only |
-| TanStack Query, Tailwind CSS, Radix | 5.105.0, 4.3.3, 1.8.1 (`radix-ui`) | Task 4 / Sprint 1 | per spec section 17 |
-| Vitest, Testing Library, Playwright, axe | 5.0.5, 16.3.3, 1.64.1, 4.14.0 | Task 4 / Sprint 1 | Playwright browsers pinned per environment |
-| Storybook | 10.6.5 | Task 4 / Sprint 1 | design-system states |
-| JS lint/format (one toolchain) | Biome 2.6.3 or ESLint 10.13.0 | Task 4 / Sprint 1 | choose one; record in an ADR |
-| OpenAPI TS generator | `openapi-typescript` 7.13.0 or `@hey-api/openapi-ts` 0.99.0 | Task 4 / Sprint 1 | choose one; generate from the API's `/openapi.json` (Task 3 publishes every enum there: state, data mode, error code, failure class, spend state) |
+| D3 | 7.9.0 | Sprint 3 map task | SVG rendering only; add to `apps/web` with its own ADR note |
 | ESCO / ASHE data releases | n/a | Sprint 2 / 5 data tasks | pinned URL and hash; fetched by `make setup` (R7) |
 | Adzuna API | n/a | Sprint 3 | unverified: no credentials (R4) |
 

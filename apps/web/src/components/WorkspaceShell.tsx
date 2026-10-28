@@ -149,7 +149,7 @@ export function WorkspaceShell({
   return (
     <WorkspaceContext.Provider value={data}>
       <a
-        className="btn btn-primary sr-only focus:not-sr-only focus:absolute focus:left-16 focus:top-16 focus:z-40"
+        className="on-space btn btn-primary sr-only focus:not-sr-only focus:absolute focus:left-16 focus:top-16 focus:z-40"
         href="#main"
       >
         Skip to the chapter

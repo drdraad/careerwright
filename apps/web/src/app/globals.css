@@ -271,8 +271,9 @@
     border-left: 1px solid var(--line-reading-hairline);
     border-top-left-radius: var(--radius-sheet);
     overflow-y: auto;
+    /* Tablet: a side sheet over the page, full height, so it never cuts across the strip. */
     position: fixed;
-    top: 60px;
+    top: 0;
     right: 0;
     bottom: 0;
     width: min(368px, 92vw);
@@ -626,7 +627,7 @@
   .route-letter[data-layer="2"] {
     border-color: var(--mark-front-later);
     background: var(--mark-front-later);
-    color: var(--surface-space);
+    color: var(--surface-space-raised);
   }
 
   .route-letter[data-layer="3"] {
