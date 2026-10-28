@@ -193,7 +193,7 @@ From the agent pre-review, not a score:
 | H-07 domain-reviewer sign-off on the fixture hand check and financial worked examples | Domain reviewer | Not run — requires human |
 | H-09 confirm or reject the Contributor test model (ADR 0003) | Product owner | Not run — requires human. Fallback documented in ADR 0003 |
 | Real-source corpus, 0 of 33 pages | Tasks 8, 10, 12 | Planned (`corpus/manifest.json`) |
-| Task 1 carry-forward list (roles, typed DB-down failure, M4, M7, bounded stop, Contributor refusal) | Task 3 | `.superpowers/sdd/l0-sprint-tasks/carry-forward-task-3.md` and register DUR-02, DUR-08, ARC1-08, MODEL-02 |
+| Task 1 carry-forward list (roles, typed DB-down failure, M4, M7, bounded stop, Contributor refusal) | Task 3 | ADR 0002 (decisions 2 and 7, "Consequences and follow-ups"), `docs/evidence/sprint-0-spike.md` ("Blocked, not run, or limited") and register DUR-02, DUR-08, ARC1-08, MODEL-02, BND1-14 |
 | amd64 images (manifests only) | Task 16 | Fresh-install qualification |
 | Re-estimate after Sprint 0 (plan "Delivery envelope") | Product owner or controller | Not done by the agent |
 | Phone focused views, tablet layout, keyboard flows, Safari | Tasks 4, 8, 14 and humans (H-04) | Planned |
