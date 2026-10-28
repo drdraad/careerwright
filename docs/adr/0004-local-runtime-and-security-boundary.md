@@ -98,8 +98,9 @@ records how they are realised, and the choices a later task must not undo silent
    version, with kind, workspace and credential ID as associated data. Master keys are
    `v<N>.key` files in `NESSA_HOME/keys` (default `~/.nessa/l0`, outside the repository and
    the database), owner-only; the highest version seals. Rotation (`make rotate-master-key`):
-   add a version, restart the API and worker so they load it, then reseal every sealed
-   record, stored keys and run outputs alike. Reseal finds every table with a key version
+   add a version, then reseal (`make reseal`), which first restarts a running API and
+   worker so they hold every version, then reseals every sealed record, stored keys and run
+   outputs alike. It is the only rotation path. Reseal finds every table with a key version
    and fails while any row is left on an older one, so the old file may be retired only
    after it succeeds. The worker resolves the workspace's active key just before each call,
    so a revocation or user-key rotation applies to every queued run. A revocation and a

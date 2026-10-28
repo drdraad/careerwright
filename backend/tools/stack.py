@@ -143,19 +143,24 @@ class Stack:
 
 
 def reseal(stack: Stack) -> str:
-    """Re-encrypt every sealed record under the current master key (setup role)."""
+    """Re-encrypt every sealed record under the newest master key (setup role). A running API
+    and worker are restarted first, so they hold every key version on disk before any record
+    moves to it; `restart` keeps each container's configuration, so a demo stack stays
+    offline. Restarting the worker recovers an in-flight run, whose call may then be made
+    again (within its reservation)."""
+    running = sorted({"api", "worker"} & stack.running())
+    if running:
+        stack.compose("restart", "--timeout", str(STOP_TIMEOUT_S), *running, timeout=120)
+        stack.wait_healthy(*running)
     result = stack.run("migrate", "python", "-m", "nessa.cli", "reseal")
     return result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
 
 
 def rotate_master_key(stack: Stack) -> str:
-    """Add a master key version, restart the API and worker so they load it, then reseal.
-    `restart` keeps each container's configuration, so a demo stack stays offline."""
+    """Add a master key version, then reseal (which reloads the API and worker first)."""
     if not {"postgres", "api", "worker"} <= stack.running():
         raise SystemExit("start Nessa first (`make dev` or `make demo`)")
     created = add_master_key_version(stack.home)
-    stack.compose("restart", "--timeout", str(STOP_TIMEOUT_S), "api", "worker", timeout=120)
-    stack.wait_healthy("api", "worker")
     reseal(stack)
     return created
 

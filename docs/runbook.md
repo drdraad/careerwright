@@ -14,8 +14,8 @@ Everything runs on this machine (ADR 0001). Run commands from the repository roo
 | `make check` | Formatting, lint, types, fast tests and the fixture validator. No Docker. |
 | `make acceptance` | Integration and stack tests against real PostgreSQL 16, DBOS and the emulator, in separate Compose projects (`nessa-l0-test`, `nessa-l0-stacktest`) and ports. Removes them afterwards. |
 | `make live-smoke` | One real connection-check run on the test model through an isolated stack (`nessa-l0-smoke`), at most 3 calls, within the `live-smoke` scope's cumulative cap (9 calls, 3 production, $0.30 worst case by default; `NESSA_LIVE_SMOKE_*` changes it). One invocation at a time: a second refuses while the ledger is held. The worker is stopped before the attempts are read, and every attempt is ledgered in `docs/evidence/live-usage.*`; if the worker cannot be confirmed stopped, every further call it could make is ledgered with an unknown cost and the command fails. Only `PRODUCTION=1` uses the production model. Reads `META_API_KEY` from `.env`. |
-| `make rotate-master-key` | With the stack running: adds master key `v<N+1>` to `NESSA_HOME/keys`, restarts the API and worker so they seal with it (their mode is kept), then reseals every sealed record (stored keys and run outputs). |
-| `make reseal` | Reseals every sealed record under the current master key, and fails if any record is left on an older version. Run it again if a rotation was interrupted. |
+| `make rotate-master-key` | With the stack running: adds master key `v<N+1>` to `NESSA_HOME/keys`, then runs `make reseal`. The only way to rotate the master key. |
+| `make reseal` | Restarts a running API and worker so they load every key version (their mode is kept), then reseals every sealed record (stored keys and run outputs) under the newest key, and fails if any record is left on an older version. Run it again if a rotation was interrupted. Restarting the worker recovers an in-flight run, whose model call may then be made again, within its spend reservation. |
 | `make status` | `docker compose ps` for the stack. |
 
 ## Addresses (127.0.0.1 only)

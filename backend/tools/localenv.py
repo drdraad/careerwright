@@ -5,7 +5,7 @@ master keys. Both directories are owner-only (0700) and every file 0600. Existin
 never overwritten: replacing a master key would make every stored credential unreadable, and
 replacing a password would no longer match the database volume. Nothing here is printed.
 
-Run: `uv run python -m tools.localenv [--rotate-master-key]`.
+Run: `uv run python -m tools.localenv`. Master-key rotation is `make rotate-master-key` only.
 """
 
 import argparse
@@ -72,8 +72,8 @@ def ensure_local_home(home: Path) -> list[str]:
 
 
 def add_master_key_version(home: Path) -> str:
-    """Rotation step 1: a new current master key. `make rotate-master-key` runs it, reloads
-    the API and worker, and reseals; `make reseal` alone finishes an interrupted rotation."""
+    """A new current master key: the first step of `make rotate-master-key`, which then
+    reseals (`tools.stack.reseal`); `make reseal` alone finishes an interrupted rotation."""
     keys = home / "keys"
     version = max(_key_versions(keys), default=0) + 1
     if not _write_new(keys / f"v{version}.key", secrets.token_bytes(KEY_BYTES)):
@@ -89,13 +89,9 @@ def check_permissions(home: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--rotate-master-key", action="store_true")
-    args = parser.parse_args(argv)
+    argparse.ArgumentParser(description=__doc__).parse_args(argv)
     home = nessa_home()
     created = ensure_local_home(home)
-    if args.rotate_master_key:
-        created.append(add_master_key_version(home))
     print(f"local configuration: {home} ({', '.join(created) or 'already complete'})")
     sys.stdout.flush()
 

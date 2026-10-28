@@ -17,7 +17,8 @@ import psycopg
 import pytest
 
 from nessa.seed import FIXTURE_WORKSPACE_ID
-from tools.stack import CORE_SERVICES, Stack, rotate_master_key
+from tools.localenv import add_master_key_version
+from tools.stack import CORE_SERVICES, Stack, reseal, rotate_master_key
 
 pytestmark = pytest.mark.stack
 
@@ -386,6 +387,43 @@ def test_master_key_rotation_reloads_the_running_api_reseals_and_keeps_demo_offl
     )
     assert versions == [(2,)]
     # `restart` kept the demo configuration: the worker still has no route out.
+    assert networks_of(demo_stack, "worker") == {f"{demo_stack.project}_internal"}
+
+
+def key_versions(stack: Stack) -> set[int]:
+    return {row[0] for row in superuser_query(stack, "SELECT key_version FROM nessa.credentials")}
+
+
+@pytest.mark.req("MODEL-05")
+def test_reseal_after_an_interrupted_rotation_reloads_the_running_api_first(
+    demo_stack: Stack,
+) -> None:
+    """N3: a rotation that added its key but stopped before the restart, then `make reseal`.
+    Records move to the new version, so the running API must hold it too: it seals a key
+    stored afterwards with that version (and could open every resealed record)."""
+    ada = sign_in(demo_stack, "ada")
+    workspace_id = call(
+        demo_stack,
+        "POST",
+        "/v1/workspaces",
+        ada,
+        {"name": "Interrupted rotation", "data_mode": "live_assisted", "synthetic": True},
+    ).json()["workspace_id"]
+    created = add_master_key_version(demo_stack.home)  # the interrupted rotation's first step
+    newest = int(created.removeprefix("keys/v").removesuffix(".key"))
+
+    reseal(demo_stack)
+
+    assert key_versions(demo_stack) == {newest}
+    stored = call(
+        demo_stack,
+        "POST",
+        f"/v1/workspaces/{workspace_id}/credentials",
+        sign_in(demo_stack, "ada"),
+        {"api_key": "c" * 40, "consent_to_encrypted_storage": True},
+    )
+    assert stored.status_code == 201
+    assert key_versions(demo_stack) == {newest}
     assert networks_of(demo_stack, "worker") == {f"{demo_stack.project}_internal"}
 
 
