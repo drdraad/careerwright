@@ -12,6 +12,38 @@ class SourceKind(StrEnum):
     DIRECT_ENTRY = "direct_entry"
     FIXTURE = "fixture"
     CONVERSATION = "conversation"  # a proposal from the interview, confirmed by the person
+    # An occupation the person chose from the taxonomy as a target: a suggestion, or the
+    # ESCO occupation an ambiguous title meant. Its locator is the ESCO URI.
+    OCCUPATION_CHOICE = "occupation_choice"
+
+
+class EntryMode(StrEnum):
+    """How the person chose to start (spec section 3, the You chapter)."""
+
+    SURE = "sure"  # "I know my direction": confirm the target, skip optional exploration
+    UNSURE = "unsure"  # "Help me explore": explore tasks first, then a varied slate
+
+
+class ConversationMode(StrEnum):
+    """The tone the person chose (spec section 4, "Uncertainty and emotional comfort")."""
+
+    PRACTICAL = "practical"  # "Keep this practical"
+    GENTLE = "gentle"  # "Help me explore gently"
+    CHALLENGE = "challenge"  # "Challenge my assumptions"
+
+
+@dataclass(frozen=True)
+class InterviewPreferences:
+    """The person's interview preferences. Version 0: never saved (nothing chosen, not
+    paused). They are preferences: never profile facts and never planning limits."""
+
+    workspace_id: uuid.UUID
+    version: int
+    entry_mode: EntryMode | None
+    conversation_mode: ConversationMode | None
+    paused: bool
+    updated_by: uuid.UUID | None
+    updated_at: datetime | None
 
 
 class Basis(StrEnum):

@@ -13,11 +13,14 @@ from nessa.money import Money
 from nessa.profile.document import (
     FIELD_NAMES,
     HARD_CONSTRAINTS,
+    PayPeriod,
     ProfileInput,
+    SalaryFloor,
     apply_profile_input,
     empty_profile,
 )
 from nessa.profile.interview import (
+    CONTEXT_MARKER,
     INSTRUCTIONS,
     MAX_PROMPT_BYTES,
     SCHEMA_ALLOWANCE_TOKENS,
@@ -32,7 +35,7 @@ from nessa.profile.interview import (
     render_prompt,
     worst_case_nano_usd,
 )
-from nessa.profile.records import Basis
+from nessa.profile.records import Basis, ConversationMode, EntryMode
 
 M1 = uuid.UUID("00000000-0000-4000-8000-000000000001")
 M2 = uuid.UUID("00000000-0000-4000-8000-000000000002")
@@ -178,7 +181,10 @@ def test_an_answer_without_a_value_to_quote_is_shown_as_inferred() -> None:
 
 @pytest.mark.req("PROF-04")
 def test_every_proposed_limit_or_target_is_marked_as_needing_explicit_confirmation() -> None:
-    ctx = context("Leeds, 6 hours a week, £100 a month, £900 in total; I want to be a plumber.")
+    ctx = context(
+        "Leeds, 6 hours a week, £100 a month, £900 in total; I want to be a plumber "
+        "earning at least £26,000 a year."
+    )
     out = output(
         *(
             update(name, text=text, items=items)
@@ -188,6 +194,7 @@ def test_every_proposed_limit_or_target_is_marked_as_needing_explicit_confirmati
                 ("monthly_payment_cap", "100", None),
                 ("direct_spend_cap", "900", None),
                 ("target_titles", None, ["Plumber"]),
+                ("minimum_salary", "26000 per year", None),
                 ("enjoyed_tasks", None, ["fixing things"]),
             )
         )
@@ -298,6 +305,118 @@ def test_the_model_sees_the_minimum_profile_subset_without_names_or_source_ids()
     assert "0000000000ff" not in prompt  # no source IDs
     assert str(M1) not in prompt  # messages are cited by ref, not by ID
     assert '"Leeds"' in prompt
+
+
+@pytest.mark.req("PROF-04", "STATE-08")
+def test_a_proposed_salary_floor_is_gross_pay_with_its_period_and_a_hard_constraint() -> None:
+    ctx = context("I won't take less than £28,000 a year.", "Or £12.50 an hour for shifts.")
+
+    proposal, found = check_turn(
+        output(update("minimum_salary", text="28000 per year")), ctx, ProposalOrigin.MODEL
+    )
+    hourly, _ = check_turn(
+        output(update("minimum_salary", text="12.50 per hour", message_refs=["m2"])),
+        ctx,
+        ProposalOrigin.MODEL,
+    )
+    bare, _ = check_turn(output(update("minimum_salary", text="28000")), ctx, ProposalOrigin.MODEL)
+
+    assert found == []
+    assert proposal is not None
+    [change] = proposal.changes
+    assert change.hard_constraint
+    assert change.basis is Basis.STATED  # the amount is in the cited message
+    assert change.value == SalaryFloor(
+        amount=Money(minor_units=2_800_000, currency="GBP"), period=PayPeriod.YEAR
+    )
+    assert hourly is not None
+    assert hourly.changes[0].value == SalaryFloor(
+        amount=Money(minor_units=1250, currency="GBP"), period=PayPeriod.HOUR
+    )
+    assert bare is not None
+    assert bare.changes[0].value == change.value  # annual unless the person says otherwise
+    assert problems(output(update("minimum_salary", text="28k-ish")), ctx)
+    declined, _ = check_turn(
+        output(update("minimum_salary", state="prefer_not_to_say")), ctx, ProposalOrigin.MODEL
+    )
+    assert declined is not None
+    assert declined.changes[0].value is None  # never zero
+
+
+@pytest.mark.req("PROF-08", "PROF-09")
+def test_the_prompt_says_how_the_person_chose_to_start_and_to_be_spoken_to() -> None:
+    ctx = TurnInput(
+        profile_version=1,
+        profile=context_profile(empty_profile()),
+        messages=[ContextMessage(ref="m1", message_id=M1, text="Hi", sent_at=AT)],
+        replies={},
+        entry_mode=EntryMode.SURE,
+        conversation_mode=ConversationMode.GENTLE,
+    )
+
+    payload = json.loads(render_prompt(ctx).removeprefix(CONTEXT_MARKER))
+
+    assert (payload["entry"], payload["mode"]) == ("sure", "gentle")
+    assert ctx.prompt_version == "interview-turn-2"
+
+
+def test_an_input_sealed_before_preferences_existed_still_opens() -> None:
+    sealed = context("Hi").model_dump(mode="json")
+    del sealed["entry_mode"], sealed["conversation_mode"]
+    sealed["prompt_version"] = "interview-turn-1"
+
+    opened = TurnInput.model_validate(sealed)
+
+    assert (opened.entry_mode, opened.conversation_mode) == (None, ConversationMode.PRACTICAL)
+
+
+@pytest.mark.req("REC1-02", "PROF-09")
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"reply": "It sounds like you might be depressed."},
+        {"next_question": "Have you been assessed for ADHD?"},
+        {"reply": "As an ISTP you would like hands-on work."},
+        {"reply": "You are a 92% match for maintenance work."},
+    ],
+)
+def test_output_inferring_a_diagnosis_type_or_match_percentage_is_repaired(
+    overrides: dict[str, Any],
+) -> None:
+    found = problems(output(**overrides), context("I liked fixing the machines more."))
+
+    assert any("did not mention" in problem for problem in found)
+
+
+@pytest.mark.req("REC1-02")
+def test_a_reason_or_value_inferring_a_trait_is_repaired_too() -> None:
+    found = problems(
+        output(update("work_style", items=["quiet work"], reason="You seem introverted.")),
+        context("I like quiet work."),
+    )
+
+    assert any("did not mention" in problem for problem in found)
+
+
+@pytest.mark.req("PROF-09", "REC1-02")
+def test_a_named_condition_is_acknowledged_but_never_recorded_in_a_career_field() -> None:
+    ctx = context("I have dyslexia, so long written tests are hard. I'm good at fixing bikes.")
+
+    acknowledged = problems(
+        output(
+            update("confident_tasks", items=["fixing bikes"]),
+            reply="Thanks for telling me about your dyslexia.",
+            next_question="Which adjustment would help with written tests?",
+        ),
+        ctx,
+    )
+    recorded = problems(output(update("confident_tasks", items=["coping with dyslexia"])), ctx)
+
+    assert acknowledged == []
+    assert recorded == [
+        "confident_tasks: health conditions are not recorded in career fields; ask which "
+        "adjustment would help instead"
+    ]
 
 
 def test_the_prompt_and_schema_fit_the_bounds_the_reservation_assumes() -> None:

@@ -7,8 +7,8 @@ the Contributor model on non-synthetic data, a call that cannot fit the spend li
 the worker re-checks everything before the call, because keys, access and budgets can
 change while a run is queued.
 
-A demo workspace never reaches a provider: its interview turns use the fixture
-interviewer (no key, no spend, no network), and every other kind is refused.
+A demo workspace never reaches a provider: its interview turns and discoveries use the
+fixture models (no key, no spend, no network), and every other kind is refused.
 """
 
 import uuid
@@ -178,8 +178,8 @@ def submit_run(
     now: datetime,
 ) -> Run:
     workspace = visible_workspace(tx, workspace_id, lock=True)
-    uses_fixture = workspace.data_mode is DataMode.DEMO and request.kind is RunKind.INTERVIEW_TURN
-    if not uses_fixture:
+    stand_in = fixture_model(request.kind) if workspace.data_mode is DataMode.DEMO else None
+    if stand_in is None:
         if runtime_mode is RuntimeMode.DEMO:
             raise NessaError(
                 ErrorCode.MODEL_UNAVAILABLE,
@@ -193,8 +193,8 @@ def submit_run(
                 stage=ErrorStage.EXECUTION,
             )
     model = (
-        fixture_model()
-        if uses_fixture
+        stand_in
+        if stand_in is not None
         else _provider_model(
             tx,
             workspace_id,

@@ -14,6 +14,8 @@ from nessa.api.interview_schemas import (
     DecisionOut,
     DecisionResult,
     PartialReplyOut,
+    PreferencesOut,
+    SupportResponseOut,
     TurnOut,
     TurnPage,
 )
@@ -29,12 +31,14 @@ from nessa.profile import interview_store
 from nessa.profile.conversation import (
     DecideTurn,
     SubmitTurn,
+    SupportShown,
     TurnView,
     decide_turn,
     submit_turn,
     turn_view,
     visible_turn,
 )
+from nessa.profile.preferences import SetPreferences, current_preferences, set_preferences
 
 router = APIRouter(
     prefix="/v1/workspaces/{workspace_id}/interview", responses=ERROR_RESPONSES, tags=["interview"]
@@ -46,7 +50,19 @@ def turn_out(tx: Tx, keyring: Keyring, view: TurnView) -> TurnOut:
     return TurnOut.of(view, run_out(tx, keyring, view.run))
 
 
-@router.post("/turns", status_code=202, response_model=TurnOut, operation_id="submit_turn")
+@router.post(
+    "/turns",
+    status_code=202,
+    response_model=TurnOut,
+    responses={
+        200: {
+            "model": SupportResponseOut,
+            "description": "The message explicitly expresses acute distress: the support "
+            "response, with nothing sent to the interviewer or stored.",
+        }
+    },
+    operation_id="submit_turn",
+)
 def submit(
     workspace_id: uuid.UUID, body: SubmitTurn, caller: CallerDep, deps: Deps, key: IdempotencyKey
 ) -> JSONResponse:
@@ -62,6 +78,10 @@ def submit(
             defaults=deps.spend_defaults,
             now=deps.clock(),
         )
+        if isinstance(view, SupportShown):
+            return CommandResult(
+                200, SupportResponseOut.of(view).model_dump(mode="json"), workspace_id
+            )
         return CommandResult(
             202, turn_out(tx, deps.keyring, view).model_dump(mode="json"), workspace_id
         )
@@ -75,8 +95,40 @@ def submit(
         fingerprint("submit_turn", request),
         execute,
     )
+    if status != 202:
+        return JSONResponse(response, status_code=status)
     location = f"/v1/workspaces/{workspace_id}/interview/turns/{response['turn_id']}"
     return JSONResponse(response, status_code=status, headers={"Location": location})
+
+
+@router.get("/preferences", response_model=PreferencesOut, operation_id="get_preferences")
+def get_preferences(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> PreferencesOut:
+    with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
+        return PreferencesOut.of(current_preferences(tx, workspace_id))
+
+
+@router.put("/preferences", response_model=PreferencesOut, operation_id="put_preferences")
+def put_preferences(
+    workspace_id: uuid.UUID,
+    body: SetPreferences,
+    caller: CallerDep,
+    deps: Deps,
+    key: IdempotencyKey,
+) -> JSONResponse:
+    def execute(tx: Tx) -> CommandResult:
+        saved = set_preferences(tx, caller.actor, workspace_id, body)
+        return CommandResult(200, PreferencesOut.of(saved).model_dump(mode="json"), workspace_id)
+
+    request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
+    status, response = run_idempotent(
+        deps.engine,
+        caller.actor.actor_id,
+        key,
+        "set_interview_preferences",
+        fingerprint("set_interview_preferences", request),
+        execute,
+    )
+    return JSONResponse(response, status_code=status)
 
 
 @router.get("/turns/{turn_id}", response_model=TurnOut, operation_id="get_turn")

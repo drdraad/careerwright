@@ -1,43 +1,83 @@
 // Reading and editing the profile document (generated types only). A missing answer is shown
 // in words by its state, never as a zero, a blank or a guess (spec section 3, STATE-08).
-import type { FieldState, Money, ProfileDocument, ProfileInput } from "@/generated/api";
+import type {
+  FieldState,
+  Money,
+  PayPeriod,
+  ProfileDocument,
+  ProfileInput,
+  SalaryFloor,
+} from "@/generated/api";
 import { listLimit } from "./bounds";
 import { formatMoney, type MoneyInputProblem, parseMoneyInput } from "./money";
-import { FIELD_STATE, PROFILE_FIELDS, type ProfileFieldName } from "./vocabulary";
+import { FIELD_STATE, PAY_PERIOD, PROFILE_FIELDS, type ProfileFieldName } from "./vocabulary";
 
 type AnyField = ProfileDocument[ProfileFieldName];
+type AnswerValue = NonNullable<AnyField["value"]>;
+
+function isSalary(value: AnswerValue): value is SalaryFloor {
+  return typeof value === "object" && !Array.isArray(value) && "period" in value;
+}
+
+/** A salary floor as the person gave it: never annualised, always gross. */
+export function describeSalary(floor: SalaryFloor): string {
+  return `${formatMoney(floor.amount)} ${PAY_PERIOD[floor.period]}, before tax`;
+}
+
+/** An answer's value as text (a proposal's value reads the same way). */
+export function describeValue(value: AnswerValue): string {
+  if (Array.isArray(value)) return value.join(", ");
+  if (isSalary(value)) return describeSalary(value);
+  if (typeof value === "object") return formatMoney(value as Money);
+  if (typeof value === "number") return `${value} hours a week`;
+  return value;
+}
 
 /** The field as text: its value when answered, otherwise what its state means. */
 export function describeField(field: AnyField): string {
   if (field.state !== "provided" || field.value === null || field.value === undefined) {
     return FIELD_STATE[field.state];
   }
-  const value = field.value;
-  if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "object") return formatMoney(value as Money);
-  if (typeof value === "number") return `${value} hours a week`;
-  return value;
+  return describeValue(field.value);
 }
 
 /** Editable form state: text for every value, so typing never loses what was typed. */
-export type FieldDraft = { state: FieldState; text: string; items: string[] };
+export type FieldDraft = {
+  state: FieldState;
+  text: string;
+  items: string[];
+  /** A salary floor's period; a year unless the person chooses another. */
+  period?: PayPeriod;
+};
 export type ProfileDraft = Record<ProfileFieldName, FieldDraft>;
+
+function textOf(value: AnyField["value"]): string {
+  if (value === null || value === undefined || Array.isArray(value)) return "";
+  if (typeof value === "object") {
+    const money = isSalary(value) ? value.amount : (value as Money);
+    return formatMoney(money).replace(/^£/, "");
+  }
+  return String(value);
+}
+
+export function fieldDraft(field: AnyField): FieldDraft {
+  const value = field.value;
+  const provided = field.state === "provided";
+  const draft: FieldDraft = {
+    state: field.state,
+    text: provided ? textOf(value) : "",
+    items: Array.isArray(value) ? [...value] : [],
+  };
+  if (provided && value !== null && value !== undefined && isSalary(value)) {
+    draft.period = value.period;
+  }
+  return draft;
+}
 
 export function draftFrom(document: ProfileDocument): ProfileDraft {
   const draft = {} as ProfileDraft;
   for (const name of Object.keys(PROFILE_FIELDS) as ProfileFieldName[]) {
-    const field = document[name];
-    const value = field.value;
-    draft[name] = {
-      state: field.state,
-      text:
-        field.state !== "provided" || value === null || value === undefined || Array.isArray(value)
-          ? ""
-          : typeof value === "object"
-            ? formatMoney(value as Money).replace(/^£/, "")
-            : String(value),
-      items: Array.isArray(value) ? [...value] : [],
-    };
+    draft[name] = fieldDraft(document[name]);
   }
   return draft;
 }
@@ -103,6 +143,26 @@ function readMoney(field: FieldDraft): Read<ProfileInput["direct_spend_cap"]> {
   };
 }
 
+function readSalary(field: FieldDraft): Read<ProfileInput["minimum_salary"]> {
+  const other = unanswered(field);
+  if (other !== null) return { ok: true, input: other };
+  const parsed = parseMoneyInput(field.text, "GBP");
+  if (parsed.ok) {
+    return {
+      ok: true,
+      input: {
+        state: "provided",
+        value: { amount: parsed.money, period: field.period ?? "year" },
+      },
+    };
+  }
+  return {
+    ok: false,
+    problem:
+      parsed.reason === "empty" ? { kind: "required" } : { kind: "money", reason: parsed.reason },
+  };
+}
+
 /** Turns the draft into the API's input, or names each field that cannot be sent as typed. */
 export function inputFrom(draft: ProfileDraft): DraftResult {
   const list = (name: ProfileFieldName) => readList(draft[name], listLimit(name));
@@ -117,6 +177,8 @@ export function inputFrom(draft: ProfileDraft): DraftResult {
     enjoyed_tasks: list("enjoyed_tasks"),
     confident_tasks: list("confident_tasks"),
     evidenced_tasks: list("evidenced_tasks"),
+    work_style: list("work_style"),
+    minimum_salary: readSalary(draft.minimum_salary),
   };
   const problems: Partial<Record<ProfileFieldName, FieldProblem>> = {};
   for (const name of Object.keys(read) as ProfileFieldName[]) {
@@ -133,7 +195,9 @@ export function inputFrom(draft: ProfileDraft): DraftResult {
     !read.monthly_payment_cap.ok ||
     !read.enjoyed_tasks.ok ||
     !read.confident_tasks.ok ||
-    !read.evidenced_tasks.ok
+    !read.evidenced_tasks.ok ||
+    !read.work_style.ok ||
+    !read.minimum_salary.ok
   ) {
     return { ok: false, problems };
   }
@@ -148,8 +212,17 @@ export function inputFrom(draft: ProfileDraft): DraftResult {
     enjoyed_tasks: read.enjoyed_tasks.input,
     confident_tasks: read.confident_tasks.input,
     evidenced_tasks: read.evidenced_tasks.input,
+    work_style: read.work_style.input,
+    minimum_salary: read.minimum_salary.input,
   };
   return { ok: true, input };
+}
+
+/** The whole document as input, so one answer can be changed and the rest sent as stored. */
+export function inputOf(document: ProfileDocument): ProfileInput {
+  const result = inputFrom(draftFrom(document));
+  if (!result.ok) throw new Error("a stored profile is always valid input");
+  return result.input;
 }
 
 export type Rebased = {

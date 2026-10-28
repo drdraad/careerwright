@@ -40,13 +40,18 @@ from nessa.profile.document import (
     FieldInput,
     FieldKind,
     FieldState,
+    PayPeriod,
     ProfileDocument,
+    SalaryFloor,
     checked_input,
     input_type,
 )
-from nessa.profile.records import Basis
+from nessa.profile.records import Basis, ConversationMode, EntryMode
+from nessa.profile.safety import inferred_sensitive_terms, recorded_health_terms
 
-PROMPT_VERSION = "interview-turn-1"
+# Version 2 (Task 6): the person's entry and conversation mode, the work-style field, and
+# the support and inference rules.
+PROMPT_VERSION = "interview-turn-2"
 INPUT_FORMAT: Literal["nessa.interview-turn-input"] = "nessa.interview-turn-input"
 MAX_MESSAGE = 2_000
 MAX_REPLY = 1_200
@@ -63,6 +68,9 @@ REPAIR_ALLOWANCE_TOKENS = 2_000  # validation problems sent back with the repair
 MAX_REQUESTS = 2  # the first request and at most one repair (bounded validation repair)
 MONEY_PATTERN = re.compile(r"^[0-9]{1,9}(\.[0-9]{1,2})?$")
 HOURS_PATTERN = re.compile(r"^[0-9]{1,3}(\.[0-9]{1,2})?$")
+SALARY_PATTERN = re.compile(
+    r"^([0-9]{1,9}(?:\.[0-9]{1,2})?)(?:\s+(?:per|a|an|each)\s+(year|month|week|hour))?$"
+)
 
 
 class ProfileField(StrEnum):
@@ -78,6 +86,8 @@ class ProfileField(StrEnum):
     ENJOYED_TASKS = "enjoyed_tasks"
     CONFIDENT_TASKS = "confident_tasks"
     EVIDENCED_TASKS = "evidenced_tasks"
+    WORK_STYLE = "work_style"
+    MINIMUM_SALARY = "minimum_salary"
 
 
 class AnsweredState(StrEnum):
@@ -143,6 +153,9 @@ class TurnInput(BaseModel):
     profile: dict[ProfileField, ContextField]
     messages: list[ContextMessage]  # oldest first; the last is the current message
     replies: dict[str, str]  # message ref -> what Nessa replied to it, if it did
+    # The person's interview preferences (defaults keep inputs sealed before them readable).
+    entry_mode: EntryMode | None = None
+    conversation_mode: ConversationMode = ConversationMode.PRACTICAL
 
 
 class ProposedChange(BaseModel):
@@ -153,7 +166,7 @@ class ProposedChange(BaseModel):
     change_id: str
     field: ProfileField
     state: AnsweredState
-    value: Money | list[str] | float | str | None
+    value: SalaryFloor | Money | list[str] | float | str | None
     basis: Basis
     message_ids: list[uuid.UUID]
     reason: str
@@ -235,7 +248,21 @@ def _value(update: ModelUpdate, problems: list[str]) -> object:
         if hours is None:
             problems.append(f"{name}: give weekly hours as a number from 0 to 168")
         return hours
+    if spec.kind is FieldKind.SALARY:
+        salary = _salary(text)
+        if salary is None:
+            problems.append(f"{name}: give gross pounds and the period, such as 28000 per year")
+        return salary
     return text
+
+
+def _salary(text: str) -> SalaryFloor | None:
+    """Gross pounds and the period as given; a year unless the person said otherwise."""
+    match = SALARY_PATTERN.match(text)
+    money = _money(match.group(1)) if match else None
+    if match is None or money is None:
+        return None
+    return SalaryFloor(amount=money, period=PayPeriod(match.group(2) or PayPeriod.YEAR.value))
 
 
 _DIGIT_GROUPING = re.compile(r"(?<=[0-9]),(?=[0-9]{3}\b)")
@@ -261,11 +288,41 @@ def _basis(update: ModelUpdate, cited: list[str], held: object) -> Basis:
     if update.items is not None:
         kept = {_quotable(str(item)) for item in held} if isinstance(held, list) else set()
         values = [item for item in update.items if _quotable(item) not in kept]
+    elif FIELD_SPECS[update.field.value].kind is FieldKind.SALARY:
+        match = SALARY_PATTERN.match(update.text or "")
+        values = [match.group(1) if match else ""]  # the amount; the period is checked apart
     else:
         values = [update.text or ""]
     if values and all(_quoted(value, cited) for value in values):
         return Basis.STATED
     return Basis.INFERRED
+
+
+def _inference_problems(output: InterviewTurnOutput, person: list[str]) -> list[str]:
+    """The support and inference rules (`nessa.profile.safety`): nothing the person never
+    mentioned about health, diagnoses, personality types or percentages, and no health
+    condition recorded in a career field."""
+    values = {
+        update.field.value: [update.text or "", *(update.items or [])]
+        for update in output.proposed_updates
+    }
+    written = [output.reply, output.next_question or ""]
+    written += [update.reason for update in output.proposed_updates]
+    written += [value for field_values in values.values() for value in field_values]
+    problems = []
+    inferred = inferred_sensitive_terms(written, person)
+    if inferred:
+        problems.append(
+            "do not suggest a health condition, diagnosis, personality type or percentage the "
+            f"person did not mention ({', '.join(inferred)})"
+        )
+    for name, field_values in values.items():
+        if recorded_health_terms(field_values):
+            problems.append(
+                f"{name}: health conditions are not recorded in career fields; ask which "
+                "adjustment would help instead"
+            )
+    return problems
 
 
 def check_turn(
@@ -286,6 +343,7 @@ def check_turn(
         problems.append("proposed_updates: at most one update per field")
     refs = {m.ref: m.message_id for m in context.messages}
     texts = {m.ref: m.text for m in context.messages}
+    problems += _inference_problems(output, list(texts.values()))
     changes: list[ProposedChange] = []
     for index, update in enumerate(output.proposed_updates, start=1):
         name = update.field.value
@@ -363,14 +421,27 @@ Field formats: text fields take "text"; list fields take "items", the complete l
 the change (keep the items the profile already holds that still apply); weekly_study_hours is a
 number of hours per week as text, such as "6"; money is pounds as digits, such as "1500"
 (direct_spend_cap: the most they would spend on the change in total; monthly_payment_cap:
-the most in any one month). cities: only names from this list:
+the most in any one month). minimum_salary: the lowest gross pay they would accept, as
+pounds and the period they gave, such as "28000 per year" or "12.50 per hour" (a year
+unless they say otherwise; never convert it). cities: only names from this list:
 {", ".join(place.label for place in ENGLISH_CITIES)}.
 enjoyed_tasks: what they enjoy; confident_tasks: what they believe they can do;
-evidenced_tasks: what they have done and can show. Keep these three apart.
+evidenced_tasks: what they have done and can show. Keep these three apart. work_style:
+how they say they like to work (optional; never ask for it twice, accept a skip).
 
-Do not ask about or infer health, personality types, aptitude or protected
+"entry" is how the person chose to start. "sure": they know their direction; confirm the
+target role and the level they aim for, then the practical limits, and do not explore
+interests or work style unless they raise them. "unsure": they want to explore; before
+naming any career, ask about kinds of tasks they enjoy or find draining. null: not chosen.
+"mode" is the tone they chose. "practical": brief and concrete. "gentle": acknowledge
+uncertainty kindly and offer small steps. "challenge": question one assumption, politely.
+If they say they feel overwhelmed, acknowledge it in one sentence and offer one smaller
+next step. Never invent a past income, a baseline or a budget they did not give.
+
+Do not ask about or infer health, diagnoses, personality types, aptitude or protected
 characteristics. If the person describes a health condition, ask only which practical
-adjustment would help. Never give a match percentage. Answer only with the JSON object.
+adjustment would help, and never record the condition in a field. Never give a match
+percentage. Answer only with the JSON object.
 """
 
 
@@ -393,6 +464,8 @@ class PromptContext(BaseModel):
     messages: list[PromptMessage]
     your_earlier_replies: dict[str, str]
     current_message: str
+    entry: EntryMode | None = None
+    mode: ConversationMode = ConversationMode.PRACTICAL
 
 
 def render_prompt(context: TurnInput) -> str:
@@ -402,6 +475,8 @@ def render_prompt(context: TurnInput) -> str:
         messages=[PromptMessage(ref=m.ref, text=m.text) for m in context.messages],
         your_earlier_replies=context.replies,
         current_message=context.messages[-1].ref,
+        entry=context.entry_mode,
+        mode=context.conversation_mode,
     )
     payload = json.loads(prompt.model_dump_json())
     return CONTEXT_MARKER + json.dumps(payload, ensure_ascii=False, sort_keys=True)

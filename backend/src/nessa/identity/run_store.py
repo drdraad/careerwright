@@ -242,18 +242,26 @@ def run(tx: Tx, run_id: uuid.UUID, *, lock: bool = False) -> Run | None:
 
 
 def runs(
-    tx: Tx, workspace_id: uuid.UUID, *, before: tuple[datetime, uuid.UUID] | None, limit: int
+    tx: Tx,
+    workspace_id: uuid.UUID,
+    *,
+    before: tuple[datetime, uuid.UUID] | None,
+    limit: int,
+    kind: RunKind | None = None,
 ) -> list[Run]:
+    """Newest first; only runs of `kind`, if given."""
     cursor = "AND (created_at, run_id) < (:at, :rid) " if before else ""
+    of_kind = "AND kind = :kind " if kind else ""
     rows = tx.execute(
         sa.text(
             f"SELECT {_RUN_COLUMNS} FROM nessa.runs WHERE workspace_id = :ws "
-            f"{cursor}ORDER BY created_at DESC, run_id DESC LIMIT :limit"
+            f"{cursor}{of_kind}ORDER BY created_at DESC, run_id DESC LIMIT :limit"
         ),
         {
             "ws": workspace_id,
             "limit": limit,
             **({"at": before[0], "rid": before[1]} if before else {}),
+            **({"kind": kind.value} if kind else {}),
         },
     ).mappings()
     return [_run(row) for row in rows]

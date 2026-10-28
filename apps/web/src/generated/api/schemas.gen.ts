@@ -157,6 +157,55 @@ export const BasisSchema = {
     description: 'How an answer relates to what the person said (spec section 3: factual confirmations\nand inferences are styled differently).'
 } as const;
 
+export const ChooseTargetSchema = {
+    properties: {
+        expected_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Version'
+        },
+        concept_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Concept Id'
+        },
+        replaces: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 120,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Replaces'
+        },
+        discovery_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Discovery Id',
+            description: 'The discovery that suggested it, if any.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_version',
+        'concept_id'
+    ],
+    title: 'ChooseTarget',
+    description: 'Make an ESCO occupation one of the targets: added, or in place of `replaces` (a\ntarget title it is the occupation for).'
+} as const;
+
 export const CityListInputSchema = {
     properties: {
         state: {
@@ -207,6 +256,17 @@ export const ConnectionCheckResultSchema = {
     ],
     title: 'ConnectionCheckResult',
     description: 'What the model proposes for the synthetic persona. Structurally valid is not true.\n\nLengths are checked by a validator rather than schema keywords, so the JSON schema sent\nto Meta stays within strict mode (Meta then enforces the structure itself).'
+} as const;
+
+export const ConversationModeSchema = {
+    type: 'string',
+    enum: [
+        'practical',
+        'gentle',
+        'challenge'
+    ],
+    title: 'ConversationMode',
+    description: 'The tone the person chose (spec section 4, "Uncertainty and emotional comfort").'
 } as const;
 
 export const CreateWorkspaceSchema = {
@@ -347,7 +407,7 @@ export const DecideTurnSchema = {
                 type: 'string'
             },
             type: 'array',
-            maxItems: 10,
+            maxItems: 12,
             title: 'Accept'
         },
         confirm_hard_constraints: {
@@ -355,7 +415,7 @@ export const DecideTurnSchema = {
                 $ref: '#/components/schemas/ProfileField'
             },
             type: 'array',
-            maxItems: 10,
+            maxItems: 12,
             title: 'Confirm Hard Constraints'
         }
     },
@@ -450,6 +510,145 @@ export const DecisionResultSchema = {
     ],
     title: 'DecisionResult',
     description: 'The decision and the resulting profile. The proposals are read from the turn: this\nresponse is stored as the command\'s receipt, and model output is kept sealed.'
+} as const;
+
+export const DirectionSchema = {
+    type: 'string',
+    enum: [
+        'close_to_current',
+        'transferable',
+        'less_familiar'
+    ],
+    title: 'Direction'
+} as const;
+
+export const DiscoveryOutSchema = {
+    properties: {
+        discovery_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Discovery Id'
+        },
+        profile_version: {
+            type: 'integer',
+            title: 'Profile Version',
+            description: 'The profile version it read, pinned.'
+        },
+        run: {
+            $ref: '#/components/schemas/RunOut'
+        },
+        proposal: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/DiscoveryProposalOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'discovery_id',
+        'profile_version',
+        'run',
+        'proposal'
+    ],
+    title: 'DiscoveryOut',
+    description: 'One discovery. `run` is authoritative for its state; `proposal` exists only once the\nrun is complete, and a failed run\'s failure class says why there is none.'
+} as const;
+
+export const DiscoveryPageSchema = {
+    properties: {
+        items: {
+            items: {
+                $ref: '#/components/schemas/DiscoveryOut'
+            },
+            type: 'array',
+            title: 'Items',
+            description: 'Newest first.'
+        },
+        next_cursor: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Next Cursor'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'items',
+        'next_cursor'
+    ],
+    title: 'DiscoveryPage'
+} as const;
+
+export const DiscoveryProposalOutSchema = {
+    properties: {
+        origin: {
+            $ref: '#/components/schemas/ProposalOrigin',
+            description: 'fixture: the deterministic demo proposer (synthetic), never a live model.'
+        },
+        prompt_version: {
+            type: 'string',
+            title: 'Prompt Version'
+        },
+        queries: {
+            items: {
+                $ref: '#/components/schemas/QueryOut'
+            },
+            type: 'array',
+            title: 'Queries'
+        },
+        hypotheses: {
+            items: {
+                $ref: '#/components/schemas/HypothesisOut'
+            },
+            type: 'array',
+            title: 'Hypotheses'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'origin',
+        'prompt_version',
+        'queries',
+        'hypotheses'
+    ],
+    title: 'DiscoveryProposalOut',
+    description: 'The validated searches. They name no suggestion: the slate is computed from them.'
+} as const;
+
+export const EmphasisSchema = {
+    type: 'string',
+    enum: [
+        'balanced',
+        'practical',
+        'unfamiliar',
+        'broad',
+        'deeper'
+    ],
+    title: 'Emphasis',
+    description: 'The slate controls (REC1-08).'
+} as const;
+
+export const EntryModeSchema = {
+    type: 'string',
+    enum: [
+        'sure',
+        'unsure'
+    ],
+    title: 'EntryMode',
+    description: 'How the person chose to start (spec section 3, the You chapter).'
 } as const;
 
 export const ErrorBodySchema = {
@@ -594,7 +793,8 @@ export const EventKindSchema = {
         'run.state_changed',
         'run.partial_updated',
         'concept.provisional_created',
-        'interview.turn_decided'
+        'interview.turn_decided',
+        'interview.preferences_updated'
     ],
     title: 'EventKind'
 } as const;
@@ -678,6 +878,48 @@ export const EventPageSchema = {
         'last_seq'
     ],
     title: 'EventPage'
+} as const;
+
+export const EvidenceOutSchema = {
+    properties: {
+        field: {
+            $ref: '#/components/schemas/ProfileField'
+        },
+        text: {
+            type: 'string',
+            title: 'Text'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'field',
+        'text'
+    ],
+    title: 'EvidenceOut',
+    description: 'One of the person\'s confirmed answers, quoted.'
+} as const;
+
+export const ExcludedOutSchema = {
+    properties: {
+        occupations: {
+            type: 'integer',
+            title: 'Occupations',
+            description: 'Pooled occupations your excluded titles removed.'
+        },
+        families: {
+            type: 'integer',
+            title: 'Families',
+            description: 'Pooled occupations your excluded kinds of work removed.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'occupations',
+        'families'
+    ],
+    title: 'ExcludedOut'
 } as const;
 
 export const FailureClassSchema = {
@@ -792,6 +1034,30 @@ export const HoursInputSchema = {
         'state'
     ],
     title: 'HoursInput'
+} as const;
+
+export const HypothesisOutSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title',
+            description: 'A search hypothesis until ESCO is found to hold it.'
+        },
+        based_on: {
+            items: {
+                $ref: '#/components/schemas/EvidenceOut'
+            },
+            type: 'array',
+            title: 'Based On'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title',
+        'based_on'
+    ],
+    title: 'HypothesisOut'
 } as const;
 
 export const IscoGroupOutSchema = {
@@ -962,6 +1228,75 @@ export const MoneyInputSchema = {
     title: 'MoneyInput'
 } as const;
 
+export const NotIncludedSchema = {
+    type: 'string',
+    enum: [
+        'duplicate',
+        'excluded_occupation',
+        'excluded_family',
+        'below_relevance_floor',
+        'family_limit',
+        'less_relevant'
+    ],
+    title: 'NotIncluded',
+    description: 'Why a pooled occupation is not on the slate ("show why this wasn\'t included").'
+} as const;
+
+export const NotIncludedOutSchema = {
+    properties: {
+        concept_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Concept Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        family: {
+            $ref: '#/components/schemas/IscoGroupOut'
+        },
+        reason: {
+            $ref: '#/components/schemas/NotIncluded'
+        },
+        duplicate_of: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Duplicate Of'
+        },
+        duplicate_of_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Duplicate Of Title'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concept_id',
+        'title',
+        'family',
+        'reason',
+        'duplicate_of',
+        'duplicate_of_title'
+    ],
+    title: 'NotIncludedOut',
+    description: 'A pooled occupation the slate does not show, and why.'
+} as const;
+
 export const OccupationHitOutSchema = {
     properties: {
         concept_id: {
@@ -1109,6 +1444,31 @@ export const OccupationOutSchema = {
     title: 'OccupationOut'
 } as const;
 
+export const OccupationRefOutSchema = {
+    properties: {
+        concept_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Concept Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        isco_group: {
+            $ref: '#/components/schemas/IscoGroupOut'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concept_id',
+        'title',
+        'isco_group'
+    ],
+    title: 'OccupationRefOut'
+} as const;
+
 export const OccupationSearchOutSchema = {
     properties: {
         release: {
@@ -1237,6 +1597,17 @@ export const PartialReplyOutSchema = {
     description: 'The turn\'s reply as it streams: unvalidated text, never a proposal. The turn\'s run\nstate and, once complete, its proposal are authoritative.'
 } as const;
 
+export const PayPeriodSchema = {
+    type: 'string',
+    enum: [
+        'year',
+        'month',
+        'week',
+        'hour'
+    ],
+    title: 'PayPeriod'
+} as const;
+
 export const PlaceListSchema = {
     properties: {
         country_code: {
@@ -1340,13 +1711,108 @@ export const PlaceOutSchema = {
     title: 'PlaceOut'
 } as const;
 
+export const PoolQueryOutSchema = {
+    properties: {
+        query_id: {
+            type: 'string',
+            title: 'Query Id'
+        },
+        text: {
+            type: 'string',
+            title: 'Text'
+        },
+        channel: {
+            $ref: '#/components/schemas/SlateChannel'
+        },
+        based_on: {
+            items: {
+                $ref: '#/components/schemas/EvidenceOut'
+            },
+            type: 'array',
+            title: 'Based On'
+        },
+        hits: {
+            type: 'integer',
+            title: 'Hits',
+            description: 'Occupations this query found (bounded per query).'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'query_id',
+        'text',
+        'channel',
+        'based_on',
+        'hits'
+    ],
+    title: 'PoolQueryOut'
+} as const;
+
+export const PreferencesOutSchema = {
+    properties: {
+        version: {
+            type: 'integer',
+            title: 'Version',
+            description: '0 while nothing has been saved.'
+        },
+        entry_mode: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/EntryMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        conversation_mode: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ConversationMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        paused: {
+            type: 'boolean',
+            title: 'Paused'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'version',
+        'entry_mode',
+        'conversation_mode',
+        'paused',
+        'updated_at'
+    ],
+    title: 'PreferencesOut',
+    description: 'How the person chose to start and to be interviewed, and whether it is paused. Null:\nnot chosen yet (the interviewer then keeps to the practical mode).'
+} as const;
+
 export const ProfileDocumentSchema = {
     properties: {
         schema_version: {
             type: 'string',
-            const: '2',
+            const: '3',
             title: 'Schema Version',
-            default: '2'
+            default: '3'
         },
         preferred_name: {
             $ref: '#/components/schemas/TextField'
@@ -1377,6 +1843,12 @@ export const ProfileDocumentSchema = {
         },
         evidenced_tasks: {
             $ref: '#/components/schemas/TextListField'
+        },
+        work_style: {
+            $ref: '#/components/schemas/TextListField'
+        },
+        minimum_salary: {
+            $ref: '#/components/schemas/SalaryField'
         }
     },
     additionalProperties: false,
@@ -1391,7 +1863,9 @@ export const ProfileDocumentSchema = {
         'monthly_payment_cap',
         'enjoyed_tasks',
         'confident_tasks',
-        'evidenced_tasks'
+        'evidenced_tasks',
+        'work_style',
+        'minimum_salary'
     ],
     title: 'ProfileDocument',
     description: 'A stored profile version\'s content: each field with the source that established it.'
@@ -1409,7 +1883,9 @@ export const ProfileFieldSchema = {
         'monthly_payment_cap',
         'enjoyed_tasks',
         'confident_tasks',
-        'evidenced_tasks'
+        'evidenced_tasks',
+        'work_style',
+        'minimum_salary'
     ],
     title: 'ProfileField',
     description: 'The only names a proposal may use: the profile\'s own fields.'
@@ -1451,6 +1927,14 @@ export const ProfileInputSchema = {
         evidenced_tasks: {
             $ref: '#/components/schemas/TaskListInput',
             description: 'Tasks the person has evidence they can do, at most 8.'
+        },
+        work_style: {
+            $ref: '#/components/schemas/TaskListInput',
+            description: 'How the person says they like to work (optional), at most 8: it informs suggestions and never excludes any kind of work.'
+        },
+        minimum_salary: {
+            $ref: '#/components/schemas/SalaryInput',
+            description: 'The lowest gross pay the person will accept, with its period: a hard limit, set only by their confirmation. Recorded, not yet applied: no suggestion is removed for pay until pay evidence exists, and unknown pay is never below it.'
         }
     },
     additionalProperties: false,
@@ -1465,7 +1949,9 @@ export const ProfileInputSchema = {
         'monthly_payment_cap',
         'enjoyed_tasks',
         'confident_tasks',
-        'evidenced_tasks'
+        'evidenced_tasks',
+        'work_style',
+        'minimum_salary'
     ],
     title: 'ProfileInput',
     description: 'What a client submits: states and values only.'
@@ -1662,6 +2148,9 @@ export const ProposedChangeOutSchema = {
         value: {
             anyOf: [
                 {
+                    $ref: '#/components/schemas/SalaryFloor'
+                },
+                {
                     $ref: '#/components/schemas/Money'
                 },
                 {
@@ -1798,6 +2287,51 @@ export const ProvisionalConceptPageSchema = {
     title: 'ProvisionalConceptPage'
 } as const;
 
+export const QueryChannelSchema = {
+    type: 'string',
+    enum: [
+        'tasks',
+        'environment',
+        'transferable',
+        'cross_industry',
+        'less_familiar'
+    ],
+    title: 'QueryChannel',
+    description: 'The model\'s discovery channels (spec section 4, DIV-1\'s five channels). Nessa adds\nthe person\'s current role and their own target titles itself.'
+} as const;
+
+export const QueryOutSchema = {
+    properties: {
+        query_id: {
+            type: 'string',
+            title: 'Query Id'
+        },
+        text: {
+            type: 'string',
+            title: 'Text'
+        },
+        channel: {
+            $ref: '#/components/schemas/QueryChannel'
+        },
+        based_on: {
+            items: {
+                $ref: '#/components/schemas/EvidenceOut'
+            },
+            type: 'array',
+            title: 'Based On'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'query_id',
+        'text',
+        'channel',
+        'based_on'
+    ],
+    title: 'QueryOut'
+} as const;
+
 export const RegisterProvisionalConceptSchema = {
     properties: {
         title: {
@@ -1813,6 +2347,42 @@ export const RegisterProvisionalConceptSchema = {
         'title'
     ],
     title: 'RegisterProvisionalConcept'
+} as const;
+
+export const ReleaseRefOutSchema = {
+    properties: {
+        dataset_id: {
+            type: 'string',
+            title: 'Dataset Id'
+        },
+        version: {
+            type: 'string',
+            title: 'Version'
+        },
+        attribution: {
+            type: 'string',
+            title: 'Attribution'
+        },
+        adaptation: {
+            type: 'string',
+            title: 'Adaptation'
+        },
+        sample: {
+            type: 'boolean',
+            title: 'Sample'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'dataset_id',
+        'version',
+        'attribution',
+        'adaptation',
+        'sample'
+    ],
+    title: 'ReleaseRefOut',
+    description: 'The ESCO release the slate searched; show the attribution and adaptation with it.'
 } as const;
 
 export const RenameWorkspaceInSchema = {
@@ -1838,11 +2408,23 @@ export const RenameWorkspaceInSchema = {
     title: 'RenameWorkspaceIn'
 } as const;
 
+export const ResolutionSchema = {
+    type: 'string',
+    enum: [
+        'esco',
+        'ambiguous',
+        'provisional',
+        'not_found'
+    ],
+    title: 'Resolution'
+} as const;
+
 export const RunKindSchema = {
     type: 'string',
     enum: [
         'connection_check',
-        'interview_turn'
+        'interview_turn',
+        'discovery'
     ],
     title: 'RunKind'
 } as const;
@@ -1995,6 +2577,92 @@ export const RunPageSchema = {
     title: 'RunPage'
 } as const;
 
+export const SalaryFieldSchema = {
+    properties: {
+        state: {
+            $ref: '#/components/schemas/FieldState'
+        },
+        value: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SalaryFloor'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        source_ref_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Ref Id'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'state'
+    ],
+    title: 'SalaryField'
+} as const;
+
+export const SalaryFloorSchema = {
+    properties: {
+        amount: {
+            $ref: '#/components/schemas/Money'
+        },
+        period: {
+            $ref: '#/components/schemas/PayPeriod',
+            description: 'Annual unless the person says otherwise.'
+        },
+        basis: {
+            type: 'string',
+            const: 'gross',
+            title: 'Basis',
+            default: 'gross'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'amount',
+        'period'
+    ],
+    title: 'SalaryFloor',
+    description: 'The lowest gross pay the person will accept, as they gave it: its period is kept and\nnever converted, because annualising needs working hours (spec section 5).'
+} as const;
+
+export const SalaryInputSchema = {
+    properties: {
+        state: {
+            $ref: '#/components/schemas/FieldState'
+        },
+        value: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SalaryFloor'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'state'
+    ],
+    title: 'SalaryInput'
+} as const;
+
 export const SearchMatchSchema = {
     type: 'string',
     enum: [
@@ -2002,6 +2670,51 @@ export const SearchMatchSchema = {
         'any'
     ],
     title: 'SearchMatch'
+} as const;
+
+export const SetPreferencesSchema = {
+    properties: {
+        expected_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Version',
+            description: '0 while nothing has been saved.'
+        },
+        entry_mode: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/EntryMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        conversation_mode: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ConversationMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        paused: {
+            type: 'boolean',
+            title: 'Paused'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_version',
+        'entry_mode',
+        'conversation_mode',
+        'paused'
+    ],
+    title: 'SetPreferences',
+    description: 'The whole set of preferences; null means not chosen.'
 } as const;
 
 export const SetSpendLimitsSchema = {
@@ -2031,6 +2744,63 @@ export const SetSpendLimitsSchema = {
         'period_limit_nano_usd'
     ],
     title: 'SetSpendLimits'
+} as const;
+
+export const SketchOutSchema = {
+    properties: {
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        profile_version: {
+            type: 'integer',
+            title: 'Profile Version'
+        },
+        inputs: {
+            additionalProperties: {
+                $ref: '#/components/schemas/FieldState'
+            },
+            propertyNames: {
+                $ref: '#/components/schemas/ProfileField'
+            },
+            type: 'object',
+            title: 'Inputs',
+            description: 'The minimum inputs: a target and four practical answers.'
+        },
+        not_asked: {
+            items: {
+                $ref: '#/components/schemas/ProfileField'
+            },
+            type: 'array',
+            title: 'Not Asked'
+        },
+        targets: {
+            items: {
+                $ref: '#/components/schemas/TargetSketchOut'
+            },
+            type: 'array',
+            title: 'Targets'
+        },
+        steps: {
+            items: {
+                $ref: '#/components/schemas/StepOut'
+            },
+            type: 'array',
+            title: 'Steps'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'label',
+        'profile_version',
+        'inputs',
+        'not_asked',
+        'targets',
+        'steps'
+    ],
+    title: 'SketchOut',
+    description: 'The early requirement sketch: never a feasible or optimal route, never priced or\ndated. Every step stays unresolved until a later chapter resolves it.'
 } as const;
 
 export const SkillRefOutSchema = {
@@ -2072,12 +2842,175 @@ export const SkillRefOutSchema = {
     title: 'SkillRefOut'
 } as const;
 
+export const SlateChannelSchema = {
+    type: 'string',
+    enum: [
+        'current',
+        'user_proposed',
+        'tasks',
+        'environment',
+        'transferable',
+        'cross_industry',
+        'less_familiar',
+        'hypothesis'
+    ],
+    title: 'SlateChannel',
+    description: 'How a candidate was found: the model\'s channels plus Nessa\'s own.'
+} as const;
+
+export const SlateOutSchema = {
+    properties: {
+        discovery_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Discovery Id'
+        },
+        profile_version: {
+            type: 'integer',
+            title: 'Profile Version'
+        },
+        release: {
+            $ref: '#/components/schemas/ReleaseRefOut'
+        },
+        emphasis: {
+            $ref: '#/components/schemas/Emphasis'
+        },
+        target_size: {
+            type: 'integer',
+            title: 'Target Size',
+            default: 6
+        },
+        family_limit: {
+            type: 'integer',
+            title: 'Family Limit',
+            description: 'At most this many from one kind of work.'
+        },
+        suggestions: {
+            items: {
+                $ref: '#/components/schemas/SuggestionOut'
+            },
+            type: 'array',
+            title: 'Suggestions'
+        },
+        fewer_reasons: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Fewer Reasons',
+            description: 'Why there are fewer than six, if there are.'
+        },
+        notes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Notes',
+            description: 'How a control changed the slate, in words.'
+        },
+        limits_not_applied: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Limits Not Applied',
+            description: 'Limits you set that the slate records but cannot apply yet.'
+        },
+        pool_size: {
+            type: 'integer',
+            title: 'Pool Size',
+            description: 'Distinct occupations after folding near-duplicates.'
+        },
+        pool_target: {
+            prefixItems: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'integer'
+                }
+            ],
+            type: 'array',
+            maxItems: 2,
+            minItems: 2,
+            title: 'Pool Target',
+            default: [
+                60,
+                120
+            ]
+        },
+        beyond_pool_limit: {
+            type: 'integer',
+            title: 'Beyond Pool Limit',
+            description: 'Occupations found past the pool\'s bound.'
+        },
+        excluded: {
+            $ref: '#/components/schemas/ExcludedOut'
+        },
+        queries: {
+            items: {
+                $ref: '#/components/schemas/PoolQueryOut'
+            },
+            type: 'array',
+            title: 'Queries',
+            description: 'Every search that ran, with its hits.'
+        },
+        unsearchable_queries: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Unsearchable Queries',
+            description: 'Queries with no searchable word.'
+        },
+        unsupported_hypotheses: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Unsupported Hypotheses',
+            description: 'Titles Nessa thought of that ESCO does not list: never suggested.'
+        },
+        not_included: {
+            items: {
+                $ref: '#/components/schemas/NotIncludedOut'
+            },
+            type: 'array',
+            title: 'Not Included',
+            description: 'Show why this wasn\'t included.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'discovery_id',
+        'profile_version',
+        'release',
+        'emphasis',
+        'family_limit',
+        'suggestions',
+        'fewer_reasons',
+        'notes',
+        'limits_not_applied',
+        'pool_size',
+        'beyond_pool_limit',
+        'excluded',
+        'queries',
+        'unsearchable_queries',
+        'unsupported_hypotheses',
+        'not_included'
+    ],
+    title: 'SlateOut',
+    description: 'A varied slate of up to six career hypotheses from the discovery\'s searches, computed\ndeterministically each time it is read, with every count that explains it.'
+} as const;
+
 export const SourceKindSchema = {
     type: 'string',
     enum: [
         'direct_entry',
         'fixture',
-        'conversation'
+        'conversation',
+        'occupation_choice'
     ],
     title: 'SourceKind'
 } as const;
@@ -2169,6 +3102,19 @@ export const SourceOutSchema = {
                     type: 'null'
                 }
             ]
+        },
+        discovery_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Discovery Id',
+            description: 'An occupation choice: the discovery that suggested it.'
         }
     },
     additionalProperties: false,
@@ -2215,6 +3161,33 @@ export const SourcePageSchema = {
         'next_cursor'
     ],
     title: 'SourcePage'
+} as const;
+
+export const SourceRefOutSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            const: 'esco',
+            title: 'Kind',
+            default: 'esco'
+        },
+        uri: {
+            type: 'string',
+            title: 'Uri',
+            description: 'The ESCO occupation\'s URI.'
+        },
+        release: {
+            type: 'string',
+            title: 'Release'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'uri',
+        'release'
+    ],
+    title: 'SourceRefOut'
 } as const;
 
 export const SpendOutSchema = {
@@ -2272,6 +3245,37 @@ export const SpendStateSchema = {
     title: 'SpendState'
 } as const;
 
+export const StepOutSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        chapter: {
+            type: 'string',
+            title: 'Chapter'
+        },
+        detail: {
+            type: 'string',
+            title: 'Detail'
+        },
+        state: {
+            type: 'string',
+            const: 'unresolved',
+            title: 'State'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'name',
+        'chapter',
+        'detail',
+        'state'
+    ],
+    title: 'StepOut'
+} as const;
+
 export const StoreKeySchema = {
     properties: {
         consent_to_encrypted_storage: {
@@ -2285,6 +3289,22 @@ export const StoreKeySchema = {
         'consent_to_encrypted_storage'
     ],
     title: 'StoreKey'
+} as const;
+
+export const SubmitDiscoverySchema = {
+    properties: {
+        expected_profile_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Profile Version'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_profile_version'
+    ],
+    title: 'SubmitDiscovery'
 } as const;
 
 export const SubmitRunSchema = {
@@ -2316,6 +3336,12 @@ export const SubmitTurnSchema = {
             maxLength: 2000,
             minLength: 1,
             title: 'Message'
+        },
+        send_after_support: {
+            type: 'boolean',
+            title: 'Send After Support',
+            description: 'The person was shown the support response for this message and chose to send it to the interviewer anyway.',
+            default: false
         }
     },
     additionalProperties: false,
@@ -2325,6 +3351,221 @@ export const SubmitTurnSchema = {
         'message'
     ],
     title: 'SubmitTurn'
+} as const;
+
+export const SuggestionOutSchema = {
+    properties: {
+        concept_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Concept Id'
+        },
+        concept_kind: {
+            type: 'string',
+            const: 'esco',
+            title: 'Concept Kind',
+            default: 'esco'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        esco_code: {
+            type: 'string',
+            title: 'Esco Code'
+        },
+        isco_group: {
+            $ref: '#/components/schemas/IscoGroupOut'
+        },
+        family: {
+            $ref: '#/components/schemas/IscoGroupOut',
+            description: 'The kind of work: its ISCO-08 minor group.'
+        },
+        sector: {
+            $ref: '#/components/schemas/IscoGroupOut',
+            description: 'Its ISCO-08 major group.'
+        },
+        direction: {
+            $ref: '#/components/schemas/Direction'
+        },
+        channels: {
+            items: {
+                $ref: '#/components/schemas/SlateChannel'
+            },
+            type: 'array',
+            title: 'Channels'
+        },
+        linked_evidence: {
+            items: {
+                $ref: '#/components/schemas/EvidenceOut'
+            },
+            type: 'array',
+            title: 'Linked Evidence',
+            description: 'The answers that found it.'
+        },
+        matched_queries: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Matched Queries',
+            description: 'The query IDs that found it.'
+        },
+        sources: {
+            items: {
+                $ref: '#/components/schemas/SourceRefOut'
+            },
+            type: 'array',
+            title: 'Sources'
+        },
+        workday: {
+            type: 'string',
+            title: 'Workday',
+            description: 'ESCO\'s description of the work, shortened.'
+        },
+        why_it_could_suit: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Why It Could Suit'
+        },
+        what_might_not_suit: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'What Might Not Suit'
+        },
+        entry_gates: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Entry Gates'
+        },
+        evidence_gaps: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Evidence Gaps'
+        },
+        try_it: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Try It',
+            description: 'Low-cost ways to test the idea before committing.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concept_id',
+        'title',
+        'esco_code',
+        'isco_group',
+        'family',
+        'sector',
+        'direction',
+        'channels',
+        'linked_evidence',
+        'matched_queries',
+        'sources',
+        'workday',
+        'why_it_could_suit',
+        'what_might_not_suit',
+        'entry_gates',
+        'evidence_gaps',
+        'try_it'
+    ],
+    title: 'SuggestionOut',
+    description: 'A career hypothesis (spec section 4\'s `CareerSuggestion`): an ESCO occupation, the\nanswers that found it and ESCO\'s facts about it, in words. Becoming a target needs the\nperson\'s choice (`POST .../targets`).'
+} as const;
+
+export const SupportResourceOutSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        contact: {
+            type: 'string',
+            title: 'Contact'
+        },
+        when: {
+            type: 'string',
+            title: 'When'
+        },
+        source_url: {
+            type: 'string',
+            title: 'Source Url'
+        },
+        checked_on: {
+            type: 'string',
+            title: 'Checked On',
+            description: 'When the service\'s own page was last checked.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'name',
+        'contact',
+        'when',
+        'source_url',
+        'checked_on'
+    ],
+    title: 'SupportResourceOut'
+} as const;
+
+export const SupportResponseOutSchema = {
+    properties: {
+        policy: {
+            type: 'string',
+            const: 'acute_distress',
+            title: 'Policy'
+        },
+        policy_version: {
+            type: 'string',
+            title: 'Policy Version'
+        },
+        review_status: {
+            type: 'string',
+            title: 'Review Status',
+            description: 'The policy is provisional until reviewed.'
+        },
+        message: {
+            type: 'string',
+            title: 'Message'
+        },
+        resources: {
+            items: {
+                $ref: '#/components/schemas/SupportResourceOut'
+            },
+            type: 'array',
+            title: 'Resources'
+        },
+        sent_to_interviewer: {
+            type: 'boolean',
+            const: false,
+            title: 'Sent To Interviewer',
+            default: false
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'policy',
+        'policy_version',
+        'review_status',
+        'message',
+        'resources'
+    ],
+    title: 'SupportResponseOut',
+    description: 'Given instead of a turn when a message explicitly expresses acute distress: the\nmessage was not sent to the interviewer and nothing was stored. Kept apart from career\nsuitability. Resend with `send_after_support` to send the message anyway.'
 } as const;
 
 export const TargetListInputSchema = {
@@ -2356,6 +3597,82 @@ export const TargetListInputSchema = {
         'state'
     ],
     title: 'TargetListInput'
+} as const;
+
+export const TargetSketchOutSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        resolution: {
+            $ref: '#/components/schemas/Resolution'
+        },
+        occupations: {
+            items: {
+                $ref: '#/components/schemas/OccupationRefOut'
+            },
+            type: 'array',
+            title: 'Occupations',
+            description: 'The ESCO occupation, or the several that share the title (choose one).'
+        },
+        close_matches: {
+            items: {
+                $ref: '#/components/schemas/OccupationRefOut'
+            },
+            type: 'array',
+            title: 'Close Matches',
+            description: 'For a title ESCO does not hold: the nearest occupations by full text.'
+        },
+        requirements: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Requirements',
+            description: 'ESCO\'s essential skills, the first few.'
+        },
+        requirement_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Requirement Count',
+            description: 'null: no requirement list.'
+        },
+        regulated: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Regulated'
+        },
+        research_status: {
+            type: 'string',
+            title: 'Research Status'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title',
+        'resolution',
+        'occupations',
+        'close_matches',
+        'requirements',
+        'requirement_count',
+        'regulated',
+        'research_status'
+    ],
+    title: 'TargetSketchOut'
 } as const;
 
 export const TaskListInputSchema = {
@@ -2723,9 +4040,9 @@ export const WorkspaceExportSchema = {
         },
         format_version: {
             type: 'integer',
-            const: 2,
+            const: 3,
             title: 'Format Version',
-            default: 2
+            default: 3
         },
         exported_at: {
             type: 'string',
@@ -2789,6 +4106,17 @@ export const WorkspaceExportSchema = {
             type: 'array',
             title: 'Provisional Concepts'
         },
+        discoveries: {
+            items: {
+                $ref: '#/components/schemas/DiscoveryOut'
+            },
+            type: 'array',
+            title: 'Discoveries',
+            description: 'Oldest first; slates are recomputed.'
+        },
+        interview_preferences: {
+            $ref: '#/components/schemas/PreferencesOut'
+        },
         spend: {
             $ref: '#/components/schemas/SpendOut'
         }
@@ -2806,6 +4134,8 @@ export const WorkspaceExportSchema = {
         'runs',
         'interview_turns',
         'provisional_concepts',
+        'discoveries',
+        'interview_preferences',
         'spend'
     ],
     title: 'WorkspaceExport'

@@ -78,6 +78,8 @@ def fixture_profile(fixtures_dir: Path) -> FixtureProfile:
             "enjoyed_tasks": unasked,
             "confident_tasks": unasked,
             "evidenced_tasks": unasked,
+            "work_style": unasked,
+            "minimum_salary": unasked,
         }
     )
     return FixtureProfile(

@@ -68,6 +68,40 @@ def _context(messages: list[ModelMessage]) -> dict[str, object] | None:
     return None
 
 
+DISCOVERY_MARKER = "Discovery context (JSON):\n"
+
+
+def _discovery_context(messages: list[ModelMessage]) -> dict[str, object] | None:
+    for message in messages:
+        for part in getattr(message, "parts", ()):
+            content = part.content if isinstance(part, UserPromptPart) else None
+            if isinstance(content, str) and content.startswith(DISCOVERY_MARKER):
+                loaded: dict[str, object] = json.loads(content[len(DISCOVERY_MARKER) :])
+                return loaded
+    return None
+
+
+def discovery_answer(
+    context: dict[str, object], sentinel: str, *, valid: bool
+) -> dict[str, object]:
+    """Every answer text as a query (an invalid answer cites a text never given), and one
+    title hypothesis ESCO cannot hold, carrying the sentinel."""
+    answers = context["answers"]
+    assert isinstance(answers, list)
+    texts = [str(a["text"]) for a in answers if 3 <= len(str(a["text"])) <= 80][:8]
+    return {
+        "queries": [
+            {
+                "text": text,
+                "channel": "tasks",
+                "based_on": [text if valid else "something never said"],
+            }
+            for text in texts
+        ],
+        "hypotheses": [{"title": f"{sentinel} orbital gardener".strip(), "based_on": texts[:1]}],
+    }
+
+
 def interview_answer(
     context: dict[str, object], sentinel: str, *, valid: bool
 ) -> dict[str, object]:
@@ -76,12 +110,34 @@ def interview_answer(
     The reply starts with `sentinel`, so even the first streamed pieces of it carry the
     sentinel into the partial store, where leak scans must find it sealed."""
     current = str(context["current_message"])
+    messages = context.get("messages")
+    text = (
+        next((str(m["text"]) for m in messages if m["ref"] == current), "")
+        if isinstance(messages, list)
+        else ""
+    )
+    salary = (
+        [
+            {
+                "field": "minimum_salary",
+                "state": "provided",
+                "text": "26000 per year",
+                "items": None,
+                "basis": "stated",
+                "message_refs": [current],
+                "reason": "You gave the least you would earn.",
+            }
+        ]
+        if "26,000 a year" in text
+        else []
+    )
     return {
         "reply": (
             f"{sentinel} Thanks for telling me. I have noted where you could work and roughly "
             "what you could spend, for you to review."
         ).strip(),
         "proposed_updates": [
+            *salary,
             {
                 "field": "cities",
                 "state": "provided",
@@ -196,7 +252,14 @@ def fake_model_builder(
                     provider_details={"refusal": f"I can't help with that {output_sentinel}"},
                 )
             context = _context(messages)
-            if context is not None:
+            found = _discovery_context(messages)
+            invalid = failure in (
+                FakeFailure.INVALID_ALWAYS,
+                FakeFailure.INVALID_THEN_UNAVAILABLE,
+            ) or (failure is FakeFailure.INVALID_ONCE and call == 0)
+            if found is not None:
+                text = json.dumps(discovery_answer(found, output_sentinel, valid=not invalid))
+            elif context is not None:
                 valid = not (
                     failure in (FakeFailure.INVALID_ALWAYS, FakeFailure.INVALID_THEN_UNAVAILABLE)
                     or (failure is FakeFailure.INVALID_ONCE and call == 0)

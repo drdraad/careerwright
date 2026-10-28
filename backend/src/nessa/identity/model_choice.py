@@ -4,21 +4,25 @@ Non-synthetic workspaces always use the Standard production model. A synthetic w
 uses the configured role: by default the cheaper test model (ruling R5). The Contributor
 test model lets Meta train on traffic, so it is refused for any workspace not labelled
 synthetic, at submission and again inside the activity (ADR 0003; carried-forward ruling).
-Demo workspaces never reach a Meta model: their interview turns use the fixture
-interviewer (`fixture_model`), which no configuration can make a test or production model.
+Demo workspaces never reach a Meta model: their interview turns and discoveries use the
+deterministic fixture models (`fixture_model`), which no configuration can make a test or
+production model.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
 from nessa.errors import ErrorCode, ErrorStage, NessaError
 from nessa.identity.model_registry import (
+    FIXTURE_DISCOVERY_MODEL_ID,
     FIXTURE_MODEL_ID,
     ModelEntry,
     ModelMode,
     UnknownModelError,
     model_entry,
 )
+from nessa.identity.records import RunKind
 
 ModelRole = Literal["test", "production"]
 
@@ -60,8 +64,18 @@ class ModelChoice:
         return model_id == self.production.model_id
 
 
-def fixture_model() -> ModelEntry:
-    return model_entry(FIXTURE_MODEL_ID)
+# The deterministic demo stand-in for each kind of run a demo workspace may make.
+FIXTURE_MODELS: Mapping[RunKind, str] = {
+    RunKind.INTERVIEW_TURN: FIXTURE_MODEL_ID,
+    RunKind.DISCOVERY: FIXTURE_DISCOVERY_MODEL_ID,
+}
+
+
+def fixture_model(kind: RunKind) -> ModelEntry | None:
+    """The demo stand-in for this kind of run, if it has one (None: a demo workspace never
+    makes this kind of run)."""
+    model_id = FIXTURE_MODELS.get(kind)
+    return None if model_id is None else model_entry(model_id)
 
 
 def assert_model_permitted(model: ModelEntry, *, synthetic: bool) -> None:

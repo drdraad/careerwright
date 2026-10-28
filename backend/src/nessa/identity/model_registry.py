@@ -56,6 +56,7 @@ _STANDARD_SPARK = TokenPrice(1_250, 150, 4_250)  # $1.25 / $0.15 cached / $4.25 
 _CONTRIBUTOR_SPARK = TokenPrice(100, 2, 200)  # $0.10 / $0.002 cached / $0.20 per M
 _SPARK_1_3 = frozenset(Capability)
 FIXTURE_MODEL_ID = "nessa-fixture-interviewer-1"
+FIXTURE_DISCOVERY_MODEL_ID = "nessa-fixture-discovery-1"
 
 _REGISTRY = {
     entry.model_id: entry
@@ -84,6 +85,13 @@ _REGISTRY = {
             TokenPrice(0, 0, 0),
             frozenset({Capability.SCHEMA_OUTPUT}),
             "deterministic demo interviewer; tested offline (ADR 0006)",
+        ),
+        ModelEntry(
+            FIXTURE_DISCOVERY_MODEL_ID,
+            ModelMode.FIXTURE,
+            TokenPrice(0, 0, 0),
+            frozenset({Capability.SCHEMA_OUTPUT}),
+            "deterministic demo query proposer; tested offline (ADR 0007)",
         ),
     )
 }

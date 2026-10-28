@@ -9,7 +9,7 @@ const SOURCE = "6f1d3c2a-0000-4000-8000-000000000001";
 
 function document(overrides: Partial<ProfileDocument> = {}): ProfileDocument {
   return {
-    schema_version: "2",
+    schema_version: "3",
     preferred_name: { state: "unasked", value: null, source_ref_id: null },
     current_role: { state: "unknown", value: null, source_ref_id: SOURCE },
     cities: { state: "provided", value: ["Manchester"], source_ref_id: SOURCE },
@@ -24,6 +24,8 @@ function document(overrides: Partial<ProfileDocument> = {}): ProfileDocument {
     enjoyed_tasks: { state: "unasked", value: null, source_ref_id: null },
     confident_tasks: { state: "unasked", value: null, source_ref_id: null },
     evidenced_tasks: { state: "unasked", value: null, source_ref_id: null },
+    work_style: { state: "unasked", value: null, source_ref_id: null },
+    minimum_salary: { state: "unasked", value: null, source_ref_id: null },
     ...overrides,
   };
 }
@@ -56,8 +58,41 @@ describe("[API-04] the profile form sends exactly what was answered, in integer 
         enjoyed_tasks: { state: "unasked" },
         confident_tasks: { state: "unasked" },
         evidenced_tasks: { state: "unasked" },
+        work_style: { state: "unasked" },
+        minimum_salary: { state: "unasked" },
       },
     });
+  });
+
+  it("[PROF-04] sends a salary floor as gross pounds with its period, never converted", () => {
+    const floor = {
+      amount: { minor_units: 1250, currency: "GBP" as const },
+      period: "hour" as const,
+    };
+    const stored = document({
+      minimum_salary: { state: "provided", value: floor, source_ref_id: SOURCE },
+    });
+
+    const draft = draftFrom(stored);
+    const result = inputFrom(draft);
+
+    expect(draft.minimum_salary).toEqual({
+      state: "provided",
+      text: "12.50",
+      items: [],
+      period: "hour",
+    });
+    expect(result.ok && result.input.minimum_salary).toEqual({ state: "provided", value: floor });
+    expect(describeField(stored.minimum_salary)).toBe("£12.50 an hour, before tax");
+    draft.minimum_salary = { state: "provided", text: "28,000", items: [] };
+    const yearly = inputFrom(draft);
+    expect(yearly.ok && yearly.input.minimum_salary).toEqual({
+      state: "provided",
+      value: { amount: { minor_units: 2_800_000, currency: "GBP" }, period: "year" },
+    });
+    draft.minimum_salary = { state: "unknown", text: "", items: [] };
+    const unknown = inputFrom(draft);
+    expect(unknown.ok && unknown.input.minimum_salary).toEqual({ state: "unknown" });
   });
 
   it("bounds each list by its own limit: three work areas, eight tasks", () => {
@@ -97,6 +132,7 @@ describe("[API-04] the profile form sends exactly what was answered, in integer 
       "enjoyed_tasks",
       "confident_tasks",
       "evidenced_tasks",
+      "work_style",
     ]);
     for (const [name, published, used] of lists) expect([name, used]).toEqual([name, published]);
   });

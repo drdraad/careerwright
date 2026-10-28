@@ -109,6 +109,33 @@ export const Basis = { STATED: 'stated', INFERRED: 'inferred' } as const;
 export type Basis = typeof Basis[keyof typeof Basis];
 
 /**
+ * ChooseTarget
+ *
+ * Make an ESCO occupation one of the targets: added, or in place of `replaces` (a
+ * target title it is the occupation for).
+ */
+export type ChooseTarget = {
+    /**
+     * Expected Version
+     */
+    expected_version: number;
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Replaces
+     */
+    replaces?: string | null;
+    /**
+     * Discovery Id
+     *
+     * The discovery that suggested it, if any.
+     */
+    discovery_id?: string | null;
+};
+
+/**
  * CityListInput
  */
 export type CityListInput = {
@@ -137,6 +164,24 @@ export type ConnectionCheckResult = {
      */
     reason: string;
 };
+
+/**
+ * ConversationMode
+ *
+ * The tone the person chose (spec section 4, "Uncertainty and emotional comfort").
+ */
+export const ConversationMode = {
+    PRACTICAL: 'practical',
+    GENTLE: 'gentle',
+    CHALLENGE: 'challenge'
+} as const;
+
+/**
+ * ConversationMode
+ *
+ * The tone the person chose (spec section 4, "Uncertainty and emotional comfort").
+ */
+export type ConversationMode = typeof ConversationMode[keyof typeof ConversationMode];
 
 /**
  * CreateWorkspace
@@ -290,6 +335,115 @@ export type DecisionResult = {
 };
 
 /**
+ * Direction
+ */
+export const Direction = {
+    CLOSE_TO_CURRENT: 'close_to_current',
+    TRANSFERABLE: 'transferable',
+    LESS_FAMILIAR: 'less_familiar'
+} as const;
+
+/**
+ * Direction
+ */
+export type Direction = typeof Direction[keyof typeof Direction];
+
+/**
+ * DiscoveryOut
+ *
+ * One discovery. `run` is authoritative for its state; `proposal` exists only once the
+ * run is complete, and a failed run's failure class says why there is none.
+ */
+export type DiscoveryOut = {
+    /**
+     * Discovery Id
+     */
+    discovery_id: string;
+    /**
+     * Profile Version
+     *
+     * The profile version it read, pinned.
+     */
+    profile_version: number;
+    run: RunOut;
+    proposal: DiscoveryProposalOut | null;
+};
+
+/**
+ * DiscoveryPage
+ */
+export type DiscoveryPage = {
+    /**
+     * Items
+     *
+     * Newest first.
+     */
+    items: Array<DiscoveryOut>;
+    /**
+     * Next Cursor
+     */
+    next_cursor: string | null;
+};
+
+/**
+ * DiscoveryProposalOut
+ *
+ * The validated searches. They name no suggestion: the slate is computed from them.
+ */
+export type DiscoveryProposalOut = {
+    /**
+     * fixture: the deterministic demo proposer (synthetic), never a live model.
+     */
+    origin: ProposalOrigin;
+    /**
+     * Prompt Version
+     */
+    prompt_version: string;
+    /**
+     * Queries
+     */
+    queries: Array<QueryOut>;
+    /**
+     * Hypotheses
+     */
+    hypotheses: Array<HypothesisOut>;
+};
+
+/**
+ * Emphasis
+ *
+ * The slate controls (REC1-08).
+ */
+export const Emphasis = {
+    BALANCED: 'balanced',
+    PRACTICAL: 'practical',
+    UNFAMILIAR: 'unfamiliar',
+    BROAD: 'broad',
+    DEEPER: 'deeper'
+} as const;
+
+/**
+ * Emphasis
+ *
+ * The slate controls (REC1-08).
+ */
+export type Emphasis = typeof Emphasis[keyof typeof Emphasis];
+
+/**
+ * EntryMode
+ *
+ * How the person chose to start (spec section 3, the You chapter).
+ */
+export const EntryMode = { SURE: 'sure', UNSURE: 'unsure' } as const;
+
+/**
+ * EntryMode
+ *
+ * How the person chose to start (spec section 3, the You chapter).
+ */
+export type EntryMode = typeof EntryMode[keyof typeof EntryMode];
+
+/**
  * ErrorBody
  */
 export type ErrorBody = {
@@ -408,7 +562,8 @@ export const EventKind = {
     RUN_STATE_CHANGED: 'run.state_changed',
     RUN_PARTIAL_UPDATED: 'run.partial_updated',
     CONCEPT_PROVISIONAL_CREATED: 'concept.provisional_created',
-    INTERVIEW_TURN_DECIDED: 'interview.turn_decided'
+    INTERVIEW_TURN_DECIDED: 'interview.turn_decided',
+    INTERVIEW_PREFERENCES_UPDATED: 'interview.preferences_updated'
 } as const;
 
 /**
@@ -458,6 +613,37 @@ export type EventPage = {
      * Pass as `after` (or Last-Event-ID) to continue.
      */
     last_seq: number;
+};
+
+/**
+ * EvidenceOut
+ *
+ * One of the person's confirmed answers, quoted.
+ */
+export type EvidenceOut = {
+    field: ProfileField;
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
+ * ExcludedOut
+ */
+export type ExcludedOut = {
+    /**
+     * Occupations
+     *
+     * Pooled occupations your excluded titles removed.
+     */
+    occupations: number;
+    /**
+     * Families
+     *
+     * Pooled occupations your excluded kinds of work removed.
+     */
+    families: number;
 };
 
 /**
@@ -535,6 +721,22 @@ export type HoursInput = {
      * Value
      */
     value?: number | null;
+};
+
+/**
+ * HypothesisOut
+ */
+export type HypothesisOut = {
+    /**
+     * Title
+     *
+     * A search hypothesis until ESCO is found to hold it.
+     */
+    title: string;
+    /**
+     * Based On
+     */
+    based_on: Array<EvidenceOut>;
 };
 
 /**
@@ -638,6 +840,53 @@ export type MoneyInput = {
 };
 
 /**
+ * NotIncluded
+ *
+ * Why a pooled occupation is not on the slate ("show why this wasn't included").
+ */
+export const NotIncluded = {
+    DUPLICATE: 'duplicate',
+    EXCLUDED_OCCUPATION: 'excluded_occupation',
+    EXCLUDED_FAMILY: 'excluded_family',
+    BELOW_RELEVANCE_FLOOR: 'below_relevance_floor',
+    FAMILY_LIMIT: 'family_limit',
+    LESS_RELEVANT: 'less_relevant'
+} as const;
+
+/**
+ * NotIncluded
+ *
+ * Why a pooled occupation is not on the slate ("show why this wasn't included").
+ */
+export type NotIncluded = typeof NotIncluded[keyof typeof NotIncluded];
+
+/**
+ * NotIncludedOut
+ *
+ * A pooled occupation the slate does not show, and why.
+ */
+export type NotIncludedOut = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    family: IscoGroupOut;
+    reason: NotIncluded;
+    /**
+     * Duplicate Of
+     */
+    duplicate_of: string | null;
+    /**
+     * Duplicate Of Title
+     */
+    duplicate_of_title: string | null;
+};
+
+/**
  * OccupationHitOut
  */
 export type OccupationHitOut = {
@@ -734,6 +983,21 @@ export type OccupationOut = {
 };
 
 /**
+ * OccupationRefOut
+ */
+export type OccupationRefOut = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    isco_group: IscoGroupOut;
+};
+
+/**
  * OccupationSearchOut
  *
  * Exact label matches (all of them, when several occupations share a label), then
@@ -821,6 +1085,21 @@ export type PartialReplyOut = {
 };
 
 /**
+ * PayPeriod
+ */
+export const PayPeriod = {
+    YEAR: 'year',
+    MONTH: 'month',
+    WEEK: 'week',
+    HOUR: 'hour'
+} as const;
+
+/**
+ * PayPeriod
+ */
+export type PayPeriod = typeof PayPeriod[keyof typeof PayPeriod];
+
+/**
  * PlaceList
  *
  * The finite list of English cities a work area can name. A city is geography only:
@@ -898,6 +1177,56 @@ export type PlaceOut = {
 };
 
 /**
+ * PoolQueryOut
+ */
+export type PoolQueryOut = {
+    /**
+     * Query Id
+     */
+    query_id: string;
+    /**
+     * Text
+     */
+    text: string;
+    channel: SlateChannel;
+    /**
+     * Based On
+     */
+    based_on: Array<EvidenceOut>;
+    /**
+     * Hits
+     *
+     * Occupations this query found (bounded per query).
+     */
+    hits: number;
+};
+
+/**
+ * PreferencesOut
+ *
+ * How the person chose to start and to be interviewed, and whether it is paused. Null:
+ * not chosen yet (the interviewer then keeps to the practical mode).
+ */
+export type PreferencesOut = {
+    /**
+     * Version
+     *
+     * 0 while nothing has been saved.
+     */
+    version: number;
+    entry_mode: EntryMode | null;
+    conversation_mode: ConversationMode | null;
+    /**
+     * Paused
+     */
+    paused: boolean;
+    /**
+     * Updated At
+     */
+    updated_at: string | null;
+};
+
+/**
  * ProfileDocument
  *
  * A stored profile version's content: each field with the source that established it.
@@ -906,7 +1235,7 @@ export type ProfileDocument = {
     /**
      * Schema Version
      */
-    schema_version?: '2';
+    schema_version?: '3';
     preferred_name: TextField;
     current_role: TextField;
     cities: TextListField;
@@ -917,6 +1246,8 @@ export type ProfileDocument = {
     enjoyed_tasks: TextListField;
     confident_tasks: TextListField;
     evidenced_tasks: TextListField;
+    work_style: TextListField;
+    minimum_salary: SalaryField;
 };
 
 /**
@@ -934,7 +1265,9 @@ export const ProfileField = {
     MONTHLY_PAYMENT_CAP: 'monthly_payment_cap',
     ENJOYED_TASKS: 'enjoyed_tasks',
     CONFIDENT_TASKS: 'confident_tasks',
-    EVIDENCED_TASKS: 'evidenced_tasks'
+    EVIDENCED_TASKS: 'evidenced_tasks',
+    WORK_STYLE: 'work_style',
+    MINIMUM_SALARY: 'minimum_salary'
 } as const;
 
 /**
@@ -975,6 +1308,14 @@ export type ProfileInput = {
      * Tasks the person has evidence they can do, at most 8.
      */
     evidenced_tasks: TaskListInput;
+    /**
+     * How the person says they like to work (optional), at most 8: it informs suggestions and never excludes any kind of work.
+     */
+    work_style: TaskListInput;
+    /**
+     * The lowest gross pay the person will accept, with its period: a hard limit, set only by their confirmation. Recorded, not yet applied: no suggestion is removed for pay until pay evidence exists, and unknown pay is never below it.
+     */
+    minimum_salary: SalaryInput;
 };
 
 /**
@@ -1094,7 +1435,7 @@ export type ProposedChangeOut = {
      *
      * The proposed answer, typed as the field's input; null unless provided. A list is the complete list after the change: accepting it replaces the field's list.
      */
-    value: Money | Array<string> | number | string | null;
+    value: SalaryFloor | Money | Array<string> | number | string | null;
     /**
      * stated: the value appears in the cited messages (checked by the server); inferred: implied, or not found in them.
      */
@@ -1166,6 +1507,47 @@ export type ProvisionalConceptPage = {
 };
 
 /**
+ * QueryChannel
+ *
+ * The model's discovery channels (spec section 4, DIV-1's five channels). Nessa adds
+ * the person's current role and their own target titles itself.
+ */
+export const QueryChannel = {
+    TASKS: 'tasks',
+    ENVIRONMENT: 'environment',
+    TRANSFERABLE: 'transferable',
+    CROSS_INDUSTRY: 'cross_industry',
+    LESS_FAMILIAR: 'less_familiar'
+} as const;
+
+/**
+ * QueryChannel
+ *
+ * The model's discovery channels (spec section 4, DIV-1's five channels). Nessa adds
+ * the person's current role and their own target titles itself.
+ */
+export type QueryChannel = typeof QueryChannel[keyof typeof QueryChannel];
+
+/**
+ * QueryOut
+ */
+export type QueryOut = {
+    /**
+     * Query Id
+     */
+    query_id: string;
+    /**
+     * Text
+     */
+    text: string;
+    channel: QueryChannel;
+    /**
+     * Based On
+     */
+    based_on: Array<EvidenceOut>;
+};
+
+/**
  * RegisterProvisionalConcept
  */
 export type RegisterProvisionalConcept = {
@@ -1173,6 +1555,34 @@ export type RegisterProvisionalConcept = {
      * Title
      */
     title: string;
+};
+
+/**
+ * ReleaseRefOut
+ *
+ * The ESCO release the slate searched; show the attribution and adaptation with it.
+ */
+export type ReleaseRefOut = {
+    /**
+     * Dataset Id
+     */
+    dataset_id: string;
+    /**
+     * Version
+     */
+    version: string;
+    /**
+     * Attribution
+     */
+    attribution: string;
+    /**
+     * Adaptation
+     */
+    adaptation: string;
+    /**
+     * Sample
+     */
+    sample: boolean;
 };
 
 /**
@@ -1190,9 +1600,28 @@ export type RenameWorkspaceIn = {
 };
 
 /**
+ * Resolution
+ */
+export const Resolution = {
+    ESCO: 'esco',
+    AMBIGUOUS: 'ambiguous',
+    PROVISIONAL: 'provisional',
+    NOT_FOUND: 'not_found'
+} as const;
+
+/**
+ * Resolution
+ */
+export type Resolution = typeof Resolution[keyof typeof Resolution];
+
+/**
  * RunKind
  */
-export const RunKind = { CONNECTION_CHECK: 'connection_check', INTERVIEW_TURN: 'interview_turn' } as const;
+export const RunKind = {
+    CONNECTION_CHECK: 'connection_check',
+    INTERVIEW_TURN: 'interview_turn',
+    DISCOVERY: 'discovery'
+} as const;
 
 /**
  * RunKind
@@ -1265,6 +1694,44 @@ export type RunPage = {
 };
 
 /**
+ * SalaryField
+ */
+export type SalaryField = {
+    state: FieldState;
+    value?: SalaryFloor | null;
+    /**
+     * Source Ref Id
+     */
+    source_ref_id?: string | null;
+};
+
+/**
+ * SalaryFloor
+ *
+ * The lowest gross pay the person will accept, as they gave it: its period is kept and
+ * never converted, because annualising needs working hours (spec section 5).
+ */
+export type SalaryFloor = {
+    amount: Money;
+    /**
+     * Annual unless the person says otherwise.
+     */
+    period: PayPeriod;
+    /**
+     * Basis
+     */
+    basis?: 'gross';
+};
+
+/**
+ * SalaryInput
+ */
+export type SalaryInput = {
+    state: FieldState;
+    value?: SalaryFloor | null;
+};
+
+/**
  * SearchMatch
  */
 export const SearchMatch = { ALL: 'all', ANY: 'any' } as const;
@@ -1273,6 +1740,26 @@ export const SearchMatch = { ALL: 'all', ANY: 'any' } as const;
  * SearchMatch
  */
 export type SearchMatch = typeof SearchMatch[keyof typeof SearchMatch];
+
+/**
+ * SetPreferences
+ *
+ * The whole set of preferences; null means not chosen.
+ */
+export type SetPreferences = {
+    /**
+     * Expected Version
+     *
+     * 0 while nothing has been saved.
+     */
+    expected_version: number;
+    entry_mode: EntryMode | null;
+    conversation_mode: ConversationMode | null;
+    /**
+     * Paused
+     */
+    paused: boolean;
+};
 
 /**
  * SetSpendLimits
@@ -1292,6 +1779,43 @@ export type SetSpendLimits = {
      * Period Limit Nano Usd
      */
     period_limit_nano_usd: number;
+};
+
+/**
+ * SketchOut
+ *
+ * The early requirement sketch: never a feasible or optimal route, never priced or
+ * dated. Every step stays unresolved until a later chapter resolves it.
+ */
+export type SketchOut = {
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    /**
+     * Inputs
+     *
+     * The minimum inputs: a target and four practical answers.
+     */
+    inputs: {
+        [key in ProfileField]?: FieldState;
+    };
+    /**
+     * Not Asked
+     */
+    not_asked: Array<ProfileField>;
+    /**
+     * Targets
+     */
+    targets: Array<TargetSketchOut>;
+    /**
+     * Steps
+     */
+    steps: Array<StepOut>;
 };
 
 /**
@@ -1319,12 +1843,131 @@ export type SkillRefOut = {
 };
 
 /**
+ * SlateChannel
+ *
+ * How a candidate was found: the model's channels plus Nessa's own.
+ */
+export const SlateChannel = {
+    CURRENT: 'current',
+    USER_PROPOSED: 'user_proposed',
+    TASKS: 'tasks',
+    ENVIRONMENT: 'environment',
+    TRANSFERABLE: 'transferable',
+    CROSS_INDUSTRY: 'cross_industry',
+    LESS_FAMILIAR: 'less_familiar',
+    HYPOTHESIS: 'hypothesis'
+} as const;
+
+/**
+ * SlateChannel
+ *
+ * How a candidate was found: the model's channels plus Nessa's own.
+ */
+export type SlateChannel = typeof SlateChannel[keyof typeof SlateChannel];
+
+/**
+ * SlateOut
+ *
+ * A varied slate of up to six career hypotheses from the discovery's searches, computed
+ * deterministically each time it is read, with every count that explains it.
+ */
+export type SlateOut = {
+    /**
+     * Discovery Id
+     */
+    discovery_id: string;
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    release: ReleaseRefOut;
+    emphasis: Emphasis;
+    /**
+     * Target Size
+     */
+    target_size?: number;
+    /**
+     * Family Limit
+     *
+     * At most this many from one kind of work.
+     */
+    family_limit: number;
+    /**
+     * Suggestions
+     */
+    suggestions: Array<SuggestionOut>;
+    /**
+     * Fewer Reasons
+     *
+     * Why there are fewer than six, if there are.
+     */
+    fewer_reasons: Array<string>;
+    /**
+     * Notes
+     *
+     * How a control changed the slate, in words.
+     */
+    notes: Array<string>;
+    /**
+     * Limits Not Applied
+     *
+     * Limits you set that the slate records but cannot apply yet.
+     */
+    limits_not_applied: Array<string>;
+    /**
+     * Pool Size
+     *
+     * Distinct occupations after folding near-duplicates.
+     */
+    pool_size: number;
+    /**
+     * Pool Target
+     */
+    pool_target?: [
+        number,
+        number
+    ];
+    /**
+     * Beyond Pool Limit
+     *
+     * Occupations found past the pool's bound.
+     */
+    beyond_pool_limit: number;
+    excluded: ExcludedOut;
+    /**
+     * Queries
+     *
+     * Every search that ran, with its hits.
+     */
+    queries: Array<PoolQueryOut>;
+    /**
+     * Unsearchable Queries
+     *
+     * Queries with no searchable word.
+     */
+    unsearchable_queries: Array<string>;
+    /**
+     * Unsupported Hypotheses
+     *
+     * Titles Nessa thought of that ESCO does not list: never suggested.
+     */
+    unsupported_hypotheses: Array<string>;
+    /**
+     * Not Included
+     *
+     * Show why this wasn't included.
+     */
+    not_included: Array<NotIncludedOut>;
+};
+
+/**
  * SourceKind
  */
 export const SourceKind = {
     DIRECT_ENTRY: 'direct_entry',
     FIXTURE: 'fixture',
-    CONVERSATION: 'conversation'
+    CONVERSATION: 'conversation',
+    OCCUPATION_CHOICE: 'occupation_choice'
 } as const;
 
 /**
@@ -1377,6 +2020,12 @@ export type SourceOut = {
      */
     message_ids?: Array<string>;
     basis?: Basis | null;
+    /**
+     * Discovery Id
+     *
+     * An occupation choice: the discovery that suggested it.
+     */
+    discovery_id?: string | null;
 };
 
 /**
@@ -1391,6 +2040,26 @@ export type SourcePage = {
      * Next Cursor
      */
     next_cursor: string | null;
+};
+
+/**
+ * SourceRefOut
+ */
+export type SourceRefOut = {
+    /**
+     * Kind
+     */
+    kind?: 'esco';
+    /**
+     * Uri
+     *
+     * The ESCO occupation's URI.
+     */
+    uri: string;
+    /**
+     * Release
+     */
+    release: string;
 };
 
 /**
@@ -1445,6 +2114,28 @@ export const SpendState = {
 export type SpendState = typeof SpendState[keyof typeof SpendState];
 
 /**
+ * StepOut
+ */
+export type StepOut = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Chapter
+     */
+    chapter: string;
+    /**
+     * Detail
+     */
+    detail: string;
+    /**
+     * State
+     */
+    state: 'unresolved';
+};
+
+/**
  * StoreKey
  */
 export type StoreKey = {
@@ -1452,6 +2143,16 @@ export type StoreKey = {
      * Consent To Encrypted Storage
      */
     consent_to_encrypted_storage: boolean;
+};
+
+/**
+ * SubmitDiscovery
+ */
+export type SubmitDiscovery = {
+    /**
+     * Expected Profile Version
+     */
+    expected_profile_version: number;
 };
 
 /**
@@ -1479,6 +2180,160 @@ export type SubmitTurn = {
      * Message
      */
     message: string;
+    /**
+     * Send After Support
+     *
+     * The person was shown the support response for this message and chose to send it to the interviewer anyway.
+     */
+    send_after_support?: boolean;
+};
+
+/**
+ * SuggestionOut
+ *
+ * A career hypothesis (spec section 4's `CareerSuggestion`): an ESCO occupation, the
+ * answers that found it and ESCO's facts about it, in words. Becoming a target needs the
+ * person's choice (`POST .../targets`).
+ */
+export type SuggestionOut = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Concept Kind
+     */
+    concept_kind?: 'esco';
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Esco Code
+     */
+    esco_code: string;
+    isco_group: IscoGroupOut;
+    /**
+     * The kind of work: its ISCO-08 minor group.
+     */
+    family: IscoGroupOut;
+    /**
+     * Its ISCO-08 major group.
+     */
+    sector: IscoGroupOut;
+    direction: Direction;
+    /**
+     * Channels
+     */
+    channels: Array<SlateChannel>;
+    /**
+     * Linked Evidence
+     *
+     * The answers that found it.
+     */
+    linked_evidence: Array<EvidenceOut>;
+    /**
+     * Matched Queries
+     *
+     * The query IDs that found it.
+     */
+    matched_queries: Array<string>;
+    /**
+     * Sources
+     */
+    sources: Array<SourceRefOut>;
+    /**
+     * Workday
+     *
+     * ESCO's description of the work, shortened.
+     */
+    workday: string;
+    /**
+     * Why It Could Suit
+     */
+    why_it_could_suit: Array<string>;
+    /**
+     * What Might Not Suit
+     */
+    what_might_not_suit: Array<string>;
+    /**
+     * Entry Gates
+     */
+    entry_gates: Array<string>;
+    /**
+     * Evidence Gaps
+     */
+    evidence_gaps: Array<string>;
+    /**
+     * Try It
+     *
+     * Low-cost ways to test the idea before committing.
+     */
+    try_it: Array<string>;
+};
+
+/**
+ * SupportResourceOut
+ */
+export type SupportResourceOut = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Contact
+     */
+    contact: string;
+    /**
+     * When
+     */
+    when: string;
+    /**
+     * Source Url
+     */
+    source_url: string;
+    /**
+     * Checked On
+     *
+     * When the service's own page was last checked.
+     */
+    checked_on: string;
+};
+
+/**
+ * SupportResponseOut
+ *
+ * Given instead of a turn when a message explicitly expresses acute distress: the
+ * message was not sent to the interviewer and nothing was stored. Kept apart from career
+ * suitability. Resend with `send_after_support` to send the message anyway.
+ */
+export type SupportResponseOut = {
+    /**
+     * Policy
+     */
+    policy: 'acute_distress';
+    /**
+     * Policy Version
+     */
+    policy_version: string;
+    /**
+     * Review Status
+     *
+     * The policy is provisional until reviewed.
+     */
+    review_status: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Resources
+     */
+    resources: Array<SupportResourceOut>;
+    /**
+     * Sent To Interviewer
+     */
+    sent_to_interviewer?: false;
 };
 
 /**
@@ -1490,6 +2345,49 @@ export type TargetListInput = {
      * Value
      */
     value?: Array<string> | null;
+};
+
+/**
+ * TargetSketchOut
+ */
+export type TargetSketchOut = {
+    /**
+     * Title
+     */
+    title: string;
+    resolution: Resolution;
+    /**
+     * Occupations
+     *
+     * The ESCO occupation, or the several that share the title (choose one).
+     */
+    occupations: Array<OccupationRefOut>;
+    /**
+     * Close Matches
+     *
+     * For a title ESCO does not hold: the nearest occupations by full text.
+     */
+    close_matches: Array<OccupationRefOut>;
+    /**
+     * Requirements
+     *
+     * ESCO's essential skills, the first few.
+     */
+    requirements: Array<string>;
+    /**
+     * Requirement Count
+     *
+     * null: no requirement list.
+     */
+    requirement_count: number | null;
+    /**
+     * Regulated
+     */
+    regulated: boolean | null;
+    /**
+     * Research Status
+     */
+    research_status: string;
 };
 
 /**
@@ -1714,7 +2612,7 @@ export type WorkspaceExport = {
     /**
      * Format Version
      */
-    format_version?: 2;
+    format_version?: 3;
     /**
      * Exported At
      */
@@ -1754,6 +2652,13 @@ export type WorkspaceExport = {
      * Provisional Concepts
      */
     provisional_concepts: Array<ProvisionalConceptOut>;
+    /**
+     * Discoveries
+     *
+     * Oldest first; slates are recomputed.
+     */
+    discoveries: Array<DiscoveryOut>;
+    interview_preferences: PreferencesOut;
     spend: SpendOut;
 };
 
@@ -2780,12 +3685,92 @@ export type SubmitTurnError = SubmitTurnErrors[keyof SubmitTurnErrors];
 
 export type SubmitTurnResponses = {
     /**
+     * The message explicitly expresses acute distress: the support response, with nothing sent to the interviewer or stored.
+     */
+    200: SupportResponseOut;
+    /**
      * Successful Response
      */
     202: TurnOut;
 };
 
 export type SubmitTurnResponse = SubmitTurnResponses[keyof SubmitTurnResponses];
+
+export type GetPreferencesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/interview/preferences';
+};
+
+export type GetPreferencesErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetPreferencesError = GetPreferencesErrors[keyof GetPreferencesErrors];
+
+export type GetPreferencesResponses = {
+    /**
+     * Successful Response
+     */
+    200: PreferencesOut;
+};
+
+export type GetPreferencesResponse = GetPreferencesResponses[keyof GetPreferencesResponses];
+
+export type PutPreferencesData = {
+    body: SetPreferences;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/interview/preferences';
+};
+
+export type PutPreferencesErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type PutPreferencesError = PutPreferencesErrors[keyof PutPreferencesErrors];
+
+export type PutPreferencesResponses = {
+    /**
+     * Successful Response
+     */
+    200: PreferencesOut;
+};
+
+export type PutPreferencesResponse = PutPreferencesResponses[keyof PutPreferencesResponses];
 
 export type GetTurnData = {
     body?: never;
@@ -2912,6 +3897,257 @@ export type DecideTurnResponses = {
 };
 
 export type DecideTurnResponse = DecideTurnResponses[keyof DecideTurnResponses];
+
+export type ListDiscoveriesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: {
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/v1/workspaces/{workspace_id}/discoveries';
+};
+
+export type ListDiscoveriesErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ListDiscoveriesError = ListDiscoveriesErrors[keyof ListDiscoveriesErrors];
+
+export type ListDiscoveriesResponses = {
+    /**
+     * Successful Response
+     */
+    200: DiscoveryPage;
+};
+
+export type ListDiscoveriesResponse = ListDiscoveriesResponses[keyof ListDiscoveriesResponses];
+
+export type SubmitDiscoveryData = {
+    body: SubmitDiscovery;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/discoveries';
+};
+
+export type SubmitDiscoveryErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type SubmitDiscoveryError = SubmitDiscoveryErrors[keyof SubmitDiscoveryErrors];
+
+export type SubmitDiscoveryResponses = {
+    /**
+     * Successful Response
+     */
+    202: DiscoveryOut;
+};
+
+export type SubmitDiscoveryResponse = SubmitDiscoveryResponses[keyof SubmitDiscoveryResponses];
+
+export type GetDiscoveryData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Discovery Id
+         */
+        discovery_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/discoveries/{discovery_id}';
+};
+
+export type GetDiscoveryErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetDiscoveryError = GetDiscoveryErrors[keyof GetDiscoveryErrors];
+
+export type GetDiscoveryResponses = {
+    /**
+     * Successful Response
+     */
+    200: DiscoveryOut;
+};
+
+export type GetDiscoveryResponse = GetDiscoveryResponses[keyof GetDiscoveryResponses];
+
+export type GetSlateData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Discovery Id
+         */
+        discovery_id: string;
+    };
+    query?: {
+        emphasis?: Emphasis;
+        /**
+         * Exclude Concept
+         */
+        exclude_concept?: Array<string>;
+        /**
+         * Exclude Family
+         */
+        exclude_family?: Array<string>;
+    };
+    url: '/v1/workspaces/{workspace_id}/discoveries/{discovery_id}/slate';
+};
+
+export type GetSlateErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetSlateError = GetSlateErrors[keyof GetSlateErrors];
+
+export type GetSlateResponses = {
+    /**
+     * Successful Response
+     */
+    200: SlateOut;
+};
+
+export type GetSlateResponse = GetSlateResponses[keyof GetSlateResponses];
+
+export type ChooseTargetData = {
+    body: ChooseTarget;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/targets';
+};
+
+export type ChooseTargetErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ChooseTargetError = ChooseTargetErrors[keyof ChooseTargetErrors];
+
+export type ChooseTargetResponses = {
+    /**
+     * Already a target; nothing changed.
+     */
+    200: ProfileOut;
+    /**
+     * Successful Response
+     */
+    201: ProfileOut;
+};
+
+export type ChooseTargetResponse = ChooseTargetResponses[keyof ChooseTargetResponses];
+
+export type GetSketchData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/sketch';
+};
+
+export type GetSketchErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetSketchError = GetSketchErrors[keyof GetSketchErrors];
+
+export type GetSketchResponses = {
+    /**
+     * Successful Response
+     */
+    200: SketchOut;
+};
+
+export type GetSketchResponse = GetSketchResponses[keyof GetSketchResponses];
 
 export type GetTaxonomyData = {
     body?: never;

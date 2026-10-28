@@ -11,7 +11,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
 import type { ProfileDocument, ProfileOut } from "@/generated/api";
 import { ApiError, ChangeKeys } from "@/lib/api";
-import { listLimit } from "@/lib/bounds";
 import {
   describeField,
   draftFrom,
@@ -27,7 +26,7 @@ import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { useEvidence } from "./EvidenceDrawer";
 import { FieldSource } from "./FieldSource";
-import { FieldError, FieldStateSelect, ListInput, ValueInput } from "./fields";
+import { AnswerControl, FieldError, FieldStateSelect } from "./fields";
 import { Glyph } from "./Glyph";
 import { RequestFailure } from "./PageState";
 
@@ -247,27 +246,15 @@ export function ProfileEditor({
                   describedBy={conflict ? conflictId : undefined}
                   onChange={(next) => change(name, next)}
                 />
-                {field.state === "provided" &&
-                  (meta.kind === "list" ? (
-                    <ListInput
-                      label={meta.label}
-                      itemLabel={meta.itemLabel}
-                      limit={listLimit(name)}
-                      draft={field}
-                      error={error}
-                      describedBy={describedBy}
-                      onChange={(next) => change(name, next)}
-                    />
-                  ) : (
-                    <ValueInput
-                      label={meta.label}
-                      kind={meta.kind}
-                      draft={field}
-                      error={error}
-                      describedBy={describedBy}
-                      onChange={(next) => change(name, next)}
-                    />
-                  ))}
+                {field.state === "provided" && (
+                  <AnswerControl
+                    name={name}
+                    draft={field}
+                    error={error}
+                    describedBy={describedBy}
+                    onChange={(next) => change(name, next)}
+                  />
+                )}
               </div>
               {field.state !== "provided" && field.state !== "unasked" && (
                 <p className="small muted">Less precise without it: {meta.lessPrecise}</p>

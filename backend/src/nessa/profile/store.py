@@ -71,11 +71,14 @@ def insert_source(
     message_ids: tuple[uuid.UUID, ...] = (),
     basis: Basis | None = None,
 ) -> None:
-    # Only a conversation source names a turn, messages and a basis (a CHECK holds the
-    # others to NULL), so other kinds are written without those columns.
+    # Only a conversation source names a turn, messages and a basis, and only it or an
+    # occupation choice a run (CHECKs hold the others to NULL), so other kinds are written
+    # without those columns.
     conversation = kind is SourceKind.CONVERSATION
     extra = ", run_id, message_ids, basis" if conversation else ""
     extra_values = ", :run, :messages, :basis" if conversation else ""
+    if kind is SourceKind.OCCUPATION_CHOICE:
+        extra, extra_values = ", run_id", ", :run"
     tx.execute(
         sa.text(
             "INSERT INTO nessa.source_references (source_ref_id, workspace_id, kind, label, "
@@ -98,6 +101,8 @@ def insert_source(
                     "basis": basis.value if basis else None,
                 }
                 if conversation
+                else {"run": run_id}
+                if kind is SourceKind.OCCUPATION_CHOICE
                 else {}
             ),
         },

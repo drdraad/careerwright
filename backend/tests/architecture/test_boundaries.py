@@ -58,6 +58,7 @@ ADAPTERS: dict[str, frozenset[str]] = {
     "nessa.identity.workflow": frozenset({"dbos"}),
     "nessa.identity.worker": frozenset({"dbos"}),
     "nessa.profile.interview_agent": frozenset({"pydantic_ai"}),
+    "nessa.profile.discovery_agent": frozenset({"pydantic_ai"}),
     "nessa.worker": frozenset({"pydantic_ai"}),
     "nessa.api.": frozenset({"fastapi", "starlette", "anyio"}),
 }

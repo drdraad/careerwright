@@ -86,6 +86,26 @@ class OccupationDetail:
 
 
 @dataclass(frozen=True)
+class OccupationFacts:
+    """What discovery shows about an occupation: its ESCO identity, its ISCO-08 unit, minor
+    (family) and major (sector) groups, and its essential skills (the first few, and how
+    many there are)."""
+
+    concept_id: uuid.UUID
+    preferred_label: str
+    esco_uri: str
+    esco_code: str
+    description: str
+    regulated: bool | None
+    unit: IscoGroupRef
+    family: IscoGroupRef
+    sector: IscoGroupRef
+    label_keys: frozenset[str]  # non-hidden labels as `nessa.concept_key`
+    essential_skills: tuple[str, ...]
+    essential_skill_count: int
+
+
+@dataclass(frozen=True)
 class ProvisionalConcept:
     """A verified title outside ESCO: an internal concept with no ESCO URI or ISCO group."""
 

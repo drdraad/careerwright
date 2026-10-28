@@ -3,7 +3,22 @@
 // generated unions makes a new API value a compile error here until it has words.
 
 import type { GlyphName } from "@/components/Glyph";
-import type { DataMode, ErrorCode, FieldState, ProfileInput, WorkState } from "@/generated/api";
+import type {
+  ConversationMode,
+  DataMode,
+  Direction,
+  Emphasis,
+  EntryMode,
+  ErrorCode,
+  FailureClass,
+  FieldState,
+  NotIncluded,
+  PartialCompleteness,
+  PayPeriod,
+  ProfileInput,
+  Resolution,
+  WorkState,
+} from "@/generated/api";
 import { listLimit } from "./bounds";
 
 /** Only error and stale add a hue; everything else is carried by glyph and words. */
@@ -62,13 +77,21 @@ export const DATA_MODE: Record<DataMode, string> = {
 
 export type ProfileFieldName = keyof ProfileInput;
 
-type FieldKind = "text" | "list" | "hours" | "money";
+type FieldKind = "text" | "list" | "hours" | "money" | "salary";
 
 type FieldWords = { label: string; hint: string; lessPrecise: string } & (
   | { kind: Exclude<FieldKind, "list"> }
   // A list's bound comes from the API's published schema (`listLimit` in ./profile).
   | { kind: "list"; itemLabel: string }
 );
+
+/** A pay period as it reads after an amount ("£28,000 a year"). */
+export const PAY_PERIOD: Record<PayPeriod, string> = {
+  year: "a year",
+  month: "a month",
+  week: "a week",
+  hour: "an hour",
+};
 
 /** Words for each profile field and, per spec section 3, what a missing answer makes less precise. */
 export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
@@ -137,6 +160,20 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
     hint: "Things you have done and could point to, such as work, a course or a reference.",
     lessPrecise: "Which requirements count as demonstrated rather than unresolved.",
   },
+  work_style: {
+    label: "How you like to work",
+    kind: "list",
+    itemLabel: "Way you like to work",
+    hint: "Optional, in your own words, such as outdoors or in a small team. It never rules work out.",
+    lessPrecise: "Nothing is ruled out: suggestions just lean less on your working preferences.",
+  },
+  minimum_salary: {
+    label: "Lowest pay you'd accept",
+    kind: "salary",
+    hint: "Before tax, with its period. A firm limit once you confirm it.",
+    lessPrecise:
+      "No route is checked against pay. Unknown pay is never treated as below your limit.",
+  },
 };
 
 export const PROFILE_FIELD_ORDER: readonly ProfileFieldName[] = [
@@ -146,11 +183,139 @@ export const PROFILE_FIELD_ORDER: readonly ProfileFieldName[] = [
   "weekly_study_hours",
   "direct_spend_cap",
   "monthly_payment_cap",
+  "minimum_salary",
   "enjoyed_tasks",
   "confident_tasks",
   "evidenced_tasks",
+  "work_style",
   "preferred_name",
 ];
+
+/** The entry choices (spec section 3: "I know my direction" or "Help me explore"). */
+export const ENTRY_MODE: Record<EntryMode, { label: string; detail: string }> = {
+  sure: {
+    label: "I know my direction",
+    detail: "Confirm the role you're aiming for, then the practical limits.",
+  },
+  unsure: {
+    label: "Help me explore",
+    detail: "Start from what you enjoy. Nessa suggests varied directions to consider.",
+  },
+};
+
+/** The tone the person chooses (spec section 4); practical until they choose another. */
+export const CONVERSATION_MODE: Record<ConversationMode, string> = {
+  practical: "Keep this practical",
+  gentle: "Help me explore gently",
+  challenge: "Challenge my assumptions",
+};
+
+/** Nessa's first question for each entry, before any reply exists (spec section 4). */
+export const OPENING_QUESTION: Record<EntryMode, string> = {
+  sure: "Which role are you aiming for, and at what level?",
+  unsure: "What would you most like to be different about your working life?",
+};
+
+/** A streamed reply's state in words. Only "incomplete" is final; nothing streamed is saved. */
+export const PARTIAL_REPLY: Record<PartialCompleteness, { label: string; tone: Tone }> = {
+  none: { label: "Nessa is reading your message", tone: "neutral" },
+  streaming: { label: "Writing a reply, not checked yet", tone: "neutral" },
+  stopped: { label: "The reply stopped. Nessa is trying again", tone: "stale" },
+  incomplete: { label: "This reply didn't finish and wasn't checked", tone: "error" },
+  superseded: { label: "Checked reply", tone: "neutral" },
+};
+
+/** Why a model run ended without a result, in the person's words (failure classes). */
+export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string }> = {
+  access_revoked: {
+    title: "Access to this workspace ended while Nessa was working",
+    action: "Nothing was saved from it.",
+  },
+  credential_unavailable: {
+    title: "No usable Meta key was found",
+    action: "Save a key to continue. Editing still works without one.",
+  },
+  model_not_permitted: {
+    title: "That model isn't allowed for this workspace's data",
+    action: "Nothing was sent. Check the workspace's data label.",
+  },
+  budget_exceeded: {
+    title: "The spending limit for model calls is reached",
+    action: "Raise the limit or wait for the next month.",
+  },
+  provider_authentication: {
+    title: "Meta didn't accept the key",
+    action: "Rotate it with a working key, then try again.",
+  },
+  provider_billing: {
+    title: "Meta refused the call for billing reasons",
+    action: "Check your Meta account, then try again.",
+  },
+  provider_permission: {
+    title: "The key isn't allowed to use that model",
+    action: "Check the key's access in your Meta account.",
+  },
+  provider_request_rejected: {
+    title: "Meta rejected the request",
+    action: "Try again. If it repeats, add the details yourself.",
+  },
+  provider_unavailable: {
+    title: "Meta isn't available right now",
+    action: "Your work is kept. Try again later.",
+  },
+  invalid_model_output: {
+    title: "The reply didn't pass Nessa's checks twice",
+    action: "Nothing was saved from it. Try again, or add the details yourself.",
+  },
+  model_refused: {
+    title: "The model declined to answer",
+    action: "Nothing was saved. Rephrase, or add the details yourself.",
+  },
+  output_truncated: {
+    title: "The reply was cut off",
+    action: "Nothing was saved from it. Try a shorter message.",
+  },
+  app_store_unavailable: {
+    title: "Nessa couldn't save the result",
+    action: "Try again in a moment.",
+  },
+  unknown_failure: {
+    title: "Something went wrong while Nessa was working",
+    action: "Nothing was saved from it. Try again.",
+  },
+};
+
+/** The slate's three directions (relative to what the person has told Nessa). */
+export const DIRECTION: Record<Direction, string> = {
+  close_to_current: "Close to what you do now",
+  transferable: "Builds on skills you could carry over",
+  less_familiar: "Something different",
+};
+
+export const EMPHASIS: Record<Emphasis, string> = {
+  balanced: "Balanced",
+  practical: "Closer to what I do",
+  unfamiliar: "Less familiar",
+  broad: "Broader",
+  deeper: "More depth",
+};
+
+/** "Show why this wasn't included". */
+export const NOT_INCLUDED: Record<NotIncluded, string> = {
+  duplicate: "Nearly the same as another occupation",
+  excluded_occupation: "You said it's not for you",
+  excluded_family: "You excluded this kind of work",
+  below_relevance_floor: "Matched your answers too weakly to suggest",
+  family_limit: "Its kind of work is already shown",
+  less_relevant: "Matched less closely than the ones shown",
+};
+
+export const RESOLUTION: Record<Resolution, string> = {
+  esco: "Found in ESCO",
+  ambiguous: "Several ESCO occupations have this title",
+  provisional: "Your own title, not in ESCO",
+  not_found: "Not found in ESCO",
+};
 
 /** An error code in the status vocabulary: its words and its tone (STATE-01). */
 export type ErrorStatement = { title: string; action: string; tone: Tone };

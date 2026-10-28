@@ -11,8 +11,10 @@ from pydantic import Field
 
 from nessa.api.catalogue_schemas import ProvisionalConceptOut
 from nessa.api.deps import CallerDep, Deps
+from nessa.api.discovery_schemas import DiscoveryOut
 from nessa.api.envelope import ERROR_RESPONSES
-from nessa.api.interview_schemas import TurnOut
+from nessa.api.interview_schemas import PreferencesOut, TurnOut
+from nessa.api.routes_discovery import discovery_out
 from nessa.api.routes_interview import turn_out
 from nessa.api.routes_runs import run_out
 from nessa.api.schemas import (
@@ -37,6 +39,8 @@ from nessa.identity.workspaces import visible_workspace
 from nessa.profile import interview_store
 from nessa.profile import store as profile_store
 from nessa.profile.conversation import turn_view
+from nessa.profile.exploration import DiscoveryView, discoveries
+from nessa.profile.preferences import current_preferences
 from nessa.profile.records import InterviewTurn, ProfileVersion, SourceReference
 
 router = APIRouter(
@@ -47,7 +51,7 @@ PAGE = 500
 
 class WorkspaceExport(ResponseModel):
     format: Literal["nessa.workspace-export"] = "nessa.workspace-export"
-    format_version: Literal[2] = 2
+    format_version: Literal[3] = 3
     exported_at: datetime
     synthetic: bool
     workspace: WorkspaceOut
@@ -58,7 +62,22 @@ class WorkspaceExport(ResponseModel):
     runs: list[RunOut]
     interview_turns: list[TurnOut] = Field(description="Oldest first.")
     provisional_concepts: list[ProvisionalConceptOut]
+    discoveries: list[DiscoveryOut] = Field(description="Oldest first; slates are recomputed.")
+    interview_preferences: PreferencesOut
     spend: SpendOut
+
+
+def _all_discoveries(tx: Tx, keyring: Keyring, workspace_id: uuid.UUID) -> list[DiscoveryOut]:
+    views: list[DiscoveryView] = []
+    while page := discoveries(
+        tx,
+        keyring,
+        workspace_id,
+        before=(views[-1].run.created_at, views[-1].run.run_id) if views else None,
+        limit=PAGE,
+    ):
+        views.extend(page)
+    return [discovery_out(tx, keyring, view) for view in reversed(views)]
 
 
 def _all_runs(tx: Tx, keyring: Keyring, workspace_id: uuid.UUID) -> list[RunOut]:
@@ -138,6 +157,8 @@ def export_workspace(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> 
         runs = _all_runs(tx, deps.keyring, workspace_id)
         turns = _all_turns(tx, deps.keyring, workspace_id)
         concepts = _all_concepts(tx, workspace_id)
+        found = _all_discoveries(tx, deps.keyring, workspace_id)
+        preferences = current_preferences(tx, workspace_id)
         spend = spend_summary(tx, workspace_id, deps.clock(), deps.spend_defaults)
     return WorkspaceExport(
         exported_at=deps.clock(),
@@ -150,5 +171,7 @@ def export_workspace(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> 
         runs=runs,
         interview_turns=turns,
         provisional_concepts=[ProvisionalConceptOut.of(c) for c in concepts],
+        discoveries=found,
+        interview_preferences=PreferencesOut.of(preferences),
         spend=SpendOut.of(spend),
     )

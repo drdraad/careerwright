@@ -21,7 +21,7 @@ from nessa.profile.interview import (
     ProfileField,
     PromptContext,
 )
-from nessa.profile.records import Basis
+from nessa.profile.records import Basis, EntryMode
 
 REPLY_PREFIX = "Demo interviewer (synthetic): "
 # Spec section 3, early value: current work, weekly availability, budget and work area.
@@ -41,6 +41,8 @@ QUESTIONS = {
     ),
     ProfileField.TARGET_TITLES: "Do you have a role in mind, or would you like to explore?",
 }
+SURE_QUESTION = "Which role are you aiming for, and at what level?"
+UNSURE_QUESTION = "What would you most like to be different about your working life?"
 _HOURS = re.compile(r"\b([0-9]{1,3}(?:\.[0-9]{1,2})?)\s*(?:hours?|hrs?)\b", re.IGNORECASE)
 # At most nine whole-pound digits, the bound `interview.MONEY_PATTERN` accepts; a longer
 # amount matches nothing, so the fixture never proposes a value the check would refuse.
@@ -48,6 +50,9 @@ _MONEY = re.compile(
     r"£\s?([0-9]{1,3}(?:,[0-9]{3}){1,2}|[0-9]{1,9})(?![0-9]|,[0-9])(?:\.([0-9]{1,2}))?"
 )
 _MONTH = re.compile(r"\b(?:a|per|each|every) month\b|\bmonthly\b", re.IGNORECASE)
+# An amount in a sentence about pay is a salary floor, not a spending limit.
+_PAY = re.compile(r"\b(?:salary|earn(?:ing)?|paid|wage|a year|per year|annual(?:ly)?)\b", re.I)
+_HOURLY = re.compile(r"\b(?:an|per|a) hour\b|\bhourly\b", re.IGNORECASE)
 _ROLE = re.compile(
     r"\bI(?:'m| am| work as) (?:a|an) ([A-Za-z][A-Za-z -]{2,60}?)(?=[.,;!?]| in | at | and |$)"
 )
@@ -118,16 +123,29 @@ def _proposals(context: PromptContext, ref: str, text: str) -> list[ModelUpdate]
         )
     if money := _MONEY.search(text):
         pounds = money.group(1).replace(",", "") + (f".{money.group(2)}" if money.group(2) else "")
-        monthly = _MONTH.search(_sentence(text, money.start())) is not None
-        updates.append(
-            _update(
-                ProfileField.MONTHLY_PAYMENT_CAP if monthly else ProfileField.DIRECT_SPEND_CAP,
-                ref,
-                "You mentioned this amount as a limit.",
-                text=pounds,
-                basis=Basis.INFERRED,
+        sentence = _sentence(text, money.start())
+        monthly = _MONTH.search(sentence) is not None
+        if _PAY.search(sentence) or _HOURLY.search(sentence):
+            period = "hour" if _HOURLY.search(sentence) else "month" if monthly else "year"
+            updates.append(
+                _update(
+                    ProfileField.MINIMUM_SALARY,
+                    ref,
+                    "You mentioned this as the least you would earn.",
+                    text=f"{pounds} per {period}",
+                    basis=Basis.INFERRED,
+                )
             )
-        )
+        else:
+            updates.append(
+                _update(
+                    ProfileField.MONTHLY_PAYMENT_CAP if monthly else ProfileField.DIRECT_SPEND_CAP,
+                    ref,
+                    "You mentioned this amount as a limit.",
+                    text=pounds,
+                    basis=Basis.INFERRED,
+                )
+            )
     elif _DECLINE.search(text) and _MONEY_WORDS.search(text):
         updates.append(
             _update(
@@ -155,6 +173,10 @@ def _proposals(context: PromptContext, ref: str, text: str) -> list[ModelUpdate]
     return updates
 
 
+def _nothing_known(context: PromptContext) -> bool:
+    return all(field.state is FieldState.UNASKED for field in context.profile.values())
+
+
 def fixture_turn(context: PromptContext) -> InterviewTurnOutput:
     current = next(m for m in context.messages if m.ref == context.current_message)
     updates = _proposals(context, current.ref, current.text)
@@ -164,9 +186,20 @@ def fixture_turn(context: PromptContext) -> InterviewTurnOutput:
         for field in CRITICAL
         if field not in answered and context.profile[field].state is FieldState.UNASKED
     ]
-    if missing:
-        question: str | None = QUESTIONS[missing[0]]
-    elif context.profile[ProfileField.TARGET_TITLES].state is FieldState.UNASKED:
+    target_unasked = (
+        ProfileField.TARGET_TITLES not in answered
+        and context.profile[ProfileField.TARGET_TITLES].state is FieldState.UNASKED
+    )
+    # The entry the person chose leads: a sure person confirms the target first; an unsure
+    # person starts from what they want to change, before any practical question.
+    question: str | None
+    if context.entry is EntryMode.SURE and target_unasked:
+        question = SURE_QUESTION
+    elif context.entry is EntryMode.UNSURE and not updates and _nothing_known(context):
+        question = UNSURE_QUESTION
+    elif missing:
+        question = QUESTIONS[missing[0]]
+    elif target_unasked:
         question = QUESTIONS[ProfileField.TARGET_TITLES]
     else:
         question = None

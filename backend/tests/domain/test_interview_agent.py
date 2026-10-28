@@ -20,7 +20,12 @@ from nessa.identity.failures import FailureClass, classify_failure
 from nessa.identity.model_registry import ModelMode
 from nessa.money import Money
 from nessa.profile.document import empty_profile
-from nessa.profile.fixture_interviewer import REPLY_PREFIX, fixture_turn
+from nessa.profile.fixture_interviewer import (
+    REPLY_PREFIX,
+    SURE_QUESTION,
+    UNSURE_QUESTION,
+    fixture_turn,
+)
 from nessa.profile.interview import (
     ContextMessage,
     InterviewProposal,
@@ -33,6 +38,7 @@ from nessa.profile.interview import (
     render_prompt,
 )
 from nessa.profile.interview_agent import fixture_interviewer_model, run_interview_turn
+from nessa.profile.records import EntryMode
 from tests.support.fake_models import FakeFailure, fake_model_builder
 
 AT = datetime(2027, 1, 1, tzinfo=UTC)
@@ -122,6 +128,35 @@ def test_the_fixture_asks_for_the_first_missing_critical_input_and_is_determinis
     ]
     assert first.next_question is not None
     assert "do you do" in first.next_question
+
+
+@pytest.mark.req("PROF-04")
+def test_the_fixture_reads_an_amount_about_pay_as_a_salary_floor_with_its_period() -> None:
+    yearly = fixture_turn(prompt_context(turn_input("I need to earn at least £24,000 a year.")))
+    hourly = fixture_turn(prompt_context(turn_input("I won't work for less than £12 an hour.")))
+
+    assert [(u.field, u.text) for u in yearly.proposed_updates] == [
+        (ProfileField.MINIMUM_SALARY, "24000 per year")
+    ]
+    assert [(u.field, u.text) for u in hourly.proposed_updates] == [
+        (ProfileField.MINIMUM_SALARY, "12 per hour")  # an hourly rate is pay, never annualised
+    ]
+    spend = fixture_turn(prompt_context(turn_input("I could spend £900 on a course.")))
+    assert [u.field for u in spend.proposed_updates] == [ProfileField.DIRECT_SPEND_CAP]
+
+
+@pytest.mark.req("PROF-08", "REC1-10")
+def test_the_fixture_follows_the_entry_the_person_chose() -> None:
+    def asked(entry: EntryMode | None, text: str) -> str | None:
+        ctx = turn_input(text).model_copy(update={"entry_mode": entry})
+        return fixture_turn(prompt_context(ctx)).next_question
+
+    sure = asked(EntryMode.SURE, "I could work in York.")
+    unsure = asked(EntryMode.UNSURE, "Hello.")
+
+    assert sure == SURE_QUESTION  # the target and its level first, no exploration
+    assert unsure == UNSURE_QUESTION  # what they want to change, before any practical limit
+    assert asked(None, "I could work in York.") == asked(EntryMode.UNSURE, "I could work in York.")
 
 
 def test_the_fixture_through_the_agent_returns_a_validated_fixture_proposal() -> None:

@@ -1747,6 +1747,16 @@
                 }
               }
             }
+          },
+          "200": {
+            "description": "The message explicitly expresses acute distress: the support response, with nothing sent to the interviewer or stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportResponseOut"
+                }
+              }
+            }
           }
         }
       },
@@ -1808,6 +1818,148 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TurnPage"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/interview/preferences": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Get Preferences",
+        "operationId": "get_preferences",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Put Preferences",
+        "operationId": "put_preferences",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPreferences"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesOut"
                 }
               }
             }
@@ -2071,6 +2223,506 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DecisionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/discoveries": {
+      "post": {
+        "tags": [
+          "discovery"
+        ],
+        "summary": "Submit",
+        "operationId": "submit_discovery",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitDiscovery"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "discovery"
+        ],
+        "summary": "List All",
+        "operationId": "list_discoveries",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryPage"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/discoveries/{discovery_id}": {
+      "get": {
+        "tags": [
+          "discovery"
+        ],
+        "summary": "Get One",
+        "operationId": "get_discovery",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "discovery_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Discovery Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/discoveries/{discovery_id}/slate": {
+      "get": {
+        "tags": [
+          "discovery"
+        ],
+        "summary": "Get Slate",
+        "description": "Recomputed on each read from the stored searches and the pinned taxonomy. The\ncontrols are view parameters only: they change nothing stored and are never limits.",
+        "operationId": "get_slate",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "discovery_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Discovery Id"
+            }
+          },
+          {
+            "name": "emphasis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Emphasis",
+              "default": "balanced"
+            }
+          },
+          {
+            "name": "exclude_concept",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "maxItems": 120,
+              "default": [],
+              "title": "Exclude Concept"
+            }
+          },
+          {
+            "name": "exclude_family",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9]{3}$"
+              },
+              "maxItems": 120,
+              "default": [],
+              "title": "Exclude Family"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlateOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/targets": {
+      "post": {
+        "tags": [
+          "discovery"
+        ],
+        "summary": "Choose",
+        "operationId": "choose_target",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChooseTarget"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already a target; nothing changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/sketch": {
+      "get": {
+        "tags": [
+          "discovery"
+        ],
+        "summary": "Get Sketch",
+        "operationId": "get_sketch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SketchOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
@@ -2682,6 +3334,54 @@
         "title": "Basis",
         "description": "How an answer relates to what the person said (spec section 3: factual confirmations\nand inferences are styled differently)."
       },
+      "ChooseTarget": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version"
+          },
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "replaces": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaces"
+          },
+          "discovery_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discovery Id",
+            "description": "The discovery that suggested it, if any."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "concept_id"
+        ],
+        "title": "ChooseTarget",
+        "description": "Make an ESCO occupation one of the targets: added, or in place of `replaces` (a\ntarget title it is the occupation for)."
+      },
       "CityListInput": {
         "properties": {
           "state": {
@@ -2731,6 +3431,16 @@
         ],
         "title": "ConnectionCheckResult",
         "description": "What the model proposes for the synthetic persona. Structurally valid is not true.\n\nLengths are checked by a validator rather than schema keywords, so the JSON schema sent\nto Meta stays within strict mode (Meta then enforces the structure itself)."
+      },
+      "ConversationMode": {
+        "type": "string",
+        "enum": [
+          "practical",
+          "gentle",
+          "challenge"
+        ],
+        "title": "ConversationMode",
+        "description": "The tone the person chose (spec section 4, \"Uncertainty and emotional comfort\")."
       },
       "CreateWorkspace": {
         "properties": {
@@ -2866,7 +3576,7 @@
               "type": "string"
             },
             "type": "array",
-            "maxItems": 10,
+            "maxItems": 12,
             "title": "Accept"
           },
           "confirm_hard_constraints": {
@@ -2874,7 +3584,7 @@
               "$ref": "#/components/schemas/ProfileField"
             },
             "type": "array",
-            "maxItems": 10,
+            "maxItems": 12,
             "title": "Confirm Hard Constraints"
           }
         },
@@ -2967,6 +3677,139 @@
         ],
         "title": "DecisionResult",
         "description": "The decision and the resulting profile. The proposals are read from the turn: this\nresponse is stored as the command's receipt, and model output is kept sealed."
+      },
+      "Direction": {
+        "type": "string",
+        "enum": [
+          "close_to_current",
+          "transferable",
+          "less_familiar"
+        ],
+        "title": "Direction"
+      },
+      "DiscoveryOut": {
+        "properties": {
+          "discovery_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Discovery Id"
+          },
+          "profile_version": {
+            "type": "integer",
+            "title": "Profile Version",
+            "description": "The profile version it read, pinned."
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunOut"
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiscoveryProposalOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "discovery_id",
+          "profile_version",
+          "run",
+          "proposal"
+        ],
+        "title": "DiscoveryOut",
+        "description": "One discovery. `run` is authoritative for its state; `proposal` exists only once the\nrun is complete, and a failed run's failure class says why there is none."
+      },
+      "DiscoveryPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoveryOut"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Newest first."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "DiscoveryPage"
+      },
+      "DiscoveryProposalOut": {
+        "properties": {
+          "origin": {
+            "$ref": "#/components/schemas/ProposalOrigin",
+            "description": "fixture: the deterministic demo proposer (synthetic), never a live model."
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version"
+          },
+          "queries": {
+            "items": {
+              "$ref": "#/components/schemas/QueryOut"
+            },
+            "type": "array",
+            "title": "Queries"
+          },
+          "hypotheses": {
+            "items": {
+              "$ref": "#/components/schemas/HypothesisOut"
+            },
+            "type": "array",
+            "title": "Hypotheses"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "origin",
+          "prompt_version",
+          "queries",
+          "hypotheses"
+        ],
+        "title": "DiscoveryProposalOut",
+        "description": "The validated searches. They name no suggestion: the slate is computed from them."
+      },
+      "Emphasis": {
+        "type": "string",
+        "enum": [
+          "balanced",
+          "practical",
+          "unfamiliar",
+          "broad",
+          "deeper"
+        ],
+        "title": "Emphasis",
+        "description": "The slate controls (REC1-08)."
+      },
+      "EntryMode": {
+        "type": "string",
+        "enum": [
+          "sure",
+          "unsure"
+        ],
+        "title": "EntryMode",
+        "description": "How the person chose to start (spec section 3, the You chapter)."
       },
       "ErrorBody": {
         "properties": {
@@ -3106,7 +3949,8 @@
           "run.state_changed",
           "run.partial_updated",
           "concept.provisional_created",
-          "interview.turn_decided"
+          "interview.turn_decided",
+          "interview.preferences_updated"
         ],
         "title": "EventKind"
       },
@@ -3188,6 +4032,46 @@
           "last_seq"
         ],
         "title": "EventPage"
+      },
+      "EvidenceOut": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ProfileField"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "field",
+          "text"
+        ],
+        "title": "EvidenceOut",
+        "description": "One of the person's confirmed answers, quoted."
+      },
+      "ExcludedOut": {
+        "properties": {
+          "occupations": {
+            "type": "integer",
+            "title": "Occupations",
+            "description": "Pooled occupations your excluded titles removed."
+          },
+          "families": {
+            "type": "integer",
+            "title": "Families",
+            "description": "Pooled occupations your excluded kinds of work removed."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "occupations",
+          "families"
+        ],
+        "title": "ExcludedOut"
       },
       "FailureClass": {
         "type": "string",
@@ -3297,6 +4181,29 @@
           "state"
         ],
         "title": "HoursInput"
+      },
+      "HypothesisOut": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "A search hypothesis until ESCO is found to hold it."
+          },
+          "based_on": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceOut"
+            },
+            "type": "array",
+            "title": "Based On"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "based_on"
+        ],
+        "title": "HypothesisOut"
       },
       "IscoGroupOut": {
         "properties": {
@@ -3460,6 +4367,73 @@
         ],
         "title": "MoneyInput"
       },
+      "NotIncluded": {
+        "type": "string",
+        "enum": [
+          "duplicate",
+          "excluded_occupation",
+          "excluded_family",
+          "below_relevance_floor",
+          "family_limit",
+          "less_relevant"
+        ],
+        "title": "NotIncluded",
+        "description": "Why a pooled occupation is not on the slate (\"show why this wasn't included\")."
+      },
+      "NotIncludedOut": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "family": {
+            "$ref": "#/components/schemas/IscoGroupOut"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NotIncluded"
+          },
+          "duplicate_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Of"
+          },
+          "duplicate_of_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Of Title"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "title",
+          "family",
+          "reason",
+          "duplicate_of",
+          "duplicate_of_title"
+        ],
+        "title": "NotIncludedOut",
+        "description": "A pooled occupation the slate does not show, and why."
+      },
       "OccupationHitOut": {
         "properties": {
           "concept_id": {
@@ -3605,6 +4579,30 @@
         ],
         "title": "OccupationOut"
       },
+      "OccupationRefOut": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "isco_group": {
+            "$ref": "#/components/schemas/IscoGroupOut"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "title",
+          "isco_group"
+        ],
+        "title": "OccupationRefOut"
+      },
       "OccupationSearchOut": {
         "properties": {
           "release": {
@@ -3730,6 +4728,16 @@
         "title": "PartialReplyOut",
         "description": "The turn's reply as it streams: unvalidated text, never a proposal. The turn's run\nstate and, once complete, its proposal are authoritative."
       },
+      "PayPeriod": {
+        "type": "string",
+        "enum": [
+          "year",
+          "month",
+          "week",
+          "hour"
+        ],
+        "title": "PayPeriod"
+      },
       "PlaceList": {
         "properties": {
           "country_code": {
@@ -3831,13 +4839,106 @@
         ],
         "title": "PlaceOut"
       },
+      "PoolQueryOut": {
+        "properties": {
+          "query_id": {
+            "type": "string",
+            "title": "Query Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/SlateChannel"
+          },
+          "based_on": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceOut"
+            },
+            "type": "array",
+            "title": "Based On"
+          },
+          "hits": {
+            "type": "integer",
+            "title": "Hits",
+            "description": "Occupations this query found (bounded per query)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "query_id",
+          "text",
+          "channel",
+          "based_on",
+          "hits"
+        ],
+        "title": "PoolQueryOut"
+      },
+      "PreferencesOut": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "0 while nothing has been saved."
+          },
+          "entry_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntryMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conversation_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConversationMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paused": {
+            "type": "boolean",
+            "title": "Paused"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "entry_mode",
+          "conversation_mode",
+          "paused",
+          "updated_at"
+        ],
+        "title": "PreferencesOut",
+        "description": "How the person chose to start and to be interviewed, and whether it is paused. Null:\nnot chosen yet (the interviewer then keeps to the practical mode)."
+      },
       "ProfileDocument": {
         "properties": {
           "schema_version": {
             "type": "string",
-            "const": "2",
+            "const": "3",
             "title": "Schema Version",
-            "default": "2"
+            "default": "3"
           },
           "preferred_name": {
             "$ref": "#/components/schemas/TextField"
@@ -3868,6 +4969,12 @@
           },
           "evidenced_tasks": {
             "$ref": "#/components/schemas/TextListField"
+          },
+          "work_style": {
+            "$ref": "#/components/schemas/TextListField"
+          },
+          "minimum_salary": {
+            "$ref": "#/components/schemas/SalaryField"
           }
         },
         "additionalProperties": false,
@@ -3882,7 +4989,9 @@
           "monthly_payment_cap",
           "enjoyed_tasks",
           "confident_tasks",
-          "evidenced_tasks"
+          "evidenced_tasks",
+          "work_style",
+          "minimum_salary"
         ],
         "title": "ProfileDocument",
         "description": "A stored profile version's content: each field with the source that established it."
@@ -3899,7 +5008,9 @@
           "monthly_payment_cap",
           "enjoyed_tasks",
           "confident_tasks",
-          "evidenced_tasks"
+          "evidenced_tasks",
+          "work_style",
+          "minimum_salary"
         ],
         "title": "ProfileField",
         "description": "The only names a proposal may use: the profile's own fields."
@@ -3940,6 +5051,14 @@
           "evidenced_tasks": {
             "$ref": "#/components/schemas/TaskListInput",
             "description": "Tasks the person has evidence they can do, at most 8."
+          },
+          "work_style": {
+            "$ref": "#/components/schemas/TaskListInput",
+            "description": "How the person says they like to work (optional), at most 8: it informs suggestions and never excludes any kind of work."
+          },
+          "minimum_salary": {
+            "$ref": "#/components/schemas/SalaryInput",
+            "description": "The lowest gross pay the person will accept, with its period: a hard limit, set only by their confirmation. Recorded, not yet applied: no suggestion is removed for pay until pay evidence exists, and unknown pay is never below it."
           }
         },
         "additionalProperties": false,
@@ -3954,7 +5073,9 @@
           "monthly_payment_cap",
           "enjoyed_tasks",
           "confident_tasks",
-          "evidenced_tasks"
+          "evidenced_tasks",
+          "work_style",
+          "minimum_salary"
         ],
         "title": "ProfileInput",
         "description": "What a client submits: states and values only."
@@ -4145,6 +5266,9 @@
           "value": {
             "anyOf": [
               {
+                "$ref": "#/components/schemas/SalaryFloor"
+              },
+              {
                 "$ref": "#/components/schemas/Money"
               },
               {
@@ -4278,6 +5402,49 @@
         ],
         "title": "ProvisionalConceptPage"
       },
+      "QueryChannel": {
+        "type": "string",
+        "enum": [
+          "tasks",
+          "environment",
+          "transferable",
+          "cross_industry",
+          "less_familiar"
+        ],
+        "title": "QueryChannel",
+        "description": "The model's discovery channels (spec section 4, DIV-1's five channels). Nessa adds\nthe person's current role and their own target titles itself."
+      },
+      "QueryOut": {
+        "properties": {
+          "query_id": {
+            "type": "string",
+            "title": "Query Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/QueryChannel"
+          },
+          "based_on": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceOut"
+            },
+            "type": "array",
+            "title": "Based On"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "query_id",
+          "text",
+          "channel",
+          "based_on"
+        ],
+        "title": "QueryOut"
+      },
       "RegisterProvisionalConcept": {
         "properties": {
           "title": {
@@ -4293,6 +5460,41 @@
           "title"
         ],
         "title": "RegisterProvisionalConcept"
+      },
+      "ReleaseRefOut": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "title": "Dataset Id"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "attribution": {
+            "type": "string",
+            "title": "Attribution"
+          },
+          "adaptation": {
+            "type": "string",
+            "title": "Adaptation"
+          },
+          "sample": {
+            "type": "boolean",
+            "title": "Sample"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "version",
+          "attribution",
+          "adaptation",
+          "sample"
+        ],
+        "title": "ReleaseRefOut",
+        "description": "The ESCO release the slate searched; show the attribution and adaptation with it."
       },
       "RenameWorkspaceIn": {
         "properties": {
@@ -4316,11 +5518,22 @@
         ],
         "title": "RenameWorkspaceIn"
       },
+      "Resolution": {
+        "type": "string",
+        "enum": [
+          "esco",
+          "ambiguous",
+          "provisional",
+          "not_found"
+        ],
+        "title": "Resolution"
+      },
       "RunKind": {
         "type": "string",
         "enum": [
           "connection_check",
-          "interview_turn"
+          "interview_turn",
+          "discovery"
         ],
         "title": "RunKind"
       },
@@ -4470,6 +5683,89 @@
         ],
         "title": "RunPage"
       },
+      "SalaryField": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/FieldState"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SalaryFloor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_ref_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "SalaryField"
+      },
+      "SalaryFloor": {
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "period": {
+            "$ref": "#/components/schemas/PayPeriod",
+            "description": "Annual unless the person says otherwise."
+          },
+          "basis": {
+            "type": "string",
+            "const": "gross",
+            "title": "Basis",
+            "default": "gross"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "amount",
+          "period"
+        ],
+        "title": "SalaryFloor",
+        "description": "The lowest gross pay the person will accept, as they gave it: its period is kept and\nnever converted, because annualising needs working hours (spec section 5)."
+      },
+      "SalaryInput": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/FieldState"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SalaryFloor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "SalaryInput"
+      },
       "SearchMatch": {
         "type": "string",
         "enum": [
@@ -4477,6 +5773,50 @@
           "any"
         ],
         "title": "SearchMatch"
+      },
+      "SetPreferences": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "description": "0 while nothing has been saved."
+          },
+          "entry_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntryMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conversation_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConversationMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paused": {
+            "type": "boolean",
+            "title": "Paused"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "entry_mode",
+          "conversation_mode",
+          "paused"
+        ],
+        "title": "SetPreferences",
+        "description": "The whole set of preferences; null means not chosen."
       },
       "SetSpendLimits": {
         "properties": {
@@ -4505,6 +5845,62 @@
           "period_limit_nano_usd"
         ],
         "title": "SetSpendLimits"
+      },
+      "SketchOut": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "profile_version": {
+            "type": "integer",
+            "title": "Profile Version"
+          },
+          "inputs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldState"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/ProfileField"
+            },
+            "type": "object",
+            "title": "Inputs",
+            "description": "The minimum inputs: a target and four practical answers."
+          },
+          "not_asked": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileField"
+            },
+            "type": "array",
+            "title": "Not Asked"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/TargetSketchOut"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/StepOut"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "profile_version",
+          "inputs",
+          "not_asked",
+          "targets",
+          "steps"
+        ],
+        "title": "SketchOut",
+        "description": "The early requirement sketch: never a feasible or optimal route, never priced or\ndated. Every step stays unresolved until a later chapter resolves it."
       },
       "SkillRefOut": {
         "properties": {
@@ -4544,12 +5940,173 @@
         ],
         "title": "SkillRefOut"
       },
+      "SlateChannel": {
+        "type": "string",
+        "enum": [
+          "current",
+          "user_proposed",
+          "tasks",
+          "environment",
+          "transferable",
+          "cross_industry",
+          "less_familiar",
+          "hypothesis"
+        ],
+        "title": "SlateChannel",
+        "description": "How a candidate was found: the model's channels plus Nessa's own."
+      },
+      "SlateOut": {
+        "properties": {
+          "discovery_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Discovery Id"
+          },
+          "profile_version": {
+            "type": "integer",
+            "title": "Profile Version"
+          },
+          "release": {
+            "$ref": "#/components/schemas/ReleaseRefOut"
+          },
+          "emphasis": {
+            "$ref": "#/components/schemas/Emphasis"
+          },
+          "target_size": {
+            "type": "integer",
+            "title": "Target Size",
+            "default": 6
+          },
+          "family_limit": {
+            "type": "integer",
+            "title": "Family Limit",
+            "description": "At most this many from one kind of work."
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionOut"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          },
+          "fewer_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fewer Reasons",
+            "description": "Why there are fewer than six, if there are."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes",
+            "description": "How a control changed the slate, in words."
+          },
+          "limits_not_applied": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limits Not Applied",
+            "description": "Limits you set that the slate records but cannot apply yet."
+          },
+          "pool_size": {
+            "type": "integer",
+            "title": "Pool Size",
+            "description": "Distinct occupations after folding near-duplicates."
+          },
+          "pool_target": {
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Pool Target",
+            "default": [
+              60,
+              120
+            ]
+          },
+          "beyond_pool_limit": {
+            "type": "integer",
+            "title": "Beyond Pool Limit",
+            "description": "Occupations found past the pool's bound."
+          },
+          "excluded": {
+            "$ref": "#/components/schemas/ExcludedOut"
+          },
+          "queries": {
+            "items": {
+              "$ref": "#/components/schemas/PoolQueryOut"
+            },
+            "type": "array",
+            "title": "Queries",
+            "description": "Every search that ran, with its hits."
+          },
+          "unsearchable_queries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unsearchable Queries",
+            "description": "Queries with no searchable word."
+          },
+          "unsupported_hypotheses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unsupported Hypotheses",
+            "description": "Titles Nessa thought of that ESCO does not list: never suggested."
+          },
+          "not_included": {
+            "items": {
+              "$ref": "#/components/schemas/NotIncludedOut"
+            },
+            "type": "array",
+            "title": "Not Included",
+            "description": "Show why this wasn't included."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "discovery_id",
+          "profile_version",
+          "release",
+          "emphasis",
+          "family_limit",
+          "suggestions",
+          "fewer_reasons",
+          "notes",
+          "limits_not_applied",
+          "pool_size",
+          "beyond_pool_limit",
+          "excluded",
+          "queries",
+          "unsearchable_queries",
+          "unsupported_hypotheses",
+          "not_included"
+        ],
+        "title": "SlateOut",
+        "description": "A varied slate of up to six career hypotheses from the discovery's searches, computed\ndeterministically each time it is read, with every count that explains it."
+      },
       "SourceKind": {
         "type": "string",
         "enum": [
           "direct_entry",
           "fixture",
-          "conversation"
+          "conversation",
+          "occupation_choice"
         ],
         "title": "SourceKind"
       },
@@ -4640,6 +6197,19 @@
                 "type": "null"
               }
             ]
+          },
+          "discovery_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discovery Id",
+            "description": "An occupation choice: the discovery that suggested it."
           }
         },
         "additionalProperties": false,
@@ -4685,6 +6255,32 @@
           "next_cursor"
         ],
         "title": "SourcePage"
+      },
+      "SourceRefOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "esco",
+            "title": "Kind",
+            "default": "esco"
+          },
+          "uri": {
+            "type": "string",
+            "title": "Uri",
+            "description": "The ESCO occupation's URI."
+          },
+          "release": {
+            "type": "string",
+            "title": "Release"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "uri",
+          "release"
+        ],
+        "title": "SourceRefOut"
       },
       "SpendOut": {
         "properties": {
@@ -4739,6 +6335,36 @@
         ],
         "title": "SpendState"
       },
+      "StepOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "chapter": {
+            "type": "string",
+            "title": "Chapter"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "state": {
+            "type": "string",
+            "const": "unresolved",
+            "title": "State"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "chapter",
+          "detail",
+          "state"
+        ],
+        "title": "StepOut"
+      },
       "StoreKey": {
         "properties": {
           "api_key": {
@@ -4759,6 +6385,21 @@
           "consent_to_encrypted_storage"
         ],
         "title": "StoreKey"
+      },
+      "SubmitDiscovery": {
+        "properties": {
+          "expected_profile_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Profile Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_profile_version"
+        ],
+        "title": "SubmitDiscovery"
       },
       "SubmitRun": {
         "properties": {
@@ -4788,6 +6429,12 @@
             "maxLength": 2000,
             "minLength": 1,
             "title": "Message"
+          },
+          "send_after_support": {
+            "type": "boolean",
+            "title": "Send After Support",
+            "description": "The person was shown the support response for this message and chose to send it to the interviewer anyway.",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -4797,6 +6444,218 @@
           "message"
         ],
         "title": "SubmitTurn"
+      },
+      "SuggestionOut": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "concept_kind": {
+            "type": "string",
+            "const": "esco",
+            "title": "Concept Kind",
+            "default": "esco"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "esco_code": {
+            "type": "string",
+            "title": "Esco Code"
+          },
+          "isco_group": {
+            "$ref": "#/components/schemas/IscoGroupOut"
+          },
+          "family": {
+            "$ref": "#/components/schemas/IscoGroupOut",
+            "description": "The kind of work: its ISCO-08 minor group."
+          },
+          "sector": {
+            "$ref": "#/components/schemas/IscoGroupOut",
+            "description": "Its ISCO-08 major group."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/Direction"
+          },
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/SlateChannel"
+            },
+            "type": "array",
+            "title": "Channels"
+          },
+          "linked_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceOut"
+            },
+            "type": "array",
+            "title": "Linked Evidence",
+            "description": "The answers that found it."
+          },
+          "matched_queries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Matched Queries",
+            "description": "The query IDs that found it."
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRefOut"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "workday": {
+            "type": "string",
+            "title": "Workday",
+            "description": "ESCO's description of the work, shortened."
+          },
+          "why_it_could_suit": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Why It Could Suit"
+          },
+          "what_might_not_suit": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "What Might Not Suit"
+          },
+          "entry_gates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Entry Gates"
+          },
+          "evidence_gaps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Gaps"
+          },
+          "try_it": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Try It",
+            "description": "Low-cost ways to test the idea before committing."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "title",
+          "esco_code",
+          "isco_group",
+          "family",
+          "sector",
+          "direction",
+          "channels",
+          "linked_evidence",
+          "matched_queries",
+          "sources",
+          "workday",
+          "why_it_could_suit",
+          "what_might_not_suit",
+          "entry_gates",
+          "evidence_gaps",
+          "try_it"
+        ],
+        "title": "SuggestionOut",
+        "description": "A career hypothesis (spec section 4's `CareerSuggestion`): an ESCO occupation, the\nanswers that found it and ESCO's facts about it, in words. Becoming a target needs the\nperson's choice (`POST .../targets`)."
+      },
+      "SupportResourceOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "contact": {
+            "type": "string",
+            "title": "Contact"
+          },
+          "when": {
+            "type": "string",
+            "title": "When"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "checked_on": {
+            "type": "string",
+            "title": "Checked On",
+            "description": "When the service's own page was last checked."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "contact",
+          "when",
+          "source_url",
+          "checked_on"
+        ],
+        "title": "SupportResourceOut"
+      },
+      "SupportResponseOut": {
+        "properties": {
+          "policy": {
+            "type": "string",
+            "const": "acute_distress",
+            "title": "Policy"
+          },
+          "policy_version": {
+            "type": "string",
+            "title": "Policy Version"
+          },
+          "review_status": {
+            "type": "string",
+            "title": "Review Status",
+            "description": "The policy is provisional until reviewed."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/SupportResourceOut"
+            },
+            "type": "array",
+            "title": "Resources"
+          },
+          "sent_to_interviewer": {
+            "type": "boolean",
+            "const": false,
+            "title": "Sent To Interviewer",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "policy",
+          "policy_version",
+          "review_status",
+          "message",
+          "resources"
+        ],
+        "title": "SupportResponseOut",
+        "description": "Given instead of a turn when a message explicitly expresses acute distress: the\nmessage was not sent to the interviewer and nothing was stored. Kept apart from career\nsuitability. Resend with `send_after_support` to send the message anyway."
       },
       "TargetListInput": {
         "properties": {
@@ -4827,6 +6686,81 @@
           "state"
         ],
         "title": "TargetListInput"
+      },
+      "TargetSketchOut": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "resolution": {
+            "$ref": "#/components/schemas/Resolution"
+          },
+          "occupations": {
+            "items": {
+              "$ref": "#/components/schemas/OccupationRefOut"
+            },
+            "type": "array",
+            "title": "Occupations",
+            "description": "The ESCO occupation, or the several that share the title (choose one)."
+          },
+          "close_matches": {
+            "items": {
+              "$ref": "#/components/schemas/OccupationRefOut"
+            },
+            "type": "array",
+            "title": "Close Matches",
+            "description": "For a title ESCO does not hold: the nearest occupations by full text."
+          },
+          "requirements": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Requirements",
+            "description": "ESCO's essential skills, the first few."
+          },
+          "requirement_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirement Count",
+            "description": "null: no requirement list."
+          },
+          "regulated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regulated"
+          },
+          "research_status": {
+            "type": "string",
+            "title": "Research Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "resolution",
+          "occupations",
+          "close_matches",
+          "requirements",
+          "requirement_count",
+          "regulated",
+          "research_status"
+        ],
+        "title": "TargetSketchOut"
       },
       "TaskListInput": {
         "properties": {
@@ -5185,9 +7119,9 @@
           },
           "format_version": {
             "type": "integer",
-            "const": 2,
+            "const": 3,
             "title": "Format Version",
-            "default": 2
+            "default": 3
           },
           "exported_at": {
             "type": "string",
@@ -5251,6 +7185,17 @@
             "type": "array",
             "title": "Provisional Concepts"
           },
+          "discoveries": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoveryOut"
+            },
+            "type": "array",
+            "title": "Discoveries",
+            "description": "Oldest first; slates are recomputed."
+          },
+          "interview_preferences": {
+            "$ref": "#/components/schemas/PreferencesOut"
+          },
           "spend": {
             "$ref": "#/components/schemas/SpendOut"
           }
@@ -5268,6 +7213,8 @@
           "runs",
           "interview_turns",
           "provisional_concepts",
+          "discoveries",
+          "interview_preferences",
           "spend"
         ],
         "title": "WorkspaceExport"

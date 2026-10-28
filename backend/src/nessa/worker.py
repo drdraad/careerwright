@@ -2,8 +2,8 @@
 model each run's pinned ID names, and the DBOS worker loop (`nessa.identity.worker`).
 
 Configuration comes from the environment and files only. A Meta model is built with the
-key the activity opened just in time; the fixture interviewer (demo workspaces only)
-needs no key and makes no network call.
+key the activity opened just in time; the fixture interviewer and query proposer (demo
+workspaces only) need no key and make no network call.
 
 Run: `python -m nessa.worker`; health check: `python -m nessa.worker --check`.
 """
@@ -22,14 +22,26 @@ from nessa.identity.activity import CONNECTION_CHECK_TASK, ActivityRuntime, Mode
 from nessa.identity.keyring import load_keyring
 from nessa.identity.meta import meta_model
 from nessa.identity.model_choice import ModelChoice
-from nessa.identity.model_registry import ModelMode, model_entry
+from nessa.identity.model_registry import (
+    FIXTURE_DISCOVERY_MODEL_ID,
+    FIXTURE_MODEL_ID,
+    ModelMode,
+    model_entry,
+)
 from nessa.identity.records import RunKind
 from nessa.logs import configure_logging
+from nessa.profile.discovery_agent import DISCOVERY_TASK, fixture_discovery_model
 from nessa.profile.interview_agent import INTERVIEW_TURN_TASK, fixture_interviewer_model
 
 TASKS: Mapping[RunKind, RunTask] = {
     RunKind.CONNECTION_CHECK: CONNECTION_CHECK_TASK,
     RunKind.INTERVIEW_TURN: INTERVIEW_TURN_TASK,
+    RunKind.DISCOVERY: DISCOVERY_TASK,
+}
+# The deterministic stand-ins for demo workspaces, by model ID.
+FIXTURE_MODELS: Mapping[str, Callable[[], Model]] = {
+    FIXTURE_MODEL_ID: fixture_interviewer_model,
+    FIXTURE_DISCOVERY_MODEL_ID: fixture_discovery_model,
 }
 
 
@@ -52,11 +64,11 @@ def _meta(model_id: str, api_key: SecretStr) -> Model:
 
 
 def model_builder(provider: ProviderBuilder = _meta) -> ModelBuilder:
-    """The fixture interviewer for its model ID, else `provider` (Meta; a fake in tests)."""
+    """The fixture model for its model ID, else `provider` (Meta; a fake in tests)."""
 
     def build(model_id: str, api_key: SecretStr | None) -> Model:
         if model_entry(model_id).mode is ModelMode.FIXTURE:
-            return fixture_interviewer_model()
+            return FIXTURE_MODELS[model_id]()
         if api_key is None:
             raise MissingKeyError(model_id)
         return provider(model_id, api_key)

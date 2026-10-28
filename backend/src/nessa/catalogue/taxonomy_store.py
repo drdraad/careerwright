@@ -24,6 +24,7 @@ from nessa.catalogue.records import (
     IscoGroupRef,
     LabelMatch,
     OccupationDetail,
+    OccupationFacts,
     OccupationHit,
     ProvisionalConcept,
     SkillRef,
@@ -318,6 +319,67 @@ def occupation(tx: Tx, concept_id: uuid.UUID) -> OccupationDetail | None:
         broader_concept_id=row["broader_concept_id"],
         skills=tuple(SkillRef(**dict(s)) for s in skills),
     )
+
+
+def occupation_facts(
+    tx: Tx, concept_ids: Iterable[uuid.UUID], *, skills_shown: int
+) -> dict[uuid.UUID, OccupationFacts]:
+    """Discovery's facts for each of these occupations (missing IDs are simply absent): the
+    ISCO family is the unit group's minor group (3 digits), the sector its major group."""
+    ids = sorted(set(concept_ids))
+    if not ids:
+        return {}
+    rows = tx.execute(
+        sa.text(
+            "SELECT o.concept_id, o.preferred_label, o.esco_uri, o.esco_code, o.description, "
+            "o.regulated, o.isco_code, unit.label AS unit_label, minor.code AS family_code, "
+            "minor.label AS family_label, major.code AS sector_code, major.label AS sector_label "
+            "FROM nessa.occupation_concepts o "
+            "JOIN nessa.isco_groups unit ON unit.code = o.isco_code "
+            "JOIN nessa.isco_groups minor ON minor.code = left(o.isco_code, 3) "
+            "JOIN nessa.isco_groups major ON major.code = left(o.isco_code, 1) "
+            "WHERE o.concept_id = ANY(CAST(:ids AS uuid[]))"
+        ),
+        {"ids": [str(i) for i in ids]},
+    ).mappings()
+    keys: dict[uuid.UUID, set[str]] = {}
+    for label in tx.execute(
+        sa.text(
+            "SELECT concept_id, nessa.concept_key(label) AS key FROM nessa.occupation_labels "
+            "WHERE concept_id = ANY(CAST(:ids AS uuid[])) AND kind <> 'hidden'"
+        ),
+        {"ids": [str(i) for i in ids]},
+    ):
+        keys.setdefault(label.concept_id, set()).add(label.key)
+    skills: dict[uuid.UUID, list[str]] = {}
+    for skill in tx.execute(
+        sa.text(
+            "SELECT r.concept_id, s.preferred_label FROM nessa.occupation_skills r "
+            "JOIN nessa.skills s ON s.skill_id = r.skill_id "
+            "WHERE r.concept_id = ANY(CAST(:ids AS uuid[])) AND r.relation = 'essential' "
+            "ORDER BY r.concept_id, s.preferred_label"
+        ),
+        {"ids": [str(i) for i in ids]},
+    ):
+        skills.setdefault(skill.concept_id, []).append(skill.preferred_label)
+    facts: dict[uuid.UUID, OccupationFacts] = {}
+    for row in rows:
+        essential = skills.get(row["concept_id"], [])
+        facts[row["concept_id"]] = OccupationFacts(
+            concept_id=row["concept_id"],
+            preferred_label=row["preferred_label"],
+            esco_uri=row["esco_uri"],
+            esco_code=row["esco_code"],
+            description=row["description"],
+            regulated=row["regulated"],
+            unit=IscoGroupRef(row["isco_code"], row["unit_label"]),
+            family=IscoGroupRef(row["family_code"], row["family_label"]),
+            sector=IscoGroupRef(row["sector_code"], row["sector_label"]),
+            label_keys=frozenset(keys.get(row["concept_id"], ())),
+            essential_skills=tuple(essential[:skills_shown]),
+            essential_skill_count=len(essential),
+        )
+    return facts
 
 
 def insert_provisional(

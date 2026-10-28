@@ -647,12 +647,12 @@ def test_a_demo_workspace_interviews_offline_with_the_labelled_fixture_interview
             "contributor",
             "demo_workspaces_use_only_the_fixture_model",
         ),
-        # ...and the fixture interviewer answers interview turns only.
+        # ...and the fixture models answer interview turns and discoveries only (0010).
         (
             "connection_check",
             "nessa-fixture-interviewer-1",
             "fixture",
-            "the_fixture_model_only_interviews",
+            "the_fixture_models_only_interview_or_discover",
         ),
     ],
 )
@@ -718,7 +718,7 @@ def test_the_export_carries_the_conversation_and_its_decisions(scenario: Scenari
         f"/v1/workspaces/{scenario.workspace_id}/export", scenario.token
     ).json()
 
-    assert exported["format_version"] == 2
+    assert exported["format_version"] == 3
     [shown] = exported["interview_turns"]
     assert shown["turn_id"] == turn["turn_id"]
     assert shown["proposal"]["changes"]

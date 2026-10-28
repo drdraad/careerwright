@@ -1,4 +1,5 @@
-"""SQL for interview turns and decisions (adapter). Both tables are append-only."""
+"""SQL for interview turns and decisions (adapter; both tables are append-only) and the
+interview preferences (one versioned row per workspace)."""
 
 import uuid
 from datetime import datetime
@@ -7,7 +8,13 @@ import sqlalchemy as sa
 from sqlalchemy import exc
 
 from nessa.db import Tx, is_unique_violation
-from nessa.profile.records import InterviewTurn, TurnDecision
+from nessa.profile.records import (
+    ConversationMode,
+    EntryMode,
+    InterviewPreferences,
+    InterviewTurn,
+    TurnDecision,
+)
 
 _TURN_COLUMNS = (
     "turn_id, workspace_id, message_id, message, profile_version, created_by, created_at"
@@ -140,3 +147,72 @@ def insert_decision(tx: Tx, workspace_id: uuid.UUID, decided: TurnDecision) -> b
             return False
         raise
     return True
+
+
+def preferences(tx: Tx, workspace_id: uuid.UUID) -> InterviewPreferences | None:
+    row = (
+        tx.execute(
+            sa.text(
+                "SELECT workspace_id, version, entry_mode, conversation_mode, paused, "
+                "updated_by, updated_at FROM nessa.interview_preferences WHERE workspace_id = :ws"
+            ),
+            {"ws": workspace_id},
+        )
+        .mappings()
+        .one_or_none()
+    )
+    if row is None:
+        return None
+    return InterviewPreferences(
+        workspace_id=row["workspace_id"],
+        version=row["version"],
+        entry_mode=EntryMode(row["entry_mode"]) if row["entry_mode"] else None,
+        conversation_mode=(
+            ConversationMode(row["conversation_mode"]) if row["conversation_mode"] else None
+        ),
+        paused=row["paused"],
+        updated_by=row["updated_by"],
+        updated_at=row["updated_at"],
+    )
+
+
+def write_preferences(
+    tx: Tx,
+    workspace_id: uuid.UUID,
+    expected_version: int,
+    *,
+    entry_mode: EntryMode | None,
+    conversation_mode: ConversationMode | None,
+    paused: bool,
+    updated_by: uuid.UUID,
+) -> bool:
+    """Insert version 1, or move `expected_version` on by one; False if it is not current
+    (the caller holds the workspace lock, so only a stale expectation fails)."""
+    values = {
+        "ws": workspace_id,
+        "expected": expected_version,
+        "entry": entry_mode.value if entry_mode else None,
+        "mode": conversation_mode.value if conversation_mode else None,
+        "paused": paused,
+        "by": updated_by,
+    }
+    if expected_version == 0:
+        inserted = tx.execute(
+            sa.text(
+                "INSERT INTO nessa.interview_preferences (workspace_id, entry_mode, "
+                "conversation_mode, paused, version, updated_by) VALUES (:ws, :entry, :mode, "
+                ":paused, 1, :by) ON CONFLICT (workspace_id) DO NOTHING"
+            ),
+            values,
+        )
+        return inserted.rowcount == 1
+    updated = tx.execute(
+        sa.text(
+            "UPDATE nessa.interview_preferences SET entry_mode = :entry, "
+            "conversation_mode = :mode, paused = :paused, version = version + 1, "
+            "updated_by = :by, updated_at = clock_timestamp() "
+            "WHERE workspace_id = :ws AND version = :expected"
+        ),
+        values,
+    )
+    return updated.rowcount == 1

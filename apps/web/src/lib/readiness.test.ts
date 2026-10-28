@@ -6,7 +6,7 @@ const SRC = "8d1f6f8e-46a1-5c2b-9d0e-3f7a1b2c4d5e";
 
 function document(overrides: Partial<ProfileDocument> = {}): ProfileDocument {
   return {
-    schema_version: "2",
+    schema_version: "3",
     preferred_name: { state: "unasked", value: null, source_ref_id: null },
     current_role: { state: "unasked", value: null, source_ref_id: null },
     cities: { state: "provided", value: ["Manchester"], source_ref_id: SRC },
@@ -17,6 +17,8 @@ function document(overrides: Partial<ProfileDocument> = {}): ProfileDocument {
     enjoyed_tasks: { state: "unasked", value: null, source_ref_id: null },
     confident_tasks: { state: "unasked", value: null, source_ref_id: null },
     evidenced_tasks: { state: "unasked", value: null, source_ref_id: null },
+    work_style: { state: "unasked", value: null, source_ref_id: null },
+    minimum_salary: { state: "unasked", value: null, source_ref_id: null },
     ...overrides,
   };
 }

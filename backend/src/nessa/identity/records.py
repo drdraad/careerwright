@@ -35,6 +35,7 @@ class EventKind(StrEnum):
     RUN_PARTIAL_UPDATED = "run.partial_updated"  # detail: the partial's sequence number only
     PROVISIONAL_CONCEPT_CREATED = "concept.provisional_created"
     INTERVIEW_TURN_DECIDED = "interview.turn_decided"
+    INTERVIEW_PREFERENCES_UPDATED = "interview.preferences_updated"
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,7 @@ class Credential:
 class RunKind(StrEnum):
     CONNECTION_CHECK = "connection_check"
     INTERVIEW_TURN = "interview_turn"
+    DISCOVERY = "discovery"  # search queries for career suggestions, from the confirmed profile
 
 
 class PartialCompleteness(StrEnum):

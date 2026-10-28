@@ -9,7 +9,12 @@ observed and who confirmed it (PROF-01).
 
 Schema version 2 (Task 5) adds three separate interest and capability fields: what the
 person enjoys, what they believe they can do and what they have evidence they can do
-(spec section 4, REC1-04). Version 1 documents read as version 2 with those unasked.
+(spec section 4, REC1-04). Schema version 3 (Task 6) adds the optional work style, how the
+person says they like to work (spec section 4's "work style and personality" layer): a
+described preference that informs suggestions, never a limit (REC1-03) and never a
+personality type; and the salary floor, the lowest gross pay they will accept with its
+period, a hard constraint (product owner, H-11). Older documents read as version 3 with
+the later fields unasked.
 Cities must be on the finite English list and are stored by its name for the city.
 """
 
@@ -29,7 +34,7 @@ from nessa.money import Money
 MAX_CITIES = 3
 MAX_TARGETS = 3
 MAX_TASKS = 8
-PROFILE_SCHEMA_VERSION: Literal["2"] = "2"
+PROFILE_SCHEMA_VERSION: Literal["3"] = "3"
 
 TextValue = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 HoursValue = Annotated[float, Field(ge=0, le=168)]
@@ -102,6 +107,28 @@ class MoneyInput(_FieldInput[Money]):
     pass
 
 
+class PayPeriod(StrEnum):
+    YEAR = "year"
+    MONTH = "month"
+    WEEK = "week"
+    HOUR = "hour"
+
+
+class SalaryFloor(BaseModel):
+    """The lowest gross pay the person will accept, as they gave it: its period is kept and
+    never converted, because annualising needs working hours (spec section 5)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    amount: Money
+    period: PayPeriod = Field(description="Annual unless the person says otherwise.")
+    basis: Literal["gross"] = "gross"
+
+
+class SalaryInput(_FieldInput[SalaryFloor]):
+    pass
+
+
 class TextField(_Field[TextValue]):
     pass
 
@@ -118,7 +145,11 @@ class MoneyField(_Field[Money]):
     pass
 
 
-FieldInput = TextInput | TextListInput | HoursInput | MoneyInput
+class SalaryField(_Field[SalaryFloor]):
+    pass
+
+
+FieldInput = TextInput | TextListInput | HoursInput | MoneyInput | SalaryInput
 
 
 class ProfileInput(BaseModel):
@@ -144,6 +175,19 @@ class ProfileInput(BaseModel):
     evidenced_tasks: TaskListInput = Field(
         description=f"Tasks the person has evidence they can do, at most {MAX_TASKS}."
     )
+    work_style: TaskListInput = Field(
+        description=(
+            f"How the person says they like to work (optional), at most {MAX_TASKS}: it "
+            "informs suggestions and never excludes any kind of work."
+        )
+    )
+    minimum_salary: SalaryInput = Field(
+        description=(
+            "The lowest gross pay the person will accept, with its period: a hard limit, set "
+            "only by their confirmation. Recorded, not yet applied: no suggestion is removed "
+            "for pay until pay evidence exists, and unknown pay is never below it."
+        )
+    )
 
 
 class ProfileDocument(BaseModel):
@@ -151,7 +195,7 @@ class ProfileDocument(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["2"] = PROFILE_SCHEMA_VERSION
+    schema_version: Literal["3"] = PROFILE_SCHEMA_VERSION
     preferred_name: TextField
     current_role: TextField
     cities: TextListField
@@ -162,23 +206,33 @@ class ProfileDocument(BaseModel):
     enjoyed_tasks: TextListField
     confident_tasks: TextListField
     evidenced_tasks: TextListField
+    work_style: TextListField
+    minimum_salary: SalaryField
 
     @model_validator(mode="before")
     @classmethod
-    def _read_version_1(cls, data: Any) -> Any:
-        """Version 1 had no interest or capability fields: they were never asked."""
-        if isinstance(data, dict) and data.get("schema_version") == "1":
-            unasked = {"state": FieldState.UNASKED.value}
-            return {
-                **{name: unasked for name in VERSION_2_FIELDS},
-                **data,
-                "schema_version": PROFILE_SCHEMA_VERSION,
-            }
-        return data
+    def _read_older_versions(cls, data: Any) -> Any:
+        """Version 1 had no interest or capability fields and version 2 no work style: they
+        were never asked."""
+        version = data.get("schema_version") if isinstance(data, dict) else None
+        later = _ADDED_AFTER.get(version) if isinstance(version, str) else None
+        if later is None:
+            return data
+        unasked = {"state": FieldState.UNASKED.value}
+        return {
+            **{name: unasked for name in later},
+            **data,
+            "schema_version": PROFILE_SCHEMA_VERSION,
+        }
 
 
 FIELD_NAMES = tuple(ProfileInput.model_fields)
 VERSION_2_FIELDS = ("enjoyed_tasks", "confident_tasks", "evidenced_tasks")
+VERSION_3_FIELDS = ("work_style", "minimum_salary")
+_ADDED_AFTER: Mapping[str, tuple[str, ...]] = {
+    "1": (*VERSION_2_FIELDS, *VERSION_3_FIELDS),
+    "2": VERSION_3_FIELDS,
+}
 
 
 class FieldKind(StrEnum):
@@ -186,6 +240,7 @@ class FieldKind(StrEnum):
     LIST = "list"
     HOURS = "hours"
     MONEY = "money"
+    SALARY = "salary"
 
 
 @dataclass(frozen=True)
@@ -208,6 +263,9 @@ FIELD_SPECS: Mapping[str, FieldSpec] = {
     "enjoyed_tasks": FieldSpec(FieldKind.LIST, MAX_TASKS),
     "confident_tasks": FieldSpec(FieldKind.LIST, MAX_TASKS),
     "evidenced_tasks": FieldSpec(FieldKind.LIST, MAX_TASKS),
+    "work_style": FieldSpec(FieldKind.LIST, MAX_TASKS),
+    # Added to the set by the product owner (H-11, 2026-10-28).
+    "minimum_salary": FieldSpec(FieldKind.SALARY, hard_constraint=True),
 }
 HARD_CONSTRAINTS = frozenset(name for name, spec in FIELD_SPECS.items() if spec.hard_constraint)
 _INPUT_TYPES: Mapping[FieldKind, type[FieldInput]] = {
@@ -215,6 +273,7 @@ _INPUT_TYPES: Mapping[FieldKind, type[FieldInput]] = {
     FieldKind.LIST: TextListInput,
     FieldKind.HOURS: HoursInput,
     FieldKind.MONEY: MoneyInput,
+    FieldKind.SALARY: SalaryInput,
 }
 
 

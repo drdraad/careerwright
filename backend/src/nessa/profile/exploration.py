@@ -1,0 +1,509 @@
+"""Career discovery use cases (spec section 4, REC-1 and DIV-1; S2.4): start a discovery,
+read its slate, and choose an occupation as a target.
+
+The chain is traceable end to end: the person's confirmed answers (a pinned profile
+version) become the model's search queries, each citing the answers it rests on; every
+query runs against the pinned ESCO release (English full-text search, any word, bounded),
+and Nessa adds the person's current role and own target titles; the hits are pooled,
+de-duplicated and ranked into a slate by deterministic code (`nessa.profile.slate`). A
+model's title hypothesis is shown only if ESCO holds it as a label; otherwise it is listed
+as unsupported, never as a suggestion (DIV1-04). Every suggestion is an ESCO occupation
+with its URI as the source, the answers that found it and its essential skills; its words
+are composed from those facts, never from model prose, and carry no percentage (REC1-05).
+
+The slate's controls (emphasis, excluded titles and kinds of work) are view parameters:
+they never change the profile and never become a planning limit. A suggestion becomes a
+target only when the person chooses it (REC1-07), through the one profile write path, with
+an `occupation_choice` source naming the ESCO occupation and the discovery.
+"""
+
+import uuid
+from dataclasses import dataclass
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from nessa.catalogue import taxonomy_store
+from nessa.catalogue.records import OccupationFacts, TaxonomyRelease
+from nessa.catalogue.taxonomy import held_release, search_occupations
+from nessa.config import RuntimeMode
+from nessa.db import Tx
+from nessa.errors import ErrorCode, ErrorStage, NessaError
+from nessa.identity import run_store
+from nessa.identity.access import Actor
+from nessa.identity.keyring import Keyring
+from nessa.identity.model_choice import ModelChoice
+from nessa.identity.records import Run, RunKind
+from nessa.identity.runs import RunRequest, open_output, submit_run
+from nessa.identity.spend import SpendLimits
+from nessa.identity.workspaces import visible_workspace
+from nessa.profile import discovery
+from nessa.profile import store as profile_store
+from nessa.profile.commands import (
+    FieldUpdate,
+    NewSource,
+    ProfileView,
+    commit_profile_version,
+    current_profile,
+)
+from nessa.profile.discovery import DiscoveryInput, DiscoveryProposal, EvidenceItem, evidence_of
+from nessa.profile.document import FieldState, ProfileDocument, TextListInput, TextValue
+from nessa.profile.interview import ProfileField
+from nessa.profile.records import SourceKind
+from nessa.profile.slate import (
+    Candidate,
+    Direction,
+    Hit,
+    Occupation,
+    PoolQuery,
+    Slate,
+    SlateChannel,
+    SlateControls,
+    build_pool,
+    choose_slate,
+)
+from nessa.profile.store import stale_version
+from nessa.vocabulary import WorkState
+
+QUERY_HITS = 30  # occupations kept per search (the taxonomy search's bound is 50)
+# An occupation that matches only some of a query's words counts for at most half as much
+# as one that matches them all (product policy, subject to evaluation).
+PARTIAL_MATCH_WEIGHT = 0.5
+SKILLS_SHOWN = 3
+DESCRIPTION_CHARS = 360
+# No pay evidence exists until regional pay is imported (Sprint 3), so the floor cannot be
+# applied: nothing is left out for pay, and unknown pay is never treated as below it.
+SALARY_FLOOR_NOT_APPLIED = (
+    "Your minimum salary is recorded but not applied yet: pay isn't researched, so no "
+    "suggestion is left out for pay, and unknown pay is never treated as below it."
+)
+CHOSEN_FROM_SUGGESTIONS = "Chosen from Nessa's suggestions"
+CHOSEN_FROM_ESCO = "Chosen from the ESCO occupations"
+_SOURCE_WORDS = {
+    ProfileField.CURRENT_ROLE: "Your current role",
+    ProfileField.TARGET_TITLES: "A role you named",
+    ProfileField.ENJOYED_TASKS: "What you enjoy",
+    ProfileField.CONFIDENT_TASKS: "What you believe you can do",
+    ProfileField.EVIDENCED_TASKS: "What you have done",
+    ProfileField.WORK_STYLE: "How you like to work",
+}
+
+
+class SubmitDiscovery(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    expected_profile_version: int = Field(ge=0)
+
+
+class ChooseTarget(BaseModel):
+    """Make an ESCO occupation one of the targets: added, or in place of `replaces` (a
+    target title it is the occupation for)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    expected_version: int = Field(ge=0)
+    concept_id: uuid.UUID
+    replaces: TextValue | None = None
+    discovery_id: uuid.UUID | None = Field(
+        default=None, description="The discovery that suggested it, if any."
+    )
+
+
+@dataclass(frozen=True)
+class DiscoveryView:
+    run: Run
+    proposal: DiscoveryProposal | None  # only once the run is complete
+
+
+@dataclass(frozen=True)
+class Explanation:
+    workday: str  # ESCO's description, shortened
+    why: list[str]
+    might_not: list[str]
+    entry_gates: list[str]
+    evidence_gaps: list[str]
+    try_it: list[str]
+
+
+@dataclass(frozen=True)
+class Suggestion:
+    candidate: Candidate
+    facts: OccupationFacts
+    explanation: Explanation
+
+
+@dataclass(frozen=True)
+class SlateView:
+    """A slate computed from a discovery's stored searches and its pinned answers."""
+
+    discovery: DiscoveryView
+    release: TaxonomyRelease
+    slate: Slate
+    suggestions: list[Suggestion]
+    queries: list[PoolQuery]
+    unsupported_hypotheses: list[str]  # model titles ESCO does not hold
+    unsearchable_queries: list[str]  # queries with no searchable word (none ran)
+    titles: dict[uuid.UUID, str]  # every pooled occupation's title
+    limits_not_applied: list[str]  # the person's limits the slate records but cannot apply
+
+
+def _proposal(tx: Tx, keyring: Keyring, run: Run) -> DiscoveryProposal | None:
+    if run.kind is not RunKind.DISCOVERY or run.status is not WorkState.COMPLETE:
+        return None
+    plaintext = open_output(tx, keyring, run)
+    return None if plaintext is None else DiscoveryProposal.model_validate_json(plaintext)
+
+
+def visible_discovery(
+    tx: Tx, keyring: Keyring, workspace_id: uuid.UUID, discovery_id: uuid.UUID
+) -> DiscoveryView:
+    visible_workspace(tx, workspace_id)
+    run = run_store.run(tx, discovery_id)
+    if run is None or run.workspace_id != workspace_id or run.kind is not RunKind.DISCOVERY:
+        raise NessaError(ErrorCode.NOT_FOUND, "No such discovery.", stage=ErrorStage.PROFILE)
+    return DiscoveryView(run, _proposal(tx, keyring, run))
+
+
+def discoveries(
+    tx: Tx,
+    keyring: Keyring,
+    workspace_id: uuid.UUID,
+    *,
+    before: tuple[datetime, uuid.UUID] | None,
+    limit: int,
+) -> list[DiscoveryView]:
+    """Newest first."""
+    visible_workspace(tx, workspace_id)
+    runs = run_store.runs(tx, workspace_id, before=before, limit=limit, kind=RunKind.DISCOVERY)
+    return [DiscoveryView(run, _proposal(tx, keyring, run)) for run in runs]
+
+
+def submit_discovery(
+    tx: Tx,
+    actor: Actor,
+    workspace_id: uuid.UUID,
+    command: SubmitDiscovery,
+    *,
+    models: ModelChoice,
+    keyring: Keyring,
+    runtime_mode: RuntimeMode,
+    defaults: SpendLimits,
+    now: datetime,
+) -> DiscoveryView:
+    """A discovery run on the current profile version, which it pins. Refused before any
+    run exists when the profile is stale, when no answer describes work yet, or when the
+    taxonomy it would search is missing."""
+    visible_workspace(tx, workspace_id, lock=True)
+    profile = current_profile(tx, workspace_id)
+    if command.expected_profile_version != profile.version:
+        raise stale_version(profile.version)
+    evidence = evidence_of(profile.document)
+    if not evidence:
+        raise NessaError(
+            ErrorCode.INSUFFICIENT_EVIDENCE,
+            "Tell Nessa what you do now, what you enjoy or what you can do first.",
+            stage=ErrorStage.PROFILE,
+            details={"needs": [field.value for field in discovery.EVIDENCE_FIELDS]},
+        )
+    held_release(tx)
+    context = DiscoveryInput(profile_version=profile.version, evidence=evidence)
+    run = submit_run(
+        tx,
+        actor,
+        workspace_id,
+        RunRequest(
+            RunKind.DISCOVERY,
+            discovery.worst_case_nano_usd,
+            profile_version=profile.version,
+            input=context.model_dump_json().encode(),
+        ),
+        models=models,
+        keyring=keyring,
+        runtime_mode=runtime_mode,
+        defaults=defaults,
+        now=now,
+    )
+    return DiscoveryView(run, None)
+
+
+def _search_hits(tx: Tx, text: str) -> tuple[Hit, ...] | None:
+    """Exact label matches score 1. Occupations that match every word score their rank over
+    the best such rank; those that match only some words (any-word search, which ranks a
+    common word in a title highly) at most `PARTIAL_MATCH_WEIGHT`. None: the query has no
+    searchable word, so nothing ran (never an empty result)."""
+    try:
+        every = search_occupations(tx, text, QUERY_HITS, any_word=False)
+        some = search_occupations(tx, text, QUERY_HITS, any_word=True)
+    except NessaError as error:
+        if error.details.get("reason") == "no_search_terms":
+            return None
+        raise
+    scores: dict[uuid.UUID, float] = {}
+    for found, weight in ((every, 1.0), (some, PARTIAL_MATCH_WEIGHT)):
+        top = max((hit.text_rank for hit in found.full_text), default=0.0)
+        for hit in found.full_text:
+            score = weight * hit.text_rank / top if top > 0 else 0.0
+            scores[hit.concept_id] = max(scores.get(hit.concept_id, 0.0), score)
+    labels = {m.concept_id for m in every.label_matches}
+    return tuple(Hit(c, 1.0, label_match=True) for c in sorted(labels)) + tuple(
+        Hit(c, s, label_match=False) for c, s in scores.items() if c not in labels
+    )
+
+
+def _label_hits(tx: Tx, title: str) -> tuple[Hit, ...]:
+    """Occupations that hold this title as a label (`nessa.concept_key`), all scoring 1."""
+    matches = taxonomy_store.concept_key_matches(tx, title)
+    return tuple(Hit(m.concept_id, 1.0, label_match=True) for m in matches)
+
+
+def _provided(document: ProfileDocument, field: ProfileField) -> list[str]:
+    value = getattr(document, field.value)
+    if value.state is not FieldState.PROVIDED or value.value is None:
+        return []
+    return [str(item) for item in (value.value if isinstance(value.value, list) else [value.value])]
+
+
+def _pinned_document(tx: Tx, run: Run) -> ProfileDocument:
+    pinned = profile_store.profile_version(tx, run.workspace_id, run.profile_version or 0)
+    if pinned is None:  # a discovery needs answers, so its version was saved
+        raise NessaError(
+            ErrorCode.INTERNAL_ERROR,
+            "The discovery's profile is missing.",
+            stage=ErrorStage.PROFILE,
+        )
+    return pinned.document
+
+
+def _description(text: str) -> str:
+    if len(text) <= DESCRIPTION_CHARS:
+        return text
+    cut = text[:DESCRIPTION_CHARS].rsplit(" ", 1)[0]
+    return f"{cut}…"
+
+
+def explain(candidate: Candidate, facts: OccupationFacts, familiarity_known: bool) -> Explanation:
+    """The suggestion's words, from the answers that found it and ESCO's record only."""
+    title = facts.preferred_label
+    why: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for match in candidate.matches:
+        for item in match.query.based_on:
+            key = (item.field.value, item.text)
+            if key in seen or len(why) == 3:
+                continue
+            seen.add(key)
+            if match.query.channel is SlateChannel.HYPOTHESIS:
+                why.append(
+                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. Nessa thought of this title "
+                    "from it, and ESCO lists it."
+                )
+            else:
+                why.append(
+                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. Nessa searched for "
+                    f"“{match.query.text}”, and ESCO's record for this occupation matched."
+                )
+    might_not: list[str] = []
+    if facts.essential_skills:
+        might_not.append(
+            f"ESCO lists {facts.essential_skill_count} essential skills, not yet compared "
+            f"with your experience, including: {', '.join(facts.essential_skills)}."
+        )
+    if facts.regulated:
+        might_not.append(
+            "ESCO marks this as a regulated profession in at least one European country. "
+            "Whether England requires registration isn't checked yet."
+        )
+    if familiarity_known and candidate.direction is Direction.LESS_FAMILIAR:
+        might_not.append(
+            "It's a different kind of work from what you've told Nessa about, so it may "
+            "need new experience."
+        )
+    gates = (
+        ["Registration may be required. Not checked yet."]
+        if facts.regulated
+        else ["Entry requirements aren't researched yet."]
+    )
+    try_it = [
+        f"Talk to someone who works as a {title} about a typical week (an informational interview)."
+    ]
+    if facts.essential_skills:
+        try_it.append(f"Try one of its tasks on a small scale: {facts.essential_skills[0]}.")
+    return Explanation(
+        workday=_description(facts.description),
+        why=why,
+        might_not=might_not,
+        entry_gates=gates,
+        evidence_gaps=[
+            "Pay, demand and listings in your work areas aren't researched yet. Finding no "
+            "listings later would be a demand signal, not proof this work doesn't exist."
+        ],
+        try_it=try_it,
+    )
+
+
+def discovery_slate(
+    tx: Tx,
+    keyring: Keyring,
+    workspace_id: uuid.UUID,
+    discovery_id: uuid.UUID,
+    controls: SlateControls,
+) -> SlateView:
+    view = visible_discovery(tx, keyring, workspace_id, discovery_id)
+    proposal = view.proposal
+    if proposal is None:
+        raise NessaError(
+            ErrorCode.PROPOSAL_NOT_AVAILABLE,
+            "This discovery has no validated queries yet.",
+            stage=ErrorStage.PROFILE,
+            details={
+                "run_status": view.run.status.value,
+                "failure_class": view.run.failure_class or "",
+            },
+        )
+    return compute_slate(tx, view, proposal, _pinned_document(tx, view.run), controls)
+
+
+def compute_slate(
+    tx: Tx,
+    view: DiscoveryView,
+    proposal: DiscoveryProposal,
+    document: ProfileDocument,
+    controls: SlateControls,
+) -> SlateView:
+    """The slate for these searches and answers over the held taxonomy. It reads taxonomy
+    tables only, so the offline evaluation runs it unchanged against the full release."""
+    release = held_release(tx)
+    queries: list[PoolQuery] = []
+    unsearchable: list[str] = []
+    for query in proposal.queries:
+        hits = _search_hits(tx, query.text)
+        if hits is None:
+            unsearchable.append(query.text)
+            continue
+        queries.append(
+            PoolQuery(
+                query.query_id,
+                query.text,
+                SlateChannel(query.channel.value),
+                tuple(query.based_on),
+                hits,
+            )
+        )
+    familiar: set[uuid.UUID] = set()
+    for index, role in enumerate(_provided(document, ProfileField.CURRENT_ROLE), start=1):
+        item = EvidenceItem(field=ProfileField.CURRENT_ROLE, text=role)
+        hits = _search_hits(tx, role) or ()
+        queries.append(PoolQuery(f"r{index}", role, SlateChannel.CURRENT, (item,), hits))
+        labelled = [hit.concept_id for hit in hits if hit.label_match]
+        familiar.update(labelled or [hit.concept_id for hit in hits[:1]])
+    for index, target in enumerate(_provided(document, ProfileField.TARGET_TITLES), start=1):
+        item = EvidenceItem(field=ProfileField.TARGET_TITLES, text=target)
+        hits = _label_hits(tx, target)
+        familiar.update(hit.concept_id for hit in hits)
+        queries.append(PoolQuery(f"t{index}", target, SlateChannel.USER_PROPOSED, (item,), hits))
+    unsupported: list[str] = []
+    for index, hypothesis in enumerate(proposal.hypotheses, start=1):
+        hits = _label_hits(tx, hypothesis.title)
+        if not hits:
+            unsupported.append(hypothesis.title)
+            continue
+        queries.append(
+            PoolQuery(
+                f"h{index}",
+                hypothesis.title,
+                SlateChannel.HYPOTHESIS,
+                tuple(hypothesis.based_on),
+                hits,
+            )
+        )
+    found = {hit.concept_id for query in queries for hit in query.hits}
+    facts = taxonomy_store.occupation_facts(tx, found, skills_shown=SKILLS_SHOWN)
+    occupations = {
+        concept_id: Occupation(
+            concept_id=concept_id,
+            title=fact.preferred_label,
+            family_code=fact.family.code,
+            family_label=fact.family.label,
+            sector_code=fact.sector.code,
+            label_keys=fact.label_keys,
+        )
+        for concept_id, fact in facts.items()
+    }
+    familiar_families = frozenset(facts[c].family.code for c in familiar if c in facts)
+    slate = choose_slate(build_pool(queries, occupations, familiar_families), controls)
+    suggestions = [
+        Suggestion(
+            candidate,
+            facts[candidate.occupation.concept_id],
+            explain(candidate, facts[candidate.occupation.concept_id], bool(familiar_families)),
+        )
+        for candidate in slate.suggestions
+    ]
+    return SlateView(
+        discovery=view,
+        release=release,
+        slate=slate,
+        suggestions=suggestions,
+        queries=queries,
+        unsupported_hypotheses=unsupported,
+        unsearchable_queries=unsearchable,
+        titles={concept_id: occupation.title for concept_id, occupation in occupations.items()},
+        limits_not_applied=(
+            [SALARY_FLOOR_NOT_APPLIED]
+            if document.minimum_salary.state is FieldState.PROVIDED
+            else []
+        ),
+    )
+
+
+def choose_target(
+    tx: Tx, actor: Actor, workspace_id: uuid.UUID, command: ChooseTarget, now: datetime
+) -> tuple[ProfileView, bool]:
+    """The person's explicit choice is the confirmation a target needs (PROF-04). Returns
+    the profile and whether it changed (the occupation may already be a target)."""
+    visible_workspace(tx, workspace_id, lock=True)
+    held_release(tx)
+    occupation = taxonomy_store.occupation(tx, command.concept_id)
+    if occupation is None:
+        raise NessaError(ErrorCode.NOT_FOUND, "No such ESCO occupation.", stage=ErrorStage.PROFILE)
+    if command.discovery_id is not None:
+        run = run_store.run(tx, command.discovery_id)
+        if run is None or run.workspace_id != workspace_id or run.kind is not RunKind.DISCOVERY:
+            raise NessaError(ErrorCode.NOT_FOUND, "No such discovery.", stage=ErrorStage.PROFILE)
+    profile = current_profile(tx, workspace_id)
+    if command.expected_version != profile.version:
+        raise stale_version(profile.version)
+    targets = _provided(profile.document, ProfileField.TARGET_TITLES)
+    label = occupation.preferred_label
+    folded = [target.casefold() for target in targets]
+    if command.replaces is not None:
+        if command.replaces.casefold() not in folded:
+            raise NessaError(
+                ErrorCode.VALIDATION_FAILED,
+                "That is not one of your target roles.",
+                stage=ErrorStage.PROFILE,
+                details={"field": "replaces", "reason": "not_a_target"},
+            )
+        chosen = [
+            label if target.casefold() == command.replaces.casefold() else target
+            for target in targets
+        ]
+        chosen = list(dict.fromkeys(chosen))  # the occupation may already be a target too
+    elif label.casefold() in folded:
+        return profile, False
+    else:
+        chosen = [*targets, label]
+    source = NewSource(
+        source_ref_id=uuid.uuid4(),
+        kind=SourceKind.OCCUPATION_CHOICE,
+        label=CHOSEN_FROM_SUGGESTIONS if command.discovery_id else CHOSEN_FROM_ESCO,
+        observed_at=now,
+        recorded_by=actor.actor_id,
+        run_id=command.discovery_id,
+        locator=occupation.esco_uri,
+    )
+    update = FieldUpdate(TextListInput(state=FieldState.PROVIDED, value=chosen), source)
+    view, changed = commit_profile_version(
+        tx, actor, workspace_id, command.expected_version, {"target_titles": update}
+    )
+    return view, bool(changed)

@@ -140,9 +140,13 @@ class SourceOut(ResponseModel):
     turn_id: uuid.UUID | None = None
     message_ids: list[uuid.UUID] = Field(default_factory=list)
     basis: Basis | None = None
+    discovery_id: uuid.UUID | None = Field(
+        default=None, description="An occupation choice: the discovery that suggested it."
+    )
 
     @classmethod
     def of(cls, source: SourceReference) -> "SourceOut":
+        conversation = source.kind is SourceKind.CONVERSATION
         return cls(
             source_ref_id=source.source_ref_id,
             kind=source.kind,
@@ -152,9 +156,10 @@ class SourceOut(ResponseModel):
             recorded_by=source.recorded_by,
             observed_at=source.observed_at,
             created_at=source.created_at,
-            turn_id=source.run_id,
+            turn_id=source.run_id if conversation else None,
             message_ids=list(source.message_ids),
             basis=source.basis,
+            discovery_id=None if conversation else source.run_id,
         )
 
 

@@ -14,6 +14,7 @@ from nessa.profile.document import (
     MAX_TARGETS,
     MAX_TASKS,
     VERSION_2_FIELDS,
+    VERSION_3_FIELDS,
     FieldState,
     ProfileDocument,
     ProfileInput,
@@ -176,18 +177,86 @@ def test_task_lists_are_bounded_with_a_typed_error() -> None:
 
 
 def test_a_version_1_document_reads_with_the_new_fields_not_asked() -> None:
+    later = (*VERSION_2_FIELDS, *VERSION_3_FIELDS)
     stored = {
         "schema_version": "1",
-        **{name: {"state": "unasked"} for name in FIELD_NAMES if name not in VERSION_2_FIELDS},
+        **{name: {"state": "unasked"} for name in FIELD_NAMES if name not in later},
         "cities": {"state": "provided", "value": ["Leeds"], "source_ref_id": str(SOURCE)},
     }
 
     document = ProfileDocument.model_validate(stored)
 
-    assert document.schema_version == "2"
+    assert document.schema_version == "3"
     assert document.cities.value == ["Leeds"]
-    for name in VERSION_2_FIELDS:
+    for name in later:
         assert getattr(document, name).state is FieldState.UNASKED
+
+
+def test_a_version_2_document_reads_with_work_style_not_asked() -> None:
+    stored = {
+        "schema_version": "2",
+        **{name: {"state": "unasked"} for name in FIELD_NAMES if name not in VERSION_3_FIELDS},
+        "enjoyed_tasks": {
+            "state": "provided",
+            "value": ["fixing bikes"],
+            "source_ref_id": str(SOURCE),
+        },
+    }
+
+    document = ProfileDocument.model_validate(stored)
+
+    assert document.schema_version == "3"
+    assert document.enjoyed_tasks.value == ["fixing bikes"]
+    assert document.work_style.state is FieldState.UNASKED
+    assert document.minimum_salary.state is FieldState.UNASKED
+
+
+@pytest.mark.req("PROF-04", "STATE-08")
+def test_the_salary_floor_is_gross_pay_with_its_period_and_unknown_is_never_zero() -> None:
+    floor = {"amount": {"minor_units": 2_800_000, "currency": "GBP"}, "period": "year"}
+
+    document = apply_profile_input(
+        empty_profile(), profile_input(minimum_salary=provided(floor)), SOURCE
+    )
+    unknown = apply_profile_input(
+        empty_profile(), profile_input(minimum_salary={"state": "unknown"}), SOURCE
+    )
+
+    assert document.minimum_salary.value is not None
+    assert document.minimum_salary.value.model_dump() == {**floor, "basis": "gross"}
+    assert (unknown.minimum_salary.state, unknown.minimum_salary.value) == (
+        FieldState.UNKNOWN,
+        None,
+    )
+    hourly = provided({"amount": {"minor_units": 1250, "currency": "GBP"}, "period": "hour"})
+    kept = apply_profile_input(empty_profile(), profile_input(minimum_salary=hourly), SOURCE)
+    assert kept.minimum_salary.value is not None
+    assert kept.minimum_salary.value.period == "hour"  # never annualised without hours
+    with pytest.raises(ValidationError):
+        profile_input(minimum_salary=provided({**floor, "period": "fortnight"}))
+    with pytest.raises(ValidationError):
+        profile_input(minimum_salary=provided({**floor, "basis": "net"}))
+
+
+@pytest.mark.req("REC1-01", "REC1-03")
+def test_work_style_is_an_optional_described_preference_never_a_limit() -> None:
+    new = profile_input(work_style=provided(["outdoors", "a small team"]))
+
+    document = apply_profile_input(empty_profile(), new, SOURCE)
+
+    assert document.work_style.value == ["outdoors", "a small team"]
+    assert "work_style" not in HARD_CONSTRAINTS  # it informs suggestions, never excludes
+    skipped = apply_profile_input(
+        empty_profile(), profile_input(work_style={"state": "skipped"}), SOURCE
+    )
+    assert (skipped.work_style.state, skipped.work_style.value) == (FieldState.SKIPPED, None)
+    with pytest.raises(NessaError) as raised:
+        apply_profile_input(
+            empty_profile(),
+            profile_input(work_style=provided([f"style {n}" for n in range(MAX_TASKS + 1)])),
+            SOURCE,
+        )
+    assert raised.value.details == {"field": "work_style", "limit": MAX_TASKS}
 
 
 @pytest.mark.req("PROF-07")
@@ -237,6 +306,7 @@ def test_limits_targets_work_areas_and_hours_are_the_hard_constraints() -> None:
         "weekly_study_hours",
         "direct_spend_cap",
         "monthly_payment_cap",
+        "minimum_salary",  # added by the product owner (H-11, 2026-10-28)
     }
     assert expected == HARD_CONSTRAINTS
 

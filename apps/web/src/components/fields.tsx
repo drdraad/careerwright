@@ -2,9 +2,16 @@
 // Form controls for one profile answer: how it is answered (its field state) and, when
 // answered, the value. Native controls, labelled and described, with errors announced.
 import { type ReactNode, useId } from "react";
-import type { FieldState } from "@/generated/api";
+import type { FieldState, PayPeriod } from "@/generated/api";
+import { listLimit } from "@/lib/bounds";
 import type { FieldDraft } from "@/lib/profile";
-import { FIELD_STATE, FIELD_STATE_ORDER } from "@/lib/vocabulary";
+import {
+  FIELD_STATE,
+  FIELD_STATE_ORDER,
+  PAY_PERIOD,
+  PROFILE_FIELDS,
+  type ProfileFieldName,
+} from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { Glyph } from "./Glyph";
 
@@ -99,6 +106,55 @@ export function ValueInput({ label, kind, draft, error, describedBy, onChange }:
       </div>
     </div>
   );
+}
+
+/** A salary floor: gross pounds and the period they are for (never converted). */
+export function SalaryInput({ label, draft, error, describedBy, onChange }: ControlProps) {
+  const id = useId();
+  return (
+    <div className="flex flex-wrap items-end gap-8">
+      <ValueInput
+        label={label}
+        kind="money"
+        draft={draft}
+        error={error}
+        describedBy={describedBy}
+        onChange={onChange}
+      />
+      <div className="grid gap-4">
+        <label htmlFor={id} className="small muted">
+          Per
+        </label>
+        <select
+          id={id}
+          className="select"
+          value={draft.period ?? "year"}
+          onChange={(event) => onChange({ ...draft, period: event.target.value as PayPeriod })}
+        >
+          {(Object.keys(PAY_PERIOD) as PayPeriod[]).map((period) => (
+            <option key={period} value={period}>
+              {period}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
+/** The value control a profile field's kind needs, labelled with the field's words. */
+export function AnswerControl({
+  name,
+  ...props
+}: Omit<ControlProps, "label"> & { name: ProfileFieldName }) {
+  const meta = PROFILE_FIELDS[name];
+  if (meta.kind === "list") {
+    return (
+      <ListInput label={meta.label} itemLabel={meta.itemLabel} limit={listLimit(name)} {...props} />
+    );
+  }
+  if (meta.kind === "salary") return <SalaryInput label={meta.label} {...props} />;
+  return <ValueInput label={meta.label} kind={meta.kind} {...props} />;
 }
 
 type ListProps = ControlProps & { itemLabel: string; limit: number };

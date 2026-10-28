@@ -3,13 +3,16 @@ and the decision on them."""
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import Field
 
 from nessa.api.schemas import ProfileOut, ResponseModel, RunOut
 from nessa.identity.records import PartialCompleteness, PartialReply
 from nessa.money import Money
-from nessa.profile.conversation import TurnView
+from nessa.profile import safety
+from nessa.profile.conversation import SupportShown, TurnView
+from nessa.profile.document import SalaryFloor
 from nessa.profile.interview import (
     AnsweredState,
     InterviewProposal,
@@ -17,14 +20,20 @@ from nessa.profile.interview import (
     ProposalOrigin,
     ProposedChange,
 )
-from nessa.profile.records import Basis, TurnDecision
+from nessa.profile.records import (
+    Basis,
+    ConversationMode,
+    EntryMode,
+    InterviewPreferences,
+    TurnDecision,
+)
 
 
 class ProposedChangeOut(ResponseModel):
     change_id: str
     field: ProfileField
     state: AnsweredState
-    value: Money | list[str] | float | str | None = Field(
+    value: SalaryFloor | Money | list[str] | float | str | None = Field(
         description=(
             "The proposed answer, typed as the field's input; null unless provided. A list is "
             "the complete list after the change: accepting it replaces the field's list."
@@ -161,6 +170,67 @@ class TurnOut(ResponseModel):
             run=run,
             proposal=ProposalOut.of(view.proposal) if view.proposal else None,
             decision=DecisionOut.of(view.decision) if view.decision else None,
+        )
+
+
+class SupportResourceOut(ResponseModel):
+    name: str
+    contact: str
+    when: str
+    source_url: str
+    checked_on: str = Field(description="When the service's own page was last checked.")
+
+
+class SupportResponseOut(ResponseModel):
+    """Given instead of a turn when a message explicitly expresses acute distress: the
+    message was not sent to the interviewer and nothing was stored. Kept apart from career
+    suitability. Resend with `send_after_support` to send the message anyway."""
+
+    policy: Literal["acute_distress"]
+    policy_version: str
+    review_status: str = Field(description="The policy is provisional until reviewed.")
+    message: str
+    resources: list[SupportResourceOut]
+    sent_to_interviewer: Literal[False] = False
+
+    @classmethod
+    def of(cls, shown: SupportShown) -> "SupportResponseOut":
+        return cls(
+            policy="acute_distress",
+            policy_version=shown.concern.policy_version,
+            review_status=safety.REVIEW_STATUS,
+            message=safety.SUPPORT_MESSAGE,
+            resources=[
+                SupportResourceOut(
+                    name=r.name,
+                    contact=r.contact,
+                    when=r.when,
+                    source_url=r.source_url,
+                    checked_on=r.checked_on,
+                )
+                for r in safety.SUPPORT_RESOURCES
+            ],
+        )
+
+
+class PreferencesOut(ResponseModel):
+    """How the person chose to start and to be interviewed, and whether it is paused. Null:
+    not chosen yet (the interviewer then keeps to the practical mode)."""
+
+    version: int = Field(description="0 while nothing has been saved.")
+    entry_mode: EntryMode | None
+    conversation_mode: ConversationMode | None
+    paused: bool
+    updated_at: datetime | None
+
+    @classmethod
+    def of(cls, preferences: InterviewPreferences) -> "PreferencesOut":
+        return cls(
+            version=preferences.version,
+            entry_mode=preferences.entry_mode,
+            conversation_mode=preferences.conversation_mode,
+            paused=preferences.paused,
+            updated_at=preferences.updated_at,
         )
 
 

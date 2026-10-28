@@ -7,6 +7,7 @@ from fastapi.routing import APIRoute
 
 from nessa.api import (
     routes_credentials,
+    routes_discovery,
     routes_events,
     routes_export,
     routes_health,
@@ -47,6 +48,7 @@ def _routes() -> FastAPI:
         routes_credentials,
         routes_runs,
         routes_interview,
+        routes_discovery,
         routes_taxonomy,
         routes_events,
         routes_export,

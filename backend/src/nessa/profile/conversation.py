@@ -45,7 +45,15 @@ from nessa.profile.interview import (
     ProfileField,
     TurnInput,
 )
-from nessa.profile.records import Basis, InterviewTurn, SourceKind, TurnDecision
+from nessa.profile.preferences import current_preferences, prompt_modes
+from nessa.profile.records import (
+    Basis,
+    InterviewPreferences,
+    InterviewTurn,
+    SourceKind,
+    TurnDecision,
+)
+from nessa.profile.safety import SupportConcern, screen_message
 from nessa.profile.store import stale_version
 from nessa.vocabulary import WorkState
 
@@ -62,6 +70,20 @@ class SubmitTurn(BaseModel):
 
     expected_profile_version: int = Field(ge=0)
     message: Message
+    send_after_support: bool = Field(
+        default=False,
+        description=(
+            "The person was shown the support response for this message and chose to send it "
+            "to the interviewer anyway."
+        ),
+    )
+
+
+@dataclass(frozen=True)
+class SupportShown:
+    """The support response, given instead of a turn: nothing was sent or stored."""
+
+    concern: SupportConcern
 
 
 class DecideTurn(BaseModel):
@@ -110,7 +132,13 @@ def visible_turn(tx: Tx, keyring: Keyring, workspace_id: uuid.UUID, turn_id: uui
 
 
 def _context(
-    tx: Tx, keyring: Keyring, profile: ProfileView, message_id: uuid.UUID, text: str, now: datetime
+    tx: Tx,
+    keyring: Keyring,
+    profile: ProfileView,
+    message_id: uuid.UUID,
+    text: str,
+    now: datetime,
+    preferences: InterviewPreferences,
 ) -> TurnInput:
     """The current message and as many earlier ones (with Nessa's replies) as fit the
     prompt budget, newest kept first."""
@@ -126,6 +154,7 @@ def _context(
         if proposal is not None:
             replies[past.message_id] = proposal.reply
     subset = interview.context_profile(profile.document)
+    entry_mode, conversation_mode = prompt_modes(preferences)
     current = (message_id, text, now)
     for start in range(len(earlier) + 1):
         kept = [(t.message_id, t.message, t.created_at) for t in earlier[start:]] + [current]
@@ -138,6 +167,8 @@ def _context(
             profile=subset,
             messages=messages,
             replies={m.ref: replies[m.message_id] for m in messages if m.message_id in replies},
+            entry_mode=entry_mode,
+            conversation_mode=conversation_mode,
         )
         if interview.prompt_bytes(context) <= MAX_PROMPT_BYTES:
             return context
@@ -160,13 +191,27 @@ def submit_turn(
     runtime_mode: RuntimeMode,
     defaults: SpendLimits,
     now: datetime,
-) -> TurnView:
+) -> TurnView | SupportShown:
+    """A new turn and its run; or, for a message that explicitly expresses acute distress,
+    the support response instead, with nothing sent to the model and nothing stored
+    (`nessa.profile.safety`), unless the person has seen it and chose to send the message."""
     visible_workspace(tx, workspace_id, lock=True)
+    concern = screen_message(command.message)
+    if concern is not None and not command.send_after_support:
+        return SupportShown(concern)
     profile = current_profile(tx, workspace_id)
     if command.expected_profile_version != profile.version:
         raise stale_version(profile.version)
     message_id = uuid.uuid4()
-    context = _context(tx, keyring, profile, message_id, command.message, now)
+    context = _context(
+        tx,
+        keyring,
+        profile,
+        message_id,
+        command.message,
+        now,
+        current_preferences(tx, workspace_id),
+    )
     run = submit_run(
         tx,
         actor,

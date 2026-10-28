@@ -56,6 +56,7 @@ class NewSource:
     run_id: uuid.UUID | None = None
     message_ids: tuple[uuid.UUID, ...] = ()
     basis: Basis | None = None
+    locator: str | None = None  # an occupation choice's ESCO URI
 
 
 @dataclass(frozen=True)
@@ -118,6 +119,7 @@ def commit_profile_version(
                 run_id=source.run_id,
                 message_ids=source.message_ids,
                 basis=source.basis,
+                locator=source.locator,
             )
     created = store.insert_profile_version(
         tx, workspace_id, expected_version + 1, document, actor.actor_id
