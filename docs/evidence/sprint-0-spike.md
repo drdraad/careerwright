@@ -1,5 +1,10 @@
 # Sprint 0 spike: exit evidence (S0.1–S0.4)
 
+> Task 3 (Sprint 1) retired `backend/spikes/` after promoting it into `backend/src/nessa`
+> and `backend/tools`. The commands and paths below are historical (git `ff449da`); their
+> scenarios now run against the product code in `make acceptance`, and the live check is
+> `make live-smoke` (ADR 0002, ADR 0004).
+
 - Date: 2026-10-27. Branch `l0-local-release`, from base `324b2ab`.
 - Machine: macOS arm64, Docker 29.1.2 (aarch64 engine), uv 0.9.18, Python 3.12.12 (uv-managed).
 - Scope: S0.1 to S0.4 of the Sprint 0 card. S0.5 (fixtures and hand checks), S0.6 (corpus

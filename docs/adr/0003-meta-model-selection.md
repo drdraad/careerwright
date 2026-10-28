@@ -51,13 +51,17 @@ The other models the key lists, from the same pricing page and https://dev.meta.
 - **Production model: `muse-spark-1.3` (Standard).** Qualified with two live calls. Call 6:
   schema output plus usage reporting. Call 7: streaming, web search and schema output in
   one call. Standard mode excludes model-training use. Contributor mode cannot be configured
-  as the production model: `MetaSettings` rejects any `-contributor` ID.
+  as the production model: the API and worker refuse to start with one (since Task 3,
+  `nessa.identity.model_choice.ModelChoice.configure`, using the mode recorded per model in
+  `nessa.identity.model_registry`).
 - **Test model: `muse-spark-1.3-contributor`.** It is the cheapest Meta model (12.5× cheaper
   input and 21× cheaper output than Standard) and the same Spark 1.3 release as production.
   It passed schema output (call 3), streaming schema output (call 4), web search with schema
   output (call 5), and the durable activity path (calls 8 and 10). Because Meta may train on
   Contributor traffic, the test model is allowed **only for synthetic or public inputs**.
-  Tooling labels it as Contributor, and no path that handles a real person's data may use it.
+  Since Task 3 this is enforced in code and in the database: a non-synthetic workspace's run
+  is always pinned to the production model, the activity refuses a Contributor model for
+  non-synthetic data, and a database CHECK rejects such a run row (ADR 0004 decision 9).
 - **Not selected:** Muse Wonder (M1 in the specification; no escalation in L0), Spark 1.1 and
   1.2 (older, same price), and image, voice and segmentation models (out of L0 scope). No
   automatic model escalation or provider substitution.
@@ -81,7 +85,12 @@ The other models the key lists, from the same pricing page and https://dev.meta.
   production cap. Every call, free or failed, is appended to
   `docs/evidence/live-usage.jsonl`. That includes worker attempts interrupted by a failure:
   they are written before the spike stack is removed, and the worst case is written if the
-  attempt rows cannot be read.
+  attempt rows cannot be read. Since Task 3 the spike CLIs are retired; `make live-smoke`
+  (`backend/tools/live_smoke.py`) is the explicit command. It caps each invocation in code
+  before the stack starts (the run's three attempts, none on the production model unless
+  `PRODUCTION=1`, worst case at most $0.10), drives the product path (key stored through the
+  API, sealed, opened only in the worker's activity), ledgers every attempt in the smoke
+  database even if the run fails, and the product's own spend reservation applies too.
 
 ## Observed behaviour and restrictions
 

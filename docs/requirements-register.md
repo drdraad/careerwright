@@ -27,9 +27,12 @@ substitute for it.
   untagged M0 section (`STATE`, `PROF`, `ACQ`, `JOB`, `ASSESS`, `OPTN`, `FRESH`, `PLN`, `PLAN`,
   `EXP`, `MODEL`, `DUR`, `API`, `SEC`, `UI`). Anchors are this register's labels, not
   specification IDs.
-- Tag each test with its ID so the register can be checked mechanically. Proposed: a pytest
-  marker `@pytest.mark.req("RDY1-03")` (Task 3 registers it, since pytest runs with
-  `--strict-markers`), and a `[RDY1-03]` prefix in Vitest and Playwright test titles.
+- Tag each test with its ID so the register can be checked mechanically: the pytest marker
+  `@pytest.mark.req("RDY1-03")` (registered in `backend/pyproject.toml` by Task 3; pytest
+  runs with `--strict-markers`), and a `[RDY1-03]` prefix in Vitest and Playwright titles.
+- Section 4 tables have no Evidence column: there the Status cell starts with the status
+  and continues with its evidence. A shared row whose Task 3 part passed but whose other
+  owners' parts are untested stays `planned` and says which part is done.
 - One test may carry several IDs; one ID may need several tests. A row is closed only when
   every assertion it names is tested.
 
@@ -79,18 +82,18 @@ and recovery · DOC document or ADR evidence · H human.
 |---|---|---|---|---|---|
 | BND1-01 | L0 local overrides of M0 recorded; nothing else relaxed | DOC | T1 | verified | `docs/adr/0001-l0-scope.md` (2bb36e5) |
 | BND1-02 | Supported slice (England, en-GB, GBP) stated before detailed collection; other regions get an explicit unsupported-region state, never a silent fallback | UI, API | T6 | planned | |
-| BND1-03 | At most three cities and three active targets; a fourth is rejected with a typed error, never added silently | D, API | T3 | planned | |
+| BND1-03 | At most three cities and three active targets; a fourth is rejected with a typed error, never added silently | D, API | T3 | verified | `tests/domain/test_profile_document.py` (incl. a Hypothesis property), `tests/integration/test_workspaces_and_profiles.py::test_a_fourth_city_is_rejected_and_nothing_is_saved` (`LIMIT_EXCEEDED`; 2556aef) |
 | BND1-04 | Residence and eligibility are never inferred from a chosen English city | D | T5 | planned | |
 | BND1-05 | Remote work only where England-compatible; remote never consumes a city slot | D | T7 | planned | |
 | BND1-06 | Planning bounds enforced and disclosed in every result: ≤ 24 action concepts, ≤ 2 starts each, ≤ 6 selected actions, ≤ 24 months, ≤ 1 conditional bridge-role transition | D | T11, T13 | planned | |
 | BND1-07 | At a hard bound, never keep the first 24 actions or first two intakes silently; ask the user to pin, exclude or choose; persist the removed-candidate count and scope restriction | D, UI | T12 | planned | |
 | BND1-08 | A regulated pathway beyond 24 months gets an explanatory sketch and an unsupported-model state (`MODEL_SCOPE_EXCEEDED`), never "impossible" (P04) | D, API | T9 | planned | |
 | BND1-09 | Non-deferrable M0 invariants hold everywhere. Covered by STATE-02/03, LIMITS-04/05, AIR1-02, FUNDING-01, PROF-04/06, SEC-01, MODEL-06, PLAN-04, READINESS-01, FIN1-06 | (rows named) | all | planned | |
-| BND1-10 | Data mode (demo, live-assisted, live-vacancy) recorded on every workspace and run (L0, GC5) | P | T3 | planned | |
-| BND1-11 | Demo mode makes no outbound request after setup, including the DBOS worker and the auth emulator (L0) | S | T3, T4 | planned | |
-| BND1-12 | Fixtures never fill missing live fields or appear as real evidence; synthetic data persistently labelled; switching to demo creates a separate workspace (L0, GC5) | D, UI | T3, T4 | planned | |
-| BND1-13 | Published ports bind 127.0.0.1; non-local Host and Origin rejected (L0, GC9) | S | T3 | planned | |
-| BND1-14 | Command contract: `make setup/dev/demo/check/acceptance/live-smoke/stop/reset-demo` behave as plan §2 states; `make stop` is bounded and never hangs | S, P | T3 | planned | |
+| BND1-10 | Data mode (demo, live-assisted, live-vacancy) recorded on every workspace and run (L0, GC5) | P | T3 | verified | workspaces and runs both carry `data_mode` and `synthetic`; a composite FK holds a run's copy equal to its workspace (migration 0002); `test_workspace_records_its_data_mode_and_permanent_synthetic_label`, `RunOut` in `test_durable_runs.py` (2556aef) |
+| BND1-11 | Demo mode makes no outbound request after setup, including the DBOS worker and the auth emulator (L0) | S | T3, T4 | verified | backend services: internal network; `tests/stack/test_local_stack.py::test_demo_mode_services_have_no_route_out_and_the_probe_can_see_one` (API, worker, emulator, PostgreSQL blocked; edge positive control reaches a host listener) and `test_live_mode_gives_the_worker_and_only_the_worker_a_route_out` (2556aef). T4 must add the web container to the probe |
+| BND1-12 | Fixtures never fill missing live fields or appear as real evidence; synthetic data persistently labelled; switching to demo creates a separate workspace (L0, GC5) | D, UI | T3, T4 | planned | T3 part verified (2556aef): `synthetic` is immutable for runtime roles, demo implies synthetic (CHECK), the fixture workspace cites the pinned P01 file and leaves absent fields unasked (`test_the_fixture_workspace_cites_the_pinned_fixture_file`), a demo workspace is its own workspace and never takes a key or runs a model. Open: UI labelling (T4) |
+| BND1-13 | Published ports bind 127.0.0.1; non-local Host and Origin rejected (L0, GC9) | S | T3 | verified | `tests/architecture/test_boundaries.py::test_compose_publishes_ports_on_loopback_only`, `tests/stack/test_local_stack.py::test_only_the_edge_publishes_ports_and_only_on_loopback`, `tests/integration/test_request_guard.py` (foreign Host 400; unauthorised local Origin 403 with no change), `tests/domain/test_config.py` (2556aef) |
+| BND1-14 | Command contract: `make setup/dev/demo/check/acceptance/live-smoke/stop/reset-demo` behave as plan §2 states; `make stop` is bounded and never hangs | S, P | T3 | verified | every target run by hand on 2026-10-28 (Task 3 report); `test_a_profile_edit_survives_a_full_stop_and_start` (bounded stop < 60 s), `test_reset_demo_restores_the_fixture_and_touches_nothing_else`, `test_migrations.py` (fresh and populated upgrade), worker shutdown watchdog; `make live-smoke` ledger row 12 (2556aef, 85bbe41) |
 | BND1-15 | A fresh checkout installs, starts and passes acceptance using the documented commands only | S | T16 | planned | |
 
 ### REC-1 Personality-informed career suggestions (spec §4)
@@ -286,17 +289,17 @@ and recovery · DOC document or ADR evidence · H human.
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| ARC1-01 | Stack fixed; CP-SAT, Rust solvers, PyO3, PixiJS, Temporal, Redis, PostGIS, embeddings and vector databases absent (dependency allowlist check in `make check`) | S | T3 | planned | |
+| ARC1-01 | Stack fixed; CP-SAT, Rust solvers, PyO3, PixiJS, Temporal, Redis, PostGIS, embeddings and vector databases absent (dependency allowlist check in `make check`) | S | T3 | verified | `tests/architecture/test_boundaries.py::test_the_lockfile_holds_none_of_the_excluded_technologies` in `make check` (backend lock; the JS lock arrives with T4, which must extend the check) (2556aef) |
 | ARC1-02 | Python dependencies pinned exactly and locked; arm64 executed | DOC | T1 | verified | `docs/dependencies.md`, `backend/uv.lock` (2bb36e5) |
 | ARC1-03 | JavaScript dependencies pinned and locked with pnpm | DOC | T4 | planned | |
 | ARC1-04 | Pydantic AI's native Meta provider qualified on the pinned model: schema output, streaming, search, usage | M | T1 | verified | ADR 0003; `docs/evidence/sprint-0-spike.md` S0.2; ledger calls 3–7. Test-model choice provisional (H-09) |
-| ARC1-05 | Worker killed mid-call or after persistence recovers to exactly one accepted output; outbox replay starts one workflow | P | T1, T3 | spike-verified | ADR 0002; `backend/spikes/durable/test_durability.py` (12 passed, re-run on 943663c, 2026-10-28) |
-| ARC1-06 | Workflow journals and logs hold identifiers only: no credential and no private payload (leak scan with a negative control) | P, S | T1, T3 | spike-verified | ADR 0002, S0.4 |
-| ARC1-07 | One retry owner (the DBOS step); typed message-free failures; exhausted retries end failed, never empty success | P | T1, T3 | spike-verified | ADR 0002 decisions 6–7 |
-| ARC1-08 | Runtime connects with non-owner roles; migration owners used only by setup | P, S | T3 | planned | ADR 0002 decision 2 |
-| ARC1-09 | Architecture checks reject circular imports and raw vendor/SQL access from domain code (GC3) | S | T3 | planned | |
-| ARC1-10 | TypeScript client generated from OpenAPI; money, state and error enums never duplicated by hand (GC10) | API | T3, T4 | planned | |
-| ARC1-11 | An LLM cannot alter a selected plan and a browser worker cannot write a skill profile; verified outputs return only through domain commands | S | T3 onward | planned | |
+| ARC1-05 | Worker killed mid-call or after persistence recovers to exactly one accepted output; outbox replay starts one workflow | P | T1, T3 | verified | product code: `tests/integration/test_durable_runs.py` (SIGKILL mid-call, after acceptance, after dispatch; replayed outbox) (2556aef). Sprint 0 spike evidence: ADR 0002 |
+| ARC1-06 | Workflow journals and logs hold identifiers only: no credential and no private payload (leak scan with a negative control) | P, S | T1, T3 | verified | every scenario in `test_durable_runs.py` and `test_worker_boundaries.py` scans both databases and worker logs (key fragments, profile and output sentinels); negative control `test_leak_negative_control.py` finds the DBOSDurability journal leak; live smoke scan clean (ledger row 12) (2556aef) |
+| ARC1-07 | One retry owner (the DBOS step); typed message-free failures; exhausted retries end failed, never empty success | P | T1, T3 | verified | `tests/domain/test_failures.py`; `test_durable_runs.py` (429 retried by the step, 503/connection exhausted to `provider_unavailable`, 401 echo, unexpected error) (2556aef) |
+| ARC1-08 | Runtime connects with non-owner roles; migration owners used only by setup | P, S | T3 | verified | `tests/integration/test_isolation.py::test_runtime_roles_are_not_owners_and_cannot_bypass_row_security`, `tests/stack/test_local_stack.py::test_the_containerised_worker_runs_dbos_as_the_non_owner_runtime_role` (2556aef); ADR 0002 decision 2, ADR 0004 decision 5 |
+| ARC1-09 | Architecture checks reject circular imports and raw vendor/SQL access from domain code (GC3) | S | T3 | verified | `tests/architecture/test_boundaries.py` in `make check` (module and package cycles, vendor allowlist; mutation-checked by adding `import sqlalchemy` to a domain module) (2556aef) |
+| ARC1-10 | TypeScript client generated from OpenAPI; money, state and error enums never duplicated by hand (GC10) | API | T3, T4 | planned | T3 part: the API's `/openapi.json` defines every enum once (`WorkState`, `DataMode`, `ErrorCode`, `ErrorStage`, `FailureClass`, `SpendState`, `ModelMode`, `EventKind`, `FieldState`) and `Money`. Open: generator and compile check (T4) |
+| ARC1-11 | An LLM cannot alter a selected plan and a browser worker cannot write a skill profile; verified outputs return only through domain commands | S | T3 onward | planned | T3 part verified (2556aef): model output is stored only as a sealed run output and changes no profile; the worker role has no access to profile tables (`test_the_worker_role_sees_only_the_run_it_executes`). Open: plans and skill profiles do not exist yet |
 
 ### TEST-1 Fixture pack and worked trace (spec §20)
 
@@ -313,7 +316,7 @@ and recovery · DOC document or ADR evidence · H human.
 | TEST1-09 | Real-source corpus labelled: 20 job postings, 10 course pages, 3 funding pages | M, H | T8, T10, T12 | planned | `corpus/manifest.json` (0/33 collected) |
 | TEST1-10 | LLM steps evaluated by schema, grounding and accepted semantic sets, never exact prose | M | T5, T6 | planned | |
 | TEST1-11 | Real-provider smoke (L0: local, budget-capped, with durable restart and browser print) | M | T16 | planned | |
-| TEST1-12 | Fixtures and core checks run in `make check` after each meaningful change | S | T3 | planned | |
+| TEST1-12 | Fixtures and core checks run in `make check` after each meaningful change | S | T3 | verified | `make check` runs format, lint, mypy, the fast suite and `fixtures/m0/validate_fixtures.py` (2556aef) |
 
 ## 3 Plan section 8 regression families
 
@@ -375,9 +378,9 @@ route fixtures separately.
 | LIMITS-04 | Failed, cancelled and invalid-input runs never appear as succeeded, empty or complete | OPT1-05 | constructed | T13 | planned |
 | LIMITS-05 | Complete empty archive → `NO_ROUTE_IN_BOUNDED_MODEL`; truncated empty → none found before the limit | OPT1-07 | constructed | T13 | planned |
 | LIMITS-06 | Cancellation reaches the optimiser child process | OPT1-09 | constructed | T13 | planned |
-| VERSIONS-01 | Confirmed edits create new input versions; a stale expected version is rejected (`STALE_INPUT_VERSION`) | PROF-05 | constructed | T3 | planned |
+| VERSIONS-01 | Confirmed edits create new input versions; a stale expected version is rejected (`STALE_INPUT_VERSION`) | PROF-05 | constructed | T3 | verified: `test_profile_writes_create_versions_and_reject_stale_expected_versions`, `test_rename_with_a_stale_version_is_rejected` (2556aef) |
 | VERSIONS-02 | Old plan versions stay immutable after a revision | PLAN-05 | constructed | T15 | planned |
-| VERSIONS-03 | A stale worker cannot overwrite a newer profile or catalogue version | DUR-04 | constructed | T3 | planned |
+| VERSIONS-03 | A stale worker cannot overwrite a newer profile or catalogue version | DUR-04 | constructed | T3 | verified for profiles: the worker role cannot write profile tables at all, and concurrent writers from one version commit exactly one (`test_concurrent_writes_from_one_version_commit_exactly_one`) (2556aef). Catalogues do not exist yet (T11) |
 | VERSIONS-04 | Editing an essential non-protected row creates a new target definition and invalidates earlier ranks | MAP1-04 | constructed | T9 | planned |
 | AI_RANGE-01 | [5, 8] fails a minimum of 6 under lower-bound filtering | AIR1-05 | TRACE-01 `score_record` | T7, T8 | planned |
 | AI_RANGE-02 | Unscored roles are included by default in exploration and counted | AIR1-05 | constructed | T7, T8 | planned |
@@ -398,13 +401,13 @@ Generated properties (plan section 8):
 
 | ID | Requirement | Layer | Owner | Status |
 |---|---|---|---|---|
-| STATE-01 | One state vocabulary across chapters, API, database and exports: draft, running, partial, complete, cancelled, blocked by missing information, insufficient coverage, stale, provider unavailable, failed | API, UI | T3, T4 | planned |
+| STATE-01 | One state vocabulary across chapters, API, database and exports: draft, running, partial, complete, cancelled, blocked by missing information, insufficient coverage, stale, provider unavailable, failed | API, UI | T3, T4 | planned (T3 part done on 2556aef: one `WorkState` enum in `nessa/vocabulary.py`, used by the runs table CHECK, the API, events and exports, plus `queued`; open: UI chapters, T4) |
 | STATE-02 | No hits reads "No matching listings found in the sources checked" with coverage and filters; a failed fetch never becomes "no jobs" | D, UI | T7, T8 | planned |
 | STATE-03 | A solver timeout never becomes "no feasible route" | D | T13 | planned |
 | STATE-04 | No feasible route: the smallest conflicting set only where proven, otherwise observed bottlenecks; relaxations offered, never applied silently | D, UI | T13, T14 | planned |
 | STATE-05 | Labelled route sketch after a target and four practical inputs; never labelled feasible or Pareto; unresolved steps stay unresolved; no fabricated providers, prices or dates | UI | T6 | planned |
 | STATE-06 | "What we know": proposed changes in a review tray (accept, edit, undo); facts and inferences styled differently; revision history; a changed constraint shows affected results before invalidating them | UI | T6 | planned |
-| STATE-07 | Long processes continue in the background and resume after the tab closes | UI, P | T3, T4 | planned |
+| STATE-07 | Long processes continue in the background and resume after the tab closes | UI, P | T3, T4 | planned (T3 part verified on 2556aef: runs are durable server-side and survive worker kills and full stack restarts; the event stream resumes from `Last-Event-ID`, `test_stream_delivers_events_with_ids_and_resumes_after_last_event_id`; open: the UI reconnect path, T4) |
 | STATE-08 | "Unknown", "skip" and "prefer not to say" accepted, with the result they make less precise; unknown salary is never zero; missing skills are never absence | D, UI | T5, T6 | planned |
 
 ### PROF Structured profile and conversational integrity (spec §4)
@@ -525,36 +528,36 @@ Generated properties (plan section 8):
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
 | MODEL-01 | One pinned approved Spark model; no automatic escalation or provider substitution; registry stores ID, mode, price version, capabilities, evaluation status | D | T5 | planned | first entry: ADR 0003 |
-| MODEL-02 | Standard IDs for personal data; Contributor never selected silently; a `-contributor` production model rejected at startup; the test model refused for any non-synthetic workspace | D | T3, T5 | planned | spike rejects `-contributor` production IDs (ADR 0003) |
+| MODEL-02 | Standard IDs for personal data; Contributor never selected silently; a `-contributor` production model rejected at startup; the test model refused for any non-synthetic workspace | D | T3, T5 | verified | `tests/domain/test_model_choice.py` (Contributor production refused at startup; non-synthetic runs pinned to Standard; Contributor refused for non-synthetic data); `test_the_contributor_model_is_refused_for_non_synthetic_data_at_every_layer` (API pins Standard; database CHECK rejects a Contributor run) (2556aef) |
 | MODEL-03 | Contract tests for streaming, schemas, refusals, truncation, timeouts and usage reporting | AD | T5 | planned | |
-| MODEL-04 | An invalid, over-budget or unavailable key preserves work and states the exact limitation; editing, demo, saved comparison and printing still work | UI, S | T3, T5 | planned | invalid key 401 observed (spike calls 1, 9, 11) |
-| MODEL-05 | Key stored with AES-GCM, unique nonce, workspace/record IDs as associated data, versioned runtime key outside database, code and backups; ownership checked before decryption; rotation and revocation tested | S | T3 | planned | sealing pattern spike-verified (ADR 0002) |
-| MODEL-06 | No key in browser storage, URLs, analytics, errors, exports, prompts, journals, logs or command arguments | S | T3, T16 | planned | |
-| MODEL-07 | Background work requires explicit consent to encrypted key storage; declining keeps editing and saved plans usable | UI | T3, T4 | planned | |
-| MODEL-08 | Per-run and per-period spend caps; estimate shown before deep research; concurrent reservation; usage reconciled; ambiguous charges recorded as unknown | S, P | T3, T16 | planned | |
-| MODEL-09 | Live calls only through explicit budget-capped commands, never in `make check` or `make acceptance`; every call ledgered with cost (R5) | S | T1, T3 | spike-verified | `docs/evidence/live-usage.md`; product command `make live-smoke` is T3 |
+| MODEL-04 | An invalid, over-budget or unavailable key preserves work and states the exact limitation; editing, demo, saved comparison and printing still work | UI, S | T3, T5 | planned | T3 part verified (2556aef): an invalid key, an exhausted budget, a revoked key or revoked access ends a run typed (`provider_authentication`, `budget_exceeded`, `credential_unavailable`, `access_revoked`) with profile and workspaces untouched; the demo runtime refuses model runs with `MODEL_UNAVAILABLE`. Open: UI statements and printing (T4, T5, T15) |
+| MODEL-05 | Key stored with AES-GCM, unique nonce, workspace/record IDs as associated data, versioned runtime key outside database, code and backups; ownership checked before decryption; rotation and revocation tested | S | T3 | verified | `tests/domain/test_keyring.py` (AES-GCM, fresh nonces, associated data, versions, owner-only key files); `tests/integration/test_credentials.py` (sealed, bound to its record, API role cannot read ciphertext); revocation and rotation of a queued run (`test_durable_runs.py`); access revoked hides the key from the worker; master-key rotation `test_master_key_rotation.py` (2556aef). Keys live in `NESSA_HOME`, outside the repository and database |
+| MODEL-06 | No key in browser storage, URLs, analytics, errors, exports, prompts, journals, logs or command arguments | S | T3, T16 | planned | T3 part verified (2556aef): errors, receipts, exports and both databases (`test_a_key_is_never_echoed_by_errors_receipts_or_exports`), journals and worker logs (every durable scenario), the connection-check prompt carries no workspace data, `make live-smoke` reads `.env` (no argument; its scan of databases, container logs and responses was clean). Open: browser storage and URLs (T4), final audit (T16) |
+| MODEL-07 | Background work requires explicit consent to encrypted key storage; declining keeps editing and saved plans usable | UI | T3, T4 | planned | T3 part verified (2556aef): `test_storing_a_key_needs_explicit_consent` (`CONSENT_REQUIRED`, editing still works). Open: the consent UI (T4) |
+| MODEL-08 | Per-run and per-period spend caps; estimate shown before deep research; concurrent reservation; usage reconciled; ambiguous charges recorded as unknown | S, P | T3, T16 | planned | T3 part verified (2556aef): `tests/domain/test_spend.py`; `test_concurrent_calls_cannot_reserve_past_the_period_limit`; submission refusal; reconciliation and `unknown` cost in `test_durable_runs.py`; `GET /spend`. Open: the cost estimate shown before deep research (T7), qualification (T16) |
+| MODEL-09 | Live calls only through explicit budget-capped commands, never in `make check` or `make acceptance`; every call ledgered with cost (R5) | S | T1, T3 | verified | `make live-smoke` (`backend/tools/live_smoke.py`; caps tested offline in `tests/tools/test_live_smoke.py`); ledger row 12 in `docs/evidence/live-usage.md` (85bbe41); the acceptance suite uses fake models only |
 
 ### DUR Durable execution (spec §17)
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| DUR-01 | Domain write and outbox row commit together; dispatch is at-least-once with a stable workflow ID | P | T3 | spike-verified | ADR 0002 decision 8 |
-| DUR-02 | Activities idempotent (keys, fingerprints, unique constraints); duplicate model spend reconciled; no exactly-once claim; accepted output checked before re-calling the model (carry-forward M4) | P | T3 | planned | |
-| DUR-03 | Long operations return 202 and a run ID; server-sent events with IDs allow reconnect; the terminal API state is authoritative; partial results carry completeness and freshness | API, UI | T3, T4 | planned | |
-| DUR-04 | A stale profile version cannot overwrite a newer one | P | T3 | planned | |
-| DUR-05 | Cancellation reaches model calls and compute processes, not just the spinner | P, S | T3, T13 | planned | |
+| DUR-01 | Domain write and outbox row commit together; dispatch is at-least-once with a stable workflow ID | P | T3 | verified | `insert_run` writes run and outbox in one transaction; `test_outbox_replay_after_a_dispatch_crash_starts_one_workflow`, `test_replaying_a_completed_outbox_entry_has_no_effect` (2556aef) |
+| DUR-02 | Activities idempotent (keys, fingerprints, unique constraints); duplicate model spend reconciled; no exactly-once claim; accepted output checked before re-calling the model (carry-forward M4) | P | T3 | verified | `test_a_crash_after_acceptance_never_calls_the_model_again_and_keeps_the_usage`, `test_worker_killed_mid_call_recovers_to_one_output_and_keeps_the_ambiguous_charge` (interrupted attempt stays `unknown` with its reservation); one output per run (unique); idempotent commands `test_a_retried_command_returns_the_first_result_and_acts_once` (2556aef) |
+| DUR-03 | Long operations return 202 and a run ID; server-sent events with IDs allow reconnect; the terminal API state is authoritative; partial results carry completeness and freshness | API, UI | T3, T4 | planned | T3 part verified (2556aef): 202 + run ID + `Location` (`test_runs_keys_and_spend_of_another_actor_are_invisible`), SSE with IDs and `Last-Event-ID` resume (`test_events.py`), `GET /runs/{id}` authoritative. Open: partial results (none yet) and the UI (T4) |
+| DUR-04 | A stale profile version cannot overwrite a newer one | P | T3 | verified | `test_concurrent_writes_from_one_version_commit_exactly_one`, stale write `409 STALE_INPUT_VERSION` (2556aef) |
+| DUR-05 | Cancellation reaches model calls and compute processes, not just the spinner | P, S | T3, T13 | planned | not done in T3: no cancel command yet (the `cancelled` state exists in the vocabulary and schema). Needs a run-lifecycle owner before Sprint 3's long runs, and T13 for the solver |
 | DUR-06 | Workspace deletion removes private payloads, object copies and workflow histories (or their payload keys) | P, S | T15, T16 | planned | |
 | DUR-07 | Research snapshots its inputs; solves consume a frozen snapshot, never a moving catalogue | D, P | T11, T13 | planned | |
-| DUR-08 | An app-database outage during an activity ends in a typed terminal state, never a run stuck queued (carry-forward, ADR 0002 decision 7) | P | T3 | planned | |
+| DUR-08 | An app-database outage during an activity ends in a typed terminal state, never a run stuck queued (carry-forward, ADR 0002 decision 7) | P | T3 | verified | `test_an_app_database_outage_mid_run_ends_in_a_typed_terminal_state` (worker role locked out mid-call; run ends `failed/app_store_unavailable`, the attempt settled `interrupted/unknown`); `tests/domain/test_failures.py` (2556aef). The DBOS-`ERROR` reconciler is implemented but not reached by a test |
 
 ### API Data contracts and errors (spec §18)
 
 | ID | Requirement | Layer | Owner | Status |
 |---|---|---|---|---|
-| API-01 | Versioned endpoints; writes separate from reads; authentication and ownership on every object; cursor pagination | API | T3 | planned |
-| API-02 | Error envelope: stable code, message, retryability, affected stage, correlation ID; codes `SOURCE_BLOCKED`, `RETRIEVAL_FAILED`, `INSUFFICIENT_EVIDENCE`, `SCHEMA_INVALID`, `MODEL_UNAVAILABLE`, `BUDGET_EXCEEDED`, `SOLVE_LIMIT_REACHED`, `STALE_INPUT_VERSION`, `FEATURE_NOT_IN_M0`, `MODEL_SCOPE_EXCEEDED`, `COARSE_MODEL_UNRESOLVED`, `NO_ROUTE_IN_BOUNDED_MODEL` | API | T3 (envelope); each code's owning task | planned |
-| API-03 | No fabricated empty success payloads | API | T3 onward | planned |
-| API-04 | `Money` (≥ 0) for payments, `SignedMoney` for economic values; minor-unit exponent is metadata, never an assumed /100; unknown money is null, not zero; a field-state wrapper keeps skipped, unasked and unresolved apart | D, API | T3, T11 | planned |
+| API-01 | Versioned endpoints; writes separate from reads; authentication and ownership on every object; cursor pagination | API | T3 | verified: `/v1` routers, idempotent writes separate from reads, every object behind the actor's row-level security (`test_isolation.py`), opaque cursors (`test_workspace_list_paginates_with_an_opaque_cursor`) (2556aef) |
+| API-02 | Error envelope: stable code, message, retryability, affected stage, correlation ID; codes `SOURCE_BLOCKED`, `RETRIEVAL_FAILED`, `INSUFFICIENT_EVIDENCE`, `SCHEMA_INVALID`, `MODEL_UNAVAILABLE`, `BUDGET_EXCEEDED`, `SOLVE_LIMIT_REACHED`, `STALE_INPUT_VERSION`, `FEATURE_NOT_IN_M0`, `MODEL_SCOPE_EXCEEDED`, `COARSE_MODEL_UNRESOLVED`, `NO_ROUTE_IN_BOUNDED_MODEL` | API | T3 (envelope); each code's owning task | planned (T3 part verified on 2556aef: the envelope `{code, message, retryable, stage, correlation_id, details}` on every error, with the correlation ID echoed as `X-Correlation-ID` (`test_request_guard.py`); all twelve codes defined in `nessa/errors.py`; `STALE_INPUT_VERSION`, `BUDGET_EXCEEDED` and `MODEL_UNAVAILABLE` raised and tested. Open: the other codes with their owning tasks) |
+| API-03 | No fabricated empty success payloads | API | T3 onward | planned (T3 surfaces verified on 2556aef: a failed or unavailable run has no output, `test_exhausted_retries_end_provider_unavailable_never_an_empty_success`; an unsaved profile is version 0, never a fabricated version; exports page through every row. Ongoing for later surfaces) |
+| API-04 | `Money` (≥ 0) for payments, `SignedMoney` for economic values; minor-unit exponent is metadata, never an assumed /100; unknown money is null, not zero; a field-state wrapper keeps skipped, unasked and unresolved apart | D, API | T3, T11 | planned (T3 part verified on 2556aef: `Money` in integer minor units, GBP only; the field-state wrapper (`unasked`, `provided`, `unknown`, `skipped`, `prefer_not_to_say`) with values only when provided, `test_profile_document.py`, `test_unknown_money_is_null_not_zero_and_states_round_trip`. Open: `SignedMoney` with its first use, T11) |
 | API-05 | Stage invariants: local search needs a confirmed target and work area; a budget-qualified solve needs confirmed budget semantics; an economic solve needs a horizon and baseline | D | T5, T11 | planned |
 | API-06 | Every derived object keeps referential integrity and provenance that locates its supporting span | P | T7 | planned |
 
@@ -562,13 +565,13 @@ Generated properties (plan section 8):
 
 | ID | Requirement | Layer | Owner | Status |
 |---|---|---|---|---|
-| SEC-01 | Invitation and ownership checked for API, cache, objects, stream, workflow and key use; uninvited and cross-workspace requests fail | S | T3 | planned |
-| SEC-02 | Row-level controls enforced in the database with non-owner roles, including the worker | S, P | T3 | planned |
-| SEC-03 | Emulator tokens accepted only under explicit local configuration; unsafe environment or host fails closed | S | T3 | planned |
-| SEC-04 | No advertising or session replay; logs hold record IDs and error classes; telemetry redacted | S | T3, T4 | planned |
+| SEC-01 | Invitation and ownership checked for API, cache, objects, stream, workflow and key use; uninvited and cross-workspace requests fail | S | T3 | verified: `test_identity.py` (uninvited, revoked tokens, revoked invitation, unverified email, rebinding refused), `test_isolation.py` (every endpoint incl. the stream, export, runs, keys and spend), `test_credentials.py`, worker scope `test_worker_boundaries.py` (2556aef). No cache exists yet |
+| SEC-02 | Row-level controls enforced in the database with non-owner roles, including the worker | S, P | T3 | verified: `test_isolation.py` (API role, no actor, other actor, forged inserts refused, append-only history), `test_the_worker_role_sees_only_the_run_it_executes`, `test_revoking_access_while_a_run_is_queued_hides_the_key_from_the_worker` (2556aef) |
+| SEC-03 | Emulator tokens accepted only under explicit local configuration; unsafe environment or host fails closed | S | T3 | verified: `tests/domain/test_config.py`; `test_the_api_refuses_to_start_with_unsafe_configuration` in the real container (2556aef) |
+| SEC-04 | No advertising or session replay; logs hold record IDs and error classes; telemetry redacted | S | T3, T4 | planned (T3 part verified on 2556aef: JSON logs with IDs and classes, messages dropped, tokens, URL passwords and process secrets scrubbed, DBOS and uvicorn routed through it, `test_redacted_logging.py`; no telemetry is configured. Open: no advertising or session replay in the web app, T4) |
 | SEC-05 | The model receives the minimum profile subset; search queries never carry names, finances or CV text | M, S | T6, T7 | planned |
 | SEC-06 | Data export, correction, deletion and revocation work | S | T15, T16 | planned |
-| SEC-07 | Dependency locks and licence notes; secret, dependency and migration checks; PostgreSQL and blob backup/restore with keys handled separately | S | T3, T16 | planned |
+| SEC-07 | Dependency locks and licence notes; secret, dependency and migration checks; PostgreSQL and blob backup/restore with keys handled separately | S | T3, T16 | planned (T3 part: locked dependencies, the excluded-technology check, migration tests on fresh and populated databases, master keys kept outside the database. Open: licence notes for the new packages, an automated secret scan, backup and restore, T16) |
 | SEC-08 | A provider outage degrades to dated saved data or an explicit unavailable state; no alternate provider; manual text is a user-selected mode | S | T7, T16 | planned |
 | SEC-09 | Model-output evaluations cover hallucinated course names, fabricated citations, altered constraints, unsafe financial assumptions, demographic stereotyping, excessive reassurance and prompt injection | M | T6, T7, T10 | planned |
 | SEC-10 | Users can report an error, and corrections keep provenance | UI | T8, T15 | planned |

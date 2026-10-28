@@ -13,7 +13,7 @@ re-running the check named in its row.
 | PostgreSQL server | 16.15 (`postgres:16.15-bookworm@sha256:d81f7b51697014367236d07ec58b54153fc28f828b72bf247fe5c7487520bcb0`; arm64 manifest `sha256:2b429c90…e8a9`) | Container only. The host has a PostgreSQL 18.4 *client*, used only for ad hoc inspection | Verified: `postgres --version` gave 16.15 (Debian 16.15-1.pgdg12+2) on aarch64; the full DBOS integration suite ran against it | Manifest only |
 | Node.js | 24.22.1 LTS (Krypton). Engine range for the web app: `>=24.11 <25` | Container: `node:24.22.1-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205` (arm64 manifest `sha256:294d33a9…1ea2`). Host: v24.11.1 | Verified: the Firebase emulator image built and ran on it (aarch64, `node --version` v24.22.1) | Manifest only |
 | pnpm | 10.33.2 | Host 10.33.2; containers use `corepack prepare pnpm@10.33.2` | Verified: installed `firebase-tools` in the arm64 image build | n/a |
-| Firebase CLI / Auth emulator | `firebase-tools@15.34.1`, Auth emulator only, `demo-nessa` project | Container built from the Node image above (`backend/spikes/firebase_emulator/Dockerfile`); no Java | Verified: `{"authEmulator":{"ready":true}}`; `accounts:signUp` returned an unsigned ID token (`alg: none`, `iss: https://securetoken.google.com/demo-nessa`); `command -v java` found nothing. Published on host loopback only (`-p 127.0.0.1:59099:9099`); `firebase.json` binds `0.0.0.0` inside the container | Not built |
+| Firebase CLI / Auth emulator | `firebase-tools@15.34.1`, Auth emulator only, `demo-nessa` project | Container built from the Node image above (`docker/auth/Dockerfile` since Task 3; it imports the committed deterministic seed on every start) | Verified: `{"authEmulator":{"ready":true}}`; `accounts:signUp` returned an unsigned ID token (`alg: none`, `iss: https://securetoken.google.com/demo-nessa`); `command -v java` found nothing. Since Task 3 it runs on the internal Compose network and the edge relays it to `127.0.0.1:59099`; `firebase.json` binds `0.0.0.0` inside the container | Not built |
 | uv | 0.9.18 (host) | Host; container checks install `uv==0.9.18` | Verified | n/a |
 | Docker / Compose | Docker 29.1.2, Compose v2 (`docker compose up --wait`) | Host | Verified | n/a |
 
@@ -41,15 +41,27 @@ Direct dependencies, pinned exactly in `backend/pyproject.toml`:
 | `dbos` | 3.3.0 | workflow engine (ADR 0002) |
 | `cryptography` | 50.0.2 | AES-256-GCM sealing |
 | `psycopg[binary]` | 3.3.6 | PostgreSQL driver (DBOS always uses psycopg 3) |
-| `httpx2` | 2.16.0 | HTTP client used by `openai` and Pydantic AI; the spike lists models with it |
+| `httpx2` | 2.16.0 | HTTP client used by `openai`, Pydantic AI and Starlette's test client |
+| `sqlalchemy` | 2.1.6 | engines and transactions (Task 3; the version `dbos==3.3.0` already locked) |
+| `alembic` | 1.20.1 | forward-only application migrations (Task 3) |
+| `fastapi` | 0.162.0 | the API and its OpenAPI contract (Task 3) |
+| `uvicorn` | 0.54.0 | ASGI server for the API container (Task 3) |
+| `firebase-admin` | 7.7.0 | ID-token verification with the revocation check, against the Auth emulator only (Task 3, ADR 0004) |
 | dev: `ruff` | 0.17.3 | lint and format |
 | dev: `mypy` | 2.4.0 | the single Python type checker (strict, pydantic plugin) |
 | dev: `pytest` | 9.2.0 | tests |
+| dev: `hypothesis` | 6.170.12 | property tests (plan section 7; Task 3) |
 | build: `hatchling` | 1.32.4 | build backend |
 
-Notable transitive versions: `openai` 3.40.0, `pydantic-core` 2.50.1, `pydantic-graph`
-2.62.0, `sqlalchemy` 2.1.6 (via `dbos`), `psycopg-binary` 3.3.6, `genai-prices` 0.1.13,
-`tiktoken` 0.14.0, `anyio` 4.15.1, `opentelemetry-api` 1.45.1.
+Since Task 3 the lock holds 88 packages. Notable transitive versions: `openai` 3.40.0,
+`pydantic-core` 2.50.1, `pydantic-graph` 2.62.0, `psycopg-binary` 3.3.6, `genai-prices`
+0.1.13, `tiktoken` 0.14.0, `anyio` 4.15.1, `opentelemetry-api` 1.45.1, `starlette` 1.10.0,
+`mako` 1.4.3 (Alembic). `firebase-admin` brings the Google client stack (`google-api-core`
+2.43.0, `google-cloud-firestore` 2.34.1, `google-cloud-storage` 3.17.1, `grpcio` 1.85.0,
+`pyjwt` 2.15.1, `httpx` 0.28.1); only `firebase_admin.auth` is used, and in emulator mode it
+contacts nothing but the emulator. All of it installed and ran in the arm64 backend image
+(`make acceptance`, 2026-10-28). `make check` refuses excluded technologies found in the lock
+(ARC1-01).
 
 Release cadence risk: Pydantic AI shipped 2.59.0 to 2.62.0 between 2026-10-21 and
 2026-10-27, and 2.62.0 was published on the check date. The ADR 0002 suite is the gate for
@@ -78,10 +90,6 @@ qualified pins.
 
 | Dependency | Candidate | Owner (task / sprint) | Disposition |
 |---|---|---|---|
-| FastAPI | 0.162.0 | Task 3 / Sprint 1 | pin with Uvicorn 0.54.0; OpenAPI contract feeds the TS client |
-| SQLAlchemy / Alembic | 2.1.6 (already locked via DBOS) / 1.20.1 | Task 3 / Sprint 1 | the SQLAlchemy pin must remain compatible with `dbos==3.3.0` |
-| firebase-admin | 7.7.0 | Task 3 / Sprint 1 | token verification against the emulator; emulator acceptance only in local config |
-| Hypothesis | 6.170.12 | first domain-logic task (Sprint 1+) | property tests (plan section 7) |
 | Scrapling (HTTP fetch only) | 0.5 | Sprint 3 acquisition task | restricted worker without model or master key; verify licence and arm64 |
 | Next.js / React / TypeScript | 16.4.3 / 19.3.1 / 7.0.2 | Task 4 / Sprint 1 | TypeScript 7 is a major release; confirm Next.js support before pinning |
 | D3 | 7.9.0 | Sprint 3 map task | SVG rendering only |
@@ -89,7 +97,7 @@ qualified pins.
 | Vitest, Testing Library, Playwright, axe | 5.0.5, 16.3.3, 1.64.1, 4.14.0 | Task 4 / Sprint 1 | Playwright browsers pinned per environment |
 | Storybook | 10.6.5 | Task 4 / Sprint 1 | design-system states |
 | JS lint/format (one toolchain) | Biome 2.6.3 or ESLint 10.13.0 | Task 4 / Sprint 1 | choose one; record in an ADR |
-| OpenAPI TS generator | `openapi-typescript` 7.13.0 or `@hey-api/openapi-ts` 0.99.0 | Task 3/4 / Sprint 1 | choose one; enums must come from the contract (constraint 10) |
+| OpenAPI TS generator | `openapi-typescript` 7.13.0 or `@hey-api/openapi-ts` 0.99.0 | Task 4 / Sprint 1 | choose one; generate from the API's `/openapi.json` (Task 3 publishes every enum there: state, data mode, error code, failure class, spend state) |
 | ESCO / ASHE data releases | n/a | Sprint 2 / 5 data tasks | pinned URL and hash; fetched by `make setup` (R7) |
 | Adzuna API | n/a | Sprint 3 | unverified: no credentials (R4) |
 
@@ -103,6 +111,10 @@ docker run --rm -v "$PWD/backend":/src:ro python:3.12.16-slim-bookworm@sha256:6d
 docker build -t nessa-spike/firebase-auth-emulator:15.34.1 backend/spikes/firebase_emulator
 uv run pytest -m integration spikes/durable -v                # PostgreSQL 16.15 + DBOS 3.3.0
 ```
+
+Since Task 3 (the spike paths above are historical; see git `ff449da`): `make setup` builds
+`nessa-l0/backend:local` and `nessa-l0/auth-emulator:15.34.1` from the locked inputs, and
+`make acceptance` runs every container on arm64.
 
 The spike's containers, volume and emulator image were removed after the checks. The
 pulled base images remain in the local Docker cache.

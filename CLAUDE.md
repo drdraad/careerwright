@@ -6,28 +6,34 @@ backend; Next.js web app to come). Authority order: `Nessa_Product_Specification
 Decisions live in `docs/adr/`; the latest sprint review is in `docs/reviews/`.
 
 ## Commands
-- Setup: `cd backend && uv sync --locked` (uv-managed Python 3.12; the host Python is
-  3.14). Design tooling: `cd docs/design && pnpm install --frozen-lockfile && pnpm exec
-  playwright install chromium`. TODO(Task 3): replace both with `make setup`.
-- Fast checks: `cd backend && uv run --locked ruff format --check . && uv run --locked
-  ruff check . && uv run --locked mypy && uv run --locked pytest && uv run --locked
-  python -I ../fixtures/m0/validate_fixtures.py`. TODO(Task 3): `make check`.
-- Full acceptance checks: `cd backend && uv run --locked pytest -m integration
-  spikes/durable` (needs Docker: PostgreSQL 16.15 and DBOS). TODO(Task 3): `make
-  acceptance`, the command CI uses.
+Run from the repository root (details: `docs/runbook.md`).
+- Setup: `make setup` (prerequisites, `uv sync --locked` on uv-managed Python 3.12, design
+  tooling, local secrets and master key in `NESSA_HOME`, default `~/.nessa/l0`, and the
+  Docker images). The host Python is 3.14; never use it for the backend.
+- Run: `make dev` (live: only the worker may reach Meta), `make demo` (no service has a
+  route out), `make stop` (bounded; keeps data), `make reset-demo` (fixture workspace only).
+- Fast checks: `make check` (ruff format and lint, mypy, fast pytest, fixture validator).
+  No Docker, no network.
+- Full acceptance checks: `make acceptance`, the command CI uses: real PostgreSQL 16.15,
+  DBOS, the Auth emulator and the Compose stack, in their own projects and ports.
 - Design references: `cd docs/design && pnpm run contrast && pnpm run screenshots`.
 - Live Meta calls run only through explicit, budget-capped commands, never from the checks
-  above. Today that is `cd backend && uv run python -m spikes.meta.live_spike <check>`.
-  TODO(Task 3): `make live-smoke`. Every call is appended to
-  `docs/evidence/live-usage.jsonl` with its cost (ruling R5).
+  above: `make live-smoke` (test model; `PRODUCTION=1` qualifies the production model).
+  Every call is appended to `docs/evidence/live-usage.jsonl` and `.md` with its cost (R5).
 
 ## Repository facts
 - Requirement IDs and test IDs: `docs/requirements-register.md`. Tag each test with its
   register ID, and update the rows your work closes.
-- Representative implementation: `backend/spikes/durable/workflow.py`. It shows the
-  pinned durable-activity pattern (ADR 0002): workflows carry IDs only; one bounded
-  activity opens the sealed payload and key just in time; failures are classified from
-  type and status with the message discarded; the DBOS step is the only retry owner.
+- Representative implementation: `backend/src/nessa/identity/activity.py` with
+  `workflow.py` beside it: the pinned durable-activity pattern (ADR 0002, ADR 0004).
+  Workflows carry IDs only; one bounded activity re-checks access, model, key and budget,
+  opens the sealed key just in time and stores the output sealed with its usage; failures
+  are classified from type and status with the message discarded; the DBOS step is the
+  only retry owner. `nessa/profile/commands.py` shows an expected-version command.
+- Layout: `nessa/identity` (identity and execution: access, workspaces, keys, runs,
+  spend), `nessa/profile`, `nessa/api` (HTTP only), `nessa/migrations` (forward-only SQL).
+  Vendor and SQL imports are allowed only in the adapters listed in
+  `backend/tests/architecture/test_boundaries.py`; add new ones there.
 - Non-obvious invariants:
   - The model proposes; validated application commands commit. Readiness, affordability
     and route ranks are computed by deterministic Python, never by the model.
@@ -44,16 +50,24 @@ Decisions live in `docs/adr/`; the latest sprint review is in `docs/reviews/`.
     labels. `fixtures/m0` is the byte-identical supplied pack (hashes in
     `fixtures/README.md`): never edit it. Fixtures never fill live fields; synthetic data
     is always labelled.
-  - Secrets: `.env` holds `META_API_KEY`. Never print it, pass it as an argument, log it
-    or journal it. The test model `muse-spark-1.3-contributor` takes synthetic or public
-    inputs only; production is `muse-spark-1.3` (ADR 0003, provisional).
-  - Loopback only: published ports bind 127.0.0.1.
+  - Secrets: `.env` holds `META_API_KEY` for `make live-smoke` only; the product takes
+    user keys through the API and seals them. Never print a key, pass it as an argument,
+    log it or journal it. Database passwords and master keys live in `NESSA_HOME`, never in
+    the repository. The test model `muse-spark-1.3-contributor` takes synthetic data only,
+    enforced in code and by a database CHECK; production is `muse-spark-1.3` (ADR 0003).
+  - Ownership is row-level security: run API SQL inside `actor_transaction` and worker
+    SQL inside `run_transaction` (`nessa/db.py`). Never connect at runtime as an owner role.
+  - Every consequential write takes an expected version and an `Idempotency-Key` and goes
+    through `run_idempotent`. Errors are `NessaError` codes; never echo request input.
+  - Loopback only: services sit on an internal network; only the edge relay publishes
+    ports, on 127.0.0.1. The API rejects foreign Host and Origin headers (ADR 0004).
   - UI uses the semantic tokens in `docs/design/tokens/tokens.css`. Sea-glass means
     selection or action only, and industry colour never means status. Every new colour
     pairing goes into `contrast-pairs.json` and is measured.
 - Compatibility boundary: the exact pins in `backend/pyproject.toml` and
-  `backend/uv.lock` (bump only by re-running the ADR 0002 suite), pnpm 10.33.2, Python
-  3.12 and PostgreSQL 16. Code goes in `backend/src/nessa/<domain module>` (plan
+  `backend/uv.lock` (bump only by re-running `make acceptance`), pnpm 10.33.2, Python
+  3.12, PostgreSQL 16, and the DBOS `application_version` `nessa-l0-1` (change it when the
+  workflow's step sequence changes). Code goes in `backend/src/nessa/<domain module>` (plan
   section 3) and `apps/web`. No empty layer scaffolding.
 
 ## Change scope

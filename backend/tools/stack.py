@@ -139,24 +139,36 @@ def _start(stack: Stack, mode: str) -> None:
         print("Demo mode: no Nessa service has a route out of this machine.")
 
 
+def ports_from_env() -> Ports:
+    """Host ports for the default stack; override when another project holds one."""
+    defaults = Ports()
+    return Ports(
+        api=int(os.environ.get("NESSA_API_PORT", defaults.api)),
+        auth=int(os.environ.get("NESSA_AUTH_PORT", defaults.auth)),
+        postgres=int(os.environ.get("NESSA_PG_PORT", defaults.postgres)),
+        web=int(os.environ.get("NESSA_WEB_PORT", defaults.web)),
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("dev", "demo", "stop", "reset-demo", "status", "build"))
     args = parser.parse_args(argv)
+    ports = ports_from_env()
     match args.command:
         case "dev":
-            _start(Stack(live=True), "live")
+            _start(Stack(ports=ports, live=True), "live")
         case "demo":
-            _start(Stack(live=False), "demo")
+            _start(Stack(ports=ports, live=False), "demo")
         case "stop":
-            print(f"Nessa {Stack().stop()}; volumes and data are kept.")
+            print(f"Nessa {Stack(ports=ports).stop()}; volumes and data are kept.")
         case "reset-demo":
-            Stack().run("migrate", "python", "-m", "nessa.cli", "reset-demo")
+            Stack(ports=ports).run("migrate", "python", "-m", "nessa.cli", "reset-demo")
             print("fixture workspace reset; other workspaces untouched.")
         case "status":
-            print(Stack().compose("ps", "--all").stdout)
+            print(Stack(ports=ports).compose("ps", "--all").stdout)
         case "build":
-            Stack().build()
+            Stack(ports=ports).build()
     sys.stdout.flush()
 
 
