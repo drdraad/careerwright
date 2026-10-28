@@ -416,7 +416,7 @@ const shots = (scratch: Scratch): Shot[] => [
     url: chapterUrl("you", scratch.talked),
     prepare: noteRefused("INSUFFICIENT_EVIDENCE", "no_quotable_answer"),
     refused: true, // the intercepted 422 is logged as a failed load
-    ready: slateNote(/Your answers are too short to quote\. Nothing from it/, true),
+    ready: slateNote(/Your answers are too short to quote\. Nessa didn't ask the model/, true),
   },
   {
     // A message with a risk stem is sent as usual, with the support panel beside it. The
