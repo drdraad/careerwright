@@ -2,7 +2,7 @@
 
 ## Career path optimiser product specification
 
-**Version 1.2 | Research checked 26 October 2026 | Product and architecture specification**
+**Version 1.3 | 28 October 2026 | Research checked 26 October 2026 | Product and architecture specification**
 
 **Your career. Your next chapter.**
 
@@ -47,7 +47,7 @@ A complete M0 session goes from sure/unsure entry, through a grounded shortlist,
 | Source permissions | Small checked-in source manifest: permission basis, attribution, retention, access policy, version | Managed rights/capability registry and broader source operations |
 | Skills and outcomes | Provisional ESCO/exemplar matrix; explicit course-outcome records and essential/gate review | Employer-diverse full-text corpus, specialist review and maintained reference families |
 | AI resilience | Range filter and unknown states; reviewed static assessments where evidence permits, with experimental badge | Routine monitoring, inter-rater qualification, supported seniority/local modifiers |
-| Research and caching | User-key research; keyless fetch process; private workspace cache in PostgreSQL | Shared cross-tenant derived cache with separate service funding and isolation |
+| Research and caching | User-key research; keyless fetch process; private workspace cache in PostgreSQL; a reviewed, dated option pack as an immutable public evidence pack, with live research `proposed` until reviewed (section 11) | Shared cross-tenant derived cache with separate service funding and isolation |
 | Planning | Up to 24 reviewed action concepts, at most two explicit starts per action, six selected actions and 24 months; at most one conditional bridge-role transition | Longer/finer planning, multiple job transitions and adaptive scenario policies |
 | Finance | Common-horizon economic cost; direct/payment caps; conservative liquidity check; existing debt as fixed commitments; confirmed grants only in unconditional figures | Qualified optimisation of new borrowing instruments and complex benefit/tax interactions |
 | Solver | One Python DFS, independent checker, deterministic order, complete encountered archive, F1-F3, explicit search limits | Larger-instance qualification; any replacement algorithm requires a later specification decision, not a hidden fallback |
@@ -251,6 +251,8 @@ A Meta LLM turns confirmed profile evidence into task and work-environment queri
 The structured `CareerSuggestion` contains a local title, canonical concept or provisional concept ID, taxonomy mappings, supporting source IDs, linked profile evidence, workday/tasks, plausible fit, potential mismatch, entry gates, evidence gaps and a low-cost way to test the hypothesis. It also identifies its discovery channel and occupation family. It never contains an invented “92% personality match”. Confirmed suggestions become `TargetRole` records only after user selection.
 
 Show “Why this could suit you”, “What might not suit you” and “Try it before committing”. Allow **broaden**, **more practical**, **less familiar**, **exclude this kind of work**, **change my profile** and **show why this wasn't included**. A rejected title does not automatically reject its entire industry. A confident user may skip this service and enter their own titles.
+
+A model-written “Why this could suit you” is permitted, in at most one bounded model call per slate, when it quotes only the person's confirmed answers and the grounded occupation record, each quotation verified server-side, and is validated like a search proposal: one bounded repair, then an observable invalid-output failure. It adds no readiness or affordability claim. Deterministic provenance (the confirmed answers and the occupation record that grounded the suggestion) remains underneath and is what exports cite.
 
 LLM job-recommendation studies have found demographic bias in earlier models; those results motivate current-model tests, not a claim that the deployed model has the same measured bias. Evaluate suggestions after removing or counterfactually varying irrelevant demographic cues, while keeping legitimate work-rights and accommodation requirements fixed. [55]
 
@@ -623,7 +625,9 @@ Display all mandatory constraints, unresolved critical fields and funding assump
 
 **Chapter gate: M0.** Explicit M0/M1 subsection or paragraph labels take precedence. M1 includes M0.
 
-**M0:** keep derived research and cache entries inside their workspace, in PostgreSQL, with user-key billing and ownership checks. Keyless fetchers return permitted text to the user-scoped extraction workflow. Only immutable public taxonomy/statistics/evidence packs are common read-only inputs; user research is not reused for other testers. Refresh on access/manual action and enforce TTL/status checks. **M1:** introduce separately funded shared public-data caching and scheduled refresh.
+**M0:** keep derived research and cache entries inside their workspace, in PostgreSQL, with user-key billing and ownership checks. Keyless fetchers return permitted text to the user-scoped extraction workflow. Only immutable public taxonomy/statistics/evidence packs, including the option pack below, are common read-only inputs; user research is not reused for other testers. Refresh on access/manual action and enforce TTL/status checks. **M1:** introduce separately funded shared public-data caching and scheduled refresh.
+
+**M0 option pack:** a reviewed, versioned, dated option pack covering the qualification personas' targets is an immutable public evidence pack and a permitted common read-only input. Its records use the section 18 shapes (LearningOption and Offering, FundingInstrument, SkillRequirement rows and `PlanAction.outcomes`), each with its SourceClaims, rights status, `review_state` and dates. Every surface that uses the pack shows its date and each record's review state; a pack record never fills a live field and is never shown as current; synthetic data stays labelled synthetic. Live research writes to the same catalogue contract, inside its own workspace, with `review_state: proposed`; a proposed record is explorable but excluded from an unqualified recommendation until reviewed, as at the option review checkpoint (section 10). The pack is not a shared cross-tenant cache, which remains M1.
 
 Cache shared public facts separately from personal assessments and rankings at M1. Keys include canonical entity, actual data geography, occupational level, language, provider, source version, policy/eligibility context and extraction schema version. A shared funding-scheme cache contains rules, never a conclusion about a particular user's eligibility.
 
@@ -793,6 +797,8 @@ Persist every distinct feasible schedule encountered to a disk-backed, versioned
 `search_coverage` is **complete** only after exhausting the entire declared finite search tree with sound pruning; otherwise it is **budget_truncated**. Separate operational states remain queued, running, succeeded, failed, cancelled and invalid-input. A crash is not a successful truncated result. Record expanded states, feasible count, remaining-work indicator, model limits, pruning-rule version and truncation reason. No elaborate certificate file is needed in M0, but these facts are not optional.
 
 A complete run with zero feasible schedules proves only **no feasible route in this bounded monthly model and catalogue**. Incomplete coverage cannot establish even that. A complete run proves the three layers only over the declared model; it does not prove global optimality across unresearched courses or excluded dates. Tens of options with two intakes can still create millions of combinations, so completion within the budget is not assumed.
+
+**Consequence of the M0 limits.** At the M0 upper bound (24 concepts, two starts each, at most six selected), the selection space alone holds $\sum_{k=0}^{6}\binom{24}{k}2^k=10{,}161{,}633$ selected sets, so the 1,000,000-state cap cannot exhaust it unless sound pruning removes most of it. `budget_truncated` is therefore the expected coverage for large catalogues, and `NO_ROUTE_IN_BOUNDED_MODEL` is correspondingly rare near the bound. Results, UI and exports treat truncation as the normal state: lead with “Best trade-offs found”, state the instance size, and say which narrowing (fewer concepts, one start, a shorter horizon) would let the search complete. Solver qualification reports the measured instance sizes at which complete coverage is reached. No rule changes: completeness semantics, the caps and the layer definitions stay as written.
 
 Retain the counterexample: $(1,3),(2,2),(3,1)$ are mutually nondominated and all dominate $(4,4)$, which lies in F2. Being beaten three times is not a valid exclusion rule. Correctness tests compare this DFS against a simple independent Cartesian-product oracle on tiny instances. No network or LLM call occurs inside candidate evaluation.
 
@@ -1168,7 +1174,7 @@ FEATURE_NOT_IN_M0           MODEL_SCOPE_EXCEEDED
 COARSE_MODEL_UNRESOLVED     NO_ROUTE_IN_BOUNDED_MODEL
 ```
 
-Use `NO_ROUTE_IN_BOUNDED_MODEL` only with complete search coverage. Budget truncation has its own coverage value and stop reason; it is not infeasibility. A proven result states the precise model and catalogue scope. Return no fabricated empty success payloads.
+Use `NO_ROUTE_IN_BOUNDED_MODEL` only with complete search coverage. Budget truncation has its own coverage value and stop reason; it is not infeasibility. Near the M0 bound truncation is the expected coverage (section 12, OPT-1): a truncated result leads with the best trade-offs found, states the instance size and names the narrowing that would let the search complete. A proven result states the precise model and catalogue scope. Return no fabricated empty success payloads.
 
 
 # 19 Security, privacy and operational integrity
@@ -1284,6 +1290,16 @@ M0 already fixes England, English, GBP and the bounded horizon. Business decisio
 These decisions do not prevent a coherent architecture, but they do prevent honest promises of universal coverage, fixed unit economics or regulatory readiness. The implementation plan should be written against the proposed M0 boundary and its acceptance gates, as a separate exercise. The private-beta assumption still requires confirmation before deployment decisions.
 
 # 22 Feedback assessment and revision record
+
+## Version 1.3 review decisions
+
+Version 1.3 (28 October 2026) applies an assessment of this specification and the local development plan against the repository after its first three local sprints (`docs/plan/l0-assessment-handover.md`). It makes two clarifications and one disclosure. No requirement is relaxed and no non-deferrable invariant changes. The product owner confirmed decisions D1 and D3 on 28 October 2026.
+
+| Reviewer proposal | Decision and change |
+|---|---|
+| A reviewed, dated option pack for the qualification personas' targets, with live research proposing records to the same catalogue (D1) | **Accept (confirmed by the product owner).** Section 11 and BND-1: the pack is an immutable public evidence pack and a permitted common read-only input in M0. Date and review state are always shown; a pack record never fills a live field and is never shown as current. Live research writes to the same catalogue contract inside its own workspace with `review_state: proposed`, excluded from unqualified recommendations until reviewed. No shared cross-tenant cache is added (still M1). |
+| Disclose what the OPT-1 limits imply | **Accept as a disclosure.** Sections 12 and 18: at the M0 bound the selection space holds 10,161,633 selected sets, so `budget_truncated` is the expected coverage for large catalogues. Results lead with “Best trade-offs found”, state the instance size and name the narrowing that would let the search complete. Completeness semantics, caps and layer definitions are unchanged. |
+| Model-written, span-cited explanations on career suggestions (D3) | **Accept (confirmed by the product owner).** Section 4, REC-1: at most one bounded call per slate; quotations only from confirmed answers and the grounded occupation record, each verified server-side; one repair, then invalid output. Deterministic provenance remains underneath and is what exports cite. |
 
 ## Version 1.2 review decisions
 
