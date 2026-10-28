@@ -21,6 +21,9 @@ MODIFIER_APOSTROPHE = "\N{MODIFIER LETTER APOSTROPHE}"
 CURLY_APOSTROPHE = "\N{RIGHT SINGLE QUOTATION MARK}"
 NON_BREAKING_HYPHEN = "\N{NON-BREAKING HYPHEN}"
 EN_DASH = "\N{EN DASH}"
+EM_DASH = "\N{EM DASH}"
+HORIZONTAL_BAR = "\N{HORIZONTAL BAR}"
+MINUS_SIGN = "\N{MINUS SIGN}"
 
 # One hand-written table (controller ruling, fix round 5): every shape the reviewers
 # reported in re-reviews 2, 3 and 4 must trigger the flow; the reviewers' career examples
@@ -142,6 +145,18 @@ CORPUS: list[tuple[str, str, bool]] = [
     ("rr4 M-3", f"I don{CURLY_APOSTROPHE}t want to live in London.", FLOW),
     ("rr4 M-3", f"self{NON_BREAKING_HYPHEN}harm support services", FLOW),
     ("rr4 M-3", f"self{EN_DASH}harm support services", FLOW),
+    # Re-review 5 N-I1: a dash glued to a word must not fuse words, and a listed word may be
+    # a later part of a hyphenated compound. Existing rows with only the punctuation swapped.
+    ("rr5 N-I1", f"Print is going to die{EM_DASH}so I want to retrain.", FLOW),
+    ("rr5 N-I1", "Print is going to die-so I want to retrain.", FLOW),
+    ("rr5 N-I1", f"I could kill myself{EM_DASH}for missing that deadline.", FLOW),
+    ("rr5 N-I1", f"Some days I just want to die{HORIZONTAL_BAR}so what.", FLOW),
+    ("rr5 N-I1", f"wish{EM_DASH}I had died", FLOW),
+    ("rr5 N-I1", f"I think the high street{MINUS_SIGN}is going to die", FLOW),
+    ("rr5 N-I1", "I have been thinking about anti-suicide work.", FLOW),
+    ("rr5 N-I1", "I have anti-self-harm awareness training from my NHS role.", FLOW),
+    ("rr5 N-I1", "I have non-suicidal awareness training from my NHS role.", FLOW),
+    ("rr5 N-I1", f"I have drug{EM_DASH}overdose awareness training from my NHS role.", FLOW),
     # The reviewers' career examples with no stem, and guards for the windows: nothing.
     ("rr3 N-I1", "I am planning to end my lifeguard job this summer.", NO_FLOW),
     ("rr3 N-I1", "I want to end my lifelong career in retail.", NO_FLOW),

@@ -5,8 +5,9 @@ It is kept apart from career suitability: nothing here scores, labels or remembe
 person, and nothing it sees reaches the profile, a proposal or a suggestion.
 
 - **One recall-first screen** (controller rulings, Task 6 fix rounds 4 and 5). The message
-  is first normalised to words (`words_of`: compatibility forms, every apostrophe and
-  hyphen, case, contractions and a few informal forms spelt out). It triggers the support
+  is first normalised to words (`words_of`: compatibility forms, the listed apostrophe,
+  hyphen and dash characters, case, hyphenated compounds split, contractions and a few
+  informal forms spelt out). It triggers the support
   flow if a word is a listed risk word (`_risk_word`), or if a listed construction's core
   word has its markers (a negation, a reflexive, a possessive, an intent) within the small
   window each rule names (`_RULES`), so tense, contraction, adverbs and the words between
@@ -38,12 +39,14 @@ POLICY_VERSION = "support-policy-5"
 CHECKED_ON = "2026-10-28"
 REVIEW_STATUS = "provisional: needs reviewed sign-off (human gate H-12)"
 
-# Normalisation: every apostrophe and hyphen variant to its ASCII form; invisible characters
-# (soft hyphen, zero-width spaces and joiners) removed.
+# Normalisation: the listed apostrophe variants to `'`, the hyphens U+2010 and U+2011 to `-`,
+# the dashes U+2012 to U+2015 and U+2212 to a space; invisible characters (soft hyphen,
+# zero-width spaces and joiners) removed. Other characters are not mapped.
 _CHARACTERS = str.maketrans(
     {
         **dict.fromkeys(map(chr, (0x2018, 0x2019, 0x201B, 0x02BB, 0x02BC, 0x0060, 0x00B4)), "'"),
-        **dict.fromkeys(map(chr, (0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2212, 0xFE63)), "-"),
+        **dict.fromkeys(map(chr, (0x2010, 0x2011)), "-"),
+        **dict.fromkeys(map(chr, (0x2012, 0x2013, 0x2014, 0x2015, 0x2212)), " "),
         **dict.fromkeys(map(chr, (0x00AD, 0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF)), ""),
     }
 )
@@ -90,12 +93,31 @@ def _spelt_out(word: str) -> tuple[str, ...]:
     return (word,)
 
 
+def _compound_parts(word: str) -> list[str]:
+    parts: list[str] = []
+    for part in word.split("-"):
+        if parts and parts[-1].endswith("self-"):
+            parts[-1] += part
+        elif part == "self":
+            parts.append("self-")
+        else:
+            parts.append(part)
+    return [part.removesuffix("-") for part in parts]
+
+
 def words_of(message: str) -> list[str]:
-    """The message's words as the screen reads them: compatibility forms (NFKC), every
-    apostrophe and hyphen variant, lower case, and contractions spelt out ("don't" is "do
-    not", "I'd" is "I would", "wanna" is "want to"). A hyphenated word stays one word."""
+    """The message's words as the screen reads them: compatibility forms (NFKC), the listed
+    apostrophe, hyphen and dash characters, lower case, and contractions spelt out ("don't" is "do
+    not", "I'd" is "I would", "wanna" is "want to"). A hyphenated compound is split into its
+    parts, so each is a word ("anti-suicide" is "anti suicide", "die-so" is "die so"), except
+    that "self" stays joined to the part after it ("self-harm", "self-esteem")."""
     text = unicodedata.normalize("NFKC", message).translate(_CHARACTERS).casefold()
-    return [part for word in _WORD.findall(text) for part in _spelt_out(word)]
+    return [
+        part
+        for word in _WORD.findall(text)
+        for piece in _compound_parts(word)
+        for part in _spelt_out(piece)
+    ]
 
 
 # The listed words. Each construction rule below anchors on a core word and looks for its

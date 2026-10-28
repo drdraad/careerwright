@@ -165,9 +165,13 @@ inference, with at least 30 evaluation cases and a capped live run.
      family, and re-review 4 found forms one family accepted and another lacked (I-1), so
      round 5 matches normalised words by proximity instead.
    - *Normalisation* (`words_of`). Compatibility forms (NFKC); every apostrophe variant
-     (curly, modifier letter, grave, acute) to `'` and every hyphen and dash variant to `-`;
-     soft hyphens and zero-width characters removed; lower case; words split on anything
-     else, a hyphenated word staying one word; contractions spelt out: any "n't" to "not"
+     (U+2018, U+2019, U+201B, U+02BB, U+02BC, grave, acute) to `'`; the hyphens U+2010 and
+     U+2011 to `-`; the dashes U+2012 to U+2015 and U+2212 to a space; soft hyphens and
+     zero-width characters removed; lower case; words split on anything else, a hyphenated
+     compound split at its hyphens so each part is a word ("anti-suicide", "die-so"), except
+     that "self" stays joined to the part after it ("self-harm", "self-esteem"); windows
+     count words after contractions are spelt out ("I'd" is two); contractions spelt out:
+     any "n't" to "not"
      (can't, won't, ain't included), the same forms without an apostrophe (dont, cant,
      hadnt, ...), cannot, 'm, 're, 've, 'll and 'd ("would"), and wanna, gonna, gotta,
      tryna to "want to", "going to", "got to", "trying to".
@@ -187,9 +191,11 @@ inference, with at least 30 evaluation cases and a capped live run.
      live, living, alive or "go on" within 4 after; "go on" (go, goes, going, went, gone)
      with a negation within 3 words before and can or could within 4 before; "better off"
      with dead, or without + me / you / him / her / us / them, within 4 words after.
-   - *The support flow.* The message is screened before anything else, so every outcome of
-     `POST .../interview/turns` carries the panel when the message triggers the screen. An
-     accepted send is a 202 as usual (no hold, no extra step) with `support_note`: a calm,
+   - *The support flow.* The message is screened before anything else. When it triggers the
+     screen, the panel accompanies an accepted send and every refusal the command (or the
+     replay of its receipt) raises; it does not accompany an unexpected server failure (a
+     database or queue error, answered 500) or a request refused before the message is
+     read (see the known limits). An accepted send is a 202 as usual (no hold, no extra step) with `support_note`: a calm,
      non-diagnostic panel with the four services and the date they were checked, saying the
      message was sent. A refused send (stale profile version, too long for the prompt,
      over budget, no key, an idempotency key reused, a workspace the caller cannot see, or
@@ -207,12 +213,14 @@ inference, with at least 30 evaluation cases and a capped live run.
      the model still writes, and spends no repair on it. The model never sees a label naming
      the screen or what matched: the context it reads is the same either way. The demo
      interviewer follows the same instruction.
-   - *Never stored.* The panel, the instruction and the dropped question are recomputed
-     from the message wherever they are needed (the API response, a replay or a refusal
-     included, and every model request and check, a repair included), so the flag reaches
-     no profile, proposal, discovery, slate, export, receipt, run, journal or log (tested by
-     scanning both databases, the worker log, the API log and the export). The model's
-     answer to the instruction is stored like any reply. Receipts stored before fix round 4
+   - *Never stored.* The panel and the instruction are recomputed from the message wherever
+     they are needed (the API response, a replay or a refusal included, and every model
+     request and check, a repair included), so no flag is stored in a profile, proposal,
+     discovery, slate, export, receipt, run, journal or log (tested by scanning both
+     databases, the worker log, the API log and the export). The question is dropped once,
+     in `check_turn`, and the stored proposal holds `next_question: null`; no field records
+     why, and a null question is ordinary. The model's answer to the instruction is stored
+     like any reply. Receipts stored before fix round 4
      but after `send_after_support` was added (Task 6 rounds 0 to 3) have another
      fingerprint, so replaying one is refused as a key reuse whose reason names an earlier
      request format, never a 500; some may still hold the old note, in pre-release local
@@ -221,7 +229,13 @@ inference, with at least 30 evaluation cases and a capped live run.
      outside it gets nothing ("my friend wants to end things", "what's the point", "I just
      want to end it", "can't carry on", method words), and a construction whose words are
      further apart than its window gets nothing: extending either is the reviewer's
-     decision. False positives show the panel, since the screen makes no intent judgement:
+     decision. Two known gaps of this kind: the wish shape "wish that I'd ... die" can fall
+     past the window of 4 words once "I'd" is spelt out, and an apostrophe-like character
+     outside the mapped list (such as U+2032) or a reflexive spelt apart other than after
+     my / your / him / her / our / them / one ("our selves" is not matched; "ourself" and
+     plural "selves" after an owner are not listed) is not read. A dash written without
+     spaces is read as a space, so "self—esteem" after "my" reads as "my self esteem" and
+     triggers. False positives show the panel, since the screen makes no intent judgement:
      listed words in career, workplace or figurative phrasing trigger it ("took my life
      savings", "ending my life sciences career", "end my working life", "better off without
      me" about a team, "hurt myself lifting", "cut yourself some slack", "I cut costs
@@ -241,8 +255,8 @@ inference, with at least 30 evaluation cases and a capped live run.
      word may be too ("mothers", so "maternity work for women"): naming who the work serves
      is not a guess about the person, while in an interview reply it would be. Both are
      validation problems, so the one bounded repair applies.
-   - **Provisional, needs reviewed sign-off (R6; H-12):** the wording, the phrase lists and
-     the resources. Clinical screening is out of scope; this is not one.
+   - **Provisional, needs reviewed sign-off (R6; H-12):** the wording, the word lists, the
+     windows and the resources. Clinical screening is out of scope; this is not one.
 
 8. **The early requirement sketch** (`GET .../sketch`, STATE-05) resolves each target
    title: first by the occupation the person chose for it (`occupation_choice`, by its
@@ -312,7 +326,9 @@ inference, with at least 30 evaluation cases and a capped live run.
   English list of words and constructions, false positives that show the panel (career,
   workplace and figurative phrases with a listed word), no intent judgement, and messages
   not screened because they were never sent (paused, no key, a reply on its way) or were
-  refused before the message was read; and the four resources and their wording (checked
+  refused before the message was read; an unexpected server failure, which carries no
+  panel; the window-of-4 wish shape and the rare apostrophe characters and spelt-apart
+  reflexives the screen does not read; and the four resources and their wording (checked
   against the services' pages on 2026-10-28).
 - [ ] **Inference rules** (decision 7): the health, type and protected-characteristic word
   lists, the kindred-word groups (discovery searches only), and refusing a condition in a
