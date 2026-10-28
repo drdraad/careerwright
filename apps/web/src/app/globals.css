@@ -1118,6 +1118,25 @@
     font-size: var(--type-25);
   }
 
+  /* The written "Why this could suit you": model prose, then its checked quotations. */
+  .written-why {
+    display: grid;
+    gap: var(--space-12);
+    padding-left: var(--space-12);
+    border-left: 2px solid var(--line-reading-hairline);
+  }
+
+  .quotations {
+    display: grid;
+    gap: var(--space-4);
+    font-size: var(--type-14);
+    overflow-wrap: anywhere;
+  }
+
+  .quote-source {
+    font-weight: 600;
+  }
+
   .segmented {
     display: flex;
     flex-wrap: wrap;

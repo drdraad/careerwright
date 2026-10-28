@@ -1,6 +1,7 @@
 // The visual review package (plan section 5, UI-11): every chapter and the shell's default,
 // selected, empty, stale, unavailable and failed states, and Sprint 2's conversation states
-// (the start, a reply to review, the slate, the support panel, a failed reply, key
+// (the start, a reply to review, the slate with its written note written, pending and
+// unavailable, the support panel, a failed reply, key
 // consent, Unknown/Skipped/Prefer not to say, the scrolled stale conflict and its Save, and
 // expanded phone sheets), at 1440×900, 390×844 and 768×1024, each with the automatable
 // checks: axe (WCAG 2.0, 2.1 and 2.2 A/AA), horizontal overflow, a label overprinting its
@@ -203,6 +204,38 @@ const SUPPORT_NOTE = {
   ],
 };
 
+/** The first suggestion's "Why this could suit you", once its written note reads `state`. */
+const slateNote = (state: RegExp) => async (page: Page) => {
+  const first = page
+    .getByRole("region", { name: "Directions to explore" })
+    .getByRole("article")
+    .first();
+  await expect(first.getByText(state)).toBeVisible({ timeout: 60_000 });
+  await first
+    .getByText("Why this could suit you")
+    .evaluate((element) => element.scrollIntoView({ block: "center" }));
+};
+
+type DiscoveryPage = { items: { explanation: { run: object; written: unknown } | null }[] };
+
+/** The latest discovery as the API answers it, with its slate's written note shown in
+ *  another state (still running, or failed its checks twice). */
+const noteIn = (status: "running" | "failed") => (page: Page) =>
+  page.route("**/discoveries?*", async (route) => {
+    const response = await route.fetch();
+    const found = (await response.json()) as DiscoveryPage;
+    for (const item of found.items) {
+      if (item.explanation === null) continue;
+      item.explanation.run = {
+        ...item.explanation.run,
+        status,
+        failure_class: status === "failed" ? "invalid_model_output" : null,
+      };
+      item.explanation.written = null;
+    }
+    await route.fulfill({ response, json: found });
+  });
+
 /** Workspaces the Sprint 2 shots start from, prepared through the API as a person would. */
 type Scratch = {
   /** New and empty: nothing saved, nothing chosen. */
@@ -302,14 +335,27 @@ const shots = (scratch: Scratch): Shot[] => [
     },
   },
   {
+    // The slate with its written note (S2.7), here the demo explainer's.
     name: "you--slate",
     as: "ada",
     url: chapterUrl("you", scratch.talked),
-    ready: async (page) => {
-      const directions = page.getByRole("region", { name: "Directions to explore" });
-      await expect(directions.getByRole("article").first()).toBeVisible();
-      await directions.getByRole("article").first().scrollIntoViewIfNeeded();
-    },
+    ready: slateNote(/Written by the demo explainer \(synthetic\)/),
+  },
+  {
+    name: "you--slate-note-pending",
+    as: "ada",
+    context: "note-pending",
+    url: chapterUrl("you", scratch.talked),
+    prepare: noteIn("running"),
+    ready: slateNote(/writing a note/),
+  },
+  {
+    name: "you--slate-note-unavailable",
+    as: "ada",
+    context: "note-unavailable",
+    url: chapterUrl("you", scratch.talked),
+    prepare: noteIn("failed"),
+    ready: slateNote(/The reply didn't pass Nessa's checks twice\. Nothing from it/),
   },
   {
     // A message with a risk stem is sent as usual, with the support panel beside it. The

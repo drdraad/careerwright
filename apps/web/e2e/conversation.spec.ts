@@ -46,7 +46,7 @@ async function expectOnTop(page: Page, target: Locator) {
   expect(onTop).toBe(true);
 }
 
-test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][STATE-05][BND1-11] talk, review, undo, explore and sketch", async ({
+test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11] talk, review, undo, explore and sketch", async ({
   page,
 }) => {
   test.setTimeout(240_000);
@@ -100,6 +100,13 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][STATE-05][BND1-11] talk, r
   const first = directions.getByRole("article").first();
   await expect(first).toBeVisible({ timeout: 60_000 });
   await expect(first.getByText("Why this could suit you")).toBeVisible();
+  // The slate's one written note (S2.7), here the demo explainer's: labelled, its quotations
+  // checked, and above how Nessa found the suggestion, which stays.
+  await expect(first.getByText(/Written by the demo explainer \(synthetic\)/)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(first.getByText("You said:").first()).toBeVisible();
+  await expect(first.getByText("How Nessa found it")).toBeVisible();
   await expect(directions).not.toContainText(/\d\s?%/);
   const title = (await first.getByRole("heading").textContent()) ?? "";
   await first.getByRole("button", { name: /Make this a target/ }).click();

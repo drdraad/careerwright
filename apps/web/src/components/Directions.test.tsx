@@ -1,11 +1,18 @@
 // Directions to explore (REC-1, DIV-1): a grounded slate in words with no percentage; the
 // controls change the view only; a suggestion becomes a target only when chosen.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import type { DiscoveryOut, ProfileOut, SlateOut, SuggestionOut } from "@/generated/api";
-import { fakeApi } from "@/test/fakeApi";
+import type {
+  DiscoveryOut,
+  ProfileOut,
+  SlateExplanationOut,
+  SlateOut,
+  SuggestionOut,
+  WorkState,
+} from "@/generated/api";
+import { fakeApi, type Route, type Sent } from "@/test/fakeApi";
 import { Directions } from "./Directions";
 import { EvidenceProvider } from "./EvidenceDrawer";
 
@@ -32,12 +39,62 @@ const profile: ProfileOut = {
     minimum_salary: unasked,
   },
 };
-const discovery = {
-  discovery_id: "d1",
+const explanation = (
+  status: WorkState,
+  written: SlateExplanationOut["written"] = null,
+): SlateExplanationOut =>
+  ({
+    explanation_id: "e1",
+    discovery_id: "d1",
+    run: {
+      run_id: "e1",
+      kind: "slate_explanation",
+      status,
+      failure_class: status === "failed" ? "invalid_model_output" : null,
+    },
+    written,
+  }) as unknown as SlateExplanationOut;
+const WRITTEN: SlateExplanationOut["written"] = {
+  origin: "model",
+  prompt_version: "slate-explanation-1",
   profile_version: 2,
-  run: { status: "complete" },
-  proposal: null,
-} as unknown as DiscoveryOut;
+  release: "esco",
+  suggestions: [
+    {
+      concept_id: "o1",
+      title: "bicycle mechanic",
+      claims: [
+        {
+          text: "You enjoy fixing bikes, and this work is mostly maintaining and repairing them.",
+          quotations: [
+            {
+              source: "answer",
+              answer_field: "enjoyed_tasks",
+              record_part: null,
+              text: "repairing bicycles",
+            },
+            {
+              source: "esco",
+              answer_field: null,
+              record_part: "description",
+              text: "maintain and repair bicycles",
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+const discoveryWith = (found: SlateExplanationOut | null): DiscoveryOut =>
+  ({
+    discovery_id: "d1",
+    profile_version: 2,
+    run: { status: "complete" },
+    proposal: null,
+    explanation: found,
+  }) as unknown as DiscoveryOut;
+// Already explained, so these tests see no request for a note.
+const discovery = discoveryWith(explanation("complete", WRITTEN));
 
 const suggestion: SuggestionOut = {
   concept_id: "o1",
@@ -104,17 +161,26 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
   ],
 });
 
-function renderDirections() {
+function renderDirections(shown: DiscoveryOut = discovery, unavailable?: string) {
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
+  const view = (found: DiscoveryOut) => (
     <QueryClientProvider client={queries}>
       <EvidenceProvider>
-        <Directions workspaceId={WS} profile={profile} discovery={discovery} />
+        <Directions
+          workspaceId={WS}
+          profile={profile}
+          discovery={found}
+          {...(unavailable === undefined ? {} : { unavailable })}
+        />
       </EvidenceProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return userEvent.setup();
+  const { rerender } = render(view(shown));
+  return { user: userEvent.setup(), rerender: (found: DiscoveryOut) => rerender(view(found)) };
 }
+
+const slateRoute: Route = { method: "GET", path: /\/slate$/, answer: () => slate([suggestion]) };
+const card = async () => screen.findByRole("article", { name: "Bicycle mechanic" });
 
 describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls, and choosing", () => {
   it("shows why, what might not suit and a small test, fewer with the reason, and no percentage", async () => {
@@ -141,7 +207,7 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
       },
       { method: "POST", path: /\/targets$/, status: 201, answer: profile },
     ]);
-    const user = renderDirections();
+    const { user } = renderDirections();
 
     await user.click(await screen.findByRole("button", { name: /Make this a target/ }));
     await waitFor(() => expect(sent.some((s) => s.path.endsWith("/targets"))).toBe(true));
@@ -157,5 +223,135 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     expect(sent.filter((s) => s.method !== "GET").map((s) => s.path)).toEqual([
       "/v1/workspaces/w-dir/targets",
     ]); // excluding wrote nothing
+  });
+});
+
+const NOTE_PATH = "/v1/workspaces/w-dir/discoveries/d1/explanation";
+const noteRequests = (sent: Sent[]) =>
+  sent.filter((s) => s.method === "POST" && s.path === NOTE_PATH);
+const other: SuggestionOut = {
+  ...suggestion,
+  concept_id: "o3",
+  title: "tree surgeon",
+  why_it_could_suit: ["What you enjoy: “working outdoors”."],
+};
+
+describe("[REC1-11] the written why: one request per slate, its states, provenance always", () => {
+  it("asks once when the slate first shows, and a changed view never asks again", async () => {
+    const sent = fakeApi([
+      slateRoute,
+      {
+        method: "POST",
+        path: /\/explanation$/,
+        status: 202,
+        answer: { explanation_id: "e1", discovery_id: "d1", run: { status: "queued" } },
+      },
+    ]);
+    const { user } = renderDirections(discoveryWith(null));
+
+    expect(await within(await card()).findByText(/writing a note/)).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(/is writing a note/);
+    await user.click(screen.getByRole("button", { name: "Less familiar" }));
+    await waitFor(() =>
+      expect(sent.some((s) => s.query.includes("emphasis=unfamiliar"))).toBe(true),
+    );
+    await user.click(screen.getByRole("button", { name: "Not for me : Bicycle mechanic" }));
+    await waitFor(() => expect(sent.some((s) => s.query.includes("exclude_concept"))).toBe(true));
+
+    expect(noteRequests(sent)).toHaveLength(1);
+    expect(noteRequests(sent)[0]?.body).toEqual({ expected_profile_version: 2 });
+  });
+
+  it("shows the note and each checked quotation above how Nessa found it", async () => {
+    const sent = fakeApi([slateRoute]);
+    renderDirections();
+
+    const shown = within(await card());
+    const note = shown.getByText(/mostly maintaining and repairing them/);
+    const found = shown.getByText("What you enjoy: “repairing bicycles”.");
+    expect(shown.getByText("You said:")).toBeVisible();
+    expect(shown.getByText("ESCO's description:")).toBeVisible();
+    expect(shown.getByText(/“maintain and repair bicycles”/)).toBeVisible();
+    expect(shown.getByText(/Written by Nessa from your answers and ESCO's record/)).toBeVisible();
+    expect(shown.getByText("How Nessa found it")).toBeVisible();
+    // The deterministic provenance stays, after the written note.
+    expect(note.compareDocumentPosition(found) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(noteRequests(sent)).toHaveLength(0); // already written: nothing asked
+    expect(document.body.textContent).not.toMatch(/\d\s?(%|per ?cent)/i);
+  });
+
+  it("says when the note is still being written, and labels the demo explainer's", async () => {
+    fakeApi([slateRoute]);
+    const { rerender } = renderDirections(discoveryWith(explanation("running")));
+
+    expect(await within(await card()).findByText(/writing a note/)).toBeVisible();
+    expect(screen.getByText("What you enjoy: “repairing bicycles”.")).toBeVisible();
+    rerender(
+      discoveryWith(explanation("complete", { ...WRITTEN, origin: "fixture" } as typeof WRITTEN)),
+    );
+    expect(await screen.findByText(/Written by the demo explainer \(synthetic\)/)).toBeVisible();
+  });
+
+  it("shows a failed note as unavailable with its failure, and the provenance stays", async () => {
+    const sent = fakeApi([slateRoute]);
+    renderDirections(discoveryWith(explanation("failed")));
+
+    const shown = within(await card());
+    expect(shown.getByText(/no written note/)).toBeVisible();
+    expect(
+      shown.getByText(/The reply didn't pass Nessa's checks twice\. Nothing from it/),
+    ).toBeVisible();
+    expect(shown.getByText("What you enjoy: “repairing bicycles”.")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(/aren't available/);
+    expect(noteRequests(sent)).toHaveLength(0); // a failed note is never asked for again
+  });
+
+  it("shows a refused request as unavailable in the error code's words", async () => {
+    fakeApi([
+      slateRoute,
+      {
+        method: "POST",
+        path: /\/explanation$/,
+        status: 409,
+        answer: {
+          error: {
+            code: "BUDGET_EXCEEDED",
+            message: "not shown",
+            retryable: false,
+            stage: "execution",
+            correlation_id: "c1",
+            details: {},
+          },
+        },
+      },
+    ]);
+    renderDirections(discoveryWith(null));
+
+    const shown = within(await card());
+    expect(await shown.findByText(/The spending limit for model calls is reached\./)).toBeVisible();
+    expect(screen.queryByText("not shown")).toBeNull(); // never the API's own message
+    expect(shown.getByText("What you enjoy: “repairing bicycles”.")).toBeVisible();
+  });
+
+  it("says a suggestion from a changed view has no note, and asks nothing for it", async () => {
+    const sent = fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([other]) }]);
+    renderDirections();
+
+    const shown = within(await screen.findByRole("article", { name: "Tree surgeon" }));
+    expect(shown.getByText(/appeared when you changed the view/)).toBeVisible();
+    expect(shown.getByText("What you enjoy: “working outdoors”.")).toBeVisible();
+    expect(noteRequests(sent)).toHaveLength(0);
+  });
+
+  it("asks for no note without a key, or for answers that have changed since", async () => {
+    const sent = fakeApi([slateRoute]);
+    renderDirections(discoveryWith(null), "Store a Meta API key to continue.");
+    await card();
+    const stale = { ...discoveryWith(null), profile_version: 1 } as DiscoveryOut;
+    renderDirections(stale);
+    await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(2));
+
+    expect(noteRequests(sent)).toHaveLength(0);
+    expect(screen.queryByText("How Nessa found it")).toBeNull(); // nothing to set it apart from
   });
 });

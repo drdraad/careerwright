@@ -14,6 +14,7 @@ import {
   decideTurn,
   type Emphasis,
   EventKind,
+  type ExplanationRunOut,
   getMe,
   getPreferences,
   getProfile,
@@ -42,10 +43,12 @@ import {
   type SourceOut,
   type StoreKeyWritable,
   type SubmitDiscovery,
+  type SubmitExplanation,
   type SubmitTurn,
   type SupportNoteOut,
   storeCredential,
   submitDiscovery,
+  submitExplanation,
   submitTurn,
   type TurnOut,
   type TurnSubmittedOut,
@@ -395,6 +398,23 @@ export function useSubmitDiscovery(id: string) {
           throwOnError: true,
         })
       ).data as DiscoveryOut,
+  );
+}
+
+/** Asks for a slate's one written explanation (ADR 0007 decision 12). Asking again, from any
+ *  view, answers with the same run: a slate never has a second call. */
+export function useSubmitExplanation(id: string) {
+  return useCommand(
+    id,
+    async ({ discoveryId, body }: { discoveryId: string; body: SubmitExplanation }, key: string) =>
+      (
+        await submitExplanation({
+          path: { workspace_id: id, discovery_id: discoveryId },
+          body,
+          headers: { "Idempotency-Key": key },
+          throwOnError: true,
+        })
+      ).data as ExplanationRunOut,
   );
 }
 

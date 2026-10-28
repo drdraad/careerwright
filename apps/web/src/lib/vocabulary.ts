@@ -16,6 +16,7 @@ import type {
   PartialCompleteness,
   PayPeriod,
   ProfileInput,
+  RecordPart,
   Resolution,
   WorkState,
 } from "@/generated/api";
@@ -311,6 +312,14 @@ export const NOT_INCLUDED: Record<NotIncluded, string> = {
   below_relevance_floor: "Matched your answers too weakly to suggest",
   family_limit: "Its kind of work is already shown",
   less_relevant: "Matched less closely than the ones shown",
+};
+
+/** Where a written explanation's quotation of ESCO comes from (a quotation of the person's
+ *  own answers reads "You said"). */
+export const RECORD_PART: Record<RecordPart, string> = {
+  title: "ESCO's title",
+  description: "ESCO's description",
+  essential_skill: "An essential skill in ESCO",
 };
 
 export const RESOLUTION: Record<Resolution, string> = {

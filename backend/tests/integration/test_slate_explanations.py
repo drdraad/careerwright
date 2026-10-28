@@ -82,7 +82,7 @@ ANSWER_PAIRS = {
 ANSWER_TEXTS = [text for _, text in ANSWER_PAIRS]
 
 
-@pytest.mark.req("REC1-11", "REC1-06", "MODEL-02")
+@pytest.mark.req("REC1-11", "REC1-06")
 def test_a_slate_has_one_written_explanation_whose_every_quotation_is_a_span_of_its_source(
     explaining: Scenario,
 ) -> None:
@@ -195,7 +195,7 @@ def test_an_explanation_is_refused_before_any_run_for_a_failed_discovery_or_chan
     assert {r["kind"] for r in runs} == {"discovery"}
 
 
-@pytest.mark.req("REC1-11", "TEST1-11")
+@pytest.mark.req("REC1-11")
 def test_the_export_cites_the_deterministic_provenance_never_the_written_text(
     explaining: Scenario,
 ) -> None:

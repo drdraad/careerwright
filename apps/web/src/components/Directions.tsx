@@ -4,25 +4,48 @@
 // suit them, what might not, and a low-cost way to try it. No match percentage, ever. The
 // controls change the view only: they are never saved and never become limits. A suggestion
 // becomes a target only when the person chooses it.
-import { useState } from "react";
+//
+// "Why this could suit you" may also carry a written note (S2.7, ADR 0007 decision 12): one
+// model run per slate, asked for once when the slate first shows, whose every quotation the
+// API checked against the person's answers or ESCO's record. It is shown above how Nessa
+// found the suggestion, never instead of it; pending, failed and not-covered states say so.
+import { useEffect, useRef, useState } from "react";
 import type {
   Direction,
   DiscoveryOut,
   Emphasis,
   NotIncludedOut,
   ProfileOut,
+  ProposalOrigin,
+  SlateExplanationOut,
   SlateOut,
   SuggestionOut,
+  WrittenWhyOut,
 } from "@/generated/api";
+import { ApiError } from "@/lib/api";
 import { listLimit } from "@/lib/bounds";
 import { stillRunning } from "@/lib/conversation";
-import { type SlateControls, useChooseTarget, useSlate, useSubmitDiscovery } from "@/lib/queries";
-import { DIRECTION, EMPHASIS, FAILURE_CLASS, NOT_INCLUDED } from "@/lib/vocabulary";
+import {
+  type SlateControls,
+  useChooseTarget,
+  useSlate,
+  useSubmitDiscovery,
+  useSubmitExplanation,
+} from "@/lib/queries";
+import {
+  DIRECTION,
+  EMPHASIS,
+  ERROR_STATEMENT,
+  FAILURE_CLASS,
+  NOT_INCLUDED,
+  RECORD_PART,
+} from "@/lib/vocabulary";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { useEvidence } from "./EvidenceDrawer";
 import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
+import { StatusBadge } from "./Status";
 
 const EVIDENCE = [
   "current_role",
@@ -69,10 +92,99 @@ function Source({ suggestion, slate }: { suggestion: SuggestionOut; slate: Slate
   );
 }
 
+/** What the slate's written note holds for one suggestion. */
+export type WrittenState =
+  | { kind: "none" } // never asked for (an earlier discovery, changed answers, no key)
+  | { kind: "pending" }
+  | { kind: "written"; why: WrittenWhyOut; origin: ProposalOrigin }
+  | { kind: "not_covered" } // a view showed it that the note was not written for
+  | { kind: "unavailable"; reason: string };
+
+const WRITTEN_BY: Record<ProposalOrigin, string> = {
+  model:
+    "Written by Nessa from your answers and ESCO's record. Each quotation was checked word for word against its source.",
+  fixture:
+    "Written by the demo explainer (synthetic). Each quotation was checked word for word against its source.",
+};
+
+/** The note's state for one suggestion: `asked` while the request is on its way or before
+ *  the discovery shows it; `refused` names a request the API turned down. */
+export function writtenState(
+  suggestion: SuggestionOut,
+  explanation: SlateExplanationOut | null,
+  asked: boolean,
+  refused: string | null,
+): WrittenState {
+  if (explanation === null) {
+    if (refused !== null) return { kind: "unavailable", reason: refused };
+    return asked ? { kind: "pending" } : { kind: "none" };
+  }
+  if (stillRunning(explanation.run.status)) return { kind: "pending" };
+  if (explanation.written === null) {
+    return {
+      kind: "unavailable",
+      reason: FAILURE_CLASS[explanation.run.failure_class ?? "unknown_failure"].title,
+    };
+  }
+  const why = explanation.written.suggestions.find((s) => s.concept_id === suggestion.concept_id);
+  return why === undefined
+    ? { kind: "not_covered" }
+    : { kind: "written", why, origin: explanation.written.origin };
+}
+
+function WrittenNote({ state }: { state: WrittenState }) {
+  if (state.kind === "none") return null;
+  if (state.kind === "pending") {
+    return <StatusBadge state="running" detail="writing a note from your answers and ESCO" />;
+  }
+  if (state.kind === "unavailable") {
+    return (
+      <div className="grid gap-4">
+        <StatusBadge state="failed" detail="no written note" />
+        <p className="small">
+          {state.reason}. Nothing from it was kept; how Nessa found this suggestion is below.
+        </p>
+      </div>
+    );
+  }
+  if (state.kind === "not_covered") {
+    return (
+      <p className="small muted">
+        Nessa wrote notes for your first set of suggestions; this one appeared when you changed the
+        view, so it has none. How Nessa found it is below.
+      </p>
+    );
+  }
+  return (
+    <div className="written-why">
+      {state.why.claims.map((claim) => (
+        <div key={claim.text} className="grid gap-4">
+          <p>{claim.text}</p>
+          <ul className="quotations">
+            {claim.quotations.map((quotation) => (
+              <li key={`${quotation.source}:${quotation.text}`}>
+                <span className="quote-source">
+                  {quotation.source === "answer"
+                    ? "You said"
+                    : RECORD_PART[quotation.record_part ?? "description"]}
+                  :
+                </span>{" "}
+                “{quotation.text}”
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      <p className="small muted">{WRITTEN_BY[state.origin]}</p>
+    </div>
+  );
+}
+
 function SuggestionCard({
   suggestion,
   slate,
   targets,
+  written,
   onChoose,
   onExcludeTitle,
   onExcludeFamily,
@@ -81,6 +193,7 @@ function SuggestionCard({
   suggestion: SuggestionOut;
   slate: SlateOut;
   targets: string[];
+  written: WrittenState;
   onChoose(): void;
   onExcludeTitle(): void;
   onExcludeFamily(): void;
@@ -97,13 +210,17 @@ function SuggestionCard({
       <h4 id={`s-${suggestion.concept_id}`}>{title}</h4>
       <p className="small muted">Kind of work: {suggestion.family.label}</p>
       <p className="small">{suggestion.workday}</p>
-      <div className="grid gap-4">
+      <div className="grid gap-8">
         <p className="section-title">Why this could suit you</p>
-        <ul className="plain-list">
-          {suggestion.why_it_could_suit.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
+        <WrittenNote state={written} />
+        <div className="grid gap-4">
+          {written.kind !== "none" && <p className="small muted">How Nessa found it</p>}
+          <ul className="plain-list">
+            {suggestion.why_it_could_suit.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
       </div>
       <div className="grid gap-4">
         <p className="section-title">What might not suit you</p>
@@ -177,18 +294,58 @@ function NotShown({ items }: { items: NotIncludedOut[] }) {
   );
 }
 
+/** Why a request for the written note was refused, in the error code's words. */
+function refusal(error: unknown): string | null {
+  if (error === null) return null;
+  return error instanceof ApiError && error.body !== null
+    ? ERROR_STATEMENT[error.body.code].title
+    : "Nessa's service isn't reachable";
+}
+
+const NOTE_ANNOUNCEMENT: Record<WrittenState["kind"], string> = {
+  none: "",
+  pending: "Nessa is writing a note on why each suggestion could suit you.",
+  written: "Nessa's written notes are shown beside the suggestions.",
+  not_covered: "Nessa's written notes are shown beside the suggestions.",
+  unavailable: "Nessa's written notes aren't available. How each suggestion was found is shown.",
+};
+
 function Slate({
   workspaceId,
   profile,
   discovery,
+  canWrite,
 }: {
   workspaceId: string;
   profile: ProfileOut;
   discovery: DiscoveryOut;
+  /** Whether a written note may be asked for (a key is stored, or the workspace is a demo). */
+  canWrite: boolean;
 }) {
   const [controls, setControls] = useState<SlateControls>(NO_CONTROLS);
   const slate = useSlate(workspaceId, discovery.discovery_id, controls);
   const choose = useChooseTarget(workspaceId);
+  const explain = useSubmitExplanation(workspaceId);
+  const explanation = discovery.explanation ?? null;
+  const asked = useRef<string | null>(null);
+  const shown = slate.data !== undefined && slate.data.suggestions.length > 0;
+  // One request per slate, when it first shows for the current answers: a view change, a
+  // remount or a refresh never asks again (and the API answers a repeat with the same run).
+  const wanted =
+    canWrite && shown && explanation === null && discovery.profile_version === profile.version;
+  const askForNote = explain.mutate;
+  useEffect(() => {
+    if (!wanted || asked.current === discovery.discovery_id) return;
+    asked.current = discovery.discovery_id;
+    askForNote({
+      discoveryId: discovery.discovery_id,
+      body: { expected_profile_version: profile.version },
+    });
+  }, [wanted, discovery.discovery_id, profile.version, askForNote]);
+  const requested = asked.current === discovery.discovery_id;
+  const refused = requested ? refusal(explain.error) : null;
+  const noteFor = (suggestion: SuggestionOut) =>
+    writtenState(suggestion, explanation, requested, refused);
   const targets =
     profile.document.target_titles.state === "provided"
       ? (profile.document.target_titles.value ?? [])
@@ -210,8 +367,13 @@ function Slate({
   const data = slate.data;
   const familiarityKnown = profile.document.current_role.state === "provided" || targets.length > 0;
   const excluded = controls.excludeConcepts.length + controls.excludeFamilies.length;
+  const first = data.suggestions[0];
+  const note = first === undefined ? "none" : noteFor(first).kind;
   return (
     <div className="grid gap-16">
+      <p className="sr-only" role="status">
+        {NOTE_ANNOUNCEMENT[note]}
+      </p>
       <fieldset className="segmented">
         <legend className="sr-only">Which directions to show</legend>
         {(Object.keys(EMPHASIS) as Emphasis[]).map((emphasis) => (
@@ -273,6 +435,7 @@ function Slate({
                 suggestion={suggestion}
                 slate={data}
                 targets={targets}
+                written={noteFor(suggestion)}
                 choosing={choose.isPending}
                 onChoose={() =>
                   choose.mutate({
@@ -382,7 +545,12 @@ export function Directions({
         )}
       {submit.error !== null && <RequestFailure error={submit.error} />}
       {discovery !== null && discovery.run.status === "complete" && (
-        <Slate workspaceId={workspaceId} profile={profile} discovery={discovery} />
+        <Slate
+          workspaceId={workspaceId}
+          profile={profile}
+          discovery={discovery}
+          canWrite={unavailable === undefined}
+        />
       )}
     </section>
   );

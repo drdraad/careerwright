@@ -1,6 +1,7 @@
-// The You chapter's states (S2.3-S2.5) on a scripted API at the network edge: the start, a
-// reply streaming and to review, a failed reply, paused; the slate full and thin; key consent
-// and a stored key; and the early sketch with a target. Every value is synthetic.
+// The You chapter's states (S2.3-S2.5, S2.7) on a scripted API at the network edge: the
+// start, a reply streaming and to review, a failed reply, paused; the slate full and thin,
+// with its written note written, pending and unavailable; key consent and a stored key; and
+// the early sketch with a target. Every value is synthetic.
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
@@ -12,11 +13,15 @@ import type {
   DiscoveryOut,
   PreferencesOut,
   ProfileOut,
+  RunOut,
   SketchOut,
+  SlateExplanationOut,
   SlateOut,
   SuggestionOut,
   TurnOut,
+  WorkState,
   WorkspaceOut,
+  WrittenExplanationOut,
 } from "@/generated/api";
 import { fakeApi, type Route } from "@/test/fakeApi";
 
@@ -223,12 +228,79 @@ const full = [
   suggestion("tree surgeon", "621", "less_familiar"),
   suggestion("wind turbine technician", "311", "less_familiar"),
 ];
-const discovery = {
-  discovery_id: "d1",
+// The written note (S2.7): synthetic claims quoting the story's answers and ESCO's words
+// the cards show (the skill "use hand tools" and each title).
+const writtenFor = (shown: SuggestionOut[]): WrittenExplanationOut => ({
+  origin: "model",
+  prompt_version: "slate-explanation-1",
   profile_version: 3,
-  run: { status: "complete" },
-  proposal: null,
-} as unknown as DiscoveryOut;
+  release: "esco-v1.2.1-en-csv",
+  suggestions: shown.map((s, n) => ({
+    concept_id: s.concept_id,
+    title: s.title,
+    claims: [
+      {
+        text: "You enjoy repairing things with your hands, and hand tools are part of the everyday work here.",
+        quotations: [
+          {
+            source: "answer",
+            answer_field: "enjoyed_tasks",
+            record_part: null,
+            text: "repairing physical objects",
+          },
+          {
+            source: "esco",
+            answer_field: null,
+            record_part: "essential_skill",
+            text: "use hand tools",
+          },
+        ],
+      },
+      ...(n % 2 === 0
+        ? [
+            {
+              text: `You said you like being outside, which fits the way ESCO describes work as ${s.title}.`,
+              quotations: [
+                {
+                  source: "answer" as const,
+                  answer_field: "enjoyed_tasks" as const,
+                  record_part: null,
+                  text: "working outdoors",
+                },
+                {
+                  source: "esco" as const,
+                  answer_field: null,
+                  record_part: "title" as const,
+                  text: s.title,
+                },
+              ],
+            },
+          ]
+        : []),
+    ],
+  })),
+});
+const noteRun = (status: WorkState) =>
+  ({
+    run_id: "e1",
+    kind: "slate_explanation",
+    status,
+    failure_class: status === "failed" ? "invalid_model_output" : null,
+  }) as unknown as RunOut;
+const discoveryWith = (explanation: SlateExplanationOut | null) =>
+  ({
+    discovery_id: "d1",
+    profile_version: 3,
+    run: { status: "complete" },
+    proposal: null,
+    explanation,
+  }) as unknown as DiscoveryOut;
+const note = (status: WorkState, shown: SuggestionOut[]): SlateExplanationOut => ({
+  explanation_id: "e1",
+  discovery_id: "d1",
+  run: noteRun(status),
+  written: status === "complete" ? writtenFor(shown) : null,
+});
 const stored: CredentialOut = {
   credential_id: "c1",
   provider: "meta",
@@ -302,13 +374,24 @@ export const Paused: Story = {
   render: you(chapterRoutes(prefs("unsure", true), [turn("complete", proposal)])),
 };
 
-const directions = (shown: SuggestionOut[]) => () => (
-  <Api routes={[{ method: "GET", path: /\/slate$/, answer: slate(shown) }]}>
-    <Directions workspaceId={WS} profile={profile} discovery={discovery} />
-  </Api>
-);
+const directions =
+  (shown: SuggestionOut[], status: WorkState = "complete") =>
+  () => (
+    <Api routes={[{ method: "GET", path: /\/slate$/, answer: slate(shown) }]}>
+      <Directions
+        workspaceId={WS}
+        profile={profile}
+        discovery={discoveryWith(note(status, shown))}
+      />
+    </Api>
+  );
+/** The slate with its written note: model prose, its checked quotations, then how it was found. */
 export const SlateOfSix: Story = { render: directions(full) };
 export const SlateThin: Story = { render: directions(full.slice(0, 2)) };
+/** The note still being written: how each suggestion was found is shown meanwhile. */
+export const SlateNotePending: Story = { render: directions(full, "running") };
+/** The note failed its checks twice: unavailable, with its failure, provenance kept. */
+export const SlateNoteUnavailable: Story = { render: directions(full, "failed") };
 
 const key = (credentials: CredentialOut[]) => () => (
   <Api routes={[]}>
