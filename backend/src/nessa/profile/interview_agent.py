@@ -36,7 +36,7 @@ from pydantic_ai.models import Model, ModelRequestContext
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import UsageLimits
 
-from nessa.identity.activity import PartialSink, RunTask, TruncationGuard
+from nessa.identity.activity import PartialSink, RepairBound, RunTask, TruncationGuard
 from nessa.identity.model_registry import FIXTURE_MODEL_ID, ModelMode
 from nessa.profile import interview
 from nessa.profile.fixture_interviewer import fixture_turn
@@ -112,7 +112,11 @@ def run_interview_turn(
         output_type=NativeOutput(InterviewTurnOutput),
         instructions=interview.instructions(context),
         retries={"tools": 0, "output": MAX_REQUESTS - 1},
-        capabilities=[TruncationGuard(), ReplyStream(on_reply)],
+        capabilities=[
+            TruncationGuard(),
+            RepairBound(interview.REPAIR_ALLOWANCE_TOKENS),
+            ReplyStream(on_reply),
+        ],
     )
     accepted: list[InterviewProposal] = []
 

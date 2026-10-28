@@ -16,7 +16,7 @@ from pydantic_ai.models import Model
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import UsageLimits
 
-from nessa.identity.activity import PartialSink, RunTask, TruncationGuard
+from nessa.identity.activity import PartialSink, RepairBound, RunTask, TruncationGuard
 from nessa.identity.model_registry import FIXTURE_EXPLAINER_MODEL_ID, ModelMode
 from nessa.profile import slate_explanation
 from nessa.profile.fixture_explainer import fixture_explanation, prompt_context
@@ -26,6 +26,7 @@ from nessa.profile.slate_explanation import (
     INSTRUCTIONS,
     MAX_OUTPUT_TOKENS,
     MAX_REQUESTS,
+    REPAIR_ALLOWANCE_TOKENS,
     ExplanationInput,
     ExplanationOutput,
     SlateExplanation,
@@ -45,7 +46,7 @@ def run_explanation(
         output_type=NativeOutput(ExplanationOutput),
         instructions=INSTRUCTIONS,
         retries={"tools": 0, "output": MAX_REQUESTS - 1},
-        capabilities=[TruncationGuard()],
+        capabilities=[TruncationGuard(), RepairBound(REPAIR_ALLOWANCE_TOKENS)],
     )
     accepted: list[SlateExplanation] = []
 

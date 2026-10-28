@@ -34,6 +34,7 @@ exception rides along as context into DBOS's step-error record or retry log.
 """
 
 import asyncio
+import dataclasses
 import hashlib
 import logging
 import time
@@ -46,9 +47,10 @@ from typing import Any, Protocol
 from pydantic import BaseModel, SecretStr
 from pydantic_ai import Agent, NativeOutput, RunContext, capture_run_messages
 from pydantic_ai.capabilities import AbstractCapability
-from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse
+from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, RetryFeedbackPart
 from pydantic_ai.models import Model, ModelRequestContext
 from pydantic_ai.usage import UsageLimits
+from pydantic_core import ErrorDetails
 
 from nessa.db import Engine, StoreUnavailableError, Tx, in_savepoint, run_transaction
 from nessa.identity import connection_check, credential_store, run_store, store
@@ -234,6 +236,88 @@ class TruncationGuard(AbstractCapability[Any]):
             ctx.messages.append(response)
             raise OutputTruncatedError
         return response
+
+
+SCHEMA_REPAIR_HEADER = (
+    "The JSON object does not match the required schema. Answer again with the whole object, "
+    "fixing these problems:"
+)
+
+
+class RepairBound(AbstractCapability[Any]):
+    """Keeps the one validation repair within the tokens the kind's reservation allows for it
+    (`allowance_bytes`; bytes bound tokens), whatever the rejected output held.
+
+    Pydantic AI answers an output that fails the schema with its validation errors, and each
+    error quotes the rejected input: for invalid JSON, the whole output, which the repair
+    request already carries once as the model's own turn. Before every request, schema
+    feedback is rewritten as the problems' locations and messages, never their input, and
+    any feedback is cut to as many problems as fit, then how many more there are. A task's
+    own `ModelRetry` message that fits is sent unchanged."""
+
+    def __init__(self, allowance_bytes: int) -> None:
+        self._allowance = allowance_bytes
+
+    async def before_model_request(
+        self, ctx: RunContext[Any], request_context: ModelRequestContext
+    ) -> ModelRequestContext:
+        messages = [
+            self._bounded(message) if isinstance(message, ModelRequest) else message
+            for message in request_context.messages
+        ]
+        return dataclasses.replace(request_context, messages=messages)
+
+    def _bounded(self, message: ModelRequest) -> ModelRequest:
+        parts = [
+            self._fitted(part) if isinstance(part, RetryFeedbackPart) else part
+            for part in message.parts
+        ]
+        if all(new is old for new, old in zip(parts, message.parts, strict=True)):
+            return message
+        return dataclasses.replace(message, parts=parts)
+
+    def _fits(self, part: RetryFeedbackPart) -> bool:
+        return len(part.model_response().encode()) <= self._allowance
+
+    def _fitted(self, part: RetryFeedbackPart) -> RetryFeedbackPart:
+        if isinstance(part.content, str) and self._fits(part):
+            return part
+        header, problems = _problems(part.content)
+        retry = dataclasses.replace(part.retry, cause="model_retry")
+        for shown in range(len(problems), -1, -1):
+            lines = [f"- {_shortened(problem)}" for problem in problems[:shown]]
+            if shown < len(problems):
+                lines.append(f"- and {len(problems) - shown} more problems.")
+            candidate = dataclasses.replace(part, content="\n".join([header, *lines]), retry=retry)
+            if self._fits(candidate):
+                return candidate
+        # Not even the header fits (an allowance below any useful message): the bare request.
+        return dataclasses.replace(part, content="Answer again with the whole object.", retry=retry)
+
+
+# A problem line longer than this is cut: one quoted value must not crowd out the others.
+REPAIR_PROBLEM_CHARS = 200
+
+
+def _problems(content: list[ErrorDetails] | str) -> tuple[str, list[str]]:
+    """The feedback's header and problem lines. A schema error becomes its location and
+    message, never its input (the rejected output)."""
+    if not isinstance(content, str):
+        return SCHEMA_REPAIR_HEADER, [
+            f"{'.'.join(str(step) for step in error['loc']) or 'the object'}: {error['msg']}"
+            for error in content
+        ]
+    lines = [line.strip() for line in content.splitlines() if line.strip()]
+    if lines and not lines[0].startswith("- "):
+        return lines[0], [line.removeprefix("- ") for line in lines[1:]]
+    return "Fix these problems:", [line.removeprefix("- ") for line in lines]
+
+
+def _shortened(problem: str) -> str:
+    problem = " ".join(problem.split())
+    if len(problem) <= REPAIR_PROBLEM_CHARS:
+        return problem
+    return f"{problem[:REPAIR_PROBLEM_CHARS]}…"
 
 
 def connection_check_agent(model: Model) -> Agent[None, ConnectionCheckResult]:

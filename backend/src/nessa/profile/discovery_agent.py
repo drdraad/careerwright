@@ -17,7 +17,7 @@ from pydantic_ai.models import Model
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import UsageLimits
 
-from nessa.identity.activity import PartialSink, RunTask, TruncationGuard
+from nessa.identity.activity import PartialSink, RepairBound, RunTask, TruncationGuard
 from nessa.identity.model_registry import FIXTURE_DISCOVERY_MODEL_ID, ModelMode
 from nessa.profile import discovery
 from nessa.profile.discovery import (
@@ -25,6 +25,7 @@ from nessa.profile.discovery import (
     INSTRUCTIONS,
     MAX_OUTPUT_TOKENS,
     MAX_REQUESTS,
+    REPAIR_ALLOWANCE_TOKENS,
     DiscoveryInput,
     DiscoveryOutput,
     DiscoveryProposal,
@@ -46,7 +47,7 @@ def run_discovery(
         output_type=NativeOutput(DiscoveryOutput),
         instructions=INSTRUCTIONS,
         retries={"tools": 0, "output": MAX_REQUESTS - 1},
-        capabilities=[TruncationGuard()],
+        capabilities=[TruncationGuard(), RepairBound(REPAIR_ALLOWANCE_TOKENS)],
     )
     accepted: list[DiscoveryProposal] = []
 
