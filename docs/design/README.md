@@ -16,7 +16,7 @@ labelled as an agent pre-review. It is not a review score.
 |---|---|
 | `tokens/tokens.css` | Canonical tokens: primitives, semantic tokens, the `.on-space` / `.on-reading` contexts, type, space, radius, motion |
 | `tokens/contrast-pairs.json` | Every text and meaningful non-text pairing the pages use, with its WCAG threshold |
-| `tokens/contrast-report.md` | Generated measurements: **64 of 64 pairs pass** |
+| `tokens/contrast-report.md` | Generated measurements: **68 of 68 pairs pass** (three added by Task 4 for the web shell) |
 | `fonts/` | Source Sans 3 and Newsreader, with licence texts and provenance (`fonts/README.md`) |
 | `compositions/index.html` | Gallery: every composition and state |
 | `compositions/conversation.html` | You: conversation, What we know, evidence drawer |
@@ -88,7 +88,9 @@ Rules the compositions follow, which implementations must keep:
   on the line at 4 months, and B is as fast and £500 cheaper.
 - **Phone sheets open at a peek** (`--sheet-peek`, 212 px) with a "More" control, so the
   main task stays in view: the question and its answer choices, the listing list, or the
-  route cards.
+  route cards. "More" raises the sheet to the viewport less 72 px and becomes "Less";
+  dragging the handle does the same. Designed and built in Task 4 (ADR 0005 decision 8);
+  these static references show the peek only.
 - **AI Resilience is always marked Experimental** (spec AIR-1). Each display has a badge and
   a provenance line. Synthetic records say so. For a real record, the same line carries
   the review date, method version and inherited geography.
@@ -176,7 +178,8 @@ declared on the page.
 
 ## Not covered here (owners)
 
-- The tablet layout (768×1024) and the other three chapters: Task 4 (Sprint 1).
+- The tablet layout (768×1024) and the other three chapters: built in `apps/web` by Task 4
+  (Sprint 1; screenshots in `docs/reviews/sprint-1/`), not added to these references.
 - The phone's focused chart view and map overview are only entry points here (an "Open
   the time and cost chart" button and a Map/List toggle). Their layouts are not composed:
   Tasks 8 and 14.

@@ -65,7 +65,10 @@
     {"fg": "--industry-coral-on-reading", "bg": "--surface-card", "kind": "text", "use": "industry label on cards"},
     {"fg": "--industry-olive-on-reading", "bg": "--surface-card", "kind": "text", "use": "industry label on cards"},
     {"fg": "--industry-other-on-reading", "bg": "--surface-card", "kind": "text", "use": "industry label on cards"},
-    {"fg": "--surface-card", "bg": "--surface-space", "kind": "non-text", "use": "light card edge on ink"}
+    {"fg": "--surface-card", "bg": "--surface-space", "kind": "non-text", "use": "light card edge on ink"},
+    {"fg": "--status-unknown-on-reading", "bg": "--surface-reading", "kind": "text", "use": "unknown and not-started states on light canvas (web shell, Task 4)"},
+    {"fg": "--text-on-reading-muted", "bg": "--surface-card-sunken", "kind": "text", "use": "disabled control text on a sunken field (web shell, Task 4)"},
+    {"fg": "--line-reading-control", "bg": "--surface-card-sunken", "kind": "non-text", "use": "disabled control boundary on a sunken field (web shell, Task 4)"}
   ],
   "distinctness": {
     "about": "Informational CIE76 colour difference between each status hue and each industry hue in the same context. Status is carried by glyph and text, so this is a check that the hues are not reused, not a WCAG criterion.",

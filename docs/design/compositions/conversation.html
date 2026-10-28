@@ -103,7 +103,9 @@
         <form class="composer" aria-label="Reply" onsubmit="return false">
           <label class="visually-hidden" for="reply">Reply to Nessa</label>
           <textarea id="reply" rows="1" placeholder="Reply in your own words"></textarea>
-          <button class="btn btn-primary" type="submit">Send</button>
+          <!-- One primary action per state: in the failure state it is "Try again". -->
+          <button class="btn btn-primary" type="submit" data-show="default unknown">Send</button>
+          <button class="btn btn-secondary" type="submit" data-show="failure">Send</button>
         </form>
       </section>
 
