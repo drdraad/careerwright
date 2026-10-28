@@ -307,6 +307,9 @@ this review does not change the application.
    profile request, but the unqualified label and service-wide error do not explain that.
    Offer an explicit retry and distinguish profile loading from live-update status.
    Check that a retry can recover without requiring the person to navigate away.
+   *Disposition (Task 6): fixed.* A failed profile load offers "Try again", which reloads in
+   place; the strip now reads "Updates: Live" and "Your answers couldn't be loaded"
+   (`WorkspaceStrip.test.tsx`, `you--failed` captures in `sprint-2/screenshots/`).
 3. **V-03 — Phone Routes does not lead with routes.** At 390×844, the
    [default viewport](sprint-1/screenshots/routes--390x844.png) contains the 174 px shell,
    title, fixture notice and comparison context; no route card is visible. The
@@ -343,12 +346,19 @@ this review does not change the application.
    introductory explanation and review spacing while retaining explicit field-state
    labels. The deferred conversation explains the missing two-column composition; it
    is not a Sprint 1 feature defect.
+   *Disposition (Task 6): fixed by the conversation composition.* You leads with how to
+   start, then one question; "What we know" sits beside it (stacked on narrow screens) and
+   the form opens on request with a one-line introduction and its explicit field-state
+   labels kept (`you--*` captures in `sprint-2/screenshots/`).
 8. **V-08 — Reconnecting moves desktop content.** Comparing
    [default You](sprint-1/screenshots/you--1440x900.png) with
    [unavailable You](sprint-1/screenshots/you--unavailable--1440x900.png), the longer status
    wraps the strip from 65 to 117 px and shifts the form down 52 px. Reserve room for the
    longer status or use a stable row arrangement at this width. Verify the transition
    while editing; these stills establish the layout difference, not its animation.
+   *Disposition (Task 6): fixed with a stable row.* From 1180 px the strip's states have
+   their own row, so a longer state no longer wraps the strip (`you` and `you--unavailable`
+   at 1440 in `sprint-2/screenshots/`; the transition while editing is still a human check).
 9. **V-09 — Visited chapter dots can resemble completed work.** In
    [desktop Plan](sprint-1/screenshots/plan--1440x900.png), You through Routes have filled
    dots although those chapters include "Not started" content. Current selection is

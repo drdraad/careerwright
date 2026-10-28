@@ -26,8 +26,9 @@ Run from the repository root (details: `docs/runbook.md`).
 - Design references: `cd docs/design && pnpm run contrast && pnpm run screenshots`.
 - Live Meta calls run only through explicit, budget-capped commands, never from the checks
   above: `make live-smoke` (test model; `PRODUCTION=1` qualifies the production model;
-  `INTERVIEW=1` runs one interview turn instead of a connection check). Every call is
-  appended to `docs/evidence/live-usage.jsonl` and `.md` with its cost (R5).
+  `INTERVIEW=1` runs one interview turn instead of a connection check) and `make
+  live-eval` (the representative evaluation cases, at most 6, test model only). Every call
+  is appended to `docs/evidence/live-usage.jsonl` and `.md` with its cost (R5).
 
 ## Repository facts
 - Requirement IDs and test IDs: `docs/requirements-register.md`. Tag each test with its
@@ -42,7 +43,8 @@ Run from the repository root (details: `docs/runbook.md`).
   class has one retry owner: the DBOS step for provider failures, the activity's store
   budget for store failures. `nessa/profile/commands.py` shows an expected-version command.
 - Layout: `nessa/identity` (identity and execution: access, workspaces, keys, runs,
-  spend), `nessa/profile` (profile, interview contract and turns, provisional concepts),
+  spend), `nessa/profile` (profile, interview contract, turns and preferences, the support
+  policy, discovery, the slate and the early sketch, provisional concepts),
   `nessa/catalogue` (the ESCO taxonomy and the English city list), `nessa/api` (HTTP only),
   `nessa/migrations` (forward-only SQL), `nessa/worker.py` (worker entry point). Identity
   never imports profile or catalogue. Vendor and SQL imports are allowed only in the
@@ -58,7 +60,12 @@ Run from the repository root (details: `docs/runbook.md`).
     and route ranks are computed by deterministic Python, never by the model. A chat
     proposal reaches the profile only through a decision on a complete, validated turn,
     against the version it was made for, with each limit or target confirmed by name, via
-    the same command as a direct edit (ADR 0006).
+    the same command as a direct edit (ADR 0006). In discovery the model proposes searches
+    only; the slate is deterministic code over ESCO, its controls are view parameters and
+    never limits, and a suggestion becomes a target only by the person's choice (ADR 0007).
+  - Explicit acute distress gets the fixed support response before any model call, and
+    nothing is stored; model output may not infer a health condition, type, protected
+    characteristic or percentage the person never used (`nessa/profile/safety.py`).
   - Money is integer minor units (GBP). Use `Money` (≥ 0) for payments and `SignedMoney`
     for economic cost. Unknown money is `null`, never 0.
   - Unknown is never zero or ineligible. Failure is never an empty success. A truncated

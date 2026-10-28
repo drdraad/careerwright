@@ -2,8 +2,9 @@
 
 - Status: Accepted (Task 5, Sprint 2: S2.1-S2.2). Decision 4's region assignment and its
   refusal of plain "Newcastle", decision 5's concept-key folding, decision 6's
-  hard-constraint set and decision 8's basis for an answer with no value are
-  **provisional, need product owner confirmation** (ruling R6; checklist H-11 below).
+  hard-constraint set and decision 8's basis for an answer with no value were provisional
+  and were confirmed by the product owner on 2026-10-28 (H-11 below), the hard-constraint
+  set with a salary floor added (implemented in Task 6, ADR 0007).
 - Date: 2026-10-28
 - Requirements: TAX1-01, TAX1-04, DIV1-01, DIV1-03, REC1-04, BND1-04, PROF-01..07,
   MODEL-01..04, STATE-08, TEST1-10; spec sections 3-5, 16 and 18; ADR 0002, ADR 0004
@@ -110,9 +111,12 @@ decision 7 requires the first run kind that reads the profile to pin the version
    (direct entry, fixture, or **conversation**), observation time, who recorded or
    confirmed it, and for a conversation source the turn that proposed it, the person's
    messages it cites and its basis, `stated` or `inferred` (PROF-01). The **hard
-   constraints** are cities, target titles, weekly study hours and both spending limits:
-   search and planning treat them as limits, so only the person's explicit confirmation
-   establishes them (PROF-04). **Provisional:** which fields are hard constraints.
+   constraints** are cities, target titles, weekly study hours, both spending limits and
+   the salary floor: search and planning treat them as limits, so only the person's
+   explicit confirmation establishes them (PROF-04). The product owner confirmed the set on
+   2026-10-28 (H-11) and added the salary floor (`minimum_salary`: the lowest gross pay the
+   person will accept, with its period), which Task 6 implemented in profile schema 3 (ADR
+   0007 decision 2), with the optional work style.
 
 7. **One write path.** `commit_profile_version` is the only way a profile changes: a direct
    edit (`PUT /profile`) and a confirmed chat proposal both go through it, with an expected
@@ -305,8 +309,8 @@ change (rulings R2, R6).
 - [x] **ONS regions** assigned to each city by the implementing agent (decision 4).
 - [x] **Hard-constraint set** (decision 6): cities, target titles, weekly study hours and
   both spending limits. **Changed by the product owner:** add a salary floor (the minimum
-  salary the person will accept, spec §4) as a hard constraint. Until it is implemented,
-  decision 6 describes the set without it.
+  salary the person will accept, spec §4) as a hard constraint. Implemented in Task 6
+  (decision 6; ADR 0007 decision 2).
 - [x] **Basis of an answer with no value** (decision 8): shown as `inferred`.
 - [x] **Concept-key folding** (decision 5): whether the plural heuristic refuses any title
   a person would expect to be accepted.

@@ -14,6 +14,7 @@ Everything runs on this machine (ADR 0001). Run commands from the repository roo
 | `make check` | Backend: formatting, lint, types, fast tests and the fixture validator. Web (`apps/web`, `pnpm run check`): generated-client drift, Biome, `tsc`, Vitest. No Docker, no network. |
 | `make acceptance` | Integration and stack tests against real PostgreSQL 16, DBOS and the emulator, in separate Compose projects (`nessa-l0-test`, `nessa-l0-stacktest`) and ports; then the Storybook build and the Playwright suite on its own demo stack (`nessa-l0-webtest`, web on `127.0.0.1:57600`): the browser journey with a full restart, keyboard, access and visual checks. Removes them afterwards. |
 | `make live-smoke` | One real connection-check run on the test model through an isolated stack (`nessa-l0-smoke`), at most 3 calls, within the `live-smoke` scope's cumulative cap (9 calls, 3 production, $0.30 worst case by default; `NESSA_LIVE_SMOKE_*` changes it). `INTERVIEW=1` runs one interview turn instead, with a fixed synthetic message, checks that its reply streamed and was superseded by the validated output, and confirms its proposals into the profile: one attempt, at most 2 calls (the call and one validation repair). One invocation at a time: a second refuses while the ledger is held. The worker is stopped before the attempts are read, and every attempt is ledgered in `docs/evidence/live-usage.*` with its request count; if the worker cannot be confirmed stopped, every further call it could make is ledgered with an unknown cost and the command fails. Only `PRODUCTION=1` uses the production model. Reads `META_API_KEY` from `.env`. |
+| `make live-eval` | The representative evaluation cases (those marked `live` in `backend/tools/evaluation_cases.json`, at most 6; `CASES=INT-01,DSC-01` runs a chosen subset) through the isolated live stack on the test model only: one synthetic workspace per case whose run limit allows exactly one attempt (at most 2 requests), within the `live-eval` scope's cumulative cap (24 requests, no production request, $0.05 worst case; `NESSA_LIVE_EVAL_*` changes it). Every attempt is ledgered in `docs/evidence/live-usage.*` after the worker stops; results with failures by type are appended to `docs/evidence/live-eval.md`, each case's output to `live-eval.jsonl`; the key is leak-scanned. Reads `META_API_KEY` from `.env`. Never part of `make check` or `make acceptance`. |
 | `make rotate-master-key` | With the stack running: adds master key `v<N+1>` to `NESSA_HOME/keys`, then runs `make reseal`. The only way to rotate the master key. |
 | `make reseal` | Restarts a running API and worker so they load every key version (their mode is kept), then reseals every sealed record (stored keys, run inputs, run outputs and partial replies) under the newest key, and fails if any record is left on an older version. Run it again if a rotation was interrupted. Restarting the worker recovers an in-flight run, whose model call may then be made again, within its spend reservation. |
 | `make status` | `docker compose ps` for the stack. |
@@ -35,9 +36,20 @@ in, is refused). These are local test credentials, not secrets.
 
 1. `make demo` (or `make dev`), then open `http://127.0.0.1:53000`.
 2. Sign in: the page offers the three seeded identities. Ada owns "P01 demo (synthetic)".
-3. **You** edits what Nessa knows. Each answer is Answered, Unknown, Skipped, Prefer not to
-   say or Not asked yet, never a blank standing in for zero. Saving makes a new version;
-   **Source** shows where an answer came from.
+3. **You** starts with "I know my direction" or "Help me explore", then the conversation:
+   one question at a time, a tone you choose, Pause and Resume. In a demo workspace the
+   replies come from the deterministic demo interviewer, labelled as such; a live workspace
+   first asks for your Meta key, with consent to encrypted storage. A reply streams, marked
+   "not checked yet", until the checked reply replaces it. Its proposed changes wait in
+   **What we know** to accept, confirm (limits and targets, by name), edit or skip; nothing
+   is saved until you save, and the last save can be undone. "Edit answers directly" opens
+   the form: each answer is Answered, Unknown, Skipped, Prefer not to say or Not asked yet,
+   never a blank standing in for zero; **Source** shows where it came from. **Directions to
+   explore** suggests up to six ESCO occupations from your answers (no score or
+   percentage), with view-only controls; "Make this a target" is the only way one becomes
+   a target. The early sketch lists what a target usually asks for, every step unresolved.
+   A message that says you want to die or harm yourself gets UK support services instead
+   of the interviewer, and nothing is stored.
 4. **Routes** in the fixture workspace shows the TRACE-01 fixture preview, labelled as such.
    Select a route to inspect it. The route search itself is not built yet, so the other
    chapters show what they will hold and which answers they need.
@@ -50,7 +62,7 @@ For UI work without Docker: `cd apps/web && pnpm storybook` (component states on
 regenerated client.
 
 `cd apps/web && pnpm run review-screenshots` regenerates the visual review package in
-`docs/reviews/sprint-1/screenshots/`. It needs Docker: like `make acceptance`, it builds and
+`docs/reviews/sprint-2/screenshots/` (Sprint 1's package stays as it was reviewed). It needs Docker: like `make acceptance`, it builds and
 starts its own stack (`nessa-l0-webtest`) and removes it afterwards.
 
 ## Calling the API (what the web app does)
@@ -75,6 +87,18 @@ with the browser's Origin unchanged.
   [change IDs], confirm_hard_constraints: [fields]}`: every accepted limit or target must be
   named in `confirm_hard_constraints`, and the profile must still be the version the message
   was sent with (`409 STALE_INPUT_VERSION` otherwise: send the message again).
+- Interview preferences (ADR 0007): `GET`/`PUT .../interview/preferences` with
+  `{expected_version, entry_mode: sure|unsure|null, conversation_mode:
+  practical|gentle|challenge|null, paused}`. A turn whose message explicitly expresses acute
+  distress answers `200` with the support response (`policy: "acute_distress"`, UK
+  resources) instead of `202`: nothing was sent or stored; resend with
+  `send_after_support: true` to send it anyway.
+- Discovery (ADR 0007): `POST .../discoveries` with `{expected_profile_version}` returns `202`
+  (`INSUFFICIENT_EVIDENCE` if no answer describes work yet); `GET .../discoveries` (newest
+  first), `GET .../discoveries/{id}`; `GET .../discoveries/{id}/slate?emphasis=&exclude_concept=
+  &exclude_family=` recomputes the slate (view only, nothing stored). `POST .../targets` with
+  `{expected_version, concept_id, discovery_id?, replaces?}` makes an ESCO occupation a
+  target. `GET .../sketch` is the early requirement sketch.
 - Taxonomy: `GET /v1/taxonomy` (the ESCO release and its attribution), `GET
   /v1/taxonomy/occupations?q=...&match=all|any`, `GET /v1/taxonomy/occupations/{concept_id}`;
   English cities: `GET /v1/places`. A title ESCO lacks: `POST
