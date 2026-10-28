@@ -3,8 +3,9 @@ name = "nessa"
 version = "0.0.0"
 description = "Nessa local career planner backend (L0)."
 requires-python = ">=3.12,<3.13"
-# Exact pins: Sprint 0 qualified this combination (docs/dependencies.md,
-# docs/adr/0002-durable-execution.md). Change them only by re-running the spike.
+# Exact pins. The DBOS/Pydantic AI pair was qualified in Sprint 0 (docs/adr/0002-durable-execution.md):
+# change those only by re-running `make acceptance`. The rest were added in Task 3
+# (docs/dependencies.md).
 dependencies = [
     "pydantic==2.14.1",
     "pydantic-settings==2.16.1",
@@ -13,6 +14,11 @@ dependencies = [
     "cryptography==50.0.2",
     "psycopg[binary]==3.3.6",
     "httpx2==2.16.0",
+    "sqlalchemy==2.1.6",
+    "alembic==1.20.1",
+    "fastapi==0.162.0",
+    "uvicorn==0.54.0",
+    "firebase-admin==7.7.0",
 ]
 
 [dependency-groups]
@@ -20,6 +26,7 @@ dev = [
     "ruff==0.17.3",
     "mypy==2.4.0",
     "pytest==9.2.0",
+    "hypothesis==6.170.12",
 ]
 
 [build-system]
@@ -32,29 +39,38 @@ packages = ["src/nessa"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["src", "spikes"]
+src = ["src", "."]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "S", "RUF", "SIM", "PT", "N"]
 ignore = []
 
 [tool.ruff.lint.per-file-ignores]
-# Tests assert with plain `assert` by design.
-"**/test_*.py" = ["S101"]
+# Tests assert with plain `assert` and use throwaway secret-shaped literals by design.
+"tests/**" = ["S101", "S105", "S106"]
+# SQL adapters splice only constant column lists and fixed clauses; every value is bound.
+"src/nessa/*/store.py" = ["S608"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["src", "spikes"]
+files = ["src", "tests", "tools"]
 plugins = ["pydantic.mypy"]
-mypy_path = "."
+mypy_path = "src:."
 explicit_package_bases = true
 
+[[tool.mypy.overrides]]
+# firebase-admin ships no type information.
+module = ["firebase_admin", "firebase_admin.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
-testpaths = ["spikes"]
-pythonpath = ["."]
-addopts = "-ra --strict-markers -m 'not integration'"
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+addopts = "-ra --strict-markers -m 'not integration and not stack'"
 markers = [
-    "integration: needs the spike PostgreSQL 16 container (backend/spikes/durable/compose.yaml)",
+    "integration: needs PostgreSQL 16 and the Firebase Auth emulator (started by the test harness in Docker)",
+    "stack: drives the full Docker Compose stack (make acceptance)",
+    "req(id): the requirements-register test ID(s) this test establishes",
 ]
 filterwarnings = ["error"]

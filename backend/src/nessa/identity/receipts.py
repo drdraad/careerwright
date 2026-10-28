@@ -1,0 +1,64 @@
+"""Idempotent consequential commands (Global Constraint 7, plan section 3).
+
+A command runs with its idempotency key in one transaction that also records a receipt of
+the response. Retrying with the same key and the same request returns the recorded response
+instead of acting twice. The same key with a different request is refused. Only successes
+are recorded; a failed command can be retried with the same key.
+"""
+
+import hashlib
+import json
+import uuid
+from collections.abc import Callable
+
+from nessa.db import Engine, Tx, actor_transaction
+from nessa.errors import ErrorCode, ErrorStage, NessaError
+from nessa.identity import store
+from nessa.identity.records import Receipt
+from nessa.identity.store import DuplicateReceiptError
+
+Execute = Callable[[Tx], tuple[int, dict[str, object]]]
+
+
+def fingerprint(command: str, request: dict[str, object]) -> str:
+    """SHA-256 of the canonical request. Callers replace secret fields before hashing."""
+    canonical = json.dumps({"command": command, "request": request}, sort_keys=True, default=str)
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _replay(receipt: Receipt, command: str, request_sha256: str) -> tuple[int, dict[str, object]]:
+    if (receipt.command, receipt.request_sha256) != (command, request_sha256):
+        raise NessaError(
+            ErrorCode.IDEMPOTENCY_KEY_REUSED,
+            "This idempotency key was already used for a different request.",
+            stage=ErrorStage.REQUEST,
+        )
+    return receipt.status_code, receipt.response
+
+
+def run_idempotent(
+    engine: Engine,
+    actor_id: uuid.UUID,
+    key: uuid.UUID,
+    command: str,
+    request_sha256: str,
+    execute: Execute,
+) -> tuple[int, dict[str, object]]:
+    try:
+        with actor_transaction(engine, actor_id) as tx:
+            receipt = store.read_receipt(tx, actor_id, key)
+            if receipt is not None:
+                return _replay(receipt, command, request_sha256)
+            status, response = execute(tx)
+            store.write_receipt(
+                tx, actor_id, key, Receipt(command, request_sha256, status, response)
+            )
+            return status, response
+    except (DuplicateReceiptError, NessaError):
+        # A concurrent duplicate may have committed first (it then made this attempt stale
+        # or took the receipt); if so, the command already happened: return its result.
+        with actor_transaction(engine, actor_id) as tx:
+            receipt = store.read_receipt(tx, actor_id, key)
+        if receipt is None:
+            raise
+        return _replay(receipt, command, request_sha256)

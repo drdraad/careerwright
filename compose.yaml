@@ -1,0 +1,140 @@
+# Nessa L0 local stack (plan section 2; ADR 0004). Start it with `make dev` or `make demo`,
+# never by hand: the Makefile sets NESSA_HOME (secrets and master keys, outside the
+# repository), the runtime mode and the ports.
+#
+# Every service sits on the `internal` network, which has no route out of the machine. The
+# `edge` relay is the only service also on a normal bridge: it publishes the API, the Auth
+# emulator, PostgreSQL and the web slot on 127.0.0.1 only.
+name: nessa-l0
+
+x-local: &local
+  NESSA_ENVIRONMENT: local
+  NESSA_RUNTIME_MODE: ${NESSA_RUNTIME_MODE:-demo}
+
+x-models: &models
+  NESSA_META_TEST_MODEL: ${NESSA_META_TEST_MODEL:-muse-spark-1.3-contributor}
+  NESSA_META_PRODUCTION_MODEL: ${NESSA_META_PRODUCTION_MODEL:-muse-spark-1.3}
+  NESSA_SYNTHETIC_MODEL_ROLE: ${NESSA_SYNTHETIC_MODEL_ROLE:-test}
+
+# One backend image; only `migrate` declares the build so parallel builds cannot race.
+x-backend: &backend
+  image: nessa-l0/backend:local
+  networks: [internal]
+  init: true
+
+services:
+  postgres:
+    # postgres:16.15-bookworm, multi-arch index digest (docs/dependencies.md).
+    image: postgres:16.15-bookworm@sha256:d81f7b51697014367236d07ec58b54153fc28f828b72bf247fe5c7487520bcb0
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_superuser
+    secrets: [pg_superuser, pg_migrator, pg_api, pg_worker, pg_dbos_owner, pg_dbos_runtime]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    networks: [internal]
+    stop_grace_period: 20s
+    healthcheck:
+      # TCP, not the socket: during initialisation the server listens on the socket only.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d nessa_app"]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+
+  auth:
+    image: nessa-l0/auth-emulator:15.34.1
+    build: ./docker/auth
+    networks: [internal]
+    init: true
+    stop_grace_period: 5s
+
+  migrate:
+    <<: *backend
+    build: ./backend
+    command: ["python", "-m", "nessa.cli", "setup-database"]
+    environment:
+      <<: *local
+      NESSA_MIGRATOR_DATABASE_URL: postgresql+psycopg://nessa_migrator@postgres:5432/nessa_app
+      NESSA_MIGRATOR_DATABASE_PASSWORD_FILE: /run/secrets/pg_migrator
+      NESSA_DBOS_OWNER_DATABASE_URL: postgresql+psycopg://nessa_dbos_owner@postgres:5432/nessa_dbos
+      NESSA_DBOS_OWNER_DATABASE_PASSWORD_FILE: /run/secrets/pg_dbos_owner
+      NESSA_FIXTURES_DIR: /fixtures/m0
+      NESSA_MASTER_KEY_DIR: /run/nessa/keys
+    secrets: [pg_migrator, pg_dbos_owner]
+    volumes:
+      - ./fixtures:/fixtures:ro
+      - ${NESSA_HOME:?run make setup}/keys:/run/nessa/keys:ro
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  api:
+    <<: *backend
+    command: ["uvicorn", "--factory", "nessa.api.main:build_app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log", "--timeout-graceful-shutdown", "5"]
+    environment:
+      <<: [*local, *models]
+      NESSA_ALLOWED_HOSTS: 127.0.0.1:${NESSA_API_PORT:-58000},localhost:${NESSA_API_PORT:-58000},api:8000,127.0.0.1:8000
+      NESSA_ALLOWED_ORIGINS: http://127.0.0.1:${NESSA_WEB_PORT:-53000},http://localhost:${NESSA_WEB_PORT:-53000}
+      NESSA_FIREBASE_PROJECT_ID: demo-nessa
+      FIREBASE_AUTH_EMULATOR_HOST: auth:9099
+      NESSA_APP_DATABASE_URL: postgresql+psycopg://nessa_api@postgres:5432/nessa_app
+      NESSA_APP_DATABASE_PASSWORD_FILE: /run/secrets/pg_api
+      NESSA_MASTER_KEY_DIR: /run/nessa/keys
+    secrets: [pg_api]
+    volumes:
+      - ${NESSA_HOME:?run make setup}/keys:/run/nessa/keys:ro
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      auth: {condition: service_healthy}
+    stop_grace_period: 10s
+    healthcheck:
+      test: ["CMD", "python", "-m", "nessa.api.health", "http://127.0.0.1:8000/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  edge:
+    <<: *backend
+    command: ["python", "-m", "nessa.edge"]
+    environment:
+      NESSA_EDGE_ROUTES: 8000=api:8000,9099=auth:9099,5432=postgres:5432,3000=web:3000
+    networks: [internal, edge]
+    ports:
+      - 127.0.0.1:${NESSA_API_PORT:-58000}:8000
+      - 127.0.0.1:${NESSA_AUTH_PORT:-59099}:9099
+      - 127.0.0.1:${NESSA_PG_PORT:-56432}:5432
+      - 127.0.0.1:${NESSA_WEB_PORT:-53000}:3000
+    stop_grace_period: 5s
+    healthcheck:
+      test: ["CMD", "python", "-m", "nessa.edge", "--check"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Next.js service slot (Task 4 adds apps/web). The edge already relays its port.
+  web:
+    profiles: [web]
+    build: ./apps/web
+    image: nessa-l0/web:local
+    networks: [internal]
+    environment:
+      NESSA_API_INTERNAL_URL: http://api:8000
+      NESSA_AUTH_EMULATOR_URL: http://127.0.0.1:${NESSA_AUTH_PORT:-59099}
+    depends_on:
+      api: {condition: service_healthy}
+
+networks:
+  internal:
+    internal: true
+  edge: {}
+
+volumes:
+  pgdata: {}
+
+secrets:
+  pg_superuser: {file: "${NESSA_HOME:?run make setup}/secrets/pg_superuser"}
+  pg_migrator: {file: "${NESSA_HOME:?run make setup}/secrets/pg_migrator"}
+  pg_api: {file: "${NESSA_HOME:?run make setup}/secrets/pg_api"}
+  pg_worker: {file: "${NESSA_HOME:?run make setup}/secrets/pg_worker"}
+  pg_dbos_owner: {file: "${NESSA_HOME:?run make setup}/secrets/pg_dbos_owner"}
+  pg_dbos_runtime: {file: "${NESSA_HOME:?run make setup}/secrets/pg_dbos_runtime"}

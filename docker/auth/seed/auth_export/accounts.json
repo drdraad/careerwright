@@ -1,0 +1,68 @@
+{
+  "kind": "identitytoolkit#DownloadAccountResponse",
+  "users": [
+    {
+      "localId": "nessa-demo-ada",
+      "displayName": "Ada Demo",
+      "email": "ada@nessa.test",
+      "emailVerified": true,
+      "salt": "fakeSaltNessaDemoAda",
+      "passwordHash": "fakeHash:salt=fakeSaltNessaDemoAda:password=nessa-demo-ada",
+      "passwordUpdatedAt": 1767225600000,
+      "validSince": "1767225600",
+      "createdAt": "1767225600000",
+      "lastLoginAt": "1767225600000",
+      "providerUserInfo": [
+        {
+          "providerId": "password",
+          "email": "ada@nessa.test",
+          "federatedId": "ada@nessa.test",
+          "rawId": "ada@nessa.test",
+          "displayName": "Ada Demo"
+        }
+      ]
+    },
+    {
+      "localId": "nessa-demo-ben",
+      "displayName": "Ben Demo",
+      "email": "ben@nessa.test",
+      "emailVerified": true,
+      "salt": "fakeSaltNessaDemoBen",
+      "passwordHash": "fakeHash:salt=fakeSaltNessaDemoBen:password=nessa-demo-ben",
+      "passwordUpdatedAt": 1767225600000,
+      "validSince": "1767225600",
+      "createdAt": "1767225600000",
+      "lastLoginAt": "1767225600000",
+      "providerUserInfo": [
+        {
+          "providerId": "password",
+          "email": "ben@nessa.test",
+          "federatedId": "ben@nessa.test",
+          "rawId": "ben@nessa.test",
+          "displayName": "Ben Demo"
+        }
+      ]
+    },
+    {
+      "localId": "nessa-demo-uninvited",
+      "displayName": "Uninvited Demo",
+      "email": "uninvited@nessa.test",
+      "emailVerified": true,
+      "salt": "fakeSaltNessaDemoUninvited",
+      "passwordHash": "fakeHash:salt=fakeSaltNessaDemoUninvited:password=nessa-demo-uninvited",
+      "passwordUpdatedAt": 1767225600000,
+      "validSince": "1767225600",
+      "createdAt": "1767225600000",
+      "lastLoginAt": "1767225600000",
+      "providerUserInfo": [
+        {
+          "providerId": "password",
+          "email": "uninvited@nessa.test",
+          "federatedId": "uninvited@nessa.test",
+          "rawId": "uninvited@nessa.test",
+          "displayName": "Uninvited Demo"
+        }
+      ]
+    }
+  ]
+}

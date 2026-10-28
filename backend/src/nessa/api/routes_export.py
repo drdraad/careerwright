@@ -1,0 +1,88 @@
+"""Workspace data export (portability). Credentials appear as metadata only, never key
+material; the export is built from the same row-level-secured reads as every other view, in
+one transaction, and pages through every row (an export is never silently truncated)."""
+
+import uuid
+from datetime import datetime
+from typing import Literal
+
+from fastapi import APIRouter
+
+from nessa.api.deps import CallerDep, Deps
+from nessa.api.envelope import ERROR_RESPONSES
+from nessa.api.schemas import EventOut, ProfileOut, SourceOut, WorkspaceOut, _Out
+from nessa.db import Tx, actor_transaction
+from nessa.identity import store as identity_store
+from nessa.identity.records import WorkspaceEvent
+from nessa.identity.workspaces import visible_workspace
+from nessa.profile import store as profile_store
+from nessa.profile.commands import ProfileView
+from nessa.profile.records import ProfileVersion, SourceReference
+
+router = APIRouter(
+    prefix="/v1/workspaces/{workspace_id}", responses=ERROR_RESPONSES, tags=["export"]
+)
+PAGE = 500
+
+
+class WorkspaceExport(_Out):
+    format: Literal["nessa.workspace-export"] = "nessa.workspace-export"
+    format_version: Literal[1] = 1
+    exported_at: datetime
+    synthetic: bool
+    workspace: WorkspaceOut
+    profile_versions: list[ProfileOut]
+    sources: list[SourceOut]
+    events: list[EventOut]
+
+
+def _all_versions(tx: Tx, workspace_id: uuid.UUID) -> list[ProfileVersion]:
+    versions: list[ProfileVersion] = []
+    while page := profile_store.list_profile_versions(
+        tx, workspace_id, before=versions[-1].version if versions else None, limit=PAGE
+    ):
+        versions.extend(page)
+    return list(reversed(versions))
+
+
+def _all_sources(tx: Tx, workspace_id: uuid.UUID) -> list[SourceReference]:
+    sources: list[SourceReference] = []
+    while page := profile_store.list_sources(
+        tx,
+        workspace_id,
+        after=(sources[-1].created_at, sources[-1].source_ref_id) if sources else None,
+        limit=PAGE,
+    ):
+        sources.extend(page)
+    return sources
+
+
+def _all_events(tx: Tx, workspace_id: uuid.UUID) -> list[WorkspaceEvent]:
+    events: list[WorkspaceEvent] = []
+    while page := identity_store.events_after(
+        tx, workspace_id, events[-1].seq if events else 0, PAGE
+    ):
+        events.extend(page)
+    return events
+
+
+@router.get("/export", response_model=WorkspaceExport)
+def export_workspace(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> WorkspaceExport:
+    with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
+        workspace = visible_workspace(tx, workspace_id)
+        versions = _all_versions(tx, workspace_id)
+        sources = _all_sources(tx, workspace_id)
+        events = _all_events(tx, workspace_id)
+    return WorkspaceExport(
+        exported_at=deps.clock(),
+        synthetic=workspace.synthetic,
+        workspace=WorkspaceOut.of(workspace),
+        profile_versions=[
+            ProfileOut.of(
+                ProfileView(v.workspace_id, v.version, v.document, v.created_by, v.created_at)
+            )
+            for v in versions
+        ],
+        sources=[SourceOut.of(s) for s in sources],
+        events=[EventOut.of(e) for e in events],
+    )
