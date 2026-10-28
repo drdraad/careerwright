@@ -432,7 +432,11 @@ want/need" is kept and listed as a known false positive for careers work (H-12).
 stored live EXP-01 output (rows 25-26) was re-checked offline with the final checker: all
 six suggestions, seven claims and 16 quotations accepted. That check read ESCO's full
 records as the evidence file keeps them, not the shortened copy the prompt carried, so a
-quotation from beyond the cut would also have passed. No live call. Checks: CHECKS-ROUND-3.
+quotation from beyond the cut would also have passed. No live call. Checks on `c937e6f`:
+`make check` exit 0 (608 fast tests; Vitest 204); `make acceptance` exit 0 (195
+integration and stack tests, the Storybook build, 22 Playwright journeys, the demo
+journey's fixture note among them); the answers-too-short note recaptured at three sizes,
+every shot's checks clean (31 per size).
 
 **Live (R5).** Scope `live-eval-6b`, test model `muse-spark-1.3-contributor`, synthetic
 case EXP-01: ledger rows 25 (discovery, 1 request, $0.000205) and 26 (explanation, 2
