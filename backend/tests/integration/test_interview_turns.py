@@ -223,6 +223,9 @@ def test_a_refusal_or_a_truncated_output_ends_typed_with_the_profile_intact(
 
     assert (turn["run"]["status"], turn["run"]["failure_class"]) == ("failed", failure_class)
     assert turn["proposal"] is None
+    [attempt] = scenario.attempts(turn["turn_id"])
+    # Neither is sent back for repair; the cut-off response's reported usage is booked.
+    assert (attempt["requests_sent"], attempt["spend_state"]) == (1, "reconciled")
     assert scenario.outputs(turn["turn_id"]) == []  # partial output is never stored
     assert scenario.profile() == before
     # The refusal text and the cut-off output carry the output sentinel: discarded.
@@ -450,11 +453,59 @@ def test_a_demo_workspace_interviews_offline_with_the_labelled_fixture_interview
     assert decided.json()["profile"]["document"]["weekly_study_hours"]["value"] == 5.0
 
 
+@pytest.mark.req("BND1-11")
+@pytest.mark.parametrize(
+    ("kind", "model_id", "model_mode", "constraint"),
+    [
+        # A demo workspace never reaches a provider model...
+        (
+            "interview_turn",
+            "muse-spark-1.3-contributor",
+            "contributor",
+            "demo_workspaces_use_only_the_fixture_model",
+        ),
+        # ...and the fixture interviewer answers interview turns only.
+        (
+            "connection_check",
+            "nessa-fixture-interviewer-1",
+            "fixture",
+            "the_fixture_model_only_interviews",
+        ),
+    ],
+)
+def test_the_database_keeps_the_fixture_interviewer_and_demo_workspaces_together(
+    infra: Infra,
+    api: ApiClient,
+    ada: str,
+    kind: str,
+    model_id: str,
+    model_mode: str,
+    constraint: str,
+) -> None:
+    created = api.write(
+        "POST", "/v1/workspaces", ada, {"name": "Demo", "data_mode": "demo", "synthetic": True}
+    )
+    assert created.status_code == 201, created.text
+
+    with pytest.raises(errors.CheckViolation, match=constraint):
+        infra.query(
+            "INSERT INTO nessa.runs (run_id, workspace_id, data_mode, synthetic, kind, "
+            "requested_by, model_id, model_mode, status, profile_version) SELECT "
+            "gen_random_uuid(), workspace_id, data_mode, synthetic, %s, owner_actor_id, %s, %s, "
+            "'queued', CASE WHEN %s = 'interview_turn' THEN 0 END "
+            "FROM nessa.workspaces WHERE workspace_id = %s",
+            (kind, model_id, model_mode, kind, created.json()["workspace_id"]),
+        )
+
+
 def test_the_worker_never_reads_profile_or_conversation_tables_and_the_api_never_reads_inputs(
-    scenario: Scenario,
+    scenario: Scenario, infra: Infra, api: ApiClient, ada: str, tmp_path: Path
 ) -> None:
     turn = run_turn(scenario, "")
     run_id = turn["turn_id"]
+    second = scenario.submit_turn("York, too.")["turn_id"]  # queued, never run
+    other = make_scenario(infra, api, ada, tmp_path)
+    elsewhere = other.submit_turn("Bristol.")["turn_id"]
 
     for table in ("interview_turns", "interview_decisions", "profile_versions"):
         with pytest.raises(errors.InsufficientPrivilege):
@@ -463,10 +514,17 @@ def test_the_worker_never_reads_profile_or_conversation_tables_and_the_api_never
         scenario.infra.as_role(
             "pg_api", "SELECT ciphertext FROM nessa.run_inputs", actor=str(uuid.uuid4())
         )
-    [sealed] = scenario.infra.as_role(
-        "pg_worker", "SELECT count(*) AS n FROM nessa.run_inputs", run=run_id
+    visible = scenario.infra.as_role(
+        "pg_worker", "SELECT run_id::text AS run_id FROM nessa.run_inputs", run=run_id
     )
-    assert sealed["n"] == 1  # the worker sees only its own run's sealed input
+    # Scoped like run outputs and keys: the run's workspace (while its requester may act),
+    # so the worker sees that workspace's sealed inputs and no other workspace's.
+    assert {row["run_id"] for row in visible} == {run_id, second}
+    assert elsewhere not in {row["run_id"] for row in visible}
+    finisher = scenario.worker("finisher")  # leave no queued run for a later test's worker
+    scenario.wait_terminal(second)
+    scenario.wait_terminal(elsewhere)
+    assert finisher.stop() == 0
 
 
 def test_the_export_carries_the_conversation_and_its_decisions(scenario: Scenario) -> None:

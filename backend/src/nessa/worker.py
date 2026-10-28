@@ -9,7 +9,7 @@ Run: `python -m nessa.worker`; health check: `python -m nessa.worker --check`.
 """
 
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 
 from pydantic import SecretStr
@@ -37,19 +37,29 @@ class MissingKeyError(RuntimeError):
     """A Meta model was requested without a key (the activity always opens one first)."""
 
 
-def model_builder() -> ModelBuilder:
+# A provider model for a model ID and the key the activity opened.
+ProviderBuilder = Callable[[str, SecretStr], Model]
+
+
+def _meta(model_id: str, api_key: SecretStr) -> Model:
+    # Each task sets its own output bound per run; this is the default ceiling.
+    return meta_model(
+        model_id,
+        api_key,
+        max_output_tokens=connection_check.LIMITS.max_output_tokens,
+        effort="minimal",
+    )
+
+
+def model_builder(provider: ProviderBuilder = _meta) -> ModelBuilder:
+    """The fixture interviewer for its model ID, else `provider` (Meta; a fake in tests)."""
+
     def build(model_id: str, api_key: SecretStr | None) -> Model:
         if model_entry(model_id).mode is ModelMode.FIXTURE:
             return fixture_interviewer_model()
         if api_key is None:
             raise MissingKeyError(model_id)
-        # Each task sets its own output bound per run; this is the default ceiling.
-        return meta_model(
-            model_id,
-            api_key,
-            max_output_tokens=connection_check.LIMITS.max_output_tokens,
-            effort="minimal",
-        )
+        return provider(model_id, api_key)
 
     return build
 

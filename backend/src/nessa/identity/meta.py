@@ -1,7 +1,9 @@
 """The Meta Model API through Pydantic AI's native Meta provider (ADR 0003; adapter).
 
-Nothing retries behind the DBOS step's back: the OpenAI client has `max_retries=0`, the agent
-has no output retries and one request at most. Structured output is `NativeOutput` (strict
+Nothing retries behind the DBOS step's back: the OpenAI client has `max_retries=0`, so no
+transport retry ever happens. Each task's agent bounds its own requests: one for the
+connection check; for an interview turn, two at most (the second only as the one validation
+repair, owned by the agent's output-retry budget). Structured output is `NativeOutput` (strict
 JSON schema), because Meta accepts no forced tool choice. The base URL is fixed: a key is
 only ever sent to Meta.
 """

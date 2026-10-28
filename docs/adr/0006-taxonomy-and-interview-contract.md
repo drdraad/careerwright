@@ -1,8 +1,8 @@
 # ADR 0006: The ESCO taxonomy, English cities and the InterviewTurn contract
 
-- Status: Accepted (Task 5, Sprint 2: S2.1-S2.2). Decision 4's region assignment and
-  decision 6's hard-constraint set are **provisional, need product owner confirmation**
-  (ruling R6).
+- Status: Accepted (Task 5, Sprint 2: S2.1-S2.2). Decision 4's region assignment,
+  decision 6's hard-constraint set and decision 8's basis for an answer with no value are
+  **provisional, need product owner confirmation** (ruling R6).
 - Date: 2026-10-28
 - Requirements: TAX1-01, TAX1-04, DIV1-01, DIV1-03, REC1-04, BND1-04, PROF-01..07,
   MODEL-01..04, STATE-08, TEST1-10; spec sections 3-5, 16 and 18; ADR 0002, ADR 0004
@@ -108,7 +108,17 @@ decision 7 requires the first run kind that reads the profile to pin the version
    update per field. A valid output is stored, sealed, as an `InterviewProposal` with
    server-assigned change IDs, message IDs in place of refs and the hard-constraint mark.
    Structural bounds are checked in code, not schema keywords, so the schema stays within
-   strict mode.
+   strict mode. A list proposal is the complete list after the change (the instructions and
+   the API say so); accepting it replaces the field's list.
+
+   **Basis is verified, not taken on trust** (fix round 1). The server keeps the model's
+   `stated` only when every new value the update proposes appears in the messages it cites
+   (case, spacing and digit grouping aside, whole words; list items the profile already
+   holds need no quote); otherwise the change is `inferred`. The correction is not a
+   validation problem, so it never costs a repair request. **Provisional, needs product
+   owner confirmation (R6):** an answer with no value to quote (`unknown`, `skipped`,
+   `prefer_not_to_say`) is shown as `inferred`, so the person checks it, even when they said
+   it in so many words.
 
 9. **Bounded validation repair, and who retries what.** An invalid output gets one repair
    request listing the problems; a second failure ends the run `invalid_model_output`
@@ -123,8 +133,10 @@ decision 7 requires the first run kind that reads the profile to pin the version
    The default run limit is $0.15 so that all three of the DBOS step's attempts fit on the
    Standard model: a Meta outage ends `provider_unavailable`, never `budget_exceeded` (fix
    round 1). An attempt that makes no provider call records a known cost of 0.
-   A response cut off at its token limit is `output_truncated` from its typed finish reason,
-   never parsed or stored; a content-filter refusal is `model_refused` and is not retried.
+   A response cut off at its token limit is `output_truncated` from its typed finish reason
+   the moment it arrives (`TruncationGuard`, on every task's agent): never parsed, repaired
+   or stored, so it costs one request, and its reported usage is still booked. A
+   content-filter refusal is `model_refused` and is not retried.
 
 10. **A new run kind on the same activity.** `interview_turn` runs through the one bounded
     activity and workflow (ADR 0002): no second model-call path. The activity takes a

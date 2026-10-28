@@ -12,18 +12,13 @@ import signal
 from datetime import UTC, datetime
 from pathlib import Path
 
-from pydantic import SecretStr
-from pydantic_ai.models import Model
-
 from nessa.config import WorkerSettings
 from nessa.db import create_engine, url_with_password
 from nessa.identity import activity, run_store, worker
-from nessa.identity.activity import ActivityRuntime, ModelBuilder
+from nessa.identity.activity import ActivityRuntime
 from nessa.identity.keyring import load_keyring
-from nessa.identity.model_registry import ModelMode, model_entry
 from nessa.logs import configure_logging
-from nessa.profile.interview_agent import fixture_interviewer_model
-from nessa.worker import TASKS
+from nessa.worker import TASKS, model_builder
 from tests.support.fake_models import FakeFailure, fake_model_builder
 
 
@@ -47,18 +42,6 @@ def install_crash_point(point: str) -> None:
         raise ValueError(f"unknown crash point {point!r}")
 
 
-def builder(fake: ModelBuilder) -> ModelBuilder:
-    """The real fixture interviewer for demo workspaces (it is product code, offline); the
-    fake for everything that would reach Meta."""
-
-    def build(model_id: str, api_key: SecretStr | None) -> Model:
-        if model_entry(model_id).mode is ModelMode.FIXTURE:
-            return fixture_interviewer_model()
-        return fake(model_id, api_key)
-
-    return build
-
-
 def main() -> None:
     configure_logging("test-worker")
     settings = WorkerSettings()
@@ -66,7 +49,9 @@ def main() -> None:
     runtime = ActivityRuntime(
         engine=create_engine(settings.app_database, application_name="test-worker"),
         keyring=load_keyring(settings.master_key_dir),
-        build_model=builder(
+        # The product builder (the real fixture interviewer for demo workspaces), with the
+        # fake in place of Meta.
+        build_model=model_builder(
             fake_model_builder(
                 delay_s=float(os.environ.get("NESSA_TEST_FAKE_DELAY_S", "0")),
                 failure=FakeFailure(failure) if failure else None,

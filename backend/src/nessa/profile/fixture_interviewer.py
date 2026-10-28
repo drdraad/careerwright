@@ -42,7 +42,11 @@ QUESTIONS = {
     ProfileField.TARGET_TITLES: "Do you have a role in mind, or would you like to explore?",
 }
 _HOURS = re.compile(r"\b([0-9]{1,3}(?:\.[0-9]{1,2})?)\s*(?:hours?|hrs?)\b", re.IGNORECASE)
-_MONEY = re.compile(r"£\s?([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,9})(?:\.([0-9]{1,2}))?")
+# At most nine whole-pound digits, the bound `interview.MONEY_PATTERN` accepts; a longer
+# amount matches nothing, so the fixture never proposes a value the check would refuse.
+_MONEY = re.compile(
+    r"£\s?([0-9]{1,3}(?:,[0-9]{3}){1,2}|[0-9]{1,9})(?![0-9]|,[0-9])(?:\.([0-9]{1,2}))?"
+)
 _MONTH = re.compile(r"\b(?:a|per|each|every) month\b|\bmonthly\b", re.IGNORECASE)
 _ROLE = re.compile(
     r"\bI(?:'m| am| work as) (?:a|an) ([A-Za-z][A-Za-z -]{2,60}?)(?=[.,;!?]| in | at | and |$)"

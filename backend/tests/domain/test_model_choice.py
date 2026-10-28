@@ -1,10 +1,17 @@
 """Which model a run may use (ADR 0003; MODEL-02; the Contributor ruling carried into Task 3)."""
 
+import uuid
+from datetime import UTC, datetime
+
 import pytest
 
 from nessa.errors import ErrorCode, NessaError
+from nessa.identity.activity import model_refusal
+from nessa.identity.failures import FailureClass
 from nessa.identity.model_choice import ModelChoice, ModelConfigurationError, assert_model_permitted
 from nessa.identity.model_registry import ModelMode, model_entry
+from nessa.identity.records import Run, RunKind
+from nessa.vocabulary import DataMode, WorkState
 
 CONTRIBUTOR = "muse-spark-1.3-contributor"
 STANDARD = "muse-spark-1.3"
@@ -45,3 +52,45 @@ def test_the_contributor_model_is_refused_for_a_non_synthetic_workspace() -> Non
     assert raised.value.code is ErrorCode.MODEL_UNAVAILABLE
     assert_model_permitted(model_entry(CONTRIBUTOR), synthetic=True)
     assert_model_permitted(model_entry(STANDARD), synthetic=False)
+
+
+def run_in(data_mode: DataMode, *, synthetic: bool) -> Run:
+    now = datetime.now(UTC)
+    return Run(
+        run_id=uuid.uuid4(),
+        workspace_id=uuid.uuid4(),
+        kind=RunKind.INTERVIEW_TURN,
+        data_mode=data_mode,
+        synthetic=synthetic,
+        requested_by=uuid.uuid4(),
+        model_id="any",
+        model_mode="any",
+        status=WorkState.QUEUED,
+        failure_class=None,
+        output_id=None,
+        created_at=now,
+        started_at=None,
+        finished_at=None,
+        profile_version=0,
+    )
+
+
+@pytest.mark.req("MODEL-02", "BND1-11")
+@pytest.mark.parametrize(
+    ("data_mode", "synthetic", "mode", "refused"),
+    [
+        (DataMode.LIVE_ASSISTED, False, ModelMode.CONTRIBUTOR, True),
+        (DataMode.LIVE_ASSISTED, True, ModelMode.CONTRIBUTOR, False),
+        (DataMode.LIVE_ASSISTED, False, ModelMode.STANDARD, False),
+        (DataMode.DEMO, True, ModelMode.CONTRIBUTOR, True),  # demo: the fixture only
+        (DataMode.DEMO, True, ModelMode.FIXTURE, False),
+        (DataMode.LIVE_ASSISTED, True, ModelMode.FIXTURE, True),  # the fixture: demo only
+    ],
+)
+def test_the_activity_re_checks_which_model_a_run_may_call(
+    data_mode: DataMode, synthetic: bool, mode: ModelMode, refused: bool
+) -> None:
+    # Defence in depth behind the submission rule and the database CHECKs.
+    refusal = model_refusal(run_in(data_mode, synthetic=synthetic), mode)
+
+    assert refusal is (FailureClass.MODEL_NOT_PERMITTED if refused else None)

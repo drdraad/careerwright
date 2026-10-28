@@ -52,6 +52,10 @@ _STATUS_FAILURES = {
 }
 
 
+class OutputTruncatedError(Exception):
+    """A response stopped at its token limit; raised before anything parses or repairs it."""
+
+
 class TransientProviderError(Exception):
     """Retryable provider failure. Carries a type-derived label only, never provider text."""
 
@@ -97,6 +101,8 @@ def classify_failure(error: BaseException) -> Classified:
         return Classified("transient_request_timeout", None)
     if isinstance(error, ContentFilterError):  # an UnexpectedModelBehavior: test it first
         return terminal(FailureClass.MODEL_REFUSED)
+    if isinstance(error, OutputTruncatedError):
+        return terminal(FailureClass.OUTPUT_TRUNCATED)
     if isinstance(error, UsageLimitExceeded | UnexpectedModelBehavior):
         return terminal(FailureClass.INVALID_MODEL_OUTPUT)
     if isinstance(error, StoreUnavailableError):

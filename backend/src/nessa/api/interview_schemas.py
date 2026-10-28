@@ -24,9 +24,17 @@ class ProposedChangeOut(ResponseModel):
     field: ProfileField
     state: AnsweredState
     value: Money | list[str] | float | str | None = Field(
-        description="The proposed answer, typed as the field's input; null unless provided."
+        description=(
+            "The proposed answer, typed as the field's input; null unless provided. A list is "
+            "the complete list after the change: accepting it replaces the field's list."
+        )
     )
-    basis: Basis = Field(description="stated (the person said it) or inferred (implied).")
+    basis: Basis = Field(
+        description=(
+            "stated: the value appears in the cited messages (checked by the server); "
+            "inferred: implied, or not found in them."
+        )
+    )
     message_ids: list[uuid.UUID] = Field(description="The person's messages it rests on.")
     reason: str
     hard_constraint: bool = Field(

@@ -153,11 +153,35 @@ def test_a_refusal_is_its_own_failure_not_a_retry() -> None:
 
 
 @pytest.mark.req("MODEL-03", "PROF-03")
-def test_a_truncated_output_is_never_accepted() -> None:
+def test_a_truncated_output_fails_at_once_and_is_never_parsed_or_repaired() -> None:
     result, messages = run_fake(FakeFailure.TRUNCATED)
 
-    # The cut-off JSON never validates; the activity classifies the run `output_truncated`
-    # from the last response's finish reason (tests/integration/test_interview_turns.py).
+    assert isinstance(result, Exception)
+    assert classify_failure(result).failure is FailureClass.OUTPUT_TRUNCATED
+    assert sum(isinstance(m, ModelRequest) for m in messages) == 1  # no repair request
+    # The cut-off response stays in the history, so its reported usage is still booked.
+    [response] = [m for m in messages if isinstance(m, ModelResponse)]
+    assert response.finish_reason == "length"
+
+
+@pytest.mark.req("PROF-05", "MODEL-03")
+def test_a_complete_but_schema_invalid_output_is_repaired_once_then_fails_typed() -> None:
+    result, messages = run_fake(FakeFailure.SCHEMA_INVALID_ALWAYS)
+
     assert isinstance(result, UnexpectedModelBehavior)
-    responses = [m for m in messages if isinstance(m, ModelResponse)]
-    assert responses[-1].finish_reason == "length"
+    assert classify_failure(result).failure is FailureClass.INVALID_MODEL_OUTPUT
+    requests = [m for m in messages if isinstance(m, ModelRequest)]
+    assert len(requests) == 2  # one repair, naming the schema problems
+    assert "ready_for_review" in str(requests[1].parts)
+
+
+def test_the_fixture_ignores_an_amount_beyond_the_money_bound() -> None:
+    for message in ("I could spend £1,000,000,000.", "I could spend £1234567890."):
+        ctx = turn_input(message)
+
+        out = fixture_turn(prompt_context(ctx))
+        proposal, problems = check_turn(out, ctx, ProposalOrigin.FIXTURE)
+
+        assert problems == []  # a demo turn never fails on what the person typed
+        assert proposal is not None
+        assert proposal.changes == []

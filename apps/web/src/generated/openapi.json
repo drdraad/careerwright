@@ -3960,11 +3960,11 @@
               }
             ],
             "title": "Value",
-            "description": "The proposed answer, typed as the field's input; null unless provided."
+            "description": "The proposed answer, typed as the field's input; null unless provided. A list is the complete list after the change: accepting it replaces the field's list."
           },
           "basis": {
             "$ref": "#/components/schemas/Basis",
-            "description": "stated (the person said it) or inferred (implied)."
+            "description": "stated: the value appears in the cited messages (checked by the server); inferred: implied, or not found in them."
           },
           "message_ids": {
             "items": {

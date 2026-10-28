@@ -21,7 +21,8 @@ paid call's result in memory; past that budget the run fails `app_store_unavaila
 because a DBOS step retry would call the model again.
 
 Every exception is classified from its type alone and its message discarded; an output cut
-off at its token limit is `output_truncated` (from the typed finish reason), never parsed.
+off at its token limit is `output_truncated` (from the typed finish reason), never parsed
+or repaired (`TruncationGuard`, on every task's agent).
 Classification happens inside the handler; the caller raises outside it, so no provider
 exception rides along as context into DBOS's step-error record or retry log.
 """
@@ -34,12 +35,13 @@ import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, SecretStr
-from pydantic_ai import Agent, NativeOutput, capture_run_messages
-from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai import Agent, NativeOutput, RunContext, capture_run_messages
+from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse
-from pydantic_ai.models import Model
+from pydantic_ai.models import Model, ModelRequestContext
 from pydantic_ai.usage import UsageLimits
 
 from nessa.db import Engine, StoreUnavailableError, Tx, run_transaction
@@ -50,6 +52,7 @@ from nessa.identity.failures import (
     STORE_LABEL,
     Classified,
     FailureClass,
+    OutputTruncatedError,
     classify_failure,
     recorded_failure,
     terminal,
@@ -137,12 +140,32 @@ def failed(failure: FailureClass) -> Outcome:
     return {"status": status.value, "failure_class": failure.value}
 
 
+class TruncationGuard(AbstractCapability[Any]):
+    """Ends the run the moment a response stops at its token limit: a cut-off output is
+    never parsed and never sent back for repair (which would spend a second request).
+
+    The response is kept in the run's history first, so its reported usage is booked."""
+
+    async def after_model_request(
+        self,
+        ctx: RunContext[Any],
+        *,
+        request_context: ModelRequestContext,
+        response: ModelResponse,
+    ) -> ModelResponse:
+        if response.finish_reason == "length":
+            ctx.messages.append(response)
+            raise OutputTruncatedError
+        return response
+
+
 def connection_check_agent(model: Model) -> Agent[None, ConnectionCheckResult]:
     return Agent(
         model,
         output_type=NativeOutput(ConnectionCheckResult),
         instructions=connection_check.INSTRUCTIONS,
         retries=0,
+        capabilities=[TruncationGuard()],
     )
 
 
@@ -175,7 +198,7 @@ def _recorded_failure(tx: Tx, run_id: uuid.UUID) -> FailureClass | None:
     return None
 
 
-def _model_refusal(run: Run, mode: ModelMode) -> FailureClass | None:
+def model_refusal(run: Run, mode: ModelMode) -> FailureClass | None:
     """Defence in depth for the submission rule and the database CHECKs: Contributor only for
     synthetic data, the fixture interviewer only for demo workspaces and vice versa."""
     if mode is ModelMode.CONTRIBUTOR and not run.synthetic:
@@ -226,7 +249,7 @@ def _prepare(rt: ActivityRuntime, run_id: uuid.UUID) -> _Ready | ActivityEnd:
         if task is None:
             return refuse(FailureClass.UNKNOWN_FAILURE)
         mode = model_entry(run.model_id).mode
-        refusal = _model_refusal(run, mode)
+        refusal = model_refusal(run, mode)
         if refusal is not None:
             return refuse(refusal)
         sealed_input = run_store.sealed_input(tx, run_id) if task.has_input else None
@@ -312,11 +335,11 @@ def _call(rt: ActivityRuntime, ready: _Ready) -> _CallResult:
             # Classify inside the handler but act outside it (see the module docstring).
             classified: Classified | None = classify_failure(error)
             output = None
-            if isinstance(error, UnexpectedModelBehavior) and _truncated(messages):
-                classified = terminal(FailureClass.OUTPUT_TRUNCATED)
         else:
             classified = None
-            if _truncated(messages):  # never accept an output cut off at its limit
+            # Every task's agent stops at a cut-off response (`TruncationGuard`); this keeps
+            # the rule for any task: an output cut off at its limit is never accepted.
+            if _truncated(messages):
                 classified, output = terminal(FailureClass.OUTPUT_TRUNCATED), None
         requests = sum(isinstance(m, ModelRequest) for m in messages)
         responses = sum(isinstance(m, ModelResponse) for m in messages)

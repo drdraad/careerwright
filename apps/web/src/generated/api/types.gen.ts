@@ -1005,11 +1005,11 @@ export type ProposedChangeOut = {
     /**
      * Value
      *
-     * The proposed answer, typed as the field's input; null unless provided.
+     * The proposed answer, typed as the field's input; null unless provided. A list is the complete list after the change: accepting it replaces the field's list.
      */
     value: Money | Array<string> | number | string | null;
     /**
-     * stated (the person said it) or inferred (implied).
+     * stated: the value appears in the cited messages (checked by the server); inferred: implied, or not found in them.
      */
     basis: Basis;
     /**

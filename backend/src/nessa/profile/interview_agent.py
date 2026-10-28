@@ -6,7 +6,8 @@ answer the same strict JSON schema (`NativeOutput`), and both outputs pass the s
 deterministic check (`interview.check_turn`). A failed check is sent back once as a repair
 request with the problems listed; a second failure ends the run `invalid_model_output`.
 That repair is the agent's output-retry budget, the only retry owner for invalid output;
-the DBOS step retries only transient provider failures (ADR 0002 decision 7).
+the DBOS step retries only transient provider failures (ADR 0002 decision 7). A response
+cut off at its token limit ends the run at once (`TruncationGuard`): never repaired.
 """
 
 import asyncio
@@ -17,7 +18,7 @@ from pydantic_ai.models import Model
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import UsageLimits
 
-from nessa.identity.activity import RunTask
+from nessa.identity.activity import RunTask, TruncationGuard
 from nessa.identity.model_registry import FIXTURE_MODEL_ID, ModelMode
 from nessa.profile import interview
 from nessa.profile.fixture_interviewer import fixture_turn
@@ -45,6 +46,7 @@ def run_interview_turn(model: Model, mode: ModelMode, raw_input: bytes | None) -
         output_type=NativeOutput(InterviewTurnOutput),
         instructions=INSTRUCTIONS,
         retries={"tools": 0, "output": MAX_REQUESTS - 1},
+        capabilities=[TruncationGuard()],
     )
     accepted: list[InterviewProposal] = []
 

@@ -10,9 +10,11 @@ profile fields can be named (keys, secrets and plan commitments are not profile 
 no output can reach them; PROF-06), every update cites at least one of the person's
 messages, values are parsed by the field's kind with integer money, cities must be on the
 English list, and list bounds hold. What it returns is the stored `InterviewProposal`, with
-server-assigned change IDs, message IDs in place of prompt labels, and each change marked
-if it is a hard constraint that only the person's explicit confirmation can establish
-(PROF-04). Problems become the text of the one bounded repair request (PROF-05).
+server-assigned change IDs, message IDs in place of prompt labels, each change marked if it
+is a hard constraint that only the person's explicit confirmation can establish (PROF-04),
+and a basis the server verified: the model's "stated" is kept only when the value appears
+in the messages it cites, otherwise the change is shown as "inferred" (PROF-01). Problems
+become the text of the one bounded repair request (PROF-05).
 
 Structural bounds are checked here rather than as schema keywords, so the JSON schema sent
 to Meta stays within strict mode (as for the connection check).
@@ -236,6 +238,36 @@ def _value(update: ModelUpdate, problems: list[str]) -> object:
     return text
 
 
+_DIGIT_GROUPING = re.compile(r"(?<=[0-9]),(?=[0-9]{3}\b)")
+
+
+def _quotable(text: str) -> str:
+    """Text as a stated value is compared: case, spacing and digit grouping aside."""
+    return " ".join(_DIGIT_GROUPING.sub("", text).casefold().split())
+
+
+def _quoted(value: str, texts: list[str]) -> bool:
+    needle = _quotable(value)
+    pattern = re.compile(rf"(?<!\w){re.escape(needle)}(?!\w)")
+    return bool(needle) and any(pattern.search(_quotable(text)) for text in texts)
+
+
+def _basis(update: ModelUpdate, cited: list[str], held: object) -> Basis:
+    """`stated` only when the model claims it and every new value the update proposes
+    appears in the messages it cites (items the profile already holds need no quote);
+    anything else, including an answer with no value to quote, is shown as `inferred`."""
+    if update.basis is not Basis.STATED or update.state is not AnsweredState.PROVIDED:
+        return Basis.INFERRED
+    if update.items is not None:
+        kept = {_quotable(str(item)) for item in held} if isinstance(held, list) else set()
+        values = [item for item in update.items if _quotable(item) not in kept]
+    else:
+        values = [update.text or ""]
+    if values and all(_quoted(value, cited) for value in values):
+        return Basis.STATED
+    return Basis.INFERRED
+
+
 def check_turn(
     output: InterviewTurnOutput, context: TurnInput, origin: ProposalOrigin
 ) -> tuple[InterviewProposal | None, list[str]]:
@@ -253,6 +285,7 @@ def check_turn(
     if len(set(fields)) != len(fields):
         problems.append("proposed_updates: at most one update per field")
     refs = {m.ref: m.message_id for m in context.messages}
+    texts = {m.ref: m.text for m in context.messages}
     changes: list[ProposedChange] = []
     for index, update in enumerate(output.proposed_updates, start=1):
         name = update.field.value
@@ -280,7 +313,9 @@ def check_turn(
                 field=update.field,
                 state=update.state,
                 value=_plain(checked.value),
-                basis=update.basis,
+                basis=_basis(
+                    update, [texts[ref] for ref in cited], context.profile[update.field].value
+                ),
                 message_ids=[refs[ref] for ref in cited],
                 reason=update.reason.strip(),
                 hard_constraint=FIELD_SPECS[name].hard_constraint,
@@ -324,7 +359,8 @@ message states, or clearly implies; mark implications as "inferred". Every updat
 refs of the messages that support it (such as "m2"). Leave out fields the messages do not
 address. Use "unknown", "skipped" or "prefer_not_to_say" when the person says so.
 
-Field formats: text fields take "text"; list fields take "items"; weekly_study_hours is a
+Field formats: text fields take "text"; list fields take "items", the complete list after
+the change (keep the items the profile already holds that still apply); weekly_study_hours is a
 number of hours per week as text, such as "6"; money is pounds as digits, such as "1500"
 (direct_spend_cap: the most they would spend on the change in total; monthly_payment_cap:
 the most in any one month). cities: only names from this list:

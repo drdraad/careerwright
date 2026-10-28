@@ -107,6 +107,75 @@ def test_a_valid_output_becomes_a_proposal_citing_message_ids_with_server_assign
     assert by_field[ProfileField.CURRENT_ROLE].message_ids == [M1, M2]
 
 
+def basis_of(out: InterviewTurnOutput, ctx: TurnInput) -> dict[str, Basis]:
+    proposal, found = check_turn(out, ctx, ProposalOrigin.MODEL)
+    assert proposal is not None, found
+    return {c.field.value: c.basis for c in proposal.changes}
+
+
+@pytest.mark.req("PROF-01", "PROF-05")
+def test_stated_is_kept_only_when_the_cited_messages_contain_the_value() -> None:
+    ctx = context("I'm a warehouse supervisor in LEEDS; I'd spend £1,500.", "About 6 hours a week.")
+    out = output(
+        update("cities", items=["Leeds"]),
+        update("current_role", text="Warehouse  Supervisor"),
+        update("direct_spend_cap", text="1500"),  # "£1,500": digit grouping aside
+        update("weekly_study_hours", text="6", message_refs=["m2"]),
+        update("target_titles", items=["Plumber"]),  # never said
+        update("monthly_payment_cap", text="150"),  # never said: not part of "1500"
+        update("enjoyed_tasks", items=["leading a team"], basis="inferred"),
+    )
+
+    assert basis_of(out, ctx) == {
+        "cities": Basis.STATED,
+        "current_role": Basis.STATED,
+        "direct_spend_cap": Basis.STATED,
+        "weekly_study_hours": Basis.STATED,
+        "target_titles": Basis.INFERRED,  # the model's claim alone is not enough
+        "monthly_payment_cap": Basis.INFERRED,
+        "enjoyed_tasks": Basis.INFERRED,  # an inference stays one
+    }
+
+
+@pytest.mark.req("PROF-01")
+def test_a_stated_value_must_appear_in_the_messages_it_cites_not_elsewhere() -> None:
+    ctx = context("I could work in York.", "Hello again.")
+
+    cited_elsewhere = output(update("cities", items=["York"], message_refs=["m2"]))
+
+    assert basis_of(cited_elsewhere, ctx) == {"cities": Basis.INFERRED}
+
+
+@pytest.mark.req("PROF-01")
+def test_a_list_is_stated_when_its_new_items_appear_and_held_items_need_no_quote() -> None:
+    held = apply_profile_input(
+        empty_profile(),
+        ProfileInput.model_validate(
+            {
+                **{name: {"state": "unasked"} for name in FIELD_NAMES},
+                "cities": {"state": "provided", "value": ["York"]},
+            }
+        ),
+        uuid.uuid4(),
+    )
+    ctx = context("Leeds would work too.").model_copy(update={"profile": context_profile(held)})
+
+    complete = output(update("cities", items=["York", "Leeds"]))
+    invented = output(update("cities", items=["York", "Leeds", "Bath"]))
+
+    assert basis_of(complete, ctx) == {"cities": Basis.STATED}
+    assert basis_of(invented, ctx) == {"cities": Basis.INFERRED}
+
+
+@pytest.mark.req("PROF-01", "STATE-08")
+def test_an_answer_without_a_value_to_quote_is_shown_as_inferred() -> None:
+    ctx = context("I'd rather not say what I can spend.")
+
+    declined = output(update("direct_spend_cap", state="prefer_not_to_say"))
+
+    assert basis_of(declined, ctx) == {"direct_spend_cap": Basis.INFERRED}
+
+
 @pytest.mark.req("PROF-04")
 def test_every_proposed_limit_or_target_is_marked_as_needing_explicit_confirmation() -> None:
     ctx = context("Leeds, 6 hours a week, £100 a month, £900 in total; I want to be a plumber.")
