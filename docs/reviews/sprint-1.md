@@ -1,11 +1,12 @@
 # Sprint 1 review: a polished local walking skeleton
 
 - Date: 2026-10-28. Branch `l0-local-release`.
-- Reviewed revision: `c769d73`, the last Task 4 commit that changes code, data or
-  screenshots. Every check below ran on it. The commit that adds this review changes only
-  this file.
+- Reviewed revision: `1f76506`, the last Task 4 commit that changes code or tests. `make
+  check` and `make acceptance` ran on it. The screenshots were captured on `c769d73`; the
+  two later commits change one error message that no capture shows, and the browser tests.
+  The commit that adds or updates this review changes only this file.
 - Sprint 1 commits: `a31fd42`..`eb70b6a` (Task 3: S1.1–S1.3, the platform) and
-  `a5d6a7c`..`c769d73` (Task 4: S1.4–S1.5, the web shell, and this review).
+  `a5d6a7c`..`1f76506` plus this review (Task 4: S1.4–S1.5, the web shell).
 - Reviewer: the Task 4 implementing agent. It is not independent of the work reviewed. A
   separate reviewer is dispatched after this task, and the human gates below remain open.
 
@@ -55,7 +56,7 @@ pre-review below are evidence for that review, not the review itself (ruling R2)
 | Fixture mode makes no external request after setup | **Passed** | web container in the egress probe (BND1-11); the journey's request log; CSP |
 | The route preview is clearly fixture-driven and does not claim the production solver exists | **Passed** | "Fixture preview: not your routes" on the page and "Not a route Nessa computed for you" in every route's drawer; shown only in the fixture workspace |
 
-## Checks run on the final candidate (`c769d73`)
+## Checks run on the final candidate (`1f76506`)
 
 Machine: macOS arm64, Docker 29.1.2 (aarch64), Node 24.11.1 (host) and 24.22.1 (images),
 pnpm 10.33.2, uv 0.9.18, Playwright 1.64.0 with Chromium 1248.
@@ -63,7 +64,8 @@ pnpm 10.33.2, uv 0.9.18, Playwright 1.64.0 with Chromium 1248.
 | Command | Result |
 |---|---|
 | `make check` | Backend: ruff format and lint clean, mypy clean (118 files), pytest 210 passed (114 deselected), fixture validator `passed`. Web: generated client matches the backend's OpenAPI document, Biome clean (80 files), `tsc` clean, Vitest 110 passed in 12 files. About 7 s |
-| `make acceptance` | pytest `-m "integration or stack"`: 114 passed in 186.7 s (real PostgreSQL 16.15, DBOS, the emulator, the Compose stack incl. the web container). Storybook build succeeded (26 stories). Playwright: 14 passed in 50.0 s on a fresh `nessa-l0-webtest` stack (access 5, journey 1, keyboard 4, Storybook 1, visual 3). Total 3 min 59 s. No test project left behind. One line of noise: Node's notice that `NO_COLOR` (set in the host shell) is ignored because Playwright sets `FORCE_COLOR` |
+| `make acceptance` | pytest `-m "integration or stack"`: 114 passed in 190.3 s (real PostgreSQL 16.15, DBOS, the emulator, the Compose stack incl. the web container). Storybook build succeeded (26 stories). Playwright: 14 passed in 50.6 s on a fresh `nessa-l0-webtest` stack (access 5, journey 1, keyboard 4, Storybook 1, visual 3). No test project left behind. One line of noise: Node's notice that `NO_COLOR` (set in the host shell) is ignored because Playwright sets `FORCE_COLOR` |
+| `playwright test e2e/journey.spec.ts --repeat-each=4` | 4 passed. This was run because an earlier `make acceptance` (on `a08643a`) failed the journey once: the test's live-state check matched "Reconnecting", the page reloaded before re-authenticating after the restart, and the restarted emulator, which re-imports its seed and ends earlier sessions, signed it out. The check is now exact and the journey starts from a reset fixture |
 | `cd docs/design && pnpm run contrast` | 68 of 68 pairs pass (three added for the shell) |
 | `cd docs/design && pnpm run screenshots` | 18 of 18 captures pass after the conversation fix |
 | `cd apps/web && pnpm run review-screenshots` | 3 passed: 33 captures (11 states × 3 viewports), no axe violation, no horizontal overflow, no unexpected console error, both fonts loaded (`checks-*.json`) |
@@ -149,7 +151,7 @@ rail, strip, drawer, cards, status words and typography match (screenshots again
 Keyboard focus is tested. Human scores: **not run — requires human (H-01)**.
 
 **6. What exact evidence establishes completion?** The commands and results above, on
-`c769d73`. Known gaps:
+`1f76506`. Known gaps:
 - the consent UI for keys (MODEL-07);
 - calm mode has no automated test (UI-05);
 - 200 % zoom;
@@ -252,6 +254,7 @@ Weak:
 | `next` 16.4.1 pinned at 13.5 days for a critical security fix | Controller | Recorded exception (ADR 0005, `docs/dependencies.md`) |
 | `undici` advisories via `jsdom` (dev only) | next `jsdom` bump | Accepted; recheck with `pnpm audit` |
 | Gantt aria-label wording (carried from Task 2) | T14 | Unchanged: the Gantt is not built yet |
+| After a full restart the Auth emulator re-imports its seed and ends earlier sessions: an open page refreshes its token and carries on, a page loaded before that asks to sign in again (then returns to the same address) | Emulator behaviour (L0 only) | Accepted; documented in the runbook |
 | amd64 images | T16 | Not built |
 
 ## Human design-review checklist (H-01, Sprint 1, not run)
