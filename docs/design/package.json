@@ -1,0 +1,20 @@
+{
+  "name": "nessa-design-references",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tooling for the Sprint 0 design references: contrast measurement, fixture-data check and screenshots.",
+  "type": "module",
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=24.11 <25"
+  },
+  "scripts": {
+    "contrast": "node tools/contrast.mjs",
+    "check-data": "node tools/check-fixture-data.mjs",
+    "screenshots": "node tools/check-fixture-data.mjs && node tools/screenshots.mjs"
+  },
+  "devDependencies": {
+    "axe-core": "4.14.0",
+    "playwright": "1.64.1"
+  }
+}

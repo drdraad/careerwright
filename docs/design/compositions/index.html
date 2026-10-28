@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nessa design references, Sprint 0</title>
+  <link rel="stylesheet" href="../tokens/tokens.css">
+  <link rel="stylesheet" href="shell.css">
+  <style>
+    main { max-width: 1120px; margin: 0 auto; padding: var(--space-48) var(--space-24); display: grid; gap: var(--space-32); }
+    h1 { font-size: var(--type-39); }
+    .lede { max-width: 66ch; color: var(--fg-muted); }
+    section { display: grid; gap: var(--space-12); }
+    h2 { font-family: var(--font-display); font-weight: 400; font-size: var(--type-25); }
+    .states { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-16); }
+    .state { display: grid; gap: var(--space-8); padding: var(--space-12); border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--bg-raised); text-decoration: none; color: var(--fg); }
+    .state img { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); }
+    .state span { font-size: var(--type-14); color: var(--fg-muted); }
+  </style>
+</head>
+<body>
+<main class="on-space">
+  <header>
+    <h1 class="display">Nessa design references</h1>
+    <p class="lede">Sprint 0 signature compositions, each in a default, an unknown-data and a failure state. Open a page and add <code>?state=unknown</code> or <code>?state=failure</code>, or use the links below. Every page carries a synthetic-data label; the map's listings are invented for design review.</p>
+  </header>
+
+  <section aria-labelledby="c1">
+    <h2 id="c1">You: conversation with evidence drawer</h2>
+    <div class="states">
+      <a class="state" href="conversation.html"><img src="../screenshots/conversation--default--1440x900.png" alt="">Default<span>P01, sure entry: review tray, evidence for take-home pay</span></a>
+      <a class="state" href="conversation.html?state=unknown"><img src="../screenshots/conversation--unknown--1440x900.png" alt="">Unknown data<span>P02: baseline pay not confirmed, not £0</span></a>
+      <a class="state" href="conversation.html?state=failure"><img src="../screenshots/conversation--failure--1440x900.png" alt="">Failure<span>Reply failed validation; profile unchanged</span></a>
+    </div>
+  </section>
+
+  <section aria-labelledby="c2">
+    <h2 id="c2">Roles: opportunity map with selected role</h2>
+    <div class="states">
+      <a class="state" href="opportunity-map.html"><img src="../screenshots/opportunity-map--default--1440x900.png" alt="">Default<span>Three work areas, 15 synthetic listings</span></a>
+      <a class="state" href="opportunity-map.html?state=unknown"><img src="../screenshots/opportunity-map--unknown--1440x900.png" alt="">Unknown data<span>Sparse: pay not stated, Leeds none found</span></a>
+      <a class="state" href="opportunity-map.html?state=failure"><img src="../screenshots/opportunity-map--failure--1440x900.png" alt="">Failure<span>One source failed; its listings shown stale</span></a>
+    </div>
+  </section>
+
+  <section aria-labelledby="c3">
+    <h2 id="c3">Routes: comparison with selected journey</h2>
+    <div class="states">
+      <a class="state" href="route-comparison.html"><img src="../screenshots/route-comparison--default--1440x900.png" alt="">Default<span>TRACE-01, economic cost, route B selected</span></a>
+      <a class="state" href="route-comparison.html?state=unknown"><img src="../screenshots/route-comparison--unknown--1440x900.png" alt="">Unknown data<span>DIRECTAI, direct spending only</span></a>
+      <a class="state" href="route-comparison.html?state=failure"><img src="../screenshots/route-comparison--failure--1440x900.png" alt="">Failure<span>Search failed; previous comparison kept, stale</span></a>
+    </div>
+  </section>
+</main>
+</body>
+</html>

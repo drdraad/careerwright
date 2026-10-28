@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Roles: opportunity map (Nessa design reference)</title>
+  <link rel="stylesheet" href="../tokens/tokens.css">
+  <link rel="stylesheet" href="shell.css">
+  <link rel="stylesheet" href="opportunity-map.css">
+</head>
+<body data-chapter="roles" data-done="you">
+<div class="app">
+  <aside class="rail on-space" data-rail></aside>
+  <header class="topbar on-space" data-topbar></header>
+
+  <section class="strip on-space" aria-label="Workspace">
+    <span class="synthetic-label" data-glyph="synthetic">Synthetic demo</span>
+    <span class="strip-item">Target <strong>Data quality analyst</strong></span>
+    <span class="strip-item strip-optional" data-show="default failure">Work areas <strong>Manchester, Leeds, remote</strong></span>
+    <span class="strip-item strip-optional" data-show="unknown">Work areas <strong>Manchester, Leeds</strong></span>
+    <span class="strip-item strip-optional">Budget <strong>Up to <span data-gbp="p01.directSpendCapMinor"></span></strong></span>
+    <span class="strip-item strip-end">Saved, version 9</span>
+  </section>
+
+  <main class="workarea on-space">
+    <div class="roles mobile-pad-for-sheet">
+      <div class="roles-head">
+        <div>
+          <h1 class="display">Roles for data quality analyst</h1>
+          <p class="coverage" data-show="default"><strong><span data-count="found"></span> listings found, <span data-count="shown"></span> after removing <span data-count="duplicates"></span> duplicates.</strong> 4 of 4 sources checked 3 hours ago.</p>
+          <p class="coverage" data-show="unknown"><strong><span data-count="found"></span> listings found, <span data-count="shown"></span> after removing <span data-count="duplicates"></span> duplicates.</strong> 4 of 4 sources checked. Leeds: none found.</p>
+          <p class="coverage" data-show="failure"><strong><span data-count="fresh"></span> listings checked today, <span data-count="stale"></span> from 2 days ago.</strong> 3 of 4 sources responded.</p>
+        </div>
+        <div class="view-toggle" role="group" aria-label="View">
+          <button type="button" aria-pressed="true" data-view="map">Map</button>
+          <button type="button" aria-pressed="false" data-view="list">List</button>
+        </div>
+      </div>
+
+      <div class="alert on-space roles-alert" role="alert" data-show="failure">
+        <span data-glyph="error"></span>
+        <div>
+          <p class="alert-title">The job board search failed, so coverage is reduced</p>
+          <p class="small">It didn't respond after 3 attempts at 09:12. The <span data-count="stale"></span> listings that came only from it are shown from 2 days ago and may have closed. This is not "no vacancies": the other 3 sources were checked today.</p>
+          <div class="alert-actions">
+            <button class="btn btn-primary" type="button">Try the search again</button>
+            <button class="btn btn-secondary" type="button">Source details</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="filters-summary"><span>Filters: unscored roles and pay not stated included</span><button class="btn btn-secondary" type="button">Edit filters</button></div>
+
+      <form class="filters" aria-label="Filters" onsubmit="return false">
+        <label class="field">Salary from <input type="number" inputmode="numeric" placeholder="Any" aria-describedby="salary-basis"><span id="salary-basis" class="visually-hidden">pounds a year before tax</span></label>
+        <label class="field">Minimum AI Resilience
+          <select><option>Any</option><option>6 or more</option></select>
+        </label>
+        <label class="field"><input type="checkbox" checked> Include unscored roles</label>
+        <label class="field"><input type="checkbox" checked> Include pay not stated</label>
+        <label class="field">Work mode <select><option>All</option><option>On site</option><option>Hybrid</option><option>Remote</option></select></label>
+        <label class="field"><input type="checkbox"> Favourites only</label>
+        <span class="result"><span data-count="shown"></span> shown</span>
+      </form>
+
+      <figure class="map">
+        <svg id="map-svg" viewBox="0 0 900 540" data-check-labels role="group" aria-label="Map of listings by work area and employer. The same listings are in the list below."></svg>
+        <figcaption class="map-foot" id="map-legend"></figcaption>
+      </figure>
+
+      <!-- Selected role: default (j1) -->
+      <article class="role-card card on-reading" data-show="default" aria-labelledby="role-j1" tabindex="0">
+        <div>
+          <h2 id="role-j1">Data quality analyst, customer and policy records</h2>
+          <p class="role-employer"><span class="industry-dot" style="background: var(--industry-blue)"></span>Kestrel Lane Insurance Services, finance and insurance</p>
+        </div>
+        <dl class="kv">
+          <dt>Where</dt><dd>Manchester, hybrid</dd>
+          <dt>Pay</dt><dd>£32,000–£36,000 a year, advertised, before tax</dd>
+          <dt>Posted</dt><dd>6 days ago</dd>
+          <dt>Checked</dt><dd>3 hours ago</dd>
+          <dt>Found on</dt><dd>2 sites, counted once</dd>
+        </dl>
+        <div class="card-block">
+          <h3 class="section-title">Matches your preferences</h3>
+          <ul>
+            <li>You enjoy <span data-value="p01.enjoyedTasks.0"></span>: the listing asks you to trace and resolve record mismatches</li>
+            <li>You enjoy <span data-value="p01.enjoyedTasks.1"></span>: you'd present findings to policy teams</li>
+            <li>A <span data-value="p01.preferredEnvironment.0"></span>, <span data-value="p01.preferredEnvironment.1"></span> team, as the listing describes it</li>
+          </ul>
+          <p class="small muted">Your skills aren't compared yet. The Skills chapter checks this listing's requirements against your evidence.</p>
+        </div>
+        <div class="card-block ai-range">
+          <h3 class="section-title">AI Resilience Score for the role</h3>
+          <div class="ai-range-head"><span class="ai-range-value"><span data-value="trace01.aiScore.range.0"></span>–<span data-value="trace01.aiScore.range.1"></span> of 10</span><span class="small">mixed to comparatively resilient, five-year outlook</span></div>
+          <div class="ai-scale" aria-hidden="true"><span style="left: 50%; width: 30%"></span></div>
+          <div class="ai-scale-ticks" aria-hidden="true"><span>0</span><span>5</span><span>10</span></div>
+          <span class="status" data-glyph="synthetic">Synthetic test record, not a real assessment</span>
+          <p class="small muted">It describes the occupation, not this employer. With a minimum of <span data-value="trace01.aiScore.minimumFilter"></span>, this role would be hidden because its range starts at <span data-value="trace01.aiScore.range.0"></span>.</p>
+        </div>
+        <div class="card-block">
+          <dl class="kv">
+            <dt>Official pay benchmark</dt><dd class="status-unknown">Not available</dd>
+            <dt>Hiring trend</dt><dd class="status-unknown">No history yet</dd>
+          </dl>
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-primary" type="button" data-glyph="star">Save to favourites</button>
+          <a class="btn btn-secondary" href="#">Open listing</a>
+          <button class="btn btn-quiet" type="button">Report a problem</button>
+        </div>
+      </article>
+
+      <!-- Selected role: unknown-data state (j4) -->
+      <article class="role-card card on-reading" data-show="unknown" aria-labelledby="role-j4" tabindex="0">
+        <div>
+          <h2 id="role-j4">Information and data quality officer</h2>
+          <p class="role-employer"><span class="industry-dot" style="background: var(--industry-coral)"></span>Northmoor Clinical Records Partnership, health and care</p>
+        </div>
+        <dl class="kv">
+          <dt>Where</dt><dd>Manchester, hybrid</dd>
+          <dt>Pay</dt><dd class="status-unknown">Not stated in the listing</dd>
+          <dt>Posted</dt><dd>4 days ago</dd>
+          <dt>Checked</dt><dd>3 hours ago</dd>
+        </dl>
+        <p class="small muted">Missing pay is kept in its own lane. It never counts as the lowest pay.</p>
+        <div class="card-block">
+          <h3 class="section-title">Matches your preferences</h3>
+          <p class="small">Only a short summary of this listing was available, so there's too little to compare. The full description may change this.</p>
+        </div>
+        <div class="card-block ai-range">
+          <h3 class="section-title">AI Resilience Score for the role</h3>
+          <div class="ai-range-head"><span class="ai-range-value"><span data-value="trace01.aiScore.range.0"></span>–<span data-value="trace01.aiScore.range.1"></span> of 10</span><span class="small">five-year outlook</span></div>
+          <div class="ai-scale" aria-hidden="true"><span style="left: 50%; width: 30%"></span></div>
+          <span class="status" data-glyph="synthetic">Synthetic test record, not a real assessment</span>
+        </div>
+        <div class="card-block">
+          <h3 class="section-title">Evidence that's thin here</h3>
+          <ul>
+            <li>Official pay benchmark: not available. The role maps to two UK occupation groups and the choice isn't resolved.</li>
+            <li>Hiring trend: no history yet. One snapshot can't show a trend.</li>
+            <li>Leeds: no matching listings in the 4 sources checked. That describes those sources today, not the work available.</li>
+          </ul>
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-primary" type="button">Paste the full listing</button>
+          <a class="btn btn-secondary" href="#">Open listing</a>
+        </div>
+      </article>
+
+      <!-- Selected role: failure state (j9, stale copy from the failed source) -->
+      <article class="role-card card on-reading" data-show="failure" aria-labelledby="role-j9" tabindex="0">
+        <div>
+          <h2 id="role-j9">Data quality analyst, mortgage and savings data</h2>
+          <p class="role-employer"><span class="industry-dot" style="background: var(--industry-blue)"></span>Hollin Brook Mutual Building Society, finance and insurance</p>
+        </div>
+        <span class="status status-stale" data-glyph="stale">Last checked 2 days ago; may have closed</span>
+        <dl class="kv">
+          <dt>Where</dt><dd>Leeds, hybrid</dd>
+          <dt>Pay</dt><dd>£33,000–£37,000 a year, advertised, before tax</dd>
+          <dt>Source</dt><dd>Job board search, which failed today</dd>
+        </dl>
+        <p class="small">Nessa kept the last version it saw instead of dropping the listing. Check it again before you rely on it or apply.</p>
+        <div class="card-block ai-range">
+          <h3 class="section-title">AI Resilience Score for the role</h3>
+          <div class="ai-range-head"><span class="ai-range-value"><span data-value="trace01.aiScore.range.0"></span>–<span data-value="trace01.aiScore.range.1"></span> of 10</span><span class="small">five-year outlook</span></div>
+          <span class="status" data-glyph="synthetic">Synthetic test record, not a real assessment</span>
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-primary" type="button">Check again</button>
+          <a class="btn btn-secondary" href="#">Open listing</a>
+        </div>
+      </article>
+
+      <section class="lens" aria-labelledby="lens-title">
+        <h2 id="lens-title">Pay and location</h2>
+        <p>Annual pay before tax, as each listing states it. Dashed bars are estimates by the listing site, not the employer.</p>
+        <svg id="lens-svg" viewBox="0 0 860 200" role="img" aria-label="Pay ranges by work area. The same figures are in the list below."></svg>
+      </section>
+
+      <section class="listings" aria-labelledby="list-title">
+        <h2 id="list-title">All <span data-count="shown"></span> listings</h2>
+        <table class="listing-table">
+          <thead><tr><th scope="col">Role</th><th scope="col">Employer</th><th scope="col">Where</th><th scope="col">Pay a year</th><th scope="col">AI Resilience</th><th scope="col">Age</th></tr></thead>
+          <tbody id="listing-rows"></tbody>
+        </table>
+        <div class="cards-mobile" id="listing-cards"></div>
+      </section>
+    </div>
+  </main>
+</div>
+<script src="data.js"></script>
+<script src="shell.js"></script>
+<script src="opportunity-map.js"></script>
+</body>
+</html>
