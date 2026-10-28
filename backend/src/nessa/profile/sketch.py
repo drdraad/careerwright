@@ -21,6 +21,7 @@ from nessa.catalogue.taxonomy import held_release, search_occupations
 from nessa.db import Tx
 from nessa.errors import NessaError
 from nessa.identity.workspaces import visible_workspace
+from nessa.profile import store
 from nessa.profile.commands import current_profile
 from nessa.profile.document import FieldState
 from nessa.profile.interview import ProfileField
@@ -89,23 +90,46 @@ def _ref(tx: Tx, concept_id: uuid.UUID) -> OccupationRef | None:
     return OccupationRef(detail.concept_id, detail.preferred_label, unit)
 
 
-def _target(tx: Tx, workspace_id: uuid.UUID, title: str) -> TargetSketch:
+def _chosen(tx: Tx, workspace_id: uuid.UUID) -> dict[str, OccupationRef]:
+    """The occupations the person chose as targets, by their title (casefolded); a later
+    choice of the same title wins. A choice from another release is simply absent."""
+    uris = store.chosen_occupation_uris(tx, workspace_id)
+    concepts = taxonomy_store.concepts_by_uri(tx, uris)
+    chosen: dict[str, OccupationRef] = {}
+    for uri in uris:
+        ref = _ref(tx, concepts[uri]) if uri in concepts else None
+        if ref is not None:
+            chosen[ref.title.casefold()] = ref
+    return chosen
+
+
+def _esco(tx: Tx, title: str, ref: OccupationRef) -> TargetSketch:
+    facts = taxonomy_store.occupation_facts(tx, [ref.concept_id], skills_shown=REQUIREMENTS_SHOWN)[
+        ref.concept_id
+    ]
+    return TargetSketch(
+        title,
+        Resolution.ESCO,
+        [ref],
+        [],
+        list(facts.essential_skills),
+        facts.essential_skill_count,
+        facts.regulated,
+        "Requirements from ESCO; not yet compared with your experience.",
+    )
+
+
+def _target(
+    tx: Tx, workspace_id: uuid.UUID, title: str, chosen: dict[str, OccupationRef]
+) -> TargetSketch:
+    """The occupation the person chose for this title, else the one ESCO occupation that
+    holds it as a label; several is ambiguous, and nothing is guessed."""
+    if title.casefold() in chosen:
+        return _esco(tx, title, chosen[title.casefold()])
     matched = sorted({m.concept_id for m in taxonomy_store.concept_key_matches(tx, title)})
     refs = [ref for ref in (_ref(tx, concept_id) for concept_id in matched) if ref is not None]
     if len(refs) == 1:
-        facts = taxonomy_store.occupation_facts(
-            tx, [refs[0].concept_id], skills_shown=REQUIREMENTS_SHOWN
-        )[refs[0].concept_id]
-        return TargetSketch(
-            title,
-            Resolution.ESCO,
-            refs,
-            [],
-            list(facts.essential_skills),
-            facts.essential_skill_count,
-            facts.regulated,
-            "Requirements from ESCO; not yet compared with your experience.",
-        )
+        return _esco(tx, title, refs[0])
     if refs:
         return TargetSketch(
             title,
@@ -126,7 +150,9 @@ def _target(tx: Tx, workspace_id: uuid.UUID, title: str) -> TargetSketch:
             for ref in (_ref(tx, hit.concept_id) for hit in found.full_text[:CLOSE_MATCHES])
             if ref is not None
         ]
-    except NessaError:
+    except NessaError as error:
+        if error.details.get("reason") != "no_search_terms":
+            raise
         close = []  # a title with no searchable word has no close matches to offer
     return TargetSketch(
         title,
@@ -183,11 +209,12 @@ def requirement_sketch(tx: Tx, workspace_id: uuid.UUID) -> Sketch:
         if targets_field.state is FieldState.PROVIDED and targets_field.value
         else []
     )
+    chosen = _chosen(tx, workspace_id) if titles else {}
     return Sketch(
         label=SKETCH_LABEL,
         profile_version=profile.version,
         inputs=inputs,
         not_asked=[field for field, state in inputs.items() if state is FieldState.UNASKED],
-        targets=[_target(tx, workspace_id, title) for title in titles],
+        targets=[_target(tx, workspace_id, title, chosen) for title in titles],
         steps=_steps(inputs) if titles else [],
     )

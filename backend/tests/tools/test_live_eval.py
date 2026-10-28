@@ -5,7 +5,13 @@ import pytest
 
 from nessa.identity.model_choice import ModelChoice
 from tools.evaluation import CaseKind, load_cases
-from tools.live_eval import MAX_LIVE_CASES, authorise_eval, select
+from tools.live_eval import (
+    MAX_LIVE_CASES,
+    SCOPE_MAX_CALLS,
+    SCOPE_MAX_COST_NANO_USD,
+    authorise_eval,
+    select,
+)
 from tools.live_smoke import CapExceededError, ScopeBudget
 from tools.usage_ledger import ScopeSpend
 
@@ -15,17 +21,31 @@ NOTHING_SPENT = ScopeSpend(0, 0, 0)
 
 
 @pytest.mark.req("MODEL-09", "TEST1-10")
-def test_the_default_live_run_is_six_representative_cases_on_the_test_model() -> None:
+def test_the_default_live_run_is_four_representative_cases_on_the_test_model() -> None:
     cases = select(load_cases(), None)
 
     plan = authorise_eval(MODELS, cases, budget=ROOMY, spent=NOTHING_SPENT)
 
-    assert len(cases) == MAX_LIVE_CASES == 6
+    assert [case.id for case in cases] == ["INT-01", "INT-02", "INT-03", "DSC-01"]
+    assert len(cases) <= MAX_LIVE_CASES == 6
     assert {case.kind for case in cases} == {CaseKind.INTERVIEW, CaseKind.DISCOVERY}
     assert plan.model_id == "muse-spark-1.3-contributor"  # never the production model
-    assert plan.calls == 12  # one attempt each, at most one validation repair
-    # Five interview attempts at $0.0035 and one discovery at $0.003 (their reservations).
-    assert plan.worst_case_nano_usd == 5 * 3_500_000 + 3_000_000
+    assert plan.calls == 8  # one attempt each, at most one validation repair
+    # Three interview attempts at $0.0035 and one discovery at $0.003 (their reservations).
+    assert plan.worst_case_nano_usd == 3 * 3_500_000 + 3_000_000
+
+
+@pytest.mark.req("MODEL-09")
+def test_a_scope_holds_one_default_run_within_the_controller_s_nine_requests() -> None:
+    # Task 6 review A-M10: the per-scope request cap is the controller's 9 (R5).
+    cases = select(load_cases(), None)
+    default = ScopeBudget("live-eval", SCOPE_MAX_CALLS, 0, SCOPE_MAX_COST_NANO_USD)
+
+    plan = authorise_eval(MODELS, cases, budget=default, spent=NOTHING_SPENT)
+
+    assert SCOPE_MAX_CALLS == 9
+    with pytest.raises(CapExceededError, match="calls used"):
+        authorise_eval(MODELS, cases, budget=default, spent=ScopeSpend(plan.calls, 0, 0))
 
 
 @pytest.mark.req("MODEL-09")
@@ -33,10 +53,10 @@ def test_more_cases_a_used_up_scope_or_a_non_model_case_are_refused() -> None:
     cases = load_cases()
     live = select(cases, None)
     with pytest.raises(CapExceededError, match="1-6 live cases"):
-        authorise_eval(MODELS, [*live, live[0]], budget=ROOMY, spent=NOTHING_SPENT)
+        authorise_eval(MODELS, [*live, *live[:3]], budget=ROOMY, spent=NOTHING_SPENT)
     with pytest.raises(CapExceededError, match="calls used"):
-        authorise_eval(MODELS, live, budget=ROOMY, spent=ScopeSpend(90, 0, 0))
-    tight = ScopeBudget("live-eval", 99, 0, max_cost_nano_usd=20_000_000)
+        authorise_eval(MODELS, live, budget=ROOMY, spent=ScopeSpend(95, 0, 0))
+    tight = ScopeBudget("live-eval", 99, 0, max_cost_nano_usd=10_000_000)
     with pytest.raises(CapExceededError, match="committed"):
         authorise_eval(MODELS, live, budget=tight, spent=NOTHING_SPENT)
     with pytest.raises(CapExceededError, match="only interview and discovery"):

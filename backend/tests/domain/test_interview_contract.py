@@ -343,6 +343,53 @@ def test_a_proposed_salary_floor_is_gross_pay_with_its_period_and_a_hard_constra
     assert declined.changes[0].value is None  # never zero
 
 
+@pytest.mark.req("PROF-04", "PROF-01")
+def test_a_salary_floor_is_stated_only_when_the_cited_words_give_its_period() -> None:
+    # Task 6 review A-I-4: the period is part of the value, so it must be quoted too.
+    hourly = context("I will not work for less than £12 an hour.")
+
+    def basis(text: str, ctx: TurnInput = hourly) -> Basis:
+        proposal, found = check_turn(
+            output(update("minimum_salary", text=text)), ctx, ProposalOrigin.MODEL
+        )
+        assert found == []
+        assert proposal is not None
+        return proposal.changes[0].basis
+
+    assert basis("12 per hour") is Basis.STATED
+    assert basis("12 per year") is Basis.INFERRED  # the wrong period is never "stated"
+    assert basis("12") is Basis.INFERRED  # a defaulted period is not the person's words
+    assert basis("26000 per year", context("Anything under £26,000 annually won't work.")) is (
+        Basis.STATED
+    )
+    assert basis("500 per week", context("I get paid £500 weekly now.")) is Basis.STATED
+    assert basis("2000 per month", context("I need £2,000 a month.")) is Basis.STATED
+    assert basis("0.50 per hour", context("I need 50p more.")) is Basis.INFERRED
+
+
+@pytest.mark.req("PROF-08")
+def test_the_one_question_lives_only_in_next_question_never_in_the_reply() -> None:
+    # Task 6 review A-I-6: the web app shows the reply and the question apart, so a question
+    # repeated in the reply would be asked twice.
+    ctx = context("I could work in York.")
+
+    assert "only in next_question" in INSTRUCTIONS
+    assert problems(output(), ctx) == []
+    assert problems(output(reply="Thanks. Where could you work?"), ctx) == [
+        "reply: no question here; ask the one question only in next_question"
+    ]
+    assert problems(output(next_question="Where could you work? And when?"), ctx) == [
+        "next_question: one question only"
+    ]
+
+
+@pytest.mark.req("PROF-04", "STATE-08")
+def test_a_proposed_salary_floor_of_nothing_is_refused() -> None:
+    ctx = context("I don't mind about pay, £0 is fine.")
+
+    assert problems(output(update("minimum_salary", text="0 per year")), ctx)
+
+
 @pytest.mark.req("PROF-08", "PROF-09")
 def test_the_prompt_says_how_the_person_chose_to_start_and_to_be_spoken_to() -> None:
     ctx = TurnInput(
@@ -357,7 +404,7 @@ def test_the_prompt_says_how_the_person_chose_to_start_and_to_be_spoken_to() -> 
     payload = json.loads(render_prompt(ctx).removeprefix(CONTEXT_MARKER))
 
     assert (payload["entry"], payload["mode"]) == ("sure", "gentle")
-    assert ctx.prompt_version == "interview-turn-2"
+    assert ctx.prompt_version == "interview-turn-3"
 
 
 def test_an_input_sealed_before_preferences_existed_still_opens() -> None:

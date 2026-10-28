@@ -144,6 +144,119 @@ def test_hard_constraints_apply_only_when_each_is_confirmed(scenario: Scenario) 
     assert "interview.turn_decided" in kinds
 
 
+def sources_by_id(scenario: Scenario) -> dict[str, dict[str, Any]]:
+    items = scenario.api.get(
+        f"/v1/workspaces/{scenario.workspace_id}/sources", scenario.token, limit=200
+    ).json()["items"]
+    return {s["source_ref_id"]: s for s in items}
+
+
+@pytest.mark.req("STATE-06", "PROF-07", "PROF-01")
+def test_a_decision_saves_the_person_s_edits_with_the_accepted_ones_as_one_version(
+    scenario: Scenario,
+) -> None:
+    # Task 6 review B-I1: the decision and the edited answers commit together or not at all.
+    turn = run_turn(scenario, "")
+    changes = {c["field"]: c["change_id"] for c in turn["proposal"]["changes"]}
+    accept_cities = {
+        "expected_version": 1,
+        "accept": [changes["cities"]],
+        "confirm_hard_constraints": ["cities"],
+    }
+    pounds_900 = {"state": "provided", "value": {"minor_units": 90_000, "currency": "GBP"}}
+
+    not_proposed = scenario.decide(
+        turn["turn_id"],
+        {**accept_cities, "edits": [{"field": "weekly_study_hours", "answer": pounds_900}]},
+    )
+    twice = scenario.decide(
+        turn["turn_id"],
+        {**accept_cities, "edits": [{"field": "cities", "answer": {"state": "unknown"}}]},
+    )
+    wrong_shape = scenario.decide(
+        turn["turn_id"],
+        {
+            **accept_cities,
+            "edits": [
+                {"field": "direct_spend_cap", "answer": {"state": "provided", "value": ["York"]}}
+            ],
+        },
+    )
+
+    for refused, reason in (
+        (not_proposed, "not_proposed"),
+        (twice, "accepted_and_edited"),
+        (wrong_shape, "invalid_answer"),
+    ):
+        assert refused.status_code == 422, refused.text
+        assert refused.json()["error"]["details"]["reason"] == reason
+    assert scenario.profile()["version"] == 1  # nothing was saved, the turn is undecided
+    assert scenario.turn(turn["turn_id"])["decision"] is None
+
+    saved = scenario.decide(
+        turn["turn_id"],
+        {**accept_cities, "edits": [{"field": "direct_spend_cap", "answer": pounds_900}]},
+    )
+
+    assert saved.status_code == 201, saved.text
+    result = saved.json()
+    document = result["profile"]["document"]
+    assert result["profile"]["version"] == 2  # one version for the decision and the edit
+    assert document["cities"]["value"] == ["Leeds"]
+    assert document["direct_spend_cap"]["value"] == pounds_900["value"]
+    sources = sources_by_id(scenario)
+    assert sources[document["cities"]["source_ref_id"]]["kind"] == "conversation"
+    assert sources[document["direct_spend_cap"]["source_ref_id"]]["kind"] == "direct_entry"
+    assert result["decision"]["rejected_change_ids"] == [changes["direct_spend_cap"]]
+
+
+@pytest.mark.req("STATE-06", "PROF-01", "VERSIONS-01")
+def test_undo_restores_the_earlier_answers_with_their_own_sources_as_a_new_version(
+    scenario: Scenario,
+) -> None:
+    # Task 6 review B-I3: undo is a revert command, never a direct edit of old values.
+    turn = run_turn(scenario, "")
+    decided = scenario.decide(turn["turn_id"], accept_all(turn)).json()["profile"]["document"]
+    edited = scenario.api.write(
+        "PUT",
+        f"/v1/workspaces/{scenario.workspace_id}/profile",
+        scenario.token,
+        {
+            "expected_version": 2,
+            "profile": {
+                **{
+                    name: {"state": value["state"], "value": value["value"]}
+                    for name, value in decided.items()
+                    if name != "schema_version"
+                },
+                "cities": {"state": "provided", "value": ["York"]},
+            },
+        },
+    )
+    assert edited.status_code == 201, edited.text
+    sources_before = sources_by_id(scenario)
+    revert = f"/v1/workspaces/{scenario.workspace_id}/profile/revert"
+
+    stale = scenario.api.write(
+        "POST", revert, scenario.token, {"expected_version": 2, "to_version": 2}
+    )
+    ahead = scenario.api.write(
+        "POST", revert, scenario.token, {"expected_version": 3, "to_version": 3}
+    )
+    undone = scenario.api.write(
+        "POST", revert, scenario.token, {"expected_version": 3, "to_version": 2}
+    )
+
+    assert (stale.status_code, stale.json()["error"]["code"]) == (409, "STALE_INPUT_VERSION")
+    assert ahead.status_code == 422
+    assert undone.status_code == 201, undone.text
+    restored = undone.json()
+    assert restored["version"] == 4
+    assert restored["document"]["cities"] == decided["cities"]  # value, state and its source
+    assert sources_by_id(scenario) == sources_before  # cited again, not re-recorded
+    assert sources_before[decided["cities"]["source_ref_id"]]["kind"] == "conversation"
+
+
 @pytest.mark.req("DUR-04", "PROF-05")
 def test_a_proposal_is_never_applied_to_a_newer_profile(scenario: Scenario) -> None:
     turn = run_turn(scenario, "")

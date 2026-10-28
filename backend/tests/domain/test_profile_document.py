@@ -236,6 +236,11 @@ def test_the_salary_floor_is_gross_pay_with_its_period_and_unknown_is_never_zero
         profile_input(minimum_salary=provided({**floor, "period": "fortnight"}))
     with pytest.raises(ValidationError):
         profile_input(minimum_salary=provided({**floor, "basis": "net"}))
+    # "No floor" is Unknown or Skipped, never a confirmed £0 (Task 6 review A-M7).
+    with pytest.raises(ValidationError):
+        profile_input(
+            minimum_salary=provided({**floor, "amount": {"minor_units": 0, "currency": "GBP"}})
+        )
 
 
 @pytest.mark.req("REC1-01", "REC1-03")

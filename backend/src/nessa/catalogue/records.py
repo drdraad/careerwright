@@ -100,6 +100,7 @@ class OccupationFacts:
     unit: IscoGroupRef
     family: IscoGroupRef
     sector: IscoGroupRef
+    preferred_key: str  # the preferred label as `nessa.concept_key`
     label_keys: frozenset[str]  # non-hidden labels as `nessa.concept_key`
     essential_skills: tuple[str, ...]
     essential_skill_count: int

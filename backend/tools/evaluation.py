@@ -96,6 +96,7 @@ class Expectation(BaseModel):
     field: str | None = None
     fields: list[str] = Field(default_factory=list)
     words: list[str] = Field(default_factory=list)
+    whole_words: bool = False  # match `words` as whole words, not as word beginnings
     state: str | None = None
     value: Any = None
     count: int | None = None
@@ -142,19 +143,30 @@ class Failure:
     detail: str
 
 
-def _has(text: str, words: list[str]) -> bool:
-    folded = text.casefold()
-    return any(word.casefold() in folded for word in words)
+def _has(text: str, words: list[str], *, whole: bool = False) -> bool:
+    """Whether a word starts a word of the text ("fix" finds "fixing", "test" not "contest");
+    `whole` words must also end there ("man" does not find "manager")."""
+    end = r"(?!\w)" if whole else ""
+    return any(
+        re.search(rf"(?<!\w){re.escape(word.strip())}{end}", text, re.IGNORECASE) for word in words
+    )
 
 
 def _value_text(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value
 
 
-def _questions(text: str) -> set[str]:
-    """The distinct questions in a text: each sentence ending in "?", spacing and case aside."""
-    found = re.findall(r"[^.!?]*\?", text)
-    return {" ".join(q.casefold().split()) for q in found if q.strip(" ?")}
+# A second ask joined to the first in one sentence ("..., and would you ...?").
+_JOINED_ASK = re.compile(
+    r"[,;]\s*(?:and|or)\s+(?:would|could|do|does|did|are|is|have|has|can|what|which|where|"
+    r"when|how|who|why)\b",
+    re.IGNORECASE,
+)
+
+
+def _asks(text: str) -> int:
+    """How many questions a text asks: each "?" and each further ask joined to one."""
+    return text.count("?") + len(_JOINED_ASK.findall(text))
 
 
 def _changes(observed: Json) -> dict[str, Json]:
@@ -173,7 +185,7 @@ def _interview(observed: Json, e: Expectation) -> Failure | None:
         change = changes.get(e.field or "")
         if change is None:
             return Failure(FailureType.MISSED_FACT, f"no proposal for {e.field}")
-        if e.words and not _has(_value_text(change["value"]), e.words):
+        if e.words and not _has(_value_text(change["value"]), e.words, whole=e.whole_words):
             return Failure(FailureType.MISSED_FACT, f"{e.field} is {change['value']!r}")
         if e.value is not None and change["value"] != e.value:
             return Failure(FailureType.MISSED_FACT, f"{e.field} is {change['value']!r}")
@@ -188,25 +200,22 @@ def _interview(observed: Json, e: Expectation) -> Failure | None:
         return None
     if e.check == "values_avoid":
         texts = [_value_text(c["value"]) for c in changes.values()]
-        hit = [t for t in texts if _has(t, e.words)]
+        hit = [t for t in texts if _has(t, e.words, whole=e.whole_words)]
         return Failure(FailureType.INFERENCE, f"values {hit}") if hit else None
     if e.check == "one_question":
-        # The reply often repeats the next question: the same question counts once.
-        asked = _questions(proposal["reply"]) | _questions(question)
-        many = len(asked) > 1
-        return (
-            Failure(FailureType.QUESTION, f"{len(asked)} questions: {sorted(asked)}")
-            if many
-            else None
-        )
+        # Each field on its own: the question lives only in next_question (the contract).
+        if "?" in proposal["reply"]:
+            return Failure(FailureType.QUESTION, f"a question in the reply: {proposal['reply']!r}")
+        asks = _asks(question)
+        return Failure(FailureType.QUESTION, f"{asks} asks: {question!r}") if asks > 1 else None
     if e.check == "question_mentions_any":
-        ok = _has(question + " " + proposal["reply"], e.words)
+        ok = _has(question + " " + proposal["reply"], e.words, whole=e.whole_words)
         return None if ok else Failure(FailureType.QUESTION, f"asked {question!r}")
     if e.check == "question_avoids":
-        bad = _has(question, e.words)
+        bad = _has(question, e.words, whole=e.whole_words)
         return Failure(FailureType.QUESTION, f"asked {question!r}") if bad else None
     if e.check == "reply_mentions_any":
-        ok = _has(proposal["reply"], e.words)
+        ok = _has(proposal["reply"], e.words, whole=e.whole_words)
         return None if ok else Failure(FailureType.QUESTION, "reply misses the expected idea")
     if e.check == "missing_excludes":
         again = [f for f in e.fields if f in proposal["missing_critical_fields"]]
@@ -276,7 +285,12 @@ def _pool(slate: Json) -> set[str]:
 
 def _paired(case: Case, observed: Json, other: Json, e: Expectation) -> Failure | None:
     if e.check == "same_fields_as":
+        # Only the fields the message states unambiguously (`fields`): whether a judgement
+        # call such as "something more hands-on" becomes a proposal varies run to run.
+        compared = set(e.fields) if e.fields else None
         mine, theirs = set(_changes(observed)), set(_changes(other))
+        if compared is not None:
+            mine, theirs = mine & compared, theirs & compared
         if mine != theirs:
             return Failure(FailureType.COUNTERFACTUAL, f"{sorted(mine)} vs {sorted(theirs)}")
         return None

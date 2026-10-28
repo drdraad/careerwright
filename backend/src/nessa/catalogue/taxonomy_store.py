@@ -268,6 +268,18 @@ def concept_key_matches(tx: Tx, title: str) -> list[LabelMatch]:
     return [LabelMatch(**dict(row)) for row in rows]
 
 
+def concepts_by_uri(tx: Tx, uris: Iterable[str]) -> dict[str, uuid.UUID]:
+    """The held release's occupations with these ESCO URIs (unknown URIs are absent)."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT esco_uri, concept_id FROM nessa.occupation_concepts "
+            "WHERE esco_uri = ANY(CAST(:uris AS text[]))"
+        ),
+        {"uris": sorted(set(uris))},
+    )
+    return {row.esco_uri: row.concept_id for row in rows}
+
+
 def occupation(tx: Tx, concept_id: uuid.UUID) -> OccupationDetail | None:
     row = (
         tx.execute(
@@ -331,7 +343,8 @@ def occupation_facts(
         return {}
     rows = tx.execute(
         sa.text(
-            "SELECT o.concept_id, o.preferred_label, o.esco_uri, o.esco_code, o.description, "
+            "SELECT o.concept_id, o.preferred_label, nessa.concept_key(o.preferred_label) AS "
+            "preferred_key, o.esco_uri, o.esco_code, o.description, "
             "o.regulated, o.isco_code, unit.label AS unit_label, minor.code AS family_code, "
             "minor.label AS family_label, major.code AS sector_code, major.label AS sector_label "
             "FROM nessa.occupation_concepts o "
@@ -375,6 +388,7 @@ def occupation_facts(
             unit=IscoGroupRef(row["isco_code"], row["unit_label"]),
             family=IscoGroupRef(row["family_code"], row["family_label"]),
             sector=IscoGroupRef(row["sector_code"], row["sector_label"]),
+            preferred_key=row["preferred_key"],
             label_keys=frozenset(keys.get(row["concept_id"], ())),
             essential_skills=tuple(essential[:skills_shown]),
             essential_skill_count=len(essential),

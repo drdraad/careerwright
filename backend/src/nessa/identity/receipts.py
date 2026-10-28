@@ -3,7 +3,8 @@
 A command runs with its idempotency key in one transaction that also records a receipt of
 the response. Retrying with the same key and the same request returns the recorded response
 instead of acting twice. The same key with a different request is refused. Only successes
-are recorded; a failed command can be retried with the same key.
+are recorded; a failed command can be retried with the same key. A success that changed
+nothing can opt out (`CommandResult.record`), so it leaves no trace of the request.
 """
 
 import hashlib
@@ -24,6 +25,9 @@ class CommandResult:
     status_code: int
     response: dict[str, object]
     workspace_id: uuid.UUID  # the receipt is deleted with this workspace
+    # False for a response that changed nothing and must leave no trace of the request (the
+    # support response keeps not even a fingerprint of the message); a retry recomputes it.
+    record: bool = True
 
 
 Execute = Callable[[Tx], CommandResult]
@@ -61,6 +65,8 @@ def run_idempotent(
             if receipt is not None:
                 return _replay(receipt, command, request_sha256)
             result = execute(tx)
+            if not result.record:
+                return result.status_code, result.response
             store.write_receipt(
                 tx,
                 actor_id,

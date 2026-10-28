@@ -3,13 +3,15 @@ read its slate, and choose an occupation as a target.
 
 The chain is traceable end to end: the person's confirmed answers (a pinned profile
 version) become the model's search queries, each citing the answers it rests on; every
-query runs against the pinned ESCO release (English full-text search, any word, bounded),
-and Nessa adds the person's current role and own target titles; the hits are pooled,
-de-duplicated and ranked into a slate by deterministic code (`nessa.profile.slate`). A
-model's title hypothesis is shown only if ESCO holds it as a label; otherwise it is listed
-as unsupported, never as a suggestion (DIV1-04). Every suggestion is an ESCO occupation
-with its URI as the source, the answers that found it and its essential skills; its words
-are composed from those facts, never from model prose, and carry no percentage (REC1-05).
+query runs against the held ESCO release (English full-text search, every word then any
+word, bounded; the release the searches were chosen for is recorded, and a slate read
+against another says so), and Nessa adds the person's current role and own target titles;
+the hits are pooled, de-duplicated and ranked into a slate by deterministic code
+(`nessa.profile.slate`). A model's title hypothesis is shown only if ESCO holds it as a
+label; otherwise it is listed as unsupported, never as a suggestion (DIV1-04). Every
+suggestion is an ESCO occupation with its URI as the source, the answers that found it and
+its essential skills; its words are composed from those facts, never from model prose, and
+carry no percentage (REC1-05).
 
 The slate's controls (emphasis, excluded titles and kinds of work) are view parameters:
 they never change the profile and never become a planning limit. A suggestion becomes a
@@ -17,8 +19,9 @@ target only when the person chooses it (REC1-07), through the one profile write 
 an `occupation_choice` source naming the ESCO occupation and the discovery.
 """
 
+import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -205,8 +208,10 @@ def submit_discovery(
             stage=ErrorStage.PROFILE,
             details={"needs": [field.value for field in discovery.EVIDENCE_FIELDS]},
         )
-    held_release(tx)
-    context = DiscoveryInput(profile_version=profile.version, evidence=evidence)
+    release = held_release(tx)
+    context = DiscoveryInput(
+        profile_version=profile.version, evidence=evidence, release=release.dataset_id
+    )
     run = submit_run(
         tx,
         actor,
@@ -281,6 +286,18 @@ def _description(text: str) -> str:
     return f"{cut}…"
 
 
+# Spelled with a vowel but said with a consonant ("a university lecturer"), or the reverse:
+# a silent h ("an hour") and capitals read as letters ("an ICT help desk agent").
+_CONSONANT_SOUND = re.compile(r"^(?:uni|use|usu|uti|eu|one\b)", re.IGNORECASE)
+_VOWEL_SOUND = re.compile(r"^(?:hour|honest|honou?r|heir|[AEFHILMNORSX][A-Z])")
+
+
+def with_article(title: str) -> str:
+    """The title after "a" or "an", as it is said."""
+    vowel = title[:1].casefold() in "aeiou" and not _CONSONANT_SOUND.match(title)
+    return f"{'an' if vowel or _VOWEL_SOUND.match(title) else 'a'} {title}"
+
+
 def explain(candidate: Candidate, facts: OccupationFacts, familiarity_known: bool) -> Explanation:
     """The suggestion's words, from the answers that found it and ESCO's record only."""
     title = facts.preferred_label
@@ -324,7 +341,8 @@ def explain(candidate: Candidate, facts: OccupationFacts, familiarity_known: boo
         else ["Entry requirements aren't researched yet."]
     )
     try_it = [
-        f"Talk to someone who works as a {title} about a typical week (an informational interview)."
+        f"Talk to someone who works as {with_article(title)} about a typical week (an "
+        "informational interview)."
     ]
     if facts.essential_skills:
         try_it.append(f"Try one of its tasks on a small scale: {facts.essential_skills[0]}.")
@@ -363,6 +381,17 @@ def discovery_slate(
     return compute_slate(tx, view, proposal, _pinned_document(tx, view.run), controls)
 
 
+def release_note(searched: str | None, held: str) -> str | None:
+    """What to say when the searches were chosen for another ESCO release than the one the
+    slate now uses (the slate is recomputed on each read)."""
+    if searched is None or searched == held:
+        return None
+    return (
+        f"These searches were chosen when ESCO {searched} was held; this slate uses {held}, "
+        "so some occupations may have changed."
+    )
+
+
 def compute_slate(
     tx: Tx,
     view: DiscoveryView,
@@ -392,7 +421,12 @@ def compute_slate(
     familiar: set[uuid.UUID] = set()
     for index, role in enumerate(_provided(document, ProfileField.CURRENT_ROLE), start=1):
         item = EvidenceItem(field=ProfileField.CURRENT_ROLE, text=role)
-        hits = _search_hits(tx, role) or ()
+        searched = _search_hits(tx, role)
+        if searched is None:  # no searchable word: reported, never a search that found nothing
+            if role not in unsearchable:
+                unsearchable.append(role)
+            continue
+        hits = searched
         queries.append(PoolQuery(f"r{index}", role, SlateChannel.CURRENT, (item,), hits))
         labelled = [hit.concept_id for hit in hits if hit.label_match]
         familiar.update(labelled or [hit.concept_id for hit in hits[:1]])
@@ -425,12 +459,16 @@ def compute_slate(
             family_code=fact.family.code,
             family_label=fact.family.label,
             sector_code=fact.sector.code,
+            preferred_key=fact.preferred_key,
             label_keys=fact.label_keys,
         )
         for concept_id, fact in facts.items()
     }
     familiar_families = frozenset(facts[c].family.code for c in familiar if c in facts)
     slate = choose_slate(build_pool(queries, occupations, familiar_families), controls)
+    changed = release_note(proposal.release, release.dataset_id)
+    if changed is not None:
+        slate = replace(slate, notes=[changed, *slate.notes])
     suggestions = [
         Suggestion(
             candidate,

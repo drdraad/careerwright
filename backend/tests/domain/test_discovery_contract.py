@@ -25,6 +25,7 @@ from nessa.profile.discovery import (
     worst_case_nano_usd,
 )
 from nessa.profile.document import FIELD_NAMES, ProfileInput, apply_profile_input, empty_profile
+from nessa.profile.exploration import release_note, with_article
 from nessa.profile.fixture_discovery import fixture_queries, prompt_context
 from nessa.profile.interview import ProfileField, ProposalOrigin
 
@@ -101,6 +102,32 @@ def test_a_valid_output_becomes_queries_that_cite_the_answers_they_come_from() -
     ]
     assert proposal.hypotheses[0].title == "Wind turbine technician"  # still a hypothesis
     assert proposal.profile_version == 3
+
+
+def test_an_occupation_gets_the_article_its_sound_needs() -> None:
+    # Task 6 review A-M14: "a administrative assistant".
+    assert with_article("administrative assistant") == "an administrative assistant"
+    assert with_article("bicycle mechanic") == "a bicycle mechanic"
+    assert with_article("ICT help desk agent") == "an ICT help desk agent"
+    assert with_article("university lecturer") == "a university lecturer"
+    assert with_article("hour-glass maker") == "an hour-glass maker"
+
+
+@pytest.mark.req("TAX1-01", "DIV1-04")
+def test_the_searches_record_the_release_they_were_chosen_for_and_a_change_is_said() -> None:
+    # Task 6 review A-M9: the slate is recomputed on each read, against the held release.
+    pinned = context().model_copy(update={"release": "esco-v1.2.1-en-csv"})
+    out = output(query("machinery repair", "tasks", "repairing physical objects"))
+
+    proposal, _ = check_discovery(out, pinned, ProposalOrigin.MODEL)
+
+    assert proposal is not None
+    assert proposal.release == "esco-v1.2.1-en-csv"
+    assert release_note("esco-v1.2.1-en-csv", "esco-v1.2.1-en-csv") is None
+    assert release_note(None, "esco-v1.2.1-en-csv") is None  # chosen before it was recorded
+    note = release_note("esco-v1.2.1-en-csv", "esco-v1.3.0-en-csv")
+    assert note is not None
+    assert "esco-v1.3.0-en-csv" in note
 
 
 @pytest.mark.req("REC1-06", "DIV1-04")

@@ -13,7 +13,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from nessa.db import Tx
+from nessa.errors import ErrorCode, ErrorStage, NessaError
 from nessa.identity import store as identity_store
 from nessa.identity.access import Actor
 from nessa.identity.records import EventKind
@@ -26,6 +29,7 @@ from nessa.profile.document import (
     ProfileInput,
     apply_updates,
     empty_profile,
+    input_type,
 )
 from nessa.profile.records import Basis, SourceKind
 from nessa.profile.store import stale_version
@@ -60,9 +64,26 @@ class NewSource:
 
 
 @dataclass(frozen=True)
+class ExistingSource:
+    """A source this workspace already recorded, cited again by a restored answer; None
+    only for an answer that was not asked."""
+
+    source_ref_id: uuid.UUID | None
+
+
+@dataclass(frozen=True)
 class FieldUpdate:
     value: FieldInput
-    source: NewSource
+    source: NewSource | ExistingSource
+
+
+class RevertProfile(BaseModel):
+    """Restore an earlier version's answers, each with its own source, as a new version."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    expected_version: int = Field(ge=0)
+    to_version: int = Field(ge=0, description="An earlier version; 0 is the empty profile.")
 
 
 def current_profile(tx: Tx, workspace_id: uuid.UUID) -> ProfileView:
@@ -106,6 +127,8 @@ def commit_profile_version(
     recorded: set[uuid.UUID] = set()
     for name in changed:
         source = updates[name].source
+        if not isinstance(source, NewSource):
+            continue  # already recorded in this workspace
         if source.source_ref_id in cited and source.source_ref_id not in recorded:
             recorded.add(source.source_ref_id)
             store.insert_source(
@@ -157,4 +180,38 @@ def write_profile(
     )
     updates = {name: FieldUpdate(getattr(new, name), source) for name in FIELD_NAMES}
     view, changed = commit_profile_version(tx, actor, workspace_id, expected_version, updates)
+    return view, bool(changed)
+
+
+def revert_profile(
+    tx: Tx, actor: Actor, workspace_id: uuid.UUID, command: RevertProfile
+) -> tuple[ProfileView, bool]:
+    """Undo: an earlier version's answers become the newest version, each citing the source
+    it had then (a fixture stays a fixture, a confirmed reading keeps its basis and turn),
+    never re-recorded as a direct entry. Returns the profile and whether it changed."""
+    visible_workspace(tx, workspace_id, lock=True)
+    current = current_profile(tx, workspace_id)
+    if command.expected_version != current.version:
+        raise stale_version(current.version)
+    if command.to_version >= current.version:
+        raise NessaError(
+            ErrorCode.VALIDATION_FAILED,
+            "Restore an earlier version than the current one.",
+            stage=ErrorStage.PROFILE,
+            details={"field": "to_version", "reason": "not_earlier"},
+        )
+    earlier = store.profile_version(tx, workspace_id, command.to_version)
+    document = empty_profile() if earlier is None else earlier.document
+    updates = {
+        name: FieldUpdate(
+            input_type(name).model_validate(
+                {"state": getattr(document, name).state, "value": getattr(document, name).value}
+            ),
+            ExistingSource(getattr(document, name).source_ref_id),
+        )
+        for name in FIELD_NAMES
+    }
+    view, changed = commit_profile_version(
+        tx, actor, workspace_id, command.expected_version, updates
+    )
     return view, bool(changed)

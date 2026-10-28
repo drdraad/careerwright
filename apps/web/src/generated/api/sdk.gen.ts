@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ChooseTargetData, ChooseTargetErrors, ChooseTargetResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, DecideTurnData, DecideTurnErrors, DecideTurnResponses, ExportWorkspaceData, ExportWorkspaceErrors, ExportWorkspaceResponses, GetDiscoveryData, GetDiscoveryErrors, GetDiscoveryResponses, GetMeData, GetMeErrors, GetMeResponses, GetOccupationData, GetOccupationErrors, GetOccupationResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetProfileVersionData, GetProfileVersionErrors, GetProfileVersionResponses, GetRunData, GetRunErrors, GetRunResponses, GetSketchData, GetSketchErrors, GetSketchResponses, GetSlateData, GetSlateErrors, GetSlateResponses, GetSpendData, GetSpendErrors, GetSpendResponses, GetTaxonomyData, GetTaxonomyErrors, GetTaxonomyResponses, GetTurnData, GetTurnErrors, GetTurnReplyData, GetTurnReplyErrors, GetTurnReplyResponses, GetTurnResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, HealthzData, HealthzResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListDiscoveriesData, ListDiscoveriesErrors, ListDiscoveriesResponses, ListEventsData, ListEventsErrors, ListEventsResponses, ListPlacesData, ListPlacesErrors, ListPlacesResponses, ListProfileVersionsData, ListProfileVersionsErrors, ListProfileVersionsResponses, ListProvisionalConceptsData, ListProvisionalConceptsErrors, ListProvisionalConceptsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListTurnsData, ListTurnsErrors, ListTurnsResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, PutPreferencesData, PutPreferencesErrors, PutPreferencesResponses, PutProfileData, PutProfileErrors, PutProfileResponses, PutSpendLimitsData, PutSpendLimitsErrors, PutSpendLimitsResponses, ReadyzData, ReadyzResponses, RegisterProvisionalConceptData, RegisterProvisionalConceptErrors, RegisterProvisionalConceptResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, RevokeCredentialData, RevokeCredentialErrors, RevokeCredentialResponses, RotateCredentialData, RotateCredentialErrors, RotateCredentialResponses, SearchOccupationsData, SearchOccupationsErrors, SearchOccupationsResponses, StoreCredentialData, StoreCredentialErrors, StoreCredentialResponses, StreamEventsData, StreamEventsErrors, StreamEventsResponse, StreamEventsResponses, SubmitDiscoveryData, SubmitDiscoveryErrors, SubmitDiscoveryResponses, SubmitRunData, SubmitRunErrors, SubmitRunResponses, SubmitTurnData, SubmitTurnErrors, SubmitTurnResponses } from './types.gen';
+import type { ChooseTargetData, ChooseTargetErrors, ChooseTargetResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, DecideTurnData, DecideTurnErrors, DecideTurnResponses, ExportWorkspaceData, ExportWorkspaceErrors, ExportWorkspaceResponses, GetDiscoveryData, GetDiscoveryErrors, GetDiscoveryResponses, GetMeData, GetMeErrors, GetMeResponses, GetOccupationData, GetOccupationErrors, GetOccupationResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetProfileVersionData, GetProfileVersionErrors, GetProfileVersionResponses, GetRunData, GetRunErrors, GetRunResponses, GetSketchData, GetSketchErrors, GetSketchResponses, GetSlateData, GetSlateErrors, GetSlateResponses, GetSpendData, GetSpendErrors, GetSpendResponses, GetTaxonomyData, GetTaxonomyErrors, GetTaxonomyResponses, GetTurnData, GetTurnErrors, GetTurnReplyData, GetTurnReplyErrors, GetTurnReplyResponses, GetTurnResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, HealthzData, HealthzResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListDiscoveriesData, ListDiscoveriesErrors, ListDiscoveriesResponses, ListEventsData, ListEventsErrors, ListEventsResponses, ListPlacesData, ListPlacesErrors, ListPlacesResponses, ListProfileVersionsData, ListProfileVersionsErrors, ListProfileVersionsResponses, ListProvisionalConceptsData, ListProvisionalConceptsErrors, ListProvisionalConceptsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListTurnsData, ListTurnsErrors, ListTurnsResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, PutPreferencesData, PutPreferencesErrors, PutPreferencesResponses, PutProfileData, PutProfileErrors, PutProfileResponses, PutSpendLimitsData, PutSpendLimitsErrors, PutSpendLimitsResponses, ReadyzData, ReadyzResponses, RegisterProvisionalConceptData, RegisterProvisionalConceptErrors, RegisterProvisionalConceptResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, RevertProfileData, RevertProfileErrors, RevertProfileResponses, RevokeCredentialData, RevokeCredentialErrors, RevokeCredentialResponses, RotateCredentialData, RotateCredentialErrors, RotateCredentialResponses, SearchOccupationsData, SearchOccupationsErrors, SearchOccupationsResponses, StoreCredentialData, StoreCredentialErrors, StoreCredentialResponses, StreamEventsData, StreamEventsErrors, StreamEventsResponse, StreamEventsResponses, SubmitDiscoveryData, SubmitDiscoveryErrors, SubmitDiscoveryResponses, SubmitRunData, SubmitRunErrors, SubmitRunResponses, SubmitTurnData, SubmitTurnErrors, SubmitTurnResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -96,6 +96,21 @@ export const getProfile = <ThrowOnError extends boolean = false>(options: Option
 export const putProfile = <ThrowOnError extends boolean = false>(options: Options<PutProfileData, ThrowOnError>): RequestResult<PutProfileResponses, PutProfileErrors, ThrowOnError> => (options.client ?? client).put<PutProfileResponses, PutProfileErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/workspaces/{workspace_id}/profile',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Revert
+ *
+ * Undo: an earlier version's answers, each with the source it had, as a new version.
+ */
+export const revertProfile = <ThrowOnError extends boolean = false>(options: Options<RevertProfileData, ThrowOnError>): RequestResult<RevertProfileResponses, RevertProfileErrors, ThrowOnError> => (options.client ?? client).post<RevertProfileResponses, RevertProfileErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/profile/revert',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -360,8 +375,9 @@ export const getDiscovery = <ThrowOnError extends boolean = false>(options: Opti
 /**
  * Get Slate
  *
- * Recomputed on each read from the stored searches and the pinned taxonomy. The
- * controls are view parameters only: they change nothing stored and are never limits.
+ * Recomputed on each read from the stored searches and the held taxonomy (a note says
+ * so if the searches were chosen for another release). The controls are view parameters
+ * only: they change nothing stored and are never limits.
  */
 export const getSlate = <ThrowOnError extends boolean = false>(options: Options<GetSlateData, ThrowOnError>): RequestResult<GetSlateResponses, GetSlateErrors, ThrowOnError> => (options.client ?? client).get<GetSlateResponses, GetSlateErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

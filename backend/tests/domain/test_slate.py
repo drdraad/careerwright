@@ -40,6 +40,7 @@ def occupation(name: str, family: str, *aliases: str) -> Occupation:
         family_code=family,
         family_label=f"Family {family}",
         sector_code=family[0],
+        preferred_key=name.casefold(),
         label_keys=frozenset({name.casefold(), *(a.casefold() for a in aliases)}),
     )
 
@@ -137,6 +138,71 @@ def test_near_identical_roles_count_once_and_say_which_they_duplicate() -> None:
     [duplicate] = [n for n in chosen.not_included if n.reason is NotIncluded.DUPLICATE]
     assert duplicate.candidate.occupation.title == "Grounds maintenance worker"
     assert duplicate.duplicate_of == concept("Groundsperson")
+
+
+@pytest.mark.req("DIV1-05")
+def test_folding_never_chains_unrelated_work_through_shared_labels() -> None:
+    # ESCO v1.2.1's own labels (Task 6 review A-I-2): quarry engineer and quarry manager name
+    # each other; mine manager is also called "quarry manager" and "facility manager"; the
+    # building caretaker is also a "facility manager"; and "building caretaker" is a name of
+    # the building cleaner. Transitively that made quarry engineer and building cleaner one.
+    chained = {
+        o.concept_id: o
+        for o in (
+            occupation("Quarry engineer", "214", "quarry manager", "mining engineer"),
+            occupation("Quarry manager", "132", "quarry engineer", "quarrying engineer"),
+            occupation("Mine manager", "132", "quarry manager", "facility manager"),
+            occupation("Building caretaker", "515", "facility manager", "caretaker"),
+            occupation("Building cleaner", "911", "building caretaker", "janitor"),
+        )
+    }
+    query = pool_query(
+        "q1",
+        SlateChannel.TASKS,
+        ("Quarry engineer", 0.9),
+        ("Building cleaner", 0.85),
+        ("Mine manager", 0.8),
+        ("Building caretaker", 0.7),
+        ("Quarry manager", 0.6),
+    )
+
+    pool = build_pool([query], chained, frozenset())
+
+    folded = {c.occupation.title: c.duplicate_of for c in pool}
+    assert folded == {
+        "Quarry engineer": None,
+        "Building cleaner": None,
+        "Mine manager": None,  # shares labels with both sides, aliases neither lead
+        "Building caretaker": concept("Building cleaner"),
+        "Quarry manager": concept("Quarry engineer"),
+    }
+
+
+@pytest.mark.req("DIV1-02", "DIV1-10")
+def test_the_bounded_pool_samples_across_families_before_relevance_cuts_it() -> None:
+    # Spec section 4 DIV-1: sample across occupational families before reranking. One family
+    # with many strong matches must not crowd every other family out of the working pool.
+    crowded = {
+        o.concept_id: o
+        for o in (
+            *(occupation(f"Mechanic {n}", "723") for n in range(6)),
+            occupation("Tree surgeon", "621"),
+            occupation("Furniture restorer", "752"),
+        )
+    }
+    query = pool_query(
+        "q1",
+        SlateChannel.TASKS,
+        *((f"Mechanic {n}", 1.0 - n / 100) for n in range(6)),
+        ("Tree surgeon", 0.5),
+        ("Furniture restorer", 0.4),
+    )
+
+    pool = build_pool([query], crowded, frozenset(), limit=4)
+
+    kept = {c.occupation.family_code for c in pool}
+    assert kept == {"723", "621", "752"}
+    assert pool.beyond_limit == 4
 
 
 @pytest.mark.req("DIV1-06")

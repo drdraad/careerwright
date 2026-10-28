@@ -285,6 +285,12 @@ export type DecideTurn = {
      * Confirm Hard Constraints
      */
     confirm_hard_constraints?: Array<ProfileField>;
+    /**
+     * Edits
+     *
+     * The person's own answers for fields this turn proposed, saved instead of those proposals (as direct entries) in the same version as the accepted ones.
+     */
+    edits?: Array<FieldEdit>;
 };
 
 /**
@@ -670,6 +676,20 @@ export const FailureClass = {
  * FailureClass
  */
 export type FailureClass = typeof FailureClass[keyof typeof FailureClass];
+
+/**
+ * FieldEdit
+ *
+ * The person's own answer for a field a proposal named. Typing it is their explicit
+ * choice, as in a direct edit, so a limit edited here needs no separate confirmation.
+ */
+export type FieldEdit = {
+    field: ProfileField;
+    /**
+     * Answer
+     */
+    answer: TextInput | TextListInput | HoursInput | MoneyInput | SalaryInput;
+};
 
 /**
  * FieldState
@@ -1615,6 +1635,24 @@ export const Resolution = {
 export type Resolution = typeof Resolution[keyof typeof Resolution];
 
 /**
+ * RevertProfile
+ *
+ * Restore an earlier version's answers, each with its own source, as a new version.
+ */
+export type RevertProfile = {
+    /**
+     * Expected Version
+     */
+    expected_version: number;
+    /**
+     * To Version
+     *
+     * An earlier version; 0 is the empty profile.
+     */
+    to_version: number;
+};
+
+/**
  * RunKind
  */
 export const RunKind = {
@@ -2526,6 +2564,17 @@ export type TextListField = {
 };
 
 /**
+ * TextListInput
+ */
+export type TextListInput = {
+    state: FieldState;
+    /**
+     * Value
+     */
+    value?: Array<string> | null;
+};
+
+/**
  * TurnOut
  *
  * One interview turn. `run` is authoritative for its state: `proposal` exists only when
@@ -3026,6 +3075,52 @@ export type PutProfileResponses = {
 };
 
 export type PutProfileResponse = PutProfileResponses[keyof PutProfileResponses];
+
+export type RevertProfileData = {
+    body: RevertProfile;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/profile/revert';
+};
+
+export type RevertProfileErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type RevertProfileError = RevertProfileErrors[keyof RevertProfileErrors];
+
+export type RevertProfileResponses = {
+    /**
+     * No field changed; no new version.
+     */
+    200: ProfileOut;
+    /**
+     * Successful Response
+     */
+    201: ProfileOut;
+};
+
+export type RevertProfileResponse = RevertProfileResponses[keyof RevertProfileResponses];
 
 export type ListProfileVersionsData = {
     body?: never;

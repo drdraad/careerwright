@@ -17,7 +17,12 @@ from nessa.errors import ErrorCode, ErrorStage, NessaError
 from nessa.identity.receipts import CommandResult, fingerprint, run_idempotent
 from nessa.identity.workspaces import visible_workspace
 from nessa.profile import store
-from nessa.profile.commands import current_profile, write_profile
+from nessa.profile.commands import (
+    RevertProfile,
+    current_profile,
+    revert_profile,
+    write_profile,
+)
 from nessa.profile.concepts import RegisterProvisionalConcept, register_provisional_concept
 
 router = APIRouter(
@@ -60,6 +65,40 @@ def put_profile(
         key,
         "write_profile",
         fingerprint("write_profile", request),
+        execute,
+    )
+    return JSONResponse(response, status_code=status)
+
+
+@router.post(
+    "/profile/revert",
+    response_model=ProfileOut,
+    status_code=201,
+    responses={200: {"model": ProfileOut, "description": "No field changed; no new version."}},
+    operation_id="revert_profile",
+)
+def revert(
+    workspace_id: uuid.UUID,
+    body: RevertProfile,
+    caller: CallerDep,
+    deps: Deps,
+    key: IdempotencyKey,
+) -> JSONResponse:
+    """Undo: an earlier version's answers, each with the source it had, as a new version."""
+
+    def execute(tx: Tx) -> CommandResult:
+        view, created = revert_profile(tx, caller.actor, workspace_id, body)
+        return CommandResult(
+            201 if created else 200, ProfileOut.of(view).model_dump(mode="json"), workspace_id
+        )
+
+    request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
+    status, response = run_idempotent(
+        deps.engine,
+        caller.actor.actor_id,
+        key,
+        "revert_profile",
+        fingerprint("revert_profile", request),
         execute,
     )
     return JSONResponse(response, status_code=status)

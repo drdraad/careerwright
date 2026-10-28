@@ -15,6 +15,7 @@ import sqlalchemy as sa
 from nessa.catalogue.esco import ESCO_RELEASE
 from nessa.cli import import_taxonomy, migrate_app
 from nessa.db import system_transaction
+from nessa.profile.slate import POOL_LIMIT
 from tests.support.infra import Infra, migrator_engine
 from tools.datasets import DATASETS_DIR
 from tools.evaluation import (
@@ -61,5 +62,6 @@ def test_every_discovery_case_passes_on_the_full_release(full_release: sa.Engine
         print(f"{case_id}: pool {observed[case_id]['pool_size']}, slate {shown}")
     assert {case_id: failures for case_id, failures in results.items() if failures} == {}
     p02 = observed["DSC-01"]
-    assert 60 <= p02["pool_size"] <= 120 or p02["beyond_pool_limit"] == 0
+    # P02's answers retrieve more than the bound, so the working pool is full (DIV1-02).
+    assert (p02["pool_size"], p02["beyond_pool_limit"] > 0) == (POOL_LIMIT, True)
     assert p02["release"]["sample"] is False  # the real catalogue, not the test subset

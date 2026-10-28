@@ -1,13 +1,14 @@
 """The discovery pool and the slate of suggestions (spec section 4, DIV-1; S2.4). Pure.
 
 **Pool.** Every query's taxonomy hits are pooled by concept: an alias is the same concept,
-and occupations that share a label (preferred or alternative, as a concept key) are
-near-identical, so they count once (DIV1-05); the most relevant represents them and the
-others say which they duplicate. The working pool is bounded (`POOL_LIMIT`, the upper end
-of the soft 60-120 target). A candidate's relevance rests only on how well the person's own
-answers retrieved it: its best normalised rank in any query, plus a little for each further
-query that found it. No pay, popularity, prestige or AI-resilience figure enters (DIV1-07),
-and no percentage is ever produced (REC1-05).
+and an occupation whose preferred label is a label of another (as a concept key) is
+near-identical to it, so they count once (DIV1-05); the most relevant represents them and
+the others say which they duplicate. Folding is never transitive. The working pool is
+bounded (`POOL_LIMIT`, the upper end of the soft 60-120 target) and filled round-robin
+across ISCO families before relevance cuts it. A candidate's relevance rests only on how
+well the person's own answers retrieved it: its best normalised rank in any query, plus a
+little for each further query that found it. No pay, popularity, prestige or AI-resilience
+figure enters (DIV1-07), and no percentage is ever produced (REC1-05).
 
 **Direction** is relative to the person (DIV1-12): close to what they do now (its ISCO
 family is one of their current role's or targets', or their role or a target found it),
@@ -130,6 +131,7 @@ class Occupation:
     family_code: str  # ISCO-08 minor group
     family_label: str
     sector_code: str  # ISCO-08 major group
+    preferred_key: str  # its preferred label as a concept key
     label_keys: frozenset[str]  # its non-hidden labels as concept keys
 
 
@@ -226,27 +228,47 @@ def _order(candidate: Candidate) -> tuple[float, str, str]:
     return (-candidate.relevance, candidate.occupation.title, str(candidate.occupation.concept_id))
 
 
+def _aliases(a: Occupation, b: Occupation) -> bool:
+    """One is a name of the other: its preferred label is one of the other's labels, or they
+    have the same labels. Merely sharing some third label is not enough: ESCO gives many
+    distinct occupations a common label ("geologist", "facility manager")."""
+    return (
+        a.preferred_key in b.label_keys
+        or b.preferred_key in a.label_keys
+        or a.label_keys == b.label_keys
+    )
+
+
 def _near_identical_groups(candidates: list[Candidate]) -> list[list[Candidate]]:
-    """Candidates sharing any label key, transitively (union-find)."""
-    parent = list(range(len(candidates)))
+    """Each candidate joins the most relevant group lead it is an alias of, or leads its own
+    group. Never transitive: a candidate is compared with leads only, so a chain of shared
+    labels cannot fold unrelated work together (DIV1-05)."""
+    groups: list[list[Candidate]] = []
+    for candidate in sorted(candidates, key=_order):
+        group = next((g for g in groups if _aliases(g[0].occupation, candidate.occupation)), None)
+        if group is None:
+            groups.append([candidate])
+        else:
+            group.append(candidate)
+    return groups
 
-    def root(i: int) -> int:
-        while parent[i] != i:
-            parent[i] = parent[parent[i]]
-            i = parent[i]
-        return i
 
-    owner: dict[str, int] = {}
-    for index, candidate in enumerate(candidates):
-        for key in candidate.occupation.label_keys:
-            if key in owner:
-                parent[root(index)] = root(owner[key])
-            else:
-                owner[key] = index
-    groups: dict[int, list[Candidate]] = {}
-    for index, candidate in enumerate(candidates):
-        groups.setdefault(root(index), []).append(candidate)
-    return list(groups.values())
+def _across_families(leads: list[Candidate], limit: int) -> set[uuid.UUID]:
+    """The working pool: round-robin across ISCO families in relevance order, so the bound
+    samples every retrieved family before relevance cuts any (spec section 4, DIV-1). Under
+    the bound it keeps everything. (Oversampling catalogue areas the search under-retrieves
+    is not done.)"""
+    by_family: dict[str, list[Candidate]] = {}
+    for lead in leads:  # already in relevance order
+        by_family.setdefault(lead.occupation.family_code, []).append(lead)
+    kept: list[Candidate] = []
+    depth = 0
+    while len(kept) < min(limit, len(leads)):
+        kept += [members[depth] for members in by_family.values() if depth < len(members)][
+            : limit - len(kept)
+        ]
+        depth += 1
+    return {c.occupation.concept_id for c in kept}
 
 
 def build_pool(
@@ -271,7 +293,6 @@ def build_pool(
     ]
     pooled: list[Candidate] = []
     for group in _near_identical_groups(candidates):
-        group.sort(key=_order)
         lead, rest = group[0], group[1:]
         if rest:  # the representative carries every query that found any of them
             merged = [m for c in group for m in c.matches]
@@ -279,7 +300,7 @@ def build_pool(
         pooled.append(lead)
         pooled += [replace(c, duplicate_of=lead.occupation.concept_id) for c in rest]
     leads = sorted((c for c in pooled if c.duplicate_of is None), key=_order)
-    kept = {c.occupation.concept_id for c in leads[:limit]}
+    kept = _across_families(leads, limit)
     return Pool(
         tuple(
             c

@@ -417,6 +417,15 @@ export const DecideTurnSchema = {
             type: 'array',
             maxItems: 12,
             title: 'Confirm Hard Constraints'
+        },
+        edits: {
+            items: {
+                $ref: '#/components/schemas/FieldEdit'
+            },
+            type: 'array',
+            maxItems: 12,
+            title: 'Edits',
+            description: 'The person\'s own answers for fields this turn proposed, saved instead of those proposals (as direct entries) in the same version as the accepted ones.'
         }
     },
     additionalProperties: false,
@@ -941,6 +950,42 @@ export const FailureClassSchema = {
         'unknown_failure'
     ],
     title: 'FailureClass'
+} as const;
+
+export const FieldEditSchema = {
+    properties: {
+        field: {
+            $ref: '#/components/schemas/ProfileField'
+        },
+        answer: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/TextInput'
+                },
+                {
+                    $ref: '#/components/schemas/TextListInput'
+                },
+                {
+                    $ref: '#/components/schemas/HoursInput'
+                },
+                {
+                    $ref: '#/components/schemas/MoneyInput'
+                },
+                {
+                    $ref: '#/components/schemas/SalaryInput'
+                }
+            ],
+            title: 'Answer'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'field',
+        'answer'
+    ],
+    title: 'FieldEdit',
+    description: 'The person\'s own answer for a field a proposal named. Typing it is their explicit\nchoice, as in a direct edit, so a limit edited here needs no separate confirmation.'
 } as const;
 
 export const FieldStateSchema = {
@@ -2417,6 +2462,30 @@ export const ResolutionSchema = {
         'not_found'
     ],
     title: 'Resolution'
+} as const;
+
+export const RevertProfileSchema = {
+    properties: {
+        expected_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Version'
+        },
+        to_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'To Version',
+            description: 'An earlier version; 0 is the empty profile.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_version',
+        'to_version'
+    ],
+    title: 'RevertProfile',
+    description: 'Restore an earlier version\'s answers, each with its own source, as a new version.'
 } as const;
 
 export const RunKindSchema = {
@@ -3912,6 +3981,36 @@ export const TextListFieldSchema = {
         'state'
     ],
     title: 'TextListField'
+} as const;
+
+export const TextListInputSchema = {
+    properties: {
+        state: {
+            $ref: '#/components/schemas/FieldState'
+        },
+        value: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        maxLength: 120,
+                        minLength: 1
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Value'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'state'
+    ],
+    title: 'TextListInput'
 } as const;
 
 export const TurnOutSchema = {

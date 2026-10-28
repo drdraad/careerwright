@@ -127,6 +127,19 @@ def list_sources(
     return [_source(row) for row in rows]
 
 
+def chosen_occupation_uris(tx: Tx, workspace_id: uuid.UUID) -> list[str]:
+    """The ESCO URIs of the occupations the person chose as targets, oldest first."""
+    return list(
+        tx.execute(
+            sa.text(
+                "SELECT locator FROM nessa.source_references WHERE workspace_id = :ws "
+                "AND kind = :kind AND locator IS NOT NULL ORDER BY created_at, source_ref_id"
+            ),
+            {"ws": workspace_id, "kind": SourceKind.OCCUPATION_CHOICE.value},
+        ).scalars()
+    )
+
+
 def current_profile(tx: Tx, workspace_id: uuid.UUID) -> ProfileVersion | None:
     row = (
         tx.execute(

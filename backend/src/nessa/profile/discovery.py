@@ -102,6 +102,9 @@ class DiscoveryInput(BaseModel):
     prompt_version: str = PROMPT_VERSION
     profile_version: int
     evidence: list[EvidenceItem]
+    # The ESCO release held at submission (its dataset ID); None in inputs sealed before
+    # it was recorded. Never sent to the model.
+    release: str | None = None
 
 
 class DiscoveryQuery(BaseModel):
@@ -134,6 +137,7 @@ class DiscoveryProposal(BaseModel):
     profile_version: int
     queries: list[DiscoveryQuery]
     hypotheses: list[Hypothesis]
+    release: str | None = None  # the release the searches were chosen for (from the input)
 
 
 def _key(text: str) -> str:
@@ -220,6 +224,7 @@ def check_discovery(
             profile_version=context.profile_version,
             queries=queries,
             hypotheses=hypotheses,
+            release=context.release,
         ),
         [],
     )

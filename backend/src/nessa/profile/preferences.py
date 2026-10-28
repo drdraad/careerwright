@@ -3,8 +3,10 @@
 
 They shape what the interviewer asks and how, and nothing else: they are never profile
 facts, never planning limits and never a judgement about the person. "Not chosen" stays
-distinct from any choice. Pausing keeps everything saved; nothing is asked until the
-person resumes. Writes take an expected version, like every consequential write.
+distinct from any choice. Pausing keeps everything saved; while paused the web app asks
+nothing and offers no way to send a message until the person resumes. The API itself does
+not refuse a message while paused (ADR 0007 decision 1): pause is the person's own setting,
+not a lock. Writes take an expected version, like every consequential write.
 """
 
 import uuid

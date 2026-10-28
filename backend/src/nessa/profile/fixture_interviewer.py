@@ -50,9 +50,12 @@ _MONEY = re.compile(
     r"£\s?([0-9]{1,3}(?:,[0-9]{3}){1,2}|[0-9]{1,9})(?![0-9]|,[0-9])(?:\.([0-9]{1,2}))?"
 )
 _MONTH = re.compile(r"\b(?:a|per|each|every) month\b|\bmonthly\b", re.IGNORECASE)
-# An amount in a sentence about pay is a salary floor, not a spending limit.
-_PAY = re.compile(r"\b(?:salary|earn(?:ing)?|paid|wage|a year|per year|annual(?:ly)?)\b", re.I)
+# An amount in a sentence about pay is a salary floor, not a spending limit; a sentence
+# about spending ("£1,500 a year on courses") is a limit even with a period in it.
+_PAY = re.compile(r"\b(?:salary|earn(?:ing)?|paid|wages?|work for)\b", re.IGNORECASE)
+_SPEND = re.compile(r"\b(?:spend|spending|budget|afford|cost|fees?|course|courses)\b", re.I)
 _HOURLY = re.compile(r"\b(?:an|per|a) hour\b|\bhourly\b", re.IGNORECASE)
+_WEEKLY = re.compile(r"\b(?:a|per|each|every) week\b|\bweekly\b", re.IGNORECASE)
 _ROLE = re.compile(
     r"\bI(?:'m| am| work as) (?:a|an) ([A-Za-z][A-Za-z -]{2,60}?)(?=[.,;!?]| in | at | and |$)"
 )
@@ -125,8 +128,16 @@ def _proposals(context: PromptContext, ref: str, text: str) -> list[ModelUpdate]
         pounds = money.group(1).replace(",", "") + (f".{money.group(2)}" if money.group(2) else "")
         sentence = _sentence(text, money.start())
         monthly = _MONTH.search(sentence) is not None
-        if _PAY.search(sentence) or _HOURLY.search(sentence):
-            period = "hour" if _HOURLY.search(sentence) else "month" if monthly else "year"
+        if (_PAY.search(sentence) or _HOURLY.search(sentence)) and not _SPEND.search(sentence):
+            period = (
+                "hour"
+                if _HOURLY.search(sentence)
+                else "week"
+                if _WEEKLY.search(sentence)
+                else "month"
+                if monthly
+                else "year"
+            )
             updates.append(
                 _update(
                     ProfileField.MINIMUM_SALARY,
@@ -204,9 +215,8 @@ def fixture_turn(context: PromptContext) -> InterviewTurnOutput:
     else:
         question = None
     noted = f"I noted {len(updates)} thing{'s' if len(updates) != 1 else ''} for you to review."
-    reply = (
-        REPLY_PREFIX + (noted if updates else "Thank you.") + (f" {question}" if question else "")
-    )
+    # The question goes only in next_question; the web app shows it once, apart (PROF-08).
+    reply = REPLY_PREFIX + (noted if updates else "Thank you.")
     return InterviewTurnOutput(
         reply=reply,
         proposed_updates=updates,

@@ -29,6 +29,7 @@ def test_every_case_attempt_is_ledgered_and_the_results_are_written(
 ) -> None:
     ledger = Ledger(tmp_path / "live-usage.jsonl")
     results = tmp_path / "live-eval.md"
+    private = tmp_path / "nessa-home" / "evidence" / "live-eval.jsonl"
     models = ModelChoice.configure(TEST_MODEL, "muse-spark-1.3", "test")
     cases = select(load_cases(), ["INT-01", "DSC-01"])
     plan = authorise_eval(
@@ -44,6 +45,7 @@ def test_every_case_attempt_is_ledgered_and_the_results_are_written(
             models,
             scope="eval-test",
             results_path=results,
+            observations_path=private,
         )
     finally:
         worker.kill_if_running()
@@ -57,5 +59,10 @@ def test_every_case_attempt_is_ledgered_and_the_results_are_written(
     assert "| INT-01 " in written
     assert "| DSC-01 " in written
     assert "Failures by type:" in written
-    observed = results.with_suffix(".jsonl").read_text(encoding="utf-8").splitlines()
-    assert len(observed) == 2  # each case's output is kept for inspection
+    # Each case's output is kept for inspection in the private evidence directory, never
+    # beside the committed results (plan section 2; Task 6 review A-I-6).
+    observed = private.read_text(encoding="utf-8").splitlines()
+    assert len(observed) == 2
+    assert not results.with_suffix(".jsonl").exists()
+    assert private.parent.stat().st_mode & 0o777 == 0o700
+    assert str(private) in written

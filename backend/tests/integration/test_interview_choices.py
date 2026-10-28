@@ -81,7 +81,7 @@ def test_the_entry_mode_and_pause_are_saved_with_versions_and_reach_the_intervie
     assert (opened["entry_mode"], opened["conversation_mode"], opened["prompt_version"]) == (
         "sure",
         "gentle",
-        "interview-turn-2",
+        "interview-turn-3",
     )
     worker = scenario.worker("worker")  # leave no queued run behind
     scenario.wait_terminal(turn["turn_id"])
@@ -96,6 +96,8 @@ def test_explicit_acute_distress_gets_support_before_any_model_call_and_nothing_
     events_before = scenario.api.get(
         f"/v1/workspaces/{scenario.workspace_id}/events", scenario.token
     ).json()["last_seq"]
+    receipts = "SELECT count(*) FROM nessa.command_receipts WHERE workspace_id = %s"
+    receipts_before = scenario.infra.query(receipts, (scenario.workspace_id,))
 
     response = scenario.api.write(
         "POST", turns, scenario.token, {"expected_profile_version": 1, "message": DISTRESS}
@@ -123,6 +125,8 @@ def test_explicit_acute_distress_gets_support_before_any_model_call_and_nothing_
         f"/v1/workspaces/{scenario.workspace_id}/events", scenario.token
     ).json()
     assert events["last_seq"] == events_before  # nothing happened
+    # Not even an idempotency receipt (it would keep a fingerprint of the message, A-M8).
+    assert scenario.infra.query(receipts, (scenario.workspace_id,)) == receipts_before
     assert scenario.leaks("don't know why I'm even looking") == []
 
     sent = scenario.api.write(

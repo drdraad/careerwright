@@ -143,6 +143,13 @@ def test_the_fixture_reads_an_amount_about_pay_as_a_salary_floor_with_its_period
     ]
     spend = fixture_turn(prompt_context(turn_input("I could spend £900 on a course.")))
     assert [u.field for u in spend.proposed_updates] == [ProfileField.DIRECT_SPEND_CAP]
+    # Task 6 review A-I-4: a weekly wage keeps its week; a yearly course budget is no floor.
+    weekly = fixture_turn(prompt_context(turn_input("I get paid £500 a week.")))
+    assert [(u.field, u.text) for u in weekly.proposed_updates] == [
+        (ProfileField.MINIMUM_SALARY, "500 per week")
+    ]
+    budget = fixture_turn(prompt_context(turn_input("I could spend £1,500 a year on courses.")))
+    assert [u.field for u in budget.proposed_updates] == [ProfileField.DIRECT_SPEND_CAP]
 
 
 @pytest.mark.req("PROF-08", "REC1-10")

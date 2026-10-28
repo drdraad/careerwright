@@ -133,8 +133,9 @@ def get_slate(
     exclude_concept: Annotated[list[uuid.UUID], Query(max_length=POOL_LIMIT)] = [],  # noqa: B006
     exclude_family: Annotated[list[FamilyCode], Query(max_length=POOL_LIMIT)] = [],  # noqa: B006
 ) -> SlateOut:
-    """Recomputed on each read from the stored searches and the pinned taxonomy. The
-    controls are view parameters only: they change nothing stored and are never limits."""
+    """Recomputed on each read from the stored searches and the held taxonomy (a note says
+    so if the searches were chosen for another release). The controls are view parameters
+    only: they change nothing stored and are never limits."""
     controls = SlateControls(
         emphasis=emphasis,
         exclude_concepts=frozenset(exclude_concept),

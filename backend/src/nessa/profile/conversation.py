@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
 
 from nessa.config import RuntimeMode
 from nessa.db import Tx
@@ -30,12 +30,14 @@ from nessa.identity.spend import SpendLimits
 from nessa.identity.workspaces import visible_workspace
 from nessa.profile import interview, interview_store
 from nessa.profile.commands import (
+    DIRECT_ENTRY_LABEL,
     FieldUpdate,
     NewSource,
     ProfileView,
     commit_profile_version,
     current_profile,
 )
+from nessa.profile.document import FieldInput, checked_input, input_type
 from nessa.profile.interview import (
     HISTORY_MESSAGES,
     MAX_MESSAGE,
@@ -97,6 +99,27 @@ class DecideTurn(BaseModel):
     confirm_hard_constraints: list[ProfileField] = Field(
         default_factory=list, max_length=len(ProfileField)
     )
+    edits: list["FieldEdit"] = Field(
+        default_factory=list,
+        max_length=len(ProfileField),
+        description=(
+            "The person's own answers for fields this turn proposed, saved instead of those "
+            "proposals (as direct entries) in the same version as the accepted ones."
+        ),
+    )
+
+
+class FieldEdit(BaseModel):
+    """The person's own answer for a field a proposal named. Typing it is their explicit
+    choice, as in a direct edit, so a limit edited here needs no separate confirmation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    field: ProfileField
+    answer: FieldInput
+
+
+DecideTurn.model_rebuild()
 
 
 @dataclass(frozen=True)
@@ -245,6 +268,43 @@ def _refusal(code: ErrorCode, message: str, **details: str | int | list[str]) ->
     return NessaError(code, message, stage=ErrorStage.PROFILE, details=details)
 
 
+def _checked_edits(
+    edits: list[FieldEdit], proposed: set[ProfileField], accepted: set[ProfileField]
+) -> dict[ProfileField, FieldInput]:
+    """Each edit's answer, checked as a direct edit of its field would be. An edit replaces
+    a proposal of this turn, so it names a proposed field, once, and one not also accepted."""
+    checked: dict[ProfileField, FieldInput] = {}
+    for edit in edits:
+        name = edit.field.value
+        reason = (
+            "not_proposed"
+            if edit.field not in proposed
+            else "accepted_and_edited"
+            if edit.field in accepted
+            else "edited_twice"
+            if edit.field in checked
+            else None
+        )
+        if reason is not None:
+            raise _refusal(
+                ErrorCode.VALIDATION_FAILED,
+                "Edit only a field this message proposed, once, instead of accepting it.",
+                field=name,
+                reason=reason,
+            )
+        try:
+            answer = input_type(name).model_validate(edit.answer.model_dump())
+        except ValidationError:
+            raise _refusal(
+                ErrorCode.VALIDATION_FAILED,
+                "That answer doesn't fit this field.",
+                field=name,
+                reason="invalid_answer",
+            ) from None
+        checked[edit.field] = checked_input(name, answer)
+    return checked
+
+
 def decide_turn(
     tx: Tx,
     actor: Actor,
@@ -316,6 +376,7 @@ def decide_turn(
             reason="not_accepted",
             fields=stray,
         )
+    edited = _checked_edits(command.edits, {c.field for c in changes.values()}, accepted_fields)
     cited = {m for c in accepted for m in changes[c].message_ids}
     sent_at = interview_store.message_times(tx, workspace_id, cited)
     if set(sent_at) != cited:  # a proposal's messages are this workspace's, by construction
@@ -340,6 +401,15 @@ def decide_turn(
                 basis=change.basis,
             ),
         )
+    entry = NewSource(
+        source_ref_id=uuid.uuid4(),
+        kind=SourceKind.DIRECT_ENTRY,
+        label=DIRECT_ENTRY_LABEL,
+        observed_at=now,
+        recorded_by=actor.actor_id,
+    )
+    for field, answer in edited.items():
+        updates[field.value] = FieldUpdate(answer, entry)
     result, changed = commit_profile_version(
         tx, actor, workspace_id, command.expected_version, updates
     )

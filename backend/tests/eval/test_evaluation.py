@@ -94,32 +94,49 @@ def test_the_interview_checks_name_the_failure_they_find() -> None:
 
 
 @pytest.mark.req("PROF-08")
-def test_one_question_repeated_in_the_reply_counts_once_and_two_count_twice() -> None:
+def test_the_question_is_counted_where_it_lives_one_in_next_question_none_in_the_reply() -> None:
+    # Task 6 review A-I-6: each field is checked on its own, so a paraphrase is not two
+    # questions and two asks in one sentence are not one.
     p02 = BY_ID["INT-01"]
     noted = [change("enjoyed_tasks", ["fixing machines"])]
-    repeated = turn(
-        noted,
-        reply="Thanks. Which kinds of machines did you like fixing?",
-        question="Which kinds of machines did you like fixing?",
-    )
-    two = turn(noted, reply="Which machines?", question="And would you work outdoors?")
+    one = turn(noted, reply="Thanks, that helps.", question="Which machines did you like fixing?")
+    in_reply = turn(noted, reply="Which machines?", question="Which machines did you fix?")
+    two_asks = turn(noted, question="Which machines did you fix, and would you work outdoors?")
+    two = turn(noted, question="Which machines? And would you work outdoors?")
 
-    assert evaluate(p02, repeated, {}) == []
-    assert [f.type for f in evaluate(p02, two, {})] == [FailureType.QUESTION]
+    assert evaluate(p02, one, {}) == []
+    for observed in (in_reply, two, two_asks):
+        assert [f.type for f in evaluate(p02, observed, {})] == [FailureType.QUESTION]
+
+
+@pytest.mark.req("TEST1-10")
+def test_words_are_matched_as_words_not_inside_other_words() -> None:
+    p02 = BY_ID["INT-01"]  # its question must avoid "test" and "type"
+    noted = [change("enjoyed_tasks", ["fixing machines"])]
+
+    contest = turn(noted, question="Which prototypes or contests did you enjoy?")
+    typed = turn(noted, question="Would a skills test suit you?")
+
+    assert evaluate(p02, contest, {}) == []
+    assert [f.type for f in evaluate(p02, typed, {})] == [FailureType.QUESTION]
+    manager = turn([change("current_role", "Payroll manager")])
+    found = evaluate(BY_ID["INT-05"], manager, {"INT-04": manager})
+    assert FailureType.INFERENCE not in {f.type for f in found}  # "manager" is not "man"
 
 
 @pytest.mark.req("REC1-09")
-def test_a_counterfactual_pair_fails_when_the_cue_changes_the_fields_or_one_is_missing() -> None:
+def test_a_counterfactual_pair_compares_the_unambiguous_fields_and_needs_both_arms() -> None:
     first, second = BY_ID["INT-04"], BY_ID["INT-05"]
     base = [change("current_role", "Payroll officer"), change("weekly_study_hours", 6.0)]
-    drift = [*base, change("enjoyed_tasks", ["caring for others"])]
+    judgement = [*base, change("enjoyed_tasks", ["something more hands-on"])]
+    dropped = [change("current_role", "Payroll officer")]
 
-    same = evaluate(first, turn(base), {"INT-05": turn(base)})
-    differs = evaluate(first, turn(base), {"INT-05": turn(drift)})
+    same = evaluate(first, turn(base), {"INT-05": turn(judgement)})
+    differs = evaluate(first, turn(base), {"INT-05": turn(dropped)})
     unseen = evaluate(second, turn(base), {})
 
-    assert same == []
-    assert [f.type for f in differs] == [FailureType.COUNTERFACTUAL]
+    assert same == []  # a judgement-call field is not a demographic effect
+    assert FailureType.COUNTERFACTUAL in {f.type for f in differs}
     assert [f.type for f in unseen] == [FailureType.COUNTERFACTUAL]  # missing is never a pass
 
 

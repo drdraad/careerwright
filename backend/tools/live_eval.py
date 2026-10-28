@@ -19,8 +19,9 @@ Caps, checked before the stack starts, under the ledger's exclusive lock:
   production requests (none by default) and worst-case cost (`NESSA_LIVE_EVAL_*`).
 Afterwards the worker is stopped and every attempt of every case workspace is ledgered in
 `docs/evidence/live-usage.*` with its cost; the results, with failures by type, are
-appended to `docs/evidence/live-eval.md`; and both databases, every container log and the
-API's responses are scanned for the key.
+appended to `docs/evidence/live-eval.md`, each case's output to the private evidence
+directory (`NESSA_HOME/evidence/live-eval.jsonl`, never committed); and both databases,
+every container log and the API's responses are scanned for the key.
 
 Run from `backend/`: `uv run --locked python -m tools.live_eval [--cases INT-01,DSC-01]`.
 """
@@ -62,11 +63,16 @@ from tools.live_smoke import (
     ledger_workspace_calls,
     smoke_stack,
 )
-from tools.localenv import REPO_ROOT
+from tools.localenv import REPO_ROOT, nessa_home
 from tools.usage_ledger import Ledger, ScopeSpend
 
 MAX_LIVE_CASES = 6  # the cap for this task's live run (controller, R5)
 MAX_COST_NANO_USD = 50_000_000  # $0.05 worst case per invocation
+# Per budget scope, cumulatively: the controller's per-scope request cap (R5), which holds
+# one default run (four cases, at most eight requests); a further authorised run gets its
+# own scope (`NESSA_LIVE_EVAL_SCOPE`).
+SCOPE_MAX_CALLS = 9
+SCOPE_MAX_COST_NANO_USD = 50_000_000
 RESULTS_PATH = REPO_ROOT / "docs" / "evidence" / "live-eval.md"
 EVAL_INTERVIEW = SmokeKind(
     "eval_interview",
@@ -99,12 +105,12 @@ class EvalSettings(BaseSettings):
     meta_production_model: str = Field(
         default="muse-spark-1.3", validation_alias="NESSA_META_PRODUCTION_MODEL"
     )
-    # Defaults: two invocations of six cases (each case at most two requests), no production
-    # model, and $0.05 worst case in all.
     budget_scope: str = Field(default="live-eval", validation_alias="NESSA_LIVE_EVAL_SCOPE")
-    scope_max_calls: int = Field(default=24, ge=0, validation_alias="NESSA_LIVE_EVAL_MAX_CALLS")
+    scope_max_calls: int = Field(
+        default=SCOPE_MAX_CALLS, ge=0, validation_alias="NESSA_LIVE_EVAL_MAX_CALLS"
+    )
     scope_max_cost_nano_usd: int = Field(
-        default=50_000_000, ge=0, validation_alias="NESSA_LIVE_EVAL_MAX_COST_NANO_USD"
+        default=SCOPE_MAX_COST_NANO_USD, ge=0, validation_alias="NESSA_LIVE_EVAL_MAX_COST_NANO_USD"
     )
 
     def budget(self) -> ScopeBudget:
@@ -263,14 +269,20 @@ def results_of(runs: list[CaseRun]) -> dict[str, list[Failure]]:
 
 
 def write_results(
-    path: Path, plan: Plan, runs: list[CaseRun], results: dict[str, list[Failure]], seqs: list[int]
+    path: Path,
+    observations_path: Path,
+    plan: Plan,
+    runs: list[CaseRun],
+    results: dict[str, list[Failure]],
+    seqs: list[int],
 ) -> None:
     lines = [
         f"## Live evaluation, {datetime.now(UTC):%Y-%m-%d %H:%M} UTC",
         "",
         f"Model `{plan.model_id}` (test model, synthetic cases only); {len(runs)} cases; at most "
         f"{plan.calls} requests, worst case {format_usd(plan.worst_case_nano_usd)}; ledger rows "
-        f"{seqs}. Failures by type: {failures_by_type(results) or 'none'}.",
+        f"{seqs}. Failures by type: {failures_by_type(results) or 'none'}. Each case's output "
+        f"is kept in the private evidence directory (`{observations_path}`, not committed).",
         "",
         "| Case | Kind | Run | Result | Failures |",
         "|---|---|---|---|---|",
@@ -290,8 +302,11 @@ def write_results(
     )
     previous = path.read_text(encoding="utf-8") if path.exists() else header
     path.write_text(previous + "\n".join(lines) + "\n\n", encoding="utf-8")
-    # What each case returned (synthetic inputs only), so a failure can be inspected later.
-    with path.with_suffix(".jsonl").open("a", encoding="utf-8") as observations:
+    # What each case returned (synthetic inputs only), so a failure can be inspected later:
+    # model output stays out of the repository, owner-only (plan section 2).
+    observations_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    observations_path.parent.chmod(0o700)
+    with observations_path.open("a", encoding="utf-8") as observations:
         for run in runs:
             record = {
                 "recorded_at": datetime.now(UTC).isoformat(),
@@ -315,6 +330,7 @@ def live_eval(
     *,
     scope: str,
     results_path: Path = RESULTS_PATH,
+    observations_path: Path | None = None,
 ) -> int:
     """Every case through the product, then the ledger (after the worker has stopped,
     whatever happened), the results and the leak scan."""
@@ -353,7 +369,8 @@ def live_eval(
         if interrupted is not None:
             raise interrupted
     results = results_of(runs)
-    write_results(results_path, plan, runs, results, seqs)
+    observed_at = observations_path or nessa_home() / "evidence" / "live-eval.jsonl"
+    write_results(results_path, observed_at, plan, runs, results, seqs)
     print(f"failures by type: {failures_by_type(results)}", flush=True)
     scanned, findings = leak_findings(target, api, key)
     print(f"leak scan: {scanned} rows/logs/responses, findings: {findings}", flush=True)

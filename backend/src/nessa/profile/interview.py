@@ -51,7 +51,7 @@ from nessa.profile.safety import inferred_sensitive_terms, recorded_health_terms
 
 # Version 2 (Task 6): the person's entry and conversation mode, the work-style field, and
 # the support and inference rules.
-PROMPT_VERSION = "interview-turn-2"
+PROMPT_VERSION = "interview-turn-3"
 INPUT_FORMAT: Literal["nessa.interview-turn-input"] = "nessa.interview-turn-input"
 MAX_MESSAGE = 2_000
 MAX_REPLY = 1_200
@@ -71,6 +71,16 @@ HOURS_PATTERN = re.compile(r"^[0-9]{1,3}(\.[0-9]{1,2})?$")
 SALARY_PATTERN = re.compile(
     r"^([0-9]{1,9}(?:\.[0-9]{1,2})?)(?:\s+(?:per|a|an|each)\s+(year|month|week|hour))?$"
 )
+# How a person names each pay period, for checking that a "stated" floor's period is theirs.
+_PERIOD_WORDS = {
+    period: re.compile(rf"\b(?:(?:an?|per|each|every) {period}|{adverb})\b", re.IGNORECASE)
+    for period, adverb in (
+        (PayPeriod.YEAR, r"yearly|annual(?:ly)?|per annum"),
+        (PayPeriod.MONTH, r"monthly"),
+        (PayPeriod.WEEK, r"weekly"),
+        (PayPeriod.HOUR, r"hourly"),
+    )
+}
 
 
 class ProfileField(StrEnum):
@@ -251,7 +261,10 @@ def _value(update: ModelUpdate, problems: list[str]) -> object:
     if spec.kind is FieldKind.SALARY:
         salary = _salary(text)
         if salary is None:
-            problems.append(f"{name}: give gross pounds and the period, such as 28000 per year")
+            problems.append(
+                f"{name}: give gross pounds above 0 and the period, such as 28000 per year "
+                "(no floor is unknown or skipped)"
+            )
         return salary
     return text
 
@@ -260,7 +273,7 @@ def _salary(text: str) -> SalaryFloor | None:
     """Gross pounds and the period as given; a year unless the person said otherwise."""
     match = SALARY_PATTERN.match(text)
     money = _money(match.group(1)) if match else None
-    if match is None or money is None:
+    if match is None or money is None or money.minor_units == 0:
         return None
     return SalaryFloor(amount=money, period=PayPeriod(match.group(2) or PayPeriod.YEAR.value))
 
@@ -290,7 +303,11 @@ def _basis(update: ModelUpdate, cited: list[str], held: object) -> Basis:
         values = [item for item in update.items if _quotable(item) not in kept]
     elif FIELD_SPECS[update.field.value].kind is FieldKind.SALARY:
         match = SALARY_PATTERN.match(update.text or "")
-        values = [match.group(1) if match else ""]  # the amount; the period is checked apart
+        period = PayPeriod(match.group(2)) if match and match.group(2) else None
+        # The period is part of the value: a defaulted or different one is not their words.
+        if period is None or not any(_PERIOD_WORDS[period].search(text) for text in cited):
+            return Basis.INFERRED
+        values = [match.group(1) if match else ""]
     else:
         values = [update.text or ""]
     if values and all(_quoted(value, cited) for value in values):
@@ -334,6 +351,11 @@ def check_turn(
         problems.append(f"reply: 1-{MAX_REPLY} characters")
     if output.next_question is not None and not _bounded(output.next_question, MAX_QUESTION):
         problems.append(f"next_question: 1-{MAX_QUESTION} characters, or null")
+    # One question at a time (PROF-08), asked once: the reply and the question are shown apart.
+    if "?" in output.reply:
+        problems.append("reply: no question here; ask the one question only in next_question")
+    if output.next_question is not None and output.next_question.count("?") > 1:
+        problems.append("next_question: one question only")
     if len(set(output.missing_critical_fields)) != len(output.missing_critical_fields):
         problems.append("missing_critical_fields: name each field once")
     if len(output.proposed_updates) > MAX_UPDATES:
@@ -409,8 +431,9 @@ def context_profile(document: ProfileDocument) -> dict[ProfileField, ContextFiel
 
 INSTRUCTIONS = f"""\
 You are the interviewer in Nessa, a career-planning service for people in England.
-Write a short, warm reply in British English and ask at most one question: the one that
-most changes the next decision. Never ask again for something the profile already holds.
+Write a short, warm reply in British English, with no question in it. Ask at most one
+question, only in next_question: the one that most changes the next decision. Never ask
+again for something the profile already holds.
 
 From the person's messages, propose updates to their profile fields. Propose only what a
 message states, or clearly implies; mark implications as "inferred". Every update cites the

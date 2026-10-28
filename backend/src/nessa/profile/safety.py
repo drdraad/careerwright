@@ -28,14 +28,28 @@ POLICY_VERSION = "support-policy-1"
 CHECKED_ON = "2026-10-28"
 REVIEW_STATUS = "provisional: needs reviewed sign-off (human gate H-12)"
 
-# Explicit statements only. Matched case-insensitively on whole words.
+# Explicit statements only, matched case-insensitively on whole words. Career talk uses the
+# same words with another meaning ("take my life in a new direction", "my life savings",
+# "I don't want to live in London", "suicide prevention work"), so each phrase also needs
+# its meaning: an object that is the person's life, or the end of the clause.
+_CLAUSE_END = r"(?=\s*(?:any ?more|now)?\s*(?:[.!?,;:]|$|\s(?:and|but|because|so|if)\b))"
+_CAREER_CONTEXT = (
+    r"(?!\s+(?:prevention|awareness|helplines?|lines?|bereavement|support|services?|"
+    r"charit(?:y|ies)|research|risk|clients|patients|callers|training))"
+)
 _ACUTE_DISTRESS = re.compile(
     r"\b(?:"
-    r"kill(?:ing)? myself|end(?:ing)? (?:it all|my (?:own )?life)|"
-    r"t(?:ake|aking|ook) my (?:own )?life|suicid(?:e|al)|self[- ]?harm(?:ing|ed)?|"
-    r"(?:harm|hurt)(?:ing)? myself|want(?:ed)? to die|wish(?:ed)? (?:i|I) (?:was|were) dead|"
-    r"better off dead|(?:do not|don't|dont) want to (?:be alive|live|be here any ?more)|"
-    r"no reason to (?:live|go on)"
+    r"kill(?:ing)? myself(?!\s+(?:with|over|at|for|trying|working|laughing))|"
+    r"end(?:ing)? (?:it all|my (?:own )?life)|"
+    r"t(?:ake|aking|ook) my (?:own )?life(?!\s+(?:savings|in|into|back|forward|around|over|"
+    r"apart|elsewhere|somewhere|to|on|seriously)\b)(?![^\w\s]s\b)|"  # not "my life's work"
+    rf"suicid(?:e|al){_CAREER_CONTEXT}|self[- ]?harm(?:ing|ed)?{_CAREER_CONTEXT}|"
+    r"harm(?:ing|ed)? myself|"
+    r"(?:want(?:ed)?|wanting|going|tempted|urges?|plan(?:ning)?|thinking about|thoughts of) "
+    r"(?:to )?hurt(?:ing)? myself|"
+    r"(?:want(?:ed)? to|wanna) die|wish(?:ed)? (?:i|I) (?:was|were) dead|better off dead|"
+    rf"(?:do not|don't|dont) want to (?:be alive|live{_CLAUSE_END}|be here any ?more)|"
+    rf"no reason to (?:live|go on){_CLAUSE_END}"
     r")\b",
     re.IGNORECASE,
 )
@@ -166,12 +180,29 @@ _DEMOGRAPHIC = (
     "woman",
     "women",
 )
+# Kindred words: a person who wrote one may be answered with another, since naming who the
+# work serves ("new mothers", so "maternity work for women") is not a guess about the person.
+_KINDRED = (
+    frozenset({"female", "girl", "girls", "mother", "mum", "woman", "women"}),
+    frozenset({"father", "male"}),
+    frozenset({"ethnic", "ethnicity"}),
+    frozenset({"pregnancy", "pregnant"}),
+    frozenset({"religion", "religious"}),
+)
 _MBTI = re.compile(r"\b[IE][NS][TF][JP]\b")  # type codes are written in capitals
 _PERCENT = re.compile(r"\b\d{1,3}(?:\.\d+)?\s?(?:%|per ?cent\b)", re.IGNORECASE)
 
 
 def _words(term: str) -> re.Pattern[str]:
     return re.compile(rf"(?<![\w-]){re.escape(term)}(?![\w-])", re.IGNORECASE)
+
+
+def _said_any(terms: Iterable[str], person: str) -> bool:
+    """Whether the person used one of the terms, singular or plural ("mothers", "mums")."""
+    return any(
+        re.search(rf"(?<![\w-]){re.escape(term)}s?(?![\w-])", person, re.IGNORECASE)
+        for term in terms
+    )
 
 
 _HEALTH_PATTERNS = tuple((term, _words(term)) for term in _HEALTH)
@@ -197,7 +228,8 @@ def _said(term: str, person: str) -> bool:
             )
             is not None
         )
-    return _words(term).search(person) is not None
+    kindred = next((group for group in _KINDRED if term in group), frozenset({term}))
+    return _said_any(kindred, person)
 
 
 def inferred_sensitive_terms(model_texts: Iterable[str], person_texts: Iterable[str]) -> list[str]:

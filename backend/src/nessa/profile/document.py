@@ -24,7 +24,14 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from nessa.catalogue.places import resolve_city
 from nessa.errors import ErrorCode, ErrorStage, NessaError
@@ -123,6 +130,13 @@ class SalaryFloor(BaseModel):
     amount: Money
     period: PayPeriod = Field(description="Annual unless the person says otherwise.")
     basis: Literal["gross"] = "gross"
+
+    @field_validator("amount")
+    @classmethod
+    def _more_than_nothing(cls, amount: Money) -> Money:
+        if amount.minor_units == 0:
+            raise ValueError("a salary floor is more than £0; no floor is Unknown or Skipped")
+        return amount
 
 
 class SalaryInput(_FieldInput[SalaryFloor]):
@@ -326,7 +340,7 @@ def checked_input(name: str, field: FieldInput) -> FieldInput:
 
 
 def apply_updates(
-    previous: ProfileDocument, updates: Mapping[str, tuple[FieldInput, uuid.UUID]]
+    previous: ProfileDocument, updates: Mapping[str, tuple[FieldInput, uuid.UUID | None]]
 ) -> tuple[ProfileDocument, list[str]]:
     """The next document and the fields it changes. Each updated field that changes cites
     its update's source; every other field keeps its value and its source."""

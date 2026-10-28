@@ -52,7 +52,7 @@ def base(scenario: Scenario) -> str:
     return f"/v1/workspaces/{scenario.workspace_id}"
 
 
-def discover(scenario: Scenario, version: int = 2) -> dict[str, Any]:
+def discover(scenario: Scenario, version: int = 2, **worker_settings: str) -> dict[str, Any]:
     submitted = scenario.api.write(
         "POST",
         f"{base(scenario)}/discoveries",
@@ -61,7 +61,7 @@ def discover(scenario: Scenario, version: int = 2) -> dict[str, Any]:
     )
     assert submitted.status_code == 202, submitted.text
     body: dict[str, Any] = submitted.json()
-    worker = scenario.worker("worker")
+    worker = scenario.worker("worker", **worker_settings)
     scenario.wait_terminal(body["discovery_id"])
     assert worker.stop() == 0
     return body
@@ -197,6 +197,50 @@ def test_a_suggestion_becomes_a_target_only_by_the_person_s_choice(scenario: Sce
 
 
 @pytest.mark.req("DIV1-06")
+def test_a_current_role_with_no_searchable_word_is_reported_never_a_search_that_found_nothing(
+    scenario: Scenario,
+) -> None:
+    # Task 6 review A-M6: like a model query, it is listed as unsearchable, not run.
+    put = scenario.api.write(
+        "PUT",
+        f"{base(scenario)}/profile",
+        scenario.token,
+        {
+            "expected_version": 2,
+            "profile": {**ANSWERS, "current_role": {"state": "provided", "value": "Of the"}},
+        },
+    )
+    assert put.status_code == 201, put.text
+
+    result = slate(scenario, discover(scenario, version=3)["discovery_id"])
+
+    assert "Of the" in result["unsearchable_queries"]
+    assert "Of the" not in [q["text"] for q in result["queries"]]
+
+
+@pytest.mark.req("PROF-05", "MODEL-02")
+def test_a_discovery_invalid_after_its_repair_fails_typed_and_has_no_slate(
+    scenario: Scenario,
+) -> None:
+    # Task 6 review A-M2: the discovery kind's own failure path, not only the interview's.
+    discovery_id = discover(scenario, fake_failure="invalid_always")["discovery_id"]
+
+    found = scenario.api.get(f"{base(scenario)}/discoveries/{discovery_id}", scenario.token)
+    run = found.json()["run"]
+    assert (run["status"], run["failure_class"]) == ("failed", "invalid_model_output")
+    assert found.json()["proposal"] is None
+    [attempt] = scenario.attempts(discovery_id)
+    assert attempt["requests_sent"] == 2  # the first request and one repair, never more
+    refused = scenario.api.get(f"{base(scenario)}/discoveries/{discovery_id}/slate", scenario.token)
+    assert (refused.status_code, refused.json()["error"]["code"]) == (
+        409,
+        "PROPOSAL_NOT_AVAILABLE",
+    )  # a failure is never an empty slate
+    assert scenario.profile()["version"] == 2
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("DIV1-06")
 def test_a_discovery_needs_an_answer_that_describes_work_and_the_current_version(
     infra: Infra, api: ApiClient, ada: str
 ) -> None:
@@ -296,6 +340,46 @@ def test_the_sketch_lists_esco_requirements_for_a_target_and_every_step_stays_un
     assert not re.search(r"feasible|optimal|£\s?\d", json.dumps(sketch), re.IGNORECASE)
 
 
+@pytest.mark.req("STATE-05", "REC1-07")
+def test_the_sketch_uses_the_occupation_the_person_chose_even_when_its_title_is_shared(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    # In ESCO 260 preferred labels are also another occupation's label ("administrative
+    # assistant"). The sample has none, so the test gives one to another occupation and
+    # removes it after (Task 6 review A-I-3).
+    def holder(title: str) -> str:
+        found = api.get("/v1/taxonomy/occupations", ada, q=title).json()
+        concept_id: str = found["label_matches"][0]["concept_id"]
+        return concept_id
+
+    mechanic, restorer = holder("bicycle mechanic"), holder("furniture restorer")
+    workspace = api.create_workspace(ada, "Shared title (synthetic)")["workspace_id"]
+    infra.query(
+        "INSERT INTO nessa.occupation_labels (concept_id, label, normalised, kind) "
+        "VALUES (%s, 'bicycle mechanic', 'bicycle mechanic', 'alternative')",
+        (restorer,),
+    )
+    try:
+        chosen = api.write(
+            "POST",
+            f"/v1/workspaces/{workspace}/targets",
+            ada,
+            {"expected_version": 0, "concept_id": mechanic},
+        )
+        sketch = api.get(f"/v1/workspaces/{workspace}/sketch", ada).json()
+    finally:
+        infra.query(
+            "DELETE FROM nessa.occupation_labels WHERE concept_id = %s AND label = %s",
+            (restorer, "bicycle mechanic"),
+        )
+
+    assert chosen.status_code == 201, chosen.text
+    [target] = sketch["targets"]
+    assert target["resolution"] == "esco"  # never "choose the one you mean" again
+    assert [o["concept_id"] for o in target["occupations"]] == [mechanic]
+    assert target["requirements"]
+
+
 @pytest.mark.req("SEC-02", "API-01")
 def test_another_account_or_a_missing_workspace_is_not_found_never_an_empty_result(
     api: ApiClient, ada: str, ben: str, scenario: Scenario
@@ -303,6 +387,8 @@ def test_another_account_or_a_missing_workspace_is_not_found_never_an_empty_resu
     discovery_id = discover(scenario)["discovery_id"]
     missing = "00000000-0000-4000-8000-00000000dead"
     mine = base(scenario)
+    # A real occupation from this workspace's slate, so only the workspace check can refuse.
+    real = slate(scenario, discovery_id)["suggestions"][0]["concept_id"]
     reads = [
         f"{mine}/sketch",
         f"{mine}/discoveries",
@@ -318,7 +404,7 @@ def test_another_account_or_a_missing_workspace_is_not_found_never_an_empty_resu
         assert absent.status_code == 404, path
     writes = [
         ("POST", f"{mine}/discoveries", {"expected_profile_version": 2}),
-        ("POST", f"{mine}/targets", {"expected_version": 2, "concept_id": missing}),
+        ("POST", f"{mine}/targets", {"expected_version": 2, "concept_id": real}),
         (
             "PUT",
             f"{mine}/interview/preferences",

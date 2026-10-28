@@ -80,7 +80,10 @@ def submit(
         )
         if isinstance(view, SupportShown):
             return CommandResult(
-                200, SupportResponseOut.of(view).model_dump(mode="json"), workspace_id
+                200,
+                SupportResponseOut.of(view).model_dump(mode="json"),
+                workspace_id,
+                record=False,
             )
         return CommandResult(
             202, turn_out(tx, deps.keyring, view).model_dump(mode="json"), workspace_id
