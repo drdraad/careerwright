@@ -17,6 +17,7 @@ from nessa.api.deps import ApiDependencies
 from nessa.config import ApiSettings
 from nessa.identity.keyring import KEY_BYTES, Keyring
 from nessa.identity.model_choice import ModelChoice
+from nessa.profile.document import FIELD_SPECS, FieldKind
 from tests.api.test_guard_and_envelope import ENV, HOST, RefusingVerifier
 from tools.openapi import render
 
@@ -62,3 +63,20 @@ def test_every_operation_has_a_named_unique_id() -> None:
     assert len(ids) == len(set(ids))
     assert all("_v1_" not in operation for operation in ids), ids  # names, not generated paths
     assert json.loads(render())["info"]["title"] == "Nessa local API"
+
+
+@pytest.mark.req("ARC1-10")
+def test_the_profile_input_publishes_every_list_bound_the_server_checks() -> None:
+    schemas = openapi_document()["components"]["schemas"]
+
+    published = {}
+    for name, prop in schemas["ProfileInput"]["properties"].items():
+        field = schemas[prop["$ref"].rsplit("/", 1)[-1]]
+        arrays = [s for s in field["properties"]["value"]["anyOf"] if s.get("type") == "array"]
+        if arrays:
+            published[name] = arrays[0].get("maxItems")
+
+    # The web reads these from the generated client instead of restating them.
+    assert published == {
+        name: spec.max_items for name, spec in FIELD_SPECS.items() if spec.kind is FieldKind.LIST
+    }

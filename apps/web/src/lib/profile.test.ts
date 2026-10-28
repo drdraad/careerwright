@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { ProfileDocument } from "@/generated/api";
-import { changedFields, describeField, draftFrom, inputFrom, rebaseDraft } from "./profile";
+import openapi from "@/generated/openapi.json";
+import {
+  changedFields,
+  describeField,
+  draftFrom,
+  inputFrom,
+  listLimit,
+  rebaseDraft,
+} from "./profile";
+import type { ProfileFieldName } from "./vocabulary";
 
 const SOURCE = "6f1d3c2a-0000-4000-8000-000000000001";
 
@@ -70,6 +79,32 @@ describe("[API-04] the profile form sends exactly what was answered, in integer 
 
     expect(result.ok).toBe(false);
     expect(!result.ok && result.problems).toEqual({ cities: { kind: "too_many", limit: 3 } });
+  });
+
+  it("takes every list bound from the API's published schema, never its own copy", () => {
+    type Schema = {
+      $ref?: string;
+      type?: string;
+      maxItems?: number;
+      anyOf?: Schema[];
+      properties?: Record<string, Schema>;
+    };
+    const schemas = openapi.components.schemas as unknown as Record<string, Schema>;
+    const fields = schemas.ProfileInput?.properties ?? {};
+    const lists = Object.entries(fields).map(([name, field]) => {
+      const input = schemas[field.$ref?.split("/").pop() ?? ""];
+      const array = input?.properties?.value?.anyOf?.find((option) => option.type === "array");
+      return [name, array?.maxItems ?? 0, listLimit(name as ProfileFieldName)];
+    });
+
+    expect(lists.filter(([, published]) => published !== 0).map(([name]) => name)).toEqual([
+      "cities",
+      "target_titles",
+      "enjoyed_tasks",
+      "confident_tasks",
+      "evidenced_tasks",
+    ]);
+    for (const [name, published, used] of lists) expect([name, used]).toEqual([name, published]);
   });
 
   it("reads typed pounds and pence as integer minor units", () => {

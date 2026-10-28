@@ -109,6 +109,17 @@ export const Basis = { STATED: 'stated', INFERRED: 'inferred' } as const;
 export type Basis = typeof Basis[keyof typeof Basis];
 
 /**
+ * CityListInput
+ */
+export type CityListInput = {
+    state: FieldState;
+    /**
+     * Value
+     */
+    value?: Array<string> | null;
+};
+
+/**
  * ConnectionCheckResult
  *
  * What the model proposes for the synthetic persona. Structurally valid is not true.
@@ -943,26 +954,26 @@ export type ProfileInput = {
     /**
      * At most 3 distinct cities from `GET /v1/places`.
      */
-    cities: TextListInput;
+    cities: CityListInput;
     /**
      * At most 3 active targets.
      */
-    target_titles: TextListInput;
+    target_titles: TargetListInput;
     weekly_study_hours: HoursInput;
     direct_spend_cap: MoneyInput;
     monthly_payment_cap: MoneyInput;
     /**
      * Tasks the person enjoys (interest), at most 8.
      */
-    enjoyed_tasks: TextListInput;
+    enjoyed_tasks: TaskListInput;
     /**
      * Tasks the person believes they can do (confidence), at most 8.
      */
-    confident_tasks: TextListInput;
+    confident_tasks: TaskListInput;
     /**
      * Tasks the person has evidence they can do, at most 8.
      */
-    evidenced_tasks: TextListInput;
+    evidenced_tasks: TaskListInput;
 };
 
 /**
@@ -1470,6 +1481,28 @@ export type SubmitTurn = {
 };
 
 /**
+ * TargetListInput
+ */
+export type TargetListInput = {
+    state: FieldState;
+    /**
+     * Value
+     */
+    value?: Array<string> | null;
+};
+
+/**
+ * TaskListInput
+ */
+export type TaskListInput = {
+    state: FieldState;
+    /**
+     * Value
+     */
+    value?: Array<string> | null;
+};
+
+/**
  * TaxonomyReleaseOut
  *
  * The import manifest of the ESCO release in use (TAX1-04). Show `attribution` and
@@ -1591,17 +1624,6 @@ export type TextListField = {
      * Source Ref Id
      */
     source_ref_id?: string | null;
-};
-
-/**
- * TextListInput
- */
-export type TextListInput = {
-    state: FieldState;
-    /**
-     * Value
-     */
-    value?: Array<string> | null;
 };
 
 /**

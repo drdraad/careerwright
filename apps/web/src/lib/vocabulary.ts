@@ -65,8 +65,8 @@ type FieldKind = "text" | "list" | "hours" | "money";
 
 type FieldWords = { label: string; hint: string; lessPrecise: string } & (
   | { kind: Exclude<FieldKind, "list"> }
-  // A list's bound is the API's (spec BND-1: three cities and three targets; eight tasks).
-  | { kind: "list"; limit: number; itemLabel: string }
+  // A list's bound comes from the API's published schema (`listLimit` in ./profile).
+  | { kind: "list"; itemLabel: string }
 );
 
 /** Words for each profile field and, per spec section 3, what a missing answer makes less precise. */
@@ -86,7 +86,6 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
   cities: {
     label: "Work areas",
     kind: "list",
-    limit: 3,
     itemLabel: "Work area",
     hint: "Up to three English cities, such as Leeds or Bristol.",
     lessPrecise: "Roles, pay and listings: none can be searched without a work area.",
@@ -94,7 +93,6 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
   target_titles: {
     label: "Target roles",
     kind: "list",
-    limit: 3,
     itemLabel: "Target role",
     hint: "Up to three roles you are considering.",
     lessPrecise: "Every later chapter: requirements, options and routes start from a target.",
@@ -120,7 +118,6 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
   enjoyed_tasks: {
     label: "Tasks you enjoy",
     kind: "list",
-    limit: 8,
     itemLabel: "Task you enjoy",
     hint: "Work you find satisfying, whether or not you are good at it yet.",
     lessPrecise: "Which directions are suggested: suggestions lean on your experience alone.",
@@ -128,7 +125,6 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
   confident_tasks: {
     label: "Tasks you believe you can do",
     kind: "list",
-    limit: 8,
     itemLabel: "Task you believe you can do",
     hint: "Things you are confident about, even without proof yet.",
     lessPrecise: "Which gaps are worth checking first.",
@@ -136,7 +132,6 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
   evidenced_tasks: {
     label: "Tasks you can show you have done",
     kind: "list",
-    limit: 8,
     itemLabel: "Task you can show",
     hint: "Things you have done and could point to, such as work, a course or a reference.",
     lessPrecise: "Which requirements count as demonstrated rather than unresolved.",

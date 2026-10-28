@@ -2682,6 +2682,36 @@
         "title": "Basis",
         "description": "How an answer relates to what the person said (spec section 3: factual confirmations\nand inferences are styled differently)."
       },
+      "CityListInput": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/FieldState"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 120,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "CityListInput"
+      },
       "ConnectionCheckResult": {
         "properties": {
           "suggested_title": {
@@ -3882,11 +3912,11 @@
             "$ref": "#/components/schemas/TextInput"
           },
           "cities": {
-            "$ref": "#/components/schemas/TextListInput",
+            "$ref": "#/components/schemas/CityListInput",
             "description": "At most 3 distinct cities from `GET /v1/places`."
           },
           "target_titles": {
-            "$ref": "#/components/schemas/TextListInput",
+            "$ref": "#/components/schemas/TargetListInput",
             "description": "At most 3 active targets."
           },
           "weekly_study_hours": {
@@ -3899,15 +3929,15 @@
             "$ref": "#/components/schemas/MoneyInput"
           },
           "enjoyed_tasks": {
-            "$ref": "#/components/schemas/TextListInput",
+            "$ref": "#/components/schemas/TaskListInput",
             "description": "Tasks the person enjoys (interest), at most 8."
           },
           "confident_tasks": {
-            "$ref": "#/components/schemas/TextListInput",
+            "$ref": "#/components/schemas/TaskListInput",
             "description": "Tasks the person believes they can do (confidence), at most 8."
           },
           "evidenced_tasks": {
-            "$ref": "#/components/schemas/TextListInput",
+            "$ref": "#/components/schemas/TaskListInput",
             "description": "Tasks the person has evidence they can do, at most 8."
           }
         },
@@ -4767,6 +4797,66 @@
         ],
         "title": "SubmitTurn"
       },
+      "TargetListInput": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/FieldState"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 120,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "TargetListInput"
+      },
+      "TaskListInput": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/FieldState"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 120,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "TaskListInput"
+      },
       "TaxonomyReleaseOut": {
         "properties": {
           "dataset_id": {
@@ -4970,35 +5060,6 @@
           "state"
         ],
         "title": "TextListField"
-      },
-      "TextListInput": {
-        "properties": {
-          "state": {
-            "$ref": "#/components/schemas/FieldState"
-          },
-          "value": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string",
-                  "maxLength": 120,
-                  "minLength": 1
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Value"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "state"
-        ],
-        "title": "TextListInput"
       },
       "TurnOut": {
         "properties": {

@@ -76,6 +76,24 @@ class TextListInput(_FieldInput[list[TextValue]]):
     pass
 
 
+def _published_bound(limit: int) -> object:
+    """A list bound in the published schema (`maxItems`), so clients read it from the
+    generated client. `checked_input` enforces it, naming the problem."""
+    return Field(json_schema_extra={"maxItems": limit})
+
+
+class CityListInput(TextListInput):
+    value: Annotated[list[TextValue], _published_bound(MAX_CITIES)] | None = None
+
+
+class TargetListInput(TextListInput):
+    value: Annotated[list[TextValue], _published_bound(MAX_TARGETS)] | None = None
+
+
+class TaskListInput(TextListInput):
+    value: Annotated[list[TextValue], _published_bound(MAX_TASKS)] | None = None
+
+
 class HoursInput(_FieldInput[HoursValue]):
     pass
 
@@ -110,20 +128,20 @@ class ProfileInput(BaseModel):
 
     preferred_name: TextInput
     current_role: TextInput
-    cities: TextListInput = Field(
+    cities: CityListInput = Field(
         description=f"At most {MAX_CITIES} distinct cities from `GET /v1/places`."
     )
-    target_titles: TextListInput = Field(description=f"At most {MAX_TARGETS} active targets.")
+    target_titles: TargetListInput = Field(description=f"At most {MAX_TARGETS} active targets.")
     weekly_study_hours: HoursInput
     direct_spend_cap: MoneyInput
     monthly_payment_cap: MoneyInput
-    enjoyed_tasks: TextListInput = Field(
+    enjoyed_tasks: TaskListInput = Field(
         description=f"Tasks the person enjoys (interest), at most {MAX_TASKS}."
     )
-    confident_tasks: TextListInput = Field(
+    confident_tasks: TaskListInput = Field(
         description=f"Tasks the person believes they can do (confidence), at most {MAX_TASKS}."
     )
-    evidenced_tasks: TextListInput = Field(
+    evidenced_tasks: TaskListInput = Field(
         description=f"Tasks the person has evidence they can do, at most {MAX_TASKS}."
     )
 

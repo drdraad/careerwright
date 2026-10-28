@@ -36,6 +36,8 @@ async function generateInto(directory, documentPath) {
       "@hey-api/client-fetch",
       { name: "@hey-api/typescript", enums: "javascript" },
       { name: "@hey-api/sdk" },
+      // The schemas as constants: input bounds (such as a list's `maxItems`) come from here.
+      { name: "@hey-api/schemas", type: "json" },
     ],
   });
 }

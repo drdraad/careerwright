@@ -16,6 +16,7 @@ import {
   draftFrom,
   type FieldProblem,
   inputFrom,
+  listLimit,
   type ProfileDraft,
   problemText,
   rebaseDraft,
@@ -251,7 +252,7 @@ export function ProfileEditor({
                     <ListInput
                       label={meta.label}
                       itemLabel={meta.itemLabel}
-                      limit={meta.limit}
+                      limit={listLimit(name)}
                       draft={field}
                       error={error}
                       describedBy={describedBy}

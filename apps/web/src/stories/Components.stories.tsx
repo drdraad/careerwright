@@ -6,6 +6,7 @@ import { Button } from "@/components/Button";
 import { FieldStateSelect, ListInput, ValueInput } from "@/components/fields";
 import { StatusBadge, SyntheticLabel } from "@/components/Status";
 import { WorkState } from "@/generated/api";
+import { listLimit } from "@/lib/profile";
 import { DISPLAY_STATE } from "@/lib/vocabulary";
 
 const meta: Meta = { title: "Components" };
@@ -98,7 +99,7 @@ export const FormControls: Story = {
       <ListInput
         label="Work areas"
         itemLabel="Work area"
-        limit={3}
+        limit={listLimit("cities")}
         draft={{ state: "provided", text: "", items: ["Manchester", "Leeds", "York"] }}
         onChange={() => {}}
       />
