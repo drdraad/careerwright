@@ -1,7 +1,7 @@
 # ADR 0005: The web app, its toolchain and same-origin access to the API
 
 - Status: Accepted (Task 4, Sprint 1; evidence: `make check`, `make acceptance`). Decision 1's
-  age exception for Next.js 16.4.1 is provisional until its removal step is done.
+  provisional age exception for Next.js 16.4.1 was removed in Task 6c (2026-10-28).
 - Date: 2026-10-28
 - Requirements: S1.4, S1.5, ARC1-01/03/10, BND1-11/12/13, UI-04/05/06/09/11, STATE-01/07,
   DUR-03, SEC-04; Global Constraints 2, 9, 10 and 11
@@ -17,20 +17,16 @@ loopback boundary the web service must join without weakening.
 
 ## Decisions
 
-1. **Versions** (all in `docs/dependencies.md`, each at least 14 days old when pinned,
-   enforced by pnpm's `minimumReleaseAge`). Next.js 16.4.1, React 19.3.0, TypeScript 6.0.3,
+1. **Versions** (all in `docs/dependencies.md`, each at least 14 days old, enforced by
+   pnpm's `minimumReleaseAge`). Next.js 16.4.1, React 19.3.0, TypeScript 6.0.3,
    Tailwind CSS 4.3.3, Radix Dialog and Popover 1.3.1, TanStack Query 5.104.2, and the
    Firebase JS SDK as `@firebase/app` 0.16.3 and `@firebase/auth` 1.13.7.
-   - **One exception to the 14-day rule:** Next.js 16.4.1 was 13.5 days old. Every older 16.x
-     is affected by GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr (critical, remote code
-     execution) and GHSA-p3m5-59mp-jv5r (high), so the age rule's purpose (avoiding a fresh,
-     unproven release) loses to a known critical defect. The exception names that version
-     only (`apps/web/pnpm-workspace.yaml`). It was accepted by the controller in the Task 4
-     review, and it is **provisional**: 16.4.1 turns 14 days old at 2026-10-28T17:43Z.
-   - **Removal step (after 2026-10-28T17:43Z):** delete `minimumReleaseAgeExclude` from
-     `apps/web/pnpm-workspace.yaml`; `cd apps/web && pnpm install --frozen-lockfile` must
-     pass with no lockfile change; then delete this exception here, in
-     `docs/dependencies.md` and in `CLAUDE.md`'s compatibility boundary.
+   - **No exception to the 14-day rule.** Next.js 16.4.1 was pinned at 13.5 days old under a
+     provisional exception, because every older 16.x is affected by GHSA-2464-fhr4-w9xw and
+     GHSA-673q-mjm6-r5xr (critical) and GHSA-p3m5-59mp-jv5r (high). It turned 14 days old
+     at 2026-10-28T17:43Z, and Task 6c removed the exception the same day:
+     `minimumReleaseAgeExclude` is gone from `apps/web/pnpm-workspace.yaml`, and
+     `pnpm install --frozen-lockfile` passes with the lockfile unchanged.
    - **TypeScript 6, not 7.** TypeScript 7 ships no JavaScript compiler API; the client
      generator uses it. 6.0.3 is the newest release that has it. Next.js type-checks with it.
    - **The Firebase packages, not the `firebase` umbrella.** Only app and auth are used; the

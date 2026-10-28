@@ -1,20 +1,7 @@
 # pnpm settings for apps/web (a single package, not a workspace of several).
-# Every resolved version, direct or transitive, must be at least 14 days old (20160 minutes).
+# Every resolved version, direct or transitive, must be at least 14 days old (20160 minutes),
+# with no exception.
 minimumReleaseAge: 20160
-# One recorded exception (docs/dependencies.md): Next.js 16.4.1 is the release that fixes
-# three advisories affecting every older 16.x (GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr,
-# critical; GHSA-p3m5-59mp-jv5r, high). It was 13.5 days old when pinned on 2026-10-28.
-minimumReleaseAgeExclude:
-  - next@16.4.1
-  - "@next/env@16.4.1"
-  - "@next/swc-darwin-arm64@16.4.1"
-  - "@next/swc-darwin-x64@16.4.1"
-  - "@next/swc-linux-arm64-gnu@16.4.1"
-  - "@next/swc-linux-arm64-musl@16.4.1"
-  - "@next/swc-linux-x64-gnu@16.4.1"
-  - "@next/swc-linux-x64-musl@16.4.1"
-  - "@next/swc-win32-arm64-msvc@16.4.1"
-  - "@next/swc-win32-x64-msvc@16.4.1"
 # Next.js lists sharp (image optimisation) as optional; the app serves no optimised images,
 # so its native libvips binaries are never installed.
 ignoredOptionalDependencies:

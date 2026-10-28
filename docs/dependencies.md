@@ -106,7 +106,7 @@ registry, checked 2026-10-28.
 
 | Package | Version | Published | Licence | Why |
 |---|---|---|---|---|
-| `next` | 16.4.1 | 2026-10-14 | MIT | the web framework (spec ARC-1). **Age exception**, below |
+| `next` | 16.4.1 | 2026-10-14 | MIT | the web framework (spec ARC-1). Fixes GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr (critical) and GHSA-p3m5-59mp-jv5r (high), which affect every older 16.x |
 | `react`, `react-dom` | 19.3.0 | 2026-09-09 | MIT | UI |
 | `@tanstack/react-query` | 5.104.2 | 2026-10-11 | MIT | server state (spec ARC-1) |
 | `@radix-ui/react-dialog`, `@radix-ui/react-popover` | 1.3.1 | 2026-10-12 | MIT | the evidence drawer, chapter menu and account menu (spec: Radix controls). Single primitives rather than the 55-package `radix-ui` bundle |
@@ -131,15 +131,10 @@ used unmodified), MIT OR Apache-2.0 (2), MIT-0 (2), CC-BY-4.0 (1: `caniuse-lite`
 data used by the build), CC0-1.0 (1), Python-2.0 (1), 0BSD (1). All are permissive or weak
 copyleft and compatible with local use. Not a legal review.
 
-Exceptions and accepted advisories (`pnpm audit`, 2026-10-28):
+Exceptions and accepted advisories (`pnpm audit`, 2026-10-28). No age exception remains: the
+provisional one for `next` 16.4.1 (pinned at 13.5 days old) was removed in Task 6c once it
+was 14 days old (ADR 0005 decision 1).
 
-- **`next` 16.4.1 was 13.5 days old when pinned** (published 2026-10-14T17:43Z). Every 16.x up
-  to 16.4.0 is affected by GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr (critical, remote
-  code execution) and GHSA-p3m5-59mp-jv5r (high). `minimumReleaseAgeExclude` names
-  `next@16.4.1` and its `@next/*` 16.4.1 packages only. It reaches 14 days on
-  2026-10-28T17:43Z. The exception is accepted and **provisional**: after that time, delete
-  `minimumReleaseAgeExclude`, check that `pnpm install --frozen-lockfile` passes with no
-  lockfile change, and remove this entry (ADR 0005 decision 1).
 - `sharp` (Next.js's optional image optimiser, with LGPL libvips binaries) is not installed
   (`ignoredOptionalDependencies`). The app serves no optimised images (`images.unoptimized`).
 - `js-yaml` is overridden from 4.2.0 to 4.3.2 (2026-08-26) for three CPU-exhaustion
