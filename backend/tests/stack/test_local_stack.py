@@ -140,7 +140,7 @@ BASH_PROBE = (
 
 
 def probe(stack: Stack, service: str, port: int) -> str:
-    if service in ("api", "edge"):
+    if service in ("api", "edge", "worker"):
         command = ["python", "-c", PYTHON_PROBE.replace("PORT", str(port))]
     elif service == "auth":
         command = ["node", "-e", NODE_PROBE.replace("PORT", str(port))]
@@ -162,15 +162,57 @@ def test_demo_mode_services_have_no_route_out_and_the_probe_can_see_one(
     assert accepted
 
     accepted.clear()
-    results = {service: probe(demo_stack, service, port) for service in ("api", "auth", "postgres")}
+    services = ("api", "worker", "auth", "postgres")
+    results = {service: probe(demo_stack, service, port) for service in services}
 
     assert "connected" not in results["postgres"], results
-    for service in ("api", "auth"):
+    for service in ("api", "worker", "auth"):
         outcome = json.loads(results[service])
         assert outcome["public_ip"] != "connected", (service, outcome)
         assert outcome["host"] != "connected", (service, outcome)
-    assert json.loads(results["api"])["dns"] != "resolved"
+    for service in ("api", "worker"):
+        assert json.loads(results[service])["dns"] != "resolved", service
     assert accepted == []  # nothing reached the host from inside the internal network
+
+
+@pytest.mark.req("BND1-11")
+def test_live_mode_gives_the_worker_and_only_the_worker_a_route_out(
+    demo_stack: Stack, host_listener: tuple[int, list[bool]]
+) -> None:
+    port, accepted = host_listener
+    live = Stack(
+        project=demo_stack.project, home=demo_stack.home, ports=demo_stack.ports, live=True
+    )
+    live.up(*CORE_SERVICES)
+    try:
+        worker = json.loads(probe(live, "worker", port))
+        assert worker["host"] == "connected"
+        assert accepted
+        accepted.clear()
+        api = json.loads(probe(live, "api", port))
+        assert api["host"] != "connected"
+        assert api["public_ip"] != "connected"
+        assert accepted == []
+    finally:
+        demo_stack.up(*CORE_SERVICES)  # back to demo for the remaining tests
+    assert json.loads(probe(demo_stack, "worker", port))["host"] != "connected"
+
+
+@pytest.mark.req("ARC1-08")
+def test_the_containerised_worker_runs_dbos_as_the_non_owner_runtime_role(
+    demo_stack: Stack,
+) -> None:
+    logs = demo_stack.logs("worker")
+
+    password = (demo_stack.home / "secrets" / "pg_dbos_runtime").read_text().strip()
+
+    assert '"msg": "worker ready"' in logs
+    assert "nessa_dbos_runtime:[redacted]@postgres:5432/nessa_dbos" in logs
+    assert password not in logs
+    assert (
+        demo_stack.exec("worker", "python", "-m", "nessa.identity.worker", "--check").returncode
+        == 0
+    )
 
 
 @pytest.mark.req("BND1-14", "STATE-07")

@@ -9,7 +9,7 @@ are recorded; a failed command can be retried with the same key.
 import hashlib
 import json
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 from nessa.db import Engine, Tx, actor_transaction
 from nessa.errors import ErrorCode, ErrorStage, NessaError
@@ -20,9 +20,11 @@ from nessa.identity.store import DuplicateReceiptError
 Execute = Callable[[Tx], tuple[int, dict[str, object]]]
 
 
-def fingerprint(command: str, request: dict[str, object]) -> str:
+def fingerprint(command: str, request: Mapping[str, object]) -> str:
     """SHA-256 of the canonical request. Callers replace secret fields before hashing."""
-    canonical = json.dumps({"command": command, "request": request}, sort_keys=True, default=str)
+    canonical = json.dumps(
+        {"command": command, "request": dict(request)}, sort_keys=True, default=str
+    )
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 

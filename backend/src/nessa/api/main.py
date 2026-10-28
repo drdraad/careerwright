@@ -9,6 +9,7 @@ from nessa.config import ApiSettings
 from nessa.db import create_engine
 from nessa.identity.firebase import FirebaseTokenVerifier
 from nessa.identity.keyring import load_keyring
+from nessa.identity.model_choice import ModelChoice
 from nessa.logs import configure_logging
 
 
@@ -21,5 +22,10 @@ def build_app() -> FastAPI:
             engine=create_engine(settings.app_database, application_name="nessa-api"),
             verifier=FirebaseTokenVerifier(settings.firebase_project_id),
             keyring=load_keyring(settings.master_key_dir),
+            models=ModelChoice.configure(
+                settings.meta_test_model,
+                settings.meta_production_model,
+                settings.synthetic_model_role,
+            ),
         )
     )

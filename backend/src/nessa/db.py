@@ -31,6 +31,13 @@ class StoreUnavailableError(NessaError):
         )
 
 
+def url_with_password(config: DatabaseConfig) -> str:
+    """For libraries that take a URL string (DBOS). The password is registered for redaction."""
+    password = config.password().get_secret_value()
+    register_secret(password)
+    return sa.make_url(config.url).set(password=password).render_as_string(hide_password=False)
+
+
 def create_engine(
     config: DatabaseConfig, *, application_name: str, pool_size: int = 5
 ) -> sa.Engine:

@@ -1,0 +1,9 @@
+# Live mode (`make dev`): the DBOS worker, and only the worker, gets a route out of the
+# machine so its bounded model activity can reach the Meta Model API. Demo mode (`make demo`)
+# does not load this file, so no Nessa service can open an outbound connection.
+services:
+  worker:
+    networks: [internal, egress]
+
+networks:
+  egress: {}

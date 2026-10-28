@@ -45,9 +45,16 @@ ADAPTERS: dict[str, frozenset[str]] = {
     "nessa.cli": frozenset({"sqlalchemy", "alembic", "dbos"}),
     "nessa.migrations.": frozenset({"alembic"}),
     "nessa.identity.store": frozenset({"sqlalchemy"}),
+    "nessa.identity.credential_store": frozenset({"sqlalchemy"}),
+    "nessa.identity.run_store": frozenset({"sqlalchemy"}),
     "nessa.profile.store": frozenset({"sqlalchemy"}),
     "nessa.identity.keyring": frozenset({"cryptography"}),
     "nessa.identity.firebase": frozenset({"firebase_admin"}),
+    "nessa.identity.meta": frozenset({"httpx2", "openai", "pydantic_ai"}),
+    "nessa.identity.failures": frozenset({"pydantic_ai"}),
+    "nessa.identity.activity": frozenset({"pydantic_ai"}),
+    "nessa.identity.workflow": frozenset({"dbos"}),
+    "nessa.identity.worker": frozenset({"dbos", "pydantic_ai"}),
     "nessa.api.": frozenset({"fastapi", "starlette", "anyio"}),
 }
 EXCLUDED_PACKAGES = frozenset(

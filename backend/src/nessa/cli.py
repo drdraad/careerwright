@@ -5,6 +5,8 @@
 - `migrate [--revision R]`: application database only (tests use it to stop part-way).
 - `seed`: invited identities and the fixture workspace, created only if missing.
 - `reset-demo`: recreate the named fixture workspace; no other workspace is touched.
+- `reseal-credentials`: after `tools.localenv --rotate-master-key`, re-encrypt stored keys
+  under the new master key version.
 """
 
 import argparse
@@ -16,8 +18,11 @@ from alembic.config import Config
 from dbos import DBOS
 
 from nessa.config import OpsSettings
-from nessa.db import Tx, create_engine
+from nessa.db import Tx, create_engine, url_with_password
+from nessa.identity import credential_store
 from nessa.identity import store as identity_store
+from nessa.identity.credentials import credential_context
+from nessa.identity.keyring import Keyring, load_keyring
 from nessa.identity.records import EventKind
 from nessa.logs import configure_logging
 from nessa.profile import store as profile_store
@@ -47,9 +52,24 @@ def migrate_app(engine: sa.Engine, revision: str = "head") -> None:
 
 
 def migrate_dbos(settings: OpsSettings) -> None:
-    database = settings.dbos_owner_database
-    url = sa.make_url(database.url).set(password=database.password().get_secret_value())
-    DBOS.migrate(url.render_as_string(hide_password=False), application_role=DBOS_RUNTIME_ROLE)
+    DBOS.migrate(
+        url_with_password(settings.dbos_owner_database), application_role=DBOS_RUNTIME_ROLE
+    )
+
+
+def reseal_credentials(engine: sa.Engine, keyring: Keyring) -> int:
+    """Master-key rotation, step 2: re-encrypt every stored key under the current master key
+    version, in one transaction. Afterwards older key files can be retired."""
+    resealed = 0
+    with engine.begin() as tx:
+        for credential_id, workspace_id, sealed in credential_store.all_sealed(tx):
+            if sealed.key_version == keyring.current_version:
+                continue
+            context = credential_context(workspace_id, credential_id)
+            fresh = keyring.seal(keyring.open(sealed, context), context)
+            credential_store.replace_sealed(tx, credential_id, fresh)
+            resealed += 1
+    return resealed
 
 
 def _create_fixture_workspace(tx: Tx, settings: OpsSettings, *, last_event_seq: int) -> None:
@@ -108,6 +128,7 @@ def main(argv: list[str] | None = None) -> None:
     migrate.add_argument("--revision", default="head")
     sub.add_parser("seed")
     sub.add_parser("reset-demo")
+    sub.add_parser("reseal-credentials")
     args = parser.parse_args(argv)
 
     configure_logging("setup")
@@ -125,6 +146,11 @@ def main(argv: list[str] | None = None) -> None:
                 seed(engine, settings)
             case "reset-demo":
                 reset_demo(engine, settings)
+            case "reseal-credentials":
+                if settings.master_key_dir is None:
+                    raise SystemExit("NESSA_MASTER_KEY_DIR is required to reseal credentials")
+                count = reseal_credentials(engine, load_keyring(settings.master_key_dir))
+                _log.info("credentials resealed", extra={"count": count})
         _log.info("setup command finished", extra={"command": args.command})
     finally:
         engine.dispose()

@@ -4,14 +4,15 @@
 #   make demo         start the stack with no route out of the machine (fixture workspace)
 #   make check        format, lint, types and fast deterministic tests (no Docker)
 #   make acceptance   full offline suite against real PostgreSQL 16, DBOS and the Auth emulator
-#   make stop        stop every service, bounded; persisted work is kept
+#   make live-smoke   budget-capped real Meta smoke on the test model; PRODUCTION=1 qualifies production
+#   make stop       stop every service, bounded; persisted work is kept
 #   make reset-demo   recreate the named fixture workspace only
 # Local secrets and master keys live in NESSA_HOME (default ~/.nessa/l0), never in the repository.
 
 UV := uv run --locked
 BACKEND := cd backend &&
 
-.PHONY: setup dev demo check acceptance stop reset-demo status
+.PHONY: setup dev demo check acceptance live-smoke stop reset-demo status
 
 setup:
 	$(BACKEND) uv python install 3.12 && uv sync --locked
@@ -33,6 +34,9 @@ check:
 
 acceptance:
 	$(BACKEND) $(UV) pytest -m "integration or stack"
+
+live-smoke:
+	$(BACKEND) $(UV) python -m tools.live_smoke $(if $(PRODUCTION),--production-model,)
 
 stop:
 	$(BACKEND) $(UV) python -m tools.stack stop

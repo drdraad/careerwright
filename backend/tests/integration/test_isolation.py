@@ -68,6 +68,29 @@ def test_writes_to_another_actors_workspace_fail_and_change_nothing(
     )
 
 
+@pytest.mark.req("SEC-01", "DUR-03")
+def test_runs_keys_and_spend_of_another_actor_are_invisible(
+    api: ApiClient, ada: str, ben: str
+) -> None:
+    workspace_id = api.create_workspace(ada)["workspace_id"]
+    base = f"/v1/workspaces/{workspace_id}"
+    api.write(
+        "POST",
+        f"{base}/credentials",
+        ada,
+        {"api_key": "k" * 40, "consent_to_encrypted_storage": True},
+    )
+    submitted = api.write("POST", f"{base}/runs", ada, {"kind": "connection_check"})
+    run_id = submitted.json()["run_id"]
+
+    assert submitted.status_code == 202
+    assert submitted.headers["location"] == f"{base}/runs/{run_id}"
+    assert submitted.json()["status"] == "queued"
+    for path in (f"{base}/runs/{run_id}", f"{base}/runs", f"{base}/credentials", f"{base}/spend"):
+        assert api.get(path, ben).status_code == 404, path
+    assert api.write("POST", f"{base}/runs", ben, {"kind": "connection_check"}).status_code == 404
+
+
 @pytest.mark.req("SEC-02", "ARC1-08")
 @pytest.mark.parametrize("table", WORKSPACE_TABLES)
 def test_the_api_role_sees_no_rows_of_another_actors_workspace(infra: Infra, table: str) -> None:
@@ -115,6 +138,10 @@ def test_runtime_roles_are_not_owners_and_cannot_bypass_row_security(infra: Infr
         for r in roles
     )
     assert owners == [{"tableowner": "nessa_migrator"}]
+    dbos_owners = infra.query(
+        "SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname = 'dbos'", database="nessa_dbos"
+    )
+    assert dbos_owners == [{"tableowner": "nessa_dbos_owner"}]
     rls = infra.query(
         "SELECT relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
         "WHERE n.nspname = 'nessa' AND c.relkind = 'r' AND NOT c.relrowsecurity"

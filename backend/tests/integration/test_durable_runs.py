@@ -1,0 +1,321 @@
+"""Durability and journal privacy of model runs against real PostgreSQL 16 and DBOS
+(ADR 0002; ARC1-05/06/07, DUR-01/02, MODEL-05/08). Workers are real processes; "kill" is
+SIGKILL. Every scenario ends with a leak scan of both databases and every worker log."""
+
+import secrets
+import signal
+from collections.abc import Iterator
+from pathlib import Path
+
+import pytest
+from pydantic import SecretStr
+
+from nessa.identity.workflow import ACTIVITY_MAX_ATTEMPTS
+from tests.integration.durable import Scenario, make_scenario
+from tests.support.client import ApiClient
+from tests.support.fake_models import FakeFailure, key_fingerprint
+from tests.support.infra import Infra
+from tests.support.workers import wait_for
+
+pytestmark = pytest.mark.integration
+
+
+@pytest.fixture
+def scenario(infra: Infra, api: ApiClient, ada: str, tmp_path: Path) -> Iterator[Scenario]:
+    started = make_scenario(infra, api, ada, tmp_path)
+    yield started
+    # A failed assertion must not leave a worker running against the session database.
+    for worker in started.workers:
+        worker.kill_if_running()
+
+
+@pytest.mark.req("ARC1-05", "ARC1-06", "DUR-03")
+def test_a_run_completes_with_a_sealed_output_and_an_identifier_only_journal(
+    scenario: Scenario,
+) -> None:
+    run_id = scenario.submit()
+    queued = scenario.api_run(run_id)
+    worker = scenario.worker("worker")
+    run = scenario.wait_terminal(run_id)
+    assert worker.stop() == 0
+
+    assert queued["status"] == "queued"
+    assert (run["status"], run["failure_class"]) == ("complete", None)
+    shown = scenario.api_run(run_id)
+    assert shown["output"]["suggested_title"].endswith(scenario.output_sentinel)
+    assert shown["output"]["reason"] == f"key fingerprint {key_fingerprint_of(scenario)}"
+    assert scenario.assert_identifier_only_journal(run_id) == {
+        "status": "complete",
+        "output_id": str(run["output_id"]),
+    }
+    [attempt] = scenario.attempts(run_id)
+    assert (attempt["outcome"], attempt["spend_state"]) == ("succeeded", "reconciled")
+    assert attempt["cost_nano_usd"] > 0
+    assert attempt["reserved_nano_usd"] >= attempt["cost_nano_usd"]
+    states = [
+        (e["kind"], e["state"])
+        for e in scenario.api.get(
+            f"/v1/workspaces/{scenario.workspace_id}/events", scenario.token
+        ).json()["items"]
+        if e["subject_id"] == run_id
+    ]
+    assert states == [("run.state_changed", s) for s in ("queued", "running", "complete")]
+    assert scenario.leaks() == []
+
+
+def key_fingerprint_of(scenario: Scenario) -> str:
+    return key_fingerprint(SecretStr(scenario.api_key))
+
+
+@pytest.mark.req("ARC1-05", "DUR-02")
+def test_worker_killed_mid_call_recovers_to_one_output_and_keeps_the_ambiguous_charge(
+    scenario: Scenario,
+) -> None:
+    run_id = scenario.submit()
+    first = scenario.worker("first", fake_delay_s="30")
+    wait_for(lambda: len(scenario.attempts(run_id)) == 1, timeout_s=30, what="attempt")
+    # The outbox entry is already marked, so only DBOS recovery can finish this run.
+    wait_for(
+        lambda: (
+            scenario.infra.query(
+                "SELECT dispatched_at FROM nessa.outbox WHERE run_id = %s", (run_id,)
+            )[0]["dispatched_at"]
+            is not None
+        ),
+        timeout_s=10,
+        what="dispatch mark",
+    )
+    first.kill()
+    assert scenario.run(run_id)["status"] == "running"
+
+    second = scenario.worker("second")
+    run = scenario.wait_terminal(run_id)
+    assert second.stop() == 0
+
+    assert run["status"] == "complete"
+    assert len(scenario.outputs(run_id)) == 1
+    attempts = scenario.attempts(run_id)
+    assert [(a["outcome"], a["spend_state"]) for a in attempts] == [
+        ("interrupted", "unknown"),  # may have been billed: its reservation stays committed
+        ("succeeded", "reconciled"),
+    ]
+    assert scenario.journal(run_id)["status"][0]["status"] == "SUCCESS"
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("DUR-02")
+def test_a_crash_after_acceptance_never_calls_the_model_again_and_keeps_the_usage(
+    scenario: Scenario,
+) -> None:
+    """Carry-forward M4: the accepted output is found before anything else, and the first
+    call's usage was committed with it."""
+    run_id = scenario.submit()
+    first = scenario.worker("first", crash_at="after_output_accepted")
+    assert first.wait_exit(60) == -signal.SIGKILL
+    [accepted] = scenario.outputs(run_id)
+    [paid] = scenario.attempts(run_id)
+
+    second = scenario.worker("second")
+    run = scenario.wait_terminal(run_id)
+    second.stop()
+
+    assert scenario.outputs(run_id) == [accepted]  # same row, untouched
+    assert run["output_id"] == accepted["output_id"]
+    first_attempt, reused = scenario.attempts(run_id)
+    assert first_attempt == paid
+    assert (paid["outcome"], paid["spend_state"]) == ("succeeded", "reconciled")
+    assert paid["input_tokens"] is not None
+    assert paid["cost_nano_usd"] is not None
+    assert (reused["outcome"], reused["spend_state"], reused["input_tokens"]) == (
+        "reused_accepted",
+        "none",
+        None,
+    )
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("ARC1-05", "DUR-01")
+def test_outbox_replay_after_a_dispatch_crash_starts_one_workflow(scenario: Scenario) -> None:
+    run_id = scenario.submit()
+    first = scenario.worker("first", crash_at="after_dispatch_before_mark", fake_delay_s="1")
+    assert first.wait_exit(60) == -signal.SIGKILL
+    outbox = scenario.infra.query("SELECT * FROM nessa.outbox WHERE run_id = %s", (run_id,))
+    assert outbox[0]["dispatched_at"] is None  # the crash lost the dispatch mark
+
+    second = scenario.worker("second")
+    run = scenario.wait_terminal(run_id)
+    wait_for(
+        lambda: (
+            scenario.infra.query(
+                "SELECT dispatched_at FROM nessa.outbox WHERE run_id = %s", (run_id,)
+            )[0]["dispatched_at"]
+            is not None
+        ),
+        timeout_s=10,
+        what="outbox replay",
+    )
+    second.stop()
+
+    assert run["status"] == "complete"
+    assert len(scenario.journal(run_id)["status"]) == 1
+    assert len(scenario.outputs(run_id)) == 1
+    assert [a["outcome"] for a in scenario.attempts(run_id)].count("succeeded") == 1
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("DUR-01")
+def test_replaying_a_completed_outbox_entry_has_no_effect(scenario: Scenario) -> None:
+    run_id = scenario.submit()
+    first = scenario.worker("first")
+    scenario.wait_terminal(run_id)
+    first.stop()
+    before = scenario.attempts(run_id)
+    scenario.infra.query(
+        "UPDATE nessa.outbox SET dispatched_at = NULL WHERE run_id = %s", (run_id,)
+    )
+
+    second = scenario.worker("second")
+    wait_for(
+        lambda: (
+            scenario.infra.query(
+                "SELECT dispatched_at FROM nessa.outbox WHERE run_id = %s", (run_id,)
+            )[0]["dispatched_at"]
+            is not None
+        ),
+        timeout_s=10,
+        what="redelivered entry",
+    )
+    second.stop()
+
+    assert scenario.attempts(run_id) == before
+    assert len(scenario.outputs(run_id)) == 1
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("ARC1-07")
+def test_a_transient_provider_error_is_retried_by_the_dbos_step_only(scenario: Scenario) -> None:
+    run_id = scenario.submit()
+    worker = scenario.worker("worker", fake_failure=FakeFailure.RATE_LIMIT_ONCE.value)
+    run = scenario.wait_terminal(run_id)
+    worker.stop()
+
+    assert run["status"] == "complete"
+    assert [a["outcome"] for a in scenario.attempts(run_id)] == ["transient_429", "succeeded"]
+    # The provider body echoed 20 characters of the key; none of it may be persisted or logged.
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("ARC1-07", "API-03")
+def test_exhausted_retries_end_provider_unavailable_never_an_empty_success(
+    scenario: Scenario,
+) -> None:
+    run_id = scenario.submit()
+    worker = scenario.worker("worker", fake_failure=FakeFailure.ALWAYS_UNAVAILABLE.value)
+    run = scenario.wait_terminal(run_id)
+    worker.stop()
+
+    assert (run["status"], run["failure_class"], run["output_id"]) == (
+        "provider_unavailable",
+        "provider_unavailable",
+        None,
+    )
+    assert len(scenario.attempts(run_id)) == ACTIVITY_MAX_ATTEMPTS
+    assert scenario.outputs(run_id) == []
+    assert scenario.api_run(run_id)["output"] is None
+    assert scenario.assert_identifier_only_journal(run_id) == {
+        "status": "provider_unavailable",
+        "failure_class": "provider_unavailable",
+    }
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("ARC1-06", "MODEL-06")
+def test_a_provider_error_echoing_the_key_is_classified_and_never_journalled(
+    scenario: Scenario,
+) -> None:
+    run_id = scenario.submit()
+    worker = scenario.worker("worker", fake_failure=FakeFailure.AUTH_ECHO.value)
+    run = scenario.wait_terminal(run_id)
+    worker.stop()
+
+    assert (run["status"], run["failure_class"]) == ("failed", "provider_authentication")
+    [attempt] = scenario.attempts(run_id)
+    # No usage reported: the charge is unknown and its reservation stays committed.
+    assert (attempt["outcome"], attempt["spend_state"]) == ("provider_authentication", "unknown")
+    scenario.assert_identifier_only_journal(run_id)
+    assert scenario.leaks() == []
+
+
+def test_connection_errors_are_retried_then_fail_visibly(scenario: Scenario) -> None:
+    run_id = scenario.submit()
+    worker = scenario.worker("worker", fake_failure=FakeFailure.CONNECTION_ERROR.value)
+    run = scenario.wait_terminal(run_id)
+    worker.stop()
+
+    assert (run["status"], run["failure_class"]) == ("provider_unavailable", "provider_unavailable")
+    assert [a["outcome"] for a in scenario.attempts(run_id)] == ["transient_connection"] * 3
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("ARC1-06")
+def test_an_unexpected_error_fails_typed_without_its_message(scenario: Scenario) -> None:
+    run_id = scenario.submit()
+    worker = scenario.worker("worker", fake_failure=FakeFailure.UNEXPECTED_ERROR.value)
+    run = scenario.wait_terminal(run_id)
+    worker.stop()
+
+    assert (run["status"], run["failure_class"]) == ("failed", "unknown_failure")
+    [attempt] = scenario.attempts(run_id)
+    assert attempt["outcome"] == "unknown_failure:RuntimeError"
+    journal = scenario.journal(run_id)
+    assert journal["status"][0]["status"] == "SUCCESS"
+    assert [step["error"] for step in journal["steps"]] == [None, None]
+    # The RuntimeError quoted the key and the output sentinel; only its class name persists.
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("MODEL-05")
+def test_revoking_the_key_stops_a_queued_run_before_any_call(scenario: Scenario) -> None:
+    run_id = scenario.submit()
+    [credential] = scenario.api.get(
+        f"/v1/workspaces/{scenario.workspace_id}/credentials", scenario.token
+    ).json()["items"]
+    scenario.api.write(
+        "POST",
+        f"/v1/workspaces/{scenario.workspace_id}/credentials/{credential['credential_id']}/revoke",
+        scenario.token,
+    )
+
+    worker = scenario.worker("worker")
+    run = scenario.wait_terminal(run_id)
+    worker.stop()
+
+    assert (run["status"], run["failure_class"]) == ("failed", "credential_unavailable")
+    [attempt] = scenario.attempts(run_id)
+    assert (attempt["spend_state"], attempt["input_tokens"]) == ("none", None)
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("MODEL-05")
+def test_rotating_the_key_while_a_run_is_queued_uses_the_new_key(scenario: Scenario) -> None:
+    run_id = scenario.submit()
+    [credential] = scenario.api.get(
+        f"/v1/workspaces/{scenario.workspace_id}/credentials", scenario.token
+    ).json()["items"]
+    new_key = secrets.token_urlsafe(32)
+    scenario.api.write(
+        "POST",
+        f"/v1/workspaces/{scenario.workspace_id}/credentials/{credential['credential_id']}/rotate",
+        scenario.token,
+        {"api_key": new_key, "consent_to_encrypted_storage": True},
+    )
+
+    worker = scenario.worker("worker")
+    run = scenario.wait_terminal(run_id)
+    worker.stop()
+
+    assert run["status"] == "complete"
+    shown = scenario.api_run(run_id)
+    assert shown["output"]["reason"] == f"key fingerprint {key_fingerprint(SecretStr(new_key))}"
+    scenario.api_key = new_key  # the scan now looks for the new key too
+    assert scenario.leaks() == []

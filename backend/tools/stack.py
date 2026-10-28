@@ -18,8 +18,9 @@ from nessa.seed import FIXTURE_WORKSPACE_ID
 from tools.localenv import REPO_ROOT, ensure_local_home, nessa_home
 
 COMPOSE_FILE = REPO_ROOT / "compose.yaml"
+LIVE_OVERRIDE = REPO_ROOT / "compose.live.yaml"
 DEFAULT_PROJECT = "nessa-l0"
-CORE_SERVICES = ("postgres", "auth", "edge", "api")
+CORE_SERVICES = ("postgres", "auth", "edge", "api", "worker")
 STOP_TIMEOUT_S = 10
 COMMAND_TIMEOUT_S = 600.0
 
@@ -38,6 +39,7 @@ class Stack:
     home: Path = field(default_factory=nessa_home)
     ports: Ports = Ports()
     live: bool = True
+    overrides: tuple[tuple[str, str], ...] = ()  # extra compose variables, e.g. the model role
 
     @property
     def api_url(self) -> str:
@@ -60,10 +62,14 @@ class Stack:
             "NESSA_AUTH_PORT": str(self.ports.auth),
             "NESSA_PG_PORT": str(self.ports.postgres),
             "NESSA_WEB_PORT": str(self.ports.web),
+            **dict(self.overrides),
         }
 
     def _files(self) -> list[str]:
-        return ["-f", str(COMPOSE_FILE)]
+        files = ["-f", str(COMPOSE_FILE)]
+        if self.live:
+            files += ["-f", str(LIVE_OVERRIDE)]
+        return files
 
     def compose(
         self, *args: str, timeout: float = COMMAND_TIMEOUT_S, check: bool = True

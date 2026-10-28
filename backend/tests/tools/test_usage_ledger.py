@@ -1,0 +1,68 @@
+"""The R5 usage ledger (ported from the Sprint 0 spike)."""
+
+from pathlib import Path
+
+from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry
+
+
+def entry(**overrides: object) -> LiveCallEntry:
+    values: dict[str, object] = {
+        "budget_scope": "live-smoke",
+        "purpose": "connection check",
+        "model_id": "muse-spark-1.3-contributor",
+        "is_production_model": False,
+        "endpoint": "POST /v1/responses",
+        "outcome": CallOutcome.OK,
+        "reserved_nano_usd": 1_000_000,
+        "estimated_cost_nano_usd": 100_000,
+        "input_tokens": 500,
+        "cached_input_tokens": 0,
+        "output_tokens": 250,
+    }
+    values.update(overrides)
+    return LiveCallEntry.model_validate(values)
+
+
+def test_append_assigns_sequence_and_persists(tmp_path: Path) -> None:
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+
+    first = ledger.append(entry())
+    second = ledger.append(entry(purpose="streaming"))
+
+    assert (first.seq, second.seq) == (1, 2)
+    assert [r.purpose for r in Ledger(tmp_path / "live-usage.jsonl").records()] == [
+        "connection check",
+        "streaming",
+    ]
+
+
+def test_markdown_shows_running_total_and_marks_unknown_cost(tmp_path: Path) -> None:
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+    ledger.append(entry(estimated_cost_nano_usd=1_000_000))
+    ledger.append(entry(estimated_cost_nano_usd=None, outcome=CallOutcome.FAILED))
+    ledger.append(entry(estimated_cost_nano_usd=2_500_000))
+
+    table = ledger.render_markdown_table()
+
+    assert "unknown" in table
+    # Running total after call 3 is $0.0035 known, flagged incomplete because call 2 is unknown.
+    assert "$0.003500 + unknown" in table
+
+
+def test_failed_calls_show_whatever_status_and_error_are_known(tmp_path: Path) -> None:
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+    ledger.append(entry(outcome=CallOutcome.FAILED, http_status=401, error_type="invalid_api_key"))
+    ledger.append(entry(outcome=CallOutcome.FAILED))
+
+    table = ledger.render_markdown_table()
+
+    assert "| failed (401 invalid_api_key) |" in table
+    assert "| failed (no detail) |" in table
+
+
+def test_the_committed_ledger_still_parses(tmp_path: Path) -> None:
+    # The Sprint 0 rows must stay readable by the promoted ledger.
+    records = Ledger().records()
+
+    assert records
+    assert [r.seq for r in records] == list(range(1, len(records) + 1))

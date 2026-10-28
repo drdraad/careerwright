@@ -14,6 +14,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import psycopg
 import sqlalchemy as sa
@@ -103,7 +104,7 @@ class Infra:
 
     def query(
         self, statement: str, params: tuple[object, ...] = (), *, database: str = "nessa_app"
-    ) -> list[dict[str, object]]:
+    ) -> list[dict[str, Any]]:
         """Inspect as the superuser (tests only; runtime never connects this way)."""
         with psycopg.connect(self.url("pg_superuser", database), row_factory=dict_row) as conn:
             cur = conn.execute(statement.encode(), params)
@@ -117,9 +118,10 @@ class Infra:
         *,
         actor: str | None = None,
         run: str | None = None,
-    ) -> list[dict[str, object]]:
+        database: str = "nessa_app",
+    ) -> list[dict[str, Any]]:
         """Run one statement as a runtime role with an optional actor/run context."""
-        with psycopg.connect(self.url(role, "nessa_app"), row_factory=dict_row) as conn:
+        with psycopg.connect(self.url(role, database), row_factory=dict_row) as conn:
             if actor:
                 conn.execute("SELECT set_config('nessa.actor_id', %s, true)", (actor,))
             if run:

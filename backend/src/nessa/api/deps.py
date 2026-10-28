@@ -15,6 +15,8 @@ from nessa.errors import ErrorCode, ErrorStage, NessaError
 from nessa.identity import store
 from nessa.identity.access import Actor, VerifiedIdentity, not_invited, unauthenticated
 from nessa.identity.keyring import Keyring
+from nessa.identity.model_choice import ModelChoice
+from nessa.identity.spend import SpendLimits
 
 
 class TokenVerifier(Protocol):
@@ -31,7 +33,15 @@ class ApiDependencies:
     engine: Engine
     verifier: TokenVerifier
     keyring: Keyring
+    models: ModelChoice
     clock: Callable[[], datetime] = _utc_now
+
+    @property
+    def spend_defaults(self) -> SpendLimits:
+        return SpendLimits(
+            run_limit_nano_usd=self.settings.default_run_spend_limit_nano_usd,
+            period_limit_nano_usd=self.settings.default_period_spend_limit_nano_usd,
+        )
 
 
 @dataclass(frozen=True)

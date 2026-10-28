@@ -10,10 +10,23 @@ from fastapi import APIRouter
 
 from nessa.api.deps import CallerDep, Deps
 from nessa.api.envelope import ERROR_RESPONSES
-from nessa.api.schemas import EventOut, ProfileOut, SourceOut, WorkspaceOut, _Out
+from nessa.api.schemas import (
+    CredentialOut,
+    EventOut,
+    ProfileOut,
+    RunOut,
+    SourceOut,
+    SpendOut,
+    WorkspaceOut,
+    _Out,
+)
 from nessa.db import Tx, actor_transaction
+from nessa.identity import credential_store, run_store
 from nessa.identity import store as identity_store
-from nessa.identity.records import WorkspaceEvent
+from nessa.identity.keyring import Keyring
+from nessa.identity.records import Run, WorkspaceEvent
+from nessa.identity.runs import open_output
+from nessa.identity.spend_limits import spend_summary
 from nessa.identity.workspaces import visible_workspace
 from nessa.profile import store as profile_store
 from nessa.profile.commands import ProfileView
@@ -34,6 +47,24 @@ class WorkspaceExport(_Out):
     profile_versions: list[ProfileOut]
     sources: list[SourceOut]
     events: list[EventOut]
+    credentials: list[CredentialOut]
+    runs: list[RunOut]
+    spend: SpendOut
+
+
+def _all_runs(tx: Tx, keyring: Keyring, workspace_id: uuid.UUID) -> list[RunOut]:
+    runs: list[Run] = []
+    while page := run_store.runs(
+        tx,
+        workspace_id,
+        before=(runs[-1].created_at, runs[-1].run_id) if runs else None,
+        limit=PAGE,
+    ):
+        runs.extend(page)
+    return [
+        RunOut.of(run, run_store.attempts(tx, run.run_id), open_output(tx, keyring, run))
+        for run in reversed(runs)
+    ]
 
 
 def _all_versions(tx: Tx, workspace_id: uuid.UUID) -> list[ProfileVersion]:
@@ -73,6 +104,9 @@ def export_workspace(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> 
         versions = _all_versions(tx, workspace_id)
         sources = _all_sources(tx, workspace_id)
         events = _all_events(tx, workspace_id)
+        credentials = credential_store.credentials(tx, workspace_id)
+        runs = _all_runs(tx, deps.keyring, workspace_id)
+        spend = spend_summary(tx, workspace_id, deps.clock(), deps.spend_defaults)
     return WorkspaceExport(
         exported_at=deps.clock(),
         synthetic=workspace.synthetic,
@@ -85,4 +119,7 @@ def export_workspace(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> 
         ],
         sources=[SourceOut.of(s) for s in sources],
         events=[EventOut.of(e) for e in events],
+        credentials=[CredentialOut.of(c) for c in credentials],
+        runs=runs,
+        spend=SpendOut.of(spend),
     )

@@ -52,3 +52,58 @@ class Receipt:
     request_sha256: str
     status_code: int
     response: dict[str, object]
+
+
+@dataclass(frozen=True)
+class Credential:
+    """Credential metadata. Key material never leaves the sealed columns."""
+
+    credential_id: uuid.UUID
+    workspace_id: uuid.UUID
+    provider: str
+    key_version: int
+    consented_at: datetime
+    created_by: uuid.UUID
+    created_at: datetime
+    revoked_at: datetime | None
+    replaced_by: uuid.UUID | None
+
+
+class RunKind(StrEnum):
+    CONNECTION_CHECK = "connection_check"
+
+
+@dataclass(frozen=True)
+class Run:
+    run_id: uuid.UUID
+    workspace_id: uuid.UUID
+    kind: RunKind
+    data_mode: DataMode
+    synthetic: bool
+    requested_by: uuid.UUID
+    model_id: str
+    model_mode: str
+    status: WorkState
+    failure_class: str | None
+    output_id: uuid.UUID | None
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
+@dataclass(frozen=True)
+class Attempt:
+    attempt_id: int
+    model_id: str
+    started_at: datetime
+    finished_at: datetime | None
+    outcome: str | None
+    spend_state: str
+    reserved_nano_usd: int
+    cost_nano_usd: int | None
+    input_tokens: int | None
+    cached_input_tokens: int | None
+    output_tokens: int | None
+    reasoning_tokens: int | None
+    web_search_queries: int | None
+    provider_response_id: str | None

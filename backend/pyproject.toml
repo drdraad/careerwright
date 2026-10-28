@@ -49,7 +49,7 @@ ignore = []
 # Tests assert with plain `assert` and use throwaway secret-shaped literals by design.
 "tests/**" = ["S101", "S105", "S106"]
 # SQL adapters splice only constant column lists and fixed clauses; every value is bound.
-"src/nessa/*/store.py" = ["S608"]
+"src/nessa/*/*store.py" = ["S608"]
 
 [tool.mypy]
 python_version = "3.12"

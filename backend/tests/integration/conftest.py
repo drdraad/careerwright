@@ -13,6 +13,7 @@ from nessa.cli import migrate_app, migrate_dbos, seed
 from nessa.db import create_engine
 from nessa.identity.firebase import FirebaseTokenVerifier
 from nessa.identity.keyring import load_keyring
+from nessa.identity.model_choice import ModelChoice
 from tests.support.client import ApiClient
 from tests.support.infra import API_BASE, Infra, sign_in_seeded, start_infra
 
@@ -46,6 +47,9 @@ def api_deps(infra: Infra) -> Iterator[ApiDependencies]:
         engine=engine,
         verifier=FirebaseTokenVerifier(settings.firebase_project_id),
         keyring=load_keyring(settings.master_key_dir),
+        models=ModelChoice.configure(
+            settings.meta_test_model, settings.meta_production_model, settings.synthetic_model_role
+        ),
     )
     engine.dispose()
 

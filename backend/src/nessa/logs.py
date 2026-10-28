@@ -74,8 +74,12 @@ def configure_logging(service: str, level: int = logging.INFO) -> None:
     root.setLevel(level)
     for name in QUIET_LOGGERS:
         logging.getLogger(name).setLevel(logging.WARNING)
-    # DBOS and uvicorn install their own handlers; route them through ours instead.
-    for name in ("dbos", "uvicorn", "uvicorn.error"):
+    # DBOS adds its own console handler only to a logger without one, so it gets ours.
+    dbos = logging.getLogger("dbos")
+    dbos.handlers[:] = [handler]
+    dbos.propagate = False
+    # uvicorn configured its handlers before calling the app factory; route them to ours.
+    for name in ("uvicorn", "uvicorn.error"):
         third_party = logging.getLogger(name)
         third_party.handlers[:] = []
         third_party.propagate = True
