@@ -9,7 +9,8 @@ Decisions live in `docs/adr/`; the latest sprint review is in `docs/reviews/`.
 Run from the repository root (details: `docs/runbook.md`).
 - Setup: `make setup` (prerequisites, `uv sync --locked` on uv-managed Python 3.12, the
   web app and design tooling with Playwright's Chromium, local secrets and master key in
-  `NESSA_HOME`, default `~/.nessa/l0`, and the Docker images). The host Python is 3.14;
+  `NESSA_HOME`, default `~/.nessa/l0`, the pinned ESCO release fetched into the gitignored
+  `var/datasets/` and hash-checked, and the Docker images). The host Python is 3.14;
   never use it for the backend. pnpm only, never npm.
 - Run: `make dev` (live: only the worker may reach Meta), `make demo` (no service has a
   route out), then open `http://127.0.0.1:53000`; `make stop` (bounded; keeps data),
@@ -24,23 +25,28 @@ Run from the repository root (details: `docs/runbook.md`).
   review package).
 - Design references: `cd docs/design && pnpm run contrast && pnpm run screenshots`.
 - Live Meta calls run only through explicit, budget-capped commands, never from the checks
-  above: `make live-smoke` (test model; `PRODUCTION=1` qualifies the production model).
-  Every call is appended to `docs/evidence/live-usage.jsonl` and `.md` with its cost (R5).
+  above: `make live-smoke` (test model; `PRODUCTION=1` qualifies the production model;
+  `INTERVIEW=1` runs one interview turn instead of a connection check). Every call is
+  appended to `docs/evidence/live-usage.jsonl` and `.md` with its cost (R5).
 
 ## Repository facts
 - Requirement IDs and test IDs: `docs/requirements-register.md`. Tag each test with its
   register ID, and update the rows your work closes.
 - Representative implementation: `backend/src/nessa/identity/activity.py` with
-  `workflow.py` beside it: the pinned durable-activity pattern (ADR 0002, ADR 0004).
-  Workflows carry IDs only; one bounded activity re-checks access, model, key and budget,
-  opens the sealed key just in time and stores the output sealed with its usage; failures
+  `workflow.py` beside it: the pinned durable-activity pattern (ADR 0002, ADR 0004), one
+  `RunTask` per run kind (composed in `nessa/worker.py`; a new model-backed kind is a task,
+  never a second call path, ADR 0006). Workflows carry IDs only; one bounded activity
+  re-checks access, model, key and budget, opens the sealed input and key just in time and
+  stores the output sealed with its usage; failures
   are classified from type and status with the message discarded; each transient failure
   class has one retry owner: the DBOS step for provider failures, the activity's store
   budget for store failures. `nessa/profile/commands.py` shows an expected-version command.
 - Layout: `nessa/identity` (identity and execution: access, workspaces, keys, runs,
-  spend), `nessa/profile`, `nessa/api` (HTTP only), `nessa/migrations` (forward-only SQL).
-  Vendor and SQL imports are allowed only in the adapters listed in
-  `backend/tests/architecture/test_boundaries.py`; add new ones there.
+  spend), `nessa/profile` (profile, interview contract and turns, provisional concepts),
+  `nessa/catalogue` (the ESCO taxonomy and the English city list), `nessa/api` (HTTP only),
+  `nessa/migrations` (forward-only SQL), `nessa/worker.py` (worker entry point). Identity
+  never imports profile or catalogue. Vendor and SQL imports are allowed only in the
+  adapters listed in `backend/tests/architecture/test_boundaries.py`; add new ones there.
 - Web layout (`apps/web`, ADR 0005): `src/app` (routes; `api/[...path]` forwards `/api/v1`
   to the API), `src/components` (shell and components; `WorkspaceShell.tsx` owns session,
   queries and events), `src/lib` (client wiring, events, vocabulary, the fixture adapter),
@@ -49,7 +55,10 @@ Run from the repository root (details: `docs/runbook.md`).
   either by hand.
 - Non-obvious invariants:
   - The model proposes; validated application commands commit. Readiness, affordability
-    and route ranks are computed by deterministic Python, never by the model.
+    and route ranks are computed by deterministic Python, never by the model. A chat
+    proposal reaches the profile only through a decision on a complete, validated turn,
+    against the version it was made for, with each limit or target confirmed by name, via
+    the same command as a direct edit (ADR 0006).
   - Money is integer minor units (GBP). Use `Money` (≥ 0) for payments and `SignedMoney`
     for economic cost. Unknown money is `null`, never 0.
   - Unknown is never zero or ineligible. Failure is never an empty success. A truncated
@@ -62,12 +71,14 @@ Run from the repository root (details: `docs/runbook.md`).
   - TRACE-01 (economic cost) and DIRECTAI (direct spending) never share route IDs or
     labels. `fixtures/m0` is the byte-identical supplied pack (hashes in
     `fixtures/README.md`): never edit it. Fixtures never fill live fields; synthetic data
-    is always labelled.
+    is always labelled. ESCO comes only from the pinned, hash-checked release;
+    `fixtures/esco-sample` is a labelled test subset, rebuilt only by `tools.esco_sample`.
   - Secrets: `.env` holds `META_API_KEY` for `make live-smoke` only; the product takes
     user keys through the API and seals them. Never print a key, pass it as an argument,
     log it or journal it. Database passwords and master keys live in `NESSA_HOME`, never in
     the repository. The test model `muse-spark-1.3-contributor` takes synthetic data only,
     enforced in code and by a database CHECK; production is `muse-spark-1.3` (ADR 0003).
+    Demo workspaces run only the offline fixture interviewer, never a provider model.
   - Ownership is row-level security: run API SQL inside `actor_transaction` and worker
     SQL inside `run_transaction` (`nessa/db.py`). Never connect at runtime as an owner role.
   - Every consequential write takes an expected version and an `Idempotency-Key` and goes

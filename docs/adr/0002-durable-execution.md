@@ -59,7 +59,10 @@ Pin this composition for every workflow that touches private data or a credentia
       output and reserves spend before the call (ADR 0004 decision 10);
    3. runs a plain Pydantic AI agent, **without** `DBOSDurability`, on the native Meta
       provider: `NativeOutput` schema mode, `request_limit=1`, output retries 0, OpenAI
-      client `max_retries=0`;
+      client `max_retries=0`. (Amended by ADR 0006 decision 9 for interview turns: one
+      validation repair, so `request_limit=2` and output retries 1, the repair owned by the
+      agent's output-retry budget and reserved within the attempt; the DBOS step still
+      retries only transient provider failures.);
    4. persists the validated output sealed, idempotently (one accepted output per run; a
       re-executed activity reuses the first one and never overwrites it, and likewise
       returns a terminal failure an earlier execution already recorded);

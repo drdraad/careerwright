@@ -95,7 +95,7 @@ records how they are realised, and the choices a later task must not undo silent
    carries none only because the connection check reads no workspace input. The first run
    kind that reads the profile must take the profile version as an expected version and
    pin it on the run, so a run never silently uses inputs newer or older than the client
-   saw.
+   saw. (Done by the interview turn, ADR 0006 decisions 10 and 11.)
 
 8. **Keys: consent, sealing, rotation, revocation.** Storing a key needs explicit consent
    to encrypted storage. It is sealed at once with AES-256-GCM under the current master-key
@@ -118,7 +118,9 @@ records how they are realised, and the choices a later task must not undo silent
    model; synthetic ones get the configured role (test by default). The database refuses a
    Contributor model on a non-synthetic run (a CHECK over the run's copy of the workspace
    label, held equal to the workspace by a composite foreign key), and the activity checks
-   again. Demo workspaces and the demo runtime never call a model.
+   again. Demo workspaces and the demo runtime never call a model. (Amended by ADR 0006
+   decision 12: they never call a *provider* model; a demo workspace's interview turns use
+   the offline fixture interviewer, which a CHECK confines to demo workspaces.)
 
 10. **Spend is reserved in the database before every call.** Each provider attempt is a row
     written before the call with its worst-case cost reserved, under a per-workspace

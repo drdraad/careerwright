@@ -156,6 +156,23 @@ Runtime image: `nessa-l0/web:local`, built from `apps/web/Dockerfile` on
 the Next.js standalone server as the `node` user. Verified on arm64 by `make acceptance`
 (2026-10-28); amd64 is not built.
 
+## Reference data (Task 5)
+
+Large third-party datasets are not committed (ruling R7): `make setup` fetches each one into
+the gitignored `var/datasets/` and refuses it unless its size and SHA-256 match the pin
+(`backend/tools/datasets.py`); `setup-database` checks the file again before it imports it.
+
+| Dataset | Pin | Source | Licence and attribution | Import |
+|---|---|---|---|---|
+| ESCO v1.2.1, classification, English, CSV | `esco-v1.2.1-classification-en-csv.zip`, 10,045,670 bytes, SHA-256 `f9761b0b52be1828b38a3e5e0ae59a93a7b0ce358bc800f52f57a8b002adeb3e` (`nessa.catalogue.esco.ESCO_RELEASE`; server `Last-Modified` 2025-12-16) | https://ec.europa.eu/esco/download/ESCO%20dataset%20-%20v1.2.1%20-%20classification%20-%20en%20-%20csv.zip, the file the ESCO download page (https://esco.ec.europa.eu/en/use-esco/download) links for that choice; fetched 2026-10-28 | Commission Decision 2011/833/EU on the reuse of Commission documents: free reuse on two conditions (https://esco.ec.europa.eu/en/about-esco/faq, checked 2026-10-28): the service shows "This service uses the ESCO classification of the European Commission." (the API returns it with every release and occupation), and any modified or adapted version is marked as such (the test sample is) | 3,039 occupations (33,498 labels), 13,939 skills (100,886 labels), 619 ISCO-08 groups, 126,051 occupation-skill and 5,818 skill-skill relations, 3,039 broader links. 25 concept rows the release repeats with only `modifiedDate` changed are imported once and counted in the manifest. About 6 s on this machine |
+| ESCO test sample | `fixtures/esco-sample/esco-v1.2.1-en-csv-sample.zip`, 76,049 bytes, SHA-256 `747c5638653e0594c0ae4210db1ee0c90eccb5c872f356fdfa36116bb56f955d` (committed) | Built from the release above by `backend/tools/esco_sample.py` (deterministic) | As above; a modified (reduced) version, labelled `sample` in the database and the API | 30 occupations, 200 skills; tests only |
+| English cities | 55 cities in `nessa.catalogue.places` | GOV.UK "List of cities" (Cabinet Office), https://www.gov.uk/government/publications/list-of-cities/list-of-cities-html, retrieved 2026-10-28, page SHA-256 `7da9d661…7afe` | Open Government Licence v3.0 | Committed as code (55 names, aliases, ONS regions) |
+
+If the ESCO download cannot be automated (the publisher changes its URLs), the manual step
+is in `docs/runbook.md`; the hash check still applies. A different release needs a new pin,
+a re-run of `make acceptance` (the full-release test checks counts) and a reviewed migration:
+the import refuses to replace a release already held.
+
 ## Not yet introduced (owner and disposition)
 
 These belong to the fixed stack but no task has installed them yet. Each introducing task
@@ -167,7 +184,7 @@ qualified pins.
 |---|---|---|---|
 | Scrapling (HTTP fetch only) | 0.5 | Sprint 3 acquisition task | restricted worker without model or master key; verify licence and arm64 |
 | D3 | 7.9.0 | Sprint 3 map task | SVG rendering only; add to `apps/web` with its own ADR note |
-| ESCO / ASHE data releases | n/a | Sprint 2 / 5 data tasks | pinned URL and hash; fetched by `make setup` (R7) |
+| ASHE data release | n/a | Sprint 3 data task (T7) | pinned URL and hash; fetched by `make setup` (R7), as ESCO is since Task 5 |
 | Adzuna API | n/a | Sprint 3 | unverified: no credentials (R4) |
 
 ## How these were checked
