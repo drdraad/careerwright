@@ -25,7 +25,11 @@ free calls (ruling R5). Generated from `live-usage.jsonl` by
   `PRODUCTION=1`, and a worst-case cost cap; cumulatively at most 9 calls, 3 on the
   production model and $0.30 worst case (unknown costs count their full
   reservation; `NESSA_LIVE_SMOKE_*` changes them). Both are enforced in
-  `backend/tools/live_smoke.py` before the stack starts.
+  `backend/tools/live_smoke.py` before the stack starts. `live-eval` (`make
+  live-eval`): at most 6 evaluation cases per invocation, each one attempt of at
+  most 2 requests on the test model, never the production model; cumulatively at
+  most 24 requests and $0.05 worst case (`NESSA_LIVE_EVAL_*`), enforced in
+  `backend/tools/live_eval.py`.
 - A row for an activity attempt that sent more than one request (the call and its
   validation repair) shows `x N` after the endpoint; its tokens and cost are the
   attempt's total, and the caps count every request.
@@ -46,3 +50,9 @@ free calls (ruling R5). Generated from `live-usage.jsonl` by
 | 12 | 2026-10-28 02:26:04 | live-smoke | connection check via API, outbox and DBOS worker (key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 114 (0) | 93 (62) | 0 | $0.000030 | $0.019707 | resp_6ae15d3804014aecb04a4853 |
 | 13 | 2026-10-28 09:04:55 | live-smoke | interview turn via API, outbox and DBOS worker; proposals confirmed into the profile (synthetic message; key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 1,128 (0) | 693 (323) | 0 | $0.000251 | $0.019958 | resp_6ae1bab2516734dafa354c6b |
 | 14 | 2026-10-28 10:34:03 | live-smoke | interview turn via API, outbox and DBOS worker; proposals confirmed into the profile (synthetic message; key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 1,147 (0) | 632 (255) | 0 | $0.000241 | $0.020200 | resp_6ae1cf90584e6f20314c4422 |
+| 15 | 2026-10-28 12:26:28 | live-eval | live evaluation: one interview case via API and DBOS worker (synthetic case; key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses x 2 | ok | 3,705 (1,393) | 1,125 (495) | 0 | $0.000459 | $0.020659 | resp_6ae1e9a3ebdaec9a49544558 |
+| 16 | 2026-10-28 12:26:28 | live-eval | live evaluation: one interview case via API and DBOS worker (synthetic case; key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 1,416 (1,137) | 413 (188) | 0 | $0.000113 | $0.020771 | resp_6ae1e9a73df4dc5972e047ef |
+| 17 | 2026-10-28 12:26:28 | live-eval | live evaluation: one interview case via API and DBOS worker (synthetic case; key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 1,419 (0) | 635 (443) | 0 | $0.000269 | $0.021040 | resp_6ae1e9d378252cd4d68c40ac |
+| 18 | 2026-10-28 12:26:28 | live-eval | live evaluation: one interview case via API and DBOS worker (synthetic case; key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 1,430 (0) | 589 (300) | 0 | $0.000261 | $0.021301 | resp_6ae1e9db3deba61886444cd1 |
+| 19 | 2026-10-28 12:26:28 | live-eval | live evaluation: one interview case via API and DBOS worker (synthetic case; key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 1,430 (0) | 819 (585) | 0 | $0.000307 | $0.021608 | resp_6ae1e9e12792daf1955f452e |
+| 20 | 2026-10-28 12:26:28 | live-eval | live evaluation: one discovery case via API and DBOS worker (synthetic case; key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 530 (0) | 568 (361) | 0 | $0.000167 | $0.021774 | resp_6ae1e9ee105f7f0e75e5494e |

@@ -151,6 +151,12 @@ def _value_text(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value
 
 
+def _questions(text: str) -> set[str]:
+    """The distinct questions in a text: each sentence ending in "?", spacing and case aside."""
+    found = re.findall(r"[^.!?]*\?", text)
+    return {" ".join(q.casefold().split()) for q in found if q.strip(" ?")}
+
+
 def _changes(observed: Json) -> dict[str, Json]:
     proposal = observed.get("proposal") or {}
     return {c["field"]: c for c in proposal.get("changes", [])}
@@ -185,8 +191,14 @@ def _interview(observed: Json, e: Expectation) -> Failure | None:
         hit = [t for t in texts if _has(t, e.words)]
         return Failure(FailureType.INFERENCE, f"values {hit}") if hit else None
     if e.check == "one_question":
-        asked = question.count("?") + proposal["reply"].count("?")
-        return Failure(FailureType.QUESTION, f"{asked} questions") if asked > 1 else None
+        # The reply often repeats the next question: the same question counts once.
+        asked = _questions(proposal["reply"]) | _questions(question)
+        many = len(asked) > 1
+        return (
+            Failure(FailureType.QUESTION, f"{len(asked)} questions: {sorted(asked)}")
+            if many
+            else None
+        )
     if e.check == "question_mentions_any":
         ok = _has(question + " " + proposal["reply"], e.words)
         return None if ok else Failure(FailureType.QUESTION, f"asked {question!r}")

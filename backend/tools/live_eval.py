@@ -1,0 +1,391 @@
+"""`make live-eval`: the representative evaluation cases on the live test model, through the
+whole product, budget-capped (plan Sprint 2: "Run a budget-capped live version of
+representative cases"; ruling R5).
+
+The cases are those marked `live` in `tools/evaluation_cases.json` (at most
+`MAX_LIVE_CASES`), or a chosen subset (`CASES=INT-01,DSC-01`). Each runs in its own
+synthetic workspace in the isolated live stack (`tools.live_smoke.smoke_stack`): the key is
+stored through the API with consent, the case's preferences and answers are saved, then one
+interview turn or one discovery runs on the test model, and its result is checked with the
+same semantic checks as the offline run. Only synthetic inputs are sent (the test model is a
+Contributor model). Each workspace's run limit allows exactly one attempt (two requests at
+most: the call and one validation repair), so the product's own reservation refuses any
+retry at cost.
+
+Caps, checked before the stack starts, under the ledger's exclusive lock:
+- per invocation: at most `MAX_LIVE_CASES` cases, no production model, and a worst-case cost
+  cap;
+- per budget scope (`live-eval`), cumulatively over the ledger: provider requests,
+  production requests (none by default) and worst-case cost (`NESSA_LIVE_EVAL_*`).
+Afterwards the worker is stopped and every attempt of every case workspace is ledgered in
+`docs/evidence/live-usage.*` with its cost; the results, with failures by type, are
+appended to `docs/evidence/live-eval.md`; and both databases, every container log and the
+API's responses are scanned for the key.
+
+Run from `backend/`: `uv run --locked python -m tools.live_eval [--cases INT-01,DSC-01]`.
+"""
+
+import argparse
+import json
+import sys
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from pydantic import Field, SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from nessa.identity.model_choice import ModelChoice
+from nessa.identity.model_registry import format_usd
+from nessa.profile import discovery, interview
+from tools.evaluation import (
+    Case,
+    CaseKind,
+    Failure,
+    FailureType,
+    evaluate,
+    failures_by_type,
+    load_cases,
+    profile_input_of,
+)
+from tools.live_smoke import (
+    Api,
+    CapExceededError,
+    ScopeBudget,
+    SmokeKind,
+    SmokeTarget,
+    assert_attempt_bound,
+    leak_findings,
+    ledger_workspace_calls,
+    smoke_stack,
+)
+from tools.localenv import REPO_ROOT
+from tools.usage_ledger import Ledger, ScopeSpend
+
+MAX_LIVE_CASES = 6  # the cap for this task's live run (controller, R5)
+MAX_COST_NANO_USD = 50_000_000  # $0.05 worst case per invocation
+RESULTS_PATH = REPO_ROOT / "docs" / "evidence" / "live-eval.md"
+EVAL_INTERVIEW = SmokeKind(
+    "eval_interview",
+    1,
+    interview.MAX_REQUESTS,
+    interview.worst_case_nano_usd,
+    "live evaluation: one interview case via API and DBOS worker (synthetic case; key "
+    "opened just in time)",
+)
+EVAL_DISCOVERY = SmokeKind(
+    "eval_discovery",
+    1,
+    discovery.MAX_REQUESTS,
+    discovery.worst_case_nano_usd,
+    "live evaluation: one discovery case via API and DBOS worker (synthetic case; key "
+    "opened just in time)",
+)
+KINDS = {CaseKind.INTERVIEW: EVAL_INTERVIEW, CaseKind.DISCOVERY: EVAL_DISCOVERY}
+
+
+class EvalSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=REPO_ROOT / ".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+    api_key: SecretStr = Field(validation_alias="META_API_KEY")
+    meta_test_model: str = Field(
+        default="muse-spark-1.3-contributor", validation_alias="NESSA_META_TEST_MODEL"
+    )
+    meta_production_model: str = Field(
+        default="muse-spark-1.3", validation_alias="NESSA_META_PRODUCTION_MODEL"
+    )
+    # Defaults: two invocations of six cases (each case at most two requests), no production
+    # model, and $0.05 worst case in all.
+    budget_scope: str = Field(default="live-eval", validation_alias="NESSA_LIVE_EVAL_SCOPE")
+    scope_max_calls: int = Field(default=24, ge=0, validation_alias="NESSA_LIVE_EVAL_MAX_CALLS")
+    scope_max_cost_nano_usd: int = Field(
+        default=50_000_000, ge=0, validation_alias="NESSA_LIVE_EVAL_MAX_COST_NANO_USD"
+    )
+
+    def budget(self) -> ScopeBudget:
+        return ScopeBudget(self.budget_scope, self.scope_max_calls, 0, self.scope_max_cost_nano_usd)
+
+
+def select(cases: list[Case], chosen: list[str] | None) -> list[Case]:
+    """The live cases, or the named ones; refused if any is not a live-capable kind or the
+    paired case of a chosen one is missing."""
+    by_id = {case.id: case for case in cases}
+    if chosen is None:
+        picked = [case for case in cases if case.live]
+    else:
+        unknown = [case_id for case_id in chosen if case_id not in by_id]
+        if unknown:
+            raise CapExceededError(f"no such cases: {unknown}")
+        picked = [by_id[case_id] for case_id in chosen]
+    wrong = [case.id for case in picked if case.kind not in KINDS]
+    if wrong:
+        raise CapExceededError(f"only interview and discovery cases run live: {wrong}")
+    return picked
+
+
+@dataclass(frozen=True)
+class Plan:
+    model_id: str
+    cases: list[Case]
+    calls: int
+    worst_case_nano_usd: int
+
+
+def authorise_eval(
+    models: ModelChoice, cases: list[Case], *, budget: ScopeBudget, spent: ScopeSpend
+) -> Plan:
+    """The test model and the invocation's bounds, or a refusal before any call."""
+    if not 1 <= len(cases) <= MAX_LIVE_CASES:
+        raise CapExceededError(f"1-{MAX_LIVE_CASES} live cases per invocation, not {len(cases)}")
+    model_id = models.test.model_id
+    if models.is_production(model_id):
+        raise CapExceededError("the test model is the production model: refusing")
+    calls = sum(KINDS[case.kind].calls() for case in cases)
+    worst = sum(KINDS[case.kind].per_attempt_nano_usd(model_id) for case in cases)
+    if worst > MAX_COST_NANO_USD:
+        raise CapExceededError(
+            f"worst case {format_usd(worst)} exceeds the cap {format_usd(MAX_COST_NANO_USD)}"
+        )
+    if spent.calls + calls > budget.max_calls:
+        raise CapExceededError(
+            f"scope {budget.scope}: {spent.calls} of {budget.max_calls} calls used, "
+            f"{calls} more needed"
+        )
+    if spent.committed_nano_usd + worst > budget.max_cost_nano_usd:
+        raise CapExceededError(
+            f"scope {budget.scope}: {format_usd(spent.committed_nano_usd)} of "
+            f"{format_usd(budget.max_cost_nano_usd)} committed, worst case {format_usd(worst)} "
+            "more"
+        )
+    return Plan(model_id, cases, calls, worst)
+
+
+def _wait(api: Api, path: str, run_of: Callable[[dict[str, Any]], dict[str, Any]]) -> Any:
+    deadline = time.monotonic() + EVAL_INTERVIEW.run_timeout_s()
+    body = api.call("GET", path)
+    while run_of(body)["status"] in ("queued", "running") and time.monotonic() < deadline:
+        time.sleep(1)
+        body = api.call("GET", path)
+    return body
+
+
+@dataclass
+class CaseRun:
+    case: Case
+    workspace_id: str
+    observed: dict[str, Any] | None = None
+    status: str = "not started"
+
+
+def _prepare(api: Api, case: Case, model_id: str, key: SecretStr) -> CaseRun:
+    workspace = api.call(
+        "POST",
+        "/v1/workspaces",
+        {
+            "name": f"Live eval {case.id} (synthetic)",
+            "data_mode": "live_assisted",
+            "synthetic": True,
+        },
+    )
+    run = CaseRun(case, workspace["workspace_id"])
+    base = f"/v1/workspaces/{run.workspace_id}"
+    per_attempt = KINDS[case.kind].per_attempt_nano_usd(model_id)
+    spend = api.call(
+        "PUT",
+        f"{base}/spend/limits",
+        {
+            "expected_version": 0,
+            "run_limit_nano_usd": per_attempt,
+            "period_limit_nano_usd": per_attempt,
+        },
+    )
+    assert_attempt_bound(spend, per_attempt, 1)
+    api.call(
+        "POST",
+        f"{base}/credentials",
+        {"api_key": key.get_secret_value(), "consent_to_encrypted_storage": True},
+    )
+    if case.entry_mode or case.conversation_mode:
+        api.call(
+            "PUT",
+            f"{base}/interview/preferences",
+            {
+                "expected_version": 0,
+                "entry_mode": case.entry_mode,
+                "conversation_mode": case.conversation_mode,
+                "paused": False,
+            },
+        )
+    if case.profile:
+        api.call(
+            "PUT",
+            f"{base}/profile",
+            {"expected_version": 0, "profile": profile_input_of(case.profile)},
+        )
+    return run
+
+
+def _drive(api: Api, run: CaseRun) -> None:
+    base = f"/v1/workspaces/{run.workspace_id}"
+    version = api.call("GET", f"{base}/profile")["version"]
+    if run.case.kind is CaseKind.INTERVIEW:
+        submitted = api.call(
+            "POST",
+            f"{base}/interview/turns",
+            {"expected_profile_version": version, "message": run.case.message},
+        )
+        turn = _wait(api, f"{base}/interview/turns/{submitted['turn_id']}", lambda b: b["run"])
+        run.status, run.observed = turn["run"]["status"], turn
+        return
+    submitted = api.call("POST", f"{base}/discoveries", {"expected_profile_version": version})
+    found = _wait(api, f"{base}/discoveries/{submitted['discovery_id']}", lambda b: b["run"])
+    run.status = found["run"]["status"]
+    if run.status == "complete":
+        run.observed = api.call("GET", f"{base}/discoveries/{submitted['discovery_id']}/slate")
+
+
+def results_of(runs: list[CaseRun]) -> dict[str, list[Failure]]:
+    observed = {run.case.id: run.observed for run in runs if run.observed is not None}
+    results: dict[str, list[Failure]] = {}
+    for run in runs:
+        if run.observed is None or (
+            run.case.kind is CaseKind.INTERVIEW and run.observed.get("proposal") is None
+        ):
+            results[run.case.id] = [Failure(FailureType.SCHEMA_INVALID, f"run {run.status}")]
+        else:
+            results[run.case.id] = evaluate(run.case, run.observed, observed)
+    return results
+
+
+def write_results(
+    path: Path, plan: Plan, runs: list[CaseRun], results: dict[str, list[Failure]], seqs: list[int]
+) -> None:
+    lines = [
+        f"## Live evaluation, {datetime.now(UTC):%Y-%m-%d %H:%M} UTC",
+        "",
+        f"Model `{plan.model_id}` (test model, synthetic cases only); {len(runs)} cases; at most "
+        f"{plan.calls} requests, worst case {format_usd(plan.worst_case_nano_usd)}; ledger rows "
+        f"{seqs}. Failures by type: {failures_by_type(results) or 'none'}.",
+        "",
+        "| Case | Kind | Run | Result | Failures |",
+        "|---|---|---|---|---|",
+    ]
+    for run in runs:
+        failures = results.get(run.case.id, [])
+        listed = "; ".join(f"{f.type.value}: {f.detail}" for f in failures) or "-"
+        verdict = "pass" if not failures else "fail"
+        lines.append(
+            f"| {run.case.id} {run.case.title} | {run.case.kind.value} | {run.status} "
+            f"| {verdict} | {listed.replace('|', '/')} |"
+        )
+    header = (
+        "# Live evaluation results\n\nGenerated by `backend/tools/live_eval.py` (`make "
+        "live-eval`); costs are in `live-usage.md`. Semantic checks only, never exact prose. "
+        "A live pass is evidence for the tested model, prompt and case only.\n\n"
+    )
+    previous = path.read_text(encoding="utf-8") if path.exists() else header
+    path.write_text(previous + "\n".join(lines) + "\n\n", encoding="utf-8")
+    # What each case returned (synthetic inputs only), so a failure can be inspected later.
+    with path.with_suffix(".jsonl").open("a", encoding="utf-8") as observations:
+        for run in runs:
+            record = {
+                "recorded_at": datetime.now(UTC).isoformat(),
+                "model_id": plan.model_id,
+                "case": run.case.id,
+                "status": run.status,
+                "failures": [
+                    {"type": f.type.value, "detail": f.detail} for f in results[run.case.id]
+                ],
+                "observed": run.observed,
+            }
+            observations.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def live_eval(
+    target: SmokeTarget,
+    key: SecretStr,
+    plan: Plan,
+    ledger: Ledger,
+    models: ModelChoice,
+    *,
+    scope: str,
+    results_path: Path = RESULTS_PATH,
+) -> int:
+    """Every case through the product, then the ledger (after the worker has stopped,
+    whatever happened), the results and the leak scan."""
+    api = Api(target, target.sign_in())
+    runs: list[CaseRun] = []
+    worker_stopped = True
+    try:
+        for case in plan.cases:
+            run = _prepare(api, case, plan.model_id, key)
+            runs.append(run)
+            _drive(api, run)
+            print(f"{case.id}: {run.status}", flush=True)
+    finally:
+        interrupted: BaseException | None = None
+        try:
+            target.stop_worker()
+        except Exception:
+            worker_stopped = False
+        except BaseException as interrupt:  # Ctrl-C during the stop: ledger first, then obey
+            worker_stopped = False
+            interrupted = interrupt
+        seqs: list[int] = []
+        for run in runs:
+            seqs += ledger_workspace_calls(
+                ledger,
+                target,
+                run.workspace_id,
+                model_id=plan.model_id,
+                models=models,
+                scope=scope,
+                worker_stopped=worker_stopped,
+                kind=KINDS[run.case.kind],
+            )
+        ledger.write_markdown()
+        print(f"ledger rows appended: {seqs}", flush=True)
+        if interrupted is not None:
+            raise interrupted
+    results = results_of(runs)
+    write_results(results_path, plan, runs, results, seqs)
+    print(f"failures by type: {failures_by_type(results)}", flush=True)
+    scanned, findings = leak_findings(target, api, key)
+    print(f"leak scan: {scanned} rows/logs/responses, findings: {findings}", flush=True)
+    if not worker_stopped:
+        raise RuntimeError("the worker could not be confirmed stopped; possible calls ledgered")
+    return 1 if findings else 0
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--cases", help="comma-separated case IDs (default: the live cases)")
+    args = parser.parse_args(argv)
+    settings = EvalSettings()
+    models = ModelChoice.configure(settings.meta_test_model, settings.meta_production_model, "test")
+    chosen = args.cases.split(",") if args.cases else None
+    cases = select(load_cases(), chosen)
+    ledger = Ledger()
+    with ledger.exclusive():
+        plan = authorise_eval(
+            models, cases, budget=settings.budget(), spent=ledger.spent(settings.budget_scope)
+        )
+        print(
+            f"live eval: model {plan.model_id} (test); {len(cases)} cases; at most {plan.calls} "
+            f"requests, worst case {format_usd(plan.worst_case_nano_usd)}",
+            flush=True,
+        )
+        with smoke_stack(production=False) as target:
+            code = live_eval(
+                target, settings.api_key, plan, ledger, models, scope=settings.budget_scope
+            )
+    sys.exit(code)
+
+
+if __name__ == "__main__":
+    main()

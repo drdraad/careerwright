@@ -9,6 +9,8 @@
 #   make live-smoke         budget-capped real Meta smoke on the test model; PRODUCTION=1 (exactly)
 #                           qualifies the production model; INTERVIEW=1 (exactly) runs one
 #                           interview turn and confirms its proposals instead of a connection check
+#   make live-eval          budget-capped live run of the representative evaluation cases (at most
+#                           6) on the test model; CASES=INT-01,DSC-01 runs a chosen subset
 #   make stop               stop every service, bounded; persisted work is kept
 #   make reset-demo         recreate the named fixture workspace only
 #   make rotate-master-key  add a master key version, reload it, reseal every sealed record
@@ -22,7 +24,7 @@ WEB := cd apps/web &&
 export NEXT_TELEMETRY_DISABLED := 1
 export STORYBOOK_DISABLE_TELEMETRY := 1
 
-.PHONY: setup dev demo check acceptance live-smoke stop reset-demo status rotate-master-key reseal
+.PHONY: setup dev demo check acceptance live-smoke live-eval stop reset-demo status rotate-master-key reseal
 
 setup:
 	$(BACKEND) uv python install 3.12 && uv sync --locked
@@ -51,6 +53,9 @@ acceptance:
 # Only PRODUCTION=1 opts in to the production model; any other value (0, false, no) does not.
 live-smoke:
 	$(BACKEND) $(UV) python -m tools.live_smoke $(if $(filter 1,$(PRODUCTION)),--production-model,) $(if $(filter 1,$(INTERVIEW)),--interview,)
+
+live-eval:
+	$(BACKEND) $(UV) python -m tools.live_eval $(if $(CASES),--cases $(CASES),)
 
 stop:
 	$(BACKEND) $(UV) python -m tools.stack stop

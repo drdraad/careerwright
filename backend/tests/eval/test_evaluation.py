@@ -93,6 +93,21 @@ def test_the_interview_checks_name_the_failure_they_find() -> None:
     assert {f.type for f in evaluate(p02, failed, {})} == {FailureType.SCHEMA_INVALID}
 
 
+@pytest.mark.req("PROF-08")
+def test_one_question_repeated_in_the_reply_counts_once_and_two_count_twice() -> None:
+    p02 = BY_ID["INT-01"]
+    noted = [change("enjoyed_tasks", ["fixing machines"])]
+    repeated = turn(
+        noted,
+        reply="Thanks. Which kinds of machines did you like fixing?",
+        question="Which kinds of machines did you like fixing?",
+    )
+    two = turn(noted, reply="Which machines?", question="And would you work outdoors?")
+
+    assert evaluate(p02, repeated, {}) == []
+    assert [f.type for f in evaluate(p02, two, {})] == [FailureType.QUESTION]
+
+
 @pytest.mark.req("REC1-09")
 def test_a_counterfactual_pair_fails_when_the_cue_changes_the_fields_or_one_is_missing() -> None:
     first, second = BY_ID["INT-04"], BY_ID["INT-05"]
