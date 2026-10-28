@@ -250,6 +250,34 @@ const noteIn = (state: "running" | "failed" | "reached_no_model") => (page: Page
     await route.fulfill({ response, json: found });
   });
 
+/** The latest discovery with no note asked for yet, and the request for one refused with
+ *  `code` and `reason`, as the API refuses it before any run. */
+const noteRefused = (code: string, reason: string) => async (page: Page) => {
+  await page.route("**/discoveries?*", async (route) => {
+    const response = await route.fetch();
+    const found = (await response.json()) as DiscoveryPage;
+    for (const item of found.items) item.explanation = null;
+    await route.fulfill({ response, json: found });
+  });
+  await page.route("**/discoveries/*/explanation", (route) =>
+    route.request().method() === "POST"
+      ? route.fulfill({
+          status: 422,
+          json: {
+            error: {
+              code,
+              message: "Refused.",
+              retryable: false,
+              stage: "profile",
+              correlation_id: "visual",
+              details: { reason },
+            },
+          },
+        })
+      : route.continue(),
+  );
+};
+
 /** Workspaces the Sprint 2 shots start from, prepared through the API as a person would. */
 type Scratch = {
   /** New and empty: nothing saved, nothing chosen. */
@@ -378,6 +406,17 @@ const shots = (scratch: Scratch): Shot[] => [
     url: chapterUrl("you", scratch.talked),
     prepare: noteIn("reached_no_model"),
     ready: slateNote(/The spending limit for model calls is reached\. Nothing from it/, true),
+  },
+  {
+    // Refused because no answer has a word to quote: asking again would repeat it, so the
+    // notice says to change the answers and offers no Try again.
+    name: "you--slate-note-too-short",
+    as: "ada",
+    context: "note-too-short",
+    url: chapterUrl("you", scratch.talked),
+    prepare: noteRefused("INSUFFICIENT_EVIDENCE", "no_quotable_answer"),
+    refused: true, // the intercepted 422 is logged as a failed load
+    ready: slateNote(/Your answers are too short to quote\. Nothing from it/, true),
   },
   {
     // A message with a risk stem is sent as usual, with the support panel beside it. The

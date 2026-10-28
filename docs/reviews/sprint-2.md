@@ -407,6 +407,16 @@ captures recaptured with every shot's checks clean (30 per size). The live EXP-0
 (rows 25-26) predates the round; its stored claims and quotations also pass the final
 rules. No new live call.
 
+**Fix round 2 (re-review 1).** The function words are now a standard English stopword
+list's (four letters or more, with contraction stems), checked on the verified span as it
+was folded for matching, so "about", "being", "could"/"should" and fullwidth "with" quote
+nothing; an apostrophe after a letter belongs to its word ("s tools" is no fragment of
+"mechanic's tools"); single quotes come off a quotation only as a matching pair; hyphenated
+and employer phrasings ("an in-demand trade", "well-paying", "sought after", "employers
+want", "short of staff") are refused; and a refusal asking again would only repeat (no
+answer to quote, answers too long, no searches) now says why and offers what can work,
+never a futile Try again. Checks: CHECKS-ROUND-2.
+
 **Live (R5).** Scope `live-eval-6b`, test model `muse-spark-1.3-contributor`, synthetic
 case EXP-01: ledger rows 25 (discovery, 1 request, $0.000205) and 26 (explanation, 2
 requests, one repair, $0.000453); $0.000658 in all, 3 of the scope's 9 requests. The

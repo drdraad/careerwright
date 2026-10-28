@@ -402,6 +402,34 @@ export const SlateNotePending: Story = { render: directions(full, "running") };
 export const SlateNoteUnavailable: Story = { render: directions(full, "failed") };
 /** The note was refused before any request reached a model: Try again, on a click. */
 export const SlateNoteRetry: Story = { render: directions(full, "failed", true) };
+/** Asking for the note was refused because no answer has a word to quote: asking again
+ *  would repeat it, so the person is told to change their answers (no Try again). */
+export const SlateNoteAnswersTooShort: Story = {
+  render: () => (
+    <Api
+      routes={[
+        { method: "GET", path: /\/slate$/, answer: slate(full) },
+        {
+          method: "POST",
+          path: /\/explanation$/,
+          status: 422,
+          answer: {
+            error: {
+              code: "INSUFFICIENT_EVIDENCE",
+              message: "",
+              retryable: false,
+              stage: "profile",
+              correlation_id: "story",
+              details: { reason: "no_quotable_answer" },
+            },
+          },
+        },
+      ]}
+    >
+      <Directions workspaceId={WS} profile={profile} discovery={discoveryWith(null)} />
+    </Api>
+  ),
+};
 
 const key = (credentials: CredentialOut[]) => () => (
   <Api routes={[]}>

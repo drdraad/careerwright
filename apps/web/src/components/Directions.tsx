@@ -40,6 +40,9 @@ import {
   FAILURE_CLASS,
   NOT_INCLUDED,
   NOTE_RECOVERY,
+  NOTE_REFUSAL_CODE,
+  NOTE_REFUSAL_REASON,
+  type NoteRefusalWords,
   RECORD_PART,
 } from "@/lib/vocabulary";
 import { Alert } from "./Alert";
@@ -95,8 +98,10 @@ function Source({ suggestion, slate }: { suggestion: SuggestionOut; slate: Slate
 }
 
 /** What the person can do about a missing note: try the note again (its run reached no
- *  model), send a refused request again, or suggest again (the slate had its one call). */
-type Recovery = "retry" | "resend" | "suggest_again";
+ *  model), send a refused request again, suggest again (the slate had its one call, or it
+ *  is no longer the current one), or change the answers first (a refusal asking again would
+ *  only repeat). */
+type Recovery = "retry" | "resend" | "suggest_again" | "edit_answers";
 
 /** What the slate's written note holds for one suggestion. */
 type WrittenState =
@@ -106,8 +111,14 @@ type WrittenState =
   | { kind: "not_covered" } // a view showed it that the note was not written for
   | { kind: "unavailable"; reason: string; action: string; recovery: Recovery };
 
-/** A request for the note that the API refused, in its error code's words. */
-type Refusal = { title: string; action: string; code: ErrorCode | null };
+/** A request for the note that the API refused, in its error code's words; `recovery` is
+ *  set when asking again could only repeat the refusal. */
+type Refusal = {
+  title: string;
+  action: string;
+  code: ErrorCode | null;
+  recovery?: NoteRefusalWords["recovery"];
+};
 
 // Only the quoted words are checked against a source; the sentences are the writer's own.
 const WRITTEN_BY: Record<ProposalOrigin, string> = {
@@ -135,23 +146,22 @@ function writtenState(
   }
   if (refused !== null) {
     const recovery: Recovery =
-      refused.code === "SLATE_ALREADY_EXPLAINED"
-        ? "suggest_again"
-        : explanation === null
-          ? "resend"
-          : explanation.can_retry
-            ? "retry"
-            : "suggest_again";
+      refused.recovery ??
+      (explanation === null ? "resend" : explanation.can_retry ? "retry" : "suggest_again");
     return { kind: "unavailable", reason: refused.title, action: refused.action, recovery };
   }
   if (explanation === null) return asked ? { kind: "pending" } : { kind: "none" };
   const failure = FAILURE_CLASS[explanation.run.failure_class ?? "unknown_failure"];
-  return {
-    kind: "unavailable",
-    reason: failure.title,
-    action: failure.action,
-    recovery: explanation.can_retry ? "retry" : "suggest_again",
-  };
+  // Once a request was sent, the failure's own advice (which may say "try again") would
+  // mislead: the slate has had its call.
+  return explanation.can_retry
+    ? { kind: "unavailable", reason: failure.title, action: failure.action, recovery: "retry" }
+    : {
+        kind: "unavailable",
+        reason: failure.title,
+        action: NOTE_RECOVERY.spent,
+        recovery: "suggest_again",
+      };
 }
 
 function WrittenNote({ state }: { state: WrittenState }) {
@@ -320,8 +330,16 @@ function NotShown({ items }: { items: NotIncludedOut[] }) {
 function refusal(error: unknown): Refusal | null {
   if (error === null) return null;
   if (error instanceof ApiError && error.body !== null) {
-    const words = ERROR_STATEMENT[error.body.code];
-    return { title: words.title, action: words.action, code: error.body.code };
+    const { code, details } = error.body;
+    const reason = details?.reason;
+    // A refusal that asking again would only repeat gets its own words and what can work.
+    const fixed =
+      typeof reason === "string" && Object.hasOwn(NOTE_REFUSAL_REASON, reason)
+        ? NOTE_REFUSAL_REASON[reason as keyof typeof NOTE_REFUSAL_REASON]
+        : NOTE_REFUSAL_CODE[code];
+    if (fixed !== undefined) return { ...fixed, code };
+    const words = ERROR_STATEMENT[code];
+    return { title: words.title, action: words.action, code };
   }
   return {
     title: "Nessa's service isn't reachable",
@@ -344,31 +362,31 @@ function NoteRecovery({
   tryBlocked?: string | undefined;
   suggestBlocked?: string | undefined;
 }) {
-  const again = state.recovery === "suggest_again";
+  const { recovery } = state;
+  // Changing the answers is done in "What we know"; the chapter then offers Suggest again,
+  // so no button here could work yet.
+  const action =
+    recovery === "edit_answers" ? undefined : recovery === "suggest_again" ? (
+      <Button variant="secondary" onClick={onSuggestAgain} disabledReason={suggestBlocked}>
+        Suggest again
+      </Button>
+    ) : (
+      <Button variant="secondary" onClick={onTryAgain} disabledReason={tryBlocked}>
+        Try again <span className="sr-only">: the written note</span>
+      </Button>
+    );
   return (
     <Alert
       tone="error"
       announce={false}
       title={`No written note: ${state.reason}`}
-      actions={
-        again ? (
-          <Button variant="secondary" onClick={onSuggestAgain} disabledReason={suggestBlocked}>
-            Suggest again
-          </Button>
-        ) : (
-          <Button variant="secondary" onClick={onTryAgain} disabledReason={tryBlocked}>
-            Try again <span className="sr-only">: the written note</span>
-          </Button>
-        )
-      }
+      actions={action}
     >
-      {/* Once the slate has had its call, only Suggest again is offered, so a failure's
-          own advice (which may say "try again") is not repeated. */}
-      {!again && <p>{state.action}</p>}
+      <p>{state.action}</p>
       <p>
-        {again
+        {recovery === "suggest_again"
           ? NOTE_RECOVERY.suggestAgain
-          : state.recovery === "retry"
+          : recovery === "retry"
             ? NOTE_RECOVERY.retry
             : NOTE_RECOVERY.resend}
       </p>

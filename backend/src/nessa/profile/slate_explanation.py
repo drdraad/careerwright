@@ -68,17 +68,29 @@ CONTEXT_MARKER = "Explanation context (JSON):\n"
 # A content word: a whole word of four letters or more that is not a common function word.
 # A quotation must hold one; so must an answer for the note to have anything to quote.
 _CONTENT_WORD = re.compile(r"\b[^\W\d_]{4,}\b")
+# The entries of four letters or more of a standard English stopword list (NLTK's),
+# contraction stems included ("couldn't" gives "couldn"), a few more modal and function
+# words, and "work" (too common in ESCO's records to link anything).
 COMMON_WORDS = frozenset(
-    {"also", "been", "both", "each", "from", "have", "here", "into", "just", "like", "more"}
-    | {"most", "much", "only", "other", "over", "same", "some", "such", "than", "that"}
-    | {"their", "them", "then", "there", "these", "they", "this", "those", "very", "what"}
-    | {"when", "where", "which", "while", "will", "with", "would", "your", "using"}
-    | {"work", "works", "working"}
+    {"about", "above", "after", "again", "against", "also", "aren", "because", "been"}
+    | {"before", "being", "below", "between", "both", "could", "couldn", "didn", "does"}
+    | {"doesn", "doing", "down", "during", "each", "every", "from", "further", "hadn"}
+    | {"hasn", "have", "haven", "having", "here", "hers", "herself", "himself", "into"}
+    | {"itself", "just", "like", "might", "mightn", "more", "most", "much", "must"}
+    | {"mustn", "myself", "needn", "once", "only", "other", "ought", "ours", "ourselves"}
+    | {"over", "same", "shall", "shan", "should", "shouldn", "some", "such", "than"}
+    | {"that", "their", "theirs", "them", "themselves", "then", "there", "these", "they"}
+    | {"this", "those", "through", "under", "until", "upon", "using", "very", "wasn"}
+    | {"were", "weren", "what", "when", "where", "which", "while", "whom", "whose", "will"}
+    | {"with", "within", "without", "would", "wouldn", "your", "yours", "yourself"}
+    | {"yourselves", "work", "works", "working"}
 )
 
 
 def content_words(text: str) -> set[str]:
-    return set(_CONTENT_WORD.findall(text.casefold())) - COMMON_WORDS
+    """The text's content words, folded as quotations are matched (compatibility forms,
+    case): "with" written in fullwidth letters is still the function word "with"."""
+    return set(_CONTENT_WORD.findall(_folded(text)[0])) - COMMON_WORDS
 
 
 def quotable(text: str) -> bool:
@@ -240,6 +252,7 @@ _AFFORDABILITY = (
     "grant",
     "grants",
     "lucrative",
+    "paying",
 )
 _HIRING = (
     "hire",
@@ -267,14 +280,19 @@ _HIRING = (
 )
 # Phrasings with a few words free: "in (high) demand", "already have the experience",
 # "plenty of jobs".
+# A hyphen separates words here as a space does ("an in-demand trade", "high-demand").
 _CLAIM_PATTERNS = (
-    ("in ... demand", r"in(?:\s+[\w-]+){0,2}\s+demand"),
+    ("in ... demand", r"in(?:[\s-]+\w+){0,2}[\s-]+demand"),
+    ("high demand", r"(?:high|great|growing|strong|huge|big|constant)[\s-]+demand"),
     (
         "already have the ...",
         r"already\s+have\s+(?:the|all\s+the|enough)\s+"
         r"(?:skills?|experience|qualifications?|training)",
     ),
     ("plenty of jobs", r"plenty\s+of\s+(?:jobs|vacancies|openings|roles|work)"),
+    ("sought after", r"sought[\s-]+after"),
+    ("employers want", r"employers?\s+(?:want|wants|need|needs|are\s+looking|look|seek)"),
+    ("short of staff", r"short(?:[\s-]+of)?[\s-]+staff(?:ed)?"),
 )
 _CURRENCY = ("£", "$", "€")
 _CLAIM_TERMS = tuple(
@@ -301,11 +319,20 @@ _APOSTROPHES = str.maketrans(
         **dict.fromkeys(map(chr, (0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212)), "-"),
     }
 )
-# Trimmed from a quotation's start: spaces and double quotation marks; never an apostrophe,
-# which may begin the source's own words ("'s work" is not "s work").
-_LEAD_TRIM = f" \t\n{_DOUBLE}"
-# Trimmed from its end: spaces, quotation marks and closing punctuation.
-_TAIL_TRIM = f" \t\n'{_DOUBLE}{_OPEN_SINGLE}{_CLOSE_SINGLE}.,;:!?{chr(0x2026)}"
+# Taken off a quotation's ends: spaces and double quotation marks, and closing punctuation
+# at its end. Single quotes come off only as a matching pair (straight, or curly left and
+# right): a lone apostrophe may be the source's own ("'s work", "workers'").
+_EDGE_TRIM = f" \t\n{_DOUBLE}"
+_CLOSING = f" .,;:!?{chr(0x2026)}"
+_SINGLE_PAIRS = (("'", "'"), (_OPEN_SINGLE, _CLOSE_SINGLE))
+
+
+def _unwrapped(text: str) -> str:
+    text = text.strip(_EDGE_TRIM).rstrip(_CLOSING)
+    for opening, closing in _SINGLE_PAIRS:
+        if len(text) > 2 and text.startswith(opening) and text.endswith(closing):
+            return text[1:-1].strip(_EDGE_TRIM).rstrip(_CLOSING)
+    return text
 
 
 def unsupported_claim_terms(text: str, allowed: Iterable[str]) -> list[str]:
@@ -343,6 +370,14 @@ def _folded(text: str) -> tuple[str, list[int]]:
     return "".join(chars), index
 
 
+def _in_word(folded: str, i: int) -> bool:
+    """Whether the folded text's character `i` belongs to a word: a letter or digit, or an
+    apostrophe after a letter ("mechanic's" is one word, so "s tools" is not a phrase of
+    "mechanic's tools")."""
+    char = folded[i]
+    return char.isalnum() or (char == "'" and i > 0 and folded[i - 1].isalpha())
+
+
 def find_span(quote: str, source: str) -> str | None:
     """The source's own characters for the first place the quotation appears in it whole
     (case, spacing and apostrophe forms aside), starting and ending at a word boundary; None
@@ -354,8 +389,8 @@ def find_span(quote: str, source: str) -> str | None:
     start = folded.find(wanted)
     while start != -1:
         end = start + len(wanted)
-        before = start == 0 or not folded[start - 1].isalnum()
-        after = end == len(folded) or not folded[end].isalnum()
+        before = start == 0 or not _in_word(folded, start - 1)
+        after = end == len(folded) or not _in_word(folded, end)
         if before and after:
             return source[index[start] : index[end - 1] + 1]
         start = folded.find(wanted, start + 1)
@@ -373,7 +408,7 @@ def _record_parts(record: OccupationRecord) -> list[tuple[RecordPart, str]]:
 def _verified(
     quote: ModelQuote, answers: Sequence[EvidenceItem], record: OccupationRecord
 ) -> Quotation | None:
-    text = quote.text.lstrip(_LEAD_TRIM).rstrip(_TAIL_TRIM)
+    text = _unwrapped(quote.text)
     if not QUOTE_CHARS[0] <= len(text) <= QUOTE_CHARS[1] or not any(c.isalpha() for c in text):
         return None
     if quote.source is QuoteSource.ANSWER:
@@ -418,14 +453,13 @@ def _checked_claim(
         problems.append(f"{where}: quotes must hold 1-{MAX_QUOTES} quotations")
     quotations: list[Quotation] = []
     for model_quote in claim.quotes[:MAX_QUOTES]:  # past the bound: counted, not checked
-        if not quotable(model_quote.text):
+        found = _verified(model_quote, answers, record)
+        if found is not None and not quotable(found.text):  # the source's own words, folded
             problems.append(
                 f"{where}: “{_echo(model_quote.text)}” has no content word; quote words that "
                 "say something"
             )
-            continue
-        found = _verified(model_quote, answers, record)
-        if found is None:
+        elif found is None:
             whose = (
                 "your answers"
                 if model_quote.source is QuoteSource.ANSWER

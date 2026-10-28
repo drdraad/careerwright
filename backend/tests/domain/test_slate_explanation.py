@@ -31,6 +31,7 @@ from nessa.profile.slate_explanation import (
     SlateExplanation,
     build_input,
     check_explanation,
+    find_span,
     prompt_bytes,
     quotable,
     render_prompt,
@@ -255,6 +256,14 @@ def test_a_claim_must_rest_on_the_person_s_answer_and_on_esco_s_record(
         "This is lucrative repair work for someone who enjoys it.",
         "There are plenty of jobs in bicycle repair for someone like you.",
         "The trade is crying out for people who enjoy repairs.",
+        # Fix round 2 (R2-M3): hyphenated and employer phrasings.
+        "Bicycle repair is an in-demand trade for someone who enjoys it.",
+        "This is high-demand repair work for someone like you.",
+        "This is well-paying repair work for someone who enjoys it.",
+        "Bicycle mechanics are highly sought after by repair shops.",
+        "Employers want people who enjoy repairing bicycles.",
+        "Employers need people who enjoy repairing bicycles.",
+        "Repair shops are short of staff, and you enjoy repairs.",
     ],
 )
 def test_a_readiness_affordability_or_hiring_claim_is_refused(text: str) -> None:
@@ -285,6 +294,97 @@ def test_an_answer_never_unlocks_a_readiness_pay_or_hiring_word(answer: str, tex
     risky = claim(text, quote("answer", answer), quote("esco", "repair bicycles"))
 
     assert any("readiness" in p for p in problems(output(("o1", [risky])), ctx))
+
+
+FULLWIDTH_WITH = "".join(chr(ord(letter) + 0xFEE0) for letter in "with")
+CURLY_PAIR = (chr(0x2018), chr(0x2019))
+FUNCTION_WORDS_PERSON = document(
+    enjoyed_tasks=["talking about what could be done", "being outdoors with others"]
+)
+FUNCTION_WORDS_RECORD = facts(
+    "bicycle mechanic",
+    "Mechanics think about what should be repaired, being careful with a mechanic's tools.",
+)
+
+
+@pytest.mark.req("REC1-11")
+@pytest.mark.parametrize(
+    ("said", "esco"),
+    [("about", "about"), ("being", "being"), ("could", "should"), (FULLWIDTH_WITH,) * 2],
+    ids=["about", "being", "could/should", "fullwidth with"],
+)
+def test_a_function_word_quotes_nothing_however_it_is_written(said: str, esco: str) -> None:
+    # Fix round 2 (R2-I1): the content word is looked for in the verified span, folded as
+    # the matcher folds it, so "with" in fullwidth letters is still the function word.
+    ctx = build_input(
+        discovery_id=DISCOVERY,
+        profile_version=1,
+        release="esco-v1.2.1-en-csv",
+        answers=evidence_of(FUNCTION_WORDS_PERSON),
+        occupations=[FUNCTION_WORDS_RECORD],
+    )
+    hollow = claim(
+        "You would fit right in with the people of this trade.",
+        quote("answer", said),
+        quote("esco", esco),
+    )
+
+    found = problems(output(("o1", [hollow])), ctx)
+
+    assert sum("content word" in p for p in found) == 2
+
+
+@pytest.mark.req("REC1-11")
+def test_an_apostrophe_after_a_letter_belongs_to_its_word() -> None:
+    # Fix round 2 (R2-M1): "s tools" is cut out of "mechanic's tools", not a phrase of it.
+    ctx = build_input(
+        discovery_id=DISCOVERY,
+        profile_version=1,
+        release="esco-v1.2.1-en-csv",
+        answers=evidence_of(FUNCTION_WORDS_PERSON),
+        occupations=[FUNCTION_WORDS_RECORD],
+    )
+    fragment = claim(
+        "You like being outdoors, and this trade is careful with its tools.",
+        quote("answer", "being outdoors"),
+        quote("esco", "s tools"),
+    )
+    whole = claim(
+        "You like being outdoors, and this trade is careful with its tools.",
+        quote("answer", "being outdoors"),
+        quote("esco", "careful with a mechanic's tools"),
+    )
+
+    assert any("not an exact quotation" in p for p in problems(output(("o1", [fragment])), ctx))
+    assert problems(output(("o1", [whole])), ctx) == []
+    assert find_span("s tools", "a mechanic's tools") is None
+    assert find_span("mechanic", "a mechanic's tools") is None  # the word is "mechanic's"
+    assert find_span("mechanic's", "a mechanic's tools") == "mechanic's"
+
+
+@pytest.mark.req("REC1-11")
+@pytest.mark.parametrize(
+    "wrapped",
+    ["'mending bikes'", "mending bikes".join(CURLY_PAIR), "'mending bikes.'"],
+    ids=["straight", "curly", "straight, a full stop inside"],
+)
+def test_a_quotation_wrapped_in_single_quotes_is_unwrapped_as_a_pair(wrapped: str) -> None:
+    # Fix round 2 (R2-M2): only a matching pair of single quotes is taken off.
+    person = document(enjoyed_tasks=["fixing and mending bikes"])
+    ctx = build_input(
+        discovery_id=DISCOVERY,
+        profile_version=1,
+        release="esco-v1.2.1-en-csv",
+        answers=evidence_of(person),
+        occupations=[MECHANIC],
+    )
+    quoted = claim(
+        "You enjoy mending bikes, which is what this trade does all day.",
+        quote("answer", wrapped),
+        quote("esco", "repair bicycles"),
+    )
+
+    assert problems(output(("o1", [quoted])), ctx) == []
 
 
 @pytest.mark.req("REC1-11")
@@ -322,7 +422,8 @@ def test_a_quotation_needs_a_content_word_and_keeps_its_leading_apostrophe() -> 
     )
 
     assert any("content word" in p for p in problems(output(("o1", [function_words])), ctx))
-    assert any("content word" in p for p in problems(output(("o1", [fragment])), ctx))
+    # Since fix round 2 (R2-M1) "s work" is not even a span: the apostrophe joins "mechanic's".
+    assert any("not an exact quotation" in p for p in problems(output(("o1", [fragment])), ctx))
     assert any("not an exact quotation" in p for p in problems(output(("o1", [apostrophe])), ctx))
     assert problems(output(("o1", [content])), ctx) == []
 

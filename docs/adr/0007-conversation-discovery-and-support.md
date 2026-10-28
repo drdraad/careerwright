@@ -350,15 +350,21 @@ inference, with at least 30 evaluation cases and a capped live run.
       claims; a claim is 20-240 characters with no quotation marks of its own (the model is
       asked for one sentence; only the length is checked), resting on 1-3 distinct
       quotations, at least one of the person's answers and at least one of that
-      occupation's record. Each quotation must hold a content word (four letters or more,
-      not a listed function word: "and" or "s work" quote nothing) and be an exact span of
-      its source at word boundaries (case, spacing and apostrophe or dash forms aside; a
-      leading apostrophe is never trimmed away), and is stored in the source's own
-      characters, with the answer's field or the record's part. Refused: a misquotation, an
-      invented answer, a fact the record lacks (another suggestion's record included),
-      readiness, affordability or hiring words, phrasings ("in high demand", "strong
-      candidate", "already have the experience", "plenty of jobs", "crying out for") or a
-      currency sign that the occupation's own record does not use (the person's answers
+      occupation's record. Each quotation must be an exact span of its source at word
+      boundaries (case, spacing, compatibility forms and apostrophe or dash forms aside; an
+      apostrophe after a letter belongs to its word, so "s tools" is no phrase of
+      "mechanic's tools"; double quotation marks and closing punctuation are taken off its
+      ends, single quotes only as a matching pair), and that span, folded as it was
+      matched, must hold a content word: four letters or more, not one of the function
+      words of a standard English stopword list with its contraction stems ("about",
+      "being", "could", "should", "with" in fullwidth letters, "and" quote nothing). It is
+      stored in the source's own characters, with the answer's field or the record's part.
+      Refused: a misquotation, an invented answer, a fact the record lacks (another
+      suggestion's record included), readiness, affordability or hiring words, phrasings
+      ("in high demand", "an in-demand trade", "high-demand", "well-paying", "strong
+      candidate", "already have the experience", "plenty of jobs", "crying out for",
+      "sought after", "employers want", "short of staff") or a currency sign that the
+      occupation's own record does not use (the person's answers
       never unlock one: "ready for a change" is no ground for "ready"), and a health
       condition, type, protected characteristic or percentage that neither the answers nor
       that record name (decision 7's guard; the record's words describe the work, not the
@@ -383,10 +389,14 @@ inference, with at least 30 evaluation cases and a capped live run.
       words were checked against the answers and ESCO's record, the sentences being the
       writer's own, and then "How Nessa found it" (decision 6's words), shown in every case.
       Pending, unavailable and not-covered states say so; a polite status line announces the
-      change. An unavailable note shows, once above the cards, the failure class's (or the
-      refused request's error code's) words from `vocabulary.ts` and one action: Try again
-      for a run that reached no model or a refused request, Suggest again (it says it makes a
-      new set of suggestions) once the slate has had its call.
+      change. An unavailable note shows, once above the cards, words from `vocabulary.ts` and
+      the one action that can work: Try again for a run that reached no model or a refusal
+      that may pass next time (budget, key, the service); Suggest again (it says it makes a
+      new set of suggestions) once the slate has had its call, or when the discovery has no
+      searches or the answers changed since; and, for a refusal that asking again would
+      only repeat (no answer to quote, answers too long, no suggestions), its own reason and
+      "Edit answers directly", after which the chapter offers Suggest again. Never a Try
+      again that cannot succeed.
     - *The support screen* (decision 7) is neither read nor written: the note sees only the
       pinned answers and ESCO, and an answer holding a listed word is quoted like any other.
     - *Known limits.* The claim's prose is model prose: only its quoted words are checked,

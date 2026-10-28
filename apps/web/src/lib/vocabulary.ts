@@ -511,11 +511,61 @@ export const NOTE_RECOVERY = {
   /** Its run stopped before any request reached a model, so the one call is unused. */
   retry: "No request reached the model, so Nessa can try the note again.",
   /** A request was sent: this slate has had its one call. */
+  spent: "These suggestions have had their one written note.",
+  /** What Suggest again does, wherever it is offered for a note. */
   suggestAgain:
-    "These suggestions have had their one written note. Suggest again for a new set of suggestions, which gets a note of its own: the suggestions shown now would be replaced.",
+    "Suggest again makes a new set of suggestions, which gets a note of its own: the suggestions shown now would be replaced.",
   /** The request for the note was refused before any run existed. */
   resend: "Nothing was sent to the model.",
 } as const;
+
+/** What can work after a refusal that asking again would only repeat: changing the answers
+ *  (the chapter then offers Suggest again) or Suggest again itself. Never Try again. */
+export type NoteRefusalWords = {
+  title: string;
+  action: string;
+  recovery: "edit_answers" | "suggest_again";
+};
+
+/** Such refusals of a slate's note, by the error's `details.reason`. */
+export const NOTE_REFUSAL_REASON = {
+  no_quotable_answer: {
+    title: "Your answers are too short to quote",
+    action:
+      "Add a few words to what you enjoy, can do or have done with Edit answers directly. Nessa then offers Suggest again.",
+    recovery: "edit_answers",
+  },
+  answers_too_long: {
+    title: "Your answers are too long for a written note",
+    action:
+      "Shorten or remove some answers with Edit answers directly. Nessa then offers Suggest again.",
+    recovery: "edit_answers",
+  },
+  no_suggestions: {
+    title: "There are no suggestions here to explain",
+    action: "Add to your answers with Edit answers directly. Nessa then offers Suggest again.",
+    recovery: "edit_answers",
+  },
+} as const satisfies Record<string, NoteRefusalWords>;
+
+/** Such refusals of a slate's note, by error code. */
+export const NOTE_REFUSAL_CODE: Partial<Record<ErrorCode, NoteRefusalWords>> = {
+  PROPOSAL_NOT_AVAILABLE: {
+    title: "These suggestions have no searches to explain",
+    action: "Their search didn't finish or didn't pass its checks.",
+    recovery: "suggest_again",
+  },
+  STALE_INPUT_VERSION: {
+    title: "Your answers changed after these suggestions were made",
+    action: "A note would quote answers you have since changed.",
+    recovery: "suggest_again",
+  },
+  SLATE_ALREADY_EXPLAINED: {
+    title: "These suggestions have had their one written note",
+    action: "Nessa doesn't write it again for the same suggestions.",
+    recovery: "suggest_again",
+  },
+};
 
 export const ERROR_STATEMENT = Object.fromEntries(
   (Object.keys(ERROR_WORDS) as ErrorCode[]).map((code) => [

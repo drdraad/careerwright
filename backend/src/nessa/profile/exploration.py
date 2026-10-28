@@ -146,9 +146,12 @@ _ENDED_WITHOUT_OUTPUT = frozenset({WorkState.FAILED, WorkState.PROVIDER_UNAVAILA
 
 
 def reached_no_model(run: Run, attempts: list[Attempt]) -> bool:
-    """A failed run none of whose attempts took a reservation or sent a request: it was
-    refused inside the activity (budget, key, access, model) before any call. An attempt
-    left unfinished or with an unknown charge counts as a call: a crash may follow one."""
+    """A failed run none of whose attempts took a reservation or recorded a request: it was
+    refused inside the activity (budget, key, access, model) before any call. A live
+    attempt holds its reservation before it calls, so one left unfinished or with an
+    unknown charge counts as a call (a crash may follow one); a fixture attempt takes no
+    reservation and makes no provider call, so it counts only by the requests it recorded,
+    and one left unfinished counts as no call."""
     return run.status in _ENDED_WITHOUT_OUTPUT and all(
         attempt.spend_state == SpendState.NONE.value and not attempt.requests_sent
         for attempt in attempts

@@ -321,8 +321,11 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     ).toBeVisible();
     expect(shown.getByText("What you enjoy: “repairing bicycles”.")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent(/aren't available/);
-    const notice = screen.getByText(/These suggestions have had their one written note\./);
-    expect(notice).toHaveTextContent(/would be replaced/); // it says what Suggest again does
+    expect(screen.getByText("These suggestions have had their one written note.")).toBeVisible();
+    // It says what Suggest again does.
+    expect(screen.getByText(/Suggest again makes a new set of suggestions/)).toHaveTextContent(
+      /would be replaced/,
+    );
     expect(screen.queryByRole("button", { name: /Try again/ })).toBeNull();
     expect(screen.queryByText(/Try again, or add the details yourself/)).toBeNull(); // not offered
     await user.click(screen.getByRole("button", { name: "Suggest again" }));
@@ -390,6 +393,67 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     await waitFor(() => expect(noteRequests(sent)).toHaveLength(2));
     expect(noteRequests(sent)[1]?.body).toEqual({ expected_profile_version: 2 });
   });
+
+  it.each([
+    {
+      code: "INSUFFICIENT_EVIDENCE",
+      status: 422,
+      reason: "no_quotable_answer",
+      words: /No written note: Your answers are too short to quote/,
+      button: null,
+    },
+    {
+      code: "LIMIT_EXCEEDED",
+      status: 422,
+      reason: "answers_too_long",
+      words: /No written note: Your answers are too long for a written note/,
+      button: null,
+    },
+    {
+      code: "PROPOSAL_NOT_AVAILABLE",
+      status: 409,
+      reason: undefined,
+      words: /No written note: These suggestions have no searches to explain/,
+      button: "Suggest again",
+    },
+  ])(
+    "a refusal asking again would repeat ($code) says why and offers what can work, never Try again",
+    async ({ code, status, reason, words, button }) => {
+      // Fix round 2 (R2-M4).
+      const sent = fakeApi([
+        slateRoute,
+        {
+          method: "POST",
+          path: /\/explanation$/,
+          status,
+          answer: {
+            error: {
+              code,
+              message: "not shown",
+              retryable: false,
+              stage: "profile",
+              correlation_id: "c3",
+              details: reason === undefined ? {} : { reason },
+            },
+          },
+        },
+      ]);
+      renderDirections(discoveryWith(null));
+
+      expect(await screen.findByText(words)).toBeVisible();
+      expect(screen.queryByRole("button", { name: /Try again/ })).toBeNull();
+      if (button === null) {
+        expect(
+          screen.getByText(/Edit answers directly\. Nessa then offers Suggest again\./),
+        ).toBeVisible();
+        expect(screen.queryByRole("button", { name: "Suggest again" })).toBeNull();
+      } else {
+        expect(screen.getByRole("button", { name: button })).toBeVisible();
+      }
+      expect(screen.queryByText("not shown")).toBeNull();
+      expect(noteRequests(sent)).toHaveLength(1); // the slate's own request, never repeated
+    },
+  );
 
   it("offers Suggest again when a try again is refused because the slate had its note", async () => {
     fakeApi([
