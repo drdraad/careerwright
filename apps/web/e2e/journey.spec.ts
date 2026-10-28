@@ -51,7 +51,9 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, inspect a fixture rout
   const routeB = page.getByRole("button", { name: /^Route B/ });
   await routeB.click();
   await expect(drawer.getByText("Synthetic fixture route")).toBeVisible();
-  await expect(drawer.getByText("lowest balance of £4,850", { exact: false })).toBeVisible();
+  await expect(
+    drawer.getByText("minimum prefunded cash balance of £4,850", { exact: false }),
+  ).toBeVisible();
   await expect(
     drawer
       .getByRole("definition")
