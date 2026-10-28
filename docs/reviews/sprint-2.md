@@ -415,7 +415,10 @@ nothing; an apostrophe after a letter belongs to its word ("s tools" is no fragm
 and employer phrasings ("an in-demand trade", "well-paying", "sought after", "employers
 want", "short of staff") are refused; and a refusal asking again would only repeat (no
 answer to quote, answers too long, no searches) now says why and offers what can work,
-never a futile Try again. Checks: CHECKS-ROUND-2.
+never a futile Try again. Checks on `e5714c5`: `make check` exit 0 (596 fast tests; Vitest
+204); `make acceptance` exit 0 (195 integration and stack tests, the Storybook build, 22
+Playwright journeys); the unavailable and answers-too-short notes captured at three sizes
+with every shot's checks clean (31 per size).
 
 **Live (R5).** Scope `live-eval-6b`, test model `muse-spark-1.3-contributor`, synthetic
 case EXP-01: ledger rows 25 (discovery, 1 request, $0.000205) and 26 (explanation, 2
