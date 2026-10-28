@@ -3,8 +3,11 @@
 A container on Nessa's `internal` network has a directly connected subnet there and no
 default route through it (Docker gives internal networks no gateway). So the internal
 subnets are the connected routes on interfaces that carry no default route, read from the
-kernel's IPv4 route table. On a host, the LAN interface carries the default route, so a
-LAN is never treated as internal. Standard library only (the edge uses it too).
+kernel's IPv4 route table. That reading holds only inside a Nessa container: on a host,
+docker0, a VPN or a second NIC also has no default route. So the edge (always a container)
+uses it for its targets, and the API uses it for clients only when its container's
+configuration says so (`client_networks`); otherwise the API is loopback-only. Standard
+library only.
 """
 
 import socket
@@ -33,13 +36,22 @@ def internal_networks(route_table: str) -> list[IPv4Network]:
     ]
 
 
-def local_networks(route_table: Path = ROUTE_TABLE) -> tuple[IPv4Network | IPv6Network, ...]:
-    """Loopback plus the internal subnets of this process's network namespace."""
+def client_networks(
+    *, internal: bool, route_table: Path = ROUTE_TABLE
+) -> tuple[IPv4Network | IPv6Network, ...]:
+    """The clients the API serves: loopback, plus this namespace's internal subnets only
+    when `internal` is set by the container's configuration. On a host, a subnet without a
+    default route (docker0, a VPN, a second NIC) is not internal to Nessa, so a host is
+    loopback-only. Enabled without any internal network found, it fails closed."""
+    if not internal:
+        return LOOPBACK
     try:
-        table = route_table.read_text(encoding="ascii")
+        found = internal_networks(route_table.read_text(encoding="ascii"))
     except OSError:
-        return LOOPBACK  # not Linux, or no route table: loopback only
-    return (*LOOPBACK, *internal_networks(table))
+        found = []
+    if not found:
+        raise RuntimeError("internal network clients are enabled but no internal network found")
+    return (*LOOPBACK, *found)
 
 
 def is_permitted(address: str, networks: Networks) -> bool:

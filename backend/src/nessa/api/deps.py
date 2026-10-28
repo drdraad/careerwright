@@ -38,8 +38,8 @@ class ApiDependencies:
     keyring: Keyring
     models: ModelChoice
     clock: Callable[[], datetime] = _utc_now
-    # Clients the API serves: loopback, plus the internal network inside a container
-    # (`nessa.localnet.local_networks()` at the composition root).
+    # Clients the API serves: loopback, plus the container's internal subnet when its
+    # configuration enables it (`nessa.localnet.client_networks` at the composition root).
     client_networks: tuple[IPv4Network | IPv6Network, ...] = LOOPBACK
 
     @property

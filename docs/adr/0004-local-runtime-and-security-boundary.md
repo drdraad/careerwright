@@ -30,9 +30,13 @@ records how they are realised, and the choices a later task must not undo silent
    emulator and database fail, and the same probe from the edge (positive control) reaches
    a listener on the host; in live mode the worker reaches it and the API still cannot.
 
-2. **Loopback requests only.** The API rejects any client whose address is outside
-   loopback and its own internal subnet, so the emulator's unsigned tokens are unusable from
-   the LAN even if the API were started on a public interface. It rejects any Host header
+2. **Loopback requests only.** The API serves loopback clients only. Its container's
+   configuration (`NESSA_API_INTERNAL_NETWORK_CLIENTS`, set in `compose.yaml`) adds its own
+   internal Compose subnet, where the edge relays from; on a host the API stays
+   loopback-only, because docker0, a VPN or a second NIC would look internal by route
+   alone. The client address is the socket peer (`--no-proxy-headers`), so no header can
+   change it. The emulator's unsigned tokens are therefore unusable from the LAN even if
+   the API listens on every interface. It rejects any Host header
    outside a configured list of local `host:port` values (defeats DNS rebinding), any
    request carrying an Origin other than the Nessa web origin, any state-changing request
    without an Origin, and every WebSocket (close code 1008; the API has none). A different

@@ -10,7 +10,7 @@ from nessa.db import create_engine
 from nessa.identity.firebase import FirebaseTokenVerifier
 from nessa.identity.keyring import load_keyring
 from nessa.identity.model_choice import ModelChoice
-from nessa.localnet import local_networks
+from nessa.localnet import client_networks
 from nessa.logs import configure_logging
 
 
@@ -28,6 +28,6 @@ def build_app() -> FastAPI:
                 settings.meta_production_model,
                 settings.synthetic_model_role,
             ),
-            client_networks=local_networks(),
+            client_networks=client_networks(internal=settings.internal_network_clients),
         )
     )

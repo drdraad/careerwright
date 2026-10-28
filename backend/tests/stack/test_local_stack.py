@@ -316,11 +316,14 @@ def test_the_edge_relays_only_into_the_internal_network_and_refuses_an_absent_ta
             name="internal_networks", call="internal_networks(ROUTE_TABLE.read_text())"
         ),
     )
+    # What the running API's own configuration makes it serve (N4: opted in by compose).
     api_view = demo_stack.exec(
         "api",
         "python",
         "-c",
-        NETWORKS_SEEN_BY.format(name="local_networks", call="local_networks()"),
+        "import json; from nessa.config import ApiSettings; "
+        "from nessa.localnet import client_networks; print(json.dumps([str(n) for n in "
+        "client_networks(internal=ApiSettings().internal_network_clients)]))",
     )
 
     # Task 3 has no web service, so the edge's web slot names an absent target: Docker's DNS

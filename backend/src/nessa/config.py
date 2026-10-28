@@ -110,6 +110,11 @@ class ApiSettings(_LocalSettings, _ModelSettings):
     app_database_url: str = Field(validation_alias="NESSA_APP_DATABASE_URL")
     app_database_password_file: Path = Field(validation_alias="NESSA_APP_DATABASE_PASSWORD_FILE")
     master_key_dir: Path = Field(validation_alias="NESSA_MASTER_KEY_DIR")
+    # Set only by the API container (compose.yaml): also serve clients on its own internal
+    # Compose subnet, where the edge relay connects from. Unset, the API is loopback-only.
+    internal_network_clients: bool = Field(
+        default=False, validation_alias="NESSA_API_INTERNAL_NETWORK_CLIENTS"
+    )
     default_run_spend_limit_nano_usd: int = Field(
         default=100_000_000, ge=0, validation_alias="NESSA_DEFAULT_RUN_SPEND_LIMIT_NANO_USD"
     )

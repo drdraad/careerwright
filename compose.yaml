@@ -71,9 +71,11 @@ services:
 
   api:
     <<: *backend
-    command: ["uvicorn", "--factory", "nessa.api.main:build_app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log", "--timeout-graceful-shutdown", "5"]
+    # --no-proxy-headers: the client address is always the socket peer, never a header.
+    command: ["uvicorn", "--factory", "nessa.api.main:build_app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log", "--no-proxy-headers", "--timeout-graceful-shutdown", "5"]
     environment:
       <<: [*local, *models]
+      NESSA_API_INTERNAL_NETWORK_CLIENTS: "true"  # the edge relays from the internal subnet
       NESSA_ALLOWED_HOSTS: 127.0.0.1:${NESSA_API_PORT:-58000},localhost:${NESSA_API_PORT:-58000},api:8000,127.0.0.1:8000
       NESSA_ALLOWED_ORIGINS: http://127.0.0.1:${NESSA_WEB_PORT:-53000},http://localhost:${NESSA_WEB_PORT:-53000}
       NESSA_FIREBASE_PROJECT_ID: demo-nessa

@@ -35,6 +35,13 @@ def test_valid_local_configuration_loads(monkeypatch: pytest.MonkeyPatch) -> Non
     assert loaded.runtime_mode is RuntimeMode.LIVE
     assert loaded.allowed_hosts == frozenset({"127.0.0.1:58000", "localhost:58000", "api:8000"})
     assert loaded.master_key_dir == Path("/run/nessa/keys")
+    assert loaded.internal_network_clients is False  # loopback-only unless configured
+
+
+def test_a_container_opts_in_to_its_internal_network_clients(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert settings(monkeypatch, NESSA_API_INTERNAL_NETWORK_CLIENTS="true").internal_network_clients
 
 
 @pytest.mark.req("SEC-03")
