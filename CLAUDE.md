@@ -63,6 +63,11 @@ Run from the repository root (details: `docs/runbook.md`).
     the same command as a direct edit (ADR 0006). In discovery the model proposes searches
     only; the slate is deterministic code over ESCO, its controls are view parameters and
     never limits, and a suggestion becomes a target only by the person's choice (ADR 0007).
+    A slate's written "Why this could suit you" is one bounded `slate_explanation` call per
+    discovery, over its first view; every quotation is verified as a span of the pinned
+    answers or that occupation's ESCO record (only the quoted words are checked, and the UI
+    says so); only a run refused before any request may be tried again, by the person's
+    click; the note changes no suggestion (ADR 0007 decision 12).
   - Any listed risk word, in any form, shows a calm support panel with UK resources beside
     the conversation. The message is still sent; that turn's reply only acknowledges and
     offers a smaller next step, and nothing about the panel is stored or used for
@@ -93,6 +98,7 @@ Run from the repository root (details: `docs/runbook.md`).
     SQL inside `run_transaction` (`nessa/db.py`). Never connect at runtime as an owner role.
   - Every consequential write takes an expected version and an `Idempotency-Key` and goes
     through `run_idempotent`. Errors are `NessaError` codes; never echo request input.
+    A command's answer is kept as its receipt in plaintext: never put model output in it.
   - Loopback only: services sit on an internal network; only the edge relay publishes
     ports, on 127.0.0.1. The API rejects foreign Host and Origin headers (ADR 0004).
   - UI uses the semantic tokens in `docs/design/tokens/tokens.css`. Sea-glass means
