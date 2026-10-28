@@ -39,6 +39,7 @@ import {
   ERROR_STATEMENT,
   FAILURE_CLASS,
   NOT_INCLUDED,
+  NOTE_CARD,
   NOTE_RECOVERY,
   NOTE_REFUSAL_CODE,
   NOTE_REFUSAL_REASON,
@@ -109,7 +110,14 @@ type WrittenState =
   | { kind: "pending" }
   | { kind: "written"; why: WrittenWhyOut; origin: ProposalOrigin }
   | { kind: "not_covered" } // a view showed it that the note was not written for
-  | { kind: "unavailable"; reason: string; action: string; recovery: Recovery };
+  | {
+      kind: "unavailable";
+      reason: string;
+      action: string;
+      recovery: Recovery;
+      /** Whether a run existed (it failed) or the request was refused before any run. */
+      ran: boolean;
+    };
 
 /** A request for the note that the API refused, in its error code's words; `recovery` is
  *  set when asking again could only repeat the refusal. */
@@ -148,19 +156,32 @@ function writtenState(
     const recovery: Recovery =
       refused.recovery ??
       (explanation === null ? "resend" : explanation.can_retry ? "retry" : "suggest_again");
-    return { kind: "unavailable", reason: refused.title, action: refused.action, recovery };
+    return {
+      kind: "unavailable",
+      reason: refused.title,
+      action: refused.action,
+      recovery,
+      ran: explanation !== null, // a refused Try again follows a run that failed
+    };
   }
   if (explanation === null) return asked ? { kind: "pending" } : { kind: "none" };
   const failure = FAILURE_CLASS[explanation.run.failure_class ?? "unknown_failure"];
   // Once a request was sent, the failure's own advice (which may say "try again") would
   // mislead: the slate has had its call.
   return explanation.can_retry
-    ? { kind: "unavailable", reason: failure.title, action: failure.action, recovery: "retry" }
+    ? {
+        kind: "unavailable",
+        reason: failure.title,
+        action: failure.action,
+        recovery: "retry",
+        ran: true,
+      }
     : {
         kind: "unavailable",
         reason: failure.title,
         action: NOTE_RECOVERY.spent,
         recovery: "suggest_again",
+        ran: true,
       };
 }
 
@@ -170,11 +191,12 @@ function WrittenNote({ state }: { state: WrittenState }) {
     return <StatusBadge state="running" detail="writing a note from your answers and ESCO" />;
   }
   if (state.kind === "unavailable") {
+    const words = state.ran ? NOTE_CARD.failed : NOTE_CARD.refused;
     return (
       <div className="grid gap-4">
-        <StatusBadge state="failed" detail="no written note" />
+        <StatusBadge state={state.ran ? "failed" : "notStarted"} detail={words.detail} />
         <p className="small">
-          {state.reason}. Nothing from it was kept; how Nessa found this suggestion is below.
+          {state.reason}. {words.after}
         </p>
       </div>
     );

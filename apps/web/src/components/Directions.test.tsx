@@ -388,6 +388,12 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     expect(screen.queryByText("not shown")).toBeNull(); // never the API's own message
     expect(shown.getByText("What you enjoy: “repairing bicycles”.")).toBeVisible();
     expect(screen.getByText("Nothing was sent to the model.")).toBeVisible();
+    // Fix round 3 (R3-M6): no run existed, so the card says it was refused before one, not
+    // that it failed or that something from it was not kept.
+    expect(shown.getByText(/Not started/)).toBeVisible();
+    expect(shown.getByText(/Nessa didn't ask the model, so nothing was sent/)).toBeVisible();
+    expect(shown.queryByText(/Failed/)).toBeNull();
+    expect(shown.queryByText(/Nothing from it was kept/)).toBeNull();
     await user.click(screen.getByRole("button", { name: "Try again : the written note" }));
     // The first request was the slate's own; the click sends it again, as a plain request.
     await waitFor(() => expect(noteRequests(sent)).toHaveLength(2));

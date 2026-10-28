@@ -404,8 +404,8 @@ in bytes are a typed refusal; the length, not "one sentence", is what is checked
 on `42ef206`: `make check` exit 0 (581 fast tests; Vitest 201); `make acceptance` exit 0
 (195 integration and stack tests, the Storybook build, 22 Playwright journeys); the note's
 captures recaptured with every shot's checks clean (30 per size). The live EXP-01 output
-(rows 25-26) predates the round; its stored claims and quotations also pass the final
-rules. No new live call.
+(rows 25-26) predates the round; its stored claims and quotations were re-checked offline
+after round 1's rules, and again after fix round 3 (below). No new live call.
 
 **Fix round 2 (re-review 1).** The function words are now a standard English stopword
 list's (four letters or more, with contraction stems), checked on the verified span as it
@@ -419,6 +419,20 @@ never a futile Try again. Checks on `e5714c5`: `make check` exit 0 (596 fast tes
 204); `make acceptance` exit 0 (195 integration and stack tests, the Storybook build, 22
 Playwright journeys); the unavailable and answers-too-short notes captured at three sizes
 with every shot's checks clean (31 per size).
+
+**Fix round 3 (re-review 2).** A regression from round 2 is fixed: the demo explainer
+quoted "children" out of "children's", which the stricter matcher refused, so a demo note
+could fail whole; the explainer now reads each quotation back as the check does and quotes
+the whole token ("children's", "students'"), and a property test shows its note always
+passes. Also: "paying attention" is a skill, not pay; an apostrophe is part of a word only
+inside it or after an "s", so "a 'people person'" can be quoted; quotation marks before
+closing punctuation come off; a request refused before any run says so on each card ("Not
+started ... Nessa didn't ask the model") instead of "Nothing from it was kept"; "employers
+want/need" is kept and listed as a known false positive for careers work (H-12). The
+stored live EXP-01 output (rows 25-26) was re-checked offline with the final checker: all
+six suggestions, seven claims and 16 quotations accepted. That check read ESCO's full
+records as the evidence file keeps them, not the shortened copy the prompt carried, so a
+quotation from beyond the cut would also have passed. No live call. Checks: CHECKS-ROUND-3.
 
 **Live (R5).** Scope `live-eval-6b`, test model `muse-spark-1.3-contributor`, synthetic
 case EXP-01: ledger rows 25 (discovery, 1 request, $0.000205) and 26 (explanation, 2

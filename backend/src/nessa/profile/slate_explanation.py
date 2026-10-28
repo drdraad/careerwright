@@ -295,8 +295,17 @@ _CLAIM_PATTERNS = (
     ("short of staff", r"short(?:[\s-]+of)?[\s-]+staff(?:ed)?"),
 )
 _CURRENCY = ("£", "$", "€")
+# "Pay attention to detail" is a skill (ESCO lists it), not pay.
+_PAY = frozenset({"pay", "pays", "paid", "paying"})
+_NOT_ATTENTION = r"(?!\s+(?:\w+\s+)?attention)"
 _CLAIM_TERMS = tuple(
-    (term, re.compile(rf"(?<!\w){re.escape(term)}(?!\w)", re.IGNORECASE))
+    (
+        term,
+        re.compile(
+            rf"(?<!\w){re.escape(term)}(?!\w){_NOT_ATTENTION if term in _PAY else ''}",
+            re.IGNORECASE,
+        ),
+    )
     for term in (*_READINESS, *_AFFORDABILITY, *_HIRING)
 ) + tuple(
     (label, re.compile(rf"(?<!\w){pattern}(?!\w)", re.IGNORECASE))
@@ -327,11 +336,21 @@ _CLOSING = f" .,;:!?{chr(0x2026)}"
 _SINGLE_PAIRS = (("'", "'"), (_OPEN_SINGLE, _CLOSE_SINGLE))
 
 
+def _bare(text: str) -> str:
+    """Spaces and double quotation marks off both ends and closing punctuation off the end,
+    until nothing more comes off ('"mending bikes".' is 'mending bikes')."""
+    previous = None
+    while text != previous:
+        previous = text
+        text = text.strip(_EDGE_TRIM).rstrip(_CLOSING)
+    return text
+
+
 def _unwrapped(text: str) -> str:
-    text = text.strip(_EDGE_TRIM).rstrip(_CLOSING)
+    text = _bare(text)
     for opening, closing in _SINGLE_PAIRS:
         if len(text) > 2 and text.startswith(opening) and text.endswith(closing):
-            return text[1:-1].strip(_EDGE_TRIM).rstrip(_CLOSING)
+            return _bare(text[1:-1])
     return text
 
 
@@ -372,10 +391,17 @@ def _folded(text: str) -> tuple[str, list[int]]:
 
 def _in_word(folded: str, i: int) -> bool:
     """Whether the folded text's character `i` belongs to a word: a letter or digit, or an
-    apostrophe after a letter ("mechanic's" is one word, so "s tools" is not a phrase of
-    "mechanic's tools")."""
+    apostrophe inside a word ("mechanic's", "don't": so "s tools" is no phrase of
+    "mechanic's tools") or after an "s" (a plural possessive, "students'"). Any other
+    apostrophe is a quotation mark, so "people person" is a phrase of "'people person'"."""
     char = folded[i]
-    return char.isalnum() or (char == "'" and i > 0 and folded[i - 1].isalpha())
+    if char.isalnum():
+        return True
+    if char != "'":
+        return False
+    letter_before = i > 0 and folded[i - 1].isalpha()
+    letter_after = i + 1 < len(folded) and folded[i + 1].isalpha()
+    return (letter_before and letter_after) or (i > 0 and folded[i - 1] == "s" and not letter_after)
 
 
 def find_span(quote: str, source: str) -> str | None:
@@ -405,22 +431,29 @@ def _record_parts(record: OccupationRecord) -> list[tuple[RecordPart, str]]:
     ]
 
 
+def quoted_span(quote: str, source: str) -> str | None:
+    """The source's own characters for a quotation of it, read as the check reads one: its
+    ends unwrapped, bounded, whole words; None if it is no quotation of the source. (Whether
+    the span says something is `quotable`.)"""
+    text = _unwrapped(quote)
+    if not QUOTE_CHARS[0] <= len(text) <= QUOTE_CHARS[1] or not any(c.isalpha() for c in text):
+        return None
+    return find_span(text, source)
+
+
 def _verified(
     quote: ModelQuote, answers: Sequence[EvidenceItem], record: OccupationRecord
 ) -> Quotation | None:
-    text = _unwrapped(quote.text)
-    if not QUOTE_CHARS[0] <= len(text) <= QUOTE_CHARS[1] or not any(c.isalpha() for c in text):
-        return None
     if quote.source is QuoteSource.ANSWER:
         for item in answers:
-            span = find_span(text, item.text)
+            span = quoted_span(quote.text, item.text)
             if span is not None:
                 return Quotation(
                     source=QuoteSource.ANSWER, answer_field=item.field, record_part=None, text=span
                 )
         return None
     for part, source in _record_parts(record):
-        span = find_span(text, source)
+        span = quoted_span(quote.text, source)
         if span is not None:
             return Quotation(
                 source=QuoteSource.ESCO, answer_field=None, record_part=part, text=span

@@ -8,6 +8,8 @@ import uuid
 from typing import Any
 
 import pytest
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 from nessa.catalogue.records import IscoGroupRef, OccupationFacts
 from nessa.errors import ErrorCode, NessaError
@@ -364,6 +366,79 @@ def test_an_apostrophe_after_a_letter_belongs_to_its_word() -> None:
 
 @pytest.mark.req("REC1-11")
 @pytest.mark.parametrize(
+    "said",
+    [
+        "I am a 'people person' at heart",
+        "I am a {} at heart".format("people person".join(CURLY_PAIR)),
+    ],
+    ids=["straight", "curly"],
+)
+def test_a_closing_single_quote_is_not_read_as_a_possessive(said: str) -> None:
+    # Fix round 3 (R3-M2): an apostrophe joins a word only inside it ("mechanic's") or after
+    # an "s" ("students'"); a closing quote after "person" is a boundary.
+    person = document(enjoyed_tasks=[said])
+    ctx = build_input(
+        discovery_id=DISCOVERY,
+        profile_version=1,
+        release="esco-v1.2.1-en-csv",
+        answers=evidence_of(person),
+        occupations=[MECHANIC],
+    )
+
+    for quoted in ("people person", "'people person'"):
+        sociable = claim(
+            "You like people, and this trade means talking customers through their repairs.",
+            quote("answer", quoted),
+            quote("esco", "repair bicycles"),
+        )
+        assert problems(output(("o1", [sociable])), ctx) == [], quoted
+    assert find_span("students' learning", "the students' learning") == "students' learning"
+    assert find_span("students", "the students' learning") is None  # the word is "students'"
+    assert find_span("s tools", "a mechanic's tools") is None
+    assert find_span("mechanic's tools", "a mechanic's tools") == "mechanic's tools"
+
+
+@pytest.mark.req("REC1-11")
+@pytest.mark.parametrize("wrapped", ['"mending bikes".', "'mending bikes'.", "“mending bikes”;"])
+def test_quotation_marks_before_closing_punctuation_come_off_too(wrapped: str) -> None:
+    # Fix round 3 (R3-M3).
+    person = document(enjoyed_tasks=["fixing and mending bikes"])
+    ctx = build_input(
+        discovery_id=DISCOVERY,
+        profile_version=1,
+        release="esco-v1.2.1-en-csv",
+        answers=evidence_of(person),
+        occupations=[MECHANIC],
+    )
+    quoted = claim(
+        "You enjoy mending bikes, which is what this trade does all day.",
+        quote("answer", wrapped),
+        quote("esco", "repair bicycles"),
+    )
+
+    assert problems(output(("o1", [quoted])), ctx) == []
+
+
+@pytest.mark.req("REC1-11")
+def test_paying_attention_is_not_a_pay_claim() -> None:
+    # Fix round 3 (R3-M1): "pay attention to detail" is a skill, not pay.
+    careful = claim(
+        "You enjoy paying attention to detail, which repairing bicycles needs.",
+        quote("answer", "repairing bicycles"),
+        quote("esco", "repair bicycles"),
+    )
+    paid = claim(
+        "This repair work is paying well, and you enjoy repairing bicycles.",
+        quote("answer", "repairing bicycles"),
+        quote("esco", "repair bicycles"),
+    )
+
+    assert problems(output(("o1", [careful]), ("o2", [GOOD_GARDENER]))) == []
+    assert any("readiness" in p for p in problems(output(("o1", [paid]), ("o2", [GOOD_GARDENER]))))
+
+
+@pytest.mark.req("REC1-11")
+@pytest.mark.parametrize(
     "wrapped",
     ["'mending bikes'", "mending bikes".join(CURLY_PAIR), "'mending bikes.'"],
     ids=["straight", "curly", "straight, a full stop inside"],
@@ -676,6 +751,88 @@ def test_the_fixture_explainer_reads_the_live_prompt_and_passes_the_same_check()
         c.text.startswith("Demo explainer (synthetic)") for c in written.suggestions[0].claims
     )
     assert fixture_explanation(prompt_context(render_prompt(ctx))) == out  # deterministic
+
+
+def fixture_problems(answers: list[str], record: OccupationFacts) -> list[str]:
+    """The check's problems with the fixture explainer's output for these answers."""
+    ctx = build_input(
+        discovery_id=DISCOVERY,
+        profile_version=1,
+        release="esco-v1.2.1-en-csv",
+        answers=evidence_of(document(enjoyed_tasks=answers)),
+        occupations=[record],
+    )
+    out = fixture_explanation(prompt_context(render_prompt(ctx)))
+    return check_explanation(out, ctx, ProposalOrigin.FIXTURE)[1]
+
+
+@pytest.mark.req("REC1-11", "TEST1-10")
+@pytest.mark.parametrize(
+    ("answer", "description", "skill"),
+    [
+        (
+            "looking after children",
+            "Nursery workers supervise children's play and meals.",
+            "plan activities",
+        ),
+        (
+            "helping students learn",
+            "Tutors monitor the students' learning progress.",
+            "explain subjects",
+        ),
+        ("fixing bikes", "Mechanics keep a customer's bikes safe.", "test brakes"),
+        (
+            "restoring old furniture",
+            "Restorers treat the furniture's surfaces (wood, metal).",
+            "apply varnish",
+        ),
+        ("gardening", "Gardeners don't only plant: they plan gardens.", "prune shrubs"),
+    ],
+    ids=["children's", "students'", "customer's", "furniture's, in brackets", "don't"],
+)
+def test_the_fixture_explainer_quotes_a_possessive_as_its_whole_word(
+    answer: str, description: str, skill: str
+) -> None:
+    # Fix round 3 (R3-I1): a word shared with the description is quoted only where it is a
+    # whole word there, else as its whole token, so the demo note never fails its check.
+    assert fixture_problems([answer], facts("occupation", description, skill)) == []
+
+
+_WORDS = st.sampled_from(
+    [
+        "children's",
+        "students'",
+        "mechanic's",
+        "don't",
+        "well-being",
+        "repair,",
+        "(tools)",
+        "bikes.",
+        "gardens",
+        "people",
+        "and",
+        "with",
+        "about",
+        "care",
+        "teaching",
+        "work",
+    ]
+)
+_PHRASE = st.lists(_WORDS, min_size=1, max_size=6).map(" ".join)
+
+
+@pytest.mark.req("REC1-11", "TEST1-10")
+@settings(max_examples=150, deadline=None)
+@given(answers=st.lists(_PHRASE, min_size=1, max_size=3), description=_PHRASE, skill=_PHRASE)
+def test_whatever_the_answers_and_record_the_fixture_s_note_passes_the_check(
+    answers: list[str], description: str, skill: str
+) -> None:
+    # A demo workspace is refused before any run when no answer has a word to quote, so
+    # only answers with one are in scope; ESCO titles always have one.
+    assume(any(quotable(text) for text in answers))
+    assume(len({a.casefold() for a in answers}) == len(answers))  # a profile list holds each once
+
+    assert fixture_problems(answers, facts("care worker", description, skill)) == []
 
 
 def test_the_prompt_and_schema_fit_the_bounds_the_reservation_assumes() -> None:

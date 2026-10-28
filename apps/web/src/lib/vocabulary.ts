@@ -519,6 +519,20 @@ export const NOTE_RECOVERY = {
   resend: "Nothing was sent to the model.",
 } as const;
 
+/** The line on each card when its note is missing: after a run that failed, or after a
+ *  request refused before any run existed. */
+export const NOTE_CARD = {
+  failed: {
+    detail: "no written note",
+    after: "Nothing from it was kept; how Nessa found this suggestion is below.",
+  },
+  refused: {
+    detail: "no written note",
+    after:
+      "Nessa didn't ask the model, so nothing was sent; how Nessa found this suggestion is below.",
+  },
+} as const;
+
 /** What can work after a refusal that asking again would only repeat: changing the answers
  *  (the chapter then offers Suggest again) or Suggest again itself. Never Try again. */
 export type NoteRefusalWords = {

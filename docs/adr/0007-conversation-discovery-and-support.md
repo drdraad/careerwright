@@ -352,9 +352,11 @@ inference, with at least 30 evaluation cases and a capped live run.
       quotations, at least one of the person's answers and at least one of that
       occupation's record. Each quotation must be an exact span of its source at word
       boundaries (case, spacing, compatibility forms and apostrophe or dash forms aside; an
-      apostrophe after a letter belongs to its word, so "s tools" is no phrase of
-      "mechanic's tools"; double quotation marks and closing punctuation are taken off its
-      ends, single quotes only as a matching pair), and that span, folded as it was
+      apostrophe inside a word or after an "s" belongs to its word, so "s tools" is no
+      phrase of "mechanic's tools" and "students" none of "students' learning", while any
+      other is a quotation mark, so "people person" is a phrase of "a 'people person'";
+      double quotation marks and closing punctuation are taken off its ends until none
+      remain, single quotes only as a matching pair), and that span, folded as it was
       matched, must hold a content word: four letters or more, not one of the function
       words of a standard English stopword list with its contraction stems ("about",
       "being", "could", "should", "with" in fullwidth letters, "and" quote nothing). It is
@@ -363,8 +365,9 @@ inference, with at least 30 evaluation cases and a capped live run.
       suggestion's record included), readiness, affordability or hiring words, phrasings
       ("in high demand", "an in-demand trade", "high-demand", "well-paying", "strong
       candidate", "already have the experience", "plenty of jobs", "crying out for",
-      "sought after", "employers want", "short of staff") or a currency sign that the
-      occupation's own record does not use (the person's answers
+      "sought after", "employers want", "short of staff"; "pay" or "paying" before
+      "attention" is a skill, not pay) or a currency sign that the occupation's own record
+      does not use (the person's answers
       never unlock one: "ready for a change" is no ground for "ready"), and a health
       condition, type, protected characteristic or percentage that neither the answers nor
       that record name (decision 7's guard; the record's words describe the work, not the
@@ -377,7 +380,10 @@ inference, with at least 30 evaluation cases and a capped live run.
       non-synthetic workspaces, the test model for synthetic ones; demo workspaces use the
       deterministic fixture explainer (`nessa-fixture-explainer-1`, each claim labelled
       "Demo explainer (synthetic)"), which the database confines to demo workspaces and, with
-      the other fixture models, to interview turns, discoveries and explanations.
+      the other fixture models, to interview turns, discoveries and explanations. It reads
+      each quotation back as the check reads it (`quoted_span`) before writing it, quoting a
+      description's word as its whole token where the word alone is no span
+      ("children's"), so its note always passes the check (a property test, fix round 3).
     - *Never a change.* The slate is computed without reading the note, and choosing a
       target records the `occupation_choice` source (ESCO URI and discovery) as before,
       never the note. The command answers with the run only (`ExplanationRunOut`): a
@@ -403,7 +409,11 @@ inference, with at least 30 evaluation cases and a capped live run.
       so a sentence may still say, in other words, more than its quotations support (no
       claim-to-quotation word check is made: it would turn paraphrase into paid repairs);
       the word screens catch the listed readiness, money, hiring and sensitive terms only.
-      A short answer with no content word ("art") cannot be quoted on its own. The live
+      A short answer with no content word ("art") cannot be quoted on its own. Known false
+      positives for the H-12 review: "employers want" or "employers need" is refused even
+      where the occupation's work is employers' needs (a careers adviser "explains what
+      employers need"), unless that record itself uses the phrase; a closing quotation mark
+      after a word ending in "s" ("'odd jobs'") reads as a plural possessive. The live
       evidence is single samples on the test model.
     - **Provisional (R6, H-12):** the readiness, affordability and hiring word lists and
       phrasings, the content-word rule and its function words, the claim and quotation
