@@ -1,8 +1,10 @@
 # L0 sprint tasks (execution breakdown)
 
-This file breaks `docs/plan/development-plan.md` (the local development plan, v1.0) into
+This file breaks `docs/plan/development-plan.md` (the local development plan, v1.1) into
 implementation tasks for agent execution. Authority order: product specification
-(`Nessa_Product_Specification.md`, v1.2) → development plan local overrides → this file.
+(`Nessa_Product_Specification.md`, v1.3) → development plan local overrides → this file.
+Tasks 1–6 (Sprints 0–2) are complete. The remaining tasks follow the order, dependency
+rules and dispatch preconditions below (ADR 0008).
 This file adds task slicing, environment facts and standing rulings only; it never
 relaxes the plan or the specification.
 
@@ -102,8 +104,12 @@ These bind every task and every review.
   evidence directory; git holds the manifest (URL, retrieval date, hash, labelled spans as
   minimal excerpts, missingness, rights status). Rights status is "pending human rights
   review" unless terms clearly permit retention.
-- R4 Adzuna: no credentials exist. Implement the adapter and its fixture contract; record
-  the live integration as "unverified — no credentials".
+- R4 Adzuna: no credentials exist (still true on 2026-10-28). Implement the adapter and its
+  fixture contract; record the live integration as "unverified — no credentials". Adzuna
+  stays optional (plan v1.1, Sprint 3 S3.3): if developer credentials are registered and
+  stored under `NESSA_HOME` before Task 7 is dispatched, Task 7 qualifies the live
+  integration instead. It is external data, still a local run; never put the credentials
+  in a command argument, log or commit.
 - R5 Live Meta usage (user instruction, 2026-10-27: "keep careful track of meta LLM
   credits and costs during testing. Use sparingly, use cheaper models to confirm working,
   and the most performant model only in production"):
@@ -131,6 +137,71 @@ These bind every task and every review.
   cannot be automated, document the exact manual step in the runbook and record it.
 - R8 Fonts: OFL (or equivalently permissive) self-hosted files, with licence texts
   committed beside them.
+- R9 England option pack labelling (D1; spec section 11; plan section 9; ADR 0008):
+  - Every surface that uses the pack (Roles, Skills, Options, Routes, Plan and every
+    export) shows the pack's date and each record's review state.
+  - A `proposed` record, whether from the pack before review or from live research, is
+    explorable but never enters an unqualified "affordable and feasible" recommendation.
+  - A pack record never fills a live field and is never shown as current.
+  - Synthetic data stays labelled synthetic and never enters the pack.
+  - Live research writes the same catalogue contract, `review_state: proposed`, inside its
+    own workspace, never into the pack.
+- R10 Human review sessions (plan section 10; ADR 0008). Three fixed sessions, each a
+  dispatch precondition. The controller does not dispatch a task whose precondition session
+  has not happened; it records "blocked: awaiting session N" in the progress ledger instead.
+  An agent prepares each session's package under R2. Only the product owner's own record of
+  a session establishes its outcome; an agent may transcribe that record, never supply it.
+  - Session 1 (about 2 h). Before Task 8, and before any page body is retained beyond the
+    source classes it permits (until then R3 governs retention). Closes H-06 as a rights
+    policy for the permitted source classes of the corpus and the option pack, so agents can
+    classify pages themselves (a page outside those classes, or not clearly within one,
+    stays "pending human rights review"), and the H-12 checklist in ADR 0007. D1–D3 were
+    confirmed by the product owner on 2026-10-28 and need no session time.
+  - Session 2 (about 2 h). After Task 11. Closes H-07 for Sprints 4–5 on the option pack
+    and the TRACE-01 checker run on P01's real option set, and H-13, the formative
+    comprehension session.
+  - Session 3 (about 1 h). Before Task 14 closes. Closes H-01 for Sprint 7, the design
+    review, against what session 2 showed.
+
+## Order, dependencies and dispatch preconditions (plan v1.1, ADR 0008)
+
+Execution is sequential: the controller runs one implementer at a time. Where the
+assessment handover (`docs/plan/l0-assessment-handover.md`) marks tasks as parallel (∥),
+they have no dependency on each other and run one after the other, in either order; they
+never run at once.
+
+Dependency rules:
+
+1. Task 6b after Task 6 (it extends Task 6's discovery). By controller ruling, Task 6c
+   follows 6b and Task 7 follows 6c; neither depends on 6b's code.
+2. Task 7b after Task 7 (it uses the Task 7 acquisition pipeline).
+3. Task 9 after Task 7 (its outcome mappings cite Task 7's SourceClaim spans). It has no
+   dependency on Task 7b (the handover's "7b ∥ 9") and follows it in the suggested order.
+4. Task 11 after Tasks 9 and 7b (its acceptance runs on the pack's P01 option set).
+5. Session 2 after Task 11.
+6. Tasks 10 and 12 after session 2 (they score the live path against the reviewed
+   values); they have no dependency on each other or on Task 8.
+7. Session 1 before Task 8, and before any page body is retained beyond the classes it
+   permits.
+8. Task 8 after Task 11, session 1 and session 2.
+9. Task 13a after Task 11 and session 2. Task 13b after Task 13a.
+10. Task 14 starts after Task 13b and after session 2's findings exist (the H-13 record),
+    and closes only after session 3.
+11. Task 15 after Task 14 has closed; Task 16 after Task 15.
+
+Suggested order: 6b → 6c → 7 → 7b → 9 → 11 → session 2 → 10 → 12 → 8 → 13a → 13b → 14
+(closes after session 3) → 15 → 16. Session 1 can be held at any point before Task 8;
+holding it before Task 7b lets 7b classify the pack's rights itself instead of leaving
+every page "pending human rights review".
+
+Dispatch preconditions: every remaining task card starts with a **Preconditions** line
+naming the tasks and the human sessions it waits for (R10). A session that has not happened
+blocks dispatch; it is never assumed, worked around or self-certified (R2).
+
+Sprint reviews follow the order: the task that finishes a sprint writes its review, so
+`docs/reviews/sprint-3.md` (Task 8) comes after `sprint-4.md` (Task 10) and `sprint-5.md`
+(Task 12), and `sprint-6.md` (Task 13b) covers 6a and 6b. Each review states the order it
+ran in.
 
 ---
 
@@ -270,10 +341,126 @@ budget-capped live eval command, and a capped live run of representative cases (
 P02 explores without invented income baseline or forced personality test; sure users
 bypass exploration. `docs/reviews/sprint-2.md`.
 
-## Task 7: Sprint 3 — evidence acquisition backend (S3.1–S3.4, S3.6)
+## Task 6b: Sprint 2 addition — span-cited "Why this could suit you" (S2.7, D3)
+
+**Preconditions:** Task 6 complete. No human session.
+
+Sprint card: "Sprint 2 Deliver conversation and career discovery", deliverable S2.7 (added
+in plan v1.1). Spec sections 4 (REC-1, the model-written explanation paragraph) and 16
+(privacy mode, spend); ADR 0007 decisions 4–7 and 10; ADR 0008 decision 4.
+
+Deliver a model-written "Why this could suit you" beside each suggestion in a slate:
+- At most one bounded model call per slate, never one per suggestion, as a run kind on the
+  one bounded activity (ADR 0002), like discovery. Decide and record when a changed view
+  (emphasis, exclusions) counts as a new slate; a view change never multiplies calls.
+- The model may quote only the person's confirmed answers that the discovery pinned and the
+  grounded ESCO occupation record. Every quotation is verified server-side as an exact span
+  of its source. A quotation that does not verify, a claim that rests on no quotation, or
+  a readiness, affordability or hiring claim is a validation problem: one repair, then
+  `invalid_model_output`, with nothing stored as checked. The guards of ADR 0007 decision 7
+  (no health condition, type, protected characteristic or percentage the person never used)
+  apply, and the prompt carries the minimum subset (no name, place, money or hours; SEC-05).
+- The deterministic provenance of ADR 0007 decision 6 (the answers and the search that found
+  the occupation) stays underneath, is shown in every case and is what exports cite. The
+  written text never changes a suggestion, its grounding, its place in the slate or the
+  profile. A failed or invalid explanation is shown as unavailable, with its failure, never
+  hidden or replaced silently.
+- Model choice per MODEL-02: the Standard production model for non-synthetic workspaces,
+  the test model for synthetic ones only; demo workspaces use a deterministic fixture
+  explainer under the same contract, confined to demo like the other fixture models. Spend
+  is reserved and reconciled like other runs (MODEL-08); nothing private enters a journal
+  (ARC1-06).
+- Live (R5): the fewest test-model calls on synthetic data that establish the contract, as
+  a capped case in `make live-eval` or an explicit capped command, every call ledgered;
+  never in `make check` or `make acceptance`.
+
+Acceptance: REC1-11. Fake-provider tests for a misquotation, an invented answer, an
+occupation fact ESCO lacks, a readiness claim, invalid JSON and a truncated response (one
+repair, then a typed failure, with the deterministic provenance still shown); one call per
+slate; exports cite the deterministic provenance; demo makes no outbound request (BND1-11).
+Finish: amend ADR 0007 decision 6's last two sentences to point at ADR 0008 and this task;
+update REC1-11 and add an addendum to `docs/reviews/sprint-2.md`.
+
+## Task 6c: Sprint 0–1 visual corrections and the `next` age-exception removal
+
+**Preconditions:** Task 6b complete (order). No human session. The `next` 16.4.1 exception
+became removable at 2026-10-28T17:43Z (ADR 0005 decision 1).
+
+Sprint cards: "Sprint 1 Build a polished local walking skeleton" (its review findings, plan
+section 10) and "Sprint 0 Resolve the expensive uncertainties" (the signature compositions).
+Spec sections 13 and 14.
+
+Deliver:
+- Sprint 1 findings (`docs/reviews/sprint-1.md`, "Open findings"):
+  - V-01: each route card keeps "Conditional" beside its readiness, with the assessed-report
+    requirement available there; never an unqualified "Ready in …". Do not carry this
+    wording into computed routes.
+  - V-03: phone Routes shows the first route card in the initial viewport; the synthetic
+    warning stays unmistakable and secondary context moves behind disclosure; check that
+    tablet route C is visible.
+  - V-04: the phone route-sheet peek shows the route name, its condition, readiness and both
+    cost figures, keeping the fixture label; capture peek and expanded states.
+  - V-05: the data-mode select has a short option label and the full explanation in
+    wrapping helper text; verify at 390 px and 200 % zoom.
+  - V-06: Plan says plan selection is not in this build and makes its action's purpose
+    explicit; it never implies that a fixture preview creates a plan.
+  - V-09: visited rail marks are distinguished or explained so they cannot read as
+    completed work.
+  - V-10: the refused-account page has one headline; the recovery instruction is supporting
+    copy.
+- Sprint 0 findings (`docs/design/pre-review-sprint-0.md`, "Open findings"), in the app:
+  - S0-V03: individual route cards keep their readiness condition (with V-01).
+  - S0-V04: the selected stale route journey carries its old version and stale status into
+    the phone peek.
+  - S0-V06: unknown Routes keeps route B's known figures (9 months, £2,400 direct spending)
+    and the More affordance.
+  - S0-V07, Routes part: failure and unknown copy never push the first route behind the
+    phone sheet. (The Roles part and S0-V08's failed Roles are Task 8's.)
+- Correct the Sprint 0 compositions in `docs/design/compositions/` for S0-V01–S0-V08
+  (Task 6 fixed the app for S0-V01, S0-V02, S0-V05 and S0-V08 in You; the compositions
+  still show them), recapture `docs/design/screenshots/` and re-run `pnpm run contrast` and
+  `pnpm run screenshots`. Any new colour pairing goes into `contrast-pairs.json` and is
+  measured.
+- Recapture the affected app views at 1440×900, 768×1024 and 390×844, including route D/E
+  cards and the layer 3 glyph (the Sprint 1 coverage gap Task 6 left). Update the
+  dispositions in `docs/reviews/sprint-1.md`, `docs/reviews/sprint-0.md` and
+  `docs/design/pre-review-sprint-0.md`. Agent pre-review only (R2): the human check stays
+  "not run — requires human".
+- Remove the `next` 16.4.1 `minimumReleaseAgeExclude` exception (ADR 0005 decision 1,
+  removal step): delete it from `apps/web/pnpm-workspace.yaml`; `cd apps/web && pnpm install
+  --frozen-lockfile` must pass with no lockfile change; then remove the exception from ADR
+  0005, `docs/dependencies.md` and ARC1-03, and propose the matching `CLAUDE.md` edit for
+  the user's approval.
+
+Acceptance: each finding's disposition names its capture or test; axe and overflow checks
+clean at the three viewports; the composition screenshots and contrast checks pass; the
+frozen install passes with no lockfile change.
+
+## Task 7: Sprint 3 — evidence acquisition backend (S3.1–S3.4, reduced S3.6)
+
+**Preconditions:** Task 6c complete (order). No human session. Adzuna credentials under
+`NESSA_HOME` at dispatch decide S3.3's live qualification (R4).
 
 Sprint card: "Sprint 3 Make the evidence and opportunity map real". Slice: S3.1, S3.2,
 S3.3, S3.4, S3.6 and their acceptance items. Spec sections 5, 6, 7, 11 (TAX-1, AIR-1).
+
+Scope notes (plan v1.1, ADR 0008):
+- S3.6 is reduced: deliver the AI-resilience assessment record model, its publication-state
+  checks, the lower-bound filter and the unscored state, qualified with one conspicuously
+  labelled fixture record. Keep the pinned AI-evidence and mapping imports (AIR1-03,
+  AIR1-07, AIR1-11, TAX1-07), so exposure-only evidence shows with resilience unscored. The
+  review pipeline is data entry through the record model: a model proposal can only be a
+  proposed record (AIR1-04), and a record publishes only when an accountable reviewer's
+  recorded decision passes the publication checks (AIR1-02). L0 publishes no reviewed real
+  record unless an accountable reviewer exists (H-10); until one does, every real role stays
+  unscored.
+- S3.5 (the Roles chapter) is Task 8, which runs after Task 11.
+- The corpus is curated in Task 7b, not here. This task still owns the attempt cases X01 and
+  X02 and the source permission manifest (OI-11) in `corpus/manifest.json`, and must leave a
+  pipeline Task 7b can run the 33 pages through. No extraction is tuned on a real page
+  before Task 7b assigns its template family and split (OI-09 moves to Task 7b).
+- Live research writes the catalogue contract, `review_state: proposed`, inside its own
+  workspace (R9).
 
 Deliver SourceAttempt/SourceClaim records (permitted retention, field spans, hashes,
 publication/retrieval/effective dates); pinned ASHE imports (R7) and reviewed UK-SOC
@@ -284,31 +471,96 @@ only where needed); manual pasted text as a separate input route; Adzuna adapter
 contract (R4); syndicated-job dedupe, agency vs employer, multi-city counted once;
 closure/freshness (jobs 24 h, fees/intakes 7 d, funding 48 h; failed refresh never extends
 validity), favourites, cancellation, resumable incremental results; AI evidence/mapping
-packs and publication-state machinery (reviewed ranges only, otherwise unscored;
-lower-bound filtering; unscored visible by default in exploration). SSRF tests with a
-controlled server incl. IPv6/encoded addresses; prove the fetcher has neither user
+packs and the reduced publication-state machinery above (reviewed ranges only, otherwise
+unscored; lower-bound filtering; unscored visible by default in exploration). SSRF tests
+with a controlled server incl. IPv6/encoded addresses; prove the fetcher has neither user
 secrets nor private profile access; failed fetch never becomes "no vacancies".
 
+## Task 7b: Sprints 3–5 — the England option pack (curation and labels)
+
+**Preconditions:** Task 7 complete (its acquisition pipeline). No session is required to
+start. Until session 1 has happened, R3 governs retention: page bodies only in the private
+evidence directory, rights "pending human rights review" unless the terms clearly permit
+retention. After session 1, classify each page against its permitted source classes,
+recording the class and the terms relied on; a page outside them stays pending (R10).
+
+Sprint cards: the corpus items of "Sprint 3", "Sprint 4" and "Sprint 5", and plan section 9
+("Required corpus", "The England option pack", "Evaluation outputs"). Spec sections 6, 10,
+11 (the M0 option pack), 18 and 20 ("M0 source corpus and acceptance").
+
+Deliver:
+- Choose the 20 job postings, 10 course pages and three funding pages for the targets of
+  P01–P05 (`fixtures/m0`), filling slots J01–J20, C01–C10 and F01–F03 of
+  `corpus/manifest.json` and keeping the case types each slot intends (duplicates, closed
+  jobs, predicted or missing pay, snippets, drift, hostile page instructions, misleading
+  course titles, teaching without assessment, conditional grants; OI-04, OI-05). Fetch them
+  under R3 through the Task 7 pipeline. Take the first capture of the drift case (J10, OI-06);
+  Task 8, the last consuming task, takes the second.
+- Label every page: values with units or currency, spans as offsets or stable selectors
+  with minimal excerpts, missingness, expected unknowns and expected failure states. Assign
+  each page's template family and holdout split before any tuning uses it (OI-09).
+- Build the pack (R9): versioned and dated catalogue records in the spec section 18 shapes
+  (LearningOption and Offering, FundingInstrument, SkillRequirement rows,
+  `PlanAction.outcomes` per OUT-1) with SourceClaims, rights status, `review_state` and
+  dates, every record `review_state: proposed`. Define its file format with a schema and a validator in the fast
+  checks, like the fixture validator. Tasks 9 and 11 load it through their domain models; a
+  format change needs a pack version bump. It is an immutable public evidence pack:
+  fetched and hash-checked like ESCO (R7), or committed only if it is small and its rights
+  permit. No page body enters git unless its class permits it; no synthetic value enters
+  the pack.
+- Hand the review to session 2: a package listing each record by persona target with every
+  consequential field (salary basis, fees, dates, deadlines, award status, outcome levels)
+  beside its span, as yes/no questions for the H-07 reviewer.
+- Update `corpus/manifest.json`, `corpus/README.md` (owners, counts, open items) and the
+  register rows TEST1-09, OUT1-10 (labels), OPTN-08 and OPTN-10.
+- No live Meta call is needed. Any that is used is test-model, capped and ledgered (R5).
+
+Acceptance: 33 pages in the manifest with URL, retrieval date, hash, rights status, template
+family, split and labels; the pack validates against its schema; every record is `proposed`
+and dated; nothing synthetic in the pack; no unpermitted body in git; the session 2 package
+is ready. `label_review` and rights review stay "not run — requires human" until a person
+records them.
+
 ## Task 8: Sprint 3 — living opportunity map and the job corpus (S3.5) + Sprint 3 review
+
+**Preconditions:** Task 11 complete; session 1 held (H-06 rights policy; R10); session 2
+held (the reviewed job values this task scores against). In the suggested order it runs
+after Task 12.
 
 Sprint card: "Sprint 3 Make the evidence and opportunity map real". Slice: S3.5, the
 20-job corpus portion, remaining acceptance, the coherence review. Spec sections 5, 7
 (VIS-1), 13, 14.
 
+Scope notes (plan v1.1, ADR 0008): the Roles chapter runs after the Sprint 4–5 backends
+because, in L0, it has no live vacancy data and every role is unscored; its deliverable is
+unchanged. It consumes the option pack's 20 job postings curated and labelled by Task 7b;
+it does not curate pages.
+
 Deliver the Roles chapter per the opportunity-map composition: SVG/D3 dendrite with stable
 anchors, company expansion, up to 100 visible job nodes, explicit aggregation counts;
 numeric salary and AI-range filters; pay lanes / pay lens; mobile-first list; one shared
 selection and filter contract across list, map and pay lens; focus retention and keyboard
-actions; graph distance never implies commute feasibility. Curate the 20 real job postings
-(R3) incl. closed jobs, missing/predicted pay, snippets, duplicates, drift and hostile page
-instructions, and run them through the pipeline. Second visual review package (sparse and
-dense data) per R2. `docs/reviews/sprint-3.md`.
+actions; graph distance never implies commute feasibility. Show the pack's date and review
+states wherever its postings appear (R9). Run the pack's 20 job postings (closed jobs,
+missing/predicted pay, snippets, duplicates, drift and hostile page instructions) through
+the pipeline, taking the drift case's second capture (J10). Score the live path, pointed at
+the same pages, field by field against the reviewed values: correct, incorrect, missing and
+unsupported, with denominators (TEST1-13; live calls R5). Record session 1's H-06 outcome
+from the product owner's own record. Second visual review package (sparse and dense data)
+per R2. `docs/reviews/sprint-3.md`.
 
 ## Task 9: Sprint 4 — capability model, protected gates and outcomes (S4.1–S4.6 backend)
+
+**Preconditions:** Task 7 complete (its SourceClaim spans). No dependency on Task 7b, which
+precedes it in the suggested order. No human session.
 
 Sprint card: "Sprint 4 Build trustworthy skills and outcome assessment". Slice: the domain
 and API for S4.1–S4.6 and their acceptance items. Spec sections 8, 9, 10 (MAP-1, OUT-1,
 RDY-1).
+
+The option pack's SkillRequirement rows and `PlanAction.outcomes` load through this task's
+domain models in the Task 7b format. Outcome and requirement records carry `review_state`,
+and a `proposed` record never supports an unqualified readiness result (OPTN-09, R9).
 
 Deliver versioned provisional matrices (ESCO + up to three permitted full-text exemplars
 per target; essential/preferred/disputed/unknown distinct); behaviourally anchored levels
@@ -326,6 +578,9 @@ earlier ranks.
 
 ## Task 10: Sprint 4 — Skills chapter, evidence questions and course corpus + Sprint 4 review
 
+**Preconditions:** session 2 held (H-07 on the pack's course outcomes; R10); Task 11
+complete. No dependency on Task 12 or Task 8.
+
 Sprint card: "Sprint 4 Build trustworthy skills and outcome assessment". Slice: the Skills
 chapter UI, the question flow UI, the ten-course corpus labels, remaining acceptance, the
 coherence review. Spec sections 8, 9, 13, 14.
@@ -333,12 +588,20 @@ coherence review. Spec sections 8, 9, 13, 14.
 Deliver the Skills chapter: demonstrated / self-reported / planned / unresolved
 requirements, behavioural anchors, inspectable evidence, shared questions across targets,
 visibly protected gates, pause/stop, unresolved coverage without an employability
-percentage; direct edits and chat proposals through the same contract. Label outcome
-fields for at least ten real course pages (R3) incl. misleading titles and teaching
-without assessment; review false-positive readiness mappings individually (any unsupported
-consequential outcome blocks publication of the affected route). `docs/reviews/sprint-4.md`.
+percentage; direct edits and chat proposals through the same contract. The ten course pages
+and their outcome labels are the option pack's (Task 7b, reviewed at session 2), including
+misleading titles and teaching without assessment; this task consumes them and curates
+nothing. Review false-positive readiness mappings individually (any unsupported
+consequential outcome blocks publication of the affected route). Show the pack's date and
+review states wherever its records appear (R9). Score the live path, pointed at the same
+course pages, field by field against the reviewed values: correct, incorrect, missing and
+unsupported, with denominators (TEST1-13; live calls R5). Record H-07's Sprint 4 part from
+the product owner's own session 2 record. `docs/reviews/sprint-4.md`.
 
 ## Task 11: Sprint 5 — offerings, funding, monthly compiler and ledgers (S5.1, S5.2, S5.4–S5.6)
+
+**Preconditions:** Tasks 9 and 7b complete. No human session; this task prepares the
+session 2 package.
 
 Sprint card: "Sprint 5 Compile real options into an honest monthly model". Slice: the
 domain/API for S5.1, S5.2, S5.4, S5.5, S5.6 and the numeric acceptance items. Spec
@@ -354,7 +617,24 @@ Python checker reproduces TRACE-01 exactly before any optimiser exists. Regressi
 families TRACE01 (ledger parts), PREFUND, PAYCAP, TIME, WORKLOAD, ECON, FUNDING with
 explicit test IDs, plus Hypothesis properties for money/dates.
 
+The option pack's LearningOption, Offering and FundingInstrument records load through this
+task's domain models in the Task 7b format, with `review_state` kept: a `proposed` record
+never enters an unqualified "affordable and feasible" result (OPTN-09, R9). Acceptance
+gains the real option set (plan v1.1, P2; TEST1-14): the same checker runs on at least one
+real option set for P01's target from the pack, every consequential field span-cited, with
+its human review left to session 2 (H-07).
+
+Finish: the session 2 package (R10, R2), ready for the product owner. For H-07, yes/no
+questions on the pack records (from Task 7b) and on the checker's result for P01's real
+option set, each field beside its span. For H-13, the formative session's surfaces (the
+fixture route comparison and the TRACE-01 ledger as existing captures or Storybook
+stories), its three questions (the cost shown, what "conditional readiness" means, what is
+uncertain) and a record sheet. Record each item as "not run — requires human".
+
 ## Task 12: Sprint 5 — option review checkpoint and funding corpus + Sprint 5 review
+
+**Preconditions:** session 2 held (H-07 and H-13; R10); Task 11 complete. No dependency on
+Task 10 or Task 8.
 
 Sprint card: "Sprint 5 Compile real options into an honest monthly model". Slice: S5.3,
 the Options chapter UI, the three-funding-page corpus, remaining acceptance, the
@@ -365,29 +645,75 @@ provider provenance, conditional funding, missing critical fields, scope bounds,
 removed-candidate counts, explicit review checkpoint; when limits are exceeded ask the
 user to retain variants — never silently truncate to the first 24 options or two intakes.
 Show why a route may fail workload, payment or cash constraints using the Task 11 model.
-Finish the three real funding pages (R3). `docs/reviews/sprint-5.md`.
+Show the pack's date and each record's review state, and keep `proposed` records
+explorable but out of any unqualified "affordable and feasible" result (R9, OPTN-08,
+OPTN-09). The three funding pages are the option pack's (Task 7b), consumed, not curated.
+Score the live path, pointed at the pack's funding pages, field by field against the
+reviewed values: correct, incorrect, missing and unsupported, with denominators (TEST1-13;
+live calls R5). Record session 2's outcomes from the product owner's own record: H-07's
+Sprint 5 part, TEST1-14, and H-13, whose dangerous misunderstandings become Task 14 scope
+inputs. `docs/reviews/sprint-5.md`.
 
-## Task 13: Sprint 6 — optimiser, archive and Pareto layers (S6.1–S6.6) + Sprint 6 review
+## Task 13a: Sprint 6a — enumerator, checker, oracle and layers on instances that complete (S6.1, S6.2, S6.5–S6.7)
 
-Sprint card: "Sprint 6 Prove the optimiser and archive semantics". Whole sprint. Spec
-section 12 (OPT-1, ROU-1, FIN-1, RDY-1), 20 (TEST-1).
+**Preconditions:** Task 11 complete; session 2 held (the reviewed option pack and TRACE-01
+checker; R10).
+
+Sprint card: "Sprint 6a Prove the optimiser and layers on instances that complete". Whole
+sprint. Spec section 12 (OPT-1, including "Consequence of the M0 limits", ROU-1, FIN-1,
+RDY-1), 20 (TEST-1).
 
 Deliver canonical DFS (skip or one reviewed offering per concept, ≤ 6 selected actions,
-DAGs/dates without equivalent permutations, all gates/timetable/cash/workload checks);
-only provably sound pruning with documented proofs; versioned disk-backed archive of every
-distinct feasible schedule (atomic checkpoints, idempotent solve identity, resume-or-restart
-under a new attempt ID); 30 s / 1,000,000 states / 50,000 feasible caps with exact stop
-reasons; separate rank stage; efficient two-objective layering qualified against simple
-iterative peeling; family grouping for presentation only; cancellable optimiser child
-process with no network/LLM/ORM access, run durably via DBOS; independent Cartesian oracle
-and independent route checker sharing no code with the candidate implementation.
-Regression families TRACE01 (layers), DIRECTAI, PARETO, FAMILY, LIMITS. Benchmark
-50,000-point ranking. `docs/reviews/sprint-6.md`.
+DAGs/dates without equivalent permutations, all gates/timetable/cash/workload checks through
+the Task 11 rules); only provably sound pruning with documented proofs; every distinct
+feasible schedule encountered kept, dominated ones included, and F1–F3 computed over that
+archive by simple iterative nondominated peeling; family grouping for presentation only;
+search coverage (`complete` only after exhausting the declared tree, else
+`budget_truncated`, never infeasible); candidate evaluation with no network, LLM or ORM
+access; independent Cartesian oracle and independent route checker sharing no code with the
+candidate implementation. Reach complete coverage on TRACE-01, the A–I fixture and
+pack-scale instances built from the reviewed option pack. Regression families TRACE01
+(layers), DIRECTAI, PARETO, FAMILY and the complete-coverage parts of LIMITS.
+
+Report (in the task report, for Task 13b and Task 14): the measured instance sizes
+(concepts, starts per concept, months) at which complete coverage is reached with the
+implemented sound pruning, with expanded-state counts and times, and the largest sizes that
+complete within the M0 limits (1,000,000 states, 30 s). A measurement run stopped before
+completion is "not complete at that size", never infeasible (OPT1-16).
+
+## Task 13b: Sprint 6b — durable archive, caps, child process and ranking benchmark (S6.3, S6.4, S6.8) + Sprint 6 review
+
+**Preconditions:** Task 13a complete. No human session.
+
+Sprint card: "Sprint 6b Make the search durable and bounded at full scale". Whole sprint.
+Spec section 12 (OPT-1, ROU-1), 17 (the cancellable solver process), 20 (TEST-1).
+
+Deliver the versioned disk-backed archive of every distinct feasible schedule (atomic
+checkpoints, idempotent solve identity, resume-or-restart under a new attempt ID); 30 s /
+1,000,000 states / 50,000 feasible caps with exact stop reasons, archive persistence
+counted in the budget; separate rank stage; an efficient two-objective layering qualified
+against Task 13a's iterative peeling, equal to it on every instance that completes;
+cancellable optimiser child process run durably via DBOS, with cancellation reaching it.
+A truncated result leads with "Best trade-offs found", states the instance size and names
+the narrowing (fewer concepts, one start, a shorter horizon) that Task 13a's measured sizes
+suggest (OPT1-15). Regression family LIMITS (caps, cancellation, truncated empty).
+Benchmark 50,000-point ranking. `docs/reviews/sprint-6.md`, covering 6a and 6b.
 
 ## Task 14: Sprint 7 — coordinated route comparison (S7.1–S7.6) + Sprint 7 review
 
+**Preconditions:** Task 13b complete; session 2's findings exist (the H-13 record, read as
+scope input). Closes only after session 3 (H-01 for Sprint 7; R10): until the product owner
+has held it, the task stays open with its review package ready, and Task 15 is not
+dispatched.
+
 Sprint card: "Sprint 7 Make route comparison the signature experience". Whole sprint.
 Spec sections 12–14 (VIS-2, ROU-1, AIR-1).
+
+Scope inputs (plan v1.1): every dangerous misunderstanding recorded at session 2 (H-13)
+is addressed or explicitly carried with a reason. Truncated coverage is the expected case
+near the bound (OPT1-15): lead with "Best trade-offs found", state the instance size and
+name the narrowing that would let the search complete, using Task 13a's measured sizes. Show
+the option pack's date and review states wherever pack records appear in a route (R9).
 
 Deliver the Routes chapter per the route-comparison composition using real solver output:
 per-target discrete time–cost scatter with cost definition/baseline/horizon/currency/
@@ -398,12 +724,21 @@ explicit reranking; linked Gantt, step cards, monthly financial table, evidence 
 purposeful transitions and calm/reduced motion; paginated archive and bounded projection
 with shown/total counts. Property and browser tests for selection/filter consistency;
 TRACE-01 renders A/B/C F1, D F2, E F3; A–I fixture uses direct-spending labels; measure
-interaction budgets. Third visual review package (R2). `docs/reviews/sprint-7.md`.
+interaction budgets. Third visual review package (R2), prepared for session 3 and checked
+against what session 2 showed. `docs/reviews/sprint-7.md`, completed with session 3's
+outcome from the product owner's own record.
 
 ## Task 15: Sprint 8 — chosen plan, progress, revision and exports (S8.1–S8.6) + Sprint 8 review
 
+**Preconditions:** Task 14 closed (after session 3). No further session; H-04 (Safari,
+print) is recorded "not run — requires human" with its checklist (R2) and is not a dispatch
+precondition.
+
 Sprint card: "Sprint 8 Turn a selected route into a durable plan". Whole sprint. Spec
 sections 11, 15 (FIN-1, AIR-1).
+
+Exports also carry the search coverage with its instance size and truncation disclosure
+(OPT1-15) and the option pack's date and review states (R9).
 
 Deliver immutable PlanVersion snapshots; Plan chapter (overview, one next action,
 progress bands, rest/reschedule; planning progress vs evidence vs real-world activity);
@@ -415,6 +750,10 @@ parser). TRACE-01 route B agrees across screen, print and JSON. Workspace deleti
 snapshots, exports, cache and workflow references. `docs/reviews/sprint-8.md`.
 
 ## Task 16: Sprint 9 — local release qualification and handover (S9.1–S9.6)
+
+**Preconditions:** Task 15 complete. No session; the Sprint 9 human gates (H-01, H-03,
+H-04, H-05, H-08) are prepared as checklists and recorded "not run — requires human" (R2);
+none is a dispatch precondition.
 
 Sprint card: "Sprint 9 Qualify and hand over the local release". Whole sprint plus the
 plan section 11 final reviewer demonstration (automatable parts).
