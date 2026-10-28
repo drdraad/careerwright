@@ -439,9 +439,9 @@ def _connection_check(api: Api, base: str, model_id: str, timeout_s: float) -> s
 
 
 def _interview_turn(api: Api, base: str, model_id: str, timeout_s: float) -> str:
-    """One turn with the synthetic message; then every proposal is accepted (limits and
-    targets confirmed explicitly) through the decision command, so the schema round-trips
-    from model output to a new profile version."""
+    """One turn with the synthetic message, whose reply must have streamed; then every
+    proposal is accepted (limits and targets confirmed explicitly) through the decision
+    command, so the schema round-trips from model output to a new profile version."""
     submitted = api.call(
         "POST",
         f"{base}/interview/turns",
@@ -456,6 +456,17 @@ def _interview_turn(api: Api, base: str, model_id: str, timeout_s: float) -> str
     proposal = turn["proposal"]
     if run["status"] != "complete" or proposal is None:
         return str(run["status"])
+    # The reply streamed (announced by events with IDs only), and the validated output has
+    # superseded it.
+    streamed = [
+        event
+        for event in api.call("GET", f"{base}/events")["items"]
+        if event["kind"] == "run.partial_updated" and event["subject_id"] == turn["turn_id"]
+    ]
+    reply = api.call("GET", f"{path}/reply")
+    print(f"streamed reply: {reply['completeness']} after {len(streamed)} writes", flush=True)
+    if not streamed or reply["completeness"] != "superseded":
+        return "complete without a streamed reply"
     changes = proposal["changes"]
     print(f"validated proposal: {json.dumps(changes, ensure_ascii=False)}", flush=True)
     if not changes or any(c["message_ids"] != [turn["message_id"]] for c in changes):

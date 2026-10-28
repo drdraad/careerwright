@@ -170,12 +170,17 @@ def test_a_worker_that_cannot_be_stopped_still_leaves_every_possible_call_ledger
         assert "leak scan findings: []" in str(stopped.value)
 
 
-@pytest.mark.req("MODEL-09", "PROF-07")
+@pytest.mark.req("MODEL-09", "PROF-07", "MODEL-03")
 def test_the_interview_smoke_confirms_its_proposals_and_ledgers_the_attempt(
-    infra: Infra, api: ApiClient, ledger: Ledger, tmp_path: Path
+    infra: Infra,
+    api: ApiClient,
+    ledger: Ledger,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The `INTERVIEW=1` orchestration, offline: one turn, its proposals confirmed into a
-    new profile version, one ledgered attempt with its request count."""
+    """The `INTERVIEW=1` orchestration, offline: one turn whose reply streamed and was then
+    superseded, its proposals confirmed into a new profile version, one ledgered attempt
+    with its request count."""
     worker = start_worker(infra, tmp_path / "worker.log")
     models = ModelChoice.configure(TEST_MODEL, "muse-spark-1.3", "test")
     try:
@@ -198,3 +203,4 @@ def test_the_interview_smoke_confirms_its_proposals_and_ledgers_the_attempt(
     assert result.findings == []
     assert (record.http_requests, record.purpose) == (1, INTERVIEW_TURN.purpose)
     assert record.estimated_cost_nano_usd is not None
+    assert "streamed reply: superseded after" in capsys.readouterr().out
