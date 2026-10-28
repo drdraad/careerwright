@@ -577,7 +577,7 @@ Generated properties (plan section 8):
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| UI-01 | Semantic token set (surfaces, text, focus, selection, industry, status) with WCAG contrast measured by script, not assumed | DOC | T2 | verified | `docs/design/tokens/` (f2e55fa): 64/64 pairs pass, `contrast-report.md` |
+| UI-01 | Semantic token set (surfaces, text, focus, selection, industry, status) with WCAG contrast measured by script, not assumed | DOC | T2 | verified | `docs/design/tokens/` (f2e55fa; re-run on 25bdb1b): 65/65 pairs pass, `contrast-report.md` |
 | UI-02 | Design rule: industry colour never means status; sea-glass reserved for selection and action; ≤ 5 named industries plus Other with a stable mapping (implementation: UI-04, VIS1-02) | DOC | T2 | verified | `docs/design/README.md` (f2e55fa); status/industry ΔE76 ≥ 20.9 in `contrast-report.md` |
 | UI-03 | Licensed self-hosted fonts with licence texts beside the files; tabular numerals for money and time | DOC | T2 | verified | `docs/design/fonts/README.md` (f2e55fa): OFL files byte-identical to pinned upstream; Source Sans 3 default figures tabular |
 | UI-04 | Tokens, fonts and the status vocabulary implemented in `apps/web` and Storybook (loading, empty, unknown, conditional, stale, error, disabled) | UI | T4 | planned | |
@@ -586,7 +586,7 @@ Generated properties (plan section 8):
 | UI-07 | SVG surfaces have DOM equivalents; every action works through a list; tooltips hold no unique information; filtering never drops keyboard focus | A11Y, UI | T8, T14 | planned | |
 | UI-08 | Measured budgets: input feedback ≤ 100 ms; p95 linked filter/selection ≤ 150 ms at 100 visible jobs and a 1,000-mark projection; device, browser and dataset reported | UI | T8, T14 | planned | |
 | UI-09 | Desktop: slim chapter rail, central work area, evidence drawer. Mobile: chapter menu, cards and lists, bottom evidence sheet, focused graph views (never a shrunken desktop graph) | UI | T4 | planned | |
-| UI-10 | Three signature compositions with real fixture numbers, long labels, mobile variants, unknown-data and failure states; screenshots at 1440×900 and 390×844 (human approval is H-02) | V | T2 | verified | `docs/design/compositions/`, `docs/design/screenshots/checks.md` (f2e55fa): 18/18 captures pass; 59 fixture values asserted |
+| UI-10 | Three signature compositions with real fixture numbers, long labels, mobile variants, unknown-data and failure states; screenshots at 1440×900 and 390×844 (human approval is H-02) | V | T2 | verified | `docs/design/compositions/`, `docs/design/screenshots/checks.md` (f2e55fa; fixes and re-run on 25bdb1b): 18/18 captures pass; 64 fixture values asserted |
 | UI-11 | Screenshot approval of all six chapters at 1440×900, 390×844 and 768×1024 across default, selected, empty, partial, stale, unavailable and failed states, with long names, three targets, negative economic cost, zero results and the 100-job limit | V, H | T4, T8, T14, T16 | planned | |
 
 ## 5 Specification section 20 non-deferrable checks
