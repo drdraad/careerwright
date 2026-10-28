@@ -2,21 +2,26 @@
 
 Every HTTP call to the Meta Model API made by Nessa tooling, including failures and
 free calls (ruling R5). Generated from `live-usage.jsonl` by
-`backend/spikes/meta/live_spike.py`; do not edit the table by hand.
+`backend/tools/usage_ledger.py`; do not edit the table by hand.
 
 - Prices: https://dev.meta.ai/docs/pricing-rate-limits (checked 2026-10-27); costs are estimates from
-  reported usage, in USD before tax. `unknown` means the charge could not be determined;
-  the budget then counts the call's full reservation.
-- `In` includes cached tokens; `Out` includes reasoning tokens (Meta usage semantics).
-- `Searches` is Pydantic AI's billed count: Meta's `tool_usage` count if present, else
-  `search` actions. Whether Meta reports `tool_usage` for search calls was not captured,
-  and Meta does not document whether other actions (`open_page`, `find_in_page`) are
-  billed. An upper bound adds $0.0025 per uncounted `web_search_call` item (calls 5
-  and 7: one each; see the JSONL `notes`). Rows 3-5 predate raw-usage and action-type
-  capture in the tool; their request path was otherwise the same.
+  reported usage, in USD before tax. `unknown` means the charge could not be
+  determined; the budget then counts the call's full reservation.
+- `In` includes cached tokens; `Out` includes reasoning tokens (Meta usage
+  semantics).
+- `Searches` is Pydantic AI's billed count: Meta's `tool_usage` count if present,
+  else `search` actions. Whether Meta reports `tool_usage` for search calls was not
+  captured, and Meta does not document whether other actions (`open_page`,
+  `find_in_page`) are billed. An upper bound adds $0.0025 per uncounted
+  `web_search_call` item (calls 5 and 7: one each; see the JSONL `notes`). Rows 3-5
+  predate raw-usage and action-type capture in the tool; their request path was
+  otherwise the same.
 - Remaining credit: not exposed by any documented Meta API endpoint; check the
   developer dashboard.
-- Budget `task-1-sprint-0`: at most 15 calls, 5 on the production model, $0.300000 worst-case committed spend.
+- Budgets: `task-1-sprint-0` (Sprint 0 spike): at most 15 calls, 5 on the production
+  model, $0.30 worst case. `live-smoke` (`make live-smoke`): each invocation at most
+  3 calls, none on the production model unless `PRODUCTION=1`, and a worst-case cost
+  cap; both enforced in `backend/tools/live_smoke.py` before the stack starts.
 
 | # | UTC time | Scope | Purpose | Model | Endpoint | Outcome | In (cached) | Out (reasoning) | Searches | Est. cost | Running total | Response ID |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -31,3 +36,4 @@ free calls (ruling R5). Generated from `live-usage.jsonl` by
 | 9 | 2026-10-27 22:34:15 | task-1-sprint-0 | invalid key inside DBOS activity | `muse-spark-1.3-contributor` | POST /v1/responses | failed (401 provider_authentication) | - (-) | - (-) | - | $0.000000 | $0.019640 | - |
 | 10 | 2026-10-27 22:34:58 | task-1-sprint-0 | schema output inside DBOS activity (key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 133 (0) | 120 (83) | 0 | $0.000037 | $0.019677 | resp_6ae1270e13a2fda9d2124b7d |
 | 11 | 2026-10-27 22:34:58 | task-1-sprint-0 | invalid key inside DBOS activity | `muse-spark-1.3-contributor` | POST /v1/responses | failed (401 provider_authentication) | - (-) | - (-) | - | $0.000000 | $0.019677 | - |
+| 12 | 2026-10-28 02:26:04 | live-smoke | connection check via API, outbox and DBOS worker (key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 114 (0) | 93 (62) | 0 | $0.000030 | $0.019707 | resp_6ae15d3804014aecb04a4853 |
