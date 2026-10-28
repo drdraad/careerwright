@@ -96,8 +96,12 @@ test("[DUR-04][VERSIONS-01] a save based on an older version is refused and the 
   await expect(first.getByText("Saved as version 1.")).toBeVisible();
 
   await second.getByRole("button", { name: "Save changes" }).click();
-  await expect(second.getByText("Version 1 was saved while you were editing")).toBeVisible();
-  await expect(second.getByText(/Version 1 changed: Current role/)).toBeVisible();
+  // Announced and focused, naming what changed and to what.
+  const notice = second.getByRole("alert").filter({
+    hasText: "Version 1 was saved while you were editing",
+  });
+  await expect(notice).toBeFocused();
+  await expect(notice).toContainText("Version 1 changed: Current role to First tab's answer.");
   await expect(second.getByRole("textbox", role)).toHaveValue("Second tab's answer");
   // Close both tabs: open pages would keep streaming into the next test's restart.
   await first.close();

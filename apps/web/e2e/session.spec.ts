@@ -66,7 +66,10 @@ test("[STATE-07][BND1-13] a change saved elsewhere reaches an open page through 
   await signIn(watcher, "ada", chapterUrl("you"));
   await expect(liveUpdates(watcher, "Live")).toBeVisible();
   await expect(watcher.getByRole("banner").getByText("Saved, version 1")).toBeVisible();
-  const opened = watcher.url();
+  // A reload keeps the address but loses this marker: it proves the page was not reloaded.
+  await watcher.evaluate(() => {
+    (window as unknown as { nessaUnreloaded?: boolean }).nessaUnreloaded = true;
+  });
 
   // Another client saves: the event must cross the API, the web server's proxy and the
   // browser's stream reader, and the page refetch, within a few seconds and without a reload.
@@ -84,6 +87,10 @@ test("[STATE-07][BND1-13] a change saved elsewhere reaches an open page through 
   await expect(watcher.getByRole("textbox", { name: "Current role", exact: true })).toHaveValue(
     "Saved from another tab",
   );
-  expect(watcher.url()).toBe(opened);
+  expect(
+    await watcher.evaluate(
+      () => (window as unknown as { nessaUnreloaded?: boolean }).nessaUnreloaded,
+    ),
+  ).toBe(true);
   await watcher.context().close();
 });
