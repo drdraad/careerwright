@@ -1,7 +1,8 @@
-"""SQL for slate explanations (adapter; the table is append-only): which run writes the one
-explanation a discovery's slate may have."""
+"""SQL for slate explanations (adapter): which run writes the one current explanation a
+discovery's slate may have. A link is only ever marked replaced, never changed otherwise."""
 
 import uuid
+from datetime import datetime
 
 import sqlalchemy as sa
 
@@ -30,11 +31,12 @@ def insert(tx: Tx, request: ExplanationRequest) -> None:
 def for_discovery(
     tx: Tx, workspace_id: uuid.UUID, discovery_id: uuid.UUID
 ) -> ExplanationRequest | None:
+    """The discovery's current link (never a replaced one)."""
     row = (
         tx.execute(
             sa.text(
                 f"SELECT {_COLUMNS} FROM nessa.slate_explanations "
-                "WHERE workspace_id = :ws AND discovery_id = :discovery"
+                "WHERE workspace_id = :ws AND discovery_id = :discovery AND replaced_at IS NULL"
             ),
             {"ws": workspace_id, "discovery": discovery_id},
         )
@@ -42,3 +44,15 @@ def for_discovery(
         .one_or_none()
     )
     return None if row is None else ExplanationRequest(**row)
+
+
+def replace(tx: Tx, explanation_id: uuid.UUID, at: datetime) -> bool:
+    """Marks a current link replaced; whether it was current."""
+    result = tx.execute(
+        sa.text(
+            "UPDATE nessa.slate_explanations SET replaced_at = :at "
+            "WHERE explanation_id = :id AND replaced_at IS NULL"
+        ),
+        {"id": explanation_id, "at": at},
+    )
+    return result.rowcount == 1

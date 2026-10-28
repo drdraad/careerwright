@@ -280,12 +280,14 @@ const writtenFor = (shown: SuggestionOut[]): WrittenExplanationOut => ({
     ],
   })),
 });
-const noteRun = (status: WorkState) =>
+// A failed note either sent its request (invalid twice) or reached no model (over budget).
+const noteRun = (status: WorkState, reachedNoModel: boolean) =>
   ({
     run_id: "e1",
     kind: "slate_explanation",
     status,
-    failure_class: status === "failed" ? "invalid_model_output" : null,
+    failure_class:
+      status === "failed" ? (reachedNoModel ? "budget_exceeded" : "invalid_model_output") : null,
   }) as unknown as RunOut;
 const discoveryWith = (explanation: SlateExplanationOut | null) =>
   ({
@@ -295,10 +297,15 @@ const discoveryWith = (explanation: SlateExplanationOut | null) =>
     proposal: null,
     explanation,
   }) as unknown as DiscoveryOut;
-const note = (status: WorkState, shown: SuggestionOut[]): SlateExplanationOut => ({
+const note = (
+  status: WorkState,
+  shown: SuggestionOut[],
+  reachedNoModel: boolean,
+): SlateExplanationOut => ({
   explanation_id: "e1",
   discovery_id: "d1",
-  run: noteRun(status),
+  run: noteRun(status, reachedNoModel),
+  can_retry: status === "failed" && reachedNoModel,
   written: status === "complete" ? writtenFor(shown) : null,
 });
 const stored: CredentialOut = {
@@ -375,13 +382,13 @@ export const Paused: Story = {
 };
 
 const directions =
-  (shown: SuggestionOut[], status: WorkState = "complete") =>
+  (shown: SuggestionOut[], status: WorkState = "complete", reachedNoModel = false) =>
   () => (
     <Api routes={[{ method: "GET", path: /\/slate$/, answer: slate(shown) }]}>
       <Directions
         workspaceId={WS}
         profile={profile}
-        discovery={discoveryWith(note(status, shown))}
+        discovery={discoveryWith(note(status, shown, reachedNoModel))}
       />
     </Api>
   );
@@ -390,8 +397,11 @@ export const SlateOfSix: Story = { render: directions(full) };
 export const SlateThin: Story = { render: directions(full.slice(0, 2)) };
 /** The note still being written: how each suggestion was found is shown meanwhile. */
 export const SlateNotePending: Story = { render: directions(full, "running") };
-/** The note failed its checks twice: unavailable, with its failure, provenance kept. */
+/** The note failed its checks twice: unavailable with its failure, provenance kept, and
+ *  Suggest again (the slate had its one call). */
 export const SlateNoteUnavailable: Story = { render: directions(full, "failed") };
+/** The note was refused before any request reached a model: Try again, on a click. */
+export const SlateNoteRetry: Story = { render: directions(full, "failed", true) };
 
 const key = (credentials: CredentialOut[]) => () => (
   <Api routes={[]}>

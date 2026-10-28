@@ -374,6 +374,7 @@ const ERROR_TONE: Record<ErrorCode, Tone> = {
   CONFIRMATION_REQUIRED: "neutral",
   PROPOSAL_NOT_AVAILABLE: "neutral",
   ALREADY_DECIDED: "neutral",
+  SLATE_ALREADY_EXPLAINED: "neutral",
 };
 
 /** What the person sees for each API error code. The API's own message is never shown. */
@@ -498,7 +499,23 @@ const ERROR_WORDS: Record<ErrorCode, Omit<ErrorStatement, "tone">> = {
     title: "You already chose what to keep from this reply",
     action: "Edit the answers directly if you want to change them.",
   },
+  SLATE_ALREADY_EXPLAINED: {
+    title: "These suggestions have had their one written note",
+    action:
+      "Suggest again for a new set of suggestions, which gets a note of its own. The suggestions shown now would be replaced.",
+  },
 };
+
+/** What the person can do when a slate's written note isn't there (ADR 0007 decision 12). */
+export const NOTE_RECOVERY = {
+  /** Its run stopped before any request reached a model, so the one call is unused. */
+  retry: "No request reached the model, so Nessa can try the note again.",
+  /** A request was sent: this slate has had its one call. */
+  suggestAgain:
+    "These suggestions have had their one written note. Suggest again for a new set of suggestions, which gets a note of its own: the suggestions shown now would be replaced.",
+  /** The request for the note was refused before any run existed. */
+  resend: "Nothing was sent to the model.",
+} as const;
 
 export const ERROR_STATEMENT = Object.fromEntries(
   (Object.keys(ERROR_WORDS) as ErrorCode[]).map((code) => [

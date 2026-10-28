@@ -43,9 +43,9 @@ from nessa.identity import run_store
 from nessa.identity.access import Actor
 from nessa.identity.keyring import Keyring
 from nessa.identity.model_choice import ModelChoice
-from nessa.identity.records import Run, RunKind
+from nessa.identity.records import Attempt, Run, RunKind
 from nessa.identity.runs import RunRequest, open_output, submit_run
-from nessa.identity.spend import SpendLimits
+from nessa.identity.spend import SpendLimits, SpendState
 from nessa.identity.workspaces import visible_workspace
 from nessa.profile import discovery, explanation_store, slate_explanation
 from nessa.profile import store as profile_store
@@ -72,7 +72,7 @@ from nessa.profile.slate import (
     build_pool,
     choose_slate,
 )
-from nessa.profile.slate_explanation import RECORD_STEPS, SlateExplanation, build_input
+from nessa.profile.slate_explanation import RECORD_STEPS, SlateExplanation, build_input, quotable
 from nessa.profile.store import stale_version
 from nessa.vocabulary import WorkState
 
@@ -126,6 +126,11 @@ class SubmitExplanation(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     expected_profile_version: int = Field(ge=0)
+    retry_failed: bool = Field(
+        default=False,
+        description="The person's explicit Try again: start the note afresh if its run failed "
+        "before any request reached a model (`can_retry`). Never sent automatically.",
+    )
 
 
 @dataclass(frozen=True)
@@ -133,6 +138,21 @@ class ExplanationView:
     request: ExplanationRequest
     run: Run
     written: SlateExplanation | None  # only once the run is complete
+    # The run failed before any request reached a model, so the slate's one call is unused.
+    can_retry: bool = False
+
+
+_ENDED_WITHOUT_OUTPUT = frozenset({WorkState.FAILED, WorkState.PROVIDER_UNAVAILABLE})
+
+
+def reached_no_model(run: Run, attempts: list[Attempt]) -> bool:
+    """A failed run none of whose attempts took a reservation or sent a request: it was
+    refused inside the activity (budget, key, access, model) before any call. An attempt
+    left unfinished or with an unknown charge counts as a call: a crash may follow one."""
+    return run.status in _ENDED_WITHOUT_OUTPUT and all(
+        attempt.spend_state == SpendState.NONE.value and not attempt.requests_sent
+        for attempt in attempts
+    )
 
 
 @dataclass(frozen=True)
@@ -197,7 +217,10 @@ def _explanation(tx: Tx, keyring: Keyring, discovery_run: Run) -> ExplanationVie
         raise NessaError(
             ErrorCode.INTERNAL_ERROR, "The explanation has no run.", stage=ErrorStage.PROFILE
         )
-    return ExplanationView(request, run, _written(tx, keyring, run))
+    attempts = run_store.attempts(tx, run.run_id)
+    return ExplanationView(
+        request, run, _written(tx, keyring, run), reached_no_model(run, attempts)
+    )
 
 
 def _view(tx: Tx, keyring: Keyring, run: Run) -> DiscoveryView:
@@ -559,13 +582,29 @@ def submit_explanation(
     a discovery's first view (balanced, no exclusions): asking again, from any view, returns
     the explanation already asked for, in whatever state, so a slate never has a second call.
 
+    The one exception is the person's explicit Try again (`retry_failed`) on a run that
+    failed before any request reached a model (`reached_no_model`): that call was never
+    made, so a new run replaces the failed link, in this locked transaction. Try again on a
+    run that did send a request is refused (`SLATE_ALREADY_EXPLAINED`): Suggest again makes a
+    new slate, with a note of its own.
+
     Refused before any run exists when the discovery has no validated searches, when the
-    answers it pinned are not the current ones (it would quote answers since changed), or
-    when its slate is empty."""
+    answers it pinned are not the current ones (it would quote answers since changed), when
+    no pinned answer holds a word to quote, or when its slate is empty."""
     visible_workspace(tx, workspace_id, lock=True)
     view = visible_discovery(tx, keyring, workspace_id, discovery_id)
-    if view.explanation is not None:
-        return view.explanation, False
+    existing = view.explanation
+    if existing is not None:
+        if not (command.retry_failed and existing.run.status in _ENDED_WITHOUT_OUTPUT):
+            return existing, False
+        if not existing.can_retry:
+            raise NessaError(
+                ErrorCode.SLATE_ALREADY_EXPLAINED,
+                "This set of suggestions has had its one written note. Suggest again for a new "
+                "set, with a note of its own.",
+                stage=ErrorStage.PROFILE,
+                details={"explanation_id": str(existing.request.explanation_id)},
+            )
     profile = current_profile(tx, workspace_id)
     if command.expected_profile_version != profile.version:
         raise stale_version(profile.version)
@@ -589,6 +628,14 @@ def submit_explanation(
             details={"current_version": profile.version, "discovery_version": pinned},
         )
     document = _pinned_document(tx, view.run)
+    answers = evidence_of(document)
+    if not any(quotable(item.text) for item in answers):
+        raise NessaError(
+            ErrorCode.INSUFFICIENT_EVIDENCE,
+            "None of your answers has a word the note could quote.",
+            stage=ErrorStage.PROFILE,
+            details={"reason": "no_quotable_answer"},
+        )
     shown = compute_slate(tx, view, proposal, document, SlateControls())
     if not shown.suggestions:
         raise NessaError(
@@ -603,7 +650,7 @@ def submit_explanation(
         discovery_id=discovery_id,
         profile_version=pinned,
         release=shown.release.dataset_id,
-        answers=evidence_of(document),
+        answers=answers,
         occupations=[records[concept] for concept in concepts],
     )
     run = submit_run(
@@ -629,6 +676,8 @@ def submit_explanation(
         created_by=actor.actor_id,
         created_at=now,
     )
+    if existing is not None:  # a Try again of a run that reached no model
+        explanation_store.replace(tx, existing.request.explanation_id, now)
     explanation_store.insert(tx, request)
     return ExplanationView(request, run, None), True
 

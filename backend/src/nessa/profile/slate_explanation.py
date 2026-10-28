@@ -36,6 +36,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from nessa.catalogue.records import OccupationFacts
+from nessa.errors import ErrorCode, ErrorStage, NessaError
 from nessa.identity.model_registry import worst_case_cost_nano_usd
 from nessa.profile.discovery import EvidenceItem
 from nessa.profile.interview import ProfileField, ProposalOrigin
@@ -58,8 +59,31 @@ MAX_PROMPT_BYTES = 8_500  # instructions plus the rendered context, at every lis
 SCHEMA_ALLOWANCE_TOKENS = 1_500
 MAX_OUTPUT_TOKENS = 2_000
 REPAIR_ALLOWANCE_TOKENS = 1_000
+# The repair message is capped below its allowance, leaving room for the fence the agent
+# puts around it (about 120 bytes; `repair_message`).
+REPAIR_MESSAGE_BYTES = 800
+ECHO_CHARS = 60  # at most this much of a model's text is repeated back in a problem
 MAX_REQUESTS = 2  # the first request and at most one repair
 CONTEXT_MARKER = "Explanation context (JSON):\n"
+# A content word: a whole word of four letters or more that is not a common function word.
+# A quotation must hold one; so must an answer for the note to have anything to quote.
+_CONTENT_WORD = re.compile(r"\b[^\W\d_]{4,}\b")
+COMMON_WORDS = frozenset(
+    {"also", "been", "both", "each", "from", "have", "here", "into", "just", "like", "more"}
+    | {"most", "much", "only", "other", "over", "same", "some", "such", "than", "that"}
+    | {"their", "them", "then", "there", "these", "they", "this", "those", "very", "what"}
+    | {"when", "where", "which", "while", "will", "with", "would", "your", "using"}
+    | {"work", "works", "working"}
+)
+
+
+def content_words(text: str) -> set[str]:
+    return set(_CONTENT_WORD.findall(text.casefold())) - COMMON_WORDS
+
+
+def quotable(text: str) -> bool:
+    """Whether a text holds a content word, so a quotation of it can say something."""
+    return bool(content_words(text))
 
 
 class QuoteSource(StrEnum):
@@ -170,8 +194,9 @@ class SlateExplanation(BaseModel):
 
 # Readiness, affordability and hiring are computed by deterministic code or researched later
 # (plan section 3); a written explanation never claims them. Whole words and phrases, any
-# case; a word the occupation's own record or the person's answers use describes the work,
-# so it may be used ("payroll clerks check that staff are paid").
+# case; a word the occupation's own ESCO record uses describes the work, so it may be used
+# ("payroll clerks check that staff are paid"). The person's answers never unlock one: "ready
+# for a change" is no ground for saying they are ready for this work.
 _READINESS = (
     "ready",
     "readiness",
@@ -180,7 +205,6 @@ _READINESS = (
     "qualifies",
     "eligible",
     "eligibility",
-    "already have the skills",
     "meet the requirements",
     "meets the requirements",
 )
@@ -215,6 +239,7 @@ _AFFORDABILITY = (
     "loan",
     "grant",
     "grants",
+    "lucrative",
 )
 _HIRING = (
     "hire",
@@ -229,17 +254,35 @@ _HIRING = (
     "vacancies",
     "job offer",
     "openings",
-    "in demand",
+    "demand for",
     "shortage",
     "shortages",
     "guarantee",
     "guaranteed",
     "get the job",
+    "candidate",
+    "candidates",
+    "crying out for",
+    "job market",
+)
+# Phrasings with a few words free: "in (high) demand", "already have the experience",
+# "plenty of jobs".
+_CLAIM_PATTERNS = (
+    ("in ... demand", r"in(?:\s+[\w-]+){0,2}\s+demand"),
+    (
+        "already have the ...",
+        r"already\s+have\s+(?:the|all\s+the|enough)\s+"
+        r"(?:skills?|experience|qualifications?|training)",
+    ),
+    ("plenty of jobs", r"plenty\s+of\s+(?:jobs|vacancies|openings|roles|work)"),
 )
 _CURRENCY = ("£", "$", "€")
 _CLAIM_TERMS = tuple(
     (term, re.compile(rf"(?<!\w){re.escape(term)}(?!\w)", re.IGNORECASE))
     for term in (*_READINESS, *_AFFORDABILITY, *_HIRING)
+) + tuple(
+    (label, re.compile(rf"(?<!\w){pattern}(?!\w)", re.IGNORECASE))
+    for label, pattern in _CLAIM_PATTERNS
 )
 # Quotation marks by code point: double (straight, curly, low, reversed, guillemets) and the
 # curly single ones.
@@ -258,13 +301,16 @@ _APOSTROPHES = str.maketrans(
         **dict.fromkeys(map(chr, (0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212)), "-"),
     }
 )
-# Trimmed from a quotation's ends: spaces, quotation marks and closing punctuation.
-_TRIM = f" \t\n'{_DOUBLE}{_OPEN_SINGLE}{_CLOSE_SINGLE}.,;:!?{chr(0x2026)}"
+# Trimmed from a quotation's start: spaces and double quotation marks; never an apostrophe,
+# which may begin the source's own words ("'s work" is not "s work").
+_LEAD_TRIM = f" \t\n{_DOUBLE}"
+# Trimmed from its end: spaces, quotation marks and closing punctuation.
+_TAIL_TRIM = f" \t\n'{_DOUBLE}{_OPEN_SINGLE}{_CLOSE_SINGLE}.,;:!?{chr(0x2026)}"
 
 
 def unsupported_claim_terms(text: str, allowed: Iterable[str]) -> list[str]:
-    """Readiness, affordability and hiring words and currency signs in a claim that neither
-    the occupation's record nor the person's answers use, in the order of the lists."""
+    """Readiness, affordability and hiring words and currency signs in a claim that the
+    allowed texts (the occupation's own record) do not use, in the order of the lists."""
     allowed_text = "\n".join(allowed)
     found = [
         term
@@ -327,7 +373,7 @@ def _record_parts(record: OccupationRecord) -> list[tuple[RecordPart, str]]:
 def _verified(
     quote: ModelQuote, answers: Sequence[EvidenceItem], record: OccupationRecord
 ) -> Quotation | None:
-    text = quote.text.strip(_TRIM)
+    text = quote.text.lstrip(_LEAD_TRIM).rstrip(_TAIL_TRIM)
     if not QUOTE_CHARS[0] <= len(text) <= QUOTE_CHARS[1] or not any(c.isalpha() for c in text):
         return None
     if quote.source is QuoteSource.ANSWER:
@@ -355,14 +401,14 @@ def _checked_claim(
     problems: list[str],
 ) -> Claim:
     text = " ".join(claim.text.split())
-    allowed = [item.text for item in answers] + [source for _, source in _record_parts(record)]
+    record_texts = [source for _, source in _record_parts(record)]
     if not CLAIM_CHARS[0] <= len(text) <= CLAIM_CHARS[1]:
-        problems.append(f"{where}: one sentence of {CLAIM_CHARS[0]}-{CLAIM_CHARS[1]} characters")
+        problems.append(f"{where}: a claim of {CLAIM_CHARS[0]}-{CLAIM_CHARS[1]} characters")
     if _QUOTE_MARKS.search(text):
         problems.append(
             f"{where}: no quotation marks in the claim; put each quotation in quotes instead"
         )
-    unsupported = unsupported_claim_terms(text, allowed)
+    unsupported = unsupported_claim_terms(text, record_texts)
     if unsupported:
         problems.append(
             f"{where}: no readiness, affordability or hiring claim, which Nessa checks "
@@ -371,7 +417,13 @@ def _checked_claim(
     if not 1 <= len(claim.quotes) <= MAX_QUOTES:
         problems.append(f"{where}: quotes must hold 1-{MAX_QUOTES} quotations")
     quotations: list[Quotation] = []
-    for model_quote in claim.quotes:
+    for model_quote in claim.quotes[:MAX_QUOTES]:  # past the bound: counted, not checked
+        if not quotable(model_quote.text):
+            problems.append(
+                f"{where}: “{_echo(model_quote.text)}” has no content word; quote words that "
+                "say something"
+            )
+            continue
         found = _verified(model_quote, answers, record)
         if found is None:
             whose = (
@@ -380,8 +432,8 @@ def _checked_claim(
                 else f"ESCO's record for {record.title}"
             )
             problems.append(
-                f"{where}: “{model_quote.text}” is not an exact quotation of whole words from "
-                f"{whose}"
+                f"{where}: “{_echo(model_quote.text)}” is not an exact quotation of whole words "
+                f"from {whose}"
             )
         else:
             quotations.append(found)
@@ -393,6 +445,32 @@ def _checked_claim(
     if QuoteSource.ESCO not in sources:
         problems.append(f"{where}: quote this occupation's ESCO record at least once (source esco)")
     return Claim(text=text, quotations=quotations)
+
+
+def _echo(text: str) -> str:
+    """A model's text as a problem repeats it: shortened, so the repair stays bounded."""
+    text = " ".join(text.split())
+    return text if len(text) <= ECHO_CHARS else f"{text[:ECHO_CHARS]}…"
+
+
+REPAIR_HEADER = (
+    "The JSON object does not pass validation. Answer again with the whole object, fixing "
+    "these problems:"
+)
+
+
+def repair_message(problems: list[str]) -> str:
+    """The repair request: the problems in order, as many as fit `REPAIR_MESSAGE_BYTES`,
+    then how many more there are, so it never outgrows its reservation."""
+    message = REPAIR_HEADER
+    for index, problem in enumerate(problems):
+        line = f"\n- {problem}"
+        left = len(problems) - index - 1
+        tail = f"\n- and {left} more problems." if left else ""
+        if len((message + line + tail).encode()) > REPAIR_MESSAGE_BYTES:
+            return f"{message}\n- and {len(problems) - index} more problems."
+        message += line
+    return message
 
 
 def check_explanation(
@@ -413,11 +491,11 @@ def check_explanation(
             continue
         if not 1 <= len(explanation.claims) <= MAX_CLAIMS:
             problems.append(f"{explanation.occupation}: claims must hold 1-{MAX_CLAIMS} claims")
-        claims = [
+        claims = [  # past the bound: counted above, not checked
             _checked_claim(
                 claim, f"{explanation.occupation} claim {n}", context.answers, record, problems
             )
-            for n, claim in enumerate(explanation.claims, start=1)
+            for n, claim in enumerate(explanation.claims[:MAX_CLAIMS], start=1)
         ]
         if len({claim.text.casefold() for claim in claims}) != len(claims):
             problems.append(f"{explanation.occupation}: make each claim once")
@@ -517,10 +595,6 @@ def _cut(text: str, limit: int) -> str:
     return text[:limit].rsplit(" ", 1)[0].rstrip()
 
 
-class PromptTooLargeError(ValueError):
-    """No step fits the prompt bound (the bounds test shows it cannot happen in L0)."""
-
-
 def build_input(
     *,
     discovery_id: uuid.UUID,
@@ -529,7 +603,9 @@ def build_input(
     answers: list[EvidenceItem],
     occupations: Sequence[OccupationFacts],
 ) -> ExplanationInput:
-    """The run's input: every pinned answer whole, and as much of each record as fits."""
+    """The run's input: every pinned answer whole, and as much of each record as fits. The
+    bound is in bytes, so answers in characters of several bytes can leave no step that
+    fits: that is refused (`LIMIT_EXCEEDED`) before any run or reservation exists."""
     for description_chars, skills in RECORD_STEPS:
         context = ExplanationInput(
             discovery_id=discovery_id,
@@ -550,7 +626,12 @@ def build_input(
         )
         if prompt_bytes(context) <= MAX_PROMPT_BYTES:
             return context
-    raise PromptTooLargeError("the explanation prompt does not fit its bound")
+    raise NessaError(
+        ErrorCode.LIMIT_EXCEEDED,
+        "Your answers are too long for a written note. Shorten or remove some, then suggest again.",
+        stage=ErrorStage.PROFILE,
+        details={"reason": "answers_too_long", "max_prompt_bytes": MAX_PROMPT_BYTES},
+    )
 
 
 def worst_case_nano_usd(model_id: str) -> int:

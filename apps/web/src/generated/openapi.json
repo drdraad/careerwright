@@ -2669,7 +2669,7 @@
           "discovery"
         ],
         "summary": "Explain",
-        "description": "The written \"Why this could suit you\" for the slate's first view, as one bounded\nrun. A slate has at most one: asking again, from any view, answers 200 with its run. The\nanswer never holds the written text (it is kept as the command's receipt); the\ndiscovery carries it.",
+        "description": "The written \"Why this could suit you\" for the slate's first view, as one bounded\nrun. A slate has at most one call: asking again, from any view, answers 200 with its run.\nOnly the person's Try again (`retry_failed`) on a run that reached no model starts a new\nrun (202); on one that sent a request it is refused, `SLATE_ALREADY_EXPLAINED`. The\nanswer never holds the written text (it is kept as the command's receipt); the\ndiscovery carries it.",
         "operationId": "submit_explanation",
         "security": [
           {
@@ -3611,7 +3611,7 @@
           "text": {
             "type": "string",
             "title": "Text",
-            "description": "Written by the model (or the demo explainer): one sentence resting on its quotations, which quote you and ESCO's record."
+            "description": "The model's own words (or the demo explainer's), at most 240 characters with no quotation of their own: not checked against any source. Only the quotations beside it were checked."
           },
           "quotations": {
             "items": {
@@ -4140,7 +4140,8 @@
           "TAXONOMY_UNAVAILABLE",
           "CONFIRMATION_REQUIRED",
           "PROPOSAL_NOT_AVAILABLE",
-          "ALREADY_DECIDED"
+          "ALREADY_DECIDED",
+          "SLATE_ALREADY_EXPLAINED"
         ],
         "title": "ErrorCode"
       },
@@ -4325,6 +4326,11 @@
           },
           "run": {
             "$ref": "#/components/schemas/RunOut"
+          },
+          "can_retry": {
+            "type": "boolean",
+            "title": "Can Retry",
+            "description": "The run failed before any request reached a model, so the person's Try again (`retry_failed`) may start the note afresh. False once a request was sent: the slate has had its one call, and Suggest again makes a new slate."
           }
         },
         "additionalProperties": false,
@@ -4332,7 +4338,8 @@
         "required": [
           "explanation_id",
           "discovery_id",
-          "run"
+          "run",
+          "can_retry"
         ],
         "title": "ExplanationRunOut",
         "description": "A slate explanation's run, as asking for it answers: never what it wrote, since a\ncommand's answer is kept as its receipt and model output is kept sealed. The discovery\n(`GET .../discoveries/{id}`) carries the written text."
@@ -6354,6 +6361,11 @@
           "run": {
             "$ref": "#/components/schemas/RunOut"
           },
+          "can_retry": {
+            "type": "boolean",
+            "title": "Can Retry",
+            "description": "The run failed before any request reached a model, so the person's Try again (`retry_failed`) may start the note afresh. False once a request was sent: the slate has had its one call, and Suggest again makes a new slate."
+          },
           "written": {
             "anyOf": [
               {
@@ -6371,6 +6383,7 @@
           "explanation_id",
           "discovery_id",
           "run",
+          "can_retry",
           "written"
         ],
         "title": "SlateExplanationOut",
@@ -6828,6 +6841,12 @@
             "type": "integer",
             "minimum": 0.0,
             "title": "Expected Profile Version"
+          },
+          "retry_failed": {
+            "type": "boolean",
+            "title": "Retry Failed",
+            "description": "The person's explicit Try again: start the note afresh if its run failed before any request reached a model (`can_retry`). Never sent automatically.",
+            "default": false
           }
         },
         "additionalProperties": false,

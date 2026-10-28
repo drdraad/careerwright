@@ -42,6 +42,8 @@ const profile: ProfileOut = {
 const explanation = (
   status: WorkState,
   written: SlateExplanationOut["written"] = null,
+  // A failed run that sent no request (refused for its budget) may be tried again.
+  reachedNoModel = false,
 ): SlateExplanationOut =>
   ({
     explanation_id: "e1",
@@ -50,8 +52,10 @@ const explanation = (
       run_id: "e1",
       kind: "slate_explanation",
       status,
-      failure_class: status === "failed" ? "invalid_model_output" : null,
+      failure_class:
+        status === "failed" ? (reachedNoModel ? "budget_exceeded" : "invalid_model_output") : null,
     },
+    can_retry: reachedNoModel,
     written,
   }) as unknown as SlateExplanationOut;
 const WRITTEN: SlateExplanationOut["written"] = {
@@ -272,7 +276,13 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     expect(shown.getByText("You said:")).toBeVisible();
     expect(shown.getByText("ESCO's description:")).toBeVisible();
     expect(shown.getByText(/“maintain and repair bicycles”/)).toBeVisible();
-    expect(shown.getByText(/Written by Nessa from your answers and ESCO's record/)).toBeVisible();
+    // Fix round 1 (I2): it says what was checked, and that the sentence is the model's own.
+    expect(
+      shown.getByText(
+        /Only the quoted words were checked against them; the sentences are Nessa's own\./,
+      ),
+    ).toBeVisible();
+    expect(shown.queryByText(/checked word for word/)).toBeNull();
     expect(shown.getByText("How Nessa found it")).toBeVisible();
     // The deterministic provenance stays, after the written note.
     expect(note.compareDocumentPosition(found) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -292,9 +302,17 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     expect(await screen.findByText(/Written by the demo explainer \(synthetic\)/)).toBeVisible();
   });
 
-  it("shows a failed note as unavailable with its failure, and the provenance stays", async () => {
-    const sent = fakeApi([slateRoute]);
-    renderDirections(discoveryWith(explanation("failed")));
+  it("shows a note that failed after a request as unavailable, and offers Suggest again", async () => {
+    const sent = fakeApi([
+      slateRoute,
+      {
+        method: "POST",
+        path: /\/discoveries$/,
+        status: 202,
+        answer: { discovery_id: "d2", run: { status: "queued" } },
+      },
+    ]);
+    const { user } = renderDirections(discoveryWith(explanation("failed")));
 
     const shown = within(await card());
     expect(shown.getByText(/no written note/)).toBeVisible();
@@ -303,11 +321,45 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     ).toBeVisible();
     expect(shown.getByText("What you enjoy: “repairing bicycles”.")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent(/aren't available/);
-    expect(noteRequests(sent)).toHaveLength(0); // a failed note is never asked for again
+    const notice = screen.getByText(/These suggestions have had their one written note\./);
+    expect(notice).toHaveTextContent(/would be replaced/); // it says what Suggest again does
+    expect(screen.queryByRole("button", { name: /Try again/ })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Suggest again" }));
+
+    await waitFor(() => expect(sent.some((s) => s.path.endsWith("/discoveries"))).toBe(true));
+    expect(sent.find((s) => s.path.endsWith("/discoveries"))?.body).toEqual({
+      expected_profile_version: 2,
+    });
+    expect(noteRequests(sent)).toHaveLength(0); // the note itself is never asked for again
+  });
+
+  it("offers Try again for a note that reached no model, and sends it only on the click", async () => {
+    const sent = fakeApi([
+      slateRoute,
+      {
+        method: "POST",
+        path: /\/explanation$/,
+        status: 202,
+        answer: { explanation_id: "e2", discovery_id: "d1", run: { status: "queued" } },
+      },
+    ]);
+    const { user } = renderDirections(discoveryWith(explanation("failed", null, true)));
+
+    await card();
+    expect(screen.getByText(/No request reached the model/)).toBeVisible();
+    expect(screen.getByText("Raise the limit or wait for the next month.")).toBeVisible();
+    expect(noteRequests(sent)).toHaveLength(0); // never automatic
+    await user.click(screen.getByRole("button", { name: "Try again : the written note" }));
+
+    await waitFor(() => expect(noteRequests(sent)).toHaveLength(1));
+    expect(noteRequests(sent)[0]?.body).toEqual({
+      expected_profile_version: 2,
+      retry_failed: true,
+    });
   });
 
   it("shows a refused request as unavailable in the error code's words", async () => {
-    fakeApi([
+    const sent = fakeApi([
       slateRoute,
       {
         method: "POST",
@@ -325,12 +377,48 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
         },
       },
     ]);
-    renderDirections(discoveryWith(null));
+    const { user } = renderDirections(discoveryWith(null));
 
     const shown = within(await card());
     expect(await shown.findByText(/The spending limit for model calls is reached\./)).toBeVisible();
     expect(screen.queryByText("not shown")).toBeNull(); // never the API's own message
     expect(shown.getByText("What you enjoy: “repairing bicycles”.")).toBeVisible();
+    expect(screen.getByText("Nothing was sent to the model.")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Try again : the written note" }));
+    // The first request was the slate's own; the click sends it again, as a plain request.
+    await waitFor(() => expect(noteRequests(sent)).toHaveLength(2));
+    expect(noteRequests(sent)[1]?.body).toEqual({ expected_profile_version: 2 });
+  });
+
+  it("offers Suggest again when a try again is refused because the slate had its note", async () => {
+    fakeApi([
+      slateRoute,
+      {
+        method: "POST",
+        path: /\/explanation$/,
+        status: 409,
+        answer: {
+          error: {
+            code: "SLATE_ALREADY_EXPLAINED",
+            message: "not shown",
+            retryable: false,
+            stage: "profile",
+            correlation_id: "c2",
+            details: {},
+          },
+        },
+      },
+    ]);
+    const { user } = renderDirections(discoveryWith(explanation("failed", null, true)));
+
+    await card();
+    await user.click(screen.getByRole("button", { name: "Try again : the written note" }));
+
+    expect(
+      await screen.findByText(/No written note: These suggestions have had their one written note/),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Suggest again" })).toBeVisible();
+    expect(screen.queryByText("not shown")).toBeNull();
   });
 
   it("says a suggestion from a changed view has no note, and asks nothing for it", async () => {

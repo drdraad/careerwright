@@ -153,7 +153,7 @@ export type ClaimOut = {
     /**
      * Text
      *
-     * Written by the model (or the demo explainer): one sentence resting on its quotations, which quote you and ESCO's record.
+     * The model's own words (or the demo explainer's), at most 240 characters with no quotation of their own: not checked against any source. Only the quotations beside it were checked.
      */
     text: string;
     /**
@@ -534,7 +534,8 @@ export const ErrorCode = {
     TAXONOMY_UNAVAILABLE: 'TAXONOMY_UNAVAILABLE',
     CONFIRMATION_REQUIRED: 'CONFIRMATION_REQUIRED',
     PROPOSAL_NOT_AVAILABLE: 'PROPOSAL_NOT_AVAILABLE',
-    ALREADY_DECIDED: 'ALREADY_DECIDED'
+    ALREADY_DECIDED: 'ALREADY_DECIDED',
+    SLATE_ALREADY_EXPLAINED: 'SLATE_ALREADY_EXPLAINED'
 } as const;
 
 /**
@@ -689,6 +690,12 @@ export type ExplanationRunOut = {
      */
     discovery_id: string;
     run: RunOut;
+    /**
+     * Can Retry
+     *
+     * The run failed before any request reached a model, so the person's Try again (`retry_failed`) may start the note afresh. False once a request was sent: the slate has had its one call, and Suggest again makes a new slate.
+     */
+    can_retry: boolean;
 };
 
 /**
@@ -2010,6 +2017,12 @@ export type SlateExplanationOut = {
      */
     discovery_id: string;
     run: RunOut;
+    /**
+     * Can Retry
+     *
+     * The run failed before any request reached a model, so the person's Try again (`retry_failed`) may start the note afresh. False once a request was sent: the slate has had its one call, and Suggest again makes a new slate.
+     */
+    can_retry: boolean;
     written: WrittenExplanationOut | null;
 };
 
@@ -2313,6 +2326,12 @@ export type SubmitExplanation = {
      * Expected Profile Version
      */
     expected_profile_version: number;
+    /**
+     * Retry Failed
+     *
+     * The person's explicit Try again: start the note afresh if its run failed before any request reached a model (`can_retry`). Never sent automatically.
+     */
+    retry_failed?: boolean;
 };
 
 /**

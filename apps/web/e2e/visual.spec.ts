@@ -204,23 +204,30 @@ const SUPPORT_NOTE = {
   ],
 };
 
-/** The first suggestion's "Why this could suit you", once its written note reads `state`. */
-const slateNote = (state: RegExp) => async (page: Page) => {
-  const first = page
-    .getByRole("region", { name: "Directions to explore" })
-    .getByRole("article")
-    .first();
-  await expect(first.getByText(state)).toBeVisible({ timeout: 60_000 });
-  await first
-    .getByText("Why this could suit you")
-    .evaluate((element) => element.scrollIntoView({ block: "center" }));
+/** The first suggestion's "Why this could suit you", once its written note reads `state`;
+ *  a missing note is shown from the notice above the cards, which holds its action. */
+const slateNote =
+  (state: RegExp, notice = false) =>
+  async (page: Page) => {
+    const directions = page.getByRole("region", { name: "Directions to explore" });
+    const first = directions.getByRole("article").first();
+    await expect(first.getByText(state)).toBeVisible({ timeout: 60_000 });
+    const anchor = notice
+      ? directions.getByText(/^No written note:/)
+      : first.getByText("Why this could suit you");
+    await anchor.evaluate((element) =>
+      element.scrollIntoView({ block: notice ? "start" : "center" }),
+    );
+  };
+
+type DiscoveryPage = {
+  items: { explanation: { run: object; written: unknown; can_retry: boolean } | null }[];
 };
 
-type DiscoveryPage = { items: { explanation: { run: object; written: unknown } | null }[] };
-
 /** The latest discovery as the API answers it, with its slate's written note shown in
- *  another state (still running, or failed its checks twice). */
-const noteIn = (status: "running" | "failed") => (page: Page) =>
+ *  another state: still running, failed after its request (invalid twice), or refused
+ *  before any request reached a model (over budget, so it may be tried again). */
+const noteIn = (state: "running" | "failed" | "reached_no_model") => (page: Page) =>
   page.route("**/discoveries?*", async (route) => {
     const response = await route.fetch();
     const found = (await response.json()) as DiscoveryPage;
@@ -228,9 +235,14 @@ const noteIn = (status: "running" | "failed") => (page: Page) =>
       if (item.explanation === null) continue;
       item.explanation.run = {
         ...item.explanation.run,
-        status,
-        failure_class: status === "failed" ? "invalid_model_output" : null,
+        status: state === "running" ? "running" : "failed",
+        failure_class: {
+          running: null,
+          failed: "invalid_model_output",
+          reached_no_model: "budget_exceeded",
+        }[state],
       };
+      item.explanation.can_retry = state === "reached_no_model";
       item.explanation.written = null;
     }
     await route.fulfill({ response, json: found });
@@ -355,7 +367,15 @@ const shots = (scratch: Scratch): Shot[] => [
     context: "note-unavailable",
     url: chapterUrl("you", scratch.talked),
     prepare: noteIn("failed"),
-    ready: slateNote(/The reply didn't pass Nessa's checks twice\. Nothing from it/),
+    ready: slateNote(/The reply didn't pass Nessa's checks twice\. Nothing from it/, true),
+  },
+  {
+    name: "you--slate-note-retry",
+    as: "ada",
+    context: "note-retry",
+    url: chapterUrl("you", scratch.talked),
+    prepare: noteIn("reached_no_model"),
+    ready: slateNote(/The spending limit for model calls is reached\. Nothing from it/, true),
   },
   {
     // A message with a risk stem is sent as usual, with the support panel beside it. The

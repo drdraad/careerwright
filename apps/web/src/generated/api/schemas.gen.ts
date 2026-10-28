@@ -242,7 +242,7 @@ export const ClaimOutSchema = {
         text: {
             type: 'string',
             title: 'Text',
-            description: 'Written by the model (or the demo explainer): one sentence resting on its quotations, which quote you and ESCO\'s record.'
+            description: 'The model\'s own words (or the demo explainer\'s), at most 240 characters with no quotation of their own: not checked against any source. Only the quotations beside it were checked.'
         },
         quotations: {
             items: {
@@ -788,7 +788,8 @@ export const ErrorCodeSchema = {
         'TAXONOMY_UNAVAILABLE',
         'CONFIRMATION_REQUIRED',
         'PROPOSAL_NOT_AVAILABLE',
-        'ALREADY_DECIDED'
+        'ALREADY_DECIDED',
+        'SLATE_ALREADY_EXPLAINED'
     ],
     title: 'ErrorCode'
 } as const;
@@ -981,6 +982,11 @@ export const ExplanationRunOutSchema = {
         },
         run: {
             $ref: '#/components/schemas/RunOut'
+        },
+        can_retry: {
+            type: 'boolean',
+            title: 'Can Retry',
+            description: 'The run failed before any request reached a model, so the person\'s Try again (`retry_failed`) may start the note afresh. False once a request was sent: the slate has had its one call, and Suggest again makes a new slate.'
         }
     },
     additionalProperties: false,
@@ -988,7 +994,8 @@ export const ExplanationRunOutSchema = {
     required: [
         'explanation_id',
         'discovery_id',
-        'run'
+        'run',
+        'can_retry'
     ],
     title: 'ExplanationRunOut',
     description: 'A slate explanation\'s run, as asking for it answers: never what it wrote, since a\ncommand\'s answer is kept as its receipt and model output is kept sealed. The discovery\n(`GET .../discoveries/{id}`) carries the written text.'
@@ -3070,6 +3077,11 @@ export const SlateExplanationOutSchema = {
         run: {
             $ref: '#/components/schemas/RunOut'
         },
+        can_retry: {
+            type: 'boolean',
+            title: 'Can Retry',
+            description: 'The run failed before any request reached a model, so the person\'s Try again (`retry_failed`) may start the note afresh. False once a request was sent: the slate has had its one call, and Suggest again makes a new slate.'
+        },
         written: {
             anyOf: [
                 {
@@ -3087,6 +3099,7 @@ export const SlateExplanationOutSchema = {
         'explanation_id',
         'discovery_id',
         'run',
+        'can_retry',
         'written'
     ],
     title: 'SlateExplanationOut',
@@ -3548,6 +3561,12 @@ export const SubmitExplanationSchema = {
             type: 'integer',
             minimum: 0,
             title: 'Expected Profile Version'
+        },
+        retry_failed: {
+            type: 'boolean',
+            title: 'Retry Failed',
+            description: 'The person\'s explicit Try again: start the note afresh if its run failed before any request reached a model (`can_retry`). Never sent automatically.',
+            default: false
         }
     },
     additionalProperties: false,

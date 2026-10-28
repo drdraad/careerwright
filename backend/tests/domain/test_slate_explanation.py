@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from nessa.catalogue.records import IscoGroupRef, OccupationFacts
+from nessa.errors import ErrorCode, NessaError
 from nessa.profile.discovery import evidence_of
 from nessa.profile.document import FIELD_NAMES, ProfileInput, apply_profile_input, empty_profile
 from nessa.profile.fixture_explainer import fixture_explanation, prompt_context
@@ -20,6 +21,8 @@ from nessa.profile.slate_explanation import (
     MAX_CLAIMS,
     MAX_PROMPT_BYTES,
     MAX_QUOTES,
+    REPAIR_ALLOWANCE_TOKENS,
+    REPAIR_MESSAGE_BYTES,
     SCHEMA_ALLOWANCE_TOKENS,
     ExplanationInput,
     ExplanationOutput,
@@ -29,7 +32,9 @@ from nessa.profile.slate_explanation import (
     build_input,
     check_explanation,
     prompt_bytes,
+    quotable,
     render_prompt,
+    repair_message,
     worst_case_nano_usd,
 )
 from tests.domain.test_safety import CORPUS
@@ -243,12 +248,83 @@ def test_a_claim_must_rest_on_the_person_s_answer_and_on_esco_s_record(
         "Employers are hiring bicycle mechanics, so you would get the job.",
         "Bicycle mechanics are in demand, with many vacancies near you.",
         "This work could earn you £28,000 while you repair bikes.",
+        # Fix round 1 (M1): phrasings the first lists missed.
+        "Bicycle mechanics are in high demand, and you enjoy repairs.",
+        "You would be a strong candidate for this repair work.",
+        "You already have the experience this repair work needs.",
+        "This is lucrative repair work for someone who enjoys it.",
+        "There are plenty of jobs in bicycle repair for someone like you.",
+        "The trade is crying out for people who enjoy repairs.",
     ],
 )
 def test_a_readiness_affordability_or_hiring_claim_is_refused(text: str) -> None:
     risky = claim(text, quote("answer", "repairing bicycles"), quote("esco", "repair bicycles"))
 
     assert any("readiness" in p for p in problems(output(("o1", [risky]), ("o2", [GOOD_GARDENER]))))
+
+
+@pytest.mark.req("REC1-11")
+@pytest.mark.parametrize(
+    ("answer", "text"),
+    [
+        ("qualified first aider", "You are already qualified to start work as a bicycle mechanic."),
+        ("ready for a change", "You are ready for this bicycle repair work as it is."),
+        ("paid carer", "As a paid carer, you would be paid well for this repair work."),
+    ],
+)
+def test_an_answer_never_unlocks_a_readiness_pay_or_hiring_word(answer: str, text: str) -> None:
+    # Fix round 1 (I1): only the occupation's ESCO record may use a screened word.
+    person = document(enjoyed_tasks=[answer, "repairing bicycles"])
+    ctx = build_input(
+        discovery_id=DISCOVERY,
+        profile_version=1,
+        release="esco-v1.2.1-en-csv",
+        answers=evidence_of(person),
+        occupations=[MECHANIC],
+    )
+    risky = claim(text, quote("answer", answer), quote("esco", "repair bicycles"))
+
+    assert any("readiness" in p for p in problems(output(("o1", [risky])), ctx))
+
+
+@pytest.mark.req("REC1-11")
+def test_a_quotation_needs_a_content_word_and_keeps_its_leading_apostrophe() -> None:
+    # Fix round 1 (I2): "and" quoted from both sides, or "s work" cut out of "mechanic's
+    # work", is not a quotation of anything.
+    person = document(enjoyed_tasks=["fixing and mending bikes"])
+    record = facts("bicycle mechanic", "A mechanic's work is to maintain and repair bicycles.")
+    ctx = build_input(
+        discovery_id=DISCOVERY,
+        profile_version=1,
+        release="esco-v1.2.1-en-csv",
+        answers=evidence_of(person),
+        occupations=[record],
+    )
+    function_words = claim(
+        "You would fit right in with the people of this trade.",
+        quote("answer", "and"),
+        quote("esco", "and"),
+    )
+    fragment = claim(
+        "You enjoy mending bikes, which is what this trade does all day.",
+        quote("answer", "mending bikes"),
+        quote("esco", "s work"),
+    )
+    apostrophe = claim(
+        "You enjoy mending bikes, which is what this trade does all day.",
+        quote("answer", "mending bikes"),
+        quote("esco", "'s work is to maintain"),
+    )
+    content = claim(
+        "You enjoy mending bikes, which is what this trade does all day.",
+        quote("answer", "mending bikes"),
+        quote("esco", "maintain and repair bicycles"),
+    )
+
+    assert any("content word" in p for p in problems(output(("o1", [function_words])), ctx))
+    assert any("content word" in p for p in problems(output(("o1", [fragment])), ctx))
+    assert any("not an exact quotation" in p for p in problems(output(("o1", [apostrophe])), ctx))
+    assert problems(output(("o1", [content])), ctx) == []
 
 
 @pytest.mark.req("REC1-11")
@@ -330,6 +406,69 @@ def test_claim_and_quotation_counts_and_lengths_are_bounded() -> None:
 
     for bad in (many_claims, [many_quotes], [long_claim]):
         assert problems(output(("o1", bad), ("o2", [GOOD_GARDENER])))
+
+
+@pytest.mark.req("REC1-11")
+def test_past_the_count_bounds_nothing_more_is_checked_and_the_repair_fits_its_allowance() -> None:
+    # Fix round 1 (M2): claims and quotations past their bounds are counted, not checked,
+    # and the repair message is capped to the bytes the reservation allows for it.
+    records = [
+        facts(f"occupation {n}", "Words about repairing bicycles.", concept=f"o{n}")
+        for n in range(6)
+    ]
+    ctx = build_input(
+        discovery_id=DISCOVERY,
+        profile_version=1,
+        release="esco-v1.2.1-en-csv",
+        answers=evidence_of(PERSON),
+        occupations=records,
+    )
+    invented = [quote("answer", f"never said {'x' * 300} {n}") for n in range(20)]
+    flood = [claim(f"Claim {n} " + "about this repair work " * 20, *invented) for n in range(20)]
+    out = output(*((f"o{n}", flood) for n in range(1, 7)))
+
+    found = problems(out, ctx)
+    message = repair_message(found)
+
+    assert any("1-2 claims" in p for p in found)
+    assert not any("claim 3" in p for p in found)  # past the bound: counted, never checked
+    assert not any("x" * 100 in p for p in found)  # a model's text is echoed shortened
+    assert len(message.encode()) <= REPAIR_MESSAGE_BYTES < REPAIR_ALLOWANCE_TOKENS
+    assert "more problems" in message
+
+
+@pytest.mark.req("REC1-11", "MODEL-08")
+def test_answers_too_long_for_the_prompt_in_bytes_are_a_typed_refusal() -> None:
+    # Fix round 1 (M3): 36 answers of 120 three-byte characters cannot fit 8,500 bytes.
+    wide = [f"{'€' * 115} {n}" for n in range(8)]
+    busy = document(
+        current_role="€" * 120,
+        target_titles=["€" * 120, "£" * 120, "¥" * 120],
+        enjoyed_tasks=wide,
+        confident_tasks=wide,
+        evidenced_tasks=wide,
+        work_style=wide,
+    )
+
+    with pytest.raises(NessaError) as refused:
+        build_input(
+            discovery_id=DISCOVERY,
+            profile_version=1,
+            release="esco-v1.2.1-en-csv",
+            answers=evidence_of(busy),
+            occupations=[MECHANIC],
+        )
+
+    assert refused.value.code is ErrorCode.LIMIT_EXCEEDED
+    assert refused.value.details["reason"] == "answers_too_long"
+
+
+@pytest.mark.req("REC1-11")
+def test_only_an_answer_with_a_content_word_can_be_quoted() -> None:
+    assert quotable("repairing bicycles")
+    assert quotable("teamwork")
+    assert not quotable("art")  # a short answer alone gives the note nothing to quote
+    assert not quotable("with them")
 
 
 @pytest.mark.req("REC1-11")

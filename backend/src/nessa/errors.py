@@ -48,6 +48,8 @@ class ErrorCode(StrEnum):
     CONFIRMATION_REQUIRED = "CONFIRMATION_REQUIRED"
     PROPOSAL_NOT_AVAILABLE = "PROPOSAL_NOT_AVAILABLE"
     ALREADY_DECIDED = "ALREADY_DECIDED"
+    # Discovery codes (Task 6b): a slate's one written note was made, so it is not made again.
+    SLATE_ALREADY_EXPLAINED = "SLATE_ALREADY_EXPLAINED"
 
 
 class ErrorStage(StrEnum):

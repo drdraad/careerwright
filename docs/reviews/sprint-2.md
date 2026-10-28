@@ -353,15 +353,20 @@ suggestion is unchanged: the note is computed after the slate, from the answers 
 discovery pinned and ESCO's records only, and nothing reads it back. The slate, a
 suggestion's grounding, its place, the profile and a target's `occupation_choice` source
 are the same with or without it (`test_slate_explanations.py` compares the slate before
-and after). A view change never makes a call; a failed note is shown as unavailable and is
-never asked again for the same slate. No exploratory filter became a constraint.
+and after). A view change never makes a call. A failed note is shown as unavailable: if its
+run reached no model (refused for budget, key, access or model, read from its attempts), the
+person may try it again by a click, and the new run replaces it; once a request was sent,
+the slate has had its one call, and Suggest again (which says it makes a new set of
+suggestions) is offered instead (fix round 1). No exploratory filter became a constraint.
 
 **Six questions, briefly.**
 
-1. Journey: as above; the failure path (invalid twice, cut off, refused before a run) is
-   shown in the UI with its words and the provenance kept.
+1. Journey: as above; the failure path (invalid twice, cut off, refused before a run or
+   before any request) is shown in the UI with its words, its one action and the
+   provenance kept.
 2. Shared concepts: a failed note uses the failure-class words, a refused request the
    error code's words, both from the generated client; "pending" uses the running status.
+   The note says only the quoted words were checked; the sentences are the writer's own.
 3. Traceability: each quotation names its source (an answer's field, or a part of ESCO's
    record) and is stored in the source's own characters; the export cites the ESCO URI and
    the discovery.
@@ -371,10 +376,11 @@ never asked again for the same slate. No exploratory filter became a constraint.
    `nessa-l0-1`. Found and fixed during the work: the submission first answered with the
    written text, which the command receipt then kept unsealed (the leak scan caught it);
    it now answers with the run only.
-5. Interface: captures `you--slate` (written), `you--slate-note-pending` and
-   `you--slate-note-unavailable` at 1440×900, 768×1024 and 390×844, with axe, overflow,
-   console and font checks clean on all 29 shots per size; no new colour pairing (existing
-   text tokens on cards, a hairline rule).
+5. Interface: captures `you--slate` (written), `you--slate-note-pending`,
+   `you--slate-note-unavailable` (with Suggest again) and, since fix round 1,
+   `you--slate-note-retry` (with Try again) at 1440×900, 768×1024 and 390×844, with axe,
+   overflow, console and font checks clean on every shot; no new colour pairing (existing
+   text tokens on cards, a hairline rule, the existing error notice).
 6. Evidence: see "Checks" below.
 
 **Checks on the final candidate** (`9929707`, plus a comment-only edit and these docs).
@@ -400,7 +406,7 @@ only "practical"), the known limit in decision 12. No production-model call.
 
 | Item | Owner | State |
 |---|---|---|
-| H-12: the note's word lists, bounds, the first-view slate, no retry, asking without a click | Reviewer and product owner | Not run — requires human (ADR 0007 checklist) |
-| H-01: the note's wording, its place above "How Nessa found it" and its length on a phone | Product owner and design reviewer | Not run — requires human |
-| Prose that says more than its quotations | Release evaluation, H-12 | Open: only quotations are verified |
+| H-12: the note's word lists and phrasings, the content-word rule, bounds, the first-view slate, Try again only for a run that reached no model, asking without a click | Reviewer and product owner | Not run — requires human (ADR 0007 checklist) |
+| H-01: the note's wording, its place above "How Nessa found it", the missing-note notice and its length on a phone | Product owner and design reviewer | Not run — requires human |
+| Prose that says more than its quotations | Release evaluation, H-12 | Open: only the quoted words are checked, and the note says so |
 | The repair rate of the note on the production model | Release task | Not run: one test-model sample only |

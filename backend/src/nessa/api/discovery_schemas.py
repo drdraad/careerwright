@@ -96,8 +96,9 @@ class QuotationOut(ResponseModel):
 
 class ClaimOut(ResponseModel):
     text: str = Field(
-        description="Written by the model (or the demo explainer): one sentence resting on "
-        "its quotations, which quote you and ESCO's record."
+        description="The model's own words (or the demo explainer's), at most 240 characters "
+        "with no quotation of their own: not checked against any source. Only the quotations "
+        "beside it were checked."
     )
     quotations: list[QuotationOut]
 
@@ -152,6 +153,11 @@ class ExplanationRunOut(ResponseModel):
     explanation_id: uuid.UUID
     discovery_id: uuid.UUID
     run: RunOut
+    can_retry: bool = Field(
+        description="The run failed before any request reached a model, so the person's Try "
+        "again (`retry_failed`) may start the note afresh. False once a request was sent: "
+        "the slate has had its one call, and Suggest again makes a new slate."
+    )
 
 
 class SlateExplanationOut(ExplanationRunOut):

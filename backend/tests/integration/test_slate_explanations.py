@@ -6,6 +6,7 @@ the discovery pinned or of ESCO's record; a failure is shown as unavailable whil
 deterministic provenance stays; the export cites the provenance, never the written text."""
 
 import dataclasses
+import threading
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,7 @@ from nessa.api.deps import ApiDependencies
 from nessa.config import RuntimeMode
 from tests.integration.durable import Scenario, make_scenario
 from tests.integration.test_discovery import ANSWERS, base, discover, slate
-from tests.support.client import ApiClient
+from tests.support.client import ApiClient, profile_with
 from tests.support.infra import API_BASE, Infra
 
 pytestmark = pytest.mark.integration
@@ -39,13 +40,41 @@ def explaining(infra: Infra, api: ApiClient, ada: str, tmp_path: Path) -> Iterat
         worker.kill_if_running()
 
 
-def ask(scenario: Scenario, discovery_id: str, version: int = 2) -> Any:
+def ask(scenario: Scenario, discovery_id: str, version: int = 2, *, retry: bool = False) -> Any:
+    body: dict[str, Any] = {"expected_profile_version": version}
+    if retry:
+        body["retry_failed"] = True  # the person's explicit Try again
     return scenario.api.write(
-        "POST",
-        f"{base(scenario)}/discoveries/{discovery_id}/explanation",
-        scenario.token,
-        {"expected_profile_version": version},
+        "POST", f"{base(scenario)}/discoveries/{discovery_id}/explanation", scenario.token, body
     )
+
+
+def run_limit(scenario: Scenario, nano_usd: int) -> None:
+    spend = scenario.api.get(f"{base(scenario)}/spend", scenario.token).json()
+    put = scenario.api.write(
+        "PUT",
+        f"{base(scenario)}/spend/limits",
+        scenario.token,
+        {
+            "expected_version": spend["version"],
+            "run_limit_nano_usd": nano_usd,
+            "period_limit_nano_usd": 1_000_000_000,
+        },
+    )
+    assert put.status_code == 200, put.text
+
+
+def refused_before_any_request(scenario: Scenario, discovery_id: str) -> dict[str, Any]:
+    """The slate's note, queued, then refused inside the activity for its budget (lowered
+    after submission): a failed run whose attempt sent nothing."""
+    asked = ask(scenario, discovery_id)
+    assert asked.status_code == 202, asked.text
+    run_limit(scenario, 0)
+    worker = scenario.worker("refusing")
+    scenario.wait_terminal(asked.json()["explanation_id"])
+    assert worker.stop() == 0
+    found: dict[str, Any] = discovery(scenario, discovery_id)["explanation"]
+    return found
 
 
 def explain(scenario: Scenario, discovery_id: str, **worker_settings: str) -> dict[str, Any]:
@@ -157,10 +186,74 @@ def test_a_failed_explanation_is_unavailable_with_its_failure_and_the_provenance
     assert attempt["requests_sent"] == requests  # one repair at most, none for a cut-off
     shown = slate(explaining, discovery_id)
     assert all(s["why_it_could_suit"] and s["linked_evidence"] for s in shown["suggestions"])
-    retried = ask(explaining, discovery_id)
-    assert (retried.status_code, retried.json()["run"]["status"]) == (200, "failed")  # no 2nd call
+    assert found["can_retry"] is False  # a request was sent: the slate had its one call
+    again = ask(explaining, discovery_id)
+    assert (again.status_code, again.json()["run"]["status"]) == (200, "failed")  # no 2nd call
+    tried = ask(explaining, discovery_id, retry=True)
+    assert (tried.status_code, tried.json()["error"]["code"]) == (409, "SLATE_ALREADY_EXPLAINED")
+    runs = explaining.api.get(f"{base(explaining)}/runs", explaining.token).json()["items"]
+    assert sorted(r["kind"] for r in runs) == ["discovery", "slate_explanation"]
     assert explaining.profile()["version"] == 2
     assert explaining.leaks() == []
+
+
+@pytest.mark.req("REC1-11", "MODEL-08")
+def test_a_note_refused_before_any_request_can_be_tried_again_and_the_new_run_replaces_it(
+    explaining: Scenario,
+) -> None:
+    discovery_id = discover(explaining)["discovery_id"]
+    failed = refused_before_any_request(explaining, discovery_id)
+    [refusal] = explaining.attempts(failed["explanation_id"])
+    run_limit(explaining, 150_000_000)
+
+    plain = ask(explaining, discovery_id)  # not a Try again: the same failed run
+    retried = ask(explaining, discovery_id, retry=True)
+    worker = explaining.worker("explainer")
+    explaining.wait_terminal(retried.json()["explanation_id"])
+    assert worker.stop() == 0
+
+    assert (failed["run"]["status"], failed["run"]["failure_class"]) == (
+        "failed",
+        "budget_exceeded",
+    )
+    assert (refusal["spend_state"], refusal["requests_sent"]) == ("none", None)
+    assert failed["can_retry"] is True
+    assert (plain.status_code, plain.json()["explanation_id"]) == (200, failed["explanation_id"])
+    assert retried.status_code == 202, retried.text
+    assert retried.json()["explanation_id"] != failed["explanation_id"]
+    current = discovery(explaining, discovery_id)["explanation"]
+    assert current["explanation_id"] == retried.json()["explanation_id"]  # replaces the link
+    assert current["written"] is not None
+    assert current["can_retry"] is False
+    # The failed run is kept, with its refusal, beside the one that wrote the note.
+    runs = explaining.api.get(f"{base(explaining)}/runs", explaining.token).json()["items"]
+    notes = {r["run_id"]: r["status"] for r in runs if r["kind"] == "slate_explanation"}
+    assert notes == {failed["explanation_id"]: "failed", current["explanation_id"]: "complete"}
+    assert explaining.leaks() == []
+
+
+@pytest.mark.req("REC1-11")
+def test_concurrent_tries_again_start_one_run(explaining: Scenario) -> None:
+    discovery_id = discover(explaining)["discovery_id"]
+    failed = refused_before_any_request(explaining, discovery_id)
+    run_limit(explaining, 150_000_000)
+    results: list[Any] = []
+
+    def try_again() -> None:
+        results.append(ask(explaining, discovery_id, retry=True))
+
+    threads = [threading.Thread(target=try_again) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sorted(r.status_code for r in results) == [200, 200, 200, 202]
+    started = {r.json()["explanation_id"] for r in results}
+    assert len(started) == 1
+    assert started != {failed["explanation_id"]}
+    runs = explaining.api.get(f"{base(explaining)}/runs", explaining.token).json()["items"]
+    assert sum(r["kind"] == "slate_explanation" for r in runs) == 2  # the failed one and one new
 
 
 @pytest.mark.req("REC1-11", "PROF-05")
@@ -180,7 +273,21 @@ def test_an_explanation_is_refused_before_any_run_for_a_failed_discovery_or_chan
 
     stale_view = ask(explaining, good, version=2)
     stale_answers = ask(explaining, good, version=3)
+    # Fix round 1: answers too short to quote (no content word) would make a doomed call.
+    short = explaining.api.write(
+        "PUT",
+        f"{base(explaining)}/profile",
+        explaining.token,
+        {"expected_version": 3, "profile": profile_with(enjoyed_tasks=["art"])},
+    )
+    assert short.status_code == 201, short.text
+    unquotable = ask(explaining, discover(explaining, version=4)["discovery_id"], version=4)
 
+    assert (unquotable.status_code, unquotable.json()["error"]["code"]) == (
+        422,
+        "INSUFFICIENT_EVIDENCE",
+    )
+    assert unquotable.json()["error"]["details"]["reason"] == "no_quotable_answer"
     assert (no_searches.status_code, no_searches.json()["error"]["code"]) == (
         409,
         "PROPOSAL_NOT_AVAILABLE",
@@ -192,7 +299,7 @@ def test_an_explanation_is_refused_before_any_run_for_a_failed_discovery_or_chan
         )
     assert discovery(explaining, good)["explanation"] is None
     runs = explaining.api.get(f"{base(explaining)}/runs", explaining.token).json()["items"]
-    assert {r["kind"] for r in runs} == {"discovery"}
+    assert {r["kind"] for r in runs} == {"discovery"}  # every refusal came before any run
 
 
 @pytest.mark.req("REC1-11")

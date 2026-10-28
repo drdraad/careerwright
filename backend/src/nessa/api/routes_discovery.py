@@ -54,6 +54,7 @@ def explanation_out(tx: Tx, keyring: Keyring, view: ExplanationView) -> SlateExp
         explanation_id=view.request.explanation_id,
         discovery_id=view.request.discovery_id,
         run=run_out(tx, keyring, view.run),
+        can_retry=view.can_retry,
         written=WrittenExplanationOut.of(view.written) if view.written else None,
     )
 
@@ -184,7 +185,9 @@ def explain(
     key: IdempotencyKey,
 ) -> JSONResponse:
     """The written "Why this could suit you" for the slate's first view, as one bounded
-    run. A slate has at most one: asking again, from any view, answers 200 with its run. The
+    run. A slate has at most one call: asking again, from any view, answers 200 with its run.
+    Only the person's Try again (`retry_failed`) on a run that reached no model starts a new
+    run (202); on one that sent a request it is refused, `SLATE_ALREADY_EXPLAINED`. The
     answer never holds the written text (it is kept as the command's receipt); the
     discovery carries it."""
 
@@ -205,6 +208,7 @@ def explain(
             explanation_id=view.request.explanation_id,
             discovery_id=view.request.discovery_id,
             run=run_out(tx, deps.keyring, view.run),
+            can_retry=view.can_retry,
         )
         return CommandResult(202 if started else 200, answer.model_dump(mode="json"), workspace_id)
 

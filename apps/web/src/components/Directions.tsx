@@ -14,6 +14,7 @@ import type {
   Direction,
   DiscoveryOut,
   Emphasis,
+  ErrorCode,
   NotIncludedOut,
   ProfileOut,
   ProposalOrigin,
@@ -38,6 +39,7 @@ import {
   ERROR_STATEMENT,
   FAILURE_CLASS,
   NOT_INCLUDED,
+  NOTE_RECOVERY,
   RECORD_PART,
 } from "@/lib/vocabulary";
 import { Alert } from "./Alert";
@@ -92,44 +94,64 @@ function Source({ suggestion, slate }: { suggestion: SuggestionOut; slate: Slate
   );
 }
 
+/** What the person can do about a missing note: try the note again (its run reached no
+ *  model), send a refused request again, or suggest again (the slate had its one call). */
+type Recovery = "retry" | "resend" | "suggest_again";
+
 /** What the slate's written note holds for one suggestion. */
 type WrittenState =
   | { kind: "none" } // never asked for (an earlier discovery, changed answers, no key)
   | { kind: "pending" }
   | { kind: "written"; why: WrittenWhyOut; origin: ProposalOrigin }
   | { kind: "not_covered" } // a view showed it that the note was not written for
-  | { kind: "unavailable"; reason: string };
+  | { kind: "unavailable"; reason: string; action: string; recovery: Recovery };
 
+/** A request for the note that the API refused, in its error code's words. */
+type Refusal = { title: string; action: string; code: ErrorCode | null };
+
+// Only the quoted words are checked against a source; the sentences are the writer's own.
 const WRITTEN_BY: Record<ProposalOrigin, string> = {
   model:
-    "Written by Nessa from your answers and ESCO's record. Each quotation was checked word for word against its source.",
+    "Written by Nessa from your answers and ESCO's record. Only the quoted words were checked against them; the sentences are Nessa's own.",
   fixture:
-    "Written by the demo explainer (synthetic). Each quotation was checked word for word against its source.",
+    "Written by the demo explainer (synthetic). Only the quoted words were checked against your answers and ESCO's record; the sentences are the explainer's own.",
 };
 
-/** The note's state for one suggestion: `asked` while the request is on its way or before
- *  the discovery shows it; `refused` names a request the API turned down. */
+/** The note's state for one suggestion: `asked` once the slate asked for it, `sending` while
+ *  a request is on its way, and `refused` the last request the API turned down. */
 function writtenState(
   suggestion: SuggestionOut,
   explanation: SlateExplanationOut | null,
-  asked: boolean,
-  refused: string | null,
+  { asked, sending, refused }: { asked: boolean; sending: boolean; refused: Refusal | null },
 ): WrittenState {
-  if (explanation === null) {
-    if (refused !== null) return { kind: "unavailable", reason: refused };
-    return asked ? { kind: "pending" } : { kind: "none" };
+  if (sending || (explanation !== null && stillRunning(explanation.run.status))) {
+    return { kind: "pending" };
   }
-  if (stillRunning(explanation.run.status)) return { kind: "pending" };
-  if (explanation.written === null) {
-    return {
-      kind: "unavailable",
-      reason: FAILURE_CLASS[explanation.run.failure_class ?? "unknown_failure"].title,
-    };
+  if (explanation?.written) {
+    const why = explanation.written.suggestions.find((s) => s.concept_id === suggestion.concept_id);
+    return why === undefined
+      ? { kind: "not_covered" }
+      : { kind: "written", why, origin: explanation.written.origin };
   }
-  const why = explanation.written.suggestions.find((s) => s.concept_id === suggestion.concept_id);
-  return why === undefined
-    ? { kind: "not_covered" }
-    : { kind: "written", why, origin: explanation.written.origin };
+  if (refused !== null) {
+    const recovery: Recovery =
+      refused.code === "SLATE_ALREADY_EXPLAINED"
+        ? "suggest_again"
+        : explanation === null
+          ? "resend"
+          : explanation.can_retry
+            ? "retry"
+            : "suggest_again";
+    return { kind: "unavailable", reason: refused.title, action: refused.action, recovery };
+  }
+  if (explanation === null) return asked ? { kind: "pending" } : { kind: "none" };
+  const failure = FAILURE_CLASS[explanation.run.failure_class ?? "unknown_failure"];
+  return {
+    kind: "unavailable",
+    reason: failure.title,
+    action: failure.action,
+    recovery: explanation.can_retry ? "retry" : "suggest_again",
+  };
 }
 
 function WrittenNote({ state }: { state: WrittenState }) {
@@ -295,11 +317,61 @@ function NotShown({ items }: { items: NotIncludedOut[] }) {
 }
 
 /** Why a request for the written note was refused, in the error code's words. */
-function refusal(error: unknown): string | null {
+function refusal(error: unknown): Refusal | null {
   if (error === null) return null;
-  return error instanceof ApiError && error.body !== null
-    ? ERROR_STATEMENT[error.body.code].title
-    : "Nessa's service isn't reachable";
+  if (error instanceof ApiError && error.body !== null) {
+    const words = ERROR_STATEMENT[error.body.code];
+    return { title: words.title, action: words.action, code: error.body.code };
+  }
+  return {
+    title: "Nessa's service isn't reachable",
+    action: "Nothing you saved is lost. Try again in a moment.",
+    code: null,
+  };
+}
+
+/** Once, above the cards: why the note is missing and the one thing to do about it. */
+function NoteRecovery({
+  state,
+  onTryAgain,
+  onSuggestAgain,
+  tryBlocked,
+  suggestBlocked,
+}: {
+  state: Extract<WrittenState, { kind: "unavailable" }>;
+  onTryAgain(): void;
+  onSuggestAgain(): void;
+  tryBlocked?: string | undefined;
+  suggestBlocked?: string | undefined;
+}) {
+  const again = state.recovery === "suggest_again";
+  return (
+    <Alert
+      tone="error"
+      announce={false}
+      title={`No written note: ${state.reason}`}
+      actions={
+        again ? (
+          <Button variant="secondary" onClick={onSuggestAgain} disabledReason={suggestBlocked}>
+            Suggest again
+          </Button>
+        ) : (
+          <Button variant="secondary" onClick={onTryAgain} disabledReason={tryBlocked}>
+            Try again <span className="sr-only">: the written note</span>
+          </Button>
+        )
+      }
+    >
+      <p>{state.action}</p>
+      <p>
+        {again
+          ? NOTE_RECOVERY.suggestAgain
+          : state.recovery === "retry"
+            ? NOTE_RECOVERY.retry
+            : NOTE_RECOVERY.resend}
+      </p>
+    </Alert>
+  );
 }
 
 const NOTE_ANNOUNCEMENT: Record<WrittenState["kind"], string> = {
@@ -315,12 +387,17 @@ function Slate({
   profile,
   discovery,
   canWrite,
+  onSuggestAgain,
+  suggestBlocked,
 }: {
   workspaceId: string;
   profile: ProfileOut;
   discovery: DiscoveryOut;
   /** Whether a written note may be asked for (a key is stored, or the workspace is a demo). */
   canWrite: boolean;
+  /** A new discovery: a new set of suggestions, with a note of its own. */
+  onSuggestAgain(): void;
+  suggestBlocked?: string | undefined;
 }) {
   const [controls, setControls] = useState<SlateControls>(NO_CONTROLS);
   const slate = useSlate(workspaceId, discovery.discovery_id, controls);
@@ -342,10 +419,19 @@ function Slate({
       body: { expected_profile_version: profile.version },
     });
   }, [wanted, discovery.discovery_id, profile.version, askForNote]);
-  const requested = asked.current === discovery.discovery_id;
-  const refused = requested ? refusal(explain.error) : null;
-  const noteFor = (suggestion: SuggestionOut) =>
-    writtenState(suggestion, explanation, requested, refused);
+  const flags = {
+    asked: asked.current === discovery.discovery_id,
+    sending: explain.isPending,
+    refused: refusal(explain.error),
+  };
+  const noteFor = (suggestion: SuggestionOut) => writtenState(suggestion, explanation, flags);
+  // Only ever by the person's click: a retry of a run that reached no model, or a refused
+  // request sent again (never automatic).
+  const tryAgain = (retry: boolean) =>
+    explain.mutate({
+      discoveryId: discovery.discovery_id,
+      body: { expected_profile_version: profile.version, ...(retry ? { retry_failed: true } : {}) },
+    });
   const targets =
     profile.document.target_titles.state === "provided"
       ? (profile.document.target_titles.value ?? [])
@@ -368,11 +454,11 @@ function Slate({
   const familiarityKnown = profile.document.current_role.state === "provided" || targets.length > 0;
   const excluded = controls.excludeConcepts.length + controls.excludeFamilies.length;
   const first = data.suggestions[0];
-  const note = first === undefined ? "none" : noteFor(first).kind;
+  const note: WrittenState = first === undefined ? { kind: "none" } : noteFor(first);
   return (
     <div className="grid gap-16">
       <p className="sr-only" role="status">
-        {NOTE_ANNOUNCEMENT[note]}
+        {NOTE_ANNOUNCEMENT[note.kind]}
       </p>
       <fieldset className="segmented">
         <legend className="sr-only">Which directions to show</legend>
@@ -401,6 +487,15 @@ function Slate({
           {line}
         </p>
       ))}
+      {note.kind === "unavailable" && (
+        <NoteRecovery
+          state={note}
+          onTryAgain={() => tryAgain(note.recovery === "retry")}
+          onSuggestAgain={onSuggestAgain}
+          tryBlocked={canWrite ? undefined : "Store a Meta API key first."}
+          suggestBlocked={suggestBlocked}
+        />
+      )}
       {excluded > 0 && (
         <div>
           <Button
@@ -550,6 +645,8 @@ export function Directions({
           profile={profile}
           discovery={discovery}
           canWrite={unavailable === undefined}
+          onSuggestAgain={start}
+          suggestBlocked={blocked}
         />
       )}
     </section>

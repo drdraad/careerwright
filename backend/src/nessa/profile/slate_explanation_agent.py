@@ -53,10 +53,7 @@ def run_explanation(
     def _check(output: ExplanationOutput) -> ExplanationOutput:
         written, problems = slate_explanation.check_explanation(output, context, origin)
         if written is None:
-            raise ModelRetry(
-                "The JSON object does not pass validation. Answer again with the whole object, "
-                "fixing these problems:\n- " + "\n- ".join(problems)
-            )
+            raise ModelRetry(slate_explanation.repair_message(problems))
         accepted.append(written)
         return output
 

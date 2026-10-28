@@ -312,38 +312,61 @@ inference, with at least 30 evaluation cases and a capped live run.
       exclusions, computed when the explanation is asked for. A changed view (emphasis,
       exclusions) is never a new slate and never makes a call: a suggestion it shows that
       the note covers keeps its note, and any other says it has none. A new discovery
-      ("Suggest again") is a new slate. `slate_explanations` holds at most one explanation
-      per discovery (a unique key); asking again, from any view or with any idempotency key,
-      answers 200 with the same run, whatever its state, so a failed note is never retried
-      for the same slate.
+      ("Suggest again") is a new slate. `slate_explanations` holds at most one current link
+      per discovery (a partial unique index, migration 0012); asking again, from any view or
+      with any idempotency key, answers 200 with the same run, whatever its state.
+    - *One call per slate, and a failed note* (fix round 1, controller ruling). Whether a
+      failed note used up the slate's call is read from its recorded attempts, not its
+      failure class: a run none of whose attempts took a reservation or sent a request was
+      refused inside the activity (budget, key, access, model) and made no call
+      (`can_retry`). Only then does the person's explicit Try again (`retry_failed: true`,
+      never sent automatically) start a new run, which replaces the failed link in the same
+      locked transaction; the failed run stays in `runs` with its attempts, and concurrent
+      tries start one run. A failed run that sent a request (a provider failure,
+      `invalid_model_output`, `output_truncated`, or an attempt left unfinished or with an
+      unknown charge) stays the slate's one note: Try again is refused
+      (`SLATE_ALREADY_EXPLAINED`), and the web app offers Suggest again, saying that it makes
+      a new set of suggestions with a note of its own.
     - *When.* The web app asks once, when a slate first shows for the current answers and a
       key is stored (or the workspace is a demo). The API refuses before any run exists when
       the expected version is stale or the discovery's pinned answers are not the current
       ones (`STALE_INPUT_VERSION`: the note would quote answers since changed), when the
-      discovery has no validated searches (`PROPOSAL_NOT_AVAILABLE`) or an empty slate
-      (`INSUFFICIENT_EVIDENCE`), and for the usual reasons any run is refused (no key, over
-      budget, demo runtime).
+      discovery has no validated searches (`PROPOSAL_NOT_AVAILABLE`), when no pinned answer
+      holds a content word to quote (`INSUFFICIENT_EVIDENCE`, `no_quotable_answer`) or the
+      slate is empty (`INSUFFICIENT_EVIDENCE`, `no_suggestions`), when the answers are too
+      long for the prompt in bytes (`LIMIT_EXCEEDED`, `answers_too_long`), and for the usual
+      reasons any run is refused (no key, over budget, demo runtime).
     - *Input* (SEC-05). The answers the discovery pinned that describe work (decision 4),
       each whole, and ESCO's record of each suggestion: its title, its description cut at a
       word, and its first essential skills (ESCO's order is alphabetical). The record steps
       down (600 characters and 6 skills, then 400/4, 250/3, 150/2, 100/1) until the prompt
       fits 8,500 bytes; the cut record is what the model reads and what quotations are
-      checked against. No name, place, money, hours, ID or link is sent. Two requests at
+      checked against. The bound is in bytes, so answers in characters of several bytes
+      that leave no step fitting are refused before any run or reservation (above). No
+      name, place, money, hours, ID or link is sent. Two requests at
       their bounds reserve $0.0034 on the test model and $0.0495 on the production model,
       so three step attempts fit the default $0.15 run limit.
     - *Output and check* (`check_explanation`). Every suggestion once, with 1-2 distinct
-      claims; a claim is one sentence of 20-240 characters with no quotation marks of its
-      own, resting on 1-3 distinct quotations, at least one of the person's answers and at
-      least one of that occupation's record. Each quotation must be an exact span of its source at word
-      boundaries (case, spacing and apostrophe or dash forms aside) and is stored in the
-      source's own characters, with the answer's field or the record's part. Refused: a
-      misquotation, an invented answer, a fact the record lacks (another suggestion's record
-      included), readiness, affordability or hiring words or a currency sign that neither
-      the record nor the answers use, and a health condition, type, protected
-      characteristic or percentage that neither the answers nor that record name (decision
-      7's guard; the record's words describe the work, not the person). One repair, then
-      `invalid_model_output`; a cut-off response is `output_truncated` at once; nothing is
-      stored as checked.
+      claims; a claim is 20-240 characters with no quotation marks of its own (the model is
+      asked for one sentence; only the length is checked), resting on 1-3 distinct
+      quotations, at least one of the person's answers and at least one of that
+      occupation's record. Each quotation must hold a content word (four letters or more,
+      not a listed function word: "and" or "s work" quote nothing) and be an exact span of
+      its source at word boundaries (case, spacing and apostrophe or dash forms aside; a
+      leading apostrophe is never trimmed away), and is stored in the source's own
+      characters, with the answer's field or the record's part. Refused: a misquotation, an
+      invented answer, a fact the record lacks (another suggestion's record included),
+      readiness, affordability or hiring words, phrasings ("in high demand", "strong
+      candidate", "already have the experience", "plenty of jobs", "crying out for") or a
+      currency sign that the occupation's own record does not use (the person's answers
+      never unlock one: "ready for a change" is no ground for "ready"), and a health
+      condition, type, protected characteristic or percentage that neither the answers nor
+      that record name (decision 7's guard; the record's words describe the work, not the
+      person). Claims and quotations past their bounds are counted, not checked, a model's
+      text is echoed at most 60 characters, and the repair message is capped at 800 bytes
+      (then "and N more problems"), so the repair fits its reserved 1,000 tokens with the
+      agent's fence. One repair, then `invalid_model_output`; a cut-off response is
+      `output_truncated` at once; nothing is stored as checked.
     - *Models* (MODEL-02, as for every run). The Standard production model for
       non-synthetic workspaces, the test model for synthetic ones; demo workspaces use the
       deterministic fixture explainer (`nessa-fixture-explainer-1`, each claim labelled
@@ -356,18 +379,26 @@ inference, with at least 30 evaluation cases and a capped live run.
       read with the discovery (`DiscoveryOut.explanation`). Export format 4 carries it beside
       the provenance, which is what exports cite.
     - *UI.* "Why this could suit you" shows the note (each claim, then each quotation after
-      "You said" or the part of ESCO's record), says who wrote it, and then "How Nessa found
-      it" (decision 6's words), shown in every case. Pending, unavailable (the failure
-      class's words, or a refused request's error-code words) and not-covered states say so;
-      a polite status line announces the change.
+      "You said" or the part of ESCO's record), says who wrote it and that only the quoted
+      words were checked against the answers and ESCO's record, the sentences being the
+      writer's own, and then "How Nessa found it" (decision 6's words), shown in every case.
+      Pending, unavailable and not-covered states say so; a polite status line announces the
+      change. An unavailable note shows, once above the cards, the failure class's (or the
+      refused request's error code's) words from `vocabulary.ts` and one action: Try again
+      for a run that reached no model or a refused request, Suggest again (it says it makes a
+      new set of suggestions) once the slate has had its call.
     - *The support screen* (decision 7) is neither read nor written: the note sees only the
       pinned answers and ESCO, and an answer holding a listed word is quoted like any other.
-    - *Known limits.* The claim's prose is model prose: only its quotations are verified, so
-      a sentence may still say, in other words, more than its quotations support; the word
-      screens catch readiness, money, hiring and the sensitive terms only. The live
+    - *Known limits.* The claim's prose is model prose: only its quoted words are checked,
+      so a sentence may still say, in other words, more than its quotations support (no
+      claim-to-quotation word check is made: it would turn paraphrase into paid repairs);
+      the word screens catch the listed readiness, money, hiring and sensitive terms only.
+      A short answer with no content word ("art") cannot be quoted on its own. The live
       evidence is single samples on the test model.
-    - **Provisional (R6, H-12):** the readiness, affordability and hiring word lists, the
-      claim and quotation bounds, and asking for the note without a click.
+    - **Provisional (R6, H-12):** the readiness, affordability and hiring word lists and
+      phrasings, the content-word rule and its function words, the claim and quotation
+      bounds, asking for the note without a click, and Try again only for a run that
+      reached no model.
 
 ## Consequences
 
@@ -379,7 +410,9 @@ inference, with at least 30 evaluation cases and a capped live run.
   `send_after_support` any more); a turn decision may carry edits.
 - Task 6b (decision 12): migration 0011; new run kind `slate_explanation` and fixture model
   `nessa-fixture-explainer-1`; `POST .../discoveries/{id}/explanation`; `DiscoveryOut`
-  gains `explanation`; export format 4.
+  gains `explanation`; export format 4. Fix round 1: migration 0012 (a replaced link, one
+  current link per discovery), `retry_failed` and `can_retry`, error code
+  `SLATE_ALREADY_EXPLAINED` (409).
 - Not done: applying the salary floor (Sprint 3, with pay evidence); a salary floor per
   target; a human review of the evaluation cases and of the support policy (H-12).
 
@@ -412,10 +445,12 @@ inference, with at least 30 evaluation cases and a capped live run.
 - [ ] **Interview repair rate** (decision 3): how often the one-question rule costs a paid
   repair, from the release evaluation.
 - [ ] **Written explanation** (decision 12): the readiness, affordability and hiring word
-  lists and the record allowance, the claim and quotation bounds, that a claim must quote
-  both the person and the record, the "first view" definition of a slate and no retry of
-  a failed note, asking for the note without a click, and the note's wording and placement
-  above "How Nessa found it".
+  lists and phrasings and the record-only allowance, the content-word rule and its function
+  words (short answers such as "art" cannot be quoted alone), the claim and quotation
+  bounds, that a claim must quote both the person and the record, the "first view"
+  definition of a slate, Try again only for a run that reached no model and Suggest again
+  otherwise, asking for the note without a click, and the note's wording (only the quoted
+  words were checked) and placement above "How Nessa found it".
 - [ ] **Evaluation cases** (decision 9): the 44 cases (EXP-01 added by Task 6b) and their
   semantic expectations. Of
   them, 20 (SUP-01..13, GRD-01..07) test deterministic code with canned inputs; the model's

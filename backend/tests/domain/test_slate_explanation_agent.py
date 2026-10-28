@@ -10,14 +10,20 @@ from typing import Any
 import pytest
 from pydantic_ai import capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior
-from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    RetryFeedbackPart,
+    TextPart,
+)
 from pydantic_ai.models import Model
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from nessa.identity.failures import FailureClass, classify_failure
 from nessa.identity.model_registry import ModelMode
 from nessa.profile.interview import ProposalOrigin
-from nessa.profile.slate_explanation import SlateExplanation
+from nessa.profile.slate_explanation import REPAIR_ALLOWANCE_TOKENS, SlateExplanation
 from nessa.profile.slate_explanation_agent import fixture_explainer_model, run_explanation
 from tests.domain.test_slate_explanation import GOOD_GARDENER, GOOD_MECHANIC, claim, context, quote
 
@@ -126,6 +132,25 @@ def test_a_refused_output_is_repaired_once_then_fails_typed_with_nothing_stored(
     sent = requests(messages)
     assert len(sent) == 2  # the first request and one repair, never a third
     assert named in str(sent[1].parts)  # the repair names the problem
+
+
+@pytest.mark.req("REC1-11", "MODEL-08")
+def test_the_repair_sent_for_a_flood_of_problems_stays_within_its_allowance() -> None:
+    # Fix round 1 (M2): whatever the output holds, the repair request's text fits the
+    # tokens the reservation allows for it (bytes bound tokens).
+    invented = [quote("answer", f"never said {'x' * 400} {n}") for n in range(30)]
+    bad = claim("This repair work " * 30, *invented)
+    flooded = json.dumps(
+        {"explanations": [{"occupation": ref, "claims": [bad] * 9} for ref in ("o1", "o2")]}
+    )
+
+    result, messages = run(scripted(flooded))
+
+    assert isinstance(result, UnexpectedModelBehavior)
+    [retry] = [p for p in requests(messages)[1].parts if isinstance(p, RetryFeedbackPart)]
+    shown = retry.model_response()  # the text the model is sent, with the agent's fence
+    assert len(shown.encode()) <= REPAIR_ALLOWANCE_TOKENS
+    assert "more problems" in shown
 
 
 @pytest.mark.req("REC1-11", "MODEL-03")

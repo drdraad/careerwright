@@ -115,12 +115,17 @@ with the browser's Origin unchanged.
 - The slate's written "Why this could suit you" (ADR 0007 decision 12): `POST
   .../discoveries/{id}/explanation` with `{expected_profile_version}` returns `202` and the
   run (`ExplanationRunOut`), or `200` and the same run if it was asked for before, from any
-  view (at most one per discovery, never a second call); it is refused with
-  `STALE_INPUT_VERSION` when the answers changed after the discovery,
-  `PROPOSAL_NOT_AVAILABLE` for a discovery without validated searches and
-  `INSUFFICIENT_EVIDENCE` for an empty slate. The written text is read with the discovery
-  (`explanation.written`), never in the command's answer. The web app asks once when a
-  slate first shows. Demo workspaces use the fixture explainer.
+  view (one call per discovery). `can_retry` is true when the run failed before any
+  request reached a model; only then does `{..., "retry_failed": true}` (the person's Try
+  again) start a new run that replaces it (`202`); for a run that sent a request it is
+  refused with `SLATE_ALREADY_EXPLAINED` (Suggest again makes a new slate). Refused before
+  any run with `STALE_INPUT_VERSION` when the answers changed after the discovery,
+  `PROPOSAL_NOT_AVAILABLE` for a discovery without validated searches,
+  `INSUFFICIENT_EVIDENCE` when no answer has a word to quote or the slate is empty, and
+  `LIMIT_EXCEEDED` (`answers_too_long`) when the answers do not fit the prompt in bytes.
+  The written text is read with the discovery (`explanation.written`), never in the
+  command's answer. The web app asks once when a slate first shows. Demo workspaces use
+  the fixture explainer.
 - Taxonomy: `GET /v1/taxonomy` (the ESCO release and its attribution), `GET
   /v1/taxonomy/occupations?q=...&match=all|any`, `GET /v1/taxonomy/occupations/{concept_id}`;
   English cities: `GET /v1/places`. A title ESCO lacks: `POST

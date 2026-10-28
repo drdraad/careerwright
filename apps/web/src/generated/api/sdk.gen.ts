@@ -389,7 +389,9 @@ export const getSlate = <ThrowOnError extends boolean = false>(options: Options<
  * Explain
  *
  * The written "Why this could suit you" for the slate's first view, as one bounded
- * run. A slate has at most one: asking again, from any view, answers 200 with its run. The
+ * run. A slate has at most one call: asking again, from any view, answers 200 with its run.
+ * Only the person's Try again (`retry_failed`) on a run that reached no model starts a new
+ * run (202); on one that sent a request it is refused, `SLATE_ALREADY_EXPLAINED`. The
  * answer never holds the written text (it is kept as the command's receipt); the
  * discovery carries it.
  */
