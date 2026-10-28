@@ -188,7 +188,7 @@ export const ERROR_STATEMENT: Record<ErrorCode, ErrorStatement> = {
   },
   HOST_NOT_ALLOWED: {
     title: "Nessa answers on its local address only",
-    action: "Open it at the address `make demo` printed.",
+    action: "Open it at the address Nessa printed when it started.",
   },
   ORIGIN_NOT_ALLOWED: {
     title: "This page isn't allowed to make changes",
