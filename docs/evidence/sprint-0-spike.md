@@ -15,7 +15,7 @@
 | Persisted state contains no credential | **Passed.** Full scans of both databases and the worker logs, with the real key | S0.4 |
 | Every unknown dependency has a named owner and disposition | **Passed for the S0.1 scope** | `docs/dependencies.md` |
 | If live access is blocked, the spike is blocked | Not blocked. The key, Standard entitlement and the test model all work | S0.2 |
-| TRACE-01 arithmetic and five persona expectations committed | **Passed** in Task 2 (S0.5): hand-checked, with findings | `docs/evidence/fixture-hand-check.md` |
+| TRACE-01 arithmetic and five persona expectations committed | **Passed** in Task 2 (S0.5): hand-checked, with findings. Agent-performed; domain-reviewer sign-off (H-07) not run — requires human | `docs/evidence/fixture-hand-check.md` |
 
 ## S0.1 Scope and dependency matrix
 

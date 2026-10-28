@@ -4,9 +4,11 @@
   RDY-1, OUT-1, AIR-1 (spec v1.2 sections 12 and 20).
 - Inputs: `fixtures/m0/` (the supplied pack, byte-identical to `Nessa_M0_Fixtures.zip`;
   hashes in `fixtures/README.md`) and `fixtures/reconstructed/directai.json`.
-- Status: **passed, with findings for implementers** (section 11). Nothing in the pack
-  contradicts the specification. Several expectations are under-specified in ways that
-  would let a wrong implementation pass a naive test; section 8 says how to test them.
+- Status: **passed, with findings for implementers** (section 11). Agent-performed (the
+  Task 2 implementing agent); domain-reviewer sign-off (H-07) **not run — requires human**.
+  Nothing in the pack contradicts the specification. Several expectations are
+  under-specified in ways that would let a wrong implementation pass a naive test;
+  section 11 says how to test them.
 
 ## 1 Method
 
@@ -179,8 +181,8 @@ all routes are stated feasible and reach the same target. Rebuilt as
 | I | 16 | £1,600 | C (12, £900), F (14, £1,200) | 3 |
 
 The column lists every dominator in the full set. Peeling: F1 = {A, B, C}. Among the
-rest, D is fastest and F is cheapest. Only D is faster than E, and it costs more, so E is
-not dominated. Within the remainder G, H and I are dominated by D, E and F respectively.
+rest, D is fastest and F is cheapest. D (8 months) and G (10 months) are faster than E (11
+months), but both cost more (£5,400 and £6,200 against £3,000), so E is not dominated. Within the remainder G, H and I are dominated by D, E and F respectively.
 F2 = {D, E, F}. F3 = {G, H, I}: nothing remains to dominate them.
 
 Correction (2026-10-27, same task): the first version of this table listed only A and D
