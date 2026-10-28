@@ -1,8 +1,9 @@
 # ADR 0007: The You chapter's conversation, grounded discovery and the support policy
 
-- Status: Accepted (Task 6, Sprint 2: S2.3-S2.6). Decision 7 (the support policy, its phrase
-  lists and its resources) and decision 5's slate weights are **provisional, need product
-  owner and reviewed sign-off** (ruling R6; human gate H-12). Decision 2's salary floor is
+- Status: Accepted (Task 6, Sprint 2: S2.3-S2.6). Decision 7 (the support policy, redesigned
+  in fix round 4: its stem list, its wording and its resources) and decision 5's slate
+  weights are **provisional, need product owner and reviewed sign-off** (ruling R6; human
+  gate H-12). Decision 2's salary floor is
   the product owner's change to the hard-constraint set (H-11, 2026-10-28).
 - Date: 2026-10-28
 - Requirements: REC1-01..10, DIV1-02, DIV1-04..12, STATE-05, STATE-06, STATE-08, PROF-04,
@@ -28,9 +29,8 @@ inference, with at least 30 evaluation cases and a capped live run.
    into its input, so the prompt (now `interview-turn-2`) tells the model how to proceed:
    a sure person confirms the target and its level and is not asked to explore; an unsure
    person is asked about tasks before any career is named. Pause is honoured by the web app:
-   nothing is asked, and every way of sending (Send, Try again, Send it again, Send my
-   message anyway) is disabled with the reason "Paused: resume to send." until Resume; the
-   composer stays in place. The API does not refuse a message while paused: pause is the
+   nothing is asked, and every way of sending (Send, Try again, Send it again) is disabled
+   with the reason "Paused: resume to send." until Resume; the composer stays in place. The API does not refuse a message while paused: pause is the
    person's own setting, not a lock. "Help me explore instead" saves the entry as `unsure`.
 
 2. **Profile schema 3** adds two fields; older documents read them as not asked.
@@ -145,50 +145,67 @@ inference, with at least 30 evaluation cases and a capped live run.
    Model-written explanations are not used in L0: grounding by construction was preferred
    to a second paid call whose prose would need its own checks.
 
-7. **The minimal support policy** (`nessa.profile.safety`, `support-policy-3`): a two-tier
-   screen (controller rulings, Task 6 fix rounds 2 and 3), before any model call. It is
-   kept apart from career suitability: it scores and remembers nothing. The four UK
+7. **The minimal support policy** (`nessa.profile.safety`, `support-policy-4`): one
+   deterministic, recall-first screen (controller ruling, Task 6 fix round 4). It is kept
+   apart from career suitability: it scores, labels and remembers nothing. The four UK
    services were checked on their own pages on 2026-10-28 (999 or A&E; NHS 111, mental
-   health option; Samaritans 116 123; Shout 85258). One table of input shapes and their
-   tiers is the specification and the test (`tests/domain/test_safety.py::CORPUS`).
-   - *Tier 1, acute (narrow).* First-person, present intent or distress only, each branch
-     starting from "I" or "me": "I (just, really, keep, ...) want to / am going to / am
-     thinking about" + an act (die at the end of a clause, kill myself, end it all or my
-     life, take my own life, hurt or harm myself); "I feel / I'm / I've been / I've felt
-     suicidal"; "I self-harm", "I've been / I keep self-harming"; "I keep / I've been /
-     I'm hurting or cutting myself" at the end of a clause; "I wish I was dead"; "I'd be
-     better off dead", "better off without me / if I took my own life"; "I don't / do not
-     want to be alive", "... to live (like this) (any more)" or "... to be here any more"
-     at the end of a clause; "I have no reason to live / go on"; "I can't / cannot go on"
-     at the end of a clause. A risk word in a professional, third-party, figurative or
-     object frame never reaches it ("people feeling suicidal", "print is going to die",
-     "die of boredom", "thinking about suicide prevention work", "I have self-harm
-     awareness training", "I kept cutting myself on the tape"). `POST .../interview/turns`
-     answers 200 with a fixed support response: nothing is sent to the interviewer or
-     stored, not even an idempotency receipt (it would keep a fingerprint of the message).
-     The person can send the message anyway (`send_after_support`); the web app sends the
-     message that was screened. Tier 1 rests on positive evidence only, never on a list of
-     words that excuse a match.
-   - *Tier 2, mention (broad).* Every other message containing a risk stem, in any
-     inflection: suicid-, self-harm-, overdos-, kill / hurt / harm / cut (-s, -ing, -ed,
-     -ting) myself, end / take (-s, -ing, -en, took) my (own) life, "to die" after an
-     intent word, "wish I was dead", "better off dead / without me", "don't / do not /
-     doesn't / didn't want to live / be alive / be here", "no reason to live / go on",
-     "can't / cannot / can not / couldn't go on". The message is sent as usual (202), and
-     the response carries a calm `support_note` with the same services, shown beside the
-     conversation until dismissed and announced through the chapter's polite live region
-     (focus is not moved; dismissing returns it to the reply field). The note is derived
-     from the request on every response, a replay included, and is never stored: the
-     idempotency receipt records the turn without it (tested). Nothing containing a risk
-     stem reaches no tier, and ordinary career talk is never blocked.
-   - *Known limits (H-12):* English phrasing only, and only the stems above; indirect or
-     third-person wording without a stem ("my friend wants to end things", "what's the
-     point") gets nothing; first-person statements in the past or with an object ("I hurt
-     myself", "I cut myself", "I was cutting myself", "I kept hurting myself lifting") are
-     tier 2, not 1, because the same words describe workplace injuries; "There's no reason
-     to go on" (no "I") and "can't go on like this" are tier 2; "I don't want to be here"
-     without "any more" is tier 2 (a common job phrase); a career phrase with a risk stem
-     gets the note, which some people may find unwelcome.
+   health option; Samaritans 116 123; Shout 85258). One table is the specification and the
+   test (`tests/domain/test_safety.py::CORPUS`): every listed stem in every listed form,
+   then sentences, then messages with no stem.
+   - *Why one screen.* Fix rounds 1 to 3 tried to tell intent apart with hand-written
+     patterns: a blocking tier for first-person present intent, a note for every other
+     mention. Each round traded false positives for false negatives: re-review 3 found
+     first-person shapes that reached neither tier (C-1), the blocking tier firing on career
+     text with no risk stem at all ("lifeguard", "without meetings") or on object frames
+     ("life sciences", "life savings") (N-I1), and uncontracted negations reaching neither
+     (N-I2). Precise intent classification by pattern is not achievable here, so the
+     classifier was removed: the screen decides only whether a listed stem is present.
+   - *The stems*, each matched in any surrounding text, any case, with a straight, curly or
+     missing apostrophe, and as a whole word ("lifeguard" and "meetings" do not match):
+     suicid-; self-harm (self harm, selfharm) and its forms; overdos-; kill / hurt / harm /
+     cut (-s, -ed, -ing, -ting) + a reflexive in any person (myself, yourself, himself,
+     herself, ourselves, yourselves, themselves, themself, oneself, "my self"; not
+     "self-esteem"); end (-s, -ed, -ing) it all; end or take (-s, -ed, -ing, -en, took) +
+     my / your / his / her / our / their / one's + (own) life or lives; an intent (want,
+     going, ready, plan, tempted, try, intend, decide, urge, in any form, + "to"; wanna;
+     gonna) + an optional adverb (just, really, simply, actually, honestly, even, truly,
+     still) + die; think / thought / thoughts about or of + (adverb) + dying; wish (-es,
+     -ed, -ing) (that) I / you / he / she / we / they was or were dead, or could or would
+     (adverb) die; better off dead or without me / you / him / her / us / them; a negation
+     (don't, doesn't, didn't, won't, wouldn't, couldn't, shouldn't, with or without the
+     apostrophe; do / does / did / would / will not; never; no longer) + (adverb) + want
+     (-s, -ed, -ing) to live, be alive or be here; no reason to live or go on; can't /
+     cannot / can not / couldn't / could not go on.
+   - *The support flow.* `POST .../interview/turns` sends every message as usual (202: no
+     hold, no extra step). When the message holds a stem, the response carries
+     `support_note`, a calm, non-diagnostic panel with the four services and the date they
+     were checked, which the web app shows beside the conversation until dismissed and
+     announces through the chapter's polite live region; focus is not moved (dismissing
+     returns it to the reply field), and the question steps aside while it is shown. For
+     that turn only, the interviewer's instructions gain a fixed sentence
+     (`SUPPORT_TURN_INSTRUCTION`, prompt `interview-turn-4`): acknowledge briefly and
+     kindly, offer one smaller next step such as pausing, ask no career question
+     (`next_question` null), and give no phone numbers or service names (the panel holds
+     the checked ones; spec section 4: never fabricate emergency details). The model never
+     sees a label naming the screen or what matched: the context it reads is the same
+     either way. The demo interviewer follows the same instruction.
+   - *Never stored.* Both the panel and the instruction are recomputed from the message
+     wherever they are needed (the API response, a replay included, and every model
+     request, a repair included), so the flag reaches no profile, proposal, discovery,
+     slate, export, receipt, run, journal or log (tested by scanning both databases, the
+     worker log, the API log and the export). A receipt stored before this change is
+     refused as a different request (its request carried `send_after_support`), never a
+     500; it may still hold the old note, in pre-release local data only.
+   - *Known limits (H-12):* a finite English stem list, so wording outside it gets nothing
+     ("my friend wants to end things", "what's the point", "I just want to end it", "can't
+     carry on", method words): extending the list is the reviewer's decision; false
+     positives show the panel, since the screen makes no intent judgement, so a stem inside
+     career, workplace or figurative phrasing triggers it ("took my life savings", "ending my
+     life sciences career", "better off without me" about a team, "hurt myself lifting",
+     "cut yourself some slack", "don't want to live in London", "don't want to be here in
+     five years", "going to die of boredom", "can't go on holiday"), and some people may
+     find that unwelcome; the instruction asks the model for no career question, but the
+     model's reply is not checked for one.
    - *Inappropriate inference.* Model output may not name a health condition, a diagnosis,
      a personality type (or MBTI code), a protected characteristic or a percentage that the
      person's own messages never used; a condition the person names may be acknowledged,
@@ -246,24 +263,25 @@ inference, with at least 30 evaluation cases and a capped live run.
 
 - Migration 0010; new run kind `discovery`; new event kind `interview.preferences_updated`;
   new source kind `occupation_choice`; new endpoints for preferences, discoveries, slates,
-  targets, the sketch and the profile revert; `submit_turn` may answer 200 with the
-  support response; a turn decision may carry edits.
+  targets, the sketch and the profile revert; `submit_turn` answers 202 with the support
+  panel when the message holds a risk stem (fix round 4: no 200 response and no
+  `send_after_support` any more); a turn decision may carry edits.
 - Not done: model-written suggestion explanations; applying the salary floor (Sprint 3,
   with pay evidence); a salary floor per target; a human review of the evaluation cases
   and of the support policy (H-12).
 
 ## Human review checklist (H-12, not run — requires human)
 
-- [ ] **Support policy** (decision 7): the shape table (`test_safety.py::CORPUS`) and where
-  the line between the tiers falls (tier 1: first-person present intent or distress; tier
-  2: the risk stems in every inflection), the fixed response and the note's wording and
-  announcement, the decision not to send or store a tier-1 message and never to store the
-  note, the "send anyway" path, the known limits listed in decision 7 (only the listed
-  stems; indirect and third-person wording without a stem; past or object-framed self-
-  injury, which overlaps workplace injury, only tier 2; "There's no reason to go on",
-  "can't go on like this" and "I don't want to be here" only tier 2; the note on career
-  phrases), and the four resources and their wording (checked against the services' pages
-  on 2026-10-28).
+- [ ] **Support policy** (decision 7): the one recall-first screen in place of an intent
+  judgement; the stem list and its forms (`test_safety.py::CORPUS`), and whether to add
+  wording it misses ("end it", "carry on", "not exist", method words); the panel's wording,
+  its placement beside the conversation, its polite announcement and the question stepping
+  aside; the smaller-step instruction's wording, and that the model's reply is not checked
+  for a career question; the decision to send every message and never store the panel or
+  the instruction; the known limits in decision 7: a finite English stem list, false
+  positives that show the panel (career, workplace and figurative phrases with a stem), no
+  intent judgement; and the four resources and their wording (checked against the
+  services' pages on 2026-10-28).
 - [ ] **Inference rules** (decision 7): the health, type and protected-characteristic word
   lists, the kindred-word groups (discovery searches only), and refusing a condition in a
   career field.
