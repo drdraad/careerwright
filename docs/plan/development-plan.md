@@ -2,7 +2,7 @@
 
 ## From product specification to a beautiful and verifiable local app
 
-27 October 2026 • Plan version 1.0 • Based on product specification 1.2
+28 October 2026 • Plan version 1.1 (version 1.0: 27 October 2026) • Based on product specification 1.3
 
 Build a complete career-planning experience that runs on a developer’s computer, works without credentials in a labelled synthetic demo, and uses one user-supplied Meta API key for live conversation and research. The endpoint is a tested local release candidate with inspectable evidence, reproducible route comparisons and a printable plan. Public hosting is outside this plan.
 
@@ -18,13 +18,17 @@ Local completion is measurable. A fresh checkout can start the app, exercise all
 
 ## Delivery envelope
 
-Ten outcome-based sprints, numbered 0–9, with an initial estimate of 37–51 engineering days. For one experienced full-stack engineer using an LLM coding assistant, plan roughly 8–11 working weeks, with regular product and design input. This is a planning range, not a validated productivity forecast. Re-estimate after the technical spike and first real-source extraction work; external access and evidence review can add elapsed time.
+Ten outcome-based sprints, numbered 0–9, with Sprint 6 delivered as 6a and 6b, and an initial estimate of 37–51 engineering days. For one experienced full-stack engineer using an LLM coding assistant, plan roughly 8–11 working weeks, with regular product and design input. This is a planning range, not a validated productivity forecast. Re-estimate after the technical spike and first real-source extraction work; external access and evidence review can add elapsed time.
+
+With agent implementers, engineering days are a sizing unit, not a duration: Sprints 0–2, sized at 9–12 engineering days, took 16 hours of wall-clock time. Elapsed time is set by human review hours: the three scheduled review sessions (section 10) and the human checks of Sprints 8–9.
 
 The earlier ten-day private-beta target is not adopted. The current instruction changes the endpoint to local operation and places a higher bar on UX. A compelling early demonstration should emerge in Sprint 1; a demonstration is not the completed product.
 
 ## How to use this plan
 
 Scope and architecture come first, followed by the design contract, sprint roadmap, detailed sprint cards, test strategy and release checklist. Each sprint card identifies deliverables, acceptance evidence and its coherence review. Keep the source specification alongside this plan for complete domain definitions.
+
+**Version 1.1 (28 October 2026)** applies the L0 assessment handover written after Sprints 0–2 (`docs/plan/l0-assessment-handover.md`), with its decisions D1–D3 confirmed by the product owner and recorded in ADR 0008. Human review becomes a scheduled resource with three sessions (sections 6 and 10). The required corpus becomes a reviewed England option pack (section 9). The remaining work follows the critical chain, and Sprint 6 is split into 6a and 6b (section 6). One formative comprehension session follows Sprint 5 (section 5). Adzuna stays optional (Sprint 3) and two risks are added (section 12). Sprint 2 gains the span-cited explanation the specification now permits (S2.7). Scope is otherwise unchanged: the dendrite, the three Pareto layers and the sliders all stay; only their order changes.
 
 # 1 The local delivery boundary
 
@@ -170,31 +174,49 @@ Set measured local budgets: immediate input feedback within 100 ms; p95 linked f
 
 Run five short synthetic-data task sessions near Sprint 9, covering sure/unsure entry, evidence inspection, route choice and print. Aim for four of five participants to finish the core task without assistance and correctly explain cost, conditional readiness and uncertainty. Any dangerous misunderstanding is a blocker regardless of the aggregate result; this small study is formative, not statistical validation.
 
+Hold one earlier formative comprehension session after Sprint 5, so that user contact precedes the two most expensive UI sprints. One person spends 30 minutes with synthetic data on the fixture route comparison and the TRACE-01 ledger; screenshots or Storybook are acceptable surfaces. Ask them to explain the cost shown, what “conditional readiness” means and what is uncertain. Record any dangerous misunderstanding as a Sprint 7 scope input. The product owner runs it at review session 2 (section 10). It is formative, not statistical, and leaves the five Sprint 9 sessions unchanged.
+
 # 6 Sprint roadmap
 
 Sprints are short, outcome-based increments rather than arbitrary two-week containers. Each starts from a usable main branch and ends with a demonstration and written evidence. Effort estimates include implementation, focused tests and the sprint review, but depend on access to the specified providers and datasets.
 
-| Sprint | Outcome | Engineering days | Main dependency |
-|---|---|---|---|
-| 0 | Verify provider, durability and local constraints; freeze contracts | 2–3 | Supplied specification and access checks |
-| 1 | Beautiful local shell and persisted fixture journey | 3–4 | Sprint 0 decisions |
-| 2 | Live interview and grounded career discovery | 4–5 | Identity, versions, Meta contract, ESCO import |
-| 3 | Reliable evidence acquisition and living opportunity map | 4–5 | Source policy, taxonomy, run lifecycle |
-| 4 | Skills, protected gates and evidence-based outcomes | 4–5 | Profile, targets and source claims |
-| 5 | Reviewed options and correct monthly finances | 4–6 | Capability model and offerings |
-| 6 | Verified enumeration and three Pareto layers | 5–7 | Frozen planning input and financial checker |
-| 7 | Exceptional coordinated route comparison | 4–6 | Real solver output and design system |
-| 8 | Chosen plan, progress, revision and exports | 3–4 | Stable comparison and immutable snapshots |
-| 9 | Local release qualification and handover | 4–6 | Complete product journey |
-| Total | Local release candidate | 37–51 | Re-estimate after Sprints 0 and 3 |
+| Sprint | Outcome | Engineering days | Human review hours | Main dependency |
+|---|---|---|---|---|
+| 0 | Verify provider, durability and local constraints; freeze contracts | 2–3 | Done: approvals given 2026-10-28, not timed | Supplied specification and access checks |
+| 1 | Beautiful local shell and persisted fixture journey | 3–4 | Done: approval given 2026-10-28, not timed | Sprint 0 decisions |
+| 2 | Live interview and grounded career discovery | 4–5 | H-11 done 2026-10-28, not timed; H-12 in session 1 | Identity, versions, Meta contract, ESCO import |
+| 3 | Reliable evidence acquisition and living opportunity map | 4–5 | About 2 (session 1, before the Roles chapter); the design review is not estimated | Source policy, taxonomy, run lifecycle |
+| 4 | Skills, protected gates and evidence-based outcomes | 4–5 | H-07 in session 2 | Profile, targets and source claims |
+| 5 | Reviewed options and correct monthly finances | 4–6 | About 2 (session 2, after the Sprint 5 backend) | Capability model and offerings |
+| 6a | Verified enumeration and three Pareto layers on instances that complete | 5–7 for 6a and 6b together | None | Frozen planning input, financial checker and reviewed option pack |
+| 6b | Durable, bounded search at full scale | (within 6a's range) | None | Sprint 6a |
+| 7 | Exceptional coordinated route comparison | 4–6 | About 1 (session 3, before Sprint 7 closes) | Real solver output, design system and session 2's findings |
+| 8 | Chosen plan, progress, revision and exports | 3–4 | Not estimated: Safari print (H-04) | Stable comparison and immutable snapshots |
+| 9 | Local release qualification and handover | 4–6 | Not estimated: design review, VoiceOver, Safari, five task sessions (H-01, H-03–H-05) | Complete product journey |
+| Total | Local release candidate | 37–51 | About 5 scheduled, plus Sprints 8–9 | Re-estimate after Sprints 0 and 3 |
 
 ## Responsibility and sequencing
 
 An engineering owner is accountable for each sprint, including agent-written code. The product owner decides consequential scope and acceptance questions. A design reviewer owns visual critique; a domain reviewer checks consequential requirement/outcome mappings and the financial worked examples. These roles can overlap, but the author’s confidence is not independent evidence.
 
-Begin source curation in Sprint 0 and complete the required corpus across Sprints 3–5. Begin visual design in Sprint 0 and implement the shell in Sprint 1. Do not postpone either until integration week. If the same engineer owns everything, include this work in the estimate rather than treating it as free parallel capacity.
+Begin source curation in Sprint 0 and complete the required corpus across Sprints 3–5. In v1.1 the corpus is curated once, right after the Sprint 3 acquisition backend, as the England option pack (section 9). Begin visual design in Sprint 0 and implement the shell in Sprint 1. Do not postpone either until integration week. If the same engineer owns everything, include this work in the estimate rather than treating it as free parallel capacity.
 
 The critical chain is validated inputs → evidence and outcomes → monthly feasibility → solver/archive → coordinated comparison → immutable exports. Visual exploration and data labelling can proceed alongside that chain with explicit contracts. An unresolved blocker affects dependent work, while independent design, fixtures and pure-domain tasks can continue.
+
+**Order of the remaining work (v1.1).** The backend slices of Sprints 4 and 5 run before the Roles chapter UI, because in L0 the dendrite has no live vacancy data and every role is unscored: the Roles chapter is requested and stays in scope, but it does not feed the chain. After Sprint 2, work proceeds in this order:
+
+1. Sprint 2 addition S2.7, then the Sprint 0–1 visual corrections.
+2. Sprint 3 acquisition backend (S3.1–S3.4 and the reduced S3.6).
+3. The England option pack (section 9).
+4. Sprint 4 backend, then Sprint 5 backend.
+5. Review session 2.
+6. Sprint 4 Skills chapter and review, then Sprint 5 Options chapter and review.
+7. Sprint 3 Roles chapter (S3.5), job scoring and review, after review session 1.
+8. Sprints 6a, 6b, 7 (closing after review session 3), 8 and 9.
+
+Review session 1 can be held at any point before the Roles chapter; held before the option pack is curated, it lets the pack's pages be classified against its rights policy rather than left pending human review. Each sprint's review is written when its last slice finishes, so the Sprint 3 review follows those of Sprints 4 and 5. With one implementer at a time, slices without a dependency on each other run one after the other, in either order.
+
+**Human review sessions.** Human review is a scheduled resource, not an event between sprints. Three fixed sessions, named in section 10 with the gates each closes, are dispatch preconditions for the work after them: no dependent slice starts until its session has happened. They total about five hours. The other human checks (the Sprint 3 and Sprint 9 design reviews, VoiceOver, Safari, the five Sprint 9 task sessions and the privacy decision) keep their positions in the sprint cards; none of them is a dispatch precondition.
 
 # Sprint 0 Resolve the expensive uncertainties
 
@@ -278,6 +300,8 @@ S2.5 Show a route or requirement sketch within the proposed five-minute usabilit
 
 S2.6 Add the minimal reviewed response policy for explicit acute distress and inappropriate diagnostic inference. Keep it separate from career suitability, with maintained resource references where needed.
 
+S2.7 (added in v1.1, after the Sprint 2 review; D3) Add the model-written “Why this could suit you” that specification section 4 now permits: at most one bounded call per slate, quoting only the person's confirmed answers and the grounded occupation record, each quotation verified server-side, with one repair and then an observable invalid-output failure. The deterministic provenance stays underneath, is shown in every case and is what exports cite. Live checks use the test model on synthetic data within an explicit cap.
+
 ## Acceptance and tests
 
 P02 completes exploration without an invented income baseline or forced personality test. Sure users bypass optional exploration. Test invalid schemas, refusals, truncation, unavailable models, budget exhaustion and stale concurrent profile writes. The old profile survives every failed proposal.
@@ -302,17 +326,17 @@ S3.1 Implement SourceAttempt and SourceClaim records, permitted retention, field
 
 S3.2 Implement bounded Meta search discovery and keyless Scrapling HTTP fetch/parse. Check scheme, resolved IP, redirects, content type, size and time. Parse stable structured fields first and use model extraction only where needed. Manual pasted text is a separately recorded input route.
 
-S3.3 Implement the Adzuna adapter and fixture contract. Qualify actual requests if credentials are available; otherwise record the live integration as unverified. Preserve predicted/advertised/unknown pay and snippets versus full descriptions.
+S3.3 Implement the Adzuna adapter and fixture contract. Qualify actual requests if credentials are available; otherwise record the live integration as unverified. Preserve predicted/advertised/unknown pay and snippets versus full descriptions. Adzuna stays optional: if developer credentials are registered and stored under `NESSA_HOME` before the acquisition backend starts, S3.3 qualifies the live integration; otherwise this deliverable is unchanged. It is external data, still a local run.
 
 S3.4 Deduplicate syndicated jobs, retain source copies, distinguish agencies from employers and count multi-city views once. Implement closure/freshness checks, favourites, cancellation and resumable incremental results.
 
-S3.5 Build the SVG dendrite with stable anchors, company expansion, up to 100 visible job nodes and explicit aggregation counts. Add numeric salary and AI-range filters, pay lanes and a mobile-first list. Graph distance never implies commute feasibility.
+S3.5 Build the SVG dendrite with stable anchors, company expansion, up to 100 visible job nodes and explicit aggregation counts. Add numeric salary and AI-range filters, pay lanes and a mobile-first list. Graph distance never implies commute feasibility. In v1.1, S3.5 runs after the Sprint 5 backend and after review session 1 (section 6, "Order of the remaining work"); its deliverable is unchanged.
 
-S3.6 Import the versioned AI evidence/mapping packs and publication-state machinery. Publish only reviewed range records; otherwise show unscored. Implement lower-bound filtering and keep unscored roles visible by default in exploration.
+S3.6 Import the versioned AI evidence/mapping packs and publication-state machinery. Publish only reviewed range records; otherwise show unscored. Implement lower-bound filtering and keep unscored roles visible by default in exploration. In v1.1 S3.6 delivers the assessment record model, its publication-state checks, the lower-bound filter and the unscored state, qualified with one conspicuously labelled fixture record. The pinned evidence and mapping imports stay, so exposure-only evidence can be shown with resilience unscored. The review pipeline is data entry through the record model: a record publishes only when an accountable reviewer's recorded decision passes the publication checks, and no model output can publish one. L0 publishes no reviewed real record unless an accountable reviewer exists, which specification section 5 allows (“the beta can expose unscored roles and the functioning range filter”).
 
 ## Acceptance and tests
 
-Complete the 20-job portion of the real-source corpus, including closed jobs, missing/predicted pay, snippets, duplicate adverts, drift and hostile page instructions. Prove that a failed fetch cannot become “no vacancies”; one ASHE snapshot cannot become a trend; and an ambiguous mapping cannot become precise city pay.
+Complete the 20-job portion of the real-source corpus, including closed jobs, missing/predicted pay, snippets, duplicate adverts, drift and hostile page instructions. In v1.1 these are the option pack's 20 job postings (section 9), run through the pipeline. Score the live path, pointed at the same provider pages, field by field against the reviewed values: correct, incorrect, missing and unsupported, with denominators. Prove that a failed fetch cannot become “no vacancies”; one ASHE snapshot cannot become a trend; and an ambiguous mapping cannot become precise city pay.
 
 Test time-based freshness: jobs 24 hours, considered fees/intakes seven days, active funding availability 48 hours; failed refresh never extends validity. Test SSRF/redirects with a controlled server, including IPv6 and encoded addresses. Verify the fetcher has neither user secrets nor private profile access. Confirm map/list counts, deduplication, focus retention and keyboard actions agree. Run the second design review with sparse and dense data.
 
@@ -348,7 +372,7 @@ P04 cannot become ready by demoting registration; an unresolved gate and an out-
 
 Test that two introductory courses cannot add ordinal levels into competence, course enrolment/completion cannot overwrite current evidence, and an unsupported outcome level remains null. Evidence changes recompute only affected gaps. Changing an essential non-protected row creates a new target definition and invalidates earlier ranks.
 
-Label the outcome fields for at least ten real course pages in the source corpus, including misleading titles and teaching without assessment. Review false-positive readiness mappings individually; any unsupported consequential outcome blocks publication of the affected route. Exercise direct edits and chat proposals through the same contract.
+Label the outcome fields for at least ten real course pages in the source corpus, including misleading titles and teaching without assessment. In v1.1 these are the option pack's ten course pages, labelled with the pack and reviewed at review session 2 (H-07). Review false-positive readiness mappings individually; any unsupported consequential outcome blocks publication of the affected route. Score the live path, pointed at the same course pages, field by field against the reviewed values: correct, incorrect, missing and unsupported, with denominators. Exercise direct edits and chat proposals through the same contract.
 
 ## Coherence review
 
@@ -356,7 +380,7 @@ Trace one missing skill from source requirement through evidence, gap, proposed 
 
 # Sprint 5 Compile real options into an honest monthly model
 
-4–6 engineering days • Entry: typed gaps, protected gates and outcome records • Requirements: OUT-1, TIME-1, FIN-1, sections 10–12
+4–6 engineering days • Entry: typed gaps, protected gates, outcome records and the England option pack • Requirements: OUT-1, TIME-1, FIN-1, sections 10–12
 
 ## Demonstrable outcome
 
@@ -366,7 +390,7 @@ The user reviews genuine or explicitly synthetic options, pins/excludes them and
 
 S5.1 Separate stable action concepts from dated offerings and intakes. Capture actual dates, timetable, fees, liabilities, prerequisites, source spans, outcomes and review status. Model apprenticeship time, wages and training once through a composite action.
 
-S5.2 Finish the three-funding-page corpus. Represent confirmed, potentially eligible, ineligible and insufficient-information statuses separately from actual award approval. Only confirmed support enters unconditional figures. New loans remain information; existing debt is a fixed commitment.
+S5.2 Finish the three-funding-page corpus (in v1.1, the option pack's three funding pages). Represent confirmed, potentially eligible, ineligible and insufficient-information statuses separately from actual award approval. Only confirmed support enters unconditional figures. New loans remain information; existing debt is a fixed commitment.
 
 S5.3 Build the option-review checkpoint. Show missing critical fields, scope bounds and removed-candidate counts. Ask the user to retain variants when limits are exceeded; never truncate to the first 24 options or two intakes silently.
 
@@ -382,17 +406,23 @@ Reproduce TRACE-01 exactly, including route B’s £600 direct/economic cost, £
 
 Test the £1,800 initial payment against a £250 monthly cap; overlapping concentrated workload; same-month application restrictions; signed negative economic costs; grants paid directly to a provider; and remaining liabilities beyond the horizon. P03 cannot spend an unapproved grant or unaccepted offer. Missing baseline requires a question or explicit direct-spending mode, not an automatic switch.
 
+Run the TRACE-01 checker on at least one real option set for P01's target from the option pack, with every consequential field span-cited and human-reviewed at review session 2 (H-07). Score the live path, pointed at the pack's funding and course pages, field by field against the reviewed values: correct, incorrect, missing and unsupported, with denominators. A `proposed` record stays out of any unqualified “affordable and feasible” result.
+
+After the Sprint 5 backend, the product owner runs the formative comprehension session (section 5) at review session 2: one person, 30 minutes, synthetic data, on the fixture route comparison and the TRACE-01 ledger, asked to explain the cost shown, what “conditional readiness” means and what is uncertain. Any dangerous misunderstanding is recorded as a Sprint 7 scope input.
+
 ## Coherence review
 
 Read one route as both a user story and a ledger. Every payment, receipt, time commitment and outcome must have one source and one place in the model. Confirm that conservative model rejection is not described as real-world impossibility.
 
-# Sprint 6 Prove the optimiser and archive semantics
+# Sprint 6a Prove the optimiser and layers on instances that complete
 
-5–7 engineering days • Entry: frozen input compiler and tested feasibility rules • Requirements: OPT-1, ROU-1, FIN-1, RDY-1, TEST-1
+5–7 engineering days for 6a and 6b together • Entry: frozen input compiler, tested feasibility rules and the option pack reviewed at review session 2 • Requirements: OPT-1, ROU-1, FIN-1, RDY-1, TEST-1
+
+Sprint 6 is split in v1.1. At two starts per concept, the selection bound alone permits 10,161,633 combinations before feasibility pruning, so at full scale the 1,000,000-state cap cannot exhaust the space unless sound pruning removes most of it: `budget_truncated` is the expected coverage for large catalogues (specification section 12). Sprint 6a proves the core on instances that complete; Sprint 6b then builds the apparatus for those that do not.
 
 ## Demonstrable outcome
 
-A deterministic Python search returns independently checked routes and correctly computed F1–F3, with truthful coverage and stop reasons. The same tiny instance can be verified by an intentionally simpler implementation.
+A deterministic Python search returns independently checked routes and correctly computed F1–F3, with truthful coverage, on TRACE-01, the A–I fixture and instances built from the option pack. The same tiny instance can be verified by an intentionally simpler implementation. The sprint reports the measured instance sizes at which complete coverage is reached.
 
 ## Deliverables
 
@@ -400,27 +430,49 @@ S6.1 Implement canonical DFS over skip or one reviewed offering per concept, wit
 
 S6.2 Start with only plainly sound pruning. Document each pruning proof and its assumptions. Do not prune on first-front dominance, current readiness or accumulated economic cost where future income/funding can change the result.
 
-S6.3 Persist every distinct feasible schedule encountered, including dominated schedules, to a versioned disk-backed archive. Use atomic archive checkpoints and an idempotent solve identity. A recovered attempt either resumes a proven checkpoint or restarts under a new attempt ID; never merges inconsistent prefixes into a completeness claim.
-
-S6.4 Enforce 30 seconds, 1,000,000 expanded states and 50,000 feasible schedules per target. Include archive persistence in the search budget and preserve every acknowledged feasible record. A cap stops with a reason; a crash is failed. Rank calculation has its own observable stage and must finish before results claim ranked completion.
-
-S6.5 Compute layers over the full encountered archive, then group families for presentation. Use an efficient two-objective rank algorithm qualified against simple iterative nondominated peeling. Equal coordinates do not dominate one another; preserve distinct alternatives behind grouped points.
+S6.5 Keep every distinct feasible schedule encountered, including dominated schedules, and compute layers over that full encountered archive by simple iterative nondominated peeling, then group families for presentation. Equal coordinates do not dominate one another; preserve distinct alternatives behind grouped points.
 
 S6.6 Build an independent Cartesian-product oracle for tiny instances and an independently expressed route checker. They must not reuse the candidate feasibility or Pareto implementation they are checking.
 
+S6.7 Record search coverage: `complete` only after exhausting the declared finite tree with sound pruning, otherwise `budget_truncated`, never infeasible. For growing pack-scale instances (concepts, starts per concept, months), measure the expanded states and time that complete coverage needs with the implemented pruning, and report the largest sizes that complete within the M0 limits.
+
 ## Acceptance and tests
 
-Compare feasible schedule sets, objectives and layers against the oracle across hand-worked and generated instances. Test the three-dominator counterexample, exact ties, multiple intakes, parallel prerequisites, zero-action readiness, economic-cost supersets and archive truncation. Inject cancellation and child-process failure.
+Compare feasible schedule sets, objectives and layers against the oracle across hand-worked and generated instances. Test the three-dominator counterexample, exact ties, multiple intakes, parallel prerequisites, zero-action readiness and economic-cost supersets.
 
-Explain observed bottlenecks and user-selectable relaxations; claim a minimal conflict only when proved. A complete empty archive means no route within this bounded model. A truncated empty archive means none found before the limit. State-limited replay is deterministic; wall-time-limited prefixes need not match. Profile/input changes cannot alter an in-flight snapshot. Benchmark 50,000-point ranking separately; avoid an unqualified quadratic implementation at this limit.
+Reach complete coverage on TRACE-01, the A–I fixture and the pack-scale instances. The sprint report states the measured instance sizes at which complete coverage is reached with the implemented sound pruning, with their expanded-state counts and times; a measurement run stopped before completion is reported as not complete at that size, never as infeasible. Explain observed bottlenecks and user-selectable relaxations; claim a minimal conflict only when proved. A complete empty archive means no route within this bounded model. A complete run on the same immutable input reproduces the same result. Profile/input changes cannot alter the snapshot being solved.
 
 ## Coherence review
 
-Compare the input assumptions, candidate checker, archived route, rank and displayed explanation for the same schedule. At two starts per concept, the selection bound alone permits 10,161,633 combinations before feasibility pruning; the resource budget cannot be treated as a completeness guarantee.
+Compare the input assumptions, candidate checker, archived route, rank and displayed explanation for the same schedule. Check that the measured coverage sizes and the narrowings they suggest are stated where Sprint 7 can show them.
+
+# Sprint 6b Make the search durable and bounded at full scale
+
+Within Sprint 6a's 5–7 engineering days • Entry: Sprint 6a's checked enumerator, oracle and layers • Requirements: OPT-1, ROU-1, TEST-1
+
+## Demonstrable outcome
+
+A full-scale search runs durably in a cancellable child process, stops at its limits with exact reasons, keeps every encountered feasible schedule on disk and ranks a 50,000-point archive within its own observable stage. A truncated result presents itself as the normal case.
+
+## Deliverables
+
+S6.3 Persist every distinct feasible schedule encountered, including dominated schedules, to a versioned disk-backed archive. Use atomic archive checkpoints and an idempotent solve identity. A recovered attempt either resumes a proven checkpoint or restarts under a new attempt ID; never merges inconsistent prefixes into a completeness claim.
+
+S6.4 Enforce 30 seconds, 1,000,000 expanded states and 50,000 feasible schedules per target. Include archive persistence in the search budget and preserve every acknowledged feasible record. A cap stops with a reason; a crash is failed. A truncated result leads with “Best trade-offs found”, states the instance size and names the narrowing (fewer concepts, one start, a shorter horizon) that would let the search complete.
+
+S6.8 Add an efficient two-objective rank algorithm, qualified against Sprint 6a's iterative peeling on the same archives. Rank calculation has its own observable stage and must finish before results claim ranked completion.
+
+## Acceptance and tests
+
+Test archive truncation, each cap's exact stop reason and the retention of every acknowledged feasible record, and resumption or restart after an injected crash. Inject cancellation and child-process failure. A truncated empty archive means none found before the limit. State-limited replay is deterministic; wall-time-limited prefixes need not match. Profile/input changes cannot alter an in-flight snapshot. Benchmark 50,000-point ranking separately; avoid an unqualified quadratic implementation at this limit. On every instance that completes, the disk-backed archive and the efficient ranks equal Sprint 6a's encountered archive and peeled layers.
+
+## Coherence review
+
+At two starts per concept, the selection bound alone permits 10,161,633 combinations before feasibility pruning; the resource budget cannot be treated as a completeness guarantee. Check that a full-scale truncated run reports itself as the expected case, with its instance size and the narrowing to try, and never as infeasible. The Sprint 6 review record covers 6a and 6b.
 
 # Sprint 7 Make route comparison the signature experience
 
-4–6 engineering days • Entry: real solver output and approved design compositions • Requirements: VIS-2, ROU-1, AIR-1, sections 13–14
+4–6 engineering days • Entry: real solver output, approved design compositions and the findings of review session 2; closes only after review session 3 • Requirements: VIS-2, ROU-1, AIR-1, sections 13–14
 
 ## Demonstrable outcome
 
@@ -428,7 +480,7 @@ The user understands the actual trade-off, selects a route and sees a coherent j
 
 ## Deliverables
 
-S7.1 Build the per-target time–cost scatter using discrete schedules. Show the chosen cost definition, baseline, horizon, currency, catalogue bounds and coverage near the chart. Group equivalent objective points without losing alternatives.
+S7.1 Build the per-target time–cost scatter using discrete schedules. Show the chosen cost definition, baseline, horizon, currency, catalogue bounds and coverage near the chart. Treat truncated coverage as the normal state: lead with “Best trade-offs found”, state the instance size and name the narrowing that would let the search complete. Group equivalent objective points without losing alternatives.
 
 S7.2 Keep F1–F3 visible with readable styling, family grouping and named dominance explanations. Choose comparators through one documented deterministic rule and allow inspection of others. Display failed or unknown stress scenarios separately; do not give them invented finite time/cost points.
 
@@ -446,7 +498,7 @@ TRACE-01 shows A/B/C in F1, D in F2 and E in F3. The separate A–I fixture uses
 
 Property and browser tests prove selection/filter consistency across charts, cards, list and Gantt. Test keyboard control, focus after filtering, target switching and stale results. Verify no smooth interpolated curve implies attainable intermediate plans. Unknown scenario evidence cannot become zero-width uncertainty.
 
-Run the third visual review and measure the local interaction budgets. Capture desktop/mobile screenshots with realistic names and actual solver records. A visual regression change requires inspection and an explanation; blanket baseline updates are not acceptance.
+Run the third visual review and measure the local interaction budgets. Its human part is review session 3, held against what review session 2 showed; Sprint 7 closes only after it. Capture desktop/mobile screenshots with realistic names and actual solver records. A visual regression change requires inspection and an explanation; blanket baseline updates are not acceptance.
 
 ## Coherence review
 
@@ -470,7 +522,7 @@ S8.3 Add dependency invalidation and proposed plan updates for changed fees, int
 
 S8.4 Replan the remaining horizon using completed evidence, paid/sunk costs and remaining contractual commitments. Keep original and revised accounting bases explicit; do not compare their economic totals as if they shared one baseline/window.
 
-S8.5 Generate browser print, JSON and ICS from a shared serialisable snapshot. Include direct/economic costs, baseline/horizon, monthly payments, cash reserve, conditional gates, actual dates, model bounds, source register and assessment dates. Let users omit sensitive notes and financial detail.
+S8.5 Generate browser print, JSON and ICS from a shared serialisable snapshot. Include direct/economic costs, baseline/horizon, monthly payments, cash reserve, conditional gates, actual dates, model bounds, search coverage stated as in S7.1, source register with the option pack's date and review states, and assessment dates. Let users omit sensitive notes and financial detail.
 
 S8.6 Define ICS date/time semantics, stable UID and revision sequence. Conditional events are labelled proposed; downloads never create external calendar entries. Use safe encoding for content and links.
 
@@ -580,11 +632,24 @@ Curate 20 real full job postings, 10 course pages and three funding pages. Recor
 
 Split cases by source/template family so near-duplicate pages do not leak into both tuning and holdout evaluation. Because 33 pages is small, report raw counts and per-field failures rather than claiming representative production accuracy. Include schema drift, closed vacancies, predicted salaries, snippets, disputed mappings, missing fees, teaching without assessment and conditional grants. Refresh or replace inaccessible cases with a documented reason.
 
+## The England option pack (v1.1, D1)
+
+Choose the 20 job postings, 10 course pages and three funding pages for the five personas' targets (P01–P05), still covering the case types above, and deliver the labelled result as a **reviewed, versioned, dated England option pack**. Its records take the specification section 18 shapes: LearningOption and Offering, FundingInstrument, SkillRequirement rows and `PlanAction.outcomes` (OUT-1), each with its SourceClaims, rights status, `review_state` and dates. Every record starts `proposed`; a human review at review session 2 (H-07) moves it to reviewed.
+
+The pack is an immutable public evidence pack (specification section 11): fetched and hash-checked like ESCO (ruling R7), or committed if it is small and its rights permit under the session 1 policy. Its labelling rules:
+
+- Every surface that uses it shows its date and each record's review state.
+- A pack record never fills a live field and is never shown as current.
+- Synthetic data stays labelled synthetic and never enters the pack.
+
+Live research (Meta search, Scrapling, Adzuna) writes to the same catalogue contract, inside its own workspace and never into the pack, with `review_state: proposed`. Proposed records are explorable but excluded from an unqualified “affordable and feasible” recommendation until reviewed, which is the option review checkpoint rule (specification section 10). The pack gives the numerical core real, reviewed options to run on before Sprint 9, and gives the live path reviewed values to be scored against.
+
 ## Evaluation outputs
 
 | Task | Measure | Blocking examples |
 |---|---|---|
 | Extraction | Correct, incorrect, missing and unsupported critical fields by source class; precision and recall with denominators | Wrong fee, deadline, award status or salary basis accepted as verified. |
+| Live versus reviewed | The live path, pointed at the option pack's provider pages, scored field by field against the reviewed values: correct, incorrect, missing and unsupported, with denominators, by source class (Sprints 3–5) | A live value that disagrees with the reviewed one accepted as verified, or a missing field counted as correct. |
 | Grounding | Claim-to-span validity and exact supporting context | Citation points to an unrelated statement, fabricated provider or invented source. |
 | Interview | Valid patch rate, constraint preservation and unsupported inference count | Quietly changes a budget, invents baseline income or infers a diagnosis. |
 | Outcomes | Task/assessment alignment and conditional-versus-evidenced state | Topic mention published as demonstrated competence or statutory credential. |
@@ -617,6 +682,16 @@ Reserve 20–30 minutes after each sprint for a whole-system review. This is a l
 
 Store a short record in docs/reviews/sprint-N.md: demonstrated journey, current revision, checks/results, visual findings, cross-module issues and accepted limitations. Fix critical incoherence before dependent work continues. Aesthetic details can be scheduled only if they do not compound into a different interaction model.
 
+## Human review sessions (v1.1)
+
+Human review is scheduled as three fixed sessions, about five hours in all. Each is a dispatch precondition for the work after it: an agent prepares the session's package (checklists, captures, the records to review), a person holds the session, and dependent work starts only after it has happened. If it has not, the work is recorded as “blocked: awaiting session N”, never started or self-certified. The product owner confirmed D1–D3 on 28 October 2026, so no session needs time for them.
+
+| Session | When | Gates it closes | Precondition for |
+|---|---|---|---|
+| 1, about 2 hours | Before the Sprint 3 Roles chapter (S3.5) and before any page body is retained beyond the source classes it permits | H-06 as a rights policy for the permitted source classes of the corpus and the option pack, so agents can then classify pages themselves (a page outside those classes stays with a person); the H-12 checklist in ADR 0007 | The Roles chapter and job corpus; retaining or committing page bodies beyond ruling R3 |
+| 2, about 2 hours | After the Sprint 5 backend | H-07 for Sprints 4 and 5, on the option pack and the TRACE-01 checker run on P01's real option set; the formative comprehension session (section 5, H-13) | Sprint 6a; the start of Sprint 7; the Skills, Options and Roles chapters' scoring against reviewed values |
+| 3, about 1 hour | Before Sprint 7 closes | H-01 for Sprint 7, the design review, against what session 2 showed | Closing Sprint 7, and so Sprint 8 |
+
 ## Use the supplied Claude Code starter kit
 
 Adopt the concise CLAUDE.md contract and replace every placeholder with the actual setup, fast-check and full-acceptance commands. Add only repository facts that change implementation decisions: typed proposal boundaries, money/time invariants, search coverage, module dependencies and the location of representative code. Do not paste the full specification into startup instructions.
@@ -636,12 +711,13 @@ Link this living checklist to code, tests, demonstrations or scope exclusions. P
 | Specification area | Primary sprints | Required evidence |
 |---|---|---|
 | BND-1 and local overrides | 0, 1, 9 | L0 scope ADR, startup/run modes, no public deployment dependency |
-| REC-1 and DIV-1 | 2 | Sure/unsure flows, grounded slates, diversity/counterfactual eval |
+| REC-1 and DIV-1 | 2 | Sure/unsure flows, grounded slates, diversity/counterfactual eval, span-cited explanations with verified quotations (S2.7) |
 | TAX-1 and AIR-1 | 2, 3, 7 | Pinned imports/mappings, reviewed/null range records, filter semantics |
 | Acquisition and source rights | 0, 3–5 | Source manifest, real corpus, hostile-input and access-policy tests |
+| England option pack (D1) | 3–5, 6a | Pack manifest with dates, review states and rights; the session 1 rights policy and the session 2 review (H-06, H-07); live-versus-reviewed field scores; the TRACE-01 checker on P01's real option set; complete coverage on pack-scale instances |
 | MAP-1, OUT-1 and RDY-1 | 4, 5 | Provisional matrix, inspectable spans, protected gates and apply-now |
-| TIME-1 and FIN-1 | 5, 6, 8 | Independent ledger checks, conservative timing, export agreement |
-| OPT-1 and ROU-1 | 6, 7 | Oracle agreement, full encountered archive, exact/truncated labels |
+| TIME-1 and FIN-1 | 5, 6a, 8 | Independent ledger checks, conservative timing, export agreement |
+| OPT-1 and ROU-1 | 6a, 6b, 7 | Oracle agreement, full encountered archive, exact/truncated labels, measured complete-coverage sizes, truncation shown as the expected case |
 | VIS-1 and VIS-2 | 1, 3, 7, 9 | Approved compositions, coordinated state, keyboard and performance |
 | Evidence lifecycle and chosen plan | 3, 8, 9 | Invalidation, immutable snapshots, replan and offline export |
 | ARC-1 and secret/privacy controls | 0, 1, 9 | Ownership, journals, spend, revocation, recovery, deletion and restore |
@@ -661,7 +737,7 @@ Defer hosted Google sign-in, cloud infrastructure/TLS/secrets and deployed smoke
 
 # 12 Implementation references and risk register
 
-The supplied product specification 1.2 is the domain authority, with the local overrides in this plan. The supplied Claude Code starter kit contributes the concise repository contract, observable failure rules and selective-review workflow. No application code or live-key test has been executed as part of preparing this development plan.
+The product specification 1.3 is the domain authority, with the local overrides in this plan. The supplied Claude Code starter kit contributes the concise repository contract, observable failure rules and selective-review workflow. No application code or live-key test has been executed as part of preparing this development plan.
 
 ## Official documentation checked for this plan
 
@@ -687,3 +763,5 @@ References checked on 27 October 2026. These narrow checks support the integrati
 | Attractive UI hides uncertainty | Make conditional/unknown states part of initial compositions and formative comprehension tests. Block misleading presentation. |
 | Design quality arrives too late | Approve signature compositions in Sprint 0, shell in 1, map in 3 and route view in 7. Fix interaction debt before final integration. |
 | Scope expands into public launch | Maintain the explicit L0 checklist. Schedule hosted/private-beta and M1 work as later milestones with their own acceptance evidence. |
+| Human review becomes the bottleneck | Sprints 0–2 took 16 hours of wall-clock time, so review points that assumed weeks between them now set elapsed time. Hold three fixed review sessions as dispatch preconditions (section 10) and size the remaining work in human review hours (section 6). |
+| The numerical core is unexercised on real, reviewed options before Sprint 9 | Build the England option pack from the required corpus (section 9), run the TRACE-01 checker on P01's real option set and review it at session 2, and hold one formative comprehension session after Sprint 5 (section 5). |
