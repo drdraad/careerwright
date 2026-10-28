@@ -223,4 +223,5 @@ Questions the reviewers should answer explicitly:
 - [ ] Approve, or list the corrections required before reusing these references in the
       remaining map/route implementation (Tasks 8 and 14).
 
-Approval: **not given — requires human (H-02)**. Approver and approval date: not recorded.
+Approval: **given by the product owner on 2026-10-28 (H-02)**, with S0-V01–S0-V08 open. No
+category scores were recorded.

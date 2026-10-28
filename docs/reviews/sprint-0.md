@@ -239,17 +239,17 @@ suite rerun for this design review.
 
 | Item | Owner | Disposition |
 |---|---|---|
-| H-02 design approval of the three compositions | Product owner and design reviewer | Agent critique complete; scoring and approval not run — requires human. Checklist below |
-| S0-V01–S0-V08 composition findings | Web/design owner | Open. Correct the phone conversation blockers before layout reuse; address state clarity and hierarchy before design approval |
-| H-07 domain-reviewer sign-off on the fixture hand check and financial worked examples | Domain reviewer | Not run — requires human |
-| H-09 confirm or reject the Contributor test model (ADR 0003) | Product owner | Not run — requires human. Fallback documented in ADR 0003 |
+| H-02 design approval of the three compositions | Product owner and design reviewer | Approved by the product owner on 2026-10-28, with S0-V01–S0-V08 open; no category scores recorded. Checklist below |
+| S0-V01–S0-V08 composition findings | Web/design owner | Open. Task 6 avoids the phone conversation blockers (S0-V01/S0-V02) and S0-V05, S0-V07 (Roles), S0-V08 in the app; the visual-corrections batch after Task 6 fixes the rest and corrects the compositions |
+| H-07 domain-reviewer sign-off on the fixture hand check and financial worked examples | Domain reviewer | Sprint 0 part confirmed by the product owner on 2026-10-28 (`docs/evidence/fixture-hand-check.md`) |
+| H-09 confirm or reject the Contributor test model (ADR 0003) | Product owner | Confirmed by the product owner on 2026-10-28; ADR 0003 accepted |
 | Real-source corpus, 0 of 33 pages | Tasks 8, 10, 12 | Planned (`corpus/manifest.json`) |
 | Task 1 carry-forward list (roles, typed DB-down failure, M4, M7, bounded stop, Contributor refusal) | Task 3 | ADR 0002 (decisions 2 and 7, "Consequences and follow-ups"), `docs/evidence/sprint-0-spike.md` ("Blocked, not run, or limited") and register DUR-02, DUR-08, ARC1-08, MODEL-02, BND1-14 |
 | amd64 images (manifests only) | Task 16 | Fresh-install qualification |
 | Re-estimate after Sprint 0 (plan "Delivery envelope") | Product owner or controller | Not done by the agent |
 | Phone focused views, tablet layout, keyboard flows, Safari | Tasks 4, 8, 14 and humans (H-04) | Planned |
 
-## Human design-review checklist (H-02, not run)
+## Human design-review checklist (H-02, approved 2026-10-28 without scores)
 
 Use `docs/design/compositions/index.html` and `docs/design/screenshots/`. Record a 1–5
 score per category with concrete defects (plan section 5). The
@@ -267,4 +267,5 @@ are ready for the human review required by R2. Pending scores are not passes.
 | Responsive composition | Not run — requires human | Hidden review entry, covered controls, unknown sheet and buried lists (S0-V01/S0-V02/S0-V06/S0-V07) |
 | Interaction continuity | Not run — requires human | Phone review/input and stale context need correction; keyboard/expansion/focus checks remain |
 
-Approval: **not given — requires human (H-02)**. Approver and approval date: not recorded.
+Approval: **given by the product owner on 2026-10-28 (H-02)**. No category scores were
+recorded. S0-V01–S0-V08 stay open and are assigned (see the table above).

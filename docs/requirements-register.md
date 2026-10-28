@@ -616,7 +616,7 @@ checklist. An agent critique is never a review score.
 | ID | Gate | When | Status | Checklist |
 |---|---|---|---|---|
 | H-01 | Design-review scores (1–5 per category, every category ≥ 4 before release) | Sprints 1, 3, 7, 9 | Sprint 1 approved by the product owner on 2026-10-28, no category scores recorded; Sprints 3, 7, 9 not run — requires human | sprint review packages |
-| H-02 | Approval of the three Sprint 0 signature compositions | Sprint 0 | not run — requires human | `docs/reviews/sprint-0.md` |
+| H-02 | Approval of the three Sprint 0 signature compositions | Sprint 0 | approved by the product owner on 2026-10-28, no category scores recorded; S0-V01–S0-V08 open | `docs/reviews/sprint-0.md` |
 | H-03 | VoiceOver walkthrough on the target Mac | Sprint 9 | not run — requires human | T16 |
 | H-04 | Real Safari checks, including print | Sprints 8, 9 | not run — requires human | T15, T16 |
 | H-05 | Five formative task sessions (4 of 5 complete unaided; any dangerous misunderstanding blocks) | Sprint 9 | not run — requires human | T16 |
