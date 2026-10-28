@@ -10,9 +10,9 @@ the DBOS step retries only transient provider failures (ADR 0002 decision 7). A 
 cut off at its token limit ends the run at once (`TruncationGuard`): never repaired.
 
 The reply streams (spec section 4: stream natural conversation, commit only after complete
-validation). `ReplyStream` reads the `reply` text out of the JSON as it arrives and hands
-each longer version to the activity's partial-reply sink; the proposals are never streamed,
-and nothing streamed is a proposal. A repair request streams its reply afresh.
+validation). `ReplyStream` reads the `reply` text out of the JSON as it arrives and hands it
+to the activity's partial-reply sink, saying when it has ended; the proposals are never
+streamed, and nothing streamed is a proposal. A repair request streams its reply afresh.
 """
 
 import asyncio
@@ -56,35 +56,48 @@ from nessa.profile.interview import (
 FIXTURE_STREAM_CHUNK = 32  # characters per delta the fixture interviewer streams
 
 
+def _reply_so_far(text: str) -> tuple[str | None, bool]:
+    """The `reply` in a prefix of the output JSON, and whether its string has closed."""
+    try:
+        partial = pydantic_core.from_json(text, allow_partial="trailing-strings")
+        closed = pydantic_core.from_json(text, allow_partial=True)  # no unfinished strings
+    except ValueError:
+        return None, False  # not yet a JSON prefix that parses
+    reply = partial.get("reply") if isinstance(partial, dict) else None
+    if not isinstance(reply, str) or not reply:
+        return None, False
+    return reply, isinstance(closed, dict) and "reply" in closed
+
+
 class ReplyStream(AbstractCapability[Any]):
-    """Sends the reply so far to `sink` each time it grows, from the streamed JSON text."""
+    """Hands the reply so far to `sink` on every text event of the streamed JSON, so the
+    sink can write the newest text when it is due, and once more with `complete=True` the
+    moment the reply's string closes (the proposals may stream for a while after it)."""
 
     def __init__(self, sink: PartialSink) -> None:
         self._sink = sink
         self._text = ""
-        self._reply = ""
+        self._ended = False
 
     async def before_model_request(
         self, ctx: RunContext[Any], request_context: ModelRequestContext
     ) -> ModelRequestContext:
-        self._text, self._reply = "", ""  # a repair request answers with a new reply
+        self._text, self._ended = "", False  # a repair request answers with a new reply
         return request_context
 
     async def on_event(self, ctx: RunContext[Any], *, event: AgentStreamEvent) -> None:
+        if self._ended:
+            return
         if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
             self._text = event.part.content
         elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
             self._text += event.delta.content_delta
         else:
             return
-        try:
-            partial = pydantic_core.from_json(self._text, allow_partial="trailing-strings")
-        except ValueError:
-            return  # not yet a JSON prefix that parses
-        reply = partial.get("reply") if isinstance(partial, dict) else None
-        if isinstance(reply, str) and reply and reply != self._reply:
-            self._reply = reply
-            self._sink(reply)
+        reply, ended = _reply_so_far(self._text)
+        if reply is not None:
+            self._ended = ended
+            self._sink(reply, complete=ended)
 
 
 def run_interview_turn(

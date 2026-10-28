@@ -87,12 +87,13 @@ def record_partial(
 
 
 def end_partial(tx: Tx, keyring: Keyring, run: Run, latest: str | None) -> None:
-    """Worker: the attempt or run failed, so the streamed reply will not complete. `latest`
-    is the reply so far, if the attempt streamed any (it may be newer than the last write)."""
+    """Worker: the attempt or run failed, so this streamed reply has stopped. `latest` is
+    the reply so far, if the attempt streamed any (it may be newer than the last write).
+    Whether it is final is the run's state (`partial_reply`)."""
     if latest is not None:
-        record_partial(tx, keyring, run, latest, PartialCompleteness.INCOMPLETE)
+        record_partial(tx, keyring, run, latest, PartialCompleteness.STOPPED)
         return
-    seq = run_store.mark_partial_incomplete(tx, run.run_id)
+    seq = run_store.mark_partial_stopped(tx, run.run_id)
     if seq is not None:
         store.append_event(
             tx,
@@ -106,17 +107,28 @@ def end_partial(tx: Tx, keyring: Keyring, run: Run, latest: str | None) -> None:
 _FAILED = frozenset({WorkState.FAILED, WorkState.PROVIDER_UNAVAILABLE, WorkState.CANCELLED})
 
 
+_SUPERSEDED = PartialReply(None, PartialCompleteness.SUPERSEDED, None, None)
+
+
 def partial_reply(tx: Tx, keyring: Keyring, run: Run) -> PartialReply:
-    """The run's streamed reply for its owner: never validated and never a result. Once the
-    run is complete only its validated output counts, so no partial text is returned."""
+    """The run's streamed reply for its owner: never validated and never a result. Once a
+    validated output is stored only it counts, so no partial text is returned.
+
+    The run, the partial and the output are read by separate statements. The worker deletes
+    the partial in the transaction that stores the output, and publishes the run complete
+    later, so a partial found missing is checked against the output last: a stored output
+    answers `superseded`, never `none`."""
     if run.status is WorkState.COMPLETE:
-        return PartialReply(None, PartialCompleteness.SUPERSEDED, None, None)
+        return _SUPERSEDED
     found = run_store.partial(tx, run.run_id)
     if found is None:
+        if run_store.accepted_output(tx, run.run_id) is not None:
+            return _SUPERSEDED
         return PartialReply(None, PartialCompleteness.NONE, None, None)
-    seq, completeness, sealed, updated_at = found
-    if run.status in _FAILED:  # ended before its worker could mark it (a crash)
-        completeness = PartialCompleteness.INCOMPLETE
+    seq, stored, sealed, updated_at = found
+    # Final once the run has failed, whatever the worker last recorded (even after a crash);
+    # otherwise streaming, or stopped while the run goes on.
+    completeness = PartialCompleteness.INCOMPLETE if run.status in _FAILED else stored
     text = keyring.open(sealed, partial_context(run.workspace_id, run.run_id)).decode()
     return PartialReply(seq, completeness, text, updated_at)
 

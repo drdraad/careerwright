@@ -1,8 +1,9 @@
 # ADR 0006: The ESCO taxonomy, English cities and the InterviewTurn contract
 
-- Status: Accepted (Task 5, Sprint 2: S2.1-S2.2). Decision 4's region assignment,
-  decision 6's hard-constraint set and decision 8's basis for an answer with no value are
-  **provisional, need product owner confirmation** (ruling R6).
+- Status: Accepted (Task 5, Sprint 2: S2.1-S2.2). Decision 4's region assignment and its
+  refusal of plain "Newcastle", decision 5's concept-key folding, decision 6's
+  hard-constraint set and decision 8's basis for an answer with no value are
+  **provisional, need product owner confirmation** (ruling R6; checklist H-11 below).
 - Date: 2026-10-28
 - Requirements: TAX1-01, TAX1-04, DIV1-01, DIV1-03, REC1-04, BND1-04, PROF-01..07,
   MODEL-01..04, STATE-08, TEST1-10; spec sections 3-5, 16 and 18; ADR 0002, ADR 0004
@@ -82,7 +83,8 @@ decision 7 requires the first run kind that reads the profile to pin the version
    A few unambiguous aliases are recorded (Hull, Newcastle upon Tyne, Brighton,
    Stoke-on-Trent, Southend, St. Albans, City of London, City of Westminster); no alias names
    two cities. Plain "Newcastle" is not an alias: it also names Newcastle-under-Lyme, which
-   is not on the list, so it is refused rather than guessed (fix round 1).
+   is not on the list, so it is refused rather than guessed (fix round 1). **Provisional,
+   needs product owner confirmation (R6):** this refusal, like the alias list itself.
    London and Westminster stay separate, as on the official list. A city is geography only:
    it implies no residence or right to work (BND1-04). **Provisional:** the ONS region of
    each city was assigned by the implementing agent; a reviewer should confirm it.
@@ -94,11 +96,12 @@ decision 7 requires the first run kind that reads the profile to pin the version
    with the occupations that hold it. "As a concept" is `nessa.concept_key`, one SQL
    function used by the API and by the database trigger, which derives it from the title
    itself: case, punctuation and hyphens folded, and a simple English plural folded per word
-   ("ICT help-desk agent", "Data analyst." and "data analysts" are refused; fix round 1). A
-   title that only resembles a label ("senior data analyst") is accepted: offering the
-   full-text matches first is discovery's work (DIV1-05, T6). Titles a model suggests are
-   not accepted here: they stay search hypotheses until corroborated (DIV1-04, the discovery
-   task).
+   ("ICT help-desk agent", "Data analyst." and "data analysts" are refused; fix round 1).
+   **Provisional, needs product owner confirmation (R6):** the folding heuristic, which
+   could refuse a title a person expects to be accepted. A title that only resembles a
+   label ("senior data analyst") is accepted: offering the full-text matches first is
+   discovery's work (DIV1-05, T6). Titles a model suggests are not accepted here: they stay
+   search hypotheses until corroborated (DIV1-04, the discovery task).
 
 6. **Profile schema version 2.** Three separate fields: `enjoyed_tasks` (interest),
    `confident_tasks` (what the person believes they can do) and `evidenced_tasks` (what they
@@ -151,7 +154,13 @@ decision 7 requires the first run kind that reads the profile to pin the version
    usage) is `unknown` and keeps its whole reservation, never part-reconciled (MODEL-08).
    The default run limit is $0.15 so that all three of the DBOS step's attempts fit on the
    Standard model: a Meta outage ends `provider_unavailable`, never `budget_exceeded` (fix
-   round 1). An attempt that makes no provider call records a known cost of 0.
+   round 1). Migration 0009 moves every workspace still on the old built-in $0.10 default,
+   never changed by the person (`version` 1), to $0.15; a limit the person set is kept
+   (fix round 2). Two cases can still report an outage as over budget, because the limit
+   is the person's to set and the reservation must hold: a run limit the person set below
+   $0.147, and a crash during a call followed by an outage (the interrupted attempt keeps
+   its reservation, so three more do not fit). An attempt that makes no provider call
+   records a known cost of 0.
    A response cut off at its token limit is `output_truncated` from its typed finish reason
    the moment it arrives (`TruncationGuard`, on every task's agent): never parsed, repaired
    or stored, so it costs one request, and its reported usage is still booked. A
@@ -198,32 +207,45 @@ decision 7 requires the first run kind that reads the profile to pin the version
     responsiveness, commit only after complete validation.
     - *What streams.* Only the natural-language `reply`, never the proposals. The agent
       streams its request (`ReplyStream`, an event capability), reads `reply` out of the
-      partial JSON as it arrives (`pydantic_core.from_json`, trailing strings allowed) and
-      hands each longer version to the activity. A repair request streams a new reply. The
-      fixture interviewer streams too, in fixed pieces, so demo turns and contract tests
-      exercise the same path.
+      partial JSON on every text event (`pydantic_core.from_json`, trailing strings
+      allowed) and hands it to the activity, saying when the reply's string has closed. A
+      repair request streams a new reply. The fixture interviewer streams too, in fixed
+      pieces, so demo turns and contract tests exercise the same path.
     - *Where it goes.* The activity seals the reply so far into `run_partials` (one row per
-      run, the run as associated data), at most once per 0.25 s, and announces each write
-      with a `run.partial_updated` event that carries the run ID and the write's sequence
-      only: the event stream stays identifiers-only. The worker may write only its own run's
-      row, and only while the requester may act; the API may only read it, for the
-      workspace's owner, through `GET .../interview/turns/{id}/reply`. `make reseal` covers
-      it.
+      run, the run as associated data) through `PartialWriter`: the first piece at once,
+      then the newest text at most once per 0.25 s on any later stream event (so the end
+      of a burst is not dropped), and the whole reply the moment it closes, whatever the
+      interval: the store holds the complete reply while the proposals are still being
+      generated (fix round 2). Each write is announced by a `run.partial_updated` event
+      that carries the run ID and the write's sequence only: the event stream stays
+      identifiers-only. The worker may write only its own run's row, and only while the
+      requester may act; the API may only read it, for the workspace's owner, through
+      `GET .../interview/turns/{id}/reply`. `make reseal` covers it.
     - *Superseded, never mistaken for the result.* The row is deleted in the transaction
-      that stores the validated output; from then on the read path answers `superseded`
-      with no text, and the proposal's reply is authoritative. On a failed attempt or run
-      the row is marked `incomplete` with the latest text received (a crash is marked when
-      the run is published). The read path reports completeness (`none`, `streaming`,
-      `incomplete`, `superseded`) and `updated_at` (spec section 18: partial results carry
-      completeness and freshness). Partial text is never validated, never enters a later
-      turn's context, and never reaches the profile, which changes only through a decision
-      on a validated proposal (PROF-03).
+      that stores the validated output. From then on the read path answers `superseded`
+      with no text, also in the moment before the run is published complete (a missing
+      partial is checked against the stored output last, so a poll never answers `none`
+      for a run that has its output). On a failed attempt the row is marked `stopped` with
+      the latest text received (a crash is marked when the run is published), in a
+      savepoint that can never abort the attempt's settlement (for example when access is
+      revoked mid-call and the worker may no longer write the row). The read path reports
+      completeness and `updated_at` (spec section 18: partial results carry completeness
+      and freshness): `none`, `streaming`, `stopped` (this attempt's reply stopped, but the
+      run goes on and may stream again or still be superseded: not final), `incomplete`
+      (final: the run ended without a validated output) and `superseded`. Partial text is
+      never validated, never enters a later turn's context, and never reaches the profile,
+      which changes only through a decision on a validated proposal (PROF-03). Leak scans
+      cover it: the test fake's reply starts with the output sentinel, the scan finds it
+      nowhere while it is sealed, and finds it in `run_partials` when stored unsealed.
     - *Best effort.* Streaming is for responsiveness only: a partial write that fails stops
       that attempt's streaming and is logged by error class; it never fails or retries the
       paid call.
-    - *Cost.* A streamed request that fails leaves a response with no usage in the
-      history; only responses that reported usage count, so such an attempt stays
-      `unknown` (decision 9).
+    - *Cost.* A streamed request that fails leaves a response in the history: with no
+      usage if it failed at once, or `interrupted` with the usage counted so far if the
+      stream broke part-way. Neither counts, so such an attempt stays `unknown` with its
+      whole reservation (decision 9; MODEL-08), never reconciled at a partial sum.
+    - *Clients* (T6): a `run.partial_updated` event refreshes only that turn's reply query,
+      never the workspace's other data.
     - Rendering the stream (the You chapter's conversation) is Task 6's part of MODEL-03.
 
 14. **Live qualification through the existing command.** `make live-smoke INTERVIEW=1` runs
@@ -256,8 +278,9 @@ decision 7 requires the first run kind that reads the profile to pin the version
   `ALREADY_DECIDED`; new failure classes: `model_refused`, `output_truncated`; new event
   kind `run.partial_updated` and read path `GET .../interview/turns/{id}/reply` (decision
   13); migrations 0006 (a known zero cost for attempts with no call), 0007
-  (`run_partials`) and 0008 (the manifest's `adaptation`, `nessa.concept_key` and the
-  trigger that uses it).
+  (`run_partials`), 0008 (the manifest's `adaptation`, `nessa.concept_key` and the trigger
+  that uses it) and 0009 (a partial records `stopped`, not `incomplete`; untouched $0.10
+  run limits move to $0.15).
 - A city outside the list, which Sprint 1 accepted as free text, is now refused on save.
   Stored version 1 documents still read; a person re-saving one with an unlisted city must
   pick a listed city.

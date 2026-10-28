@@ -18,8 +18,9 @@ that run:
 
 While a task's reply streams, the reply so far is sealed into the run's partial store
 (`run_partials`; its status events carry the run ID and a sequence only). The validated
-output supersedes it in the transaction that stores the output; a failure marks it
-incomplete. A partial reply is never validated, never a result, and never applied.
+output supersedes it in the transaction that stores the output; a failed attempt marks it
+stopped, in a savepoint that can never abort the attempt's settlement. A partial reply is
+never validated, never a result, and never applied.
 
 Its own database work is retried through an outage for `store_retry_budget_s`, keeping a
 paid call's result in memory; past that budget the run fails `app_store_unavailable`,
@@ -40,7 +41,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import BaseModel, SecretStr
 from pydantic_ai import Agent, NativeOutput, RunContext, capture_run_messages
@@ -49,7 +50,7 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse
 from pydantic_ai.models import Model, ModelRequestContext
 from pydantic_ai.usage import UsageLimits
 
-from nessa.db import Engine, StoreUnavailableError, Tx, run_transaction
+from nessa.db import Engine, StoreUnavailableError, Tx, in_savepoint, run_transaction
 from nessa.identity import connection_check, credential_store, run_store, store
 from nessa.identity.connection_check import ConnectionCheckResult
 from nessa.identity.credentials import credential_context
@@ -72,8 +73,15 @@ from nessa.vocabulary import DataMode, WorkState
 Outcome = dict[str, str]
 # A model for a model ID; the key is None for the fixture interviewer, which needs none.
 ModelBuilder = Callable[[str, SecretStr | None], Model]
+
+
 # Where a task sends the natural-language reply so far while the output streams.
-PartialSink = Callable[[str], None]
+class PartialSink(Protocol):
+    """Takes the reply so far each time the stream moves; `complete` once the reply ends."""
+
+    def __call__(self, text: str, *, complete: bool) -> None: ...
+
+
 # How long the activity keeps retrying its own database work (the attempt row, the result)
 # through an outage before the run fails `app_store_unavailable`.
 STORE_RETRY_BUDGET_S = 60.0
@@ -139,41 +147,61 @@ class _CallResult:
     partial: str | None  # the reply so far, if the task streamed one
 
 
-class _PartialWriter:
-    """The run's streamed reply while it arrives: sealed, written at most once per
-    `PARTIAL_WRITE_INTERVAL_S`, each write announced by an event with IDs only.
+class PartialWriter:
+    """A streamed reply's writes: the first piece at once, then the newest text at most once
+    per `interval_s` (on any later stream event, so the end of a burst is not dropped), and
+    the whole reply as soon as it ends, whatever the interval.
 
     Streaming is for responsiveness only. A write that fails stops this attempt's streaming
     and never fails or retries the call (a retry would pay again); settling the attempt
-    records the latest reply as superseded or incomplete either way."""
+    records the latest reply as superseded or stopped either way."""
 
-    def __init__(self, rt: ActivityRuntime, run: Run) -> None:
-        self._rt = rt
-        self._run = run
+    def __init__(
+        self,
+        write: Callable[[str], None],
+        *,
+        clock: Callable[[], float] = time.monotonic,
+        interval_s: float = PARTIAL_WRITE_INTERVAL_S,
+    ) -> None:
+        self._write = write
+        self._clock = clock
+        self._interval_s = interval_s
+        self._written: str | None = None
         self._written_at: float | None = None
         self._stopped = False
         self.latest: str | None = None
 
-    def __call__(self, text: str) -> None:
+    def __call__(self, text: str, *, complete: bool) -> None:
         self.latest = text
-        now = time.monotonic()
-        if self._stopped or (
-            self._written_at is not None and now - self._written_at < PARTIAL_WRITE_INTERVAL_S
-        ):
+        if self._stopped or text == self._written:
             return
-        self._written_at = now
+        now = self._clock()
+        due = self._written_at is None or now - self._written_at >= self._interval_s
+        if not (complete or due):
+            return
+        self._written, self._written_at = text, now
         try:
             self._write(text)
         except Exception as error:
             self._stopped = True
-            _log.warning(
-                "partial reply not written",
-                extra={"run_id": str(self._run.run_id), "error_class": type(error).__name__},
-            )
+            _log.warning("partial reply not written", extra={"error_class": type(error).__name__})
 
-    def _write(self, text: str) -> None:
-        with run_transaction(self._rt.engine, self._run.run_id) as tx:
-            record_partial(tx, self._rt.keyring, self._run, text, PartialCompleteness.STREAMING)
+
+def _write_partial(rt: ActivityRuntime, run: Run, text: str) -> None:
+    with run_transaction(rt.engine, run.run_id) as tx:
+        record_partial(tx, rt.keyring, run, text, PartialCompleteness.STREAMING)
+
+
+def _end_partial(tx: Tx, keyring: Keyring, run: Run, latest: str | None) -> None:
+    """Mark the run's partial stopped without ever aborting the transaction around it (the
+    attempt's settlement): when the worker may no longer write it (access revoked mid-call),
+    or anything else refuses the write, the savepoint is rolled back and the failure logged."""
+    refused = in_savepoint(tx, lambda: end_partial(tx, keyring, run, latest))
+    if refused is not None:
+        _log.warning(
+            "partial reply not marked stopped",
+            extra={"run_id": str(run.run_id), "error_class": refused},
+        )
 
 
 def succeeded(output_id: uuid.UUID) -> Outcome:
@@ -338,9 +366,15 @@ def _prepare(rt: ActivityRuntime, run_id: uuid.UUID) -> _Ready | ActivityEnd:
 
 
 def _measured(messages: list[ModelMessage]) -> list[ModelResponse]:
-    """The responses that reported usage. A failed streamed request still leaves a response
-    in the history, with no parts and no usage: its cost is unknown, never zero."""
-    return [m for m in messages if isinstance(m, ModelResponse) and m.usage.has_values()]
+    """The complete responses that reported usage. A streamed request that fails still
+    leaves a response in the history: with no usage if it failed at once, or `interrupted`
+    with the usage counted so far if the stream broke part-way. Either may have been billed
+    in full, so neither counts: the attempt's cost is unknown, never a partial sum."""
+    return [
+        m
+        for m in messages
+        if isinstance(m, ModelResponse) and m.state != "interrupted" and m.usage.has_values()
+    ]
 
 
 def _usage(messages: list[ModelMessage]) -> tuple[Usage | None, int | None, str | None]:
@@ -380,7 +414,7 @@ def _open(rt: ActivityRuntime, ready: _Ready) -> tuple[SecretStr | None, bytes |
 
 def _call(rt: ActivityRuntime, ready: _Ready) -> _CallResult:
     task = rt.tasks[ready.run.kind]
-    partial = _PartialWriter(rt, ready.run)
+    partial = PartialWriter(lambda text: _write_partial(rt, ready.run, text))
     with capture_run_messages() as messages:
         try:
             api_key, opened = _open(rt, ready)
@@ -432,7 +466,7 @@ def _settle(rt: ActivityRuntime, ready: _Ready, call: _CallResult) -> ActivityEn
         if call.output is None:
             classified = call.classified or terminal(FailureClass.UNKNOWN_FAILURE)
             end = _ended(classified)
-            end_partial(tx, rt.keyring, ready.run, call.partial)  # never a result
+            _end_partial(tx, rt.keyring, ready.run, call.partial)  # never a result
         else:
             output_id = uuid.uuid4()
             body = call.output.model_dump_json().encode()
@@ -508,7 +542,7 @@ def publish(rt: ActivityRuntime, run_id: uuid.UUID, outcome: Outcome) -> None:
         # unknown charge, never left looking in flight after the run has ended.
         run_store.interrupt_unfinished_attempts(tx, run_id)
         if status is not WorkState.COMPLETE:  # a crash can leave a partial still streaming
-            end_partial(tx, rt.keyring, run, None)
+            _end_partial(tx, rt.keyring, run, None)
         output = outcome.get("output_id")
         if run_store.finish_run(
             tx,

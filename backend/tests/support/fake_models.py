@@ -9,6 +9,7 @@ invalid output once (repaired) or always, a complete but schema-invalid object, 
 truncation, a repair request that fails without usage, and a stream cut off part-way.
 """
 
+import asyncio
 import hashlib
 import itertools
 import json
@@ -30,6 +31,8 @@ from pydantic_ai.usage import RequestUsage
 FAKE_MODEL_NAME = "fake-function-model"
 CONTEXT_MARKER = "Context (JSON):\n"
 STREAM_CHUNK = 24  # characters per streamed delta
+PROPOSALS_KEY = '"proposed_updates"'
+PAUSE_S = 4.0  # PAUSE_AFTER_REPLY: long enough for a test to read the stored partial
 
 
 class FakeFailure(StrEnum):
@@ -46,6 +49,7 @@ class FakeFailure(StrEnum):
     REFUSAL = "refusal"  # the provider's content filter answers with a refusal
     TRUNCATED = "truncated"  # the output stops at its token limit, mid-JSON
     CUT_MID_STREAM = "cut_mid_stream"  # the stream breaks after part of the reply
+    PAUSE_AFTER_REPLY = "pause_after_reply"  # the reply streams, then a pause, then the rest
 
 
 def key_fingerprint(api_key: SecretStr | None) -> str:
@@ -67,12 +71,15 @@ def _context(messages: list[ModelMessage]) -> dict[str, object] | None:
 def interview_answer(
     context: dict[str, object], sentinel: str, *, valid: bool
 ) -> dict[str, object]:
-    """A proposal for the current message: a stated city and an inferred spending limit."""
+    """A proposal for the current message: a stated city and an inferred spending limit.
+
+    The reply starts with `sentinel`, so even the first streamed pieces of it carry the
+    sentinel into the partial store, where leak scans must find it sealed."""
     current = str(context["current_message"])
     return {
         "reply": (
-            "Thanks for telling me. I have noted where you could work and roughly what you "
-            f"could spend, for you to review. {sentinel}"
+            f"{sentinel} Thanks for telling me. I have noted where you could work and roughly "
+            "what you could spend, for you to review."
         ).strip(),
         "proposed_updates": [
             {
@@ -107,6 +114,7 @@ class _Ending:
     finish_reason: Any = None
     provider_details: dict[str, Any] | None = None
     break_after: int | None = None  # deltas sent before the connection breaks
+    pause_after_reply: bool = False  # PAUSE_S between the reply and the proposals
 
 
 class _StreamingFunctionModel(FunctionModel):
@@ -123,11 +131,18 @@ class _StreamingFunctionModel(FunctionModel):
         self._ending.finish_reason = response.finish_reason
         self._ending.provider_details = response.provider_details
         text = "".join(p.content for p in response.parts if isinstance(p, TextPart))
-        chunks = [text[i : i + STREAM_CHUNK] for i in range(0, len(text), STREAM_CHUNK)] or [""]
-        for index, chunk in enumerate(chunks):
-            if self._ending.break_after is not None and index == self._ending.break_after:
-                raise ModelConnectionError(FAKE_MODEL_NAME, "stream broken", phase="read")
-            yield chunk
+        split = text.find(PROPOSALS_KEY) if self._ending.pause_after_reply else -1
+        parts = [text[:split], text[split:]] if split > 0 else [text]
+        index = 0
+        for number, part in enumerate(parts):
+            if number:
+                await asyncio.sleep(PAUSE_S)  # the model is still working on the proposals
+            chunks = [part[i : i + STREAM_CHUNK] for i in range(0, len(part), STREAM_CHUNK)]
+            for chunk in chunks or [""]:
+                if self._ending.break_after is not None and index == self._ending.break_after:
+                    raise ModelConnectionError(FAKE_MODEL_NAME, "stream broken", phase="read")
+                index += 1
+                yield chunk
 
     @asynccontextmanager
     async def request_stream(self, *args: Any, **kwargs: Any) -> AsyncIterator[StreamedResponse]:
@@ -159,6 +174,7 @@ def fake_model_builder(
                     log.write(f"call {call}\n")
             time.sleep(delay_s)
             ending.break_after = None
+            ending.pause_after_reply = failure is FakeFailure.PAUSE_AFTER_REPLY
             if failure is FakeFailure.AUTH_ECHO:
                 body = {"code": "invalid_api_key", "message": f"Incorrect API key {echoed}..."}
                 raise ModelHTTPError(401, model_id, body)

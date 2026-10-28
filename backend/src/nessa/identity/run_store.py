@@ -162,12 +162,12 @@ def upsert_partial(tx: Tx, run: Run, sealed: SealedValue, completeness: PartialC
     )
 
 
-def mark_partial_incomplete(tx: Tx, run_id: uuid.UUID) -> int | None:
-    """Worker: a streaming partial will not complete; its new sequence, or None if the run
-    has no streaming partial."""
+def mark_partial_stopped(tx: Tx, run_id: uuid.UUID) -> int | None:
+    """Worker: a streaming partial has stopped; its new sequence, or None if the run has no
+    streaming partial."""
     seq = tx.execute(
         sa.text(
-            "UPDATE nessa.run_partials SET seq = seq + 1, completeness = 'incomplete', "
+            "UPDATE nessa.run_partials SET seq = seq + 1, completeness = 'stopped', "
             "updated_at = clock_timestamp() WHERE run_id = :id AND completeness = 'streaming' "
             "RETURNING seq"
         ),

@@ -87,8 +87,11 @@ class PartialCompleteness(StrEnum):
 
     NONE = "none"  # no reply text has arrived
     STREAMING = "streaming"  # the reply so far; more may follow
-    INCOMPLETE = "incomplete"  # it stopped and will not complete (that attempt or run failed)
-    SUPERSEDED = "superseded"  # the run completed: its validated output is authoritative
+    # This attempt's reply stopped, but the run goes on: another attempt may stream a new
+    # reply, and a validated output may still supersede it. Not final.
+    STOPPED = "stopped"
+    INCOMPLETE = "incomplete"  # final: the run ended without a validated output
+    SUPERSEDED = "superseded"  # a validated output is stored: it is authoritative
 
 
 @dataclass(frozen=True)

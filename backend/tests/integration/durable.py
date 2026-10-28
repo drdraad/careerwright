@@ -11,7 +11,7 @@ from typing import Any
 import httpx2 as httpx
 
 from tests.support.client import ApiClient, profile_with
-from tests.support.infra import Infra
+from tests.support.infra import Infra, create_emulator_user, sign_in
 from tests.support.workers import Worker, start_worker, wait_for
 from tools.leak_scan import Finding, Needle, scan
 
@@ -165,6 +165,19 @@ class Scenario:
             *scan([*app, *dbos, *logs], [*keys, output]),
             *scan([*dbos, *logs], owned),
         ]
+
+
+def fresh_actor(api: ApiClient, infra: Infra) -> tuple[str, str]:
+    """A new invited person (email, ID token), whose access a test may revoke."""
+    uid = f"actor-{uuid.uuid4().hex[:8]}"
+    email = f"{uid}@nessa.test"
+    create_emulator_user(uid, email, "password-123456")
+    infra.query(
+        "INSERT INTO nessa.actors (actor_id, email, display_name, access) "
+        "VALUES (%s, %s, 'Fresh', 'active')",
+        (uuid.uuid4(), email),
+    )
+    return email, sign_in(email, "password-123456")
 
 
 def make_scenario(

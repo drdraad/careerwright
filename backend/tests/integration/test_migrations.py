@@ -186,6 +186,48 @@ def add_edited_workspace(tx: sa.Connection) -> uuid.UUID:
     return workspace.workspace_id
 
 
+@pytest.mark.req("MODEL-08", "MODEL-04")
+def test_an_untouched_old_default_run_limit_upgrades_to_the_new_default(infra: Infra) -> None:
+    database = f"nessa_limits_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    engine = migrator_engine(infra, database)
+    try:
+        migrate_app(engine, "0008")
+        seed(engine, infra.ops_settings(database))
+        with engine.begin() as tx:
+            rows = {
+                "untouched": (100_000_000, 1),  # the old built-in default, never edited
+                "chosen": (100_000_000, 2),  # the person set $0.10 themselves
+                "lower": (50_000_000, 1),  # created under another configured default
+            }
+            workspaces = {name: add_edited_workspace(tx) for name in rows}
+            for name, (run_limit, version) in rows.items():
+                tx.exec_driver_sql(
+                    "INSERT INTO nessa.spend_limits (workspace_id, run_limit_nano_usd, "
+                    "period_limit_nano_usd, version) VALUES (%(ws)s, %(run)s, 1000000000, %(v)s)",
+                    {"ws": workspaces[name], "run": run_limit, "v": version},
+                )
+
+        migrate_app(engine)
+    finally:
+        engine.dispose()
+
+    limits = {
+        name: infra.query(
+            "SELECT run_limit_nano_usd AS run, period_limit_nano_usd AS period, version "
+            "FROM nessa.spend_limits WHERE workspace_id = %s",
+            (workspace,),
+            database=database,
+        )[0]
+        for name, workspace in workspaces.items()
+    }
+    assert limits == {
+        "untouched": {"run": 150_000_000, "period": 1_000_000_000, "version": 1},
+        "chosen": {"run": 100_000_000, "period": 1_000_000_000, "version": 2},
+        "lower": {"run": 50_000_000, "period": 1_000_000_000, "version": 1},
+    }
+
+
 @pytest.mark.req("MODEL-08")
 def test_attempts_that_made_no_call_upgrade_to_a_known_zero_cost(infra: Infra) -> None:
     database = f"nessa_zero_cost_{uuid.uuid4().hex[:8]}"

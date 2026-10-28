@@ -18,6 +18,7 @@ from nessa.db import create_engine, url_with_password
 from nessa.identity import activity, run_store, worker
 from nessa.identity.activity import ActivityRuntime
 from nessa.identity.keyring import load_keyring
+from nessa.identity.records import Run
 from nessa.logs import configure_logging
 from nessa.worker import TASKS, model_builder
 from tests.support.fake_models import FakeFailure, fake_model_builder
@@ -40,13 +41,13 @@ def install_crash_point(point: str) -> None:
     elif point == "after_dispatch_before_mark":
         run_store.mark_dispatched = lambda tx, outbox_id: _kill()
     elif point == "after_first_partial":
-        write = activity._PartialWriter._write
+        write = activity._write_partial
 
-        def write_then_die(self: activity._PartialWriter, text: str) -> None:
-            write(self, text)
+        def write_then_die(rt: ActivityRuntime, run: Run, text: str) -> None:
+            write(rt, run, text)
             _kill()
 
-        activity._PartialWriter._write = write_then_die  # type: ignore[method-assign]
+        activity._write_partial = write_then_die
     elif point:
         raise ValueError(f"unknown crash point {point!r}")
 

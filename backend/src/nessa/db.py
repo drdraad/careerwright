@@ -7,7 +7,7 @@ a pooled connection never carries one request's identity into the next.
 """
 
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
 import sqlalchemy as sa
@@ -86,6 +86,21 @@ def system_transaction(engine: sa.Engine) -> Iterator[Tx]:
     """No actor or run: only what a role may see without one (the outbox, definer functions)."""
     with _transaction(engine, None, None) as conn:
         yield conn
+
+
+def in_savepoint(tx: Tx, operation: Callable[[], None]) -> str | None:
+    """Run `operation` in a savepoint, so a refusal (a row-level security check, a
+    constraint) rolls back that work only and the transaction goes on. Returns None, or the
+    refusing error's class name (its message can quote SQL parameters, so it is dropped).
+    A lost connection is not caught: the transaction cannot go on."""
+    try:
+        with tx.begin_nested():
+            operation()
+    except (exc.OperationalError, exc.InterfaceError):
+        raise
+    except exc.DBAPIError as error:
+        return type(error.orig).__name__
+    return None
 
 
 def ping(engine: sa.Engine) -> None:

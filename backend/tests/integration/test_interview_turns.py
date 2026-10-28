@@ -21,10 +21,11 @@ from psycopg import errors
 from nessa.api.app import create_app
 from nessa.api.deps import ApiDependencies
 from nessa.config import RuntimeMode
-from tests.integration.durable import Scenario, make_scenario
+from tests.integration.durable import Scenario, fresh_actor, make_scenario
 from tests.support.client import ApiClient, profile_with
 from tests.support.fake_models import interview_answer
 from tests.support.infra import API_BASE, Infra
+from tests.support.workers import wait_for
 
 pytestmark = pytest.mark.integration
 
@@ -70,7 +71,7 @@ def test_a_turn_runs_durably_and_its_proposals_cite_the_message(scenario: Scenar
     assert (turn["profile_version"], turn["decision"]) == (1, None)
     proposal = turn["proposal"]
     assert (proposal["origin"], proposal["profile_version"]) == ("model", 1)
-    assert proposal["reply"].endswith(scenario.output_sentinel)
+    assert proposal["reply"].startswith(scenario.output_sentinel)
     changes = {c["field"]: c for c in proposal["changes"]}
     assert changes["cities"]["value"] == ["Leeds"]
     assert changes["cities"]["basis"] == "stated"
@@ -289,7 +290,101 @@ def test_a_reply_cut_off_mid_stream_ends_observably_with_the_partial_marked_inco
     refused = scenario.decide(turn["turn_id"], {"expected_version": 1, "accept": ["c1"]})
     assert (refused.status_code, refused.json()["error"]["code"]) == (409, "PROPOSAL_NOT_AVAILABLE")
     assert scenario.profile() == before  # nothing partial ever commits
+    # A call cut off part-way may have been billed in full: never reconciled at the usage
+    # counted so far, but unknown, with the whole reservation kept.
+    attempts = scenario.attempts(turn["turn_id"])
+    assert [(a["spend_state"], a["cost_nano_usd"]) for a in attempts] == [("unknown", None)] * 3
+    assert all(a["reserved_nano_usd"] == 3_500_000 for a in attempts)
+    # The stored partial holds the output sentinel (the fake's reply starts with it), and the
+    # scan finds nothing: it is sealed. Stored unsealed, the same scan finds it.
+    assert scenario.output_sentinel in partial["text"]
     assert scenario.leaks() == []
+    [row] = scenario.infra.query(
+        "SELECT ciphertext FROM nessa.run_partials WHERE run_id = %s", (turn["turn_id"],)
+    )
+    unsealed = "UPDATE nessa.run_partials SET ciphertext = %s WHERE run_id = %s"
+    scenario.infra.query(unsealed, (partial["text"].encode(), turn["turn_id"]))
+    try:
+        assert ("nessa.run_partials", "model output") in {
+            (f.location, f.needle_label) for f in scenario.leaks()
+        }
+    finally:
+        scenario.infra.query(unsealed, (row["ciphertext"], turn["turn_id"]))
+
+
+@pytest.mark.req("MODEL-03")
+def test_the_whole_reply_is_stored_as_soon_as_it_ends_while_the_proposals_are_still_coming(
+    scenario: Scenario,
+) -> None:
+    turn_id = scenario.submit_turn("Leeds")["turn_id"]
+    full = interview_answer({"current_message": "m1"}, scenario.output_sentinel, valid=True)
+    worker = scenario.worker("worker", fake_failure="pause_after_reply")
+
+    def whole_reply_stored() -> bool:
+        partial = scenario.api.get(reply_path(scenario, turn_id), scenario.token).json()
+        return bool(partial["text"] == full["reply"])
+
+    # The reply streams in pieces quickly, then the fake pauses before the proposals: the
+    # stored partial must already be the whole reply, not the first piece of it.
+    wait_for(whole_reply_stored, timeout_s=10, what="the whole reply in the partial store")
+    assert scenario.run(turn_id)["status"] == "running"
+    assert scenario.outputs(turn_id) == []  # the proposals have not finished
+    assert scenario.leaks() == []  # the partial holds the sentinel, sealed
+    scenario.wait_terminal(turn_id)
+    assert worker.stop() == 0
+    done = scenario.api.get(reply_path(scenario, turn_id), scenario.token).json()
+    assert done["completeness"] == "superseded"
+
+
+@pytest.mark.req("MODEL-03")
+def test_between_attempts_a_stopped_reply_is_not_called_final_and_a_stored_output_supersedes(
+    scenario: Scenario,
+) -> None:
+    turn_id = scenario.submit_turn("Leeds")["turn_id"]
+    # The first attempt's stream is cut; the worker dies right after settling it, so the
+    # run is still running and the DBOS step will try again.
+    crashed = scenario.worker("crashes", crash_at="after_settle", fake_failure="cut_mid_stream")
+    assert crashed.wait_exit(60) == -signal.SIGKILL
+
+    between = scenario.api.get(reply_path(scenario, turn_id), scenario.token).json()
+
+    assert scenario.run(turn_id)["status"] == "running"
+    assert between["completeness"] == "stopped"  # may still be superseded: not final
+    assert between["text"]
+    succeeding = scenario.worker("succeeds", crash_at="after_settle")
+    assert succeeding.wait_exit(60) == -signal.SIGKILL
+    # The output is stored, the run is not yet published as complete: the reply is already
+    # superseded, never "none".
+    assert scenario.run(turn_id)["status"] == "running"
+    assert scenario.outputs(turn_id) != []
+    stored = scenario.api.get(reply_path(scenario, turn_id), scenario.token).json()
+    assert (stored["completeness"], stored["text"]) == ("superseded", None)
+    finisher = scenario.worker("finishes")
+    assert scenario.wait_terminal(turn_id)["status"] == "complete"
+    assert finisher.stop() == 0
+
+
+@pytest.mark.req("MODEL-03", "SEC-01")
+def test_access_revoked_mid_call_still_settles_the_attempt_and_ends_typed(
+    infra: Infra, api: ApiClient, tmp_path: Path
+) -> None:
+    email, token = fresh_actor(api, infra)
+    revoked = make_scenario(infra, api, token, tmp_path)
+    turn_id = revoked.submit_turn("Leeds")["turn_id"]
+    worker = revoked.worker("worker", fake_failure="cut_mid_stream", fake_delay_s="3")
+    wait_for(lambda: revoked.attempts(turn_id) != [], timeout_s=30, what="the first attempt")
+
+    # Revoked while the call is in flight: the partial cannot be written, nor marked.
+    infra.query("UPDATE nessa.actors SET access = 'revoked' WHERE email = %s", (email,))
+    run = revoked.wait_terminal(turn_id)
+    assert worker.stop() == 0
+
+    # The attempt's settlement is not lost to the partial store: it is recorded with its
+    # own outcome, and the retry is refused for the real reason.
+    assert (run["status"], run["failure_class"]) == ("failed", "access_revoked")
+    first, second = revoked.attempts(turn_id)
+    assert (first["outcome"], first["spend_state"]) == ("transient_connection", "unknown")
+    assert (second["outcome"], second["spend_state"]) == ("access_revoked", "none")
 
 
 @pytest.mark.req("MODEL-03", "PROF-03")

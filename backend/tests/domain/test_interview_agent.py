@@ -4,13 +4,18 @@ on a fake provider (MODEL-03, PROF-02, PROF-05). No network, no database."""
 
 import itertools
 import uuid
+from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from pydantic_ai import capture_run_messages
 from pydantic_ai.exceptions import ContentFilterError, UnexpectedModelBehavior
-from pydantic_ai.messages import ModelRequest, ModelResponse
+from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 
+from nessa.identity.activity import PartialWriter
 from nessa.identity.failures import FailureClass, classify_failure
 from nessa.identity.model_registry import ModelMode
 from nessa.money import Money
@@ -33,8 +38,22 @@ from tests.support.fake_models import FakeFailure, fake_model_builder
 AT = datetime(2027, 1, 1, tzinfo=UTC)
 
 
-def ignore(_reply: str) -> None:
+def ignore(text: str, *, complete: bool) -> None:
     """A partial-reply sink that keeps nothing."""
+
+
+@dataclass
+class Recorder:
+    """A partial-reply sink that keeps every call: the reply so far, and whether it ended."""
+
+    calls: list[tuple[str, bool]] = field(default_factory=list)
+
+    def __call__(self, text: str, *, complete: bool) -> None:
+        self.calls.append((text, complete))
+
+    @property
+    def texts(self) -> list[str]:
+        return [text for text, _ in self.calls]
 
 
 def turn_input(*texts: str) -> TurnInput:
@@ -124,32 +143,59 @@ def grows(replies: list[str]) -> bool:
 @pytest.mark.req("MODEL-03")
 def test_the_fixture_streams_its_reply_before_the_validated_proposal_arrives() -> None:
     ctx = turn_input("I could work in Bristol, 5 hours a week.")
-    streamed: list[str] = []
+    streamed = Recorder()
 
     proposal = run_interview_turn(
-        fixture_interviewer_model(),
-        ModelMode.FIXTURE,
-        ctx.model_dump_json().encode(),
-        streamed.append,
+        fixture_interviewer_model(), ModelMode.FIXTURE, ctx.model_dump_json().encode(), streamed
     )
 
-    assert len(streamed) > 1  # in pieces, as it arrives
-    assert grows(streamed)
-    assert streamed[-1] == proposal.reply  # the whole reply, and only the reply
+    assert len(set(streamed.texts)) > 1  # in pieces, as it arrives
+    assert grows(streamed.texts)
+    # The whole reply, and only the reply, marked as ended; nothing after it.
+    assert streamed.calls[-1] == (proposal.reply, True)
+    assert [complete for _, complete in streamed.calls].count(True) == 1
+
+
+@pytest.mark.req("MODEL-03")
+def test_the_writer_stores_the_whole_reply_before_the_proposals_finish_streaming() -> None:
+    ctx = turn_input("I could work in Bristol, 5 hours a week.")
+    model = fixture_interviewer_model()
+    assert isinstance(model, FunctionModel)
+    stream, sent = model.stream_function, list[str]()
+    assert stream is not None
+
+    async def counted(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[Any]:
+        async for chunk in stream(messages, info):
+            if isinstance(chunk, str):
+                sent.append(chunk)
+            yield chunk
+
+    model.stream_function = counted
+    writes: list[tuple[str, int]] = []
+    # A clock that never moves: no throttle window ever elapses, so only the first piece
+    # and the flush at the reply's end can be written.
+    writer = PartialWriter(lambda text: writes.append((text, len("".join(sent)))), clock=lambda: 0)
+
+    proposal = run_interview_turn(model, ModelMode.FIXTURE, ctx.model_dump_json().encode(), writer)
+
+    first, last = writes
+    assert proposal.reply.startswith(first[0])
+    assert last[0] == proposal.reply  # the whole reply is stored...
+    assert last[1] < len("".join(sent))  # ...while the proposals are still streaming
 
 
 def run_fake(failure: FakeFailure | None) -> tuple[object, list[object], list[str]]:
     model = fake_model_builder(failure=failure)("muse-spark-1.3-contributor", None)
     ctx = turn_input("I could work in Leeds and spend about £1,500.")
-    streamed: list[str] = []
+    streamed = Recorder()
     with capture_run_messages() as messages:
         try:
             result: object = run_interview_turn(
-                model, ModelMode.CONTRIBUTOR, ctx.model_dump_json().encode(), streamed.append
+                model, ModelMode.CONTRIBUTOR, ctx.model_dump_json().encode(), streamed
             )
         except Exception as error:  # the activity classifies this
             result = error
-    return result, list(messages), streamed
+    return result, list(messages), streamed.texts
 
 
 @pytest.mark.req("MODEL-03")

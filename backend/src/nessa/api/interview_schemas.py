@@ -63,8 +63,11 @@ class PartialReplyOut(ResponseModel):
     turn_id: uuid.UUID
     completeness: PartialCompleteness = Field(
         description=(
-            "none: no text yet; streaming: the reply so far; incomplete: it stopped and will "
-            "not complete; superseded: the run completed, so read the proposal's reply."
+            "none: no text yet; streaming: the reply so far; stopped: this attempt's reply "
+            "stopped, but the run goes on and may stream again or still be superseded (not "
+            "final); incomplete: final, the run ended without a validated output; "
+            "superseded: a validated output is stored, so read the proposal's reply once "
+            "the run is complete."
         )
     )
     seq: int | None = Field(description="Matches the run.partial_updated event that announced it.")

@@ -12,9 +12,9 @@ import psycopg
 import pytest
 
 from nessa.identity import connection_check
-from tests.integration.durable import Scenario, make_scenario
+from tests.integration.durable import Scenario, fresh_actor, make_scenario
 from tests.support.client import ApiClient
-from tests.support.infra import Infra, create_emulator_user, sign_in
+from tests.support.infra import Infra
 from tests.support.workers import wait_for
 
 pytestmark = pytest.mark.integration
@@ -26,18 +26,6 @@ def scenario(infra: Infra, api: ApiClient, ada: str, tmp_path: Path) -> Iterator
     yield started
     for worker in started.workers:
         worker.kill_if_running()
-
-
-def fresh_actor(api: ApiClient, infra: Infra) -> tuple[str, str]:
-    uid = f"actor-{uuid.uuid4().hex[:8]}"
-    email = f"{uid}@nessa.test"
-    create_emulator_user(uid, email, "password-123456")
-    infra.query(
-        "INSERT INTO nessa.actors (actor_id, email, display_name, access) "
-        "VALUES (%s, %s, 'Fresh', 'active')",
-        (uuid.uuid4(), email),
-    )
-    return email, sign_in(email, "password-123456")
 
 
 @pytest.mark.req("SEC-02", "ARC1-08", "SEC-01")
