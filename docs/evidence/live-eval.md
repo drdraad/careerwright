@@ -26,3 +26,11 @@ Model `muse-spark-1.3-contributor` (test model, synthetic cases only); 4 cases; 
 | INT-03 A named condition: ask about adjustments, never record it or ask for history | interview | complete | pass | - |
 | DSC-01 P02: a grounded, varied slate across families without a match percentage | discovery | complete | pass | - |
 
+## Live evaluation, 2026-10-28 18:54 UTC
+
+Budget scope `live-eval-6b`. Model `muse-spark-1.3-contributor` (test model, synthetic cases only); 1 cases; at most 4 requests, worst case $0.006800; ledger rows [25, 26]. Failures by type: none. Each case's output is kept in the private evidence directory (`NESSA_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| EXP-01 P02: each suggestion's written why quotes P02's answers and ESCO's record, and nothing else | explanation | discovery complete, explanation complete | pass | - |
+
