@@ -542,7 +542,7 @@ describe("[STATE-06][PROF-08] sending a stale tray's message again goes through 
             });
             return {
               policy: "acute_distress",
-              policy_version: "support-policy-1",
+              policy_version: "support-policy-2",
               review_status: "provisional",
               message: "I'm sorry things feel this hard.",
               resources: [],
@@ -585,7 +585,7 @@ describe("[PROF-09] explicit distress gets the support response instead of the i
   it("shows the checked UK services, keeps the message, and sends it only if asked", async () => {
     const support = {
       policy: "acute_distress",
-      policy_version: "support-policy-1",
+      policy_version: "support-policy-2",
       review_status: "provisional",
       message: "I'm sorry things feel this hard.",
       resources: [
@@ -628,6 +628,96 @@ describe("[PROF-09] explicit distress gets the support response instead of the i
       posts.map((s) => (s.body as { send_after_support: boolean }).send_after_support),
     ).toEqual([false, true]);
     expect(posts[1]?.body).toMatchObject({ message: "Some days I just want to die." });
+  });
+});
+
+describe("[PROF-09] any other risk word is sent as usual, with a calm support note", () => {
+  it("sends the message, clears the reply field and shows the note beside it", async () => {
+    const note = {
+      policy: "risk_mention",
+      policy_version: "support-policy-2",
+      review_status: "provisional",
+      message:
+        "If anything you mentioned is about how you are feeling, support is available any " +
+        "time. Your message was sent to Nessa as usual.",
+      resources: [
+        {
+          name: "Samaritans",
+          contact: "Call 116 123",
+          when: "To talk",
+          source_url: "https://www.samaritans.org/",
+          checked_on: "2026-10-28",
+        },
+      ],
+    };
+    const sent = fakeApi(
+      routes({ preferences: prefs("unsure"), turns: [] }, [
+        {
+          method: "POST",
+          path: /\/interview\/turns$/,
+          status: 202,
+          answer: { ...turn("queued"), support_note: note },
+        },
+      ]),
+    );
+    const user = renderYou();
+
+    const field = await screen.findByLabelText("Reply to Nessa");
+    await user.type(field, "I volunteer on a suicide prevention helpline.");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    const shown = await screen.findByRole("region", { name: "Support is available" });
+    expect(shown).toHaveTextContent("Samaritans: Call 116 123");
+    expect(shown).toHaveTextContent("sent to Nessa as usual");
+    expect(field).toHaveValue(""); // it was sent
+    expect(sent.filter((s) => s.method === "POST")).toHaveLength(1);
+    expect(screen.queryByText("Support is available now")).toBeNull(); // not the blocking one
+    await user.click(within(shown).getByRole("button", { name: "Dismiss the support note" }));
+    expect(screen.queryByRole("region", { name: "Support is available" })).toBeNull();
+  });
+});
+
+describe("[UI-06] focus moves to the question only when the entry choice is saved", () => {
+  it("does not move focus later if saving the choice failed", async () => {
+    const state = { preferences: prefs(null), turns: [] as TurnOut[] };
+    fakeApi(
+      routes(state, [
+        {
+          method: "PUT",
+          path: /\/interview\/preferences$/,
+          status: 503,
+          answer: {
+            error: {
+              code: "STORE_UNAVAILABLE",
+              message: "The database is unavailable.",
+              retryable: true,
+              stage: "storage",
+              correlation_id: "c4",
+              details: {},
+            },
+          },
+        },
+      ]),
+    );
+    const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queries}>
+        <EvidenceProvider>
+          <YouChapter workspace={workspace} profile={profile} />
+        </EvidenceProvider>
+      </QueryClientProvider>,
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Help me explore" }));
+    expect(await screen.findByRole("alert")).toBeVisible();
+    // Later the choice arrives some other way (another tab): focus must not jump.
+    state.preferences = prefs("unsure");
+    await queries.invalidateQueries();
+    const question = await screen.findByRole("heading", {
+      name: "What would you most like to be different about your working life?",
+    });
+    expect(question).not.toHaveFocus();
   });
 });
 

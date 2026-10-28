@@ -10,6 +10,7 @@ import type {
   EntryMode,
   PreferencesOut,
   ProfileOut,
+  SupportNoteOut,
   SupportResponseOut,
   TurnOut,
   WorkspaceOut,
@@ -103,6 +104,32 @@ function Reply({
         {view.kind === "streaming" && <p aria-hidden="true">{view.text}</p>}
       </div>
     </div>
+  );
+}
+
+/** Beside a sent message that used a risk word (tier 2): calm, not blocking, dismissible.
+ *  The message went to Nessa as usual. */
+function SupportNote({ note, onDismiss }: { note: SupportNoteOut; onDismiss(): void }) {
+  const titleId = useId();
+  return (
+    <section className="card grid gap-8 small" aria-labelledby={titleId}>
+      <h3 id={titleId} className="font-semibold">
+        Support is available
+      </h3>
+      <p>{note.message}</p>
+      <ul className="plain-list">
+        {note.resources.map((resource) => (
+          <li key={resource.name}>
+            <strong>{resource.name}:</strong> {resource.contact}. {resource.when}.
+          </li>
+        ))}
+      </ul>
+      <div>
+        <Button variant="quiet" onClick={onDismiss}>
+          Dismiss <span className="sr-only">the support note</span>
+        </Button>
+      </div>
+    </section>
   );
 }
 
@@ -240,14 +267,18 @@ export function Conversation({
 
   const save = (
     changes: Partial<Pick<PreferencesOut, "entry_mode" | "conversation_mode" | "paused">>,
+    onError?: () => void,
   ) =>
-    setPreferences.mutate({
-      expected_version: preferences.version,
-      entry_mode: preferences.entry_mode,
-      conversation_mode: preferences.conversation_mode,
-      paused: preferences.paused,
-      ...changes,
-    });
+    setPreferences.mutate(
+      {
+        expected_version: preferences.version,
+        entry_mode: preferences.entry_mode,
+        conversation_mode: preferences.conversation_mode,
+        paused: preferences.paused,
+        ...changes,
+      },
+      { onError },
+    );
 
   const send = async (text: string, sendAfterSupport = false) => {
     const sent = await sender.send({
@@ -303,7 +334,8 @@ export function Conversation({
           preferences={preferences}
           onChoose={(entry) => {
             setFocusQuestion(true);
-            save({ entry_mode: entry });
+            // A failed save leaves the choice on screen; focus must not jump later (N-M6).
+            save({ entry_mode: entry }, () => setFocusQuestion(false));
           }}
         />
       ) : (
@@ -383,6 +415,7 @@ export function Conversation({
           onSendAnyway={() => void send(support.message, true)}
         />
       )}
+      {sender.note !== null && <SupportNote note={sender.note} onDismiss={sender.dismissNote} />}
       {sender.error !== null && <RequestFailure error={sender.error} />}
 
       {!entryNeeded && (

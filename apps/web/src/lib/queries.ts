@@ -43,11 +43,13 @@ import {
   type StoreKeyWritable,
   type SubmitDiscovery,
   type SubmitTurn,
+  type SupportNoteOut,
   type SupportResponseOut,
   storeCredential,
   submitDiscovery,
   submitTurn,
   type TurnOut,
+  type TurnSubmittedOut,
 } from "@/generated/api";
 import { API_BASE, ApiError, ChangeKeys } from "./api";
 import { openWorkspaceStream, type StreamStatus } from "./events";
@@ -293,8 +295,10 @@ export function useTurnReply(id: string, turnId: string, enabled = true) {
   });
 }
 
+/** A sent turn (with the support note when the message used a risk word), or, for first-
+ *  person acute distress, the support response instead of sending (ADR 0007 decision 7). */
 export type Submitted =
-  | { kind: "turn"; turn: TurnOut }
+  | { kind: "turn"; turn: TurnSubmittedOut }
   | { kind: "support"; support: SupportResponseOut };
 
 export function useSubmitTurn(id: string) {
@@ -305,9 +309,7 @@ export function useSubmitTurn(id: string) {
       headers: { "Idempotency-Key": key },
       throwOnError: true,
     });
-    return "policy" in data
-      ? { kind: "support", support: data }
-      : { kind: "turn", turn: data as TurnOut };
+    return "turn_id" in data ? { kind: "turn", turn: data } : { kind: "support", support: data };
   });
 }
 
@@ -337,6 +339,9 @@ export function useSendMessage(id: string) {
     response: SupportResponseOut;
     message: string;
   } | null>(null);
+  // The support note beside a sent message that used a risk word; kept until dismissed or
+  // the next message is sent. It is never stored.
+  const [note, setNote] = useState<SupportNoteOut | null>(null);
   const send = async (body: SubmitTurn): Promise<boolean> => {
     const sent = await submit.mutateAsync(body).catch(() => null);
     if (sent === null) return false;
@@ -345,9 +350,17 @@ export function useSendMessage(id: string) {
       return false;
     }
     setSupport(null);
+    setNote(sent.turn.support_note);
     return true;
   };
-  return { send, support, pending: submit.isPending, error: submit.error };
+  return {
+    send,
+    support,
+    note,
+    dismissNote: () => setNote(null),
+    pending: submit.isPending,
+    error: submit.error,
+  };
 }
 export type MessageSender = ReturnType<typeof useSendMessage>;
 

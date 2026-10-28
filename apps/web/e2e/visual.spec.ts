@@ -162,6 +162,48 @@ const FAILED_TURN = {
   decision: null,
 };
 
+/** The API's tier-2 support note (`nessa.profile.safety.SUPPORT_NOTE` and its resources). */
+const SUPPORT_NOTE = {
+  policy: "risk_mention",
+  policy_version: "support-policy-2",
+  review_status: "provisional: needs reviewed sign-off (human gate H-12)",
+  message:
+    "If anything you mentioned is about how you are feeling, support is available any time, " +
+    "from people trained to help. Your message was sent to Nessa as usual.",
+  resources: [
+    {
+      name: "Emergency services",
+      contact: "Call 999 or go to A&E",
+      when: "If your life is at risk now, or you can't keep yourself safe",
+      source_url:
+        "https://www.nhs.uk/nhs-services/mental-health-services/where-to-get-urgent-help-for-mental-health/",
+      checked_on: "2026-10-28",
+    },
+    {
+      name: "NHS 111",
+      contact: "Call 111 and choose the mental health option, or use 111 online",
+      when: "For urgent mental health help and advice",
+      source_url:
+        "https://www.nhs.uk/nhs-services/mental-health-services/where-to-get-urgent-help-for-mental-health/",
+      checked_on: "2026-10-28",
+    },
+    {
+      name: "Samaritans",
+      contact: "Call 116 123 (free, any time, day or night)",
+      when: "To talk to someone who will listen",
+      source_url: "https://www.samaritans.org/how-we-can-help/contact-samaritan/",
+      checked_on: "2026-10-28",
+    },
+    {
+      name: "Shout",
+      contact: "Text SHOUT to 85258 (free, 24/7)",
+      when: "If you would rather text than talk",
+      source_url: "https://giveusashout.org/get-help/",
+      checked_on: "2026-10-28",
+    },
+  ],
+};
+
 /** Workspaces the Sprint 2 shots start from, prepared through the API as a person would. */
 type Scratch = {
   /** New and empty: nothing saved, nothing chosen. */
@@ -283,6 +325,31 @@ const shots = (scratch: Scratch): Shot[] => [
       const support = page.getByRole("alert").filter({ hasText: "Support is available now" });
       await expect(support).toBeVisible();
       await support.scrollIntoViewIfNeeded();
+    },
+  },
+  {
+    // Tier 2: a risk word without first-person distress is sent as usual, with the note.
+    // The send is answered here so the scratch conversation is left as it was.
+    name: "you--support-note",
+    as: "ada",
+    context: "support-note",
+    url: chapterUrl("you", scratch.talked),
+    prepare: async (page) => {
+      await page.route("**/interview/turns", (route) =>
+        route.request().method() === "POST"
+          ? route.fulfill({ status: 202, json: { ...FAILED_TURN, support_note: SUPPORT_NOTE } })
+          : route.continue(),
+      );
+    },
+    ready: async (page) => {
+      await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
+      await page
+        .getByRole("textbox", { name: "Reply to Nessa" })
+        .fill("I volunteer on a suicide prevention helpline and want paid work like it.");
+      await page.getByRole("button", { name: "Send" }).click();
+      const note = page.getByRole("region", { name: "Support is available" });
+      await expect(note).toBeVisible();
+      await note.scrollIntoViewIfNeeded();
     },
   },
   {
