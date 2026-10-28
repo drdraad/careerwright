@@ -2,7 +2,7 @@
 
 - Date: 2026-10-28. Branch `l0-local-release`.
 - Reviewed revision: `96259d7` for this pre-review; after the independent review's fix
-  rounds 1 and 2, the final code is `8dde3e6` (the commit that updates this review changes
+  rounds 1 to 3, the final code is `561c97f` (the commit that updates this review changes
   docs and screenshots only).
 - Sprint 2 commits: `ef25e31`..`8a817f6` (Task 5: S2.1-S2.2, the taxonomy and the
   InterviewTurn contract, with two fix rounds) and `b51d2b7` onward (Task 6: S2.3-S2.6, the
@@ -64,10 +64,10 @@ backend tests, 176 Vitest, 178 integration and stack, 21 Playwright); its first 
 run caught the sticky composer covering Try again (axe `target-size` at 390×844), fixed and
 rerun clean.
 
-After fix round 2 (final code, `8dde3e6`):
+After fix round 3 (final code, `561c97f`):
 
 - `make check`: exit 0. Backend: ruff format (175 files) and ruff check clean, mypy clean
-  (175 files), 412 fast tests passed, fixture validator passed. Web: client drift, Biome
+  (175 files), 433 fast tests passed, fixture validator passed. Web: client drift, Biome
   (108 files), `tsc`, Vitest 192 tests in 24 files passed.
 - `make acceptance`: exit 0. 185 integration and stack tests passed on PostgreSQL 16.15 and
   DBOS (including the full ESCO import and offline evaluation), the Storybook build, and 22
@@ -77,7 +77,7 @@ After fix round 2 (final code, `8dde3e6`):
   axe, overflow, overprint, console and font checks clean at every viewport
   (`checks-*.json`).
 - Live: `make live-eval` twice in all (rows 15-20, then the fix-round 1 run, rows 21-24);
-  none in fix round 2. Not run: VoiceOver, Safari, 200 % zoom, the production model.
+  none in fix rounds 2 and 3. Not run: VoiceOver, Safari, 200 % zoom, the production model.
 
 ## The six questions
 
@@ -248,6 +248,17 @@ limits are in the H-12 checklist. Nine minor findings were also fixed: undo is i
 cross-account sweep; a stored £0 floor still opens; folding stays within one ISCO minor
 group (164 within-group ESCO alias pairs still fold, for H-12); kindred words only in
 searches; a "?" in a reply with no next question costs no repair; and smaller ones.
+
+**Re-review 2 and fix round 3.** The second re-review found the nine minor findings fixed
+and A-I-1 still partial: three tier-1 branches did not check who was speaking (so "people
+feeling suicidal" on a helpline, "print is going to die" and "thinking about suicide
+prevention work" were blocked); "cutting myself" and a few inflections reached no tier;
+the note was kept in the idempotency receipt; and the note was not announced. By the
+controller's second ruling, tier 1 is now first-person present intent only and tier 2 a
+broad stem screen over every inflection, both specified by one table of input shapes; the
+receipt holds no note (a replay recomputes it, tested); the note is announced politely
+and dismissing it returns focus to the reply field. Remaining limits are in the H-12
+checklist.
 
 ## Accepted limitations and open items
 

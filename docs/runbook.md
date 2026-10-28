@@ -99,7 +99,8 @@ with the browser's Origin unchanged.
   resources) instead of `202`: nothing was sent or stored, not even an idempotency receipt;
   resend with `send_after_support: true` to send it anyway. Any other risk word: `202` as
   usual, with a `support_note` (`policy: "risk_mention"`, the same resources) to show beside
-  it; otherwise `support_note` is null.
+  it; otherwise `support_note` is null. The note is derived from the request every time (a
+  replay with the same idempotency key gets it too) and is never stored.
 - Discovery (ADR 0007): `POST .../discoveries` with `{expected_profile_version}` returns `202`
   (`INSUFFICIENT_EVIDENCE` if no answer describes work yet); `GET .../discoveries` (newest
   first), `GET .../discoveries/{id}`; `GET .../discoveries/{id}/slate?emphasis=&exclude_concept=

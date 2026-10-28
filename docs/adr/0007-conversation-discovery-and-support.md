@@ -145,33 +145,50 @@ inference, with at least 30 evaluation cases and a capped live run.
    Model-written explanations are not used in L0: grounding by construction was preferred
    to a second paid call whose prose would need its own checks.
 
-7. **The minimal support policy** (`nessa.profile.safety`, `support-policy-2`): a two-tier
-   screen (controller ruling, Task 6 fix round 2), before any model call. It is kept apart
-   from career suitability: it scores and remembers nothing. The four UK services were
-   checked on their own pages on 2026-10-28 (999 or A&E; NHS 111, mental health option;
-   Samaritans 116 123; Shout 85258).
-   - *Tier 1, acute.* A first-person statement of intent or distress: an intent phrase
-     ("want to", "thinking about", "going to", ...) with an act (die, kill myself, end my
-     life, take my own life, hurt or harm myself), "I feel / I'm / I've been suicidal",
-     "I self-harm", "I've been / I keep hurting myself", "take my own life", "wish I was
-     dead", "better off dead", "don't want to be alive", "don't want to live (like this)
-     (any more)" and "no reason to go on" or "can't go on" at the end of a clause.
-     `POST .../interview/turns` answers 200 with a fixed support response: nothing is sent
-     to the interviewer or stored, not even an idempotency receipt (it would keep a
-     fingerprint of the message). The person can send the message anyway
-     (`send_after_support`); the web app sends the message that was screened. Tier 1 rests
-     on positive evidence only, never on a list of words that excuse a match.
-   - *Tier 2, mention.* Any other risk word or phrase (suicide, self-harm, overdose, kill,
-     hurt or harm myself, take or end my life, can't go on, ...), whatever surrounds it:
-     the message is sent as usual (202), and the response carries a calm `support_note`
-     with the same services, shown beside the conversation until dismissed. Nothing about
-     it is stored. So no risk word is ever silently dropped, and ordinary career talk is
-     never blocked ("take my life in a new direction", "my life savings", "I don't want to
-     live in London", "I hurt myself lifting boxes", "suicide prevention work": tier 2).
-   - *Known limits (H-12):* English phrasing only; indirect or third-person wording ("my
-     friend wants to die", "what's the point") gets nothing; a past simple "I hurt myself"
-     or "I cut myself" is tier 2, not 1; "can't go on like this" is tier 2; a career phrase
-     with a risk word gets the note, which some people may find unwelcome.
+7. **The minimal support policy** (`nessa.profile.safety`, `support-policy-3`): a two-tier
+   screen (controller rulings, Task 6 fix rounds 2 and 3), before any model call. It is
+   kept apart from career suitability: it scores and remembers nothing. The four UK
+   services were checked on their own pages on 2026-10-28 (999 or A&E; NHS 111, mental
+   health option; Samaritans 116 123; Shout 85258). One table of input shapes and their
+   tiers is the specification and the test (`tests/domain/test_safety.py::CORPUS`).
+   - *Tier 1, acute (narrow).* First-person, present intent or distress only, each branch
+     starting from "I" or "me": "I (just, really, keep, ...) want to / am going to / am
+     thinking about" + an act (die at the end of a clause, kill myself, end it all or my
+     life, take my own life, hurt or harm myself); "I feel / I'm / I've been / I've felt
+     suicidal"; "I self-harm", "I've been / I keep self-harming"; "I keep / I've been /
+     I'm hurting or cutting myself" at the end of a clause; "I wish I was dead"; "I'd be
+     better off dead", "better off without me / if I took my own life"; "I don't / do not
+     want to be alive", "... to live (like this) (any more)" or "... to be here any more"
+     at the end of a clause; "I have no reason to live / go on"; "I can't / cannot go on"
+     at the end of a clause. A risk word in a professional, third-party, figurative or
+     object frame never reaches it ("people feeling suicidal", "print is going to die",
+     "die of boredom", "thinking about suicide prevention work", "I have self-harm
+     awareness training", "I kept cutting myself on the tape"). `POST .../interview/turns`
+     answers 200 with a fixed support response: nothing is sent to the interviewer or
+     stored, not even an idempotency receipt (it would keep a fingerprint of the message).
+     The person can send the message anyway (`send_after_support`); the web app sends the
+     message that was screened. Tier 1 rests on positive evidence only, never on a list of
+     words that excuse a match.
+   - *Tier 2, mention (broad).* Every other message containing a risk stem, in any
+     inflection: suicid-, self-harm-, overdos-, kill / hurt / harm / cut (-s, -ing, -ed,
+     -ting) myself, end / take (-s, -ing, -en, took) my (own) life, "to die" after an
+     intent word, "wish I was dead", "better off dead / without me", "don't / do not /
+     doesn't / didn't want to live / be alive / be here", "no reason to live / go on",
+     "can't / cannot / can not / couldn't go on". The message is sent as usual (202), and
+     the response carries a calm `support_note` with the same services, shown beside the
+     conversation until dismissed and announced through the chapter's polite live region
+     (focus is not moved; dismissing returns it to the reply field). The note is derived
+     from the request on every response, a replay included, and is never stored: the
+     idempotency receipt records the turn without it (tested). Nothing containing a risk
+     stem reaches no tier, and ordinary career talk is never blocked.
+   - *Known limits (H-12):* English phrasing only, and only the stems above; indirect or
+     third-person wording without a stem ("my friend wants to end things", "what's the
+     point") gets nothing; first-person statements in the past or with an object ("I hurt
+     myself", "I cut myself", "I was cutting myself", "I kept hurting myself lifting") are
+     tier 2, not 1, because the same words describe workplace injuries; "There's no reason
+     to go on" (no "I") and "can't go on like this" are tier 2; "I don't want to be here"
+     without "any more" is tier 2 (a common job phrase); a career phrase with a risk stem
+     gets the note, which some people may find unwelcome.
    - *Inappropriate inference.* Model output may not name a health condition, a diagnosis,
      a personality type (or MBTI code), a protected characteristic or a percentage that the
      person's own messages never used; a condition the person names may be acknowledged,
@@ -237,13 +254,16 @@ inference, with at least 30 evaluation cases and a capped live run.
 
 ## Human review checklist (H-12, not run — requires human)
 
-- [ ] **Support policy** (decision 7): the two tiers and where the line between them falls
-  (the tier-1 intent phrases and first-person statements; the tier-2 risk words), the
-  fixed response and the note's wording, the decision not to send or store a tier-1
-  message, the "send anyway" path, the known limits listed in decision 7 (indirect and
-  third-person wording; past simple "I hurt myself" and "can't go on like this" only tier
-  2; the note on career phrases), and the four resources and their wording (checked
-  against the services' pages on 2026-10-28).
+- [ ] **Support policy** (decision 7): the shape table (`test_safety.py::CORPUS`) and where
+  the line between the tiers falls (tier 1: first-person present intent or distress; tier
+  2: the risk stems in every inflection), the fixed response and the note's wording and
+  announcement, the decision not to send or store a tier-1 message and never to store the
+  note, the "send anyway" path, the known limits listed in decision 7 (only the listed
+  stems; indirect and third-person wording without a stem; past or object-framed self-
+  injury, which overlaps workplace injury, only tier 2; "There's no reason to go on",
+  "can't go on like this" and "I don't want to be here" only tier 2; the note on career
+  phrases), and the four resources and their wording (checked against the services' pages
+  on 2026-10-28).
 - [ ] **Inference rules** (decision 7): the health, type and protected-characteristic word
   lists, the kindred-word groups (discovery searches only), and refusing a condition in a
   career field.
