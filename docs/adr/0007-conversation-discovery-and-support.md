@@ -545,11 +545,12 @@ so that item stays open: not run — requires human.
   canned inputs; the model's behaviour rests on the live cases alone, single samples so
   far. **Accepted for L0** by the product owner on 2026-10-28 (session 1, Part B line 5).
   EXP-01 is in the open item above.
-- [x] **Counterfactual tolerance** (decision 9): which fields must not change with an
-  irrelevant cue, and how many samples per arm the release task's comparison needs.
-  **Run approved** by the product owner on 2026-10-28 (session 1, Part B line 6): "run the
-  powered comparison at release, estimated at most $0.07 on the test model" (Task 16).
-  Derived from the Task 6 report, not asked at the session: about 10 samples per arm, at
-  most 40 requests, its own scope above the 9-request cap, and INT-04/05's fields as built
-  (`current_role`, `weekly_study_hours`). Still open, to be decided before Task 16 runs it:
-  the pass rule across several samples per arm (decision 9).
+- [x] **Counterfactual comparison run** (decision 9): **Approved** by the product owner on
+  2026-10-28 (session 1, Part B line 6): "run the powered comparison at release, estimated
+  at most $0.07 on the test model" (Task 16).
+- [ ] **Counterfactual tolerance** (decision 9): the pass rule across several samples per
+  arm, and which fields must not change with an irrelevant cue. Not asked at session 1; to
+  be decided before Task 16 runs the comparison. Derived from the Task 6 report, not asked
+  at the session: about 10 samples per arm, at most 40 requests, its own scope above the
+  9-request cap, and INT-04/05's fields as built (`current_role`, `weekly_study_hours`).
+  Not run — requires human.
