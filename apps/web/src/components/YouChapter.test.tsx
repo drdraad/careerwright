@@ -1,6 +1,7 @@
 // The You chapter against a scripted API at the network edge: the entry choice leads, a
 // streamed reply is provisional until checked, the review tray saves only chosen and confirmed
-// changes, explicit distress gets the support response, and one action is the primary.
+// changes, a message with a risk stem is sent with the support panel beside it, and one action
+// is the primary.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -10,6 +11,7 @@ import type {
   ProfileDocument,
   ProfileOut,
   SketchOut,
+  SupportNoteOut,
   TurnOut,
   WorkspaceOut,
 } from "@/generated/api";
@@ -190,6 +192,24 @@ const unknownHours: TurnOut["proposal"] = {
       message_ids: ["m1"],
       reason: "You said you don't know yet.",
       hard_constraint: true,
+    },
+  ],
+};
+
+/** The API's support panel (`nessa.profile.safety.SUPPORT_NOTE`, one of its resources). */
+const panel: SupportNoteOut = {
+  policy_version: "support-policy-4",
+  review_status: "provisional: needs reviewed sign-off (human gate H-12)",
+  message:
+    "If anything you mentioned is about how you are feeling, support is available any time, " +
+    "from people trained to help. Your message was sent to Nessa as usual.",
+  resources: [
+    {
+      name: "Samaritans",
+      contact: "Call 116 123",
+      when: "To talk",
+      source_url: "https://www.samaritans.org/",
+      checked_on: "2026-10-28",
     },
   ],
 };
@@ -528,7 +548,7 @@ describe("[UI-06] each new reply is announced once, and focus follows the first 
 describe("[STATE-06][PROF-08] sending a stale tray's message again goes through the send path", () => {
   const stale = { ...turn("complete", proposal), profile_version: 0 };
 
-  it("sends once, says when it can't, and shows a support response", async () => {
+  it("sends once, says when it can't, and shows the support panel the API sends", async () => {
     const state: Live = { preferences: prefs("unsure"), turns: [stale], profile };
     let release: () => void = () => undefined;
     const sent = fakeApi(
@@ -536,18 +556,12 @@ describe("[STATE-06][PROF-08] sending a stale tray's message again goes through 
         {
           method: "POST",
           path: /\/interview\/turns$/,
+          status: 202,
           answer: async () => {
             await new Promise<void>((resolve) => {
               release = resolve;
             });
-            return {
-              policy: "acute_distress",
-              policy_version: "support-policy-3",
-              review_status: "provisional",
-              message: "I'm sorry things feel this hard.",
-              resources: [],
-              sent_to_interviewer: false,
-            };
+            return { ...turn("queued"), turn_id: "t2", support_note: panel };
           },
         },
       ]),
@@ -559,9 +573,12 @@ describe("[STATE-06][PROF-08] sending a stale tray's message again goes through 
     await user.click(again); // still sending: no second request
     release();
 
-    expect(await screen.findByText("Support is available now")).toBeVisible();
+    expect(await screen.findByRole("region", { name: "Support is available" })).toBeVisible();
     expect(sent.filter((s) => s.method === "POST")).toHaveLength(1);
-    expect(sent.find((s) => s.method === "POST")?.body).toMatchObject({ message: stale.message });
+    expect(sent.find((s) => s.method === "POST")?.body).toEqual({
+      expected_profile_version: 1,
+      message: stale.message,
+    });
   });
 
   it("can't send while paused, and says so", async () => {
@@ -581,82 +598,15 @@ describe("[STATE-06][PROF-08] sending a stale tray's message again goes through 
   });
 });
 
-describe("[PROF-09] explicit distress gets the support response instead of the interviewer", () => {
-  it("shows the checked UK services, keeps the message, and sends it only if asked", async () => {
-    const support = {
-      policy: "acute_distress",
-      policy_version: "support-policy-3",
-      review_status: "provisional",
-      message: "I'm sorry things feel this hard.",
-      resources: [
-        {
-          name: "Samaritans",
-          contact: "Call 116 123",
-          when: "To talk",
-          source_url: "https://www.samaritans.org/",
-          checked_on: "2026-10-28",
-        },
-      ],
-      sent_to_interviewer: false,
-    };
-    const sent = fakeApi(
-      routes({ preferences: prefs("unsure"), turns: [] }, [
-        { method: "POST", path: /\/interview\/turns$/, answer: support },
-      ]),
-    );
-    const user = renderYou();
-
-    await user.type(
-      await screen.findByLabelText("Reply to Nessa"),
-      "Some days I just want to die.",
-    );
-    await user.click(screen.getByRole("button", { name: "Send" }));
-
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Support is available now");
-    expect(alert).toHaveTextContent("Samaritans: Call 116 123");
-    expect(screen.getByLabelText("Reply to Nessa")).toHaveValue("Some days I just want to die.");
-    // B-M9: the question steps aside, the date reads as a date, and what is sent anyway is
-    // the message that was screened, even if the reply field has changed since.
-    expect(screen.queryByRole("heading", { name: /What would you most like/ })).toBeNull();
-    expect(alert).toHaveTextContent("checked on their own websites on 28 October 2026");
-    await user.type(screen.getByLabelText("Reply to Nessa"), " Also, I like gardens.");
-    await user.click(screen.getByRole("button", { name: "Send my message to Nessa anyway" }));
-    await waitFor(() => expect(sent.filter((s) => s.method === "POST")).toHaveLength(2));
-    const posts = sent.filter((s) => s.method === "POST");
-    expect(
-      posts.map((s) => (s.body as { send_after_support: boolean }).send_after_support),
-    ).toEqual([false, true]);
-    expect(posts[1]?.body).toMatchObject({ message: "Some days I just want to die." });
-  });
-});
-
-describe("[PROF-09] any other risk word is sent as usual, with a calm support note", () => {
-  it("sends the message, clears the reply field and shows the note beside it", async () => {
-    const note = {
-      policy: "risk_mention",
-      policy_version: "support-policy-3",
-      review_status: "provisional",
-      message:
-        "If anything you mentioned is about how you are feeling, support is available any " +
-        "time. Your message was sent to Nessa as usual.",
-      resources: [
-        {
-          name: "Samaritans",
-          contact: "Call 116 123",
-          when: "To talk",
-          source_url: "https://www.samaritans.org/",
-          checked_on: "2026-10-28",
-        },
-      ],
-    };
+describe("[PROF-09] a message with a risk stem is sent as usual, with the support panel", () => {
+  it("sends it at once, announces the panel without moving focus, and lets it be dismissed", async () => {
     const sent = fakeApi(
       routes({ preferences: prefs("unsure"), turns: [] }, [
         {
           method: "POST",
           path: /\/interview\/turns$/,
           status: 202,
-          answer: { ...turn("queued"), support_note: note },
+          answer: { ...turn("queued"), support_note: panel },
         },
       ]),
     );
@@ -666,17 +616,24 @@ describe("[PROF-09] any other risk word is sent as usual, with a calm support no
     await user.type(field, "I volunteer on a suicide prevention helpline.");
     await user.click(screen.getByRole("button", { name: "Send" }));
 
+    // One request, the message as typed, nothing to confirm: no hold, no extra click.
     const shown = await screen.findByRole("region", { name: "Support is available" });
+    const posts = sent.filter((s) => s.method === "POST");
+    expect(posts.map((s) => s.body)).toEqual([
+      { expected_profile_version: 1, message: "I volunteer on a suicide prevention helpline." },
+    ]);
+    expect(field).toHaveValue(""); // it was sent
+    expect(screen.queryByRole("alert")).toBeNull(); // calm: not an alert
     expect(shown).toHaveTextContent("Samaritans: Call 116 123");
     expect(shown).toHaveTextContent("sent to Nessa as usual");
-    expect(field).toHaveValue(""); // it was sent
-    expect(sent.filter((s) => s.method === "POST")).toHaveLength(1);
-    expect(screen.queryByText("Support is available now")).toBeNull(); // not the blocking one
-    // Re-review 2, I-4: announced politely, focus left where it was.
+    expect(shown).toHaveTextContent("checked on their own websites on 28 October 2026");
+    // No career question this turn: the question steps aside while the panel is shown.
+    expect(screen.queryByRole("heading", { name: /What would you most like/ })).toBeNull();
+    // Announced politely; focus left where it was (re-review 2, I-4).
     expect(screen.getByTestId("you-announcer")).toHaveTextContent(
       "Your message was sent. Support information is shown above the reply field.",
     );
-    expect(screen.getByRole("button", { name: "Send" })).toHaveFocus(); // not moved to the note
+    expect(screen.getByRole("button", { name: "Send" })).toHaveFocus(); // not moved to the panel
     await user.click(within(shown).getByRole("button", { name: "Dismiss the support note" }));
     expect(screen.queryByRole("region", { name: "Support is available" })).toBeNull();
     expect(field).toHaveFocus(); // M-1: back to the reply field, not lost

@@ -55,7 +55,6 @@ from nessa.profile.records import (
     SourceKind,
     TurnDecision,
 )
-from nessa.profile.safety import SupportConcern, SupportTier, screen_message
 from nessa.profile.store import stale_version
 from nessa.vocabulary import WorkState
 
@@ -72,27 +71,6 @@ class SubmitTurn(BaseModel):
 
     expected_profile_version: int = Field(ge=0)
     message: Message
-    send_after_support: bool = Field(
-        default=False,
-        description=(
-            "The person was shown the support response for this message and chose to send it "
-            "to the interviewer anyway."
-        ),
-    )
-
-
-@dataclass(frozen=True)
-class SupportShown:
-    """The support response, given instead of a turn: nothing was sent or stored."""
-
-    concern: SupportConcern
-
-
-def support_note_for(command: "SubmitTurn") -> SupportConcern | None:
-    """The support note beside a sent message that used a risk word (tier 2, or tier 1 sent
-    anyway). Derived from the request each time, for a fresh send or a replayed one, so it
-    is never stored, not even in the idempotency receipt."""
-    return screen_message(command.message)
 
 
 class DecideTurn(BaseModel):
@@ -221,15 +199,11 @@ def submit_turn(
     runtime_mode: RuntimeMode,
     defaults: SpendLimits,
     now: datetime,
-) -> TurnView | SupportShown:
-    """A new turn and its run; or, for a message stating acute distress in the first person,
-    the support response instead, with nothing sent to the model and nothing stored
-    (`nessa.profile.safety`, tier 1), unless the person has seen it and chose to send the
-    message. Any other risk word is sent as usual; its note comes from `support_note_for`."""
+) -> TurnView:
+    """A new turn and its run. Every message is sent, one with a risk stem included: the
+    support flow (`nessa.profile.safety`) is derived from the message where it is needed,
+    by the API for the panel and by the interviewer's instructions, and never stored."""
     visible_workspace(tx, workspace_id, lock=True)
-    concern = screen_message(command.message)
-    if concern is not None and concern.tier is SupportTier.ACUTE and not command.send_after_support:
-        return SupportShown(concern)
     profile = current_profile(tx, workspace_id)
     if command.expected_profile_version != profile.version:
         raise stale_version(profile.version)

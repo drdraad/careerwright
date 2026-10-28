@@ -15,7 +15,6 @@ from nessa.api.interview_schemas import (
     DecisionResult,
     PartialReplyOut,
     PreferencesOut,
-    SupportResponseOut,
     TurnOut,
     TurnPage,
     TurnSubmittedOut,
@@ -32,15 +31,14 @@ from nessa.profile import interview_store
 from nessa.profile.conversation import (
     DecideTurn,
     SubmitTurn,
-    SupportShown,
     TurnView,
     decide_turn,
     submit_turn,
-    support_note_for,
     turn_view,
     visible_turn,
 )
 from nessa.profile.preferences import SetPreferences, current_preferences, set_preferences
+from nessa.profile.safety import has_risk_stem
 
 router = APIRouter(
     prefix="/v1/workspaces/{workspace_id}/interview", responses=ERROR_RESPONSES, tags=["interview"]
@@ -52,19 +50,7 @@ def turn_out(tx: Tx, keyring: Keyring, view: TurnView) -> TurnOut:
     return TurnOut.of(view, run_out(tx, keyring, view.run))
 
 
-@router.post(
-    "/turns",
-    status_code=202,
-    response_model=TurnSubmittedOut,
-    responses={
-        200: {
-            "model": SupportResponseOut,
-            "description": "The message states acute distress in the first person: the "
-            "support response, with nothing sent to the interviewer or stored.",
-        }
-    },
-    operation_id="submit_turn",
-)
+@router.post("/turns", status_code=202, response_model=TurnSubmittedOut, operation_id="submit_turn")
 def submit(
     workspace_id: uuid.UUID, body: SubmitTurn, caller: CallerDep, deps: Deps, key: IdempotencyKey
 ) -> JSONResponse:
@@ -80,14 +66,7 @@ def submit(
             defaults=deps.spend_defaults,
             now=deps.clock(),
         )
-        if isinstance(sent, SupportShown):
-            return CommandResult(
-                200,
-                SupportResponseOut.of(sent).model_dump(mode="json"),
-                workspace_id,
-                record=False,
-            )
-        # The receipt records the turn only; the support note is added below, every time.
+        # The receipt records the turn only; the support panel is added below, every time.
         return CommandResult(
             202, turn_out(tx, deps.keyring, sent).model_dump(mode="json"), workspace_id
         )
@@ -101,10 +80,10 @@ def submit(
         fingerprint("submit_turn", request),
         execute,
     )
-    if status != 202:
-        return JSONResponse(response, status_code=status)
-    # A replay has the same request (by fingerprint), so the same note is derived again.
-    submitted = TurnSubmittedOut.sent(TurnOut.model_validate(response), support_note_for(body))
+    # A replay has the same request (by fingerprint), so the same panel is derived again.
+    submitted = TurnSubmittedOut.sent(
+        TurnOut.model_validate(response), support=has_risk_stem(body.message)
+    )
     location = f"/v1/workspaces/{workspace_id}/interview/turns/{response['turn_id']}"
     return JSONResponse(
         submitted.model_dump(mode="json"), status_code=status, headers={"Location": location}

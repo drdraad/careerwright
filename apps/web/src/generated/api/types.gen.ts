@@ -2221,12 +2221,6 @@ export type SubmitTurn = {
      * Message
      */
     message: string;
-    /**
-     * Send After Support
-     *
-     * The person was shown the support response for this message and chose to send it to the interviewer anyway.
-     */
-    send_after_support?: boolean;
 };
 
 /**
@@ -2316,15 +2310,12 @@ export type SuggestionOut = {
 /**
  * SupportNoteOut
  *
- * Shown beside a turn whose message used a risk word without stating acute distress in
- * the first person: the message was sent as usual. Derived from the request on every
- * response, including a replay; never stored, not even in the idempotency receipt.
+ * The support panel, shown beside a turn whose message holds a risk stem
+ * (`nessa.profile.safety`): the message was sent as usual. Kept apart from career
+ * suitability. Derived from the request on every response, a replay included; never
+ * stored, not even in the idempotency receipt.
  */
 export type SupportNoteOut = {
-    /**
-     * Policy
-     */
-    policy: 'risk_mention' | 'acute_distress';
     /**
      * Policy Version
      */
@@ -2371,42 +2362,6 @@ export type SupportResourceOut = {
      * When the service's own page was last checked.
      */
     checked_on: string;
-};
-
-/**
- * SupportResponseOut
- *
- * Given instead of a turn when a message explicitly expresses acute distress: the
- * message was not sent to the interviewer and nothing was stored. Kept apart from career
- * suitability. Resend with `send_after_support` to send the message anyway.
- */
-export type SupportResponseOut = {
-    /**
-     * Policy
-     */
-    policy: 'acute_distress';
-    /**
-     * Policy Version
-     */
-    policy_version: string;
-    /**
-     * Review Status
-     *
-     * The policy is provisional until reviewed.
-     */
-    review_status: string;
-    /**
-     * Message
-     */
-    message: string;
-    /**
-     * Resources
-     */
-    resources: Array<SupportResourceOut>;
-    /**
-     * Sent To Interviewer
-     */
-    sent_to_interviewer?: false;
 };
 
 /**
@@ -2662,7 +2617,7 @@ export type TurnPage = {
 /**
  * TurnSubmittedOut
  *
- * A new turn, with the support note when its message used a risk word.
+ * A new turn, with the support panel when its message holds a risk stem.
  */
 export type TurnSubmittedOut = {
     /**
@@ -3848,10 +3803,6 @@ export type SubmitTurnErrors = {
 export type SubmitTurnError = SubmitTurnErrors[keyof SubmitTurnErrors];
 
 export type SubmitTurnResponses = {
-    /**
-     * The message states acute distress in the first person: the support response, with nothing sent to the interviewer or stored.
-     */
-    200: SupportResponseOut;
     /**
      * Successful Response
      */

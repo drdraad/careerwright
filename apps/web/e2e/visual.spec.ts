@@ -1,6 +1,6 @@
 // The visual review package (plan section 5, UI-11): every chapter and the shell's default,
 // selected, empty, stale, unavailable and failed states, and Sprint 2's conversation states
-// (the start, a reply to review, the slate, the support response, a failed reply, key
+// (the start, a reply to review, the slate, the support panel, a failed reply, key
 // consent, Unknown/Skipped/Prefer not to say, the scrolled stale conflict and its Save, and
 // expanded phone sheets), at 1440×900, 390×844 and 768×1024, each with the automatable
 // checks: axe (WCAG 2.0, 2.1 and 2.2 A/AA), horizontal overflow, a label overprinting its
@@ -162,10 +162,9 @@ const FAILED_TURN = {
   decision: null,
 };
 
-/** The API's tier-2 support note (`nessa.profile.safety.SUPPORT_NOTE` and its resources). */
+/** The API's support panel (`nessa.profile.safety.SUPPORT_NOTE` and its resources). */
 const SUPPORT_NOTE = {
-  policy: "risk_mention",
-  policy_version: "support-policy-3",
+  policy_version: "support-policy-4",
   review_status: "provisional: needs reviewed sign-off (human gate H-12)",
   message:
     "If anything you mentioned is about how you are feeling, support is available any time, " +
@@ -313,23 +312,8 @@ const shots = (scratch: Scratch): Shot[] => [
     },
   },
   {
-    name: "you--support",
-    as: "ada",
-    url: chapterUrl("you", scratch.talked),
-    ready: async (page) => {
-      await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
-      await page
-        .getByRole("textbox", { name: "Reply to Nessa" })
-        .fill("Some days I just want to die.");
-      await page.getByRole("button", { name: "Send" }).click();
-      const support = page.getByRole("alert").filter({ hasText: "Support is available now" });
-      await expect(support).toBeVisible();
-      await support.scrollIntoViewIfNeeded();
-    },
-  },
-  {
-    // Tier 2: a risk word without first-person distress is sent as usual, with the note.
-    // The send is answered here so the scratch conversation is left as it was.
+    // A message with a risk stem is sent as usual, with the support panel beside it. The
+    // send is answered here so the scratch conversation is left as it was.
     name: "you--support-note",
     as: "ada",
     context: "support-note",

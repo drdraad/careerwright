@@ -114,19 +114,33 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][STATE-05][BND1-11] talk, r
   expect(externalRequests(requests)).toEqual([]);
 });
 
-test("[PROF-09] explicit distress gets the support response in place of the interviewer", async ({
+test("[PROF-09] a message with a risk stem is sent as usual, with the support panel and a smaller step", async ({
   page,
 }) => {
   const workspace = await demoWorkspace("Support (synthetic)");
   await signIn(page, "ada", chapterUrl("you", workspace));
   await page.getByRole("button", { name: "Help me explore" }).click();
+  const opening = page.getByRole("heading", {
+    name: "What would you most like to be different about your working life?",
+  });
+  await expect(opening).toBeVisible();
 
   await send(page, "Some days I just want to die.");
 
-  const support = page.getByRole("alert").filter({ hasText: "Support is available now" });
-  await expect(support).toContainText("Samaritans: Call 116 123");
-  await expect(support).toContainText("Call 999 or go to A&E");
-  await expect(page.getByText(/^You, \d\d:\d\d$/)).toHaveCount(0); // nothing was sent or stored
+  const panel = page.getByRole("region", { name: "Support is available" });
+  await expect(panel).toContainText("Samaritans: Call 116 123");
+  await expect(panel).toContainText("Call 999 or go to A&E");
+  await expect(page.getByText(/^You, \d\d:\d\d$/)).toHaveCount(1); // sent, with no extra step
+  // The demo interviewer got the smaller-step instruction for this turn: it acknowledges the
+  // message, offers a smaller step and asks no question.
+  await expect(
+    page.getByText(/^Demo interviewer \(synthetic\): Thank you for telling me\./),
+  ).toBeVisible({ timeout: 60_000 });
+  await panel.getByRole("button", { name: "Dismiss the support note" }).click();
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "Reply to Nessa" })).toBeFocused();
+  await expect(opening).toHaveCount(0);
+  await expect(page.locator(".question")).toHaveCount(0);
 });
 
 test("[UI-09] V-08: the strip keeps its height when updates are interrupted", async ({

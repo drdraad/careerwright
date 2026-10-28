@@ -22,6 +22,7 @@ from nessa.money import Money
 from nessa.profile.document import empty_profile
 from nessa.profile.fixture_interviewer import (
     REPLY_PREFIX,
+    SMALLER_STEP_REPLY,
     SURE_QUESTION,
     UNSURE_QUESTION,
     fixture_turn,
@@ -39,6 +40,7 @@ from nessa.profile.interview import (
 )
 from nessa.profile.interview_agent import fixture_interviewer_model, run_interview_turn
 from nessa.profile.records import EntryMode
+from nessa.profile.safety import SUPPORT_TURN_INSTRUCTION
 from tests.support.fake_models import FakeFailure, fake_model_builder
 
 AT = datetime(2027, 1, 1, tzinfo=UTC)
@@ -318,6 +320,54 @@ def test_a_complete_but_schema_invalid_output_is_repaired_once_then_fails_typed(
     requests = [m for m in messages if isinstance(m, ModelRequest)]
     assert len(requests) == 2  # one repair, naming the schema problems
     assert "ready_for_review" in str(requests[1].parts)
+
+
+def instructions_sent(model: FunctionModel, message: str) -> list[str]:
+    """The instructions each request of one turn carried to the model."""
+    stream, seen = model.stream_function, list[str]()
+    assert stream is not None
+
+    async def recorded(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[Any]:
+        seen.append(info.instructions or "")
+        async for chunk in stream(messages, info):
+            yield chunk
+
+    model.stream_function = recorded
+    ctx = turn_input(message)
+    run_interview_turn(model, ModelMode.CONTRIBUTOR, ctx.model_dump_json().encode(), ignore)
+    return seen
+
+
+@pytest.mark.req("PROF-09")
+def test_every_request_of_a_turn_with_a_risk_stem_carries_the_smaller_step_instruction() -> None:
+    def fake() -> FunctionModel:
+        model = fake_model_builder(failure=FakeFailure.INVALID_ONCE)("test-model", None)
+        assert isinstance(model, FunctionModel)
+        return model
+
+    flagged = instructions_sent(fake(), "I could work in Leeds. I took my life savings out.")
+    plain = instructions_sent(fake(), "I could work in Leeds and spend about £1,500.")
+
+    assert len(flagged) == len(plain) == 2  # the first request and the repair
+    assert all(SUPPORT_TURN_INSTRUCTION in sent for sent in flagged)
+    assert not any(SUPPORT_TURN_INSTRUCTION in sent for sent in plain)
+
+
+@pytest.mark.req("PROF-09")
+def test_the_fixture_follows_the_smaller_step_instruction_and_asks_no_career_question() -> None:
+    def turn(message: str) -> InterviewProposal:
+        ctx = turn_input(message)
+        encoded = ctx.model_dump_json().encode()
+        return run_interview_turn(fixture_interviewer_model(), ModelMode.FIXTURE, encoded, ignore)
+
+    flagged = turn("I could work in Bristol. I took my life savings out to retrain.")
+    plain = turn("I could work in Bristol.")
+
+    assert flagged.next_question is None
+    assert flagged.reply.startswith(REPLY_PREFIX + SMALLER_STEP_REPLY)
+    assert [c.field for c in flagged.changes] == [ProfileField.CITIES]  # proceeds as usual
+    assert plain.next_question is not None
+    assert SMALLER_STEP_REPLY not in plain.reply
 
 
 def test_the_fixture_ignores_an_amount_beyond_the_money_bound() -> None:

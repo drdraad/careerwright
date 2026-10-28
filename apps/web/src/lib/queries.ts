@@ -44,7 +44,6 @@ import {
   type SubmitDiscovery,
   type SubmitTurn,
   type SupportNoteOut,
-  type SupportResponseOut,
   storeCredential,
   submitDiscovery,
   submitTurn,
@@ -295,22 +294,21 @@ export function useTurnReply(id: string, turnId: string, enabled = true) {
   });
 }
 
-/** A sent turn (with the support note when the message used a risk word), or, for first-
- *  person acute distress, the support response instead of sending (ADR 0007 decision 7). */
-export type Submitted =
-  | { kind: "turn"; turn: TurnSubmittedOut }
-  | { kind: "support"; support: SupportResponseOut };
-
+/** A sent turn, with the support panel when its message holds a risk stem (ADR 0007
+ *  decision 7). */
 export function useSubmitTurn(id: string) {
-  return useCommand(id, async (body: SubmitTurn, key: string): Promise<Submitted> => {
-    const { data } = await submitTurn({
-      path: path(id),
-      body,
-      headers: { "Idempotency-Key": key },
-      throwOnError: true,
-    });
-    return "turn_id" in data ? { kind: "turn", turn: data } : { kind: "support", support: data };
-  });
+  return useCommand(
+    id,
+    async (body: SubmitTurn, key: string): Promise<TurnSubmittedOut> =>
+      (
+        await submitTurn({
+          path: path(id),
+          body,
+          headers: { "Idempotency-Key": key },
+          throwOnError: true,
+        })
+      ).data,
+  );
 }
 
 export type Decide = { turnId: string; body: DecideTurn };
@@ -330,32 +328,20 @@ export function useDecideTurn(id: string) {
   );
 }
 
-/** Sending a message: a turn, or the support response for it. The support response is kept
- *  with the message it answered, so "send it anyway" sends that message, not whatever is in
- *  the reply field now. Resolves whether a turn was sent. */
+/** Sending a message. Resolves whether a turn was sent. */
 export function useSendMessage(id: string) {
   const submit = useSubmitTurn(id);
-  const [support, setSupport] = useState<{
-    response: SupportResponseOut;
-    message: string;
-  } | null>(null);
-  // The support note beside a sent message that used a risk word; kept until dismissed or
+  // The support panel beside a sent message that holds a risk stem; kept until dismissed or
   // the next message is sent. It is never stored.
   const [note, setNote] = useState<SupportNoteOut | null>(null);
   const send = async (body: SubmitTurn): Promise<boolean> => {
     const sent = await submit.mutateAsync(body).catch(() => null);
     if (sent === null) return false;
-    if (sent.kind === "support") {
-      setSupport({ response: sent.support, message: body.message });
-      return false;
-    }
-    setSupport(null);
-    setNote(sent.turn.support_note);
+    setNote(sent.support_note);
     return true;
   };
   return {
     send,
-    support,
     note,
     dismissNote: () => setNote(null),
     pending: submit.isPending,

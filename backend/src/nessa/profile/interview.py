@@ -47,11 +47,17 @@ from nessa.profile.document import (
     input_type,
 )
 from nessa.profile.records import Basis, ConversationMode, EntryMode
-from nessa.profile.safety import inferred_sensitive_terms, recorded_health_terms
+from nessa.profile.safety import (
+    SUPPORT_TURN_INSTRUCTION,
+    has_risk_stem,
+    inferred_sensitive_terms,
+    recorded_health_terms,
+)
 
 # Version 2 (Task 6): the person's entry and conversation mode, the work-style field, and
-# the support and inference rules.
-PROMPT_VERSION = "interview-turn-3"
+# the support and inference rules. Version 3: one question, in next_question only. Version 4:
+# the smaller-step instruction for a turn whose message triggers the support screen.
+PROMPT_VERSION = "interview-turn-4"
 INPUT_FORMAT: Literal["nessa.interview-turn-input"] = "nessa.interview-turn-input"
 MAX_MESSAGE = 2_000
 MAX_REPLY = 1_200
@@ -508,8 +514,17 @@ def render_prompt(context: TurnInput) -> str:
     return CONTEXT_MARKER + json.dumps(payload, ensure_ascii=False, sort_keys=True)
 
 
+def instructions(context: TurnInput) -> str:
+    """The turn's instructions: with the smaller-step instruction when, and only when, the
+    current message triggers the support screen (`nessa.profile.safety`). Recomputed from the
+    message for every request, so nothing about the screen is sealed or stored."""
+    if has_risk_stem(context.messages[-1].text):
+        return f"{INSTRUCTIONS}\n{SUPPORT_TURN_INSTRUCTION}\n"
+    return INSTRUCTIONS
+
+
 def prompt_bytes(context: TurnInput) -> int:
-    return len(INSTRUCTIONS.encode()) + len(render_prompt(context).encode())
+    return len(instructions(context).encode()) + len(render_prompt(context).encode())
 
 
 def worst_case_nano_usd(model_id: str) -> int:

@@ -24,6 +24,9 @@ from nessa.profile.interview import (
 from nessa.profile.records import Basis, EntryMode
 
 REPLY_PREFIX = "Demo interviewer (synthetic): "
+SMALLER_STEP_REPLY = (
+    "Thank you for telling me. There's no rush: you can pause here, or come back to this later."
+)
 # Spec section 3, early value: current work, weekly availability, budget and work area.
 CRITICAL = (
     ProfileField.CURRENT_ROLE,
@@ -188,7 +191,9 @@ def _nothing_known(context: PromptContext) -> bool:
     return all(field.state is FieldState.UNASKED for field in context.profile.values())
 
 
-def fixture_turn(context: PromptContext) -> InterviewTurnOutput:
+def fixture_turn(context: PromptContext, *, smaller_step: bool = False) -> InterviewTurnOutput:
+    """`smaller_step`: the turn's instructions carry the smaller-step instruction, so the
+    reply acknowledges the message and offers a smaller step, and no question is asked."""
     current = next(m for m in context.messages if m.ref == context.current_message)
     updates = _proposals(context, current.ref, current.text)
     answered = {u.field for u in updates}
@@ -204,7 +209,9 @@ def fixture_turn(context: PromptContext) -> InterviewTurnOutput:
     # The entry the person chose leads: a sure person confirms the target first; an unsure
     # person starts from what they want to change, before any practical question.
     question: str | None
-    if context.entry is EntryMode.SURE and target_unasked:
+    if smaller_step:
+        question = None
+    elif context.entry is EntryMode.SURE and target_unasked:
         question = SURE_QUESTION
     elif context.entry is EntryMode.UNSURE and not updates and _nothing_known(context):
         question = UNSURE_QUESTION
@@ -216,7 +223,10 @@ def fixture_turn(context: PromptContext) -> InterviewTurnOutput:
         question = None
     noted = f"I noted {len(updates)} thing{'s' if len(updates) != 1 else ''} for you to review."
     # The question goes only in next_question; the web app shows it once, apart (PROF-08).
-    reply = REPLY_PREFIX + (noted if updates else "Thank you.")
+    said = noted if updates else "Thank you."
+    if smaller_step:
+        said = SMALLER_STEP_REPLY + (f" {noted}" if updates else "")
+    reply = REPLY_PREFIX + said
     return InterviewTurnOutput(
         reply=reply,
         proposed_updates=updates,

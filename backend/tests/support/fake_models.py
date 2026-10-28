@@ -28,6 +28,8 @@ from pydantic_ai.models import Model, StreamedResponse
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RequestUsage
 
+from nessa.profile.safety import SUPPORT_TURN_INSTRUCTION
+
 FAKE_MODEL_NAME = "fake-function-model"
 CONTEXT_MARKER = "Context (JSON):\n"
 STREAM_CHUNK = 24  # characters per streamed delta
@@ -103,9 +105,11 @@ def discovery_answer(
 
 
 def interview_answer(
-    context: dict[str, object], sentinel: str, *, valid: bool
+    context: dict[str, object], sentinel: str, *, valid: bool, smaller_step: bool = False
 ) -> dict[str, object]:
-    """A proposal for the current message: a stated city and an inferred spending limit.
+    """A proposal for the current message: a stated city and an inferred spending limit;
+    with no next question when the instructions carry the smaller-step instruction
+    (`smaller_step`), as they ask.
 
     The reply starts with `sentinel`, so even the first streamed pieces of it carry the
     sentinel into the partial store, where leak scans must find it sealed."""
@@ -157,7 +161,9 @@ def interview_answer(
                 "reason": "You mentioned about 1,500 pounds.",
             },
         ],
-        "next_question": "How many hours a week could you give to learning?",
+        "next_question": None
+        if smaller_step
+        else "How many hours a week could you give to learning?",
         "missing_critical_fields": ["weekly_study_hours"],
         "ready_for_review": True,
     }
@@ -264,7 +270,10 @@ def fake_model_builder(
                     failure in (FakeFailure.INVALID_ALWAYS, FakeFailure.INVALID_THEN_UNAVAILABLE)
                     or (failure is FakeFailure.INVALID_ONCE and call == 0)
                 )
-                answer = interview_answer(context, output_sentinel, valid=valid)
+                smaller_step = SUPPORT_TURN_INSTRUCTION in (info.instructions or "")
+                answer = interview_answer(
+                    context, output_sentinel, valid=valid, smaller_step=smaller_step
+                )
                 if failure is FakeFailure.SCHEMA_INVALID_ALWAYS:
                     answer["ready_for_review"] = "yes"  # complete JSON, wrong type
                     del answer["missing_critical_fields"]

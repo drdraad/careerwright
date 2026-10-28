@@ -1,148 +1,290 @@
-"""The minimal response policy (S2.6, PROF-09, REC1-02). The screen has two tiers: a message
-that states acute distress in the first person gets a fixed, reviewed support response
-before any model call and is not sent; any other mention of a risk word is sent as usual
-with a calm support note beside it, so no risk word is ever silently dropped and ordinary
-career talk is never blocked. Model output may not infer a health condition, a diagnosis,
-a personality type or a match percentage the person never used."""
+"""The minimal response policy (S2.6, PROF-09, REC1-02). One recall-first screen: a message
+holding any listed risk stem, in any inflection, person, tense or negation, triggers the
+support flow (the support panel, and the smaller-step instruction for that turn), and the
+message is sent as usual. No intent is judged, so a stem inside career phrasing triggers it
+too (an accepted false positive, listed for H-12), and a message with no stem gets nothing.
+Model output may not infer a health condition, a diagnosis, a personality type or a match
+percentage the person never used."""
+
+from collections.abc import Iterable
+from itertools import product
 
 import pytest
 
 from nessa.profile.safety import (
-    POLICY_VERSION,
     SUPPORT_RESOURCES,
-    SupportTier,
+    has_risk_stem,
     inferred_sensitive_terms,
     recorded_health_terms,
-    screen_message,
 )
 
-ACUTE, MENTION, NONE = 1, 2, 0
+FLOW, NO_FLOW = True, False
+Row = tuple[str, str, bool]
+CURLY = "\N{RIGHT SINGLE QUOTATION MARK}"  # the apostrophe phone keyboards type
 
-# One table: each row is an input shape, an example and the tier it must reach. Tier 1 is
-# first-person present intent or distress only; tier 2 is any other message containing a
-# risk stem, in any inflection; nothing with a risk stem reaches no tier (controller
-# ruling, fix round 3). Examples are minimal; most are workplace phrasing.
-CORPUS: list[tuple[str, str, int]] = [
-    # Tier 1: first person, present intent or distress.
-    ("intent + kill myself", "Honestly I want to kill myself, nothing is working.", ACUTE),
-    ("intent + kill myself + reason", "I want to kill myself over this.", ACUTE),
-    ("intent (perfect) + end my life", "I've been thinking about ending my life.", ACUTE),
-    ("intent + die, clause end", "Some days I just want to die.", ACUTE),
-    ("informal intent + die", "Some days I wanna die.", ACUTE),
-    ("intent + hurt myself", "I want to hurt myself.", ACUTE),
-    ("intent + end it all", "I want to end it all.", ACUTE),
-    ("I feel suicidal", "I feel suicidal most days since I lost my job.", ACUTE),
-    ("I feel suicidal + need", "I feel suicidal and I need support.", ACUTE),
-    ("I've felt suicidal", "I've felt suicidal since I lost my job.", ACUTE),
-    ("I keep thinking about + end my life", "I keep thinking about ending my life.", ACUTE),
-    ("I have been self-harming", "I have been self-harming again.", ACUTE),
-    ("I self-harm (present)", "I self-harm when work gets too much.", ACUTE),
-    ("I keep hurting myself, clause end", "I keep hurting myself.", ACUTE),
-    ("I don't want to be alive", "I don't want to be alive any more.", ACUTE),
-    ("I don't want to live, clause end", "I don't want to live anymore.", ACUTE),
-    ("I don't want to live like this", "I don't want to live like this.", ACUTE),
-    ("I do not want to live like this", "I do not want to live like this.", ACUTE),
-    ("I do not want to be here any more", "I do not want to be here any more.", ACUTE),
+SELVES = (
+    "myself",
+    "yourself",
+    "himself",
+    "herself",
+    "ourselves",
+    "yourselves",
+    "themselves",
+    "themself",
+    "oneself",
+    "my self",
+)
+WHOSE = ("my", "your", "his", "her", "our", "their", "one's")
+PRONOUNS = ("I", "you", "he", "she", "we", "they")
+INTENTS = (
+    "want to",
+    "wants to",
+    "wanted to",
+    "wanting to",
+    "wanna",
+    "going to",
+    "gonna",
+    "ready to",
+    "plan to",
+    "plans to",
+    "planned to",
+    "planning to",
+    "tempted to",
+    "try to",
+    "tries to",
+    "tried to",
+    "trying to",
+    "intend to",
+    "intends to",
+    "intended to",
+    "intending to",
+    "decide to",
+    "decides to",
+    "decided to",
+    "deciding to",
+    "urge to",
+    "urges to",
+)
+THINKING = ("think", "thinks", "thinking", "thought", "thoughts")
+NOT_WANTING = (
+    "don't want",
+    "dont want",
+    f"don{CURLY}t want",
+    "do not want",
+    "don't really want",
+    "don't even want",
+    "doesn't want",
+    "does not want",
+    "didn't want",
+    "did not want",
+    "won't want",
+    "wouldn't want",
+    "would not want",
+    "never want",
+    "never wanted",
+    "no longer want",
+    "no longer wants",
+    "not wanting",
+)
+CANNOT = ("can't", "cant", f"can{CURLY}t", "cannot", "can not", "couldn't", "couldnt", "could not")
+
+
+def forms(stem: str, phrases: Iterable[str]) -> list[Row]:
+    """Each listed form of a stem, bare: every one triggers the flow."""
+    return [(f"{stem}: {phrase}", phrase, FLOW) for phrase in phrases]
+
+
+# One table (controller ruling, fix round 4). First every stem in every form the policy
+# lists, then sentences, then messages with no stem.
+CORPUS: list[Row] = [
+    *forms("suicid-", ["suicide", "suicides", "suicidal", "suicidality", "Suicide"]),
+    *forms(
+        "self-harm",
+        [
+            "self-harm",
+            "self harm",
+            "selfharm",
+            "self-harms",
+            "self-harmed",
+            "self-harming",
+            "SELF-HARM",
+        ],
+    ),
+    *forms("overdos-", ["overdose", "overdoses", "overdosed", "overdosing"]),
+    *forms(
+        "kill/hurt/harm/cut + self",
+        [
+            f"{verb} {self}"
+            for verb, self in product(
+                (
+                    "kill",
+                    "kills",
+                    "killed",
+                    "killing",
+                    "hurt",
+                    "hurts",
+                    "hurting",
+                    "harm",
+                    "harms",
+                    "harmed",
+                    "harming",
+                    "cut",
+                    "cuts",
+                    "cutting",
+                ),
+                SELVES,
+            )
+        ],
+    ),
+    *forms("end it all", ["end it all", "ends it all", "ended it all", "ending it all"]),
+    *forms(
+        "end/take + a life",
+        [
+            f"{verb} {whose} {life}"
+            for verb, whose, life in product(
+                ("end", "ends", "ended", "ending", "take", "takes", "took", "taking", "taken"),
+                WHOSE,
+                ("life", "own life", "lives", "own lives"),
+            )
+        ],
+    ),
+    *forms(
+        "intent + die",
+        [f"{intent} {adverb}die" for intent, adverb in product(INTENTS, ("", "just ", "really "))],
+    ),
+    *forms(
+        "thinking about/of + dying",
+        [
+            f"{verb} {about} {adverb}dying"
+            for verb, about, adverb in product(THINKING, ("about", "of"), ("", "just "))
+        ],
+    ),
+    *forms(
+        "wish + dead",
+        [
+            *(
+                f"{wish} {who} {was} dead"
+                for wish, who, was in product(
+                    ("wish", "wishes", "wished", "wishing"), PRONOUNS, ("was", "were")
+                )
+            ),
+            "wish that I was dead",
+            "wish I could die",
+            "wish I could just die",
+            "wished she would die",
+        ],
+    ),
+    *forms(
+        "better off dead/without",
+        [
+            "better off dead",
+            *(f"better off without {who}" for who in ("me", "you", "him", "her", "us", "them")),
+        ],
+    ),
+    *forms(
+        "not want to live/be alive/be here",
+        [f"{neg} to {what}" for neg, what in product(NOT_WANTING, ("live", "be alive", "be here"))],
+    ),
+    *forms("no reason to", ["no reason to live", "no reason to go on"]),
+    *forms("cannot go on", [f"{cannot} go on" for cannot in CANNOT]),
+    # Sentences: the earlier corpus (fix rounds 1-3), every row of which held a stem.
+    ("intent + kill myself", "Honestly I want to kill myself, nothing is working.", FLOW),
+    ("intent (perfect) + end my life", "I've been thinking about ending my life.", FLOW),
+    ("intent + die, clause end", "Some days I just want to die.", FLOW),
+    ("informal intent + die", "Some days I wanna die.", FLOW),
+    ("capitals", "Some days I Want To Die.", FLOW),
+    ("I feel suicidal", "I feel suicidal most days since I lost my job.", FLOW),
+    ("I have been self-harming", "I have been self-harming again.", FLOW),
+    ("I keep hurting myself", "I keep hurting myself.", FLOW),
+    ("I don't want to be alive", "I don't want to be alive any more.", FLOW),
+    ("I do not want to be here any more", "I do not want to be here any more.", FLOW),
     (
         "better off if I took my own life",
         "Everyone would be better off if I took my own life",
-        ACUTE,
+        FLOW,
     ),
-    ("I can't go on, clause end", "I can't go on.", ACUTE),
-    # Tier 2: a risk stem in a professional, third-party, figurative or object frame.
-    ("professional: suicide prevention", "I volunteer on a suicide prevention helpline.", MENTION),
-    (
-        "professional: intent + suicide (noun)",
-        "I have been thinking about suicide prevention work.",
-        MENTION,
-    ),
-    (
-        "professional: intent of + suicide",
-        "I am thinking of suicide prevention as a career.",
-        MENTION,
-    ),
-    (
-        "professional: self-harm services",
-        "I'd like to work in self-harm support services.",
-        MENTION,
-    ),
-    (
-        "professional: I have + self-harm (noun)",
-        "I have self-harm awareness training from my NHS role.",
-        MENTION,
-    ),
-    (
-        "third party: people feeling suicidal",
-        "I answer calls from people feeling suicidal.",
-        MENTION,
-    ),
-    (
-        "third party: young people feeling suicidal",
-        "I support young people feeling suicidal as a youth worker.",
-        MENTION,
-    ),
-    ("third party: something going to die", "I think the high street is going to die.", MENTION),
-    ("third party: print going to die", "Print is going to die, so I want to retrain.", MENTION),
-    ("no subject: no reason to go on", "There's no reason to go on.", MENTION),
-    ("figurative: die of boredom", "I am going to die of boredom in this job.", MENTION),
-    ("figurative: die on this hill", "I am ready to die on this hill about remote work.", MENTION),
+    ("I can't go on", "I can't go on.", FLOW),
+    ("professional: suicide prevention", "I volunteer on a suicide prevention helpline.", FLOW),
+    ("professional: self-harm services", "I'd like to work in self-harm support services.", FLOW),
+    ("third party: feeling suicidal", "I answer calls from people feeling suicidal.", FLOW),
+    ("third party: going to die", "Print is going to die, so I want to retrain.", FLOW),
+    ("figurative: die of boredom", "I am going to die of boredom in this job.", FLOW),
     (
         "figurative: killing myself with work",
         "I'm killing myself with overtime at the depot.",
-        MENTION,
+        FLOW,
     ),
-    ("figurative: could kill myself", "I could kill myself for missing that deadline.", MENTION),
-    ("object: take my life in a direction", "I want to take my life in a new direction.", MENTION),
-    ("object: life savings", "I took my life savings out to retrain.", MENTION),
-    ("object: taken my life savings", "Retraining has taken my life savings.", MENTION),
-    ("object: live in a place", "I don't want to live in London.", MENTION),
-    ("injury: hurt myself lifting", "I hurt myself lifting boxes at the warehouse.", MENTION),
+    ("object: take my life in a direction", "I want to take my life in a new direction.", FLOW),
+    ("object: took my life savings", "I took my life savings out to retrain.", FLOW),
+    ("object: taken my life savings", "Retraining has taken my life savings.", FLOW),
+    ("object: live in a place", "I don't want to live in London.", FLOW),
+    ("injury: hurt myself lifting", "I hurt myself lifting boxes at the warehouse.", FLOW),
+    ("injury: kept cutting myself", "I kept cutting myself on the packaging tape.", FLOW),
+    ("course: no reason to go on with", "There is no reason to go on with the course.", FLOW),
+    ("course: cannot go on with", "I cannot go on with this course.", FLOW),
+    ("job: don't want to be here", "I don't want to be here in five years.", FLOW),
+    # The re-review 3 career probes that hold a stem: accepted false positives (H-12).
     (
-        "injury: have been hurting myself lifting",
-        "I have been hurting myself lifting boxes at the warehouse.",
-        MENTION,
+        "career: took my life savings",
+        "I would be better off if I took my life savings and retrained.",
+        FLOW,
     ),
     (
-        "injury: kept cutting myself on tape",
-        "I kept cutting myself on the packaging tape at the depot.",
-        MENTION,
+        "career: ending my life sciences career",
+        "I am thinking about ending my life sciences career.",
+        FLOW,
     ),
     (
-        "injury: was cutting myself on tape",
-        "I was cutting myself on the packaging tape at the depot.",
-        MENTION,
+        "career: end my life coaching business",
+        "I want to end my life coaching business and teach.",
+        FLOW,
     ),
-    ("injury: hurt myself (past)", "I hurt myself again last night.", MENTION),
     (
-        "course: no reason to go on with",
-        "There is no reason to go on with the accounting course.",
-        MENTION,
+        "career: team better off without me",
+        "My old team is better off without me, so I want a new role.",
+        FLOW,
     ),
-    ("can't go on + qualifier", "I can't go on like this at work.", MENTION),
-    ("cannot go on + object", "I cannot go on with this course.", MENTION),
-    ("can not go on + qualifier", "I can not go on like this at work.", MENTION),
-    ("wanting to die (figurative)", "Wanting to die on every hill slows meetings down.", MENTION),
-    ("don't want to be here (job)", "I don't want to be here in five years.", MENTION),
-    # No risk stem: nothing.
-    ("killing me (not myself)", "This commute is killing me.", NONE),
-    ("dying to", "I'm dying to try woodwork.", NONE),
-    ("kill for", "I'd kill for a four-day week.", NONE),
-    ("want to quit", "The deadline pressure made me want to quit.", NONE),
-    ("overwhelmed", "I feel a bit overwhelmed by all the options.", NONE),
-    ("a named condition", "I have dyslexia, so long written tests are hard.", NONE),
+    (
+        "career: hurt myself lifting",
+        "I am going to hurt myself lifting these boxes at the depot.",
+        FLOW,
+    ),
+    ("career: keep cutting myself", "The tape is sharp and I keep cutting myself.", FLOW),
+    ("career: did not want to live in", "He did not want to live in London.", FLOW),
+    ("career: does not want to live in", "She does not want to live in Leeds.", FLOW),
+    ("career: could not go on with", "I could not go on with the accounting course.", FLOW),
+    # No stem: nothing, however close the words.
+    ("lifeguard", "I am planning to end my lifeguard job this summer.", NO_FLOW),
+    ("lifelong", "I want to end my lifelong career in retail.", NO_FLOW),
+    ("lifestyle", "I want to end my lifestyle blog.", NO_FLOW),
+    ("working life", "I want to end my working life in teaching.", NO_FLOW),
+    ("life sciences, no verb", "I studied life sciences at college.", NO_FLOW),
+    ("life savings, no verb", "I spent my life savings on the course.", NO_FLOW),
+    ("workplace cuts", "There were job cuts at work this year.", NO_FLOW),
+    ("cut costs", "I cut costs in my team.", NO_FLOW),
+    ("without meetings", "The team would be better off without meetings on Fridays.", NO_FLOW),
+    ("better off without a thing", "We would be better off without the old rota.", NO_FLOW),
+    ("self-esteem", "Redundancy hurt my self-esteem.", NO_FLOW),
+    ("want to live in", "I want to live in Leeds.", NO_FLOW),
+    ("go online", "I can't go online at work.", NO_FLOW),
+    ("die down", "The noise will die down soon.", NO_FLOW),
+    ("dying to", "I'm dying to try woodwork.", NO_FLOW),
+    ("killing me", "This commute is killing me.", NO_FLOW),
+    ("kill for", "I'd kill for a four-day week.", NO_FLOW),
+    ("want to quit", "The deadline pressure made me want to quit.", NO_FLOW),
+    ("overwhelmed", "I feel a bit overwhelmed by all the options.", NO_FLOW),
+    ("a named condition", "I have dyslexia, so long written tests are hard.", NO_FLOW),
 ]
 
 
 @pytest.mark.req("PROF-09")
-@pytest.mark.parametrize(("shape", "message", "tier"), CORPUS, ids=[row[0] for row in CORPUS])
-def test_the_screen_puts_each_shape_in_its_tier(shape: str, message: str, tier: int) -> None:
-    concern = screen_message(message)
-
-    found = NONE if concern is None else ACUTE if concern.tier is SupportTier.ACUTE else MENTION
-    assert found == tier, shape
-    if concern is not None:
-        assert concern.policy == ("acute_distress" if tier == ACUTE else "risk_mention")
-        assert concern.policy_version == POLICY_VERSION
+@pytest.mark.parametrize(("shape", "message", "flow"), CORPUS, ids=[row[0] for row in CORPUS])
+def test_any_listed_stem_triggers_the_support_flow_and_nothing_else_does(
+    shape: str, message: str, flow: bool
+) -> None:
+    assert has_risk_stem(message) is flow, shape
+    # Whatever surrounds it: a stem inside other words still counts, and none appears.
+    assert has_risk_stem(f"At work, {message}, and so on.") is flow, shape
 
 
 @pytest.mark.req("PROF-09")

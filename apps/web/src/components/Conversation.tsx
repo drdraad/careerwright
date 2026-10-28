@@ -2,10 +2,10 @@
 // The conversation (spec section 4, S2.3): one useful question at a time, the person's
 // choice of entry and tone, pause and resume, and the reply as it streams. A streamed reply
 // is marked not checked until the validated turn replaces it; a failed turn says why, keeps
-// what streamed marked as not saved, and saves nothing. The support screen has two tiers
-// (ADR 0007 decision 7): a first-person statement of acute distress gets the support
-// response instead of the interviewer; any other risk word is sent as usual, with a calm
-// support note beside it, announced politely and dismissible.
+// what streamed marked as not saved, and saves nothing. A message with a risk stem is sent
+// as usual, and the API's calm support panel is shown beside it (ADR 0007 decision 7):
+// announced politely, focus left where it is, dismissible, and the question steps aside
+// while it is shown (no career question that turn).
 import { useEffect, useId, useRef, useState } from "react";
 import type {
   ConversationMode,
@@ -13,7 +13,6 @@ import type {
   PreferencesOut,
   ProfileOut,
   SupportNoteOut,
-  SupportResponseOut,
   TurnOut,
   WorkspaceOut,
 } from "@/generated/api";
@@ -109,10 +108,11 @@ function Reply({
   );
 }
 
-/** Beside a sent message that used a risk word (tier 2): calm, not blocking, dismissible.
- *  The message went to Nessa as usual. */
+/** Beside a sent message that holds a risk stem: calm, not blocking, dismissible. The
+ *  message went to Nessa as usual. */
 function SupportNote({ note, onDismiss }: { note: SupportNoteOut; onDismiss(): void }) {
   const titleId = useId();
+  const checked = note.resources[0]?.checked_on;
   return (
     <section className="card grid gap-8 small" aria-labelledby={titleId}>
       <h3 id={titleId} className="font-semibold">
@@ -126,48 +126,19 @@ function SupportNote({ note, onDismiss }: { note: SupportNoteOut; onDismiss(): v
           </li>
         ))}
       </ul>
+      {checked !== undefined && (
+        <p className="muted">
+          These services were checked on their own websites on{" "}
+          {day.format(new Date(`${checked}T12:00:00Z`))}. This note is provisional until it is
+          reviewed.
+        </p>
+      )}
       <div>
         <Button variant="quiet" onClick={onDismiss}>
           Dismiss <span className="sr-only">the support note</span>
         </Button>
       </div>
     </section>
-  );
-}
-
-function SupportNotice({
-  support,
-  onSendAnyway,
-  blocked,
-}: {
-  support: SupportResponseOut;
-  onSendAnyway(): void;
-  blocked: string | undefined;
-}) {
-  const checked = support.resources[0]?.checked_on;
-  return (
-    <Alert tone="neutral" title="Support is available now" announce>
-      <p>{support.message}</p>
-      <ul className="plain-list mt-8">
-        {support.resources.map((resource) => (
-          <li key={resource.name}>
-            <strong>{resource.name}:</strong> {resource.contact}. {resource.when}.
-          </li>
-        ))}
-      </ul>
-      {checked !== undefined && (
-        <p className="muted mt-8">
-          These services were checked on their own websites on{" "}
-          {day.format(new Date(`${checked}T12:00:00Z`))}. This response is provisional until it is
-          reviewed.
-        </p>
-      )}
-      <div className="alert-actions">
-        <Button variant="secondary" onClick={onSendAnyway} disabledReason={blocked}>
-          Send my message to Nessa anyway
-        </Button>
-      </div>
-    </Alert>
   );
 }
 
@@ -234,7 +205,7 @@ export function Conversation({
   const replyField = useRef<HTMLTextAreaElement>(null);
   const modeId = useId();
   const demo = workspace.data_mode === "demo";
-  const support = sender.support;
+  const note = sender.note;
 
   const latest = turns.at(-1);
   const latestFailed = latest !== undefined && turnFailed(latest);
@@ -261,7 +232,6 @@ export function Conversation({
   }, [answeredId, answered, announce]);
 
   // A new support note is announced politely; focus stays where the person is (I-4).
-  const note = sender.note;
   const announcedNote = useRef<typeof note>(null);
   useEffect(() => {
     if (note !== null && note !== announcedNote.current) {
@@ -293,12 +263,8 @@ export function Conversation({
       { onError },
     );
 
-  const send = async (text: string, sendAfterSupport = false) => {
-    const sent = await sender.send({
-      expected_profile_version: profile.version,
-      message: text,
-      send_after_support: sendAfterSupport,
-    });
+  const send = async (text: string) => {
+    const sent = await sender.send({ expected_profile_version: profile.version, message: text });
     if (sent && text === message.trim()) setMessage("");
   };
 
@@ -407,7 +373,7 @@ export function Conversation({
           ) : (
             question !== null &&
             !latestFailed &&
-            support === null && (
+            note === null && (
               <section className="question" aria-labelledby="question-title">
                 <h2 id="question-title" className="display" tabIndex={-1} ref={questionTitle}>
                   {question}
@@ -421,13 +387,6 @@ export function Conversation({
         </>
       )}
 
-      {support !== null && (
-        <SupportNotice
-          support={support.response}
-          blocked={sendBlocked}
-          onSendAnyway={() => void send(support.message, true)}
-        />
-      )}
       {note !== null && (
         <SupportNote
           note={note}

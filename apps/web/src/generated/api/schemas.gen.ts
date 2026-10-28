@@ -3406,12 +3406,6 @@ export const SubmitTurnSchema = {
             maxLength: 2000,
             minLength: 1,
             title: 'Message'
-        },
-        send_after_support: {
-            type: 'boolean',
-            title: 'Send After Support',
-            description: 'The person was shown the support response for this message and chose to send it to the interviewer anyway.',
-            default: false
         }
     },
     additionalProperties: false,
@@ -3557,14 +3551,6 @@ export const SuggestionOutSchema = {
 
 export const SupportNoteOutSchema = {
     properties: {
-        policy: {
-            type: 'string',
-            enum: [
-                'risk_mention',
-                'acute_distress'
-            ],
-            title: 'Policy'
-        },
         policy_version: {
             type: 'string',
             title: 'Policy Version'
@@ -3589,14 +3575,13 @@ export const SupportNoteOutSchema = {
     additionalProperties: false,
     type: 'object',
     required: [
-        'policy',
         'policy_version',
         'review_status',
         'message',
         'resources'
     ],
     title: 'SupportNoteOut',
-    description: 'Shown beside a turn whose message used a risk word without stating acute distress in\nthe first person: the message was sent as usual. Derived from the request on every\nresponse, including a replay; never stored, not even in the idempotency receipt.'
+    description: 'The support panel, shown beside a turn whose message holds a risk stem\n(`nessa.profile.safety`): the message was sent as usual. Kept apart from career\nsuitability. Derived from the request on every response, a replay included; never\nstored, not even in the idempotency receipt.'
 } as const;
 
 export const SupportResourceOutSchema = {
@@ -3633,53 +3618,6 @@ export const SupportResourceOutSchema = {
         'checked_on'
     ],
     title: 'SupportResourceOut'
-} as const;
-
-export const SupportResponseOutSchema = {
-    properties: {
-        policy: {
-            type: 'string',
-            const: 'acute_distress',
-            title: 'Policy'
-        },
-        policy_version: {
-            type: 'string',
-            title: 'Policy Version'
-        },
-        review_status: {
-            type: 'string',
-            title: 'Review Status',
-            description: 'The policy is provisional until reviewed.'
-        },
-        message: {
-            type: 'string',
-            title: 'Message'
-        },
-        resources: {
-            items: {
-                $ref: '#/components/schemas/SupportResourceOut'
-            },
-            type: 'array',
-            title: 'Resources'
-        },
-        sent_to_interviewer: {
-            type: 'boolean',
-            const: false,
-            title: 'Sent To Interviewer',
-            default: false
-        }
-    },
-    additionalProperties: false,
-    type: 'object',
-    required: [
-        'policy',
-        'policy_version',
-        'review_status',
-        'message',
-        'resources'
-    ],
-    title: 'SupportResponseOut',
-    description: 'Given instead of a turn when a message explicitly expresses acute distress: the\nmessage was not sent to the interviewer and nothing was stored. Kept apart from career\nsuitability. Resend with `send_after_support` to send the message anyway.'
 } as const;
 
 export const TargetListInputSchema = {
@@ -4229,7 +4167,7 @@ export const TurnSubmittedOutSchema = {
         'support_note'
     ],
     title: 'TurnSubmittedOut',
-    description: 'A new turn, with the support note when its message used a risk word.'
+    description: 'A new turn, with the support panel when its message holds a risk stem.'
 } as const;
 
 export const WorkStateSchema = {

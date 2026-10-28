@@ -53,7 +53,7 @@ from nessa.profile.interview import (
     check_turn,
     context_profile,
 )
-from nessa.profile.safety import SupportTier, screen_message
+from nessa.profile.safety import has_risk_stem
 from nessa.profile.slate import Emphasis, SlateControls
 from nessa.vocabulary import DataMode, WorkState
 
@@ -64,7 +64,7 @@ Json = dict[str, Any]
 class CaseKind(StrEnum):
     INTERVIEW = "interview"  # one interview turn: model behaviour (live only)
     DISCOVERY = "discovery"  # the confirmed answers to a slate
-    SUPPORT = "support"  # the acute-distress screen, before any model call
+    SUPPORT = "support"  # the support screen: whether the message triggers the support flow
     GUARD = "guard"  # a canned model output against the deterministic output checks
 
 
@@ -340,8 +340,7 @@ def evaluate(case: Case, observed: Json, others: Mapping[str, Json]) -> list[Fai
         elif case.kind is CaseKind.DISCOVERY:
             failure = _discovery(observed, e, answers_of(case))
         elif case.kind is CaseKind.SUPPORT:
-            # `support_shown`: tier 1, the support response instead of sending; `support_note`:
-            # tier 2, sent as usual with the support note beside it.
+            # `support_shown`: the support flow (the panel beside the sent message).
             shown = bool(observed[e.check])
             want = bool(e.value)
             failure = (
@@ -384,12 +383,7 @@ def document_of(case: Case) -> ProfileDocument:
 
 
 def observe_support(case: Case) -> Json:
-    concern = screen_message(case.message or "")
-    tier = None if concern is None else concern.tier
-    return {
-        "support_shown": tier is SupportTier.ACUTE,
-        "support_note": tier is SupportTier.MENTION,
-    }
+    return {"support_shown": has_risk_stem(case.message or "")}
 
 
 def observe_guard(case: Case) -> Json:

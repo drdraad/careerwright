@@ -3,7 +3,6 @@ and the decision on them."""
 
 import uuid
 from datetime import datetime
-from typing import Literal
 
 from pydantic import Field
 
@@ -11,7 +10,7 @@ from nessa.api.schemas import ProfileOut, ResponseModel, RunOut
 from nessa.identity.records import PartialCompleteness, PartialReply
 from nessa.money import Money
 from nessa.profile import safety
-from nessa.profile.conversation import SupportShown, TurnView
+from nessa.profile.conversation import TurnView
 from nessa.profile.document import SalaryFloor
 from nessa.profile.interview import (
     AnsweredState,
@@ -27,7 +26,6 @@ from nessa.profile.records import (
     InterviewPreferences,
     TurnDecision,
 )
-from nessa.profile.safety import SupportConcern
 
 
 class ProposedChangeOut(ResponseModel):
@@ -174,40 +172,6 @@ class TurnOut(ResponseModel):
         )
 
 
-class SupportNoteOut(ResponseModel):
-    """Shown beside a turn whose message used a risk word without stating acute distress in
-    the first person: the message was sent as usual. Derived from the request on every
-    response, including a replay; never stored, not even in the idempotency receipt."""
-
-    policy: Literal["risk_mention", "acute_distress"]
-    policy_version: str
-    review_status: str = Field(description="The policy is provisional until reviewed.")
-    message: str
-    resources: list["SupportResourceOut"]
-
-    @classmethod
-    def of(cls, concern: SupportConcern) -> "SupportNoteOut":
-        return cls(
-            policy=concern.tier.value,
-            policy_version=concern.policy_version,
-            review_status=safety.REVIEW_STATUS,
-            message=safety.SUPPORT_NOTE,
-            resources=_resources(),
-        )
-
-
-class TurnSubmittedOut(TurnOut):
-    """A new turn, with the support note when its message used a risk word."""
-
-    support_note: SupportNoteOut | None
-
-    @classmethod
-    def sent(cls, turn: TurnOut, note: SupportConcern | None) -> "TurnSubmittedOut":
-        return cls(
-            **turn.model_dump(), support_note=None if note is None else SupportNoteOut.of(note)
-        )
-
-
 class SupportResourceOut(ResponseModel):
     name: str
     contact: str
@@ -216,43 +180,44 @@ class SupportResourceOut(ResponseModel):
     checked_on: str = Field(description="When the service's own page was last checked.")
 
 
-class SupportResponseOut(ResponseModel):
-    """Given instead of a turn when a message explicitly expresses acute distress: the
-    message was not sent to the interviewer and nothing was stored. Kept apart from career
-    suitability. Resend with `send_after_support` to send the message anyway."""
+class SupportNoteOut(ResponseModel):
+    """The support panel, shown beside a turn whose message holds a risk stem
+    (`nessa.profile.safety`): the message was sent as usual. Kept apart from career
+    suitability. Derived from the request on every response, a replay included; never
+    stored, not even in the idempotency receipt."""
 
-    policy: Literal["acute_distress"]
     policy_version: str
     review_status: str = Field(description="The policy is provisional until reviewed.")
     message: str
     resources: list[SupportResourceOut]
-    sent_to_interviewer: Literal[False] = False
 
     @classmethod
-    def of(cls, shown: SupportShown) -> "SupportResponseOut":
+    def current(cls) -> "SupportNoteOut":
         return cls(
-            policy="acute_distress",
-            policy_version=shown.concern.policy_version,
+            policy_version=safety.POLICY_VERSION,
             review_status=safety.REVIEW_STATUS,
-            message=safety.SUPPORT_MESSAGE,
-            resources=_resources(),
+            message=safety.SUPPORT_NOTE,
+            resources=[
+                SupportResourceOut(
+                    name=r.name,
+                    contact=r.contact,
+                    when=r.when,
+                    source_url=r.source_url,
+                    checked_on=r.checked_on,
+                )
+                for r in safety.SUPPORT_RESOURCES
+            ],
         )
 
 
-def _resources() -> list[SupportResourceOut]:
-    return [
-        SupportResourceOut(
-            name=r.name,
-            contact=r.contact,
-            when=r.when,
-            source_url=r.source_url,
-            checked_on=r.checked_on,
-        )
-        for r in safety.SUPPORT_RESOURCES
-    ]
+class TurnSubmittedOut(TurnOut):
+    """A new turn, with the support panel when its message holds a risk stem."""
 
+    support_note: SupportNoteOut | None
 
-SupportNoteOut.model_rebuild()
+    @classmethod
+    def sent(cls, turn: TurnOut, *, support: bool) -> "TurnSubmittedOut":
+        return cls(**turn.model_dump(), support_note=SupportNoteOut.current() if support else None)
 
 
 class PreferencesOut(ResponseModel):

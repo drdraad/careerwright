@@ -31,11 +31,13 @@ from nessa.profile.interview import (
     TurnInput,
     check_turn,
     context_profile,
+    instructions,
     prompt_bytes,
     render_prompt,
     worst_case_nano_usd,
 )
 from nessa.profile.records import Basis, ConversationMode, EntryMode
+from nessa.profile.safety import SUPPORT_TURN_INSTRUCTION, has_risk_stem
 
 M1 = uuid.UUID("00000000-0000-4000-8000-000000000001")
 M2 = uuid.UUID("00000000-0000-4000-8000-000000000002")
@@ -407,7 +409,31 @@ def test_the_prompt_says_how_the_person_chose_to_start_and_to_be_spoken_to() -> 
     payload = json.loads(render_prompt(ctx).removeprefix(CONTEXT_MARKER))
 
     assert (payload["entry"], payload["mode"]) == ("sure", "gentle")
-    assert ctx.prompt_version == "interview-turn-3"
+    assert ctx.prompt_version == "interview-turn-4"
+
+
+@pytest.mark.req("PROF-09")
+def test_the_smaller_step_instruction_is_added_only_for_a_turn_whose_message_has_a_risk_stem() -> (
+    None
+):
+    flagged = context("I took my life savings out to retrain.")
+    plain = context("I could work in Leeds.")
+    earlier = context("I took my life savings out to retrain.", "I could work in Leeds.")
+
+    assert instructions(flagged) == f"{INSTRUCTIONS}\n{SUPPORT_TURN_INSTRUCTION}\n"
+    assert instructions(plain) == INSTRUCTIONS
+    assert instructions(earlier) == INSTRUCTIONS  # that turn only
+    assert prompt_bytes(flagged) == len(instructions(flagged).encode()) + len(
+        render_prompt(flagged).encode()
+    )
+    # The model never sees a label naming the screen or what it matched: the context it
+    # reads has the same shape either way, and the added words name neither.
+    shown = json.loads(render_prompt(flagged).removeprefix(CONTEXT_MARKER))
+    assert shown.keys() == json.loads(render_prompt(plain).removeprefix(CONTEXT_MARKER)).keys()
+    added = SUPPORT_TURN_INSTRUCTION.casefold()
+    assert not has_risk_stem(added)
+    for label in ("support", "screen", "flag", "risk", "safety", "distress", "crisis", "life"):
+        assert label not in added, label
 
 
 def test_an_input_sealed_before_preferences_existed_still_opens() -> None:
@@ -472,6 +498,8 @@ def test_a_named_condition_is_acknowledged_but_never_recorded_in_a_career_field(
 def test_the_prompt_and_schema_fit_the_bounds_the_reservation_assumes() -> None:
     long_message = "I have worked in warehouses for years. " * 50  # about 2,000 characters
     assert prompt_bytes(context(long_message[:2000])) <= MAX_PROMPT_BYTES
+    flagged = "I took my life savings out. " + long_message  # with the smaller-step instruction
+    assert prompt_bytes(context(flagged[:2000])) <= MAX_PROMPT_BYTES
     schema = json.dumps(InterviewTurnOutput.model_json_schema())
     assert len(schema.encode()) <= SCHEMA_ALLOWANCE_TOKENS  # bytes bound tokens
     assert len(INSTRUCTIONS.encode()) < MAX_PROMPT_BYTES // 2

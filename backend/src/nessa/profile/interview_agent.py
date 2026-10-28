@@ -42,7 +42,6 @@ from nessa.profile import interview
 from nessa.profile.fixture_interviewer import fixture_turn
 from nessa.profile.interview import (
     CONTEXT_MARKER,
-    INSTRUCTIONS,
     MAX_OUTPUT_TOKENS,
     MAX_REQUESTS,
     InterviewProposal,
@@ -52,6 +51,7 @@ from nessa.profile.interview import (
     TurnInput,
     render_prompt,
 )
+from nessa.profile.safety import SUPPORT_TURN_INSTRUCTION
 
 FIXTURE_STREAM_CHUNK = 32  # characters per delta the fixture interviewer streams
 
@@ -110,7 +110,7 @@ def run_interview_turn(
     agent = Agent(
         model,
         output_type=NativeOutput(InterviewTurnOutput),
-        instructions=INSTRUCTIONS,
+        instructions=interview.instructions(context),
         retries={"tools": 0, "output": MAX_REQUESTS - 1},
         capabilities=[TruncationGuard(), ReplyStream(on_reply)],
     )
@@ -157,20 +157,23 @@ def _prompt_context(messages: list[ModelMessage]) -> PromptContext:
     raise ValueError("the prompt has no context")
 
 
-def _fixture_json(messages: list[ModelMessage]) -> str:
-    return fixture_turn(_prompt_context(messages)).model_dump_json()
+def _fixture_json(messages: list[ModelMessage], info: AgentInfo) -> str:
+    smaller_step = SUPPORT_TURN_INSTRUCTION in (info.instructions or "")
+    return fixture_turn(_prompt_context(messages), smaller_step=smaller_step).model_dump_json()
 
 
 def fixture_interviewer_model() -> Model:
     """The deterministic demo interviewer behind Pydantic AI's model interface: no network,
-    no key; it answers from the prompt's context with `fixture_turn`, whole or streamed in
+    no key; it answers from the prompt's context with `fixture_turn`, following the
+    smaller-step instruction when the turn's instructions carry it, whole or streamed in
     pieces like a provider."""
 
     def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-        return ModelResponse(parts=[TextPart(_fixture_json(messages))], model_name=FIXTURE_MODEL_ID)
+        text = _fixture_json(messages, info)
+        return ModelResponse(parts=[TextPart(text)], model_name=FIXTURE_MODEL_ID)
 
     async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
-        text = _fixture_json(messages)
+        text = _fixture_json(messages, info)
         for start in range(0, len(text), FIXTURE_STREAM_CHUNK):
             yield text[start : start + FIXTURE_STREAM_CHUNK]
 
