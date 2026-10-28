@@ -2,8 +2,8 @@
 
 - Date: 2026-10-28. Branch `l0-local-release`.
 - Reviewed revision: `96259d7` for this pre-review; after the independent review's fix
-  round 1, the final code is `7f2a45b` (the commit that updates this review changes docs and
-  screenshots only).
+  rounds 1 and 2, the final code is `8dde3e6` (the commit that updates this review changes
+  docs and screenshots only).
 - Sprint 2 commits: `ef25e31`..`8a817f6` (Task 5: S2.1-S2.2, the taxonomy and the
   InterviewTurn contract, with two fix rounds) and `b51d2b7` onward (Task 6: S2.3-S2.6, the
   You chapter, discovery, the sketch, the support policy, the evaluation and this review).
@@ -32,8 +32,9 @@ fresh demo stack (`apps/web/e2e/conversation.spec.ts`), and against the live tes
 
 P02 (unsure, unemployed) explores without an income baseline (none exists in the profile,
 and no budget or salary value was proposed live: INT-01) and without any personality test
-(work style is optional and skippable). The minimal support policy answers explicit acute
-distress before any model call.
+(work style is optional and skippable). The minimal support policy answers first-person
+acute distress before any model call, and sends any other mention of a risk word as usual
+with a calm support note beside it (two tiers, since fix round 2).
 
 Not shown: a person with a real key on the production model (the release task owns the one
 production qualification call); listings, pay or skills comparison (Sprints 3-4).
@@ -63,20 +64,20 @@ backend tests, 176 Vitest, 178 integration and stack, 21 Playwright); its first 
 run caught the sticky composer covering Try again (axe `target-size` at 390×844), fixed and
 rerun clean.
 
-After fix round 1 (final code):
+After fix round 2 (final code, `8dde3e6`):
 
 - `make check`: exit 0. Backend: ruff format (175 files) and ruff check clean, mypy clean
-  (175 files), 400 fast tests passed, fixture validator passed. Web: client drift, Biome
-  (108 files), `tsc`, Vitest 190 tests in 24 files passed (rerun after the last test-only
-  commit, `7f2a45b`).
-- `make acceptance`: exit 0. 183 integration and stack tests passed on PostgreSQL 16.15 and
+  (175 files), 412 fast tests passed, fixture validator passed. Web: client drift, Biome
+  (108 files), `tsc`, Vitest 192 tests in 24 files passed.
+- `make acceptance`: exit 0. 185 integration and stack tests passed on PostgreSQL 16.15 and
   DBOS (including the full ESCO import and offline evaluation), the Storybook build, and 22
   Playwright tests passed (journeys, keyboard, session, recovery in place, Storybook axe,
   the visual package at three viewports).
-- `pnpm run review-screenshots`: 3 passed; 81 captures with axe, overflow, overprint,
-  console and font checks clean at every viewport (`checks-*.json`).
-- Live: `make live-eval` twice in all (rows 15-20, then the fix-round run, rows 21-24). Not
-  run: VoiceOver, Safari, 200 % zoom, the production model.
+- `pnpm run review-screenshots`: 3 passed; 84 captures (including `you--support-note`) with
+  axe, overflow, overprint, console and font checks clean at every viewport
+  (`checks-*.json`).
+- Live: `make live-eval` twice in all (rows 15-20, then the fix-round 1 run, rows 21-24);
+  none in fix round 2. Not run: VoiceOver, Safari, 200 % zoom, the production model.
 
 ## The six questions
 
@@ -236,6 +237,18 @@ behavioural changes, each with a test written first:
   edit and skip, MODEL-07's revoked key, S0-V08 in every state); the behaviour or the claim
   was corrected and each claim now names its test.
 
+**Re-review and fix round 2.** The re-review found 35 of 37 fixed, accepted the A-M4
+deferral, and found A-I-1 only partly fixed: excusing a match by the word after it had
+turned some explicit statements into silent misses ("I want to kill myself over this", "I
+keep hurting myself", "I don't want to live like this", "I feel suicidal and need
+support"). By the controller's ruling the screen now has two tiers: first-person intent or
+distress gets the support response and is not sent; any other risk word is sent as usual
+with a support note, so none is dropped and no career phrase is blocked. Its remaining
+limits are in the H-12 checklist. Nine minor findings were also fixed: undo is in the
+cross-account sweep; a stored £0 floor still opens; folding stays within one ISCO minor
+group (164 within-group ESCO alias pairs still fold, for H-12); kindred words only in
+searches; a "?" in a reply with no next question costs no repair; and smaller ones.
+
 ## Accepted limitations and open items
 
 | Item | Owner | State |
@@ -261,8 +274,9 @@ behavioural changes, each with a test written first:
    limits and "Accept" for facts understood; is Undo discoverable?
 4. **Slate:** are the cards' three sections helpful or too long on a phone; is "no score or
    percentage" understood; do the controls read as a view, not a filter on the profile?
-5. **Support response:** is it calm, clear and actionable; is "Send my message anyway"
-   appropriate (also H-12)?
+5. **Support response and note:** is the blocking response calm, clear and actionable; is
+   "Send my message anyway" appropriate; is the non-blocking note beside a sent message
+   calm rather than alarming, and easy to dismiss (also H-12)?
 6. **Key consent:** is what is stored, where and its limits clear before consent?
 7. **Phone:** What we know, the reply field and Try again beside the sheet (S0-V01/V02).
 

@@ -42,8 +42,10 @@ inference, with at least 30 evaluation cases and a capped live run.
      unless they say otherwise; `month`, `week` or `hour` as given; never annualised, spec
      section 5). It is a **hard constraint** (the product owner's change to ADR 0006 decision
      6): the interview may propose it, only explicit confirmation establishes it, and
-     Unknown, Skipped and Prefer not to say are answers, never 0 (a floor is more than £0;
-     "no floor" is Unknown or Skipped). The period is part of the value: a proposal is
+     Unknown, Skipped and Prefer not to say are answers, never 0 (a new floor is more than
+     £0; "no floor" is Unknown or Skipped; the rule applies to input only, so a version
+     stored before it still opens, and undoing to one refuses with `no_longer_valid`). The
+     period is part of the value: a proposal is
      `stated` only when the cited words give both the amount and that period ("an hour",
      "weekly", "annually"); a defaulted or different period is `inferred`. Until regional pay
      evidence exists (Sprint 3), nothing can apply it: the slate says so in
@@ -52,11 +54,13 @@ inference, with at least 30 evaluation cases and a capped live run.
 
 3. **One useful question at a time** is the interviewer's job and part of the contract
    (`interview-turn-3`): the question lives only in `next_question`, which holds at most one
-   question mark, and the reply holds none (a validation problem, so the one repair
-   applies). The web app shows the reply and the question apart, so it is asked once. The
-   evaluation checks each field on its own (`one_question`, which also counts a second ask
-   joined to the first in one sentence) and `missing_excludes`, never exact prose. Earlier
-   turns stay one action away.
+   question mark, and beside it the reply holds none (a validation problem, so the one
+   repair applies). With no next question there is nothing to repeat, so a "?" in the reply
+   costs no repair. The web app shows the reply and the question apart, so it is asked once.
+   The evaluation checks each field on its own (`one_question`, which also counts a second
+   ask joined to the first in one sentence) and `missing_excludes`, never exact prose; the
+   repair rate is for the H-12 and release evaluations to track. Earlier turns stay one
+   action away.
 
 4. **Discovery is a run kind on the one activity** (`discovery`; ADR 0002, ADR 0006
    decision 10). The model proposes **searches, never suggestions** (`discovery-queries-1`):
@@ -84,13 +88,18 @@ inference, with at least 30 evaluation cases and a capped live run.
      Nessa adds the current role (searched) and the person's own target titles (exact label
      matches). A model title becomes a candidate only if ESCO holds it as a label (DIV1-04);
      otherwise it is listed as an unsupported hypothesis, never suggested.
-   - *Pool.* Hits are pooled by concept (an alias is the same concept). An occupation whose
-     preferred label is one of another's non-hidden labels (as a concept key), or that has
-     the same labels, is near-identical to it and counts once, the most relevant
-     representing them (DIV1-05). Folding is never transitive: a candidate joins a group
-     only through its lead, because ESCO gives many distinct occupations a shared label
-     ("geologist", "facility manager"), and chains of them once folded quarry engineers
-     with building cleaners. The pool is bounded at 120 (the soft 60-120 target), filled
+   - *Pool.* Hits are pooled by concept (an alias is the same concept). An occupation in the
+     same ISCO minor group as another, whose preferred label is one of the other's
+     non-hidden labels (as a concept key) or that has the same labels, is near-identical to
+     it and counts once, the most relevant representing them (DIV1-05). Folding is never
+     transitive: a candidate joins a group only through its lead, because ESCO gives many
+     distinct occupations a shared label ("geologist", "facility manager"), and chains of
+     them once folded quarry engineers with building cleaners. Nor does it cross kinds of
+     work: ESCO lists "biochemist" as a chemist, but that is related work, not the same
+     role. By an offline count (Python approximation of `nessa.concept_key` over ESCO
+     v1.2.1's preferred and alternative labels), 319 occupation pairs are one alias apart:
+     155 across minor groups no longer fold, and 164 within one still do (for example
+     physiotherapist and occupational therapist; H-12). The pool is bounded at 120 (the soft 60-120 target), filled
      round-robin across ISCO minor groups in relevance order so every retrieved family is
      sampled before relevance cuts any (spec section 4, DIV-1), and the excess is counted.
      Oversampling catalogue areas the search under-retrieves is not done.
@@ -136,28 +145,41 @@ inference, with at least 30 evaluation cases and a capped live run.
    Model-written explanations are not used in L0: grounding by construction was preferred
    to a second paid call whose prose would need its own checks.
 
-7. **The minimal support policy** (`nessa.profile.safety`, `support-policy-1`).
-   - *Explicit acute distress* (wanting to die, suicide, self-harm, in so many words) is
-     screened before any model call: `POST .../interview/turns` answers 200 with a fixed
-     support response and four UK services, checked on their own pages on 2026-10-28
-     (999 or A&E; NHS 111, mental health option; Samaritans 116 123; Shout 85258), and
-     nothing is sent to the interviewer or stored, not even an idempotency receipt (it would
-     keep a fingerprint of the message). It is kept apart from career suitability: it scores
-     and remembers nothing. Only explicit wording counts, and each phrase needs its meaning:
-     an object that is the person's life, or the end of the clause. So career talk does not
-     trigger it ("take my life in a new direction", "my life savings", "I don't want to live
-     in London", "I hurt myself lifting boxes", "no reason to go on with the course",
-     "suicide prevention work", "self-harm support services"). If it does by mistake, the
-     person can send the message anyway (`send_after_support`); the web app sends the
-     message that was screened. Known misses (H-12): "I can't go on", and anything
-     indirect.
+7. **The minimal support policy** (`nessa.profile.safety`, `support-policy-2`): a two-tier
+   screen (controller ruling, Task 6 fix round 2), before any model call. It is kept apart
+   from career suitability: it scores and remembers nothing. The four UK services were
+   checked on their own pages on 2026-10-28 (999 or A&E; NHS 111, mental health option;
+   Samaritans 116 123; Shout 85258).
+   - *Tier 1, acute.* A first-person statement of intent or distress: an intent phrase
+     ("want to", "thinking about", "going to", ...) with an act (die, kill myself, end my
+     life, take my own life, hurt or harm myself), "I feel / I'm / I've been suicidal",
+     "I self-harm", "I've been / I keep hurting myself", "take my own life", "wish I was
+     dead", "better off dead", "don't want to be alive", "don't want to live (like this)
+     (any more)" and "no reason to go on" or "can't go on" at the end of a clause.
+     `POST .../interview/turns` answers 200 with a fixed support response: nothing is sent
+     to the interviewer or stored, not even an idempotency receipt (it would keep a
+     fingerprint of the message). The person can send the message anyway
+     (`send_after_support`); the web app sends the message that was screened. Tier 1 rests
+     on positive evidence only, never on a list of words that excuse a match.
+   - *Tier 2, mention.* Any other risk word or phrase (suicide, self-harm, overdose, kill,
+     hurt or harm myself, take or end my life, can't go on, ...), whatever surrounds it:
+     the message is sent as usual (202), and the response carries a calm `support_note`
+     with the same services, shown beside the conversation until dismissed. Nothing about
+     it is stored. So no risk word is ever silently dropped, and ordinary career talk is
+     never blocked ("take my life in a new direction", "my life savings", "I don't want to
+     live in London", "I hurt myself lifting boxes", "suicide prevention work": tier 2).
+   - *Known limits (H-12):* English phrasing only; indirect or third-person wording ("my
+     friend wants to die", "what's the point") gets nothing; a past simple "I hurt myself"
+     or "I cut myself" is tier 2, not 1; "can't go on like this" is tier 2; a career phrase
+     with a risk word gets the note, which some people may find unwelcome.
    - *Inappropriate inference.* Model output may not name a health condition, a diagnosis,
      a personality type (or MBTI code), a protected characteristic or a percentage that the
      person's own messages never used; a condition the person names may be acknowledged,
      to ask which adjustment would help, but is never recorded in a career field. A word the
-     person used, singular or plural, or a kindred one ("mothers", so "women" or "maternity
-     work for women") may be used: naming who the work serves is not a guess about the
-     person. Both are validation problems, so the one bounded repair applies.
+     person used, singular or plural, may be used. In a discovery search only, a kindred
+     word may be too ("mothers", so "maternity work for women"): naming who the work serves
+     is not a guess about the person, while in an interview reply it would be. Both are
+     validation problems, so the one bounded repair applies.
    - **Provisional, needs reviewed sign-off (R6; H-12):** the wording, the phrase lists and
      the resources. Clinical screening is out of scope; this is not one.
 
@@ -179,7 +201,8 @@ inference, with at least 30 evaluation cases and a capped live run.
    one default run and a further authorised run gets its own scope
    (`NESSA_LIVE_EVAL_SCOPE`). Every attempt is ledgered after the worker stops, the key is
    leak-scanned, results with failures by type are appended to
-   `docs/evidence/live-eval.md`, and each case's output is kept in the private evidence
+   `docs/evidence/live-eval.md` under a header naming the budget scope (runs from fix round
+   2 on), and each case's output is kept in the private evidence
    directory (`NESSA_HOME/evidence/live-eval.jsonl`, never committed) so a failure can be
    diagnosed. It is never part of `make check` or `make acceptance`. The counterfactual pair
    (INT-04/05) is not in the default run: one sample per arm cannot separate a demographic
@@ -214,16 +237,23 @@ inference, with at least 30 evaluation cases and a capped live run.
 
 ## Human review checklist (H-12, not run — requires human)
 
-- [ ] **Support policy** (decision 7): the fixed wording, the explicit-distress phrase list
-  and its meaning rules (object and clause end; the career-context words after "suicide"
-  and "self-harm"), the known misses ("I can't go on", indirect wording), the decision not
-  to send or store the message, the "send anyway" path, and the four resources and their
-  wording (checked against the services' pages on 2026-10-28).
+- [ ] **Support policy** (decision 7): the two tiers and where the line between them falls
+  (the tier-1 intent phrases and first-person statements; the tier-2 risk words), the
+  fixed response and the note's wording, the decision not to send or store a tier-1
+  message, the "send anyway" path, the known limits listed in decision 7 (indirect and
+  third-person wording; past simple "I hurt myself" and "can't go on like this" only tier
+  2; the note on career phrases), and the four resources and their wording (checked
+  against the services' pages on 2026-10-28).
 - [ ] **Inference rules** (decision 7): the health, type and protected-characteristic word
-  lists, the kindred-word groups, and refusing a condition in a career field.
+  lists, the kindred-word groups (discovery searches only), and refusing a condition in a
+  career field.
 - [ ] **Slate policy** (decision 5): channel weights, the partial-match weight, the floor
   (and whether an absolute rank floor is needed), the bonuses, quotas, the family limit,
-  alias-only folding and the family round-robin pool.
+  alias-only folding within a minor group (164 ESCO pairs still fold, for example
+  physiotherapist and occupational therapist: are they the same role?) and the family
+  round-robin pool.
+- [ ] **Interview repair rate** (decision 3): how often the one-question rule costs a paid
+  repair, from the release evaluation.
 - [ ] **Evaluation cases** (decision 9): the 43 cases and their semantic expectations. Of
   them, 20 (SUP-01..13, GRD-01..07) test deterministic code with canned inputs; the model's
   behaviour rests on the live cases alone, single samples so far.

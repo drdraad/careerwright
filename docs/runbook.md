@@ -49,7 +49,8 @@ in, is refused). These are local test credentials, not secrets.
    percentage), with view-only controls; "Make this a target" is the only way one becomes
    a target. The early sketch lists what a target usually asks for, every step unresolved.
    A message that says you want to die or harm yourself gets UK support services instead
-   of the interviewer, and nothing is stored.
+   of the interviewer, and nothing is stored; any other mention of such words is sent as
+   usual, with a calm support note beside it.
 4. **Routes** in the fixture workspace shows the TRACE-01 fixture preview, labelled as such.
    Select a route to inspect it. The route search itself is not built yet, so the other
    chapters show what they will hold and which answers they need.
@@ -93,10 +94,12 @@ with the browser's Origin unchanged.
   sources (undo).
 - Interview preferences (ADR 0007): `GET`/`PUT .../interview/preferences` with
   `{expected_version, entry_mode: sure|unsure|null, conversation_mode:
-  practical|gentle|challenge|null, paused}`. A turn whose message explicitly expresses acute
-  distress answers `200` with the support response (`policy: "acute_distress"`, UK
+  practical|gentle|challenge|null, paused}`. A turn whose message states acute distress in
+  the first person answers `200` with the support response (`policy: "acute_distress"`, UK
   resources) instead of `202`: nothing was sent or stored, not even an idempotency receipt;
-  resend with `send_after_support: true` to send it anyway.
+  resend with `send_after_support: true` to send it anyway. Any other risk word: `202` as
+  usual, with a `support_note` (`policy: "risk_mention"`, the same resources) to show beside
+  it; otherwise `support_note` is null.
 - Discovery (ADR 0007): `POST .../discoveries` with `{expected_profile_version}` returns `202`
   (`INSUFFICIENT_EVIDENCE` if no answer describes work yet); `GET .../discoveries` (newest
   first), `GET .../discoveries/{id}`; `GET .../discoveries/{id}/slate?emphasis=&exclude_concept=

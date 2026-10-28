@@ -63,8 +63,9 @@ Run from the repository root (details: `docs/runbook.md`).
     the same command as a direct edit (ADR 0006). In discovery the model proposes searches
     only; the slate is deterministic code over ESCO, its controls are view parameters and
     never limits, and a suggestion becomes a target only by the person's choice (ADR 0007).
-  - Explicit acute distress gets the fixed support response before any model call, and
-    nothing is stored; model output may not infer a health condition, type, protected
+  - First-person acute distress gets the fixed support response before any model call, and
+    nothing is stored; any other risk word is sent as usual with a support note (two tiers,
+    ADR 0007 decision 7); model output may not infer a health condition, type, protected
     characteristic or percentage the person never used (`nessa/profile/safety.py`).
   - Money is integer minor units (GBP). Use `Money` (≥ 0) for payments and `SignedMoney`
     for economic cost. Unknown money is `null`, never 0.
