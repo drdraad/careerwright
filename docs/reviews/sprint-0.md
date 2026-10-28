@@ -1,12 +1,14 @@
 # Sprint 0 review: resolve the expensive uncertainties
 
 - Date: 2026-10-28. Branch `l0-local-release`.
-- Reviewed revision: `25bdb1b`, the last Task 2 commit that changes code or data (after
-  fix round 1). Every check below ran on it. The commit that updates this review changes
-  only this file. Sprint 0 commits: `e32fb12`..`2bb36e5` (Task 1: S0.1–S0.4) and
+- Historical reviewed revision: `25bdb1b`, the last Task 2 commit that changes code or data
+  (after fix round 1). The original candidate checks below ran on it.
+  Sprint 0 commits: `e32fb12`..`2bb36e5` (Task 1: S0.1–S0.4) and
   `e925c57`..`25bdb1b` (Task 2: S0.5, S0.6 and fix round 1).
-- Reviewer: the Task 2 implementing agent. It is not independent of the work reviewed. A
-  separate reviewer is dispatched after this task, and the human gates below remain open.
+- Implementation reviewer: the Task 2 implementing agent, not independent of the work.
+  Composition reviewer: Codex, inspecting all 18 images and the reference sources, with
+  fresh design checks recorded under Visual findings. This is an **agent pre-review —
+  not the required human review** (R2), and does not qualify the current application.
 
 ## Outcome
 
@@ -23,9 +25,11 @@ Sprint 0 delivered its technical decisions and evidence:
   the rest have had a structural check only.
 - Three signature compositions exist in honest default, unknown-data and failure states.
 
-**No application exists yet.** No journey can be demonstrated from a product UI, and that
-is expected at this point in the plan. Human approval of the compositions and the other
-human gates are **not run** (ruling R2).
+**At Sprint 0, no application existed yet.** The product journey was therefore not
+demonstrable from a UI. The composition review finds a coherent visual direction, but two
+phone conversation blockers (S0-V01/S0-V02) need correction before that layout is reused.
+Human approval of the compositions and the other human gates remain **not run — requires
+human** (ruling R2).
 
 ## Exit evidence (Sprint 0 card)
 
@@ -84,7 +88,8 @@ Result: **not run (no UI yet)**.
 **2. Do shared concepts mean the same thing everywhere?** Checked across the
 specification, the register, the hand check, the compositions and the ADRs:
 - Unknown is never zero.
-- Conditional readiness stays conditional.
+- Conditional readiness is stated in the group/journey notices; individual route cards
+  need to retain it when separated from those notices (S0-V03).
 - Stale and failed stay distinct.
 - Economic and direct cost are never mixed: TRACE-01 versus DIRECTAI, with labels checked
   in the compositions.
@@ -124,11 +129,14 @@ Result: **passed at the reference level**. A product-level trace is Sprint 5 and
 
 None blocks Task 2's deliverables.
 
-**5. Is the interface coherent and polished?** There is no implemented screen to compare
-yet. The references were built and iterated against their own renders. The defects found
-and fixed are listed in `docs/design/pre-review-sprint-0.md`, labelled as an agent
-pre-review. **Design-review scores: not run — requires human (H-02).** The checklist
-follows below.
+**5. Is the interface coherent and polished?** The reference surfaces, typography and
+selection language are coherent; phone task completion is not established. The review of
+all 18 captures, reference sources and targeted Chromium layouts reproduced a hidden
+profile-review entry point and a covered composer/retry action. Conditional readiness,
+stale selection, unsupported preference-fit copy and unknown-state hierarchy also need
+correction. The detailed agent critique and earlier fixes are in
+[`pre-review-sprint-0.md`](../design/pre-review-sprint-0.md).
+**Design-review scores: not run — requires human (H-02).** The checklist follows below.
 
 **6. What exact evidence establishes completion?** The commands and results above, on
 revision `25bdb1b`. Known gaps:
@@ -173,6 +181,11 @@ versioned result without the LLM owning a transaction?** Partly established:
 - Scenario ranges are stated as not evaluated rather than drawn at zero width.
 - A failed search keeps the previous comparison as stale, never as "no routes".
 
+The composition critique identifies presentation limits despite those data checks:
+individual cards lose their readiness condition (S0-V03), and the fixed selected journey
+does not carry its own stale version (S0-V04). Honest data needs those qualifications to
+remain visible with the selected item.
+
 Building the route comparison also exposed a real error in the hand check (incomplete
 dominator lists for DIRECTAI G and H). It was corrected in `f5b73d1`.
 
@@ -189,25 +202,45 @@ display carries the badge.
 
 ## Visual findings
 
-From the agent pre-review, not a score:
+**Agent pre-review — not the required human review.** The full
+[evidence, screenshot matrix and eight findings](../design/pre-review-sprint-0.md#open-findings)
+are recorded in the existing composition critique.
 
-- Strong: one structural motif across pages, one primary action per view, distinct
-  failed, stale, unknown and conditional states, and layers 2 and 3 told apart by shape
-  and label. Dashes now mean only provisional or reading aid.
-- Weak:
-  - The phone's focused chart and map overview are not composed.
-  - The bottom sheet opens at a 212 px peek; its expanded height and swipe are not
-    designed. In the phone failure state of Routes, the failure and stale notices lead and
-    the route cards start below the fold.
-  - SVG labels at 13 px shrink on narrower desktops.
-  - The early sketch's provisional status relies on a dashed edge.
-  - No scenario whiskers are demonstrated, because the fixtures carry no scenario data.
+- **Strengths:** consistent ink/light surfaces, typography and selection; labelled
+  synthetic data; explicit unknown pay and reduced coverage; distinct route-layer shapes.
+  The inspected desktop Gantt and ledger explain the assessment gate, payments and
+  pre-pay low balance. The early sketch has a provisional title and research disclaimer,
+  as well as its dashed edge.
+- **Phone blockers (S0-V01/S0-V02):** both the profile panel and its mobile summary are
+  hidden. The reply field at y=775–819 is covered by the sheet beginning at y=632, and
+  scrolling cannot expose it; the work area has no scroll range. The failure retry
+  button is also covered. Correct these before reusing the conversation layout.
+- **State clarity (S0-V03–S0-V06):** route cards need their own condition, the selected
+  stale journey needs its old version/freshness, the unknown Roles card must not claim a
+  preference match, and unknown Routes should retain B's known 9 months/£2,400 and More
+  affordance.
+- **Hierarchy (S0-V07/S0-V08):** phone failure/unknown stacks put the first listing or
+  route behind the sheet. Default desktop You and failed Roles have competing filled
+  actions, contrary to the stated primary-action convention.
+
+Fresh design checks: **64 fixture assertions, 68 contrast pairs and 18 Chromium captures
+pass**. The screenshot checker and contrast checker wrote only to a temporary folder;
+all 18 PNGs and both generated reports match the committed files byte for byte. Separate
+layout probes reproduced the phone blockers and absent unknown-route expansion control.
+Passing the baseline checks does not establish task usability.
+
+Coverage: all nine composition/state pairs at desktop and phone sizes, plus five default
+desktop section captures. No tablet, phone expanded sheet, focused chart/map view, 200 %
+zoom, keyboard journey, VoiceOver or Safari check was run. Dense data, negative economic
+cost and scenario ranges remain uncomposed. No application code was changed or backend
+suite rerun for this design review.
 
 ## Accepted limitations and open items
 
 | Item | Owner | Disposition |
 |---|---|---|
-| H-02 design approval of the three compositions | Product owner and design reviewer | Not run — requires human. Checklist below |
+| H-02 design approval of the three compositions | Product owner and design reviewer | Agent critique complete; scoring and approval not run — requires human. Checklist below |
+| S0-V01–S0-V08 composition findings | Web/design owner | Open. Correct the phone conversation blockers before layout reuse; address state clarity and hierarchy before design approval |
 | H-07 domain-reviewer sign-off on the fixture hand check and financial worked examples | Domain reviewer | Not run — requires human |
 | H-09 confirm or reject the Contributor test model (ADR 0003) | Product owner | Not run — requires human. Fallback documented in ADR 0003 |
 | Real-source corpus, 0 of 33 pages | Tasks 8, 10, 12 | Planned (`corpus/manifest.json`) |
@@ -219,18 +252,19 @@ From the agent pre-review, not a score:
 ## Human design-review checklist (H-02, not run)
 
 Use `docs/design/compositions/index.html` and `docs/design/screenshots/`. Record a 1–5
-score per category with concrete defects (plan section 5). The full checklist, with the
-questions to answer, is in `docs/design/pre-review-sprint-0.md`.
+score per category with concrete defects (plan section 5). The
+[full checklist and agent evidence](../design/pre-review-sprint-0.md#human-review-checklist-not-run--requires-human)
+are ready for the human review required by R2. Pending scores are not passes.
 
 | Category | Score (1–5) | Defects |
 |---|---|---|
-| Hierarchy | | |
-| Typography | | |
-| Spacing | | |
-| Visual identity | | |
-| Chart legibility | | |
-| Uncertainty communication | | |
-| Responsive composition | | |
-| Interaction continuity | | |
+| Hierarchy | Not run — requires human | Buried phone lists and competing filled actions (S0-V07/S0-V08) |
+| Typography | Not run — requires human | Readable desktop text/table; small SVG labels, dense tray and zoom require review |
+| Spacing | Not run — requires human | Phone input/recovery covered by the sheet (S0-V02) |
+| Visual identity | Not run — requires human | Consistent surfaces, branches and selection; colour-vision/display checks remain |
+| Chart legibility | Not run — requires human | Desktop chart/Gantt/ledger inspected; phone focus, tablet and dense/scenario cases absent |
+| Uncertainty communication | Not run — requires human | Conditions, stale selection, unsupported match and omitted known figures (S0-V03–S0-V06) |
+| Responsive composition | Not run — requires human | Hidden review entry, covered controls, unknown sheet and buried lists (S0-V01/S0-V02/S0-V06/S0-V07) |
+| Interaction continuity | Not run — requires human | Phone review/input and stale context need correction; keyboard/expansion/focus checks remain |
 
-Approval: not given. Approver and date: blank until a human reviews.
+Approval: **not given — requires human (H-02)**. Approver and approval date: not recorded.
