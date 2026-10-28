@@ -7,7 +7,13 @@ from typing import Any
 import pytest
 
 from nessa.identity.model_choice import ModelChoice
-from tools.live_smoke import MAX_CALLS, CapExceededError, authorise, ledger_attempts
+from tools.live_smoke import (
+    MAX_CALLS,
+    CapExceededError,
+    authorise,
+    ledger_attempts,
+    ledger_possible_calls,
+)
 from tools.usage_ledger import CallOutcome, Ledger
 
 
@@ -41,6 +47,7 @@ def test_a_model_whose_worst_case_breaks_the_cost_cap_is_refused() -> None:
 def attempt(**values: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
         "attempt_id": 1,
+        "run_id": "run-1",
         "model_id": "muse-spark-1.3-contributor",
         "outcome": "succeeded",
         "spend_state": "reconciled",
@@ -67,7 +74,7 @@ def test_every_attempt_that_reached_meta_is_ledgered_and_unknown_stays_unknown(
         attempt(attempt_id=3),
     ]
 
-    seqs = ledger_attempts(ledger, attempts, "run-1", production_model="muse-spark-1.3")
+    seqs = ledger_attempts(ledger, attempts, production_model="muse-spark-1.3")
 
     records = ledger.records()
     assert seqs == [1, 2]
@@ -75,3 +82,18 @@ def test_every_attempt_that_reached_meta_is_ledgered_and_unknown_stays_unknown(
     assert records[0].estimated_cost_nano_usd is None  # unknown, never zero
     assert records[1].estimated_cost_nano_usd == 40_000
     assert not any(r.is_production_model for r in records)
+
+
+@pytest.mark.req("MODEL-09")
+def test_unreadable_attempts_are_ledgered_as_every_possible_call_with_unknown_cost(
+    tmp_path: Path,
+) -> None:
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+    models = ModelChoice.configure("muse-spark-1.3-contributor", "muse-spark-1.3", "test")
+
+    seqs = ledger_possible_calls(ledger, "muse-spark-1.3-contributor", 809_600, models)
+
+    records = ledger.records()
+    assert len(seqs) == MAX_CALLS
+    assert all(r.estimated_cost_nano_usd is None for r in records)
+    assert all(r.reserved_nano_usd == 809_600 for r in records)

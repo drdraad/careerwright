@@ -118,15 +118,15 @@ def _superuser(stack: Stack, database: str) -> str:
     return f"postgresql://postgres:{password}@127.0.0.1:{stack.ports.postgres}/{database}"
 
 
-def _attempts(stack: Stack, run_id: str) -> list[dict[str, Any]]:
+def _all_attempts(stack: Stack) -> list[dict[str, Any]]:
+    """Every attempt in the smoke database, which exists for this invocation only, so no call
+    escapes the ledger even if the client never learned its run ID."""
     with psycopg.connect(_superuser(stack, "nessa_app"), row_factory=dict_row) as conn:
-        return conn.execute(
-            "SELECT * FROM nessa.model_attempts WHERE run_id = %s ORDER BY attempt_id", (run_id,)
-        ).fetchall()
+        return conn.execute("SELECT * FROM nessa.model_attempts ORDER BY attempt_id").fetchall()
 
 
 def ledger_attempts(
-    ledger: Ledger, attempts: list[dict[str, Any]], run_id: str, *, production_model: str
+    ledger: Ledger, attempts: list[dict[str, Any]], *, production_model: str
 ) -> list[int]:
     """One ledger row per attempt that reached the provider (a reservation was taken)."""
     seqs = []
@@ -151,11 +151,35 @@ def ledger_attempts(
                 reasoning_tokens=attempt["reasoning_tokens"],
                 web_search_queries=attempt["web_search_queries"],
                 provider_response_id=attempt["provider_response_id"],
-                notes=json.dumps({"run_id": run_id, "attempt_id": attempt["attempt_id"]}),
+                notes=json.dumps(
+                    {"run_id": str(attempt["run_id"]), "attempt_id": attempt["attempt_id"]}
+                ),
             )
         )
         seqs.append(record.seq)
     return seqs
+
+
+def ledger_possible_calls(
+    ledger: Ledger, model_id: str, reserved_nano_usd: int, models: ModelChoice
+) -> list[int]:
+    """The attempts could not be read: record every call the run was allowed to make, with an
+    unknown cost, rather than nothing."""
+    return [
+        ledger.append(
+            LiveCallEntry(
+                budget_scope=BUDGET_SCOPE,
+                purpose=f"{PURPOSE} (possible call; attempts unreadable)",
+                model_id=model_id,
+                is_production_model=models.is_production(model_id),
+                endpoint=RESPONSES_ENDPOINT,
+                outcome=CallOutcome.FAILED,
+                reserved_nano_usd=reserved_nano_usd,
+                error_type="attempts_unreadable",
+            )
+        ).seq
+        for _ in range(MAX_CALLS)
+    ]
 
 
 def leak_findings(stack: Stack, api: Api, key: SecretStr) -> tuple[int, list[Finding]]:
@@ -201,7 +225,7 @@ def run_smoke(settings: SmokeSettings, *, production: bool, ledger: Ledger) -> i
         live=True,
         overrides=(("NESSA_SYNTHETIC_MODEL_ROLE", "production" if production else "test"),),
     )
-    run_id: str | None = None
+    key_sent = False
     status = "not started"
     findings: list[Finding] = []
     try:
@@ -215,6 +239,7 @@ def run_smoke(settings: SmokeSettings, *, production: bool, ledger: Ledger) -> i
             {"name": "Live smoke (synthetic)", "data_mode": "live_assisted", "synthetic": True},
         )
         base = f"/v1/workspaces/{workspace['workspace_id']}"
+        key_sent = True  # from here on the worker may call Meta
         api.call(
             "POST",
             f"{base}/credentials",
@@ -234,13 +259,15 @@ def run_smoke(settings: SmokeSettings, *, production: bool, ledger: Ledger) -> i
         scanned, findings = leak_findings(stack, api, settings.api_key)
         print(f"leak scan: {scanned} rows/logs/responses, findings: {findings}", flush=True)
     finally:
-        if run_id is not None:
-            seqs = ledger_attempts(
-                ledger,
-                _attempts(stack, run_id),
-                run_id,
-                production_model=models.production.model_id,
-            )
+        if key_sent:
+            try:
+                attempts = _all_attempts(stack)
+            except psycopg.Error:
+                seqs = ledger_possible_calls(ledger, model_id, worst_case // MAX_CALLS, models)
+            else:
+                seqs = ledger_attempts(
+                    ledger, attempts, production_model=models.production.model_id
+                )
             ledger.write_markdown()
             print(f"ledger rows appended: {seqs}", flush=True)
         stack.down()
