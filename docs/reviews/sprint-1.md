@@ -10,8 +10,11 @@
   `a5d6a7c`..`a939024` (Task 4: S1.4–S1.5, the web shell, and this review),
   `aea2e32`..`ccf3d05` (fix round 1) and `e96ae5f`..`283f45e` plus the docs update (fix
   round 2).
-- Reviewer: the Task 4 implementing agent. It is not independent of the work reviewed. A
-  separate reviewer is dispatched after this task, and the human gates below remain open.
+- Implementation reviewer: the Task 4 implementing agent, not independent of the work.
+  Screenshot reviewer: Codex, reviewing all 48 committed PNGs and the three recorded check
+  reports. This is an **agent pre-review — not the required human review** (R2). The
+  implementation checks below are retained historical results, not rerun for this review;
+  the screenshots do not establish the behaviour of later revisions.
 
 ## Outcome
 
@@ -33,11 +36,14 @@ Throughout, the browser contacts nothing but the web origin and the loopback Aut
 The six-chapter shell follows the Sprint 0 references: ink rail, raised strip, light reading
 surfaces, cards, the evidence drawer and phone bottom sheet, the status vocabulary and the
 two licensed fonts. Only You (the profile) and Routes (the labelled fixture preview) have
-content. Roles, Skills, Options and Plan show what they will hold, which answers they
-depend on and what to do next, because their features belong to later sprints.
+content. Roles, Skills and Options explain their intended content and starting answers;
+their features belong to later sprints. Plan describes its intended next step, but its
+action and missing-feature explanation need correction (V-06).
 
 **Human design approval: not run, requires a human (H-01).** The screenshots and the agent
 pre-review below are evidence for that review, not the review itself (ruling R2).
+The screenshot critique is complete: the visual language is coherent, but route readiness,
+phone comparison hierarchy and failure recovery need attention before visual acceptance.
 
 ## Card deliverables and acceptance
 
@@ -108,8 +114,9 @@ Result: **passed (UI, automated)**.
   cannot drift.
 - **Unknown, skipped and prefer-not-to-say** stay distinct from zero in the form, the strip
   and the chapters.
-- **Conditional** readiness is a gate glyph with its condition in words. **Stale** (the
-  stale-save notice) uses sand and a clock; **failed** uses a red edge and a cause.
+- **Conditional** readiness is a gate glyph with its condition in the comparison summary
+  and drawer, but the route cards say only "Ready in …" (visual finding V-01). **Stale**
+  (the stale-save notice) uses sand and a clock; **failed** uses a red edge and a cause.
 - **Economic cost** is labelled as such on the fixture preview. Direct spending is a
   separate figure.
 - **Synthetic** is a persistent pill in the strip and the phone top bar.
@@ -117,7 +124,7 @@ Result: **passed (UI, automated)**.
 Hazard noted: the fixture preview's layers are the fixture's stated `expected.fronts`, not
 a computation. The page and the drawer say so, and nothing in TypeScript ranks routes.
 
-Result: **passed**.
+Result: **passed for the shared vocabulary; route-card wording needs correction (V-01)**.
 
 **3. Can a consequential displayed claim be traced to source, version, confirmation and
 calculation?** Traced: the strip's "Up to £1,500" in the fixture workspace.
@@ -155,12 +162,15 @@ Sprint 5–6).
 
 Result: **passed**.
 
-**5. Is the interface coherent and polished?** Compared with the Sprint 0 references, the
-rail, strip, cards, status words and typography follow them (screenshots against
-`docs/design/screenshots/`). The drawer did not, and the agent pre-review missed it: the
-Task 4 review found its labels overprinting long values at 1440 and 768 px. That is fixed
-and now checked on every capture. Differences and defects are listed under "Visual
-findings". Keyboard focus is tested. Human scores: **not run — requires human (H-01)**.
+**5. Is the interface coherent and polished?** Coherent, but visual acceptance remains
+open. All 48 screenshots were inspected against the rubric and the Sprint 0 default You
+and Routes references. The rail, surfaces and typography carry through; the phone route
+sheet loses the reference's visible key figures, and phone Routes puts every route below
+the first viewport. The cards' unqualified readiness and the failed page's recovery/status
+wording also need correction. The earlier drawer-label overprint is absent from the
+visible facts in these captures. Findings, coverage gaps and follow-up checks are below.
+The original keyboard-test results remain historical evidence; static images cannot
+verify focus behaviour. Human scores: **not run — requires human (H-01)**.
 
 **6. What exact evidence establishes completion?** The commands and results above, on
 `283f45e`. Known gaps:
@@ -208,9 +218,10 @@ the UI has no run trigger yet.
 
 **All six chapters share the same state vocabulary:** yes (question 2).
 
-**Empty states explain what the user can do next:** yes. Each planned chapter names its
-purpose, the answers it uses with their current state, and a "Review what we know" action;
-the home page offers "New workspace".
+**Empty states explain what the user can do next:** mostly. The home page offers "New
+workspace"; Roles, Skills and Options name the answers they use and offer "Review what we
+know". Plan says to choose a route but offers the same profile action, without explaining
+that plan selection is not available yet (V-06).
 
 **Duplicate state stores and placeholder abstractions eliminated:**
 - **State stores:** server state lives only in the query cache, and the strip and chapters
@@ -228,46 +239,154 @@ UI (no run trigger exists yet).
 
 ## Visual findings
 
-Agent pre-review (from the 48 captures; not a score). The first package held 30 captures (10
-states × 3), not the 33 this review first stated.
+**Agent pre-review — not the required human review.** All 48 viewport PNGs were opened
+and inspected: 16 states at 1440×900, 768×1024 and 390×844. The first package held 30
+captures (10 states × 3), not the 33 this review first stated. No numeric design scores
+or human approval are assigned.
 
-Strong:
-- The shell reads as the reference: one structural motif, the ink rail, sea-glass used only
-  for the current chapter, the primary action and selection.
-- The fixture route cards and drawer closely follow the route-comparison reference, layers
-  are told apart by shape and words, and every route is labelled synthetic.
-- Empty chapters are explained rather than blank, and so are the empty home and a new
-  workspace's Routes.
-- The stale save keeps the edits and names what changed; the unavailable state keeps the
-  work on screen and says "Reconnecting" in the strip on every size, phones included.
-- The phone sheet peeks at 212 px and expands; the tablet drawer is a full-height side
-  sheet.
+**Evidence inspected.** Each link is a reviewed image. The three `checks-*.json` reports
+contain exactly these files, once each, with matching PNG dimensions: fonts loaded,
+zero horizontal page overflow, and empty overprint, axe and unexpected-error lists for
+all 48. This checks the committed reports' contents, not a new browser run. The overprint
+check covers description-list labels against their values; it does not detect every
+clipped control or judge composition.
 
-Weak:
-- **You:** a long single-column form. The reference's two-column composition (conversation
-  beside "What we know") waits for the conversation (T6). The field-state select beside
-  each value adds visual weight; a human may prefer a quieter control.
-- **Phone Routes:** the fixture notice and "What's being compared" fill the first screen,
-  and the route cards start below the fold (as in the Sprint 0 failure state).
-- **Strip:** it wraps to two rows on tablets and phones; on phones the workspace switcher is
-  indented relative to the target.
-- **Refused page:** "This account isn't invited" repeats as heading and alert title.
-- **Failed load:** "Nessa's service isn't reachable" says to try again in a moment but
-  offers no Try again action; the person has to reload.
-- **Stale save:** in the captures, the field-level conflict ("Version 1 has … here") sits
-  below the fold. The notice on the first screen names each changed answer and its new
-  value, and it takes focus.
-- **Width:** at 1440 px without the drawer, reading chapters leave a wide empty right
-  margin (content is held to 760–1080 px).
-- **Layers:** layers 2 and 3 share one grey and differ by shape and label (carried from
-  Task 2 for H-01).
-- **Motion:** none is visible in static captures. Calm mode is untested.
-- **Phone route sheet peek:** the peek shows the generic "Where this came from" title, and
-  the route's key figures start below it. The reference peek
-  (`docs/design/screenshots/route-comparison--default--390x844.png`) shows the route name
-  with its readiness, direct-spend and economic-cost figures.
+| State | 1440×900 | 768×1024 | 390×844 |
+|---|---|---|---|
+| Sign-in | [Desktop](sprint-1/screenshots/sign-in--1440x900.png) | [Tablet](sprint-1/screenshots/sign-in--768x1024.png) | [Phone](sprint-1/screenshots/sign-in--390x844.png) |
+| You | [Desktop](sprint-1/screenshots/you--1440x900.png) | [Tablet](sprint-1/screenshots/you--768x1024.png) | [Phone](sprint-1/screenshots/you--390x844.png) |
+| You: source selected | [Desktop](sprint-1/screenshots/you--source-drawer--1440x900.png) | [Tablet](sprint-1/screenshots/you--source-drawer--768x1024.png) | [Phone](sprint-1/screenshots/you--source-drawer--390x844.png) |
+| Roles | [Desktop](sprint-1/screenshots/roles--1440x900.png) | [Tablet](sprint-1/screenshots/roles--768x1024.png) | [Phone](sprint-1/screenshots/roles--390x844.png) |
+| Skills | [Desktop](sprint-1/screenshots/skills--1440x900.png) | [Tablet](sprint-1/screenshots/skills--768x1024.png) | [Phone](sprint-1/screenshots/skills--390x844.png) |
+| Options | [Desktop](sprint-1/screenshots/options--1440x900.png) | [Tablet](sprint-1/screenshots/options--768x1024.png) | [Phone](sprint-1/screenshots/options--390x844.png) |
+| Routes | [Desktop](sprint-1/screenshots/routes--1440x900.png) | [Tablet](sprint-1/screenshots/routes--768x1024.png) | [Phone](sprint-1/screenshots/routes--390x844.png) |
+| Routes: B selected | [Desktop](sprint-1/screenshots/routes--route-b--1440x900.png) | [Tablet](sprint-1/screenshots/routes--route-b--768x1024.png) | [Phone](sprint-1/screenshots/routes--route-b--390x844.png) |
+| Plan | [Desktop](sprint-1/screenshots/plan--1440x900.png) | [Tablet](sprint-1/screenshots/plan--768x1024.png) | [Phone](sprint-1/screenshots/plan--390x844.png) |
+| Routes: empty workspace | [Desktop](sprint-1/screenshots/routes--empty--1440x900.png) | [Tablet](sprint-1/screenshots/routes--empty--768x1024.png) | [Phone](sprint-1/screenshots/routes--empty--390x844.png) |
+| You: stale save | [Desktop](sprint-1/screenshots/you--stale--1440x900.png) | [Tablet](sprint-1/screenshots/you--stale--768x1024.png) | [Phone](sprint-1/screenshots/you--stale--390x844.png) |
+| You: updates unavailable | [Desktop](sprint-1/screenshots/you--unavailable--1440x900.png) | [Tablet](sprint-1/screenshots/you--unavailable--768x1024.png) | [Phone](sprint-1/screenshots/you--unavailable--390x844.png) |
+| You: first load failed | [Desktop](sprint-1/screenshots/you--failed--1440x900.png) | [Tablet](sprint-1/screenshots/you--failed--768x1024.png) | [Phone](sprint-1/screenshots/you--failed--390x844.png) |
+| Home: no workspaces | [Desktop](sprint-1/screenshots/home--empty--1440x900.png) | [Tablet](sprint-1/screenshots/home--empty--768x1024.png) | [Phone](sprint-1/screenshots/home--empty--390x844.png) |
+| Workspace not found | [Desktop](sprint-1/screenshots/not-found--1440x900.png) | [Tablet](sprint-1/screenshots/not-found--768x1024.png) | [Phone](sprint-1/screenshots/not-found--390x844.png) |
+| Account not invited | [Desktop](sprint-1/screenshots/not-invited--1440x900.png) | [Tablet](sprint-1/screenshots/not-invited--768x1024.png) | [Phone](sprint-1/screenshots/not-invited--390x844.png) |
 
-Found by the Task 4 review or by its new captures, not by this pre-review, and fixed:
+**What holds up.**
+
+- The rail, raised strip, light reading chapters and ink exploration chapters form one
+  recognisable shell. Newsreader headings and Source Sans 3 body copy retain the Sprint 0
+  identity; headings, labels and amounts are readable in the inspected views.
+- Default and empty chapters explain their state. Skills says nothing has been assessed,
+  rather than treating unassessed skills as missing. Options distinguishes unasked study
+  hours from the explicit £1,500 limits. Empty Routes says no route has been computed;
+  the desktop/tablet unknown budget reads "Not confirmed", not £0.
+- Fixture status is prominent in the top bar, the Routes notice and both evidence views.
+  Route costs distinguish economic cost from direct spending. Route B's selected edge is
+  clear at every width, and its desktop/tablet drawer separates dates, costs and monthly
+  amounts without the earlier label collisions.
+- The stale notice names the changed answer and newer value, says the local edits are
+  kept, and distinguishes unsaved changes from the saved version in the editor heading.
+  The unavailable captures retain the visible profile and say "Reconnecting" at all sizes.
+- Sign-in and refusal pages reflow without visible text collisions. The phone's longer
+  identity buttons wrap; not-found offers both workspaces and sign-out as recovery paths.
+
+**Open findings, ordered by consequence.** V-01–V-06 are usability or clarity corrections;
+V-07–V-10 are polish or comprehension risks. Recommendations describe follow-up work;
+this review does not change the application.
+
+1. **V-01 — Route cards omit their readiness condition (all sizes).** In
+   [selected phone Routes](sprint-1/screenshots/routes--route-b--390x844.png), A/B/C each
+   say "Ready in … months"; the qualification is above the list and can scroll away.
+   The selected drawer restores it, but an unopened card can read as unconditional. Keep
+   "Conditional" beside each card's readiness, with the assessed-report requirement
+   available there. Recheck cards with the summary off-screen; do not carry this wording
+   into computed routes.
+2. **V-02 — Failed-load recovery has no action and ambiguous status (all sizes).**
+   [Failed You](sprint-1/screenshots/you--failed--390x844.png) says "try again in a
+   moment" but supplies no retry control. The strip simultaneously says "Live" and
+   "What we know couldn't be loaded". A live event connection can coexist with a failed
+   profile request, but the unqualified label and service-wide error do not explain that.
+   Offer an explicit retry and distinguish profile loading from live-update status.
+   Check that a retry can recover without requiring the person to navigate away.
+3. **V-03 — Phone Routes does not lead with routes.** At 390×844, the
+   [default viewport](sprint-1/screenshots/routes--390x844.png) contains the 174 px shell,
+   title, fixture notice and comparison context; no route card is visible. The
+   [Sprint 0 default](../design/screenshots/route-comparison--default--390x844.png)
+   already showed route A before the sheet. Keep the synthetic warning unmistakable,
+   shorten the introductory stack and move secondary context behind disclosure so that
+   the first route appears in the initial viewport. The same stacking pushes tablet
+   route C mostly below its viewport, although A and B remain visible.
+4. **V-04 — The phone route-sheet peek omits the decision figures.** In
+   [route B's peek](sprint-1/screenshots/routes--route-b--390x844.png), the 212 px sheet
+   spends its height on a generic title, "Route B", the synthetic badge and condition;
+   its readiness and costs are not visible inside the sheet. The Sprint 0 peek showed
+   the route name, condition, 4 months, £600 direct spending and £600 economic cost.
+   Put the selected route and compact key figures in the peek, retaining fixture and
+   condition labels. Capture both peek and expanded states; More alone does not establish
+   that the expanded content fits or scrolls correctly.
+5. **V-05 — The phone data-mode explanation is clipped.** On
+   [empty home](sprint-1/screenshots/home--empty--390x844.png), the native select cuts off
+   "Demo data: synthetic, nothing leaves this computer" at "…leaves thi". Page overflow
+   remains zero, so that check misses the lost information. Keep the selected option
+   short and place the complete explanation in wrapping helper text. Verify it at 390 px
+   and 200 % zoom.
+6. **V-06 — Plan's stated next step and action disagree (all sizes).**
+   [Empty Plan](sprint-1/screenshots/plan--390x844.png) says a plan starts from a route
+   selected in Routes, but its only action is "Review what we know". Unlike the other
+   planned chapters, it does not say plan selection is absent from this build. Explain
+   that limitation and make the offered action's purpose explicit; do not imply that
+   selecting a fixture preview creates a plan. Recheck the empty copy and destination.
+7. **V-07 — The profile introduction outweighs the first task.** In
+   [phone You](sprint-1/screenshots/you--390x844.png), the first field card starts around
+   y=566; even "Add another target role" is cut by the bottom of the viewport. Repeated
+   field titles, helper copy and "How you answer …" labels make a sparse form tall.
+   At 1440 px, the 760 px form also leaves a broad unused right margin. Shorten the
+   introductory explanation and review spacing while retaining explicit field-state
+   labels. The deferred conversation explains the missing two-column composition; it
+   is not a Sprint 1 feature defect.
+8. **V-08 — Reconnecting moves desktop content.** Comparing
+   [default You](sprint-1/screenshots/you--1440x900.png) with
+   [unavailable You](sprint-1/screenshots/you--unavailable--1440x900.png), the longer status
+   wraps the strip from 65 to 117 px and shifts the form down 52 px. Reserve room for the
+   longer status or use a stable row arrangement at this width. Verify the transition
+   while editing; these stills establish the layout difference, not its animation.
+9. **V-09 — Visited chapter dots can resemble completed work.** In
+   [desktop Plan](sprint-1/screenshots/plan--1440x900.png), You through Routes have filled
+   dots although those chapters include "Not started" content. Current selection is
+   clear, but there is no visible explanation that filled means visited. This is a
+   comprehension risk, not evidence of a wrong stored state. Distinguish or explain
+   visitation before adding completion indicators, and ask the human reviewer what the
+   marks communicate.
+10. **V-10 — The refused-account page repeats its headline.**
+    [Not invited](sprint-1/screenshots/not-invited--390x844.png) uses "This account isn't
+    invited" as both page heading and alert title. The repetition adds weight without a
+    second piece of information. Retain one clear cause and the sign-out action; use
+    supporting copy for the recovery instruction.
+
+**Limits of the image evidence.** These are viewport captures (`fullPage: false`), not
+whole-page reviews. In particular:
+
+- Neither drawer has an expanded phone capture. Source-file, hash and observation details
+  are visible on desktop/tablet but below the phone peek. The images show More, a handle
+  and Close; they do not prove dragging, expansion, scrolling or focus return.
+- No stale capture shows the actual conflicting input and its inline newer value. The
+  notice is visible, but retained input, field-level association and the save control's
+  layout need scrolled captures or a live check. The default phone form also omits most
+  fields and Save. Existing automated tests remain separate evidence for behaviour.
+- Route D and E cards and the layer 3 glyph are outside these viewports; even the default
+  desktop shows only the layer 2 heading at the bottom. The package therefore cannot
+  establish layer 2/3 differentiation. There are no application charts, Gantt or scenario
+  whiskers yet; chart legibility is not assessable from the fixture cards.
+- The no-producer states remain deferred: partial results, zero results and the 100-job
+  limit. Long names, three targets, negative economic cost, unknown/skipped/prefer-not-to-say
+  selections and the open phone chapter menu are not shown here. Storybook or test claims
+  are not substitutes for inspecting those views.
+- Static captures do not establish focus visibility across the journey, error
+  announcements, calm/reduced-motion behaviour, 200 % zoom, VoiceOver or real Safari.
+  No application, browser suite, Storybook or contrast measurement was rerun for this
+  screenshot critique.
+
+**Previously corrected defects (Task 4's evidence, not new fixes in this review):**
+
 - **Drawer facts overprinted their values** at 1440×900 and 768×1024: "Source" over the
   persona's source name and "SHA-256" over the hash. The facts list sized its value column
   to the longest value and squeezed the label column to nothing. Labels now take their own
@@ -287,7 +406,9 @@ Found by the Task 4 review or by its new captures, not by this pre-review, and f
 
 | Item | Owner | Disposition |
 |---|---|---|
-| H-01 design-review scores for Sprint 1 | Product owner and design reviewer | Not run — requires human. Checklist below |
+| H-01 design-review scores for Sprint 1 | Product owner and design reviewer | Agent screenshot critique complete; scoring and approval not run — requires human. Checklist below |
+| V-01–V-10 screenshot findings | Web owner; product/design reviewer for the visitation convention | Open. Prioritise V-01–V-06 and recapture affected views before visual acceptance; V-07–V-10 need polish/comprehension review |
+| Screenshot coverage gaps | Web owner | Add expanded phone sheets, scrolled conflict/save views and lower route layers; inspect long names and other supported states before claiming full visual coverage |
 | H-03 VoiceOver, H-04 Safari | Humans, Sprints 8–9 | Not run — requires human |
 | MODEL-07 consent UI for storing a Meta key | T6 (assigned by the controller) | Not in the Task 4 brief; backend done; the error words exist |
 | UI-05 calm-mode test; graph reveal | T14 | Implemented, untested |
@@ -304,9 +425,14 @@ Found by the Task 4 review or by its new captures, not by this pre-review, and f
 
 Use `docs/reviews/sprint-1/screenshots/` (or run `make demo` and open
 `http://127.0.0.1:53000`, signing in as Ada), alongside the Sprint 0 references in
-`docs/design/screenshots/`. Score 1–5 with concrete defects (plan section 5).
+`docs/design/screenshots/`. The agent's evidence and defects are filled in below;
+**scoring and approval are not run — requires human**, under R2 in
+[`docs/plan/l0-sprint-tasks.md`](../plan/l0-sprint-tasks.md). Score 1–5 with concrete
+defects (plan section 5); every category must reach at least 4 before the final local
+release. A pending score is not a pass or an agent-assigned failure.
 
 What the screenshots cover, at each of the three sizes:
+
 - **Default:** sign-in and all six chapters on the fixture workspace.
 - **Selected:** a field's source in the drawer; route B in the drawer.
 - **Empty:** Ben's home with no workspaces; Routes in a new workspace.
@@ -316,6 +442,7 @@ What the screenshots cover, at each of the three sizes:
   uninvited account.
 
 Not in the screenshots, so review them in Storybook (`cd apps/web && pnpm storybook`):
+
 - **States:** Loading, Empty, Unknown, Conditional, Stale, ErrorState and Disabled.
 - **Shell:** the strip when refreshing failed or the stream stopped, an unknown budget, and
   long names with three targets; the drawer with an unknown source and a failed load; a
@@ -323,28 +450,39 @@ Not in the screenshots, so review them in Storybook (`cd apps/web && pnpm storyb
 
 Not reviewable yet (no producer): partial results, zero results and the 100-job limit.
 
-Also check:
+Use the following observations to guide the live human check:
 
-1. Does the shell feel like the calm observatory at all three sizes? Rail, strip, light
-   reading chapters, ink exploration chapters.
-2. Is "Fixture preview: not your routes" unmistakable, and is any wording too
-   apologetic or too technical?
-3. Do the empty chapters explain enough, without nagging?
-4. On the phone, is the bottom sheet's peek, More and Less, and drag right? Is the expanded
-   height right?
-5. Does the You form's field-state control ("Answered", "Unknown", …) read clearly?
-6. Layers 2 and 3: is one grey enough (carried from Task 2)?
-7. Keyboard: tab through a chapter and open and close the drawer; is focus always visible?
+1. **Identity:** the rail, typography and light/ink chapter distinction are consistent.
+   Judge whether the tall tablet strip and the desktop status-induced shift (V-08) still
+   feel calm while editing.
+2. **Fixture clarity:** "Fixture preview: not your routes" is prominent. Check that a
+   person still understands the conditional readiness when the notice is off-screen
+   (V-01), without needing to open the drawer.
+3. **Empty chapters:** Roles, Skills and Options explain missing features and inputs.
+   Check Plan's next-step/action mismatch (V-06), and whether filled rail dots imply
+   completed chapters (V-09).
+4. **Phone sheet:** the captured route peek omits its key figures (V-04). Inspect both
+   sheets expanded, More/Less, drag, dismissal and internal scrolling; those states have
+   no image evidence here.
+5. **Profile controls:** Answered and Not asked yet are readable, but repeated labels
+   make the form long (V-07). Inspect Unknown, Skip and Prefer not to say, the scrolled
+   stale conflict and Save; confirm the complete data-mode explanation is readable
+   (V-05).
+6. **Comparison:** check that a route is discoverable promptly on the phone (V-03).
+   Scroll to D/E to judge the layer 2/3 shapes and grey, which these captures do not show.
+7. **Recovery and keyboard:** test retry after the failed load and distinguish it from
+   update-stream status (V-02). Tab through chapters and sheets, checking visible focus,
+   announcements and focus return; repeat at 200 % zoom and with reduced motion.
 
-| Category | Score (1–5) | Defects |
+| Category | Human score (1–5) | Evidence and defects to assess |
 |---|---|---|
-| Hierarchy | | |
-| Typography | | |
-| Spacing | | |
-| Visual identity | | |
-| Chart legibility | | |
-| Uncertainty communication | | |
-| Responsive composition | | |
-| Interaction continuity | | |
+| Hierarchy | Not run — requires human | Chapter titles and state cards are distinct. Phone Routes shows no route card initially (V-03); the sheet's generic title displaces decision figures (V-04) |
+| Typography | Not run — requires human | Serif headings, body copy and numeric rows remain readable. Repeated profile labels add weight (V-07); inspect the small wrapped source hash and long-name cases at zoom |
+| Spacing | Not run — requires human | Cards use consistent gutters. The phone profile's first card starts around y=566 (V-07); desktop reconnect adds 52 px to the strip (V-08). Wide empty margins alone do not establish a defect |
+| Visual identity | Not run — requires human | Rail, raised strip, sea-glass selection and light/ink surfaces match the reference language. Filled visited dots may imply completion (V-09); the refusal headline repeats (V-10) |
+| Chart legibility | Not run — requires human | No application charts exist in this package. Route A/B/C figures and B's monthly rows are readable; D/E, layer 3 and charts cannot be judged. Assess charts when implemented |
+| Uncertainty communication | Not run — requires human | Synthetic notices, unknown budget and stale/failed states are explicit. Card readiness loses the condition (V-01); failed profile loading still says Live (V-02); the phone mode explanation is clipped (V-05) |
+| Responsive composition | Not run — requires human | Chapters reflow without visible page overflow. Phone Routes hierarchy (V-03), sheet figures (V-04), mode clipping (V-05) and form density (V-07) remain open. Expanded sheets and lower content are unreviewed |
+| Interaction continuity | Not run — requires human | B's selection and the stale notice are visible. Retry is absent (V-02), Plan's action does not match its next step (V-06), and reconnect moves content (V-08). Keyboard, drag, retained edits and motion need live checks |
 
-Approval: not given. Approver and date: blank until a human reviews.
+Approval: **not given — requires human (H-01)**. Approver and approval date: not recorded.
