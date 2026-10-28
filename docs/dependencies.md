@@ -56,6 +56,19 @@ Release cadence risk: Pydantic AI shipped 2.59.0 to 2.62.0 between 2026-10-21 an
 any bump. `pytest` 9.2.0 was also published that day; it is tooling only, and the suite
 ran clean on it.
 
+## Design-reference tooling (`docs/design/pnpm-lock.yaml`, dev only)
+
+Added in Task 2 to measure and capture the Sprint 0 design references. It is not part of
+the application and ships nothing.
+
+| Package | Version | Why | arm64 evidence |
+|---|---|---|---|
+| `playwright` | 1.64.1 (published 2026-10-14), Chromium build 1248 (Chrome for Testing 156.0.8078.4) | screenshots at 1440×900 and 390×844 | Verified: 18 captures (`docs/design/screenshots/checks.md`) |
+| `axe-core` | 4.14.0 (published 2026-10-05), MPL-2.0 | automated WCAG A/AA checks on each capture | Verified: same run |
+
+The web app (Task 4) pins its own copies in `apps/web`. These match the candidates below,
+so the two stay aligned unless Task 4 records a reason to differ.
+
 ## Not yet introduced (owner and disposition)
 
 These belong to the fixed stack but no task has installed them yet. Each introducing task

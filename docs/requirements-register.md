@@ -270,7 +270,7 @@ and recovery · DOC document or ADR evidence · H human.
 | ARC1-02 | Python dependencies pinned exactly and locked; arm64 executed | DOC | T1 | verified | `docs/dependencies.md`, `backend/uv.lock` (2bb36e5) |
 | ARC1-03 | JavaScript dependencies pinned and locked with pnpm | DOC | T4 | planned | |
 | ARC1-04 | Pydantic AI's native Meta provider qualified on the pinned model: schema output, streaming, search, usage | M | T1 | verified | ADR 0003; `docs/evidence/sprint-0-spike.md` S0.2; ledger calls 3–7. Test-model choice provisional (H-09) |
-| ARC1-05 | Worker killed mid-call or after persistence recovers to exactly one accepted output; outbox replay starts one workflow | P | T1, T3 | spike-verified | ADR 0002; `backend/spikes/durable/test_durability.py` |
+| ARC1-05 | Worker killed mid-call or after persistence recovers to exactly one accepted output; outbox replay starts one workflow | P | T1, T3 | spike-verified | ADR 0002; `backend/spikes/durable/test_durability.py` (12 passed, re-run on 943663c, 2026-10-28) |
 | ARC1-06 | Workflow journals and logs hold identifiers only: no credential and no private payload (leak scan with a negative control) | P, S | T1, T3 | spike-verified | ADR 0002, S0.4 |
 | ARC1-07 | One retry owner (the DBOS step); typed message-free failures; exhausted retries end failed, never empty success | P | T1, T3 | spike-verified | ADR 0002 decisions 6–7 |
 | ARC1-08 | Runtime connects with non-owner roles; migration owners used only by setup | P, S | T3 | planned | ADR 0002 decision 2 |
@@ -282,9 +282,9 @@ and recovery · DOC document or ADR evidence · H human.
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| TEST1-01 | Fixture pack placed unchanged; its validator passes | DOC | T2 | verified | `fixtures/m0/`, `fixtures/README.md`; validator run in `docs/evidence/fixture-hand-check.md` §1 |
-| TEST1-02 | TRACE-01 arithmetic and the five persona expectations independently hand-checked | DOC | T2 | verified | `docs/evidence/fixture-hand-check.md` (domain-reviewer sign-off is H-07) |
-| TEST1-03 | A–I direct-spend fixture reconstructed, labelled and namespaced | DOC | T2 | verified | `fixtures/reconstructed/directai.json` |
+| TEST1-01 | Fixture pack placed unchanged; its validator passes | DOC | T2 | verified | `fixtures/m0/`, `fixtures/README.md` (e925c57); validator run in `docs/evidence/fixture-hand-check.md` §1 |
+| TEST1-02 | TRACE-01 arithmetic and the five persona expectations independently hand-checked | DOC | T2 | verified | `docs/evidence/fixture-hand-check.md` (e925c57, corrected f5b73d1); domain-reviewer sign-off is H-07 |
+| TEST1-03 | A–I direct-spend fixture reconstructed, labelled and namespaced | DOC | T2 | verified | `fixtures/reconstructed/directai.json` (e925c57) |
 | TEST1-04 | P01 end to end (browser, API, PostgreSQL, DBOS, solver): TRACE-01 ledger, three fronts, route B print snapshot | UI | T16 | planned | |
 | TEST1-05 | P02 end to end: grounded diverse shortlist, no forced personality test, no economic solve on an invented baseline | UI | T16 | planned | |
 | TEST1-06 | P03 end to end: payment-cap rejection; grant and offer income not spent before their gates | UI | T16 | planned | |
@@ -540,16 +540,16 @@ Generated properties (plan section 8):
 
 | ID | Requirement | Layer | Owner | Status | Evidence |
 |---|---|---|---|---|---|
-| UI-01 | Semantic token set (surfaces, text, focus, selection, industry, status) with WCAG contrast measured by script, not assumed | DOC | T2 | planned | |
-| UI-02 | Design rule: industry colour never means status; sea-glass reserved for selection and action; ≤ 5 named industries plus Other with a stable mapping (implementation: UI-04, VIS1-02) | DOC | T2 | planned | |
-| UI-03 | Licensed self-hosted fonts with licence texts beside the files; tabular numerals for money and time | DOC | T2 | planned | |
+| UI-01 | Semantic token set (surfaces, text, focus, selection, industry, status) with WCAG contrast measured by script, not assumed | DOC | T2 | verified | `docs/design/tokens/` (f2e55fa): 64/64 pairs pass, `contrast-report.md` |
+| UI-02 | Design rule: industry colour never means status; sea-glass reserved for selection and action; ≤ 5 named industries plus Other with a stable mapping (implementation: UI-04, VIS1-02) | DOC | T2 | verified | `docs/design/README.md` (f2e55fa); status/industry ΔE76 ≥ 20.9 in `contrast-report.md` |
+| UI-03 | Licensed self-hosted fonts with licence texts beside the files; tabular numerals for money and time | DOC | T2 | verified | `docs/design/fonts/README.md` (f2e55fa): OFL files byte-identical to pinned upstream; Source Sans 3 default figures tabular |
 | UI-04 | Tokens, fonts and the status vocabulary implemented in `apps/web` and Storybook (loading, empty, unknown, conditional, stale, error, disabled) | UI | T4 | planned | |
 | UI-05 | Motion: 120–180 ms controls, 220–320 ms panels, ≤ 450 ms graph reveal, no continuous force motion; reduced-motion and calm mode remove spatial animation, not information | UI | T4, T14 | planned | |
 | UI-06 | WCAG 2.2 AA: axe clean; keyboard-only completion; visible focus; headings and names; focus return from drawers; 200 % zoom; no horizontal overflow at 390 px; announced errors | A11Y | T4 onward | planned | |
 | UI-07 | SVG surfaces have DOM equivalents; every action works through a list; tooltips hold no unique information; filtering never drops keyboard focus | A11Y, UI | T8, T14 | planned | |
 | UI-08 | Measured budgets: input feedback ≤ 100 ms; p95 linked filter/selection ≤ 150 ms at 100 visible jobs and a 1,000-mark projection; device, browser and dataset reported | UI | T8, T14 | planned | |
 | UI-09 | Desktop: slim chapter rail, central work area, evidence drawer. Mobile: chapter menu, cards and lists, bottom evidence sheet, focused graph views (never a shrunken desktop graph) | UI | T4 | planned | |
-| UI-10 | Three signature compositions with real fixture numbers, long labels, mobile variants, unknown-data and failure states; screenshots at 1440×900 and 390×844 (human approval is H-02) | V | T2 | planned | |
+| UI-10 | Three signature compositions with real fixture numbers, long labels, mobile variants, unknown-data and failure states; screenshots at 1440×900 and 390×844 (human approval is H-02) | V | T2 | verified | `docs/design/compositions/`, `docs/design/screenshots/checks.md` (f2e55fa): 18/18 captures pass; 59 fixture values asserted |
 | UI-11 | Screenshot approval of all six chapters at 1440×900, 390×844 and 768×1024 across default, selected, empty, partial, stale, unavailable and failed states, with long names, three targets, negative economic cost, zero results and the 100-job limit | V, H | T4, T8, T14, T16 | planned | |
 
 ## 5 Specification section 20 non-deferrable checks
