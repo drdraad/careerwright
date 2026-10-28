@@ -2,8 +2,10 @@
 // The conversation (spec section 4, S2.3): one useful question at a time, the person's
 // choice of entry and tone, pause and resume, and the reply as it streams. A streamed reply
 // is marked not checked until the validated turn replaces it; a failed turn says why, keeps
-// what streamed marked as not saved, and saves nothing. A message that explicitly expresses
-// acute distress gets the support response instead of the interviewer (ADR 0007 decision 7).
+// what streamed marked as not saved, and saves nothing. The support screen has two tiers
+// (ADR 0007 decision 7): a first-person statement of acute distress gets the support
+// response instead of the interviewer; any other risk word is sent as usual, with a calm
+// support note beside it, announced politely and dismissible.
 import { useEffect, useId, useRef, useState } from "react";
 import type {
   ConversationMode,
@@ -229,6 +231,7 @@ export function Conversation({
   const [showEarlier, setShowEarlier] = useState(false);
   const [focusQuestion, setFocusQuestion] = useState(false);
   const questionTitle = useRef<HTMLHeadingElement>(null);
+  const replyField = useRef<HTMLTextAreaElement>(null);
   const modeId = useId();
   const demo = workspace.data_mode === "demo";
   const support = sender.support;
@@ -256,6 +259,16 @@ export function Conversation({
       announce(repliedWords(answered));
     }
   }, [answeredId, answered, announce]);
+
+  // A new support note is announced politely; focus stays where the person is (I-4).
+  const note = sender.note;
+  const announcedNote = useRef<typeof note>(null);
+  useEffect(() => {
+    if (note !== null && note !== announcedNote.current) {
+      announcedNote.current = note; // once per note, however often the chapter renders
+      announce("Your message was sent. Support information is shown above the reply field.");
+    }
+  }, [note, announce]);
 
   // After choosing how to start, the first question takes focus (it replaced the choice).
   useEffect(() => {
@@ -415,7 +428,15 @@ export function Conversation({
           onSendAnyway={() => void send(support.message, true)}
         />
       )}
-      {sender.note !== null && <SupportNote note={sender.note} onDismiss={sender.dismissNote} />}
+      {note !== null && (
+        <SupportNote
+          note={note}
+          onDismiss={() => {
+            sender.dismissNote();
+            replyField.current?.focus(); // the button goes; focus is never lost (M-1)
+          }}
+        />
+      )}
       {sender.error !== null && <RequestFailure error={sender.error} />}
 
       {!entryNeeded && (
@@ -431,6 +452,7 @@ export function Conversation({
             Reply to Nessa
           </label>
           <textarea
+            ref={replyField}
             id={`${modeId}-reply`}
             rows={2}
             maxLength={2000}

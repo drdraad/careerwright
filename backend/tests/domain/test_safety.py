@@ -16,85 +16,133 @@ from nessa.profile.safety import (
     screen_message,
 )
 
-# Clear first-person intent or a first-person statement of distress or self-injury.
-ACUTE = [
-    "Honestly I want to kill myself, nothing is working.",
-    "I've been thinking about ending my life.",
-    "I feel suicidal most days since I lost my job.",
-    "I have been self-harming again.",
-    "Some days I just want to die.",
-    "I don't want to be alive any more.",
-    "Everyone would be better off if I took my own life",
-    "Some days I wanna die.",
-    "I want to hurt myself.",
-    "I don't want to live anymore.",
-    "There's no reason to go on.",
-    "I want to end it all.",
-    # Shapes the fix-round 1 matcher missed (re-review 1): intent with a reason after it,
-    # self-injury disclosed without an intent word, a qualifier after "live", and a
-    # first-person statement followed by a career-sounding word.
-    "I want to kill myself over this.",
-    "I keep hurting myself.",
-    "I don't want to live like this.",
-    "I feel suicidal and I need support.",
-    "I self-harm when work gets too much.",
-    "I can't go on.",
-]
+ACUTE, MENTION, NONE = 1, 2, 0
 
-# A risk word without clear first-person intent: sent as usual, with the support note.
-MENTION = [
-    # The earlier career false positives (review A-I-1): never blocked.
-    "I want to take my life in a new direction.",
-    "I took my life savings out to retrain.",
-    "I don't want to live in London.",
-    "I hurt myself lifting boxes at the warehouse, so I need lighter work.",
-    "There is no reason to go on with the accounting course.",
-    "I'm killing myself with overtime at the depot.",
-    "I volunteer on a suicide prevention helpline and want paid work like it.",
-    "I'd like to work in self-harm support services.",
-    # Missed shapes without clear intent: noted, never dropped.
-    "I could kill myself for missing that deadline.",
-    "I hurt myself again last night.",
-    "I can't go on like this at work.",
-]
-
-ORDINARY = [
-    "This commute is killing me.",
-    "I'm dying to try woodwork.",
-    "I'd kill for a four-day week.",
-    "The deadline pressure made me want to quit.",
-    "I feel a bit overwhelmed by all the options.",
-    "I have dyslexia, so long written tests are hard.",
+# One table: each row is an input shape, an example and the tier it must reach. Tier 1 is
+# first-person present intent or distress only; tier 2 is any other message containing a
+# risk stem, in any inflection; nothing with a risk stem reaches no tier (controller
+# ruling, fix round 3). Examples are minimal; most are workplace phrasing.
+CORPUS: list[tuple[str, str, int]] = [
+    # Tier 1: first person, present intent or distress.
+    ("intent + kill myself", "Honestly I want to kill myself, nothing is working.", ACUTE),
+    ("intent + kill myself + reason", "I want to kill myself over this.", ACUTE),
+    ("intent (perfect) + end my life", "I've been thinking about ending my life.", ACUTE),
+    ("intent + die, clause end", "Some days I just want to die.", ACUTE),
+    ("informal intent + die", "Some days I wanna die.", ACUTE),
+    ("intent + hurt myself", "I want to hurt myself.", ACUTE),
+    ("intent + end it all", "I want to end it all.", ACUTE),
+    ("I feel suicidal", "I feel suicidal most days since I lost my job.", ACUTE),
+    ("I feel suicidal + need", "I feel suicidal and I need support.", ACUTE),
+    ("I've felt suicidal", "I've felt suicidal since I lost my job.", ACUTE),
+    ("I keep thinking about + end my life", "I keep thinking about ending my life.", ACUTE),
+    ("I have been self-harming", "I have been self-harming again.", ACUTE),
+    ("I self-harm (present)", "I self-harm when work gets too much.", ACUTE),
+    ("I keep hurting myself, clause end", "I keep hurting myself.", ACUTE),
+    ("I don't want to be alive", "I don't want to be alive any more.", ACUTE),
+    ("I don't want to live, clause end", "I don't want to live anymore.", ACUTE),
+    ("I don't want to live like this", "I don't want to live like this.", ACUTE),
+    ("I do not want to live like this", "I do not want to live like this.", ACUTE),
+    ("I do not want to be here any more", "I do not want to be here any more.", ACUTE),
+    (
+        "better off if I took my own life",
+        "Everyone would be better off if I took my own life",
+        ACUTE,
+    ),
+    ("I can't go on, clause end", "I can't go on.", ACUTE),
+    # Tier 2: a risk stem in a professional, third-party, figurative or object frame.
+    ("professional: suicide prevention", "I volunteer on a suicide prevention helpline.", MENTION),
+    (
+        "professional: intent + suicide (noun)",
+        "I have been thinking about suicide prevention work.",
+        MENTION,
+    ),
+    (
+        "professional: intent of + suicide",
+        "I am thinking of suicide prevention as a career.",
+        MENTION,
+    ),
+    (
+        "professional: self-harm services",
+        "I'd like to work in self-harm support services.",
+        MENTION,
+    ),
+    (
+        "professional: I have + self-harm (noun)",
+        "I have self-harm awareness training from my NHS role.",
+        MENTION,
+    ),
+    (
+        "third party: people feeling suicidal",
+        "I answer calls from people feeling suicidal.",
+        MENTION,
+    ),
+    (
+        "third party: young people feeling suicidal",
+        "I support young people feeling suicidal as a youth worker.",
+        MENTION,
+    ),
+    ("third party: something going to die", "I think the high street is going to die.", MENTION),
+    ("third party: print going to die", "Print is going to die, so I want to retrain.", MENTION),
+    ("no subject: no reason to go on", "There's no reason to go on.", MENTION),
+    ("figurative: die of boredom", "I am going to die of boredom in this job.", MENTION),
+    ("figurative: die on this hill", "I am ready to die on this hill about remote work.", MENTION),
+    (
+        "figurative: killing myself with work",
+        "I'm killing myself with overtime at the depot.",
+        MENTION,
+    ),
+    ("figurative: could kill myself", "I could kill myself for missing that deadline.", MENTION),
+    ("object: take my life in a direction", "I want to take my life in a new direction.", MENTION),
+    ("object: life savings", "I took my life savings out to retrain.", MENTION),
+    ("object: taken my life savings", "Retraining has taken my life savings.", MENTION),
+    ("object: live in a place", "I don't want to live in London.", MENTION),
+    ("injury: hurt myself lifting", "I hurt myself lifting boxes at the warehouse.", MENTION),
+    (
+        "injury: have been hurting myself lifting",
+        "I have been hurting myself lifting boxes at the warehouse.",
+        MENTION,
+    ),
+    (
+        "injury: kept cutting myself on tape",
+        "I kept cutting myself on the packaging tape at the depot.",
+        MENTION,
+    ),
+    (
+        "injury: was cutting myself on tape",
+        "I was cutting myself on the packaging tape at the depot.",
+        MENTION,
+    ),
+    ("injury: hurt myself (past)", "I hurt myself again last night.", MENTION),
+    (
+        "course: no reason to go on with",
+        "There is no reason to go on with the accounting course.",
+        MENTION,
+    ),
+    ("can't go on + qualifier", "I can't go on like this at work.", MENTION),
+    ("cannot go on + object", "I cannot go on with this course.", MENTION),
+    ("can not go on + qualifier", "I can not go on like this at work.", MENTION),
+    ("wanting to die (figurative)", "Wanting to die on every hill slows meetings down.", MENTION),
+    ("don't want to be here (job)", "I don't want to be here in five years.", MENTION),
+    # No risk stem: nothing.
+    ("killing me (not myself)", "This commute is killing me.", NONE),
+    ("dying to", "I'm dying to try woodwork.", NONE),
+    ("kill for", "I'd kill for a four-day week.", NONE),
+    ("want to quit", "The deadline pressure made me want to quit.", NONE),
+    ("overwhelmed", "I feel a bit overwhelmed by all the options.", NONE),
+    ("a named condition", "I have dyslexia, so long written tests are hard.", NONE),
 ]
 
 
 @pytest.mark.req("PROF-09")
-@pytest.mark.parametrize("message", ACUTE)
-def test_first_person_acute_distress_gets_the_support_response_and_is_not_sent(
-    message: str,
-) -> None:
+@pytest.mark.parametrize(("shape", "message", "tier"), CORPUS, ids=[row[0] for row in CORPUS])
+def test_the_screen_puts_each_shape_in_its_tier(shape: str, message: str, tier: int) -> None:
     concern = screen_message(message)
 
-    assert concern is not None
-    assert concern.tier is SupportTier.ACUTE
-    assert concern.policy == "acute_distress"
-    assert concern.policy_version == POLICY_VERSION
-
-
-@pytest.mark.req("PROF-09")
-@pytest.mark.parametrize("message", MENTION)
-def test_any_other_risk_word_is_sent_as_usual_with_a_support_note(message: str) -> None:
-    concern = screen_message(message)
-
-    assert concern is not None  # never silently dropped
-    assert concern.tier is SupportTier.MENTION  # never blocked
-    assert concern.policy == "risk_mention"
-
-
-@pytest.mark.req("PROF-09")
-@pytest.mark.parametrize("message", ORDINARY)
-def test_ordinary_figures_of_speech_and_disclosures_get_nothing(message: str) -> None:
-    assert screen_message(message) is None
+    found = NONE if concern is None else ACUTE if concern.tier is SupportTier.ACUTE else MENTION
+    assert found == tier, shape
+    if concern is not None:
+        assert concern.policy == ("acute_distress" if tier == ACUTE else "risk_mention")
+        assert concern.policy_version == POLICY_VERSION
 
 
 @pytest.mark.req("PROF-09")

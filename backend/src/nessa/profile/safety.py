@@ -4,17 +4,22 @@ section 4, "Uncertainty and emotional comfort"; S2.6; PROF-09, REC1-02).
 It is kept apart from career suitability: nothing here scores, labels or remembers the
 person, and nothing it sees reaches the profile or a suggestion.
 
-- **A two-tier screen** (controller ruling, Task 6 fix round 2):
-  - *Acute* (tier 1): a first-person statement of intent or distress ("I want to die", "I
-    feel suicidal", "I've been self-harming", "I don't want to live any more") is answered
-    at once with a fixed support response and the UK services below, before any model
-    call: it is not sent to the interviewer, not stored as a turn and never used for
-    suggestions. A person shown it by mistake can choose to send the message anyway.
-  - *Mention* (tier 2): any other use of a risk word ("suicide prevention work", "I took my
-    life savings", "killing myself with overtime") is sent as usual, and the person sees a
-    calm support note with the same services beside it. No risk word is ever silently
-    dropped, and ordinary career talk is never blocked.
-  Only words count, so figures of speech without a risk word ("this commute is killing me")
+- **A two-tier screen** (controller rulings, Task 6 fix rounds 2 and 3):
+  - *Acute* (tier 1, narrow): a first-person, present statement of intent or distress ("I
+    want to die", "I feel suicidal", "I've been self-harming", "I don't want to live any
+    more") is answered at once with a fixed support response and the UK services below,
+    before any model call: it is not sent to the interviewer, not stored and never used
+    for suggestions. A person shown it by mistake can choose to send the message anyway.
+    A risk word in a professional, third-party, figurative or object frame ("people
+    feeling suicidal", "print is going to die", "suicide prevention work") never reaches
+    it.
+  - *Mention* (tier 2, broad): any other message containing a risk stem, in any
+    inflection ("I took my life savings", "killing myself with overtime", "cutting myself
+    on the tape") is sent as usual, and the person sees a calm support note with the same
+    services beside it. Nothing containing a risk stem is silently dropped, and ordinary
+    career talk is never blocked. The note is derived from the request each time and never
+    stored.
+  Only words count, so figures of speech without a risk stem ("this commute is killing me")
   get nothing. Tier 1 rests on positive evidence only (who and what), never on a list of
   words that excuse a match. Clinical screening is out of scope; this is not one.
 - **Inference.** Model output may not suggest a health condition, a diagnosis or a
@@ -32,52 +37,67 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 
-POLICY_VERSION = "support-policy-2"
+POLICY_VERSION = "support-policy-3"
 CHECKED_ON = "2026-10-28"
 REVIEW_STATUS = "provisional: needs reviewed sign-off (human gate H-12)"
 
 _A = r"[^\w\s]?"  # an apostrophe, straight or curly, or none ("don't", "dont")
 _END = r"(?=\s*(?:[.!?,;:]|$))"  # the end of a clause
-_MORE = r"(?:\s+any\s?more)?"
-# Tier 1: first-person intent or distress, from positive evidence only.
-_INTENT = (
-    r"(?:want(?:ed)?\s+to|wanna|going\s+to|gonna|plan(?:ning)?\s+to|tempted\s+to|"
-    r"try(?:ing)?\s+to|ready\s+to|decided\s+to|(?:thinking|thought|think)\s+(?:about|of)|"
-    r"thoughts\s+of|urges?\s+to)"
+_MORE = r"(?:\s+(?:any\s?more|again))?"
+_NOT = rf"(?:don{_A}t|do\s+not)"
+_CANNOT = rf"(?:can{_A}t|cannot|can\s+not)"
+
+# Tier 1: first person, present intent or distress; positive evidence only. Every branch
+# starts from "I" (or "me"), so a professional, third-party, figurative or object frame
+# never reaches it ("people feeling suicidal", "print is going to die", "die of boredom",
+# "suicide prevention work", "I have self-harm awareness training").
+_I = (
+    rf"\bI(?:{_A}m|\s+am|{_A}ve\s+been|\s+have\s+been)?"
+    r"(?:\s+(?:just|really|honestly|still|so|keep|often|sometimes))*"
 )
+_INTENT = (
+    r"(?:want\s+to|wanna|(?:am\s+)?going\s+to|gonna|plan(?:ning)?\s+to|intend(?:ing)?\s+to|"
+    r"(?:thinking|think)\s+(?:about|of))"
+)
+# The acts. "die" only at the end of a clause ("die of boredom", "die on this hill" are not).
 _ACT = (
-    r"(?:die|dying|kill(?:ing)?\s+myself|end(?:ing)?\s+(?:it\s+all|my\s+(?:own\s+)?life)|"
-    r"tak(?:e|ing)\s+my\s+own\s+life|hurt(?:ing)?\s+myself|harm(?:ing)?\s+myself|suicide)"
+    rf"(?:die{_END}|kill(?:ing)?\s+myself|end(?:ing)?\s+(?:it\s+all|my\s+(?:own\s+)?life)|"
+    r"tak(?:e|ing)\s+my\s+own\s+life|hurt(?:ing)?\s+myself|harm(?:ing)?\s+myself)"
 )
 _ACUTE = re.compile(
-    r"\b(?:"
-    rf"{_INTENT}\s+(?:just\s+)?{_ACT}|"
-    rf"(?:I{_A}m|I\s+am|I\s+feel|I\s+felt|I{_A}ve\s+(?:been|felt)|I\s+have\s+(?:been|felt)|"
-    rf"I\s+was|feeling)\s+(?:so\s+|really\s+|very\s+)?suicidal|"
-    rf"I(?:{_A}ve|\s+have)?\s+(?:been\s+|started\s+|keep\s+|kept\s+)?"
-    r"(?:self[- ]?harm(?:ing|ed)?|harm(?:ing|ed)?\s+myself)|"
-    rf"I(?:{_A}ve|\s+have)?\s+(?:been|keep|kept|started)\s+(?:hurting|cutting)\s+myself|"
-    r"t(?:ake|aking|ook)\s+my\s+own\s+life|"
-    r"wish(?:ed)?\s+I\s+(?:was|were)\s+dead|better\s+off\s+dead|better\s+off\s+without\s+me|"
-    rf"don{_A}t\s+want\s+to\s+(?:be\s+alive|be\s+here{_MORE}{_END}|"
-    rf"live(?:\s+like\s+this|\s+this\s+way)?{_MORE}{_END})|"
-    rf"do\s+not\s+want\s+to\s+(?:be\s+alive|live(?:\s+like\s+this)?{_MORE}{_END})|"
-    rf"no\s+reason\s+to\s+(?:live|go\s+on){_MORE}{_END}|"
-    rf"can{_A}t\s+go\s+on{_MORE}{_END}"
-    r")\b",
+    r"(?:"
+    rf"{_I}\s+{_INTENT}\s+{_ACT}|"
+    rf"\bI(?:{_A}m|\s+am|\s+feel|{_A}m\s+feeling|{_A}ve\s+(?:been(?:\s+feeling)?|felt)|"
+    rf"\s+have\s+(?:been(?:\s+feeling)?|felt)|\s+keep\s+feeling)"
+    r"\s+(?:so\s+|really\s+|very\s+)?suicidal|"
+    rf"\bI\s+(?:self[- ]?harm|harm\s+myself)\b|"
+    rf"\bI(?:{_A}m|\s+am|{_A}ve\s+been|\s+have\s+been|\s+keep|{_A}ve\s+started|"
+    rf"\s+have\s+started)\s+(?:self[- ]?harming|harming\s+myself)|"
+    rf"\bI(?:{_A}m|\s+am|{_A}ve\s+been|\s+have\s+been|\s+keep)\s+(?:hurting|cutting)\s+myself"
+    rf"{_MORE}{_END}|"
+    r"\bwish(?:ed)?\s+I\s+(?:was|were)\s+dead|"
+    rf"\bI(?:{_A}d|\s+would|\s+might)\s+be\s+better\s+off\s+dead|"
+    r"\bbetter\s+off\s+(?:without\s+me|if\s+I\s+(?:took|take|ended|end)\s+my\s+(?:own\s+)?life)|"
+    rf"\bI\s+{_NOT}\s+want\s+to\s+(?:be\s+alive|be\s+here\s+any\s?more{_END}|"
+    rf"live(?:\s+like\s+this|\s+this\s+way)?(?:\s+any\s?more)?{_END})|"
+    rf"\bI\s+(?:have|{_A}ve\s+got|see)\s+no\s+reason\s+to\s+(?:live|go\s+on)(?:\s+any\s?more)?{_END}|"
+    rf"\bI\s+{_CANNOT}\s+go\s+on(?:\s+any\s?more)?{_END}"
+    r")",
     re.IGNORECASE,
 )
-# Tier 2: every risk word or phrase, whatever surrounds it.
+# Tier 2: every risk stem, in every inflection, whatever surrounds it. Nothing containing
+# one reaches no tier.
 _RISK = re.compile(
     r"\b(?:"
     r"suicid\w*|self[- ]?harm\w*|overdos\w*|"
-    r"(?:kill|hurt|harm|cut)(?:s|ing|ed)?\s+myself|"
+    r"(?:kill(?:s|ing|ed)?|hurt(?:s|ing)?|harm(?:s|ing|ed)?|cut(?:s|ting)?)\s+myself|"
     r"end(?:s|ing|ed)?\s+(?:it\s+all|my\s+(?:own\s+)?life)|"
-    r"t(?:ake|akes|aking|ook)\s+my\s+(?:own\s+)?life|"
-    r"(?:want(?:ed)?\s+to|wanna)\s+die|wish(?:ed)?\s+I\s+(?:was|were)\s+dead|"
-    r"better\s+off\s+(?:dead|without\s+me)|"
-    rf"(?:don{_A}t|do\s+not)\s+want\s+to\s+(?:be\s+alive|live|be\s+here)|"
-    rf"no\s+reason\s+to\s+(?:live|go\s+on)|can{_A}t\s+go\s+on"
+    r"t(?:ake|akes|aking|aken|ook)\s+my\s+(?:own\s+)?life|"
+    r"(?:(?:want(?:s|ing|ed)?|going|ready|plan(?:s|ning|ned)?|tempted|try(?:ing)?|"
+    r"intend(?:s|ing|ed)?)\s+to|wanna|gonna)\s+die|"
+    r"wish(?:es|ed)?\s+I\s+(?:was|were)\s+dead|better\s+off\s+(?:dead|without\s+me)|"
+    rf"(?:{_NOT}|doesn{_A}t|didn{_A}t)\s+want\s+to\s+(?:be\s+alive|live|be\s+here)|"
+    rf"no\s+reason\s+to\s+(?:live|go\s+on)|(?:{_CANNOT}|couldn{_A}t)\s+go\s+on"
     r")\b",
     re.IGNORECASE,
 )

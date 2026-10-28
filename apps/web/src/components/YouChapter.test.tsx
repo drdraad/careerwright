@@ -542,7 +542,7 @@ describe("[STATE-06][PROF-08] sending a stale tray's message again goes through 
             });
             return {
               policy: "acute_distress",
-              policy_version: "support-policy-2",
+              policy_version: "support-policy-3",
               review_status: "provisional",
               message: "I'm sorry things feel this hard.",
               resources: [],
@@ -585,7 +585,7 @@ describe("[PROF-09] explicit distress gets the support response instead of the i
   it("shows the checked UK services, keeps the message, and sends it only if asked", async () => {
     const support = {
       policy: "acute_distress",
-      policy_version: "support-policy-2",
+      policy_version: "support-policy-3",
       review_status: "provisional",
       message: "I'm sorry things feel this hard.",
       resources: [
@@ -635,7 +635,7 @@ describe("[PROF-09] any other risk word is sent as usual, with a calm support no
   it("sends the message, clears the reply field and shows the note beside it", async () => {
     const note = {
       policy: "risk_mention",
-      policy_version: "support-policy-2",
+      policy_version: "support-policy-3",
       review_status: "provisional",
       message:
         "If anything you mentioned is about how you are feeling, support is available any " +
@@ -672,8 +672,14 @@ describe("[PROF-09] any other risk word is sent as usual, with a calm support no
     expect(field).toHaveValue(""); // it was sent
     expect(sent.filter((s) => s.method === "POST")).toHaveLength(1);
     expect(screen.queryByText("Support is available now")).toBeNull(); // not the blocking one
+    // Re-review 2, I-4: announced politely, focus left where it was.
+    expect(screen.getByTestId("you-announcer")).toHaveTextContent(
+      "Your message was sent. Support information is shown above the reply field.",
+    );
+    expect(screen.getByRole("button", { name: "Send" })).toHaveFocus(); // not moved to the note
     await user.click(within(shown).getByRole("button", { name: "Dismiss the support note" }));
     expect(screen.queryByRole("region", { name: "Support is available" })).toBeNull();
+    expect(field).toHaveFocus(); // M-1: back to the reply field, not lost
   });
 });
 

@@ -3596,7 +3596,7 @@ export const SupportNoteOutSchema = {
         'resources'
     ],
     title: 'SupportNoteOut',
-    description: 'Shown beside a turn whose message used a risk word without stating acute distress in\nthe first person: the message was sent as usual. Nothing about it is stored.'
+    description: 'Shown beside a turn whose message used a risk word without stating acute distress in\nthe first person: the message was sent as usual. Derived from the request on every\nresponse, including a replay; never stored, not even in the idempotency receipt.'
 } as const;
 
 export const SupportResourceOutSchema = {

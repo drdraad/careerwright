@@ -148,8 +148,9 @@ def test_any_other_risk_word_is_sent_as_usual_with_a_support_note(scenario: Scen
     mention = "I volunteer on a suicide prevention helpline and want paid work like it."
     plain = "I could work in Leeds."
 
+    key = uuid.uuid4()
     noted = scenario.api.write(
-        "POST", turns, scenario.token, {"expected_profile_version": 1, "message": mention}
+        "POST", turns, scenario.token, {"expected_profile_version": 1, "message": mention}, key=key
     )
     ordinary = scenario.api.write(
         "POST", turns, scenario.token, {"expected_profile_version": 1, "message": plain}
@@ -157,7 +158,7 @@ def test_any_other_risk_word_is_sent_as_usual_with_a_support_note(scenario: Scen
 
     assert noted.status_code == 202, noted.text  # sent to the interviewer as usual
     note = noted.json()["support_note"]
-    assert (note["policy"], note["policy_version"]) == ("risk_mention", "support-policy-2")
+    assert (note["policy"], note["policy_version"]) == ("risk_mention", "support-policy-3")
     assert {r["name"] for r in note["resources"]} == {
         "Emergency services",
         "NHS 111",
@@ -169,7 +170,22 @@ def test_any_other_risk_word_is_sent_as_usual_with_a_support_note(scenario: Scen
     assert ordinary.json()["support_note"] is None
     listed = scenario.api.get(turns, scenario.token).json()["items"]
     assert {t["message"] for t in listed} == {mention, plain}
-    assert all("support_note" not in t for t in listed)  # nothing about it is stored
+    assert all("support_note" not in t for t in listed)
+    # Never stored (re-review 2, I-3): not even in the idempotency receipt; a replay of the
+    # same request recomputes the note from the request.
+    receipts = scenario.infra.query(
+        "SELECT response::text AS response FROM nessa.command_receipts WHERE workspace_id = %s",
+        (scenario.workspace_id,),
+    )
+    assert receipts
+    assert not [
+        r for r in receipts if "risk_mention" in r["response"] or "support" in r["response"]
+    ]
+    replayed = scenario.api.write(
+        "POST", turns, scenario.token, {"expected_profile_version": 1, "message": mention}, key=key
+    )
+    assert replayed.json()["turn_id"] == noted.json()["turn_id"]  # the same turn, replayed
+    assert replayed.json()["support_note"] == note
     worker = scenario.worker("worker")
     for body in (noted.json(), ordinary.json()):
         scenario.wait_terminal(body["turn_id"])

@@ -36,6 +36,7 @@ from nessa.profile.conversation import (
     TurnView,
     decide_turn,
     submit_turn,
+    support_note_for,
     turn_view,
     visible_turn,
 )
@@ -86,8 +87,10 @@ def submit(
                 workspace_id,
                 record=False,
             )
-        submitted = TurnSubmittedOut.sent(turn_out(tx, deps.keyring, sent.view), sent.note)
-        return CommandResult(202, submitted.model_dump(mode="json"), workspace_id)
+        # The receipt records the turn only; the support note is added below, every time.
+        return CommandResult(
+            202, turn_out(tx, deps.keyring, sent).model_dump(mode="json"), workspace_id
+        )
 
     request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
     status, response = run_idempotent(
@@ -100,8 +103,12 @@ def submit(
     )
     if status != 202:
         return JSONResponse(response, status_code=status)
+    # A replay has the same request (by fingerprint), so the same note is derived again.
+    submitted = TurnSubmittedOut.sent(TurnOut.model_validate(response), support_note_for(body))
     location = f"/v1/workspaces/{workspace_id}/interview/turns/{response['turn_id']}"
-    return JSONResponse(response, status_code=status, headers={"Location": location})
+    return JSONResponse(
+        submitted.model_dump(mode="json"), status_code=status, headers={"Location": location}
+    )
 
 
 @router.get("/preferences", response_model=PreferencesOut, operation_id="get_preferences")

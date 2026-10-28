@@ -88,13 +88,11 @@ class SupportShown:
     concern: SupportConcern
 
 
-@dataclass(frozen=True)
-class TurnSent:
-    """A new turn. `note` is set when the message used a risk word: the person sees the
-    support note beside it (it is never stored)."""
-
-    view: "TurnView"
-    note: SupportConcern | None
+def support_note_for(command: "SubmitTurn") -> SupportConcern | None:
+    """The support note beside a sent message that used a risk word (tier 2, or tier 1 sent
+    anyway). Derived from the request each time, for a fresh send or a replayed one, so it
+    is never stored, not even in the idempotency receipt."""
+    return screen_message(command.message)
 
 
 class DecideTurn(BaseModel):
@@ -223,11 +221,11 @@ def submit_turn(
     runtime_mode: RuntimeMode,
     defaults: SpendLimits,
     now: datetime,
-) -> TurnSent | SupportShown:
+) -> TurnView | SupportShown:
     """A new turn and its run; or, for a message stating acute distress in the first person,
     the support response instead, with nothing sent to the model and nothing stored
     (`nessa.profile.safety`, tier 1), unless the person has seen it and chose to send the
-    message. Any other risk word is sent as usual, with the support note (tier 2)."""
+    message. Any other risk word is sent as usual; its note comes from `support_note_for`."""
     visible_workspace(tx, workspace_id, lock=True)
     concern = screen_message(command.message)
     if concern is not None and concern.tier is SupportTier.ACUTE and not command.send_after_support:
@@ -271,7 +269,7 @@ def submit_turn(
         created_at=now,
     )
     interview_store.insert_turn(tx, turn)
-    return TurnSent(TurnView(turn, run, None, None), concern)
+    return TurnView(turn, run, None, None)
 
 
 def _refusal(code: ErrorCode, message: str, **details: str | int | list[str]) -> NessaError:

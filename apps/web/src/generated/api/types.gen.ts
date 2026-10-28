@@ -2317,7 +2317,8 @@ export type SuggestionOut = {
  * SupportNoteOut
  *
  * Shown beside a turn whose message used a risk word without stating acute distress in
- * the first person: the message was sent as usual. Nothing about it is stored.
+ * the first person: the message was sent as usual. Derived from the request on every
+ * response, including a replay; never stored, not even in the idempotency receipt.
  */
 export type SupportNoteOut = {
     /**

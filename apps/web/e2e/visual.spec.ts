@@ -165,7 +165,7 @@ const FAILED_TURN = {
 /** The API's tier-2 support note (`nessa.profile.safety.SUPPORT_NOTE` and its resources). */
 const SUPPORT_NOTE = {
   policy: "risk_mention",
-  policy_version: "support-policy-2",
+  policy_version: "support-policy-3",
   review_status: "provisional: needs reviewed sign-off (human gate H-12)",
   message:
     "If anything you mentioned is about how you are feeling, support is available any time, " +

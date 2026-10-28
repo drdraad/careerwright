@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from nessa.errors import ErrorCode, NessaError
 from nessa.money import Money
+from nessa.profile.commands import restored_answers
 from nessa.profile.document import (
     FIELD_NAMES,
     HARD_CONSTRAINTS,
@@ -258,6 +259,10 @@ def test_a_stored_floor_of_nothing_from_before_the_rule_still_reads() -> None:
 
     assert document.minimum_salary.value is not None
     assert document.minimum_salary.value.amount.minor_units == 0
+    # Undoing to that version refuses in words, never a 500 (re-review 2, M-3).
+    with pytest.raises(NessaError) as refused:
+        restored_answers(document)
+    assert refused.value.details == {"field": "minimum_salary", "reason": "no_longer_valid"}
 
 
 @pytest.mark.req("REC1-01", "REC1-03")

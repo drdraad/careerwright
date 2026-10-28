@@ -202,10 +202,19 @@ def revert_profile(
         )
     earlier = store.profile_version(tx, workspace_id, command.to_version)
     document = empty_profile() if earlier is None else earlier.document
+    view, changed = commit_profile_version(
+        tx, actor, workspace_id, command.expected_version, restored_answers(document)
+    )
+    return view, bool(changed)
+
+
+def restored_answers(document: ProfileDocument) -> dict[str, FieldUpdate]:
+    """A stored version's answers as updates citing their own sources. An answer stored before
+    a newer input rule (a £0 salary floor) is refused in words, never saved again."""
     updates: dict[str, FieldUpdate] = {}
     for name in FIELD_NAMES:
         field = getattr(document, name)
-        try:  # an answer stored before a newer input rule (a £0 floor) is refused, not saved
+        try:
             answer = input_type(name).model_validate({"state": field.state, "value": field.value})
         except ValidationError:
             raise NessaError(
@@ -215,7 +224,4 @@ def revert_profile(
                 details={"field": name, "reason": "no_longer_valid"},
             ) from None
         updates[name] = FieldUpdate(answer, ExistingSource(field.source_ref_id))
-    view, changed = commit_profile_version(
-        tx, actor, workspace_id, command.expected_version, updates
-    )
-    return view, bool(changed)
+    return updates
