@@ -19,7 +19,7 @@ from nessa.vocabulary import DataMode, WorkState
 
 _WORKSPACE_COLUMNS = (
     "workspace_id, owner_actor_id, name, data_mode, synthetic, fixture_key, version, "
-    "created_at, updated_at"
+    "last_event_seq, created_at, updated_at"
 )
 
 
@@ -36,6 +36,7 @@ def _workspace(row: sa.RowMapping) -> Workspace:
         synthetic=row["synthetic"],
         fixture_key=row["fixture_key"],
         version=row["version"],
+        last_event_seq=row["last_event_seq"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )

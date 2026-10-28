@@ -94,6 +94,7 @@ export const fixtureWorkspace: WorkspaceOut = {
   synthetic: true,
   fixture: true,
   version: 1,
+  last_event_seq: 1,
   created_at: `${persona.data_as_of}T00:00:00Z`,
   updated_at: `${persona.data_as_of}T00:00:00Z`,
 };

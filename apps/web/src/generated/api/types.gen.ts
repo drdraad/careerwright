@@ -922,6 +922,12 @@ export type WorkspaceOut = {
      */
     version: number;
     /**
+     * Last Event Seq
+     *
+     * The workspace's latest status-event sequence number when read: pass it as Last-Event-ID to receive only what happens after this read.
+     */
+    last_event_seq: number;
+    /**
      * Created At
      */
     created_at: string;

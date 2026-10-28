@@ -61,6 +61,33 @@ def test_stream_delivers_events_with_ids_and_resumes_after_last_event_id(
     assert first[3]["detail"] == {"version": 3, "changed_fields": "cities"}
 
 
+@pytest.mark.req("DUR-03", "STATE-07")
+def test_a_workspace_reports_its_last_event_so_a_reopened_page_resumes_there(
+    api: ApiClient, ada: str
+) -> None:
+    workspace_id = api.create_workspace(ada)["workspace_id"]
+    api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace_id}/profile",
+        ada,
+        {"expected_version": 0, "profile": profile_with(cities=["Leeds"])},
+    )
+    loaded = api.get(f"/v1/workspaces/{workspace_id}", ada).json()
+    page = api.get(f"/v1/workspaces/{workspace_id}/events", ada).json()
+    stream = f"/v1/workspaces/{workspace_id}/events/stream"
+    api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace_id}/profile",
+        ada,
+        {"expected_version": 1, "profile": profile_with(cities=["York"])},
+    )
+
+    resumed = read_events(api, ada, stream, 1, **{"Last-Event-ID": str(loaded["last_event_seq"])})
+
+    assert loaded["last_event_seq"] == page["last_seq"] == 2
+    assert [e["seq"] for e in resumed] == [3]  # only what happened after the page loaded
+
+
 @pytest.mark.req("SEC-01")
 def test_the_stream_ends_once_the_firebase_token_is_revoked(
     api: ApiClient, infra: Infra, monkeypatch: pytest.MonkeyPatch

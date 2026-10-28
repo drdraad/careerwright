@@ -17,6 +17,7 @@ class Workspace:
     synthetic: bool
     fixture_key: str | None
     version: int
+    last_event_seq: int
     created_at: datetime
     updated_at: datetime
 

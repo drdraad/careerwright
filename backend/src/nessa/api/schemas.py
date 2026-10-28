@@ -51,6 +51,10 @@ class WorkspaceOut(ResponseModel):
     synthetic: bool = Field(description="Persistent synthetic-data label; never changes.")
     fixture: bool = Field(description="The named fixture workspace that `make reset-demo` resets.")
     version: int
+    last_event_seq: int = Field(
+        description="The workspace's latest status-event sequence number when read: pass it "
+        "as Last-Event-ID to receive only what happens after this read."
+    )
     created_at: datetime
     updated_at: datetime
 
@@ -63,6 +67,7 @@ class WorkspaceOut(ResponseModel):
             synthetic=workspace.synthetic,
             fixture=workspace.fixture_key is not None,
             version=workspace.version,
+            last_event_seq=workspace.last_event_seq,
             created_at=workspace.created_at,
             updated_at=workspace.updated_at,
         )

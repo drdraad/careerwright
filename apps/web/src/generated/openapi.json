@@ -3207,6 +3207,11 @@
             "type": "integer",
             "title": "Version"
           },
+          "last_event_seq": {
+            "type": "integer",
+            "title": "Last Event Seq",
+            "description": "The workspace's latest status-event sequence number when read: pass it as Last-Event-ID to receive only what happens after this read."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -3227,6 +3232,7 @@
           "synthetic",
           "fixture",
           "version",
+          "last_event_seq",
           "created_at",
           "updated_at"
         ],
