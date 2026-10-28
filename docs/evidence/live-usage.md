@@ -20,10 +20,15 @@ free calls (ruling R5). Generated from `live-usage.jsonl` by
   developer dashboard.
 - Budgets: `task-1-sprint-0` (Sprint 0 spike): at most 15 calls, 5 on the production
   model, $0.30 worst case. `live-smoke` (`make live-smoke`): each invocation at most
-  3 calls, none on the production model unless `PRODUCTION=1`, and a worst-case cost
-  cap; cumulatively at most 9 calls, 3 on the production model and $0.30 worst case
-  (unknown costs count their full reservation; `NESSA_LIVE_SMOKE_*` changes them).
-  Both are enforced in `backend/tools/live_smoke.py` before the stack starts.
+  3 calls (a connection check) or 2 (`INTERVIEW=1`: one interview attempt and at
+  most one validation repair), none on the production model unless
+  `PRODUCTION=1`, and a worst-case cost cap; cumulatively at most 9 calls, 3 on the
+  production model and $0.30 worst case (unknown costs count their full
+  reservation; `NESSA_LIVE_SMOKE_*` changes them). Both are enforced in
+  `backend/tools/live_smoke.py` before the stack starts.
+- A row for an activity attempt that sent more than one request (the call and its
+  validation repair) shows `x N` after the endpoint; its tokens and cost are the
+  attempt's total, and the caps count every request.
 
 | # | UTC time | Scope | Purpose | Model | Endpoint | Outcome | In (cached) | Out (reasoning) | Searches | Est. cost | Running total | Response ID |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -39,3 +44,4 @@ free calls (ruling R5). Generated from `live-usage.jsonl` by
 | 10 | 2026-10-27 22:34:58 | task-1-sprint-0 | schema output inside DBOS activity (key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 133 (0) | 120 (83) | 0 | $0.000037 | $0.019677 | resp_6ae1270e13a2fda9d2124b7d |
 | 11 | 2026-10-27 22:34:58 | task-1-sprint-0 | invalid key inside DBOS activity | `muse-spark-1.3-contributor` | POST /v1/responses | failed (401 provider_authentication) | - (-) | - (-) | - | $0.000000 | $0.019677 | - |
 | 12 | 2026-10-28 02:26:04 | live-smoke | connection check via API, outbox and DBOS worker (key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 114 (0) | 93 (62) | 0 | $0.000030 | $0.019707 | resp_6ae15d3804014aecb04a4853 |
+| 13 | 2026-10-28 09:04:55 | live-smoke | interview turn via API, outbox and DBOS worker; proposals confirmed into the profile (synthetic message; key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 1,128 (0) | 693 (323) | 0 | $0.000251 | $0.019958 | resp_6ae1bab2516734dafa354c6b |
