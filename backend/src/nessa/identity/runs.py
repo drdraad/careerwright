@@ -321,6 +321,21 @@ class Cancellation:
     requested: list[uuid.UUID]
 
 
+def _unsettled(tx: Tx, run: Run) -> list[Run]:
+    """The run while it is unsettled, then the runs it started that are."""
+    started = run_store.unsettled_started_runs(tx, run.run_id)
+    return [*([] if run.status in _TERMINAL else [run]), *started]
+
+
+def _run_finished(run: Run) -> NessaError:
+    return NessaError(
+        ErrorCode.RUN_FINISHED,
+        "This run has already finished, so there is nothing to cancel.",
+        stage=ErrorStage.EXECUTION,
+        details={"status": run.status.value},
+    )
+
+
 def cancel_run(tx: Tx, actor: Actor, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Cancellation:
     """Ask for a queued or running run to stop (DUR-05). The worker cancels its workflow, so
     nothing more is called or fetched for it, and publishes it `cancelled`, distinct from a
@@ -339,7 +354,12 @@ def cancel_run(tx: Tx, actor: Actor, workspace_id: uuid.UUID, run_id: uuid.UUID)
     seen here or refused there (migration 0023). Each request's foreign key takes a key-share
     lock on its run's row. The worker locks a run's row and then writes the run's events,
     which lock the workspace's row, so the requests are recorded before the workspace's row
-    is locked, never after: otherwise each would wait for the other."""
+    is locked, never after: otherwise each would wait for the other.
+
+    A request can wait at a run's row while the worker's terminal publish holds it, so the
+    runs are read again once the workspace's row is locked (fix round 1): a run that settled
+    meanwhile is not named and gets no event, and when none of them is left unsettled the
+    answer is still `RUN_FINISHED`, which rolls the requests back."""
     run_store.lock_started_runs(tx, run_id)
     visible_workspace(tx, workspace_id)
     # Not locked: the API may not lock runs. If the worker finishes the run meanwhile, the
@@ -347,25 +367,24 @@ def cancel_run(tx: Tx, actor: Actor, workspace_id: uuid.UUID, run_id: uuid.UUID)
     run = run_store.run(tx, run_id)
     if run is None or run.workspace_id != workspace_id:
         raise NessaError(ErrorCode.NOT_FOUND, "No such run.", stage=ErrorStage.EXECUTION)
-    started_runs = run_store.unsettled_started_runs(tx, run_id)
-    if run.status in _TERMINAL and not started_runs:
-        raise NessaError(
-            ErrorCode.RUN_FINISHED,
-            "This run has already finished, so there is nothing to cancel.",
-            stage=ErrorStage.EXECUTION,
-            details={"status": run.status.value},
-        )
-    asked = [*([] if run.status in _TERMINAL else [run]), *started_runs]
-    recorded = [each for each in asked if run_store.request_cancellation(tx, each, actor.actor_id)]
+    asked = _unsettled(tx, run)
+    if not asked:
+        raise _run_finished(run)
+    recorded = {e.run_id for e in asked if run_store.request_cancellation(tx, e, actor.actor_id)}
     visible_workspace(tx, workspace_id, lock=True)
-    for each in recorded:
-        store.append_event(tx, workspace_id, EventKind.RUN_CANCEL_REQUESTED, str(each.run_id))
     cancelled = run_store.run(tx, run_id)
     if cancelled is None:
         raise NessaError(
             ErrorCode.INTERNAL_ERROR, "The run was not recorded.", stage=ErrorStage.EXECUTION
         )
-    return Cancellation(cancelled, [each.run_id for each in asked])
+    unsettled = {each.run_id for each in _unsettled(tx, cancelled)}
+    named = [each.run_id for each in asked if each.run_id in unsettled]
+    if not named:
+        raise _run_finished(cancelled)
+    for each in named:
+        if each in recorded:
+            store.append_event(tx, workspace_id, EventKind.RUN_CANCEL_REQUESTED, str(each))
+    return Cancellation(cancelled, named)
 
 
 def visible_run(tx: Tx, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Run:

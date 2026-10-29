@@ -25,6 +25,7 @@ from nessa.evidence.records import AttemptStatus, Extraction, InputRoute
 from nessa.identity import run_store
 from nessa.identity import store as identity_store
 from nessa.identity.activity import ACTIVITY_MAX_ATTEMPTS
+from nessa.identity.failures import FailureClass
 from nessa.identity.keyring import Keyring, SealedValue, load_keyring
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.model_registry import model_entry
@@ -757,6 +758,82 @@ def test_a_cancel_while_the_worker_writes_a_run_s_event_ends_without_a_store_err
         (workspace, publishing),
     )
     assert {"state": "running"} in events
+
+
+def _publish_failed(tx: Tx, run: Run) -> None:
+    """What `activity.publish` writes under the run's row lock for a failed run."""
+    failure = FailureClass.UNKNOWN_FAILURE.value
+    assert run_store.finish_run(tx, run.run_id, WorkState.FAILED, output_id=None, failure=failure)
+    identity_store.append_event(
+        tx,
+        run.workspace_id,
+        EventKind.RUN_STATE_CHANGED,
+        str(run.run_id),
+        state=WorkState.FAILED,
+        detail={"failure_class": failure},
+    )
+
+
+def _cancel_events(infra: Infra, workspace: str) -> list[str]:
+    rows = infra.query(
+        "SELECT subject_id FROM nessa.workspace_events WHERE workspace_id = %s "
+        "AND kind = 'run.cancel_requested' ORDER BY seq",
+        (workspace,),
+    )
+    return [r["subject_id"] for r in rows]
+
+
+@pytest.mark.req("DUR-05")
+@pytest.mark.parametrize("cascade", [False, True], ids=["a_run", "a_finished_acquisition"])
+def test_a_cancel_whose_runs_all_settle_while_it_waits_is_run_finished(
+    infra: Infra, scenario: Scenario, cascade: bool
+) -> None:
+    # Task 7d fix round 1 (review Minor 1). The cancel reads its runs before it can wait at a
+    # run's row; the worker's terminal publish holds that row and commits the run failed.
+    # Once nothing it asked for is unsettled, the answer is still 409 RUN_FINISHED, and its
+    # request and receipt roll back with it.
+    workspace = scenario.workspace_id
+    if cascade:
+        cancelled, [settling, settled] = _cascade(infra, scenario)
+        for ended in (cancelled, settled):
+            infra.query(
+                "UPDATE nessa.runs SET status = 'failed', failure_class = 'unknown_failure', "
+                "finished_at = clock_timestamp() WHERE run_id = %s",
+                (ended,),
+            )
+    else:
+        cancelled = settling = scenario.submit()
+
+    answer = _cancel_while_the_worker_holds(infra, scenario, cancelled, settling, _publish_failed)
+
+    assert answer.status_code == 409, answer.text
+    assert answer.json()["error"]["code"] == "RUN_FINISHED"
+    assert answer.json()["error"]["details"] == {"status": "failed"}
+    requests = infra.query(
+        "SELECT 1 FROM nessa.run_cancellations WHERE workspace_id = %s", (workspace,)
+    )
+    receipts = infra.query(
+        "SELECT 1 FROM nessa.command_receipts WHERE workspace_id = %s AND command = 'cancel_run'",
+        (workspace,),
+    )
+    assert (requests, receipts, _cancel_events(infra, workspace)) == ([], [], [])
+    assert _status(infra, settling) == "failed"  # the worker's publish committed at once
+
+
+@pytest.mark.req("DUR-05")
+def test_a_cancel_names_only_the_runs_still_unsettled_once_it_has_waited(
+    infra: Infra, scenario: Scenario
+) -> None:
+    # Task 7d fix round 1 (review Minor 1): one started run settles while the cancel waits
+    # for its row; the answer and the events name the acquisition and the other run only.
+    cancelled, [first, settling] = _cascade(infra, scenario)
+
+    answer = _cancel_while_the_worker_holds(infra, scenario, cancelled, settling, _publish_failed)
+
+    assert answer.status_code == 202, answer.text
+    assert answer.json()["cancellation_requested"] == [cancelled, first]
+    assert _cancel_events(infra, scenario.workspace_id) == [cancelled, first]
+    assert _status(infra, settling) == "failed"
 
 
 @pytest.mark.req("DUR-05", "STATE-02")
