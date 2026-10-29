@@ -16,7 +16,7 @@ employer stays undisclosed unless a source discloses it.
 import hashlib
 import re
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -255,12 +255,11 @@ def _signature(provider: str, facts: CanonicalFacts) -> str:
     return repr((provider, facts))
 
 
-def group_copies(copies: Iterable[tuple[str, JobCopy]]) -> list[Grouped]:
-    """Copies grouped into jobs by `same_job`, transitively; the grouping and each job's key
-    do not depend on the copies' order."""
-    items = list(copies)
-    found = [canonical_facts(job, provider=provider) for provider, job in items]
-    parent = list(range(len(items)))
+def groups_of(found: Sequence[CanonicalFacts]) -> list[list[int]]:
+    """The indices of `found` grouped by `same_job`, transitively: the one rule both the
+    grouping below and the stored path (`jobs_joined`) use. The grouping does not depend on
+    the order."""
+    parent = list(range(len(found)))
 
     def root(i: int) -> int:
         while parent[i] != i:
@@ -268,15 +267,34 @@ def group_copies(copies: Iterable[tuple[str, JobCopy]]) -> list[Grouped]:
             i = parent[i]
         return i
 
-    for i in range(len(items)):
-        for j in range(i + 1, len(items)):
+    for i in range(len(found)):
+        for j in range(i + 1, len(found)):
             if same_job(found[i], found[j]):
                 parent[root(j)] = root(i)
     members: dict[int, list[int]] = {}
-    for i in range(len(items)):
+    for i in range(len(found)):
         members.setdefault(root(i), []).append(i)
+    return list(members.values())
+
+
+def jobs_joined[Job](
+    stored: Sequence[tuple[Job, CanonicalFacts]], new: CanonicalFacts
+) -> list[Job]:
+    """The stored jobs a new copy belongs to: each job with a copy in the new copy's group,
+    by `groups_of` over the candidates and the new copy, in the order given (oldest job
+    first). None: a new job. Several: the new copy bridges them, and they are one job."""
+    found = [facts for _, facts in stored] + [new]
+    group = next(g for g in groups_of(found) if len(stored) in g)
+    return list(dict.fromkeys(stored[i][0] for i in sorted(group) if i < len(stored)))
+
+
+def group_copies(copies: Iterable[tuple[str, JobCopy]]) -> list[Grouped]:
+    """Copies grouped into jobs by `same_job`, transitively; the grouping and each job's key
+    do not depend on the copies' order."""
+    items = list(copies)
+    found = [canonical_facts(job, provider=provider) for provider, job in items]
     groups = []
-    for indices in members.values():
+    for indices in groups_of(found):
         signature = min(_signature(items[i][0], found[i]) for i in indices)
         key = str(uuid.uuid5(_GROUP_NAMESPACE, signature))
         groups.append(Grouped(key, [items[i] for i in indices]))

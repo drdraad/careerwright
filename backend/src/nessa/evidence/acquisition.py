@@ -48,7 +48,7 @@ from nessa.evidence.jobs import (
     description_fingerprints,
     facts_from_json,
     facts_json,
-    same_job,
+    jobs_joined,
     title_key,
 )
 from nessa.evidence.records import (
@@ -726,22 +726,24 @@ def _record_copies(
         facts = canonical_facts(copy, provider=result.provider)
         job_id: uuid.UUID | None = None
         if copy.extraction_error is None:
-            for candidate, stored in store.candidate_copies(
+            # The grouping rule the property tests cover, over the candidates: a copy that
+            # bridges stored jobs makes them one job, the oldest (JOB-02, PROP-02).
+            candidates = store.candidate_copies(
                 tx,
                 run.workspace_id,
                 provider=result.provider,
                 source_job_id=copy.source_job_id,
                 title_key=facts.title_key,
-            ):
-                if same_job(facts, facts_from_json(stored)):
-                    job_id = candidate
-                    break
-            if job_id is None:
+            )
+            joined = jobs_joined([(job, facts_from_json(f)) for job, f in candidates], facts)
+            if not joined:
                 job_id = uuid.uuid4()
                 store.insert_job(
                     tx, job_id=job_id, workspace_id=run.workspace_id, exemplar=False, at=now
                 )
             else:
+                job_id = joined[0]
+                store.merge_jobs(tx, run.workspace_id, keep=job_id, merged=joined[1:])
                 store.job_verified(tx, job_id, now)
         copy_id = uuid.uuid4()
         store.insert_copy(

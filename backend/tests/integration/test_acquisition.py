@@ -3,6 +3,7 @@ API submits, a real worker process runs the acquisition workflow, and the restri
 acquisition worker fetches from a controlled source server. Every page is synthetic."""
 
 import dataclasses
+import itertools
 import json
 import secrets
 import time
@@ -446,6 +447,88 @@ def test_a_target_that_failed_for_good_is_not_fetched_again_after_a_crash(
     assert attempts[0] == {"position": 0, "status": "failed", "reason": "http_error"}
     assert [a["position"] for a in attempts] == [0, 1]  # the 404 is not fetched again
     assert sources.paths().count("/gone/once") == 1
+
+
+APPLY_URL = "https://careers.northwind.example/apply/7781"
+BOARD_FIELDS = {k: v for k, v in POSTING.items() if k not in ("identifier", "hiringOrganization")}
+# Review B I1's three copies of one vacancy: a board copy for Leeds with the apply link, a
+# board snippet for Manchester naming the employer, and the employer's own page for both.
+# The two board copies share nothing; only the employer's page joins them.
+DEDUPE_PAGES = {
+    "/dedupe/board-leeds": page(
+        {
+            **BOARD_FIELDS,
+            "url": APPLY_URL,
+            "jobLocation": {"address": {"addressLocality": "Leeds"}},
+            "description": "Data quality analyst wanted.",
+        }
+    ),
+    "/dedupe/board-manchester": page(
+        {
+            **BOARD_FIELDS,
+            "hiringOrganization": POSTING["hiringOrganization"],
+            "jobLocation": {"address": {"addressLocality": "Manchester"}},
+            "description": "We are looking for a data quality analyst to join our team. You "
+            "will profile datasets, write",
+        }
+    ),
+    "/dedupe/employer": page({**POSTING, "url": APPLY_URL}),
+}
+DEDUPE_HOSTS = {
+    "/dedupe/board-leeds": "jobs.board.example",
+    "/dedupe/board-manchester": "jobs.board.example",
+    "/dedupe/employer": "careers.northwind.example",
+}
+
+
+@pytest.mark.req("JOB-02", "PROP-02")
+def test_three_copies_of_one_vacancy_are_one_job_in_every_arrival_order(
+    infra: Infra, api: ApiClient, ada: str, sources: SourceServer, worker: Worker
+) -> None:
+    for path, body in DEDUPE_PAGES.items():
+        sources.routes[path] = Scripted(body=body.encode())
+    for order in itertools.permutations(DEDUPE_PAGES):
+        workspace = str(api.create_workspace(ada, f"Dedupe {order}")["workspace_id"])
+        urls = [url(sources, DEDUPE_HOSTS[p], p) for p in order]
+        run_id = submit(api, ada, workspace, {"urls": urls}).json()["acquisition"]["run"]["run_id"]
+        wait_terminal(infra, run_id)
+        listing = jobs(api, ada, workspace, limit=1)
+
+        assert listing["total_jobs"] == 1, order
+        [job] = listing["items"]
+        assert len(job["copies"]) == 3, order  # every copy kept, on the one job
+        assert listing["city_counts"] == {"Leeds": 1, "Manchester": 1}, order
+        assert listing["next_cursor"] is None, order
+
+
+@pytest.mark.req("JOB-02", "JOB-07")
+def test_a_copy_that_bridges_two_jobs_merges_them_with_their_claims_and_favourites(
+    infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker
+) -> None:
+    for path, body in DEDUPE_PAGES.items():
+        sources.routes[path] = Scripted(body=body.encode())
+    boards = [url(sources, DEDUPE_HOSTS[p], p) for p in list(DEDUPE_PAGES)[:2]]
+    first = submit(api, ada, workspace, {"urls": boards}).json()["acquisition"]["run"]
+    wait_terminal(infra, first["run_id"])
+    before = jobs(api, ada, workspace)
+    assert before["total_jobs"] == 2  # nothing yet says the two are one vacancy
+    newer, older = before["items"]  # newest first
+    path = f"/v1/workspaces/{workspace}/jobs/{newer['job_id']}/favourite"
+    assert api.write("PUT", path, ada).status_code == 200
+
+    employer = [url(sources, DEDUPE_HOSTS["/dedupe/employer"], "/dedupe/employer")]
+    second = submit(api, ada, workspace, {"urls": employer}).json()["acquisition"]["run"]
+    wait_terminal(infra, second["run_id"])
+    after = jobs(api, ada, workspace)
+
+    assert after["total_jobs"] == 1
+    [job] = after["items"]
+    assert job["job_id"] == older["job_id"]  # the oldest job is kept
+    assert job["favourite"] is True  # the merged job's favourite moved with it
+    assert len(job["copies"]) == 3
+    detail = api.get(f"/v1/workspaces/{workspace}/jobs/{job['job_id']}", ada).json()
+    assert {c["copy_id"] for c in detail["claims"]} == {c["copy_id"] for c in job["copies"]}
+    assert api.get(f"/v1/workspaces/{workspace}/jobs/{newer['job_id']}", ada).status_code == 404
 
 
 @pytest.mark.req("FRESH-03", "JOB-02")

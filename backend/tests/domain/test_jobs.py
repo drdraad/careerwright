@@ -1,6 +1,7 @@
 """Canonical jobs from source copies (spec section 7, "Search, canonicalisation and
 matching"; JOB-01, JOB-02, PROP-02). Pure: deterministic rules, no model."""
 
+import itertools
 import uuid
 
 import pytest
@@ -16,6 +17,7 @@ from nessa.evidence.jobs import (
     description_fingerprints,
     employer_key,
     group_copies,
+    jobs_joined,
     same_job,
     title_key,
 )
@@ -27,6 +29,8 @@ FULL = (
     "source. Experience with SQL is essential and Python is desirable. Hybrid working."
 )
 SNIPPET = "We are looking for a data quality analyst to join our Manchester team. You will profile datasets, write validation…"  # noqa: E501
+SNIPPET_KIND = DescriptionKind.SNIPPET
+APPLY = "https://careers.northwind.example/apply/7781"
 
 
 def copy(
@@ -207,6 +211,59 @@ def test_duplicate_source_copies_preserve_the_canonical_job_count(
     rng.shuffle(duplicated)  # type: ignore[attr-defined]
 
     assert len(group_copies(duplicated)) == base == 5
+
+
+def stored_path(arrivals: list[tuple[str, JobCopy]]) -> list[int]:
+    """The stored path's rule, as `_record_copies` applies it, one copy at a time: each
+    copy joins the jobs `jobs_joined` names (oldest first), merging them, or starts one.
+    Returns each copy's job at the end."""
+    stored: list[tuple[int, CanonicalFacts]] = []
+    for provider, job in arrivals:
+        found = facts(job, provider)
+        joined = jobs_joined(stored, found)
+        keep = joined[0] if joined else max((j for j, _ in stored), default=-1) + 1
+        stored = [(keep if j in joined else j, f) for j, f in stored] + [(keep, found)]
+    return [j for j, _ in stored]
+
+
+BOARD_LEEDS = ("jobs.board.example", copy(employer=None, cities=("Leeds",), apply_url=APPLY))
+BOARD_SNIPPET = ("adzuna", copy(cities=("Manchester",), description=SNIPPET, kind=SNIPPET_KIND))
+EMPLOYER_PAGE = ("careers.northwind.example", copy(cities=("Leeds", "Manchester"), apply_url=APPLY))
+
+
+@pytest.mark.req("JOB-02", "PROP-02")
+@pytest.mark.parametrize(
+    "order", list(itertools.permutations([BOARD_LEEDS, BOARD_SNIPPET, EMPLOYER_PAGE]))
+)
+def test_the_stored_path_gives_one_job_for_three_copies_in_every_arrival_order(
+    order: tuple[tuple[str, JobCopy], ...],
+) -> None:
+    # Review B I1: the two board copies share nothing (Leeds against Manchester); only the
+    # employer's page joins them. Arriving last, it used to leave two jobs.
+    assert not same_job(facts(BOARD_LEEDS[1], "x"), facts(BOARD_SNIPPET[1], "adzuna"))
+
+    assert len(set(stored_path(list(order)))) == len(group_copies(list(order))) == 1
+
+
+@pytest.mark.req("PROP-02")
+@given(st.lists(st.integers(min_value=0, max_value=7), min_size=1, max_size=14), st.randoms())
+def test_the_stored_path_counts_jobs_as_the_grouping_does_in_any_arrival_order(
+    picks: list[int], rng: object
+) -> None:
+    pool = [
+        BOARD_LEEDS,
+        BOARD_SNIPPET,
+        EMPLOYER_PAGE,
+        ("careers.northwind.example", copy(title="Senior Data Quality Analyst")),
+        ("careers.northwind.example", copy(cities=("York",), apply_url=f"{APPLY}?city=york")),
+        ("jobs.board.example", copy(title="Data Engineer", employer=None, apply_url=APPLY)),
+        ("jobs.board.example", copy(employer="Contoso Ltd", cities=("Leeds",))),
+        ("adzuna", copy(source_job_id="9", cities=("Leeds",))),
+    ]
+    arrivals = [pool[i] for i in picks]
+    rng.shuffle(arrivals)  # type: ignore[attr-defined]
+
+    assert len(set(stored_path(arrivals))) == len(group_copies(arrivals))
 
 
 def test_grouping_is_deterministic_and_keys_are_stable() -> None:

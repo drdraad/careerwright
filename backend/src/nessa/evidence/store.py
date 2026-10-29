@@ -559,6 +559,48 @@ def candidate_copies(
     return [(r.job_id, r.facts) for r in rows]
 
 
+def merge_jobs(
+    tx: Tx, workspace_id: uuid.UUID, *, keep: uuid.UUID, merged: list[uuid.UUID]
+) -> None:
+    """A new copy showed these jobs are one: their copies (with their claims) and
+    favourites move to `keep`, the oldest (first seen first), and the others are removed."""
+    if not merged:
+        return
+    params = {"ws": workspace_id, "keep": keep, "merged": merged}
+    tx.execute(
+        sa.text(
+            "UPDATE nessa.job_copies SET job_id = :keep "
+            "WHERE workspace_id = :ws AND job_id = ANY(:merged)"
+        ),
+        params,
+    )
+    tx.execute(
+        sa.text(
+            "INSERT INTO nessa.job_favourites (workspace_id, job_id, created_by, created_at) "
+            "SELECT workspace_id, :keep, created_by, min(created_at) FROM nessa.job_favourites "
+            "WHERE workspace_id = :ws AND job_id = ANY(:merged) GROUP BY workspace_id, created_by "
+            "ON CONFLICT DO NOTHING"
+        ),
+        params,
+    )
+    tx.execute(
+        sa.text(
+            # `keep` is the oldest (first seen first): its first sighting stands.
+            "UPDATE nessa.jobs k SET "
+            "last_success_at = greatest(k.last_success_at, m.last_success_at), "
+            "last_attempt_at = greatest(k.last_attempt_at, m.last_attempt_at) FROM (SELECT "
+            "max(last_success_at) AS last_success_at, max(last_attempt_at) AS last_attempt_at "
+            "FROM nessa.jobs WHERE workspace_id = :ws AND job_id = ANY(:merged)) m "
+            "WHERE k.job_id = :keep"
+        ),
+        params,
+    )
+    tx.execute(
+        sa.text("DELETE FROM nessa.jobs WHERE workspace_id = :ws AND job_id = ANY(:merged)"),
+        params,
+    )
+
+
 def insert_job(
     tx: Tx, *, job_id: uuid.UUID, workspace_id: uuid.UUID, exemplar: bool, at: datetime
 ) -> None:

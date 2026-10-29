@@ -142,7 +142,10 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    value, and a copy's title and employer, keep at most 200 characters, the excerpt bound,
    so a reference-only page's records never hold more of it; an apply link is a checked URL
    and is kept whole; a source ID longer than that is left unknown rather than cut (fix
-   round 1, review A M4). Structured fields
+   round 1, review A M4). The database holds claims to that shape (migration 0017, review
+   B M3): `field` is a claim field, `span` has a 64-hex `source_sha256`, an excerpt and
+   offsets or a pointer, and a claim's attempt is its copy's (`(copy_id, attempt_id)`
+   references the copy). Structured fields
    come first: JSON-LD `JobPosting` (also in `@graph` and type lists); a salary that is not
    whole pence, another currency or a malformed date is quarantined, never guessed; postings
    on one page that disagree on salary, expiry, contract or employer are all marked
@@ -152,7 +155,15 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    source ID, or when nothing material differs (title with its level words, a contract
    dimension both state, disjoint cities, employers) and they share an application URL or,
    for one named employer, the description (whole, or the 16-word opening a board snippet
-   keeps). Every copy is kept; a multi-city job is one job under each city. An advertiser
+   keeps). Every copy is kept; a multi-city job is one job under each city. The stored
+   path uses the same rule the property tests cover (fix round 1, review B I1): a new copy
+   is grouped with its candidates by `jobs.groups_of`, the union-find `group_copies` uses,
+   and every stored job in its group is one job, so a copy that bridges two (the employer's
+   page joining a Leeds board copy and a Manchester snippet) merges them: their copies,
+   with their claims, and favourites move to the oldest job and the others are removed
+   (`store.merge_jobs`; migration 0017 lets the worker do it). The count no longer depends
+   on arrival order (`test_three_copies_of_one_vacancy_are_one_job_in_every_arrival_order`,
+   and a property test of the stored rule against the grouping). An advertiser
    whose name holds a staffing word (`jobs.AGENCY_MARKERS`, provisional) is an agency, and
    its copy names no employer: the hiring employer stays undisclosed.
 

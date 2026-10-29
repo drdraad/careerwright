@@ -15,12 +15,14 @@ from nessa.evidence.addresses import UrlRefusal
 from nessa.evidence.records import (
     AttemptReason,
     AttemptStatus,
+    ClaimField,
     Extraction,
     InputRoute,
     Retention,
     RightsClass,
 )
 from nessa.migrations.versions import r0016_unreadable_and_partial as r0016
+from nessa.migrations.versions import r0017_job_merge_and_claim_integrity as r0017
 
 BODY = b"<html>synthetic</html>"
 
@@ -37,6 +39,13 @@ def test_the_database_holds_attempt_reasons_to_the_code_s_labels() -> None:
     extraction = re.search(r"extraction IN \((.*?)\)\)", r0016.SCHEMA, re.DOTALL)
     assert extraction is not None
     assert set(re.findall(r"'([a-z_]+)'", extraction.group(1))) == {e.value for e in Extraction}
+
+
+def test_the_database_holds_claim_fields_to_the_code_s_fields() -> None:
+    found = re.search(r"field IN \((.*?)\)\)", r0017.SCHEMA, re.DOTALL)
+
+    assert found is not None
+    assert set(re.findall(r"'([a-z_]+)'", found.group(1))) == {f.value for f in ClaimField}
 
 
 def _kept(body: bytes | None, sha256: str) -> AcquisitionResult:
