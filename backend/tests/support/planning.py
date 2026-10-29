@@ -4,20 +4,28 @@ implicit: wages arrive late in the month (the pack's validator assumes it; hand 
 Nothing here enters the product."""
 
 from datetime import date
+from typing import Literal
 
 from nessa.capability.readiness import ReadinessState
 from nessa.planning.catalogue import (
     ActionConcept,
     ActionKind,
+    AwardState,
     Basis,
     Catalogue,
     CatalogueLabel,
     Citation,
+    EligibilityStatus,
+    InstrumentKind,
+    OfferGate,
     Offering,
     Payment,
     PaymentPlan,
     RecordState,
+    Recurring,
+    Support,
     Variant,
+    Wage,
     WorkPattern,
     WorkPatternKind,
 )
@@ -158,3 +166,169 @@ def trace_route(letter: str) -> dict[str, object]:
         r for r in fixture("worked_trace.json")["routes"] if r["id"] == letter
     )
     return route
+
+
+# Constructed cases: a person and options written for one rule each (synthetic).
+
+START = date(2027, 1, 1)
+
+
+def person(
+    *,
+    horizon: int = 1,
+    opening: int = 0,
+    living: int = 0,
+    reserve: int = 0,
+    pay: int = 0,
+    hours: int = 0,
+    availability: int | None = 40,
+    baseline: int | None = None,
+    objective: str = "direct_spending",
+    timing: ReceiptTiming = ReceiptTiming.LATER,
+    **limits: object,
+) -> PlanningInputs:
+    """A synthetic person: `pay` and `hours` are the continuation's, a month and a week."""
+    return PlanningInputs.model_validate(
+        {
+            "planning_start": START,
+            "horizon_months": horizon,
+            "objective_basis": objective,
+            "baseline": (
+                None
+                if baseline is None
+                else Baseline(
+                    label="staying in the current role",
+                    net_income_by_month=[baseline] * horizon,
+                    cited=CONSTRUCTED,
+                )
+            ),
+            "continuation": Continuation(
+                label="the current role, unchanged",
+                hours_per_week=hours,
+                net_income_by_month=[pay] * horizon,
+                cited=CONSTRUCTED,
+            ),
+            "wage_timing": timing,
+            "opening_cash_minor": opening,
+            "living_outgoings_by_month": [living] * horizon,
+            "reserve_minor": reserve,
+            "direct_spend_cap_minor": limits.pop("direct_cap", None),
+            "monthly_payment_cap_minor": limits.pop("monthly_cap", None),
+            "weekly_availability_by_month": None
+            if availability is None
+            else [availability] * horizon,
+            "scenario_delay_months": DELAY_MONTHS,
+            "synthetic": True,
+            **limits,
+        }
+    )
+
+
+def option(
+    name: str,
+    *,
+    start: date | None = START,
+    finish: date | None = date(2027, 1, 31),
+    hours: int | None = 0,
+    payments: tuple[tuple[int, int], ...] = (),
+    due: tuple[tuple[date, int], ...] = (),
+    kind: ActionKind = ActionKind.LEARNING,
+    state: RecordState = RecordState.ACCEPTED_ASSUMPTION,
+    pattern: WorkPattern | None = None,
+    wage: int | None = None,
+    supports: tuple[Support, ...] = (),
+    offer: OfferGate | None = None,
+    unknown_cost: str | None = None,
+    recurring: Recurring | None = None,
+    synthetic: bool = True,
+    group: str | None = None,
+    **offering: object,
+) -> tuple[ActionConcept, Offering, Variant]:
+    """One concept with one offering and one variant. `payments` are (month offset, amount)."""
+    plan = PaymentPlan(
+        plan_id="plan",
+        payments=[
+            *(
+                Payment(kind="fee", amount_minor=a, month_offset=n, cited=CONSTRUCTED)
+                for n, a in payments
+            ),
+            *(Payment(kind="fee", amount_minor=a, due=d, cited=CONSTRUCTED) for d, a in due),
+        ],
+        recurring=recurring,
+        unknown=unknown_cost,
+    )
+    concept = ActionConcept(
+        concept_id=f"concept:{name}",
+        kind=kind,
+        title=name,
+        provider=None,
+        review_state=state,
+        exclusive_group=group,
+        synthetic=synthetic,
+        cited=CONSTRUCTED,
+    )
+    dated = Offering.model_validate(
+        {
+            "offering_id": f"offering:{name}",
+            "concept_id": concept.concept_id,
+            "review_state": state,
+            "start": start,
+            "finish": finish,
+            "weekly_hours": hours,
+            "payment_plans": [plan],
+            "offer_gate": offer,
+            "synthetic": synthetic,
+            "cited": CONSTRUCTED,
+            **offering,
+        }
+    )
+    variant = Variant(
+        variant_id=name,
+        offering_id=dated.offering_id,
+        plan_id="plan",
+        work_pattern=pattern,
+        wage=Wage(net_income_minor=wage, cited=CONSTRUCTED) if wage is not None else None,
+        supports=list(supports),
+    )
+    return concept, dated, variant
+
+
+def catalogue_of(*options: tuple[ActionConcept, Offering, Variant]) -> Catalogue:
+    return Catalogue(
+        label=CatalogueLabel(name="constructed", dated=START, synthetic=True),
+        concepts=[c for c, _, _ in options],
+        offerings=[o for _, o, _ in options],
+        variants=[v for _, _, v in options],
+    )
+
+
+def support(
+    *,
+    paid_to: Literal["provider", "person"] = "person",
+    amount: int | None = None,
+    month: int | None = 0,
+    eligibility: EligibilityStatus = EligibilityStatus.CONFIRMED,
+    award: AwardState = AwardState.APPROVED,
+    assumed: bool = False,
+    early: bool = False,
+    kind: InstrumentKind = InstrumentKind.GRANT,
+    state: RecordState = RecordState.ACCEPTED_ASSUMPTION,
+) -> Support:
+    return Support(
+        instrument_id="funding:constructed",
+        kind=kind,
+        covers_fees_in_full=amount is None,
+        amount_minor=amount,
+        paid_to=paid_to,
+        paid_month_offset=month if paid_to == "person" else None,
+        proven_before_outflows=early,
+        eligibility=eligibility,
+        award=award,
+        assumed=assumed,
+        review_state=state,
+        cited=CONSTRUCTED,
+    )
+
+
+def pattern(kind: WorkPatternKind, hours: int, pay: int) -> WorkPattern:
+    return WorkPattern(kind=kind, hours_per_week=hours, net_income_minor=pay, cited=CONSTRUCTED)
