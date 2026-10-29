@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 from pydantic import SecretStr
-from pydantic_ai.messages import ModelMessage, ModelResponse
+from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RequestUsage
 
@@ -17,6 +17,7 @@ from nessa.identity.model_choice import ModelChoice
 from tests.support.fake_models import search_parts
 from tools import live_smoke
 from tools.live_smoke import (
+    EXTRACT_BUDGET,
     INTERVIEW_TURN,
     MAX_CALLS,
     SEARCH_CITY,
@@ -28,6 +29,7 @@ from tools.live_smoke import (
     authorise,
     ledger_attempts,
     ledger_possible_calls,
+    qualify_extraction,
     qualify_search_bound,
 )
 from tools.localenv import REPO_ROOT
@@ -323,3 +325,87 @@ def test_the_search_bound_qualification_asks_for_one_search_and_ledgers_what_met
         assert notes["source_hosts"] == ["careers.northwind.example"]
         assert notes["excluded"] == [{"reason": "source_not_permitted", "host": "www.linkedin.com"}]
         assert "https://" not in row.notes
+
+
+EXTRACTED = {
+    "postings": [
+        {
+            "title": "Data Quality Analyst",
+            "employer": "Northwind Analytics Ltd",
+            "location": "Manchester",
+            "work_mode": None,
+            "salary": "£32,000 to £36,000 per year",
+            "employment_type": None,
+            "date_posted": None,
+            "valid_through": "30 November 2026",
+            "apply_url": None,
+        }
+    ]
+}
+
+
+def _extraction_meta(*replies: str, sent: list[str]) -> Callable[[str, SecretStr], FunctionModel]:
+    """Meta's place, offline: each request gets the next reply, with its own usage."""
+
+    def build(model_id: str, api_key: SecretStr) -> FunctionModel:
+        def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            sent.append(str(messages[0].parts[-1].content))  # type: ignore[union-attr]
+            n = len(sent)
+            usage = RequestUsage(input_tokens=1_000 * n, output_tokens=100 * n)
+            return ModelResponse(parts=[TextPart(replies[n - 1])], usage=usage)
+
+        return FunctionModel(respond)
+
+    return build
+
+
+@pytest.mark.req("MODEL-09", "ACQ-03")
+def test_the_extraction_qualification_reads_the_fixture_page_and_ledgers_each_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("META_API_KEY", "not-a-real-key-for-this-test")
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+    sent: list[str] = []
+    build = _extraction_meta('{"postings": "none"}', json.dumps(EXTRACTED), sent=sent)
+
+    code = qualify_extraction(SmokeSettings(_env_file=None), ledger, build=build)
+
+    assert code == 0
+    assert "Synthetic test page: not a real advert" in sent[0]  # the fixture page only
+    first, second = ledger.records()  # the call and its schema repair, each its own row
+    assert {(r.budget_scope, r.model_id, r.http_requests) for r in (first, second)} == {
+        ("live-extract", "muse-spark-1.3-contributor", 1)
+    }
+    assert (
+        (first.input_tokens, first.output_tokens),
+        (second.input_tokens, second.output_tokens),
+    ) == (
+        (1_000, 100),
+        (2_000, 200),
+    )
+    assert first.estimated_cost_nano_usd == 1_000 * 100 + 100 * 200
+    assert first.notes == ""
+    notes = json.loads(second.notes)
+    assert (notes["postings"], notes["claims"]["model"], notes["followed_page_instruction"]) == (
+        1,
+        5,
+        False,
+    )
+    assert notes["page"] == "fixtures/acquisition/extraction-page.html"
+
+
+@pytest.mark.req("MODEL-09")
+def test_the_extraction_scope_refuses_a_run_its_three_requests_cannot_cover(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("META_API_KEY", "not-a-real-key-for-this-test")
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+    sent: list[str] = []
+    build = _extraction_meta('{"postings": "none"}', json.dumps(EXTRACTED), sent=sent)
+    assert qualify_extraction(SmokeSettings(_env_file=None), ledger, build=build) == 0
+
+    with pytest.raises(CapExceededError, match="live-extract: 2 of 3 calls used, 2 more needed"):
+        qualify_extraction(SmokeSettings(_env_file=None), ledger, build=build)
+    assert len(sent) == 2  # refused before any request
+    assert (EXTRACT_BUDGET.max_calls, EXTRACT_BUDGET.max_production_calls) == (3, 0)
+    assert EXTRACT_BUDGET.max_cost_nano_usd == 300_000_000

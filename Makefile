@@ -15,6 +15,8 @@
 #                           6) on the test model; CASES=INT-01,DSC-01 runs a chosen subset
 #   make live-adzuna        two real Adzuna search requests (free tier; at most 10 in its scope),
 #                           credentials read from .env in code, each request ledgered at $0
+#   make live-extract       one in-process page extraction of the synthetic fixture page on the
+#                           test model (scope live-extract: at most 3 requests, $0.30), ledgered
 #   make stop               stop every service, bounded; persisted work is kept
 #   make reset-demo         recreate the named fixture workspace only
 #   make rotate-master-key  add a master key version, reload it, reseal every sealed record
@@ -28,7 +30,7 @@ WEB := cd apps/web &&
 export NEXT_TELEMETRY_DISABLED := 1
 export STORYBOOK_DISABLE_TELEMETRY := 1
 
-.PHONY: setup dev demo check acceptance live-smoke live-eval live-adzuna stop reset-demo status rotate-master-key reseal
+.PHONY: setup dev demo check acceptance live-smoke live-eval live-adzuna live-extract stop reset-demo status rotate-master-key reseal
 
 setup:
 	$(BACKEND) uv python install 3.12 && uv sync --locked
@@ -63,6 +65,9 @@ live-eval:
 
 live-adzuna:
 	$(BACKEND) $(UV) python -m tools.live_adzuna
+
+live-extract:
+	$(BACKEND) $(UV) python -m tools.live_smoke --extract
 
 stop:
 	$(BACKEND) $(UV) python -m tools.stack stop
