@@ -104,7 +104,9 @@ in Task 11; `checks-*.json` beside them hold the automated checks, which are not
 - the start: `you--1440x900.png`, `you--390x844.png`;
 - a reply with its proposed changes: `you--reply-to-review--1440x900.png`,
   `you--reply-to-review--390x844.png`;
-- the slate: `you--slate--1440x900.png`, `you--slate--390x844.png`.
+- the slate: `you--slate--1440x900.png`, `you--slate--390x844.png`;
+- for the checklist below: `you--reply-failed--*`, `you--support-note--*`,
+  `you--key-consent--*` and `you--source-drawer--390x844.png`.
 
 **Tasks:**
 
@@ -136,7 +138,20 @@ Score each category 1 to 5 with a concrete defect for any score below 4 (plan se
 | Understanding: the suggestion explained, as said | |
 | Choosing: the suggestion chosen; found the control? | |
 | Where the first screen hides the decision controls (each size) | |
-| Sprint 2 checklist items 1-6 (`sprint-2.md`): yes / no each, with notes | |
+
+The Sprint 2 checklist (`docs/reviews/sprint-2.md`, "Human design-review checklist"): yes or
+no for each of its seven items, with notes. The captures cover most of it; the parts they do
+not show need the live app (`make demo`, then `http://127.0.0.1:53000`).
+
+| # | Item | Captures | Needs the live app for | Yes / no, notes |
+|---|---|---|---|---|
+| 1 | Start | `you--1440x900.png`, `you--390x844.png` | | |
+| 2 | Conversation | `you--reply-failed--*`, `you--reply-to-review--*` | an unchecked reply while it streams (or Storybook **You / Reply Streaming**) | |
+| 3 | Review tray | `you--reply-to-review--*` | Confirm, Accept and Undo used in turn | |
+| 4 | Slate | `you--slate--*` | | |
+| 5 | Support panel | `you--support-note--*` | the panel beside a refused send (no capture exists) | |
+| 6 | Key consent | `you--key-consent--*` | | |
+| 7 | Phone | `you--390x844.png`, `you--source-drawer--390x844.png`, `you--reply-failed--390x844.png` | the reply field and Try again with the sheet open | |
 
 ## 3 H-07: the option pack, parts 1 and 2 (55 minutes)
 
@@ -167,6 +182,11 @@ The provisional decisions the plan leaves to the product owner (ruling R6), as y
 questions. "No" needs a note with what to do instead. The controller may add any it still
 holds before the session.
 
+Two of ADR 0011's provisional decisions are not on this sheet: decision 10 (pack-local skill
+rows) was taken by the controller as an internal identifier scheme and superseded by ADR 0012's
+rubrics, and decision 12 (a restrictive copyright notice keeps a page pending) belongs to the
+rights review before any push (OI-07).
+
 | # | From | Decision | Yes / no, and a note if no |
 |---|---|---|---|
 | D1 | ADR 0011 decision 8 | P02 has no records in the pack, since its fixture gives it no target. | |
@@ -180,12 +200,12 @@ holds before the session.
 | D9 | ADR 0012 decision 7 (review N6) | The right to work, or another eligibility statement alone, never makes a target "ready": that needs a skill row a rubric models or a modelled legal-practice or recognition gate. | |
 | D10 | ADR 0012 decision 8 | The questions' order (essential 3, disputed 2, preferred 1, times uncertainty and targets served), stopping once 80% of the weighted required rows have usable evidence, and the twelve first prompts. | |
 | D11 | ADR 0012 decision 10 | A target finds its pack target by the same title, or else by the one pack target whose ESCO crosswalk names its occupation; two candidates are never guessed between. | |
-| D12 | ADR 0013 decision 4 | A whole fee with no stated payment date is taken as due in the course's first month. | |
+| D12 | ADR 0013 decision 4 | A whole fee with no stated payment date is taken as due in the course's first month, and so is each stated extra cost (such as a £13.99 certificate). | |
 | D13 | ADR 0013 decision 4 | An intake given only as a month stands on the monthly grid as that month's first day. | |
 | D14 | ADR 0013 decision 6 | The monthly deficit limit, if you set one, counts each month's payments, less support received, plus the pay lost against your baseline. | |
-| D15 | ADR 0013 decision 6 | Repayments of debt you already have count in the monthly cash, but not against the monthly payment cap for the transition. | |
+| D15 | ADR 0013 decision 6 | Today the model follows the specification (section 12: payments plus repayments within the monthly payment cap, `P_m + R_m ≤ M_m`), so repayments of debt you already have count against the cap as well as in the monthly cash. Should they sit outside the monthly payment cap instead? (Yes changes the model; no keeps it.) | |
 | D16 | ADR 0013 decision 8 | A readiness milestone reached at the month boundary that ends the comparison horizon counts as within it. | |
-| D17 | ADR 0013 decision 9 | The delay scenario moves every conditional offer and award later by one number of months, declared for each comparison with no default; course dates stay fixed. | |
+| D17 | ADR 0013 decision 9 | The delay scenario moves every conditional offer and award later by one number of months, declared for each comparison with no default, whoever the award is paid to: a fee waiver paid to the provider that arrives late leaves you paying the fees due before it. Course dates stay fixed. | |
 
 ## The session record (not run - requires human)
 
