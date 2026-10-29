@@ -150,12 +150,20 @@ class _Witness(Fetcher):
 
 
 def locate(text: str, excerpts: Sequence[str]) -> list[dict[str, object]]:
-    """Every occurrence of each excerpt in the hashed text, as character offsets."""
+    """Every occurrence of each excerpt in the hashed text, as character offsets with the
+    exact text there. Whitespace in an excerpt matches any run of whitespace, since markup
+    breaks lines where a reader sees one space; nothing else is loosened."""
     found: list[dict[str, object]] = []
     for excerpt in excerpts:
-        starts = [m.start() for m in re.finditer(re.escape(excerpt), text)] if excerpt else []
+        words = excerpt.split()
+        pattern = re.compile(r"\s+".join(re.escape(w) for w in words)) if words else None
+        hits = list(pattern.finditer(text))[:MAX_HITS] if pattern else []
         found.append(
-            {"excerpt": excerpt, "offsets": [[s, s + len(excerpt)] for s in starts[:MAX_HITS]]}
+            {
+                "excerpt": excerpt,
+                "offsets": [[m.start(), m.end()] for m in hits],
+                "texts": [m.group() for m in hits],
+            }
         )
     return found
 

@@ -19,7 +19,7 @@ from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
 from tests.support.source_server import Scripted, SourceServer, source_server
 from tests.tools.test_live_adzuna import APP_ID, APP_KEY, fake_acquire
-from tools.corpus import acquire_for_corpus, adzuna_for_corpus, agent_classification
+from tools.corpus import acquire_for_corpus, adzuna_for_corpus, agent_classification, locate
 from tools.live_adzuna import MAX_SCOPE_REQUESTS, SCOPE
 from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry
 
@@ -179,7 +179,16 @@ def test_a_label_s_excerpts_are_located_in_the_hashed_text_of_a_page_whose_body_
     found, missing = located
     assert found["offsets"]
     assert all(text[s:e] == "Data Quality Analyst" for s, e in found["offsets"])
-    assert missing == {"excerpt": "not on the page", "offsets": []}
+    assert missing == {"excerpt": "not on the page", "offsets": [], "texts": []}
+
+
+def test_whitespace_in_an_excerpt_matches_a_line_break_in_the_markup_and_nothing_else() -> None:
+    text = "<li>Experience of\n      Power BI</li><li>Experience of Power-BI</li>"
+
+    [found] = locate(text, ["Experience of Power BI"])
+
+    assert found["offsets"] == [[4, 32]]
+    assert found["texts"] == ["Experience of\n      Power BI"]
 
 
 CREDENTIALS = (SecretStr(APP_ID), SecretStr(APP_KEY))
