@@ -59,6 +59,7 @@ class Fact(StrictModel):
     value: JsonValue = None
     unknown: str | None = None
     cited: Citation | None = None
+    note: str | None = None  # how the model reads it, where that is not the page's own words
 
     @model_validator(mode="after")
     def _known_or_why(self) -> Self:
@@ -91,6 +92,9 @@ class ActionConcept(StrictModel):
     synthetic: bool
     cited: Citation | None = None
     facts: list[Fact] = Field(default_factory=list)  # credential, level, assessment, claims
+    # Stated entry requirements: until the person confirms they meet them, a route through
+    # the concept is unresolved (spec section 10, "Option review checkpoint").
+    entry_requirements: list[Fact] = Field(default_factory=list)
 
 
 class Payment(StrictModel):
@@ -178,6 +182,9 @@ class Offering(StrictModel):
     # strictly before the deadline month, unless the gate is verified in the initial state.
     application_gate: str | None = None
     offer_gate: OfferGate | None = None
+    # The dated offering whose planned outcomes (OUT-1) this one carries, when one intake is
+    # taken several ways (full time, part time); None: its own.
+    outcomes_from: str | None = None
     synthetic: bool
     cited: Citation | None = None
     facts: list[Fact] = Field(default_factory=list)  # every consequential field, cited
@@ -325,6 +332,7 @@ class Variant(StrictModel):
     work_pattern: WorkPattern | None = None  # None: the continuation scenario's work
     wage: Wage | None = None
     supports: list[Support] = Field(default_factory=list)
+    entry_requirements_met: bool = False  # the person's confirmation that they meet them
 
 
 class CatalogueLabel(StrictModel):

@@ -22,6 +22,7 @@ from nessa.planning.catalogue import (
     ActionKind,
     AwardState,
     EligibilityStatus,
+    Fact,
     InstrumentKind,
     OfferGate,
     RecordState,
@@ -679,3 +680,19 @@ def test_one_concept_per_exclusive_group_and_at_most_six_actions() -> None:
     with pytest.raises(NessaError) as refused:
         check_route(monthly, [v.variant_id for _, _, v in seven])
     assert refused.value.code is ErrorCode.MODEL_SCOPE_EXCEEDED
+
+
+@pytest.mark.req("OPTN-03", "PLN-06")
+def test_stated_entry_requirements_keep_a_route_unresolved_until_the_person_confirms() -> None:
+    concept, offering, variant = option("course")
+    required = concept.model_copy(
+        update={"entry_requirements": [Fact(field="entry_requirement", value="GCSE maths")]}
+    )
+    met = variant.model_copy(update={"entry_requirements_met": True})
+
+    unconfirmed = check(person(), (required, offering, variant))
+    confirmed = check(person(), (required, offering, met))
+
+    assert codes(unconfirmed) == {"entry_requirements_unconfirmed"}
+    assert unconfirmed.feasibility is Feasibility.UNRESOLVED
+    assert confirmed.feasibility is Feasibility.FEASIBLE

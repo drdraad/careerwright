@@ -172,6 +172,7 @@ class CompiledVariant(StrictModel):
     variant_id: str
     concept_id: str
     offering_id: str
+    outcome_offering_id: str  # the offering the capability model's outcomes name
     kind: ActionKind
     exclusive_group: str | None
     review_states: list[RecordState]  # its concept's, offering's and supports'
@@ -192,10 +193,11 @@ class CompiledVariant(StrictModel):
     work_pattern: WorkPattern | None
     wage: Wage | None
     offer_gate: OfferGate | None
-    prerequisites: list[str]
+    prerequisites: list[str]  # the application gate among them, where one is needed
     grants: list[str]
     application_deadline: date | None
     application_gate: str | None
+    entry_unconfirmed: bool  # stated entry requirements the person has not confirmed
 
     @property
     def conditional_offer(self) -> bool:
@@ -276,6 +278,7 @@ def compile_input(
                 variant_id=variant.variant_id,
                 concept_id=concept.concept_id,
                 offering_id=offering.offering_id,
+                outcome_offering_id=offering.outcomes_from or offering.offering_id,
                 kind=concept.kind,
                 exclusive_group=concept.exclusive_group,
                 review_states=[
@@ -309,10 +312,20 @@ def compile_input(
                 work_pattern=variant.work_pattern,
                 wage=variant.wage,
                 offer_gate=offering.offer_gate,
-                prerequisites=offering.prerequisites,
+                prerequisites=[
+                    *offering.prerequisites,
+                    *(
+                        [offering.application_gate]
+                        if offering.application_gate is not None
+                        and offering.application_gate not in offering.prerequisites
+                        else []
+                    ),
+                ],
                 grants=offering.grants,
                 application_deadline=offering.application_deadline,
                 application_gate=offering.application_gate,
+                entry_unconfirmed=bool(concept.entry_requirements)
+                and not variant.entry_requirements_met,
             )
         )
     return MonthlyInput(

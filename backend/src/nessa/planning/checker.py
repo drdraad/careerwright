@@ -97,6 +97,7 @@ class FindingCode(StrEnum):
     DATES_UNKNOWN = "dates_unknown"
     COST_UNKNOWN = "cost_unknown"
     WORKLOAD_UNKNOWN = "workload_unknown"
+    ENTRY_REQUIREMENTS_UNCONFIRMED = "entry_requirements_unconfirmed"
     BASELINE_MISSING = "baseline_missing"
     ECONOMIC_COST_CAP = "economic_cost_cap"
 
@@ -107,6 +108,7 @@ _UNRESOLVED = frozenset(
         FindingCode.DATES_UNKNOWN,
         FindingCode.COST_UNKNOWN,
         FindingCode.WORKLOAD_UNKNOWN,
+        FindingCode.ENTRY_REQUIREMENTS_UNCONFIRMED,
         FindingCode.BASELINE_MISSING,
     }
 )
@@ -423,6 +425,8 @@ class _Check:
                 )
             elif timeline.start < 1:
                 self.add(FindingCode.STARTS_BEFORE_PLANNING, variant_id=variant.variant_id)
+            if variant.entry_unconfirmed:
+                self.add(FindingCode.ENTRY_REQUIREMENTS_UNCONFIRMED, variant_id=variant.variant_id)
 
     def _gates(self) -> None:
         initial = set(self.inputs.initial_gates)
@@ -845,7 +849,7 @@ class _Check:
         boundaries = sorted({t.usable for t in placed if t.usable <= self.horizon + 1})
         last = current
         for boundary in boundaries:
-            done = frozenset(t.variant.offering_id for t in placed if t.usable <= boundary)
+            done = frozenset(t.variant.outcome_offering_id for t in placed if t.usable <= boundary)
             last = at(done)
             if last.state in READY:
                 return last.state, last.qualifications, boundary
