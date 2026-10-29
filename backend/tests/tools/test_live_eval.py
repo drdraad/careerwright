@@ -1,6 +1,8 @@
 """The live evaluation's caps refuse before any call (ruling R5; MODEL-09). Offline: nothing
 here contacts Meta."""
 
+from pathlib import Path
+
 import pytest
 
 from nessa.identity.model_choice import ModelChoice
@@ -9,10 +11,13 @@ from tools.live_eval import (
     MAX_LIVE_CASES,
     SCOPE_MAX_CALLS,
     SCOPE_MAX_COST_NANO_USD,
+    Plan,
     authorise_eval,
     select,
+    write_results,
 )
 from tools.live_smoke import CapExceededError, ScopeBudget
+from tools.localenv import check_permissions
 from tools.usage_ledger import ScopeSpend
 
 MODELS = ModelChoice.configure("muse-spark-1.3-contributor", "muse-spark-1.3", "test")
@@ -87,3 +92,18 @@ def test_a_test_model_that_is_the_production_model_is_refused() -> None:
 
     with pytest.raises(CapExceededError, match="production model"):
         authorise_eval(same, select(load_cases(), None), budget=ROOMY, spent=NOTHING_SPENT)
+
+
+@pytest.mark.req("MODEL-09")
+def test_the_private_observations_file_is_owner_only_so_setup_still_starts(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir(mode=0o700)
+    observations = home / "evidence" / "live-eval.jsonl"
+    plan = Plan("muse-spark-1.3-contributor", [], calls=0, worst_case_nano_usd=0)
+
+    write_results(tmp_path / "results.md", observations, plan, [], {}, [], "live-eval")
+
+    assert observations.stat().st_mode & 0o777 == 0o600
+    check_permissions(home)  # `make setup` and `make demo` refuse a file others can read

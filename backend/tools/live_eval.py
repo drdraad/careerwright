@@ -387,6 +387,8 @@ def write_results(
     # model output stays out of the repository, owner-only (plan section 2).
     observations_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     observations_path.parent.chmod(0o700)
+    observations_path.touch(mode=0o600, exist_ok=True)
+    observations_path.chmod(0o600)  # `tools.localenv.check_permissions` refuses anything wider
     with observations_path.open("a", encoding="utf-8") as observations:
         for run in runs:
             record = {
