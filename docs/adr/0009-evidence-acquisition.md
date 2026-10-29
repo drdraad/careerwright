@@ -459,27 +459,38 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
       `FOR UPDATE`, the only lock a key share on it waits for at run time, only by the
       worker, as the first lock of its transaction (`activity._prepare` and `publish`,
       `acquisition.acquire_target` and `publish_acquisition`), and that run's events, which
-      lock the workspace's row, come after it. The cancel records its requests, whose
-      foreign keys take a key-share lock on each run's row, and only then locks the
-      workspace's row and writes its events. So a cancel that waits for a run's row holds
-      only its cancellation lock and key shares, which the worker never waits for, and the
-      worker's event goes through. Until Task 7d the cancel locked the workspace's row
-      first: it then waited for the run's row while the worker waited for the workspace's
-      row, and PostgreSQL ended the cancel with a deadlock error (`40P01`, answered
+      lock the workspace's row, come after it; a DELETE of a run's row takes the same lock,
+      so T15's workspace deletion (DUR-06) must keep this order too (today only setup's
+      `reset-demo` deletes runs, through the workspace's cascade). The cancel records its
+      requests, whose foreign keys take a key-share lock on each run's row, and only then
+      locks the workspace's row and writes its events. So a cancel that waits for a run's
+      row holds only its cancellation lock and key shares, which the worker waits for only
+      as its transaction's first lock, holding nothing, and the worker's event goes through.
+      Until Task 7d the cancel locked the workspace's row first: it then waited for the
+      run's row while the worker waited for the workspace's row, and PostgreSQL ended one of
+      them (in the reproduction, the cancel) with a deadlock error (`40P01`, answered
       `STORE_UNAVAILABLE`), so the person had to cancel again, and the cascade above made
       that possible for up to five more runs. Reproduced first with two connections (the
       worker's transaction holds the run's row until the cancel waits for it, then writes
       the event), for a run and for an acquisition's started run, and fixed by the order,
       with no retry loop
       (`test_a_cancel_while_the_worker_writes_a_run_s_event_ends_without_a_store_error`).
+      Since a request can wait at a run's row while the worker's terminal publish holds it,
+      the cancel reads its runs again once it holds the workspace's row (fix round 1, review
+      Minor 1): a run that settled meanwhile is not named and gets no event, and when none
+      it asked for is left unsettled the answer is still `RUN_FINISHED`, and its requests
+      roll back with no receipt
+      (`test_a_cancel_whose_runs_all_settle_while_it_waits_is_run_finished`,
+      `test_a_cancel_names_only_the_runs_still_unsettled_once_it_has_waited`).
       Two kinds of key share on a run's row come after the workspace's row, and neither
-      closes a cycle. A recording that starts an extraction run takes one on the
-      acquisition's row (`started_by_run`) after its document's key share on the workspace's
-      row and before its events; a key share does not block the locks the `FOR UPDATE`
-      holder then takes on the workspace's row (its event, its inserts' key shares). An API
-      command that refers to a complete run (an interview decision's sources, a slate
-      explanation's discovery) takes one after locking the workspace's row; the worker
-      writes no event for a complete run (publishing it again records nothing).
+      closes a cycle. A model-readable page's recording takes one on the acquisition's row
+      (its `page_extractions` link and, when it starts a run, `started_by_run`) after its
+      document's key share on the workspace's row and before its events; a key share does
+      not block the locks the `FOR UPDATE` holder then takes on the workspace's row (its
+      event, its inserts' key shares). An API command that refers to a complete run (an
+      interview decision's sources, a slate explanation's discovery) takes one after locking
+      the workspace's row; the worker writes no event for a complete run (publishing it
+      again records nothing).
     - *Input and retention.* The sealed input is that text, marked in the prompt as
       untrusted data. It is erased once the run is terminal, whatever its outcome, by
       `nessa.erase_run_input` (`RunTask.erases_input`), even after the requester's access
@@ -569,10 +580,11 @@ results, the ledger rows it wrote and the ledger table found no credential.
   order*). `cancel_run` locked the workspace's row `FOR UPDATE` and then took a key-share
   lock on each run's row (the `run_cancellations` foreign key), while a worker transaction
   can hold a run's row `FOR UPDATE` and then write an event, which updates the workspace's
-  row; the two deadlocked, and PostgreSQL ended the cancel with a store error, so the
-  person had to cancel again. The cancel now records its requests before it locks the
-  workspace's row. No workflow's step sequence changed: DBOS `application_version` stays
-  `nessa-l0-1`.
+  row; the two deadlocked, and PostgreSQL ended one of them with a store error (in the
+  reproduction, the cancel, so the person had to cancel again; an ended worker transaction
+  is repeated by its retry owner). The cancel now records its requests before it locks the
+  workspace's row, and reads its runs again once it holds it (fix round 1). No workflow's
+  step sequence changed: DBOS `application_version` stays `nessa-l0-1`.
 - The live search proposed no candidate in two tries; candidate quality is unqualified.
 - The Adzuna live integration is qualified on the free tier by `make live-adzuna` (two
   requests, above). A live-vacancy workspace also needs `make setup` to place the
