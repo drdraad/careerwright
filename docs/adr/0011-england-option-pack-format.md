@@ -3,10 +3,11 @@
 - Status: Accepted for Task 7b (Sprints 3–5 corpus items; plan v1.2). Amended in Task 7b
   fix round 1 (2026-10-29): decisions 3, 4, 7 and 9 changed, and 13 and 14 added. Amended
   again in fix round 2: decisions 2, 3 and 13; and in fix round 3: decisions 3 and 13.
-  - **Provisional, need product owner confirmation (R6):** decisions 8 (P02 has no
-    records), 9 (conflicting statements stay unresolved, and a bound is the label over a
-    point at the same amount), 10 (pack-local skill rows) and 12 (a restrictive copyright
-    notice keeps a page pending).
+  - **Confirmed by the product owner (R6), 2026-10-29:** decisions 8 (P02 has no records)
+    and 9 (conflicting statements stay unresolved, and a bound is the label over a point at
+    the same amount).
+  - **Provisional, need product owner confirmation (R6):** decisions 10 (pack-local skill
+    rows) and 12 (a restrictive copyright notice keeps a page pending).
   - **Not run — requires human:** the labels' review (H-07, session 2) and C08's rights
     review (OI-07).
 - Date: 2026-10-29

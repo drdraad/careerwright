@@ -2,12 +2,13 @@
 
 - Status: Accepted for Task 7, slice 7B (Sprint 3: S3.1's ASHE and UK SOC part, the salary
   floor, the reduced S3.6). Decision 4 (the full-time tables), decision 8 (the 90th
-  percentile; advertised pay read as gross), decision 7's evidence-quality words and every
-  licence reading in decision 2 are **provisional, need product owner confirmation (R6)**.
-  For decision 8's statistic the product owner should know that the pinned Table 15 (4)
-  publishes no percentile at region x unit group, so with this release the occupation floor
-  can never leave a suggestion out (decision 8; fix round 2): the choice of statistic or
-  geography is theirs. Fix round 1 (2026-10-29) amended decisions 4, 7, 8, 9 and 10 as
+  percentile at unit group, kept rather than Table 15 (3)'s broader minor group; advertised
+  pay read as gross), decision 7's evidence-quality words (limited, moderate, strong) and
+  every licence reading in decision 2 (the ILO scores from the lead author's repository
+  included) were **confirmed by the product owner (R6) on 2026-10-29**. They kept the 90th
+  percentile knowing that the pinned Table 15 (4) publishes no percentile at region x unit
+  group, so with this release the occupation floor can never leave a suggestion out
+  (decision 8; fix round 2). Fix round 1 (2026-10-29) amended decisions 4, 7, 8, 9 and 10 as
   marked; fix round 2 decisions 4 and 8.
 - Date: 2026-10-29
 - Requirements: TAX1-02..07, AIR1-02, AIR1-03, AIR1-04, AIR1-05 (backend), AIR1-07,
@@ -213,11 +214,9 @@ evidence endpoint's 503 and 404.
 ## Consequences and open items
 
 - Not run, requires a human (R2): H-10, every reviewed UK SOC mapping and every published
-  AI Resilience record; the licence readings above, the provisional decisions 4 (the
-  full-time tables) and 8 (the 90th percentile, which this release never publishes at
-  region x unit group, so the occupation floor removes nothing until the product owner
-  chooses another statistic or geography; advertised pay read as gross) and decision 7's
-  evidence-quality words (R6).
+  AI Resilience record. (The licence readings above, decisions 4 and 8 and decision 7's
+  evidence-quality words were confirmed by the product owner on 2026-10-29, R6; the
+  occupation floor removes nothing with this release, as they chose.)
 - Jobs carry no occupation ID yet (JOB-01's open part), so a vacancy shows its own pay and no
   modelled pay; the Roles chapter that shows an occupation's evidence and the pay lens is
   Task 8.

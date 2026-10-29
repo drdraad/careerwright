@@ -192,8 +192,8 @@ rights review before any push (OI-07).
 
 | # | From | Decision | Yes / no, and a note if no |
 |---|---|---|---|
-| D1 | ADR 0011 decision 8 | P02 has no records in the pack, since its fixture gives it no target. | |
-| D2 | ADR 0011 decision 9 | Two statements on one page that disagree leave the field unknown, keeping both; a bound and a point at the same amount are not a disagreement, and the bound is the label ("Up to £28,000"). | |
+| D1 | ADR 0011 decision 8 | P02 has no records in the pack, since its fixture gives it no target. | Yes: answered by the product owner on 2026-10-29, before the session |
+| D2 | ADR 0011 decision 9 | Two statements on one page that disagree leave the field unknown, keeping both; a bound and a point at the same amount are not a disagreement, and the bound is the label ("Up to £28,000"). | Yes: answered by the product owner on 2026-10-29, before the session |
 | D3 | ADR 0012 decision 3 | A requirement's importance is what the postings state (all essential, all preferred, or "disputed" for a mix); a disputed row counts as required until you decide; an ESCO-only row is unknown and never enters readiness. | |
 | D4 | ADR 0012 decision 4 | A protected gate is satisfied only when you say you hold it and have verified it at its source (L0 checks no register); a regulated occupation with no typed gate keeps a gate no statement can satisfy. | |
 | D5 | ADR 0012 decision 5 | "I did it with help" counts at most as level 1. | |
