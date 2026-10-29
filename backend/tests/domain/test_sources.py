@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from nessa.evidence.acquire import Pacer
 from nessa.evidence.records import Retention, RightsClass
 from nessa.evidence.sources import (
     MANIFEST_PATH,
@@ -118,6 +119,22 @@ def test_a_page_not_clearly_within_a_class_stays_pending_human_rights_review(
     assert page.rights_class is RightsClass.OTHER
     assert page.rights_status == PENDING_REVIEW == "pending human rights review"
     assert page.retention is Retention.EXCERPTS
+
+
+def test_requests_to_one_host_are_paced_to_its_rate_limit_and_other_hosts_are_not() -> None:
+    now = [100.0]
+    slept: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        slept.append(seconds)
+        now[0] += seconds
+
+    pacer = Pacer(clock=lambda: now[0], sleep=sleep)
+    pacer.wait("www.gov.uk", 5.0)
+    pacer.wait("www.gov.uk", 5.0)
+    pacer.wait("nationalcareers.service.gov.uk", 5.0)
+
+    assert slept == [5.0]  # only the second request to the same host waited
 
 
 def test_the_manifest_file_is_inside_the_package() -> None:

@@ -7,7 +7,7 @@ Everything runs on this machine (ADR 0001). Run commands from the repository roo
 | Command | What it does |
 |---|---|
 | `make setup` | Checks Docker (Compose v2), uv, pnpm 10.33.2 and Node 24; installs the locked backend, web-app and design-tooling dependencies and Playwright's Chromium; creates `NESSA_HOME` (default `~/.nessa/l0`) with generated database passwords and master key `v1`, all owner-only; downloads the pinned ESCO release (10 MB) into `var/datasets/` and keeps it only if its size and SHA-256 match; builds the images (backend, Auth emulator, web). Network is needed here only. Safe to re-run: it never replaces an existing password or key, and re-verifies a dataset already present instead of fetching it again. |
-| `make dev` | Starts the stack in **live** mode and waits until healthy: migrates, seeds, imports the ESCO release on the first start (about 6 s; later starts find it imported), starts the web app, prints the URLs. Only the worker can reach the internet (for Meta). |
+| `make dev` | Starts the stack in **live** mode and waits until healthy: migrates, seeds, imports the ESCO release on the first start (about 6 s; later starts find it imported), starts the web app, prints the URLs. Only the worker (for Meta) and the restricted acquisition worker (for permitted pages and Adzuna) can reach the internet. Live-vacancy workspaces are offered only if setup placed Adzuna credentials. |
 | `make demo` | Same, in **demo** mode: no Nessa service has a route out of the machine. Calls to Meta are refused; a demo workspace's interview turns are answered by the offline fixture interviewer, labelled as such. |
 | `make stop` | Stops every service within a bound (SIGTERM, then SIGKILL after the grace period). Volumes and `NESSA_HOME` are kept; DBOS recovers in-flight runs on the next start. |
 | `make reset-demo` | Recreates the fixture workspace "P01 demo (synthetic)" only. Event numbers continue, so a resumed stream sees the reset. |
@@ -15,8 +15,10 @@ Everything runs on this machine (ADR 0001). Run commands from the repository roo
 | `make acceptance` | Integration and stack tests against real PostgreSQL 16, DBOS and the emulator, in separate Compose projects (`nessa-l0-test`, `nessa-l0-stacktest`) and ports; then the Storybook build and the Playwright suite on its own demo stack (`nessa-l0-webtest`, web on `127.0.0.1:57600`): the browser journey with a full restart, keyboard, access and visual checks. Removes them afterwards. |
 | `make live-smoke` | One real connection-check run on the test model through an isolated stack (`nessa-l0-smoke`), at most 3 calls, within the `live-smoke` scope's cumulative cap (9 calls, 3 production, $0.30 worst case by default; `NESSA_LIVE_SMOKE_*` changes it). `INTERVIEW=1` runs one interview turn instead, with a fixed synthetic message, checks that its reply streamed and was superseded by the validated output, and confirms its proposals into the profile: one attempt, at most 2 calls (the call and one validation repair). One invocation at a time: a second refuses while the ledger is held. The worker is stopped before the attempts are read, and every attempt is ledgered in `docs/evidence/live-usage.*` with its request count; if the worker cannot be confirmed stopped, every further call it could make is ledgered with an unknown cost and the command fails. Only `PRODUCTION=1` uses the production model. Reads `META_API_KEY` from `.env`. |
 | `make live-eval` | The representative evaluation cases (those marked `live` in `backend/tools/evaluation_cases.json`: INT-01..03 and DSC-01; at most 6 per invocation; `CASES=INT-01,DSC-01` runs a chosen subset) through the isolated live stack on the test model only: one synthetic workspace per case whose run limit allows exactly one attempt (at most 2 requests), within the budget scope's cumulative cap (the controller's 9 requests, no production request, $0.05 worst case; `NESSA_LIVE_EVAL_*` changes it). A scope holds one default run; a further authorised run gets its own scope (`NESSA_LIVE_EVAL_SCOPE=...`). The slate-explanation case EXP-01 is not in the default run: `CASES=EXP-01` runs a discovery and then its slate's explanation in one workspace, each run limited to one attempt (at most 4 requests), checking each quotation against ESCO's record as the taxonomy serves it. Every attempt is ledgered in `docs/evidence/live-usage.*` after the worker stops; results with failures by type are appended to `docs/evidence/live-eval.md`, and each case's output to the private evidence directory (`NESSA_HOME/evidence/live-eval.jsonl`, owner-only, never committed); the key is leak-scanned. Reads `META_API_KEY` from `.env`. Never part of `make check` or `make acceptance`. |
+| `make live-smoke SEARCH=1` | One source search (Meta web search) on the test model through the isolated stack, for the synthetic target "Data analyst" in Manchester: one attempt of one request (at most 2 searches; worst case $0.008), in its own scope `live-search` (at most 9 requests and $0.30). Prints the candidates, how many the search really returned, what was excluded and the searches run; ledgered like any smoke. |
+| `make live-adzuna` | Two real Adzuna search requests (free tier) through the acquisition adapter's own code, in the `live-adzuna` scope (at most 10 requests). Reads `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` from `.env` in code, never printed; if either is absent it says "blocked: Adzuna credentials not found" and sends nothing. Each request is ledgered in `docs/evidence/live-usage.*` at $0 with its endpoint recorded without the credentials; the summary is counts only. Never part of `make check` or `make acceptance`. |
 | `make rotate-master-key` | With the stack running: adds master key `v<N+1>` to `NESSA_HOME/keys`, then runs `make reseal`. The only way to rotate the master key. |
-| `make reseal` | Restarts a running API and worker so they load every key version (their mode is kept), then reseals every sealed record (stored keys, run inputs, run outputs and partial replies) under the newest key, and fails if any record is left on an older version. Run it again if a rotation was interrupted. Restarting the worker recovers an in-flight run, whose model call may then be made again, within its spend reservation. |
+| `make reseal` | Restarts a running API and worker so they load every key version (their mode is kept), then reseals every sealed record (stored keys, run inputs, run outputs, partial replies and kept source bodies) under the newest key, and fails if any record is left on an older version. Run it again if a rotation was interrupted. Restarting the worker recovers an in-flight run, whose model call may then be made again, within its spend reservation. |
 | `make status` | `docker compose ps` for the stack. |
 
 ## Addresses (127.0.0.1 only)
@@ -126,6 +128,38 @@ with the browser's Origin unchanged.
   The written text is read with the discovery (`explanation.written`), never in the
   command's answer. The web app asks once when a slate first shows. Demo workspaces use
   the fixture explainer.
+- Cancelling a run (DUR-05): `POST .../runs/{run_id}/cancel` answers `202` with the run and
+  its `cancel_requested_at`; the worker stops its workflow and the run ends `cancelled`
+  (never a failure). A queued run is never started and reserves nothing; a model call
+  already sent completes and is booked at its cost, and its result is not used. A finished
+  run answers `409 RUN_FINISHED`.
+- Research (ADR 0009). `POST .../research/acquisitions` with `{urls: [...]}` (at most 10) or,
+  in a live-vacancy workspace, `{adzuna: {what, where, page?, results_per_page?}}` returns
+  `202` and the acquisition (its run, targets and attempts). A URL another run is already
+  fetching is joined and one that failed recently waits out its back-off (both listed in
+  `skipped`; `200` with no acquisition if nothing was started). A URL with a user name,
+  password or `app_key` in it is refused (`422`, `credentials_in_url`); any other refusal
+  (private address, scheme, port, a denied source, robots.txt) is recorded as a blocked
+  attempt. `GET .../research/acquisitions/{run_id}` shows each target's attempts (status,
+  reason, retries, rights class, what was kept), the jobs found so far and, once complete,
+  the summary. A run whose every source failed is `failed/retrieval_failed`, or
+  `source_blocked` when every source was refused: never "no vacancies".
+- Pasted text: `POST .../research/pasted` with `{target, title, text, employer?, city?,
+  source_url?}` returns `201` and the job: the person's own example of a target (at most 3
+  per target; `422 LIMIT_EXCEEDED` after that), never fetched, never a live vacancy
+  (`exemplar: true`, freshness `never_verified`).
+- Jobs: `GET .../jobs?favourites=&cursor=&limit=` (each job's values, every source copy,
+  freshness from its last successful retrieval, `total_jobs` counting a multi-city job once,
+  `city_counts`, `coverage` by latest attempt status and, when empty, `empty_reason`);
+  `GET .../jobs/{job_id}` adds every claim with its span; `PUT`/`DELETE
+  .../jobs/{job_id}/favourite`.
+- Source search: `POST .../research/searches` with `{expected_profile_version, target,
+  city}` (a confirmed target and one of your cities; `409 CONFIRMATION_REQUIRED` otherwise)
+  returns `202`; `GET .../research/searches/{id}` shows the candidate pages (each marked
+  grounded when the search returned it) and what was excluded. Candidates are never
+  claims: acquire the ones you choose.
+- Corpus pages (Task 7b): from `backend/`, `uv run --locked python -m tools.corpus --slot
+  <slot> --url <url>` (`corpus/README.md`).
 - Taxonomy: `GET /v1/taxonomy` (the ESCO release and its attribution), `GET
   /v1/taxonomy/occupations?q=...&match=all|any`, `GET /v1/taxonomy/occupations/{concept_id}`;
   English cities: `GET /v1/places`. A title ESCO lacks: `POST
@@ -142,6 +176,11 @@ with the browser's Origin unchanged.
   run `make reseal` (it refuses to report success while any record is on an old version).
 - `NESSA_HOME` holds the only copy of the master keys and database passwords; keep it
   private.
+- Adzuna (live-vacancy mode, optional, ruling R4): `make setup` copies `ADZUNA_APP_ID` and
+  `ADZUNA_APP_KEY` from the repository `.env` into `NESSA_HOME/adzuna/` (owner-only, never
+  printed; it reports "blocked: Adzuna credentials not found" when either is absent). Only
+  the restricted acquisition worker's container mounts that directory. To change them, edit
+  `.env` and run `make setup` again; the next `make dev` uses them.
 
 ## Upgrades and backups
 

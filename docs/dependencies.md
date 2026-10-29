@@ -47,11 +47,23 @@ Direct dependencies, pinned exactly in `backend/pyproject.toml`:
 | `fastapi` | 0.162.0 | the API and its OpenAPI contract (Task 3) |
 | `uvicorn` | 0.54.0 | ASGI server for the API container (Task 3) |
 | `firebase-admin` | 7.7.0 | ID-token verification with the revocation check, against the Auth emulator only (Task 3, ADR 0004) |
+| `scrapling` | 0.4.15 (2026-08-23) | the one scraper (spec section 6), used as a parser only: `scrapling.parser.Selector` reads pages' JSON-LD. Its HTTP fetcher imports Playwright, Patchright and browserforge, which the backend excludes, so the `fetchers` extra is not installed and retrieval is Nessa's own guarded client on `httpcore2` (Task 7A, ADR 0009 decision 2). 0.5 (2026-10-17) was under 14 days old and imports the same browser stack |
 | dev: `ruff` | 0.17.3 | lint and format |
 | dev: `mypy` | 2.4.0 | the single Python type checker (strict, pydantic plugin) |
 | dev: `pytest` | 9.2.0 | tests |
 | dev: `hypothesis` | 6.170.12 | property tests (plan section 7; Task 3) |
 | build: `hatchling` | 1.32.4 | build backend |
+
+Task 7A added `scrapling` 0.4.15 and its five dependencies, each published more than 14 days
+before 2026-10-28: `lxml` 6.1.3 (2026-09-02, BSD-3-Clause), `cssselect` 1.6.0 (2026-10-09,
+BSD-3-Clause), `orjson` 3.13.0 (2026-10-07, MPL-2.0 AND (Apache-2.0 OR MIT)), `tld` 0.13.2
+(2026-03-06, MPL-1.1 OR GPL-2.0-only OR LGPL-2.1-or-later, used under MPL-1.1) and `w3lib`
+2.5.0 (2026-09-30, BSD-3-Clause); the lock now holds 94 packages. `scrapling` is BSD-3-Clause.
+MPL files are used unmodified, so they add no obligation beyond keeping their notices (not a
+legal review). lxml 6.1 deprecates an `HTMLParser` option Scrapling 0.4.15 still passes as a
+no-op; `backend/pyproject.toml` ignores that one `DeprecationWarning` in tests, which
+otherwise turn warnings into errors. `httpcore2` and `certifi` were already locked (through
+`httpx2` and `httpx`) and are now imported directly by `nessa.evidence.fetcher`.
 
 Since Task 3 the lock holds 88 packages. Notable transitive versions: `openai` 3.40.0,
 `pydantic-core` 2.50.1, `pydantic-graph` 2.62.0, `psycopg-binary` 3.3.6, `genai-prices`
