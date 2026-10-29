@@ -3,10 +3,13 @@ ruling for Task 7A), free tier only, capped and ledgered.
 
 The credentials are read in code from the repository's gitignored `.env` (`ADZUNA_APP_ID`,
 `ADZUNA_APP_KEY`) into `SecretStr`s, registered for log redaction, never printed and never a
-command argument. If either name is absent the command reports "blocked: Adzuna credentials
-not found" and makes no request. Each request goes through the product's own path in the
-restricted acquisition worker's code (`nessa.evidence.acquire.acquire_adzuna`: the guarded
-fetcher, the response contract, the credential-free recorded URL) and is appended to
+command argument. If either name is absent (or empty) the command reports "blocked: Adzuna
+credentials not found", which of the two is missing, and the names, never the values, of
+the variables `.env` does set whose name holds "ADZUNA" (fix round 5, item 4: the product
+owner's names may differ), and makes no request. Each request goes through the product's
+own path in the restricted acquisition worker's code
+(`nessa.evidence.acquire.acquire_adzuna`: the guarded fetcher, the response contract, the
+credential-free recorded URL) and is appended to
 `docs/evidence/live-usage.jsonl` and `.md` with its request count, the endpoint as recorded
 (no credentials), the result class and a cost of $0 (free tier). Nothing an advert says is
 kept: the summary is counts only (session 1 class 6, reference only).
@@ -23,6 +26,7 @@ import sys
 from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -34,7 +38,7 @@ from nessa.evidence.jobs import group_copies
 from nessa.evidence.records import AttemptStatus
 from nessa.evidence.sources import load_manifest
 from nessa.logs import register_secret
-from tools.localenv import REPO_ROOT
+from tools.localenv import ENV_FILE, env_names_containing
 from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry
 
 SCOPE = "live-adzuna"
@@ -53,8 +57,9 @@ Acquire = Callable[..., AcquisitionResult]
 
 
 class AdzunaSettings(BaseSettings):
+    # An empty value is no credential, as setup reads it (`localenv.place_adzuna_credentials`).
     model_config = SettingsConfigDict(
-        env_file=REPO_ROOT / ".env", env_file_encoding="utf-8", extra="ignore"
+        env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore", env_ignore_empty=True
     )
 
     app_id: SecretStr | None = Field(default=None, validation_alias="ADZUNA_APP_ID")
@@ -92,10 +97,16 @@ def run(
     *,
     acquire: Acquire = acquire_adzuna,
     fetcher: Fetcher | None = None,
+    env_file: Path = ENV_FILE,
 ) -> dict[str, object]:
-    """The qualification; returns its summary (counts only, never a credential)."""
+    """The qualification; returns its summary (counts and names only, never a credential)."""
     if settings.app_id is None or settings.app_key is None:
-        return {"status": BLOCKED}
+        found = {"ADZUNA_APP_ID": settings.app_id, "ADZUNA_APP_KEY": settings.app_key}
+        return {
+            "status": BLOCKED,
+            "missing": [name for name, value in found.items() if value is None],
+            "adzuna_names_in_env": env_names_containing(env_file, "ADZUNA"),
+        }
     credentials = (settings.app_id, settings.app_key)
     for secret in credentials:
         register_secret(secret.get_secret_value())

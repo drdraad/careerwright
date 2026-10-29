@@ -2,6 +2,7 @@
 R4; controller ruling for Task 7A). The Adzuna call is replaced by the fixture contract."""
 
 import hashlib
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -115,13 +116,67 @@ def test_the_scope_cap_refuses_before_any_request(tmp_path: Path) -> None:
     assert called == []
 
 
-@pytest.mark.parametrize(("app_id", "app_key"), [(None, APP_KEY), (APP_ID, None), (None, None)])
+@pytest.mark.parametrize(
+    ("app_id", "app_key", "missing"),
+    [
+        (None, APP_KEY, ["ADZUNA_APP_ID"]),
+        (APP_ID, None, ["ADZUNA_APP_KEY"]),
+        (None, None, ["ADZUNA_APP_ID", "ADZUNA_APP_KEY"]),
+    ],
+)
 def test_a_missing_credential_is_blocked_and_nothing_is_sent(
-    tmp_path: Path, app_id: str | None, app_key: str | None
+    tmp_path: Path, app_id: str | None, app_key: str | None, missing: list[str]
 ) -> None:
     ledger = Ledger(tmp_path / "usage.jsonl")
 
-    summary = run(settings(app_id, app_key), ledger, acquire=fake_acquire)
+    summary = run(
+        settings(app_id, app_key), ledger, acquire=fake_acquire, env_file=tmp_path / "no-env"
+    )
 
-    assert summary == {"status": BLOCKED}
+    assert summary == {"status": BLOCKED, "missing": missing, "adzuna_names_in_env": []}
+    assert ledger.records() == []
+
+
+# Synthetic values only. The Adzuna-named variables are written in other spellings and
+# cases, beside a variable of another service, one whose value mentions Adzuna, a comment
+# and an empty expected name.
+SYNTHETIC_ENV = (
+    "META_API_KEY=synthetic-meta-0000\n"
+    "ADZUNA_ID=synthetic-adzuna-1111\n"
+    "export adzuna_api_key='synthetic-adzuna-2222'\n"
+    'Adzuna_Secret = "synthetic-adzuna-3333"\n'
+    "OTHER_SERVICE_TOKEN=ADZUNA-synthetic-4444\n"
+    "# ADZUNA_COMMENTED=synthetic-adzuna-5555\n"
+    "ADZUNA_APP_KEY=\n"
+)
+
+
+@pytest.mark.req("SEC-05")
+def test_absent_credentials_list_the_adzuna_names_found_never_a_value(tmp_path: Path) -> None:
+    # Fix round 5, item 4: the product owner says the credentials are in `.env`, under names
+    # the tool does not know. It lists those names only, and makes no request.
+    dotenv = tmp_path / "dotenv"
+    dotenv.write_text(SYNTHETIC_ENV, encoding="utf-8")
+    ledger = Ledger(tmp_path / "usage.jsonl")
+    sent: list[object] = []
+
+    summary = run(
+        AdzunaSettings(_env_file=dotenv),
+        ledger,
+        acquire=lambda *args, **kwargs: sent.append(args),  # type: ignore[arg-type]
+        env_file=dotenv,
+    )
+
+    assert summary == {
+        "status": BLOCKED,
+        "missing": ["ADZUNA_APP_ID", "ADZUNA_APP_KEY"],  # an empty value is absent
+        "adzuna_names_in_env": ["ADZUNA_APP_KEY", "ADZUNA_ID", "Adzuna_Secret", "adzuna_api_key"],
+    }
+    shown = json.dumps(summary)
+    assert "synthetic" not in shown
+    for digits in ("0000", "1111", "2222", "3333", "4444", "5555"):
+        assert digits not in shown
+    for other in ("META_API_KEY", "OTHER_SERVICE_TOKEN", "ADZUNA_COMMENTED"):
+        assert other not in shown
+    assert sent == []
     assert ledger.records() == []

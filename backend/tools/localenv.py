@@ -10,6 +10,7 @@ Run: `uv run python -m tools.localenv`. Master-key rotation is `make rotate-mast
 
 import argparse
 import os
+import re
 import secrets
 import stat
 import sys
@@ -89,6 +90,25 @@ def _env_values(env_file: Path, names: tuple[str, ...]) -> dict[str, str]:
         if sep and name.strip() in names:
             found[name.strip()] = value.strip().strip("'\"")
     return {name: value for name, value in found.items() if value}
+
+
+_ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def env_names_containing(env_file: Path, fragment: str) -> list[str]:
+    """The names, never the values, of the variables a dotenv file sets whose name holds
+    `fragment` (case aside), sorted. A line counts only when what stands before its `=` is a
+    variable name, so neither a comment nor any part of a value is taken for one. Read in
+    code: nothing of the file but these names leaves this function."""
+    if not env_file.is_file():
+        return []
+    names: set[str] = set()
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        name, sep, _ = line.strip().removeprefix("export ").partition("=")
+        name = name.strip()
+        if sep and _ENV_NAME.fullmatch(name) and fragment.lower() in name.lower():
+            names.add(name)
+    return sorted(names)
 
 
 def place_adzuna_credentials(home: Path, env_file: Path = ENV_FILE) -> str:
