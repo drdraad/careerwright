@@ -4,7 +4,11 @@
   floor, the reduced S3.6). Decision 4 (the full-time tables), decision 8 (the 90th
   percentile; advertised pay read as gross), decision 7's evidence-quality words and every
   licence reading in decision 2 are **provisional, need product owner confirmation (R6)**.
-  Fix round 1 (2026-10-29) amended decisions 4, 6, 7, 8 and 10 as marked.
+  For decision 8's statistic the product owner should know that the pinned Table 15 (4)
+  publishes no percentile at region x unit group, so with this release the occupation floor
+  can never leave a suggestion out (decision 8; fix round 2): the choice of statistic or
+  geography is theirs. Fix round 1 (2026-10-29) amended decisions 4, 7, 8, 9 and 10 as
+  marked; fix round 2 decisions 4 and 8.
 - Date: 2026-10-29
 - Requirements: TAX1-02..07, AIR1-02, AIR1-03, AIR1-04, AIR1-05 (backend), AIR1-07,
   AIR1-10, AIR1-11, AIR1-12, JOB-05, DIV1-07, JOB-03 (the floor's part); spec sections 4, 5,
@@ -70,7 +74,12 @@ that is a reviewed range or unscored, never a formula. L0 has no accountable rev
    shown beside it, a P90's never the median's (fix round 1, review A M4; migration 0028,
    transformation `nessa-ashe-import-2`, which removes the held ASHE import so
    `setup-database` imports it again). One release is held, so the trend is `unavailable`,
-   `single_snapshot`.
+   `single_snapshot`. What this release publishes (fix round 2, re-review 1-A N1, counted on
+   the pinned file and pinned in
+   `test_reference_data.py::test_the_pinned_files_import_with_their_documented_counts`): at
+   region x four-digit unit group, no percentile at all (0 of 135,960 percentile cells, in
+   any period); the median for 5,091 of 13,596 estimates, and the mean. Table 15 (3), the
+   three-digit minor groups, does publish percentiles; it is not imported.
 
 5. **UK SOC 2020 mapping (TAX1-02, TAX1-03).** ONS's coding index codes each of 32,435 job
    titles to a SOC 2020 unit group and an ISCO-08 group (235 entries without a code are
@@ -145,7 +154,14 @@ that is a reviewed range or unscored, never a formula. L0 has no accountable rev
      advertised-pay rule (fix round 1, review A M6). Left-out occupations say
      `below_salary_floor` in "show why this wasn't included"; `salary_floor` gives the
      counts and a sentence with every count, `meets` included (review A M7). In L0 no
-     mapping is reviewed, so the floor removes no suggestion and says why.
+     mapping is reviewed, so the floor removes no suggestion and says why. And it never
+     could with this release, a reviewed mapping or not (fix round 2, re-review 1-A N1): the
+     pinned Table 15 (4) publishes no percentile at region x unit group (decision 4), so the
+     90th percentile is always unpublished and every occupation is kept, after a review as
+     `not_published`. The rule is not changed here: a median or mean would remove careers
+     where many jobs pay more (DIV1-07), and a minor-group figure from Table 15 (3) would be
+     a broad-SOC estimate the spec admits only with an explicit label. Which statistic or
+     geography the floor uses is the product owner's decision (R6).
    - The job listing (the current profile's floor; `pay.floor_verdict`): a vacancy is left
      out only when every advertised GBP amount its copies state in the floor's period has a
      top (a range's maximum, an "up to", or one amount) below it. A minimum with no maximum
@@ -198,8 +214,10 @@ evidence endpoint's 503 and 404.
 
 - Not run, requires a human (R2): H-10, every reviewed UK SOC mapping and every published
   AI Resilience record; the licence readings above, the provisional decisions 4 (the
-  full-time tables) and 8 (the 90th percentile; advertised pay read as gross) and decision
-  7's evidence-quality words (R6).
+  full-time tables) and 8 (the 90th percentile, which this release never publishes at
+  region x unit group, so the occupation floor removes nothing until the product owner
+  chooses another statistic or geography; advertised pay read as gross) and decision 7's
+  evidence-quality words (R6).
 - Jobs carry no occupation ID yet (JOB-01's open part), so a vacancy shows its own pay and no
   modelled pay; the Roles chapter that shows an occupation's evidence and the pay lens is
   Task 8.

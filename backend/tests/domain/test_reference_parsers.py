@@ -55,17 +55,24 @@ def test_ashe_keeps_codes_regions_periods_pence_and_onss_markers() -> None:
     annual = _estimate(release, "3544", samples.NORTH_WEST, AshePeriod.YEAR)
     assert (annual.soc_title, annual.region_name) == ("Data analysts", "North West")
     assert annual.figures["median"] == 3_806_310  # £38,063.10 as integer pence
-    assert annual.figures["p90"] == 5_200_000
-    assert annual.figures["p10"] is None  # withheld, never 0
+    # As in the real Table 15 (4), no percentile is published (fix round 2, 1-A N1).
+    assert annual.figures["p90"] is None  # withheld, never 0
+    assert annual.markers["p90"] == "x"
+    assert annual.figures["p10"] is None
     assert annual.markers["p10"] == "x"
     # Fix round 1, A-M4: each statistic keeps its own CV from the "b" table.
     assert annual.cvs["median"] == Decimal("9.6")
-    assert annual.cvs["p90"] == Decimal(samples.P90_CV)
     assert annual.cvs["p10"] is None  # withheld in the "b" table too
     assert annual.jobs_thousands == Decimal("8")
+    # The sample's one labelled exception publishes a P90, with its own CV.
+    code, region = samples.P90_EXCEPTION
+    exception = _estimate(release, code, region, AshePeriod.YEAR)
+    assert exception.figures["p90"] == 2_400_000
+    assert exception.cvs["p90"] == Decimal(samples.P90_CV)
+    assert exception.cvs["median"] == Decimal("8.4")  # never the P90's
     # A binary-float artefact is read as decimal text and rounded to the penny.
     books = _estimate(release, "4122", samples.NORTH_WEST, AshePeriod.YEAR)
-    assert books.figures["p90"] == 2_500_050
+    assert books.figures["median"] == 2_400_050
     weekly = _estimate(release, "3544", samples.LONDON, AshePeriod.WEEK)
     assert weekly.figures["median"] == 89_000
     assert weekly.region_code == "E12000007"

@@ -143,15 +143,19 @@ def test_an_occupation_s_pay_keeps_every_uk_soc_candidate_regional_and_unmodelle
         "cv": None,
         "reliability": "unreliable",
     }
-    # Fix round 1, A-M4: each statistic carries its own CV and band, P90 among them.
+    # Fix round 1, A-M4: each statistic carries its own CV and band. Fix round 2 (1-A N1):
+    # as in the real release, the P90 is withheld at region x unit group.
     assert (statistics["median"]["cv"], statistics["median"]["reliability"]) == (
         "9.6",
         "reasonably_precise",
     )
-    assert (statistics["p90"]["cv"], statistics["p90"]["reliability"]) == (
-        samples.P90_CV,
-        "acceptable",
-    )
+    assert statistics["p90"] == {
+        "statistic": "p90",
+        "amount": None,
+        "withheld": "x",
+        "cv": None,
+        "reliability": "unreliable",
+    }
     [withheld] = [b for b in systems["benchmarks"] if b["period"] == "year"]
     assert {s["statistic"]: s["reliability"] for s in withheld["statistics"]}["median"] == (
         "unreliable"
@@ -385,3 +389,19 @@ def test_the_pinned_files_import_with_their_documented_counts(infra: Infra) -> N
         "SELECT count(DISTINCT region_code) AS n FROM nessa.ashe_estimates", database=database
     )
     assert regions["n"] == 11  # England's nine regions, Wales and Scotland: never a city
+    # Fix round 2 (re-review 1-A N1): the 2026 provisional Table 15 (4) publishes no
+    # percentile at region x unit group, so the occupation floor rule (P90 in every region)
+    # can never leave a suggestion out with this release (ADR 0010 decision 8). Pinned so a
+    # release that publishes them is noticed, never assumed.
+    [published] = infra.query(
+        "SELECT count(*) FILTER (WHERE key LIKE 'p%%') AS percentile_cells, "
+        "count(*) FILTER (WHERE value <> 'null'::jsonb AND key LIKE 'p%%') AS percentiles, "
+        "count(*) FILTER (WHERE value <> 'null'::jsonb AND key = 'median') AS medians "
+        "FROM nessa.ashe_estimates, jsonb_each(figures)",
+        database=database,
+    )
+    assert published == {
+        "percentile_cells": 13_596 * 10,  # ten percentiles per estimate, every one read
+        "percentiles": 0,
+        "medians": 13_596 - 8_505,
+    }

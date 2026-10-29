@@ -5,7 +5,10 @@ Every figure here is **synthetic**: invented for tests, labelled so in each samp
 (`sample=True`, a `-synthetic-sample` dataset ID) and never shown as evidence about a real
 occupation. The layouts (sheet names, title rows, header rows, ONS's markers, the
 crosswalk's metadata lines) copy the real files, which `make setup` fetches and the
-full-release tests import. The occupations are the ESCO sample's (`fixtures/esco-sample`).
+full-release tests import, and so does what ASHE withholds: no percentile at region x unit
+group, except one labelled synthetic exception (`P90_EXCEPTION`) for the floor's mechanism
+test, which the real release never has. The occupations are the ESCO sample's
+(`fixtures/esco-sample`).
 """
 
 import csv
@@ -101,24 +104,31 @@ _HEADER_ROWS: list[list[Cell]] = [
     ],
 ]  # fmt: skip
 _TITLES = {"1": "Weekly pay - Gross", "5": "Hourly Pay - Gross", "7": "Annual pay - Gross"}
-P90_CV = "14.2"  # synthetic: an "acceptable" band, worse than any median's here
+P90_CV = "14.2"  # synthetic: an "acceptable" band, worse than its median's
 
-# (region, SOC code, SOC title, {table: (median, p90, CV)}): synthetic.
+# (region, SOC code, SOC title, {table: (median, p90, CV)}): synthetic. As in the real
+# 2026 provisional Table 15 (4), no percentile is published at region x unit group: every
+# P90 (and every other percentile) is "x" (slice 7B fix round 2, re-review 1-A N1).
 ASHE_ROWS = [
-    ("North West", "3544", "Data analysts", {"7": ("38063.1", "52000", "9.6"),
+    ("North West", "3544", "Data analysts", {"7": ("38063.1", "x", "9.6"),
                                             "1": ("760.4", "x", "7.2"),
                                             "5": ("20.54", "x", "7.6")}),
-    ("London", "3544", "Data analysts", {"7": ("46000.4", "64000", "6.1"),
+    ("London", "3544", "Data analysts", {"7": ("46000.4", "x", "6.1"),
                                         "1": ("890", "x", "5.5"),
                                         "5": ("24.1", "x", "5.9")}),
+    # A median written as a binary-float artefact, as ONS's workbooks store figures.
     ("North West", "4122", "Book-keepers, payroll managers and wages clerks",
-     {"7": ("24000", "25000.49999999999", "4.8"), "1": ("460", "x", "4.1"),
+     {"7": ("24000.49999999999", "x", "4.8"), "1": ("460", "x", "4.1"),
       "5": ("12.5", "x", "4.4")}),
     ("North West", "2135", "IT business analysts, architects and systems designers",
      {"7": ("x", "x", "x"), "1": ("x", "x", "x"), "5": ("x", "x", "x")}),
+    # SYNTHETIC EXCEPTION: a published annual P90 (and its own CV), which the real Table
+    # 15 (4) never has. It exists only so the floor's mechanism can be tested end to end
+    # (`test_discovery.py`) and a percentile's own CV read (`test_reference_parsers.py`).
     ("Yorkshire and The Humber", "5231", "Vehicle technicians, mechanics and electricians",
      {"7": ("21000", "24000", "8.4"), "1": ("420", "x", "7.0"), "5": ("11.2", "x", "7.3")}),
 ]  # fmt: skip
+P90_EXCEPTION = ("5231", "E12000003")  # the one row above with a published P90
 
 
 def _ashe_table(table: str, *, cv: bool) -> bytes:
