@@ -147,11 +147,11 @@ def _record_claims(pack: Pack, source_id: str) -> list[Claim]:
 
 
 def _copies(
-    pack: Pack, source_id: str, fetcher: Fetcher, pacer: Pacer
+    pack: Pack, source_id: str, fetcher: Fetcher, pacer: Pacer, evidence_dir: Path
 ) -> tuple[list[JobCopy], str]:
     """The path's postings for a page, and how it was read."""
     source = next(s for s in pack.sources if s.source_id == source_id)
-    kept = EVIDENCE_DIR / source_id / f"{source.sha256}.html"
+    kept = evidence_dir / source_id / f"{source.sha256}.html"
     if kept.is_file():
         body = kept.read_bytes()
         if hashlib.sha256(body).hexdigest() != source.sha256:
@@ -165,10 +165,15 @@ def _copies(
 
 
 def read(
-    pack: Pack, *, fetcher: Fetcher | None = None, pacer: Pacer | None = None
+    pack: Pack,
+    *,
+    fetcher: Fetcher | None = None,
+    pacer: Pacer | None = None,
+    evidence_dir: Path = EVIDENCE_DIR,
 ) -> dict[str, object]:
     """One fetcher and one pacer for the whole read, so each host's rate limit holds across
-    its pages (spec section 6) and its robots.txt is read once."""
+    its pages (spec section 6) and its robots.txt is read once. `evidence_dir`: where kept
+    bodies are looked for."""
     fetcher = fetcher or Fetcher(user_agent=load_manifest().user_agent)
     pacer = pacer or Pacer()
     pages: list[dict[str, object]] = []
@@ -180,7 +185,7 @@ def read(
         if source.route.value == "adzuna":
             pages.append({"slot": source.source_id, "read": "not scored: Adzuna labels"})
             continue
-        copies, how = _copies(pack, source.source_id, fetcher, pacer)
+        copies, how = _copies(pack, source.source_id, fetcher, pacer, evidence_dir)
         entry: dict[str, object] = {"slot": source.source_id, "kind": source.kind.value}
         entry["read"] = how
         entry["postings_read"] = len(copies)

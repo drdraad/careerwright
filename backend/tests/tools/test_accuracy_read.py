@@ -3,12 +3,14 @@ against a page's labels, field by field. Values are synthetic."""
 
 from datetime import UTC, date, datetime
 from ipaddress import IPv4Address, IPv6Address
+from pathlib import Path
+from typing import Any
 
 import pytest
 
-from nessa.catalogue.option_pack import load_pack
+from nessa.catalogue.option_pack import Split, load_pack
 from nessa.evidence.acquire import Pacer
-from nessa.evidence.fetcher import Fetcher, HostNotFoundError
+from nessa.evidence.fetcher import Admit, Fetched, Fetcher, FetchFailure, HostNotFoundError
 from nessa.evidence.records import (
     AdvertiserKind,
     DescriptionKind,
@@ -140,11 +142,7 @@ def _no_such_host(host: str, port: int) -> list[IPAddress]:
     raise HostNotFoundError
 
 
-@pytest.mark.req("TEST1-09", "ACQ-06")
-def test_one_read_paces_every_page_of_a_host_to_its_rate_limit() -> None:
-    """The read fetches the excerpt-only development pages again, twelve of them on one
-    job board: each page after a host's first waits that host's rate limit (spec section 6),
-    across the whole read. No request leaves: no name resolves."""
+def _paced() -> tuple[Pacer, list[float]]:
     now = [0.0]
     waits: list[float] = []
 
@@ -152,10 +150,44 @@ def test_one_read_paces_every_page_of_a_host_to_its_rate_limit() -> None:
         waits.append(seconds)
         now[0] += seconds
 
-    pacer = Pacer(clock=lambda: now[0], sleep=sleep)
+    return Pacer(clock=lambda: now[0], sleep=sleep), waits
+
+
+@pytest.mark.req("TEST1-09", "ACQ-06")
+def test_one_read_paces_every_page_of_a_host_to_its_rate_limit(tmp_path: Path) -> None:
+    """With no kept body (`tmp_path`), the read fetches every development page again, twelve
+    of them on one job board: each after that host's first waits its rate limit (spec
+    section 6), across the whole read. No request leaves: no name resolves."""
+    pacer, waits = _paced()
     fetcher = Fetcher(user_agent="NessaL0/test", resolve=_no_such_host)
 
-    read(load_pack(PACK_VERSION), fetcher=fetcher, pacer=pacer)
+    read(load_pack(PACK_VERSION), fetcher=fetcher, pacer=pacer, evidence_dir=tmp_path)
 
-    assert len(waits) >= 11
-    assert set(waits) == {5.0}
+    assert waits == [5.0] * 11
+
+
+class _Recording(Fetcher):
+    """The network edge, recording each page asked for; no name resolves."""
+
+    def __init__(self) -> None:
+        super().__init__(user_agent="NessaL0/test", resolve=_no_such_host)
+        self.asked: list[str] = []
+
+    def fetch_page(self, url: str, admit: Admit | None = None) -> Fetched | FetchFailure:
+        self.asked.append(url)
+        return super().fetch_page(url, admit)
+
+
+@pytest.mark.req("TEST1-09")
+def test_the_read_never_touches_a_holdout_page(tmp_path: Path) -> None:
+    pack = load_pack(PACK_VERSION)
+    holdout = {s.source_id: s.url for s in pack.sources if s.split is Split.HOLDOUT}
+    fetcher = _Recording()
+
+    result = read(pack, fetcher=fetcher, pacer=_paced()[0], evidence_dir=tmp_path)
+
+    pages: Any = result["pages"]
+    assert holdout
+    assert not set(holdout) & {p["slot"] for p in pages}
+    assert len(fetcher.asked) == 17  # the development pages, Adzuna's three left out
+    assert not set(holdout.values()) & set(fetcher.asked)
