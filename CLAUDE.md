@@ -5,6 +5,20 @@ backend; Next.js web app in `apps/web`). Authority order: `Nessa_Product_Specifi
 (v1.2), then `docs/plan/development-plan.md` (v1.0), then `docs/plan/l0-sprint-tasks.md`.
 Decisions live in `docs/adr/`; the latest sprint review is in `docs/reviews/`.
 
+## Talking to the user
+Anything the user reads must be easy: chat replies, review packages, questions, decision
+sheets and reports. Keep their effort as low as you can.
+- Write like a helpful colleague talking: plain everyday words, short sentences, one idea
+  per line.
+- Start with what they need to do or know. Cut everything they don't need.
+- No internal codes (task numbers, ruling, gate, requirement or ADR IDs) unless they need one
+  to act. Put references in a footnote.
+- Explain a technical word in a few plain words the first time, or pick a simpler word.
+- Ask a question in one sentence, and say what "yes" does.
+- Show money in pounds (£2,995), never minor units or JSON.
+- Before sending, reread it as someone who has never seen the code. If a sentence needs
+  our context to make sense, rewrite it.
+
 ## Commands
 Run from the repository root (details: `docs/runbook.md`).
 - Setup: `make setup` (prerequisites, `uv sync --locked` on uv-managed Python 3.12, the
