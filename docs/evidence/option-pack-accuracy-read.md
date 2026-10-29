@@ -17,12 +17,13 @@ outcome. The read was not run again, since fix rounds 1 and 2 allowed no page fe
   Manchester", so the copy's "Manchester" still scores `correct` by the same rule.
 - **The other changes:** J01's new fact and J19's unresolved place leave every scored field as
   it was, and the course and funding pages keep the same number of labelled values.
-- **Fix round 2's re-cut** changed no scored job field: working patterns, durations and rates
-  are not scored. Two course pages changed their counts of labelled values, which the read
-  counts as `missing`.
-  - C03 has one fewer (10), because its lifetime access is now null: the page states no end.
+- **Fix rounds 2 and 3's re-cut** changed no scored job field: working patterns, durations
+  and rates are not scored. One course page changed its count of labelled values, which the
+  read counts as `missing`.
   - C04 has one more (14), because its year of access is now its own fact.
-  - The course total stays 84, and funding stays 28.
+  - C03 keeps 11: its lifetime access is a stated "no end", not a null.
+  - So the committed pack holds 85 labelled course values, one more than the 84 in the table
+    below, which is the read as it was run. Funding stays 28.
 - **How this was checked:** offline, with the scorer's own `job_labels` over the versions of
   the pack.
 

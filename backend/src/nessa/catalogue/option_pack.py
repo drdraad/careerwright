@@ -52,7 +52,7 @@ SCHEMA_PATH = PACKS_DIR / "england-option-pack.schema.json"
 # Every committed version, pinned by the SHA-256 of its file's bytes: a version never
 # changes; a correction or a review is a new version (Task 7c publishes the reviewed one).
 PINS: dict[str, str] = {
-    "0.1.0": "6ee1134b9943a22e3ba251a1433febe58200a9ff5cb0106c1eb3d0688699038f",
+    "0.1.0": "d7ff17d73a9b17b43529b5cbbe4349ef016f7268c4ac4c2a6a53a13f97e6a3d3",
 }
 
 SHA256 = r"^[0-9a-f]{64}$"
@@ -459,17 +459,25 @@ class Instalment(StrictModel):
 class DurationPart(StrictModel):
     """One way of taking it (full time, part time, self-paced) and how long it lasts."""
 
-    unit: Literal["hours", "weeks", "months", "years"]
+    unit: Literal["hours", "weeks", "months", "years"] | None  # null only with no number
     minimum: Annotated[int, Field(ge=1)] | None  # null with a maximum: "up to"
     maximum: Annotated[int, Field(ge=1)] | None
     mode: Literal["full_time", "part_time", "self_paced"] | None
     # True: what is typical ("an average completion time of 6-8 months"), never bounds.
     typical: bool
+    # True: a stated "no end" ("Lifetime access"), never a missing value. A minimum may
+    # still say "at least"; a maximum may not.
+    unbounded: bool
 
     @model_validator(mode="after")
     def _range(self) -> "DurationPart":
-        if self.minimum is None and self.maximum is None:
+        numbers = self.minimum is not None or self.maximum is not None
+        if self.unbounded and self.maximum is not None:
+            raise ValueError("no end, yet a maximum")
+        if not self.unbounded and not numbers:
             raise ValueError("a duration with no length")
+        if numbers and self.unit is None:
+            raise ValueError("a length without its unit")
         if self.minimum is not None and self.maximum is not None and self.maximum < self.minimum:
             raise ValueError("a maximum below its minimum")
         return self

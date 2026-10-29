@@ -144,7 +144,9 @@ def _instalment(value: dict[str, object]) -> str:
 
 def _duration(part: dict[str, object]) -> str:
     low, high, unit = part["minimum"], part["maximum"], part["unit"]
-    if low == high:
+    if part["unbounded"]:
+        length = f"at least {low} {unit}, no end" if low is not None else "no end (lifetime)"
+    elif low == high:
         length = f"{low} {unit}"
     elif low is None:
         length = f"up to {high} {unit}"
@@ -342,7 +344,8 @@ HOW = """\
   "advertised" or "predicted" is the pay basis. "per unstated period" means the source gives
   no period (Adzuna's figures).
 - **Durations** say how the course is taken (full time, part time, self-paced) where the
-  excerpt does. "typically" marks what is typical (an average), never a bound.
+  excerpt does. "typically" marks what is typical (an average), never a bound. "no end"
+  is a length the page states as having none (lifetime access), not an unknown.
 - **Rates** say "not repayable" or "repayable" only where the page says so.
 - **Excerpts** are shown as code, exactly as in the hashed text, with runs of whitespace
   collapsed. So HTML appears as written: `&#163;`, `&pound;` and `&#xA3;` are £, and

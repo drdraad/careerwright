@@ -367,7 +367,16 @@ def test_a_typical_length_a_flexible_pattern_and_an_unknown_repayment_have_their
             "C01.duration",
             "C01",
             "duration",
-            [{"unit": "months", "minimum": 6, "maximum": 8, "mode": None, "typical": True}],
+            [
+                {
+                    "unit": "months",
+                    "minimum": 6,
+                    "maximum": 8,
+                    "mode": None,
+                    "typical": True,
+                    "unbounded": False,
+                }
+            ],
         ),
         claim(
             "C01.pattern", "C01", "working_pattern", {"pattern": "flexible", "hours_per_week": None}
@@ -388,6 +397,36 @@ def test_a_typical_length_a_flexible_pattern_and_an_unknown_repayment_have_their
     data["learning_options"][0]["facts"] = ["C01.duration", "C01.pattern", "C01.grant"]
 
     assert problems(data) == []
+
+
+NO_END = {
+    "unit": None,
+    "minimum": None,
+    "maximum": None,
+    "mode": None,
+    "typical": False,
+    "unbounded": True,
+}
+
+
+@pytest.mark.req("OPTN-10")
+@pytest.mark.parametrize(
+    ("part", "fits"),
+    [
+        (NO_END, True),  # "Lifetime access": a stated value, never null (review R2-1)
+        ({**NO_END, "unit": "months", "minimum": 12}, True),  # at least a year, no end
+        ({**NO_END, "unit": "months", "maximum": 12}, False),  # no end, yet an end
+        ({**NO_END, "unbounded": False}, False),  # neither an end nor "no end"
+        ({k: v for k, v in NO_END.items() if k != "unbounded"}, False),  # unsaid
+    ],
+    ids=["no end", "at least, no end", "an end too", "nothing", "unbounded unsaid"],
+)
+def test_a_duration_says_no_end_in_one_declared_way(part: dict[str, object], fits: bool) -> None:
+    data = minimal()
+    data["claims"].append(claim("C01.access_period", "C01", "access_period", [part]))
+    data["learning_options"][0]["facts"] = ["C01.access_period"]
+
+    assert problems(data) == ([] if fits else ["C01.access_period is not duration"])
 
 
 @pytest.mark.req("OPTN-10")
@@ -547,11 +586,12 @@ def test_the_committed_values_say_typical_repayable_and_not_counted_where_their_
     # "an average completion time of 6-8 months": typical, never bounds; "one year of
     # access": at most 12 months (review N1).
     assert pack.claim("C04.duration").value == [
-        {**months, "minimum": 6, "maximum": 8, "typical": True}
+        {**months, "minimum": 6, "maximum": 8, "typical": True, "unbounded": False}
     ]
     assert pack.claim("C04.access_period").value == [
-        {**months, "minimum": None, "maximum": 12, "typical": False}
+        {**months, "minimum": None, "maximum": 12, "typical": False, "unbounded": False}
     ]
+    assert pack.claim("C03.access_period").value == [NO_END]  # "Lifetime access" (R2-1)
     support: Any = pack.claim("C08.support_grant").value
     assert support["repayable"] is False  # "which they will not need to pay back" (N2)
     pattern: Any = pack.claim("J19.working_pattern").value

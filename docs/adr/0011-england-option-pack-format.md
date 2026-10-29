@@ -2,7 +2,7 @@
 
 - Status: Accepted for Task 7b (Sprints 3–5 corpus items; plan v1.2). Amended in Task 7b
   fix round 1 (2026-10-29): decisions 3, 4, 7 and 9 changed, and 13 and 14 added. Amended
-  again in fix round 2: decisions 2, 3 and 13.
+  again in fix round 2: decisions 2, 3 and 13; and in fix round 3: decisions 3 and 13.
   - **Provisional, need product owner confirmation (R6):** decisions 8 (P02 has no
     records), 9 (conflicting statements stay unresolved, and a bound is the label over a
     point at the same amount), 10 (pack-local skill rows) and 12 (a restrictive copyright
@@ -80,7 +80,9 @@ be precise enough for a person to accept or reject each one with a yes or a no.
          says;
        - J19's working pattern was reduced to its excerpt ("full time, 36 hours");
        - `J01.salary_point`'s count became null (not counted), and `J01.salary`'s note
-         mentions the header again.
+         mentions the header again;
+       - in fix round 3, part of this last re-cut, durations gained a declared "no end"
+         (`unbounded`), and C03's "Lifetime access" took it in place of null.
      - `format_version` still stayed 1, for the same reason.
    - **0.1.0 is frozen from the end of Task 7b.** Any later change, Task 7c's reviewed
      version included, is a new file.
@@ -156,8 +158,9 @@ be precise enough for a person to accept or reject each one with a yes or a no.
       only) allow nothing more.
 13. **Every value has one shape, declared by its field.**
     - **The shapes are boring:** numbers, ISO strings, fixed words or text. A value is never
-      a float, and never a range written as a string. A null value is the page withholding
-      or lacking the value, so it has no shape.
+      a float, and never a range written as a string. A null value means only that the page
+      withholds or lacks the value, so it has no shape. A value the page states is never
+      null: a stated "no end" is a duration with `unbounded: true`.
     - **Claim fields:** each claim field declares its shape (`CLAIM_FIELD_SHAPES`), and a
       field not listed holds text.
     - **Record fields:** each record field declares the shape of the claims it cites
@@ -174,7 +177,7 @@ be precise enough for a person to accept or reject each one with a yes or a no.
     | instalment | `{"currency", "minor_units": int or null, "period", "count": int or null, "at_least": bool}`, with an amount or a count | `Offering.instalment` |
     | date | an ISO date `YYYY-MM-DD` or month `YYYY-MM` | `Offering.intake`, `Offering.application_deadline`, `JobPosting.date_posted`, `FundingInstrument.published_on`, `FundingInstrument.rules_updated_on` |
     | deadline (datetime) | an ISO date, or an ISO datetime with its UTC offset | `JobPosting.valid_through` |
-    | duration | a list of `{"unit": hours, weeks, months or years, "minimum", "maximum", "mode": full_time, part_time, self_paced or null, "typical": bool}`, one per way of taking it; integer ends, either may be null but not both; `typical: true` is what is typical (an average), never bounds | `Offering.duration` (facts: `contract_duration`, `duration_limit`, `access_period`) |
+    | duration | a list of `{"unit": hours, weeks, months, years or null, "minimum", "maximum", "mode": full_time, part_time, self_paced or null, "typical": bool, "unbounded": bool}`, one per way of taking it; integer ends with their unit; `typical: true` is what is typical (an average), never bounds; `unbounded: true` is a stated "no end" ("Lifetime access"), with no maximum and, if no minimum, no unit; otherwise at least one end | `Offering.duration` (facts: `contract_duration`, `duration_limit`, `access_period`) |
     | schedule | `{"pattern": full_time, part_time, flexible or null, "hours_per_week": int or null}`, with at least one | `Offering.schedule` (facts: a posting's `working_pattern`) |
     | place | `{"label", "locality", "region", "postal_code"}`, the label required | `JobPosting.location`, `Offering.location` |
     | level | an RQF level, 0 to 8 | `LearningOption.level` |

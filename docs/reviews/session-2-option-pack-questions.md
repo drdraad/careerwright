@@ -53,7 +53,8 @@ In all: 344 rows, about 86 minutes at 15 seconds a row.
   "advertised" or "predicted" is the pay basis. "per unstated period" means the source gives
   no period (Adzuna's figures).
 - **Durations** say how the course is taken (full time, part time, self-paced) where the
-  excerpt does. "typically" marks what is typical (an average), never a bound.
+  excerpt does. "typically" marks what is typical (an average), never a bound. "no end"
+  is a length the page states as having none (lifetime access), not an unknown.
 - **Rates** say "not repayable" or "repayable" only where the page says so.
 - **Excerpts** are shown as code, exactly as in the hashed text, with runs of whitespace
   collapsed. So HTML appears as written: `&#163;`, `&pound;` and `&#xA3;` are £, and
@@ -193,7 +194,7 @@ Closes H-07 for Sprints 4–5 (the options, offerings, outcomes and funding).
 |---|---|---|---|---|---|
 | Q97 | `option:C03` | credential | no formal qualification | `No formal qualification` (C03.qualification, offsets 110609–110632) | yes / no |
 | Q98 | `option:C03` | assessment | no other assessment | `Apart from this, you do not need to sit for any other assessments.` (C03.assessment, offsets 133685–133751) | yes / no |
-| Q99 | `option:C03` | fact: access_period | unknown (null) | `Lifetime access` (C03.access_period, offsets 110326–110341) | yes / no |
+| Q99 | `option:C03` | fact: access_period | no end (lifetime) | `Lifetime access` (C03.access_period, offsets 110326–110341) | yes / no |
 | Q100 | `option:C03` | fact: stated_purpose | skills to work as a nursing assistant | `will teach you the skills and techniques needed to work as a Nursing Assistant.` (C03.stated_purpose, offsets 2840–2919) | yes / no |
 | Q101 | `offering:C03` | fee_total | £19.00 | `<span class="current-price">&#163;19</span>` (C03.fee_total, offsets 109362–109405) | yes / no |
 | Q102 | `offering:C03` | instalment | unknown: not stated on the page | (no span) | yes / no |

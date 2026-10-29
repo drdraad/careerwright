@@ -1595,14 +1595,21 @@
           "description": "One way of taking it (full time, part time, self-paced) and how long it lasts.",
           "properties": {
             "unit": {
-              "enum": [
-                "hours",
-                "weeks",
-                "months",
-                "years"
+              "anyOf": [
+                {
+                  "enum": [
+                    "hours",
+                    "weeks",
+                    "months",
+                    "years"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
-              "title": "Unit",
-              "type": "string"
+              "title": "Unit"
             },
             "minimum": {
               "anyOf": [
@@ -1647,6 +1654,10 @@
             "typical": {
               "title": "Typical",
               "type": "boolean"
+            },
+            "unbounded": {
+              "title": "Unbounded",
+              "type": "boolean"
             }
           },
           "required": [
@@ -1654,7 +1665,8 @@
             "minimum",
             "maximum",
             "mode",
-            "typical"
+            "typical",
+            "unbounded"
           ],
           "title": "DurationPart",
           "type": "object"

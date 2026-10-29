@@ -55,6 +55,16 @@ def test_the_package_asks_every_entry_gate_and_every_pay_money_or_date_fact() ->
 
 
 @pytest.mark.req("TEST1-09")
+def test_a_stated_no_end_is_shown_as_one_a_reviewer_can_confirm() -> None:
+    # Reproduced in the round 2 package (review R2-1): "Lifetime access" showed "unknown
+    # (null)", a row the reviewer had to answer no.
+    text = review_package(load_pack(PACKAGE_VERSION))
+    [row] = [line for line in text.splitlines() if "(C03.access_period," in line]
+
+    assert "| no end (lifetime) |" in row
+
+
+@pytest.mark.req("TEST1-09")
 def test_the_parts_follow_the_gates_and_keep_each_record_in_one_part() -> None:
     pack = load_pack(PACKAGE_VERSION)
     first, second, third = parts(pack)
