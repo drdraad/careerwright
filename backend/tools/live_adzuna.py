@@ -16,8 +16,9 @@ kept: the summary is counts only (session 1 class 6, reference only). Then the r
 ledger rows this run wrote and the ledger's table are scanned for either credential
 (`tools.leak_scan`); a finding, named by place and credential name only, fails the run.
 
-Caps, enforced before any request under the ledger's exclusive lock: at most
-`REQUESTS_PER_RUN` per invocation and `MAX_SCOPE_REQUESTS` in the `live-adzuna` scope.
+Caps, enforced before any request under the ledger's exclusive lock: the two `QUERIES` per
+invocation, and `MAX_SCOPE_REQUESTS` in the `live-adzuna` scope (`search`, which the corpus
+tool also uses for the option pack's Adzuna slots, Task 7b).
 
 Run from `backend/`: `uv run --locked python -m tools.live_adzuna`.
 """
@@ -26,7 +27,8 @@ import argparse
 import json
 import sys
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -52,7 +54,6 @@ QUERIES = (
     AdzunaQuery(what="data analyst", where="Manchester", page=1, results_per_page=20),
     AdzunaQuery(what="data analyst", where="Manchester", page=2, results_per_page=20),
 )
-REQUESTS_PER_RUN = len(QUERIES)
 MODEL_COLUMN = "adzuna-jobs-api"
 BLOCKED = "blocked: Adzuna credentials not found"
 ID_NAME, KEY_NAME = ADZUNA_ENV  # the `.env` names, the same ones setup reads
@@ -70,14 +71,15 @@ class AdzunaSettings(BaseSettings):
     app_key: SecretStr | None = Field(default=None, validation_alias=KEY_NAME)
 
 
-def _entry(query: AdzunaQuery, result: AcquisitionResult) -> LiveCallEntry:
+def _entry(query: AdzunaQuery, result: AcquisitionResult, purpose: str) -> LiveCallEntry:
     sent = result.status is not AttemptStatus.BLOCKED
     bases = Counter(c.salary.basis.value if c.salary else "none" for c in result.copies)
     kinds = sorted({c.description_kind.value for c in result.copies if c.description_kind})
     return LiveCallEntry(
         budget_scope=SCOPE,
         provider="adzuna",
-        purpose=f"Adzuna search page {query.page} through the acquisition adapter (free tier)",
+        purpose=f"{purpose}Adzuna search page {query.page} through the acquisition adapter "
+        "(free tier)",
         http_requests=1,
         model_id=MODEL_COLUMN,
         is_production_model=False,
@@ -95,23 +97,44 @@ def _entry(query: AdzunaQuery, result: AcquisitionResult) -> LiveCallEntry:
     )
 
 
-def run(
-    settings: AdzunaSettings,
+@dataclass(frozen=True)
+class Searched:
+    """What one capped search did: its results, the ledger rows it wrote, and the leak
+    scan of both (`cells` scanned; each finding names a place and a credential's `.env`
+    name, never the value)."""
+
+    results: list[AcquisitionResult]
+    cells: int
+    findings: list[str]
+
+    @property
+    def holding_a_credential(self) -> int:
+        return len({f.split(":")[0] for f in self.findings if f.startswith("result ")})
+
+
+def missing_credentials(settings: AdzunaSettings, env_file: Path = ENV_FILE) -> dict[str, object]:
+    """The blocked answer: which credential is missing, and the names, never the values, of
+    the Adzuna-named variables `.env` does set (fix round 5, item 4)."""
+    found = {ID_NAME: settings.app_id, KEY_NAME: settings.app_key}
+    return {
+        "status": BLOCKED,
+        "missing": [name for name, value in found.items() if value is None],
+        "adzuna_names_in_env": env_names_containing(env_file, "ADZUNA"),
+    }
+
+
+def search(
+    credentials: tuple[SecretStr, SecretStr],
     ledger: Ledger,
+    queries: Sequence[AdzunaQuery],
     *,
     acquire: Acquire = acquire_adzuna,
     fetcher: Fetcher | None = None,
-    env_file: Path = ENV_FILE,
-) -> dict[str, object]:
-    """The qualification; returns its summary (counts and names only, never a credential)."""
-    if settings.app_id is None or settings.app_key is None:
-        found = {ID_NAME: settings.app_id, KEY_NAME: settings.app_key}
-        return {
-            "status": BLOCKED,
-            "missing": [name for name, value in found.items() if value is None],
-            "adzuna_names_in_env": env_names_containing(env_file, "ADZUNA"),
-        }
-    credentials = (settings.app_id, settings.app_key)
+    purpose: str = "",
+) -> Searched:
+    """The queries through the product's own adapter, within the scope's cap (checked for
+    all of them before any request, under the ledger's exclusive lock), each request
+    ledgered at $0; then the results and the rows written scanned for either credential."""
     for secret in credentials:
         register_secret(secret.get_secret_value())
     used = fetcher or Fetcher(user_agent=load_manifest().user_agent)
@@ -119,19 +142,18 @@ def run(
     rows: list[LiveCallRecord] = []
     with ledger.exclusive():
         spent = ledger.spent(SCOPE).calls
-        if spent + REQUESTS_PER_RUN > MAX_SCOPE_REQUESTS:
+        if spent + len(queries) > MAX_SCOPE_REQUESTS:
             raise SystemExit(
                 f"refused: the {SCOPE} scope has used {spent} of {MAX_SCOPE_REQUESTS} requests"
             )
         pacer = Pacer()
-        for query in QUERIES:
+        for query in queries:
             result = acquire(used, pacer, query, credentials, now=datetime.now(UTC))
-            rows.append(ledger.append(_entry(query, result)))
+            rows.append(ledger.append(_entry(query, result, purpose)))
             results.append(result)
             if result.status is not AttemptStatus.SUCCEEDED:
                 break  # a failed page is recorded; the next would only repeat it
         ledger.write_markdown()
-    copies = [("adzuna", c) for r in results for c in r.copies]
     # Everything the worker would store (claims, URLs, excerpts) is scanned for either
     # credential's value, which Adzuna may echo in a landing link (review A M3), and so is
     # everything this run wrote to the ledger (fix round 5). A finding names its place and
@@ -145,17 +167,32 @@ def run(
         Needle(name, secret.get_secret_value())
         for name, secret in zip((ID_NAME, KEY_NAME), credentials, strict=True)
     ]
-    findings = scan(cells, needles)
-    echoed = len({f.location for f in findings if f.location.startswith("result ")})
+    findings = [f"{f.location}: {f.needle_label}" for f in scan(cells, needles)]
+    return Searched(results, len(cells), findings)
+
+
+def run(
+    settings: AdzunaSettings,
+    ledger: Ledger,
+    *,
+    acquire: Acquire = acquire_adzuna,
+    fetcher: Fetcher | None = None,
+    env_file: Path = ENV_FILE,
+) -> dict[str, object]:
+    """The qualification; returns its summary (counts and names only, never a credential)."""
+    if settings.app_id is None or settings.app_key is None:
+        return missing_credentials(settings, env_file)
+    searched = search(
+        (settings.app_id, settings.app_key), ledger, QUERIES, acquire=acquire, fetcher=fetcher
+    )
+    results = searched.results
+    copies = [("adzuna", c) for r in results for c in r.copies]
     return {
         "status": "complete"
-        if not findings and all(r.status is AttemptStatus.SUCCEEDED for r in results)
+        if not searched.findings and all(r.status is AttemptStatus.SUCCEEDED for r in results)
         else "failed",
-        "results_holding_a_credential": echoed,
-        "leak_scan": {
-            "cells": len(cells),
-            "findings": [f"{f.location}: {f.needle_label}" for f in findings],
-        },
+        "results_holding_a_credential": searched.holding_a_credential,
+        "leak_scan": {"cells": searched.cells, "findings": searched.findings},
         "requests": len(results),
         "outcomes": [
             f"{r.status.value} {r.http_status or ''} {r.reason or ''}".strip() for r in results
