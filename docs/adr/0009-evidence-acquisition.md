@@ -183,7 +183,10 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    and every stored job in its group is one job, so a copy that bridges two (the employer's
    page joining a Leeds board copy and a Manchester snippet) merges them: their copies,
    with their claims, and favourites move to the oldest job and the others are removed
-   (`store.merge_jobs`; migration 0017 lets the worker do it). The count no longer depends
+   (`store.merge_jobs`; migration 0017 lets the worker do it). Recording is serialised per
+   workspace (`pg_advisory_xact_lock`, `store.lock_workspace_records`, from reading the
+   candidates to the merge; fix round 2, review B N2), so a merge never deletes a job
+   another run is recording onto. The count no longer depends
    on arrival order (`test_three_copies_of_one_vacancy_are_one_job_in_every_arrival_order`,
    and a property test of the stored rule against the grouping). An advertiser
    whose name holds a staffing word (`jobs.AGENCY_MARKERS`, provisional) is an agency, and

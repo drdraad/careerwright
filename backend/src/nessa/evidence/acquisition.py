@@ -837,6 +837,9 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
         result = _unavailable(target, rt.clock())
     result = _kept_body_checked(result)
     with run_transaction(rt.engine, run_id) as tx:
+        # One recording at a time per workspace, from reading the candidates to the merge,
+        # so a merge never deletes a job another run is recording onto (review B N2).
+        store.lock_workspace_records(tx, run.workspace_id)
         if run_store.authorised_workspace(tx) != run.workspace_id:
             # Nothing it found is recorded; its attempt is settled, never left pending.
             store.settle_revoked_attempt(tx, attempt_id)

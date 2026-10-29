@@ -469,19 +469,6 @@ def advert_counts(tx: Tx, workspace_id: uuid.UUID) -> AdvertCounts | None:
     )
 
 
-def copy_counts(tx: Tx, attempt_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
-    if not attempt_ids:
-        return {}
-    rows = tx.execute(
-        sa.text(
-            "SELECT attempt_id, count(*) AS n FROM nessa.job_copies "
-            "WHERE attempt_id = ANY(:ids) GROUP BY attempt_id"
-        ),
-        {"ids": attempt_ids},
-    )
-    return {r.attempt_id: int(r.n) for r in rows}
-
-
 # --- documents --------------------------------------------------------------------------
 
 
@@ -557,6 +544,15 @@ def candidate_copies(
         {"ws": workspace_id, "provider": provider, "source_id": source_job_id, "title": title_key},
     )
     return [(r.job_id, r.facts) for r in rows]
+
+
+def lock_workspace_records(tx: Tx, workspace_id: uuid.UUID) -> None:
+    """Hold the workspace's recording lock until the transaction ends: every transaction
+    that reads candidate jobs and records or merges onto them takes it first."""
+    tx.execute(
+        sa.text("SELECT pg_advisory_xact_lock(hashtextextended(CAST(:ws AS text), 7681))"),
+        {"ws": workspace_id},
+    )
 
 
 def merge_jobs(

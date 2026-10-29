@@ -544,6 +544,46 @@ def test_three_copies_of_one_vacancy_are_one_job_in_every_arrival_order(
         assert listing["next_cursor"] is None, order
 
 
+@pytest.mark.req("JOB-02", "DUR-02")
+def test_overlapping_acquisitions_in_one_workspace_lose_no_copy_or_claim(
+    infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker
+) -> None:
+    # Review B N2: three runs at once, each bridging and merging the same vacancy's jobs.
+    # Each URL is distinct (a query) and serves the same page, so none is joined.
+    for path, body in DEDUPE_PAGES.items():
+        sources.routes[path] = Scripted(body=body.encode())
+    orders = list(itertools.permutations(DEDUPE_PAGES))[:3]
+    run_ids = [
+        submit(
+            api,
+            ada,
+            workspace,
+            {"urls": [url(sources, DEDUPE_HOSTS[p], f"{p}?run={n}") for p in order]},
+        ).json()["acquisition"]["run"]["run_id"]
+        for n, order in enumerate(orders)
+    ]
+    for run_id in run_ids:
+        wait_terminal(infra, run_id)
+
+    listing = jobs(api, ada, workspace)
+    attempts = infra.query(
+        "SELECT status FROM nessa.source_attempts WHERE run_id = ANY(%s::uuid[])", (run_ids,)
+    )
+    copies = infra.query(
+        "SELECT c.copy_id, count(s.claim_id) AS claims FROM nessa.job_copies c "
+        "LEFT JOIN nessa.source_claims s ON s.copy_id = c.copy_id "
+        "WHERE c.workspace_id = %s GROUP BY c.copy_id",
+        (workspace,),
+    )
+
+    assert [a["status"] for a in attempts] == ["succeeded"] * 9  # none stranded pending
+    assert listing["total_jobs"] == 1
+    assert len(copies) == 9  # every recorded copy kept
+    assert all(c["claims"] > 0 for c in copies)  # with its claims
+    [job] = listing["items"]
+    assert len(job["copies"]) == 9
+
+
 @pytest.mark.req("JOB-02", "JOB-07")
 def test_a_copy_that_bridges_two_jobs_merges_them_with_their_claims_and_favourites(
     infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker
