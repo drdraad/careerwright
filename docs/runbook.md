@@ -164,7 +164,14 @@ with the browser's Origin unchanged.
   grounded when the search returned it) and what was excluded. Candidates are never
   claims: acquire the ones you choose.
 - Corpus pages (Task 7b): from `backend/`, `uv run --locked python -m tools.corpus --slot
-  <slot> --url <url>` (`corpus/README.md`).
+  <slot> --url <url>`. Add `--locate "<excerpt>"` to place a label's excerpt in the hashed
+  text, or use `--adzuna "<what>" "<where>"` in place of `--url` for one capped, ledgered
+  Adzuna search (`corpus/README.md`). Leave the host's rate limit between runs.
+- The England option pack (ADR 0011): `nessa.catalogue.option_pack.load_pack("0.1.0")`
+  loads the pinned version, and the fast checks validate it. The early accuracy read of its
+  development pages is `uv run --locked python -m tools.accuracy_read [--out <file>]`. It
+  fetches the excerpt-only pages again through the product's fetcher, paced, with no model
+  call. Its result is `docs/evidence/option-pack-accuracy-read.md`.
 - Taxonomy: `GET /v1/taxonomy` (the ESCO release and its attribution), `GET
   /v1/taxonomy/occupations?q=...&match=all|any`, `GET /v1/taxonomy/occupations/{concept_id}`;
   English cities: `GET /v1/places`. A title ESCO lacks: `POST

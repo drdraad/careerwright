@@ -254,7 +254,11 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    on arrival order (`test_three_copies_of_one_vacancy_are_one_job_in_every_arrival_order`,
    and a property test of the stored rule against the grouping). An advertiser
    whose name holds a staffing word (`jobs.AGENCY_MARKERS`, provisional) is an agency, and
-   its copy names no employer: the hiring employer stays undisclosed.
+   its copy names no employer: the hiring employer stays undisclosed. An advertiser counts
+   as advertising on its own site only when the posting's `hiringOrganization` links that
+   site's home page (path empty or `/`). A deeper link, such as a job board's own profile
+   page for the advertiser on the board's host, leaves the kind unknown (Task 7b,
+   reproduced on the option pack's J01 and J12, `pages._home_page_host`).
 
 7. **Freshness on access (FRESH-02..04).** Maximum ages from the last success: jobs 24 h
    (then "awaiting recheck"), fees and intakes 7 d, funding availability 48 h, funding rules

@@ -6,10 +6,25 @@ section 9). It extends the pack's `fixtures/m0/source_corpus_manifest.json` (has
 in `derived_from`) with one slot per required page, intended case types, owners and open
 items.
 
-**Status: not collected (0 of 20 job postings, 0 of 10 course pages, 0 of 3 funding
-pages).** Synthetic personas and generated HTML do not count toward it. The two attempt
-cases are recorded (Task 7A, 2026-10-29): X01, a GOV.UK address that returns 404, and X02, a
-LinkedIn posting the source manifest refuses without a request.
+**Status: collected, labels unreviewed (20 of 20 job postings, 10 of 10 course pages, 3 of
+3 funding pages; Task 7b, 2026-10-29).**
+
+- **Labels:** the labels live in the England option pack 0.1.0
+  (`backend/src/nessa/catalogue/packs/england_option_pack/`, ADR 0011). Each slot's
+  `labels.claims` names its claims there.
+- **Reviews:** label review (H-07, session 2: `docs/reviews/session-2-option-pack-questions.md`)
+  and the rights review of the one page pending (C08) are **not run - requires human**.
+- **Split:** 20 pages are in the development split, 13 in holdout. The early accuracy read
+  of the development pages is `docs/evidence/option-pack-accuracy-read.md`.
+- **Excluded:** synthetic personas and generated HTML do not count toward the corpus.
+- **Attempt cases** (Task 7A, 2026-10-29): X01, a GOV.UK address that returns 404, and X02,
+  a LinkedIn posting the source manifest refuses without a request.
+
+| Owner (consumes the reviewed version) | Slots | Collected | Sources |
+|---|---|---|---|
+| Task 8 (Sprint 3) | J01–J20 | 20 | 9 Reed and 8 NHS Jobs pages (job boards, reference only); 3 Adzuna adverts from one API response |
+| Task 10 (Sprint 4) | C01–C10 | 10 | 6 course-provider or public-sector pages kept privately; 3 Reed pages (reference only); 1 university page pending rights review (C08) |
+| Task 12 (Sprint 5) | F01–F03 | 3 | 2 GOV.UK pages; 1 Department for Education page (Skills for Careers) |
 
 ## What lives where (ruling R3; the session 1 rights policy)
 
@@ -58,6 +73,14 @@ and the short quoted spans that prove each extracted value.
    the body under `var/evidence/corpus/<slot>/` only where the class permits, and prints the
    record: `retrieved_at`, `http_status`, `content_type`, `sha256` of the exact bytes and each
    claim's offsets and excerpt. It never edits this manifest.
+   - Add `--locate "<excerpt>"`, once per labelled excerpt, to get each excerpt's offsets in
+     the hashed text. A run of spaces matches any whitespace, and the tool prints the exact
+     text found. This is the only way to place an excerpt on a page whose body is not kept.
+   - For an Adzuna slot, run `--adzuna "<what>" "<where>"` in place of `--url`. That is one
+     request through `make live-adzuna`'s own capped, ledgered, leak-scanned path.
+   - Each run is one process with its own pacer. Leave at least the host's rate limit
+     (`sources.json`, 5 seconds by default) between runs against the same host: a shell
+     loop of runs does not pace them.
 3. Set `rights_status` from the rights policy above. Name the page's class and the terms
    relied on, quoted and dated: `<class id>: <terms, quoted and dated>` for any class but
    `other`, for example
@@ -79,6 +102,18 @@ Every unresolved access or reviewer need is in `open_items`, each with an owner 
 disposition. The human-only items (OI-07 rights review of pages outside the policy's
 classes, OI-08 label review) are **not run - requires human** (ruling R2). No agent
 records them as passed.
+
+After Task 7b, the items still open:
+
+- **Human gates:** OI-07 (C08's rights) and OI-08 (the H-07 label review).
+- **Corpus gaps and later captures:**
+  - OI-05: no real prompt-injection page was found, so a labelled synthetic page covers
+    the case.
+  - OI-06: J10's second capture is Task 8's.
+  - OI-12: employer careers and applicant-tracking pages the pipeline cannot read.
+  - The case `deferred_grant` was not observed on F03.
+- **Before any push:** OI-13 lists the committed excerpts that hold a person's name.
+- **Unchanged:** OI-10 (the evidence directory's backup).
 
 ## Human rights-review checklist (OI-07)
 
