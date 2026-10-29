@@ -55,7 +55,12 @@ NOT_TEXT = frozenset(
 # not looked at: one can look like a telephone number.
 LINK_KEYS = frozenset({"@context", "@id", "url", "sameAs", "logo", "image", "redirect_url"})
 
-_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
+# An image file extension is never an email's TLD (none is a delegated TLD), so an image
+# named like `logo@2x.png` is a path, not an address (Task 7 slice B, R6-1, controller ruling).
+_NOT_IMAGE_EXTENSION = r"(?!(?i:png|jpe?g|gif|webp|avif|svg|ico|bmp|tiff?)(?![\w-]))"
+_EMAIL = re.compile(
+    rf"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.{_NOT_IMAGE_EXTENSION}[A-Za-z]{{2,}}"
+)
 # The same, as normalised text shows an address that inline markup split: optional whitespace
 # around the "@" and the domain's dots ("jane<span>@</span>recruit.example" reads "jane @
 # recruit.example"). The TLD is letters only, so "£5 @ the door" is no address. A dot with
@@ -66,7 +71,7 @@ _DOT_BEFORE_LABEL = r"(?:\.|\s+\.|\s*\.\s+(?=[a-z0-9]))"
 _DOT_BEFORE_TLD = r"(?:\.|\s+\.|\s*\.\s+(?=[a-z]))"
 _SHOWN_EMAIL = re.compile(
     rf"[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9-]+(?:{_DOT_BEFORE_LABEL}[A-Za-z0-9-]+)*"
-    rf"{_DOT_BEFORE_TLD}[A-Za-z]{{2,}}(?![\w-])"
+    rf"{_DOT_BEFORE_TLD}{_NOT_IMAGE_EXTENSION}[A-Za-z]{{2,}}(?![\w-])"
 )
 # Not preceded by a word character or anything that would put it inside a URL or a number.
 _NOT_INSIDE = r"(?<![\w/=?&#%.+-])"

@@ -197,7 +197,18 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    @GOVUK. Sign up", "Drop in @ 10am. Bring photo ID.") is not taken for an address (fix
    round 5); the spaced form still errs towards removal where the next sentence starts
    lowercase ("Follow us @GOVUK. or email us" reads as an address), so such a body is not
-   kept and those words leave the model's input.
+   kept and those words leave the model's input. An image file extension (png, jpg, jpeg,
+   gif, webp, avif, svg, ico, bmp, tif, tiff, in any case) is never read as an address's
+   TLD, in either pattern (Task 7 slice B, R6-1, controller ruling): before, an image named
+   `logo@2x.png` read as an address, so a JSON-LD `logo` or a percent-encoded `srcset`
+   holding one meant no body (`link_detail`, `attribute_detail`) and a plain `src` had its
+   path rewritten; now each keeps the body and the path
+   (`test_redaction.py::test_an_image_named_at_2x_keeps_the_body_and_its_path`), and a real
+   address at a real TLD is still removed (`jane@png.example`, `a@b.jpg.example`). Still
+   read as an address, fail safe: an image name with another dotted part before its
+   extension that starts with two letters (`logo@2x.retina.png`, a hashed
+   `logo@2x.ab12cd.png`), whose earlier part is taken for the TLD, so such a body is not
+   kept, or the path is rewritten.
 
 5. **Records (spec section 18).** `source_attempts`: every try by any route, blocked and
    failed ones included, written before the request and settled after, a retry naming the

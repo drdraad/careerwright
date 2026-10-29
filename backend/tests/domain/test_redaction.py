@@ -5,7 +5,9 @@ parsed or sealed. Every name, address and number here is synthetic."""
 import base64
 import hashlib
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
+from urllib.parse import quote
 
 import pytest
 from pydantic import SecretStr
@@ -15,7 +17,13 @@ from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_adzuna, acq
 from nessa.evidence.fetcher import Fetcher
 from nessa.evidence.pages import redact_page
 from nessa.evidence.records import AttemptStatus, BodyNotKept, ClaimField, Retention
-from nessa.evidence.redaction import CONTACT_REMOVED, EMAIL_REMOVED, PHONE_REMOVED, redact_text
+from nessa.evidence.redaction import (
+    CONTACT_REMOVED,
+    EMAIL_REMOVED,
+    PHONE_REMOVED,
+    redact_shown,
+    redact_text,
+)
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
 from tests.support.source_server import SYNTHETIC_MARKER, Scripted, source_server
@@ -414,6 +422,69 @@ def test_an_entity_encoded_mailto_link_with_no_visible_address_means_no_body() -
         Retention.EXCERPTS,
         BodyNotKept.ATTRIBUTE_DETAIL,
     )
+
+
+# Task 7 slice B, R6-1 (controller ruling): an image file extension is never an email's TLD,
+# so an iOS-style name such as `logo@2x.png` is a path, not an address, in every place an
+# employer page writes one.
+IMAGE_NAMES = ["logo@2x.png", "hero@3x.webp", "icon@2x.svg", "photo@2x.jpeg", "Badge@2X.PNG"]
+IMAGE_PLACES = {
+    "a JSON-LD logo": lambda name: page_with_block(
+        json.dumps(
+            {
+                **POSTING,
+                "hiringOrganization": {"@type": "Organization", "logo": f"/media/{name}"},
+            }
+        )
+    ),
+    "a percent-encoded srcset": lambda name: page_with_text(
+        f'<img alt="" srcset="/_next/image?url={quote("/media/" + name, safe="")}&amp;w=256 1x">'
+    ),
+    "a plain src": lambda name: page_with_text(f'<img alt="" src="/media/{name}">'),
+    "a plain srcset": lambda name: page_with_text(
+        f'<img alt="" srcset="/media/{name} 2x, /media/small.png 1x">'
+    ),
+}
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize("name", IMAGE_NAMES)
+def test_an_image_file_name_is_never_read_as_an_email_address(name: str) -> None:
+    assert redact_text(f"/media/{name}") == f"/media/{name}"
+    assert redact_shown(f"/media/{name} 2x") == f"/media/{name} 2x"
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize("place", IMAGE_PLACES.values(), ids=IMAGE_PLACES.keys())
+def test_an_image_named_at_2x_keeps_the_body_and_its_path(
+    place: Callable[[str], bytes],
+) -> None:
+    result, kept = _acquire_kept(place("logo@2x.png"))
+
+    assert (result.retention, result.body_not_kept) == (Retention.BODY, None)
+    assert b"logo@2x.png" in kept or b"logo%402x.png" in kept
+    assert EMAIL_REMOVED.encode() not in kept
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize(
+    "email",
+    [
+        "jane@recruit.example",
+        "hr@northwind.co.uk",
+        "jane@png.example",  # an image word as a label, not the TLD
+        "jane@recruit.pngs",  # a TLD that only starts like an extension
+        "a@b.jpg.example",  # an extension inside the domain, not at its end
+    ],
+)
+def test_real_addresses_are_still_removed_beside_the_image_rule(email: str) -> None:
+    assert redact_text(f"Write to {email} today.") == f"Write to {EMAIL_REMOVED} today."
+    assert redact_shown(f"Write to {email} today.") == f"Write to {EMAIL_REMOVED} today."
+
+    result, kept = _acquire_kept(page_with_text(f"Write to {email} today."))
+
+    assert (result.retention, result.body_not_kept) == (Retention.BODY, None)
+    assert email.encode() not in kept
 
 
 def test_a_plain_mailto_link_loses_its_address_and_the_body_is_kept() -> None:
