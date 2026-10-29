@@ -15,8 +15,10 @@
     - decision 8: the question weights, the 80% stop and the twelve initial prompts;
     - decision 10: how a target finds its pack target and ESCO seed.
   - **Not run — requires human:** the domain review of the capability reference (its
-    rubrics, required levels, ESCO crosswalks and gate types). It is not in the session 2
-    package yet (consequences).
+    rubrics, required levels, ESCO crosswalks and gate types). Task 11 put it in the session 2
+    package, with a proposed level for every pack outcome (R1-R58,
+    `docs/reviews/session-2-capability-questions.md`), and these provisional decisions on its
+    decision sheet (D3-D11).
 - Date: 2026-10-29
 - Requirements: MAP1-01–MAP1-08, OUT1-01–OUT1-07, OUT1-11, RDY1-01–RDY1-05, BND1-08,
   ASSESS-01, ASSESS-03–ASSESS-06, READINESS-01–04, TRACE01-06, VERSIONS-04, OPTN-09, PLN-04;
@@ -297,8 +299,8 @@ deterministic code: a model may later propose mappings and answers, never commit
   version (Task 7c) or an accepted assumption gives a level. Task 11's TRACE-01 checker run
   on P01's real option set can check finances; its readiness stays a partial sketch.
 - The capability reference needs the same human review as the pack's labels. Its rubrics,
-  required levels, crosswalks and gate types are proposed for session 2's package (Task 11),
-  whose generator today reads the pack only.
+  required levels, crosswalks and gate types are in session 2's package (Task 11, generated
+  by `tools.session_2_files`).
 - The P01 demo workspace's target has the pack target's title, so it shows the real pack
   matrix (public reference data, as ESCO is), not TRACE-01's synthetic matrix.
 - Ranks do not exist yet: Tasks 11 and 13a must key planning inputs and ranks by
