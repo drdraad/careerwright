@@ -1,11 +1,17 @@
 # ADR 0012: The capability model: matrices, evidence, protected gates, outcomes and readiness
 
-- Status: Accepted for Task 9 (Sprint 4 backend, S4.1–S4.6).
-  - **Provisional, need product owner confirmation (R6):** decisions 3 (how importance is
-    derived, ESCO-only rows unknown, disputed counted as required), 4 (what verifies a
-    protected gate), 5 (what evidence counts towards readiness), 6 (who reviews an assessed
-    result), 8 (the question weights, the 80% stop and the twelve initial prompts) and 10
-    (how a target finds its pack target and ESCO seed).
+- Status: Accepted for Task 9 (Sprint 4 backend, S4.1–S4.6). Amended in fix round 1
+  (2026-10-29): decisions 4, 5, 7, 8, 9 and 10 changed, as marked.
+  - **Provisional, need product owner confirmation (R6):**
+    - decision 3: how importance is derived, ESCO-only rows unknown, disputed counted as
+      required;
+    - decision 4: what verifies a protected gate, and the unmodelled gate for a regulated
+      occupation;
+    - decision 5: what evidence counts towards readiness, "with help" capped at level 1, and
+      a reviewed demonstration below a self-report (review M4, parked);
+    - decision 6: who reviews an assessed result;
+    - decision 8: the question weights, the 80% stop and the twelve initial prompts;
+    - decision 10: how a target finds its pack target and ESCO seed.
   - **Not run — requires human:** the domain review of the capability reference (its
     rubrics, required levels, ESCO crosswalks and gate types). It is not in the session 2
     package yet (consequences).
@@ -85,18 +91,55 @@ deterministic code: a model may later propose mappings and answers, never commit
    conflict gap. A gate is satisfied only when the person states they hold it **and verified
    it at its source** (their own entry on the NMC register; an employer's right to work
    check), recorded as their confirmation (provisional: L0 checks no register). Held but
-   unverified, "don't know" and no answer are unresolved, never ineligible.
+   unverified, "don't know" and no answer are unresolved, never ineligible. A result resting
+   on such a statement is qualified `person_confirmed_verification` (fix round 1, I3).
+
+   **A regulated occupation is never silent** (fix round 1, C1(c); provisional). When ESCO
+   records the target's occupation as regulated and no typed legal-practice or recognition
+   gate models it, the matrix holds an unmodelled protected gate `gate:occupation-regulation`
+   (`modelled: false`): always required, never demoted, not asked, listed as unresolved, and
+   never satisfied by a statement (a statement on it is refused). ESCO flags only 16 of 3,039
+   occupations (nurse and general practitioner among them; bookkeeper, data quality
+   specialist and ICT help desk agent are not), so a regulated UK role ESCO does not flag
+   gets no such gate. Decision 7's `insufficient_coverage` still keeps it from reading
+   ready.
 
 5. **Evidence (provisional).** An answer is about a subject (an ESCO skill, a pack row, a
    gate), so it is shared across targets, but a level counts only against the rubric it was
    chosen for: another target's row with the same subject and another rubric asks for its
    own level and offers the earlier example. Kept apart: the person's own level, a level a
-   reviewed demonstration or assessment showed, and the confidence. Towards readiness: a
-   reviewed demonstration's level (`corroborated`); otherwise the latest self-report with a
-   concrete example and when it was last done (`provisional`); a level with no example stays
-   `unsupported`, self-reported and not false, and counts for nothing. Unsure is unknown,
-   never level 0. Time in a job adds nothing by itself: no field turns duration into a
-   level. AI assistance is kept on every reading.
+   reviewed demonstration or assessment showed, and the confidence.
+
+   **Towards readiness:**
+   - a reviewed demonstration's level, `provisional` and never `corroborated` while L0 has
+     no reviewer: the person enters it, so a result resting on one is qualified
+     `person_confirmed_demonstration` (fix round 1, I3);
+   - otherwise the latest self-report with a concrete example and when it was last done
+     (`provisional`);
+   - a level with no example stays `unsupported`, self-reported and not false, and counts
+     for nothing.
+
+   Time in a job adds nothing by itself: no field turns duration into a level. AI assistance
+   is kept on every reading.
+
+   **The five answers carry their meaning** (fix round 1, I2; spec section 9).
+   - "I have not learned this" and "I understand it but have not tried" are a known level 0:
+     a learn gap, not asked again.
+   - "I am unsure" is unknown, never level 0: an unresolved assumption, listed and not asked
+     again.
+   - These level-free answers hold for the subject under any target's rubric.
+   - An answer that contradicts its level is refused (`VALIDATION_FAILED`,
+     `inconsistent_evidence`), as are the not-yet-done answers above level 0. Migration 0030
+     repeats the rules as CHECKs (`NOT VALID`, so an earlier row is kept as written).
+   - **"I did it with help" is at most level 1 (provisional):** spec section 8's anchors
+     define level 1 as "performs with guidance" and levels 2 to 4 by independence, which is
+     this reading's basis. The anchors do not state the ceiling in so many words.
+
+   **Parked for session 2's decision sheet and the final review (review M4):** a reviewed
+   demonstration below a concrete self-report sets the current level to the demonstration's
+   (a self-report of 3 and a course assessment of 1 give 1, with `conflict: true`). An
+   introductory assessment may show "at least 1" rather than "at most 1". The conflict
+   prompts a clarification, so nothing is lost, but the rule is a choice.
 
 6. **Outcomes (OUT-1).** The pack's planned outcomes load as provider claims with their
    span, evidence kind, confidence, rubric version, claim state and review state. A level on
@@ -131,6 +174,23 @@ deterministic code: a model may later propose mappings and answers, never commit
    matrix is provisional, and proposed records, proposed rubrics, self-reported evidence and
    assumptions are each named (OPTN-09, R9).
 
+   **States keep what is known apart from what is not** (fix round 1, C1(a) and I1; Global
+   Constraint 6):
+
+   | State | When |
+   |---|---|
+   | `insufficient_coverage` | No required row or gate is modelled (no rubric, no typed gate): an unknown target, ESCO seed rows only, or a regulated occupation with only the unmodelled gate. A target-level blocker `no_modelled_requirements` (row ID null). Never ready |
+   | `not_ready` | A known shortfall: below the required level, not held, or a pathway beyond the model |
+   | `not_yet_assessed` | Only unknowns block: no usable evidence, unresolved, or a required row with no rubric |
+   | `conditional_on_assessed_completion` | Met only by a scenario's planned outcomes |
+   | `ready_now_for_modelled_requirements` | Met now |
+
+   `insufficient_coverage` is not the same state as `not_yet_assessed`: the person's answers
+   can settle the second, never the first. A conditional scenario is a partial sketch,
+   qualified `missing_outcome_level`, when a completed offering has an assessed, supported
+   outcome for a required row with no stated level. A topic mention or unassessed practice
+   rules a level out, so it is not "missing" (C06's exam is; C02's topic mention is not).
+
 8. **The question graph (provisional weights).** One graph across the targets, a shared
    subject asked once. Requirements and gates first; then importance (essential 3, disputed
    2, preferred 1) × uncertainty (4 no answer, 3 unsupported, 2 another rubric's answer or a
@@ -138,7 +198,9 @@ deterministic code: a model may later propose mappings and answers, never commit
    are the initial set. Asking is "enough" once every gate is known or marked unresolved and
    at least 80% of the weighted required rows have usable evidence; "stopped" when the
    person stops or pauses, with every open question kept. Coverage is counts, never a
-   percentage.
+   percentage. With no modelled row or gate the state is `insufficient_coverage`, never
+   "enough" (fix round 1). An unsure answer and a gate's "don't know" are not asked again
+   and stay in `unresolved`.
 
 9. **Versions.** A matrix has a `matrix_version` (a digest of its content) and a
    `definition_version` (a digest of its required rows, their levels, rubrics and gate types).
@@ -150,13 +212,25 @@ deterministic code: a model may later propose mappings and answers, never commit
    gap depends only on its own row's subject and names the records it rests on, so an
    evidence change alters only the gaps it affects.
 
+   **Labels on every result** (fix round 1, I4 and M8). The pack's date and each record's
+   review state reach every derived result: the question graph's envelope carries the pack
+   and reference labels; prompt rows, readiness rows and gaps carry their row's review
+   state; candidate options carry their `as_of` date. Every capability response carries the
+   workspace's `synthetic` and `data_mode`. A synthetic workspace's matrices, readiness and
+   questions say `synthetic: true`.
+
 10. **Persistence and the API (provisional matching).** Migration 0029: `capability_states`
     and the append-only `skill_evidence`, `requirement_statements` and `matrix_edits`, under
     row-level security, their CHECKs repeating the domain rules. Nothing derived is stored:
     matrices, questions and readiness are computed on read from the profile's targets. A
-    target's pack target is the one with the same title (case and punctuation folded); its
-    ESCO seed is the occupation ESCO labels with exactly that title, otherwise the pack
-    target's crosswalk; otherwise none, with the reason. Endpoints under
+    target's pack target is the one with the same title (case and punctuation folded), or
+    else the one pack target whose crosswalk names the target's ESCO occupation (fix round
+    1, C1(b)). Choosing an occupation in the product stores ESCO's preferred label ("nurse
+    responsible for general care"), and the second route brings it to the pack's rows and
+    the NMC gate. Several such pack targets are never guessed between. The match is recorded
+    as `pack_target.basis`. The ESCO seed is the occupation ESCO labels with exactly that
+    title, otherwise the pack target's crosswalk; otherwise none, with the reason. Migration
+    0030 adds the answer CHECKs (decision 5). Endpoints under
     `/v1/workspaces/{id}/capability`: `GET matrices`, `GET questions`, `GET readiness`,
     `POST evidence`, `POST statements`, `POST edits`, `PUT questions/state`, each write with
     an expected version and an Idempotency-Key, returning the new version.
