@@ -14,6 +14,7 @@ import signal
 import threading
 import time
 import uuid
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from types import FrameType
 
@@ -48,17 +49,39 @@ def dbos_config(system_database_url: str) -> DBOSConfig:
     }
 
 
-def dispatch_outbox(engine: Engine) -> int:
+# A workflow by its outbox name: the model run's here; other modules' are composed in
+# `nessa.worker` (identity imports no other module).
+Workflows = Mapping[str, Callable[[str], object]]
+MODEL_WORKFLOWS: Workflows = {run_store.MODEL_RUN_WORKFLOW: workflow.model_run_workflow}
+
+
+def dispatch_outbox(engine: Engine, workflows: Workflows = MODEL_WORKFLOWS) -> int:
     with system_transaction(engine) as tx:
         entries = run_store.pending_outbox(tx)
-    for outbox_id, workflow_id, run_id in entries:
+    for outbox_id, workflow_id, run_id, name in entries:
         # The workflow ID is the idempotency key: replaying an entry that was started but not
         # marked dispatched returns the existing workflow instead of starting another.
         with SetWorkflowID(workflow_id):
-            DBOS.start_workflow(workflow.model_run_workflow, str(run_id))
+            DBOS.start_workflow(workflows[name], str(run_id))
         with system_transaction(engine) as tx:
             run_store.mark_dispatched(tx, outbox_id)
     return len(entries)
+
+
+def act_on_cancellations(engine: Engine, runtime: ActivityRuntime) -> int:
+    """DUR-05: cancel each requested run's DBOS workflow, so no further step (model call or
+    fetch) starts, then publish the run `cancelled`. A step already under way finishes and
+    its attempt is settled as usual (a sent request may have been billed); its result is
+    kept but the run stays cancelled. A run cancelled before dispatch is never started."""
+    with system_transaction(engine) as tx:
+        pending = run_store.pending_cancellations(tx)
+    for run_id, workflow_id, dispatched in pending:
+        if dispatched:
+            DBOS.cancel_workflow(workflow_id)
+        activity.publish(runtime, run_id, activity.cancelled())
+        with system_transaction(engine) as tx:
+            run_store.mark_cancellation_signalled(tx, run_id)
+    return len(pending)
 
 
 def reconcile_errored_runs(runtime: ActivityRuntime) -> int:
@@ -67,7 +90,10 @@ def reconcile_errored_runs(runtime: ActivityRuntime) -> int:
     and a run whose output was accepted ends complete with it (`activity.reconcile`). Runs
     already terminal cost one lookup each: errored workflows are rare and never re-run."""
     errored = DBOS.list_workflows(
-        status="ERROR", name=workflow.WORKFLOW_NAME, load_input=False, load_output=False
+        status="ERROR",
+        name=[run_store.MODEL_RUN_WORKFLOW, run_store.ACQUISITION_WORKFLOW],
+        load_input=False,
+        load_output=False,
     )
     return sum(
         activity.reconcile(runtime, uuid.UUID(status.workflow_id.removeprefix("nessa-run-")))
@@ -87,12 +113,19 @@ def check() -> int:
     return 0 if age < HEARTBEAT_STALE_S else 1
 
 
-def loop_pass(engine: Engine, runtime: ActivityRuntime, *, next_reconcile: float) -> float:
+def loop_pass(
+    engine: Engine,
+    runtime: ActivityRuntime,
+    *,
+    next_reconcile: float,
+    workflows: Workflows = MODEL_WORKFLOWS,
+) -> float:
     """One pass of the worker loop; returns when reconciliation is next due. A failure is
     logged by class and the outbox retried next pass; reconciliation waits its interval even
-    after a failed pass, so it never spins."""
+    after a failed pass, so it never spins. Cancellations are acted on before dispatch."""
     try:
-        dispatch_outbox(engine)
+        act_on_cancellations(engine, runtime)
+        dispatch_outbox(engine, workflows)
         if time.monotonic() >= next_reconcile:
             next_reconcile = time.monotonic() + RECONCILE_INTERVAL_S
             reconcile_errored_runs(runtime)
@@ -102,7 +135,12 @@ def loop_pass(engine: Engine, runtime: ActivityRuntime, *, next_reconcile: float
     return next_reconcile
 
 
-def run(engine: Engine, runtime: ActivityRuntime, system_database_url: str) -> None:
+def run(
+    engine: Engine,
+    runtime: ActivityRuntime,
+    system_database_url: str,
+    workflows: Workflows = MODEL_WORKFLOWS,
+) -> None:
     """Launch DBOS, loop until SIGTERM/SIGINT, then shut down within the deadline."""
     workflow.configure(runtime)
     DBOS(config=dbos_config(system_database_url))
@@ -117,7 +155,9 @@ def run(engine: Engine, runtime: ActivityRuntime, system_database_url: str) -> N
     _log.info("worker ready", extra={"application_version": APPLICATION_VERSION})
     next_reconcile = 0.0
     while not stop.is_set():
-        next_reconcile = loop_pass(engine, runtime, next_reconcile=next_reconcile)
+        next_reconcile = loop_pass(
+            engine, runtime, next_reconcile=next_reconcile, workflows=workflows
+        )
         stop.wait(DISPATCH_INTERVAL_S)
     _log.info("worker stopping")
     watchdog = threading.Timer(SHUTDOWN_DEADLINE_S, os._exit, args=(EXIT_SHUTDOWN_TIMEOUT,))

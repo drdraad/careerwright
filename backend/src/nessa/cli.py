@@ -27,6 +27,8 @@ from nessa.catalogue.esco import ESCO_RELEASE, ReleasePin, parse_release, read_v
 from nessa.catalogue.taxonomy import import_release, is_held
 from nessa.config import OpsSettings
 from nessa.db import Tx, create_engine, url_with_password
+from nessa.evidence import store as evidence_store
+from nessa.evidence.acquisition import document_context
 from nessa.identity import credential_store, run_store
 from nessa.identity import store as identity_store
 from nessa.identity.credentials import credential_context
@@ -135,6 +137,14 @@ def reseal(engine: sa.Engine, keyring: Keyring) -> dict[str, int]:
                 run_store.all_sealed_partials(tx),
                 partial_context,
                 lambda record_id, sealed: run_store.replace_sealed_partial(tx, record_id, sealed),
+            ),
+            "source_documents": _reseal_rows(
+                keyring,
+                evidence_store.all_sealed_documents(tx),
+                document_context,
+                lambda record_id, sealed: evidence_store.replace_sealed_document(
+                    tx, record_id, sealed
+                ),
             ),
         }
         stale = _tables_on_old_versions(tx, keyring.current_version)

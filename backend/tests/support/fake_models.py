@@ -24,7 +24,14 @@ from typing import Any
 
 from pydantic import SecretStr
 from pydantic_ai.exceptions import ModelConnectionError, ModelHTTPError
-from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, UserPromptPart
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelResponse,
+    NativeToolCallPart,
+    NativeToolReturnPart,
+    TextPart,
+    UserPromptPart,
+)
 from pydantic_ai.models import Model, StreamedResponse
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RequestUsage
@@ -104,6 +111,42 @@ def discovery_answer(
         ],
         "hypotheses": [{"title": f"{sentinel} orbital gardener".strip(), "based_on": texts[:1]}],
     }
+
+
+SEARCH_MARKER = "Search request (JSON):\n"
+SEARCHED = "https://careers.northwind.example/jobs/1"
+
+
+def _search_request(messages: list[ModelMessage]) -> dict[str, object] | None:
+    for message in messages:
+        for part in getattr(message, "parts", ()):
+            content = part.content if isinstance(part, UserPromptPart) else None
+            if isinstance(content, str) and content.startswith(SEARCH_MARKER):
+                loaded: dict[str, object] = json.loads(content[len(SEARCH_MARKER) :])
+                return loaded
+    return None
+
+
+def search_parts(request: dict[str, object], sentinel: str) -> list[Any]:
+    """One search returning one page, and three candidates: that page (grounded), a page the
+    search never returned, and a source the manifest denies."""
+    query = f"{request['role']} jobs {request['city']}"
+    candidates = [
+        {"url": SEARCHED, "title": f"{request['role']} {sentinel}".strip()},
+        {"url": "https://jobs.board.example/ad/9", "title": "Not returned by the search"},
+        {"url": "https://www.linkedin.com/jobs/view/1", "title": "Behind a sign-in"},
+    ]
+    return [
+        NativeToolCallPart(
+            tool_name="web_search", tool_call_id="ws_1", args={"type": "search", "query": query}
+        ),
+        NativeToolReturnPart(
+            tool_name="web_search",
+            tool_call_id="ws_1",
+            content={"status": "completed", "sources": [{"type": "url", "url": SEARCHED}]},
+        ),
+        TextPart(json.dumps({"candidates": candidates})),
+    ]
 
 
 EXPLANATION_MARKER = "Explanation context (JSON):\n"
@@ -304,6 +347,11 @@ def fake_model_builder(
             context = _context(messages)
             found = _discovery_context(messages)
             explaining = _explanation_context(messages)
+            searching = _search_request(messages)
+            if searching is not None:
+                return ModelResponse(
+                    parts=search_parts(searching, output_sentinel), model_name=FAKE_MODEL_NAME
+                )
             invalid = failure in (
                 FakeFailure.INVALID_ALWAYS,
                 FakeFailure.INVALID_THEN_UNAVAILABLE,

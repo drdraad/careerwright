@@ -70,6 +70,9 @@ ADAPTERS: dict[str, frozenset[str]] = {
     # Evidence and acquisition (Task 7, ADR 0009): the guarded HTTP client and the parser.
     "nessa.evidence.fetcher": frozenset({"httpcore2", "certifi"}),
     "nessa.evidence.pages": frozenset({"scrapling"}),
+    "nessa.evidence.store": frozenset({"sqlalchemy"}),
+    "nessa.evidence.workflow": frozenset({"dbos"}),
+    "nessa.evidence.search_agent": frozenset({"pydantic_ai"}),
     "nessa.api.": frozenset({"fastapi", "starlette", "anyio"}),
 }
 EXCLUDED_PACKAGES = frozenset(
@@ -296,6 +299,51 @@ def test_the_javascript_lockfiles_hold_none_of_the_excluded_technologies(lock: s
 
     assert len(names) > 0, f"{lock} has no packages: the reader is broken"
     assert excluded == set()
+
+
+def import_closure(root: str) -> tuple[set[str], set[str]]:
+    """(Nessa modules, vendor packages) that `root` imports, transitively."""
+    known = modules()
+    seen: set[str] = set()
+    vendors: set[str] = set()
+    pending = [root]
+    while pending:
+        name = pending.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        found = imports(name, known[name])
+        vendors |= {target.split(".")[0] for target in found} & VENDORS
+        pending.extend(t for t in found if t in known and t not in seen)
+    return seen, vendors
+
+
+@pytest.mark.req("ACQ-05")
+def test_the_acquisition_worker_cannot_reach_a_database_key_model_or_profile() -> None:
+    # Global Constraint 8: the restricted acquisition worker holds no user secret, model key,
+    # master key or private profile store. Its code cannot even reach one.
+    reached, vendors = import_closure("nessa.acquisition")
+
+    assert vendors <= {"httpcore2", "certifi", "scrapling"}
+    forbidden = [
+        m
+        for m in reached
+        if m in ("nessa.db", "nessa.identity.keyring", "nessa.identity.meta", "nessa.worker")
+        or m.startswith(("nessa.profile", "nessa.identity.credential", "nessa.api"))
+        or m.endswith("store")
+    ]
+    assert forbidden == []
+
+
+@pytest.mark.req("ACQ-05")
+def test_the_acquisition_worker_has_no_setting_for_a_database_key_or_model() -> None:
+    from nessa.acquisition import AcquisitionSettings
+
+    assert set(AcquisitionSettings.model_fields) == {
+        "environment",
+        "port",
+        "adzuna_credentials_dir",
+    }
 
 
 def published_ports(path: Path) -> list[str]:

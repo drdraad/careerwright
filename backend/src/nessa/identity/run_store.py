@@ -19,9 +19,13 @@ from nessa.identity.spend import SpendState
 from nessa.vocabulary import DataMode, WorkState
 
 _RUN_COLUMNS = (
-    "run_id, workspace_id, kind, data_mode, synthetic, requested_by, model_id, model_mode, "
-    "status, failure_class, output_id, created_at, started_at, finished_at, profile_version"
+    "r.run_id, r.workspace_id, r.kind, r.data_mode, r.synthetic, r.requested_by, r.model_id, "
+    "r.model_mode, r.status, r.failure_class, r.output_id, r.created_at, r.started_at, "
+    "r.finished_at, r.profile_version, c.requested_at AS cancel_requested_at"
 )
+_RUNS = "nessa.runs r LEFT JOIN nessa.run_cancellations c ON c.run_id = r.run_id"
+MODEL_RUN_WORKFLOW = "nessa.model_run"
+ACQUISITION_WORKFLOW = "nessa.acquisition_run"
 _ATTEMPT_COLUMNS = (
     "attempt_id, model_id, started_at, finished_at, outcome, spend_state, reserved_nano_usd, "
     "cost_nano_usd, input_tokens, cached_input_tokens, output_tokens, reasoning_tokens, "
@@ -51,12 +55,20 @@ def _run(row: sa.RowMapping) -> Run:
         started_at=row["started_at"],
         finished_at=row["finished_at"],
         profile_version=row["profile_version"],
+        cancel_requested_at=row["cancel_requested_at"],
     )
 
 
-def insert_run(tx: Tx, run: Run, workflow_id: str, sealed_input: SealedValue | None) -> None:
-    """The run, its sealed input (if it has one) and its outbox entry, in the caller's
-    transaction (transactional outbox)."""
+def insert_run(
+    tx: Tx,
+    run: Run,
+    workflow_id: str,
+    sealed_input: SealedValue | None,
+    *,
+    workflow_name: str = MODEL_RUN_WORKFLOW,
+) -> None:
+    """The run, its sealed input (if it has one) and its outbox entry naming the workflow
+    that executes it, in the caller's transaction (transactional outbox)."""
     tx.execute(
         sa.text(
             "INSERT INTO nessa.runs (run_id, workspace_id, data_mode, synthetic, kind, "
@@ -91,10 +103,10 @@ def insert_run(tx: Tx, run: Run, workflow_id: str, sealed_input: SealedValue | N
         )
     tx.execute(
         sa.text(
-            "INSERT INTO nessa.outbox (workspace_id, run_id, workflow_id) "
-            "VALUES (:ws, :id, :workflow)"
+            "INSERT INTO nessa.outbox (workspace_id, run_id, workflow_id, workflow_name) "
+            "VALUES (:ws, :id, :workflow, :name)"
         ),
-        {"ws": run.workspace_id, "id": run.run_id, "workflow": workflow_id},
+        {"ws": run.workspace_id, "id": run.run_id, "workflow": workflow_id, "name": workflow_name},
     )
 
 
@@ -230,8 +242,8 @@ def run(tx: Tx, run_id: uuid.UUID, *, lock: bool = False) -> Run | None:
     row = (
         tx.execute(
             sa.text(
-                f"SELECT {_RUN_COLUMNS} FROM nessa.runs WHERE run_id = :id"
-                + (" FOR UPDATE" if lock else "")
+                f"SELECT {_RUN_COLUMNS} FROM {_RUNS} WHERE r.run_id = :id"
+                + (" FOR UPDATE OF r" if lock else "")
             ),
             {"id": run_id},
         )
@@ -250,12 +262,12 @@ def runs(
     kind: RunKind | None = None,
 ) -> list[Run]:
     """Newest first; only runs of `kind`, if given."""
-    cursor = "AND (created_at, run_id) < (:at, :rid) " if before else ""
-    of_kind = "AND kind = :kind " if kind else ""
+    cursor = "AND (r.created_at, r.run_id) < (:at, :rid) " if before else ""
+    of_kind = "AND r.kind = :kind " if kind else ""
     rows = tx.execute(
         sa.text(
-            f"SELECT {_RUN_COLUMNS} FROM nessa.runs WHERE workspace_id = :ws "
-            f"{cursor}{of_kind}ORDER BY created_at DESC, run_id DESC LIMIT :limit"
+            f"SELECT {_RUN_COLUMNS} FROM {_RUNS} WHERE r.workspace_id = :ws "
+            f"{cursor}{of_kind}ORDER BY r.created_at DESC, r.run_id DESC LIMIT :limit"
         ),
         {
             "ws": workspace_id,
@@ -523,15 +535,53 @@ def period_spend(tx: Tx, workspace_id: uuid.UUID, period: date) -> tuple[int, in
     return int(row.committed), int(row.unknown)
 
 
-def pending_outbox(tx: Tx, limit: int = 50) -> list[tuple[int, str, uuid.UUID]]:
+def pending_outbox(tx: Tx, limit: int = 50) -> list[tuple[int, str, uuid.UUID, str]]:
+    """(outbox ID, workflow ID, run ID, workflow name) of entries not yet dispatched. A run
+    cancelled before dispatch is never started."""
     rows = tx.execute(
         sa.text(
-            "SELECT outbox_id, workflow_id, run_id FROM nessa.outbox WHERE dispatched_at IS NULL "
-            "ORDER BY outbox_id LIMIT :limit"
+            "SELECT o.outbox_id, o.workflow_id, o.run_id, o.workflow_name FROM nessa.outbox o "
+            "WHERE o.dispatched_at IS NULL AND NOT EXISTS "
+            "(SELECT 1 FROM nessa.run_cancellations c WHERE c.run_id = o.run_id) "
+            "ORDER BY o.outbox_id LIMIT :limit"
         ),
         {"limit": limit},
     )
-    return [(r.outbox_id, r.workflow_id, r.run_id) for r in rows]
+    return [(r.outbox_id, r.workflow_id, r.run_id, r.workflow_name) for r in rows]
+
+
+def request_cancellation(tx: Tx, run: Run, requested_by: uuid.UUID) -> bool:
+    """API: record the request once; returns whether this call recorded it."""
+    inserted = tx.execute(
+        sa.text(
+            "INSERT INTO nessa.run_cancellations (run_id, workspace_id, requested_by) "
+            "VALUES (:run, :ws, :by) ON CONFLICT (run_id) DO NOTHING"
+        ),
+        {"run": run.run_id, "ws": run.workspace_id, "by": requested_by},
+    )
+    return inserted.rowcount == 1
+
+
+def pending_cancellations(tx: Tx, limit: int = 50) -> list[tuple[uuid.UUID, str, bool]]:
+    """Worker, unscoped: (run ID, workflow ID, dispatched) of requests not yet acted on."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT c.run_id, o.workflow_id, o.dispatched_at IS NOT NULL AS dispatched "
+            "FROM nessa.run_cancellations c JOIN nessa.outbox o ON o.run_id = c.run_id "
+            "WHERE c.signalled_at IS NULL ORDER BY c.requested_at LIMIT :limit"
+        ),
+        {"limit": limit},
+    )
+    return [(r.run_id, r.workflow_id, r.dispatched) for r in rows]
+
+
+def mark_cancellation_signalled(tx: Tx, run_id: uuid.UUID) -> None:
+    tx.execute(
+        sa.text(
+            "UPDATE nessa.run_cancellations SET signalled_at = clock_timestamp() WHERE run_id = :id"
+        ),
+        {"id": run_id},
+    )
 
 
 def mark_dispatched(tx: Tx, outbox_id: int) -> None:

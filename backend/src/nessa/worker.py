@@ -17,7 +17,11 @@ from pydantic_ai.models import Model
 
 from nessa.config import WorkerSettings
 from nessa.db import create_engine, url_with_password
-from nessa.identity import connection_check, worker
+from nessa.evidence import workflow as acquisition_workflow
+from nessa.evidence.acquisition import AcquisitionRuntime
+from nessa.evidence.search_agent import SOURCE_SEARCH_TASK
+from nessa.evidence.service_client import HttpAcquisitionClient
+from nessa.identity import connection_check, run_store, worker, workflow
 from nessa.identity.activity import CONNECTION_CHECK_TASK, ActivityRuntime, ModelBuilder, RunTask
 from nessa.identity.keyring import load_keyring
 from nessa.identity.meta import meta_model
@@ -40,6 +44,12 @@ TASKS: Mapping[RunKind, RunTask] = {
     RunKind.INTERVIEW_TURN: INTERVIEW_TURN_TASK,
     RunKind.DISCOVERY: DISCOVERY_TASK,
     RunKind.SLATE_EXPLANATION: SLATE_EXPLANATION_TASK,
+    RunKind.SOURCE_SEARCH: SOURCE_SEARCH_TASK,
+}
+# Each run's workflow, by the name its outbox entry carries.
+WORKFLOWS: worker.Workflows = {
+    run_store.MODEL_RUN_WORKFLOW: workflow.model_run_workflow,
+    run_store.ACQUISITION_WORKFLOW: acquisition_workflow.acquisition_workflow,
 }
 # The deterministic stand-ins for demo workspaces, by model ID.
 FIXTURE_MODELS: Mapping[str, Callable[[], Model]] = {
@@ -101,7 +111,10 @@ def main() -> None:
         clock=_utc_now,
         tasks=TASKS,
     )
-    worker.run(engine, runtime, url_with_password(settings.dbos_database))
+    acquisition_workflow.configure(
+        AcquisitionRuntime(runtime, HttpAcquisitionClient(settings.acquisition_url))
+    )
+    worker.run(engine, runtime, url_with_password(settings.dbos_database), WORKFLOWS)
 
 
 if __name__ == "__main__":

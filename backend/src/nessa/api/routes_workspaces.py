@@ -56,7 +56,9 @@ def create(
     body: CreateWorkspace, caller: CallerDep, deps: Deps, key: IdempotencyKey
 ) -> JSONResponse:
     def execute(tx: Tx) -> CommandResult:
-        workspace = create_workspace(tx, caller.actor, body)
+        workspace = create_workspace(
+            tx, caller.actor, body, adzuna_configured=deps.settings.adzuna_configured
+        )
         return CommandResult(
             201, WorkspaceOut.of(workspace).model_dump(mode="json"), workspace.workspace_id
         )

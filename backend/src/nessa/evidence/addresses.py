@@ -106,6 +106,28 @@ def _name(host: str) -> str | IPAddress | UrlRefusal:
     return ascii_host
 
 
+def apply_link(raw: object) -> str | None:
+    """A link a source gives for viewing or applying to a vacancy, if it is safe to keep and
+    later show: an `https` URL with a host, after surrounding space is removed. Anything else
+    (`javascript:`, `data:`, other schemes in any letter case, scheme-relative or hostless
+    URLs, or text that does not parse) is no link at all, so it never becomes a claim. The
+    one check for every source of such a link (pages, Adzuna); pages are untrusted data."""
+    if not isinstance(raw, str):
+        return None
+    link = raw.strip()
+    if len(link) > MAX_URL_CHARS or any(ch.isspace() or ord(ch) < 0x20 for ch in link):
+        return None
+    try:
+        parts = urlsplit(link)
+        host = parts.hostname
+        parts.port  # noqa: B018 - a malformed port fails here
+    except ValueError:
+        return None
+    if parts.scheme.lower() != "https" or not host or "@" in parts.netloc:
+        return None
+    return link
+
+
 def check_url(
     raw: str, *, allowed_ports: frozenset[int] = ALLOWED_PORTS
 ) -> CheckedUrl | UrlRefusal:

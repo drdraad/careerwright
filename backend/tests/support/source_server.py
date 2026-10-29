@@ -65,7 +65,11 @@ def source_server(routes: dict[str, Scripted] | None = None) -> Iterator[SourceS
             state.seen.append(
                 Seen(self.path, self.headers.get("Host"), self.headers.get("User-Agent"))
             )
-            script = state.routes.get(self.path, Scripted(404, body=b"not found"))
+            # An exact path (with its query) first, else the path alone (an API's query).
+            script = state.routes.get(
+                self.path,
+                state.routes.get(self.path.partition("?")[0], Scripted(404, body=b"not found")),
+            )
             if script.delay_s:
                 time.sleep(script.delay_s)
             self.send_response(script.status)

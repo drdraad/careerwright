@@ -24,6 +24,7 @@ from urllib.parse import urlsplit
 
 from scrapling.parser import Selector
 
+from nessa.evidence.addresses import apply_link
 from nessa.evidence.amounts import minor_units
 from nessa.evidence.jobs import advertiser_kind, description_fingerprints, title_key
 from nessa.evidence.records import (
@@ -34,8 +35,8 @@ from nessa.evidence.records import (
     JobCopy,
     Location,
     PayBasis,
-    PayPeriod,
     Salary,
+    SalaryPeriod,
     SourceSpan,
     ValidationState,
     WorkMode,
@@ -45,7 +46,7 @@ EXCERPT_CHARS = 200
 _DECODER = json.JSONDecoder()
 _COLON = re.compile(r"\s*:\s*")
 _DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
-_PERIODS = {p.value.upper(): p for p in PayPeriod}
+_PERIODS = {p.value.upper(): p for p in SalaryPeriod}
 _MISSING = object()
 
 
@@ -343,9 +344,11 @@ def _copy(posting: dict[str, Any], claims: _Claims, page_host: str | None) -> Jo
         fingerprint, lead = description_fingerprints(_plain(description))
         claims.add(ClaimField.DESCRIPTION, DescriptionKind.FULL.value, "description", description)
 
-    apply_url = posting.get("url") if isinstance(posting.get("url"), str) else None
+    # Untrusted: only a plain https link is kept (`addresses.apply_link`); anything else is
+    # no claim at all.
+    apply_url = apply_link(posting.get("url"))
     if apply_url is not None:
-        claims.add(ClaimField.APPLY_URL, apply_url, "url", apply_url)
+        claims.add(ClaimField.APPLY_URL, apply_url, "url", posting["url"])
 
     return JobCopy(
         source_job_id=source_job_id,

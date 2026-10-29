@@ -14,7 +14,7 @@ from nessa.evidence.records import (
     ClaimField,
     DescriptionKind,
     PayBasis,
-    PayPeriod,
+    SalaryPeriod,
     ValidationState,
 )
 from tests.support.source_server import SYNTHETIC_MARKER
@@ -91,7 +91,7 @@ def test_a_json_ld_job_posting_becomes_a_job_copy_with_every_value_typed() -> No
     assert job.salary is not None
     assert job.salary.minimum_minor_units == 3_200_000
     assert job.salary.maximum_minor_units == 3_650_050  # exact pence, never a float
-    assert job.salary.period is PayPeriod.YEAR
+    assert job.salary.period is SalaryPeriod.YEAR
     assert job.salary.basis is PayBasis.ADVERTISED
     assert parsed.hiring_hosts == ("northwind.example",)
 
@@ -227,6 +227,37 @@ def test_a_page_without_structured_data_yields_no_posting_and_says_so() -> None:
 
     assert parsed.postings == []
     assert parsed.issues == ["no_structured_job_posting"]
+
+
+UNSAFE_LINKS = [
+    "javascript:alert(document.cookie)",
+    "JaVaScRiPt:alert(1)",
+    "  javascript:alert(1)",
+    "data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==",
+    "https:///apply",  # no host
+    "http://careers.northwind.example/apply/7781",  # only https links are kept
+    "//careers.northwind.example/apply",
+    "https://[::1",  # does not parse
+]
+
+
+@pytest.mark.req("ACQ-04")
+@pytest.mark.parametrize("link", UNSAFE_LINKS)
+def test_an_apply_link_that_is_not_plain_https_is_no_claim_at_all(link: str) -> None:
+    [job] = parse(page({**POSTING, "url": link})).postings
+
+    assert job.apply_url is None
+    assert ClaimField.APPLY_URL not in {c.field for c in job.claims}
+
+
+@pytest.mark.req("ACQ-04")
+def test_a_valid_https_apply_link_is_kept_without_its_surrounding_space() -> None:
+    [job] = parse(
+        page({**POSTING, "url": "  https://careers.northwind.example/apply/7781 "})
+    ).postings
+
+    assert job.apply_url == "https://careers.northwind.example/apply/7781"
+    assert ClaimField.APPLY_URL in {c.field for c in job.claims}
 
 
 @pytest.mark.req("ACQ-04")

@@ -410,3 +410,58 @@ def test_rotating_the_key_while_a_run_is_queued_uses_the_new_key(scenario: Scena
     scenario.retired_keys.append(scenario.api_key)
     scenario.api_key = new_key
     assert scenario.leaks() == []  # neither the replaced key nor its successor anywhere
+
+
+def cancel(scenario: Scenario, run_id: str) -> dict[str, object]:
+    response = scenario.api.write(
+        "POST", f"/v1/workspaces/{scenario.workspace_id}/runs/{run_id}/cancel", scenario.token
+    )
+    assert response.status_code == 202, response.text
+    body: dict[str, object] = response.json()
+    return body
+
+
+@pytest.mark.req("DUR-05", "MODEL-08")
+def test_a_run_cancelled_while_queued_never_calls_the_model_or_reserves_spend(
+    scenario: Scenario,
+) -> None:
+    run_id = scenario.submit()
+    requested = cancel(scenario, run_id)  # no worker yet: the run is still queued
+
+    worker = scenario.worker("worker")
+    run = scenario.wait_terminal(run_id)
+    worker.stop()
+
+    assert requested["status"] == "queued"
+    assert requested["cancel_requested_at"] is not None
+    assert (run["status"], run["failure_class"], run["output_id"]) == ("cancelled", None, None)
+    assert scenario.attempts(run_id) == []  # no call, no reservation
+    assert scenario.journal(run_id)["status"] == []  # its workflow was never started
+    assert scenario.leaks() == []
+
+
+@pytest.mark.req("DUR-05", "MODEL-08")
+def test_a_run_cancelled_mid_call_settles_that_call_and_makes_no_other(
+    scenario: Scenario,
+) -> None:
+    run_id = scenario.submit()
+    worker = scenario.worker("worker", fake_delay_s="4")
+    wait_for(lambda: len(scenario.attempts(run_id)) == 1, timeout_s=30, what="the call")
+
+    cancel(scenario, run_id)
+    run = scenario.wait_terminal(run_id, timeout_s=10)  # before the call itself ends
+    wait_for(
+        lambda: scenario.attempts(run_id)[0]["finished_at"] is not None,
+        timeout_s=30,
+        what="the call to settle",
+    )
+    worker.stop()
+    [attempt] = scenario.attempts(run_id)
+    journal = scenario.journal(run_id)
+
+    assert (run["status"], run["failure_class"]) == ("cancelled", None)
+    assert attempt["spend_state"] == "reconciled"  # the sent call is booked at its cost
+    assert scenario.run(run_id)["status"] == "cancelled"  # its result never revives the run
+    assert journal["status"][0]["status"] == "CANCELLED"
+    assert "nessa.publish_outcome" not in {s["function_name"] for s in journal["steps"]}
+    assert scenario.leaks() == []

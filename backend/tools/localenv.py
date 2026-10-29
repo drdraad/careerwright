@@ -53,12 +53,19 @@ def _key_versions(keys: Path) -> list[int]:
     return sorted(int(p.stem[1:]) for p in keys.glob("v*.key") if p.stem[1:].isdigit())
 
 
+ADZUNA_DIR = "adzuna"
+# The Adzuna credentials' names in the repository `.env` (ruling R4) and the files the
+# acquisition worker reads them from (`nessa.acquisition`).
+ADZUNA_ENV = {"ADZUNA_APP_ID": "adzuna_app_id", "ADZUNA_APP_KEY": "adzuna_app_key"}
+ENV_FILE = REPO_ROOT / ".env"
+
+
 def ensure_local_home(home: Path) -> list[str]:
     """Create whatever is missing; return the names of files created (never their contents)."""
     if home.is_relative_to(REPO_ROOT):
         raise SystemExit(f"NESSA_HOME must be outside the repository ({REPO_ROOT})")
     created: list[str] = []
-    for directory in (home, home / "secrets", home / "keys"):
+    for directory in (home, home / "secrets", home / "keys", home / ADZUNA_DIR):
         _private_dir(directory)
     for name in PASSWORD_NAMES:
         if _write_new(home / "secrets" / name, secrets.token_urlsafe(32).encode()):
@@ -69,6 +76,47 @@ def ensure_local_home(home: Path) -> list[str]:
         created.append("keys/v1.key")
     check_permissions(home)
     return created
+
+
+def _env_values(env_file: Path, names: tuple[str, ...]) -> dict[str, str]:
+    """`NAME=value` lines of a dotenv file, for the names asked for only. Read in code: the
+    values are never printed or passed on a command line."""
+    if not env_file.is_file():
+        return {}
+    found: dict[str, str] = {}
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        name, sep, value = line.strip().removeprefix("export ").partition("=")
+        if sep and name.strip() in names:
+            found[name.strip()] = value.strip().strip("'\"")
+    return {name: value for name, value in found.items() if value}
+
+
+def place_adzuna_credentials(home: Path, env_file: Path = ENV_FILE) -> str:
+    """Copy the Adzuna credentials from `.env` into NESSA_HOME (owner-only), where only the
+    acquisition worker's container reads them. Returns what happened, never a value: both
+    are needed, and a name that is absent is reported as such, never guessed."""
+    values = _env_values(env_file, tuple(ADZUNA_ENV))
+    missing = sorted(set(ADZUNA_ENV) - set(values))
+    if missing:
+        return f"blocked: Adzuna credentials not found ({', '.join(missing)} absent from .env)"
+    directory = home / ADZUNA_DIR
+    _private_dir(directory)
+    for name, file_name in ADZUNA_ENV.items():
+        path = directory / file_name
+        if path.exists() and path.read_text(encoding="utf-8").strip() == values[name]:
+            continue
+        path.unlink(missing_ok=True)
+        _write_new(path, values[name].encode())
+    check_permissions(home)
+    return "placed in NESSA_HOME/adzuna"
+
+
+def adzuna_configured(home: Path) -> bool:
+    """Both credential files are in place (their values are not read here)."""
+    return all(
+        (home / ADZUNA_DIR / name).is_file() and (home / ADZUNA_DIR / name).stat().st_size > 0
+        for name in ADZUNA_ENV.values()
+    )
 
 
 def add_master_key_version(home: Path) -> str:
@@ -83,7 +131,10 @@ def add_master_key_version(home: Path) -> str:
 
 def check_permissions(home: Path) -> None:
     others = stat.S_IRWXG | stat.S_IRWXO
-    for path in (home, home / "secrets", home / "keys", *home.glob("*/*")):
+    directories = [
+        home / name for name in ("secrets", "keys", ADZUNA_DIR) if (home / name).exists()
+    ]
+    for path in (home, *directories, *home.glob("*/*")):
         if path.stat().st_mode & others:
             raise SystemExit(f"{path} is readable by other users; chmod it owner-only")
 

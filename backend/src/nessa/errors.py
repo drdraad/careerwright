@@ -50,6 +50,8 @@ class ErrorCode(StrEnum):
     ALREADY_DECIDED = "ALREADY_DECIDED"
     # Discovery codes (Task 6b): a slate's one written note was made, so it is not made again.
     SLATE_ALREADY_EXPLAINED = "SLATE_ALREADY_EXPLAINED"
+    # Run lifecycle (Task 7A, DUR-05): a finished run cannot be cancelled.
+    RUN_FINISHED = "RUN_FINISHED"
 
 
 class ErrorStage(StrEnum):

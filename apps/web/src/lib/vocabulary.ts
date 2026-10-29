@@ -283,6 +283,14 @@ export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string
     title: "Nessa couldn't save the result",
     action: "Try again in a moment.",
   },
+  retrieval_failed: {
+    title: "None of the sources could be read",
+    action: "This isn't a sign there are no vacancies. Try again later, or paste the advert.",
+  },
+  source_blocked: {
+    title: "Every source was refused by its access rules",
+    action: "Nothing was fetched. Choose other sources, or paste the advert.",
+  },
   unknown_failure: {
     title: "Something went wrong while Nessa was working",
     action: "Nothing was saved from it. Try again.",
@@ -375,6 +383,7 @@ const ERROR_TONE: Record<ErrorCode, Tone> = {
   PROPOSAL_NOT_AVAILABLE: "neutral",
   ALREADY_DECIDED: "neutral",
   SLATE_ALREADY_EXPLAINED: "neutral",
+  RUN_FINISHED: "neutral",
 };
 
 /** What the person sees for each API error code. The API's own message is never shown. */
@@ -503,6 +512,10 @@ const ERROR_WORDS: Record<ErrorCode, Omit<ErrorStatement, "tone">> = {
     title: "These suggestions have had their one written note",
     action:
       "Suggest again for a new set of suggestions, which gets a note of its own. The suggestions shown now would be replaced.",
+  },
+  RUN_FINISHED: {
+    title: "This had already finished",
+    action: "Nothing was cancelled. Its result stands.",
   },
 };
 

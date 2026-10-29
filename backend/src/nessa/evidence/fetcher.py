@@ -264,6 +264,10 @@ class Fetcher:
         self._ssl = ssl.create_default_context(cafile=certifi.where())
         self._robots: dict[str, tuple[float, RobotFileParser | str | None]] = {}
 
+    def check(self, url: str) -> CheckedUrl | UrlRefusal:
+        """`addresses.check_url` with this fetcher's ports."""
+        return check_url(url, allowed_ports=self._ports)
+
     def _address_allowed(self, address: IPAddress, port: int) -> bool:
         return (str(address), port) in self._extra_allowed or address_refusal(address) is None
 

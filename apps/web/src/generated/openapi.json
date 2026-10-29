@@ -1694,6 +1694,93 @@
         }
       }
     },
+    "/v1/workspaces/{workspace_id}/runs/{run_id}/cancel": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Cancel",
+        "description": "Ask a queued or running run to stop (DUR-05): 202 with the run, which ends\n`cancelled` once the worker has stopped it. A finished run is `RUN_FINISHED`.",
+        "operationId": "cancel_run",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/workspaces/{workspace_id}/runs/{run_id}": {
       "get": {
         "tags": [
@@ -2924,6 +3011,737 @@
         }
       }
     },
+    "/v1/workspaces/{workspace_id}/research/acquisitions": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Submit",
+        "description": "202 with the run that fetches the sources; 200 with no run when every URL is being\nfetched already or is waiting out a back-off (each listed in `skipped`).",
+        "operationId": "submit_acquisition",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitAcquisition"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmittedAcquisitionOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/research/acquisitions/{run_id}": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Get Acquisition",
+        "operationId": "get_acquisition",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/research/searches": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Submit Source Search",
+        "description": "Meta search for candidate pages for one confirmed target in one of your cities (202 +\nrun). The run pins the profile version it read.",
+        "operationId": "submit_search",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitSearch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/research/searches/{run_id}": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Get Search",
+        "operationId": "get_search",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/research/pasted": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Paste",
+        "description": "Record a posting the person pasted: its own input route, never fetched, kept as their\nexample of a target (at most three per target).",
+        "operationId": "paste_text",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasteText"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetailOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/jobs": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "List Jobs",
+        "operationId": "list_jobs",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "favourites",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Favourites"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobPage"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Get Job",
+        "operationId": "get_job",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetailOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/jobs/{job_id}/favourite": {
+      "put": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Favourite Job",
+        "operationId": "favourite_job",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Unfavourite Job",
+        "operationId": "unfavourite_job",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/taxonomy": {
       "get": {
         "tags": [
@@ -3375,6 +4193,73 @@
   },
   "components": {
     "schemas": {
+      "AcquisitionOut": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/RunOut"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/TargetOut"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "job_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Job Ids",
+            "description": "The jobs this run's sources produced so far."
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AcquisitionSummaryOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A complete run's outcome per target; none until it is complete."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run",
+          "targets",
+          "job_ids",
+          "summary"
+        ],
+        "title": "AcquisitionOut"
+      },
+      "AcquisitionSummaryOut": {
+        "properties": {
+          "succeeded": {
+            "type": "integer",
+            "title": "Succeeded"
+          },
+          "blocked": {
+            "type": "integer",
+            "title": "Blocked"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "succeeded",
+          "blocked",
+          "failed"
+        ],
+        "title": "AcquisitionSummaryOut"
+      },
       "ActorOut": {
         "properties": {
           "actor_id": {
@@ -3399,6 +4284,53 @@
           "display_name"
         ],
         "title": "ActorOut"
+      },
+      "AdvertiserKind": {
+        "type": "string",
+        "enum": [
+          "employer",
+          "agency",
+          "unknown"
+        ],
+        "title": "AdvertiserKind"
+      },
+      "AdzunaQuery": {
+        "properties": {
+          "what": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "What"
+          },
+          "where": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Where"
+          },
+          "page": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Page",
+            "default": 1
+          },
+          "results_per_page": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Results Per Page",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "what",
+          "where"
+        ],
+        "title": "AdzunaQuery",
+        "description": "One bounded search: a role and a place, one page of at most 50 results."
       },
       "AnsweredState": {
         "type": "string",
@@ -3519,6 +4451,16 @@
         ],
         "title": "AttemptOut"
       },
+      "AttemptStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "succeeded",
+          "blocked",
+          "failed"
+        ],
+        "title": "AttemptStatus"
+      },
       "Basis": {
         "type": "string",
         "enum": [
@@ -3605,6 +4547,23 @@
           "state"
         ],
         "title": "CityListInput"
+      },
+      "ClaimField": {
+        "type": "string",
+        "enum": [
+          "title",
+          "employer",
+          "location",
+          "work_mode",
+          "salary",
+          "date_posted",
+          "valid_through",
+          "employment_type",
+          "description",
+          "apply_url",
+          "source_job_id"
+        ],
+        "title": "ClaimField"
       },
       "ClaimOut": {
         "properties": {
@@ -3904,6 +4863,14 @@
         "title": "DecisionResult",
         "description": "The decision and the resulting profile. The proposals are read from the turn: this\nresponse is stored as the command's receipt, and model output is kept sealed."
       },
+      "DescriptionKind": {
+        "type": "string",
+        "enum": [
+          "full",
+          "snippet"
+        ],
+        "title": "DescriptionKind"
+      },
       "Direction": {
         "type": "string",
         "enum": [
@@ -4141,7 +5108,8 @@
           "CONFIRMATION_REQUIRED",
           "PROPOSAL_NOT_AVAILABLE",
           "ALREADY_DECIDED",
-          "SLATE_ALREADY_EXPLAINED"
+          "SLATE_ALREADY_EXPLAINED",
+          "RUN_FINISHED"
         ],
         "title": "ErrorCode"
       },
@@ -4187,6 +5155,8 @@
           "spend_limits.updated",
           "run.state_changed",
           "run.partial_updated",
+          "run.cancel_requested",
+          "research.updated",
           "concept.provisional_created",
           "interview.turn_decided",
           "interview.preferences_updated"
@@ -4360,6 +5330,8 @@
           "model_refused",
           "output_truncated",
           "app_store_unavailable",
+          "retrieval_failed",
+          "source_blocked",
           "unknown_failure"
         ],
         "title": "FailureClass"
@@ -4409,6 +5381,115 @@
           "prefer_not_to_say"
         ],
         "title": "FieldState"
+      },
+      "Freshness": {
+        "type": "string",
+        "enum": [
+          "current",
+          "current_with_warning",
+          "stale",
+          "expired",
+          "closed",
+          "not_yet_valid",
+          "never_verified"
+        ],
+        "title": "Freshness"
+      },
+      "FreshnessKind": {
+        "type": "string",
+        "enum": [
+          "job",
+          "course_fee_intake",
+          "funding_availability",
+          "funding_rules",
+          "course_syllabus"
+        ],
+        "title": "FreshnessKind"
+      },
+      "FreshnessOut": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/FreshnessKind"
+          },
+          "state": {
+            "$ref": "#/components/schemas/Freshness"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "usable_as_current": {
+            "type": "boolean",
+            "title": "Usable As Current"
+          },
+          "last_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Attempt At"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "valid_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Until"
+          },
+          "verified_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Until"
+          },
+          "max_age_hours": {
+            "type": "integer",
+            "title": "Max Age Hours"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "state",
+          "label",
+          "usable_as_current",
+          "last_attempt_at",
+          "last_success_at",
+          "valid_until",
+          "verified_until",
+          "max_age_hours"
+        ],
+        "title": "FreshnessOut",
+        "description": "How current a source's data is, from its last successful retrieval (spec section 11).\nA failed refresh moves `last_attempt_at` only."
       },
       "Health": {
         "properties": {
@@ -4511,6 +5592,16 @@
         ],
         "title": "HypothesisOut"
       },
+      "InputRoute": {
+        "type": "string",
+        "enum": [
+          "fetch",
+          "adzuna",
+          "pasted_text"
+        ],
+        "title": "InputRoute",
+        "description": "How a source reached Nessa. Pasted text is its own route, never a retrieval."
+      },
       "IscoGroupOut": {
         "properties": {
           "code": {
@@ -4529,6 +5620,316 @@
           "label"
         ],
         "title": "IscoGroupOut"
+      },
+      "JobCopyOut": {
+        "properties": {
+          "copy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Copy Id"
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Attempt Id"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "route": {
+            "$ref": "#/components/schemas/InputRoute"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "source_job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Job Id"
+          },
+          "description_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DescriptionKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rights_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rights Status"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Retrieved At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "copy_id",
+          "attempt_id",
+          "provider",
+          "route",
+          "source_url",
+          "source_job_id",
+          "description_kind",
+          "rights_status",
+          "retrieved_at"
+        ],
+        "title": "JobCopyOut"
+      },
+      "JobDetailOut": {
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/JobOut"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/SourceClaimOut"
+            },
+            "type": "array",
+            "title": "Claims"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "job",
+          "claims"
+        ],
+        "title": "JobDetailOut"
+      },
+      "JobOut": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "employer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer",
+            "description": "Null when the advert does not name the employer."
+          },
+          "advertiser": {
+            "$ref": "#/components/schemas/AdvertiserKind"
+          },
+          "locations": {
+            "items": {
+              "$ref": "#/components/schemas/Location"
+            },
+            "type": "array",
+            "title": "Locations"
+          },
+          "work_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "salary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Salary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "salary_confirmed": {
+            "type": "boolean",
+            "title": "Salary Confirmed",
+            "description": "True only for pay the source advertises."
+          },
+          "employment_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employment Type"
+          },
+          "date_posted": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Posted"
+          },
+          "description_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DescriptionKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exemplar": {
+            "type": "boolean",
+            "title": "Exemplar",
+            "description": "The person's pasted example of a target: never a live vacancy."
+          },
+          "favourite": {
+            "type": "boolean",
+            "title": "Favourite"
+          },
+          "first_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Seen At"
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/FreshnessOut"
+          },
+          "copies": {
+            "items": {
+              "$ref": "#/components/schemas/JobCopyOut"
+            },
+            "type": "array",
+            "title": "Copies"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "job_id",
+          "title",
+          "employer",
+          "advertiser",
+          "locations",
+          "work_mode",
+          "salary",
+          "salary_confirmed",
+          "employment_type",
+          "date_posted",
+          "description_kind",
+          "exemplar",
+          "favourite",
+          "first_seen_at",
+          "freshness",
+          "copies"
+        ],
+        "title": "JobOut",
+        "description": "A canonical job: the values of its newest full copy, and every source copy. Unknown\nvalues are null, never zero; predicted pay is never advertised pay."
+      },
+      "JobPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JobOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total_jobs": {
+            "type": "integer",
+            "title": "Total Jobs",
+            "description": "Distinct jobs: a multi-city job counts once."
+          },
+          "city_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "City Counts",
+            "description": "Jobs appearing in each city; a multi-city job appears in each."
+          },
+          "coverage": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Coverage",
+            "description": "Sources tried, by their latest attempt's status (succeeded, blocked, failed, pending)."
+          },
+          "empty_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Reason",
+            "description": "When there are no jobs: no_sources_checked, no_source_retrieved (every source failed or was blocked: not 'no vacancies') or none_found_in_sources_checked."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "total_jobs",
+          "city_counts",
+          "coverage",
+          "empty_reason"
+        ],
+        "title": "JobPage",
+        "description": "A page of jobs, with counts that never double count a multi-city job and coverage\nthat says how many sources were checked. An empty page says why (STATE-02)."
       },
       "LabelMatchOut": {
         "properties": {
@@ -4583,6 +5984,70 @@
           "isco_label"
         ],
         "title": "LabelMatchOut"
+      },
+      "Location": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "locality": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locality"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "title": "Location"
       },
       "ModelMode": {
         "type": "string",
@@ -5033,6 +6498,85 @@
         ],
         "title": "PartialReplyOut",
         "description": "The turn's reply as it streams: unvalidated text, never a proposal. The turn's run\nstate and, once complete, its proposal are authoritative."
+      },
+      "PasteText": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Target"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 50000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "employer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Where the person copied it from, as a reference only."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target",
+          "title",
+          "text"
+        ],
+        "title": "PasteText",
+        "description": "A posting the person pasted: their own example of a target (spec section 7, \"User\nexamples versus discovered corpus\")."
+      },
+      "PayBasis": {
+        "type": "string",
+        "enum": [
+          "advertised",
+          "predicted",
+          "unknown"
+        ],
+        "title": "PayBasis",
+        "description": "Advertised (stated by the source), predicted (a provider's estimate, such as\nAdzuna's `salary_is_predicted`) and unknown stay distinct (spec section 6)."
       },
       "PayPeriod": {
         "type": "string",
@@ -5894,6 +7438,15 @@
         ],
         "title": "Resolution"
       },
+      "Retention": {
+        "type": "string",
+        "enum": [
+          "body",
+          "excerpts"
+        ],
+        "title": "Retention",
+        "description": "What a workspace keeps of a source's body."
+      },
       "RevertProfile": {
         "properties": {
           "expected_version": {
@@ -5917,13 +7470,29 @@
         "title": "RevertProfile",
         "description": "Restore an earlier version's answers, each with its own source, as a new version."
       },
+      "RightsClass": {
+        "type": "string",
+        "enum": [
+          "govuk",
+          "public-sector",
+          "course-provider",
+          "professional-body",
+          "employer-posting",
+          "job-board",
+          "other"
+        ],
+        "title": "RightsClass",
+        "description": "The page classes of the session 1 rights policy (H-06; `corpus/README.md`)."
+      },
       "RunKind": {
         "type": "string",
         "enum": [
           "connection_check",
           "interview_turn",
           "discovery",
-          "slate_explanation"
+          "slate_explanation",
+          "acquisition",
+          "source_search"
         ],
         "title": "RunKind"
       },
@@ -5958,11 +7527,26 @@
             "title": "Synthetic"
           },
           "model_id": {
-            "type": "string",
-            "title": "Model Id"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id",
+            "description": "None for a run that calls no model (acquisition)."
           },
           "model_mode": {
-            "$ref": "#/components/schemas/ModelMode"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "created_at": {
             "type": "string",
@@ -5992,6 +7576,19 @@
               }
             ],
             "title": "Finished At"
+          },
+          "cancel_requested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Requested At",
+            "description": "When the person asked to cancel it; the run ends `cancelled` once the worker has stopped it."
           },
           "attempts": {
             "items": {
@@ -6072,6 +7669,61 @@
           "next_cursor"
         ],
         "title": "RunPage"
+      },
+      "Salary": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency"
+          },
+          "minimum_minor_units": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Minor Units"
+          },
+          "maximum_minor_units": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum Minor Units"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SalaryPeriod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "basis": {
+            "$ref": "#/components/schemas/PayBasis"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "currency",
+          "period",
+          "basis"
+        ],
+        "title": "Salary",
+        "description": "Pay as the source gives it, before any normalisation. GBP in minor units; a period\nthe source does not state stays None (never assumed to be a year)."
       },
       "SalaryField": {
         "properties": {
@@ -6157,6 +7809,63 @@
         "title": "SalaryInput",
         "description": "A new answer: a floor is more than £0. Checked on input only, so a version stored\nbefore the rule still opens (read, history, export)."
       },
+      "SalaryPeriod": {
+        "type": "string",
+        "enum": [
+          "year",
+          "month",
+          "week",
+          "day",
+          "hour"
+        ],
+        "title": "SalaryPeriod",
+        "description": "The period a source states pay per (the profile's salary floor has its own)."
+      },
+      "SearchCandidate": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "grounded": {
+            "type": "boolean",
+            "title": "Grounded",
+            "description": "The search actually returned this URL."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "url",
+          "title",
+          "grounded"
+        ],
+        "title": "SearchCandidate"
+      },
+      "SearchExcluded": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Url"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "url",
+          "reason"
+        ],
+        "title": "SearchExcluded"
+      },
       "SearchMatch": {
         "type": "string",
         "enum": [
@@ -6164,6 +7873,89 @@
           "any"
         ],
         "title": "SearchMatch"
+      },
+      "SearchOut": {
+        "properties": {
+          "search_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Search Id"
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunOut"
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SearchProposal"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None until the run is complete."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "search_id",
+          "run",
+          "proposal"
+        ],
+        "title": "SearchOut",
+        "description": "A source search: candidate pages only, never claims. The person chooses which to\nacquire; a candidate the search did not return is marked ungrounded."
+      },
+      "SearchProposal": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/SearchCandidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/SearchExcluded"
+            },
+            "type": "array",
+            "title": "Excluded"
+          },
+          "queries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Queries",
+            "description": "What the model searched for."
+          },
+          "sources_seen": {
+            "type": "integer",
+            "title": "Sources Seen",
+            "description": "Distinct pages the search returned."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target",
+          "city",
+          "candidates",
+          "excluded",
+          "queries",
+          "sources_seen"
+        ],
+        "title": "SearchProposal",
+        "description": "A source search's validated output: candidates only, never claims."
       },
       "SetPreferences": {
         "properties": {
@@ -6330,6 +8122,52 @@
           "relation"
         ],
         "title": "SkillRefOut"
+      },
+      "SkippedOut": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "retry_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "url",
+          "reason",
+          "run_id",
+          "retry_at"
+        ],
+        "title": "SkippedOut",
+        "description": "A URL not fetched by this request: another run is fetching it (`in_flight`), or it\nfailed recently and waits out its back-off (`backing_off`, until `retry_at`)."
       },
       "SlateChannel": {
         "type": "string",
@@ -6534,6 +8372,304 @@
         "title": "SlateOut",
         "description": "A varied slate of up to six career hypotheses from the discovery's searches, computed\ndeterministically each time it is read, with every count that explains it."
       },
+      "SourceAttemptOut": {
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Attempt Id"
+          },
+          "route": {
+            "$ref": "#/components/schemas/InputRoute"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "requested_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Url"
+          },
+          "final_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Url"
+          },
+          "redirects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Redirects"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AttemptStatus"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why it was blocked or failed: a label, never text."
+          },
+          "transient": {
+            "type": "boolean",
+            "title": "Transient"
+          },
+          "retry_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Of"
+          },
+          "http_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Status"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type"
+          },
+          "content_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Sha256"
+          },
+          "byte_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Byte Count"
+          },
+          "rights_class": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RightsClass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rights_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rights Status"
+          },
+          "retention": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Retention"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "http_requests": {
+            "type": "integer",
+            "title": "Http Requests"
+          },
+          "cost_nano_usd": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Nano Usd",
+            "description": "0 for page fetches and Adzuna's free tier."
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "attempt_id",
+          "route",
+          "provider",
+          "requested_url",
+          "final_url",
+          "redirects",
+          "status",
+          "reason",
+          "transient",
+          "retry_of",
+          "http_status",
+          "content_type",
+          "content_sha256",
+          "byte_count",
+          "rights_class",
+          "rights_status",
+          "retention",
+          "http_requests",
+          "cost_nano_usd",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "SourceAttemptOut",
+        "description": "One try to obtain a source (spec section 18, SourceAttempt). Blocked and failed tries\nare kept with their reason; a URL never carries a credential."
+      },
+      "SourceClaimOut": {
+        "properties": {
+          "claim_id": {
+            "type": "integer",
+            "title": "Claim Id"
+          },
+          "copy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Copy Id"
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Attempt Id"
+          },
+          "field": {
+            "$ref": "#/components/schemas/ClaimField"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/ValidationState"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue"
+          },
+          "span": {
+            "$ref": "#/components/schemas/SourceSpan"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Retrieved At"
+          },
+          "published_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published On"
+          },
+          "valid_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Until"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "claim_id",
+          "copy_id",
+          "attempt_id",
+          "field",
+          "value",
+          "validation",
+          "issue",
+          "span",
+          "retrieved_at",
+          "published_on",
+          "valid_until"
+        ],
+        "title": "SourceClaimOut",
+        "description": "One field value with the span that supports it (spec section 18, SourceClaim)."
+      },
       "SourceKind": {
         "type": "string",
         "enum": [
@@ -6716,6 +8852,64 @@
         ],
         "title": "SourceRefOut"
       },
+      "SourceSpan": {
+        "properties": {
+          "source_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Sha256"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "pointer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pointer"
+          },
+          "excerpt": {
+            "type": "string",
+            "maxLength": 400,
+            "title": "Excerpt"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_sha256",
+          "excerpt"
+        ],
+        "title": "SourceSpan",
+        "description": "Where a value is in its source: character offsets into the source's text (a page's\ndecoded HTML or the pasted text), or for an API response a JSON pointer; with a minimal\nexcerpt either way, so a reviewer can find what supported the value at retrieval time."
+      },
       "SpendOut": {
         "properties": {
           "run_limit_nano_usd": {
@@ -6820,6 +9014,34 @@
         ],
         "title": "StoreKey"
       },
+      "SubmitAcquisition": {
+        "properties": {
+          "urls": {
+            "items": {
+              "type": "string",
+              "maxLength": 2048,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Urls"
+          },
+          "adzuna": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdzunaQuery"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SubmitAcquisition",
+        "description": "Up to ten URLs, or one Adzuna search: never both."
+      },
       "SubmitDiscovery": {
         "properties": {
           "expected_profile_version": {
@@ -6873,6 +9095,37 @@
         "title": "SubmitRun",
         "description": "`POST /runs` starts the runs that need no input; interview turns have their own\nendpoint, which records the person's message with the run."
       },
+      "SubmitSearch": {
+        "properties": {
+          "expected_profile_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Profile Version"
+          },
+          "target": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Target",
+            "description": "One of your target roles."
+          },
+          "city": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "City",
+            "description": "One of your cities."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_profile_version",
+          "target",
+          "city"
+        ],
+        "title": "SubmitSearch"
+      },
       "SubmitTurn": {
         "properties": {
           "expected_profile_version": {
@@ -6894,6 +9147,35 @@
           "message"
         ],
         "title": "SubmitTurn"
+      },
+      "SubmittedAcquisitionOut": {
+        "properties": {
+          "acquisition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AcquisitionOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None when every URL was skipped: nothing was started."
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/SkippedOut"
+            },
+            "type": "array",
+            "title": "Skipped"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "acquisition",
+          "skipped"
+        ],
+        "title": "SubmittedAcquisitionOut"
       },
       "SuggestionOut": {
         "properties": {
@@ -7125,6 +9407,63 @@
           "state"
         ],
         "title": "TargetListInput"
+      },
+      "TargetOut": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "route": {
+            "$ref": "#/components/schemas/InputRoute"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "queued, succeeded, blocked, failed, cancelled, or not_attempted (the run ended before it)."
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/SourceAttemptOut"
+            },
+            "type": "array",
+            "title": "Attempts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "route",
+          "url",
+          "query",
+          "status",
+          "attempts"
+        ],
+        "title": "TargetOut"
       },
       "TargetSketchOut": {
         "properties": {
@@ -7658,6 +9997,25 @@
         ],
         "title": "TurnSubmittedOut",
         "description": "A new turn, with the support panel when its message holds a risk stem."
+      },
+      "ValidationState": {
+        "type": "string",
+        "enum": [
+          "structured",
+          "user_supplied",
+          "quarantined"
+        ],
+        "title": "ValidationState",
+        "description": "How a claim's value was established. Only deterministic code approves a value."
+      },
+      "WorkMode": {
+        "type": "string",
+        "enum": [
+          "on_site",
+          "remote",
+          "hybrid"
+        ],
+        "title": "WorkMode"
       },
       "WorkState": {
         "type": "string",

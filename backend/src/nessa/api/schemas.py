@@ -296,11 +296,16 @@ class RunOut(ResponseModel):
     failure_class: FailureClass | None
     data_mode: DataMode
     synthetic: bool
-    model_id: str
-    model_mode: ModelMode
+    model_id: str | None = Field(description="None for a run that calls no model (acquisition).")
+    model_mode: ModelMode | None
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    cancel_requested_at: datetime | None = Field(
+        default=None,
+        description="When the person asked to cancel it; the run ends `cancelled` once the "
+        "worker has stopped it.",
+    )
     attempts: list[AttemptOut]
     output: ConnectionCheckResult | None = Field(
         description="A connection check's result. An interview turn's proposals are read "
@@ -322,10 +327,11 @@ class RunOut(ResponseModel):
             data_mode=run.data_mode,
             synthetic=run.synthetic,
             model_id=run.model_id,
-            model_mode=ModelMode(run.model_mode),
+            model_mode=ModelMode(run.model_mode) if run.model_mode else None,
             created_at=run.created_at,
             started_at=run.started_at,
             finished_at=run.finished_at,
+            cancel_requested_at=run.cancel_requested_at,
             attempts=[AttemptOut.of(a) for a in attempts],
             output=output,
             profile_version=run.profile_version,

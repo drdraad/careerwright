@@ -5,7 +5,8 @@
 # Every service sits on the `internal` network, which has no route out of the machine. The
 # `edge` relay is the only service also on a normal bridge: it publishes the API, the Auth
 # emulator, PostgreSQL and the web app on 127.0.0.1 only. `compose.live.yaml` gives the
-# worker (and nothing else) a route out, for Meta; demo mode omits it.
+# worker (for Meta) and the restricted acquisition worker (for permitted pages and Adzuna),
+# and nothing else, a route out; demo mode omits it.
 name: nessa-l0
 
 x-local: &local
@@ -86,6 +87,8 @@ services:
       NESSA_APP_DATABASE_URL: postgresql+psycopg://nessa_api@postgres:5432/nessa_app
       NESSA_APP_DATABASE_PASSWORD_FILE: /run/secrets/pg_api
       NESSA_MASTER_KEY_DIR: /run/nessa/keys
+      # Whether setup placed Adzuna credentials (live-vacancy workspaces); never the values.
+      NESSA_ADZUNA_CONFIGURED: ${NESSA_ADZUNA_CONFIGURED:-false}
     secrets: [pg_api]
     volumes:
       - ${NESSA_HOME:?run make setup}/keys:/run/nessa/keys:ro
@@ -109,15 +112,37 @@ services:
       NESSA_DBOS_DATABASE_URL: postgresql+psycopg://nessa_dbos_runtime@postgres:5432/nessa_dbos
       NESSA_DBOS_DATABASE_PASSWORD_FILE: /run/secrets/pg_dbos_runtime
       NESSA_MASTER_KEY_DIR: /run/nessa/keys
+      NESSA_ACQUISITION_URL: http://acquisition:8100
     secrets: [pg_worker, pg_dbos_runtime]
     volumes:
       - ${NESSA_HOME:?run make setup}/keys:/run/nessa/keys:ro
     depends_on:
       migrate: {condition: service_completed_successfully}
+      acquisition: {condition: service_healthy}
     # The worker exits within its own shutdown deadline; Docker kills it after this grace.
     stop_grace_period: 15s
     healthcheck:
       test: ["CMD", "python", "-m", "nessa.worker", "--check"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # The restricted acquisition worker (Global Constraint 8; ADR 0009): fetches permitted
+  # pages and runs Adzuna searches for the DBOS worker, and records nothing. It gets no
+  # database secret, master key, model key or profile: no secret, and one read-only mount,
+  # the Adzuna credentials that setup placed under NESSA_HOME (ruling R4). In live mode
+  # (compose.live.yaml) it has a route out; in demo mode it has none.
+  acquisition:
+    <<: *backend
+    command: ["python", "-m", "nessa.acquisition"]
+    environment:
+      NESSA_ENVIRONMENT: local
+      NESSA_ADZUNA_CREDENTIALS_DIR: /run/nessa/adzuna
+    volumes:
+      - ${NESSA_HOME:?run make setup}/adzuna:/run/nessa/adzuna:ro
+    stop_grace_period: 5s
+    healthcheck:
+      test: ["CMD", "python", "-m", "nessa.acquisition", "--check"]
       interval: 2s
       timeout: 3s
       retries: 30

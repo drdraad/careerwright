@@ -25,8 +25,12 @@ class CreateWorkspace(BaseModel):
     synthetic: bool
 
 
-def create_workspace(tx: Tx, actor: Actor, command: CreateWorkspace) -> Workspace:
-    if command.data_mode is DataMode.LIVE_VACANCY:
+def create_workspace(
+    tx: Tx, actor: Actor, command: CreateWorkspace, *, adzuna_configured: bool = False
+) -> Workspace:
+    """`adzuna_configured`: setup placed Adzuna credentials for the acquisition worker
+    (ruling R4); without them live-vacancy mode is refused."""
+    if command.data_mode is DataMode.LIVE_VACANCY and not adzuna_configured:
         raise NessaError(
             ErrorCode.MODE_NOT_SUPPORTED,
             "Live-vacancy mode needs separately qualified Adzuna credentials, which are not "

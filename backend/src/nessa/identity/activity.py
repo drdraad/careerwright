@@ -130,6 +130,7 @@ class ActivityEnd:
 @dataclass(frozen=True)
 class _Ready:
     run: Run
+    model_id: str
     mode: ModelMode
     attempt_id: int
     credential_id: uuid.UUID | None
@@ -208,6 +209,10 @@ def _end_partial(tx: Tx, keyring: Keyring, run: Run, latest: str | None) -> None
 
 def succeeded(output_id: uuid.UUID) -> Outcome:
     return {"status": WorkState.COMPLETE.value, "output_id": str(output_id)}
+
+
+def cancelled() -> Outcome:
+    return {"status": WorkState.CANCELLED.value}
 
 
 def failed(failure: FailureClass) -> Outcome:
@@ -373,8 +378,12 @@ def _prepare(rt: ActivityRuntime, run_id: uuid.UUID) -> _Ready | ActivityEnd:
     now = rt.clock()
     with run_transaction(rt.engine, run_id) as tx:
         run = run_store.run(tx, run_id, lock=True)
-        if run is None:
+        if run is None or run.model_id is None:  # a keyless run never reaches this activity
             return _ended(terminal(FailureClass.UNKNOWN_FAILURE))
+        if run.status is WorkState.CANCELLED or run.cancel_requested_at is not None:
+            # DUR-05: nothing is reserved or called for a run the person cancelled.
+            return ActivityEnd("cancelled", cancelled())
+        model_id = run.model_id
         if run_store.mark_running(tx, run_id):
             store.append_event(
                 tx,
@@ -409,7 +418,7 @@ def _prepare(rt: ActivityRuntime, run_id: uuid.UUID) -> _Ready | ActivityEnd:
         task = rt.tasks.get(run.kind)
         if task is None:
             return refuse(FailureClass.UNKNOWN_FAILURE)
-        mode = model_entry(run.model_id).mode
+        mode = model_entry(model_id).mode
         refusal = model_refusal(run, mode)
         if refusal is not None:
             return refuse(refusal)
@@ -421,13 +430,13 @@ def _prepare(rt: ActivityRuntime, run_id: uuid.UUID) -> _Ready | ActivityEnd:
             attempt_id = run_store.insert_attempt(
                 tx, run=run, period=period, spend_state=SpendState.NONE
             )
-            return _Ready(run, mode, attempt_id, None, None, sealed_input)
+            return _Ready(run, model_id, mode, attempt_id, None, None, sealed_input)
         key = credential_store.sealed_active_credential(tx, run.workspace_id)
         if key is None:
             return refuse(FailureClass.CREDENTIAL_UNAVAILABLE)
         run_store.lock_spend(tx, run.workspace_id)
         limits = credential_store.spend_limits(tx, run.workspace_id)
-        worst_case = task.worst_case_nano_usd(run.model_id)
+        worst_case = task.worst_case_nano_usd(model_id)
         period_committed, run_committed = run_store.committed_spend(
             tx, run.workspace_id, run_id, period
         )
@@ -446,7 +455,7 @@ def _prepare(rt: ActivityRuntime, run_id: uuid.UUID) -> _Ready | ActivityEnd:
             reserved_nano_usd=worst_case,
             credential_id=key[0],
         )
-    return _Ready(run, mode, attempt_id, key[0], key[1], sealed_input)
+    return _Ready(run, model_id, mode, attempt_id, key[0], key[1], sealed_input)
 
 
 def _measured(messages: list[ModelMessage]) -> list[ModelResponse]:
@@ -503,7 +512,7 @@ def _call(rt: ActivityRuntime, ready: _Ready) -> _CallResult:
         try:
             api_key, opened = _open(rt, ready)
             output: BaseModel | None = task.call(
-                rt.build_model(ready.run.model_id, api_key), ready.mode, opened, partial
+                rt.build_model(ready.model_id, api_key), ready.mode, opened, partial
             )
         except Exception as error:
             # Classify inside the handler but act outside it (see the module docstring).
@@ -541,7 +550,7 @@ def _spend(ready: _Ready, call: _CallResult) -> tuple[SpendState, int | None]:
     # and the whole reservation stays committed, even when an earlier request reported usage.
     if call.usage is None or call.responses < call.requests_sent:
         return SpendState.UNKNOWN, None
-    return SpendState.RECONCILED, estimate_cost_nano_usd(ready.run.model_id, call.usage)
+    return SpendState.RECONCILED, estimate_cost_nano_usd(ready.model_id, call.usage)
 
 
 def _settle(rt: ActivityRuntime, ready: _Ready, call: _CallResult) -> ActivityEnd:

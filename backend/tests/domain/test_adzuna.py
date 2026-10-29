@@ -23,7 +23,7 @@ from nessa.evidence.records import (
     PayBasis,
     ValidationState,
 )
-from tests.domain.test_pages import POSTING, page, parse
+from tests.domain.test_pages import POSTING, UNSAFE_LINKS, page, parse
 
 FIXTURE = Path(__file__).resolve().parents[3] / "fixtures" / "acquisition" / "adzuna-search-gb.json"
 APP_ID = SecretStr("id-0123456789")
@@ -146,6 +146,30 @@ def test_redaction_removes_credentials_from_any_url_however_they_are_written() -
 def test_queries_are_bounded(fields: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         AdzunaQuery.model_validate(fields)
+
+
+def with_redirect(link: str) -> bytes:
+    data = json.loads(body())
+    data["results"] = [{**data["results"][0], "redirect_url": link}]
+    return json.dumps(data).encode()
+
+
+@pytest.mark.req("ACQ-04")
+@pytest.mark.parametrize("link", UNSAFE_LINKS)
+def test_an_adzuna_link_that_is_not_plain_https_is_no_claim_at_all(link: str) -> None:
+    [copy] = parse_search(with_redirect(link), sha256="0" * 64).copies
+
+    assert copy.apply_url is None
+    assert ClaimField.APPLY_URL not in {c.field for c in copy.claims}
+
+
+@pytest.mark.req("ACQ-04")
+def test_a_valid_adzuna_https_link_is_kept_without_its_surrounding_space() -> None:
+    link = " https://www.adzuna.co.uk/jobs/land/ad/5000000001?se=synthetic"
+    [copy] = parse_search(with_redirect(link), sha256="0" * 64).copies
+
+    assert copy.apply_url == link.strip()
+    assert ClaimField.APPLY_URL in {c.field for c in copy.claims}
 
 
 @pytest.mark.req("JOB-05")

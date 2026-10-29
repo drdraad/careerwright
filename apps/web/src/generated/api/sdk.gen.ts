@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ChooseTargetData, ChooseTargetErrors, ChooseTargetResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, DecideTurnData, DecideTurnErrors, DecideTurnResponses, ExportWorkspaceData, ExportWorkspaceErrors, ExportWorkspaceResponses, GetDiscoveryData, GetDiscoveryErrors, GetDiscoveryResponses, GetMeData, GetMeErrors, GetMeResponses, GetOccupationData, GetOccupationErrors, GetOccupationResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetProfileVersionData, GetProfileVersionErrors, GetProfileVersionResponses, GetRunData, GetRunErrors, GetRunResponses, GetSketchData, GetSketchErrors, GetSketchResponses, GetSlateData, GetSlateErrors, GetSlateResponses, GetSpendData, GetSpendErrors, GetSpendResponses, GetTaxonomyData, GetTaxonomyErrors, GetTaxonomyResponses, GetTurnData, GetTurnErrors, GetTurnReplyData, GetTurnReplyErrors, GetTurnReplyResponses, GetTurnResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, HealthzData, HealthzResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListDiscoveriesData, ListDiscoveriesErrors, ListDiscoveriesResponses, ListEventsData, ListEventsErrors, ListEventsResponses, ListPlacesData, ListPlacesErrors, ListPlacesResponses, ListProfileVersionsData, ListProfileVersionsErrors, ListProfileVersionsResponses, ListProvisionalConceptsData, ListProvisionalConceptsErrors, ListProvisionalConceptsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListTurnsData, ListTurnsErrors, ListTurnsResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, PutPreferencesData, PutPreferencesErrors, PutPreferencesResponses, PutProfileData, PutProfileErrors, PutProfileResponses, PutSpendLimitsData, PutSpendLimitsErrors, PutSpendLimitsResponses, ReadyzData, ReadyzResponses, RegisterProvisionalConceptData, RegisterProvisionalConceptErrors, RegisterProvisionalConceptResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, RevertProfileData, RevertProfileErrors, RevertProfileResponses, RevokeCredentialData, RevokeCredentialErrors, RevokeCredentialResponses, RotateCredentialData, RotateCredentialErrors, RotateCredentialResponses, SearchOccupationsData, SearchOccupationsErrors, SearchOccupationsResponses, StoreCredentialData, StoreCredentialErrors, StoreCredentialResponses, StreamEventsData, StreamEventsErrors, StreamEventsResponse, StreamEventsResponses, SubmitDiscoveryData, SubmitDiscoveryErrors, SubmitDiscoveryResponses, SubmitExplanationData, SubmitExplanationErrors, SubmitExplanationResponses, SubmitRunData, SubmitRunErrors, SubmitRunResponses, SubmitTurnData, SubmitTurnErrors, SubmitTurnResponses } from './types.gen';
+import type { CancelRunData, CancelRunErrors, CancelRunResponses, ChooseTargetData, ChooseTargetErrors, ChooseTargetResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, DecideTurnData, DecideTurnErrors, DecideTurnResponses, ExportWorkspaceData, ExportWorkspaceErrors, ExportWorkspaceResponses, FavouriteJobData, FavouriteJobErrors, FavouriteJobResponses, GetAcquisitionData, GetAcquisitionErrors, GetAcquisitionResponses, GetDiscoveryData, GetDiscoveryErrors, GetDiscoveryResponses, GetJobData, GetJobErrors, GetJobResponses, GetMeData, GetMeErrors, GetMeResponses, GetOccupationData, GetOccupationErrors, GetOccupationResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetProfileVersionData, GetProfileVersionErrors, GetProfileVersionResponses, GetRunData, GetRunErrors, GetRunResponses, GetSearchData, GetSearchErrors, GetSearchResponses, GetSketchData, GetSketchErrors, GetSketchResponses, GetSlateData, GetSlateErrors, GetSlateResponses, GetSpendData, GetSpendErrors, GetSpendResponses, GetTaxonomyData, GetTaxonomyErrors, GetTaxonomyResponses, GetTurnData, GetTurnErrors, GetTurnReplyData, GetTurnReplyErrors, GetTurnReplyResponses, GetTurnResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, HealthzData, HealthzResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListDiscoveriesData, ListDiscoveriesErrors, ListDiscoveriesResponses, ListEventsData, ListEventsErrors, ListEventsResponses, ListJobsData, ListJobsErrors, ListJobsResponses, ListPlacesData, ListPlacesErrors, ListPlacesResponses, ListProfileVersionsData, ListProfileVersionsErrors, ListProfileVersionsResponses, ListProvisionalConceptsData, ListProvisionalConceptsErrors, ListProvisionalConceptsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListTurnsData, ListTurnsErrors, ListTurnsResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, PasteTextData, PasteTextErrors, PasteTextResponses, PutPreferencesData, PutPreferencesErrors, PutPreferencesResponses, PutProfileData, PutProfileErrors, PutProfileResponses, PutSpendLimitsData, PutSpendLimitsErrors, PutSpendLimitsResponses, ReadyzData, ReadyzResponses, RegisterProvisionalConceptData, RegisterProvisionalConceptErrors, RegisterProvisionalConceptResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, RevertProfileData, RevertProfileErrors, RevertProfileResponses, RevokeCredentialData, RevokeCredentialErrors, RevokeCredentialResponses, RotateCredentialData, RotateCredentialErrors, RotateCredentialResponses, SearchOccupationsData, SearchOccupationsErrors, SearchOccupationsResponses, StoreCredentialData, StoreCredentialErrors, StoreCredentialResponses, StreamEventsData, StreamEventsErrors, StreamEventsResponse, StreamEventsResponses, SubmitAcquisitionData, SubmitAcquisitionErrors, SubmitAcquisitionResponses, SubmitDiscoveryData, SubmitDiscoveryErrors, SubmitDiscoveryResponses, SubmitExplanationData, SubmitExplanationErrors, SubmitExplanationResponses, SubmitRunData, SubmitRunErrors, SubmitRunResponses, SubmitSearchData, SubmitSearchErrors, SubmitSearchResponses, SubmitTurnData, SubmitTurnErrors, SubmitTurnResponses, UnfavouriteJobData, UnfavouriteJobErrors, UnfavouriteJobResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -256,6 +256,18 @@ export const submitRun = <ThrowOnError extends boolean = false>(options: Options
 });
 
 /**
+ * Cancel
+ *
+ * Ask a queued or running run to stop (DUR-05): 202 with the run, which ends
+ * `cancelled` once the worker has stopped it. A finished run is `RUN_FINISHED`.
+ */
+export const cancelRun = <ThrowOnError extends boolean = false>(options: Options<CancelRunData, ThrowOnError>): RequestResult<CancelRunResponses, CancelRunErrors, ThrowOnError> => (options.client ?? client).post<CancelRunResponses, CancelRunErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/runs/{run_id}/cancel',
+    ...options
+});
+
+/**
  * Get Run
  */
 export const getRun = <ThrowOnError extends boolean = false>(options: Options<GetRunData, ThrowOnError>): RequestResult<GetRunResponses, GetRunErrors, ThrowOnError> => (options.client ?? client).get<GetRunResponses, GetRunErrors, ThrowOnError>({
@@ -424,6 +436,108 @@ export const chooseTarget = <ThrowOnError extends boolean = false>(options: Opti
 export const getSketch = <ThrowOnError extends boolean = false>(options: Options<GetSketchData, ThrowOnError>): RequestResult<GetSketchResponses, GetSketchErrors, ThrowOnError> => (options.client ?? client).get<GetSketchResponses, GetSketchErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/workspaces/{workspace_id}/sketch',
+    ...options
+});
+
+/**
+ * Submit
+ *
+ * 202 with the run that fetches the sources; 200 with no run when every URL is being
+ * fetched already or is waiting out a back-off (each listed in `skipped`).
+ */
+export const submitAcquisition = <ThrowOnError extends boolean = false>(options: Options<SubmitAcquisitionData, ThrowOnError>): RequestResult<SubmitAcquisitionResponses, SubmitAcquisitionErrors, ThrowOnError> => (options.client ?? client).post<SubmitAcquisitionResponses, SubmitAcquisitionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/research/acquisitions',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get Acquisition
+ */
+export const getAcquisition = <ThrowOnError extends boolean = false>(options: Options<GetAcquisitionData, ThrowOnError>): RequestResult<GetAcquisitionResponses, GetAcquisitionErrors, ThrowOnError> => (options.client ?? client).get<GetAcquisitionResponses, GetAcquisitionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/research/acquisitions/{run_id}',
+    ...options
+});
+
+/**
+ * Submit Source Search
+ *
+ * Meta search for candidate pages for one confirmed target in one of your cities (202 +
+ * run). The run pins the profile version it read.
+ */
+export const submitSearch = <ThrowOnError extends boolean = false>(options: Options<SubmitSearchData, ThrowOnError>): RequestResult<SubmitSearchResponses, SubmitSearchErrors, ThrowOnError> => (options.client ?? client).post<SubmitSearchResponses, SubmitSearchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/research/searches',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get Search
+ */
+export const getSearch = <ThrowOnError extends boolean = false>(options: Options<GetSearchData, ThrowOnError>): RequestResult<GetSearchResponses, GetSearchErrors, ThrowOnError> => (options.client ?? client).get<GetSearchResponses, GetSearchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/research/searches/{run_id}',
+    ...options
+});
+
+/**
+ * Paste
+ *
+ * Record a posting the person pasted: its own input route, never fetched, kept as their
+ * example of a target (at most three per target).
+ */
+export const pasteText = <ThrowOnError extends boolean = false>(options: Options<PasteTextData, ThrowOnError>): RequestResult<PasteTextResponses, PasteTextErrors, ThrowOnError> => (options.client ?? client).post<PasteTextResponses, PasteTextErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/research/pasted',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List Jobs
+ */
+export const listJobs = <ThrowOnError extends boolean = false>(options: Options<ListJobsData, ThrowOnError>): RequestResult<ListJobsResponses, ListJobsErrors, ThrowOnError> => (options.client ?? client).get<ListJobsResponses, ListJobsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/jobs',
+    ...options
+});
+
+/**
+ * Get Job
+ */
+export const getJob = <ThrowOnError extends boolean = false>(options: Options<GetJobData, ThrowOnError>): RequestResult<GetJobResponses, GetJobErrors, ThrowOnError> => (options.client ?? client).get<GetJobResponses, GetJobErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/jobs/{job_id}',
+    ...options
+});
+
+/**
+ * Unfavourite Job
+ */
+export const unfavouriteJob = <ThrowOnError extends boolean = false>(options: Options<UnfavouriteJobData, ThrowOnError>): RequestResult<UnfavouriteJobResponses, UnfavouriteJobErrors, ThrowOnError> => (options.client ?? client).delete<UnfavouriteJobResponses, UnfavouriteJobErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/jobs/{job_id}/favourite',
+    ...options
+});
+
+/**
+ * Favourite Job
+ */
+export const favouriteJob = <ThrowOnError extends boolean = false>(options: Options<FavouriteJobData, ThrowOnError>): RequestResult<FavouriteJobResponses, FavouriteJobErrors, ThrowOnError> => (options.client ?? client).put<FavouriteJobResponses, FavouriteJobErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/jobs/{job_id}/favourite',
     ...options
 });
 

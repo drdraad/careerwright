@@ -17,6 +17,7 @@ from nessa.identity.receipts import CommandResult, fingerprint, run_idempotent
 from nessa.identity.records import Run
 from nessa.identity.runs import (
     SubmitRun,
+    cancel_run,
     connection_check_output,
     connection_check_request,
     submit_run,
@@ -67,6 +68,33 @@ def submit(
     )
     location = f"/v1/workspaces/{workspace_id}/runs/{response['run_id']}"
     return JSONResponse(response, status_code=status, headers={"Location": location})
+
+
+@router.post(
+    "/runs/{run_id}/cancel", status_code=202, response_model=RunOut, operation_id="cancel_run"
+)
+def cancel(
+    workspace_id: uuid.UUID, run_id: uuid.UUID, caller: CallerDep, deps: Deps, key: IdempotencyKey
+) -> JSONResponse:
+    """Ask a queued or running run to stop (DUR-05): 202 with the run, which ends
+    `cancelled` once the worker has stopped it. A finished run is `RUN_FINISHED`."""
+
+    def execute(tx: Tx) -> CommandResult:
+        run = cancel_run(tx, caller.actor, workspace_id, run_id)
+        return CommandResult(
+            202, run_out(tx, deps.keyring, run).model_dump(mode="json"), workspace_id
+        )
+
+    request = {"workspace_id": str(workspace_id), "run_id": str(run_id)}
+    status, response = run_idempotent(
+        deps.engine,
+        caller.actor.actor_id,
+        key,
+        "cancel_run",
+        fingerprint("cancel_run", request),
+        execute,
+    )
+    return JSONResponse(response, status_code=status)
 
 
 @router.get("/runs/{run_id}", response_model=RunOut)

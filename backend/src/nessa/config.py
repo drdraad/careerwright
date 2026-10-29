@@ -124,6 +124,9 @@ class ApiSettings(_LocalSettings, _ModelSettings):
     default_period_spend_limit_nano_usd: int = Field(
         default=1_000_000_000, ge=0, validation_alias="NESSA_DEFAULT_PERIOD_SPEND_LIMIT_NANO_USD"
     )
+    # Set by the stack when setup placed Adzuna credentials for the acquisition worker
+    # (ruling R4). The API never holds them; it only allows live-vacancy workspaces.
+    adzuna_configured: bool = Field(default=False, validation_alias="NESSA_ADZUNA_CONFIGURED")
 
     _split_hosts = field_validator("allowed_hosts", "allowed_origins", mode="before")(_split)
 
@@ -172,8 +175,19 @@ class WorkerSettings(_LocalSettings, _ModelSettings):
     dbos_database_url: str = Field(validation_alias="NESSA_DBOS_DATABASE_URL")
     dbos_database_password_file: Path = Field(validation_alias="NESSA_DBOS_DATABASE_PASSWORD_FILE")
     master_key_dir: Path = Field(validation_alias="NESSA_MASTER_KEY_DIR")
+    # The restricted acquisition worker on the internal network (ADR 0009).
+    acquisition_url: str = Field(
+        default="http://acquisition:8100", validation_alias="NESSA_ACQUISITION_URL"
+    )
 
     _no_inline_password = field_validator("app_database_url", "dbos_database_url")(_passwordless)
+
+    @field_validator("acquisition_url")
+    @classmethod
+    def _acquisition_is_local(cls, value: str) -> str:
+        if not value.startswith("http://") or not is_local_host(value.removeprefix("http://")):
+            raise ValueError("the acquisition worker must be a local http://host:port")
+        return value
 
     @property
     def app_database(self) -> DatabaseConfig:

@@ -10,6 +10,8 @@ import pytest
 import sqlalchemy as sa
 
 from nessa.cli import ResealIncompleteError, migrate_app, reseal, seed
+from nessa.evidence import store as evidence_store
+from nessa.evidence.acquisition import document_context
 from nessa.identity import credential_store
 from nessa.identity.credentials import credential_context
 from nessa.identity.keyring import Keyring, MasterKeyError, SealedValue, load_keyring
@@ -102,6 +104,27 @@ def add_sealed_partial(tx: sa.Connection, keyring: Keyring, run_id: uuid.UUID, t
     )
 
 
+def add_sealed_document(
+    tx: sa.Connection, keyring: Keyring, workspace: uuid.UUID, text: str
+) -> uuid.UUID:
+    """A pasted text's sealed body (Task 7A): the attempt and its document."""
+    attempt_id = uuid.uuid4()
+    tx.exec_driver_sql(
+        "INSERT INTO nessa.source_attempts (attempt_id, workspace_id, route, provider, status, "
+        "content_sha256, retention, created_by, finished_at) VALUES (%(id)s, %(ws)s, "
+        "'pasted_text', 'pasted_text', 'succeeded', repeat('0', 64), 'body', %(owner)s, now())",
+        {"id": attempt_id, "ws": workspace, "owner": FIXTURE_OWNER.actor_id},
+    )
+    evidence_store.insert_document(
+        tx,
+        attempt_id=attempt_id,
+        workspace_id=workspace,
+        sha256="0" * 64,
+        sealed=keyring.seal(text.encode(), document_context(workspace, attempt_id)),
+    )
+    return attempt_id
+
+
 @pytest.fixture
 def rotation(infra: Infra, tmp_path: Path) -> tuple[Infra, str, Path]:
     database = f"nessa_rotation_{uuid.uuid4().hex[:8]}"
@@ -147,6 +170,9 @@ def test_resealing_moves_every_sealed_record_to_the_new_master_key_version(
             partials = {run_id: "Thanks for telling" for run_id in inputs}
             for run_id, text in partials.items():
                 add_sealed_partial(tx, old, run_id, text)
+            documents = {
+                add_sealed_document(tx, old, workspace, "A pasted advert"): "A pasted advert"
+            }
 
         add_master_key_version(home)
         resealed = reseal(engine, load_keyring(home / "keys"))
@@ -154,8 +180,26 @@ def test_resealing_moves_every_sealed_record_to_the_new_master_key_version(
     finally:
         engine.dispose()
 
-    assert resealed == {"credentials": 2, "run_inputs": 1, "run_outputs": 2, "run_partials": 1}
-    assert again == {"credentials": 0, "run_inputs": 0, "run_outputs": 0, "run_partials": 0}
+    assert resealed == {
+        "credentials": 2,
+        "run_inputs": 1,
+        "run_outputs": 2,
+        "run_partials": 1,
+        "source_documents": 1,
+    }
+    assert set(again.values()) == {0}
+    for row in infra.query(
+        "SELECT attempt_id, workspace_id, key_version, nonce, ciphertext "
+        "FROM nessa.source_documents",
+        database=database,
+    ):
+        assert row["key_version"] == 2
+        sealed = SealedValue(2, bytes(row["nonce"]), bytes(row["ciphertext"]))
+        context = document_context(row["workspace_id"], row["attempt_id"])
+        assert (
+            load_keyring(home / "keys").open(sealed, context).decode()
+            == (documents[row["attempt_id"]])
+        )
     # Retire version 1: the new key alone opens every sealed record.
     (home / "keys" / "v1.key").unlink()
     only_new = load_keyring(home / "keys")

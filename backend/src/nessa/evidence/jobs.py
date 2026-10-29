@@ -163,6 +163,42 @@ def canonical_facts(job: JobCopy, *, provider: str) -> CanonicalFacts:
     )
 
 
+def facts_json(facts: CanonicalFacts) -> dict[str, object]:
+    """The facts as stored beside a copy, so later copies are matched without re-parsing."""
+    return {
+        "source_key": list(facts.source_key) if facts.source_key else None,
+        "application": facts.application,
+        "employer_key": facts.employer_key,
+        "title_key": facts.title_key,
+        "contract": [list(pair) for pair in facts.contract],
+        "locations": sorted(facts.locations),
+        "fingerprint": facts.fingerprint,
+        "lead": facts.lead,
+    }
+
+
+def facts_from_json(data: dict[str, object]) -> CanonicalFacts:
+    source_key = data.get("source_key")
+    contract = data.get("contract")
+    locations = data.get("locations")
+    return CanonicalFacts(
+        source_key=(str(source_key[0]), str(source_key[1]))
+        if isinstance(source_key, list) and len(source_key) == 2
+        else None,
+        application=str(data["application"]) if data.get("application") else None,
+        employer_key=str(data["employer_key"]) if data.get("employer_key") else None,
+        title_key=str(data.get("title_key") or ""),
+        contract=tuple(
+            (str(pair[0]), str(pair[1]))
+            for pair in (contract if isinstance(contract, list) else [])
+            if isinstance(pair, list) and len(pair) == 2
+        ),
+        locations=frozenset(str(x) for x in (locations if isinstance(locations, list) else [])),
+        fingerprint=str(data["fingerprint"]) if data.get("fingerprint") else None,
+        lead=str(data["lead"]) if data.get("lead") else None,
+    )
+
+
 def _contracts_differ(a: CanonicalFacts, b: CanonicalFacts) -> bool:
     theirs = dict(b.contract)
     return any(

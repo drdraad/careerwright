@@ -28,7 +28,14 @@ from nessa.identity.access import Actor
 from nessa.identity.keyring import Keyring, RecordContext
 from nessa.identity.model_choice import ModelChoice, assert_model_permitted, fixture_model
 from nessa.identity.model_registry import ModelEntry
-from nessa.identity.records import EventKind, PartialCompleteness, PartialReply, Run, RunKind
+from nessa.identity.records import (
+    KEYLESS_KINDS,
+    EventKind,
+    PartialCompleteness,
+    PartialReply,
+    Run,
+    RunKind,
+)
 from nessa.identity.spend import SpendLimits, budget_exceeded, period_start, refused_scope
 from nessa.identity.workspaces import visible_workspace
 from nessa.vocabulary import DataMode, WorkState
@@ -243,6 +250,94 @@ def submit_run(
             ErrorCode.INTERNAL_ERROR, "The run was not recorded.", stage=ErrorStage.EXECUTION
         )
     return stored_run
+
+
+def submit_keyless_run(
+    tx: Tx,
+    actor: Actor,
+    workspace_id: uuid.UUID,
+    kind: RunKind,
+    *,
+    runtime_mode: RuntimeMode,
+    workflow_name: str,
+    now: datetime,
+) -> Run:
+    """A run that calls no model (`KEYLESS_KINDS`): no key, model or spend, but the same
+    run record, outbox, events and cancellation as every other run. It needs a route out of
+    the machine, so the demo runtime and demo workspaces refuse it."""
+    if kind not in KEYLESS_KINDS:
+        raise ValueError(f"{kind} calls a model")
+    workspace = visible_workspace(tx, workspace_id, lock=True)
+    if runtime_mode is RuntimeMode.DEMO or workspace.data_mode is DataMode.DEMO:
+        raise NessaError(
+            ErrorCode.MODE_NOT_SUPPORTED,
+            "Demo workspaces and the offline demo never fetch sources.",
+            stage=ErrorStage.EXECUTION,
+        )
+    run = Run(
+        run_id=uuid.uuid4(),
+        workspace_id=workspace_id,
+        kind=kind,
+        data_mode=workspace.data_mode,
+        synthetic=workspace.synthetic,
+        requested_by=actor.actor_id,
+        model_id=None,
+        model_mode=None,
+        status=WorkState.QUEUED,
+        failure_class=None,
+        output_id=None,
+        created_at=now,
+        started_at=None,
+        finished_at=None,
+    )
+    run_store.insert_run(tx, run, workflow_id(run.run_id), None, workflow_name=workflow_name)
+    store.append_event(
+        tx,
+        workspace_id,
+        EventKind.RUN_STATE_CHANGED,
+        str(run.run_id),
+        state=WorkState.QUEUED,
+        detail={"kind": run.kind.value},
+    )
+    stored_run = run_store.run(tx, run.run_id)
+    if stored_run is None:
+        raise NessaError(
+            ErrorCode.INTERNAL_ERROR, "The run was not recorded.", stage=ErrorStage.EXECUTION
+        )
+    return stored_run
+
+
+_TERMINAL = frozenset(
+    {WorkState.COMPLETE, WorkState.FAILED, WorkState.PROVIDER_UNAVAILABLE, WorkState.CANCELLED}
+)
+
+
+def cancel_run(tx: Tx, actor: Actor, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Run:
+    """Ask for a queued or running run to stop (DUR-05). The worker cancels its workflow, so
+    nothing more is called or fetched for it, and publishes it `cancelled`, distinct from a
+    failure; what it already finished is kept. A run that has finished cannot be cancelled.
+    The run ID is the precondition (like revoking a key); asking twice changes nothing."""
+    visible_workspace(tx, workspace_id, lock=True)
+    # Not locked: the API may not lock runs. If the worker finishes the run meanwhile, the
+    # request changes nothing (publication records a terminal state once).
+    run = run_store.run(tx, run_id)
+    if run is None or run.workspace_id != workspace_id:
+        raise NessaError(ErrorCode.NOT_FOUND, "No such run.", stage=ErrorStage.EXECUTION)
+    if run.status in _TERMINAL:
+        raise NessaError(
+            ErrorCode.RUN_FINISHED,
+            "This run has already finished, so there is nothing to cancel.",
+            stage=ErrorStage.EXECUTION,
+            details={"status": run.status.value},
+        )
+    if run_store.request_cancellation(tx, run, actor.actor_id):
+        store.append_event(tx, workspace_id, EventKind.RUN_CANCEL_REQUESTED, str(run_id))
+    cancelled = run_store.run(tx, run_id)
+    if cancelled is None:
+        raise NessaError(
+            ErrorCode.INTERNAL_ERROR, "The run was not recorded.", stage=ErrorStage.EXECUTION
+        )
+    return cancelled
 
 
 def visible_run(tx: Tx, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Run:

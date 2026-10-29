@@ -5,6 +5,45 @@ export type ClientOptions = {
 };
 
 /**
+ * AcquisitionOut
+ */
+export type AcquisitionOut = {
+    run: RunOut;
+    /**
+     * Targets
+     */
+    targets: Array<TargetOut>;
+    /**
+     * Job Ids
+     *
+     * The jobs this run's sources produced so far.
+     */
+    job_ids: Array<string>;
+    /**
+     * A complete run's outcome per target; none until it is complete.
+     */
+    summary: AcquisitionSummaryOut | null;
+};
+
+/**
+ * AcquisitionSummaryOut
+ */
+export type AcquisitionSummaryOut = {
+    /**
+     * Succeeded
+     */
+    succeeded: number;
+    /**
+     * Blocked
+     */
+    blocked: number;
+    /**
+     * Failed
+     */
+    failed: number;
+};
+
+/**
  * ActorOut
  */
 export type ActorOut = {
@@ -20,6 +59,44 @@ export type ActorOut = {
      * Display Name
      */
     display_name: string;
+};
+
+/**
+ * AdvertiserKind
+ */
+export const AdvertiserKind = {
+    EMPLOYER: 'employer',
+    AGENCY: 'agency',
+    UNKNOWN: 'unknown'
+} as const;
+
+/**
+ * AdvertiserKind
+ */
+export type AdvertiserKind = typeof AdvertiserKind[keyof typeof AdvertiserKind];
+
+/**
+ * AdzunaQuery
+ *
+ * One bounded search: a role and a place, one page of at most 50 results.
+ */
+export type AdzunaQuery = {
+    /**
+     * What
+     */
+    what: string;
+    /**
+     * Where
+     */
+    where: string;
+    /**
+     * Page
+     */
+    page?: number;
+    /**
+     * Results Per Page
+     */
+    results_per_page?: number;
 };
 
 /**
@@ -93,6 +170,21 @@ export type AttemptOut = {
 };
 
 /**
+ * AttemptStatus
+ */
+export const AttemptStatus = {
+    PENDING: 'pending',
+    SUCCEEDED: 'succeeded',
+    BLOCKED: 'blocked',
+    FAILED: 'failed'
+} as const;
+
+/**
+ * AttemptStatus
+ */
+export type AttemptStatus = typeof AttemptStatus[keyof typeof AttemptStatus];
+
+/**
  * Basis
  *
  * How an answer relates to what the person said (spec section 3: factual confirmations
@@ -145,6 +237,28 @@ export type CityListInput = {
      */
     value?: Array<string> | null;
 };
+
+/**
+ * ClaimField
+ */
+export const ClaimField = {
+    TITLE: 'title',
+    EMPLOYER: 'employer',
+    LOCATION: 'location',
+    WORK_MODE: 'work_mode',
+    SALARY: 'salary',
+    DATE_POSTED: 'date_posted',
+    VALID_THROUGH: 'valid_through',
+    EMPLOYMENT_TYPE: 'employment_type',
+    DESCRIPTION: 'description',
+    APPLY_URL: 'apply_url',
+    SOURCE_JOB_ID: 'source_job_id'
+} as const;
+
+/**
+ * ClaimField
+ */
+export type ClaimField = typeof ClaimField[keyof typeof ClaimField];
 
 /**
  * ClaimOut
@@ -357,6 +471,16 @@ export type DecisionResult = {
 };
 
 /**
+ * DescriptionKind
+ */
+export const DescriptionKind = { FULL: 'full', SNIPPET: 'snippet' } as const;
+
+/**
+ * DescriptionKind
+ */
+export type DescriptionKind = typeof DescriptionKind[keyof typeof DescriptionKind];
+
+/**
  * Direction
  */
 export const Direction = {
@@ -535,7 +659,8 @@ export const ErrorCode = {
     CONFIRMATION_REQUIRED: 'CONFIRMATION_REQUIRED',
     PROPOSAL_NOT_AVAILABLE: 'PROPOSAL_NOT_AVAILABLE',
     ALREADY_DECIDED: 'ALREADY_DECIDED',
-    SLATE_ALREADY_EXPLAINED: 'SLATE_ALREADY_EXPLAINED'
+    SLATE_ALREADY_EXPLAINED: 'SLATE_ALREADY_EXPLAINED',
+    RUN_FINISHED: 'RUN_FINISHED'
 } as const;
 
 /**
@@ -588,6 +713,8 @@ export const EventKind = {
     SPEND_LIMITS_UPDATED: 'spend_limits.updated',
     RUN_STATE_CHANGED: 'run.state_changed',
     RUN_PARTIAL_UPDATED: 'run.partial_updated',
+    RUN_CANCEL_REQUESTED: 'run.cancel_requested',
+    RESEARCH_UPDATED: 'research.updated',
     CONCEPT_PROVISIONAL_CREATED: 'concept.provisional_created',
     INTERVIEW_TURN_DECIDED: 'interview.turn_decided',
     INTERVIEW_PREFERENCES_UPDATED: 'interview.preferences_updated'
@@ -715,6 +842,8 @@ export const FailureClass = {
     MODEL_REFUSED: 'model_refused',
     OUTPUT_TRUNCATED: 'output_truncated',
     APP_STORE_UNAVAILABLE: 'app_store_unavailable',
+    RETRIEVAL_FAILED: 'retrieval_failed',
+    SOURCE_BLOCKED: 'source_blocked',
     UNKNOWN_FAILURE: 'unknown_failure'
 } as const;
 
@@ -752,6 +881,79 @@ export const FieldState = {
  * FieldState
  */
 export type FieldState = typeof FieldState[keyof typeof FieldState];
+
+/**
+ * Freshness
+ */
+export const Freshness = {
+    CURRENT: 'current',
+    CURRENT_WITH_WARNING: 'current_with_warning',
+    STALE: 'stale',
+    EXPIRED: 'expired',
+    CLOSED: 'closed',
+    NOT_YET_VALID: 'not_yet_valid',
+    NEVER_VERIFIED: 'never_verified'
+} as const;
+
+/**
+ * Freshness
+ */
+export type Freshness = typeof Freshness[keyof typeof Freshness];
+
+/**
+ * FreshnessKind
+ */
+export const FreshnessKind = {
+    JOB: 'job',
+    COURSE_FEE_INTAKE: 'course_fee_intake',
+    FUNDING_AVAILABILITY: 'funding_availability',
+    FUNDING_RULES: 'funding_rules',
+    COURSE_SYLLABUS: 'course_syllabus'
+} as const;
+
+/**
+ * FreshnessKind
+ */
+export type FreshnessKind = typeof FreshnessKind[keyof typeof FreshnessKind];
+
+/**
+ * FreshnessOut
+ *
+ * How current a source's data is, from its last successful retrieval (spec section 11).
+ * A failed refresh moves `last_attempt_at` only.
+ */
+export type FreshnessOut = {
+    kind: FreshnessKind;
+    state: Freshness;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Usable As Current
+     */
+    usable_as_current: boolean;
+    /**
+     * Last Attempt At
+     */
+    last_attempt_at: string | null;
+    /**
+     * Last Success At
+     */
+    last_success_at: string | null;
+    /**
+     * Valid Until
+     */
+    valid_until: string | null;
+    /**
+     * Verified Until
+     */
+    verified_until: string | null;
+    /**
+     * Max Age Hours
+     */
+    max_age_hours: number;
+};
 
 /**
  * Health
@@ -806,6 +1008,24 @@ export type HypothesisOut = {
 };
 
 /**
+ * InputRoute
+ *
+ * How a source reached Nessa. Pasted text is its own route, never a retrieval.
+ */
+export const InputRoute = {
+    FETCH: 'fetch',
+    ADZUNA: 'adzuna',
+    PASTED_TEXT: 'pasted_text'
+} as const;
+
+/**
+ * InputRoute
+ *
+ * How a source reached Nessa. Pasted text is its own route, never a retrieval.
+ */
+export type InputRoute = typeof InputRoute[keyof typeof InputRoute];
+
+/**
  * IscoGroupOut
  */
 export type IscoGroupOut = {
@@ -817,6 +1037,162 @@ export type IscoGroupOut = {
      * Label
      */
     label: string;
+};
+
+/**
+ * JobCopyOut
+ */
+export type JobCopyOut = {
+    /**
+     * Copy Id
+     */
+    copy_id: string;
+    /**
+     * Attempt Id
+     */
+    attempt_id: string;
+    /**
+     * Provider
+     */
+    provider: string;
+    route: InputRoute;
+    /**
+     * Source Url
+     */
+    source_url: string | null;
+    /**
+     * Source Job Id
+     */
+    source_job_id: string | null;
+    description_kind: DescriptionKind | null;
+    /**
+     * Rights Status
+     */
+    rights_status: string | null;
+    /**
+     * Retrieved At
+     */
+    retrieved_at: string;
+};
+
+/**
+ * JobDetailOut
+ */
+export type JobDetailOut = {
+    job: JobOut;
+    /**
+     * Claims
+     */
+    claims: Array<SourceClaimOut>;
+};
+
+/**
+ * JobOut
+ *
+ * A canonical job: the values of its newest full copy, and every source copy. Unknown
+ * values are null, never zero; predicted pay is never advertised pay.
+ */
+export type JobOut = {
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Employer
+     *
+     * Null when the advert does not name the employer.
+     */
+    employer: string | null;
+    advertiser: AdvertiserKind;
+    /**
+     * Locations
+     */
+    locations: Array<Location>;
+    work_mode: WorkMode | null;
+    salary: Salary | null;
+    /**
+     * Salary Confirmed
+     *
+     * True only for pay the source advertises.
+     */
+    salary_confirmed: boolean;
+    /**
+     * Employment Type
+     */
+    employment_type: string | null;
+    /**
+     * Date Posted
+     */
+    date_posted: string | null;
+    description_kind: DescriptionKind | null;
+    /**
+     * Exemplar
+     *
+     * The person's pasted example of a target: never a live vacancy.
+     */
+    exemplar: boolean;
+    /**
+     * Favourite
+     */
+    favourite: boolean;
+    /**
+     * First Seen At
+     */
+    first_seen_at: string;
+    freshness: FreshnessOut;
+    /**
+     * Copies
+     */
+    copies: Array<JobCopyOut>;
+};
+
+/**
+ * JobPage
+ *
+ * A page of jobs, with counts that never double count a multi-city job and coverage
+ * that says how many sources were checked. An empty page says why (STATE-02).
+ */
+export type JobPage = {
+    /**
+     * Items
+     */
+    items: Array<JobOut>;
+    /**
+     * Next Cursor
+     */
+    next_cursor: string | null;
+    /**
+     * Total Jobs
+     *
+     * Distinct jobs: a multi-city job counts once.
+     */
+    total_jobs: number;
+    /**
+     * City Counts
+     *
+     * Jobs appearing in each city; a multi-city job appears in each.
+     */
+    city_counts: {
+        [key: string]: number;
+    };
+    /**
+     * Coverage
+     *
+     * Sources tried, by their latest attempt's status (succeeded, blocked, failed, pending).
+     */
+    coverage: {
+        [key: string]: number;
+    };
+    /**
+     * Empty Reason
+     *
+     * When there are no jobs: no_sources_checked, no_source_retrieved (every source failed or was blocked: not 'no vacancies') or none_found_in_sources_checked.
+     */
+    empty_reason: string | null;
 };
 
 /**
@@ -853,6 +1229,32 @@ export type LabelMatchOut = {
      * Isco Label
      */
     isco_label: string;
+};
+
+/**
+ * Location
+ */
+export type Location = {
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Locality
+     */
+    locality?: string | null;
+    /**
+     * Region
+     */
+    region?: string | null;
+    /**
+     * Postal Code
+     */
+    postal_code?: string | null;
+    /**
+     * Country
+     */
+    country?: string | null;
 };
 
 /**
@@ -1149,6 +1551,61 @@ export type PartialReplyOut = {
      */
     updated_at: string | null;
 };
+
+/**
+ * PasteText
+ *
+ * A posting the person pasted: their own example of a target (spec section 7, "User
+ * examples versus discovered corpus").
+ */
+export type PasteText = {
+    /**
+     * Target
+     */
+    target: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Employer
+     */
+    employer?: string | null;
+    /**
+     * City
+     */
+    city?: string | null;
+    /**
+     * Source Url
+     *
+     * Where the person copied it from, as a reference only.
+     */
+    source_url?: string | null;
+};
+
+/**
+ * PayBasis
+ *
+ * Advertised (stated by the source), predicted (a provider's estimate, such as
+ * Adzuna's `salary_is_predicted`) and unknown stay distinct (spec section 6).
+ */
+export const PayBasis = {
+    ADVERTISED: 'advertised',
+    PREDICTED: 'predicted',
+    UNKNOWN: 'unknown'
+} as const;
+
+/**
+ * PayBasis
+ *
+ * Advertised (stated by the source), predicted (a provider's estimate, such as
+ * Adzuna's `salary_is_predicted`) and unknown stay distinct (spec section 6).
+ */
+export type PayBasis = typeof PayBasis[keyof typeof PayBasis];
 
 /**
  * PayPeriod
@@ -1726,6 +2183,20 @@ export const Resolution = {
 export type Resolution = typeof Resolution[keyof typeof Resolution];
 
 /**
+ * Retention
+ *
+ * What a workspace keeps of a source's body.
+ */
+export const Retention = { BODY: 'body', EXCERPTS: 'excerpts' } as const;
+
+/**
+ * Retention
+ *
+ * What a workspace keeps of a source's body.
+ */
+export type Retention = typeof Retention[keyof typeof Retention];
+
+/**
  * RevertProfile
  *
  * Restore an earlier version's answers, each with its own source, as a new version.
@@ -1744,13 +2215,37 @@ export type RevertProfile = {
 };
 
 /**
+ * RightsClass
+ *
+ * The page classes of the session 1 rights policy (H-06; `corpus/README.md`).
+ */
+export const RightsClass = {
+    GOVUK: 'govuk',
+    PUBLIC_SECTOR: 'public-sector',
+    COURSE_PROVIDER: 'course-provider',
+    PROFESSIONAL_BODY: 'professional-body',
+    EMPLOYER_POSTING: 'employer-posting',
+    JOB_BOARD: 'job-board',
+    OTHER: 'other'
+} as const;
+
+/**
+ * RightsClass
+ *
+ * The page classes of the session 1 rights policy (H-06; `corpus/README.md`).
+ */
+export type RightsClass = typeof RightsClass[keyof typeof RightsClass];
+
+/**
  * RunKind
  */
 export const RunKind = {
     CONNECTION_CHECK: 'connection_check',
     INTERVIEW_TURN: 'interview_turn',
     DISCOVERY: 'discovery',
-    SLATE_EXPLANATION: 'slate_explanation'
+    SLATE_EXPLANATION: 'slate_explanation',
+    ACQUISITION: 'acquisition',
+    SOURCE_SEARCH: 'source_search'
 } as const;
 
 /**
@@ -1778,9 +2273,11 @@ export type RunOut = {
     synthetic: boolean;
     /**
      * Model Id
+     *
+     * None for a run that calls no model (acquisition).
      */
-    model_id: string;
-    model_mode: ModelMode;
+    model_id: string | null;
+    model_mode: ModelMode | null;
     /**
      * Created At
      */
@@ -1793,6 +2290,12 @@ export type RunOut = {
      * Finished At
      */
     finished_at: string | null;
+    /**
+     * Cancel Requested At
+     *
+     * When the person asked to cancel it; the run ends `cancelled` once the worker has stopped it.
+     */
+    cancel_requested_at?: string | null;
     /**
      * Attempts
      */
@@ -1821,6 +2324,29 @@ export type RunPage = {
      * Next Cursor
      */
     next_cursor: string | null;
+};
+
+/**
+ * Salary
+ *
+ * Pay as the source gives it, before any normalisation. GBP in minor units; a period
+ * the source does not state stays None (never assumed to be a year).
+ */
+export type Salary = {
+    /**
+     * Currency
+     */
+    currency: string;
+    /**
+     * Minimum Minor Units
+     */
+    minimum_minor_units?: number | null;
+    /**
+     * Maximum Minor Units
+     */
+    maximum_minor_units?: number | null;
+    period: SalaryPeriod | null;
+    basis: PayBasis;
 };
 
 /**
@@ -1865,6 +2391,60 @@ export type SalaryInput = {
 };
 
 /**
+ * SalaryPeriod
+ *
+ * The period a source states pay per (the profile's salary floor has its own).
+ */
+export const SalaryPeriod = {
+    YEAR: 'year',
+    MONTH: 'month',
+    WEEK: 'week',
+    DAY: 'day',
+    HOUR: 'hour'
+} as const;
+
+/**
+ * SalaryPeriod
+ *
+ * The period a source states pay per (the profile's salary floor has its own).
+ */
+export type SalaryPeriod = typeof SalaryPeriod[keyof typeof SalaryPeriod];
+
+/**
+ * SearchCandidate
+ */
+export type SearchCandidate = {
+    /**
+     * Url
+     */
+    url: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Grounded
+     *
+     * The search actually returned this URL.
+     */
+    grounded: boolean;
+};
+
+/**
+ * SearchExcluded
+ */
+export type SearchExcluded = {
+    /**
+     * Url
+     */
+    url: string;
+    /**
+     * Reason
+     */
+    reason: string;
+};
+
+/**
  * SearchMatch
  */
 export const SearchMatch = { ALL: 'all', ANY: 'any' } as const;
@@ -1873,6 +2453,60 @@ export const SearchMatch = { ALL: 'all', ANY: 'any' } as const;
  * SearchMatch
  */
 export type SearchMatch = typeof SearchMatch[keyof typeof SearchMatch];
+
+/**
+ * SearchOut
+ *
+ * A source search: candidate pages only, never claims. The person chooses which to
+ * acquire; a candidate the search did not return is marked ungrounded.
+ */
+export type SearchOut = {
+    /**
+     * Search Id
+     */
+    search_id: string;
+    run: RunOut;
+    /**
+     * None until the run is complete.
+     */
+    proposal: SearchProposal | null;
+};
+
+/**
+ * SearchProposal
+ *
+ * A source search's validated output: candidates only, never claims.
+ */
+export type SearchProposal = {
+    /**
+     * Target
+     */
+    target: string;
+    /**
+     * City
+     */
+    city: string;
+    /**
+     * Candidates
+     */
+    candidates: Array<SearchCandidate>;
+    /**
+     * Excluded
+     */
+    excluded: Array<SearchExcluded>;
+    /**
+     * Queries
+     *
+     * What the model searched for.
+     */
+    queries: Array<string>;
+    /**
+     * Sources Seen
+     *
+     * Distinct pages the search returned.
+     */
+    sources_seen: number;
+};
 
 /**
  * SetPreferences
@@ -1973,6 +2607,31 @@ export type SkillRefOut = {
      * essential or optional (ESCO's occupation-skill link).
      */
     relation: string;
+};
+
+/**
+ * SkippedOut
+ *
+ * A URL not fetched by this request: another run is fetching it (`in_flight`), or it
+ * failed recently and waits out its back-off (`backing_off`, until `retry_at`).
+ */
+export type SkippedOut = {
+    /**
+     * Url
+     */
+    url: string;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Retry At
+     */
+    retry_at: string | null;
 };
 
 /**
@@ -2122,6 +2781,134 @@ export type SlateOut = {
 };
 
 /**
+ * SourceAttemptOut
+ *
+ * One try to obtain a source (spec section 18, SourceAttempt). Blocked and failed tries
+ * are kept with their reason; a URL never carries a credential.
+ */
+export type SourceAttemptOut = {
+    /**
+     * Attempt Id
+     */
+    attempt_id: string;
+    route: InputRoute;
+    /**
+     * Provider
+     */
+    provider: string;
+    /**
+     * Requested Url
+     */
+    requested_url: string | null;
+    /**
+     * Final Url
+     */
+    final_url: string | null;
+    /**
+     * Redirects
+     */
+    redirects: Array<string>;
+    status: AttemptStatus;
+    /**
+     * Reason
+     *
+     * Why it was blocked or failed: a label, never text.
+     */
+    reason: string | null;
+    /**
+     * Transient
+     */
+    transient: boolean;
+    /**
+     * Retry Of
+     */
+    retry_of: string | null;
+    /**
+     * Http Status
+     */
+    http_status: number | null;
+    /**
+     * Content Type
+     */
+    content_type: string | null;
+    /**
+     * Content Sha256
+     */
+    content_sha256: string | null;
+    /**
+     * Byte Count
+     */
+    byte_count: number | null;
+    rights_class: RightsClass | null;
+    /**
+     * Rights Status
+     */
+    rights_status: string | null;
+    retention: Retention | null;
+    /**
+     * Http Requests
+     */
+    http_requests: number;
+    /**
+     * Cost Nano Usd
+     *
+     * 0 for page fetches and Adzuna's free tier.
+     */
+    cost_nano_usd: number | null;
+    /**
+     * Started At
+     */
+    started_at: string;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+};
+
+/**
+ * SourceClaimOut
+ *
+ * One field value with the span that supports it (spec section 18, SourceClaim).
+ */
+export type SourceClaimOut = {
+    /**
+     * Claim Id
+     */
+    claim_id: number;
+    /**
+     * Copy Id
+     */
+    copy_id: string;
+    /**
+     * Attempt Id
+     */
+    attempt_id: string;
+    field: ClaimField;
+    /**
+     * Value
+     */
+    value: unknown;
+    validation: ValidationState;
+    /**
+     * Issue
+     */
+    issue: string | null;
+    span: SourceSpan;
+    /**
+     * Retrieved At
+     */
+    retrieved_at: string;
+    /**
+     * Published On
+     */
+    published_on: string | null;
+    /**
+     * Valid Until
+     */
+    valid_until: string | null;
+};
+
+/**
  * SourceKind
  */
 export const SourceKind = {
@@ -2224,6 +3011,36 @@ export type SourceRefOut = {
 };
 
 /**
+ * SourceSpan
+ *
+ * Where a value is in its source: character offsets into the source's text (a page's
+ * decoded HTML or the pasted text), or for an API response a JSON pointer; with a minimal
+ * excerpt either way, so a reviewer can find what supported the value at retrieval time.
+ */
+export type SourceSpan = {
+    /**
+     * Source Sha256
+     */
+    source_sha256: string;
+    /**
+     * Start
+     */
+    start?: number | null;
+    /**
+     * End
+     */
+    end?: number | null;
+    /**
+     * Pointer
+     */
+    pointer?: string | null;
+    /**
+     * Excerpt
+     */
+    excerpt: string;
+};
+
+/**
  * SpendOut
  *
  * Provider spend in integer nano-USD (Meta bills in USD; never a float).
@@ -2307,6 +3124,19 @@ export type StoreKey = {
 };
 
 /**
+ * SubmitAcquisition
+ *
+ * Up to ten URLs, or one Adzuna search: never both.
+ */
+export type SubmitAcquisition = {
+    /**
+     * Urls
+     */
+    urls?: Array<string>;
+    adzuna?: AdzunaQuery | null;
+};
+
+/**
  * SubmitDiscovery
  */
 export type SubmitDiscovery = {
@@ -2348,6 +3178,28 @@ export type SubmitRun = {
 };
 
 /**
+ * SubmitSearch
+ */
+export type SubmitSearch = {
+    /**
+     * Expected Profile Version
+     */
+    expected_profile_version: number;
+    /**
+     * Target
+     *
+     * One of your target roles.
+     */
+    target: string;
+    /**
+     * City
+     *
+     * One of your cities.
+     */
+    city: string;
+};
+
+/**
  * SubmitTurn
  */
 export type SubmitTurn = {
@@ -2359,6 +3211,20 @@ export type SubmitTurn = {
      * Message
      */
     message: string;
+};
+
+/**
+ * SubmittedAcquisitionOut
+ */
+export type SubmittedAcquisitionOut = {
+    /**
+     * None when every URL was skipped: nothing was started.
+     */
+    acquisition: AcquisitionOut | null;
+    /**
+     * Skipped
+     */
+    skipped: Array<SkippedOut>;
 };
 
 /**
@@ -2513,6 +3379,37 @@ export type TargetListInput = {
      * Value
      */
     value?: Array<string> | null;
+};
+
+/**
+ * TargetOut
+ */
+export type TargetOut = {
+    /**
+     * Position
+     */
+    position: number;
+    route: InputRoute;
+    /**
+     * Url
+     */
+    url: string | null;
+    /**
+     * Query
+     */
+    query: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Status
+     *
+     * queued, succeeded, blocked, failed, cancelled, or not_attempted (the run ended before it).
+     */
+    status: string;
+    /**
+     * Attempts
+     */
+    attempts: Array<SourceAttemptOut>;
 };
 
 /**
@@ -2798,6 +3695,38 @@ export type TurnSubmittedOut = {
     decision: DecisionOut | null;
     support_note: SupportNoteOut | null;
 };
+
+/**
+ * ValidationState
+ *
+ * How a claim's value was established. Only deterministic code approves a value.
+ */
+export const ValidationState = {
+    STRUCTURED: 'structured',
+    USER_SUPPLIED: 'user_supplied',
+    QUARANTINED: 'quarantined'
+} as const;
+
+/**
+ * ValidationState
+ *
+ * How a claim's value was established. Only deterministic code approves a value.
+ */
+export type ValidationState = typeof ValidationState[keyof typeof ValidationState];
+
+/**
+ * WorkMode
+ */
+export const WorkMode = {
+    ON_SITE: 'on_site',
+    REMOTE: 'remote',
+    HYBRID: 'hybrid'
+} as const;
+
+/**
+ * WorkMode
+ */
+export type WorkMode = typeof WorkMode[keyof typeof WorkMode];
 
 /**
  * WorkState
@@ -3889,6 +4818,52 @@ export type SubmitRunResponses = {
 
 export type SubmitRunResponse = SubmitRunResponses[keyof SubmitRunResponses];
 
+export type CancelRunData = {
+    body?: never;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/runs/{run_id}/cancel';
+};
+
+export type CancelRunErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type CancelRunError = CancelRunErrors[keyof CancelRunErrors];
+
+export type CancelRunResponses = {
+    /**
+     * Successful Response
+     */
+    202: RunOut;
+};
+
+export type CancelRunResponse = CancelRunResponses[keyof CancelRunResponses];
+
 export type GetRunData = {
     body?: never;
     path: {
@@ -4514,6 +5489,385 @@ export type GetSketchResponses = {
 };
 
 export type GetSketchResponse = GetSketchResponses[keyof GetSketchResponses];
+
+export type SubmitAcquisitionData = {
+    body: SubmitAcquisition;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/research/acquisitions';
+};
+
+export type SubmitAcquisitionErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type SubmitAcquisitionError = SubmitAcquisitionErrors[keyof SubmitAcquisitionErrors];
+
+export type SubmitAcquisitionResponses = {
+    /**
+     * Successful Response
+     */
+    202: SubmittedAcquisitionOut;
+};
+
+export type SubmitAcquisitionResponse = SubmitAcquisitionResponses[keyof SubmitAcquisitionResponses];
+
+export type GetAcquisitionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/research/acquisitions/{run_id}';
+};
+
+export type GetAcquisitionErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetAcquisitionError = GetAcquisitionErrors[keyof GetAcquisitionErrors];
+
+export type GetAcquisitionResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcquisitionOut;
+};
+
+export type GetAcquisitionResponse = GetAcquisitionResponses[keyof GetAcquisitionResponses];
+
+export type SubmitSearchData = {
+    body: SubmitSearch;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/research/searches';
+};
+
+export type SubmitSearchErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type SubmitSearchError = SubmitSearchErrors[keyof SubmitSearchErrors];
+
+export type SubmitSearchResponses = {
+    /**
+     * Successful Response
+     */
+    202: SearchOut;
+};
+
+export type SubmitSearchResponse = SubmitSearchResponses[keyof SubmitSearchResponses];
+
+export type GetSearchData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/research/searches/{run_id}';
+};
+
+export type GetSearchErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetSearchError = GetSearchErrors[keyof GetSearchErrors];
+
+export type GetSearchResponses = {
+    /**
+     * Successful Response
+     */
+    200: SearchOut;
+};
+
+export type GetSearchResponse = GetSearchResponses[keyof GetSearchResponses];
+
+export type PasteTextData = {
+    body: PasteText;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/research/pasted';
+};
+
+export type PasteTextErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type PasteTextError = PasteTextErrors[keyof PasteTextErrors];
+
+export type PasteTextResponses = {
+    /**
+     * Successful Response
+     */
+    201: JobDetailOut;
+};
+
+export type PasteTextResponse = PasteTextResponses[keyof PasteTextResponses];
+
+export type ListJobsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: {
+        /**
+         * Favourites
+         */
+        favourites?: boolean;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/v1/workspaces/{workspace_id}/jobs';
+};
+
+export type ListJobsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ListJobsError = ListJobsErrors[keyof ListJobsErrors];
+
+export type ListJobsResponses = {
+    /**
+     * Successful Response
+     */
+    200: JobPage;
+};
+
+export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
+
+export type GetJobData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/jobs/{job_id}';
+};
+
+export type GetJobErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetJobError = GetJobErrors[keyof GetJobErrors];
+
+export type GetJobResponses = {
+    /**
+     * Successful Response
+     */
+    200: JobDetailOut;
+};
+
+export type GetJobResponse = GetJobResponses[keyof GetJobResponses];
+
+export type UnfavouriteJobData = {
+    body?: never;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/jobs/{job_id}/favourite';
+};
+
+export type UnfavouriteJobErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type UnfavouriteJobError = UnfavouriteJobErrors[keyof UnfavouriteJobErrors];
+
+export type UnfavouriteJobResponses = {
+    /**
+     * Successful Response
+     */
+    200: JobOut;
+};
+
+export type UnfavouriteJobResponse = UnfavouriteJobResponses[keyof UnfavouriteJobResponses];
+
+export type FavouriteJobData = {
+    body?: never;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Job Id
+         */
+        job_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/jobs/{job_id}/favourite';
+};
+
+export type FavouriteJobErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type FavouriteJobError = FavouriteJobErrors[keyof FavouriteJobErrors];
+
+export type FavouriteJobResponses = {
+    /**
+     * Successful Response
+     */
+    200: JobOut;
+};
+
+export type FavouriteJobResponse = FavouriteJobResponses[keyof FavouriteJobResponses];
 
 export type GetTaxonomyData = {
     body?: never;

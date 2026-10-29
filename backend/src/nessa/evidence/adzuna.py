@@ -21,6 +21,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import Field, SecretStr
 
+from nessa.evidence.addresses import apply_link
 from nessa.evidence.amounts import minor_units
 from nessa.evidence.jobs import advertiser_kind, description_fingerprints
 from nessa.evidence.records import (
@@ -65,12 +66,14 @@ class AdzunaQuery(StrictModel):
         ]
 
 
-def recorded_url(query: AdzunaQuery) -> str:
+def recorded_url(query: AdzunaQuery, search_url: str = SEARCH_URL) -> str:
     """The request as Nessa records it: never with the credentials."""
-    return f"{SEARCH_URL.format(page=query.page)}?{urlencode(query._parameters())}"
+    return f"{search_url.format(page=query.page)}?{urlencode(query._parameters())}"
 
 
-def transport_url(query: AdzunaQuery, app_id: SecretStr, app_key: SecretStr) -> str:
+def transport_url(
+    query: AdzunaQuery, app_id: SecretStr, app_key: SecretStr, search_url: str = SEARCH_URL
+) -> str:
     """The URL sent to Adzuna. Only the acquisition worker builds it, for one HTTP call;
     it is never stored, logged or returned."""
     parameters = [
@@ -79,7 +82,7 @@ def transport_url(query: AdzunaQuery, app_id: SecretStr, app_key: SecretStr) -> 
         *query._parameters(),
         ("content-type", "application/json"),
     ]
-    return f"{SEARCH_URL.format(page=query.page)}?{urlencode(parameters)}"
+    return f"{search_url.format(page=query.page)}?{urlencode(parameters)}"
 
 
 def redact(url: str) -> str:
@@ -242,7 +245,7 @@ def _copy(result: dict[str, Any], claims: _Claims) -> JobCopy | None:
             ClaimField.DESCRIPTION, DescriptionKind.SNIPPET.value, "description", description
         )
     redirect = result.get("redirect_url")
-    apply_url = redirect if isinstance(redirect, str) and redirect.startswith("https://") else None
+    apply_url = apply_link(redirect)  # the one check for every apply link
     if apply_url is not None:
         claims.add(ClaimField.APPLY_URL, apply_url, "redirect_url", redirect)
     return JobCopy(

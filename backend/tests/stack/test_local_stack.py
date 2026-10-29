@@ -146,8 +146,8 @@ BASH_PROBE = (
 def probe(stack: Stack, service: str, port: int, *, outside: bool = True) -> str:
     """Connect to the host listener and, when `outside`, to TEST_NET and resolve a public
     name through the container's resolver. The host listener is the egress evidence; the
-    edge control and the live-mode worker have a real route, so they probe the host only."""
-    if service in ("api", "edge", "worker"):
+    edge control and the live-mode workers have a real route, so they probe the host only."""
+    if service in ("api", "edge", "worker", "acquisition"):
         targets = [("host", ("host.docker.internal", port))]
         if outside:
             targets.append(("outside", (TEST_NET, 443)))
@@ -181,21 +181,21 @@ def test_demo_mode_services_have_no_route_out_and_the_probe_can_see_one(
     assert accepted
 
     accepted.clear()
-    services = ("api", "worker", "auth", "web", "postgres")
+    services = ("api", "worker", "acquisition", "auth", "web", "postgres")
     results = {service: probe(demo_stack, service, port) for service in services}
 
     assert "connected" not in results["postgres"], results
-    for service in ("api", "worker", "auth", "web"):
+    for service in ("api", "worker", "acquisition", "auth", "web"):
         outcome = json.loads(results[service])
         assert outcome["outside"] != "connected", (service, outcome)
         assert outcome["host"] != "connected", (service, outcome)
-    for service in ("api", "worker", "auth", "web"):
+    for service in ("api", "worker", "acquisition", "auth", "web"):
         assert json.loads(results[service])["dns"] != "resolved", service
     assert accepted == []  # nothing reached the host from inside the internal network
 
 
-@pytest.mark.req("BND1-11")
-def test_live_mode_gives_the_worker_and_only_the_worker_a_route_out(
+@pytest.mark.req("BND1-11", "ACQ-05")
+def test_live_mode_gives_the_two_workers_and_nothing_else_a_route_out(
     demo_stack: Stack, host_listener: tuple[int, list[bool]]
 ) -> None:
     port, accepted = host_listener
@@ -204,10 +204,11 @@ def test_live_mode_gives_the_worker_and_only_the_worker_a_route_out(
     )
     live.up(*CORE_SERVICES)
     try:
-        worker = json.loads(probe(live, "worker", port, outside=False))
-        assert worker["host"] == "connected"
-        assert accepted
-        accepted.clear()
+        for service in ("worker", "acquisition"):
+            reached = json.loads(probe(live, service, port, outside=False))
+            assert reached["host"] == "connected", service
+            assert accepted
+            accepted.clear()
         api = json.loads(probe(live, "api", port, outside=False))
         web = json.loads(probe(live, "web", port))
         assert api["host"] != "connected"
@@ -217,7 +218,43 @@ def test_live_mode_gives_the_worker_and_only_the_worker_a_route_out(
         assert accepted == []
     finally:
         demo_stack.up(*CORE_SERVICES)  # back to demo for the remaining tests
-    assert json.loads(probe(demo_stack, "worker", port, outside=False))["host"] != "connected"
+    for service in ("worker", "acquisition"):
+        assert json.loads(probe(demo_stack, service, port, outside=False))["host"] != "connected"
+
+
+def _inspect(stack: Stack, service: str) -> dict[str, Any]:
+    inspected = subprocess.run(  # noqa: S603
+        ["docker", "inspect", stack.container_id(service)],  # noqa: S607
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    found: dict[str, Any] = json.loads(inspected.stdout)[0]
+    return found
+
+
+@pytest.mark.req("ACQ-05")
+def test_the_acquisition_worker_holds_no_database_secret_master_key_or_model_key(
+    demo_stack: Stack,
+) -> None:
+    # Global Constraint 8, as the container really runs: its only mount is the Adzuna
+    # credential directory, it has no Compose secret, and nothing in its environment names a
+    # database, a master key or a Meta key. The worker that does hold them is the contrast.
+    acquisition = _inspect(demo_stack, "acquisition")
+    worker = _inspect(demo_stack, "worker")
+
+    mounts = {m["Destination"] for m in acquisition["Mounts"]}
+    assert mounts == {"/run/nessa/adzuna"}
+    assert all(m["RW"] is False for m in acquisition["Mounts"])
+    names = {entry.partition("=")[0] for entry in acquisition["Config"]["Env"]}
+    assert not {n for n in names if "DATABASE" in n or "MASTER_KEY" in n or "META" in n}
+    assert demo_stack.exec("acquisition", "ls", "/run/secrets").returncode != 0
+    assert "/run/nessa/keys" in {m["Destination"] for m in worker["Mounts"]}  # the contrast
+    assert (
+        demo_stack.exec("acquisition", "python", "-m", "nessa.acquisition", "--check").returncode
+        == 0
+    )
 
 
 @pytest.mark.req("ARC1-08")

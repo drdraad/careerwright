@@ -17,12 +17,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from nessa.seed import FIXTURE_WORKSPACE_ID
-from tools.localenv import REPO_ROOT, add_master_key_version, ensure_local_home, nessa_home
+from tools.localenv import (
+    REPO_ROOT,
+    add_master_key_version,
+    adzuna_configured,
+    ensure_local_home,
+    nessa_home,
+)
 
 COMPOSE_FILE = REPO_ROOT / "compose.yaml"
 LIVE_OVERRIDE = REPO_ROOT / "compose.live.yaml"
 DEFAULT_PROJECT = "nessa-l0"
-CORE_SERVICES = ("postgres", "auth", "edge", "api", "worker", "web")
+CORE_SERVICES = ("postgres", "auth", "edge", "api", "acquisition", "worker", "web")
 STOP_TIMEOUT_S = 10
 COMMAND_TIMEOUT_S = 600.0
 
@@ -64,6 +70,8 @@ class Stack:
             "NESSA_AUTH_PORT": str(self.ports.auth),
             "NESSA_PG_PORT": str(self.ports.postgres),
             "NESSA_WEB_PORT": str(self.ports.web),
+            # Only whether the credentials are in place, never their values (ruling R4).
+            "NESSA_ADZUNA_CONFIGURED": "true" if adzuna_configured(self.home) else "false",
             **dict(self.overrides),
         }
 

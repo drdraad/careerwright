@@ -1,8 +1,11 @@
-# Live mode (`make dev`): the DBOS worker, and only the worker, gets a route out of the
-# machine so its bounded model activity can reach the Meta Model API. Demo mode (`make demo`)
-# does not load this file, so no Nessa service can open an outbound connection.
+# Live mode (`make dev`): the DBOS worker gets a route out of the machine so its bounded model
+# activity can reach the Meta Model API, and the restricted acquisition worker gets one so it
+# can fetch permitted pages and query Adzuna (ADR 0009). Nothing else does. Demo mode
+# (`make demo`) does not load this file, so no Nessa service can open an outbound connection.
 services:
   worker:
+    networks: [internal, egress]
+  acquisition:
     networks: [internal, egress]
 
 networks:

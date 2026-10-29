@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 from tools import datasets
-from tools.localenv import ensure_local_home, nessa_home
+from tools.localenv import ensure_local_home, nessa_home, place_adzuna_credentials
 from tools.stack import Stack
 
 PNPM_VERSION = "10.33.2"
@@ -53,6 +53,8 @@ def main() -> None:
         raise SystemExit(1)
     created = ensure_local_home(nessa_home())
     print(f"local configuration in {nessa_home()}: {', '.join(created) or 'already complete'}")
+    # Live-vacancy mode is optional (R4): its absence is reported, never an error.
+    print(f"Adzuna credentials: {place_adzuna_credentials(nessa_home())}")
     datasets.main([])  # exits non-zero, with the manual step, if a pinned file cannot be had
     print("building images (locked dependencies)...", flush=True)
     Stack().build()

@@ -33,6 +33,9 @@ class EventKind(StrEnum):
     SPEND_LIMITS_UPDATED = "spend_limits.updated"
     RUN_STATE_CHANGED = "run.state_changed"
     RUN_PARTIAL_UPDATED = "run.partial_updated"  # detail: the partial's sequence number only
+    RUN_CANCEL_REQUESTED = "run.cancel_requested"
+    # An acquisition run finished one of its targets; detail: the target's position only.
+    RESEARCH_UPDATED = "research.updated"
     PROVISIONAL_CONCEPT_CREATED = "concept.provisional_created"
     INTERVIEW_TURN_DECIDED = "interview.turn_decided"
     INTERVIEW_PREFERENCES_UPDATED = "interview.preferences_updated"
@@ -82,6 +85,13 @@ class RunKind(StrEnum):
     INTERVIEW_TURN = "interview_turn"
     DISCOVERY = "discovery"  # search queries for career suggestions, from the confirmed profile
     SLATE_EXPLANATION = "slate_explanation"  # the written "Why this could suit you" of a slate
+    # Fetch permitted pages or query Adzuna through the restricted acquisition worker. Calls
+    # no model, so it names none and needs no key.
+    ACQUISITION = "acquisition"
+    SOURCE_SEARCH = "source_search"  # Meta search proposes candidate pages for a target
+
+
+KEYLESS_KINDS = frozenset({RunKind.ACQUISITION})
 
 
 class PartialCompleteness(StrEnum):
@@ -113,8 +123,8 @@ class Run:
     data_mode: DataMode
     synthetic: bool
     requested_by: uuid.UUID
-    model_id: str
-    model_mode: str
+    model_id: str | None  # None only for a keyless kind (`KEYLESS_KINDS`)
+    model_mode: str | None
     status: WorkState
     failure_class: str | None
     output_id: uuid.UUID | None
@@ -124,6 +134,7 @@ class Run:
     # The profile version a run read, pinned at submission (ADR 0004 decision 7); None for
     # a run that reads no workspace input (the connection check).
     profile_version: int | None = None
+    cancel_requested_at: datetime | None = None  # DUR-05: the person asked to cancel it
 
 
 @dataclass(frozen=True)

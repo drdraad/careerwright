@@ -42,6 +42,10 @@ class FailureClass(StrEnum):
     MODEL_REFUSED = "model_refused"  # the provider's content filter refused to answer
     OUTPUT_TRUNCATED = "output_truncated"  # the output hit its token limit: never used
     APP_STORE_UNAVAILABLE = "app_store_unavailable"
+    # An acquisition run whose every source failed, or was refused by policy (Task 7A): never
+    # an empty success ("no vacancies"), and the attempts say which and why.
+    RETRIEVAL_FAILED = "retrieval_failed"
+    SOURCE_BLOCKED = "source_blocked"
     UNKNOWN_FAILURE = "unknown_failure"
 
 

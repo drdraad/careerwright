@@ -85,7 +85,9 @@ class PayBasis(StrEnum):
     UNKNOWN = "unknown"
 
 
-class PayPeriod(StrEnum):
+class SalaryPeriod(StrEnum):
+    """The period a source states pay per (the profile's salary floor has its own)."""
+
     YEAR = "year"
     MONTH = "month"
     WEEK = "week"
@@ -138,7 +140,7 @@ class Salary(StrictModel):
     currency: str = Field(pattern=r"^[A-Z]{3}$")
     minimum_minor_units: int | None = Field(default=None, ge=0)
     maximum_minor_units: int | None = Field(default=None, ge=0)
-    period: PayPeriod | None
+    period: SalaryPeriod | None
     basis: PayBasis
 
     @model_validator(mode="after")
