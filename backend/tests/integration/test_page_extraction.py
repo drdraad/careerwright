@@ -8,7 +8,7 @@ import json
 import secrets
 import threading
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -16,7 +16,7 @@ from typing import Any
 import psycopg
 import pytest
 
-from nessa.db import Engine, create_engine, run_transaction
+from nessa.db import Engine, Tx, create_engine, run_transaction
 from nessa.evidence import extraction
 from nessa.evidence.acquire import AcquisitionResult
 from nessa.evidence.extraction import DropReason
@@ -28,7 +28,7 @@ from nessa.identity.activity import ACTIVITY_MAX_ATTEMPTS
 from nessa.identity.keyring import Keyring, SealedValue, load_keyring
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.model_registry import model_entry
-from nessa.identity.records import EventKind
+from nessa.identity.records import EventKind, Run
 from nessa.identity.runs import output_context
 from nessa.vocabulary import WorkState
 from tests.integration.durable import Scenario, fresh_actor, make_scenario
@@ -666,61 +666,82 @@ def test_a_cancel_while_a_kept_page_for_extraction_is_recorded_ends_without_a_st
     assert documents == [{"n": 1}]
 
 
-@pytest.mark.req("DUR-05")
-@pytest.mark.parametrize("cascade", [False, True], ids=["a_run", "an_acquisition"])
-def test_a_cancel_while_the_worker_writes_a_run_s_event_ends_without_a_store_error(
-    infra: Infra, scenario: Scenario, cascade: bool
-) -> None:
-    # Task 7d (intermediate review, point 1). The worker locks a run's row and then writes the
-    # run's event, which locks the workspace's row (`activity._prepare` and `publish`,
-    # `acquisition.acquire_target`). A cancel's request takes a key-share lock on the run's
-    # row (the `run_cancellations` foreign key). Two connections: the worker's transaction
-    # holds the run's row until the cancel waits for it, then writes the event. Had the cancel
-    # locked the workspace's row before its requests, each would wait on the other and
-    # PostgreSQL would end one with a deadlock error. An acquisition's cancel asks for the runs
-    # it started too; the worker here holds the last of them.
+def _cascade(infra: Infra, scenario: Scenario) -> tuple[str, list[str]]:
+    """An acquisition (no worker runs it) and the two extraction runs it started."""
     workspace = scenario.workspace_id
-    if cascade:
-        cancelled = _unread_acquisition(scenario.api, infra, scenario.token, workspace)
-        started = [
-            _submit_as_worker(
-                infra, cancelled, _attempt(infra, cancelled, workspace, "no_structured_data")
-            )
-            for _ in range(2)
-        ]
-        publishing, asked = started[-1], [cancelled, *started]
-    else:
-        cancelled = publishing = scenario.submit()
-        asked = [cancelled]
+    acquisition_id = _unread_acquisition(scenario.api, infra, scenario.token, workspace)
+    started = [
+        _submit_as_worker(
+            infra, acquisition_id, _attempt(infra, acquisition_id, workspace, "no_structured_data")
+        )
+        for _ in range(2)
+    ]
+    return acquisition_id, started
+
+
+def _cancel_while_the_worker_holds(
+    infra: Infra, scenario: Scenario, cancelled: str, held: str, write: Callable[[Tx, Run], None]
+) -> Any:
+    """Two connections: a worker-role transaction locks `held`'s row, as the worker's first
+    lock (`activity._prepare` and `publish`, `acquisition.acquire_target`), until the cancel
+    of `cancelled` waits for that row at its request; then it makes `write` and commits.
+    Returns the cancel's answer."""
     answers: list[Any] = []
     cancelling = threading.Thread(
-        target=lambda: answers.append(_cancel(scenario.api, scenario.token, workspace, cancelled))
+        target=lambda: answers.append(
+            _cancel(scenario.api, scenario.token, scenario.workspace_id, cancelled)
+        )
     )
     engine, _ = _worker_engine(infra)
     try:
-        with run_transaction(engine, uuid.UUID(publishing)) as tx:
-            run = run_store.run(tx, uuid.UUID(publishing), lock=True)  # the worker's first lock
+        with run_transaction(engine, uuid.UUID(held)) as tx:
+            run = run_store.run(tx, uuid.UUID(held), lock=True)
             assert run is not None
-            assert run_store.mark_running(tx, run.run_id)
             cancelling.start()
             wait_for(
                 lambda: _lock_waits(infra, "transactionid", "run_cancellations"),
                 timeout_s=10.0,
                 what="the cancel's request at the run's row",
             )
-            identity_store.append_event(
-                tx,
-                run.workspace_id,
-                EventKind.RUN_STATE_CHANGED,
-                publishing,
-                state=WorkState.RUNNING,
-            )
+            write(tx, run)
     finally:
         if cancelling.ident is not None:
             cancelling.join(timeout=30.0)
         engine.dispose()
-
     [answer] = answers
+    return answer
+
+
+def _start_running(tx: Tx, run: Run) -> None:
+    """What `activity._prepare` writes under the run's row lock."""
+    assert run_store.mark_running(tx, run.run_id)
+    identity_store.append_event(
+        tx, run.workspace_id, EventKind.RUN_STATE_CHANGED, str(run.run_id), state=WorkState.RUNNING
+    )
+
+
+@pytest.mark.req("DUR-05")
+@pytest.mark.parametrize("cascade", [False, True], ids=["a_run", "an_acquisition"])
+def test_a_cancel_while_the_worker_writes_a_run_s_event_ends_without_a_store_error(
+    infra: Infra, scenario: Scenario, cascade: bool
+) -> None:
+    # Task 7d (intermediate review, point 1). The worker locks a run's row and then writes the
+    # run's event, which locks the workspace's row. A cancel's request takes a key-share lock
+    # on the run's row (the `run_cancellations` foreign key). The worker's transaction holds
+    # the run's row until the cancel waits for it, then writes the event. Had the cancel
+    # locked the workspace's row before its requests, each would wait on the other and
+    # PostgreSQL would end one with a deadlock error. An acquisition's cancel asks for the runs
+    # it started too; the worker here holds the last of them.
+    workspace = scenario.workspace_id
+    if cascade:
+        cancelled, started = _cascade(infra, scenario)
+        publishing, asked = started[-1], [cancelled, *started]
+    else:
+        cancelled = publishing = scenario.submit()
+        asked = [cancelled]
+
+    answer = _cancel_while_the_worker_holds(infra, scenario, cancelled, publishing, _start_running)
+
     assert answer.status_code == 202, answer.text  # the cancel: never a store error
     assert answer.json()["cancellation_requested"] == asked
     requested = infra.query(
