@@ -61,6 +61,8 @@ def test_each_target_s_pack_options_are_served_with_their_labels(api: ApiClient,
     fee = next(f for f in c04["facts"] if f["field"] == "fee_total")
     assert fee["value"] == {"currency": "GBP", "minor_units": 299500}
     assert fee["cited"]["claim_id"] == "C04.fee_total"
+    [whole] = c04["payment_plans"][0]["payments"]
+    assert whole["amount"] == {"currency": "GBP", "minor_units": 299500}  # Money, never bare
     assert c04["start"] is None  # unknown, never a default
     assert c04["unknown"]["start"] == "not stated on the page"
     # A target the pack does not cover has no options, and says so rather than empty success.

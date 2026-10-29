@@ -99,6 +99,10 @@ class FindingCode(StrEnum):
     WORKLOAD_UNKNOWN = "workload_unknown"
     ENTRY_REQUIREMENTS_UNCONFIRMED = "entry_requirements_unconfirmed"
     BASELINE_MISSING = "baseline_missing"
+    # A hard limit the person has not stated (its name is the reason): never a pass.
+    LIMIT_UNKNOWN = "limit_unknown"
+    # A payment due before the planning start: whether it was paid is not known.
+    PAYMENT_BEFORE_START = "payment_before_start"
     ECONOMIC_COST_CAP = "economic_cost_cap"
 
 
@@ -110,6 +114,8 @@ _UNRESOLVED = frozenset(
         FindingCode.WORKLOAD_UNKNOWN,
         FindingCode.ENTRY_REQUIREMENTS_UNCONFIRMED,
         FindingCode.BASELINE_MISSING,
+        FindingCode.LIMIT_UNKNOWN,
+        FindingCode.PAYMENT_BEFORE_START,
     }
 )
 
@@ -132,7 +138,9 @@ class Feasibility(StrEnum):
 
 
 class Verdict(StrEnum):
-    AFFORDABLE_AND_FEASIBLE = "affordable_and_feasible"  # every record reviewed, no condition
+    # Nothing qualifies it: every record reviewed, no condition, no synthetic input and an
+    # unqualified readiness. M0 matrices are always provisional, so L0 never reaches it.
+    AFFORDABLE_AND_FEASIBLE = "affordable_and_feasible"
     QUALIFIED = "affordable_and_feasible_with_qualifications"
     READINESS_NOT_REACHED = "readiness_not_reached_in_this_model"
     UNRESOLVED = "unresolved"
@@ -166,7 +174,9 @@ class RouteCheck(StrictModel):
     feasibility: Feasibility
     verdict: Verdict
     findings: list[Finding]
-    qualifications: list[RouteQualification]
+    # The route's own qualifications, then every one its readiness carries, by name: a
+    # qualified readiness never gives an unqualified verdict (R9; ADR 0013 decision 10).
+    qualifications: list[RouteQualification | Qualification]
     conditions: list[Condition]
     readiness_state: ReadinessState | None
     readiness_qualifications: list[Qualification]
@@ -229,10 +239,20 @@ class _Timeline:
 
     @property
     def usable(self) -> int:
-        return self.finish + 1
+        """The month from which what it grants is usable: the compiler's `usable_from`."""
+        return _index(self.variant.usable_index) + self.shift
 
     def active(self, month: int) -> bool:
         return self.placed and self.start <= month <= self.finish
+
+
+@dataclass
+class _Cover:
+    """Support paid to the provider: from which month it covers, and what of it is left."""
+
+    offset: int
+    support: Support
+    left: int
 
 
 @dataclass
@@ -301,6 +321,8 @@ class _Check:
         self.months = _Months(self.horizon)
         self.beyond: list[Liability] = []
         self.unscheduled: list[Liability] = []
+        self.before_start: list[Liability] = []
+        self.debts, self.debt_service = self._debts()
         self.costs_known = True
         self.support_outside = 0  # person-paid support received outside the horizon's months
         # A variant with no months can still bring pay or support: then the cash ledger is
@@ -336,7 +358,6 @@ class _Check:
         self._gates()
         income, hours = self._income_and_hours()
         self._workload(hours)
-        debts, debt_service = self._debts()
         income_ledger = self._income_ledger(income)
         direct = self._direct_ledger()
         cash = liquidity(
@@ -347,7 +368,7 @@ class _Check:
             later=self.months.later,
             living=self.inputs.living_outgoings_by_month,
             payments=self.months.payments,
-            debt_service=debt_service,
+            debt_service=self.debt_service,
             complete=self.costs_known
             and self.receipts_known
             and all(t.placed for t in self.present),
@@ -365,7 +386,7 @@ class _Check:
         if cap is not None and economic is not None and economic > cap:
             self.add(FindingCode.ECONOMIC_COST_CAP, amount=economic, limit=cap, unit="minor_units")
         objective = economic if self.inputs.objective_basis == "economic" else direct.total_minor
-        qualifications = self._qualifications()
+        qualifications = self._qualifications(readiness_qualifications)
         feasibility = self._feasibility()
         complete_cash = cash.complete
         return RouteCheck(
@@ -397,7 +418,7 @@ class _Check:
             minimum_prefunded_cash=_signed(
                 min(m.lower_bound_minor for m in cash.months) if complete_cash else None
             ),
-            ledgers=Ledgers(direct=direct, income=income_ledger, liquidity=cash, debts=debts),
+            ledgers=Ledgers(direct=direct, income=income_ledger, liquidity=cash, debts=self.debts),
         )
 
     # The selection and the gates (spec section 12, "Decision variables and prerequisites").
@@ -507,7 +528,15 @@ class _Check:
                     verification="confirm_offer_accepted",
                 )
             )
-        waived = any(s.paid_to == "provider" and s.covers_fees_in_full for s in counted)
+        # Support paid to the provider covers what falls due once the award is made: from the
+        # start or, for a conditional award in the delay scenario, that many months later, so
+        # the person pays whatever falls due before it arrives (ADR 0013 decision 9).
+        covers = [
+            _Cover(self._award_offset(s), s, s.amount_minor)
+            for s in counted
+            if s.paid_to == "provider"
+        ]
+        waived = any(c.support.covers_fees_in_full and c.offset == 0 for c in covers)
         if variant.cost_unknown is not None and not waived:
             self.costs_known = False
             self.add(
@@ -521,16 +550,17 @@ class _Check:
                 variant_id=variant.variant_id,
                 reason="the number or the exact amount of its payments is not stated",
             )
-            self._single_payment(variant.recurring.amount_minor, variant.variant_id)
-        cover = sum(
-            s.amount_minor or 0 for s in counted if s.paid_to == "provider" and s.amount_minor
-        )
+            self._single_payment(variant.recurring.amount.minor_units, variant.variant_id)
         fees = 0
-        for index, kind, amount in sorted(due, key=lambda d: (d[0] is None, d[0] or 0)):
-            covered = amount if waived and kind != "extra" else 0
-            if not waived and kind != "extra":
-                covered = min(cover, amount)
-                cover -= covered
+        for index, kind, amount, when in sorted(due, key=lambda d: (d[0] is None, d[0] or 0)):
+            covered = 0
+            for cover in covers if kind != "extra" else []:
+                if not self._covered(timeline, index, cover.offset):
+                    continue
+                owed = amount - covered
+                take = owed if cover.support.covers_fees_in_full else min(cover.left, owed)
+                covered += take
+                cover.left -= take
             paid = amount - covered
             fees += paid if kind != "extra" else 0
             if index is None:
@@ -544,18 +574,46 @@ class _Check:
                         variant_id=variant.variant_id, due=self.label(index), amount_minor=paid
                     )
                 )
-            elif index >= 1:  # before the planning start: refused as starting before it
+            elif index < 1:
+                self._before_start(variant.variant_id, when or self.label(index), paid)
+            else:
                 self.months.payments[index - 1] += paid
                 self.months.to_provider[index - 1] += covered
         for support in counted:
             if support.paid_to == "person":
                 self._receipt(timeline, support, fees)
-                fees = max(0, fees - (support.amount_minor or 0))
+                fees = max(0, fees - support.amount_minor)
 
-    def _due(self, timeline: _Timeline) -> list[tuple[int | None, str, int]]:
+    def _award_offset(self, support: Support) -> int:
+        """Months after the variant's start at which an award is made."""
+        delayed = self.scenario is Scenario.DELAY and support.conditional
+        return self.inputs.scenario_delay_months if delayed else 0
+
+    @staticmethod
+    def _covered(timeline: _Timeline, index: int | None, offset: int) -> bool:
+        if offset == 0:
+            return True
+        # A delayed award covers only a payment known to fall due after it arrives.
+        return index is not None and timeline.placed and index >= timeline.start + offset
+
+    def _before_start(self, variant_id: str, due: str, amount: int) -> None:
+        """Due before the planning start: never dropped, and whether it was paid is never
+        guessed, so the direct cost is unknown until the person says."""
+        self.costs_known = False
+        self.before_start.append(Liability(variant_id=variant_id, due=due, amount_minor=amount))
+        self.add(
+            FindingCode.PAYMENT_BEFORE_START,
+            variant_id=variant_id,
+            amount=amount,
+            unit="minor_units",
+            reason=f"due {due}, before the planning start {self.inputs.planning_start}",
+        )
+
+    def _due(self, timeline: _Timeline) -> list[tuple[int | None, str, int, str | None]]:
+        """Each payment's month index, kind, amount and stated due date."""
         variant = timeline.variant
         start = self.monthly.start
-        due: list[tuple[int | None, str, int]] = []
+        due: list[tuple[int | None, str, int, str | None]] = []
         for payment in variant.payments:
             if payment.due is not None:
                 index: int | None = Month.of(payment.due).months_after(start) + 1 + timeline.shift
@@ -563,22 +621,25 @@ class _Check:
                 index = timeline.start + payment.offset
             else:
                 index = None
-            due.append((index, payment.kind, payment.amount_minor))
+            stated = payment.due.isoformat() if payment.due is not None else None
+            due.append((index, payment.kind, payment.amount_minor, stated))
         recurring = variant.recurring
         if recurring is not None and recurring.total_minor and recurring.count:
             for n in range(recurring.count):
                 index = timeline.start + n if variant.placed else None
-                due.append((index, "instalment", recurring.amount_minor))
+                due.append((index, "instalment", recurring.amount.minor_units, None))
         return due
 
     def _single_payment(self, amount: int, variant_id: str) -> None:
-        """A payment whose month is unknown still exceeds the monthly cap in any month."""
+        """A payment whose month is unknown still exceeds the monthly cap in any month, with
+        the least any month's debt repayments add (spec section 12: P_m + R_m <= M_m)."""
         cap = self.inputs.monthly_payment_cap_minor
-        if cap is not None and amount > cap:
+        total = amount + min(self.debt_service, default=0)
+        if cap is not None and total > cap:
             self.add(
                 FindingCode.MONTHLY_PAYMENT_CAP,
                 variant_id=variant_id,
-                amount=amount,
+                amount=total,
                 limit=cap,
                 unit="minor_units",
             )
@@ -613,22 +674,22 @@ class _Check:
                 if t.active(month) and t.variant.work_pattern is not None
             ]
             job: WorkPattern | None = patterns[0] if patterns else None
-            if len({(p.kind, p.hours_per_week, p.net_income_minor) for p in patterns}) > 1:
+            if len({(p.kind, p.hours_per_week, p.net_income) for p in patterns}) > 1:
                 self.add(FindingCode.CONFLICTING_WORK_PATTERNS, month=self.label(month))
-            pay = job.net_income_minor if job else continuation.net_income_by_month[month - 1]
+            pay = job.net_income.minor_units if job else continuation.net_income_by_month[month - 1]
             self._pay(month, pay, self.inputs.wage_timing)
             total = pay
             for timeline in self.present:
                 wage = timeline.variant.wage
                 if wage is None or not timeline.active(month):
                     continue
-                total += wage.net_income_minor
+                total += wage.net_income.minor_units
                 timing = (
                     ReceiptTiming.LATER
                     if timeline.variant.conditional_offer
                     else self.inputs.wage_timing
                 )
-                self._pay(month, wage.net_income_minor, timing)
+                self._pay(month, wage.net_income.minor_units, timing)
             income.append(total)
             hours.append(job.hours_per_week if job else continuation.hours_per_week)
         return income, hours
@@ -770,6 +831,7 @@ class _Check:
             months=months,
             beyond_horizon=self.beyond,
             unscheduled=self.unscheduled,
+            before_start=self.before_start,
             complete=self.costs_known,
             total_minor=max(0, total) if self.costs_known else None,
         )
@@ -785,6 +847,15 @@ class _Check:
             - sum(self.months.support)
             - self.support_outside
         )
+        # An unknown hard limit is never a pass (review I2): the deficit cap applies only when
+        # the person sets one, and the economic-cost cap is a preference, so neither is here.
+        for name, value in (
+            ("direct_spend_cap", inputs.direct_spend_cap_minor),
+            ("monthly_payment_cap", inputs.monthly_payment_cap_minor),
+            ("reserve", inputs.reserve_minor),
+        ):
+            if value is None:
+                self.add(FindingCode.LIMIT_UNKNOWN, reason=name)
         if inputs.direct_spend_cap_minor is not None and known > inputs.direct_spend_cap_minor:
             self.add(
                 FindingCode.DIRECT_SPEND_CAP,
@@ -794,11 +865,13 @@ class _Check:
             )
         cap = inputs.monthly_payment_cap_minor
         for n, amount in enumerate(self.months.payments):
-            if cap is not None and amount > cap:
+            # Spec section 12: P_m + R_m <= M_m, every repayment included (ADR 0013 decision 6).
+            outgoing = amount + self.debt_service[n]
+            if cap is not None and outgoing > cap:
                 self.add(
                     FindingCode.MONTHLY_PAYMENT_CAP,
                     month=self.label(n + 1),
-                    amount=amount,
+                    amount=outgoing,
                     limit=cap,
                     unit="minor_units",
                 )
@@ -821,14 +894,15 @@ class _Check:
                             limit=deficit_cap,
                             unit="minor_units",
                         )
-        if self.receipts_known and all(t.placed for t in self.present):
+        reserve = inputs.reserve_minor
+        if reserve is not None and self.receipts_known and all(t.placed for t in self.present):
             for cash_month in cash:
-                if cash_month.lower_bound_minor < inputs.reserve_minor:
+                if cash_month.lower_bound_minor < reserve:
                     self.add(
                         FindingCode.RESERVE,
                         month=cash_month.month,
                         amount=cash_month.lower_bound_minor,
-                        limit=inputs.reserve_minor,
+                        limit=reserve,
                         unit="minor_units",
                     )
 
@@ -862,9 +936,11 @@ class _Check:
                 return last.state, last.qualifications, boundary
         return last.state, last.qualifications, None
 
-    def _qualifications(self) -> list[RouteQualification]:
+    def _qualifications(
+        self, readiness: list[Qualification]
+    ) -> list[RouteQualification | Qualification]:
         states = {s for v in self.selected for s in v.review_states}
-        found = []
+        found: list[RouteQualification | Qualification] = []
         if RecordState.PROPOSED in states:
             found.append(RouteQualification.PROPOSED_RECORDS)
         if RecordState.ACCEPTED_ASSUMPTION in states:
@@ -877,6 +953,10 @@ class _Check:
             found.append(RouteQualification.CONDITIONAL_AWARD)
         if self.monthly.readiness is None:
             found.append(RouteQualification.READINESS_NOT_ASSESSED)
+        # Every qualification readiness carries, by name, the provisional matrix included: in
+        # L0 a route resting on the pack reads qualified (R9; ADR 0013 decision 10). A name
+        # both lists share ("proposed_records") is listed once.
+        found += [q for q in readiness if q.value not in {f.value for f in found}]
         return found
 
     def _feasibility(self) -> Feasibility:
@@ -890,7 +970,7 @@ class _Check:
     def _verdict(
         self,
         feasibility: Feasibility,
-        qualifications: list[RouteQualification],
+        qualifications: list[RouteQualification | Qualification],
         ready_at: int | None,
     ) -> Verdict:
         if feasibility is Feasibility.NOT_FEASIBLE_IN_MODEL:

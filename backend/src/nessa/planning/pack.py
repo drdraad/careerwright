@@ -40,13 +40,14 @@ from nessa.catalogue.option_pack import (
 from nessa.catalogue.option_pack import (
     Offering as PackOffering,
 )
+from nessa.money import Money
 from nessa.planning.catalogue import (
     ActionConcept,
     ActionKind,
-    Basis,
     Catalogue,
     CatalogueLabel,
     Citation,
+    CitationBasis,
     Fact,
     FundingInstrument,
     InstrumentKind,
@@ -151,7 +152,7 @@ class _Reader:
             else f"pointer {span.pointer}"
         )
         return Citation(
-            basis=Basis.SOURCE,
+            basis=CitationBasis.SOURCE,
             claim_id=claim.claim_id,
             source_id=claim.source_id,
             source_hash=source.sha256,
@@ -290,7 +291,7 @@ class _Reader:
                 extras.append(
                     Payment(
                         kind="extra",
-                        amount_minor=amount,
+                        amount=_gbp(amount),
                         month_offset=WHOLE_FEE_DUE,
                         cited=self.cite(claim),
                     )
@@ -306,7 +307,7 @@ class _Reader:
             unknown = "; ".join([why, *missing])
             return [PaymentPlan(plan_id="as-stated", payments=extras, unknown=unknown)]
         whole = Payment(
-            kind="fee", amount_minor=fee_minor, month_offset=WHOLE_FEE_DUE, cited=self.cite(fee)
+            kind="fee", amount=_gbp(fee_minor), month_offset=WHOLE_FEE_DUE, cited=self.cite(fee)
         )
         known = "; ".join(missing) or None
         plans = [PaymentPlan(plan_id="pay-in-full", payments=[whole, *extras], unknown=known)]
@@ -322,7 +323,7 @@ class _Reader:
                     plan_id="instalments",
                     payments=extras,
                     recurring=Recurring(
-                        amount_minor=amount,
+                        amount=_gbp(amount),
                         at_least=value.get("at_least") is True,
                         count=count if isinstance(count, int) else None,
                         cited=self.cite(instalment),
@@ -383,6 +384,10 @@ def _plus_months(day: date, months: int) -> date:
 def _minor(value: JsonValue) -> int | None:
     amount = value.get("minor_units") if isinstance(value, dict) else None
     return amount if isinstance(amount, int) else None
+
+
+def _gbp(minor: int) -> Money:
+    return Money(minor_units=minor, currency="GBP")
 
 
 def _text(value: JsonValue) -> str | None:

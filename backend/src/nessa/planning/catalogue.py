@@ -25,7 +25,8 @@ from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
-Minor = Annotated[int, Field(ge=0)]  # integer GBP minor units, never negative
+from nessa.money import Money
+
 Hours = Annotated[int, Field(ge=0, le=168)]
 
 
@@ -33,7 +34,9 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class Basis(StrEnum):
+class CitationBasis(StrEnum):
+    """Where a cited value comes from (named apart from the profile's `Basis`)."""
+
     SOURCE = "source"  # read from a page: a pack claim with its span
     PERSON = "person"  # the person's own confirmed answer or assumption
     FIXTURE = "fixture"  # a synthetic fixture value, always labelled
@@ -42,7 +45,7 @@ class Basis(StrEnum):
 class Citation(StrictModel):
     """Where a value came from. A source value names its claim, span and exact excerpt."""
 
-    basis: Basis
+    basis: CitationBasis
     claim_id: str | None = None
     source_id: str | None = None
     source_hash: str | None = None
@@ -103,7 +106,7 @@ class Payment(StrictModel):
     as due on the first day of its month: conservative prefunding (TIME-1)."""
 
     kind: Literal["fee", "instalment", "extra"]
-    amount_minor: Minor
+    amount: Money
     due: date | None = None
     month_offset: Annotated[int, Field(ge=0)] | None = None
     cited: Citation
@@ -119,7 +122,7 @@ class Recurring(StrictModel):
     """Payments stated as "from £X a month" with or without their number: a total is known
     only with the count and an exact amount."""
 
-    amount_minor: Minor
+    amount: Money
     at_least: bool
     count: Annotated[int, Field(ge=1)] | None
     cited: Citation
@@ -128,7 +131,7 @@ class Recurring(StrictModel):
     def total_minor(self) -> int | None:
         if self.count is None or self.at_least:
             return None
-        return self.amount_minor * self.count
+        return self.amount.minor_units * self.count
 
 
 class PaymentPlan(StrictModel):
@@ -253,7 +256,7 @@ class Support(StrictModel):
     instrument_id: str
     kind: InstrumentKind
     covers_fees_in_full: bool = False  # a waiver of the whole fee, whatever its amount
-    amount_minor: Minor | None = None
+    amount: Money | None = None
     paid_to: Literal["provider", "person"]
     paid_month_offset: Annotated[int, Field(ge=0)] | None = None  # for a payment to the person
     proven_before_outflows: bool = False  # stated to arrive before that month's outflows
@@ -274,11 +277,16 @@ class Support(StrictModel):
             and self.eligibility is not EligibilityStatus.CONFIRMED
         ):
             raise ValueError("an approved award needs confirmed eligibility")
-        if self.covers_fees_in_full == (self.amount_minor is not None):
+        if self.covers_fees_in_full == (self.amount is not None):
             raise ValueError("support covers the fees in full or states its amount")
         if (self.paid_to == "person") != (self.paid_month_offset is not None):
             raise ValueError("support paid to the person states its month")
         return self
+
+    @property
+    def amount_minor(self) -> int:
+        """The stated amount in minor units, for arithmetic; 0 for a waiver in full."""
+        return self.amount.minor_units if self.amount is not None else 0
 
     @property
     def confirmed(self) -> bool:
@@ -310,7 +318,7 @@ class WorkPattern(StrictModel):
 
     kind: WorkPatternKind
     hours_per_week: Hours
-    net_income_minor: Minor  # a month, while the variant is active
+    net_income: Money  # a month, while the variant is active
     cited: Citation
 
 
@@ -318,7 +326,7 @@ class Wage(StrictModel):
     """A job's or an apprenticeship's take-home pay a month, as the person confirmed it: it
     starts at the offer gate and never funds a payment before it arrives."""
 
-    net_income_minor: Minor
+    net_income: Money
     cited: Citation
 
 
@@ -329,10 +337,21 @@ class Variant(StrictModel):
     variant_id: str
     offering_id: str
     plan_id: str | None = None
-    work_pattern: WorkPattern | None = None  # None: the continuation scenario's work
-    wage: Wage | None = None
-    supports: list[Support] = Field(default_factory=list)
-    entry_requirements_met: bool = False  # the person's confirmation that they meet them
+    work_pattern: WorkPattern | None = Field(
+        default=None,
+        description="Null: none confirmed yet, so the continuation scenario's work applies.",
+    )
+    wage: Wage | None = Field(default=None, description="Null: no take-home wage confirmed yet.")
+    supports: list[Support] = Field(
+        default_factory=list,
+        description="The support the person has confirmed for this variant: empty means none "
+        "confirmed yet, never that none is available.",
+    )
+    entry_requirements_met: bool | None = Field(
+        default=None,
+        description="Whether the person meets the stated entry requirements: null is not yet "
+        "confirmed, never ineligible.",
+    )
 
 
 class CatalogueLabel(StrictModel):

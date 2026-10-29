@@ -118,7 +118,9 @@ def test_relaxing_a_limit_never_adds_a_violation(
                 if inputs.monthly_payment_cap_minor is None
                 else inputs.monthly_payment_cap_minor + more
             ),
-            "reserve_minor": max(0, inputs.reserve_minor - more),
+            "reserve_minor": (
+                None if inputs.reserve_minor is None else max(0, inputs.reserve_minor - more)
+            ),
             "opening_cash_minor": inputs.opening_cash_minor + more,
             "weekly_availability_by_month": [min(168, h + more % 20) for h in availability],
         }

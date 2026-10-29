@@ -17,6 +17,7 @@ from nessa.capability.outcomes import (
     PlannedOutcome,
     Provenance,
 )
+from nessa.capability.readiness import Qualification
 from nessa.errors import ErrorCode, NessaError
 from nessa.planning.catalogue import (
     ActionKind,
@@ -662,7 +663,7 @@ def test_delay_and_no_offer_change_both_the_time_and_the_income() -> None:
 
 
 @pytest.mark.req("OPTN-09")
-def test_only_reviewed_records_and_no_condition_give_an_unqualified_result() -> None:
+def test_a_qualified_readiness_never_gives_an_unqualified_verdict() -> None:
     def verdict(state: RecordState, *, synthetic: bool) -> RouteCheck:
         course = option(
             "job", state=state, synthetic=synthetic, kind=ActionKind.WORK,
@@ -675,9 +676,18 @@ def test_only_reviewed_records_and_no_condition_give_an_unqualified_result() -> 
     reviewed = verdict(RecordState.REVIEWED, synthetic=False)
 
     assert proposed.verdict is Verdict.QUALIFIED
-    assert proposed.qualifications == [RouteQualification.PROPOSED_RECORDS]
-    assert reviewed.verdict is Verdict.AFFORDABLE_AND_FEASIBLE
-    assert reviewed.qualifications == []
+    assert RouteQualification.PROPOSED_RECORDS in proposed.qualifications
+    # Every record of the route reviewed, yet its readiness rests on an accepted assumption,
+    # a proposed rubric and a provisional matrix: each is named, and the verdict is qualified
+    # (R9; spec section 10: an accepted provisional mapping supports no unqualified claim).
+    assert reviewed.verdict is Verdict.QUALIFIED
+    assert reviewed.readiness_qualifications
+    assert set(reviewed.readiness_qualifications) <= set(reviewed.qualifications)
+    assert {
+        Qualification.PROVISIONAL_MATRIX,
+        Qualification.PROPOSED_RUBRICS,
+        Qualification.PLANNED_OUTCOME_ASSUMPTION,
+    } <= set(reviewed.qualifications)
     assert verdict(RecordState.REVIEWED, synthetic=True).verdict is Verdict.QUALIFIED
 
 
@@ -707,3 +717,100 @@ def test_stated_entry_requirements_keep_a_route_unresolved_until_the_person_conf
     assert codes(unconfirmed) == {"entry_requirements_unconfirmed"}
     assert unconfirmed.feasibility is Feasibility.UNRESOLVED
     assert confirmed.feasibility is Feasibility.FEASIBLE
+
+
+# Fix round 1: unknown limits, payments before the start, delayed awards, existing debt.
+
+
+@pytest.mark.req("FIN1-06", "TIME1-05")
+@pytest.mark.parametrize(
+    ("limit", "field"),
+    [
+        ("direct_spend_cap", "direct_spend_cap_minor"),
+        ("monthly_payment_cap", "monthly_payment_cap_minor"),
+        ("reserve", "reserve_minor"),
+    ],
+)
+def test_an_unknown_hard_limit_is_unresolved_never_a_pass(limit: str, field: str) -> None:
+    inputs = person(opening=100000).model_copy(update={field: None})
+    result = check(inputs, option("course", payments=((0, 5000),)))
+
+    [found] = result.findings
+    assert (found.code, found.kind, found.reason) == (
+        FindingCode.LIMIT_UNKNOWN,
+        FindingKind.UNRESOLVED,
+        limit,
+    )
+    assert result.feasibility is Feasibility.UNRESOLVED
+    # The deficit cap applies only when the person sets one: absent, it is no finding.
+    assert codes(check(person(opening=100000), option("course"))) == set()
+
+
+@pytest.mark.req("FIN1-02", "ECON-04")
+def test_a_payment_due_before_the_planning_start_is_named_never_dropped() -> None:
+    # The review's probe: a February course with a £500 deposit due 15 December 2026.
+    course = option(
+        "course",
+        start=FEB,
+        finish=date(2027, 2, 28),
+        payments=((0, 10000),),
+        due=((date(2026, 12, 15), 50000),),
+    )
+    result = check(person(horizon=3, opening=100000), course)
+
+    [found] = result.findings
+    assert (found.code, found.kind, found.amount) == (
+        FindingCode.PAYMENT_BEFORE_START,
+        FindingKind.UNRESOLVED,
+        50000,
+    )
+    assert found.reason is not None
+    assert "2026-12-15" in found.reason
+    assert result.direct_cost is None  # whether it was paid is not guessed
+    assert result.feasibility is Feasibility.UNRESOLVED
+    assert [(i.due, i.amount_minor) for i in result.ledgers.direct.before_start] == [
+        ("2026-12-15", 50000)
+    ]
+
+
+@pytest.mark.req("FUNDING-05", "PLN-08")
+def test_a_delayed_award_to_the_provider_leaves_the_person_paying_until_it_arrives() -> None:
+    # The review's probe: an assumed fee waiver paid to the provider.
+    waiver = support(
+        paid_to="provider",
+        kind=InstrumentKind.FEE_WAIVER,
+        eligibility=EligibilityStatus.POTENTIALLY_ELIGIBLE,
+        award=AwardState.APPLIED,
+        assumed=True,
+    )
+    course = option(
+        "c",
+        finish=date(2027, 3, 31),
+        payments=((0, 10000), (1, 10000), (2, 10000)),
+        supports=(waiver,),
+    )
+    evaluation = evaluate_route(
+        compile_input(person(horizon=3, opening=100000), catalogue_of(course)), ["c"]
+    )
+
+    def paid(scenario: Scenario) -> list[int]:
+        return [m.payments_minor for m in evaluation.scenario(scenario).ledgers.direct.months]
+
+    assert paid(Scenario.BASE) == [0, 0, 0]
+    assert paid(Scenario.DELAY) == [10000, 10000, 0]  # the award arrives two months late
+    assert paid(Scenario.NO_AWARD) == [10000, 10000, 10000]
+
+
+@pytest.mark.req("FIN1-10", "FIN1-06")
+def test_existing_debt_repayments_count_inside_the_monthly_payment_cap() -> None:
+    # Spec section 12: P_m + R_m <= M_m.
+    debt = ExistingDebt(
+        debt_id="card", monthly_repayment_minor=10000, balance_minor=None, cited=CONSTRUCTED
+    )
+    inputs = person(opening=100000, monthly_cap=20000, existing_debts=[debt])
+
+    over = check(inputs, option("course", payments=((0, 15000),)))
+    within = check(inputs, option("course", payments=((0, 10000),)))
+
+    assert finding(over, FindingCode.MONTHLY_PAYMENT_CAP) == [("2027-01", 25000)]
+    assert within.feasibility is Feasibility.FEASIBLE  # 10000 + 10000 = 20000, at the cap

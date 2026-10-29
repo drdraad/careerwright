@@ -782,6 +782,22 @@ export const Band = {
 export type Band = typeof Band[keyof typeof Band];
 
 /**
+ * Basis
+ *
+ * How an answer relates to what the person said (spec section 3: factual confirmations
+ * and inferences are styled differently).
+ */
+export const Basis = { STATED: 'stated', INFERRED: 'inferred' } as const;
+
+/**
+ * Basis
+ *
+ * How an answer relates to what the person said (spec section 3: factual confirmations
+ * and inferences are styled differently).
+ */
+export type Basis = typeof Basis[keyof typeof Basis];
+
+/**
  * Blocker
  */
 export type Blocker = {
@@ -990,7 +1006,7 @@ export type ChooseTarget = {
  * Where a value came from. A source value names its claim, span and exact excerpt.
  */
 export type Citation = {
-    basis: NessaPlanningCatalogueBasis;
+    basis: CitationBasis;
     /**
      * Claim Id
      */
@@ -1016,6 +1032,24 @@ export type Citation = {
      */
     retrieved_on?: string | null;
 };
+
+/**
+ * CitationBasis
+ *
+ * Where a cited value comes from (named apart from the profile's `Basis`).
+ */
+export const CitationBasis = {
+    SOURCE: 'source',
+    PERSON: 'person',
+    FIXTURE: 'fixture'
+} as const;
+
+/**
+ * CitationBasis
+ *
+ * Where a cited value comes from (named apart from the profile's `Basis`).
+ */
+export type CitationBasis = typeof CitationBasis[keyof typeof CitationBasis];
 
 /**
  * CityListInput
@@ -3974,10 +4008,7 @@ export type Payment = {
      * Kind
      */
     kind: 'fee' | 'instalment' | 'extra';
-    /**
-     * Amount Minor
-     */
-    amount_minor: number;
+    amount: Money;
     /**
      * Due
      */
@@ -4519,7 +4550,7 @@ export type ProposedChangeOut = {
     /**
      * stated: the value appears in the cited messages (checked by the server); inferred: implied, or not found in them.
      */
-    basis: NessaProfileRecordsBasis;
+    basis: Basis;
     /**
      * Message Ids
      *
@@ -4971,10 +5002,7 @@ export type RecordStatement = {
  * only with the count and an exact amount.
  */
 export type Recurring = {
-    /**
-     * Amount Minor
-     */
-    amount_minor: number;
+    amount: Money;
     /**
      * At Least
      */
@@ -6411,7 +6439,7 @@ export type SourceOut = {
      * Message Ids
      */
     message_ids?: Array<string>;
-    basis?: NessaProfileRecordsBasis | null;
+    basis?: Basis | null;
     /**
      * Discovery Id
      *
@@ -6811,10 +6839,7 @@ export type Support = {
      * Covers Fees In Full
      */
     covers_fees_in_full?: boolean;
-    /**
-     * Amount Minor
-     */
-    amount_minor?: number | null;
+    amount?: Money | null;
     /**
      * Paid To
      */
@@ -7505,16 +7530,26 @@ export type Variant = {
      * Plan Id
      */
     plan_id?: string | null;
+    /**
+     * Null: none confirmed yet, so the continuation scenario's work applies.
+     */
     work_pattern?: WorkPattern | null;
+    /**
+     * Null: no take-home wage confirmed yet.
+     */
     wage?: Wage | null;
     /**
      * Supports
+     *
+     * The support the person has confirmed for this variant: empty means none confirmed yet, never that none is available.
      */
     supports?: Array<Support>;
     /**
      * Entry Requirements Met
+     *
+     * Whether the person meets the stated entry requirements: null is not yet confirmed, never ineligible.
      */
-    entry_requirements_met?: boolean;
+    entry_requirements_met?: boolean | null;
 };
 
 /**
@@ -7524,10 +7559,7 @@ export type Variant = {
  * starts at the offer gate and never funds a payment before it arrives.
  */
 export type Wage = {
-    /**
-     * Net Income Minor
-     */
-    net_income_minor: number;
+    net_income: Money;
     cited: Citation;
 };
 
@@ -7557,10 +7589,7 @@ export type WorkPattern = {
      * Hours Per Week
      */
     hours_per_week: number;
-    /**
-     * Net Income Minor
-     */
-    net_income_minor: number;
+    net_income: Money;
     cited: Citation;
 };
 
@@ -7774,36 +7803,6 @@ export type WrittenWhyOut = {
      */
     claims: Array<ClaimOut>;
 };
-
-/**
- * Basis
- */
-export const NessaPlanningCatalogueBasis = {
-    SOURCE: 'source',
-    PERSON: 'person',
-    FIXTURE: 'fixture'
-} as const;
-
-/**
- * Basis
- */
-export type NessaPlanningCatalogueBasis = typeof NessaPlanningCatalogueBasis[keyof typeof NessaPlanningCatalogueBasis];
-
-/**
- * Basis
- *
- * How an answer relates to what the person said (spec section 3: factual confirmations
- * and inferences are styled differently).
- */
-export const NessaProfileRecordsBasis = { STATED: 'stated', INFERRED: 'inferred' } as const;
-
-/**
- * Basis
- *
- * How an answer relates to what the person said (spec section 3: factual confirmations
- * and inferences are styled differently).
- */
-export type NessaProfileRecordsBasis = typeof NessaProfileRecordsBasis[keyof typeof NessaProfileRecordsBasis];
 
 /**
  * MatricesOut

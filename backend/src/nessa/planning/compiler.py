@@ -30,11 +30,13 @@ from nessa.capability.evidence import RequirementStatement, SkillEvidence
 from nessa.capability.matrix import Matrix
 from nessa.capability.outcomes import PlannedOutcome
 from nessa.errors import ErrorCode, ErrorStage, NessaError
+from nessa.money import Minor
 from nessa.planning.catalogue import (
     ActionKind,
     Catalogue,
     CatalogueLabel,
     Citation,
+    Hours,
     OfferGate,
     PaymentPlan,
     RecordState,
@@ -44,10 +46,7 @@ from nessa.planning.catalogue import (
     Wage,
     WorkPattern,
 )
-from nessa.planning.months import MAX_HORIZON_MONTHS, Month, grid
-
-Minor = Annotated[int, Field(ge=0)]
-Hours = Annotated[int, Field(ge=0, le=168)]
+from nessa.planning.months import MAX_HORIZON_MONTHS, Month, grid, touched, usable_from
 
 
 class StrictModel(BaseModel):
@@ -113,7 +112,8 @@ class PlanningInputs(StrictModel):
     wage_timing: ReceiptTiming = ReceiptTiming.LATER
     opening_cash_minor: Minor
     living_outgoings_by_month: list[Minor]
-    reserve_minor: Minor
+    # The three hard limits: None is unknown, an unresolved finding, never "no limit".
+    reserve_minor: Minor | None
     direct_spend_cap_minor: Minor | None
     monthly_payment_cap_minor: Minor | None
     # A separately named limit on the monthly incremental deficit against the baseline:
@@ -183,6 +183,7 @@ class CompiledVariant(StrictModel):
     finish_date: date | None
     start_index: int | None  # 1 is the planning start's month
     finish_index: int | None
+    usable_index: int | None  # the month from which what it grants is usable
     active: list[int]  # the touched months, by index; beyond the horizon too
     weekly_hours: Hours | None
     sessions: list[Session]
@@ -262,13 +263,15 @@ def compile_input(
         placed = not unplaced
         start_index: int | None = None
         finish_index: int | None = None
+        usable_index: int | None = None
         active: list[int] = []
         if offering.start is not None and offering.finish is not None:
             if offering.finish < offering.start:
                 raise ValueError(f"{offering.offering_id} finishes before it starts")
-            start_index = Month.of(offering.start).months_after(start) + 1
-            finish_index = Month.of(offering.finish).months_after(start) + 1
-            active = list(range(start_index, finish_index + 1))
+            # TIME-1's own rules (`months`): every touched month, usable from the next boundary.
+            active = [m.months_after(start) + 1 for m in touched(offering.start, offering.finish)]
+            start_index, finish_index = active[0], active[-1]
+            usable_index = usable_from(offering.finish).months_after(start) + 1
         if plan is None:
             cost_unknown: str | None = offering.unknown.get("fee", "no payment plan is stated")
         else:
@@ -293,6 +296,7 @@ def compile_input(
                 finish_date=offering.finish,
                 start_index=start_index,
                 finish_index=finish_index,
+                usable_index=usable_index,
                 active=active,
                 weekly_hours=offering.weekly_hours,
                 sessions=offering.sessions,
@@ -300,7 +304,7 @@ def compile_input(
                 payments=[
                     CompiledPayment(
                         kind=p.kind,
-                        amount_minor=p.amount_minor,
+                        amount_minor=p.amount.minor_units,
                         offset=p.month_offset,
                         due=p.due,
                         cited=p.cited,
@@ -325,7 +329,7 @@ def compile_input(
                 application_deadline=offering.application_deadline,
                 application_gate=offering.application_gate,
                 entry_unconfirmed=bool(concept.entry_requirements)
-                and not variant.entry_requirements_met,
+                and variant.entry_requirements_met is not True,
             )
         )
     return MonthlyInput(

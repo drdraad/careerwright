@@ -7,14 +7,15 @@ from datetime import date
 from typing import Literal
 
 from nessa.capability.readiness import ReadinessState
+from nessa.money import Money
 from nessa.planning.catalogue import (
     ActionConcept,
     ActionKind,
     AwardState,
-    Basis,
     Catalogue,
     CatalogueLabel,
     Citation,
+    CitationBasis,
     EligibilityStatus,
     InstrumentKind,
     OfferGate,
@@ -39,11 +40,15 @@ from nessa.planning.compiler import (
 from tests.support.capability import fixture, trace_evidence, trace_matrix, trace_outcomes
 
 TRACE = "fixtures/m0/worked_trace.json"
-FIXTURE = Citation(basis=Basis.FIXTURE, locator=TRACE)
-CONSTRUCTED = Citation(basis=Basis.FIXTURE, locator="constructed test case")
+FIXTURE = Citation(basis=CitationBasis.FIXTURE, locator=TRACE)
+CONSTRUCTED = Citation(basis=CitationBasis.FIXTURE, locator="constructed test case")
 COURSES = ("A", "B", "C", "D", "E")
 CONDITIONAL = ReadinessState.CONDITIONAL_ON_ASSESSED_COMPLETION
 DELAY_MONTHS = 2  # a constructed stress case; TRACE-01 has no condition for it to move
+
+
+def gbp(minor: int) -> Money:
+    return Money(minor_units=minor, currency="GBP")
 
 
 def trace_inputs(**changes: object) -> PlanningInputs:
@@ -92,7 +97,7 @@ def _pattern(action: dict[str, object], continuation_hours: int) -> WorkPattern:
         if hours == continuation_hours
         else WorkPatternKind.REDUCED_HOURS
     )
-    return WorkPattern(kind=kind, hours_per_week=hours, net_income_minor=income, cited=FIXTURE)
+    return WorkPattern(kind=kind, hours_per_week=hours, net_income=gbp(income), cited=FIXTURE)
 
 
 def trace_catalogue(**study_hours: int) -> Catalogue:
@@ -116,7 +121,7 @@ def trace_catalogue(**study_hours: int) -> Catalogue:
             )
         )
         payments = [
-            Payment(kind="fee", amount_minor=amount, month_offset=n, cited=FIXTURE)
+            Payment(kind="fee", amount=gbp(amount), month_offset=n, cited=FIXTURE)
             for n, amount in enumerate(action["fees_by_month_minor"])
             if amount
         ]
@@ -171,6 +176,9 @@ def trace_route(letter: str) -> dict[str, object]:
 # Constructed cases: a person and options written for one rule each (synthetic).
 
 START = date(2027, 1, 1)
+# A stated limit far above anything a constructed case spends: the case is about another
+# rule. An unknown limit is never a pass, so a case leaves a limit unknown only on purpose.
+UNTESTED_LIMIT = 100_000_000
 
 
 def person(
@@ -178,7 +186,7 @@ def person(
     horizon: int = 1,
     opening: int = 0,
     living: int = 0,
-    reserve: int = 0,
+    reserve: int | None = 0,
     pay: int = 0,
     hours: int = 0,
     availability: int | None = 40,
@@ -212,8 +220,8 @@ def person(
             "opening_cash_minor": opening,
             "living_outgoings_by_month": [living] * horizon,
             "reserve_minor": reserve,
-            "direct_spend_cap_minor": limits.pop("direct_cap", None),
-            "monthly_payment_cap_minor": limits.pop("monthly_cap", None),
+            "direct_spend_cap_minor": limits.pop("direct_cap", UNTESTED_LIMIT),
+            "monthly_payment_cap_minor": limits.pop("monthly_cap", UNTESTED_LIMIT),
             "weekly_availability_by_month": None
             if availability is None
             else [availability] * horizon,
@@ -249,10 +257,10 @@ def option(
         plan_id="plan",
         payments=[
             *(
-                Payment(kind="fee", amount_minor=a, month_offset=n, cited=CONSTRUCTED)
+                Payment(kind="fee", amount=gbp(a), month_offset=n, cited=CONSTRUCTED)
                 for n, a in payments
             ),
-            *(Payment(kind="fee", amount_minor=a, due=d, cited=CONSTRUCTED) for d, a in due),
+            *(Payment(kind="fee", amount=gbp(a), due=d, cited=CONSTRUCTED) for d, a in due),
         ],
         recurring=recurring,
         unknown=unknown_cost,
@@ -287,7 +295,7 @@ def option(
         offering_id=dated.offering_id,
         plan_id="plan",
         work_pattern=pattern,
-        wage=Wage(net_income_minor=wage, cited=CONSTRUCTED) if wage is not None else None,
+        wage=Wage(net_income=gbp(wage), cited=CONSTRUCTED) if wage is not None else None,
         supports=list(supports),
     )
     return concept, dated, variant
@@ -318,7 +326,7 @@ def support(
         instrument_id="funding:constructed",
         kind=kind,
         covers_fees_in_full=amount is None,
-        amount_minor=amount,
+        amount=gbp(amount) if amount is not None else None,
         paid_to=paid_to,
         paid_month_offset=month if paid_to == "person" else None,
         proven_before_outflows=early,
@@ -331,4 +339,4 @@ def support(
 
 
 def pattern(kind: WorkPatternKind, hours: int, pay: int) -> WorkPattern:
-    return WorkPattern(kind=kind, hours_per_week=hours, net_income_minor=pay, cited=CONSTRUCTED)
+    return WorkPattern(kind=kind, hours_per_week=hours, net_income=gbp(pay), cited=CONSTRUCTED)

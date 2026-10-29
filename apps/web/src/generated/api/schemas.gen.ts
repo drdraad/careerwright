@@ -1145,6 +1145,16 @@ export const BandSchema = {
     description: 'The rubric\'s ordinal bands (spec section 5). Never averaged, subtracted or read as\nprobabilities (AIR1-12).'
 } as const;
 
+export const BasisSchema = {
+    type: 'string',
+    enum: [
+        'stated',
+        'inferred'
+    ],
+    title: 'Basis',
+    description: 'How an answer relates to what the person said (spec section 3: factual confirmations\nand inferences are styled differently).'
+} as const;
+
 export const BlockerSchema = {
     properties: {
         row_id: {
@@ -1500,7 +1510,7 @@ export const ChooseTargetSchema = {
 export const CitationSchema = {
     properties: {
         basis: {
-            $ref: '#/components/schemas/nessa__planning__catalogue__Basis'
+            $ref: '#/components/schemas/CitationBasis'
         },
         claim_id: {
             anyOf: [
@@ -1577,6 +1587,17 @@ export const CitationSchema = {
     ],
     title: 'Citation',
     description: 'Where a value came from. A source value names its claim, span and exact excerpt.'
+} as const;
+
+export const CitationBasisSchema = {
+    type: 'string',
+    enum: [
+        'source',
+        'person',
+        'fixture'
+    ],
+    title: 'CitationBasis',
+    description: 'Where a cited value comes from (named apart from the profile\'s `Basis`).'
 } as const;
 
 export const CityListInputSchema = {
@@ -5964,10 +5985,8 @@ export const PaymentSchema = {
             ],
             title: 'Kind'
         },
-        amount_minor: {
-            type: 'integer',
-            minimum: 0,
-            title: 'Amount Minor'
+        amount: {
+            $ref: '#/components/schemas/Money'
         },
         due: {
             anyOf: [
@@ -6001,7 +6020,7 @@ export const PaymentSchema = {
     type: 'object',
     required: [
         'kind',
-        'amount_minor',
+        'amount',
         'cited'
     ],
     title: 'Payment',
@@ -6935,7 +6954,7 @@ export const ProposedChangeOutSchema = {
             description: 'The proposed answer, typed as the field\'s input; null unless provided. A list is the complete list after the change: accepting it replaces the field\'s list.'
         },
         basis: {
-            $ref: '#/components/schemas/nessa__profile__records__Basis',
+            $ref: '#/components/schemas/Basis',
             description: 'stated: the value appears in the cited messages (checked by the server); inferred: implied, or not found in them.'
         },
         message_ids: {
@@ -7654,10 +7673,8 @@ export const RecordStatementSchema = {
 
 export const RecurringSchema = {
     properties: {
-        amount_minor: {
-            type: 'integer',
-            minimum: 0,
-            title: 'Amount Minor'
+        amount: {
+            $ref: '#/components/schemas/Money'
         },
         at_least: {
             type: 'boolean',
@@ -7682,7 +7699,7 @@ export const RecurringSchema = {
     additionalProperties: false,
     type: 'object',
     required: [
-        'amount_minor',
+        'amount',
         'at_least',
         'count',
         'cited'
@@ -10054,7 +10071,7 @@ export const SourceOutSchema = {
         basis: {
             anyOf: [
                 {
-                    $ref: '#/components/schemas/nessa__profile__records__Basis'
+                    $ref: '#/components/schemas/Basis'
                 },
                 {
                     type: 'null'
@@ -10668,17 +10685,15 @@ export const SupportSchema = {
             title: 'Covers Fees In Full',
             default: false
         },
-        amount_minor: {
+        amount: {
             anyOf: [
                 {
-                    type: 'integer',
-                    minimum: 0
+                    $ref: '#/components/schemas/Money'
                 },
                 {
                     type: 'null'
                 }
-            ],
-            title: 'Amount Minor'
+            ]
         },
         paid_to: {
             type: 'string',
@@ -11839,7 +11854,8 @@ export const VariantSchema = {
                 {
                     type: 'null'
                 }
-            ]
+            ],
+            description: 'Null: none confirmed yet, so the continuation scenario\'s work applies.'
         },
         wage: {
             anyOf: [
@@ -11849,19 +11865,28 @@ export const VariantSchema = {
                 {
                     type: 'null'
                 }
-            ]
+            ],
+            description: 'Null: no take-home wage confirmed yet.'
         },
         supports: {
             items: {
                 $ref: '#/components/schemas/Support'
             },
             type: 'array',
-            title: 'Supports'
+            title: 'Supports',
+            description: 'The support the person has confirmed for this variant: empty means none confirmed yet, never that none is available.'
         },
         entry_requirements_met: {
-            type: 'boolean',
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Entry Requirements Met',
-            default: false
+            description: 'Whether the person meets the stated entry requirements: null is not yet confirmed, never ineligible.'
         }
     },
     additionalProperties: false,
@@ -11876,10 +11901,8 @@ export const VariantSchema = {
 
 export const WageSchema = {
     properties: {
-        net_income_minor: {
-            type: 'integer',
-            minimum: 0,
-            title: 'Net Income Minor'
+        net_income: {
+            $ref: '#/components/schemas/Money'
         },
         cited: {
             $ref: '#/components/schemas/Citation'
@@ -11888,7 +11911,7 @@ export const WageSchema = {
     additionalProperties: false,
     type: 'object',
     required: [
-        'net_income_minor',
+        'net_income',
         'cited'
     ],
     title: 'Wage',
@@ -11916,10 +11939,8 @@ export const WorkPatternSchema = {
             minimum: 0,
             title: 'Hours Per Week'
         },
-        net_income_minor: {
-            type: 'integer',
-            minimum: 0,
-            title: 'Net Income Minor'
+        net_income: {
+            $ref: '#/components/schemas/Money'
         },
         cited: {
             $ref: '#/components/schemas/Citation'
@@ -11930,7 +11951,7 @@ export const WorkPatternSchema = {
     required: [
         'kind',
         'hours_per_week',
-        'net_income_minor',
+        'net_income',
         'cited'
     ],
     title: 'WorkPattern',
@@ -12236,26 +12257,6 @@ export const WrittenWhyOutSchema = {
         'claims'
     ],
     title: 'WrittenWhyOut'
-} as const;
-
-export const nessa__planning__catalogue__BasisSchema = {
-    type: 'string',
-    enum: [
-        'source',
-        'person',
-        'fixture'
-    ],
-    title: 'Basis'
-} as const;
-
-export const nessa__profile__records__BasisSchema = {
-    type: 'string',
-    enum: [
-        'stated',
-        'inferred'
-    ],
-    title: 'Basis',
-    description: 'How an answer relates to what the person said (spec section 3: factual confirmations\nand inferences are styled differently).'
 } as const;
 
 export const MatricesOutWritableSchema = {

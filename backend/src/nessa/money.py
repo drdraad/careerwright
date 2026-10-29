@@ -5,11 +5,14 @@ assumes a division by 100. `SignedMoney` holds economic values (spec section 18)
 negative against a baseline and are never cash available today.
 """
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 Currency = Literal["GBP"]
+# Integer GBP minor units, never negative: for arithmetic inside a module. What crosses the
+# API is `Money` or `SignedMoney`, never a bare amount.
+Minor = Annotated[int, Field(ge=0)]
 
 
 class Money(BaseModel):

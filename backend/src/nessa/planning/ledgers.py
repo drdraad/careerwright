@@ -14,11 +14,10 @@ S5.5), in integer GBP minor units. Pure.
   never planned (spec section 10).
 """
 
-from typing import Annotated
+from pydantic import BaseModel, ConfigDict
 
-from pydantic import BaseModel, ConfigDict, Field
+from nessa.money import Minor
 
-Minor = Annotated[int, Field(ge=0)]
 BASIS_POINTS = 10_000
 
 
@@ -48,6 +47,8 @@ class DirectLedger(StrictModel):
     months: list[DirectMonth]
     beyond_horizon: list[Liability]
     unscheduled: list[Liability]  # known payments of a variant whose months are unknown
+    # Due before the planning start: whether each was paid is not known, so the total is not.
+    before_start: list[Liability]
     complete: bool  # every payment's amount is known
     total_minor: Minor | None  # None: some cost is unknown, never 0
 
@@ -80,7 +81,7 @@ class LiquidityMonth(StrictModel):
 
 
 class LiquidityLedger(StrictModel):
-    reserve_minor: Minor
+    reserve_minor: Minor | None  # None: not known, so no month is checked against it
     months: list[LiquidityMonth]
     complete: bool  # every outflow and receipt is placed and known
 
@@ -109,7 +110,7 @@ def liquidity(
     months: list[str],
     *,
     opening_minor: int,
-    reserve_minor: int,
+    reserve_minor: int | None,
     early: list[int],
     later: list[int],
     living: list[int],

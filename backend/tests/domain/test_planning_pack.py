@@ -12,13 +12,14 @@ from nessa.catalogue.option_pack import load_pack
 from nessa.planning.catalogue import (
     ActionConcept,
     ActionKind,
-    Basis,
     Catalogue,
+    CitationBasis,
     Fact,
     FundingInstrument,
     InstrumentKind,
     Offering,
     RecordState,
+    Variant,
 )
 from nessa.planning.pack import pack_catalogue
 
@@ -110,10 +111,15 @@ def test_payment_plans_are_what_the_pages_state_and_unknown_is_never_zero() -> N
     c04 = offering(catalogue(P01), "offering:C04")
     full, instalments = c04.payment_plans
 
-    assert [(p.kind, p.amount_minor, p.month_offset) for p in full.payments] == [("fee", 299500, 0)]
+    assert [(p.kind, p.amount.minor_units, p.month_offset) for p in full.payments] == [
+        ("fee", 299500, 0)
+    ]
     assert full.payments[0].cited.claim_id == "C04.fee_total"
     assert instalments.recurring is not None
-    assert (instalments.recurring.amount_minor, instalments.recurring.at_least) == (6952, True)
+    assert (instalments.recurring.amount.minor_units, instalments.recurring.at_least) == (
+        6952,
+        True,
+    )
     assert instalments.recurring.count is None
     assert instalments.recurring.total_minor is None
     c01 = offering(catalogue(P01), "offering:C01#full_time")
@@ -123,11 +129,11 @@ def test_payment_plans_are_what_the_pages_state_and_unknown_is_never_zero() -> N
     assert "not eligible" in unknown.unknown  # the claim's own reading of "fully funded"
     c10 = offering(catalogue("it-support-technician-bristol"), "offering:C10")
     [c10_full] = c10.payment_plans  # three payments, their amounts not stated: no plan
-    assert [(p.kind, p.amount_minor) for p in c10_full.payments] == [("fee", 29500)]
+    assert [(p.kind, p.amount.minor_units) for p in c10_full.payments] == [("fee", 29500)]
     assert c10_full.unknown is not None
     assert "exam" in c10_full.unknown
     c03 = offering(catalogue("registered-nurse-manchester"), "offering:C03")
-    assert [(p.kind, p.amount_minor) for p in c03.payment_plans[0].payments] == [
+    assert [(p.kind, p.amount.minor_units) for p in c03.payment_plans[0].payments] == [
         ("fee", 1900),
         ("extra", 1399),
     ]
@@ -172,7 +178,7 @@ def test_every_consequential_field_is_cited_beside_its_span_or_says_why_it_is_un
         if item.unknown is not None and item.cited is None:
             continue  # the pack's own reason, with no span to cite
         assert item.cited is not None
-        assert item.cited.basis is Basis.SOURCE
+        assert item.cited.basis is CitationBasis.SOURCE
         claim = claims[item.cited.claim_id or ""]
         assert item.cited.excerpt == claim.excerpt
         assert item.cited.source_hash == sources[claim.source_id].sha256
@@ -207,3 +213,14 @@ def test_the_funding_pages_load_as_instruments_never_as_a_person_s_award() -> No
     c01 = offering(found, "offering:C01#full_time")
     assert {f.field for f in c01.facts} >= {"funding_route", "eligibility_earnings"}
     assert all(v.supports == [] for v in found.variants)  # no status without the person
+
+
+@pytest.mark.req("OPTN-03", "OPTN-09")
+def test_what_the_person_has_not_confirmed_is_served_as_not_yet_confirmed() -> None:
+    found = catalogue("bookkeeping-assistant-leeds")  # C02, C05, C06, C09 state entry rules
+
+    # Unknown is never ineligible: no person has said whether they meet the requirements.
+    assert {v.entry_requirements_met for v in found.variants} == {None}
+    properties = Variant.model_json_schema()["properties"]
+    assert "none confirmed yet" in properties["supports"]["description"]
+    assert "not yet confirmed" in properties["entry_requirements_met"]["description"]

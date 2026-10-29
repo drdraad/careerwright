@@ -6005,6 +6005,15 @@
         "title": "Band",
         "description": "The rubric's ordinal bands (spec section 5). Never averaged, subtracted or read as\nprobabilities (AIR1-12)."
       },
+      "Basis": {
+        "type": "string",
+        "enum": [
+          "stated",
+          "inferred"
+        ],
+        "title": "Basis",
+        "description": "How an answer relates to what the person said (spec section 3: factual confirmations\nand inferences are styled differently)."
+      },
       "Blocker": {
         "properties": {
           "row_id": {
@@ -6352,7 +6361,7 @@
       "Citation": {
         "properties": {
           "basis": {
-            "$ref": "#/components/schemas/nessa__planning__catalogue__Basis"
+            "$ref": "#/components/schemas/CitationBasis"
           },
           "claim_id": {
             "anyOf": [
@@ -6429,6 +6438,16 @@
         ],
         "title": "Citation",
         "description": "Where a value came from. A source value names its claim, span and exact excerpt."
+      },
+      "CitationBasis": {
+        "type": "string",
+        "enum": [
+          "source",
+          "person",
+          "fixture"
+        ],
+        "title": "CitationBasis",
+        "description": "Where a cited value comes from (named apart from the profile's `Basis`)."
       },
       "CityListInput": {
         "properties": {
@@ -10695,10 +10714,8 @@
             ],
             "title": "Kind"
           },
-          "amount_minor": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Amount Minor"
+          "amount": {
+            "$ref": "#/components/schemas/Money"
           },
           "due": {
             "anyOf": [
@@ -10732,7 +10749,7 @@
         "type": "object",
         "required": [
           "kind",
-          "amount_minor",
+          "amount",
           "cited"
         ],
         "title": "Payment",
@@ -11647,7 +11664,7 @@
             "description": "The proposed answer, typed as the field's input; null unless provided. A list is the complete list after the change: accepting it replaces the field's list."
           },
           "basis": {
-            "$ref": "#/components/schemas/nessa__profile__records__Basis",
+            "$ref": "#/components/schemas/Basis",
             "description": "stated: the value appears in the cited messages (checked by the server); inferred: implied, or not found in them."
           },
           "message_ids": {
@@ -12347,10 +12364,8 @@
       },
       "Recurring": {
         "properties": {
-          "amount_minor": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Amount Minor"
+          "amount": {
+            "$ref": "#/components/schemas/Money"
           },
           "at_least": {
             "type": "boolean",
@@ -12375,7 +12390,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "amount_minor",
+          "amount",
           "at_least",
           "count",
           "cited"
@@ -14697,7 +14712,7 @@
           "basis": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/nessa__profile__records__Basis"
+                "$ref": "#/components/schemas/Basis"
               },
               {
                 "type": "null"
@@ -15300,17 +15315,15 @@
             "title": "Covers Fees In Full",
             "default": false
           },
-          "amount_minor": {
+          "amount": {
             "anyOf": [
               {
-                "type": "integer",
-                "minimum": 0.0
+                "$ref": "#/components/schemas/Money"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Amount Minor"
+            ]
           },
           "paid_to": {
             "type": "string",
@@ -16442,7 +16455,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Null: none confirmed yet, so the continuation scenario's work applies."
           },
           "wage": {
             "anyOf": [
@@ -16452,19 +16466,28 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Null: no take-home wage confirmed yet."
           },
           "supports": {
             "items": {
               "$ref": "#/components/schemas/Support"
             },
             "type": "array",
-            "title": "Supports"
+            "title": "Supports",
+            "description": "The support the person has confirmed for this variant: empty means none confirmed yet, never that none is available."
           },
           "entry_requirements_met": {
-            "type": "boolean",
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Entry Requirements Met",
-            "default": false
+            "description": "Whether the person meets the stated entry requirements: null is not yet confirmed, never ineligible."
           }
         },
         "additionalProperties": false,
@@ -16478,10 +16501,8 @@
       },
       "Wage": {
         "properties": {
-          "net_income_minor": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Net Income Minor"
+          "net_income": {
+            "$ref": "#/components/schemas/Money"
           },
           "cited": {
             "$ref": "#/components/schemas/Citation"
@@ -16490,7 +16511,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "net_income_minor",
+          "net_income",
           "cited"
         ],
         "title": "Wage",
@@ -16516,10 +16537,8 @@
             "minimum": 0.0,
             "title": "Hours Per Week"
           },
-          "net_income_minor": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Net Income Minor"
+          "net_income": {
+            "$ref": "#/components/schemas/Money"
           },
           "cited": {
             "$ref": "#/components/schemas/Citation"
@@ -16530,7 +16549,7 @@
         "required": [
           "kind",
           "hours_per_week",
-          "net_income_minor",
+          "net_income",
           "cited"
         ],
         "title": "WorkPattern",
@@ -16829,24 +16848,6 @@
           "claims"
         ],
         "title": "WrittenWhyOut"
-      },
-      "nessa__planning__catalogue__Basis": {
-        "type": "string",
-        "enum": [
-          "source",
-          "person",
-          "fixture"
-        ],
-        "title": "Basis"
-      },
-      "nessa__profile__records__Basis": {
-        "type": "string",
-        "enum": [
-          "stated",
-          "inferred"
-        ],
-        "title": "Basis",
-        "description": "How an answer relates to what the person said (spec section 3: factual confirmations\nand inferences are styled differently)."
       }
     },
     "securitySchemes": {

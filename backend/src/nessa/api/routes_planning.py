@@ -1,7 +1,13 @@
 """Planning endpoints (S5.1, S5.2; ADR 0013): each target's options from the option pack as
 the planning model reads them, labelled with the pack's date and every record's review state.
-Read-only: the person's planning assumptions are confirmed at the option checkpoint
-(Task 12), which owns their persistence."""
+
+Read-only. What has no store yet is every input the person supplies (ADR 0013 decision 11):
+the baseline, the continuation scenario, opening cash, living costs, the reserve, the three
+hard limits and the deficit cap, weekly availability, commitments, existing debts, the
+objective basis, the delay months, and, per variant, the work pattern, wage, funding statuses
+and entry confirmation. The option checkpoint (Task 12) confirms them and owns their
+persistence; until then a variant's support is "none confirmed yet" and its entry
+confirmation null."""
 
 import uuid
 
