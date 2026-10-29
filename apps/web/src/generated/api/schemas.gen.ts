@@ -1987,7 +1987,7 @@ export const JobPageSchema = {
                     type: 'null'
                 }
             ],
-            description: 'What the next acquisition may spend on the person\'s key, shown before it starts (MODEL-08); none for a demo workspace, which never calls a model.'
+            description: 'The most the next acquisition may spend on the person\'s key, a maximum shown before it starts (MODEL-08); none for a demo workspace, which never calls a model.'
         }
     },
     additionalProperties: false,
@@ -2220,12 +2220,12 @@ export const ModelSpendOutSchema = {
         per_run_nano_usd: {
             type: 'integer',
             title: 'Per Run Nano Usd',
-            description: 'One run\'s reservation, at its bounds.'
+            description: 'The most one run may spend: every attempt it may make, each at its reservation\'s bounds.'
         },
         worst_case_nano_usd: {
             type: 'integer',
             title: 'Worst Case Nano Usd',
-            description: 'model_runs x per_run_nano_usd.'
+            description: 'The most the acquisition may spend: model_runs x per_run_nano_usd.'
         }
     },
     additionalProperties: false,
@@ -2237,7 +2237,7 @@ export const ModelSpendOutSchema = {
         'worst_case_nano_usd'
     ],
     title: 'ModelSpendOut',
-    description: 'What one acquisition may spend on the person\'s model key, before it starts (MODEL-08;\ncomputed in deterministic code). Each page whose structured data gives no posting may be\nread by an extraction run on the workspace\'s model, at most `model_runs` per acquisition;\neach run reserves at most `per_run_nano_usd` before its provider call, and a retried\nattempt (a provider outage) reserves again within the key\'s run limit.'
+    description: 'The most one acquisition may spend on the person\'s model key, before it starts\n(MODEL-08; computed in deterministic code, by the functions the reservation uses). Each\npage whose structured data gives no posting may be read by an extraction run on the\nworkspace\'s model, at most `model_runs` per acquisition; each run may make every attempt\nits retry owner allows (a provider outage is retried), each reserving its worst case.\nA maximum, never an expected cost.'
 } as const;
 
 export const MoneySchema = {

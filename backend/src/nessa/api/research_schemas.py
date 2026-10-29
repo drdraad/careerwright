@@ -410,16 +410,22 @@ class AdvertsOut(ResponseModel):
 
 
 class ModelSpendOut(ResponseModel):
-    """What one acquisition may spend on the person's model key, before it starts (MODEL-08;
-    computed in deterministic code). Each page whose structured data gives no posting may be
-    read by an extraction run on the workspace's model, at most `model_runs` per acquisition;
-    each run reserves at most `per_run_nano_usd` before its provider call, and a retried
-    attempt (a provider outage) reserves again within the key's run limit."""
+    """The most one acquisition may spend on the person's model key, before it starts
+    (MODEL-08; computed in deterministic code, by the functions the reservation uses). Each
+    page whose structured data gives no posting may be read by an extraction run on the
+    workspace's model, at most `model_runs` per acquisition; each run may make every attempt
+    its retry owner allows (a provider outage is retried), each reserving its worst case.
+    A maximum, never an expected cost."""
 
     model_id: str = Field(description="The model the workspace's extraction runs pin.")
     model_runs: int = Field(description="At most this many extraction runs per acquisition.")
-    per_run_nano_usd: int = Field(description="One run's reservation, at its bounds.")
-    worst_case_nano_usd: int = Field(description="model_runs x per_run_nano_usd.")
+    per_run_nano_usd: int = Field(
+        description="The most one run may spend: every attempt it may make, each at its "
+        "reservation's bounds."
+    )
+    worst_case_nano_usd: int = Field(
+        description="The most the acquisition may spend: model_runs x per_run_nano_usd."
+    )
 
     @classmethod
     def of(cls, estimate: ModelSpendEstimate) -> "ModelSpendOut":
@@ -456,6 +462,7 @@ class JobPage(ResponseModel):
         description="When there are no vacancies, why: never a bare empty list (STATE-02)."
     )
     acquisition_model_spend: ModelSpendOut | None = Field(
-        description="What the next acquisition may spend on the person's key, shown before "
-        "it starts (MODEL-08); none for a demo workspace, which never calls a model."
+        description="The most the next acquisition may spend on the person's key, a maximum "
+        "shown before it starts (MODEL-08); none for a demo workspace, which never calls a "
+        "model."
     )

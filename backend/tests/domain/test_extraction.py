@@ -18,6 +18,7 @@ from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
+from nessa.config import ApiSettings
 from nessa.evidence import extraction_runs
 from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_page
 from nessa.evidence.acquisition import ModelExtractionState, extraction_state
@@ -55,6 +56,7 @@ from nessa.evidence.records import (
 )
 from nessa.evidence.redaction import EMAIL_REMOVED, PHONE_REMOVED
 from nessa.evidence.store import ExtractionRow
+from nessa.identity.activity import ACTIVITY_MAX_ATTEMPTS
 from nessa.identity.failures import FailureClass, OutputTruncatedError, classify_failure
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.model_registry import ModelMode
@@ -432,6 +434,15 @@ def test_postings_past_the_limit_are_dropped_not_read() -> None:
         ("£40,000 maximum per year", (None, 4_000_000, SalaryPeriod.YEAR)),
         ("£40,000 a year, up to", (None, 4_000_000, SalaryPeriod.YEAR)),
         ("£30k to £35k", (3_000_000, 3_500_000, None)),  # a multiplier on both sides
+        # Fix round 4, item 3: a period attached to the number reads as that period.
+        ("£30,000pa", (3_000_000, 3_000_000, SalaryPeriod.YEAR)),
+        ("£30,000p.a.", (3_000_000, 3_000_000, SalaryPeriod.YEAR)),
+        ("£14.50ph", (1_450, 1_450, SalaryPeriod.HOUR)),
+        ("£14.50p/h", (1_450, 1_450, SalaryPeriod.HOUR)),
+        ("£30,000annually", (3_000_000, 3_000_000, SalaryPeriod.YEAR)),
+        ("£14.50hourly", (1_450, 1_450, SalaryPeriod.HOUR)),
+        ("£30kpa", (3_000_000, 3_000_000, SalaryPeriod.YEAR)),  # after its multiplier
+        ("£30,000-£35,000pa", (3_000_000, 3_500_000, SalaryPeriod.YEAR)),
     ],
 )
 def test_pay_is_read_exactly_as_the_span_states_it(
@@ -461,9 +472,14 @@ def test_pay_is_read_exactly_as_the_span_states_it(
         ("£25-30K a year", "salary_invalid"),
         ("£30 - £35k", "salary_invalid"),
         ("£30k - £35", "salary_invalid"),
-        ("£1.2m", "salary_invalid"),  # a letter straight after the number
-        ("£30kpa", "salary_invalid"),
+        ("£1.2m", "salary_invalid"),  # a magnitude letter straight after the number
         ("£40,000 minimum and up to £45,000", "salary_invalid"),  # two amounts
+        # Fix round 4, item 3: only a period may be attached; a magnitude or another letter
+        # is still refused.
+        ("£30-35k", "salary_invalid"),
+        ("£2bn", "salary_invalid"),
+        ("£30,000ish", "salary_invalid"),
+        ("£30kish", "salary_invalid"),
     ],
 )
 def test_pay_that_cannot_be_read_exactly_stays_unknown_with_its_issue(
@@ -692,25 +708,37 @@ def test_an_attempt_reserves_both_requests_at_their_bounds() -> None:
 
 
 @pytest.mark.req("MODEL-08")
-def test_an_acquisition_s_model_spend_is_the_cap_times_one_run_s_reservation() -> None:
-    # Fix round 3, item 5: shown before an acquisition starts, for the workspace's model.
+@pytest.mark.parametrize(
+    ("synthetic", "model_id", "worst_case"),
+    [
+        (False, "muse-spark-1.3", 716_250_000),  # $0.716: 5 runs x 3 attempts x $0.048
+        (True, "muse-spark-1.3-contributor", 51_000_000),  # $0.051: 5 x 3 x $0.0034
+    ],
+    ids=["production model", "test model"],
+)
+def test_an_acquisition_s_model_spend_is_its_runs_ceiling_over_every_attempt(
+    synthetic: bool, model_id: str, worst_case: int
+) -> None:
+    # Fix round 3, item 5, made the true ceiling by fix round 4, item 4: each run may make
+    # every attempt its retry owner (the DBOS step) allows, each reserving the activity's own
+    # worst case, and on the default run limit every one of them fits.
     models = ModelChoice.configure("muse-spark-1.3-contributor", "muse-spark-1.3", "test")
+    default_run_limit = ApiSettings.model_fields["default_run_spend_limit_nano_usd"].default
+    reservation = PAGE_EXTRACTION_TASK.worst_case_nano_usd(model_id)
 
-    personal = acquisition_model_spend(models, synthetic=False, data_mode=DataMode.LIVE_ASSISTED)
-    synthetic = acquisition_model_spend(models, synthetic=True, data_mode=DataMode.LIVE_VACANCY)
+    estimate = acquisition_model_spend(
+        models, synthetic=synthetic, data_mode=DataMode.LIVE_ASSISTED
+    )
 
-    assert personal is not None
-    assert synthetic is not None
-    assert (personal.model_id, personal.model_runs, personal.worst_case_nano_usd) == (
-        "muse-spark-1.3",
+    assert estimate is not None
+    assert (estimate.model_id, estimate.model_runs) == (
+        model_id,
         extraction_runs.MAX_EXTRACTIONS_PER_ACQUISITION,
-        5 * 47_750_000,  # $0.239: five runs at the production model's reservation
     )
-    assert (synthetic.model_id, synthetic.per_run_nano_usd) == (
-        "muse-spark-1.3-contributor",
-        3_400_000,
-    )
-    assert acquisition_model_spend(models, synthetic=True, data_mode=DataMode.DEMO) is None
+    assert estimate.per_run_nano_usd == ACTIVITY_MAX_ATTEMPTS * reservation
+    assert estimate.per_run_nano_usd <= default_run_limit  # the run limit never cuts it short
+    assert estimate.worst_case_nano_usd == worst_case
+    assert acquisition_model_spend(models, synthetic=synthetic, data_mode=DataMode.DEMO) is None
 
 
 # --- the database holds the code's labels -----------------------------------------------

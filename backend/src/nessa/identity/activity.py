@@ -86,6 +86,11 @@ class PartialSink(Protocol):
     def __call__(self, text: str, *, complete: bool) -> None: ...
 
 
+# The DBOS step's attempts at this activity (`workflow.bounded_model_activity`), the only
+# retry owner for provider failures. Each attempt reserves its own worst case, so together
+# they bound what one run may spend (`run_worst_case_nano_usd`); kept here, beside the
+# reservation, so the API reads them without the workflow engine.
+ACTIVITY_MAX_ATTEMPTS = 3
 # How long the activity keeps retrying its own database work (the attempt row, the result)
 # through an outage before the run fails `app_store_unavailable`.
 STORE_RETRY_BUDGET_S = 60.0
@@ -118,6 +123,13 @@ class RunTask:
     exceeded_bound: Callable[[Usage], str | None] | None = None
     record: Callable[[Tx, Keyring, Run, BaseModel], None] | None = None
     erases_input: bool = False
+
+
+def run_worst_case_nano_usd(attempt_worst_case: Callable[[str], int], model_id: str) -> int:
+    """The most one run may spend on the key (MODEL-08; fix round 4, item 4): every attempt
+    its retry owner may make, each reserving what a task's `worst_case_nano_usd` gives, as
+    the activity reserves it."""
+    return ACTIVITY_MAX_ATTEMPTS * attempt_worst_case(model_id)
 
 
 @dataclass(frozen=True)

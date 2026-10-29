@@ -387,11 +387,14 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
       round 3, review C M3); the activity's reservation remains the enforcement.
     - *Spend shown first (MODEL-08, fix round 3 item 5).* The job list (`GET .../jobs`, the
       read the research view makes before an acquisition starts) carries
-      `acquisition_model_spend`: `MAX_EXTRACTIONS_PER_ACQUISITION` times one extraction
-      run's reservation on the workspace's model (`extraction_runs.acquisition_model_spend`,
-      deterministic): $0.017 on the test model, $0.239 on the production model; none for a
-      demo workspace. A retried attempt (a provider outage) reserves again within the key's
-      run limit, as the field says. Task 8 shows it on screen.
+      `acquisition_model_spend`, the true ceiling since fix round 4 (item 4):
+      `MAX_EXTRACTIONS_PER_ACQUISITION` times one extraction run's worst case across every
+      attempt its retry owner, the DBOS step, may make (`ACTIVITY_MAX_ATTEMPTS`, 3), each at
+      the reservation the activity takes (`extraction_runs.acquisition_model_spend`, through
+      `activity.run_worst_case_nano_usd` and the task's own `worst_case_nano_usd`, so the
+      estimate and the reservation cannot drift): $0.051 on the test model, $0.716 on the
+      production model, each run's three attempts within the default $0.15 run limit; none
+      for a demo workspace. The field says it is a maximum. Task 8 shows it on screen.
     - *Cancellation (DUR-05, fix round 3 item 4).* Each extraction run records the
       acquisition that started it (`runs.started_by_run`, migration 0023). Cancelling a run
       also requests the cancellation of every run it started that has not settled (queued or
@@ -416,8 +419,13 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
       only as stated; dates as they parse; `apply_link`; no personal details; the claim
       bounds). Pay that cannot be read without a guess is refused, `salary_invalid` (fix
       round 3, review C I2): a range with a multiplier on one side only (`£30-35k`), a
-      letter straight after a number that is not its `k` (`£1.2m`, `£30kpa`); "up to",
-      "max" or "maximum" after the amount gives a maximum, as before it. A negated work
+      letter straight after a number, or after its `k`, that is not an attached period
+      (`£1.2m`, `£2bn`, `£30,000ish`); "up to", "max" or "maximum" after the amount gives a
+      maximum, as before it. Since fix round 4 (item 3) a period attached to the number
+      reads as that period, never as a refusal: `pa`, `p.a.`, `ph`, `p/h` and the attached
+      year and hour words the reader knows (`annual`, `annually`, `yearly`, `hourly`), so
+      `£30,000pa`, `£14.50ph` and `£30kpa` are read exactly; an attached month, week or day
+      form (`£2,000pcm`) is still refused. A negated work
       mode ("not remote", "non-remote") is `work_mode_unclear` (review C M1). The input is
       held to 8,000 bytes of UTF-8, as its reservation assumes (review C M4). A field
       without a verified span is dropped with its reason; a span whose

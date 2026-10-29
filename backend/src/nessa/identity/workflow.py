@@ -15,7 +15,7 @@ from dbos import DBOS
 from dbos import error as dbos_error
 
 from nessa.identity import activity, run_store
-from nessa.identity.activity import ActivityRuntime, Outcome
+from nessa.identity.activity import ACTIVITY_MAX_ATTEMPTS, ActivityRuntime, Outcome
 from nessa.identity.failures import (
     LabelledError,
     TransientProviderError,
@@ -24,7 +24,6 @@ from nessa.identity.failures import (
 )
 
 WORKFLOW_NAME = run_store.MODEL_RUN_WORKFLOW
-ACTIVITY_MAX_ATTEMPTS = 3
 ACTIVITY_INTERVAL_S = 1.0
 ACTIVITY_BACKOFF_RATE = 2.0
 PUBLISH_MAX_ATTEMPTS = 12  # backoff 1 s doubling: about 34 minutes of outage

@@ -33,6 +33,7 @@ from nessa.evidence.recording import record_copies
 from nessa.evidence.records import MODEL_READABLE, AttemptStatus, ExtractionNotRun
 from nessa.identity import credential_store, run_store
 from nessa.identity import store as identity_store
+from nessa.identity.activity import run_worst_case_nano_usd
 from nessa.identity.keyring import Keyring
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.model_registry import ModelEntry, ModelMode
@@ -46,10 +47,12 @@ MAX_EXTRACTIONS_PER_ACQUISITION = 5
 
 @dataclass(frozen=True)
 class ModelSpendEstimate:
-    """What an acquisition may spend on the person's key, shown before it starts (MODEL-08:
-    "display estimated incremental cost before deep research"; fix round 3, item 5): at most
-    `model_runs` extraction runs, each reserving at most `per_run_nano_usd` (one attempt's
-    worst case on the workspace's model) before its provider call."""
+    """The most an acquisition may spend on the person's key, shown before it starts
+    (MODEL-08: "display estimated incremental cost before deep research"; fix round 3, item
+    5; the true ceiling since fix round 4, item 4): at most `model_runs` extraction runs,
+    each spending at most `per_run_nano_usd`, which is every attempt its retry owner (the
+    DBOS step) may make at the reservation the activity takes for each. A maximum, never an
+    expected cost."""
 
     model_id: str
     model_runs: int
@@ -60,12 +63,14 @@ class ModelSpendEstimate:
 def acquisition_model_spend(
     models: ModelChoice, *, synthetic: bool, data_mode: DataMode
 ) -> ModelSpendEstimate | None:
-    """Deterministic: the cap times one extraction run's reservation for the model the
-    workspace's runs pin. None for a demo workspace, which never extracts."""
+    """Deterministic: the cap times one extraction run's ceiling for the model the
+    workspace's runs pin, from the functions the reservation uses
+    (`activity.run_worst_case_nano_usd` over the task's `extraction.worst_case_nano_usd`), so
+    the two cannot drift. None for a demo workspace, which never extracts."""
     if data_mode is DataMode.DEMO:
         return None
     model = models.for_workspace(synthetic=synthetic)
-    per_run = extraction.worst_case_nano_usd(model.model_id)
+    per_run = run_worst_case_nano_usd(extraction.worst_case_nano_usd, model.model_id)
     return ModelSpendEstimate(
         model_id=model.model_id,
         model_runs=MAX_EXTRACTIONS_PER_ACQUISITION,

@@ -7,6 +7,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from nessa.config import ApiSettings
+from nessa.identity.activity import ACTIVITY_MAX_ATTEMPTS
 from nessa.identity.records import RunKind
 from nessa.identity.spend import (
     BudgetScope,
@@ -16,7 +17,6 @@ from nessa.identity.spend import (
     period_start,
     refused_scope,
 )
-from nessa.identity.workflow import ACTIVITY_MAX_ATTEMPTS
 from nessa.worker import TASKS
 
 LIMITS = SpendLimits(run_limit_nano_usd=1_000, period_limit_nano_usd=5_000)

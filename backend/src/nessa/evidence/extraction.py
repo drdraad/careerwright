@@ -229,7 +229,16 @@ _CURRENCY = r"£|\$|€|(?<![A-Za-z])(?:GBP|USD|EUR)(?![A-Za-z])"
 # Digits with their grouping commas, never a trailing comma ("£30,000, plus ..."); whether
 # the grouping is right is checked after (`_GROUPED`), so "£1,00" is no amount at all.
 _NUMBER = r"(?:\d[\d,]*\d|\d)(?:\.\d+)?"
-_THOUSANDS = r"[kK](?![A-Za-z])"
+# The period words that may stand straight after a number or its `k` ("£30,000pa",
+# "£14.50ph", "£30kpa"): they read as that period, never as a refusal (fix round 4, item 3).
+# Any other letter there, a magnitude ("£1.2m", "£2bn") among them, is still refused.
+_ATTACHED_PERIOD_WORDS = {
+    SalaryPeriod.YEAR: r"p\.?a\.?|annual(?:ly)?|yearly",
+    SalaryPeriod.HOUR: r"p/?h|hourly",
+}
+_ATTACHED = f"(?:{'|'.join(_ATTACHED_PERIOD_WORDS.values())})(?![A-Za-z])"
+_ATTACHED_PERIOD = re.compile(_ATTACHED, re.IGNORECASE)
+_THOUSANDS = rf"[kK](?=(?i:{_ATTACHED})|(?![A-Za-z]))"
 _RANGE = f"-|{chr(0x2013)}|{chr(0x2014)}|to"  # a hyphen, an en or em dash, or "to"
 _MONEY = re.compile(
     rf"(?P<cur>{_CURRENCY})\s?(?P<low>{_NUMBER})\s?(?P<low_k>{_THOUSANDS})?"
@@ -244,14 +253,17 @@ _UP_TO = re.compile(r"(?<![A-Za-z])(?:up to|maximum|max\.?)(?![A-Za-z])", re.IGN
 _FROM = re.compile(r"(?<![A-Za-z])(?:from|starting at|minimum|min\.?)(?![A-Za-z])", re.IGNORECASE)
 _AT_LEAST = re.compile(r"(?<![A-Za-z])(?:minimum|min\.?)(?![A-Za-z])", re.IGNORECASE)
 _PERIOD_WORDS = {
-    SalaryPeriod.YEAR: r"per (?:annum|year)|a year|annual(?:ly)?|yearly|p\.?a\.?",
+    SalaryPeriod.YEAR: rf"per (?:annum|year)|a year|{_ATTACHED_PERIOD_WORDS[SalaryPeriod.YEAR]}",
     SalaryPeriod.MONTH: r"per (?:calendar )?month|a month|monthly|pcm",
     SalaryPeriod.WEEK: r"per week|a week|weekly",
     SalaryPeriod.DAY: r"per day|a day|daily|day rate",
-    SalaryPeriod.HOUR: r"per hour|an hour|hourly",
+    SalaryPeriod.HOUR: rf"per hour|an hour|{_ATTACHED_PERIOD_WORDS[SalaryPeriod.HOUR]}",
 }
+# A period word stands apart from other letters, except an amount's own `k` ("£30kpa").
 _PERIODS = {
-    period: re.compile(rf"(?<![A-Za-z])(?:{words})(?![A-Za-z])", re.IGNORECASE)
+    period: re.compile(
+        rf"(?:(?<![A-Za-z])|(?<=\d[kK])|(?<=\d [kK]))(?:{words})(?![A-Za-z])", re.IGNORECASE
+    )
     for period, words in _PERIOD_WORDS.items()
 }
 
@@ -269,17 +281,20 @@ def _pence(number: str, thousands: str | None) -> int | str:
 def _misreadable(match: re.Match[str]) -> bool:
     """Whether reading the match would guess (fix round 3, review C I2): a range with a
     multiplier on one side only ("£30-35k": £30 or £30,000?), or a letter straight after a
-    number that is not its `k` ("£1.2m", "£30kpa")."""
+    number, or after its `k`, that is not an attached period ("£1.2m"; fix round 4, item 3:
+    "£30,000pa" and "£30kpa" are read)."""
     if match["high"] is not None and (match["low_k"] is None) != (match["high_k"] is None):
         return True
+    text = match.string
     for side in ("low", "high"):
         if match[side] is None:
             continue
         end = match.end(side)
-        if end < len(match.string) and match.string[end].isalpha():
-            multiplier = f"{side}_k"
-            if match[multiplier] is None or match.start(multiplier) != end:
-                return True
+        multiplier = f"{side}_k"
+        if match[multiplier] is not None and match.start(multiplier) == end:
+            end = match.end(multiplier)
+        if end < len(text) and text[end].isalpha() and not _ATTACHED_PERIOD.match(text, end):
+            return True
     return False
 
 

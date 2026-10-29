@@ -14,9 +14,8 @@ from pydantic import SecretStr
 
 from nessa.db import create_engine
 from nessa.identity import worker as worker_loop
-from nessa.identity.activity import ActivityRuntime
+from nessa.identity.activity import ACTIVITY_MAX_ATTEMPTS, ActivityRuntime
 from nessa.identity.keyring import load_keyring
-from nessa.identity.workflow import ACTIVITY_MAX_ATTEMPTS
 from nessa.worker import TASKS, model_builder
 from tests.integration.durable import Scenario, make_scenario
 from tests.support.client import ApiClient

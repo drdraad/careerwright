@@ -76,16 +76,17 @@ from nessa.evidence.pages import redact_page, visible_text
 from nessa.evidence.records import ValidationState
 from nessa.evidence.search_agent import run_search
 from nessa.identity import connection_check
-from nessa.identity.activity import STORE_RETRY_BUDGET_S, PartialWriter, measured_usage
+from nessa.identity.activity import (
+    ACTIVITY_MAX_ATTEMPTS,
+    STORE_RETRY_BUDGET_S,
+    PartialWriter,
+    measured_usage,
+)
 from nessa.identity.failures import BoundExceededError, classify_failure
 from nessa.identity.meta import REQUEST_TIMEOUT_S, meta_model
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.model_registry import ModelMode, estimate_cost_nano_usd, format_usd
-from nessa.identity.workflow import (
-    ACTIVITY_BACKOFF_RATE,
-    ACTIVITY_INTERVAL_S,
-    ACTIVITY_MAX_ATTEMPTS,
-)
+from nessa.identity.workflow import ACTIVITY_BACKOFF_RATE, ACTIVITY_INTERVAL_S
 from nessa.profile import interview
 from tools.leak_scan import Finding, Needle, scan
 from tools.localenv import REPO_ROOT, ensure_local_home

@@ -1443,7 +1443,7 @@ export type JobPage = {
      */
     empty_reason: EmptyReason | null;
     /**
-     * What the next acquisition may spend on the person's key, shown before it starts (MODEL-08); none for a demo workspace, which never calls a model.
+     * The most the next acquisition may spend on the person's key, a maximum shown before it starts (MODEL-08); none for a demo workspace, which never calls a model.
      */
     acquisition_model_spend: ModelSpendOut | null;
 };
@@ -1576,11 +1576,12 @@ export type ModelMode = typeof ModelMode[keyof typeof ModelMode];
 /**
  * ModelSpendOut
  *
- * What one acquisition may spend on the person's model key, before it starts (MODEL-08;
- * computed in deterministic code). Each page whose structured data gives no posting may be
- * read by an extraction run on the workspace's model, at most `model_runs` per acquisition;
- * each run reserves at most `per_run_nano_usd` before its provider call, and a retried
- * attempt (a provider outage) reserves again within the key's run limit.
+ * The most one acquisition may spend on the person's model key, before it starts
+ * (MODEL-08; computed in deterministic code, by the functions the reservation uses). Each
+ * page whose structured data gives no posting may be read by an extraction run on the
+ * workspace's model, at most `model_runs` per acquisition; each run may make every attempt
+ * its retry owner allows (a provider outage is retried), each reserving its worst case.
+ * A maximum, never an expected cost.
  */
 export type ModelSpendOut = {
     /**
@@ -1598,13 +1599,13 @@ export type ModelSpendOut = {
     /**
      * Per Run Nano Usd
      *
-     * One run's reservation, at its bounds.
+     * The most one run may spend: every attempt it may make, each at its reservation's bounds.
      */
     per_run_nano_usd: number;
     /**
      * Worst Case Nano Usd
      *
-     * model_runs x per_run_nano_usd.
+     * The most the acquisition may spend: model_runs x per_run_nano_usd.
      */
     worst_case_nano_usd: number;
 };

@@ -22,6 +22,7 @@ from nessa.evidence.extraction import DropReason
 from nessa.evidence.extraction_runs import MAX_EXTRACTIONS_PER_ACQUISITION, start_extraction
 from nessa.evidence.records import AttemptStatus, Extraction, InputRoute
 from nessa.identity import run_store
+from nessa.identity.activity import ACTIVITY_MAX_ATTEMPTS
 from nessa.identity.keyring import Keyring, SealedValue, load_keyring
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.model_registry import model_entry
@@ -696,11 +697,12 @@ def test_the_job_list_states_what_an_acquisition_may_spend_before_it_starts(
 ) -> None:
     listing = jobs(api, ada, scenario.workspace_id)
 
-    # The synthetic workspace's test model: five runs at one reservation each.
-    per_run = extraction.worst_case_nano_usd("muse-spark-1.3-contributor")
+    # The synthetic workspace's test model: five runs, each at most every attempt the DBOS
+    # step may make at one reservation (fix round 4, item 4): $0.051.
+    per_run = ACTIVITY_MAX_ATTEMPTS * extraction.worst_case_nano_usd("muse-spark-1.3-contributor")
     assert listing["acquisition_model_spend"] == {
         "model_id": "muse-spark-1.3-contributor",
         "model_runs": 5,
         "per_run_nano_usd": per_run,
-        "worst_case_nano_usd": 5 * per_run,
+        "worst_case_nano_usd": 51_000_000,
     }
