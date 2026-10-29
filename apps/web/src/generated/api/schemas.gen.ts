@@ -2221,12 +2221,17 @@ export const ModelSpendOutSchema = {
         per_run_nano_usd: {
             type: 'integer',
             title: 'Per Run Nano Usd',
-            description: 'The most one run may spend: every attempt it may make, each at its reservation\'s bounds.'
+            description: 'The most one run spends without a worker crash: every attempt it may make, each at its reservation\'s bounds.'
         },
         worst_case_nano_usd: {
             type: 'integer',
             title: 'Worst Case Nano Usd',
-            description: 'The most the acquisition may spend: model_runs x per_run_nano_usd.'
+            description: 'The most the acquisition spends without a worker crash: model_runs x per_run_nano_usd.'
+        },
+        hard_maximum_nano_usd: {
+            type: 'integer',
+            title: 'Hard Maximum Nano Usd',
+            description: 'The most the acquisition can ever spend, a worker crash included: model_runs x the workspace\'s per-run spend limit, past which a run never reserves.'
         }
     },
     additionalProperties: false,
@@ -2235,10 +2240,11 @@ export const ModelSpendOutSchema = {
         'model_id',
         'model_runs',
         'per_run_nano_usd',
-        'worst_case_nano_usd'
+        'worst_case_nano_usd',
+        'hard_maximum_nano_usd'
     ],
     title: 'ModelSpendOut',
-    description: 'The most one acquisition may spend on the person\'s model key, before it starts\n(MODEL-08; computed in deterministic code, by the functions the reservation uses). Each\npage whose structured data gives no posting may be read by an extraction run on the\nworkspace\'s model, at most `model_runs` per acquisition; each run may make every attempt\nits retry owner allows (a provider outage is retried), each reserving its worst case.\nA maximum, never an expected cost.'
+    description: 'The most one acquisition may spend on the person\'s model key, before it starts\n(MODEL-08; computed in deterministic code), as two maxima, never an expected cost. Each\npage whose structured data gives no posting may be read by an extraction run on the\nworkspace\'s model, at most `model_runs` per acquisition. Without a worker crash, each\nrun makes at most every attempt its retry owner allows (a provider outage is retried),\neach reserving its worst case (`worst_case_nano_usd`). A crash can give a run fresh\nattempts, but never a reservation past the workspace\'s run limit\n(`hard_maximum_nano_usd`).'
 } as const;
 
 export const MoneySchema = {

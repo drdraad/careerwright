@@ -749,29 +749,52 @@ def test_an_attempt_reserves_both_requests_at_their_bounds() -> None:
     ],
     ids=["production model", "test model"],
 )
-def test_an_acquisition_s_model_spend_is_its_runs_ceiling_over_every_attempt(
+def test_an_acquisition_s_model_spend_states_its_ceiling_without_a_crash_and_its_hard_maximum(
     synthetic: bool, model_id: str, worst_case: int
 ) -> None:
-    # Fix round 3, item 5, made the true ceiling by fix round 4, item 4: each run may make
-    # every attempt its retry owner (the DBOS step) allows, each reserving the activity's own
-    # worst case, and on the default run limit every one of them fits.
+    # Fix round 3, item 5; fix round 4, item 4: without a worker crash each run makes at
+    # most every attempt its retry owner (the DBOS step) allows, each reserving the
+    # activity's own worst case, all within the default run limit. Fix round 5 (re-review
+    # 2-C N1): after a crash DBOS gives the step fresh attempts, so the hard maximum is each
+    # run's spend limit, past which the activity never reserves.
     models = ModelChoice.configure("muse-spark-1.3-contributor", "muse-spark-1.3", "test")
     default_run_limit = ApiSettings.model_fields["default_run_spend_limit_nano_usd"].default
     reservation = PAGE_EXTRACTION_TASK.worst_case_nano_usd(model_id)
 
     estimate = acquisition_model_spend(
-        models, synthetic=synthetic, data_mode=DataMode.LIVE_ASSISTED
+        models,
+        synthetic=synthetic,
+        data_mode=DataMode.LIVE_ASSISTED,
+        run_limit_nano_usd=default_run_limit,
+    )
+    lower = acquisition_model_spend(
+        models,
+        synthetic=synthetic,
+        data_mode=DataMode.LIVE_ASSISTED,
+        run_limit_nano_usd=20_000_000,
     )
 
     assert estimate is not None
+    assert lower is not None
     assert (estimate.model_id, estimate.model_runs) == (
         model_id,
         extraction_runs.MAX_EXTRACTIONS_PER_ACQUISITION,
     )
     assert estimate.per_run_nano_usd == ACTIVITY_MAX_ATTEMPTS * reservation
     assert estimate.per_run_nano_usd <= default_run_limit  # the run limit never cuts it short
-    assert estimate.worst_case_nano_usd == worst_case
-    assert acquisition_model_spend(models, synthetic=synthetic, data_mode=DataMode.DEMO) is None
+    assert estimate.worst_case_nano_usd == worst_case  # without a worker crash
+    assert estimate.hard_maximum_nano_usd == 750_000_000  # 5 runs x the $0.15 run limit
+    assert lower.hard_maximum_nano_usd == 100_000_000  # it follows the workspace's own limit
+    assert lower.worst_case_nano_usd == worst_case
+    assert (
+        acquisition_model_spend(
+            models,
+            synthetic=synthetic,
+            data_mode=DataMode.DEMO,
+            run_limit_nano_usd=default_run_limit,
+        )
+        is None
+    )
 
 
 # --- the database holds the code's labels -----------------------------------------------

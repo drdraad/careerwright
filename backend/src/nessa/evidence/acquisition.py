@@ -81,6 +81,8 @@ from nessa.identity.keyring import Keyring, RecordContext
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.records import EventKind, Run, RunKind
 from nessa.identity.runs import open_output, output_context, submit_keyless_run, visible_run
+from nessa.identity.spend import SpendLimits
+from nessa.identity.spend_limits import spend_summary
 from nessa.identity.workspaces import visible_workspace
 from nessa.vocabulary import DataMode, WorkState
 
@@ -653,11 +655,14 @@ def list_jobs(
     limit: int,
     now: datetime,
     models: ModelChoice,
+    defaults: SpendLimits,
 ) -> JobListing:
     """One page of jobs, and the workspace's totals, counted in the database (no cap), with
     what the next acquisition may spend on the person's key: the read the research view
-    makes before an acquisition starts (fix round 3, item 5)."""
+    makes before an acquisition starts (fix round 3, item 5). Its hard maximum follows the
+    workspace's run limit, the default one until limits are stored (`spend_summary`)."""
     workspace = visible_workspace(tx, workspace_id)
+    run_limit = spend_summary(tx, workspace_id, now, defaults).limits.run_limit_nano_usd
     rows = store.jobs(
         tx, workspace_id, favourites_only=favourites_only, before=before, limit=limit + 1
     )
@@ -675,7 +680,10 @@ def list_jobs(
         store.advert_counts(tx, workspace_id),
         _empty_reason(total_jobs, covered),
         acquisition_model_spend(
-            models, synthetic=workspace.synthetic, data_mode=workspace.data_mode
+            models,
+            synthetic=workspace.synthetic,
+            data_mode=workspace.data_mode,
+            run_limit_nano_usd=run_limit,
         ),
     )
 

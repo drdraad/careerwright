@@ -1578,11 +1578,13 @@ export type ModelMode = typeof ModelMode[keyof typeof ModelMode];
  * ModelSpendOut
  *
  * The most one acquisition may spend on the person's model key, before it starts
- * (MODEL-08; computed in deterministic code, by the functions the reservation uses). Each
+ * (MODEL-08; computed in deterministic code), as two maxima, never an expected cost. Each
  * page whose structured data gives no posting may be read by an extraction run on the
- * workspace's model, at most `model_runs` per acquisition; each run may make every attempt
- * its retry owner allows (a provider outage is retried), each reserving its worst case.
- * A maximum, never an expected cost.
+ * workspace's model, at most `model_runs` per acquisition. Without a worker crash, each
+ * run makes at most every attempt its retry owner allows (a provider outage is retried),
+ * each reserving its worst case (`worst_case_nano_usd`). A crash can give a run fresh
+ * attempts, but never a reservation past the workspace's run limit
+ * (`hard_maximum_nano_usd`).
  */
 export type ModelSpendOut = {
     /**
@@ -1600,15 +1602,21 @@ export type ModelSpendOut = {
     /**
      * Per Run Nano Usd
      *
-     * The most one run may spend: every attempt it may make, each at its reservation's bounds.
+     * The most one run spends without a worker crash: every attempt it may make, each at its reservation's bounds.
      */
     per_run_nano_usd: number;
     /**
      * Worst Case Nano Usd
      *
-     * The most the acquisition may spend: model_runs x per_run_nano_usd.
+     * The most the acquisition spends without a worker crash: model_runs x per_run_nano_usd.
      */
     worst_case_nano_usd: number;
+    /**
+     * Hard Maximum Nano Usd
+     *
+     * The most the acquisition can ever spend, a worker crash included: model_runs x the workspace's per-run spend limit, past which a run never reserves.
+     */
+    hard_maximum_nano_usd: number;
 };
 
 /**

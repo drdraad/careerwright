@@ -208,6 +208,7 @@ def list_jobs(
             limit=limit,
             now=deps.clock(),
             models=deps.models,
+            defaults=deps.spend_defaults,
         )
     last = listing.jobs[-1].job if listing.jobs else None
     return JobPage(

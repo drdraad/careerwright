@@ -408,14 +408,20 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
       round 3, review C M3); the activity's reservation remains the enforcement.
     - *Spend shown first (MODEL-08, fix round 3 item 5).* The job list (`GET .../jobs`, the
       read the research view makes before an acquisition starts) carries
-      `acquisition_model_spend`, the true ceiling since fix round 4 (item 4):
-      `MAX_EXTRACTIONS_PER_ACQUISITION` times one extraction run's worst case across every
-      attempt its retry owner, the DBOS step, may make (`ACTIVITY_MAX_ATTEMPTS`, 3), each at
-      the reservation the activity takes (`extraction_runs.acquisition_model_spend`, through
-      `activity.run_worst_case_nano_usd` and the task's own `worst_case_nano_usd`, so the
-      estimate and the reservation cannot drift): $0.051 on the test model, $0.716 on the
-      production model, each run's three attempts within the default $0.15 run limit; none
-      for a demo workspace. The field says it is a maximum. Task 8 shows it on screen.
+      `acquisition_model_spend`, two maxima, never an expected cost. Without a worker crash
+      (fix round 4, item 4): `MAX_EXTRACTIONS_PER_ACQUISITION` times one extraction run's
+      worst case across every attempt its retry owner, the DBOS step, may make
+      (`ACTIVITY_MAX_ATTEMPTS`, 3), each at the reservation the activity takes
+      (`extraction_runs.acquisition_model_spend`, through `activity.run_worst_case_nano_usd`
+      and the task's own `worst_case_nano_usd`, so the estimate and the reservation cannot
+      drift): $0.051 on the test model, $0.716 on the production model, each run's three
+      attempts within the default $0.15 run limit (`worst_case_nano_usd`). The hard
+      maximum, a crash included (fix round 5, re-review 2-C N1): DBOS runs a step a crash
+      interrupted again with a fresh set of attempts, but the activity never reserves past
+      the workspace's per-run spend limit, so `MAX_EXTRACTIONS_PER_ACQUISITION` times that
+      limit, the default one until limits are stored: $0.75 at the default
+      (`hard_maximum_nano_usd`). The activity is unchanged; the fields say which figure is
+      which. None for a demo workspace. Task 8 shows it on screen.
     - *Cancellation (DUR-05, fix round 3 item 4).* Each extraction run records the
       acquisition that started it (`runs.started_by_run`, migration 0023). Cancelling a run
       also requests the cancellation of every run it started that has not settled (queued or

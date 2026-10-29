@@ -49,24 +49,29 @@ MAX_EXTRACTIONS_PER_ACQUISITION = 5
 class ModelSpendEstimate:
     """The most an acquisition may spend on the person's key, shown before it starts
     (MODEL-08: "display estimated incremental cost before deep research"; fix round 3, item
-    5; the true ceiling since fix round 4, item 4): at most `model_runs` extraction runs,
-    each spending at most `per_run_nano_usd`, which is every attempt its retry owner (the
-    DBOS step) may make at the reservation the activity takes for each. A maximum, never an
-    expected cost."""
+    5), as two maxima, never an expected cost:
+    - without a worker crash (fix round 4, item 4): at most `model_runs` extraction runs,
+      each spending at most `per_run_nano_usd`, every attempt its retry owner (the DBOS
+      step) may make at the reservation the activity takes for each;
+    - the hard maximum, a crash included (fix round 5, re-review 2-C N1): DBOS gives a step
+      interrupted by a crash fresh attempts, but the activity never reserves past the
+      workspace's per-run spend limit, so `model_runs` times that limit."""
 
     model_id: str
     model_runs: int
     per_run_nano_usd: int
     worst_case_nano_usd: int
+    hard_maximum_nano_usd: int
 
 
 def acquisition_model_spend(
-    models: ModelChoice, *, synthetic: bool, data_mode: DataMode
+    models: ModelChoice, *, synthetic: bool, data_mode: DataMode, run_limit_nano_usd: int
 ) -> ModelSpendEstimate | None:
     """Deterministic: the cap times one extraction run's ceiling for the model the
     workspace's runs pin, from the functions the reservation uses
     (`activity.run_worst_case_nano_usd` over the task's `extraction.worst_case_nano_usd`), so
-    the two cannot drift. None for a demo workspace, which never extracts."""
+    the two cannot drift; and the cap times the workspace's run limit. None for a demo
+    workspace, which never extracts."""
     if data_mode is DataMode.DEMO:
         return None
     model = models.for_workspace(synthetic=synthetic)
@@ -76,6 +81,7 @@ def acquisition_model_spend(
         model_runs=MAX_EXTRACTIONS_PER_ACQUISITION,
         per_run_nano_usd=per_run,
         worst_case_nano_usd=MAX_EXTRACTIONS_PER_ACQUISITION * per_run,
+        hard_maximum_nano_usd=MAX_EXTRACTIONS_PER_ACQUISITION * run_limit_nano_usd,
     )
 
 

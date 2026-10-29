@@ -799,16 +799,28 @@ def test_the_test_model_never_reads_a_page_of_a_workspace_that_is_not_synthetic(
 
 @pytest.mark.req("MODEL-08")
 def test_the_job_list_states_what_an_acquisition_may_spend_before_it_starts(
-    api: ApiClient, ada: str, scenario: Scenario
+    infra: Infra, api: ApiClient, ada: str, scenario: Scenario
 ) -> None:
+    infra.query(
+        "UPDATE nessa.spend_limits SET run_limit_nano_usd = 40000000 WHERE workspace_id = %s",
+        (scenario.workspace_id,),
+    )
+    keyless = str(api.create_workspace(ada, "No key yet")["workspace_id"])
+
     listing = jobs(api, ada, scenario.workspace_id)
+    before_a_key = jobs(api, ada, keyless)
 
     # The synthetic workspace's test model: five runs, each at most every attempt the DBOS
-    # step may make at one reservation (fix round 4, item 4): $0.051.
+    # step may make at one reservation without a worker crash (fix round 4, item 4): $0.051.
+    # The hard maximum, a crash included, is five runs at the workspace's own run limit
+    # (fix round 5, re-review 2-C N1): here $0.04 each, so $0.20.
     per_run = ACTIVITY_MAX_ATTEMPTS * extraction.worst_case_nano_usd("muse-spark-1.3-contributor")
     assert listing["acquisition_model_spend"] == {
         "model_id": "muse-spark-1.3-contributor",
         "model_runs": 5,
         "per_run_nano_usd": per_run,
         "worst_case_nano_usd": 51_000_000,
+        "hard_maximum_nano_usd": 200_000_000,
     }
+    # No limits stored yet: the default run limit, which storing a key sets, applies.
+    assert before_a_key["acquisition_model_spend"]["hard_maximum_nano_usd"] == 750_000_000
