@@ -82,8 +82,14 @@ class Row:
     span: str
 
 
-def _money(minor: int) -> str:
-    return f"£{minor / 100:,.2f}"
+PENCE = 100  # GBP's minor units a pound
+
+
+def pounds(minor: int) -> str:
+    """GBP minor units as pounds and pence, with whole numbers only (Global Constraint 4)."""
+    sign = "-" if minor < 0 else ""
+    whole, pence = divmod(abs(minor), PENCE)
+    return f"{sign}£{whole:,}.{pence:02d}"
 
 
 def show(field: str, value: object) -> str:
@@ -92,11 +98,11 @@ def show(field: str, value: object) -> str:
         return "unknown (null)"
     shape = CLAIM_FIELD_SHAPES.get(field, "text")
     if isinstance(value, dict) and shape == "money":
-        return _money(value["minor_units"])
+        return pounds(value["minor_units"])
     if isinstance(value, dict) and shape == "rate":
         bound = "at least " if value["at_least"] else ""
         repayable = {True: ", repayable", False: ", not repayable"}.get(value["repayable"], "")
-        return f"{bound}{_money(value['minor_units'])} per {value['period']}{repayable}"
+        return f"{bound}{pounds(value['minor_units'])} per {value['period']}{repayable}"
     if isinstance(value, dict) and shape == "pay":
         return _pay(value)
     if isinstance(value, dict) and shape == "instalment":
@@ -120,11 +126,11 @@ def show(field: str, value: object) -> str:
 def _pay(value: dict[str, object]) -> str:
     low, high = value["minimum_minor_units"], value["maximum_minor_units"]
     if isinstance(low, int) and isinstance(high, int):
-        amount = _money(low) if low == high else f"{_money(low)}{DASH}{_money(high)}"
+        amount = pounds(low) if low == high else f"{pounds(low)}{DASH}{pounds(high)}"
     elif isinstance(high, int):
-        amount = f"up to {_money(high)}"
+        amount = f"up to {pounds(high)}"
     else:
-        amount = f"from {_money(low)}" if isinstance(low, int) else "?"
+        amount = f"from {pounds(low)}" if isinstance(low, int) else "?"
     period = f"per {value['period']}" if value["period"] else "per unstated period"
     return f"{amount} {period}, {value['basis']}"
 
@@ -134,7 +140,7 @@ def _instalment(value: dict[str, object]) -> str:
     minor, period, count = value["minor_units"], value["period"], value["count"]
     if isinstance(minor, int):
         bound = "from " if value["at_least"] else ""
-        parts.append(f"{bound}{_money(minor)}" + (f" per {period}" if period else ""))
+        parts.append(f"{bound}{pounds(minor)}" + (f" per {period}" if period else ""))
     if count:
         parts.append(f"{count} payments")
     if not isinstance(minor, int):

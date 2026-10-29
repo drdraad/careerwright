@@ -29,9 +29,9 @@ from nessa.capability.reference import Reference, load_reference
 from nessa.catalogue.option_pack import Pack, load_pack
 from nessa.planning.catalogue import (
     AwardState,
-    Basis,
     Catalogue,
     Citation,
+    CitationBasis,
     EligibilityStatus,
     Fact,
     InstrumentKind,
@@ -39,6 +39,7 @@ from nessa.planning.catalogue import (
     Support,
 )
 from nessa.planning.checker import (
+    FindingCode,
     FindingKind,
     RouteCheck,
     RouteEvaluation,
@@ -57,7 +58,7 @@ from nessa.planning.compiler import (
 )
 from nessa.planning.pack import pack_catalogue
 from tools.localenv import REPO_ROOT
-from tools.option_pack_files import DASH, SECONDS_PER_ROW, show
+from tools.option_pack_files import DASH, SECONDS_PER_ROW, pounds, show
 from tools.option_pack_files import PACKAGE_VERSION as PACK_VERSION
 
 REFERENCE_VERSION = "0.1.0"
@@ -67,7 +68,7 @@ CAPABILITY_PATH = REVIEWS / "session-2-capability-questions.md"
 FIXTURES = REPO_ROOT / "fixtures" / "m0"
 TRACE = "fixtures/m0/worked_trace.json"
 P01_FILE = "fixtures/m0/personas/P01.json"
-FIXTURE = Citation(basis=Basis.FIXTURE, locator=TRACE)
+FIXTURE = Citation(basis=CitationBasis.FIXTURE, locator=TRACE)
 P01_TARGET = "data-quality-analyst-manchester"
 # No condition in P01's real option set for the delay scenario to move; declared all the same.
 DELAY_MONTHS = 2
@@ -166,7 +167,7 @@ def p01_option_set(pack: Pack) -> Catalogue:
         award=AwardState.NOT_APPLIED,
         review_state=RecordState.PROPOSED,
         cited=Citation(
-            basis=Basis.SOURCE,
+            basis=CitationBasis.SOURCE,
             claim_id=route.claim_id,
             source_id=route.source_id,
             source_hash=source.sha256,
@@ -244,8 +245,9 @@ def p01_run() -> Run:
 # Rendering.
 
 
-def _money(minor: int) -> str:
-    return f"£{minor / 100:,.2f}"
+def limit_text(minor: int | None) -> str:
+    """A limit as the reviewer reads it: one not stated is unknown, never £0.00."""
+    return "unknown" if minor is None else pounds(minor)
 
 
 def _excerpt(text: str) -> str:
@@ -259,10 +261,40 @@ def _span(cited: Citation | None) -> str:
     return f"`{_excerpt(cited.excerpt)}` ({cited.claim_id}, {locator})"
 
 
+UNKNOWN_TAILS = (": unknown, never zero", ": unknown, never 0", ": unknown")
+
+
+def _reason(text: str) -> str:
+    """A page's reason for an unknown value, without its own closing "unknown"."""
+    for tail in UNKNOWN_TAILS:
+        if text.endswith(tail):
+            return text.removesuffix(tail)
+    return text
+
+
+def _plain(field: str, value: object) -> str:
+    """A value in words, money as pounds: the shared `show`, and the rules a page states
+    (earnings, age, a yes or no) that it would print as JSON."""
+    if isinstance(value, dict) and isinstance(value.get("below_annual_gross"), dict):
+        text = f"earns below {pounds(value['below_annual_gross']['minor_units'])} a year before tax"
+        text += f" ({value['area']})" if value.get("area") else ""
+        return text + (", or is unemployed" if value.get("or_unemployed") else "")
+    if isinstance(value, dict) and isinstance(value.get("minimum_age"), int):
+        on = f", on the {value['on']}" if value.get("on") else ""
+        return f"aged {value['minimum_age']} or over{on}"
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    return show(field, value)
+
+
 def _value(item: Fact) -> str:
     if item.unknown is not None:
-        return f"unknown: {item.unknown}"
-    return show(item.field, item.value)
+        return f"unknown: {_reason(item.unknown)}"
+    return _plain(item.field, item.value)
+
+
+def _words(code: str) -> str:
+    return code.replace("_", " ")
 
 
 def _table(header: list[str], rows: list[list[str]], prefix: str, first: int) -> list[str]:
@@ -292,12 +324,20 @@ HOW = """\
 
 
 def _input_rows(inputs: PlanningInputs, run: Run) -> list[list[str]]:
-    baseline = inputs.baseline.net_income_by_month[0] if inputs.baseline else 0
-    label = inputs.baseline.label if inputs.baseline else "none"
+    baseline = (
+        f"{pounds(inputs.baseline.net_income_by_month[0])} a month take-home, "
+        f"{inputs.baseline.label}"
+        if inputs.baseline
+        else "unknown: no baseline is confirmed"
+    )
     hours = inputs.continuation.hours_per_week
-    pay = _money(inputs.continuation.net_income_by_month[0])
-    availability = (inputs.weekly_availability_by_month or [0])[0]
-    living = _money(inputs.living_outgoings_by_month[0])
+    pay = pounds(inputs.continuation.net_income_by_month[0])
+    availability = (
+        f"{inputs.weekly_availability_by_month[0]} hours a week in every month"
+        if inputs.weekly_availability_by_month
+        else "unknown"
+    )
+    living = pounds(inputs.living_outgoings_by_month[0])
     levels = ", ".join(
         f"{TRACE_ROWS[s].rsplit(':', 1)[-1]} {e.self_assessed_level}"
         for s, e in zip(TRACE_ROWS, run.readiness.evidence, strict=True)
@@ -310,7 +350,7 @@ def _input_rows(inputs: PlanningInputs, run: Run) -> list[list[str]]:
             f"{inputs.planning_start:%Y-%m}, {inputs.horizon_months} months",
             trace,
         ],
-        ["`P01`", "baseline", f"{_money(baseline)} a month take-home, {label}", trace],
+        ["`P01`", "baseline", baseline, trace],
         [
             "`P01`",
             "continuation",
@@ -320,18 +360,19 @@ def _input_rows(inputs: PlanningInputs, run: Run) -> list[list[str]]:
         [
             "`P01`",
             "cash",
-            f"opening {_money(inputs.opening_cash_minor)}; living costs {living} a month; "
-            f"reserve {_money(inputs.reserve_minor)}",
+            f"opening {pounds(inputs.opening_cash_minor)}; living costs {living} a month; "
+            f"reserve {limit_text(inputs.reserve_minor)}",
             trace,
         ],
         [
             "`P01`",
             "limits",
-            f"direct-spend cap {_money(inputs.direct_spend_cap_minor or 0)}; monthly payment "
-            f"cap {_money(inputs.monthly_payment_cap_minor or 0)}",
+            f"direct-spend limit {limit_text(inputs.direct_spend_cap_minor)}; monthly payment "
+            f"limit {limit_text(inputs.monthly_payment_cap_minor)}, existing debt repayments "
+            f"included{'' if inputs.existing_debts else ' (P01 has none)'}",
             person,
         ],
-        ["`P01`", "weekly availability", f"{availability} hours a week in every month", trace],
+        ["`P01`", "weekly availability", availability, trace],
         [
             "`P01`",
             "when pay arrives",
@@ -341,8 +382,8 @@ def _input_rows(inputs: PlanningInputs, run: Run) -> list[list[str]]:
         [
             "`P01`",
             "work while studying",
-            f"keeps the current role, {hours} hours a week (`retain_work`, one of P01's "
-            "accepted work patterns), because no option states a timetable",
+            f"keeps working in the current role, {hours} hours a week (one of the work "
+            "patterns P01 accepts), because no option states a timetable",
             person,
         ],
         [
@@ -420,7 +461,7 @@ def _option_rows(run: Run) -> list[list[str]]:
             rows.append(
                 [
                     name,
-                    item.field,
+                    _words(item.field),
                     _value(item),
                     _reading(item),
                     _span(item.cited),
@@ -439,29 +480,64 @@ def _verdict(check: RouteCheck) -> str:
     return words.get(check.verdict, check.verdict.value)
 
 
+_FINDING_WORDS = {
+    FindingCode.DATES_UNKNOWN: "no start date, so no month on the grid",
+    FindingCode.COST_UNKNOWN: "the cost is not known",
+    FindingCode.WORKLOAD_UNKNOWN: "no weekly hours, so the workload cannot be checked",
+    FindingCode.DIRECT_SPEND_CAP: "direct spending above the direct-spend limit",
+    FindingCode.MONTHLY_PAYMENT_CAP: "one month's payments above the monthly payment limit",
+    FindingCode.LIMIT_UNKNOWN: "a limit not stated",
+}
+_EVIDENCE_WORDS = {
+    "topic_mention": "a topic named, not practised or assessed",
+    "practice": "practice without an assessment",
+    "exam": "an exam",
+    "assessed_work_sample": "an assessed work sample",
+}
+_CONFIDENCE_WORDS = {
+    "unsupported": "the page does not support it",
+    "provisional": "provisional",
+    "corroborated": "corroborated",
+}
+
+
 def _findings(check: RouteCheck) -> str:
     parts = []
     for finding in check.findings:
+        words = _FINDING_WORDS.get(finding.code, _words(finding.code.value))
         if finding.kind is FindingKind.VIOLATION and finding.amount is not None:
-            amount, limit = _money(finding.amount), _money(finding.limit or 0)
-            parts.append(f"{finding.code.value}: {amount} above {limit}")
+            amount, limit = pounds(finding.amount), limit_text(finding.limit)
+            parts.append(f"{words}: {amount} against {limit}")
         else:
-            parts.append(finding.code.value)
+            parts.append(words)
     return "; ".join(dict.fromkeys(parts))
+
+
+def _sketch_reason(run: Run) -> str:
+    """Why no pack option reaches readiness here, in full (review M6)."""
+    reasons = ["no pack outcome has a level yet"]
+    if not any(v.placed for v in run.monthly.variants):
+        reasons.append("no variant has dates, so no completion is ever assessed")
+    if all(o.evidence_kind.value in ("topic_mention", "practice") for o in run.readiness.outcomes):
+        reasons.append(
+            "and P01's outcomes are topic mentions or practice without an assessment, which "
+            "keep no level even once reviewed (R41-R48 propose none)"
+        )
+    return "; ".join(reasons)
 
 
 def _result_rows(run: Run) -> list[list[str]]:
     rows = []
     plans = {o.offering_id: o for o in run.catalogue.offerings}
+    sketch = _sketch_reason(run)
     for evaluation in run.evaluations:
         check = evaluation.scenario(Scenario.BASE)
         variant = run.monthly.variant(check.route[0])
         offering = plans[variant.offering_id]
         fee = next((f for f in offering.facts if f.field == "fee_total"), None)
-        state = check.readiness_state.value if check.readiness_state else "not assessed"
+        state = _words(check.readiness_state.value) if check.readiness_state else "not assessed"
         readiness = (
-            f"readiness not reached in this model ({state}): a partial sketch, since no pack "
-            "outcome has a level"
+            f"readiness not reached in this model ({state}): a partial sketch, since {sketch}"
             if check.months_to_readiness is None
             else f"ready after {check.months_to_readiness} months"
         )
@@ -477,13 +553,14 @@ def _result_rows(run: Run) -> list[list[str]]:
     for outcome in run.readiness.outcomes:
         claim = outcome.source_span
         cited = Citation(
-            basis=Basis.SOURCE,
+            basis=CitationBasis.SOURCE,
             claim_id=claim.claim_id,
             excerpt=claim.excerpt,
             locator=f"offsets {claim.start}-{claim.end}",
         )
+        kind = _EVIDENCE_WORDS[outcome.evidence_kind.value]
         reading = (
-            f"{outcome.evidence_kind.value}, {outcome.confidence.value}, no level, proposed: "
+            f"{kind}; {_CONFIDENCE_WORDS[outcome.confidence.value]}; no level, proposed: "
             "counts for nothing towards readiness"
         )
         rows.append(
@@ -535,9 +612,8 @@ def checker_questions() -> str:
         f"  (`{P01_TARGET}`), every record `proposed`.",
         "- **The person is synthetic:** P01's money, hours and evidence are the M0 fixture's",
         "  (TRACE-01). Only the options are real.",
-        "- **Readiness is a partial sketch:** every planned outcome in pack 0.1.0 has no level, so",
-        "  no pack option counts towards readiness until Task 7c publishes reviewed levels. Every",
-        "  result below says so.",
+        "- **Readiness is a partial sketch:** no pack option counts towards readiness here, since",
+        f"  {_sketch_reason(run)}. Every result below says so.",
         f"- **Scenarios:** base, delay ({DELAY_MONTHS} months), no award and no offer. This set",
         "  has no offer and no assumed award, so all four read the same; Part C shows the base",
         "  one.",
@@ -637,7 +713,7 @@ def _level_rows(pack: Pack, reference: Reference) -> list[list[str]]:
         claim = claims[outcome.source_span]
         rubric = reference.rubric_for(outcome.skill_id)
         cited = Citation(
-            basis=Basis.SOURCE,
+            basis=CitationBasis.SOURCE,
             claim_id=claim.claim_id,
             excerpt=claim.excerpt,
             locator=f"offsets {claim.span.start}-{claim.span.end}",

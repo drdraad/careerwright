@@ -18,12 +18,14 @@ from nessa.planning.checker import (
     Verdict,
 )
 from tests.support.planning import trace_inputs
-from tools.option_pack_files import PACKAGE_PATH
+from tools import session_2_files
+from tools.option_pack_files import PACKAGE_PATH, pounds
 from tools.session_2_files import (
     CAPABILITY_PATH,
     CHECKER_PATH,
     capability_questions,
     checker_questions,
+    limit_text,
     p01_inputs,
     p01_run,
     proposed_levels,
@@ -170,3 +172,35 @@ def test_the_proposals_never_touch_the_frozen_pack() -> None:
     assert load_pack("0.1.0", pins=PINS).pack_version == "0.1.0"
     assert 'level_on_completion": 2' not in pack_path("0.1.0").read_text(encoding="utf-8")
     assert PACKAGE_PATH.exists()  # the Q package stays as Task 7b left it
+
+
+@pytest.mark.req("TEST1-14")
+def test_the_checker_questions_read_plainly() -> None:
+    # Review M6: money as pounds, never JSON or minor units; words, never codes.
+    text = checker_questions()
+
+    assert "minor_units" not in text
+    assert '{"' not in text
+    for code in ("dates_unknown", "cost_unknown", "workload_unknown", "direct_spend_cap"):
+        assert code not in text
+    assert "not_ready" not in text
+    assert "topic_mention" not in text
+    assert "£32,400.00" in text  # C01's earnings rule
+    assert not re.search(r"unknown: [^|]*: unknown", text)  # T14 said "unknown" twice
+    # The partial sketch's whole reason.
+    assert "no variant has dates" in text
+    assert "topic mentions or practice without an assessment" in text
+
+
+@pytest.mark.req("TEST1-14")
+def test_an_absent_limit_reads_unknown_never_zero() -> None:
+    assert limit_text(None) == "unknown"
+    assert limit_text(150000) == "£1,500.00"
+
+
+def test_money_is_formatted_with_whole_numbers_in_one_helper() -> None:
+    # Review M11: no float division for money (Global Constraint 4), one helper for both tools.
+    assert pounds(123456789012345678) == "£1,234,567,890,123,456.78"
+    assert pounds(5) == "£0.05"
+    assert pounds(-15000) == "-£150.00"
+    assert vars(session_2_files)["pounds"] is pounds  # the session 2 tool uses the same one
