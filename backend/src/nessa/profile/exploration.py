@@ -241,6 +241,9 @@ class AiFilterView:
     below_minimum: int
     unscored: int
     unscored_excluded: int
+    # A scored occupation's range is a synthetic fixture's, never a real assessment (fix
+    # round 1, review B M8).
+    synthetic: bool = False
 
 
 def _hard_filters(
@@ -279,11 +282,8 @@ def _hard_filters(
             for c, (verdict, _) in verdicts.items()
             if verdict is FloorVerdict.BELOW
         }
-    outcomes = {
-        c: filter_outcome(assessment(hard.pack, esco_uris[c]), hard.ai_filter)
-        for c in considered
-        if c in esco_uris
-    }
+    assessments = {c: assessment(hard.pack, esco_uris[c]) for c in considered if c in esco_uris}
+    outcomes = {c: filter_outcome(found, hard.ai_filter) for c, found in assessments.items()}
     for concept, outcome in outcomes.items():
         if concept in left_out:
             continue
@@ -301,6 +301,7 @@ def _hard_filters(
         below_minimum=found.count(FilterOutcome.BELOW_MINIMUM),
         unscored=sum(o in unscored for o in found),
         unscored_excluded=found.count(FilterOutcome.UNSCORED_EXCLUDED),
+        synthetic=any(a.synthetic and outcomes[c] not in unscored for c, a in assessments.items()),
     )
     return left_out, counts, view
 

@@ -17,6 +17,7 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+from nessa.catalogue.ai_resilience import FIXTURE_PACK, AssessmentPacks, check_pack, load_pack
 from nessa.catalogue.reference import DATASETS, Dataset
 from nessa.catalogue.releases import ReleasePin
 
@@ -290,6 +291,17 @@ SAMPLE_BYTES = {
     "task_usage": task_usage_csv,
     "crosswalk": crosswalk_csv,
 }
+
+
+def packs_scoring(esco_uri: str) -> AssessmentPacks:
+    """Assessment packs whose product slot holds the committed synthetic fixture record moved
+    to `esco_uri`: for tests that run a published range through a workspace that is not the
+    fixture's. Tests only: the committed product pack is never synthetic."""
+    fixture = load_pack(FIXTURE_PACK)
+    moved = fixture.model_copy(
+        update={"records": [r.model_copy(update={"esco_uri": esco_uri}) for r in fixture.records]}
+    )
+    return AssessmentPacks(product=check_pack(moved), fixture=check_pack(fixture))
 
 
 def sample_pin(pin: ReleasePin, data: bytes) -> ReleasePin:

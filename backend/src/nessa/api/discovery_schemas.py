@@ -378,6 +378,9 @@ class AiResilienceFilterOut(ResponseModel):
     below_minimum: int
     unscored: int
     unscored_excluded: int
+    synthetic: bool = Field(
+        description="A scored range here is a synthetic fixture's, never a real assessment."
+    )
     pack_version: str
     pack_dated: date
     summary: str | None = Field(description="In words, when the filter is not at its default.")
@@ -394,9 +397,14 @@ class AiResilienceFilterOut(ResponseModel):
                 if chosen.include_unscored
                 else f"{view.unscored_excluded} unscored left out"
             )
+            ranges = (
+                "each range (a synthetic fixture range here, not a real assessment)"
+                if view.synthetic
+                else "each reviewed range"
+            )
             summary = (
-                f"AI Resilience Score filter, {minimum} on the lower end of each reviewed "
-                f"range: {view.below_minimum} left out below it; {unscored}."
+                f"AI Resilience Score filter, {minimum} on the lower end of {ranges}: "
+                f"{view.below_minimum} left out below it; {unscored}."
             )
         return cls(
             minimum=chosen.minimum,
@@ -405,6 +413,7 @@ class AiResilienceFilterOut(ResponseModel):
             below_minimum=view.below_minimum,
             unscored=view.unscored,
             unscored_excluded=view.unscored_excluded,
+            synthetic=view.synthetic,
             pack_version=view.pack_version,
             pack_dated=view.pack_dated,
             summary=summary,

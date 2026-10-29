@@ -8,15 +8,20 @@ and 10 is not a guarantee (AIR1-10). M0 publishes a range only, marked experimen
 inherited geography and no seniority or local modifiers (AIR1-01).
 
 How a record publishes. There is no formula: no code turns exposure, observed use or their
-absence into a score (AIR1-03). A record is data entered through this model, and a model's
-proposal can only be a proposal (`AssessmentOrigin.MODEL_PROPOSAL`, no decision; AIR1-04).
-It is published only when an accountable reviewer's recorded decision passes every check
-in `publication_failures` (AIR1-02, AIR1-12): a reviewed mapping, stated technological and
-geographic scope, observed supporting evidence from at least two independent evidence
-families, recorded contradictions, physical-automation coverage stated, the rubric's
-bands (an integer inside a band only with a documented anchor), the five-year horizon and
-this method version. A withdrawn record, or one a known material correction affects, is
-never published (AIR1-07).
+absence into a score (AIR1-03). A record is data entered through this model. A model's
+proposal (`AssessmentOrigin.MODEL_PROPOSAL`) never publishes, whatever its decision says: a
+reviewer who accepts one enters it as their own `reviewer_entry` (AIR1-04). A record is
+published only when an accountable reviewer's recorded decision passes every check in
+`publication_failures` (AIR1-02, AIR1-12): a reviewer entry; a reviewed mapping; stated
+technological and geographic scope; observed supporting evidence from at least two
+independent evidence families, not all of them exposure (task exposure, observed use: such
+evidence keeps resilience unscored, spec AIR-1 step 4); the reviewer's grade of the
+evidence; recorded contradictions; physical-automation coverage stated; the bounds the
+decision approved; the rubric's bands (an integer inside a band only with a documented
+anchor, and a widening reason for a range across bands); the five-year horizon and this
+method version. A reviewed null skips the evidence checks: it is the reviewer's answer to
+evidence that cannot support a range. A withdrawn record, or one a known material
+correction affects, is never published (AIR1-07).
 
 The reviewed pack is committed, versioned and dated, and loaded and checked when the API
 starts, before any session: its corrections are applied then and invalidate the records
@@ -126,15 +131,28 @@ class Anchor(StrictModel):
 
 
 class ReviewerDecision(StrictModel):
-    """An accountable reviewer's recorded decision (H-10)."""
+    """An accountable reviewer's recorded decision (H-10), with the range it allows: a
+    record whose bounds differ from these does not publish (fix round 1, review B M1)."""
 
     reviewer: str = Field(min_length=1, max_length=120)
     role: Literal["accountable reviewer"]
     decided_on: date
     outcome: Literal["range", "null"]  # null: no defensible range, the role stays unscored
+    lower: int | None = Field(default=None, ge=SCALE[0], le=SCALE[1])  # null for a null
+    upper: int | None = Field(default=None, ge=SCALE[0], le=SCALE[1])
     reasons: str = Field(min_length=1, max_length=2000)
     assumptions: list[str]
+    # Why the range spans more than one band (the scenarios, the mapping): required then.
     widening_reason: str | None = Field(default=None, max_length=1000)
+
+
+class EvidenceQuality(StrEnum):
+    """The reviewer's grade of the evidence for the allowed range (spec section 18's
+    "evidence quality"; the words are provisional, R6)."""
+
+    LIMITED = "limited"
+    MODERATE = "moderate"
+    STRONG = "strong"
 
 
 class Withdrawal(StrictModel):
@@ -143,8 +161,10 @@ class Withdrawal(StrictModel):
 
 
 class AssessmentOrigin(StrEnum):
-    MODEL_PROPOSAL = "model_proposal"  # a model proposed it; only a person can decide it
-    REVIEWER_ENTRY = "reviewer_entry"  # entered by the reviewer
+    # A model proposed it. It never publishes, whatever its decision says: a reviewer who
+    # accepts it enters it again as their own `reviewer_entry` (fix round 1, review B I2).
+    MODEL_PROPOSAL = "model_proposal"
+    REVIEWER_ENTRY = "reviewer_entry"  # entered by the accountable reviewer
 
 
 class AssessmentRecord(StrictModel):
@@ -165,6 +185,7 @@ class AssessmentRecord(StrictModel):
     evidence: list[EvidenceItem]
     contradictions: list[str] | None  # None: not recorded; [] recorded as none found
     physical_automation_coverage: str | None = Field(default=None, max_length=500)
+    evidence_quality: EvidenceQuality | None = None  # required for a range
     method_version: str
     origin: AssessmentOrigin
     synthetic: bool
@@ -195,6 +216,19 @@ class PublicationFailure(StrEnum):
     UNKNOWN_METHOD_VERSION = "unknown_method_version"
     MISSING_USE_AS_PROTECTION = "missing_use_as_protection"
     SYNTHETIC_NOT_LABELLED = "synthetic_not_labelled"
+    # Fix round 1 (review B I1, I2, M1, M6):
+    # every observed item is exposure or observed use: exposure evidence only, so
+    # resilience stays unscored (spec AIR-1 step 4)
+    EXPOSURE_ONLY_EVIDENCE = "exposure_only_evidence"
+    MODEL_PROPOSAL = "model_proposal"  # a model's proposal never publishes
+    BOUNDS_NOT_DECIDED = "bounds_not_decided"  # the record's bounds are not the decision's
+    EVIDENCE_QUALITY_NOT_STATED = "evidence_quality_not_stated"
+    WIDENING_NOT_EXPLAINED = "widening_not_explained"  # a range across bands, no reason
+
+
+# Families that measure exposure (technical potential, observed adoption), never what
+# protects or substitutes the work: they alone cannot support a resilience range.
+EXPOSURE_FAMILIES = frozenset({EvidenceFamily.TASK_EXPOSURE, EvidenceFamily.OBSERVED_USE})
 
 
 def _independent_families(evidence: Iterable[EvidenceItem]) -> bool:
@@ -205,37 +239,58 @@ def _independent_families(evidence: Iterable[EvidenceItem]) -> bool:
     return len(families) >= 2 and len(groups) >= 2
 
 
+def _evidence_failures(record: AssessmentRecord) -> list[PublicationFailure]:
+    """Whether the evidence can support a range. A reviewed null needs none of this: it is
+    the reviewer's answer to evidence that cannot (fix round 1, review B M2)."""
+    observed = [item for item in record.evidence if item.observed]
+    failures = []
+    if not observed:
+        failures.append(PublicationFailure.NO_SUPPORTING_EVIDENCE)
+    if not _independent_families(record.evidence):
+        failures.append(PublicationFailure.FEWER_THAN_TWO_INDEPENDENT_FAMILIES)
+    if observed and all(item.family in EXPOSURE_FAMILIES for item in observed):
+        failures.append(PublicationFailure.EXPOSURE_ONLY_EVIDENCE)
+    if record.evidence_quality is None:
+        failures.append(PublicationFailure.EVIDENCE_QUALITY_NOT_STATED)
+    return failures
+
+
 def _range_failures(record: AssessmentRecord) -> list[PublicationFailure]:
     failures = []
     low, high = record.lower, record.upper
-    outcome = record.decision.outcome if record.decision else "range"
-    if outcome == "null":
+    decision = record.decision
+    if decision is not None and (decision.lower, decision.upper) != (low, high):
+        failures.append(PublicationFailure.BOUNDS_NOT_DECIDED)
+    if decision is not None and decision.outcome == "null":
         if low is not None or high is not None:
             failures.append(PublicationFailure.RANGE_INVALID)
         return failures
     if low is None or high is None or low > high:
-        return [PublicationFailure.RANGE_INVALID]
+        return [*failures, PublicationFailure.RANGE_INVALID]
     anchored = {anchor.value for anchor in record.anchors}
     if (low not in _BAND_LOWS and low not in anchored) or (
         high not in _BAND_HIGHS and high not in anchored
     ):
         failures.append(PublicationFailure.BOUND_WITHOUT_ANCHOR)
+    across_bands = band_of(low) is not band_of(high)
+    if across_bands and not (decision and (decision.widening_reason or "").strip()):
+        failures.append(PublicationFailure.WIDENING_NOT_EXPLAINED)
     return failures
 
 
 def publication_failures(record: AssessmentRecord) -> list[PublicationFailure]:
     """Every check the record fails; empty only for a publishable record. Deterministic."""
     failures: list[PublicationFailure] = []
+    if record.origin is AssessmentOrigin.MODEL_PROPOSAL:
+        failures.append(PublicationFailure.MODEL_PROPOSAL)
     if record.decision is None:
         failures.append(PublicationFailure.NO_REVIEWER_DECISION)
     if not record.mapping_reviewed:
         failures.append(PublicationFailure.MAPPING_NOT_REVIEWED)
     if not record.technological_scope.strip() or not record.geographic_scope.strip():
         failures.append(PublicationFailure.SCOPE_NOT_STATED)
-    if not any(item.observed for item in record.evidence):
-        failures.append(PublicationFailure.NO_SUPPORTING_EVIDENCE)
-    if not _independent_families(record.evidence):
-        failures.append(PublicationFailure.FEWER_THAN_TWO_INDEPENDENT_FAMILIES)
+    if record.decision is None or record.decision.outcome == "range":
+        failures += _evidence_failures(record)
     if record.contradictions is None:
         failures.append(PublicationFailure.CONTRADICTIONS_NOT_RECORDED)
     if not (record.physical_automation_coverage or "").strip():
@@ -367,10 +422,11 @@ class Assessment:
     upper: int | None
     pack_version: str
     pack_dated: date
-    synthetic: bool
+    synthetic: bool  # the record is synthetic; False when there is no record (review B M3)
     label: str | None
     record_id: str | None
     failures: tuple[PublicationFailure, ...] = ()
+    evidence_quality: EvidenceQuality | None = None  # a published range's
 
     @property
     def bands(self) -> tuple[Band, ...]:
@@ -397,7 +453,7 @@ def assessment(pack: CheckedPack, esco_uri: str) -> Assessment:
             upper=None,
             pack_version=version,
             pack_dated=dated,
-            synthetic=pack.pack.synthetic,
+            synthetic=False,  # no record: nothing synthetic is shown, even in the fixture pack
             label=None,
             record_id=None,
         )
@@ -422,6 +478,7 @@ def assessment(pack: CheckedPack, esco_uri: str) -> Assessment:
         label=record.label,
         record_id=record.record_id,
         failures=() if published else found.failures,
+        evidence_quality=record.evidence_quality if scored else None,
     )
 
 

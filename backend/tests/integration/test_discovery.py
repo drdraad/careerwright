@@ -268,6 +268,47 @@ def test_the_ai_resilience_filter_keeps_unscored_roles_by_default_and_counts_its
     assert default["salary_floor"] is None  # the person set no floor
 
 
+@pytest.mark.req("AIR1-05")
+def test_a_published_range_is_filtered_on_its_lower_end_and_labelled_synthetic(
+    scenario: Scenario, api_deps: ApiDependencies
+) -> None:
+    # Fix round 1, B-M7, B-M8: the labelled synthetic record (5-8) moved onto the bicycle
+    # mechanic, whose slate this discovery makes.
+    discovery_id = discover(scenario)["discovery_id"]
+    packs = samples.packs_scoring(samples.BICYCLE_MECHANIC)
+    with TestClient(
+        create_app(dataclasses.replace(api_deps, assessment_packs=packs)),
+        base_url=API_BASE,
+        raise_server_exceptions=False,
+        client=("127.0.0.1", 57015),
+    ) as client:
+        scored_api = ApiClient(client)
+
+        def view(minimum: str) -> dict[str, Any]:
+            response = scored_api.get(
+                f"{base(scenario)}/discoveries/{discovery_id}/slate",
+                scenario.token,
+                min_ai_resilience=minimum,
+            )
+            assert response.status_code == 200, response.text
+            body: dict[str, Any] = response.json()
+            return body
+
+        at_five, at_six = view("5"), view("6")
+
+    kept = at_five["ai_resilience_filter"]
+    assert (kept["scored"], kept["below_minimum"], kept["synthetic"]) == (1, 0, True)
+    assert BICYCLE_MECHANIC in {s["concept_id"] for s in at_five["suggestions"]}
+    assert "synthetic fixture range" in kept["summary"]
+    left = at_six["ai_resilience_filter"]
+    assert (left["scored"], left["below_minimum"], left["synthetic"]) == (1, 1, True)
+    assert BICYCLE_MECHANIC not in {s["concept_id"] for s in at_six["suggestions"]}
+    reasons = {n["concept_id"]: n["reason"] for n in at_six["not_included"]}
+    assert reasons[BICYCLE_MECHANIC] == "below_ai_resilience_minimum"
+    unscored = slate(scenario, discovery_id, min_ai_resilience="6")["ai_resilience_filter"]
+    assert (unscored["scored"], unscored["synthetic"]) == (0, False)  # the product pack
+
+
 @pytest.mark.req("REC1-07", "PROF-04", "PROF-07")
 def test_a_suggestion_becomes_a_target_only_by_the_person_s_choice(scenario: Scenario) -> None:
     discovery_id = discover(scenario)["discovery_id"]

@@ -170,11 +170,19 @@ export type AiEvidenceOut = {
 
 /**
  * AiEvidenceState
+ *
+ * What the imported evidence is beside the assessment (fix round 1, review B I1).
  */
-export const AiEvidenceState = { EXPOSURE_ONLY: 'exposure_only', NO_EVIDENCE: 'no_evidence' } as const;
+export const AiEvidenceState = {
+    EXPOSURE_ONLY: 'exposure_only',
+    ASSESSED: 'assessed',
+    NO_EVIDENCE: 'no_evidence'
+} as const;
 
 /**
  * AiEvidenceState
+ *
+ * What the imported evidence is beside the assessment (fix round 1, review B I1).
  */
 export type AiEvidenceState = typeof AiEvidenceState[keyof typeof AiEvidenceState];
 
@@ -216,6 +224,12 @@ export type AiResilienceFilterOut = {
      * Unscored Excluded
      */
     unscored_excluded: number;
+    /**
+     * Synthetic
+     *
+     * A scored range here is a synthetic fixture's, never a real assessment.
+     */
+    synthetic: boolean;
     /**
      * Pack Version
      */
@@ -275,9 +289,13 @@ export type AiResilienceOut = {
      */
     band_words: Array<string>;
     /**
+     * The reviewer's grade of the evidence for a published range.
+     */
+    evidence_quality: EvidenceQuality | null;
+    /**
      * Synthetic
      *
-     * A synthetic fixture: never a real assessment.
+     * This record is a synthetic fixture, never a real assessment; false when the role has no record.
      */
     synthetic: boolean;
     /**
@@ -1155,6 +1173,26 @@ export type EvidenceOut = {
      */
     text: string;
 };
+
+/**
+ * EvidenceQuality
+ *
+ * The reviewer's grade of the evidence for the allowed range (spec section 18's
+ * "evidence quality"; the words are provisional, R6).
+ */
+export const EvidenceQuality = {
+    LIMITED: 'limited',
+    MODERATE: 'moderate',
+    STRONG: 'strong'
+} as const;
+
+/**
+ * EvidenceQuality
+ *
+ * The reviewer's grade of the evidence for the allowed range (spec section 18's
+ * "evidence quality"; the words are provisional, R6).
+ */
+export type EvidenceQuality = typeof EvidenceQuality[keyof typeof EvidenceQuality];
 
 /**
  * ExcludedOut

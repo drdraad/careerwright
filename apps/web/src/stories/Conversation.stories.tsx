@@ -210,6 +210,7 @@ const slate = (suggestions: SuggestionOut[]): SlateOut => ({
     below_minimum: 0,
     unscored: suggestions.length < 6 ? 2 : 94,
     unscored_excluded: 0,
+    synthetic: false,
     pack_version: "l0-2026-10-29",
     pack_dated: "2026-10-29",
     summary: null,

@@ -247,9 +247,11 @@ export const AiEvidenceStateSchema = {
     type: 'string',
     enum: [
         'exposure_only',
+        'assessed',
         'no_evidence'
     ],
-    title: 'AiEvidenceState'
+    title: 'AiEvidenceState',
+    description: 'What the imported evidence is beside the assessment (fix round 1, review B I1).'
 } as const;
 
 export const AiResilienceFilterOutSchema = {
@@ -292,6 +294,11 @@ export const AiResilienceFilterOutSchema = {
             type: 'integer',
             title: 'Unscored Excluded'
         },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic',
+            description: 'A scored range here is a synthetic fixture\'s, never a real assessment.'
+        },
         pack_version: {
             type: 'string',
             title: 'Pack Version'
@@ -323,6 +330,7 @@ export const AiResilienceFilterOutSchema = {
         'below_minimum',
         'unscored',
         'unscored_excluded',
+        'synthetic',
         'pack_version',
         'pack_dated',
         'summary'
@@ -409,10 +417,21 @@ export const AiResilienceOutSchema = {
             type: 'array',
             title: 'Band Words'
         },
+        evidence_quality: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/EvidenceQuality'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'The reviewer\'s grade of the evidence for a published range.'
+        },
         synthetic: {
             type: 'boolean',
             title: 'Synthetic',
-            description: 'A synthetic fixture: never a real assessment.'
+            description: 'This record is a synthetic fixture, never a real assessment; false when the role has no record.'
         },
         synthetic_label: {
             anyOf: [
@@ -449,6 +468,7 @@ export const AiResilienceOutSchema = {
         'upper',
         'bands',
         'band_words',
+        'evidence_quality',
         'synthetic',
         'synthetic_label',
         'pack_version',
@@ -1529,6 +1549,17 @@ export const EvidenceOutSchema = {
     ],
     title: 'EvidenceOut',
     description: 'One of the person\'s confirmed answers, quoted.'
+} as const;
+
+export const EvidenceQualitySchema = {
+    type: 'string',
+    enum: [
+        'limited',
+        'moderate',
+        'strong'
+    ],
+    title: 'EvidenceQuality',
+    description: 'The reviewer\'s grade of the evidence for the allowed range (spec section 18\'s\n"evidence quality"; the words are provisional, R6).'
 } as const;
 
 export const ExcludedOutSchema = {

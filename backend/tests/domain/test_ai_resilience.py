@@ -18,6 +18,7 @@ from nessa.catalogue.ai_resilience import (
     AssessmentState,
     Band,
     Correction,
+    EvidenceFamily,
     FilterOutcome,
     PublicationFailure,
     RecordState,
@@ -37,8 +38,11 @@ DECISION = {
     "role": "accountable reviewer",
     "decided_on": "2026-10-29",
     "outcome": "range",
+    "lower": 5,
+    "upper": 8,
     "reasons": "Synthetic decision for a test.",
     "assumptions": [],
+    "widening_reason": "Synthetic: the scenarios disagree across two bands.",
 }
 EVIDENCE = [
     {
@@ -71,6 +75,7 @@ def record(**changes: Any) -> AssessmentRecord:
         "evidence": EVIDENCE,
         "contradictions": [],
         "physical_automation_coverage": "not assessed; stated",
+        "evidence_quality": "limited",
         "method_version": ai_resilience.METHOD_VERSION,
         "origin": "reviewer_entry",
         "synthetic": True,
@@ -118,9 +123,30 @@ def test_a_reviewed_complete_record_publishes() -> None:
         ),
         ({"contradictions": None}, PublicationFailure.CONTRADICTIONS_NOT_RECORDED),
         ({"physical_automation_coverage": None}, PublicationFailure.PHYSICAL_AUTOMATION_NOT_STATED),
-        ({"lower": 8, "upper": 5}, PublicationFailure.RANGE_INVALID),
-        ({"lower": None}, PublicationFailure.RANGE_INVALID),
-        ({"lower": 6}, PublicationFailure.BOUND_WITHOUT_ANCHOR),  # inside the 5-6 band
+        ({"lower": 8, "upper": 5, "decision": {**DECISION, "lower": 8, "upper": 5}},
+         PublicationFailure.RANGE_INVALID),
+        ({"lower": None, "decision": {**DECISION, "lower": None}},
+         PublicationFailure.RANGE_INVALID),
+        ({"lower": 6, "decision": {**DECISION, "lower": 6}},
+         PublicationFailure.BOUND_WITHOUT_ANCHOR),  # inside the 5-6 band
+        # Fix round 1, B-I1: exposure and observed use alone, from independent sources, are
+        # exposure evidence only: resilience stays unscored.
+        (
+            {"evidence": [EVIDENCE[0], {**EVIDENCE[1], "family": "observed_use",
+                                        "bearing": "pressure"}]},
+            PublicationFailure.EXPOSURE_ONLY_EVIDENCE,
+        ),
+        # Fix round 1, B-I2: a model's proposal never publishes, whatever its decision says.
+        ({"origin": "model_proposal"}, PublicationFailure.MODEL_PROPOSAL),
+        # Fix round 1, B-M1: the decision binds the bounds it approved.
+        ({"upper": 10}, PublicationFailure.BOUNDS_NOT_DECIDED),
+        ({"decision": {**DECISION, "lower": None, "upper": None}},
+         PublicationFailure.BOUNDS_NOT_DECIDED),
+        # Fix round 1, B-M6: spec section 18's evidence quality, and a widening reason for a
+        # range across bands.
+        ({"evidence_quality": None}, PublicationFailure.EVIDENCE_QUALITY_NOT_STATED),
+        ({"decision": {**DECISION, "widening_reason": None}},
+         PublicationFailure.WIDENING_NOT_EXPLAINED),
         ({"reference_point": 7}, PublicationFailure.REFERENCE_POINT_NOT_IN_M0),
         ({"seniority": "junior"}, PublicationFailure.MODIFIER_NOT_IN_M0),
         ({"modifiers": ["London"]}, PublicationFailure.MODIFIER_NOT_IN_M0),
@@ -149,21 +175,32 @@ def test_a_record_missing_any_publication_condition_never_publishes(
 
 
 def test_a_documented_anchor_allows_an_integer_inside_a_band() -> None:
-    anchored = record(lower=6, anchors=[{"value": 6, "description": "synthetic anchor"}])
+    anchored = record(
+        lower=6,
+        anchors=[{"value": 6, "description": "synthetic anchor"}],
+        decision={**DECISION, "lower": 6},
+    )
 
     assert publication_failures(anchored) == []
 
 
 @pytest.mark.req("AIR1-04")
-def test_a_model_s_proposal_is_only_ever_a_proposal() -> None:
-    proposal = record(origin=AssessmentOrigin.MODEL_PROPOSAL, decision=None)
+def test_a_model_s_proposal_carrying_a_full_decision_stays_proposed() -> None:
+    # Fix round 1, B-I2: `origin` decides. A reviewer who accepts a proposal enters it as
+    # their own `reviewer_entry` record; the proposal itself never publishes.
+    proposal = record(origin=AssessmentOrigin.MODEL_PROPOSAL)
 
     checked = check_record(proposal, [])
+
+    assert checked.failures == (PublicationFailure.MODEL_PROPOSAL,)  # every other check passes
     assert checked.state is RecordState.PROPOSED
-    assert PublicationFailure.NO_REVIEWER_DECISION in checked.failures
-    # The record model is the only way in: no field lets a model mark itself reviewed.
-    assert "published" not in AssessmentRecord.model_fields
-    assert "state" not in AssessmentRecord.model_fields
+    found = assessment(check_pack(pack(proposal)), DATA_ANALYST)
+    assert (found.state, found.unscored_reason) == (
+        AssessmentState.UNSCORED,
+        UnscoredReason.NOT_PUBLISHABLE,
+    )
+    entered = record(origin=AssessmentOrigin.REVIEWER_ENTRY)
+    assert check_record(entered, []).state is RecordState.PUBLISHED
 
 
 @pytest.mark.req("AIR1-03")
@@ -202,11 +239,43 @@ def test_a_known_correction_invalidates_what_it_affects_at_once_and_withdrawal_h
 
 
 def test_a_reviewed_null_assessment_is_unscored_with_its_reason() -> None:
-    null = record(lower=None, upper=None, decision={**DECISION, "outcome": "null"})
+    null_decision = {**DECISION, "outcome": "null", "lower": None, "upper": None}
+    null = record(lower=None, upper=None, decision=null_decision)
 
     found = assessment(check_pack(pack(null)), DATA_ANALYST)
     assert found.state is AssessmentState.PUBLISHED_NULL
     assert found.unscored_reason is UnscoredReason.REVIEWED_NULL
+
+
+def test_a_reviewed_null_for_thin_evidence_reports_the_reviewer_s_decision() -> None:
+    # Fix round 1, B-M2: a null is the reviewer's answer to insufficient evidence, so the
+    # evidence-sufficiency checks do not apply to it; one exposure family is enough to say so.
+    null_decision = {**DECISION, "outcome": "null", "lower": None, "upper": None}
+    thin = record(
+        lower=None,
+        upper=None,
+        evidence=[EVIDENCE[0]],
+        evidence_quality=None,
+        decision=null_decision,
+    )
+
+    assert publication_failures(thin) == []
+    found = assessment(check_pack(pack(thin)), DATA_ANALYST)
+    assert (found.state, found.unscored_reason) == (
+        AssessmentState.PUBLISHED_NULL,
+        UnscoredReason.REVIEWED_NULL,
+    )
+    with_bounds = record(lower=5, upper=8, evidence=[EVIDENCE[0]], decision=null_decision)
+    assert PublicationFailure.RANGE_INVALID in publication_failures(with_bounds)
+
+
+def test_synthetic_describes_the_record_never_the_pack() -> None:
+    # Fix round 1, B-M3: a role with no record in the fixture pack is not a synthetic
+    # assessment: it has none.
+    found = assessment(check_pack(pack(record())), DATA_QUALITY_SPECIALIST)
+
+    assert (found.state, found.synthetic, found.label) == (AssessmentState.UNSCORED, False, None)
+    assert assessment(check_pack(pack(record())), DATA_ANALYST).synthetic is True
 
 
 @pytest.mark.req("AIR1-05")
@@ -254,9 +323,13 @@ def test_the_committed_packs_hold_no_real_record_and_one_labelled_synthetic_one(
         UnscoredReason.NO_RECORD
     )
     [fixture] = packs.fixture.records
-    assert fixture.state is RecordState.PUBLISHED
+    assert fixture.state is RecordState.PUBLISHED  # under every rule, B-I1's included
     assert fixture.record.synthetic
     assert "synthetic" in (fixture.record.label or "").casefold()
+    families = {item.family for item in fixture.record.evidence}
+    exposure = {EvidenceFamily.TASK_EXPOSURE, EvidenceFamily.OBSERVED_USE}
+    assert families - exposure  # not exposure evidence only
+    assert all("SYNTHETIC" in item.measure for item in fixture.record.evidence)
     assert packs.for_workspace(fixture_workspace=False) is packs.product
     mixed = {**pack(record()).model_dump(mode="json"), "synthetic": False}
     with pytest.raises(ValueError, match="synthetic"):

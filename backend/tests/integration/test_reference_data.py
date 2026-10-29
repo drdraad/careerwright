@@ -19,7 +19,8 @@ from nessa.catalogue.esco import ESCO_RELEASE, concept_id
 from nessa.catalogue.pay import MappingReview, MappingReviewPack
 from nessa.catalogue.reference import DATASETS, ReferenceMismatchError
 from nessa.catalogue.releases import ReleaseIntegrityError
-from nessa.cli import import_reference_data, import_taxonomy, migrate_app
+from nessa.cli import import_reference_data, import_taxonomy, migrate_app, seed
+from nessa.db import create_engine
 from nessa.seed import FIXTURE_WORKSPACE_ID
 from tests.support import reference_data as samples
 from tests.support.client import ApiClient, profile_with
@@ -223,6 +224,83 @@ def test_the_synthetic_fixture_record_publishes_only_in_the_fixture_workspace(
     assert shown["pack_version"].startswith("fixture-")
     assert elsewhere["ai_resilience"]["state"] == "unscored"  # never a real assessment
     assert elsewhere["ai_resilience"]["synthetic"] is False
+    # Fix round 1, B-M3: a role with no record in the fixture pack is not "synthetic".
+    no_record = evidence(api, ada, str(FIXTURE_WORKSPACE_ID), DATA_ANALYST)["ai_resilience"]
+    assert (no_record["state"], no_record["synthetic"], no_record["synthetic_label"]) == (
+        "unscored",
+        False,
+        None,
+    )
+
+
+@pytest.mark.req("AIR1-03", "AIR1-02")
+def test_imported_exposure_is_never_called_exposure_only_beside_a_published_range(
+    api_deps: ApiDependencies, api: ApiClient, ada: str, manchester: str
+) -> None:
+    # Fix round 1, B-I1: the evidence's state follows the assessment. The labelled synthetic
+    # record is moved onto the data analyst, whose ILO group and O*NET matches are imported.
+    deps = dataclasses.replace(
+        api_deps, assessment_packs=samples.packs_scoring(samples.DATA_ANALYST)
+    )
+    with TestClient(
+        create_app(deps),
+        base_url=API_BASE,
+        raise_server_exceptions=False,
+        client=("127.0.0.1", 57013),
+    ) as client:
+        scored = evidence(ApiClient(client), ada, manchester, DATA_ANALYST)
+    unscored = evidence(api, ada, manchester, DATA_ANALYST)
+
+    assert scored["ai_resilience"]["state"] == "published_range"
+    assert scored["ai_evidence"]["state"] == "assessed"
+    assert scored["ai_evidence"]["ilo"] is not None  # still shown, as its source measures it
+    assert scored["ai_resilience"]["evidence_quality"] == "limited"
+    assert scored["ai_resilience"]["synthetic"] is True
+    assert unscored["ai_evidence"]["state"] == "exposure_only"
+    assert unscored["ai_resilience"]["evidence_quality"] is None
+
+
+def test_an_unknown_occupation_is_not_found(api: ApiClient, ada: str, manchester: str) -> None:
+    # Fix round 1, B-M9.
+    response = api.get(f"/v1/workspaces/{manchester}/occupations/{uuid.uuid4()}/evidence", ada)
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_without_reference_data_the_evidence_is_unavailable_never_empty(
+    infra: Infra, api_deps: ApiDependencies, ada: str
+) -> None:
+    # Fix round 1, B-M9 (GC6): a database holding ESCO but none of the reference datasets.
+    database = f"nessa_noref_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    owner = migrator_engine(infra, database)
+    try:
+        migrate_app(owner)
+        seed(owner, infra.ops_settings(database))
+        import_taxonomy(owner, SAMPLE_PATH, SAMPLE_RELEASE)
+    finally:
+        owner.dispose()
+    settings = infra.api_settings(database)
+    engine = create_engine(settings.app_database, application_name="t")
+    deps = dataclasses.replace(api_deps, settings=settings, engine=engine)
+    try:
+        with TestClient(
+            create_app(deps),
+            base_url=API_BASE,
+            raise_server_exceptions=False,
+            client=("127.0.0.1", 57014),
+        ) as client:
+            bare = ApiClient(client)
+            workspace = bare.create_workspace(ada, "No reference data")["workspace_id"]
+            response = bare.get(
+                f"/v1/workspaces/{workspace}/occupations/{DATA_ANALYST}/evidence", ada
+            )
+    finally:
+        engine.dispose()
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "REFERENCE_DATA_UNAVAILABLE"
 
 
 @pytest.fixture

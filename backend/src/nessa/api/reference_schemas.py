@@ -26,6 +26,7 @@ from nessa.catalogue.ai_resilience import (
     Assessment,
     AssessmentState,
     Band,
+    EvidenceQuality,
     UnscoredReason,
 )
 from nessa.catalogue.ashe import STATISTICS, AshePeriod, Marker, Reliability
@@ -207,7 +208,10 @@ class OnetMatchOut(ResponseModel):
 
 
 class AiEvidenceState(StrEnum):
-    EXPOSURE_ONLY = "exposure_only"  # evidence is shown; resilience is not derived from it
+    """What the imported evidence is beside the assessment (fix round 1, review B I1)."""
+
+    EXPOSURE_ONLY = "exposure_only"  # shown, and no range is published: resilience unscored
+    ASSESSED = "assessed"  # a reviewed range is published; this evidence is context only
     NO_EVIDENCE = "no_evidence"
 
 
@@ -232,7 +236,13 @@ class AiResilienceOut(ResponseModel):
     upper: int | None
     bands: list[Band]
     band_words: list[str]
-    synthetic: bool = Field(description="A synthetic fixture: never a real assessment.")
+    evidence_quality: EvidenceQuality | None = Field(
+        description="The reviewer's grade of the evidence for a published range."
+    )
+    synthetic: bool = Field(
+        description="This record is a synthetic fixture, never a real assessment; false when "
+        "the role has no record."
+    )
     synthetic_label: str | None
     pack_version: str
     pack_dated: date
@@ -247,6 +257,7 @@ class AiResilienceOut(ResponseModel):
             upper=found.upper,
             bands=list(found.bands),
             band_words=[BAND_WORDS[b] for b in found.bands],
+            evidence_quality=found.evidence_quality,
             synthetic=found.synthetic,
             synthetic_label=found.label if found.synthetic else None,
             pack_version=found.pack_version,
@@ -312,6 +323,12 @@ class OccupationEvidenceOut(ResponseModel):
         modelled = evidence.modelled
         observed = [OnetMatchOut.of(m) for m in evidence.onet_matches]
         exposure = evidence.ilo is not None or any(m.observed for m in evidence.onet_matches)
+        if evidence.assessment.state is AssessmentState.PUBLISHED_RANGE:
+            evidence_state = AiEvidenceState.ASSESSED
+        elif exposure:
+            evidence_state = AiEvidenceState.EXPOSURE_ONLY
+        else:
+            evidence_state = AiEvidenceState.NO_EVIDENCE
         return cls(
             concept_id=evidence.identity.concept_id,
             title=evidence.identity.preferred_label,
@@ -350,7 +367,7 @@ class OccupationEvidenceOut(ResponseModel):
             ),
             trend=TrendOut(state=evidence.trend[0], reason=evidence.trend[1]),
             ai_evidence=AiEvidenceOut(
-                state=AiEvidenceState.EXPOSURE_ONLY if exposure else AiEvidenceState.NO_EVIDENCE,
+                state=evidence_state,
                 ilo=None
                 if evidence.ilo is None
                 else IloExposureOut(

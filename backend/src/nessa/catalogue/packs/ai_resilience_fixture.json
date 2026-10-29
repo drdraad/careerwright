@@ -27,10 +27,18 @@
           "independence_group": "anthropic-economic-index",
           "measure": "SYNTHETIC FIXTURE: observed use of matched O*NET tasks",
           "bearing": "pressure"
+        },
+        {
+          "family": "human_accountability",
+          "source_id": "synthetic-fixture-accountability-statement",
+          "independence_group": "synthetic-fixture-accountability",
+          "measure": "SYNTHETIC FIXTURE: an invented statement that sign-off on data quality stays with a named person",
+          "bearing": "protection"
         }
       ],
       "contradictions": ["SYNTHETIC FIXTURE: no contradiction was researched for this fixture"],
       "physical_automation_coverage": "SYNTHETIC FIXTURE: physical automation is not assessed",
+      "evidence_quality": "limited",
       "method_version": "nessa-air-rubric-m0-1",
       "origin": "reviewer_entry",
       "synthetic": true,
@@ -40,8 +48,11 @@
         "role": "accountable reviewer",
         "decided_on": "2026-10-29",
         "outcome": "range",
+        "lower": 5,
+        "upper": 8,
         "reasons": "SYNTHETIC FIXTURE: written to qualify the record model, its publication checks and the lower-bound filter. It is not evidence about any occupation.",
-        "assumptions": ["SYNTHETIC FIXTURE: none"]
+        "assumptions": ["SYNTHETIC FIXTURE: none"],
+        "widening_reason": "SYNTHETIC FIXTURE: the range spans two bands to exercise the widening rule"
       }
     }
   ],
