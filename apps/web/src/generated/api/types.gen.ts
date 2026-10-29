@@ -1052,7 +1052,8 @@ export const ErrorCode = {
     ALREADY_DECIDED: 'ALREADY_DECIDED',
     SLATE_ALREADY_EXPLAINED: 'SLATE_ALREADY_EXPLAINED',
     RUN_FINISHED: 'RUN_FINISHED',
-    REFERENCE_DATA_UNAVAILABLE: 'REFERENCE_DATA_UNAVAILABLE'
+    REFERENCE_DATA_UNAVAILABLE: 'REFERENCE_DATA_UNAVAILABLE',
+    PROTECTED_GATE: 'PROTECTED_GATE'
 } as const;
 
 /**
@@ -1078,6 +1079,7 @@ export const ErrorStage = {
     WORKSPACE: 'workspace',
     PROFILE: 'profile',
     CATALOGUE: 'catalogue',
+    CAPABILITY: 'capability',
     CREDENTIAL: 'credential',
     EXECUTION: 'execution',
     SPEND: 'spend',

@@ -483,6 +483,7 @@ const ERROR_TONE: Record<ErrorCode, Tone> = {
   ALREADY_DECIDED: "neutral",
   SLATE_ALREADY_EXPLAINED: "neutral",
   RUN_FINISHED: "neutral",
+  PROTECTED_GATE: "neutral",
 };
 
 /** What the person sees for each API error code. The API's own message is never shown. */
@@ -619,6 +620,10 @@ const ERROR_WORDS: Record<ErrorCode, Omit<ErrorStatement, "tone">> = {
   RUN_FINISHED: {
     title: "This had already finished",
     action: "Nothing was cancelled. Its result stands.",
+  },
+  PROTECTED_GATE: {
+    title: "A legal or entry requirement can't be switched off",
+    action: "Challenge its source, or choose a different target.",
   },
 };
 

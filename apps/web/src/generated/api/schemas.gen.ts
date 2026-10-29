@@ -1392,7 +1392,8 @@ export const ErrorCodeSchema = {
         'ALREADY_DECIDED',
         'SLATE_ALREADY_EXPLAINED',
         'RUN_FINISHED',
-        'REFERENCE_DATA_UNAVAILABLE'
+        'REFERENCE_DATA_UNAVAILABLE',
+        'PROTECTED_GATE'
     ],
     title: 'ErrorCode'
 } as const;
@@ -1419,6 +1420,7 @@ export const ErrorStageSchema = {
         'workspace',
         'profile',
         'catalogue',
+        'capability',
         'credential',
         'execution',
         'spend',

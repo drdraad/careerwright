@@ -54,6 +54,9 @@ class ErrorCode(StrEnum):
     RUN_FINISHED = "RUN_FINISHED"
     # Reference data (Task 7 slice B): ASHE, the SOC index or the AI evidence is not imported.
     REFERENCE_DATA_UNAVAILABLE = "REFERENCE_DATA_UNAVAILABLE"
+    # Capability (Task 9, spec section 8): a protected gate (legal practice, recognition,
+    # admission or eligibility) cannot be demoted; challenge its source or change the target.
+    PROTECTED_GATE = "PROTECTED_GATE"
 
 
 class ErrorStage(StrEnum):
@@ -64,6 +67,7 @@ class ErrorStage(StrEnum):
     WORKSPACE = "workspace"
     PROFILE = "profile"
     CATALOGUE = "catalogue"
+    CAPABILITY = "capability"
     CREDENTIAL = "credential"
     EXECUTION = "execution"
     SPEND = "spend"
