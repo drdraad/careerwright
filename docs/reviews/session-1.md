@@ -120,3 +120,18 @@ given ("yes"):
 Not asked, so not covered by this answer: names in excerpts, claim values or anything
 committed to git; names in structured contact fields (still removed); email addresses and
 phone numbers (still never kept).
+
+### Delegated decision (2026-10-29): names in excerpts and claims
+
+The controller then asked: "May a name in running text also stay in those short evidence
+quotes, including the ones committed to git?" The product owner answered, as given: "Do as
+you think best for these questions." This is therefore the controller's decision under that
+delegation, not the product owner's own answer, and the product owner may reverse it:
+
+- Excerpts and claim values kept on this machine (the database): a name in running text may
+  stay, as in kept bodies. Names cannot be detected deterministically (ADR 0009 decision 4).
+- Excerpts committed to git: they may be committed on this machine. Before any push or
+  publication of the repository, the committed excerpts are reviewed for names in running
+  text. That review is a human gate on the push, carried in the release report.
+- Unchanged: structured contact names, email addresses and phone numbers are removed
+  everywhere.

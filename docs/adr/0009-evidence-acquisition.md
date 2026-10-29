@@ -1,8 +1,9 @@
 # ADR 0009: Evidence acquisition, the restricted acquisition worker and run cancellation
 
-- Status: Accepted for Task 7A (Sprint 3, S3.1–S3.4 acquisition core). Decision 2, the
-  agency word list in decision 6 and decision 15's word lists and date forms are
-  **provisional, need product owner confirmation (R6)**.
+- Status: Accepted for Task 7A (Sprint 3, S3.1–S3.4 acquisition core). The agency word list
+  in decision 6 and decision 15's word lists and date forms are **provisional, need product
+  owner confirmation (R6)**. Decision 2 was decided by the controller on 2026-10-29 under the
+  product owner's delegation ("Do as you think best for these questions").
 - Date: 2026-10-29
 - Requirements: ACQ-01..10, JOB-01/02/05/06/08, FRESH-01..04, STATE-02, API-06, DUR-05,
   MODEL-08, SEC-05, SEC-08, PROP-02; spec sections 6, 7, 11 and 18; Global Constraint 8;
@@ -44,7 +45,7 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    A new database role was rejected: the init script that creates roles runs only on a new
    volume, so existing installations would not get it.
 
-2. **Scrapling parses; Nessa's own client retrieves (provisional).** Scrapling 0.4.15 and
+2. **Scrapling parses; Nessa's own client retrieves.** Scrapling 0.4.15 and
    0.5 import Playwright, Patchright and browserforge when their HTTP fetcher is imported
    (`scrapling/engines/toolbelt/convertor.py`, `fingerprints.py`), and `make check` excludes
    Playwright from the backend (spec section 6: no browser rendering). So Scrapling 0.4.15's
@@ -53,8 +54,10 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    `nessa.evidence.fetcher` on the HTTP core already in the lock (`httpcore2`). That client
    also does what Scrapling's curl-based fetcher does not expose: it connects to the very
    address it checked. Spec section 6 says M0 "calls its HTTP fetch/parse capability"; this
-   keeps Scrapling as the one scraper and parser and replaces only the transport. Needs the
-   product owner's confirmation.
+   keeps Scrapling as the one scraper and parser and replaces only the transport. Decided
+   by the controller on 2026-10-29 under the product owner's delegation: every fetch keeps
+   the guarded client's address, robots.txt and pacing checks, and no browser or
+   fingerprinting code enters the backend.
 
 3. **Every hop is checked; refusals are attempts.** `addresses.check_url`: http or https,
    no credentials, port 80 or 443, a public IP literal or a multi-label name; local names
@@ -172,7 +175,9 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    **Known limits, for the product owner:** a personal name in running text (for example
    "ask for Jane in HR") cannot be told apart from other words deterministically and is
    not removed (the product owner accepted this for privately kept bodies on 2026-10-29,
-   `docs/reviews/session-1.md`, last addendum; excerpts and claims are not covered); nor is a detail written in another form (an email with "at" for "@", a
+   `docs/reviews/session-1.md`, last addendum; for excerpts and claims the controller decided
+   the same under the product owner's delegation, with committed excerpts reviewed for names
+   before any push); nor is a detail written in another form (an email with "at" for "@", a
    number spelt out or split by other characters, an address percent-encoded in a link
    such as `mailto:jane%40recruit.example`). A detail hidden by markup (entities, line
    breaks, invisible characters, inline elements, an attribute's entities) is not removed
