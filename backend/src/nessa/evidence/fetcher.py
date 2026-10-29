@@ -9,20 +9,27 @@ in the lock, and Scrapling parses (`nessa.evidence.pages`).
 Every hop is checked before it is requested: the URL (`addresses.check_url`), then, at
 connect time, every address the host resolves to (`addresses.address_refusal`); the
 connection goes to an address that passed, so no later DNS answer can change it. A redirect
-is a new hop with the same checks; https never redirects down to http. The response is
-bounded in redirects, total time, size (decompressed size too) and content type. A page
-fetch reads robots.txt first (RFC 9309). Failures are labels, classified from types and
-statuses only; no exception message or response body is kept.
+target is checked before it is recorded or followed, and is a new hop with the same checks;
+https never redirects down to http. For a page, each new host a page or its redirects reach
+(robots.txt included) is admitted by the caller first (the source permission manifest and
+the pacer, `acquire.acquire_page`), and every hop's URL is checked against its origin's
+robots.txt (RFC 9309) before it is requested. One deadline bounds the whole page fetch, in
+every phase: the name lookup, each connect (at most `MAX_ADDRESSES` tried), every read and
+write, TLS and the response's status line and headers. The response is bounded in
+redirects, size (decompressed size too) and content type. Failures are labels, classified
+from types and statuses only; no exception message or response body is kept.
 """
 
 import ipaddress
 import re
 import socket
 import ssl
+import threading
 import time
 import zlib
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
+from typing import Any
 from urllib.parse import urljoin, urlsplit
 
 import certifi
@@ -46,8 +53,12 @@ REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 ROBOTS_TOKEN = "NessaL0"  # noqa: S105 - the robots.txt user-agent token, not a secret
 ROBOTS_MAX_BYTES = 512_000  # RFC 9309: parse at least 500 KiB
 ROBOTS_CACHE_S = 600.0
+MAX_ADDRESSES = 4  # tried in turn when a name resolves to several
 
 Resolve = Callable[[str, int], list[IPAddress]]
+# Called before the first request to each host of a page fetch: None once the host is
+# admitted (and paced), else the refusal label.
+Admit = Callable[[CheckedUrl], str | None]
 
 
 @dataclass(frozen=True)
@@ -72,6 +83,7 @@ class Fetched:
     charset: str | None
     body: bytes  # after any content encoding is undone
     address: str | None  # the address the last hop connected to
+    requests: int = 0  # HTTP requests sent for it, robots.txt included
 
     @property
     def text(self) -> str:
@@ -86,11 +98,12 @@ class FetchFailure:
     requested_url: str
     outcome: AttemptStatus  # BLOCKED by policy, or FAILED when tried
     reason: str
-    redirects: tuple[str, ...] = ()
+    redirects: tuple[str, ...] = ()  # checked URLs only: a refused target is never recorded
     final_url: str | None = None
     http_status: int | None = None
     transient: bool = False
     address: str | None = None
+    requests: int = 0  # HTTP requests sent for it, robots.txt included
 
 
 class HostNotFoundError(Exception):
@@ -105,8 +118,67 @@ class _TooLargeError(Exception):
     pass
 
 
-class _DeadlineError(Exception):
-    pass
+def _resolve_within(resolve: Resolve, host: str, port: int, timeout: float) -> list[IPAddress]:
+    """The lookup, given at most `timeout` seconds. The system resolver cannot be
+    interrupted, so it runs on a daemon thread that is left to finish on its own."""
+    outcome: list[list[IPAddress] | BaseException] = []
+
+    def lookup() -> None:
+        try:
+            outcome.append(resolve(host, port))
+        except BaseException as error:  # handed to the caller as it was
+            outcome.append(error)
+
+    thread = threading.Thread(target=lookup, name="nessa-resolve", daemon=True)
+    thread.start()
+    thread.join(timeout)
+    if not outcome:
+        raise httpcore2.ConnectTimeout
+    if isinstance(outcome[0], BaseException):
+        raise outcome[0]
+    return outcome[0]
+
+
+class _BoundedStream(httpcore2.NetworkStream):
+    """A connection whose every read, write and TLS start waits at most the per-operation
+    timeout or what is left before the deadline, whichever is less, so a server trickling
+    its status line or sending 1xx responses without end cannot outlast the bound."""
+
+    def __init__(
+        self, inner: httpcore2.NetworkStream, deadline: float, clock: Callable[[], float]
+    ) -> None:
+        self._inner = inner
+        self._deadline = deadline
+        self._clock = clock
+
+    def _within(self, timeout: float | None, expired: type[Exception]) -> float:
+        remaining = self._deadline - self._clock()
+        if remaining <= 0:
+            raise expired
+        return remaining if timeout is None else min(timeout, remaining)
+
+    def read(self, max_bytes: int, timeout: float | None = None) -> bytes:
+        return self._inner.read(max_bytes, self._within(timeout, httpcore2.ReadTimeout))
+
+    def write(self, buffer: bytes, timeout: float | None = None) -> None:
+        self._inner.write(buffer, self._within(timeout, httpcore2.WriteTimeout))
+
+    def close(self) -> None:
+        self._inner.close()
+
+    def start_tls(
+        self,
+        ssl_context: ssl.SSLContext,
+        server_hostname: str | None = None,
+        timeout: float | None = None,
+    ) -> httpcore2.NetworkStream:
+        inner = self._inner.start_tls(
+            ssl_context, server_hostname, self._within(timeout, httpcore2.ConnectTimeout)
+        )
+        return _BoundedStream(inner, self._deadline, self._clock)
+
+    def get_extra_info(self, info: str) -> Any:
+        return self._inner.get_extra_info(info)
 
 
 def system_resolve(host: str, port: int) -> list[IPAddress]:
@@ -127,13 +199,27 @@ def system_resolve(host: str, port: int) -> list[IPAddress]:
 
 class _GuardedBackend(httpcore2.NetworkBackend):
     """Resolves at connect time, refuses the host if any answer is not allowed, and connects
-    to an address that passed."""
+    to an address that passed; all within the deadline."""
 
-    def __init__(self, resolve: Resolve, allowed: Callable[[IPAddress, int], bool]) -> None:
+    def __init__(
+        self,
+        resolve: Resolve,
+        allowed: Callable[[IPAddress, int], bool],
+        deadline: float,
+        clock: Callable[[], float],
+    ) -> None:
         self._resolve = resolve
         self._allowed = allowed
+        self._deadline = deadline
+        self._clock = clock
         self._inner = httpcore2.SyncBackend()
         self.address: str | None = None
+
+    def _within(self, timeout: float | None) -> float:
+        remaining = self._deadline - self._clock()
+        if remaining <= 0:
+            raise httpcore2.ConnectTimeout
+        return remaining if timeout is None else min(timeout, remaining)
 
     def connect_tcp(
         self,
@@ -143,16 +229,16 @@ class _GuardedBackend(httpcore2.NetworkBackend):
         local_address: str | None = None,
         socket_options: Iterable[httpcore2.SOCKET_OPTION] | None = None,
     ) -> httpcore2.NetworkStream:
-        addresses = self._resolve(host, port)
+        addresses = _resolve_within(self._resolve, host, port, self._within(timeout))
         if not addresses or not all(self._allowed(a, port) for a in addresses):
             raise _AddressRefusedError
         last: Exception = httpcore2.ConnectError()
-        for address in addresses:
+        for address in addresses[:MAX_ADDRESSES]:
             try:
                 stream = self._inner.connect_tcp(
                     str(address),
                     port,
-                    timeout=timeout,
+                    timeout=self._within(timeout),
                     local_address=local_address,
                     socket_options=socket_options,
                 )
@@ -160,7 +246,7 @@ class _GuardedBackend(httpcore2.NetworkBackend):
                 last = error
                 continue
             self.address = str(address)
-            return stream
+            return _BoundedStream(stream, self._deadline, self._clock)
         raise last
 
     def connect_unix_socket(
@@ -320,6 +406,19 @@ def parse_robots(text: str, token: str) -> RobotsRules:
     )
 
 
+def redirect_target(
+    current: CheckedUrl, location: str, allowed_ports: frozenset[int] = ALLOWED_PORTS
+) -> CheckedUrl | str:
+    """Where a redirect from `current` leads, checked, or the refusal label: a target that
+    fails the URL checks, or http after https, is refused before it is recorded."""
+    target = check_url(urljoin(current.url, location), allowed_ports=allowed_ports)
+    if isinstance(target, UrlRefusal):
+        return target.value
+    if current.scheme == "https" and target.scheme == "http":
+        return "redirect_downgrade"
+    return target
+
+
 def _header(headers: list[tuple[bytes, bytes]], name: bytes) -> str | None:
     for key, value in headers:
         if key.lower() == name:
@@ -375,13 +474,30 @@ class Fetcher:
     def fetch(
         self, url: str, *, accept: frozenset[str] | None, max_bytes: int | None = None
     ) -> Fetched | FetchFailure:
-        """One bounded GET, following checked redirects. `accept`: the content types taken
-        (None takes any, for robots.txt)."""
-        deadline = self._clock() + self.limits.total_s
-        limit = max_bytes or self.limits.max_bytes
+        """One bounded GET, following checked redirects, with no robots.txt and no host
+        admission (an API request). `accept`: the content types taken (None takes any)."""
+        checked = check_url(url, allowed_ports=self._ports)
+        if isinstance(checked, UrlRefusal):
+            return self._blocked(url, checked.value, [])
+        visit = _Visit(self._clock() + self.limits.total_s, admit=None)
+        return self._follow(
+            checked, accept=accept, limit=max_bytes or self.limits.max_bytes, visit=visit
+        )
+
+    def _follow(
+        self,
+        checked: CheckedUrl,
+        *,
+        accept: frozenset[str] | None,
+        limit: int,
+        visit: "_Visit",
+        robots: bool = False,
+    ) -> Fetched | FetchFailure:
+        """GETs from `checked`, following redirects. With `robots`, every hop's URL is
+        checked against its origin's robots.txt first."""
+        requested = checked.url
         redirects: list[str] = []
-        current, previous_scheme = url, None
-        backend = _GuardedBackend(self._resolve, self._address_allowed)
+        backend = _GuardedBackend(self._resolve, self._address_allowed, visit.deadline, self._clock)
         with httpcore2.ConnectionPool(
             ssl_context=self._ssl,
             network_backend=backend,
@@ -391,23 +507,29 @@ class Fetcher:
             http2=False,
         ) as pool:
             for _hop in range(self.limits.max_redirects + 1):
-                checked = check_url(current, allowed_ports=self._ports)
-                if isinstance(checked, UrlRefusal):
-                    return self._blocked(url, checked.value, redirects)
-                if previous_scheme == "https" and checked.scheme == "http":
-                    return self._blocked(url, "redirect_downgrade", redirects)
-                if (checked.ip_literal is not None) and not self._address_allowed(
-                    checked.ip_literal, checked.port
-                ):
-                    return self._blocked(url, UrlRefusal.ADDRESS_NOT_ALLOWED.value, redirects)
-                result = self._get(pool, backend, checked, accept, limit, deadline)
+                refusal = self._before_request(checked, visit, robots=robots)
+                if refusal is not None:
+                    return replace(
+                        refusal,
+                        requested_url=requested,
+                        redirects=tuple(redirects),
+                        final_url=checked.url,
+                        requests=visit.requests,
+                    )
+                visit.requests += 1
+                result = self._get(pool, backend, checked, accept, limit, visit.deadline)
                 if isinstance(result, _Redirect):
-                    current, previous_scheme = urljoin(checked.url, result.location), checked.scheme
-                    redirects.append(current)
+                    target = redirect_target(checked, result.location, self._ports)
+                    if isinstance(target, str):
+                        return replace(
+                            self._blocked(requested, target, redirects), requests=visit.requests
+                        )
+                    redirects.append(target.url)
+                    checked = target
                     continue
                 if isinstance(result, FetchFailure):
                     return FetchFailure(
-                        url,
+                        requested,
                         result.outcome,
                         result.reason,
                         tuple(redirects),
@@ -415,9 +537,10 @@ class Fetcher:
                         result.http_status,
                         result.transient,
                         backend.address,
+                        visit.requests,
                     )
                 return Fetched(
-                    url,
+                    requested,
                     checked.url,
                     tuple(redirects),
                     result.status,
@@ -425,10 +548,34 @@ class Fetcher:
                     result.charset,
                     result.body,
                     backend.address,
+                    visit.requests,
                 )
         return FetchFailure(
-            url, AttemptStatus.FAILED, "too_many_redirects", tuple(redirects), current
+            requested,
+            AttemptStatus.FAILED,
+            "too_many_redirects",
+            tuple(redirects),
+            checked.url,
+            requests=visit.requests,
         )
+
+    def _before_request(
+        self, checked: CheckedUrl, visit: "_Visit", *, robots: bool
+    ) -> FetchFailure | None:
+        """A hop's checks before its request: its address, its host's admission when the
+        visit reaches the host for the first time, and its origin's robots.txt."""
+        if checked.ip_literal is not None and not self._address_allowed(
+            checked.ip_literal, checked.port
+        ):
+            return FetchFailure(
+                checked.url, AttemptStatus.BLOCKED, UrlRefusal.ADDRESS_NOT_ALLOWED.value
+            )
+        if visit.admit is not None and checked.host not in visit.admitted:
+            reason = visit.admit(checked)
+            if reason is not None:
+                return FetchFailure(checked.url, AttemptStatus.BLOCKED, reason)
+            visit.admitted.add(checked.host)
+        return self._robots_refusal(checked, visit) if robots else None
 
     def _get(
         self,
@@ -495,8 +642,6 @@ class Fetcher:
                     return failed("too_large", status=status)
                 body = _Body(limit, encoding)
                 for chunk in response.iter_stream():
-                    if self._clock() > deadline:
-                        raise _DeadlineError
                     body.feed(chunk)
                 return Fetched(
                     checked.url, checked.url, (), status, content_type, charset, body.body(), None
@@ -508,7 +653,6 @@ class Fetcher:
         except _TooLargeError:
             return failed("too_large")
         except (
-            _DeadlineError,
             httpcore2.ConnectTimeout,
             httpcore2.ReadTimeout,
             httpcore2.WriteTimeout,
@@ -526,21 +670,22 @@ class Fetcher:
         except (httpcore2.NetworkError, httpcore2.ProtocolError):
             return failed("connection_failed", transient=True)
 
-    def robots_refusal(self, checked: CheckedUrl) -> FetchFailure | None:
-        """None when robots.txt allows the page; otherwise why not (RFC 9309 section 2.3.1:
+    def _robots_refusal(self, checked: CheckedUrl, visit: "_Visit") -> FetchFailure | None:
+        """None when robots.txt allows the URL; otherwise why not (RFC 9309 section 2.3.1:
         a 4xx robots.txt allows everything; one that cannot be reached disallows, as a
-        transient failure that is not remembered, so the next try reads it again)."""
-        netloc = (
-            checked.host
-            if checked.ip_literal is None or checked.ip_literal.version == 4
-            else f"[{checked.host}]"
-        )
-        if checked.port != DEFAULT_PORTS[checked.scheme]:
-            netloc = f"{netloc}:{checked.port}"
-        origin = f"{checked.scheme}://{netloc}"
+        transient failure that is not remembered, so the next try reads it again). The
+        robots.txt request is part of the visit: its time, its count and its redirects'
+        admission."""
+        root = urlsplit(checked.url)
+        origin = f"{root.scheme}://{root.netloc}"
         cached = self._robots.get(origin)
         if cached is None or self._clock() - cached[0] > ROBOTS_CACHE_S:
-            result = self.fetch(f"{origin}/robots.txt", accept=None, max_bytes=ROBOTS_MAX_BYTES)
+            result = self._follow(
+                replace(checked, url=f"{origin}/robots.txt"),
+                accept=None,
+                limit=ROBOTS_MAX_BYTES,
+                visit=visit,
+            )
             if isinstance(result, Fetched):
                 rules = parse_robots(result.text, ROBOTS_TOKEN)
             elif result.http_status is not None and 400 <= result.http_status < 500:
@@ -559,16 +704,31 @@ class Fetcher:
             return FetchFailure(checked.url, AttemptStatus.BLOCKED, "robots_disallowed")
         return None
 
-    def fetch_page(self, url: str) -> Fetched | FetchFailure:
-        """A page: its URL checked, then robots.txt, then the page itself (HTML only)."""
+    def fetch_page(self, url: str, admit: Admit | None = None) -> Fetched | FetchFailure:
+        """A page (HTML only): its URL checked; then, for each hop, its host admitted the
+        first time the visit reaches it (`admit`, first host included), its origin's
+        robots.txt, and the request. The time bound starts once the first host is admitted,
+        so the pacer's wait for it is not counted against the page."""
         checked = check_url(url, allowed_ports=self._ports)
         if isinstance(checked, UrlRefusal):
             return self._blocked(url, checked.value, [])
-        if checked.ip_literal is not None and not self._address_allowed(
-            checked.ip_literal, checked.port
-        ):
-            return self._blocked(url, UrlRefusal.ADDRESS_NOT_ALLOWED.value, [])
-        refusal = self.robots_refusal(checked)
-        if refusal is not None:
-            return replace(refusal, requested_url=url)
-        return self.fetch(checked.url, accept=HTML_TYPES)
+        visit = _Visit(0.0, admit=admit)
+        if admit is not None:
+            reason = admit(checked)
+            if reason is not None:
+                return FetchFailure(checked.url, AttemptStatus.BLOCKED, reason)
+            visit.admitted.add(checked.host)
+        visit.deadline = self._clock() + self.limits.total_s
+        return self._follow(
+            checked, accept=HTML_TYPES, limit=self.limits.max_bytes, visit=visit, robots=True
+        )
+
+
+@dataclass
+class _Visit:
+    """One fetch's shared state across its hops and robots.txt requests."""
+
+    deadline: float
+    admit: Admit | None
+    admitted: set[str] = field(default_factory=set)
+    requests: int = 0

@@ -24,9 +24,9 @@ from datetime import datetime
 from pydantic import Field, SecretStr
 
 from nessa.evidence import adzuna
-from nessa.evidence.addresses import UrlRefusal
+from nessa.evidence.addresses import CheckedUrl, UrlRefusal
 from nessa.evidence.adzuna import AdzunaQuery
-from nessa.evidence.fetcher import JSON_TYPES, Fetched, Fetcher, FetchFailure
+from nessa.evidence.fetcher import JSON_TYPES, Admit, Fetched, Fetcher, FetchFailure
 from nessa.evidence.pages import parse_page
 from nessa.evidence.records import (
     AttemptStatus,
@@ -55,9 +55,9 @@ class AcquisitionResult(StrictModel):
 
     route: InputRoute
     provider: str
-    requested_url: str
+    requested_url: str | None  # None for a URL refused by the checks: never recorded
     final_url: str | None = None
-    redirects: list[str] = Field(default_factory=list)
+    redirects: list[str] = Field(default_factory=list)  # checked URLs only
     status: AttemptStatus
     reason: str | None = None
     transient: bool = False
@@ -73,6 +73,7 @@ class AcquisitionResult(StrictModel):
     copies: list[JobCopy] = Field(default_factory=list)
     issues: list[str] = Field(default_factory=list)
     total: int | None = None  # Adzuna's count of matching adverts
+    http_requests: int = Field(default=0, ge=0)  # sent for it, robots.txt included
     fetched_at: datetime
 
 
@@ -113,8 +114,26 @@ def _failure_result(
         transient=failure.transient,
         http_status=failure.http_status,
         address=failure.address,
+        http_requests=failure.requests,
         fetched_at=now,
     )
+
+
+def admission(pacer: Pacer) -> Admit:
+    """The source permission manifest for each host a page fetch reaches, the first and
+    every redirect's (ACQ-06): a denied or API-only host is refused before any request to
+    it; a permitted one is paced to its rate limit."""
+
+    def admit(checked: CheckedUrl) -> str | None:
+        rule = rule_for(checked.host)
+        if rule.access is Access.DENIED:
+            return "source_denied"
+        if rule.access is Access.API_ONLY:
+            return "source_api_only"
+        pacer.wait(checked.host, rule.rate_limit_seconds)
+        return None
+
+    return admit
 
 
 def acquire_page(
@@ -126,30 +145,19 @@ def acquire_page(
     classify: Callable[[str], PageRights] = classify_page,
 ) -> AcquisitionResult:
     """`classify`: the page's class from its final host; the manifest's, except where the
-    corpus tool records an agent's classification (`tools.corpus`)."""
+    corpus tool records an agent's classification (`tools.corpus`). A refused URL is
+    recorded without it: only a checked URL is ever recorded as one."""
     checked = fetcher.check(url)
     if isinstance(checked, UrlRefusal):
         return AcquisitionResult(
             route=InputRoute.FETCH,
             provider="unknown",
-            requested_url=url,
+            requested_url=None,
             status=AttemptStatus.BLOCKED,
             reason=checked.value,
             fetched_at=now,
         )
-    rule = rule_for(checked.host)
-    if rule.access is not Access.PERMITTED:
-        return AcquisitionResult(
-            route=InputRoute.FETCH,
-            provider=checked.host,
-            requested_url=checked.url,
-            status=AttemptStatus.BLOCKED,
-            reason="source_denied" if rule.access is Access.DENIED else "source_api_only",
-            rights_class=rule.rights_class,
-            fetched_at=now,
-        )
-    pacer.wait(checked.host, rule.rate_limit_seconds)
-    result = fetcher.fetch_page(checked.url)
+    result = fetcher.fetch_page(checked.url, admission(pacer))
     if isinstance(result, FetchFailure):
         return _failure_result(InputRoute.FETCH, checked.host, checked.url, result, now)
     return _page_result(fetcher, result, checked.host, now, classify)
@@ -185,6 +193,7 @@ def _page_result(
         body_b64=base64.b64encode(page.body).decode() if keep else None,
         copies=parsed.postings,
         issues=parsed.issues,
+        http_requests=page.requests,
         fetched_at=now,
     )
 
@@ -223,12 +232,14 @@ def acquire_adzuna(
             reason=result.reason,
             transient=result.transient,
             http_status=result.http_status,
+            http_requests=result.requests,
         )
     digest = hashlib.sha256(result.body).hexdigest()
     page = adzuna.parse_search(result.body, sha256=digest)
     rights = classify_page("api.adzuna.com")
     common = {
         **base,
+        "http_requests": result.requests,
         "http_status": result.status,
         "content_type": result.content_type,
         "content_sha256": digest,

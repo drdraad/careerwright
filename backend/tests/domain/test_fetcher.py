@@ -13,7 +13,7 @@ from collections.abc import Callable, Iterator
 
 import pytest
 
-from nessa.evidence.addresses import IPAddress
+from nessa.evidence.addresses import ALLOWED_PORTS, CheckedUrl, IPAddress, check_url
 from nessa.evidence.fetcher import (
     DEFAULT_LIMITS,
     HTML_TYPES,
@@ -25,6 +25,7 @@ from nessa.evidence.fetcher import (
     HostNotFoundError,
     RobotsRules,
     parse_robots,
+    redirect_target,
 )
 from nessa.evidence.records import AttemptStatus
 from tests.support.source_server import Scripted, SourceServer, html, source_server
@@ -99,9 +100,11 @@ def test_a_permitted_page_is_fetched_from_the_checked_address_under_its_own_name
         "http://%31%32%37.0.0.1/",
         "http://localhost/",
         "file:///etc/passwd",
+        "javascript:alert(1)",
+        "data:text/html,<script>alert(1)</script>",
     ],
 )
-def test_a_redirect_to_a_private_or_encoded_address_is_blocked_before_it_is_followed(
+def test_a_redirect_to_a_private_or_encoded_address_is_blocked_and_never_recorded(
     location: str,
 ) -> None:
     routes = {"/go": Scripted(302, headers=(("Location", location),))}
@@ -114,8 +117,31 @@ def test_a_redirect_to_a_private_or_encoded_address_is_blocked_before_it_is_foll
         "host_not_allowed",
         "scheme_not_allowed",
     }
-    assert result.redirects == (location,)
+    # Only checked URLs are recorded: a refused target is in no URL field.
+    assert result.redirects == ()
+    assert result.final_url is None
+    assert result.requested_url == url(server, "/go")
     assert server.paths() == ["/go"]
+
+
+@pytest.mark.req("ACQ-01")
+def test_https_never_redirects_down_to_http() -> None:
+    https = _checked("https://careers.northwind.example/jobs/1")
+
+    down = redirect_target(https, "http://careers.northwind.example/jobs/1", ALLOWED_PORTS)
+    along = redirect_target(https, "/jobs/2", ALLOWED_PORTS)
+    up = redirect_target(_checked("http://careers.northwind.example/"), "https://x.example/")
+
+    assert down == "redirect_downgrade"
+    assert isinstance(along, CheckedUrl)
+    assert along.url == "https://careers.northwind.example/jobs/2"
+    assert isinstance(up, CheckedUrl)
+
+
+def _checked(raw: str) -> CheckedUrl:
+    checked = check_url(raw)
+    assert isinstance(checked, CheckedUrl), checked
+    return checked
 
 
 @pytest.mark.req("ACQ-01")
@@ -289,6 +315,66 @@ def test_a_page_slower_than_the_time_limit_fails_as_a_timeout() -> None:
     assert (result.outcome, result.reason) == (AttemptStatus.FAILED, "timeout")
     assert result.transient
     assert time.monotonic() - started < 3.0
+
+
+def _trickled_status_line() -> Iterator[bytes]:
+    for byte in b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 4\r\n\r\nok!!":
+        time.sleep(0.2)
+        yield bytes([byte])
+
+
+def _endless_informational() -> Iterator[bytes]:
+    for _ in range(50):
+        time.sleep(0.2)
+        yield b"HTTP/1.1 102 Processing\r\n\r\n"
+
+
+@pytest.mark.req("ACQ-02")
+@pytest.mark.parametrize(
+    "raw",
+    [_trickled_status_line, _endless_informational],
+    ids=["a status line and headers trickled a byte at a time", "1xx responses without end"],
+)
+def test_the_time_limit_holds_while_the_status_line_and_headers_arrive(
+    raw: Callable[[], Iterator[bytes]],
+) -> None:
+    with source_server({"/slow": Scripted(raw=raw)}) as server:
+        started = time.monotonic()
+        result = failure(
+            fetcher(server, limits=FetchLimits(total_s=1.0, read_s=1.0)).fetch(
+                url(server, "/slow"), accept=HTML_TYPES
+            )
+        )
+        elapsed = time.monotonic() - started
+
+    assert (result.outcome, result.reason, result.transient) == (
+        AttemptStatus.FAILED,
+        "timeout",
+        True,
+    )
+    assert elapsed < 2.0
+
+
+@pytest.mark.req("ACQ-02")
+def test_the_time_limit_holds_while_a_name_is_looked_up() -> None:
+    def slow_resolve(host: str, port: int) -> list[IPAddress]:
+        time.sleep(3.0)
+        return [LOOPBACK]
+
+    with source_server({"/job": Scripted(body=PAGE)}) as server:
+        f = Fetcher(
+            resolve=slow_resolve,
+            limits=FetchLimits(total_s=1.0, connect_s=1.0),
+            user_agent="NessaL0/test",
+            extra_allowed=frozenset({("127.0.0.1", server.port)}),
+        )
+        started = time.monotonic()
+        result = failure(f.fetch(url(server, "/job"), accept=HTML_TYPES))
+        elapsed = time.monotonic() - started
+
+    assert (result.reason, result.transient) == ("timeout", True)
+    assert elapsed < 2.0
+    assert server.seen == []
 
 
 @pytest.mark.req("ACQ-02", "ACQ-07")
@@ -481,6 +567,40 @@ def test_a_page_robots_txt_allows_is_fetched(robots: Scripted) -> None:
 
     assert isinstance(result, Fetched), result
     assert server.paths() == ["/robots.txt", "/jobs/1"]
+
+
+@pytest.mark.req("ACQ-06")
+def test_a_redirect_to_a_path_robots_txt_disallows_is_never_requested() -> None:
+    routes = {
+        "/robots.txt": Scripted(
+            body=b"User-agent: *\nDisallow: /private\n", headers=(("Content-Type", "text/plain"),)
+        ),
+        "/go": Scripted(302, headers=(("Location", "/private/job"),)),
+        "/private/job": Scripted(body=PAGE),
+    }
+    with source_server(routes) as server:
+        result = failure(fetcher(server).fetch_page(url(server, "/go")))
+
+    assert (result.outcome, result.reason) == (AttemptStatus.BLOCKED, "robots_disallowed")
+    assert result.redirects == (url(server, "/private/job"),)
+    assert server.paths() == ["/robots.txt", "/go"]
+
+
+@pytest.mark.req("ACQ-06")
+def test_every_request_is_counted_robots_txt_included() -> None:
+    routes = {
+        "/robots.txt": Scripted(404),
+        "/old": Scripted(301, headers=(("Location", "/new"),)),
+        "/new": Scripted(body=PAGE),
+    }
+    with source_server(routes) as server:
+        f = fetcher(server)
+        first = f.fetch_page(url(server, "/old"))
+        again = f.fetch_page(url(server, "/new"))  # robots.txt is remembered for the origin
+
+    assert isinstance(first, Fetched)
+    assert isinstance(again, Fetched)
+    assert (first.requests, again.requests) == (3, 1)
 
 
 @pytest.mark.req("ACQ-01")

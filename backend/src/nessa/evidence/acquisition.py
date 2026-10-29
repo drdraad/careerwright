@@ -679,11 +679,6 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
             result = rt.client.fetch(target.url or "")
     except AcquisitionUnavailableError:
         result = _unavailable(target, rt.clock())
-    requests = (
-        1
-        if result.route is InputRoute.ADZUNA and result.content_sha256
-        else (0 if result.status is AttemptStatus.BLOCKED else 1 + len(result.redirects))
-    )
     with run_transaction(rt.engine, run_id) as tx:
         if run_store.authorised_workspace(tx) != run.workspace_id:
             store.set_target_status(tx, run_id, position, AttemptStatus.FAILED.value)
@@ -691,10 +686,10 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
                 "status": AttemptStatus.FAILED.value,
                 "reason": FailureClass.ACCESS_REVOKED.value,
             }
-        store.finish_attempt(tx, attempt_id, result, http_requests=requests)
+        store.finish_attempt(tx, attempt_id, result, http_requests=result.http_requests)
         if result.status is AttemptStatus.SUCCEEDED:
             _record_copies(tx, rt, run, attempt_id, result)
-        elif target.url:
+        elif target.url and result.requested_url:
             store.job_attempted(
                 tx,
                 store.jobs_from_url(tx, run.workspace_id, result.requested_url),

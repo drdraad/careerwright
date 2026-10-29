@@ -52,11 +52,21 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    percent-encoding, Unicode digits, IPv4-compatible IPv6) are refused, never decoded.
    `address_refusal` refuses every non-global, multicast or reserved address and every IPv6
    form embedding IPv4 (mapped, 6to4, Teredo, NAT64). The fetcher resolves at connect time,
-   refuses a host if any answer fails, and connects to an answer that passed, so DNS
-   rebinding cannot change the address; each redirect (at most 5) is a new hop with the
-   same checks, and https never redirects to http. Bounds: 2 MB (also after gzip or deflate,
-   so a decompression bomb is cut), 20 s in all (5 s connect, 10 s read), HTML only for
-   pages, JSON for Adzuna. robots.txt is read first for each origin and obeyed for the token
+   refuses a host if any answer fails, and connects to an answer that passed (at most 4
+   tried), so DNS rebinding cannot change the address; each redirect (at most 5) is checked
+   before it is recorded or followed and is a new hop with the same checks, and https never
+   redirects to http. Only checked URLs are recorded (fix round 1, review A I5). Every new
+   host a page fetch reaches, a redirect's or a robots.txt redirect's included, is admitted
+   before any request to it: the manifest's access (a denied or API-only host ends the
+   attempt `source_denied` or `source_api_only`, with the redirects so far) and then its
+   rate limit; and every hop's URL is checked against its own origin's robots.txt (fix
+   round 1, review A I1). Bounds: 2 MB (also after gzip or deflate, so a decompression bomb
+   is cut); 20 s for the whole page fetch, its robots.txt requests and later hosts' pacing
+   included, enforced in every phase (the name lookup, on a thread it does not wait past;
+   each connect; every read, write and TLS start; so a trickled status line or an endless
+   run of 1xx responses ends at the bound), with at most 5 s per connect and 10 s per
+   read; the first host's pacing comes before the bound starts. HTML only for pages, JSON
+   for Adzuna. robots.txt is read first for each origin and obeyed for the token
    `NessaL0` by Nessa's own RFC 9309 matcher (`fetcher.parse_robots`; `urllib.robotparser`
    was replaced in fix round 1 because it ignores `*` and `$` and takes the first matching
    rule): the groups naming the token without regard to case, else the `*` groups,

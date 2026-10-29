@@ -22,6 +22,9 @@ class Scripted:
     headers: tuple[tuple[str, str], ...] = (("Content-Type", "text/html; charset=utf-8"),)
     body: bytes | Callable[[], Iterator[bytes]] = b""  # a callable streams chunk by chunk
     delay_s: float = 0.0  # before the status line
+    # Raw bytes written as they are yielded, status line and headers included (a server
+    # that trickles its headers or sends 1xx responses without end); replaces the rest.
+    raw: Callable[[], Iterator[bytes]] | None = None
 
 
 @dataclass(frozen=True)
@@ -72,6 +75,15 @@ def source_server(routes: dict[str, Scripted] | None = None) -> Iterator[SourceS
             )
             if script.delay_s:
                 time.sleep(script.delay_s)
+            if script.raw is not None:
+                self.close_connection = True
+                try:
+                    for chunk in script.raw():
+                        self.wfile.write(chunk)
+                        self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    return
+                return
             self.send_response(script.status)
             for name, value in script.headers:
                 self.send_header(name, value)

@@ -3,6 +3,7 @@ what may be fetched, from where, and what a workspace keeps of it (ACQ-06, FRESH
 
 import base64
 import json
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -22,10 +23,11 @@ from nessa.evidence.sources import (
 )
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
-from tests.support.source_server import Scripted, source_server
+from tests.support.source_server import Scripted, SourceServer, source_server
 
 REPO = Path(__file__).resolve().parents[3]
 ON = date(2026, 10, 28)
+PAGE_BODY = page(POSTING).encode()
 
 
 def test_the_manifest_loads_and_names_its_open_item() -> None:
@@ -166,6 +168,92 @@ def test_a_listed_keep_privately_host_keeps_its_body_by_its_manifest_entry() -> 
     assert (result.rights_class, result.retention) == (RightsClass.GOVUK, Retention.BODY)
     assert result.body_b64 is not None
     assert base64.b64decode(result.body_b64) == body
+
+
+CROSS_HOST_NAMES = {
+    "lnkd.in": [LOOPBACK],
+    "www.linkedin.com": [LOOPBACK],
+    "www.adzuna.co.uk": [LOOPBACK],
+    "jobs.board.example": [LOOPBACK],
+    "jobs.other.example": [LOOPBACK],
+}
+
+
+def _cross_host(
+    server: SourceServer, pacer: Pacer | None = None, *, other: SourceServer | None = None
+) -> Callable[[str], AcquisitionResult]:
+    ports = {server.port} | ({other.port} if other else set())
+    fetcher = Fetcher(
+        resolve=scripted_resolver(CROSS_HOST_NAMES),
+        user_agent="NessaL0/test",
+        extra_allowed=frozenset(("127.0.0.1", port) for port in ports),
+    )
+    return lambda url: acquire_page(
+        fetcher,
+        pacer or Pacer(sleep=lambda seconds: None),
+        url,
+        now=datetime(2026, 10, 29, tzinfo=UTC),
+    )
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize(
+    ("host", "reason"),
+    [("www.linkedin.com", "source_denied"), ("www.adzuna.co.uk", "source_api_only")],
+    ids=["a denied host (the lnkd.in shape)", "an API-only host"],
+)
+def test_a_redirect_to_a_host_the_manifest_refuses_is_blocked_before_any_request_to_it(
+    host: str, reason: str
+) -> None:
+    with source_server() as server:
+        target = f"http://{host}:{server.port}/jobs/view/1"
+        server.routes["/abc"] = Scripted(301, headers=(("Location", target),))
+        result = _cross_host(server)(f"http://lnkd.in:{server.port}/abc")
+
+    assert (result.status, result.reason) == (AttemptStatus.BLOCKED, reason)
+    assert result.redirects == [target]  # the redirects so far, each a checked URL
+    assert result.requested_url == f"http://lnkd.in:{server.port}/abc"
+    assert [s.host for s in server.seen] == [f"lnkd.in:{server.port}"] * 2  # robots, /abc
+    assert server.paths() == ["/robots.txt", "/abc"]
+
+
+@pytest.mark.req("ACQ-06")
+def test_a_redirect_to_an_origin_whose_robots_txt_disallows_is_never_requested() -> None:
+    disallow = Scripted(
+        body=b"User-agent: *\nDisallow: /job\n", headers=(("Content-Type", "text/plain"),)
+    )
+    with source_server() as first, source_server({"/robots.txt": disallow}) as other:
+        target = f"http://jobs.other.example:{other.port}/job"
+        first.routes["/go"] = Scripted(302, headers=(("Location", target),))
+        result = _cross_host(first, other=other)(f"http://jobs.board.example:{first.port}/go")
+
+    assert (result.status, result.reason) == (AttemptStatus.BLOCKED, "robots_disallowed")
+    assert result.redirects == [target]
+    assert first.paths() == ["/robots.txt", "/go"]
+    assert other.paths() == ["/robots.txt"]  # the page itself never
+    assert result.http_requests == 3
+
+
+@pytest.mark.req("ACQ-06")
+def test_a_redirect_to_another_host_waits_for_that_host_s_rate_limit() -> None:
+    now = [100.0]
+    slept: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        slept.append(seconds)
+        now[0] += seconds
+
+    pacer = Pacer(clock=lambda: now[0], sleep=sleep)
+    with source_server() as first, source_server({"/job": Scripted(body=PAGE_BODY)}) as other:
+        acquire = _cross_host(first, pacer, other=other)
+        target = f"http://jobs.other.example:{other.port}/job"
+        first.routes["/go"] = Scripted(302, headers=(("Location", target),))
+        acquire(target)  # the other host was visited a moment ago
+        result = acquire(f"http://jobs.board.example:{first.port}/go")
+
+    assert result.status is AttemptStatus.SUCCEEDED
+    assert result.final_url == target
+    assert slept == [5.0]  # the default rate limit, waited before the redirect's request
 
 
 @pytest.mark.req("ACQ-06")
