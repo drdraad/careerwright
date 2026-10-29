@@ -285,7 +285,11 @@ def test_a_redirect_whose_pacing_would_outlast_the_time_bound_is_a_timeout_witho
     )
     assert slept == []  # no wait, and no slot taken for it
     assert after == seen  # nothing was sent to the other host
-    assert pacer.wait("jobs.other.example", 5.0, within_s=0.0) is False  # its slot is unchanged
+    # The refused hop took no slot: the next one is still the first visit's, 5 s on, so a
+    # wait allowed 5 s gets it after exactly 5 s (a taken slot would make it 10; re-review
+    # A N-4).
+    assert pacer.wait("jobs.other.example", 5.0, within_s=5.0) is True
+    assert slept == [5.0]
 
 
 @pytest.mark.req("ACQ-06")

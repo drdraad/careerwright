@@ -38,7 +38,6 @@ from nessa.evidence.search import (
     render_prompt,
 )
 from nessa.identity.activity import PartialSink, RunTask, TruncationGuard
-from nessa.identity.failures import BoundExceededError
 from nessa.identity.model_registry import ModelMode
 
 
@@ -106,21 +105,13 @@ def run_search(
         openai_include_web_search_sources=True,
         extra_body={"max_tool_calls": max_tool_calls},
     )
-    result = asyncio.run(
+    asyncio.run(
         agent.run(
             render_prompt(context),
             usage_limits=UsageLimits(request_limit=MAX_REQUESTS),
             model_settings=settings,
         )
     )
-    # Meta runs the searches inside the one request, so `request_limit` cannot bound them:
-    # the response's own usage is held to the reservation's bounds. An overrun is booked at
-    # its actual cost (the activity reads the usage) and its output is never used.
-    usage = result.usage
-    if usage.details.get("web_search_requests", 0) > max_tool_calls:
-        raise BoundExceededError("web_searches")
-    if usage.input_tokens > search.max_input_tokens(max_tool_calls):
-        raise BoundExceededError("input_tokens")
     return accepted[-1]
 
 
@@ -128,4 +119,8 @@ SOURCE_SEARCH_TASK = RunTask(
     call=run_search,
     worst_case_nano_usd=search.worst_case_nano_usd,
     has_input=True,
+    # Meta runs the searches inside the one request, so `request_limit` cannot bound them:
+    # the activity holds the captured usage to the reservation's bounds on every path, a
+    # reply that also failed included (review B N4).
+    exceeded_bound=search.exceeded_bound,
 )

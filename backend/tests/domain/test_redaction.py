@@ -14,7 +14,7 @@ from nessa.evidence import adzuna
 from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_adzuna, acquire_page
 from nessa.evidence.fetcher import Fetcher
 from nessa.evidence.pages import redact_page
-from nessa.evidence.records import AttemptStatus, Retention
+from nessa.evidence.records import AttemptStatus, BodyNotKept, Retention
 from nessa.evidence.redaction import CONTACT_REMOVED, EMAIL_REMOVED, PHONE_REMOVED, redact_text
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
@@ -97,7 +97,7 @@ PERSONAL = [
 def test_json_ld_contacts_are_removed_and_the_rest_of_the_page_kept() -> None:
     redacted = redact_page(CONTACT_PAGE)
 
-    assert not redacted.unlocated
+    assert redacted.unremovable is None
     assert not [p for p in PERSONAL if p in redacted.text]
     assert CONTACT_REMOVED in redacted.text
     assert "Northwind Analytics Ltd" in redacted.text  # the organisation is not a person
@@ -199,17 +199,79 @@ def test_details_after_json_escapes_and_on_crlf_pages_go_and_the_posting_still_p
 
 @pytest.mark.req("ACQ-06")
 def test_a_contact_block_that_cannot_be_located_means_the_body_is_never_kept() -> None:
-    # A NUL inside the block: the parser's view of it differs from the page's text, so the
-    # block cannot be rewritten in place; its contact would stay, so the body is not kept.
-    block = ESCAPED_BLOCK.replace('"Data Quality Analyst"', '"Data Quality\x00Analyst"')
+    # The re-review's case 10: a raw NUL in the block, so the parser's view of it differs from
+    # the page's text and it cannot be rewritten in place; its contact would stay, so the
+    # body is not kept.
+    block = json.dumps(
+        {
+            **POSTING,
+            "description": "Call:\n07700 900123 or jane.smith@recruit.example",
+            "applicationContact": {"name": "Jane Smith"},
+        }
+    ).replace("Data Quality Analyst", "Data Quality\x00Analyst")
     body = page_with_block(block)
 
     result, kept = _acquire_kept(body)
 
     assert kept == b""
-    assert result.retention is Retention.EXCERPTS
+    assert (result.retention, result.body_not_kept) == (
+        Retention.EXCERPTS,
+        BodyNotKept.CONTACT_UNLOCATED,
+    )
     assert result.rights_status is not None
-    assert "body_not_kept:contact_unlocated" in result.rights_status
+    assert "[" not in result.rights_status  # the rights statement only (review B N5)
+    # Its claims come from redacted values, though cited by pointer (re-review A N-1 (a)).
+    stored = json.dumps([c.model_dump(mode="json") for copy in result.copies for c in copy.claims])
+    assert result.copies
+    assert not [p for p in ESCAPED_PERSONAL if p in stored]
+
+
+# The re-review's probe, cases 11 to 13 (re-review A N-1 (b) to (d)), on a keep-privately host.
+APP_STATE = (
+    '<script type="application/json">{"recruiter": "Call:\\n07700 900123 or '
+    '\\u003cb\\u003ejane@recruit.example"}</script>'
+)
+NOT_JSON = (
+    '{"@type": "JobPosting", "title": "Data Quality Analyst", '
+    '"description": "Call:\\n07700 900123",}'  # a trailing comma: not JSON
+)
+REPEATED = (
+    '{"@type": "JobPosting", "title": "Data Quality Analyst",'
+    ' "description": "Call:\\n07700 900123", "description": "Apply online."}'
+)
+
+
+@pytest.mark.req("ACQ-06")
+def test_inline_json_in_any_script_is_redacted_in_its_decoded_values() -> None:
+    body = (
+        f"<!doctype html><html><head>{SYNTHETIC_MARKER}{APP_STATE}</head><body>x</body></html>"
+    ).encode()
+
+    _, kept = _acquire_kept(body)
+
+    assert kept  # kept, and redacted
+    assert b"07700" not in kept
+    assert b"jane@recruit.example" not in kept
+    assert json.loads(kept.decode().split('json">')[1].split("</script>")[0])  # still JSON
+
+
+@pytest.mark.req("ACQ-06")
+def test_a_json_ld_block_that_is_not_json_and_holds_details_means_no_body() -> None:
+    result, kept = _acquire_kept(page_with_block(NOT_JSON))
+
+    assert kept == b""
+    assert result.body_not_kept is BodyNotKept.BLOCK_UNREDACTABLE
+    assert result.extraction is not None  # its posting was never read either
+
+
+@pytest.mark.req("ACQ-06")
+def test_a_repeated_key_s_shadowed_value_is_not_kept() -> None:
+    result, kept = _acquire_kept(page_with_block(REPEATED))
+
+    assert kept
+    assert b"07700" not in kept  # the earlier, shadowed description went with the rewrite
+    [copy] = result.copies
+    assert copy.title == "Data Quality Analyst"
 
 
 def page_with_block(block: str) -> bytes:

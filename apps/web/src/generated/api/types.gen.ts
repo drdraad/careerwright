@@ -288,6 +288,22 @@ export const Basis = { STATED: 'stated', INFERRED: 'inferred' } as const;
 export type Basis = typeof Basis[keyof typeof Basis];
 
 /**
+ * BodyNotKept
+ *
+ * Why a body its rights class may keep was not kept: personal details in it could not
+ * be removed (`pages.redact_page`), so only its hash and excerpts are.
+ */
+export const BodyNotKept = { CONTACT_UNLOCATED: 'contact_unlocated', BLOCK_UNREDACTABLE: 'block_unredactable' } as const;
+
+/**
+ * BodyNotKept
+ *
+ * Why a body its rights class may keep was not kept: personal details in it could not
+ * be removed (`pages.redact_page`), so only its hash and excerpts are.
+ */
+export type BodyNotKept = typeof BodyNotKept[keyof typeof BodyNotKept];
+
+/**
  * ChooseTarget
  *
  * Make an ESCO occupation one of the targets: added, or in place of `replaces` (a
@@ -3086,6 +3102,10 @@ export type SourceAttemptOut = {
      */
     rights_status: string | null;
     retention: Retention | null;
+    /**
+     * Why a body its class may keep was not kept: personal details in it could not be removed.
+     */
+    body_not_kept: BodyNotKept | null;
     /**
      * Http Requests
      *

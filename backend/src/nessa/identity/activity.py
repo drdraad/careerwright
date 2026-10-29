@@ -58,6 +58,7 @@ from nessa.identity.connection_check import ConnectionCheckResult
 from nessa.identity.credentials import credential_context
 from nessa.identity.failures import (
     STORE_LABEL,
+    BoundExceededError,
     Classified,
     FailureClass,
     OutputTruncatedError,
@@ -102,11 +103,14 @@ class RunTask:
     without one) and a sink for the streamed reply so far (a kind that streams nothing
     ignores it), and returns the validated output to seal, or raises.
     `worst_case_nano_usd` bounds one attempt's cost (every request it may send) for a
-    model ID."""
+    model ID. `exceeded_bound`, for a kind whose provider can do more inside one request
+    than the reservation assumed (Meta's searches), names the bound its measured usage went
+    past; the activity then fails the attempt `bound_exceeded`, whatever else happened."""
 
     call: Callable[[Model, ModelMode, bytes | None, PartialSink], BaseModel]
     worst_case_nano_usd: Callable[[str], int]
     has_input: bool
+    exceeded_bound: Callable[[Usage], str | None] | None = None
 
 
 @dataclass(frozen=True)
@@ -539,6 +543,10 @@ def _call(rt: ActivityRuntime, ready: _Ready) -> _CallResult:
             # report is inconsistent, so the cost is unknown and the output is not accepted.
             classified = classified or classify_failure(error)
             output, usage, reasoning, response_id = None, None, None, None
+        # Held on every path: a reply that overran and also failed still says it overran.
+        bound = task.exceeded_bound(usage) if task.exceeded_bound and usage else None
+        if bound is not None:
+            classified, output = classify_failure(BoundExceededError(bound)), None
     return _CallResult(
         output, classified, usage, reasoning, response_id, requests, responses, partial.latest
     )

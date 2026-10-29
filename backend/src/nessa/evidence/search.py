@@ -17,10 +17,10 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from nessa.config import RuntimeMode
 from nessa.db import Tx
@@ -31,7 +31,7 @@ from nessa.evidence.sources import Access, load_manifest, rule_for
 from nessa.identity.access import Actor
 from nessa.identity.keyring import Keyring
 from nessa.identity.model_choice import ModelChoice
-from nessa.identity.model_registry import worst_case_cost_nano_usd
+from nessa.identity.model_registry import Usage, worst_case_cost_nano_usd
 from nessa.identity.records import Run, RunKind
 from nessa.identity.runs import RunRequest, open_output, submit_run, visible_run
 from nessa.identity.spend import SpendLimits
@@ -124,6 +124,22 @@ class SearchExcluded(StrictModel):
         default=None, description="A refused URL's host as plain text, never a link."
     )
     reason: ExclusionReason
+
+    @model_validator(mode="before")
+    @classmethod
+    def _only_checked_urls(cls, data: Any) -> Any:
+        """Held whenever one is read, so a proposal sealed before the URL rule (a raw
+        `javascript:` value in `url`) is never served with it (re-review A N-3)."""
+        if not isinstance(data, dict) or not isinstance(data.get("url"), str):
+            return data
+        checked = check_url(data["url"])
+        if isinstance(checked, CheckedUrl):
+            return {**data, "url": checked.url}
+        return {
+            **data,
+            "url": None,
+            "refused_host": data.get("refused_host") or _host_text(data["url"]),
+        }
 
 
 class SearchEmptyReason(StrEnum):
@@ -235,6 +251,16 @@ def max_input_tokens(max_tool_calls: int = MAX_TOOL_CALLS) -> int:
     """The input bound the reservation assumes: the prompt, the schema and every tool call's
     injected results."""
     return MAX_PROMPT_BYTES + SCHEMA_ALLOWANCE_TOKENS + max_tool_calls * TOOL_RESULT_TOKENS
+
+
+def exceeded_bound(usage: Usage, max_tool_calls: int = MAX_TOOL_CALLS) -> str | None:
+    """The reservation's bound a call's measured usage went past, if any: more searches
+    than `max_tool_calls`, or more input than reserved."""
+    if usage.web_search_queries > max_tool_calls:
+        return "web_searches"
+    if usage.input_tokens > max_input_tokens(max_tool_calls):
+        return "input_tokens"
+    return None
 
 
 def worst_case_nano_usd(model_id: str, *, max_tool_calls: int = MAX_TOOL_CALLS) -> int:

@@ -24,6 +24,7 @@ from nessa.evidence.records import (
     AdvertiserKind,
     AttemptReason,
     AttemptStatus,
+    BodyNotKept,
     ClaimField,
     DescriptionKind,
     Extraction,
@@ -67,6 +68,10 @@ class SourceAttemptOut(ResponseModel):
     rights_class: RightsClass | None
     rights_status: str | None
     retention: Retention | None
+    body_not_kept: BodyNotKept | None = Field(
+        description="Why a body its class may keep was not kept: personal details in it could "
+        "not be removed."
+    )
     http_requests: int = Field(description="Sent for it, robots.txt included.")
     total_matching: int | None = Field(description="For a search: the adverts it matched.")
     adverts_retrieved: int = Field(description="The adverts (copies) it returned.")
@@ -95,6 +100,7 @@ class SourceAttemptOut(ResponseModel):
             rights_class=RightsClass(row.rights_class) if row.rights_class else None,
             rights_status=row.rights_status,
             retention=Retention(row.retention) if row.retention else None,
+            body_not_kept=row.body_not_kept,
             http_requests=row.http_requests,
             total_matching=row.total_matching,
             adverts_retrieved=adverts_retrieved,

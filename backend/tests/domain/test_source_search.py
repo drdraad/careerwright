@@ -20,14 +20,17 @@ from nessa.evidence.search import (
     SearchEmptyReason,
     SearchInput,
     SearchOutput,
+    SearchProposal,
     check_search,
+    exceeded_bound,
     max_input_tokens,
     prompt_bytes,
     refused_hosts,
     render_prompt,
     worst_case_nano_usd,
 )
-from nessa.evidence.search_agent import run_search, searched
+from nessa.evidence.search_agent import SOURCE_SEARCH_TASK, run_search, searched
+from nessa.identity.activity import measured_usage
 from nessa.identity.failures import BoundExceededError, FailureClass, classify_failure
 from nessa.identity.model_registry import ModelMode
 from tests.support.fake_models import SEARCHED, search_parts
@@ -98,6 +101,33 @@ def test_candidates_past_the_limit_are_excluded_not_kept() -> None:
     assert [e.reason for e in proposal.excluded] == ["over_the_limit"] * 2
 
 
+@pytest.mark.req("ACQ-01")
+def test_a_proposal_sealed_with_a_raw_url_is_never_served_with_it() -> None:
+    # Re-review A N-3: a proposal sealed before the URL rule held `javascript:` in `url`.
+    sealed = json.dumps(
+        {
+            "target": "Data quality analyst",
+            "city": "Manchester",
+            "candidates": [],
+            "excluded": [
+                {"url": "javascript:alert(1)", "reason": "scheme_not_allowed"},
+                {"url": "http://10.0.0.2/jobs", "reason": "address_not_allowed"},
+                {"url": "HTTPS://Uk.LinkedIn.com/jobs/1", "reason": "source_not_permitted"},
+            ],
+            "queries": [],
+            "sources_seen": 0,
+        }
+    )
+
+    proposal = SearchProposal.model_validate_json(sealed)
+
+    assert [(e.url, e.refused_host) for e in proposal.excluded] == [
+        (None, None),
+        (None, "10.0.0.2"),
+        ("https://uk.linkedin.com/jobs/1", None),
+    ]
+
+
 @pytest.mark.req("STATE-02")
 @pytest.mark.parametrize(
     ("proposed", "sources", "reason"),
@@ -166,24 +196,27 @@ class Provider:
     ],
     ids=["a third search", "more input than reserved"],
 )
-def test_a_search_past_its_reserved_bounds_fails_and_its_output_is_never_used(
+def test_a_search_past_its_reserved_bounds_is_named_for_the_activity_to_refuse(
     usage: RequestUsage, bound: str
 ) -> None:
-    # Review B I4: Meta runs the searches inside the one request; its own usage is the check.
+    # Review B I4, N4: Meta runs the searches inside the one request, so its own measured
+    # usage is the check, applied by the activity on every path (`RunTask.exceeded_bound`).
     provider = Provider(search_parts(request(), "SENTINEL"), usage)
 
-    with capture_run_messages() as messages, pytest.raises(BoundExceededError) as raised:
+    with capture_run_messages() as messages:
         run_search(
             provider.model(), ModelMode.CONTRIBUTOR, CONTEXT.model_dump_json().encode(), ignore
         )
+    measured, _, _ = measured_usage(messages)
 
-    classified = classify_failure(raised.value)
+    assert measured is not None
+    assert SOURCE_SEARCH_TASK.exceeded_bound is exceeded_bound
+    assert exceeded_bound(measured) == bound
+    classified = classify_failure(BoundExceededError(bound))
     assert (classified.failure, classified.label) == (
         FailureClass.BOUND_EXCEEDED,
         f"bound_exceeded:{bound}",
     )
-    responses = [m for m in messages if isinstance(m, ModelResponse)]
-    assert [r.usage.input_tokens for r in responses] == [usage.input_tokens]  # booked at cost
 
 
 @pytest.mark.req("MODEL-08")

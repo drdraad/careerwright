@@ -97,6 +97,14 @@ UNREADABLE = frozenset(set(Extraction) - {Extraction.NO_MATCHING_ADVERTS})
 MODEL_READABLE = frozenset({Extraction.NO_STRUCTURED_DATA, Extraction.NO_JOB_POSTING})
 
 
+class BodyNotKept(StrEnum):
+    """Why a body its rights class may keep was not kept: personal details in it could not
+    be removed (`pages.redact_page`), so only its hash and excerpts are."""
+
+    CONTACT_UNLOCATED = "contact_unlocated"  # a JSON-LD block holding them was not found
+    BLOCK_UNREDACTABLE = "block_unredactable"  # a JSON-LD block that is not JSON held them
+
+
 class RightsClass(StrEnum):
     """The page classes of the session 1 rights policy (H-06; `corpus/README.md`)."""
 

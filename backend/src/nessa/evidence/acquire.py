@@ -32,6 +32,7 @@ from nessa.evidence.pages import parse_page, redact_page
 from nessa.evidence.records import (
     AttemptReason,
     AttemptStatus,
+    BodyNotKept,
     Extraction,
     InputRoute,
     JobCopy,
@@ -43,9 +44,6 @@ from nessa.evidence.redaction import redact_json
 from nessa.evidence.sources import Access, PageRights, classify_page, retention, rule_for
 
 ADZUNA_PROVIDER = "adzuna"
-# The label a rights status carries when a body its class may keep is not kept, because a
-# JSON-LD block with personal details in it could not be rewritten (`pages.redact_page`).
-BODY_NOT_KEPT_CONTACT_UNLOCATED = "body_not_kept:contact_unlocated"
 
 
 class FetchRequest(StrictModel):
@@ -77,6 +75,8 @@ class AcquisitionResult(StrictModel):
     rights_class: RightsClass | None = None
     rights_status: str | None = None
     retention: Retention | None = None
+    # Why a body its class may keep was not kept (personal details could not be removed).
+    body_not_kept: BodyNotKept | None = None
     body_b64: str | None = None  # only when the rights class permits keeping the body
     copies: list[JobCopy] = Field(default_factory=list)
     # A retrieved source with no publishable posting says why; only `no_job_posting` may
@@ -196,13 +196,11 @@ def _page_result(
     parsed = parse_page(text, sha256=digest, page_url=page.final_url)
     final_host = fetcher.check(page.final_url)
     rights = classify(final_host.host if not isinstance(final_host, UrlRefusal) else host)
-    if redacted.unlocated and rights.retention is Retention.BODY:
+    body_not_kept = None
+    if redacted.unremovable is not None and rights.retention is Retention.BODY:
         # Fail safe: personal details may remain in a block that could not be rewritten.
-        rights = PageRights(
-            rights.rights_class,
-            f"{rights.rights_status} [{BODY_NOT_KEPT_CONTACT_UNLOCATED}]",
-            Retention.EXCERPTS,
-        )
+        rights = PageRights(rights.rights_class, rights.rights_status, Retention.EXCERPTS)
+        body_not_kept = redacted.unremovable
     keep = rights.retention is Retention.BODY
     return AcquisitionResult(
         route=InputRoute.FETCH,
@@ -220,6 +218,7 @@ def _page_result(
         rights_class=rights.rights_class,
         rights_status=rights.rights_status,
         retention=rights.retention,
+        body_not_kept=body_not_kept,
         body_b64=base64.b64encode(kept).decode() if keep else None,
         copies=parsed.postings,
         extraction=parsed.extraction,

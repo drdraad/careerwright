@@ -586,6 +586,42 @@ def test_overlapping_acquisitions_in_one_workspace_lose_no_copy_or_claim(
     assert len(job["copies"]) == 9
 
 
+@pytest.mark.req("SEC-02", "JOB-06")
+def test_the_worker_can_never_delete_an_example_or_move_a_pasted_copy(
+    infra: Infra, api: ApiClient, ada: str, workspace: str
+) -> None:
+    # Review B N6: 0017's grants (for merging) are held by restrictive policies.
+    example = {"target": "Gardener", "title": "Gardener", "text": "Gardener wanted in Leeds."}
+    pasted = api.write("POST", f"/v1/workspaces/{workspace}/research/pasted", ada, example)
+    exemplar = pasted.json()["job"]["job_id"]
+    run_id = submit(api, ada, workspace, {"urls": ["https://jobs.example.org/a"]}).json()[
+        "acquisition"
+    ]["run"]["run_id"]  # a run the worker acts for; no worker runs here
+    vacancy = str(uuid.uuid4())
+    infra.query(
+        "INSERT INTO nessa.jobs (job_id, workspace_id, exemplar, last_success_at, "
+        "last_attempt_at) VALUES (%s, %s, false, clock_timestamp(), clock_timestamp())",
+        (vacancy, workspace),
+    )
+
+    deleted = infra.as_role(
+        "pg_worker",
+        "DELETE FROM nessa.jobs WHERE job_id = ANY(%s::uuid[]) RETURNING job_id::text AS id",
+        ([exemplar, vacancy],),
+        run=run_id,
+    )
+    moved = infra.as_role(
+        "pg_worker",
+        "UPDATE nessa.job_copies SET job_id = job_id WHERE job_id = %s RETURNING copy_id",
+        (exemplar,),
+        run=run_id,
+    )
+
+    assert deleted == [{"id": vacancy}]  # a vacancy may go in a merge; the example never
+    assert moved == []
+    assert infra.query("SELECT 1 FROM nessa.jobs WHERE job_id = %s", (exemplar,))
+
+
 @pytest.mark.req("JOB-02", "JOB-07")
 def test_a_copy_that_bridges_two_jobs_merges_them_with_their_claims_and_favourites(
     infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker
@@ -1059,8 +1095,13 @@ def test_a_source_search_proposes_candidates_for_a_confirmed_target_and_city(
 
 
 @pytest.mark.req("MODEL-08", "JOB-08")
+@pytest.mark.parametrize(
+    "failure",
+    ["search_overrun", "search_overrun_invalid"],
+    ids=["an overrun", "an overrun whose answer is also unusable (review B N4)"],
+)
 def test_a_search_past_its_reserved_bounds_is_booked_at_cost_and_its_output_never_used(
-    infra: Infra, api: ApiClient, ada: str, tmp_path: Path
+    infra: Infra, api: ApiClient, ada: str, tmp_path: Path, failure: str
 ) -> None:
     scenario = make_scenario(infra, api, ada, tmp_path)
     profile = profile_with(target_titles=["Data quality analyst"], cities=["Manchester"])
@@ -1069,7 +1110,7 @@ def test_a_search_past_its_reserved_bounds_is_booked_at_cost_and_its_output_neve
     assert saved.status_code == 201, saved.text
     body = {"expected_profile_version": 2, "target": "Data quality analyst", "city": "Manchester"}
     search_id = api.write("POST", f"{base}/research/searches", ada, body).json()["search_id"]
-    worker = scenario.worker("search", fake_failure="search_overrun")  # 3 searches reported
+    worker = scenario.worker("search", fake_failure=failure)  # 3 searches reported
     try:
         run = scenario.wait_terminal(search_id)
     finally:

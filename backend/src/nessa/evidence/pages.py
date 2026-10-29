@@ -29,6 +29,7 @@ from nessa.evidence.amounts import minor_units
 from nessa.evidence.jobs import advertiser_kind, description_fingerprints, title_key
 from nessa.evidence.records import (
     CLAIM_TEXT_CHARS,
+    BodyNotKept,
     Claim,
     ClaimField,
     ClaimValue,
@@ -43,7 +44,7 @@ from nessa.evidence.records import (
     ValidationState,
     WorkMode,
 )
-from nessa.evidence.redaction import redact_json, redact_text
+from nessa.evidence.redaction import redact_json, redact_text, redact_value
 
 EXCERPT_CHARS = 200
 LOCALITY_CHARS, POSTAL_CODE_CHARS, COUNTRY_CHARS = 120, 20, 60  # `records.Location`'s bounds
@@ -407,39 +408,62 @@ def _conflicts(postings: list[JobCopy]) -> list[JobCopy]:
     return marked
 
 
+_ESCAPE = re.compile(r"\\(?:u([0-9a-fA-F]{4})|([nrtbf/\\\"]))")
+_ESCAPED = {"n": "\n", "r": "\n", "t": "\t", "b": " ", "f": " ", "/": "/", "\\": "\\", '"': '"'}
+
+
+def _holds_escaped_details(raw: str) -> bool:
+    """Whether text that is not JSON holds an email or a telephone number once its
+    JSON-style escapes are decoded."""
+    decoded = _ESCAPE.sub(
+        lambda m: chr(int(m.group(1), 16)) if m.group(1) else _ESCAPED[m.group(2)], raw
+    )
+    return redact_text(decoded) != decoded
+
+
 @dataclass(frozen=True)
 class RedactedPage:
     text: str  # line endings normalised, personal details removed: what is parsed and kept
-    # A JSON-LD block held personal details but could not be found in the page's text to
-    # be written again, so they may remain: the body must never be kept.
-    unlocated: bool
+    # Personal details that may remain, so the body must never be kept: a script holding
+    # them could not be found in the page's text to be written again, or a JSON-LD block
+    # holding them is not JSON, so only its text could be redacted.
+    unremovable: BodyNotKept | None
 
 
 def redact_page(text: str) -> RedactedPage:
     """A page's text without third parties' personal details (`nessa.evidence.redaction`).
-    Line endings are normalised first (the parser reports a block's text with LF, so a CRLF
-    page's blocks would not be found). Each JSON-LD block is redacted in its decoded values
-    and written again only if that changed it; the HTML around the blocks is redacted as
-    text."""
+    Line endings are normalised first (the parser reports a script's text with LF, so a
+    CRLF page's scripts would not be found). Every script whose content is JSON (JSON-LD,
+    an app's state) is redacted in its decoded values and written again when that, or a
+    repeated key, changes it; a script that is not JSON, and the HTML around the scripts,
+    are redacted as text (re-review A N-1)."""
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     cursor = 0
     parts: list[str] = []
-    unlocated = False
-    for script in Selector(content=text).css('script[type="application/ld+json"]'):
+    unremovable: BodyNotKept | None = None
+    for script in Selector(content=text).css("script"):
         raw = str(script.text)
-        cleaned = redact_json(raw)
-        offset = text.find(raw, cursor) if raw else -1
-        if offset == -1:
-            redacted = redact_text(raw) if cleaned is None else cleaned
-            unlocated = unlocated or redacted != raw
+        if not raw:
             continue
-        parts += [
-            redact_text(text[cursor:offset]),
-            redact_text(raw) if cleaned is None else cleaned,
-        ]
+        cleaned = redact_json(raw)
+        as_text = redact_text(raw) if cleaned is None else cleaned
+        # Whether it holds details, looked for with JSON-style escapes decoded too, since a
+        # detail right after `\n` is hidden from the text patterns.
+        holds = as_text != raw or (cleaned is None and _holds_escaped_details(raw))
+        offset = text.find(raw, cursor)
+        if offset == -1:
+            if holds:
+                unremovable = unremovable or BodyNotKept.CONTACT_UNLOCATED
+            continue
+        if cleaned is None and holds:
+            # A script that is not JSON (a JSON-LD block that does not parse, or code) and
+            # holds details: text redaction cannot be trusted inside its escapes, so the
+            # body is not kept (the ruling names JSON-LD; this holds for any script).
+            unremovable = unremovable or BodyNotKept.BLOCK_UNREDACTABLE
+        parts += [redact_text(text[cursor:offset]), as_text]
         cursor = offset + len(raw)
     parts.append(redact_text(text[cursor:]))
-    return RedactedPage("".join(parts), unlocated)
+    return RedactedPage("".join(parts), unremovable)
 
 
 def parse_page(text: str, *, sha256: str, page_url: str) -> ParsedPage:
@@ -457,7 +481,9 @@ def parse_page(text: str, *, sha256: str, page_url: str) -> ParsedPage:
             cursor = offset + len(raw)
         block = _Block(index, raw, offset if offset != -1 else None)
         try:
-            data = json.loads(raw)
+            # Claims come from redacted values, so a block that could not be rewritten in
+            # the text (and so is cited by a pointer) still gives none (re-review A N-1).
+            data = redact_value(json.loads(raw))
         except ValueError:
             unreadable += 1
             continue

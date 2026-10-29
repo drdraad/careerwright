@@ -4,8 +4,9 @@ security boundary"; ACQ-01). Pure: no network.
 A URL passes only with an `http` or `https` scheme, no credentials, port 80 or 443, and a
 host that is either a public IP literal or a multi-label DNS name. Anything that could be an
 encoded address (one decimal or hex number, octal or short dotted forms, percent-encoding,
-any digit outside ASCII, a full stop IDNA would fold to ".", an IPv6 zone ID) is refused
-rather than decoded, so no parser
+any digit outside ASCII, a full stop IDNA would fold to ".", any other non-ASCII character
+whose compatibility form holds an ASCII digit or ".", an IPv6 zone ID) is refused rather
+than decoded, so no parser
 disagreement can turn it into a private address. One trailing dot is removed (it names the
 same host) before the name or address is checked. The fetcher applies `address_refusal`
 again to every address a name resolves to, at connect time, and checks every redirect
@@ -14,6 +15,7 @@ target with `check_url` again.
 
 import ipaddress
 import re
+import unicodedata
 from dataclasses import dataclass
 from enum import StrEnum
 from urllib.parse import quote, urlsplit, urlunsplit
@@ -88,9 +90,17 @@ def _ip_literal(host: str) -> IPAddress | UrlRefusal:
         return UrlRefusal.HOST_NOT_ALLOWED  # any other non-address in brackets
 
 
+def _folds_to_address(ch: str) -> bool:
+    """Whether a non-ASCII character is, or folds to, part of an address: a digit, one of
+    IDNA's full stops, or anything whose compatibility form (NFKC) holds an ASCII digit or
+    "." (re-review A N-2: U+2024, U+FE52 and the like)."""
+    folded = unicodedata.normalize("NFKC", ch)
+    return ch.isdigit() or ch in IDNA_DOTS or any(c == "." or c in "0123456789" for c in folded)
+
+
 def _name(host: str) -> str | IPAddress | UrlRefusal:
     """The host's ASCII name, or a canonical dotted-quad address, or the refusal."""
-    if "%" in host or any((ch.isdigit() or ch in IDNA_DOTS) and not ch.isascii() for ch in host):
+    if "%" in host or any(_folds_to_address(ch) for ch in host if not ch.isascii()):
         return UrlRefusal.HOST_NOT_ALLOWED  # never decoded: IDNA would fold such digits, dots
     host = host.removesuffix(".")
     try:

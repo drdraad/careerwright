@@ -59,9 +59,11 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    no credentials, port 80 or 443, a public IP literal or a multi-label name; local names
    and every encoded address form (one decimal or hex number, octal, short dotted forms,
    percent-encoding, any digit outside ASCII, a full stop IDNA folds to "." (U+3002,
-   U+FF0E, U+FF61), an IPv6 zone ID, IPv4-compatible IPv6) are refused, never decoded (fix
-   round 1, review A M1 and M2, addendum M-3: before, Unicode digits and dots were folded
-   by IDNA and a zone ID parsed); one trailing ASCII dot is removed before the check.
+   U+FF0E, U+FF61), any other non-ASCII character whose NFKC form holds an ASCII digit or
+   "." (U+2024, U+FE52 and the like), an IPv6 zone ID, IPv4-compatible IPv6) are refused,
+   never decoded (fix round 1, review A M1 and M2, addendum M-3, fix round 2 N-2: before,
+   Unicode digits and dots were folded by IDNA or nameprep and a zone ID parsed); one
+   trailing ASCII dot is removed before the check.
    `address_refusal` refuses every non-global, multicast or reserved address, the
    deprecated site-local `fec0::/10` (which `is_global` passes) and every IPv6
    form embedding IPv4 (mapped, 6to4, Teredo, NAT64). The fetcher resolves at connect time,
@@ -132,15 +134,20 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    UK national (10 or 11 digits from a leading 0) or international (`+`, 8 to 15 digits)
    form, not inside a URL, a word or a longer number; and in JSON every name, email,
    telephone and fax number of an `applicationContact` or `contactPoint`. How (addendum,
-   re-review A C-1, I-1 to I-3, M-1): a page's line endings are normalised first; each
-   JSON-LD block, and Adzuna's response, is redacted in its decoded values and written again
-   only if that changed it, with every `</` escaped, so a detail right after an escape
-   (`\n`, `\t`, `>`) is found and the JSON stays valid; IDs and URLs (`identifier`,
-   `url`, `sameAs`, Adzuna's `id` and `redirect_url`) are never redacted; the HTML around
-   the blocks is redacted as text. If a block holding such a detail cannot be found in the
-   page's text to be rewritten, the body is never kept, whatever its class: only the hash
-   and the claims' excerpts, its rights status labelled `body_not_kept:contact_unlocated`.
-   Claims and excerpts come from the redacted text. `content_sha256` is the hash of what was
+   re-review A C-1, I-1 to I-3, M-1; fix round 2, re-review A N-1): a page's line endings
+   are normalised first; every script whose content is JSON (JSON-LD, an app's state) and
+   Adzuna's response are redacted in their decoded values and written again when that, or a
+   repeated key (whose earlier, shadowed value then goes), changes them, with every `</`
+   escaped, so a detail right after an escape (`\n`, `\t`, `>`) is found and the JSON
+   stays valid; IDs and URLs (`identifier`, `url`, `sameAs`, Adzuna's `id` and
+   `redirect_url`) are never redacted; a script that is not JSON, and the HTML around the
+   scripts, are redacted as text. The body is never kept, whatever its class (only its hash
+   and the claims' excerpts), when a script holding such a detail cannot be found in the
+   page's text to be rewritten (`body_not_kept: contact_unlocated`) or is not JSON, so its
+   escapes could hide one (`block_unredactable`, looked for with the escapes decoded); the
+   reason is its own typed column (migration 0020), the rights status the rights statement
+   only (review B N5). Claims and excerpts come from decoded, redacted values, also for a
+   block cited by pointer. `content_sha256` is the hash of what was
    kept; `retrieved_sha256` (migration 0015) is the hash of the bytes as retrieved, for
    change detection only. Kept bodies are UTF-8 with LF line endings.
    **Known limits, for the product owner:** a personal name in running text (for example
@@ -186,7 +193,9 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    (`store.merge_jobs`; migration 0017 lets the worker do it). Recording is serialised per
    workspace (`pg_advisory_xact_lock`, `store.lock_workspace_records`, from reading the
    candidates to the merge; fix round 2, review B N2), so a merge never deletes a job
-   another run is recording onto. The count no longer depends
+   another run is recording onto. Restrictive policies (migration 0020, review B N6) keep
+   the merge's grants to merging: the worker never deletes an exemplar job, never moves a
+   pasted copy, and never moves a copy onto an exemplar. The count no longer depends
    on arrival order (`test_three_copies_of_one_vacancy_are_one_job_in_every_arrival_order`,
    and a property test of the stored rule against the grouping). An advertiser
    whose name holds a staffing word (`jobs.AGENCY_MARKERS`, provisional) is an agency, and
@@ -289,8 +298,10 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
     search returned it, and lists the rest as excluded with the reason. Candidates are never
     claims; the person chooses what to acquire.
     Fix round 1 (review B I4, I5, I6): Meta runs the searches inside the one request, so
-    `request_limit` cannot bound them; after the call the response's own usage is held to
-    the reservation's bounds (`web_search_requests` at most `max_tool_calls`, input tokens
+    `request_limit` cannot bound them; the activity holds the call's measured usage to the
+    reservation's bounds on every path, a reply that also failed or was cut off included
+    (`RunTask.exceeded_bound`; fix round 2, review B N4) (`web_search_requests` at most
+    `max_tool_calls`, input tokens
     at most the reserved input), and an overrun fails the run `bound_exceeded` with the
     bound named in the attempt's outcome (`bound_exceeded:web_searches`), booked at its
     actual cost, its output never used. Whether Meta keeps to `max_tool_calls` is qualified

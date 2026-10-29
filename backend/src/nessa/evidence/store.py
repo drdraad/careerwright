@@ -21,6 +21,7 @@ from nessa.evidence.records import (
     UNREADABLE,
     AttemptReason,
     AttemptStatus,
+    BodyNotKept,
     Claim,
     Extraction,
     InputRoute,
@@ -32,7 +33,8 @@ _ATTEMPT_COLUMNS = (
     "attempt_id, run_id, position, retry_of, route, provider, requested_url, final_url, "
     "redirects, status, reason, transient, http_status, content_type, address, "
     "content_sha256, byte_count, rights_class, rights_status, retention, http_requests, "
-    "cost_nano_usd, created_by, started_at, finished_at, extraction, total_matching"
+    "cost_nano_usd, created_by, started_at, finished_at, extraction, total_matching, "
+    "body_not_kept"
 )
 
 
@@ -77,6 +79,7 @@ class AttemptRow:
     finished_at: datetime | None
     extraction: Extraction | None  # why a retrieved source gave no publishable posting
     total_matching: int | None  # Adzuna's count of matching adverts
+    body_not_kept: BodyNotKept | None  # why a body its class may keep was not kept
 
     @property
     def unreadable(self) -> bool:
@@ -121,6 +124,9 @@ def _attempt(row: sa.RowMapping) -> AttemptRow:
     values["route"] = InputRoute(values["route"])
     values["status"] = AttemptStatus(values["status"])
     values["extraction"] = Extraction(values["extraction"]) if values["extraction"] else None
+    values["body_not_kept"] = (
+        BodyNotKept(values["body_not_kept"]) if values["body_not_kept"] else None
+    )
     values["reason"] = AttemptReason(values["reason"]) if values["reason"] else None
     return AttemptRow(**values)
 
@@ -307,6 +313,7 @@ def finish_attempt(
             "jsonb), status = :status, reason = :reason, transient = :transient, http_status = "
             ":http, content_type = :ctype, address = :address, content_sha256 = :sha, "
             "retrieved_sha256 = :retrieved, extraction = :extraction, total_matching = :total, "
+            "body_not_kept = :not_kept, "
             "byte_count = :bytes, rights_class = :class, rights_status = :rights, retention = "
             ":retention, http_requests = :requests, cost_nano_usd = 0, "
             "finished_at = clock_timestamp() WHERE attempt_id = :id"
@@ -325,6 +332,7 @@ def finish_attempt(
             "retrieved": result.retrieved_sha256,
             "extraction": result.extraction.value if result.extraction else None,
             "total": result.total,
+            "not_kept": result.body_not_kept.value if result.body_not_kept else None,
             "bytes": result.byte_count,
             "class": result.rights_class.value if result.rights_class else None,
             "rights": result.rights_status,

@@ -62,6 +62,7 @@ class FakeFailure(StrEnum):
     CUT_MID_STREAM = "cut_mid_stream"  # the stream breaks after part of the reply
     PAUSE_AFTER_REPLY = "pause_after_reply"  # the reply streams, then a pause, then the rest
     SEARCH_OVERRUN = "search_overrun"  # a search reply reporting more searches than allowed
+    SEARCH_OVERRUN_INVALID = "search_overrun_invalid"  # the same, its answer also unusable
 
 
 def key_fingerprint(api_key: SecretStr | None) -> str:
@@ -349,6 +350,16 @@ def fake_model_builder(
             found = _discovery_context(messages)
             explaining = _explanation_context(messages)
             searching = _search_request(messages)
+            if searching is not None and failure is FakeFailure.SEARCH_OVERRUN_INVALID:
+                return ModelResponse(
+                    parts=[TextPart('{"candidates": "not a list"}')],
+                    model_name=FAKE_MODEL_NAME,
+                    usage=RequestUsage(
+                        input_tokens=20_000,
+                        output_tokens=300,
+                        details={"web_search_requests": 3},
+                    ),
+                )
             if searching is not None and failure is FakeFailure.SEARCH_OVERRUN:
                 return ModelResponse(
                     parts=search_parts(searching, output_sentinel),

@@ -11,6 +11,7 @@ from nessa.evidence.addresses import CheckedUrl, UrlRefusal, address_refusal, ch
 # Full stops IDNA folds to "." (re-review A M-3), written as code points so none is mistaken
 # for an ASCII dot.
 IDEOGRAPHIC, FULLWIDTH, HALFWIDTH = chr(0x3002), chr(0xFF0E), chr(0xFF61)
+LEADER, SMALL_STOP = chr(0x2024), chr(0xFE52)  # their NFKC forms hold "."
 
 
 @pytest.mark.req("ACQ-01")
@@ -101,6 +102,10 @@ def test_private_loopback_link_local_and_metadata_literals_are_refused(raw: str)
         (f"http://93{FULLWIDTH}184{FULLWIDTH}215{FULLWIDTH}14/", UrlRefusal.HOST_NOT_ALLOWED),
         (f"http://127{IDEOGRAPHIC}0{IDEOGRAPHIC}0{IDEOGRAPHIC}1/", UrlRefusal.HOST_NOT_ALLOWED),
         (f"http://jobs{HALFWIDTH}example{HALFWIDTH}org/", UrlRefusal.HOST_NOT_ALLOWED),  # a name
+        # Folded to "." by nameprep (re-review A N-2): one dot leader, small full stop.
+        (f"http://93{LEADER}184{LEADER}215{LEADER}14/", UrlRefusal.HOST_NOT_ALLOWED),
+        (f"http://127{SMALL_STOP}0{SMALL_STOP}0{SMALL_STOP}1/", UrlRefusal.HOST_NOT_ALLOWED),
+        (f"http://jobs{SMALL_STOP}example.org/", UrlRefusal.HOST_NOT_ALLOWED),
         ("http://[2606:4700::1111%25eth0]/", UrlRefusal.HOST_NOT_ALLOWED),  # a zone ID
         ("http://[fe80::1%25eth0]/", UrlRefusal.HOST_NOT_ALLOWED),
         # A trailing dot is the same name: it is removed, and the address then checked.

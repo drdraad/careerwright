@@ -375,6 +375,16 @@ export const BasisSchema = {
     description: 'How an answer relates to what the person said (spec section 3: factual confirmations\nand inferences are styled differently).'
 } as const;
 
+export const BodyNotKeptSchema = {
+    type: 'string',
+    enum: [
+        'contact_unlocated',
+        'block_unredactable'
+    ],
+    title: 'BodyNotKept',
+    description: 'Why a body its rights class may keep was not kept: personal details in it could not\nbe removed (`pages.redact_page`), so only its hash and excerpts are.'
+} as const;
+
 export const ChooseTargetSchema = {
     properties: {
         expected_version: {
@@ -4683,6 +4693,17 @@ export const SourceAttemptOutSchema = {
                 }
             ]
         },
+        body_not_kept: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/BodyNotKept'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Why a body its class may keep was not kept: personal details in it could not be removed.'
+        },
         http_requests: {
             type: 'integer',
             title: 'Http Requests',
@@ -4756,6 +4777,7 @@ export const SourceAttemptOutSchema = {
         'rights_class',
         'rights_status',
         'retention',
+        'body_not_kept',
         'http_requests',
         'total_matching',
         'adverts_retrieved',

@@ -64,7 +64,7 @@ from nessa.evidence import search
 from nessa.evidence.search_agent import run_search
 from nessa.identity import connection_check
 from nessa.identity.activity import STORE_RETRY_BUDGET_S, PartialWriter, measured_usage
-from nessa.identity.failures import classify_failure
+from nessa.identity.failures import BoundExceededError, classify_failure
 from nessa.identity.meta import REQUEST_TIMEOUT_S, meta_model
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.model_registry import ModelMode, estimate_cost_nano_usd, format_usd
@@ -841,6 +841,10 @@ def qualify_search_bound(
             except Exception as error:  # the label only, never the message
                 outcome = classify_failure(error).label
         usage, reasoning, response_id = measured_usage(messages)
+        # The activity's own check, on every path (`SOURCE_SEARCH_TASK.exceeded_bound`).
+        bound = search.exceeded_bound(usage, BOUND_TOOL_CALLS) if usage else None
+        if bound is not None:
+            outcome = classify_failure(BoundExceededError(bound)).label
         requests = max(1, sum(isinstance(m, ModelRequest) for m in messages))
         notes: dict[str, object] = {"max_tool_calls": BOUND_TOOL_CALLS}
         if proposal is not None:

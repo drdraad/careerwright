@@ -97,15 +97,30 @@ def _contact(value: Any) -> Any:
     }
 
 
+def loads_json(raw: str) -> tuple[Any, bool]:
+    """The decoded JSON (the last of a repeated key, as `json.loads` keeps it) and whether
+    any object repeated a key. Raises ValueError when it is not JSON."""
+    repeated = False
+
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        nonlocal repeated
+        repeated = repeated or len({key for key, _ in items}) != len(items)
+        return dict(items)
+
+    return json.loads(raw, object_pairs_hook=pairs), repeated
+
+
 def redact_json(raw: str) -> str | None:
     """JSON text with personal details removed from its decoded values, or None when it is
-    not JSON. Unchanged JSON is returned exactly as it was; changed JSON is written again
-    with every `</` escaped, so no value can close the script element holding it."""
+    not JSON. JSON that redaction leaves unchanged, with no repeated key, is returned exactly
+    as it was; any other is written again (a repeated key's earlier, shadowed value goes:
+    re-review A N-1), with every `</` escaped, so no value can close the element holding
+    it."""
     try:
-        data = json.loads(raw)
+        data, repeated = loads_json(raw)
     except ValueError:
         return None
     cleaned = redact_value(data)
-    if cleaned == data:
+    if cleaned == data and not repeated:
         return raw
     return json.dumps(cleaned, ensure_ascii=False, indent=2).replace("</", "<\\/")
