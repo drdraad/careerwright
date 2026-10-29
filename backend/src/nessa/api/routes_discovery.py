@@ -23,6 +23,7 @@ from nessa.api.envelope import ERROR_RESPONSES
 from nessa.api.pagination import DEFAULT_LIMIT, MAX_LIMIT, decode_timestamped, encode
 from nessa.api.routes_runs import run_out
 from nessa.api.schemas import ProfileOut
+from nessa.catalogue.ai_resilience import ResilienceFilter
 from nessa.db import Tx, actor_transaction
 from nessa.identity.keyring import Keyring
 from nessa.identity.receipts import CommandResult, fingerprint, run_idempotent
@@ -35,6 +36,7 @@ from nessa.profile.exploration import (
     choose_target,
     discoveries,
     discovery_slate,
+    hard_filters,
     submit_discovery,
     submit_explanation,
     visible_discovery,
@@ -150,17 +152,24 @@ def get_slate(
     emphasis: Emphasis = Emphasis.BALANCED,
     exclude_concept: Annotated[list[uuid.UUID], Query(max_length=POOL_LIMIT)] = [],  # noqa: B006
     exclude_family: Annotated[list[FamilyCode], Query(max_length=POOL_LIMIT)] = [],  # noqa: B006
+    min_ai_resilience: Annotated[int | None, Query(ge=0, le=10)] = None,
+    include_unscored: bool = True,
 ) -> SlateOut:
     """Recomputed on each read from the stored searches and the held taxonomy (a note says
     so if the searches were chosen for another release). The controls are view parameters
-    only: they change nothing stored and are never limits."""
+    only: they change nothing stored and are never limits. Your confirmed salary floor is
+    applied as a hard filter, with counts; the AI Resilience filter (`min_ai_resilience`,
+    Any when absent, on the lower end of a reviewed range; unscored occupations included
+    unless `include_unscored` is false) is a view parameter too, also counted."""
     controls = SlateControls(
         emphasis=emphasis,
         exclude_concepts=frozenset(exclude_concept),
         exclude_families=frozenset(exclude_family),
     )
+    chosen = ResilienceFilter(minimum=min_ai_resilience, include_unscored=include_unscored)
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
-        view = discovery_slate(tx, deps.keyring, workspace_id, discovery_id, controls)
+        hard = hard_filters(tx, workspace_id, deps.mapping_reviews, deps.assessment_packs, chosen)
+        view = discovery_slate(tx, deps.keyring, workspace_id, discovery_id, controls, hard)
         return SlateOut.of(view, emphasis)
 
 
@@ -203,6 +212,7 @@ def explain(
             runtime_mode=deps.settings.runtime_mode,
             defaults=deps.spend_defaults,
             now=deps.clock(),
+            hard=hard_filters(tx, workspace_id, deps.mapping_reviews, deps.assessment_packs),
         )
         answer = ExplanationRunOut(
             explanation_id=view.request.explanation_id,

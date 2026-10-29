@@ -332,6 +332,11 @@ export const EMPTY_REASON: Record<EmptyReason, { title: string; detail: string }
     title: "No matching listings found in the sources checked",
     detail: "Only these sources were checked. Others may list vacancies.",
   },
+  all_below_salary_floor: {
+    title: "Every vacancy found advertises less than your minimum salary",
+    detail:
+      "Vacancies with unknown, predicted or differently stated pay are always kept. Change your minimum salary to see the others.",
+  },
 };
 
 /** How a page went that Nessa's model read for a job advert (fix round 3, review C M5).
@@ -407,6 +412,9 @@ export const NOT_INCLUDED: Record<NotIncluded, string> = {
   duplicate: "Nearly the same as another occupation",
   excluded_occupation: "You said it's not for you",
   excluded_family: "You excluded this kind of work",
+  below_salary_floor: "Its official pay is below your minimum salary",
+  below_ai_resilience_minimum: "Its AI Resilience range starts below the minimum you chose",
+  ai_resilience_unscored_excluded: "It has no AI Resilience range, and you chose to hide those",
   below_relevance_floor: "Matched your answers too weakly to suggest",
   family_limit: "Its kind of work is already shown",
   less_relevant: "Matched less closely than the ones shown",
@@ -469,6 +477,7 @@ const ERROR_TONE: Record<ErrorCode, Tone> = {
   AUTH_UNAVAILABLE: "error",
   INTERNAL_ERROR: "error",
   TAXONOMY_UNAVAILABLE: "error",
+  REFERENCE_DATA_UNAVAILABLE: "error",
   CONFIRMATION_REQUIRED: "neutral",
   PROPOSAL_NOT_AVAILABLE: "neutral",
   ALREADY_DECIDED: "neutral",
@@ -584,6 +593,10 @@ const ERROR_WORDS: Record<ErrorCode, Omit<ErrorStatement, "tone">> = {
   },
   TAXONOMY_UNAVAILABLE: {
     title: "The occupation list isn't loaded",
+    action: "Run the setup step again, then restart Nessa. Your work is kept.",
+  },
+  REFERENCE_DATA_UNAVAILABLE: {
+    title: "Pay and AI evidence aren't loaded",
     action: "Run the setup step again, then restart Nessa. Your work is kept.",
   },
   CONFIRMATION_REQUIRED: {

@@ -1,8 +1,9 @@
 """Setup-only commands. They connect with the migration-owner roles, which runtime never uses.
 
 - `setup-database`: migrate the application database, migrate DBOS's system database and
-  grant its runtime role, seed, then import the pinned ESCO release from the datasets
-  directory if it is not imported yet (idempotent; `make dev` and `make demo` run it).
+  grant its runtime role, seed, then import the pinned ESCO release and the pinned reference
+  datasets (ASHE, the SOC 2020 coding index, the AI evidence; ADR 0010) from the datasets
+  directory where not imported yet (idempotent; `make dev` and `make demo` run it).
 - `migrate [--revision R]`: application database only (tests use it to stop part-way).
 - `seed`: invited identities and the fixture workspace, created only if missing.
 - `reset-demo`: recreate the named fixture workspace; no other workspace is touched.
@@ -14,7 +15,7 @@
 import argparse
 import logging
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 import sqlalchemy as sa
@@ -22,8 +23,11 @@ from alembic import command
 from alembic.config import Config
 from dbos import DBOS
 
-from nessa.catalogue import taxonomy_store
-from nessa.catalogue.esco import ESCO_RELEASE, ReleasePin, parse_release, read_verified
+from nessa.catalogue import reference_store, taxonomy_store
+from nessa.catalogue.esco import ESCO_RELEASE, parse_release
+from nessa.catalogue.reference import DATASETS, Dataset, import_dataset
+from nessa.catalogue.reference import is_held as is_reference_held
+from nessa.catalogue.releases import ReleasePin, read_verified
 from nessa.catalogue.taxonomy import import_release, is_held
 from nessa.config import OpsSettings
 from nessa.db import Tx, create_engine, url_with_password
@@ -206,6 +210,25 @@ def import_taxonomy(engine: sa.Engine, path: Path, pin: ReleasePin = ESCO_RELEAS
         return import_release(tx, catalogue)
 
 
+def import_reference_data(
+    engine: sa.Engine, files: Iterable[tuple[Dataset, Path]]
+) -> dict[str, str]:
+    """Import each pinned reference dataset at its path unless it is held already, each in
+    its own transaction, in `reference.DATASETS` order. Each file is verified against its
+    pin before it is parsed; another release is refused."""
+    outcomes: dict[str, str] = {}
+    for dataset, path in files:
+        with engine.begin() as tx:
+            held = reference_store.held(tx, dataset.name)
+        if held is not None and is_reference_held(held, dataset):
+            outcomes[dataset.name] = "already imported"
+            continue
+        data = read_verified(path, dataset.pin)
+        with engine.begin() as tx:
+            outcomes[dataset.name] = import_dataset(tx, dataset, data)
+    return outcomes
+
+
 def reset_demo(engine: sa.Engine, settings: OpsSettings) -> None:
     with engine.begin() as tx:
         existing = identity_store.fixture_workspace(tx, FIXTURE_KEY)
@@ -241,6 +264,11 @@ def main(argv: list[str] | None = None) -> None:
                 _log.info(
                     "taxonomy", extra={"dataset": ESCO_RELEASE.dataset_id, "outcome": outcome}
                 )
+                directory = settings.datasets_dir
+                imported = import_reference_data(
+                    engine, ((d, directory / d.pin.file_name) for d in DATASETS)
+                )
+                _log.info("reference data", extra=imported)
             case "migrate":
                 migrate_app(engine, args.revision)
             case "seed":

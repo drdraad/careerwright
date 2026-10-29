@@ -308,6 +308,29 @@ def test_excluding_a_title_keeps_its_family_and_every_filter_is_counted() -> Non
     assert by_family.excluded == {"occupations": 0, "families": 3}
 
 
+@pytest.mark.req("DIV1-07", "AIR1-05")
+def test_a_hard_filter_leaves_out_only_what_it_names_and_says_why_for_each() -> None:
+    # The salary floor and the AI Resilience filter decide what is below them (deterministic
+    # code over the evidence); the slate only leaves those out, each with its own reason,
+    # and fills from the rest: nothing else is removed (Task 7 slice B).
+    pool = build_pool(p02_like_pool(), OCCUPATIONS, FAMILIAR)
+    unfiltered = choose_slate(pool)
+    left_out = {
+        concept("Bicycle mechanic"): NotIncluded.BELOW_SALARY_FLOOR,
+        concept("Tree surgeon"): NotIncluded.BELOW_AI_RESILIENCE_MINIMUM,
+    }
+
+    chosen = choose_slate(pool, left_out=left_out)
+
+    shown = {s.occupation.title for s in chosen.suggestions}
+    assert not {"Bicycle mechanic", "Tree surgeon"} & shown
+    assert len(chosen.suggestions) == len(unfiltered.suggestions)  # filled from the rest
+    reasons = {left.candidate.occupation.title: left.reason for left in chosen.not_included}
+    assert reasons["Bicycle mechanic"] is NotIncluded.BELOW_SALARY_FLOOR
+    assert reasons["Tree surgeon"] is NotIncluded.BELOW_AI_RESILIENCE_MINIMUM
+    assert chosen.excluded == {"occupations": 0, "families": 0}  # the person's exclusions
+
+
 @pytest.mark.req("REC1-08", "DIV1-12")
 def test_less_familiar_and_more_practical_shift_the_slate_relative_to_the_person() -> None:
     unfamiliar = slate(controls=SlateControls(emphasis=Emphasis.UNFAMILIAR))

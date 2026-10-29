@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from nessa.api.app import create_app
 from nessa.api.deps import ApiDependencies
-from nessa.cli import import_taxonomy, migrate_app, migrate_dbos, seed
+from nessa.cli import import_reference_data, import_taxonomy, migrate_app, migrate_dbos, seed
 from nessa.db import create_engine
 from nessa.identity.firebase import FirebaseTokenVerifier
 from nessa.identity.keyring import load_keyring
@@ -17,6 +17,7 @@ from nessa.identity.model_choice import ModelChoice
 from tests.support.client import ApiClient
 from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
 from tests.support.infra import API_BASE, Infra, sign_in_seeded, start_infra
+from tests.support.reference_data import sample_files
 
 pytestmark = pytest.mark.integration
 
@@ -35,6 +36,11 @@ def infra(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Infra]:
             # The committed, labelled sample: the full release is imported in its own
             # database by `test_taxonomy.py::test_the_full_pinned_release_imports_...`.
             import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE)
+            # Synthetic reference samples (ADR 0010); the pinned files are imported in their
+            # own database by `test_reference_data.py`.
+            import_reference_data(
+                engine, sample_files(Path(tmp_path_factory.mktemp("reference-samples")))
+            )
         finally:
             engine.dispose()
         # firebase-admin reads this variable at call time (validated by ApiSettings).

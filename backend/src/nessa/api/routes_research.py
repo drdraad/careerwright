@@ -24,6 +24,7 @@ from nessa.api.research_schemas import (
     SourceClaimOut,
     SubmittedAcquisitionOut,
     TargetOut,
+    VacancySalaryFloorOut,
 )
 from nessa.api.routes_runs import run_out
 from nessa.db import Tx, actor_transaction
@@ -217,6 +218,9 @@ def list_jobs(
         if listing.more and last
         else None,
         total_jobs=listing.total_jobs,
+        salary_floor=VacancySalaryFloorOut.of(listing.salary_floor)
+        if listing.salary_floor
+        else None,
         exemplars=listing.exemplars,
         city_counts=listing.city_counts,
         coverage=listing.coverage,

@@ -22,7 +22,8 @@ import io
 import zipfile
 from pathlib import Path
 
-from nessa.catalogue.esco import ESCO_RELEASE, read_verified
+from nessa.catalogue.esco import ESCO_RELEASE
+from nessa.catalogue.releases import read_verified
 from tools.datasets import DATASETS_DIR
 from tools.localenv import REPO_ROOT
 

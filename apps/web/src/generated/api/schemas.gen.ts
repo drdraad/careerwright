@@ -203,6 +203,260 @@ export const AdzunaQuerySchema = {
     description: 'One bounded search: a role and a place, one page of at most 50 results.'
 } as const;
 
+export const AiEvidenceOutSchema = {
+    properties: {
+        state: {
+            $ref: '#/components/schemas/AiEvidenceState'
+        },
+        ilo: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/IloExposureOut'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Null: the index does not score the group.'
+        },
+        observed_use: {
+            items: {
+                $ref: '#/components/schemas/OnetMatchOut'
+            },
+            type: 'array',
+            title: 'Observed Use',
+            description: 'Per O*NET-SOC 2019 match from the ESCO to O*NET crosswalk, never averaged.'
+        },
+        observed_use_measure: {
+            type: 'string',
+            title: 'Observed Use Measure',
+            default: 'Each task\'s share of the Claude conversations the Anthropic Economic Index mapped to tasks: observed use, not replacement. A task the release did not observe is not observed, never zero, and never protection.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'state',
+        'ilo',
+        'observed_use'
+    ],
+    title: 'AiEvidenceOut'
+} as const;
+
+export const AiEvidenceStateSchema = {
+    type: 'string',
+    enum: [
+        'exposure_only',
+        'no_evidence'
+    ],
+    title: 'AiEvidenceState'
+} as const;
+
+export const AiResilienceFilterOutSchema = {
+    properties: {
+        basis: {
+            type: 'string',
+            const: 'lower_bound',
+            title: 'Basis',
+            default: 'lower_bound'
+        },
+        minimum: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Minimum',
+            description: 'Null: Any.'
+        },
+        include_unscored: {
+            type: 'boolean',
+            title: 'Include Unscored'
+        },
+        scored: {
+            type: 'integer',
+            title: 'Scored'
+        },
+        below_minimum: {
+            type: 'integer',
+            title: 'Below Minimum'
+        },
+        unscored: {
+            type: 'integer',
+            title: 'Unscored'
+        },
+        unscored_excluded: {
+            type: 'integer',
+            title: 'Unscored Excluded'
+        },
+        pack_version: {
+            type: 'string',
+            title: 'Pack Version'
+        },
+        pack_dated: {
+            type: 'string',
+            format: 'date',
+            title: 'Pack Dated'
+        },
+        summary: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Summary',
+            description: 'In words, when the filter is not at its default.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'minimum',
+        'include_unscored',
+        'scored',
+        'below_minimum',
+        'unscored',
+        'unscored_excluded',
+        'pack_version',
+        'pack_dated',
+        'summary'
+    ],
+    title: 'AiResilienceFilterOut',
+    description: 'The AI Resilience filter\'s basis and counts (AIR1-05): the minimum applies to the\nlower end of a reviewed range; unscored occupations are included unless you switch\nthem off, and are never read as 0 or 10.'
+} as const;
+
+export const AiResilienceOutSchema = {
+    properties: {
+        label: {
+            type: 'string',
+            title: 'Label',
+            default: 'AI Resilience Score'
+        },
+        meaning: {
+            type: 'string',
+            title: 'Meaning',
+            default: 'Pressure on demand for human work in this role over five years, including reduced staffing and entry-level hiring: 0 to 10, higher is more resilient. It is not a probability that anyone will lose a job; 0 is not certain elimination and 10 is not a guarantee. Experimental: a range under a reviewed rubric, never a precise score.'
+        },
+        experimental: {
+            type: 'boolean',
+            const: true,
+            title: 'Experimental',
+            default: true
+        },
+        horizon_years: {
+            type: 'integer',
+            title: 'Horizon Years',
+            default: 5
+        },
+        geography: {
+            type: 'string',
+            const: 'inherited',
+            title: 'Geography',
+            default: 'inherited'
+        },
+        state: {
+            $ref: '#/components/schemas/AssessmentState'
+        },
+        unscored_reason: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/UnscoredReason'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        lower: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Lower'
+        },
+        upper: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Upper'
+        },
+        bands: {
+            items: {
+                $ref: '#/components/schemas/Band'
+            },
+            type: 'array',
+            title: 'Bands'
+        },
+        band_words: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Band Words'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic',
+            description: 'A synthetic fixture: never a real assessment.'
+        },
+        synthetic_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Synthetic Label'
+        },
+        pack_version: {
+            type: 'string',
+            title: 'Pack Version'
+        },
+        pack_dated: {
+            type: 'string',
+            format: 'date',
+            title: 'Pack Dated'
+        },
+        method_version: {
+            type: 'string',
+            title: 'Method Version',
+            default: 'nessa-air-rubric-m0-1'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'state',
+        'unscored_reason',
+        'lower',
+        'upper',
+        'bands',
+        'band_words',
+        'synthetic',
+        'synthetic_label',
+        'pack_version',
+        'pack_dated'
+    ],
+    title: 'AiResilienceOut'
+} as const;
+
 export const AnsweredStateSchema = {
     type: 'string',
     enum: [
@@ -213,6 +467,27 @@ export const AnsweredStateSchema = {
     ],
     title: 'AnsweredState',
     description: 'A proposal answers a field; it never returns one to "not asked".'
+} as const;
+
+export const AshePeriodSchema = {
+    type: 'string',
+    enum: [
+        'year',
+        'week',
+        'hour'
+    ],
+    title: 'AshePeriod',
+    description: 'The period a table gives pay per. A month has no ASHE table, and no figure is ever\nconverted between periods (annualising needs hours; spec section 5).'
+} as const;
+
+export const AssessmentStateSchema = {
+    type: 'string',
+    enum: [
+        'published_range',
+        'published_null',
+        'unscored'
+    ],
+    title: 'AssessmentState'
 } as const;
 
 export const AttemptOutSchema = {
@@ -369,6 +644,19 @@ export const AttemptStatusSchema = {
         'failed'
     ],
     title: 'AttemptStatus'
+} as const;
+
+export const BandSchema = {
+    type: 'string',
+    enum: [
+        '0-2',
+        '3-4',
+        '5-6',
+        '7-8',
+        '9-10'
+    ],
+    title: 'Band',
+    description: 'The rubric\'s ordinal bands (spec section 5). Never averaged, subtracted or read as\nprobabilities (AIR1-12).'
 } as const;
 
 export const BasisSchema = {
@@ -972,7 +1260,8 @@ export const EmptyReasonSchema = {
         'no_source_retrieved',
         'no_posting_readable',
         'no_posting_found_by_model',
-        'none_found_in_sources_checked'
+        'none_found_in_sources_checked',
+        'all_below_salary_floor'
     ],
     title: 'EmptyReason',
     description: 'Why a listing has no vacancy (STATE-02): never a bare empty list. Only\n`none_found_in_sources_checked` says the sources read held none, and only an API\'s own\nempty answer can give it (fix round 2, review B N1); a page model extraction read and\nfound no advert on gives `no_posting_found_by_model`, never that (ruling 9).'
@@ -1082,7 +1371,8 @@ export const ErrorCodeSchema = {
         'PROPOSAL_NOT_AVAILABLE',
         'ALREADY_DECIDED',
         'SLATE_ALREADY_EXPLAINED',
-        'RUN_FINISHED'
+        'RUN_FINISHED',
+        'REFERENCE_DATA_UNAVAILABLE'
     ],
     title: 'ErrorCode'
 } as const;
@@ -1313,6 +1603,20 @@ export const ExplanationRunOutSchema = {
     description: 'A slate explanation\'s run, as asking for it answers: never what it wrote, since a\ncommand\'s answer is kept as its receipt and model output is kept sealed. The discovery\n(`GET .../discoveries/{id}`) carries the written text.'
 } as const;
 
+export const ExposureGradientSchema = {
+    type: 'string',
+    enum: [
+        'Exposed: Gradient 4',
+        'Exposed: Gradient 3',
+        'Exposed: Gradient 2',
+        'Exposed: Gradient 1',
+        'Minimal Exposure',
+        'Not Exposed'
+    ],
+    title: 'ExposureGradient',
+    description: 'The occupation\'s exposure category in the 2025 index (Table 5 of the paper).'
+} as const;
+
 export const ExtractionSchema = {
     type: 'string',
     enum: [
@@ -1411,6 +1715,41 @@ export const FieldStateSchema = {
         'prefer_not_to_say'
     ],
     title: 'FieldState'
+} as const;
+
+export const FloorReasonOutSchema = {
+    properties: {
+        reason: {
+            $ref: '#/components/schemas/FloorUnknown'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'count'
+    ],
+    title: 'FloorReasonOut'
+} as const;
+
+export const FloorUnknownSchema = {
+    type: 'string',
+    enum: [
+        'no_pay',
+        'predicted',
+        'period_differs',
+        'period_not_stated',
+        'other_currency',
+        'no_reviewed_mapping',
+        'no_work_area',
+        'not_published'
+    ],
+    title: 'FloorUnknown',
+    description: 'Why pay could not be compared with the floor; each is kept, and counted.'
 } as const;
 
 export const FreshnessSchema = {
@@ -1628,6 +1967,50 @@ export const HypothesisOutSchema = {
         'based_on'
     ],
     title: 'HypothesisOut'
+} as const;
+
+export const IloExposureOutSchema = {
+    properties: {
+        isco_code: {
+            type: 'string',
+            title: 'Isco Code'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        tasks: {
+            type: 'integer',
+            title: 'Tasks'
+        },
+        mean_score: {
+            type: 'string',
+            title: 'Mean Score'
+        },
+        sd_score: {
+            type: 'string',
+            title: 'Sd Score'
+        },
+        gradient: {
+            $ref: '#/components/schemas/ExposureGradient'
+        },
+        measure: {
+            type: 'string',
+            title: 'Measure',
+            default: 'Technical potential of generative AI to perform the ISCO-08 group\'s tasks, 0 to 1 (the mean and spread of its task scores): never a prediction of job loss, and the group\'s, not this occupation\'s alone.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'isco_code',
+        'title',
+        'tasks',
+        'mean_score',
+        'sd_score',
+        'gradient'
+    ],
+    title: 'IloExposureOut'
 } as const;
 
 export const InputRouteSchema = {
@@ -1931,7 +2314,18 @@ export const JobPageSchema = {
         total_jobs: {
             type: 'integer',
             title: 'Total Jobs',
-            description: 'Distinct vacancies: a multi-city job counts once; an example never does.'
+            description: 'Distinct vacancies your salary floor kept: a multi-city job counts once; an example never does.'
+        },
+        salary_floor: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/VacancySalaryFloorOut'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'What your confirmed salary floor left out and kept; null with none.'
         },
         exemplars: {
             type: 'integer',
@@ -1997,6 +2391,7 @@ export const JobPageSchema = {
         'items',
         'next_cursor',
         'total_jobs',
+        'salary_floor',
         'exemplars',
         'city_counts',
         'coverage',
@@ -2128,6 +2523,42 @@ export const LocationSchema = {
     title: 'Location'
 } as const;
 
+export const MappingResolutionSchema = {
+    type: 'string',
+    enum: [
+        'no_candidate',
+        'single_candidate',
+        'title_resolved',
+        'ambiguous'
+    ],
+    title: 'MappingResolution'
+} as const;
+
+export const MarkerSchema = {
+    type: 'string',
+    enum: [
+        'x',
+        '..',
+        ':',
+        '-'
+    ],
+    title: 'Marker',
+    description: 'ONS\'s markers for a value it does not publish (Table 15\'s key).'
+} as const;
+
+export const MatchTypeSchema = {
+    type: 'string',
+    enum: [
+        'exactMatch',
+        'closeMatch',
+        'broadMatch',
+        'narrowMatch',
+        'exactISCO'
+    ],
+    title: 'MatchType',
+    description: 'The crosswalk\'s SKOS match types: how close an O*NET occupation is to its ESCO one.'
+} as const;
+
 export const ModelExtractionOutSchema = {
     properties: {
         state: {
@@ -2247,6 +2678,47 @@ export const ModelSpendOutSchema = {
     description: 'The most one acquisition may spend on the person\'s model key, before it starts\n(MODEL-08; computed in deterministic code), as two maxima, never an expected cost. Each\npage whose structured data gives no posting may be read by an extraction run on the\nworkspace\'s model, at most `model_runs` per acquisition. Without a worker crash, each\nrun makes at most every attempt its retry owner allows (a provider outage is retried),\neach reserving its worst case (`worst_case_nano_usd`). A crash can give a run fresh\nattempts, but never a reservation past the workspace\'s run limit\n(`hard_maximum_nano_usd`).'
 } as const;
 
+export const ModelledPayOutSchema = {
+    properties: {
+        basis: {
+            type: 'string',
+            const: 'modelled',
+            title: 'Basis',
+            description: 'Never advertised or provider-predicted.'
+        },
+        soc_code: {
+            type: 'string',
+            title: 'Soc Code'
+        },
+        benchmarks: {
+            items: {
+                $ref: '#/components/schemas/PayBenchmarkOut'
+            },
+            type: 'array',
+            title: 'Benchmarks'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'basis',
+        'soc_code',
+        'benchmarks'
+    ],
+    title: 'ModelledPayOut'
+} as const;
+
+export const ModelledPayUnavailableSchema = {
+    type: 'string',
+    enum: [
+        'no_reviewed_mapping',
+        'no_work_area',
+        'not_published'
+    ],
+    title: 'ModelledPayUnavailable',
+    description: 'Why an occupation has no modelled pay (it is then unknown, never zero).'
+} as const;
+
 export const MoneySchema = {
     properties: {
         minor_units: {
@@ -2336,6 +2808,9 @@ export const NotIncludedSchema = {
         'duplicate',
         'excluded_occupation',
         'excluded_family',
+        'below_salary_floor',
+        'below_ai_resilience_minimum',
+        'ai_resilience_unscored_excluded',
         'below_relevance_floor',
         'family_limit',
         'less_relevant'
@@ -2397,6 +2872,107 @@ export const NotIncludedOutSchema = {
     ],
     title: 'NotIncludedOut',
     description: 'A pooled occupation the slate does not show, and why.'
+} as const;
+
+export const ObservedTaskOutSchema = {
+    properties: {
+        task: {
+            type: 'string',
+            title: 'Task'
+        },
+        share_pct: {
+            type: 'string',
+            title: 'Share Pct'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'task',
+        'share_pct'
+    ],
+    title: 'ObservedTaskOut'
+} as const;
+
+export const OccupationEvidenceOutSchema = {
+    properties: {
+        concept_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Concept Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        esco_uri: {
+            type: 'string',
+            title: 'Esco Uri'
+        },
+        regions: {
+            items: {
+                $ref: '#/components/schemas/RegionOut'
+            },
+            type: 'array',
+            title: 'Regions',
+            description: 'Your cities\' regions: ASHE is regional.'
+        },
+        uk_soc: {
+            $ref: '#/components/schemas/UkSocMappingOut'
+        },
+        modelled_pay: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ModelledPayOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        modelled_pay_unavailable: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ModelledPayUnavailable'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        trend: {
+            $ref: '#/components/schemas/TrendOut'
+        },
+        ai_evidence: {
+            $ref: '#/components/schemas/AiEvidenceOut'
+        },
+        ai_resilience: {
+            $ref: '#/components/schemas/AiResilienceOut'
+        },
+        releases: {
+            items: {
+                $ref: '#/components/schemas/ReferenceReleaseOut'
+            },
+            type: 'array',
+            title: 'Releases'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concept_id',
+        'title',
+        'esco_uri',
+        'regions',
+        'uk_soc',
+        'modelled_pay',
+        'modelled_pay_unavailable',
+        'trend',
+        'ai_evidence',
+        'ai_resilience',
+        'releases'
+    ],
+    title: 'OccupationEvidenceOut'
 } as const;
 
 export const OccupationHitOutSchema = {
@@ -2624,6 +3200,68 @@ export const OccupationSearchOutSchema = {
     description: 'Exact label matches (all of them, when several occupations share a label), then\nranked full-text matches. `full_text_total` counts every other full-text match, so a\nlimited page is never mistaken for the whole result.'
 } as const;
 
+export const OnetMatchOutSchema = {
+    properties: {
+        onet_code: {
+            type: 'string',
+            title: 'Onet Code'
+        },
+        onet_title: {
+            type: 'string',
+            title: 'Onet Title'
+        },
+        match_type: {
+            $ref: '#/components/schemas/MatchType'
+        },
+        in_release: {
+            type: 'boolean',
+            title: 'In Release',
+            description: 'False: the release lists no task for this code.'
+        },
+        tasks_listed: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tasks Listed'
+        },
+        tasks_observed: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tasks Observed'
+        },
+        top_tasks: {
+            items: {
+                $ref: '#/components/schemas/ObservedTaskOut'
+            },
+            type: 'array',
+            title: 'Top Tasks'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'onet_code',
+        'onet_title',
+        'match_type',
+        'in_release',
+        'tasks_listed',
+        'tasks_observed',
+        'top_tasks'
+    ],
+    title: 'OnetMatchOut'
+} as const;
+
 export const PartialCompletenessSchema = {
     type: 'string',
     enum: [
@@ -2780,6 +3418,96 @@ export const PayBasisSchema = {
     description: 'Advertised (stated by the source), predicted (a provider\'s estimate, such as\nAdzuna\'s `salary_is_predicted`) and unknown stay distinct (spec section 6).'
 } as const;
 
+export const PayBenchmarkOutSchema = {
+    properties: {
+        soc_code: {
+            type: 'string',
+            title: 'Soc Code'
+        },
+        soc_title: {
+            type: 'string',
+            title: 'Soc Title'
+        },
+        region_code: {
+            type: 'string',
+            title: 'Region Code'
+        },
+        region_name: {
+            type: 'string',
+            title: 'Region Name'
+        },
+        geography: {
+            type: 'string',
+            const: 'region',
+            title: 'Geography',
+            description: 'Regional, never a city\'s figure.'
+        },
+        population: {
+            type: 'string',
+            const: 'full_time',
+            title: 'Population'
+        },
+        period: {
+            $ref: '#/components/schemas/AshePeriod'
+        },
+        pay_definition: {
+            type: 'string',
+            title: 'Pay Definition'
+        },
+        jobs_thousands: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Jobs Thousands'
+        },
+        median_cv: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Median Cv',
+            description: 'Coefficient of variation of the median, %.'
+        },
+        reliability: {
+            $ref: '#/components/schemas/Reliability'
+        },
+        statistics: {
+            items: {
+                $ref: '#/components/schemas/PayStatisticOut'
+            },
+            type: 'array',
+            title: 'Statistics'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'soc_code',
+        'soc_title',
+        'region_code',
+        'region_name',
+        'geography',
+        'population',
+        'period',
+        'pay_definition',
+        'jobs_thousands',
+        'median_cv',
+        'reliability',
+        'statistics'
+    ],
+    title: 'PayBenchmarkOut',
+    description: 'An official pay benchmark (ONS ASHE): a unit group\'s pay in a work region.'
+} as const;
+
 export const PayPeriodSchema = {
     type: 'string',
     enum: [
@@ -2789,6 +3517,44 @@ export const PayPeriodSchema = {
         'hour'
     ],
     title: 'PayPeriod'
+} as const;
+
+export const PayStatisticOutSchema = {
+    properties: {
+        statistic: {
+            $ref: '#/components/schemas/Statistic'
+        },
+        amount: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Gross pay; null when ONS withholds it.'
+        },
+        withheld: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Marker'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'ONS\'s marker for a withheld value.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'statistic',
+        'amount',
+        'withheld'
+    ],
+    title: 'PayStatisticOut'
 } as const;
 
 export const PlaceListSchema = {
@@ -3117,7 +3883,7 @@ export const ProfileInputSchema = {
         },
         minimum_salary: {
             $ref: '#/components/schemas/SalaryInput',
-            description: 'The lowest gross pay the person will accept, with its period: a hard limit, set only by their confirmation. Recorded, not yet applied: no suggestion is removed for pay until pay evidence exists, and unknown pay is never below it.'
+            description: 'The lowest gross pay the person will accept, with its period: a hard limit, set only by their confirmation. Applied as a hard filter, with counts: a suggestion or a vacancy is left out only when the highest pay it states in this period is below it; unknown, predicted or other-period pay is never below it.'
         }
     },
     additionalProperties: false,
@@ -3578,6 +4344,112 @@ export const RecordPartSchema = {
     title: 'RecordPart'
 } as const;
 
+export const ReferenceReleaseOutSchema = {
+    properties: {
+        dataset: {
+            type: 'string',
+            title: 'Dataset'
+        },
+        dataset_id: {
+            type: 'string',
+            title: 'Dataset Id'
+        },
+        version: {
+            type: 'string',
+            title: 'Version'
+        },
+        source_url: {
+            type: 'string',
+            title: 'Source Url'
+        },
+        sha256: {
+            type: 'string',
+            title: 'Sha256'
+        },
+        size_bytes: {
+            type: 'integer',
+            title: 'Size Bytes'
+        },
+        native_code_version: {
+            type: 'string',
+            title: 'Native Code Version'
+        },
+        transformation_version: {
+            type: 'string',
+            title: 'Transformation Version'
+        },
+        licence: {
+            type: 'string',
+            title: 'Licence'
+        },
+        attribution: {
+            type: 'string',
+            title: 'Attribution'
+        },
+        sample: {
+            type: 'boolean',
+            title: 'Sample',
+            description: 'A synthetic or reduced test copy: never real evidence.'
+        },
+        record_count: {
+            type: 'integer',
+            title: 'Record Count'
+        },
+        counts: {
+            additionalProperties: {
+                type: 'integer'
+            },
+            type: 'object',
+            title: 'Counts'
+        },
+        imported_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Imported At'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'dataset',
+        'dataset_id',
+        'version',
+        'source_url',
+        'sha256',
+        'size_bytes',
+        'native_code_version',
+        'transformation_version',
+        'licence',
+        'attribution',
+        'sample',
+        'record_count',
+        'counts',
+        'imported_at'
+    ],
+    title: 'ReferenceReleaseOut',
+    description: 'A pinned reference dataset\'s import manifest (TAX1-04): show its attribution wherever\nits figures appear.'
+} as const;
+
+export const RegionOutSchema = {
+    properties: {
+        code: {
+            type: 'string',
+            title: 'Code'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'code',
+        'name'
+    ],
+    title: 'RegionOut'
+} as const;
+
 export const RegisterProvisionalConceptSchema = {
     properties: {
         title: {
@@ -3629,6 +4501,19 @@ export const ReleaseRefOutSchema = {
     ],
     title: 'ReleaseRefOut',
     description: 'The ESCO release the slate searched; show the attribution and adaptation with it.'
+} as const;
+
+export const ReliabilitySchema = {
+    type: 'string',
+    enum: [
+        'precise',
+        'reasonably_precise',
+        'acceptable',
+        'unreliable',
+        'unknown'
+    ],
+    title: 'Reliability',
+    description: 'ONS\'s quality bands for an estimate\'s coefficient of variation (CV).'
 } as const;
 
 export const RenameWorkspaceInSchema = {
@@ -3697,6 +4582,16 @@ export const RevertProfileSchema = {
     ],
     title: 'RevertProfile',
     description: 'Restore an earlier version\'s answers, each with its own source, as a new version.'
+} as const;
+
+export const ReviewStateSchema = {
+    type: 'string',
+    enum: [
+        'unreviewed',
+        'reviewed',
+        'review_not_a_candidate'
+    ],
+    title: 'ReviewState'
 } as const;
 
 export const RightsClassSchema = {
@@ -4176,6 +5071,63 @@ export const SalaryFloorSchema = {
     ],
     title: 'SalaryFloor',
     description: 'The lowest gross pay the person will accept, as they gave it: its period is kept and\nnever converted, because annualising needs working hours (spec section 5).'
+} as const;
+
+export const SalaryFloorOutSchema = {
+    properties: {
+        amount: {
+            $ref: '#/components/schemas/Money'
+        },
+        period: {
+            type: 'string',
+            title: 'Period'
+        },
+        basis: {
+            type: 'string',
+            const: 'gross',
+            title: 'Basis',
+            default: 'gross'
+        },
+        left_out: {
+            type: 'integer',
+            title: 'Left Out',
+            description: 'Suggestions left out because their pay is below it.'
+        },
+        meets: {
+            type: 'integer',
+            title: 'Meets'
+        },
+        kept_pay_unknown: {
+            type: 'integer',
+            title: 'Kept Pay Unknown',
+            description: 'Kept: their pay could not be compared.'
+        },
+        kept_by_reason: {
+            items: {
+                $ref: '#/components/schemas/FloorReasonOut'
+            },
+            type: 'array',
+            title: 'Kept By Reason'
+        },
+        summary: {
+            type: 'string',
+            title: 'Summary',
+            description: 'The counts in words, for display.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'amount',
+        'period',
+        'left_out',
+        'meets',
+        'kept_pay_unknown',
+        'kept_by_reason',
+        'summary'
+    ],
+    title: 'SalaryFloorOut',
+    description: 'Your confirmed salary floor, applied as a hard filter: a suggestion is left out only\nwhen official pay for it (ASHE through a reviewed UK SOC mapping, the 90th percentile in\nevery region of your cities) is below it. Unknown pay is never treated as below it.'
 } as const;
 
 export const SalaryInputSchema = {
@@ -4741,13 +5693,19 @@ export const SlateOutSchema = {
             title: 'Notes',
             description: 'How a control changed the slate, in words.'
         },
-        limits_not_applied: {
-            items: {
-                type: 'string'
-            },
-            type: 'array',
-            title: 'Limits Not Applied',
-            description: 'Limits you set that the slate records but cannot apply yet.'
+        salary_floor: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SalaryFloorOut'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Your confirmed salary floor\'s effect, as a hard filter; null with none.'
+        },
+        ai_resilience_filter: {
+            $ref: '#/components/schemas/AiResilienceFilterOut'
         },
         pool_size: {
             type: 'integer',
@@ -4824,7 +5782,8 @@ export const SlateOutSchema = {
         'suggestions',
         'fewer_reasons',
         'notes',
-        'limits_not_applied',
+        'salary_floor',
+        'ai_resilience_filter',
         'pool_size',
         'beyond_pool_limit',
         'excluded',
@@ -4835,6 +5794,47 @@ export const SlateOutSchema = {
     ],
     title: 'SlateOut',
     description: 'A varied slate of up to six career hypotheses from the discovery\'s searches, computed\ndeterministically each time it is read, with every count that explains it.'
+} as const;
+
+export const SocCandidateOutSchema = {
+    properties: {
+        soc_code: {
+            type: 'string',
+            title: 'Soc Code'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        index_entries: {
+            type: 'integer',
+            title: 'Index Entries',
+            description: 'Index titles of the ISCO group coded to it.'
+        },
+        title_match: {
+            type: 'boolean',
+            title: 'Title Match',
+            description: 'An ESCO label is one of its index titles.'
+        },
+        benchmarks: {
+            items: {
+                $ref: '#/components/schemas/PayBenchmarkOut'
+            },
+            type: 'array',
+            title: 'Benchmarks',
+            description: 'ASHE for this unit group in your cities\' regions: about the unit group, not this occupation, unless the mapping is reviewed.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'soc_code',
+        'title',
+        'index_entries',
+        'title_match',
+        'benchmarks'
+    ],
+    title: 'SocCandidateOut'
 } as const;
 
 export const SourceAttemptOutSchema = {
@@ -5492,6 +6492,25 @@ export const SpendStateSchema = {
         'unknown'
     ],
     title: 'SpendState'
+} as const;
+
+export const StatisticSchema = {
+    type: 'string',
+    enum: [
+        'median',
+        'mean',
+        'p10',
+        'p20',
+        'p25',
+        'p30',
+        'p40',
+        'p60',
+        'p70',
+        'p75',
+        'p80',
+        'p90'
+    ],
+    title: 'Statistic'
 } as const;
 
 export const StepOutSchema = {
@@ -6386,6 +7405,40 @@ export const TextListInputSchema = {
     title: 'TextListInput'
 } as const;
 
+export const TrendOutSchema = {
+    properties: {
+        state: {
+            $ref: '#/components/schemas/TrendState'
+        },
+        reason: {
+            $ref: '#/components/schemas/TrendReason'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'state',
+        'reason'
+    ],
+    title: 'TrendOut'
+} as const;
+
+export const TrendReasonSchema = {
+    type: 'string',
+    enum: [
+        'single_snapshot'
+    ],
+    title: 'TrendReason'
+} as const;
+
+export const TrendStateSchema = {
+    type: 'string',
+    enum: [
+        'unavailable'
+    ],
+    title: 'TrendState'
+} as const;
+
 export const TurnOutSchema = {
     properties: {
         turn_id: {
@@ -6585,6 +7638,100 @@ export const TurnSubmittedOutSchema = {
     description: 'A new turn, with the support panel when its message holds a risk stem.'
 } as const;
 
+export const UkSocMappingOutSchema = {
+    properties: {
+        isco_code: {
+            type: 'string',
+            title: 'Isco Code'
+        },
+        resolution: {
+            $ref: '#/components/schemas/MappingResolution'
+        },
+        review_state: {
+            $ref: '#/components/schemas/ReviewState'
+        },
+        proposed_soc_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Proposed Soc Code',
+            description: 'A single or title match: unreviewed.'
+        },
+        reviewed_soc_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reviewed Soc Code'
+        },
+        reviewer: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reviewer'
+        },
+        reviewed_on: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reviewed On'
+        },
+        candidates: {
+            items: {
+                $ref: '#/components/schemas/SocCandidateOut'
+            },
+            type: 'array',
+            title: 'Candidates'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'isco_code',
+        'resolution',
+        'review_state',
+        'proposed_soc_code',
+        'reviewed_soc_code',
+        'reviewer',
+        'reviewed_on',
+        'candidates'
+    ],
+    title: 'UkSocMappingOut',
+    description: 'ESCO occupation to UK SOC 2020, with every candidate kept (TAX1-02).'
+} as const;
+
+export const UnscoredReasonSchema = {
+    type: 'string',
+    enum: [
+        'no_record',
+        'not_publishable',
+        'withdrawn',
+        'invalidated',
+        'reviewed_null'
+    ],
+    title: 'UnscoredReason'
+} as const;
+
 export const UrlRefusalSchema = {
     type: 'string',
     enum: [
@@ -6598,6 +7745,75 @@ export const UrlRefusalSchema = {
     ],
     title: 'UrlRefusal',
     description: 'Why a URL is not fetched. Each is a policy refusal, recorded as a blocked attempt.'
+} as const;
+
+export const VacancyFloorReasonOutSchema = {
+    properties: {
+        reason: {
+            $ref: '#/components/schemas/FloorUnknown'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'count'
+    ],
+    title: 'VacancyFloorReasonOut'
+} as const;
+
+export const VacancySalaryFloorOutSchema = {
+    properties: {
+        amount: {
+            $ref: '#/components/schemas/Money'
+        },
+        period: {
+            type: 'string',
+            title: 'Period'
+        },
+        basis: {
+            type: 'string',
+            const: 'gross',
+            title: 'Basis',
+            default: 'gross'
+        },
+        left_out: {
+            type: 'integer',
+            title: 'Left Out',
+            description: 'Vacancies left out: their advertised pay is below it.'
+        },
+        meets: {
+            type: 'integer',
+            title: 'Meets'
+        },
+        kept_pay_unknown: {
+            type: 'integer',
+            title: 'Kept Pay Unknown'
+        },
+        kept_by_reason: {
+            items: {
+                $ref: '#/components/schemas/VacancyFloorReasonOut'
+            },
+            type: 'array',
+            title: 'Kept By Reason'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'amount',
+        'period',
+        'left_out',
+        'meets',
+        'kept_pay_unknown',
+        'kept_by_reason'
+    ],
+    title: 'VacancySalaryFloorOut',
+    description: 'Your confirmed salary floor, applied to vacancies as a hard filter: a vacancy is left\nout only when the highest pay it advertises in the floor\'s period, in GBP, is below it\n(advertised pay is read as gross). Predicted, unstated or other-period pay is never\nbelow it: those are kept and counted by reason.'
 } as const;
 
 export const ValidationStateSchema = {

@@ -48,7 +48,12 @@ class Place:
 
     @property
     def region(self) -> str:
-        return _REGIONS[self.region_code]
+        return region_name(self.region_code)
+
+
+def region_name(region_code: str) -> str:
+    """An English ONS region's name (E12 code)."""
+    return _REGIONS[region_code]
 
 
 def _place(label: str, region: str, *aliases: str) -> Place:

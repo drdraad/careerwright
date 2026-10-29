@@ -8,6 +8,7 @@ while the run's requester may act (migration 0013).
 
 import json
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -28,6 +29,7 @@ from nessa.evidence.records import (
     ExtractionOutcome,
     InputRoute,
     JobCopy,
+    Salary,
 )
 from nessa.identity.keyring import SealedValue
 from nessa.vocabulary import WorkState
@@ -1004,21 +1006,42 @@ def jobs(
     favourites_only: bool,
     before: tuple[datetime, uuid.UUID] | None,
     limit: int,
+    left_out: Sequence[uuid.UUID] = (),
 ) -> list[JobRow]:
+    """A page of jobs, newest first, without those a hard filter left out."""
     cursor = "AND (j.first_seen_at, j.job_id) < (:at, :id) " if before else ""
     favourite = "AND f.job_id IS NOT NULL " if favourites_only else ""
     rows = tx.execute(
         sa.text(
             f"SELECT {_JOB_COLUMNS} FROM {_JOBS} WHERE j.workspace_id = :ws {cursor}{favourite}"
+            "AND j.job_id <> ALL(CAST(:left_out AS uuid[])) "
             "ORDER BY j.first_seen_at DESC, j.job_id DESC LIMIT :limit"
         ),
         {
             "ws": workspace_id,
             "limit": limit,
+            "left_out": [str(job) for job in left_out],
             **({"at": before[0], "id": before[1]} if before else {}),
         },
     ).mappings()
     return [JobRow(**dict(r)) for r in rows]
+
+
+def vacancy_pay(tx: Tx, workspace_id: uuid.UUID) -> dict[uuid.UUID, list[Salary | None]]:
+    """Each vacancy's copies' pay (an example is never a vacancy), for the salary floor."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT c.job_id, c.copy -> 'salary' AS salary FROM nessa.job_copies c "
+            "JOIN nessa.jobs j ON j.job_id = c.job_id "
+            "WHERE c.workspace_id = :ws AND NOT j.exemplar ORDER BY c.job_id, c.created_at"
+        ),
+        {"ws": workspace_id},
+    )
+    pay: dict[uuid.UUID, list[Salary | None]] = {}
+    for row in rows:
+        salary = None if row.salary is None else Salary.model_validate(row.salary)
+        pay.setdefault(row.job_id, []).append(salary)
+    return pay
 
 
 def job(tx: Tx, workspace_id: uuid.UUID, job_id: uuid.UUID) -> JobRow | None:
@@ -1047,16 +1070,20 @@ def job_totals(tx: Tx, workspace_id: uuid.UUID) -> tuple[int, int]:
     return int(row.jobs), int(row.exemplars)
 
 
-def city_counts(tx: Tx, workspace_id: uuid.UUID) -> dict[str, int]:
-    """City -> the vacancies seen there; a job in several cities counts in each."""
+def city_counts(
+    tx: Tx, workspace_id: uuid.UUID, left_out: Sequence[uuid.UUID] = ()
+) -> dict[str, int]:
+    """City -> the vacancies seen there, without those a hard filter left out; a job in
+    several cities counts in each."""
     rows = tx.execute(
         sa.text(
             "SELECT coalesce(nullif(l ->> 'locality', ''), l ->> 'label') AS city, "
             "count(DISTINCT c.job_id) AS n FROM nessa.job_copies c JOIN nessa.jobs j "
             "ON j.job_id = c.job_id CROSS JOIN LATERAL jsonb_array_elements(c.copy -> 'locations')"
-            " AS l WHERE c.workspace_id = :ws AND NOT j.exemplar GROUP BY 1"
+            " AS l WHERE c.workspace_id = :ws AND NOT j.exemplar "
+            "AND j.job_id <> ALL(CAST(:left_out AS uuid[])) GROUP BY 1"
         ),
-        {"ws": workspace_id},
+        {"ws": workspace_id, "left_out": [str(job) for job in left_out]},
     )
     return dict(sorted((r.city, int(r.n)) for r in rows))
 

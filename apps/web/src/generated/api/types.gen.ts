@@ -148,6 +148,157 @@ export type AdzunaQuery = {
 };
 
 /**
+ * AiEvidenceOut
+ */
+export type AiEvidenceOut = {
+    state: AiEvidenceState;
+    /**
+     * Null: the index does not score the group.
+     */
+    ilo: IloExposureOut | null;
+    /**
+     * Observed Use
+     *
+     * Per O*NET-SOC 2019 match from the ESCO to O*NET crosswalk, never averaged.
+     */
+    observed_use: Array<OnetMatchOut>;
+    /**
+     * Observed Use Measure
+     */
+    observed_use_measure?: string;
+};
+
+/**
+ * AiEvidenceState
+ */
+export const AiEvidenceState = { EXPOSURE_ONLY: 'exposure_only', NO_EVIDENCE: 'no_evidence' } as const;
+
+/**
+ * AiEvidenceState
+ */
+export type AiEvidenceState = typeof AiEvidenceState[keyof typeof AiEvidenceState];
+
+/**
+ * AiResilienceFilterOut
+ *
+ * The AI Resilience filter's basis and counts (AIR1-05): the minimum applies to the
+ * lower end of a reviewed range; unscored occupations are included unless you switch
+ * them off, and are never read as 0 or 10.
+ */
+export type AiResilienceFilterOut = {
+    /**
+     * Basis
+     */
+    basis?: 'lower_bound';
+    /**
+     * Minimum
+     *
+     * Null: Any.
+     */
+    minimum: number | null;
+    /**
+     * Include Unscored
+     */
+    include_unscored: boolean;
+    /**
+     * Scored
+     */
+    scored: number;
+    /**
+     * Below Minimum
+     */
+    below_minimum: number;
+    /**
+     * Unscored
+     */
+    unscored: number;
+    /**
+     * Unscored Excluded
+     */
+    unscored_excluded: number;
+    /**
+     * Pack Version
+     */
+    pack_version: string;
+    /**
+     * Pack Dated
+     */
+    pack_dated: string;
+    /**
+     * Summary
+     *
+     * In words, when the filter is not at its default.
+     */
+    summary: string | null;
+};
+
+/**
+ * AiResilienceOut
+ */
+export type AiResilienceOut = {
+    /**
+     * Label
+     */
+    label?: string;
+    /**
+     * Meaning
+     */
+    meaning?: string;
+    /**
+     * Experimental
+     */
+    experimental?: true;
+    /**
+     * Horizon Years
+     */
+    horizon_years?: number;
+    /**
+     * Geography
+     */
+    geography?: 'inherited';
+    state: AssessmentState;
+    unscored_reason: UnscoredReason | null;
+    /**
+     * Lower
+     */
+    lower: number | null;
+    /**
+     * Upper
+     */
+    upper: number | null;
+    /**
+     * Bands
+     */
+    bands: Array<Band>;
+    /**
+     * Band Words
+     */
+    band_words: Array<string>;
+    /**
+     * Synthetic
+     *
+     * A synthetic fixture: never a real assessment.
+     */
+    synthetic: boolean;
+    /**
+     * Synthetic Label
+     */
+    synthetic_label: string | null;
+    /**
+     * Pack Version
+     */
+    pack_version: string;
+    /**
+     * Pack Dated
+     */
+    pack_dated: string;
+    /**
+     * Method Version
+     */
+    method_version?: string;
+};
+
+/**
  * AnsweredState
  *
  * A proposal answers a field; it never returns one to "not asked".
@@ -165,6 +316,40 @@ export const AnsweredState = {
  * A proposal answers a field; it never returns one to "not asked".
  */
 export type AnsweredState = typeof AnsweredState[keyof typeof AnsweredState];
+
+/**
+ * AshePeriod
+ *
+ * The period a table gives pay per. A month has no ASHE table, and no figure is ever
+ * converted between periods (annualising needs hours; spec section 5).
+ */
+export const AshePeriod = {
+    YEAR: 'year',
+    WEEK: 'week',
+    HOUR: 'hour'
+} as const;
+
+/**
+ * AshePeriod
+ *
+ * The period a table gives pay per. A month has no ASHE table, and no figure is ever
+ * converted between periods (annualising needs hours; spec section 5).
+ */
+export type AshePeriod = typeof AshePeriod[keyof typeof AshePeriod];
+
+/**
+ * AssessmentState
+ */
+export const AssessmentState = {
+    PUBLISHED_RANGE: 'published_range',
+    PUBLISHED_NULL: 'published_null',
+    UNSCORED: 'unscored'
+} as const;
+
+/**
+ * AssessmentState
+ */
+export type AssessmentState = typeof AssessmentState[keyof typeof AssessmentState];
 
 /**
  * AttemptOut
@@ -276,6 +461,28 @@ export const AttemptStatus = {
  * AttemptStatus
  */
 export type AttemptStatus = typeof AttemptStatus[keyof typeof AttemptStatus];
+
+/**
+ * Band
+ *
+ * The rubric's ordinal bands (spec section 5). Never averaged, subtracted or read as
+ * probabilities (AIR1-12).
+ */
+export const Band = {
+    '0_2': '0-2',
+    '3_4': '3-4',
+    '5_6': '5-6',
+    '7_8': '7-8',
+    '9_10': '9-10'
+} as const;
+
+/**
+ * Band
+ *
+ * The rubric's ordinal bands (spec section 5). Never averaged, subtracted or read as
+ * probabilities (AIR1-12).
+ */
+export type Band = typeof Band[keyof typeof Band];
 
 /**
  * Basis
@@ -731,7 +938,8 @@ export const EmptyReason = {
     NO_SOURCE_RETRIEVED: 'no_source_retrieved',
     NO_POSTING_READABLE: 'no_posting_readable',
     NO_POSTING_FOUND_BY_MODEL: 'no_posting_found_by_model',
-    NONE_FOUND_IN_SOURCES_CHECKED: 'none_found_in_sources_checked'
+    NONE_FOUND_IN_SOURCES_CHECKED: 'none_found_in_sources_checked',
+    ALL_BELOW_SALARY_FLOOR: 'all_below_salary_floor'
 } as const;
 
 /**
@@ -825,7 +1033,8 @@ export const ErrorCode = {
     PROPOSAL_NOT_AVAILABLE: 'PROPOSAL_NOT_AVAILABLE',
     ALREADY_DECIDED: 'ALREADY_DECIDED',
     SLATE_ALREADY_EXPLAINED: 'SLATE_ALREADY_EXPLAINED',
-    RUN_FINISHED: 'RUN_FINISHED'
+    RUN_FINISHED: 'RUN_FINISHED',
+    REFERENCE_DATA_UNAVAILABLE: 'REFERENCE_DATA_UNAVAILABLE'
 } as const;
 
 /**
@@ -1015,6 +1224,27 @@ export type ExplanationRunOut = {
 };
 
 /**
+ * ExposureGradient
+ *
+ * The occupation's exposure category in the 2025 index (Table 5 of the paper).
+ */
+export const ExposureGradient = {
+    EXPOSED_GRADIENT_4: 'Exposed: Gradient 4',
+    EXPOSED_GRADIENT_3: 'Exposed: Gradient 3',
+    EXPOSED_GRADIENT_2: 'Exposed: Gradient 2',
+    EXPOSED_GRADIENT_1: 'Exposed: Gradient 1',
+    MINIMAL_EXPOSURE: 'Minimal Exposure',
+    NOT_EXPOSED: 'Not Exposed'
+} as const;
+
+/**
+ * ExposureGradient
+ *
+ * The occupation's exposure category in the 2025 index (Table 5 of the paper).
+ */
+export type ExposureGradient = typeof ExposureGradient[keyof typeof ExposureGradient];
+
+/**
  * Extraction
  *
  * Why a retrieved source gave no posting that could be published. Only an API's own
@@ -1121,6 +1351,40 @@ export const FieldState = {
  * FieldState
  */
 export type FieldState = typeof FieldState[keyof typeof FieldState];
+
+/**
+ * FloorReasonOut
+ */
+export type FloorReasonOut = {
+    reason: FloorUnknown;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
+ * FloorUnknown
+ *
+ * Why pay could not be compared with the floor; each is kept, and counted.
+ */
+export const FloorUnknown = {
+    NO_PAY: 'no_pay',
+    PREDICTED: 'predicted',
+    PERIOD_DIFFERS: 'period_differs',
+    PERIOD_NOT_STATED: 'period_not_stated',
+    OTHER_CURRENCY: 'other_currency',
+    NO_REVIEWED_MAPPING: 'no_reviewed_mapping',
+    NO_WORK_AREA: 'no_work_area',
+    NOT_PUBLISHED: 'not_published'
+} as const;
+
+/**
+ * FloorUnknown
+ *
+ * Why pay could not be compared with the floor; each is kept, and counted.
+ */
+export type FloorUnknown = typeof FloorUnknown[keyof typeof FloorUnknown];
 
 /**
  * Freshness
@@ -1245,6 +1509,37 @@ export type HypothesisOut = {
      * Based On
      */
     based_on: Array<EvidenceOut>;
+};
+
+/**
+ * IloExposureOut
+ */
+export type IloExposureOut = {
+    /**
+     * Isco Code
+     */
+    isco_code: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Tasks
+     */
+    tasks: number;
+    /**
+     * Mean Score
+     */
+    mean_score: string;
+    /**
+     * Sd Score
+     */
+    sd_score: string;
+    gradient: ExposureGradient;
+    /**
+     * Measure
+     */
+    measure?: string;
 };
 
 /**
@@ -1410,9 +1705,13 @@ export type JobPage = {
     /**
      * Total Jobs
      *
-     * Distinct vacancies: a multi-city job counts once; an example never does.
+     * Distinct vacancies your salary floor kept: a multi-city job counts once; an example never does.
      */
     total_jobs: number;
+    /**
+     * What your confirmed salary floor left out and kept; null with none.
+     */
+    salary_floor: VacancySalaryFloorOut | null;
     /**
      * Exemplars
      *
@@ -1510,6 +1809,60 @@ export type Location = {
      */
     country?: string | null;
 };
+
+/**
+ * MappingResolution
+ */
+export const MappingResolution = {
+    NO_CANDIDATE: 'no_candidate',
+    SINGLE_CANDIDATE: 'single_candidate',
+    TITLE_RESOLVED: 'title_resolved',
+    AMBIGUOUS: 'ambiguous'
+} as const;
+
+/**
+ * MappingResolution
+ */
+export type MappingResolution = typeof MappingResolution[keyof typeof MappingResolution];
+
+/**
+ * Marker
+ *
+ * ONS's markers for a value it does not publish (Table 15's key).
+ */
+export const Marker = {
+    X: 'x',
+    '..': '..',
+    '': ':',
+    2: '-'
+} as const;
+
+/**
+ * Marker
+ *
+ * ONS's markers for a value it does not publish (Table 15's key).
+ */
+export type Marker = typeof Marker[keyof typeof Marker];
+
+/**
+ * MatchType
+ *
+ * The crosswalk's SKOS match types: how close an O*NET occupation is to its ESCO one.
+ */
+export const MatchType = {
+    EXACT_MATCH: 'exactMatch',
+    CLOSE_MATCH: 'closeMatch',
+    BROAD_MATCH: 'broadMatch',
+    NARROW_MATCH: 'narrowMatch',
+    EXACT_ISCO: 'exactISCO'
+} as const;
+
+/**
+ * MatchType
+ *
+ * The crosswalk's SKOS match types: how close an O*NET occupation is to its ESCO one.
+ */
+export type MatchType = typeof MatchType[keyof typeof MatchType];
 
 /**
  * ModelExtractionOut
@@ -1620,6 +1973,44 @@ export type ModelSpendOut = {
 };
 
 /**
+ * ModelledPayOut
+ */
+export type ModelledPayOut = {
+    /**
+     * Basis
+     *
+     * Never advertised or provider-predicted.
+     */
+    basis: 'modelled';
+    /**
+     * Soc Code
+     */
+    soc_code: string;
+    /**
+     * Benchmarks
+     */
+    benchmarks: Array<PayBenchmarkOut>;
+};
+
+/**
+ * ModelledPayUnavailable
+ *
+ * Why an occupation has no modelled pay (it is then unknown, never zero).
+ */
+export const ModelledPayUnavailable = {
+    NO_REVIEWED_MAPPING: 'no_reviewed_mapping',
+    NO_WORK_AREA: 'no_work_area',
+    NOT_PUBLISHED: 'not_published'
+} as const;
+
+/**
+ * ModelledPayUnavailable
+ *
+ * Why an occupation has no modelled pay (it is then unknown, never zero).
+ */
+export type ModelledPayUnavailable = typeof ModelledPayUnavailable[keyof typeof ModelledPayUnavailable];
+
+/**
  * Money
  *
  * A payment, fee, cap or balance: never negative.
@@ -1664,6 +2055,9 @@ export const NotIncluded = {
     DUPLICATE: 'duplicate',
     EXCLUDED_OCCUPATION: 'excluded_occupation',
     EXCLUDED_FAMILY: 'excluded_family',
+    BELOW_SALARY_FLOOR: 'below_salary_floor',
+    BELOW_AI_RESILIENCE_MINIMUM: 'below_ai_resilience_minimum',
+    AI_RESILIENCE_UNSCORED_EXCLUDED: 'ai_resilience_unscored_excluded',
     BELOW_RELEVANCE_FLOOR: 'below_relevance_floor',
     FAMILY_LIMIT: 'family_limit',
     LESS_RELEVANT: 'less_relevant'
@@ -1700,6 +2094,54 @@ export type NotIncludedOut = {
      * Duplicate Of Title
      */
     duplicate_of_title: string | null;
+};
+
+/**
+ * ObservedTaskOut
+ */
+export type ObservedTaskOut = {
+    /**
+     * Task
+     */
+    task: string;
+    /**
+     * Share Pct
+     */
+    share_pct: string;
+};
+
+/**
+ * OccupationEvidenceOut
+ */
+export type OccupationEvidenceOut = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Esco Uri
+     */
+    esco_uri: string;
+    /**
+     * Regions
+     *
+     * Your cities' regions: ASHE is regional.
+     */
+    regions: Array<RegionOut>;
+    uk_soc: UkSocMappingOut;
+    modelled_pay: ModelledPayOut | null;
+    modelled_pay_unavailable: ModelledPayUnavailable | null;
+    trend: TrendOut;
+    ai_evidence: AiEvidenceOut;
+    ai_resilience: AiResilienceOut;
+    /**
+     * Releases
+     */
+    releases: Array<ReferenceReleaseOut>;
 };
 
 /**
@@ -1844,6 +2286,39 @@ export type OccupationSearchOut = {
 };
 
 /**
+ * OnetMatchOut
+ */
+export type OnetMatchOut = {
+    /**
+     * Onet Code
+     */
+    onet_code: string;
+    /**
+     * Onet Title
+     */
+    onet_title: string;
+    match_type: MatchType;
+    /**
+     * In Release
+     *
+     * False: the release lists no task for this code.
+     */
+    in_release: boolean;
+    /**
+     * Tasks Listed
+     */
+    tasks_listed: number | null;
+    /**
+     * Tasks Observed
+     */
+    tasks_observed: number | null;
+    /**
+     * Top Tasks
+     */
+    top_tasks: Array<ObservedTaskOut>;
+};
+
+/**
  * PartialCompleteness
  *
  * How complete a run's streamed reply is (spec section 18: partial results carry
@@ -1956,6 +2431,60 @@ export const PayBasis = {
 export type PayBasis = typeof PayBasis[keyof typeof PayBasis];
 
 /**
+ * PayBenchmarkOut
+ *
+ * An official pay benchmark (ONS ASHE): a unit group's pay in a work region.
+ */
+export type PayBenchmarkOut = {
+    /**
+     * Soc Code
+     */
+    soc_code: string;
+    /**
+     * Soc Title
+     */
+    soc_title: string;
+    /**
+     * Region Code
+     */
+    region_code: string;
+    /**
+     * Region Name
+     */
+    region_name: string;
+    /**
+     * Geography
+     *
+     * Regional, never a city's figure.
+     */
+    geography: 'region';
+    /**
+     * Population
+     */
+    population: 'full_time';
+    period: AshePeriod;
+    /**
+     * Pay Definition
+     */
+    pay_definition: string;
+    /**
+     * Jobs Thousands
+     */
+    jobs_thousands: string | null;
+    /**
+     * Median Cv
+     *
+     * Coefficient of variation of the median, %.
+     */
+    median_cv: string | null;
+    reliability: Reliability;
+    /**
+     * Statistics
+     */
+    statistics: Array<PayStatisticOut>;
+};
+
+/**
  * PayPeriod
  */
 export const PayPeriod = {
@@ -1969,6 +2498,21 @@ export const PayPeriod = {
  * PayPeriod
  */
 export type PayPeriod = typeof PayPeriod[keyof typeof PayPeriod];
+
+/**
+ * PayStatisticOut
+ */
+export type PayStatisticOut = {
+    statistic: Statistic;
+    /**
+     * Gross pay; null when ONS withholds it.
+     */
+    amount: Money | null;
+    /**
+     * ONS's marker for a withheld value.
+     */
+    withheld: Marker | null;
+};
 
 /**
  * PlaceList
@@ -2184,7 +2728,7 @@ export type ProfileInput = {
      */
     work_style: TaskListInput;
     /**
-     * The lowest gross pay the person will accept, with its period: a hard limit, set only by their confirmation. Recorded, not yet applied: no suggestion is removed for pay until pay evidence exists, and unknown pay is never below it.
+     * The lowest gross pay the person will accept, with its period: a hard limit, set only by their confirmation. Applied as a hard filter, with counts: a suggestion or a vacancy is left out only when the highest pay it states in this period is below it; unknown, predicted or other-period pay is never below it.
      */
     minimum_salary: SalaryInput;
 };
@@ -2464,6 +3008,89 @@ export const RecordPart = {
 export type RecordPart = typeof RecordPart[keyof typeof RecordPart];
 
 /**
+ * ReferenceReleaseOut
+ *
+ * A pinned reference dataset's import manifest (TAX1-04): show its attribution wherever
+ * its figures appear.
+ */
+export type ReferenceReleaseOut = {
+    /**
+     * Dataset
+     */
+    dataset: string;
+    /**
+     * Dataset Id
+     */
+    dataset_id: string;
+    /**
+     * Version
+     */
+    version: string;
+    /**
+     * Source Url
+     */
+    source_url: string;
+    /**
+     * Sha256
+     */
+    sha256: string;
+    /**
+     * Size Bytes
+     */
+    size_bytes: number;
+    /**
+     * Native Code Version
+     */
+    native_code_version: string;
+    /**
+     * Transformation Version
+     */
+    transformation_version: string;
+    /**
+     * Licence
+     */
+    licence: string;
+    /**
+     * Attribution
+     */
+    attribution: string;
+    /**
+     * Sample
+     *
+     * A synthetic or reduced test copy: never real evidence.
+     */
+    sample: boolean;
+    /**
+     * Record Count
+     */
+    record_count: number;
+    /**
+     * Counts
+     */
+    counts: {
+        [key: string]: number;
+    };
+    /**
+     * Imported At
+     */
+    imported_at: string;
+};
+
+/**
+ * RegionOut
+ */
+export type RegionOut = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
  * RegisterProvisionalConcept
  */
 export type RegisterProvisionalConcept = {
@@ -2500,6 +3127,26 @@ export type ReleaseRefOut = {
      */
     sample: boolean;
 };
+
+/**
+ * Reliability
+ *
+ * ONS's quality bands for an estimate's coefficient of variation (CV).
+ */
+export const Reliability = {
+    PRECISE: 'precise',
+    REASONABLY_PRECISE: 'reasonably_precise',
+    ACCEPTABLE: 'acceptable',
+    UNRELIABLE: 'unreliable',
+    UNKNOWN: 'unknown'
+} as const;
+
+/**
+ * Reliability
+ *
+ * ONS's quality bands for an estimate's coefficient of variation (CV).
+ */
+export type Reliability = typeof Reliability[keyof typeof Reliability];
 
 /**
  * RenameWorkspaceIn
@@ -2561,6 +3208,20 @@ export type RevertProfile = {
      */
     to_version: number;
 };
+
+/**
+ * ReviewState
+ */
+export const ReviewState = {
+    UNREVIEWED: 'unreviewed',
+    REVIEWED: 'reviewed',
+    REVIEW_NOT_A_CANDIDATE: 'review_not_a_candidate'
+} as const;
+
+/**
+ * ReviewState
+ */
+export type ReviewState = typeof ReviewState[keyof typeof ReviewState];
 
 /**
  * RightsClass
@@ -2792,6 +3453,51 @@ export type SalaryFloor = {
      * Basis
      */
     basis?: 'gross';
+};
+
+/**
+ * SalaryFloorOut
+ *
+ * Your confirmed salary floor, applied as a hard filter: a suggestion is left out only
+ * when official pay for it (ASHE through a reviewed UK SOC mapping, the 90th percentile in
+ * every region of your cities) is below it. Unknown pay is never treated as below it.
+ */
+export type SalaryFloorOut = {
+    amount: Money;
+    /**
+     * Period
+     */
+    period: string;
+    /**
+     * Basis
+     */
+    basis?: 'gross';
+    /**
+     * Left Out
+     *
+     * Suggestions left out because their pay is below it.
+     */
+    left_out: number;
+    /**
+     * Meets
+     */
+    meets: number;
+    /**
+     * Kept Pay Unknown
+     *
+     * Kept: their pay could not be compared.
+     */
+    kept_pay_unknown: number;
+    /**
+     * Kept By Reason
+     */
+    kept_by_reason: Array<FloorReasonOut>;
+    /**
+     * Summary
+     *
+     * The counts in words, for display.
+     */
+    summary: string;
 };
 
 /**
@@ -3189,11 +3895,10 @@ export type SlateOut = {
      */
     notes: Array<string>;
     /**
-     * Limits Not Applied
-     *
-     * Limits you set that the slate records but cannot apply yet.
+     * Your confirmed salary floor's effect, as a hard filter; null with none.
      */
-    limits_not_applied: Array<string>;
+    salary_floor: SalaryFloorOut | null;
+    ai_resilience_filter: AiResilienceFilterOut;
     /**
      * Pool Size
      *
@@ -3238,6 +3943,38 @@ export type SlateOut = {
      * Show why this wasn't included.
      */
     not_included: Array<NotIncludedOut>;
+};
+
+/**
+ * SocCandidateOut
+ */
+export type SocCandidateOut = {
+    /**
+     * Soc Code
+     */
+    soc_code: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Index Entries
+     *
+     * Index titles of the ISCO group coded to it.
+     */
+    index_entries: number;
+    /**
+     * Title Match
+     *
+     * An ESCO label is one of its index titles.
+     */
+    title_match: boolean;
+    /**
+     * Benchmarks
+     *
+     * ASHE for this unit group in your cities' regions: about the unit group, not this occupation, unless the mapping is reviewed.
+     */
+    benchmarks: Array<PayBenchmarkOut>;
 };
 
 /**
@@ -3580,6 +4317,29 @@ export const SpendState = {
  * SpendState
  */
 export type SpendState = typeof SpendState[keyof typeof SpendState];
+
+/**
+ * Statistic
+ */
+export const Statistic = {
+    MEDIAN: 'median',
+    MEAN: 'mean',
+    P10: 'p10',
+    P20: 'p20',
+    P25: 'p25',
+    P30: 'p30',
+    P40: 'p40',
+    P60: 'p60',
+    P70: 'p70',
+    P75: 'p75',
+    P80: 'p80',
+    P90: 'p90'
+} as const;
+
+/**
+ * Statistic
+ */
+export type Statistic = typeof Statistic[keyof typeof Statistic];
 
 /**
  * StepOut
@@ -4119,6 +4879,34 @@ export type TextListInput = {
 };
 
 /**
+ * TrendOut
+ */
+export type TrendOut = {
+    state: TrendState;
+    reason: TrendReason;
+};
+
+/**
+ * TrendReason
+ */
+export const TrendReason = { SINGLE_SNAPSHOT: 'single_snapshot' } as const;
+
+/**
+ * TrendReason
+ */
+export type TrendReason = typeof TrendReason[keyof typeof TrendReason];
+
+/**
+ * TrendState
+ */
+export const TrendState = { UNAVAILABLE: 'unavailable' } as const;
+
+/**
+ * TrendState
+ */
+export type TrendState = typeof TrendState[keyof typeof TrendState];
+
+/**
  * TurnOut
  *
  * One interview turn. `run` is authoritative for its state: `proposal` exists only when
@@ -4214,6 +5002,58 @@ export type TurnSubmittedOut = {
 };
 
 /**
+ * UkSocMappingOut
+ *
+ * ESCO occupation to UK SOC 2020, with every candidate kept (TAX1-02).
+ */
+export type UkSocMappingOut = {
+    /**
+     * Isco Code
+     */
+    isco_code: string;
+    resolution: MappingResolution;
+    review_state: ReviewState;
+    /**
+     * Proposed Soc Code
+     *
+     * A single or title match: unreviewed.
+     */
+    proposed_soc_code: string | null;
+    /**
+     * Reviewed Soc Code
+     */
+    reviewed_soc_code: string | null;
+    /**
+     * Reviewer
+     */
+    reviewer: string | null;
+    /**
+     * Reviewed On
+     */
+    reviewed_on: string | null;
+    /**
+     * Candidates
+     */
+    candidates: Array<SocCandidateOut>;
+};
+
+/**
+ * UnscoredReason
+ */
+export const UnscoredReason = {
+    NO_RECORD: 'no_record',
+    NOT_PUBLISHABLE: 'not_publishable',
+    WITHDRAWN: 'withdrawn',
+    INVALIDATED: 'invalidated',
+    REVIEWED_NULL: 'reviewed_null'
+} as const;
+
+/**
+ * UnscoredReason
+ */
+export type UnscoredReason = typeof UnscoredReason[keyof typeof UnscoredReason];
+
+/**
  * UrlRefusal
  *
  * Why a URL is not fetched. Each is a policy refusal, recorded as a blocked attempt.
@@ -4234,6 +5074,55 @@ export const UrlRefusal = {
  * Why a URL is not fetched. Each is a policy refusal, recorded as a blocked attempt.
  */
 export type UrlRefusal = typeof UrlRefusal[keyof typeof UrlRefusal];
+
+/**
+ * VacancyFloorReasonOut
+ */
+export type VacancyFloorReasonOut = {
+    reason: FloorUnknown;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
+ * VacancySalaryFloorOut
+ *
+ * Your confirmed salary floor, applied to vacancies as a hard filter: a vacancy is left
+ * out only when the highest pay it advertises in the floor's period, in GBP, is below it
+ * (advertised pay is read as gross). Predicted, unstated or other-period pay is never
+ * below it: those are kept and counted by reason.
+ */
+export type VacancySalaryFloorOut = {
+    amount: Money;
+    /**
+     * Period
+     */
+    period: string;
+    /**
+     * Basis
+     */
+    basis?: 'gross';
+    /**
+     * Left Out
+     *
+     * Vacancies left out: their advertised pay is below it.
+     */
+    left_out: number;
+    /**
+     * Meets
+     */
+    meets: number;
+    /**
+     * Kept Pay Unknown
+     */
+    kept_pay_unknown: number;
+    /**
+     * Kept By Reason
+     */
+    kept_by_reason: Array<VacancyFloorReasonOut>;
+};
 
 /**
  * ValidationState
@@ -5874,6 +6763,14 @@ export type GetSlateData = {
          * Exclude Family
          */
         exclude_family?: Array<string>;
+        /**
+         * Min Ai Resilience
+         */
+        min_ai_resilience?: number | null;
+        /**
+         * Include Unscored
+         */
+        include_unscored?: boolean;
     };
     url: '/v1/workspaces/{workspace_id}/discoveries/{discovery_id}/slate';
 };
@@ -6408,6 +7305,44 @@ export type FavouriteJobResponses = {
 };
 
 export type FavouriteJobResponse = FavouriteJobResponses[keyof FavouriteJobResponses];
+
+export type GetOccupationEvidenceData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Concept Id
+         */
+        concept_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/occupations/{concept_id}/evidence';
+};
+
+export type GetOccupationEvidenceErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetOccupationEvidenceError = GetOccupationEvidenceErrors[keyof GetOccupationEvidenceErrors];
+
+export type GetOccupationEvidenceResponses = {
+    /**
+     * Successful Response
+     */
+    200: OccupationEvidenceOut;
+};
+
+export type GetOccupationEvidenceResponse = GetOccupationEvidenceResponses[keyof GetOccupationEvidenceResponses];
 
 export type GetTaxonomyData = {
     body?: never;

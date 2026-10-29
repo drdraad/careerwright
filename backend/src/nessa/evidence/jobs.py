@@ -20,7 +20,14 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from nessa.evidence.records import AdvertiserKind, JobCopy
+from nessa.catalogue.pay import (
+    FloorUnknown,
+    FloorVerdict,
+    SalaryFloorRule,
+    StatedPay,
+    floor_verdict,
+)
+from nessa.evidence.records import AdvertiserKind, JobCopy, Salary
 
 # Words in an advertiser's name that mark a staffing agency (reviewable list).
 AGENCY_MARKERS = (
@@ -299,6 +306,31 @@ def group_copies(copies: Iterable[tuple[str, JobCopy]]) -> list[Grouped]:
         key = str(uuid.uuid5(_GROUP_NAMESPACE, signature))
         groups.append(Grouped(key, [items[i] for i in indices]))
     return sorted(groups, key=lambda group: group.job_key)
+
+
+def job_against_floor(
+    floor: SalaryFloorRule, salaries: Iterable[Salary | None]
+) -> tuple[FloorVerdict, FloorUnknown | None]:
+    """One job, from its copies' pay, against the person's salary floor (Task 7 slice B): it
+    is below only when advertised GBP pay in the floor's period, the highest of its copies'
+    amounts (the top of a range, or its one amount), is below. Advertised pay is read as
+    gross, as UK adverts state pay (provisional, R6). Predicted, unknown and other-period
+    pay is never below the floor (`pay.floor_verdict`)."""
+    stated = [
+        StatedPay(
+            basis=s.basis.value,
+            currency=s.currency,
+            period=s.period.value if s.period else None,
+            highest_minor_units=max(
+                amount
+                for amount in (s.minimum_minor_units, s.maximum_minor_units)
+                if amount is not None
+            ),
+        )
+        for s in salaries
+        if s is not None
+    ]
+    return floor_verdict(floor, stated)
 
 
 def city_views(groups: Iterable[Grouped]) -> dict[str, list[str]]:

@@ -14,7 +14,6 @@ the statement below and marks any modified or adapted version as such.
 """
 
 import csv
-import hashlib
 import io
 import re
 import uuid
@@ -22,7 +21,8 @@ import zipfile
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
+
+from nessa.catalogue.releases import ReleaseIntegrityError, ReleasePin
 
 # Transformation: 6 of the release's 19 CSV files (ISCO groups, occupations, skills,
 # occupation-skill and skill-skill relations, the occupation hierarchy; left out: skill
@@ -47,24 +47,8 @@ LICENCE = (
 # Internal concept and skill IDs are UUIDv5 of the ESCO URI in this namespace: stable across
 # re-imports, and never confused with a provisional concept (random UUIDv4).
 CONCEPT_NAMESPACE = uuid.UUID("2b8c7e14-1f0a-4d7e-9a3c-5e6f70819a2b")
-MAX_RELEASE_BYTES = 64 * 1024 * 1024
 MAX_LABEL = 200
 MAX_TEXT = 4000
-
-
-@dataclass(frozen=True)
-class ReleasePin:
-    """One exact ESCO package: where it comes from and the bytes it must be."""
-
-    dataset_id: str
-    version: str
-    language: str
-    url: str
-    file_name: str
-    sha256: str
-    size_bytes: int
-    native_code_version: str
-    sample: bool = False
 
 
 ESCO_RELEASE = ReleasePin(
@@ -80,10 +64,6 @@ ESCO_RELEASE = ReleasePin(
     size_bytes=10_045_670,
     native_code_version="ESCO v1.2.1 (occupations grouped by ISCO-08)",
 )
-
-
-class ReleaseIntegrityError(ValueError):
-    """The file is not the pinned release, or its contents do not have ESCO's structure."""
 
 
 class LabelKind(StrEnum):
@@ -185,20 +165,6 @@ def normalise_label(text: str) -> str:
 
 def concept_id(uri: str) -> uuid.UUID:
     return uuid.uuid5(CONCEPT_NAMESPACE, uri)
-
-
-def read_verified(path: Path, pin: ReleasePin) -> bytes:
-    """The release's bytes, only if they are exactly the pinned file."""
-    if not path.is_file():
-        raise ReleaseIntegrityError(f"{pin.dataset_id} is not at {path}; run `make setup`")
-    size = path.stat().st_size
-    if size != pin.size_bytes or size > MAX_RELEASE_BYTES:
-        raise ReleaseIntegrityError(f"{path.name} is {size} bytes, not {pin.size_bytes}")
-    data = path.read_bytes()
-    digest = hashlib.sha256(data).hexdigest()
-    if digest != pin.sha256:
-        raise ReleaseIntegrityError(f"{path.name} has SHA-256 {digest}, not {pin.sha256}")
-    return data
 
 
 _OCCUPATION_URI = re.compile(r"^http://data\.europa\.eu/esco/occupation/[0-9a-f-]{36}$")

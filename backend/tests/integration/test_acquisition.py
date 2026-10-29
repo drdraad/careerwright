@@ -670,6 +670,97 @@ def test_three_copies_of_one_vacancy_are_one_job_in_every_arrival_order(
         assert listing["next_cursor"] is None, order
 
 
+def _salary(low: object, high: object, unit: str = "YEAR") -> dict[str, Any]:
+    value = {"@type": "QuantitativeValue", "minValue": low, "maxValue": high, "unitText": unit}
+    return {"@type": "MonetaryAmount", "currency": "GBP", "value": value}
+
+
+# Synthetic postings for the salary floor (£26,000 a year): one meets it, one advertises
+# less, one is paid by the hour (never converted), one states no pay.
+FLOOR_PAGES = {
+    "/floor/meets": page(POSTING),
+    "/floor/below": page(
+        {**POSTING, "title": "Junior Data Clerk", "identifier": "NW-1",
+         "baseSalary": _salary(18000, 21000)}
+    ),
+    "/floor/hourly": page(
+        {**POSTING, "title": "Data Assistant", "identifier": "NW-2",
+         "baseSalary": _salary("12.50", "13.00", "HOUR")}
+    ),
+    "/floor/unpaid": page(
+        {k: v for k, v in {**POSTING, "title": "Data Steward", "identifier": "NW-3"}.items()
+         if k != "baseSalary"}
+    ),
+}  # fmt: skip
+
+
+@pytest.mark.req("DIV1-07", "JOB-03", "JOB-05")
+def test_the_salary_floor_leaves_out_only_vacancies_advertising_less_and_counts_the_rest(
+    infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker
+) -> None:
+    for path, body in FLOOR_PAGES.items():
+        sources.routes[path] = Scripted(body=body.encode())
+    urls = [url(sources, "careers.northwind.example", p) for p in FLOOR_PAGES]
+    run_id = submit(api, ada, workspace, {"urls": urls}).json()["acquisition"]["run"]["run_id"]
+    wait_terminal(infra, run_id)
+    before = jobs(api, ada, workspace)
+    floor = {"amount": {"minor_units": 2_600_000, "currency": "GBP"}, "period": "year"}
+    put = api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace}/profile",
+        ada,
+        {"expected_version": 0, "profile": profile_with(minimum_salary=floor)},
+    )
+    assert put.status_code == 201, put.text
+    after = jobs(api, ada, workspace)
+    one = jobs(api, ada, workspace, limit=1)
+
+    assert before["total_jobs"] == 4
+    assert before["salary_floor"] is None  # no floor set: nothing filtered
+    titles = {j["title"] for j in after["items"]}
+    assert titles == {"Data Quality Analyst", "Data Assistant", "Data Steward"}
+    assert after["total_jobs"] == 3
+    assert after["city_counts"] == {"Leeds": 3, "Manchester": 3}
+    assert after["salary_floor"] == {
+        "amount": floor["amount"],
+        "period": "year",
+        "basis": "gross",
+        "left_out": 1,
+        "meets": 1,
+        "kept_pay_unknown": 2,
+        "kept_by_reason": [
+            {"reason": "no_pay", "count": 1},
+            {"reason": "period_differs", "count": 1},
+        ],
+    }
+    # Pagination never lands on a left-out vacancy.
+    assert one["next_cursor"] is not None
+    assert one["items"][0]["title"] != "Junior Data Clerk"
+
+
+@pytest.mark.req("DIV1-07", "STATE-02")
+def test_a_listing_the_floor_empties_says_so_never_that_none_were_found(
+    infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker
+) -> None:
+    sources.routes["/floor/below"] = Scripted(body=FLOOR_PAGES["/floor/below"].encode())
+    target = url(sources, "careers.northwind.example", "/floor/below")
+    run_id = submit(api, ada, workspace, {"urls": [target]}).json()["acquisition"]["run"]["run_id"]
+    wait_terminal(infra, run_id)
+    floor = {"amount": {"minor_units": 2_600_000, "currency": "GBP"}, "period": "year"}
+    api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace}/profile",
+        ada,
+        {"expected_version": 0, "profile": profile_with(minimum_salary=floor)},
+    )
+
+    listing = jobs(api, ada, workspace)
+
+    assert (listing["total_jobs"], listing["items"]) == (0, [])
+    assert listing["empty_reason"] == "all_below_salary_floor"
+    assert listing["salary_floor"]["left_out"] == 1
+
+
 @pytest.mark.req("JOB-02", "DUR-02")
 def test_overlapping_acquisitions_in_one_workspace_lose_no_copy_or_claim(
     infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker

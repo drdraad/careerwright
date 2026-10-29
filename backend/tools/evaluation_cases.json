@@ -478,7 +478,7 @@
     {
       "id": "DSC-09",
       "kind": "discovery",
-      "title": "A salary floor is recorded but not applied, and removes nothing",
+      "title": "A salary floor is applied with its counts, and never removes a suggestion whose pay is unknown",
       "requirements": ["PROF-04", "DIV1-07"],
       "synthetic": true,
       "profile": {"enjoyed_tasks": ["repairing bicycles"], "minimum_salary": {"amount": {"minor_units": 2600000, "currency": "GBP"}, "period": "year"}},

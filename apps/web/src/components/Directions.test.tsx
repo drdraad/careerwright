@@ -137,7 +137,18 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
   fewer_reasons:
     shown.length < 6 ? ["Only 1 occupation matched your answers closely enough to suggest."] : [],
   notes: [],
-  limits_not_applied: [],
+  salary_floor: null,
+  ai_resilience_filter: {
+    minimum: null,
+    include_unscored: true,
+    scored: 0,
+    below_minimum: 0,
+    unscored: 4,
+    unscored_excluded: 0,
+    pack_version: "l0-2026-10-29",
+    pack_dated: "2026-10-29",
+    summary: null,
+  },
   pool_size: 4,
   pool_target: [60, 120],
   beyond_pool_limit: 0,
@@ -199,6 +210,32 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     // Familiarity unknown: the group heading claims no relation to their current work.
     expect(screen.getByRole("heading", { name: "Directions to consider" })).toBeVisible();
     expect(document.body.textContent).not.toMatch(/\d\s?(%|per ?cent)/i); // a number as a percentage
+  });
+
+  it("[DIV1-07] says what the salary floor left out and why the rest was kept", async () => {
+    const summary =
+      "Your minimum salary of £26,000 a year (gross) is applied: 0 left out because their official pay is below it; 4 kept because no reviewed UK occupation code links them to pay data. Unknown pay is never treated as below it.";
+    fakeApi([
+      {
+        method: "GET",
+        path: /\/slate$/,
+        answer: {
+          ...slate([suggestion]),
+          salary_floor: {
+            amount: { minor_units: 2_600_000, currency: "GBP" },
+            period: "year",
+            left_out: 0,
+            meets: 0,
+            kept_pay_unknown: 4,
+            kept_by_reason: [{ reason: "no_reviewed_mapping", count: 4 }],
+            summary,
+          },
+        },
+      },
+    ]);
+    renderDirections();
+
+    expect(await screen.findByText(summary)).toBeVisible();
   });
 
   it("excludes a title as a view only, and makes a target only when chosen", async () => {

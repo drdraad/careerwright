@@ -3,16 +3,19 @@ from ESCO) and the early requirement sketch. No suggestion carries a percentage,
 rank meant as fit."""
 
 import uuid
+from datetime import date
 from typing import Literal
 
 from pydantic import Field
 
 from nessa.api.catalogue_schemas import IscoGroupOut
 from nessa.api.schemas import ResponseModel, RunOut
+from nessa.catalogue.pay import FloorCounts, FloorUnknown
 from nessa.catalogue.records import ConceptKind, TaxonomyRelease
+from nessa.money import Money
 from nessa.profile.discovery import DiscoveryProposal, EvidenceItem, QueryChannel
 from nessa.profile.document import FieldState
-from nessa.profile.exploration import SlateView, Suggestion
+from nessa.profile.exploration import AiFilterView, SlateView, Suggestion
 from nessa.profile.interview import ProfileField, ProposalOrigin
 from nessa.profile.sketch import OccupationRef, Resolution, Sketch, Step, TargetSketch
 from nessa.profile.slate import (
@@ -311,6 +314,100 @@ class ExcludedOut(ResponseModel):
     families: int = Field(description="Pooled occupations your excluded kinds of work removed.")
 
 
+_PERIOD_WORDS = {"year": "a year", "month": "a month", "week": "a week", "hour": "an hour"}
+_FLOOR_REASON_WORDS = {
+    FloorUnknown.NO_REVIEWED_MAPPING: "no reviewed UK occupation code links them to pay data",
+    FloorUnknown.NO_WORK_AREA: "you have not named a city, so no region's pay applies",
+    FloorUnknown.NOT_PUBLISHED: "the official figure is not published for your regions",
+    FloorUnknown.PERIOD_DIFFERS: "official pay is not given per your floor's period",
+}
+
+
+class FloorReasonOut(ResponseModel):
+    reason: FloorUnknown
+    count: int
+
+
+class SalaryFloorOut(ResponseModel):
+    """Your confirmed salary floor, applied as a hard filter: a suggestion is left out only
+    when official pay for it (ASHE through a reviewed UK SOC mapping, the 90th percentile in
+    every region of your cities) is below it. Unknown pay is never treated as below it."""
+
+    amount: Money
+    period: str
+    basis: Literal["gross"] = "gross"
+    left_out: int = Field(description="Suggestions left out because their pay is below it.")
+    meets: int
+    kept_pay_unknown: int = Field(description="Kept: their pay could not be compared.")
+    kept_by_reason: list[FloorReasonOut]
+    summary: str = Field(description="The counts in words, for display.")
+
+    @classmethod
+    def of(cls, counts: FloorCounts) -> "SalaryFloorOut":
+        floor = counts.floor
+        pounds = f"£{floor.minor_units // 100:,}" + (
+            f".{floor.minor_units % 100:02d}" if floor.minor_units % 100 else ""
+        )
+        words = f"Your minimum salary of {pounds} {_PERIOD_WORDS[floor.period]} (gross) is applied"
+        parts = [f"{counts.left_out} left out because their official pay is below it"]
+        for reason, n in counts.unknown.items():
+            parts.append(f"{n} kept because {_FLOOR_REASON_WORDS.get(reason, reason.value)}")
+        return cls(
+            amount=Money(minor_units=floor.minor_units, currency="GBP"),
+            period=floor.period,
+            left_out=counts.left_out,
+            meets=counts.meets,
+            kept_pay_unknown=counts.kept_unknown,
+            kept_by_reason=[FloorReasonOut(reason=r, count=n) for r, n in counts.unknown.items()],
+            summary=f"{words}: {'; '.join(parts)}. Unknown pay is never treated as below it.",
+        )
+
+
+class AiResilienceFilterOut(ResponseModel):
+    """The AI Resilience filter's basis and counts (AIR1-05): the minimum applies to the
+    lower end of a reviewed range; unscored occupations are included unless you switch
+    them off, and are never read as 0 or 10."""
+
+    basis: Literal["lower_bound"] = "lower_bound"
+    minimum: int | None = Field(description="Null: Any.")
+    include_unscored: bool
+    scored: int
+    below_minimum: int
+    unscored: int
+    unscored_excluded: int
+    pack_version: str
+    pack_dated: date
+    summary: str | None = Field(description="In words, when the filter is not at its default.")
+
+    @classmethod
+    def of(cls, view: AiFilterView) -> "AiResilienceFilterOut":
+        chosen = view.chosen
+        active = chosen.minimum is not None or not chosen.include_unscored
+        summary = None
+        if active:
+            minimum = "Any" if chosen.minimum is None else f"{chosen.minimum} or more"
+            unscored = (
+                f"{view.unscored} unscored kept"
+                if chosen.include_unscored
+                else f"{view.unscored_excluded} unscored left out"
+            )
+            summary = (
+                f"AI Resilience Score filter, {minimum} on the lower end of each reviewed "
+                f"range: {view.below_minimum} left out below it; {unscored}."
+            )
+        return cls(
+            minimum=chosen.minimum,
+            include_unscored=chosen.include_unscored,
+            scored=view.scored,
+            below_minimum=view.below_minimum,
+            unscored=view.unscored,
+            unscored_excluded=view.unscored_excluded,
+            pack_version=view.pack_version,
+            pack_dated=view.pack_dated,
+            summary=summary,
+        )
+
+
 class SlateOut(ResponseModel):
     """A varied slate of up to six career hypotheses from the discovery's searches, computed
     deterministically each time it is read, with every count that explains it."""
@@ -324,9 +421,10 @@ class SlateOut(ResponseModel):
     suggestions: list[SuggestionOut]
     fewer_reasons: list[str] = Field(description="Why there are fewer than six, if there are.")
     notes: list[str] = Field(description="How a control changed the slate, in words.")
-    limits_not_applied: list[str] = Field(
-        description="Limits you set that the slate records but cannot apply yet."
+    salary_floor: SalaryFloorOut | None = Field(
+        description="Your confirmed salary floor's effect, as a hard filter; null with none."
     )
+    ai_resilience_filter: AiResilienceFilterOut
     pool_size: int = Field(description="Distinct occupations after folding near-duplicates.")
     pool_target: tuple[int, int] = (POOL_TARGET, POOL_LIMIT)
     beyond_pool_limit: int = Field(description="Occupations found past the pool's bound.")
@@ -350,7 +448,8 @@ class SlateOut(ResponseModel):
             suggestions=[SuggestionOut.of(s, view.release) for s in view.suggestions],
             fewer_reasons=slate.fewer_reasons,
             notes=slate.notes,
-            limits_not_applied=view.limits_not_applied,
+            salary_floor=SalaryFloorOut.of(view.salary_floor) if view.salary_floor else None,
+            ai_resilience_filter=AiResilienceFilterOut.of(view.ai_filter),
             pool_size=slate.pool_size,
             beyond_pool_limit=slate.beyond_limit,
             excluded=ExcludedOut(**slate.excluded),

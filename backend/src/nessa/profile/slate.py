@@ -101,6 +101,11 @@ class NotIncluded(StrEnum):
     DUPLICATE = "duplicate"
     EXCLUDED_OCCUPATION = "excluded_occupation"
     EXCLUDED_FAMILY = "excluded_family"
+    # Hard filters (Task 7 slice B): the person's confirmed salary floor, and the AI
+    # Resilience filter they chose; deterministic code decides what is below each.
+    BELOW_SALARY_FLOOR = "below_salary_floor"
+    BELOW_AI_RESILIENCE_MINIMUM = "below_ai_resilience_minimum"
+    AI_RESILIENCE_UNSCORED_EXCLUDED = "ai_resilience_unscored_excluded"
     BELOW_RELEVANCE_FLOOR = "below_relevance_floor"
     FAMILY_LIMIT = "family_limit"
     LESS_RELEVANT = "less_relevant"
@@ -354,8 +359,15 @@ def _plural(count: int, one: str, many: str) -> str:
     return f"{count} {one if count == 1 else many}"
 
 
-def choose_slate(pool: Pool, controls: SlateControls | None = None) -> Slate:
+def choose_slate(
+    pool: Pool,
+    controls: SlateControls | None = None,
+    left_out: Mapping[uuid.UUID, NotIncluded] | None = None,
+) -> Slate:
+    """`left_out`: occupations a hard filter leaves out (the salary floor, the AI Resilience
+    filter), each with its reason; the caller decided, from evidence, that each is below."""
     controls = controls or SlateControls()
+    hard = left_out or {}
     policy = _POLICIES[controls.emphasis]
     left: list[Left] = []
     eligible: list[Candidate] = []
@@ -370,6 +382,8 @@ def choose_slate(pool: Pool, controls: SlateControls | None = None) -> Slate:
         elif occupation.family_code in controls.exclude_families:
             excluded["families"] += 1
             left.append(Left(candidate, NotIncluded.EXCLUDED_FAMILY))
+        elif occupation.concept_id in hard:
+            left.append(Left(candidate, hard[occupation.concept_id]))
         elif candidate.best_score < policy.floor:
             left.append(Left(candidate, NotIncluded.BELOW_RELEVANCE_FLOOR))
         else:

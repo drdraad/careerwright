@@ -8,6 +8,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from nessa.catalogue.pay import FloorUnknown, FloorVerdict, SalaryFloorRule
 from nessa.evidence.jobs import (
     CanonicalFacts,
     Grouped,
@@ -17,11 +18,20 @@ from nessa.evidence.jobs import (
     description_fingerprints,
     employer_key,
     group_copies,
+    job_against_floor,
     jobs_joined,
     same_job,
     title_key,
 )
-from nessa.evidence.records import AdvertiserKind, DescriptionKind, JobCopy, Location
+from nessa.evidence.records import (
+    AdvertiserKind,
+    DescriptionKind,
+    JobCopy,
+    Location,
+    PayBasis,
+    Salary,
+    SalaryPeriod,
+)
 
 FULL = (
     "We are looking for a data quality analyst to join our Manchester team. You will "
@@ -272,3 +282,43 @@ def test_grouping_is_deterministic_and_keys_are_stable() -> None:
 
     assert [g.job_key for g in a] == [g.job_key for g in b]
     assert all(isinstance(g, Grouped) and uuid.UUID(g.job_key) for g in a)
+
+
+def pay(
+    low: int | None,
+    high: int | None,
+    period: SalaryPeriod | None = SalaryPeriod.YEAR,
+    basis: PayBasis = PayBasis.ADVERTISED,
+) -> Salary:
+    return Salary(
+        currency="GBP",
+        minimum_minor_units=low,
+        maximum_minor_units=high,
+        period=period,
+        basis=basis,
+    )
+
+
+@pytest.mark.req("DIV1-07", "JOB-05", "JOB-03")
+@pytest.mark.parametrize(
+    ("salaries", "verdict", "reason"),
+    [
+        ([pay(1_800_000, 2_100_000)], FloorVerdict.BELOW, None),
+        ([pay(2_400_000, 2_700_000)], FloorVerdict.MEETS, None),  # the top of the range decides
+        ([pay(2_500_000, None)], FloorVerdict.BELOW, None),  # a single amount is its own top
+        ([pay(None, 2_500_000)], FloorVerdict.BELOW, None),  # "up to" is a top
+        ([pay(1_000_000, 1_200_000, basis=PayBasis.PREDICTED)], FloorVerdict.UNKNOWN,
+         FloorUnknown.PREDICTED),
+        ([pay(1_250, 1_400, SalaryPeriod.HOUR)], FloorVerdict.UNKNOWN, FloorUnknown.PERIOD_DIFFERS),
+        ([pay(1_800_000, 2_000_000, None)], FloorVerdict.UNKNOWN, FloorUnknown.PERIOD_NOT_STATED),
+        ([None], FloorVerdict.UNKNOWN, FloorUnknown.NO_PAY),
+        # Copies of one job: advertised pay in the floor's period meets it in one copy.
+        ([pay(1_800_000, 2_000_000), pay(2_600_000, None)], FloorVerdict.MEETS, None),
+    ],
+)  # fmt: skip
+def test_a_job_is_below_the_floor_only_when_its_advertised_pay_in_the_period_is(
+    salaries: list[Salary | None], verdict: FloorVerdict, reason: FloorUnknown | None
+) -> None:
+    floor = SalaryFloorRule(2_600_000, "year")
+
+    assert job_against_floor(floor, salaries) == (verdict, reason)

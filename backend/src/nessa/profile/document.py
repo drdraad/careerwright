@@ -191,8 +191,9 @@ class ProfileInput(BaseModel):
     minimum_salary: SalaryInput = Field(
         description=(
             "The lowest gross pay the person will accept, with its period: a hard limit, set "
-            "only by their confirmation. Recorded, not yet applied: no suggestion is removed "
-            "for pay until pay evidence exists, and unknown pay is never below it."
+            "only by their confirmation. Applied as a hard filter, with counts: a suggestion "
+            "or a vacancy is left out only when the highest pay it states in this period is "
+            "below it; unknown, predicted or other-period pay is never below it."
         )
     )
 

@@ -52,6 +52,8 @@ class ErrorCode(StrEnum):
     SLATE_ALREADY_EXPLAINED = "SLATE_ALREADY_EXPLAINED"
     # Run lifecycle (Task 7A, DUR-05): a finished run cannot be cancelled.
     RUN_FINISHED = "RUN_FINISHED"
+    # Reference data (Task 7 slice B): ASHE, the SOC index or the AI evidence is not imported.
+    REFERENCE_DATA_UNAVAILABLE = "REFERENCE_DATA_UNAVAILABLE"
 
 
 class ErrorStage(StrEnum):

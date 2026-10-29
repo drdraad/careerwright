@@ -13,7 +13,8 @@ from typing import Any
 import pytest
 from psycopg import errors
 
-from nessa.catalogue.esco import ESCO_RELEASE, concept_id, parse_release, read_verified
+from nessa.catalogue.esco import ESCO_RELEASE, concept_id, parse_release
+from nessa.catalogue.releases import read_verified
 from nessa.catalogue.taxonomy import (
     TaxonomyMismatchError,
     import_release,

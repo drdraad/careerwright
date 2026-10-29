@@ -28,13 +28,30 @@ changes no suggestion.
 
 import re
 import uuid
-from dataclasses import dataclass, replace
-from datetime import datetime
+from dataclasses import dataclass, field, replace
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from nessa.catalogue import taxonomy_store
+from nessa.catalogue.ai_resilience import (
+    AssessmentPacks,
+    CheckedPack,
+    FilterOutcome,
+    ResilienceFilter,
+    assessment,
+    filter_outcome,
+)
+from nessa.catalogue.pay import (
+    FloorCounts,
+    FloorVerdict,
+    MappingReviewPack,
+    ModelledPayUnavailable,
+    floor_counts,
+    modelled_floor_verdict,
+)
 from nessa.catalogue.records import OccupationFacts, TaxonomyRelease
+from nessa.catalogue.reference import modelled_pay_of, region_codes
 from nessa.catalogue.taxonomy import held_release, search_occupations
 from nessa.config import RuntimeMode
 from nessa.db import Tx
@@ -60,11 +77,14 @@ from nessa.profile.discovery import DiscoveryInput, DiscoveryProposal, EvidenceI
 from nessa.profile.document import FieldState, ProfileDocument, TextListInput, TextValue
 from nessa.profile.interview import ProfileField
 from nessa.profile.records import ExplanationRequest, SourceKind
+from nessa.profile.role_evidence import cities_of, salary_floor
 from nessa.profile.slate import (
     Candidate,
     Direction,
     Hit,
+    NotIncluded,
     Occupation,
+    Pool,
     PoolQuery,
     Slate,
     SlateChannel,
@@ -87,12 +107,6 @@ QUERY_HITS = 30  # occupations kept per search (the taxonomy search's bound is 5
 PARTIAL_MATCH_WEIGHT = 0.5
 SKILLS_SHOWN = 3
 DESCRIPTION_CHARS = 360
-# No pay evidence exists until regional pay is imported (Sprint 3), so the floor cannot be
-# applied: nothing is left out for pay, and unknown pay is never treated as below it.
-SALARY_FLOOR_NOT_APPLIED = (
-    "Your minimum salary is recorded but not applied yet: pay isn't researched, so no "
-    "suggestion is left out for pay, and unknown pay is never treated as below it."
-)
 CHOSEN_FROM_SUGGESTIONS = "Chosen from Nessa's suggestions"
 CHOSEN_FROM_ESCO = "Chosen from the ESCO occupations"
 _SOURCE_WORDS = {
@@ -199,7 +213,96 @@ class SlateView:
     unsupported_hypotheses: list[str]  # model titles ESCO does not hold
     unsearchable_queries: list[str]  # queries with no searchable word (none ran)
     titles: dict[uuid.UUID, str]  # every pooled occupation's title
-    limits_not_applied: list[str]  # the person's limits the slate records but cannot apply
+    # The confirmed salary floor's effect on the pool (None when the person set none), and
+    # the AI Resilience filter's (Task 7 slice B, ADR 0010).
+    salary_floor: FloorCounts | None
+    ai_filter: "AiFilterView"
+
+
+@dataclass(frozen=True)
+class HardFilterInput:
+    """What the slate's hard filters read besides the answers: the reviewed UK SOC mappings
+    (modelled pay), the workspace's assessment pack and the AI Resilience filter chosen."""
+
+    reviews: MappingReviewPack
+    pack: CheckedPack
+    ai_filter: ResilienceFilter = field(default_factory=ResilienceFilter)
+
+
+@dataclass(frozen=True)
+class AiFilterView:
+    """What the AI Resilience filter did to the pool: its basis is the lower end of a
+    published range, and unscored occupations are counted, never read as 0 or 10."""
+
+    chosen: ResilienceFilter
+    pack_version: str
+    pack_dated: date
+    scored: int
+    below_minimum: int
+    unscored: int
+    unscored_excluded: int
+
+
+def _hard_filters(
+    tx: Tx,
+    pool: Pool,
+    document: ProfileDocument,
+    controls: SlateControls,
+    hard: HardFilterInput,
+    esco_uris: dict[uuid.UUID, str],
+) -> tuple[dict[uuid.UUID, NotIncluded], FloorCounts | None, AiFilterView]:
+    """The occupations the salary floor and the AI Resilience filter leave out, decided by
+    deterministic code over the evidence, with each filter's counts. Only the distinct
+    occupations the person did not exclude themselves are considered."""
+    considered = [
+        c.occupation.concept_id
+        for c in pool
+        if c.duplicate_of is None
+        and c.occupation.concept_id not in controls.exclude_concepts
+        and c.occupation.family_code not in controls.exclude_families
+    ]
+    left_out: dict[uuid.UUID, NotIncluded] = {}
+    floor = salary_floor(document)
+    counts = None
+    if floor is not None:
+        regions = region_codes(cities_of(document))
+        modelled = modelled_pay_of(tx, considered, regions, hard.reviews)
+        verdicts = {
+            c: modelled_floor_verdict(
+                floor, modelled.get(c, ModelledPayUnavailable.NO_REVIEWED_MAPPING), regions
+            )
+            for c in considered
+        }
+        counts = floor_counts(floor, verdicts.values())
+        left_out = {
+            c: NotIncluded.BELOW_SALARY_FLOOR
+            for c, (verdict, _) in verdicts.items()
+            if verdict is FloorVerdict.BELOW
+        }
+    outcomes = {
+        c: filter_outcome(assessment(hard.pack, esco_uris[c]), hard.ai_filter)
+        for c in considered
+        if c in esco_uris
+    }
+    for concept, outcome in outcomes.items():
+        if concept in left_out:
+            continue
+        if outcome is FilterOutcome.BELOW_MINIMUM:
+            left_out[concept] = NotIncluded.BELOW_AI_RESILIENCE_MINIMUM
+        elif outcome is FilterOutcome.UNSCORED_EXCLUDED:
+            left_out[concept] = NotIncluded.AI_RESILIENCE_UNSCORED_EXCLUDED
+    found = list(outcomes.values())
+    unscored = (FilterOutcome.UNSCORED_KEPT, FilterOutcome.UNSCORED_EXCLUDED)
+    view = AiFilterView(
+        chosen=hard.ai_filter,
+        pack_version=hard.pack.pack.pack_version,
+        pack_dated=hard.pack.pack.dated,
+        scored=sum(o not in unscored for o in found),
+        below_minimum=found.count(FilterOutcome.BELOW_MINIMUM),
+        unscored=sum(o in unscored for o in found),
+        unscored_excluded=found.count(FilterOutcome.UNSCORED_EXCLUDED),
+    )
+    return left_out, counts, view
 
 
 def _proposal(tx: Tx, keyring: Keyring, run: Run) -> DiscoveryProposal | None:
@@ -438,12 +541,27 @@ def explain(candidate: Candidate, facts: OccupationFacts, familiarity_known: boo
     )
 
 
+def hard_filters(
+    tx: Tx,
+    workspace_id: uuid.UUID,
+    reviews: MappingReviewPack,
+    packs: AssessmentPacks,
+    ai_filter: ResilienceFilter | None = None,
+) -> HardFilterInput:
+    """The workspace's hard-filter inputs: the synthetic fixture pack applies only in the
+    fixture workspace, the product pack everywhere else."""
+    workspace = visible_workspace(tx, workspace_id)
+    pack = packs.for_workspace(fixture_workspace=workspace.fixture_key is not None)
+    return HardFilterInput(reviews, pack, ai_filter or ResilienceFilter())
+
+
 def discovery_slate(
     tx: Tx,
     keyring: Keyring,
     workspace_id: uuid.UUID,
     discovery_id: uuid.UUID,
     controls: SlateControls,
+    hard: HardFilterInput,
 ) -> SlateView:
     view = visible_discovery(tx, keyring, workspace_id, discovery_id)
     proposal = view.proposal
@@ -457,7 +575,7 @@ def discovery_slate(
                 "failure_class": view.run.failure_class or "",
             },
         )
-    return compute_slate(tx, view, proposal, _pinned_document(tx, view.run), controls)
+    return compute_slate(tx, view, proposal, _pinned_document(tx, view.run), controls, hard)
 
 
 def release_note(searched: str | None, held: str) -> str | None:
@@ -477,9 +595,13 @@ def compute_slate(
     proposal: DiscoveryProposal,
     document: ProfileDocument,
     controls: SlateControls,
+    hard: HardFilterInput,
 ) -> SlateView:
-    """The slate for these searches and answers over the held taxonomy. It reads taxonomy
-    tables only, so the offline evaluation runs it unchanged against the full release."""
+    """The slate for these searches and answers over the held taxonomy, with the person's
+    confirmed salary floor and the chosen AI Resilience filter applied as hard filters, each
+    counted. Pay is read only through a reviewed UK SOC mapping, so without one the
+    taxonomy tables are all it reads, and the offline evaluation runs it unchanged against
+    the full release."""
     release = held_release(tx)
     queries: list[PoolQuery] = []
     unsearchable: list[str] = []
@@ -544,7 +666,10 @@ def compute_slate(
         for concept_id, fact in facts.items()
     }
     familiar_families = frozenset(facts[c].family.code for c in familiar if c in facts)
-    slate = choose_slate(build_pool(queries, occupations, familiar_families), controls)
+    pool = build_pool(queries, occupations, familiar_families)
+    esco_uris = {concept_id: fact.esco_uri for concept_id, fact in facts.items()}
+    left_out, floor, ai_filter = _hard_filters(tx, pool, document, controls, hard, esco_uris)
+    slate = choose_slate(pool, controls, left_out)
     changed = release_note(proposal.release, release.dataset_id)
     if changed is not None:
         slate = replace(slate, notes=[changed, *slate.notes])
@@ -565,11 +690,8 @@ def compute_slate(
         unsupported_hypotheses=unsupported,
         unsearchable_queries=unsearchable,
         titles={concept_id: occupation.title for concept_id, occupation in occupations.items()},
-        limits_not_applied=(
-            [SALARY_FLOOR_NOT_APPLIED]
-            if document.minimum_salary.state is FieldState.PROVIDED
-            else []
-        ),
+        salary_floor=floor,
+        ai_filter=ai_filter,
     )
 
 
@@ -585,9 +707,11 @@ def submit_explanation(
     runtime_mode: RuntimeMode,
     defaults: SpendLimits,
     now: datetime,
+    hard: HardFilterInput,
 ) -> tuple[ExplanationView, bool]:
     """The slate's one written explanation, and whether this request started it. A slate is
-    a discovery's first view (balanced, no exclusions): asking again, from any view, returns
+    a discovery's first view (balanced, no exclusions, the salary floor applied and the AI
+    Resilience filter at Any): asking again, from any view, returns
     the explanation already asked for, in whatever state, so a slate never has a second call.
 
     The one exception is the person's explicit Try again (`retry_failed`) on a run that
@@ -645,7 +769,9 @@ def submit_explanation(
             stage=ErrorStage.PROFILE,
             details={"reason": "no_quotable_answer"},
         )
-    shown = compute_slate(tx, view, proposal, document, SlateControls())
+    shown = compute_slate(
+        tx, view, proposal, document, SlateControls(), replace(hard, ai_filter=ResilienceFilter())
+    )
     if not shown.suggestions:
         raise NessaError(
             ErrorCode.INSUFFICIENT_EVIDENCE,

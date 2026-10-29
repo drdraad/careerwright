@@ -3,11 +3,12 @@ claims, and freshness (Task 7A). Enums come from the domain modules once (GC10).
 
 import uuid
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field
 
 from nessa.api.schemas import ResponseModel, RunOut
+from nessa.catalogue.pay import FloorCounts, FloorUnknown
 from nessa.evidence.acquisition import (
     AcquisitionSummary,
     Coverage,
@@ -44,6 +45,7 @@ from nessa.evidence.records import (
 from nessa.evidence.search import SearchProposal
 from nessa.evidence.store import AdvertCounts, AttemptRow, ClaimRow, CopyRow, ExtractionRow
 from nessa.identity.failures import FailureClass
+from nessa.money import Money
 
 
 class ModelExtractionOut(ResponseModel):
@@ -445,6 +447,39 @@ class ModelSpendOut(ResponseModel):
         )
 
 
+class VacancyFloorReasonOut(ResponseModel):
+    reason: FloorUnknown
+    count: int
+
+
+class VacancySalaryFloorOut(ResponseModel):
+    """Your confirmed salary floor, applied to vacancies as a hard filter: a vacancy is left
+    out only when the highest pay it advertises in the floor's period, in GBP, is below it
+    (advertised pay is read as gross). Predicted, unstated or other-period pay is never
+    below it: those are kept and counted by reason."""
+
+    amount: Money
+    period: str
+    basis: Literal["gross"] = "gross"
+    left_out: int = Field(description="Vacancies left out: their advertised pay is below it.")
+    meets: int
+    kept_pay_unknown: int
+    kept_by_reason: list[VacancyFloorReasonOut]
+
+    @classmethod
+    def of(cls, counts: FloorCounts) -> "VacancySalaryFloorOut":
+        return cls(
+            amount=Money(minor_units=counts.floor.minor_units, currency="GBP"),
+            period=counts.floor.period,
+            left_out=counts.left_out,
+            meets=counts.meets,
+            kept_pay_unknown=counts.kept_unknown,
+            kept_by_reason=[
+                VacancyFloorReasonOut(reason=r, count=n) for r, n in counts.unknown.items()
+            ],
+        )
+
+
 class JobPage(ResponseModel):
     """A page of jobs, with counts that never double count a multi-city job and coverage
     that says how many sources were checked. An empty page says why (STATE-02)."""
@@ -452,7 +487,11 @@ class JobPage(ResponseModel):
     items: list[JobOut] = Field(description="Vacancies and the person's examples, newest first.")
     next_cursor: str | None
     total_jobs: int = Field(
-        description="Distinct vacancies: a multi-city job counts once; an example never does."
+        description="Distinct vacancies your salary floor kept: a multi-city job counts once; "
+        "an example never does."
+    )
+    salary_floor: VacancySalaryFloorOut | None = Field(
+        description="What your confirmed salary floor left out and kept; null with none."
     )
     exemplars: int = Field(description="The person's pasted examples: never vacancies.")
     city_counts: dict[str, int] = Field(

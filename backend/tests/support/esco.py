@@ -7,7 +7,8 @@ only `nessa.catalogue.esco.ESCO_RELEASE`.
 
 import dataclasses
 
-from nessa.catalogue.esco import ESCO_RELEASE, ReleasePin
+from nessa.catalogue.esco import ESCO_RELEASE
+from nessa.catalogue.releases import ReleasePin
 from tools.localenv import REPO_ROOT
 
 SAMPLE_DIR = REPO_ROOT / "fixtures" / "esco-sample"

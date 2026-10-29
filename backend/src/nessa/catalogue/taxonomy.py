@@ -12,13 +12,9 @@ import uuid
 from dataclasses import dataclass
 
 from nessa.catalogue import taxonomy_store
-from nessa.catalogue.esco import (
-    TRANSFORMATION_VERSION,
-    EscoCatalogue,
-    ReleasePin,
-    normalise_label,
-)
+from nessa.catalogue.esco import TRANSFORMATION_VERSION, EscoCatalogue, normalise_label
 from nessa.catalogue.records import LabelMatch, OccupationDetail, OccupationHit, TaxonomyRelease
+from nessa.catalogue.releases import ReleasePin
 from nessa.db import Tx
 from nessa.errors import ErrorCode, ErrorStage, NessaError
 

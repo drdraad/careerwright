@@ -2,7 +2,7 @@
 
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from ipaddress import IPv4Network, IPv6Network
 from typing import Annotated, Protocol
@@ -11,6 +11,8 @@ from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import SecretStr
 
+from nessa.catalogue.ai_resilience import AssessmentPacks, committed_packs
+from nessa.catalogue.pay import MappingReviewPack, committed_reviews
 from nessa.config import ApiSettings
 from nessa.db import Engine, system_transaction
 from nessa.errors import ErrorCode, ErrorStage, NessaError
@@ -41,6 +43,11 @@ class ApiDependencies:
     # Clients the API serves: loopback, plus the container's internal subnet when its
     # configuration enables it (`nessa.localnet.client_networks` at the composition root).
     client_networks: tuple[IPv4Network | IPv6Network, ...] = LOOPBACK
+    # The committed, dated assessment and mapping-review packs, loaded and checked when the
+    # API starts, before any session: a pack's corrections invalidate the records they
+    # affect then (AIR1-07, ADR 0010).
+    assessment_packs: AssessmentPacks = field(default_factory=committed_packs)
+    mapping_reviews: MappingReviewPack = field(default_factory=committed_reviews)
 
     @property
     def spend_defaults(self) -> SpendLimits:

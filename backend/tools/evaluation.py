@@ -29,6 +29,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from nessa.api.discovery_schemas import SlateOut, WrittenExplanationOut
 from nessa.catalogue import taxonomy_store
+from nessa.catalogue.ai_resilience import committed_packs
+from nessa.catalogue.pay import committed_reviews
 from nessa.db import Tx
 from nessa.identity.model_registry import FIXTURE_DISCOVERY_MODEL_ID
 from nessa.identity.records import Run, RunKind
@@ -46,7 +48,7 @@ from nessa.profile.document import (
     apply_profile_input,
     empty_profile,
 )
-from nessa.profile.exploration import DiscoveryView, SlateView, compute_slate
+from nessa.profile.exploration import DiscoveryView, HardFilterInput, SlateView, compute_slate
 from nessa.profile.fixture_discovery import fixture_queries, prompt_context
 from nessa.profile.fixture_explainer import fixture_explanation
 from nessa.profile.fixture_explainer import prompt_context as explainer_context
@@ -91,7 +93,7 @@ class FailureType(StrEnum):
     UNSUPPORTED_TITLE = "unsupported_title"  # a model title shown as a suggestion
     THIN_EVIDENCE = "thin_evidence"  # filler, or fewer without a reason
     PREFERENCE_EXCLUSION = "preference_exclusion"  # a preference removed work
-    LIMIT = "limit"  # a recorded limit not reported as unapplied
+    LIMIT = "limit"  # a confirmed limit not reported with its counts, or applied to unknowns
     SUPPORT_MISSED = "support_missed"
     SUPPORT_FALSE_POSITIVE = "support_false_positive"
     GUARD = "guard"  # the output check accepted what it should refuse, or the reverse
@@ -282,8 +284,15 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         short = len(suggestions) < observed["target_size"] and not observed["fewer_reasons"]
         return Failure(FailureType.THIN_EVIDENCE, "fewer, with no reason") if short else None
     if e.check == "limit_reported":
-        given = bool(observed["limits_not_applied"])
-        return None if given else Failure(FailureType.LIMIT, "salary floor not reported")
+        # The floor is applied with its counts, and pay it cannot compare is never below it
+        # (Task 7 slice B). The evaluation holds no reviewed UK SOC mapping, so every pooled
+        # occupation's pay is unknown and the floor must leave nothing out.
+        floor = observed.get("salary_floor")
+        if floor is None:
+            return Failure(FailureType.LIMIT, "salary floor not reported")
+        if floor["left_out"]:
+            return Failure(FailureType.LIMIT, f"{floor['left_out']} left out with pay unknown")
+        return None
     raise ValueError(f"unknown discovery check {e.check!r}")
 
 
@@ -529,7 +538,11 @@ def _offline_slate(tx: Tx, case: Case, release: str | None) -> SlateView:
         finished_at=_AT,
         profile_version=1,
     )
-    return compute_slate(tx, DiscoveryView(run, proposal), proposal, document, SlateControls())
+    # The product's committed packs: no reviewed mapping, no published assessment.
+    hard = HardFilterInput(committed_reviews(), committed_packs().product)
+    return compute_slate(
+        tx, DiscoveryView(run, proposal), proposal, document, SlateControls(), hard
+    )
 
 
 def failures_by_type(results: Mapping[str, list[Failure]]) -> dict[str, int]:

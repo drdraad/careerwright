@@ -524,7 +524,12 @@ function Slate({
         {excluded > 0 &&
           ` Your exclusions removed ${data.excluded.occupations + data.excluded.families}.`}
       </p>
-      {[...data.fewer_reasons, ...data.notes, ...data.limits_not_applied].map((line) => (
+      {[
+        ...data.fewer_reasons,
+        ...data.notes,
+        ...(data.salary_floor ? [data.salary_floor.summary] : []),
+        ...(data.ai_resilience_filter.summary ? [data.ai_resilience_filter.summary] : []),
+      ].map((line) => (
         <p key={line} className="small">
           {line}
         </p>

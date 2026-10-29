@@ -8,6 +8,7 @@ import dataclasses
 import json
 import re
 from collections.abc import Iterator
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -16,10 +17,13 @@ from fastapi.testclient import TestClient
 
 from nessa.api.app import create_app
 from nessa.api.deps import ApiDependencies
+from nessa.catalogue.esco import concept_id
+from nessa.catalogue.pay import MappingReview, MappingReviewPack
 from nessa.catalogue.taxonomy import held_release
 from nessa.config import RuntimeMode
 from nessa.db import system_transaction
 from tests.integration.durable import Scenario, make_scenario
+from tests.support import reference_data as samples
 from tests.support.client import ApiClient, profile_with
 from tests.support.esco import SAMPLE_RELEASE
 from tests.support.infra import API_BASE, Infra, migrator_engine
@@ -163,6 +167,105 @@ def test_the_slate_controls_change_the_view_only_and_count_their_effect(
     assert (deeper["emphasis"], deeper["family_limit"]) == ("deeper", 4)
     assert deeper["notes"]
     assert scenario.profile()["version"] == 2  # a view never changes the profile
+
+
+BICYCLE_MECHANIC = str(concept_id(samples.BICYCLE_MECHANIC))
+FLOOR = {"amount": {"minor_units": 2_600_000, "currency": "GBP"}, "period": "year"}
+
+
+def with_floor(scenario: Scenario) -> str:
+    """The answers again with a confirmed salary floor (a direct edit), then a discovery."""
+    put = scenario.api.write(
+        "PUT",
+        f"{base(scenario)}/profile",
+        scenario.token,
+        {"expected_version": 2, "profile": {**ANSWERS, "minimum_salary": {
+            "state": "provided", "value": FLOOR}}},
+    )  # fmt: skip
+    assert put.status_code == 201, put.text
+    return str(discover(scenario, version=3)["discovery_id"])
+
+
+@pytest.mark.req("DIV1-07", "PROF-04")
+def test_the_salary_floor_leaves_out_only_what_reviewed_pay_puts_below_it_and_counts_it(
+    scenario: Scenario, api_deps: ApiDependencies
+) -> None:
+    discovery_id = with_floor(scenario)
+    unreviewed = slate(scenario, discovery_id)
+    review = MappingReview(
+        esco_uri=samples.BICYCLE_MECHANIC,
+        soc_code="5231",
+        reviewer="Synthetic reviewer (tests only)",
+        reviewed_on=date(2026, 10, 29),
+        reasons="Synthetic review for a test.",
+    )
+    reviews = MappingReviewPack(pack_version="test", dated=date(2026, 10, 29), reviews=[review])
+    with TestClient(
+        create_app(dataclasses.replace(api_deps, mapping_reviews=reviews)),
+        base_url=API_BASE,
+        raise_server_exceptions=False,
+        client=("127.0.0.1", 57012),
+    ) as client:
+        response = ApiClient(client).get(
+            f"{base(scenario)}/discoveries/{discovery_id}/slate", scenario.token
+        )
+    assert response.status_code == 200, response.text
+    reviewed = response.json()
+
+    # No reviewed mapping: every pooled occupation's pay is unknown, so nothing is left out.
+    floor = unreviewed["salary_floor"]
+    assert (floor["amount"], floor["period"], floor["basis"]) == (
+        FLOOR["amount"],
+        "year",
+        "gross",
+    )
+    assert floor["left_out"] == 0
+    assert floor["kept_by_reason"] == [
+        {"reason": "no_reviewed_mapping", "count": floor["kept_pay_unknown"]}
+    ]
+    assert floor["kept_pay_unknown"] >= 1
+    assert "never treated as below it" in floor["summary"]
+    assert BICYCLE_MECHANIC in {s["concept_id"] for s in unreviewed["suggestions"]}
+    # A reviewed mapping whose regional 90th percentile (synthetic) is below the floor.
+    assert reviewed["salary_floor"]["left_out"] == 1
+    assert BICYCLE_MECHANIC not in {s["concept_id"] for s in reviewed["suggestions"]}
+    reasons = {n["concept_id"]: n["reason"] for n in reviewed["not_included"]}
+    assert reasons[BICYCLE_MECHANIC] == "below_salary_floor"
+    assert reviewed["salary_floor"]["kept_pay_unknown"] == floor["kept_pay_unknown"] - 1
+    no_floor = slate(scenario, discover(scenario, version=3)["discovery_id"])
+    assert no_floor["salary_floor"]["left_out"] == 0  # the same answers, same unknowns
+
+
+@pytest.mark.req("AIR1-05")
+def test_the_ai_resilience_filter_keeps_unscored_roles_by_default_and_counts_its_effect(
+    scenario: Scenario,
+) -> None:
+    discovery_id = discover(scenario)["discovery_id"]
+    default = slate(scenario, discovery_id)
+    any_minimum = slate(scenario, discovery_id, min_ai_resilience="7")
+    hidden = slate(scenario, discovery_id, min_ai_resilience="3", include_unscored="false")
+
+    shown = default["ai_resilience_filter"]
+    assert (shown["basis"], shown["minimum"], shown["include_unscored"]) == (
+        "lower_bound",
+        None,
+        True,
+    )
+    assert shown["scored"] == 0  # no reviewed record exists: every role is unscored
+    assert shown["unscored"] >= len(default["suggestions"]) >= 1
+    assert shown["summary"] is None
+    # A minimum leaves every unscored role in: unknown is never read as 0.
+    assert [s["concept_id"] for s in any_minimum["suggestions"]] == [
+        s["concept_id"] for s in default["suggestions"]
+    ]
+    assert any_minimum["ai_resilience_filter"]["below_minimum"] == 0
+    # Only switching unscored roles off removes them, and it says how many.
+    assert hidden["suggestions"] == []
+    assert hidden["ai_resilience_filter"]["unscored_excluded"] == shown["unscored"]
+    assert "unscored left out" in hidden["ai_resilience_filter"]["summary"]
+    assert {n["reason"] for n in hidden["not_included"]} >= {"ai_resilience_unscored_excluded"}
+    assert hidden["fewer_reasons"]
+    assert default["salary_floor"] is None  # the person set no floor
 
 
 @pytest.mark.req("REC1-07", "PROF-04", "PROF-07")

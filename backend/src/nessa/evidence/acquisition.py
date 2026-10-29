@@ -31,6 +31,7 @@ from urllib.parse import urlsplit
 
 from pydantic import Field, StringConstraints, model_validator
 
+from nessa.catalogue.pay import FloorCounts, FloorVerdict, floor_counts
 from nessa.config import RuntimeMode
 from nessa.db import Engine, Tx, run_transaction
 from nessa.errors import ErrorCode, ErrorStage, NessaError
@@ -52,7 +53,13 @@ from nessa.evidence.freshness import (
     freshness,
     refresh_decision,
 )
-from nessa.evidence.jobs import canonical_facts, description_fingerprints, facts_json, title_key
+from nessa.evidence.jobs import (
+    canonical_facts,
+    description_fingerprints,
+    facts_json,
+    job_against_floor,
+    title_key,
+)
 from nessa.evidence.recording import record_copies
 from nessa.evidence.records import (
     AdvertiserKind,
@@ -84,6 +91,8 @@ from nessa.identity.runs import open_output, output_context, submit_keyless_run,
 from nessa.identity.spend import SpendLimits
 from nessa.identity.spend_limits import spend_summary
 from nessa.identity.workspaces import visible_workspace
+from nessa.profile.commands import current_profile
+from nessa.profile.role_evidence import salary_floor
 from nessa.vocabulary import DataMode, WorkState
 
 MAX_URLS = 10
@@ -609,25 +618,34 @@ class EmptyReason(StrEnum):
     NO_POSTING_READABLE = "no_posting_readable"
     NO_POSTING_FOUND_BY_MODEL = "no_posting_found_by_model"
     NONE_FOUND_IN_SOURCES_CHECKED = "none_found_in_sources_checked"
+    # Vacancies were found, and the person's salary floor left every one out (Task 7 slice
+    # B): the counts say how many.
+    ALL_BELOW_SALARY_FLOOR = "all_below_salary_floor"
 
 
 @dataclass(frozen=True)
 class JobListing:
     jobs: list[JobView]  # the page: vacancies and the person's examples, newest first
     more: bool
-    total_jobs: int  # vacancies only: an example is never one
+    total_jobs: int  # vacancies the salary floor kept: an example is never one
     exemplars: int
-    city_counts: dict[str, int]  # vacancies only
+    city_counts: dict[str, int]  # vacancies only, as `total_jobs`
     coverage: dict[Coverage, int]
     adverts: store.AdvertCounts | None  # retrieved n of the total matching, for searches
     empty_reason: EmptyReason | None
     # What the next acquisition may spend on the person's key (MODEL-08); None in demo.
     model_spend: ModelSpendEstimate | None = None
+    # The confirmed salary floor's effect on the vacancies; None when the person set none.
+    salary_floor: FloorCounts | None = None
 
 
-def _empty_reason(total_jobs: int, covered: dict[Coverage, int]) -> EmptyReason | None:
+def _empty_reason(
+    total_jobs: int, covered: dict[Coverage, int], left_out: int = 0
+) -> EmptyReason | None:
     if total_jobs:
         return None
+    if left_out:
+        return EmptyReason.ALL_BELOW_SALARY_FLOOR
     if not covered:
         return EmptyReason.NO_SOURCES_CHECKED
     if covered.get(Coverage.PENDING):  # an answer is still coming (review B N7)
@@ -660,31 +678,53 @@ def list_jobs(
     """One page of jobs, and the workspace's totals, counted in the database (no cap), with
     what the next acquisition may spend on the person's key: the read the research view
     makes before an acquisition starts (fix round 3, item 5). Its hard maximum follows the
-    workspace's run limit, the default one until limits are stored (`spend_summary`)."""
+    workspace's run limit, the default one until limits are stored (`spend_summary`).
+
+    The person's confirmed salary floor is a hard filter (Task 7 slice B): a vacancy whose
+    advertised pay in the floor's period is below it is left out of the page and the
+    totals, and the floor's counts say how many, and why the rest were kept
+    (`jobs.job_against_floor`). An example is never filtered: it is not a vacancy."""
     workspace = visible_workspace(tx, workspace_id)
     run_limit = spend_summary(tx, workspace_id, now, defaults).limits.run_limit_nano_usd
+    floor = salary_floor(current_profile(tx, workspace_id).document)
+    counts: FloorCounts | None = None
+    left_out: list[uuid.UUID] = []
+    if floor is not None:
+        verdicts = {
+            job: job_against_floor(floor, salaries)
+            for job, salaries in store.vacancy_pay(tx, workspace_id).items()
+        }
+        counts = floor_counts(floor, verdicts.values())
+        left_out = sorted(j for j, (v, _) in verdicts.items() if v is FloorVerdict.BELOW)
     rows = store.jobs(
-        tx, workspace_id, favourites_only=favourites_only, before=before, limit=limit + 1
+        tx,
+        workspace_id,
+        favourites_only=favourites_only,
+        before=before,
+        limit=limit + 1,
+        left_out=left_out,
     )
     page, more = rows[:limit], len(rows) > limit
     views = _views(tx, page, store.copies_of_jobs(tx, [j.job_id for j in page]), now)
-    total_jobs, exemplars = store.job_totals(tx, workspace_id)
+    vacancies, exemplars = store.job_totals(tx, workspace_id)
+    total_jobs = vacancies - len(left_out)
     covered = {Coverage(k): n for k, n in store.coverage(tx, workspace_id).items()}
     return JobListing(
         views,
         more,
         total_jobs,
         exemplars,
-        store.city_counts(tx, workspace_id),
+        store.city_counts(tx, workspace_id, left_out),
         covered,
         store.advert_counts(tx, workspace_id),
-        _empty_reason(total_jobs, covered),
+        _empty_reason(total_jobs, covered, len(left_out)),
         acquisition_model_spend(
             models,
             synthetic=workspace.synthetic,
             data_mode=workspace.data_mode,
             run_limit_nano_usd=run_limit,
         ),
+        counts,
     )
 
 

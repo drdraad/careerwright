@@ -152,7 +152,7 @@ def slate(*suggestions: dict[str, Any], **extra: Any) -> dict[str, Any]:
         "family_limit": 2,
         "target_size": 6,
         "fewer_reasons": [],
-        "limits_not_applied": [],
+        "salary_floor": None,
         "unsupported_hypotheses": [],
         **extra,
     }
