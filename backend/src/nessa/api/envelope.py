@@ -37,6 +37,7 @@ STATUS: dict[ErrorCode, int] = {
     ErrorCode.ALREADY_DECIDED: 409,
     ErrorCode.SLATE_ALREADY_EXPLAINED: 409,
     ErrorCode.RUN_FINISHED: 409,
+    ErrorCode.PROTECTED_GATE: 409,
     ErrorCode.INTERNAL_ERROR: 500,
 }
 DEFAULT_STATUS = 422

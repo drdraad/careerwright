@@ -3839,6 +3839,541 @@
         }
       }
     },
+    "/v1/workspaces/{workspace_id}/capability/matrices": {
+      "get": {
+        "tags": [
+          "capability"
+        ],
+        "summary": "Get Matrices",
+        "description": "Each target's provisional matrix, labelled with the pack's date and review states.",
+        "operationId": "list_capability_matrices",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatricesOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/capability/questions": {
+      "get": {
+        "tags": [
+          "capability"
+        ],
+        "summary": "Get Questions",
+        "description": "One question graph across the targets: gates first, then decision-impact order.",
+        "operationId": "get_capability_questions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionsOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/capability/readiness": {
+      "get": {
+        "tags": [
+          "capability"
+        ],
+        "summary": "Get Readiness",
+        "description": "Readiness, gaps and abstract actions for each target, with the versions they rest on.",
+        "operationId": "get_capability_readiness",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/capability/evidence": {
+      "post": {
+        "tags": [
+          "capability"
+        ],
+        "summary": "Post Evidence",
+        "description": "An answer about a skill, against one rubric's anchors: shared across targets.",
+        "operationId": "record_skill_evidence",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordEvidence"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityChangeOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/capability/statements": {
+      "post": {
+        "tags": [
+          "capability"
+        ],
+        "summary": "Post Statement",
+        "description": "Whether the person holds a credential, experience or eligibility requirement.",
+        "operationId": "record_requirement_statement",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordStatement"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityChangeOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/capability/edits": {
+      "post": {
+        "tags": [
+          "capability"
+        ],
+        "summary": "Post Edit",
+        "description": "Set a row's importance or challenge its source. A protected gate is never demoted\n(`PROTECTED_GATE`); relaxing an employer's requirement needs the warning acknowledged.",
+        "operationId": "edit_matrix_row",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditRow"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityChangeOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Nothing changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityChangeOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/capability/questions/state": {
+      "put": {
+        "tags": [
+          "capability"
+        ],
+        "summary": "Put Questions State",
+        "description": "Stop or pause the questions (every open question is kept), or resume them.",
+        "operationId": "set_capability_questions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetQuestions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityChangeOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/taxonomy": {
       "get": {
         "tags": [
@@ -4290,6 +4825,86 @@
   },
   "components": {
     "schemas": {
+      "AbstractAction": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "review_postings_and_apply",
+              "learn",
+              "demonstrate",
+              "obtain_credential",
+              "gain_experience",
+              "resolve_eligibility",
+              "verify",
+              "check_employer_acceptance"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "rows": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "mandatory": {
+            "type": "boolean",
+            "title": "Mandatory"
+          },
+          "prerequisites": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Prerequisites"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateOption"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "outside_planning_model"
+            ],
+            "title": "State",
+            "default": "open"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action_id",
+          "kind",
+          "label",
+          "rows",
+          "mandatory"
+        ],
+        "title": "AbstractAction"
+      },
       "AcquisitionOut": {
         "properties": {
           "run": {
@@ -4757,6 +5372,18 @@
         ],
         "title": "AiResilienceOut"
       },
+      "Answer": {
+        "type": "string",
+        "enum": [
+          "done_independently",
+          "done_with_help",
+          "understand_not_tried",
+          "not_learned",
+          "unsure"
+        ],
+        "title": "Answer",
+        "description": "The five answers the interview pattern distinguishes, each in the same neutral tone."
+      },
       "AnsweredState": {
         "type": "string",
         "enum": [
@@ -4768,6 +5395,109 @@
         "title": "AnsweredState",
         "description": "A proposal answers a field; it never returns one to \"not asked\"."
       },
+      "AppliedEdit": {
+        "properties": {
+          "edit_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Edit Id"
+          },
+          "row_id": {
+            "type": "string",
+            "title": "Row Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "set_importance",
+              "challenge"
+            ],
+            "title": "Action"
+          },
+          "importance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Importance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "warning_acknowledged": {
+            "type": "boolean",
+            "title": "Warning Acknowledged"
+          },
+          "recorded_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Recorded By"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          },
+          "from_matrix_version": {
+            "type": "string",
+            "title": "From Matrix Version"
+          },
+          "from_definition_version": {
+            "type": "string",
+            "title": "From Definition Version"
+          },
+          "to_matrix_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Matrix Version"
+          },
+          "to_definition_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Definition Version"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "row_missing"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "edit_id",
+          "row_id",
+          "action",
+          "importance",
+          "reason",
+          "warning_acknowledged",
+          "recorded_by",
+          "recorded_at",
+          "from_matrix_version",
+          "from_definition_version",
+          "status"
+        ],
+        "title": "AppliedEdit"
+      },
       "AshePeriod": {
         "type": "string",
         "enum": [
@@ -4777,6 +5507,151 @@
         ],
         "title": "AshePeriod",
         "description": "The period a table gives pay per. A month has no ASHE table, and no figure is ever\nconverted between periods (annualising needs hours; spec section 5)."
+      },
+      "Assessment": {
+        "properties": {
+          "target_key": {
+            "type": "string",
+            "title": "Target Key"
+          },
+          "target_title": {
+            "type": "string",
+            "title": "Target Title"
+          },
+          "matrix_version": {
+            "type": "string",
+            "title": "Matrix Version"
+          },
+          "definition_version": {
+            "type": "string",
+            "title": "Definition Version"
+          },
+          "evidence_version": {
+            "type": "integer",
+            "title": "Evidence Version"
+          },
+          "pack_version": {
+            "type": "string",
+            "title": "Pack Version"
+          },
+          "reference_version": {
+            "type": "string",
+            "title": "Reference Version"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "title": "Synthetic"
+          },
+          "scenario": {
+            "type": "string",
+            "enum": [
+              "current",
+              "conditional"
+            ],
+            "title": "Scenario"
+          },
+          "completed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Completed"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ReadinessState"
+          },
+          "primary_action": {
+            "$ref": "#/components/schemas/PrimaryAction"
+          },
+          "training_required": {
+            "type": "boolean",
+            "title": "Training Required"
+          },
+          "show_route_chart": {
+            "type": "boolean",
+            "title": "Show Route Chart"
+          },
+          "qualifications": {
+            "items": {
+              "$ref": "#/components/schemas/Qualification"
+            },
+            "type": "array",
+            "title": "Qualifications"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowAssessment"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/Blocker"
+            },
+            "type": "array",
+            "title": "Blockers"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/Gap"
+            },
+            "type": "array",
+            "title": "Gaps"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/AbstractAction"
+            },
+            "type": "array",
+            "title": "Actions"
+          },
+          "employer_checks": {
+            "items": {
+              "$ref": "#/components/schemas/EmployerCheck"
+            },
+            "type": "array",
+            "title": "Employer Checks"
+          },
+          "optional_development": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Optional Development"
+          },
+          "not_modelled_rows": {
+            "type": "integer",
+            "title": "Not Modelled Rows"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_key",
+          "target_title",
+          "matrix_version",
+          "definition_version",
+          "evidence_version",
+          "pack_version",
+          "reference_version",
+          "synthetic",
+          "scenario",
+          "completed",
+          "state",
+          "primary_action",
+          "training_required",
+          "show_route_chart",
+          "qualifications",
+          "rows",
+          "blockers",
+          "gaps",
+          "actions",
+          "employer_checks",
+          "optional_development",
+          "not_modelled_rows"
+        ],
+        "title": "Assessment"
       },
       "AssessmentState": {
         "type": "string",
@@ -4961,6 +5836,24 @@
         "title": "Basis",
         "description": "How an answer relates to what the person said (spec section 3: factual confirmations\nand inferences are styled differently)."
       },
+      "Blocker": {
+        "properties": {
+          "row_id": {
+            "type": "string",
+            "title": "Row Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RowStatus"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "row_id",
+          "kind"
+        ],
+        "title": "Blocker"
+      },
       "BodyNotKept": {
         "type": "string",
         "enum": [
@@ -4972,6 +5865,189 @@
         ],
         "title": "BodyNotKept",
         "description": "Why a body its rights class may keep was not kept: personal details in it could not\nbe removed (`pages.redact_page`), so only its hash and excerpts are. Each applies to any\nscript, JSON-LD or not (fix round 3 corrects 0020's wording, re-review 3 A R3-1)."
+      },
+      "CandidateOption": {
+        "properties": {
+          "outcome_id": {
+            "type": "string",
+            "title": "Outcome Id"
+          },
+          "option_id": {
+            "type": "string",
+            "title": "Option Id"
+          },
+          "offering_id": {
+            "type": "string",
+            "title": "Offering Id"
+          },
+          "option_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Option Title"
+          },
+          "outcome_type": {
+            "$ref": "#/components/schemas/OutcomeType"
+          },
+          "evidence_kind": {
+            "$ref": "#/components/schemas/EvidenceKind"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/Confidence"
+          },
+          "level_on_completion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level On Completion"
+          },
+          "review_state": {
+            "$ref": "#/components/schemas/OutcomeReview"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "addresses": {
+            "type": "boolean",
+            "title": "Addresses"
+          },
+          "numeric_use": {
+            "type": "string",
+            "enum": [
+              "usable",
+              "excluded_missing_level",
+              "excluded_not_accepted",
+              "not_a_level"
+            ],
+            "title": "Numeric Use"
+          },
+          "months_minimum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Months Minimum"
+          },
+          "outside_planning_model": {
+            "type": "boolean",
+            "title": "Outside Planning Model"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "outcome_id",
+          "option_id",
+          "offering_id",
+          "option_title",
+          "outcome_type",
+          "evidence_kind",
+          "confidence",
+          "level_on_completion",
+          "review_state",
+          "provenance",
+          "addresses",
+          "numeric_use",
+          "months_minimum",
+          "outside_planning_model"
+        ],
+        "title": "CandidateOption",
+        "description": "An option whose planned outcome maps to the gap's row: \"expected to address\", never a\nrecommendation, and never a reason the gap is closed."
+      },
+      "CapabilityChangeOut": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "questions_stopped": {
+            "type": "boolean",
+            "title": "Questions Stopped"
+          },
+          "recorded_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded Id"
+          },
+          "matrix_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matrix Version"
+          },
+          "definition_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "questions_stopped",
+          "recorded_id",
+          "matrix_version",
+          "definition_version"
+        ],
+        "title": "CapabilityChangeOut"
+      },
+      "Challenge": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "recorded_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Recorded By"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "recorded_by",
+          "recorded_at"
+        ],
+        "title": "Challenge"
       },
       "ChooseTarget": {
         "properties": {
@@ -5091,6 +6167,105 @@
         ],
         "title": "ClaimOut"
       },
+      "ClaimSpan": {
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "title": "Claim Id"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "pointer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pointer"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Retrieved At"
+          },
+          "occurrences": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurrences"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "claim_id",
+          "source_id",
+          "url",
+          "sha256",
+          "start",
+          "end",
+          "pointer",
+          "excerpt",
+          "retrieved_at",
+          "occurrences"
+        ],
+        "title": "ClaimSpan",
+        "description": "A SourceClaim's location: offsets into the hashed text, or a JSON pointer."
+      },
+      "Confidence": {
+        "type": "string",
+        "enum": [
+          "unsupported",
+          "provisional",
+          "corroborated"
+        ],
+        "title": "Confidence",
+        "description": "Categorical support from the source, never a model-generated probability."
+      },
       "ConnectionCheckResult": {
         "properties": {
           "suggested_title": {
@@ -5120,6 +6295,27 @@
         ],
         "title": "ConversationMode",
         "description": "The tone the person chose (spec section 4, \"Uncertainty and emotional comfort\")."
+      },
+      "Count": {
+        "properties": {
+          "mentioned": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Mentioned"
+          },
+          "of": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Of"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mentioned",
+          "of"
+        ],
+        "title": "Count"
       },
       "Coverage": {
         "type": "string",
@@ -5511,6 +6707,78 @@
         "title": "DiscoveryProposalOut",
         "description": "The validated searches. They name no suggestion: the slate is computed from them."
       },
+      "EditRow": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "description": "0 while nothing has been recorded."
+          },
+          "target": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Target",
+            "description": "One of the profile's target titles."
+          },
+          "matrix_version": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Matrix Version",
+            "description": "The matrix shown."
+          },
+          "row_id": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Row Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "set_importance",
+              "challenge"
+            ],
+            "title": "Action"
+          },
+          "importance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Importance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "warning_acknowledged": {
+            "type": "boolean",
+            "title": "Warning Acknowledged",
+            "description": "The person read that relaxing an employer's requirement may leave the plan unable to satisfy those postings.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "target",
+          "matrix_version",
+          "row_id",
+          "action",
+          "reason"
+        ],
+        "title": "EditRow",
+        "description": "Set a row's importance, or challenge its source, at the checkpoint."
+      },
       "Emphasis": {
         "type": "string",
         "enum": [
@@ -5522,6 +6790,60 @@
         ],
         "title": "Emphasis",
         "description": "The slate controls (REC1-08)."
+      },
+      "EmployerCheck": {
+        "properties": {
+          "row_id": {
+            "type": "string",
+            "title": "Row Id"
+          },
+          "requirement_id": {
+            "type": "string",
+            "title": "Requirement Id"
+          },
+          "posting_id": {
+            "type": "string",
+            "title": "Posting Id"
+          },
+          "posting_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Posting Title"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "row_id",
+          "requirement_id",
+          "posting_id",
+          "posting_title",
+          "text",
+          "kind"
+        ],
+        "title": "EmployerCheck",
+        "description": "A posting's own essential requirement: check it against that posting before applying."
       },
       "EmptyReason": {
         "type": "string",
@@ -5675,6 +6997,47 @@
         "title": "ErrorStage",
         "description": "Which part of the product the failure affects."
       },
+      "EscoLink": {
+        "properties": {
+          "skill_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Skill Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "skill_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Type"
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "essential",
+              "optional"
+            ],
+            "title": "Relation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "skill_id",
+          "label",
+          "skill_type",
+          "relation"
+        ],
+        "title": "EscoLink"
+      },
       "EventKind": {
         "type": "string",
         "enum": [
@@ -5692,7 +7055,8 @@
           "research.updated",
           "concept.provisional_created",
           "interview.turn_decided",
-          "interview.preferences_updated"
+          "interview.preferences_updated",
+          "capability.updated"
         ],
         "title": "EventKind"
       },
@@ -5774,6 +7138,28 @@
           "last_seq"
         ],
         "title": "EventPage"
+      },
+      "EvidenceContext": {
+        "type": "string",
+        "enum": [
+          "paid_work",
+          "study",
+          "volunteering",
+          "caring",
+          "other"
+        ],
+        "title": "EvidenceContext",
+        "description": "Where it was done: transferable evidence from any of these counts."
+      },
+      "EvidenceKind": {
+        "type": "string",
+        "enum": [
+          "topic_mention",
+          "practice",
+          "assessed_work_sample",
+          "exam"
+        ],
+        "title": "EvidenceKind"
       },
       "EvidenceOut": {
         "properties": {
@@ -6125,6 +7511,173 @@
         "title": "FreshnessOut",
         "description": "How current a source's data is, from its last successful retrieval (spec section 11).\nA failed refresh moves `last_attempt_at` only."
       },
+      "Gap": {
+        "properties": {
+          "gap_id": {
+            "type": "string",
+            "title": "Gap Id"
+          },
+          "row_id": {
+            "type": "string",
+            "title": "Row Id"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/GapKind"
+          },
+          "mandatory": {
+            "type": "boolean",
+            "title": "Mandatory"
+          },
+          "required_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Level"
+          },
+          "evidenced_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidenced Level"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Evidence Ids"
+          },
+          "statement_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statement Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "gap_id",
+          "row_id",
+          "subject",
+          "label",
+          "kind",
+          "mandatory",
+          "required_level",
+          "evidenced_level",
+          "evidence_ids",
+          "statement_id"
+        ],
+        "title": "Gap"
+      },
+      "GapKind": {
+        "type": "string",
+        "enum": [
+          "learn",
+          "demonstrate",
+          "credential",
+          "experience",
+          "eligibility",
+          "information",
+          "preference_conflict"
+        ],
+        "title": "GapKind"
+      },
+      "GateInfo": {
+        "properties": {
+          "gate_key": {
+            "type": "string",
+            "title": "Gate Key"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/GateKind"
+          },
+          "protected": {
+            "type": "boolean",
+            "const": true,
+            "title": "Protected",
+            "default": true
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "issuing_body": {
+            "type": "string",
+            "title": "Issuing Body"
+          },
+          "jurisdiction": {
+            "type": "string",
+            "title": "Jurisdiction"
+          },
+          "verification": {
+            "type": "string",
+            "title": "Verification"
+          },
+          "acceptable_proof": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Acceptable Proof"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "gate_key",
+          "kind",
+          "label",
+          "issuing_body",
+          "jurisdiction",
+          "verification",
+          "acceptable_proof"
+        ],
+        "title": "GateInfo"
+      },
+      "GateKind": {
+        "type": "string",
+        "enum": [
+          "legal_practice",
+          "recognition",
+          "admission",
+          "eligibility"
+        ],
+        "title": "GateKind",
+        "description": "The protected gate types (spec section 8): a preference toggle never removes one."
+      },
       "Health": {
         "properties": {
           "status": {
@@ -6138,6 +7691,15 @@
           "status"
         ],
         "title": "Health"
+      },
+      "Holding": {
+        "type": "string",
+        "enum": [
+          "held",
+          "not_held",
+          "unknown"
+        ],
+        "title": "Holding"
       },
       "HoursField": {
         "properties": {
@@ -6268,6 +7830,16 @@
           "gradient"
         ],
         "title": "IloExposureOut"
+      },
+      "Importance": {
+        "type": "string",
+        "enum": [
+          "essential",
+          "preferred",
+          "disputed",
+          "unknown"
+        ],
+        "title": "Importance"
       },
       "InputRoute": {
         "type": "string",
@@ -6804,6 +8376,435 @@
         "title": "MatchType",
         "description": "The crosswalk's SKOS match types: how close an O*NET occupation is to its ESCO one."
       },
+      "MatricesOut": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "questions_stopped": {
+            "type": "boolean",
+            "title": "Questions Stopped"
+          },
+          "profile_version": {
+            "type": "integer",
+            "title": "Profile Version"
+          },
+          "pack": {
+            "$ref": "#/components/schemas/PackLabel"
+          },
+          "reference": {
+            "$ref": "#/components/schemas/ReferenceLabel"
+          },
+          "matrices": {
+            "items": {
+              "$ref": "#/components/schemas/Matrix"
+            },
+            "type": "array",
+            "title": "Matrices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "questions_stopped",
+          "profile_version",
+          "pack",
+          "reference",
+          "matrices"
+        ],
+        "title": "MatricesOut"
+      },
+      "Matrix": {
+        "properties": {
+          "target_key": {
+            "type": "string",
+            "title": "Target Key"
+          },
+          "target_title": {
+            "type": "string",
+            "title": "Target Title"
+          },
+          "status": {
+            "type": "string",
+            "const": "provisional_no_specialist_review",
+            "title": "Status",
+            "default": "provisional_no_specialist_review"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "title": "Synthetic",
+            "default": false
+          },
+          "jurisdiction": {
+            "type": "string",
+            "const": "GB-ENG",
+            "title": "Jurisdiction",
+            "default": "GB-ENG"
+          },
+          "matrix_version": {
+            "type": "string",
+            "title": "Matrix Version",
+            "default": ""
+          },
+          "definition_version": {
+            "type": "string",
+            "title": "Definition Version",
+            "default": ""
+          },
+          "sources": {
+            "$ref": "#/components/schemas/MatrixSources"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/MatrixCoverage"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/MatrixRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "edits": {
+            "items": {
+              "$ref": "#/components/schemas/AppliedEdit"
+            },
+            "type": "array",
+            "title": "Edits"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_key",
+          "target_title",
+          "sources",
+          "coverage",
+          "rows"
+        ],
+        "title": "Matrix"
+      },
+      "MatrixCoverage": {
+        "properties": {
+          "exemplars": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Exemplars"
+          },
+          "exemplar_rows_read": {
+            "type": "boolean",
+            "const": false,
+            "title": "Exemplar Rows Read",
+            "default": false
+          },
+          "full_text_vacancies": {
+            "type": "integer",
+            "title": "Full Text Vacancies"
+          },
+          "snippet_vacancies": {
+            "type": "integer",
+            "title": "Snippet Vacancies"
+          },
+          "unknown_description_vacancies": {
+            "type": "integer",
+            "title": "Unknown Description Vacancies"
+          },
+          "posting_copies": {
+            "type": "integer",
+            "title": "Posting Copies"
+          },
+          "esco_essential": {
+            "type": "integer",
+            "title": "Esco Essential"
+          },
+          "esco_optional": {
+            "type": "integer",
+            "title": "Esco Optional"
+          },
+          "modelled_rows": {
+            "type": "integer",
+            "title": "Modelled Rows"
+          },
+          "not_modelled_rows": {
+            "type": "integer",
+            "title": "Not Modelled Rows"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "exemplars",
+          "full_text_vacancies",
+          "snippet_vacancies",
+          "unknown_description_vacancies",
+          "posting_copies",
+          "esco_essential",
+          "esco_optional",
+          "modelled_rows",
+          "not_modelled_rows"
+        ],
+        "title": "MatrixCoverage"
+      },
+      "MatrixRow": {
+        "properties": {
+          "row_id": {
+            "type": "string",
+            "title": "Row Id"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RowKind"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/RowScope",
+            "default": "target"
+          },
+          "importance": {
+            "$ref": "#/components/schemas/Importance"
+          },
+          "source_importance": {
+            "$ref": "#/components/schemas/Importance"
+          },
+          "gate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GateInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observable_task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observable Task"
+          },
+          "required_level": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Level"
+          },
+          "rubric": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RubricView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "acceptable_proof": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Acceptable Proof"
+          },
+          "prerequisites": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Prerequisites"
+          },
+          "prevalence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Prevalence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/PostingCitation"
+            },
+            "type": "array",
+            "title": "Citations"
+          },
+          "esco": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EscoLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "uncertainty": {
+            "items": {
+              "$ref": "#/components/schemas/Uncertainty"
+            },
+            "type": "array",
+            "title": "Uncertainty"
+          },
+          "challenges": {
+            "items": {
+              "$ref": "#/components/schemas/Challenge"
+            },
+            "type": "array",
+            "title": "Challenges"
+          },
+          "jurisdiction": {
+            "type": "string",
+            "title": "Jurisdiction",
+            "default": "GB-ENG"
+          },
+          "review_state": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "reviewed"
+            ],
+            "title": "Review State",
+            "default": "proposed"
+          },
+          "employer_specific": {
+            "type": "boolean",
+            "title": "Employer Specific",
+            "default": false
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "description": "In the target definition: a protected gate, or essential or disputed.",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "row_id",
+          "subject",
+          "label",
+          "kind",
+          "importance",
+          "source_importance",
+          "required"
+        ],
+        "title": "MatrixRow"
+      },
+      "MatrixSources": {
+        "properties": {
+          "pack_version": {
+            "type": "string",
+            "title": "Pack Version"
+          },
+          "pack_dated": {
+            "type": "string",
+            "format": "date",
+            "title": "Pack Dated"
+          },
+          "reference_version": {
+            "type": "string",
+            "title": "Reference Version"
+          },
+          "reference_dated": {
+            "type": "string",
+            "format": "date",
+            "title": "Reference Dated"
+          },
+          "reference_review_state": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "reviewed"
+            ],
+            "title": "Reference Review State"
+          },
+          "esco_release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Esco Release"
+          },
+          "occupation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OccupationLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "occupation_note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OccupationNote"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pack_target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PackTargetLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pack_version",
+          "pack_dated",
+          "reference_version",
+          "reference_dated",
+          "reference_review_state",
+          "esco_release",
+          "occupation",
+          "occupation_note",
+          "pack_target"
+        ],
+        "title": "MatrixSources"
+      },
+      "Method": {
+        "type": "string",
+        "enum": [
+          "self_report",
+          "work_sample",
+          "assessment"
+        ],
+        "title": "Method"
+      },
       "ModelExtractionOut": {
         "properties": {
           "state": {
@@ -7249,6 +9250,57 @@
         ],
         "title": "OccupationHitOut"
       },
+      "OccupationLink": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "esco_label",
+              "pack_crosswalk"
+            ],
+            "title": "Basis"
+          },
+          "regulated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regulated"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "label",
+          "basis",
+          "regulated"
+        ],
+        "title": "OccupationLink"
+      },
+      "OccupationNote": {
+        "type": "string",
+        "enum": [
+          "no_exact_esco_label",
+          "ambiguous_esco_label",
+          "not_in_held_taxonomy"
+        ],
+        "title": "OccupationNote",
+        "description": "Why a matrix has no ESCO seed."
+      },
       "OccupationOut": {
         "properties": {
           "concept_id": {
@@ -7488,6 +9540,84 @@
           "top_tasks"
         ],
         "title": "OnetMatchOut"
+      },
+      "OutcomeReview": {
+        "type": "string",
+        "enum": [
+          "proposed",
+          "accepted_assumption",
+          "reviewed",
+          "rejected"
+        ],
+        "title": "OutcomeReview"
+      },
+      "OutcomeType": {
+        "type": "string",
+        "enum": [
+          "skill_level",
+          "credential",
+          "supervised_experience"
+        ],
+        "title": "OutcomeType"
+      },
+      "PackLabel": {
+        "properties": {
+          "pack_version": {
+            "type": "string",
+            "title": "Pack Version"
+          },
+          "dated": {
+            "type": "string",
+            "format": "date",
+            "title": "Dated"
+          },
+          "label_review": {
+            "type": "string",
+            "title": "Label Review"
+          },
+          "records_proposed": {
+            "type": "integer",
+            "title": "Records Proposed"
+          },
+          "records_reviewed": {
+            "type": "integer",
+            "title": "Records Reviewed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pack_version",
+          "dated",
+          "label_review",
+          "records_proposed",
+          "records_reviewed"
+        ],
+        "title": "PackLabel",
+        "description": "The option pack's date and review states, shown wherever its records are (R9)."
+      },
+      "PackTargetLink": {
+        "properties": {
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_id",
+          "title",
+          "city"
+        ],
+        "title": "PackTargetLink"
       },
       "PartialCompleteness": {
         "type": "string",
@@ -7916,6 +10046,111 @@
         ],
         "title": "PoolQueryOut"
       },
+      "PostingCitation": {
+        "properties": {
+          "requirement_id": {
+            "type": "string",
+            "title": "Requirement Id"
+          },
+          "posting_id": {
+            "type": "string",
+            "title": "Posting Id"
+          },
+          "vacancy_id": {
+            "type": "string",
+            "title": "Vacancy Id"
+          },
+          "posting_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Posting Title"
+          },
+          "stated_kind": {
+            "type": "string",
+            "title": "Stated Kind"
+          },
+          "stated_importance": {
+            "$ref": "#/components/schemas/Importance"
+          },
+          "gate_words": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gate Words"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "description_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "snippet"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Kind"
+          },
+          "review_state": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "reviewed"
+            ],
+            "title": "Review State"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "claim": {
+            "$ref": "#/components/schemas/ClaimSpan"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "requirement_id",
+          "posting_id",
+          "vacancy_id",
+          "posting_title",
+          "stated_kind",
+          "stated_importance",
+          "gate_words",
+          "text",
+          "description_kind",
+          "review_state",
+          "as_of",
+          "claim"
+        ],
+        "title": "PostingCitation",
+        "description": "One posting's requirement row behind a matrix row, as the pack records it."
+      },
       "PreferencesOut": {
         "properties": {
           "version": {
@@ -7971,6 +10206,32 @@
         ],
         "title": "PreferencesOut",
         "description": "How the person chose to start and to be interviewed, and whether it is paused. Null:\nnot chosen yet (the interviewer then keeps to the practical mode)."
+      },
+      "Prevalence": {
+        "properties": {
+          "full_text": {
+            "$ref": "#/components/schemas/Count"
+          },
+          "snippet": {
+            "$ref": "#/components/schemas/Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "full_text",
+          "snippet"
+        ],
+        "title": "Prevalence",
+        "description": "Distinct vacancies naming the row. `full_text` counts vacancies with a full\ndescription; `snippet` counts the rest (snippets, or a description of unknown kind):\nsnippet prevalence, never evidence of absence and never requirement frequency."
+      },
+      "PrimaryAction": {
+        "type": "string",
+        "enum": [
+          "review_current_postings_and_apply",
+          "address_gaps"
+        ],
+        "title": "PrimaryAction"
       },
       "ProfileDocument": {
         "properties": {
@@ -8219,6 +10480,168 @@
         ],
         "title": "ProfileWriteIn"
       },
+      "Prompt": {
+        "properties": {
+          "prompt_id": {
+            "type": "string",
+            "title": "Prompt Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "requirement",
+              "skill"
+            ],
+            "title": "Kind"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/QuestionReason"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          },
+          "importance_weight": {
+            "type": "integer",
+            "title": "Importance Weight"
+          },
+          "uncertainty_weight": {
+            "type": "integer",
+            "title": "Uncertainty Weight"
+          },
+          "route_impact": {
+            "type": "integer",
+            "title": "Route Impact"
+          },
+          "burden": {
+            "type": "integer",
+            "title": "Burden"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PromptRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "gate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GateInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reuse_evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Reuse Evidence Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "prompt_id",
+          "kind",
+          "subject",
+          "label",
+          "reason",
+          "priority",
+          "importance_weight",
+          "uncertainty_weight",
+          "route_impact",
+          "burden",
+          "rows",
+          "gate",
+          "reuse_evidence_ids"
+        ],
+        "title": "Prompt"
+      },
+      "PromptRow": {
+        "properties": {
+          "target_key": {
+            "type": "string",
+            "title": "Target Key"
+          },
+          "target_title": {
+            "type": "string",
+            "title": "Target Title"
+          },
+          "row_id": {
+            "type": "string",
+            "title": "Row Id"
+          },
+          "importance": {
+            "$ref": "#/components/schemas/Importance"
+          },
+          "rubric_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rubric Version"
+          },
+          "required_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Level"
+          },
+          "observable_task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observable Task"
+          },
+          "anchors": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Anchors"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_key",
+          "target_title",
+          "row_id",
+          "importance",
+          "rubric_version",
+          "required_level",
+          "observable_task",
+          "anchors"
+        ],
+        "title": "PromptRow"
+      },
       "ProposalOrigin": {
         "type": "string",
         "enum": [
@@ -8367,6 +10790,14 @@
         ],
         "title": "ProposedChangeOut"
       },
+      "Provenance": {
+        "type": "string",
+        "enum": [
+          "provider_claim",
+          "user_override"
+        ],
+        "title": "Provenance"
+      },
       "ProvisionalConceptOut": {
         "properties": {
           "concept_id": {
@@ -8442,6 +10873,19 @@
         ],
         "title": "ProvisionalConceptPage"
       },
+      "Qualification": {
+        "type": "string",
+        "enum": [
+          "provisional_matrix",
+          "proposed_records",
+          "proposed_rubrics",
+          "self_reported_evidence",
+          "planned_outcome_assumption",
+          "user_assumption"
+        ],
+        "title": "Qualification",
+        "description": "Why a result is not unqualified. M0 matrices are always provisional."
+      },
       "QueryChannel": {
         "type": "string",
         "enum": [
@@ -8484,6 +10928,139 @@
           "based_on"
         ],
         "title": "QueryOut"
+      },
+      "QuestionCoverage": {
+        "properties": {
+          "gates_known": {
+            "type": "integer",
+            "title": "Gates Known"
+          },
+          "gates": {
+            "type": "integer",
+            "title": "Gates"
+          },
+          "required_rows_with_usable_evidence": {
+            "type": "integer",
+            "title": "Required Rows With Usable Evidence"
+          },
+          "required_rows": {
+            "type": "integer",
+            "title": "Required Rows"
+          },
+          "weighted_with_usable_evidence": {
+            "type": "integer",
+            "title": "Weighted With Usable Evidence"
+          },
+          "weighted_required": {
+            "type": "integer",
+            "title": "Weighted Required"
+          },
+          "unresolved": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unresolved"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "gates_known",
+          "gates",
+          "required_rows_with_usable_evidence",
+          "required_rows",
+          "weighted_with_usable_evidence",
+          "weighted_required",
+          "unresolved"
+        ],
+        "title": "QuestionCoverage"
+      },
+      "QuestionGraph": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "asking",
+              "enough",
+              "stopped"
+            ],
+            "title": "State"
+          },
+          "evidence_version": {
+            "type": "integer",
+            "title": "Evidence Version"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/TargetVersions"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "prompts": {
+            "items": {
+              "$ref": "#/components/schemas/Prompt"
+            },
+            "type": "array",
+            "title": "Prompts"
+          },
+          "initial": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Initial"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/QuestionCoverage"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state",
+          "evidence_version",
+          "targets",
+          "prompts",
+          "initial",
+          "coverage"
+        ],
+        "title": "QuestionGraph"
+      },
+      "QuestionReason": {
+        "type": "string",
+        "enum": [
+          "not_stated",
+          "unverified",
+          "no_evidence",
+          "unsupported_claim",
+          "other_rubric",
+          "conflict"
+        ],
+        "title": "QuestionReason"
+      },
+      "QuestionsOut": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "profile_version": {
+            "type": "integer",
+            "title": "Profile Version"
+          },
+          "graph": {
+            "$ref": "#/components/schemas/QuestionGraph"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "profile_version",
+          "graph"
+        ],
+        "title": "QuestionsOut"
       },
       "QuotationOut": {
         "properties": {
@@ -8536,6 +11113,238 @@
         ],
         "title": "QuoteSource"
       },
+      "ReadinessOut": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "profile_version": {
+            "type": "integer",
+            "title": "Profile Version"
+          },
+          "pack": {
+            "$ref": "#/components/schemas/PackLabel"
+          },
+          "assessments": {
+            "items": {
+              "$ref": "#/components/schemas/Assessment"
+            },
+            "type": "array",
+            "title": "Assessments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "profile_version",
+          "pack",
+          "assessments"
+        ],
+        "title": "ReadinessOut"
+      },
+      "ReadinessState": {
+        "type": "string",
+        "enum": [
+          "ready_now_for_modelled_requirements",
+          "conditional_on_assessed_completion",
+          "not_ready"
+        ],
+        "title": "ReadinessState"
+      },
+      "RecordEvidence": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "description": "0 while nothing has been recorded."
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Subject"
+          },
+          "rubric_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rubric Version"
+          },
+          "answer": {
+            "$ref": "#/components/schemas/Answer"
+          },
+          "self_assessed_level": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Self Assessed Level"
+          },
+          "example": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example"
+          },
+          "last_done": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Done"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvidenceContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "independence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "independent",
+                  "with_help"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Independence"
+          },
+          "complexity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "routine",
+                  "complex"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Complexity"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
+          },
+          "ai_assisted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Assisted"
+          },
+          "method": {
+            "$ref": "#/components/schemas/Method",
+            "default": "self_report"
+          },
+          "demonstrated_level": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Demonstrated Level"
+          },
+          "assessed_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessed By"
+          },
+          "reviewed_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed On"
+          },
+          "outcome_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "subject",
+          "answer"
+        ],
+        "title": "RecordEvidence",
+        "description": "An answer about a skill: the level is chosen against `rubric_version`'s anchors."
+      },
       "RecordPart": {
         "type": "string",
         "enum": [
@@ -8544,6 +11353,82 @@
           "essential_skill"
         ],
         "title": "RecordPart"
+      },
+      "RecordStatement": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "description": "0 while nothing has been recorded."
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Subject"
+          },
+          "holding": {
+            "$ref": "#/components/schemas/Holding"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified",
+            "description": "Checked at its source: a register, a right to work check."
+          },
+          "verification_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "subject",
+          "holding",
+          "verified"
+        ],
+        "title": "RecordStatement",
+        "description": "Whether the person holds a credential, experience or eligibility requirement."
+      },
+      "ReferenceLabel": {
+        "properties": {
+          "reference_version": {
+            "type": "string",
+            "title": "Reference Version"
+          },
+          "dated": {
+            "type": "string",
+            "format": "date",
+            "title": "Dated"
+          },
+          "review_state": {
+            "type": "string",
+            "title": "Review State"
+          },
+          "label_review": {
+            "type": "string",
+            "title": "Label Review"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reference_version",
+          "dated",
+          "review_state",
+          "label_review"
+        ],
+        "title": "ReferenceLabel",
+        "description": "The rubrics, crosswalks and gate types' version and review state."
       },
       "ReferenceReleaseOut": {
         "properties": {
@@ -8798,6 +11683,311 @@
         ],
         "title": "RightsClass",
         "description": "The page classes of the session 1 rights policy (H-06; `corpus/README.md`)."
+      },
+      "RowAssessment": {
+        "properties": {
+          "row_id": {
+            "type": "string",
+            "title": "Row Id"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RowKind"
+          },
+          "importance": {
+            "$ref": "#/components/schemas/Importance"
+          },
+          "mandatory": {
+            "type": "boolean",
+            "title": "Mandatory"
+          },
+          "protected": {
+            "type": "boolean",
+            "title": "Protected"
+          },
+          "required_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Level"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RowStatus"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "statement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatementView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "planned_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Level"
+          },
+          "eligible_to_apply_after_completion": {
+            "type": "boolean",
+            "title": "Eligible To Apply After Completion",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "row_id",
+          "subject",
+          "label",
+          "kind",
+          "importance",
+          "mandatory",
+          "protected",
+          "required_level",
+          "status",
+          "evidence",
+          "statement"
+        ],
+        "title": "RowAssessment"
+      },
+      "RowEvidence": {
+        "properties": {
+          "level": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "demonstrated",
+              "self_reported",
+              "none"
+            ],
+            "title": "Basis"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Confidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "self_assessed_level": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Self Assessed Level"
+          },
+          "demonstrated_level": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Demonstrated Level"
+          },
+          "last_done": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Done"
+          },
+          "independence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "independent",
+                  "with_help"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Independence"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
+          },
+          "ai_assisted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Assisted"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Evidence Ids"
+          },
+          "shared_from_other_rubric": {
+            "type": "boolean",
+            "title": "Shared From Other Rubric"
+          },
+          "conflict": {
+            "type": "boolean",
+            "title": "Conflict"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "level",
+          "basis",
+          "confidence",
+          "self_assessed_level",
+          "demonstrated_level",
+          "last_done",
+          "independence",
+          "tools",
+          "ai_assisted",
+          "evidence_ids",
+          "shared_from_other_rubric",
+          "conflict"
+        ],
+        "title": "RowEvidence",
+        "description": "What one row reads from the evidence on its subject, against its own rubric."
+      },
+      "RowKind": {
+        "type": "string",
+        "enum": [
+          "skill",
+          "task",
+          "credential",
+          "experience",
+          "eligibility"
+        ],
+        "title": "RowKind",
+        "description": "Credentials, experience and eligibility are distinct from learnable skills (spec\nsection 8): only skills and tasks have levels."
+      },
+      "RowScope": {
+        "type": "string",
+        "enum": [
+          "target",
+          "posting"
+        ],
+        "title": "RowScope"
+      },
+      "RowStatus": {
+        "type": "string",
+        "enum": [
+          "met",
+          "below_required",
+          "no_usable_evidence",
+          "not_modelled",
+          "satisfied",
+          "not_held",
+          "unresolved",
+          "pathway_outside_model"
+        ],
+        "title": "RowStatus"
+      },
+      "RubricView": {
+        "properties": {
+          "version_id": {
+            "type": "string",
+            "title": "Version Id"
+          },
+          "anchors": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Anchors"
+          },
+          "review_state": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "reviewed"
+            ],
+            "title": "Review State"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version_id",
+          "anchors",
+          "review_state"
+        ],
+        "title": "RubricView"
       },
       "RunCancelOut": {
         "properties": {
@@ -9575,6 +12765,28 @@
         ],
         "title": "SetPreferences",
         "description": "The whole set of preferences; null means not chosen."
+      },
+      "SetQuestions": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "description": "0 while nothing has been recorded."
+          },
+          "stopped": {
+            "type": "boolean",
+            "title": "Stopped",
+            "description": "Stop or pause the questions; false resumes them."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "stopped"
+        ],
+        "title": "SetQuestions"
       },
       "SetSpendLimits": {
         "properties": {
@@ -10649,6 +13861,30 @@
         ],
         "title": "SpendState"
       },
+      "StatementView": {
+        "properties": {
+          "statement_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Statement Id"
+          },
+          "holding": {
+            "$ref": "#/components/schemas/Holding"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "statement_id",
+          "holding",
+          "verified"
+        ],
+        "title": "StatementView"
+      },
       "Statistic": {
         "type": "string",
         "enum": [
@@ -11281,6 +14517,35 @@
         ],
         "title": "TargetStatus"
       },
+      "TargetVersions": {
+        "properties": {
+          "target_key": {
+            "type": "string",
+            "title": "Target Key"
+          },
+          "target_title": {
+            "type": "string",
+            "title": "Target Title"
+          },
+          "matrix_version": {
+            "type": "string",
+            "title": "Matrix Version"
+          },
+          "definition_version": {
+            "type": "string",
+            "title": "Definition Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_key",
+          "target_title",
+          "matrix_version",
+          "definition_version"
+        ],
+        "title": "TargetVersions"
+      },
       "TaskListInput": {
         "properties": {
           "state": {
@@ -11850,6 +15115,24 @@
         ],
         "title": "UkSocMappingOut",
         "description": "ESCO occupation to UK SOC 2020, with every candidate kept (TAX1-02)."
+      },
+      "Uncertainty": {
+        "type": "string",
+        "enum": [
+          "esco_seed_only",
+          "importance_disputed",
+          "importance_unknown",
+          "no_rubric",
+          "snippet_signal_only",
+          "one_posting_only",
+          "proposed_sources",
+          "proposed_rubric",
+          "proposed_crosswalk",
+          "set_by_person",
+          "relaxed_by_person",
+          "challenged"
+        ],
+        "title": "Uncertainty"
       },
       "UnscoredReason": {
         "type": "string",

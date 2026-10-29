@@ -40,7 +40,6 @@ from nessa.catalogue.option_pack import (
     Claim,
     JobPosting,
     Pack,
-    ReviewState,
     Skill,
     SkillRequirement,
     Source,
@@ -149,7 +148,7 @@ class PostingCitation(StrictModel):
     gate_words: str | None
     text: str | None
     description_kind: Literal["full", "snippet"] | None
-    review_state: ReviewState
+    review_state: Literal["proposed", "reviewed"]  # the pack record's
     as_of: date  # its retrieval date: never "current"
     claim: ClaimSpan
 
@@ -262,7 +261,7 @@ class MatrixSources(StrictModel):
     pack_target: PackTargetLink | None
 
 
-class Coverage(StrictModel):
+class MatrixCoverage(StrictModel):
     exemplars: int = Field(ge=0, le=3)  # the person's own full-text examples
     # Requirement rows are not yet read from the person's examples (ADR 0012): counted only.
     exemplar_rows_read: Literal[False] = False
@@ -306,7 +305,7 @@ class Matrix(StrictModel):
     matrix_version: str = ""
     definition_version: str = ""
     sources: MatrixSources
-    coverage: Coverage
+    coverage: MatrixCoverage
     rows: list[MatrixRow]
     edits: list[AppliedEdit] = Field(default_factory=list)
 
@@ -383,7 +382,7 @@ def build_matrix(
                 else None
             ),
         ),
-        coverage=Coverage(
+        coverage=MatrixCoverage(
             exemplars=exemplars,
             full_text_vacancies=sum(k == "full" for k in vacancies.values()),
             snippet_vacancies=sum(k == "snippet" for k in vacancies.values()),
@@ -487,7 +486,7 @@ class _PackRows:
             gate_words=requirement.gate,
             text=text if isinstance(text, str) else None,
             description_kind="full" if kind == "full" else "snippet" if kind == "snippet" else None,
-            review_state=requirement.review_state,
+            review_state=requirement.review_state.value,
             as_of=requirement.as_of,
             claim=ClaimSpan(
                 claim_id=claim.claim_id,
@@ -513,7 +512,7 @@ class _PackRows:
 
     def _common(self, citations: list[PostingCitation], prevalence: Prevalence) -> set[Uncertainty]:
         found: set[Uncertainty] = set()
-        if any(c.review_state is not ReviewState.REVIEWED for c in citations):
+        if any(c.review_state != "reviewed" for c in citations):
             found.add(Uncertainty.PROPOSED_SOURCES)
         if prevalence.full_text.mentioned == 0 and prevalence.snippet.mentioned > 0:
             found.add(Uncertainty.SNIPPET_SIGNAL_ONLY)
@@ -602,7 +601,7 @@ class _PackRows:
     def _posting_row(self, requirement: SkillRequirement, citation: PostingCitation) -> MatrixRow:
         kind = RowKind(requirement.kind)
         uncertainty = {Uncertainty.ONE_POSTING_ONLY, Uncertainty.IMPORTANCE_UNKNOWN}
-        if citation.review_state is not ReviewState.REVIEWED:
+        if citation.review_state != "reviewed":
             uncertainty.add(Uncertainty.PROPOSED_SOURCES)
         if kind in LEVELLED_KINDS:
             uncertainty.add(Uncertainty.NO_RUBRIC)
@@ -644,7 +643,7 @@ def _review_state(
     citations: Sequence[PostingCitation], reference: Reference
 ) -> Literal["proposed", "reviewed"]:
     reviewed = reference.review_state == "reviewed" and all(
-        c.review_state is ReviewState.REVIEWED for c in citations
+        c.review_state == "reviewed" for c in citations
     )
     return "reviewed" if reviewed else "proposed"
 

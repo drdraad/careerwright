@@ -57,6 +57,7 @@ ADAPTERS: dict[str, frozenset[str]] = {
     "nessa.profile.explanation_store": frozenset({"sqlalchemy"}),
     "nessa.catalogue.taxonomy_store": frozenset({"sqlalchemy"}),
     "nessa.catalogue.reference_store": frozenset({"sqlalchemy"}),  # Task 7 slice B, ADR 0010
+    "nessa.capability.store": frozenset({"sqlalchemy"}),  # Task 9, ADR 0012
     "nessa.identity.keyring": frozenset({"cryptography"}),
     "nessa.identity.firebase": frozenset({"firebase_admin"}),
     "nessa.identity.meta": frozenset({"httpx2", "openai", "pydantic_ai"}),

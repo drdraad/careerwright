@@ -5,6 +5,45 @@ export type ClientOptions = {
 };
 
 /**
+ * AbstractAction
+ */
+export type AbstractAction = {
+    /**
+     * Action Id
+     */
+    action_id: string;
+    /**
+     * Kind
+     */
+    kind: 'review_postings_and_apply' | 'learn' | 'demonstrate' | 'obtain_credential' | 'gain_experience' | 'resolve_eligibility' | 'verify' | 'check_employer_acceptance';
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Rows
+     */
+    rows: Array<string>;
+    /**
+     * Mandatory
+     */
+    mandatory: boolean;
+    /**
+     * Prerequisites
+     */
+    prerequisites?: Array<string>;
+    /**
+     * Candidates
+     */
+    candidates?: Array<CandidateOption>;
+    /**
+     * State
+     */
+    state?: 'open' | 'outside_planning_model';
+    code?: ErrorCode | null;
+};
+
+/**
  * AcquisitionOut
  */
 export type AcquisitionOut = {
@@ -317,6 +356,26 @@ export type AiResilienceOut = {
 };
 
 /**
+ * Answer
+ *
+ * The five answers the interview pattern distinguishes, each in the same neutral tone.
+ */
+export const Answer = {
+    DONE_INDEPENDENTLY: 'done_independently',
+    DONE_WITH_HELP: 'done_with_help',
+    UNDERSTAND_NOT_TRIED: 'understand_not_tried',
+    NOT_LEARNED: 'not_learned',
+    UNSURE: 'unsure'
+} as const;
+
+/**
+ * Answer
+ *
+ * The five answers the interview pattern distinguishes, each in the same neutral tone.
+ */
+export type Answer = typeof Answer[keyof typeof Answer];
+
+/**
  * AnsweredState
  *
  * A proposal answers a field; it never returns one to "not asked".
@@ -334,6 +393,61 @@ export const AnsweredState = {
  * A proposal answers a field; it never returns one to "not asked".
  */
 export type AnsweredState = typeof AnsweredState[keyof typeof AnsweredState];
+
+/**
+ * AppliedEdit
+ */
+export type AppliedEdit = {
+    /**
+     * Edit Id
+     */
+    edit_id: string;
+    /**
+     * Row Id
+     */
+    row_id: string;
+    /**
+     * Action
+     */
+    action: 'set_importance' | 'challenge';
+    importance: Importance | null;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Warning Acknowledged
+     */
+    warning_acknowledged: boolean;
+    /**
+     * Recorded By
+     */
+    recorded_by: string;
+    /**
+     * Recorded At
+     */
+    recorded_at: string;
+    /**
+     * From Matrix Version
+     */
+    from_matrix_version: string;
+    /**
+     * From Definition Version
+     */
+    from_definition_version: string;
+    /**
+     * To Matrix Version
+     */
+    to_matrix_version?: string | null;
+    /**
+     * To Definition Version
+     */
+    to_definition_version?: string | null;
+    /**
+     * Status
+     */
+    status: 'applied' | 'row_missing';
+};
 
 /**
  * AshePeriod
@@ -354,6 +468,94 @@ export const AshePeriod = {
  * converted between periods (annualising needs hours; spec section 5).
  */
 export type AshePeriod = typeof AshePeriod[keyof typeof AshePeriod];
+
+/**
+ * Assessment
+ */
+export type Assessment = {
+    /**
+     * Target Key
+     */
+    target_key: string;
+    /**
+     * Target Title
+     */
+    target_title: string;
+    /**
+     * Matrix Version
+     */
+    matrix_version: string;
+    /**
+     * Definition Version
+     */
+    definition_version: string;
+    /**
+     * Evidence Version
+     */
+    evidence_version: number;
+    /**
+     * Pack Version
+     */
+    pack_version: string;
+    /**
+     * Reference Version
+     */
+    reference_version: string;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    /**
+     * Scenario
+     */
+    scenario: 'current' | 'conditional';
+    /**
+     * Completed
+     */
+    completed: Array<string>;
+    state: ReadinessState;
+    primary_action: PrimaryAction;
+    /**
+     * Training Required
+     */
+    training_required: boolean;
+    /**
+     * Show Route Chart
+     */
+    show_route_chart: boolean;
+    /**
+     * Qualifications
+     */
+    qualifications: Array<Qualification>;
+    /**
+     * Rows
+     */
+    rows: Array<RowAssessment>;
+    /**
+     * Blockers
+     */
+    blockers: Array<Blocker>;
+    /**
+     * Gaps
+     */
+    gaps: Array<Gap>;
+    /**
+     * Actions
+     */
+    actions: Array<AbstractAction>;
+    /**
+     * Employer Checks
+     */
+    employer_checks: Array<EmployerCheck>;
+    /**
+     * Optional Development
+     */
+    optional_development: Array<string>;
+    /**
+     * Not Modelled Rows
+     */
+    not_modelled_rows: number;
+};
 
 /**
  * AssessmentState
@@ -519,6 +721,17 @@ export const Basis = { STATED: 'stated', INFERRED: 'inferred' } as const;
 export type Basis = typeof Basis[keyof typeof Basis];
 
 /**
+ * Blocker
+ */
+export type Blocker = {
+    /**
+     * Row Id
+     */
+    row_id: string;
+    kind: RowStatus;
+};
+
+/**
  * BodyNotKept
  *
  * Why a body its rights class may keep was not kept: personal details in it could not
@@ -541,6 +754,100 @@ export const BodyNotKept = {
  * script, JSON-LD or not (fix round 3 corrects 0020's wording, re-review 3 A R3-1).
  */
 export type BodyNotKept = typeof BodyNotKept[keyof typeof BodyNotKept];
+
+/**
+ * CandidateOption
+ *
+ * An option whose planned outcome maps to the gap's row: "expected to address", never a
+ * recommendation, and never a reason the gap is closed.
+ */
+export type CandidateOption = {
+    /**
+     * Outcome Id
+     */
+    outcome_id: string;
+    /**
+     * Option Id
+     */
+    option_id: string;
+    /**
+     * Offering Id
+     */
+    offering_id: string;
+    /**
+     * Option Title
+     */
+    option_title: string | null;
+    outcome_type: OutcomeType;
+    evidence_kind: EvidenceKind;
+    confidence: Confidence;
+    /**
+     * Level On Completion
+     */
+    level_on_completion: number | null;
+    review_state: OutcomeReview;
+    provenance: Provenance;
+    /**
+     * Addresses
+     */
+    addresses: boolean;
+    /**
+     * Numeric Use
+     */
+    numeric_use: 'usable' | 'excluded_missing_level' | 'excluded_not_accepted' | 'not_a_level';
+    /**
+     * Months Minimum
+     */
+    months_minimum: number | null;
+    /**
+     * Outside Planning Model
+     */
+    outside_planning_model: boolean;
+};
+
+/**
+ * CapabilityChangeOut
+ */
+export type CapabilityChangeOut = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Questions Stopped
+     */
+    questions_stopped: boolean;
+    /**
+     * Recorded Id
+     */
+    recorded_id: string | null;
+    /**
+     * Matrix Version
+     */
+    matrix_version: string | null;
+    /**
+     * Definition Version
+     */
+    definition_version: string | null;
+};
+
+/**
+ * Challenge
+ */
+export type Challenge = {
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Recorded By
+     */
+    recorded_by: string;
+    /**
+     * Recorded At
+     */
+    recorded_at: string;
+};
 
 /**
  * ChooseTarget
@@ -619,6 +926,72 @@ export type ClaimOut = {
 };
 
 /**
+ * ClaimSpan
+ *
+ * A SourceClaim's location: offsets into the hashed text, or a JSON pointer.
+ */
+export type ClaimSpan = {
+    /**
+     * Claim Id
+     */
+    claim_id: string;
+    /**
+     * Source Id
+     */
+    source_id: string;
+    /**
+     * Url
+     */
+    url: string;
+    /**
+     * Sha256
+     */
+    sha256: string;
+    /**
+     * Start
+     */
+    start: number | null;
+    /**
+     * End
+     */
+    end: number | null;
+    /**
+     * Pointer
+     */
+    pointer: string | null;
+    /**
+     * Excerpt
+     */
+    excerpt: string;
+    /**
+     * Retrieved At
+     */
+    retrieved_at: string;
+    /**
+     * Occurrences
+     */
+    occurrences: number | null;
+};
+
+/**
+ * Confidence
+ *
+ * Categorical support from the source, never a model-generated probability.
+ */
+export const Confidence = {
+    UNSUPPORTED: 'unsupported',
+    PROVISIONAL: 'provisional',
+    CORROBORATED: 'corroborated'
+} as const;
+
+/**
+ * Confidence
+ *
+ * Categorical support from the source, never a model-generated probability.
+ */
+export type Confidence = typeof Confidence[keyof typeof Confidence];
+
+/**
  * ConnectionCheckResult
  *
  * What the model proposes for the synthetic persona. Structurally valid is not true.
@@ -654,6 +1027,20 @@ export const ConversationMode = {
  * The tone the person chose (spec section 4, "Uncertainty and emotional comfort").
  */
 export type ConversationMode = typeof ConversationMode[keyof typeof ConversationMode];
+
+/**
+ * Count
+ */
+export type Count = {
+    /**
+     * Mentioned
+     */
+    mentioned: number;
+    /**
+     * Of
+     */
+    of: number;
+};
 
 /**
  * Coverage
@@ -923,6 +1310,51 @@ export type DiscoveryProposalOut = {
 };
 
 /**
+ * EditRow
+ *
+ * Set a row's importance, or challenge its source, at the checkpoint.
+ */
+export type EditRow = {
+    /**
+     * Expected Version
+     *
+     * 0 while nothing has been recorded.
+     */
+    expected_version: number;
+    /**
+     * Target
+     *
+     * One of the profile's target titles.
+     */
+    target: string;
+    /**
+     * Matrix Version
+     *
+     * The matrix shown.
+     */
+    matrix_version: string;
+    /**
+     * Row Id
+     */
+    row_id: string;
+    /**
+     * Action
+     */
+    action: 'set_importance' | 'challenge';
+    importance?: Importance | null;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Warning Acknowledged
+     *
+     * The person read that relaxing an employer's requirement may leave the plan unable to satisfy those postings.
+     */
+    warning_acknowledged?: boolean;
+};
+
+/**
  * Emphasis
  *
  * The slate controls (REC1-08).
@@ -941,6 +1373,38 @@ export const Emphasis = {
  * The slate controls (REC1-08).
  */
 export type Emphasis = typeof Emphasis[keyof typeof Emphasis];
+
+/**
+ * EmployerCheck
+ *
+ * A posting's own essential requirement: check it against that posting before applying.
+ */
+export type EmployerCheck = {
+    /**
+     * Row Id
+     */
+    row_id: string;
+    /**
+     * Requirement Id
+     */
+    requirement_id: string;
+    /**
+     * Posting Id
+     */
+    posting_id: string;
+    /**
+     * Posting Title
+     */
+    posting_title: string | null;
+    /**
+     * Text
+     */
+    text: string | null;
+    /**
+     * Kind
+     */
+    kind: string;
+};
 
 /**
  * EmptyReason
@@ -1094,6 +1558,28 @@ export const ErrorStage = {
 export type ErrorStage = typeof ErrorStage[keyof typeof ErrorStage];
 
 /**
+ * EscoLink
+ */
+export type EscoLink = {
+    /**
+     * Skill Id
+     */
+    skill_id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Skill Type
+     */
+    skill_type: string | null;
+    /**
+     * Relation
+     */
+    relation: 'essential' | 'optional';
+};
+
+/**
  * EventKind
  */
 export const EventKind = {
@@ -1111,7 +1597,8 @@ export const EventKind = {
     RESEARCH_UPDATED: 'research.updated',
     CONCEPT_PROVISIONAL_CREATED: 'concept.provisional_created',
     INTERVIEW_TURN_DECIDED: 'interview.turn_decided',
-    INTERVIEW_PREFERENCES_UPDATED: 'interview.preferences_updated'
+    INTERVIEW_PREFERENCES_UPDATED: 'interview.preferences_updated',
+    CAPABILITY_UPDATED: 'capability.updated'
 } as const;
 
 /**
@@ -1162,6 +1649,41 @@ export type EventPage = {
      */
     last_seq: number;
 };
+
+/**
+ * EvidenceContext
+ *
+ * Where it was done: transferable evidence from any of these counts.
+ */
+export const EvidenceContext = {
+    PAID_WORK: 'paid_work',
+    STUDY: 'study',
+    VOLUNTEERING: 'volunteering',
+    CARING: 'caring',
+    OTHER: 'other'
+} as const;
+
+/**
+ * EvidenceContext
+ *
+ * Where it was done: transferable evidence from any of these counts.
+ */
+export type EvidenceContext = typeof EvidenceContext[keyof typeof EvidenceContext];
+
+/**
+ * EvidenceKind
+ */
+export const EvidenceKind = {
+    TOPIC_MENTION: 'topic_mention',
+    PRACTICE: 'practice',
+    ASSESSED_WORK_SAMPLE: 'assessed_work_sample',
+    EXAM: 'exam'
+} as const;
+
+/**
+ * EvidenceKind
+ */
+export type EvidenceKind = typeof EvidenceKind[keyof typeof EvidenceKind];
 
 /**
  * EvidenceOut
@@ -1502,6 +2024,125 @@ export type FreshnessOut = {
 };
 
 /**
+ * Gap
+ */
+export type Gap = {
+    /**
+     * Gap Id
+     */
+    gap_id: string;
+    /**
+     * Row Id
+     */
+    row_id: string;
+    /**
+     * Subject
+     */
+    subject: string;
+    /**
+     * Label
+     */
+    label: string;
+    kind: GapKind;
+    /**
+     * Mandatory
+     */
+    mandatory: boolean;
+    /**
+     * Required Level
+     */
+    required_level: number | null;
+    /**
+     * Evidenced Level
+     */
+    evidenced_level: number | null;
+    /**
+     * Evidence Ids
+     */
+    evidence_ids: Array<string>;
+    /**
+     * Statement Id
+     */
+    statement_id: string | null;
+};
+
+/**
+ * GapKind
+ */
+export const GapKind = {
+    LEARN: 'learn',
+    DEMONSTRATE: 'demonstrate',
+    CREDENTIAL: 'credential',
+    EXPERIENCE: 'experience',
+    ELIGIBILITY: 'eligibility',
+    INFORMATION: 'information',
+    PREFERENCE_CONFLICT: 'preference_conflict'
+} as const;
+
+/**
+ * GapKind
+ */
+export type GapKind = typeof GapKind[keyof typeof GapKind];
+
+/**
+ * GateInfo
+ */
+export type GateInfo = {
+    /**
+     * Gate Key
+     */
+    gate_key: string;
+    kind: GateKind;
+    /**
+     * Protected
+     */
+    protected?: true;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Issuing Body
+     */
+    issuing_body: string;
+    /**
+     * Jurisdiction
+     */
+    jurisdiction: string;
+    /**
+     * Verification
+     */
+    verification: string;
+    /**
+     * Acceptable Proof
+     */
+    acceptable_proof: Array<string>;
+    /**
+     * Notes
+     */
+    notes?: Array<string>;
+};
+
+/**
+ * GateKind
+ *
+ * The protected gate types (spec section 8): a preference toggle never removes one.
+ */
+export const GateKind = {
+    LEGAL_PRACTICE: 'legal_practice',
+    RECOGNITION: 'recognition',
+    ADMISSION: 'admission',
+    ELIGIBILITY: 'eligibility'
+} as const;
+
+/**
+ * GateKind
+ *
+ * The protected gate types (spec section 8): a preference toggle never removes one.
+ */
+export type GateKind = typeof GateKind[keyof typeof GateKind];
+
+/**
  * Health
  */
 export type Health = {
@@ -1510,6 +2151,20 @@ export type Health = {
      */
     status: string;
 };
+
+/**
+ * Holding
+ */
+export const Holding = {
+    HELD: 'held',
+    NOT_HELD: 'not_held',
+    UNKNOWN: 'unknown'
+} as const;
+
+/**
+ * Holding
+ */
+export type Holding = typeof Holding[keyof typeof Holding];
 
 /**
  * HoursField
@@ -1583,6 +2238,21 @@ export type IloExposureOut = {
      */
     measure?: string;
 };
+
+/**
+ * Importance
+ */
+export const Importance = {
+    ESSENTIAL: 'essential',
+    PREFERRED: 'preferred',
+    DISPUTED: 'disputed',
+    UNKNOWN: 'unknown'
+} as const;
+
+/**
+ * Importance
+ */
+export type Importance = typeof Importance[keyof typeof Importance];
 
 /**
  * InputRoute
@@ -1907,6 +2577,239 @@ export const MatchType = {
 export type MatchType = typeof MatchType[keyof typeof MatchType];
 
 /**
+ * MatricesOut
+ */
+export type MatricesOut = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Questions Stopped
+     */
+    questions_stopped: boolean;
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    pack: PackLabel;
+    reference: ReferenceLabel;
+    /**
+     * Matrices
+     */
+    matrices: Array<Matrix>;
+};
+
+/**
+ * Matrix
+ */
+export type Matrix = {
+    /**
+     * Target Key
+     */
+    target_key: string;
+    /**
+     * Target Title
+     */
+    target_title: string;
+    /**
+     * Status
+     */
+    status?: 'provisional_no_specialist_review';
+    /**
+     * Synthetic
+     */
+    synthetic?: boolean;
+    /**
+     * Jurisdiction
+     */
+    jurisdiction?: 'GB-ENG';
+    /**
+     * Matrix Version
+     */
+    matrix_version?: string;
+    /**
+     * Definition Version
+     */
+    definition_version?: string;
+    sources: MatrixSources;
+    coverage: MatrixCoverage;
+    /**
+     * Rows
+     */
+    rows: Array<MatrixRow>;
+    /**
+     * Edits
+     */
+    edits?: Array<AppliedEdit>;
+};
+
+/**
+ * MatrixCoverage
+ */
+export type MatrixCoverage = {
+    /**
+     * Exemplars
+     */
+    exemplars: number;
+    /**
+     * Exemplar Rows Read
+     */
+    exemplar_rows_read?: false;
+    /**
+     * Full Text Vacancies
+     */
+    full_text_vacancies: number;
+    /**
+     * Snippet Vacancies
+     */
+    snippet_vacancies: number;
+    /**
+     * Unknown Description Vacancies
+     */
+    unknown_description_vacancies: number;
+    /**
+     * Posting Copies
+     */
+    posting_copies: number;
+    /**
+     * Esco Essential
+     */
+    esco_essential: number;
+    /**
+     * Esco Optional
+     */
+    esco_optional: number;
+    /**
+     * Modelled Rows
+     */
+    modelled_rows: number;
+    /**
+     * Not Modelled Rows
+     */
+    not_modelled_rows: number;
+};
+
+/**
+ * MatrixRow
+ */
+export type MatrixRow = {
+    /**
+     * Row Id
+     */
+    row_id: string;
+    /**
+     * Subject
+     */
+    subject: string;
+    /**
+     * Label
+     */
+    label: string;
+    kind: RowKind;
+    scope?: RowScope;
+    importance: Importance;
+    source_importance: Importance;
+    gate?: GateInfo | null;
+    /**
+     * Observable Task
+     */
+    observable_task?: string | null;
+    /**
+     * Required Level
+     */
+    required_level?: number | null;
+    rubric?: RubricView | null;
+    /**
+     * Acceptable Proof
+     */
+    acceptable_proof?: Array<string>;
+    /**
+     * Prerequisites
+     */
+    prerequisites?: Array<string>;
+    prevalence?: Prevalence | null;
+    /**
+     * Citations
+     */
+    citations?: Array<PostingCitation>;
+    esco?: EscoLink | null;
+    /**
+     * Uncertainty
+     */
+    uncertainty?: Array<Uncertainty>;
+    /**
+     * Challenges
+     */
+    challenges?: Array<Challenge>;
+    /**
+     * Jurisdiction
+     */
+    jurisdiction?: string;
+    /**
+     * Review State
+     */
+    review_state?: 'proposed' | 'reviewed';
+    /**
+     * Employer Specific
+     */
+    employer_specific?: boolean;
+    /**
+     * Required
+     *
+     * In the target definition: a protected gate, or essential or disputed.
+     */
+    readonly required: boolean;
+};
+
+/**
+ * MatrixSources
+ */
+export type MatrixSources = {
+    /**
+     * Pack Version
+     */
+    pack_version: string;
+    /**
+     * Pack Dated
+     */
+    pack_dated: string;
+    /**
+     * Reference Version
+     */
+    reference_version: string;
+    /**
+     * Reference Dated
+     */
+    reference_dated: string;
+    /**
+     * Reference Review State
+     */
+    reference_review_state: 'proposed' | 'reviewed';
+    /**
+     * Esco Release
+     */
+    esco_release: string | null;
+    occupation: OccupationLink | null;
+    occupation_note: OccupationNote | null;
+    pack_target: PackTargetLink | null;
+};
+
+/**
+ * Method
+ */
+export const Method = {
+    SELF_REPORT: 'self_report',
+    WORK_SAMPLE: 'work_sample',
+    ASSESSMENT: 'assessment'
+} as const;
+
+/**
+ * Method
+ */
+export type Method = typeof Method[keyof typeof Method];
+
+/**
  * ModelExtractionOut
  *
  * How model extraction went for a retrieved page whose structured data gave no posting
@@ -2219,6 +3122,46 @@ export type OccupationHitOut = {
 };
 
 /**
+ * OccupationLink
+ */
+export type OccupationLink = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Basis
+     */
+    basis: 'esco_label' | 'pack_crosswalk';
+    /**
+     * Regulated
+     */
+    regulated: boolean | null;
+};
+
+/**
+ * OccupationNote
+ *
+ * Why a matrix has no ESCO seed.
+ */
+export const OccupationNote = {
+    NO_EXACT_ESCO_LABEL: 'no_exact_esco_label',
+    AMBIGUOUS_ESCO_LABEL: 'ambiguous_esco_label',
+    NOT_IN_HELD_TAXONOMY: 'not_in_held_taxonomy'
+} as const;
+
+/**
+ * OccupationNote
+ *
+ * Why a matrix has no ESCO seed.
+ */
+export type OccupationNote = typeof OccupationNote[keyof typeof OccupationNote];
+
+/**
  * OccupationOut
  */
 export type OccupationOut = {
@@ -2358,6 +3301,81 @@ export type OnetMatchOut = {
      * Top Tasks
      */
     top_tasks: Array<ObservedTaskOut>;
+};
+
+/**
+ * OutcomeReview
+ */
+export const OutcomeReview = {
+    PROPOSED: 'proposed',
+    ACCEPTED_ASSUMPTION: 'accepted_assumption',
+    REVIEWED: 'reviewed',
+    REJECTED: 'rejected'
+} as const;
+
+/**
+ * OutcomeReview
+ */
+export type OutcomeReview = typeof OutcomeReview[keyof typeof OutcomeReview];
+
+/**
+ * OutcomeType
+ */
+export const OutcomeType = {
+    SKILL_LEVEL: 'skill_level',
+    CREDENTIAL: 'credential',
+    SUPERVISED_EXPERIENCE: 'supervised_experience'
+} as const;
+
+/**
+ * OutcomeType
+ */
+export type OutcomeType = typeof OutcomeType[keyof typeof OutcomeType];
+
+/**
+ * PackLabel
+ *
+ * The option pack's date and review states, shown wherever its records are (R9).
+ */
+export type PackLabel = {
+    /**
+     * Pack Version
+     */
+    pack_version: string;
+    /**
+     * Dated
+     */
+    dated: string;
+    /**
+     * Label Review
+     */
+    label_review: string;
+    /**
+     * Records Proposed
+     */
+    records_proposed: number;
+    /**
+     * Records Reviewed
+     */
+    records_reviewed: number;
+};
+
+/**
+ * PackTargetLink
+ */
+export type PackTargetLink = {
+    /**
+     * Target Id
+     */
+    target_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * City
+     */
+    city: string;
 };
 
 /**
@@ -2662,6 +3680,56 @@ export type PoolQueryOut = {
 };
 
 /**
+ * PostingCitation
+ *
+ * One posting's requirement row behind a matrix row, as the pack records it.
+ */
+export type PostingCitation = {
+    /**
+     * Requirement Id
+     */
+    requirement_id: string;
+    /**
+     * Posting Id
+     */
+    posting_id: string;
+    /**
+     * Vacancy Id
+     */
+    vacancy_id: string;
+    /**
+     * Posting Title
+     */
+    posting_title: string | null;
+    /**
+     * Stated Kind
+     */
+    stated_kind: string;
+    stated_importance: Importance;
+    /**
+     * Gate Words
+     */
+    gate_words: string | null;
+    /**
+     * Text
+     */
+    text: string | null;
+    /**
+     * Description Kind
+     */
+    description_kind: 'full' | 'snippet' | null;
+    /**
+     * Review State
+     */
+    review_state: 'proposed' | 'reviewed';
+    /**
+     * As Of
+     */
+    as_of: string;
+    claim: ClaimSpan;
+};
+
+/**
  * PreferencesOut
  *
  * How the person chose to start and to be interviewed, and whether it is paused. Null:
@@ -2685,6 +3753,28 @@ export type PreferencesOut = {
      */
     updated_at: string | null;
 };
+
+/**
+ * Prevalence
+ *
+ * Distinct vacancies naming the row. `full_text` counts vacancies with a full
+ * description; `snippet` counts the rest (snippets, or a description of unknown kind):
+ * snippet prevalence, never evidence of absence and never requirement frequency.
+ */
+export type Prevalence = {
+    full_text: Count;
+    snippet: Count;
+};
+
+/**
+ * PrimaryAction
+ */
+export const PrimaryAction = { REVIEW_CURRENT_POSTINGS_AND_APPLY: 'review_current_postings_and_apply', ADDRESS_GAPS: 'address_gaps' } as const;
+
+/**
+ * PrimaryAction
+ */
+export type PrimaryAction = typeof PrimaryAction[keyof typeof PrimaryAction];
 
 /**
  * ProfileDocument
@@ -2829,6 +3919,95 @@ export type ProfileWriteIn = {
 };
 
 /**
+ * Prompt
+ */
+export type Prompt = {
+    /**
+     * Prompt Id
+     */
+    prompt_id: string;
+    /**
+     * Kind
+     */
+    kind: 'requirement' | 'skill';
+    /**
+     * Subject
+     */
+    subject: string;
+    /**
+     * Label
+     */
+    label: string;
+    reason: QuestionReason;
+    /**
+     * Priority
+     */
+    priority: number;
+    /**
+     * Importance Weight
+     */
+    importance_weight: number;
+    /**
+     * Uncertainty Weight
+     */
+    uncertainty_weight: number;
+    /**
+     * Route Impact
+     */
+    route_impact: number;
+    /**
+     * Burden
+     */
+    burden: number;
+    /**
+     * Rows
+     */
+    rows: Array<PromptRow>;
+    gate: GateInfo | null;
+    /**
+     * Reuse Evidence Ids
+     */
+    reuse_evidence_ids: Array<string>;
+};
+
+/**
+ * PromptRow
+ */
+export type PromptRow = {
+    /**
+     * Target Key
+     */
+    target_key: string;
+    /**
+     * Target Title
+     */
+    target_title: string;
+    /**
+     * Row Id
+     */
+    row_id: string;
+    importance: Importance;
+    /**
+     * Rubric Version
+     */
+    rubric_version: string | null;
+    /**
+     * Required Level
+     */
+    required_level: number | null;
+    /**
+     * Observable Task
+     */
+    observable_task: string | null;
+    /**
+     * Anchors
+     */
+    anchors: {
+        [key: string]: string;
+    };
+};
+
+/**
  * ProposalOrigin
  */
 export const ProposalOrigin = { MODEL: 'model', FIXTURE: 'fixture' } as const;
@@ -2919,6 +4098,16 @@ export type ProposedChangeOut = {
 };
 
 /**
+ * Provenance
+ */
+export const Provenance = { PROVIDER_CLAIM: 'provider_claim', USER_OVERRIDE: 'user_override' } as const;
+
+/**
+ * Provenance
+ */
+export type Provenance = typeof Provenance[keyof typeof Provenance];
+
+/**
  * ProvisionalConceptOut
  *
  * A title the person verified that ESCO does not hold: no ESCO URI, no ISCO group.
@@ -2967,6 +4156,27 @@ export type ProvisionalConceptPage = {
 };
 
 /**
+ * Qualification
+ *
+ * Why a result is not unqualified. M0 matrices are always provisional.
+ */
+export const Qualification = {
+    PROVISIONAL_MATRIX: 'provisional_matrix',
+    PROPOSED_RECORDS: 'proposed_records',
+    PROPOSED_RUBRICS: 'proposed_rubrics',
+    SELF_REPORTED_EVIDENCE: 'self_reported_evidence',
+    PLANNED_OUTCOME_ASSUMPTION: 'planned_outcome_assumption',
+    USER_ASSUMPTION: 'user_assumption'
+} as const;
+
+/**
+ * Qualification
+ *
+ * Why a result is not unqualified. M0 matrices are always provisional.
+ */
+export type Qualification = typeof Qualification[keyof typeof Qualification];
+
+/**
  * QueryChannel
  *
  * The model's discovery channels (spec section 4, DIV-1's five channels). Nessa adds
@@ -3008,6 +4218,99 @@ export type QueryOut = {
 };
 
 /**
+ * QuestionCoverage
+ */
+export type QuestionCoverage = {
+    /**
+     * Gates Known
+     */
+    gates_known: number;
+    /**
+     * Gates
+     */
+    gates: number;
+    /**
+     * Required Rows With Usable Evidence
+     */
+    required_rows_with_usable_evidence: number;
+    /**
+     * Required Rows
+     */
+    required_rows: number;
+    /**
+     * Weighted With Usable Evidence
+     */
+    weighted_with_usable_evidence: number;
+    /**
+     * Weighted Required
+     */
+    weighted_required: number;
+    /**
+     * Unresolved
+     */
+    unresolved: Array<string>;
+};
+
+/**
+ * QuestionGraph
+ */
+export type QuestionGraph = {
+    /**
+     * State
+     */
+    state: 'asking' | 'enough' | 'stopped';
+    /**
+     * Evidence Version
+     */
+    evidence_version: number;
+    /**
+     * Targets
+     */
+    targets: Array<TargetVersions>;
+    /**
+     * Prompts
+     */
+    prompts: Array<Prompt>;
+    /**
+     * Initial
+     */
+    initial: Array<string>;
+    coverage: QuestionCoverage;
+};
+
+/**
+ * QuestionReason
+ */
+export const QuestionReason = {
+    NOT_STATED: 'not_stated',
+    UNVERIFIED: 'unverified',
+    NO_EVIDENCE: 'no_evidence',
+    UNSUPPORTED_CLAIM: 'unsupported_claim',
+    OTHER_RUBRIC: 'other_rubric',
+    CONFLICT: 'conflict'
+} as const;
+
+/**
+ * QuestionReason
+ */
+export type QuestionReason = typeof QuestionReason[keyof typeof QuestionReason];
+
+/**
+ * QuestionsOut
+ */
+export type QuestionsOut = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    graph: QuestionGraph;
+};
+
+/**
  * QuotationOut
  */
 export type QuotationOut = {
@@ -3039,6 +4342,108 @@ export const QuoteSource = { ANSWER: 'answer', ESCO: 'esco' } as const;
 export type QuoteSource = typeof QuoteSource[keyof typeof QuoteSource];
 
 /**
+ * ReadinessOut
+ */
+export type ReadinessOut = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    pack: PackLabel;
+    /**
+     * Assessments
+     */
+    assessments: Array<Assessment>;
+};
+
+/**
+ * ReadinessState
+ */
+export const ReadinessState = {
+    READY_NOW_FOR_MODELLED_REQUIREMENTS: 'ready_now_for_modelled_requirements',
+    CONDITIONAL_ON_ASSESSED_COMPLETION: 'conditional_on_assessed_completion',
+    NOT_READY: 'not_ready'
+} as const;
+
+/**
+ * ReadinessState
+ */
+export type ReadinessState = typeof ReadinessState[keyof typeof ReadinessState];
+
+/**
+ * RecordEvidence
+ *
+ * An answer about a skill: the level is chosen against `rubric_version`'s anchors.
+ */
+export type RecordEvidence = {
+    /**
+     * Expected Version
+     *
+     * 0 while nothing has been recorded.
+     */
+    expected_version: number;
+    /**
+     * Subject
+     */
+    subject: string;
+    /**
+     * Rubric Version
+     */
+    rubric_version?: string | null;
+    answer: Answer;
+    /**
+     * Self Assessed Level
+     */
+    self_assessed_level?: number | null;
+    /**
+     * Example
+     */
+    example?: string | null;
+    /**
+     * Last Done
+     */
+    last_done?: string | null;
+    context?: EvidenceContext | null;
+    /**
+     * Independence
+     */
+    independence?: 'independent' | 'with_help' | null;
+    /**
+     * Complexity
+     */
+    complexity?: 'routine' | 'complex' | null;
+    /**
+     * Tools
+     */
+    tools?: string | null;
+    /**
+     * Ai Assisted
+     */
+    ai_assisted?: boolean | null;
+    method?: Method;
+    /**
+     * Demonstrated Level
+     */
+    demonstrated_level?: number | null;
+    /**
+     * Assessed By
+     */
+    assessed_by?: string | null;
+    /**
+     * Reviewed On
+     */
+    reviewed_on?: string | null;
+    /**
+     * Outcome Id
+     */
+    outcome_id?: string | null;
+};
+
+/**
  * RecordPart
  */
 export const RecordPart = {
@@ -3051,6 +4456,59 @@ export const RecordPart = {
  * RecordPart
  */
 export type RecordPart = typeof RecordPart[keyof typeof RecordPart];
+
+/**
+ * RecordStatement
+ *
+ * Whether the person holds a credential, experience or eligibility requirement.
+ */
+export type RecordStatement = {
+    /**
+     * Expected Version
+     *
+     * 0 while nothing has been recorded.
+     */
+    expected_version: number;
+    /**
+     * Subject
+     */
+    subject: string;
+    holding: Holding;
+    /**
+     * Verified
+     *
+     * Checked at its source: a register, a right to work check.
+     */
+    verified: boolean;
+    /**
+     * Verification Note
+     */
+    verification_note?: string | null;
+};
+
+/**
+ * ReferenceLabel
+ *
+ * The rubrics, crosswalks and gate types' version and review state.
+ */
+export type ReferenceLabel = {
+    /**
+     * Reference Version
+     */
+    reference_version: string;
+    /**
+     * Dated
+     */
+    dated: string;
+    /**
+     * Review State
+     */
+    review_state: string;
+    /**
+     * Label Review
+     */
+    label_review: string;
+};
 
 /**
  * ReferenceReleaseOut
@@ -3289,6 +4747,173 @@ export const RightsClass = {
  * The page classes of the session 1 rights policy (H-06; `corpus/README.md`).
  */
 export type RightsClass = typeof RightsClass[keyof typeof RightsClass];
+
+/**
+ * RowAssessment
+ */
+export type RowAssessment = {
+    /**
+     * Row Id
+     */
+    row_id: string;
+    /**
+     * Subject
+     */
+    subject: string;
+    /**
+     * Label
+     */
+    label: string;
+    kind: RowKind;
+    importance: Importance;
+    /**
+     * Mandatory
+     */
+    mandatory: boolean;
+    /**
+     * Protected
+     */
+    protected: boolean;
+    /**
+     * Required Level
+     */
+    required_level: number | null;
+    status: RowStatus;
+    evidence: RowEvidence | null;
+    statement: StatementView | null;
+    /**
+     * Planned Level
+     */
+    planned_level?: number | null;
+    /**
+     * Eligible To Apply After Completion
+     */
+    eligible_to_apply_after_completion?: boolean;
+};
+
+/**
+ * RowEvidence
+ *
+ * What one row reads from the evidence on its subject, against its own rubric.
+ */
+export type RowEvidence = {
+    /**
+     * Level
+     */
+    level: number | null;
+    /**
+     * Basis
+     */
+    basis: 'demonstrated' | 'self_reported' | 'none';
+    confidence: Confidence | null;
+    /**
+     * Self Assessed Level
+     */
+    self_assessed_level: number | null;
+    /**
+     * Demonstrated Level
+     */
+    demonstrated_level: number | null;
+    /**
+     * Last Done
+     */
+    last_done: string | null;
+    /**
+     * Independence
+     */
+    independence: 'independent' | 'with_help' | null;
+    /**
+     * Tools
+     */
+    tools: string | null;
+    /**
+     * Ai Assisted
+     */
+    ai_assisted: boolean | null;
+    /**
+     * Evidence Ids
+     */
+    evidence_ids: Array<string>;
+    /**
+     * Shared From Other Rubric
+     */
+    shared_from_other_rubric: boolean;
+    /**
+     * Conflict
+     */
+    conflict: boolean;
+};
+
+/**
+ * RowKind
+ *
+ * Credentials, experience and eligibility are distinct from learnable skills (spec
+ * section 8): only skills and tasks have levels.
+ */
+export const RowKind = {
+    SKILL: 'skill',
+    TASK: 'task',
+    CREDENTIAL: 'credential',
+    EXPERIENCE: 'experience',
+    ELIGIBILITY: 'eligibility'
+} as const;
+
+/**
+ * RowKind
+ *
+ * Credentials, experience and eligibility are distinct from learnable skills (spec
+ * section 8): only skills and tasks have levels.
+ */
+export type RowKind = typeof RowKind[keyof typeof RowKind];
+
+/**
+ * RowScope
+ */
+export const RowScope = { TARGET: 'target', POSTING: 'posting' } as const;
+
+/**
+ * RowScope
+ */
+export type RowScope = typeof RowScope[keyof typeof RowScope];
+
+/**
+ * RowStatus
+ */
+export const RowStatus = {
+    MET: 'met',
+    BELOW_REQUIRED: 'below_required',
+    NO_USABLE_EVIDENCE: 'no_usable_evidence',
+    NOT_MODELLED: 'not_modelled',
+    SATISFIED: 'satisfied',
+    NOT_HELD: 'not_held',
+    UNRESOLVED: 'unresolved',
+    PATHWAY_OUTSIDE_MODEL: 'pathway_outside_model'
+} as const;
+
+/**
+ * RowStatus
+ */
+export type RowStatus = typeof RowStatus[keyof typeof RowStatus];
+
+/**
+ * RubricView
+ */
+export type RubricView = {
+    /**
+     * Version Id
+     */
+    version_id: string;
+    /**
+     * Anchors
+     */
+    anchors: {
+        [key: string]: string;
+    };
+    /**
+     * Review State
+     */
+    review_state: 'proposed' | 'reviewed';
+};
 
 /**
  * RunCancelOut
@@ -3730,6 +5355,24 @@ export type SetPreferences = {
      * Paused
      */
     paused: boolean;
+};
+
+/**
+ * SetQuestions
+ */
+export type SetQuestions = {
+    /**
+     * Expected Version
+     *
+     * 0 while nothing has been recorded.
+     */
+    expected_version: number;
+    /**
+     * Stopped
+     *
+     * Stop or pause the questions; false resumes them.
+     */
+    stopped: boolean;
 };
 
 /**
@@ -4364,6 +6007,21 @@ export const SpendState = {
 export type SpendState = typeof SpendState[keyof typeof SpendState];
 
 /**
+ * StatementView
+ */
+export type StatementView = {
+    /**
+     * Statement Id
+     */
+    statement_id: string;
+    holding: Holding;
+    /**
+     * Verified
+     */
+    verified: boolean;
+};
+
+/**
  * Statistic
  */
 export const Statistic = {
@@ -4778,6 +6436,28 @@ export const TargetStatus = {
 export type TargetStatus = typeof TargetStatus[keyof typeof TargetStatus];
 
 /**
+ * TargetVersions
+ */
+export type TargetVersions = {
+    /**
+     * Target Key
+     */
+    target_key: string;
+    /**
+     * Target Title
+     */
+    target_title: string;
+    /**
+     * Matrix Version
+     */
+    matrix_version: string;
+    /**
+     * Definition Version
+     */
+    definition_version: string;
+};
+
+/**
  * TaskListInput
  */
 export type TaskListInput = {
@@ -5081,6 +6761,29 @@ export type UkSocMappingOut = {
      */
     candidates: Array<SocCandidateOut>;
 };
+
+/**
+ * Uncertainty
+ */
+export const Uncertainty = {
+    ESCO_SEED_ONLY: 'esco_seed_only',
+    IMPORTANCE_DISPUTED: 'importance_disputed',
+    IMPORTANCE_UNKNOWN: 'importance_unknown',
+    NO_RUBRIC: 'no_rubric',
+    SNIPPET_SIGNAL_ONLY: 'snippet_signal_only',
+    ONE_POSTING_ONLY: 'one_posting_only',
+    PROPOSED_SOURCES: 'proposed_sources',
+    PROPOSED_RUBRIC: 'proposed_rubric',
+    PROPOSED_CROSSWALK: 'proposed_crosswalk',
+    SET_BY_PERSON: 'set_by_person',
+    RELAXED_BY_PERSON: 'relaxed_by_person',
+    CHALLENGED: 'challenged'
+} as const;
+
+/**
+ * Uncertainty
+ */
+export type Uncertainty = typeof Uncertainty[keyof typeof Uncertainty];
 
 /**
  * UnscoredReason
@@ -5396,6 +7099,140 @@ export type WrittenWhyOut = {
      * Claims
      */
     claims: Array<ClaimOut>;
+};
+
+/**
+ * MatricesOut
+ */
+export type MatricesOutWritable = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Questions Stopped
+     */
+    questions_stopped: boolean;
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    pack: PackLabel;
+    reference: ReferenceLabel;
+    /**
+     * Matrices
+     */
+    matrices: Array<MatrixWritable>;
+};
+
+/**
+ * Matrix
+ */
+export type MatrixWritable = {
+    /**
+     * Target Key
+     */
+    target_key: string;
+    /**
+     * Target Title
+     */
+    target_title: string;
+    /**
+     * Status
+     */
+    status?: 'provisional_no_specialist_review';
+    /**
+     * Synthetic
+     */
+    synthetic?: boolean;
+    /**
+     * Jurisdiction
+     */
+    jurisdiction?: 'GB-ENG';
+    /**
+     * Matrix Version
+     */
+    matrix_version?: string;
+    /**
+     * Definition Version
+     */
+    definition_version?: string;
+    sources: MatrixSources;
+    coverage: MatrixCoverage;
+    /**
+     * Rows
+     */
+    rows: Array<MatrixRowWritable>;
+    /**
+     * Edits
+     */
+    edits?: Array<AppliedEdit>;
+};
+
+/**
+ * MatrixRow
+ */
+export type MatrixRowWritable = {
+    /**
+     * Row Id
+     */
+    row_id: string;
+    /**
+     * Subject
+     */
+    subject: string;
+    /**
+     * Label
+     */
+    label: string;
+    kind: RowKind;
+    scope?: RowScope;
+    importance: Importance;
+    source_importance: Importance;
+    gate?: GateInfo | null;
+    /**
+     * Observable Task
+     */
+    observable_task?: string | null;
+    /**
+     * Required Level
+     */
+    required_level?: number | null;
+    rubric?: RubricView | null;
+    /**
+     * Acceptable Proof
+     */
+    acceptable_proof?: Array<string>;
+    /**
+     * Prerequisites
+     */
+    prerequisites?: Array<string>;
+    prevalence?: Prevalence | null;
+    /**
+     * Citations
+     */
+    citations?: Array<PostingCitation>;
+    esco?: EscoLink | null;
+    /**
+     * Uncertainty
+     */
+    uncertainty?: Array<Uncertainty>;
+    /**
+     * Challenges
+     */
+    challenges?: Array<Challenge>;
+    /**
+     * Jurisdiction
+     */
+    jurisdiction?: string;
+    /**
+     * Review State
+     */
+    review_state?: 'proposed' | 'reviewed';
+    /**
+     * Employer Specific
+     */
+    employer_specific?: boolean;
 };
 
 /**
@@ -7388,6 +9225,280 @@ export type GetOccupationEvidenceResponses = {
 };
 
 export type GetOccupationEvidenceResponse = GetOccupationEvidenceResponses[keyof GetOccupationEvidenceResponses];
+
+export type ListCapabilityMatricesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/capability/matrices';
+};
+
+export type ListCapabilityMatricesErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ListCapabilityMatricesError = ListCapabilityMatricesErrors[keyof ListCapabilityMatricesErrors];
+
+export type ListCapabilityMatricesResponses = {
+    /**
+     * Successful Response
+     */
+    200: MatricesOut;
+};
+
+export type ListCapabilityMatricesResponse = ListCapabilityMatricesResponses[keyof ListCapabilityMatricesResponses];
+
+export type GetCapabilityQuestionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/capability/questions';
+};
+
+export type GetCapabilityQuestionsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetCapabilityQuestionsError = GetCapabilityQuestionsErrors[keyof GetCapabilityQuestionsErrors];
+
+export type GetCapabilityQuestionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: QuestionsOut;
+};
+
+export type GetCapabilityQuestionsResponse = GetCapabilityQuestionsResponses[keyof GetCapabilityQuestionsResponses];
+
+export type GetCapabilityReadinessData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/capability/readiness';
+};
+
+export type GetCapabilityReadinessErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetCapabilityReadinessError = GetCapabilityReadinessErrors[keyof GetCapabilityReadinessErrors];
+
+export type GetCapabilityReadinessResponses = {
+    /**
+     * Successful Response
+     */
+    200: ReadinessOut;
+};
+
+export type GetCapabilityReadinessResponse = GetCapabilityReadinessResponses[keyof GetCapabilityReadinessResponses];
+
+export type RecordSkillEvidenceData = {
+    body: RecordEvidence;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/capability/evidence';
+};
+
+export type RecordSkillEvidenceErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type RecordSkillEvidenceError = RecordSkillEvidenceErrors[keyof RecordSkillEvidenceErrors];
+
+export type RecordSkillEvidenceResponses = {
+    /**
+     * Successful Response
+     */
+    201: CapabilityChangeOut;
+};
+
+export type RecordSkillEvidenceResponse = RecordSkillEvidenceResponses[keyof RecordSkillEvidenceResponses];
+
+export type RecordRequirementStatementData = {
+    body: RecordStatement;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/capability/statements';
+};
+
+export type RecordRequirementStatementErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type RecordRequirementStatementError = RecordRequirementStatementErrors[keyof RecordRequirementStatementErrors];
+
+export type RecordRequirementStatementResponses = {
+    /**
+     * Successful Response
+     */
+    201: CapabilityChangeOut;
+};
+
+export type RecordRequirementStatementResponse = RecordRequirementStatementResponses[keyof RecordRequirementStatementResponses];
+
+export type EditMatrixRowData = {
+    body: EditRow;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/capability/edits';
+};
+
+export type EditMatrixRowErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type EditMatrixRowError = EditMatrixRowErrors[keyof EditMatrixRowErrors];
+
+export type EditMatrixRowResponses = {
+    /**
+     * Nothing changed.
+     */
+    200: CapabilityChangeOut;
+    /**
+     * Successful Response
+     */
+    201: CapabilityChangeOut;
+};
+
+export type EditMatrixRowResponse = EditMatrixRowResponses[keyof EditMatrixRowResponses];
+
+export type SetCapabilityQuestionsData = {
+    body: SetQuestions;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/capability/questions/state';
+};
+
+export type SetCapabilityQuestionsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type SetCapabilityQuestionsError = SetCapabilityQuestionsErrors[keyof SetCapabilityQuestionsErrors];
+
+export type SetCapabilityQuestionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CapabilityChangeOut;
+};
+
+export type SetCapabilityQuestionsResponse = SetCapabilityQuestionsResponses[keyof SetCapabilityQuestionsResponses];
 
 export type GetTaxonomyData = {
     body?: never;

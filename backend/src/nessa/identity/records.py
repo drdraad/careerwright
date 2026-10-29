@@ -39,6 +39,9 @@ class EventKind(StrEnum):
     PROVISIONAL_CONCEPT_CREATED = "concept.provisional_created"
     INTERVIEW_TURN_DECIDED = "interview.turn_decided"
     INTERVIEW_PREFERENCES_UPDATED = "interview.preferences_updated"
+    # Skill evidence, a requirement statement, a matrix edit or the questions' state changed;
+    # detail: the capability version only.
+    CAPABILITY_UPDATED = "capability.updated"
 
 
 @dataclass(frozen=True)

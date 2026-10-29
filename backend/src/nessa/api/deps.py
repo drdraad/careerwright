@@ -11,6 +11,7 @@ from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import SecretStr
 
+from nessa.capability.commands import CapabilityData, committed_data
 from nessa.catalogue.ai_resilience import AssessmentPacks, committed_packs
 from nessa.catalogue.pay import MappingReviewPack, committed_reviews
 from nessa.config import ApiSettings
@@ -48,6 +49,9 @@ class ApiDependencies:
     # affect then (AIR1-07, ADR 0010).
     assessment_packs: AssessmentPacks = field(default_factory=committed_packs)
     mapping_reviews: MappingReviewPack = field(default_factory=committed_reviews)
+    # The option pack and the capability reference, checked against their pins and each
+    # other when the API starts (ADR 0011, ADR 0012).
+    capability: CapabilityData = field(default_factory=committed_data)
 
     @property
     def spend_defaults(self) -> SpendLimits:

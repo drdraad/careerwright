@@ -16,10 +16,10 @@ from nessa.capability.evidence import (
     SkillEvidence,
 )
 from nessa.capability.matrix import (
-    Coverage,
     GateInfo,
     Importance,
     Matrix,
+    MatrixCoverage,
     MatrixRow,
     MatrixSources,
     RowKind,
@@ -99,7 +99,7 @@ def synthetic_matrix(title: str, rows: list[MatrixRow]) -> Matrix:
             occupation_note=None,
             pack_target=None,
         ),
-        coverage=Coverage(
+        coverage=MatrixCoverage(
             exemplars=0,
             full_text_vacancies=0,
             snippet_vacancies=0,
