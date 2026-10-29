@@ -535,6 +535,47 @@ def test_an_acquisition_cancelled_while_fetching_hands_no_page_to_extraction(
     assert [k["kind"] for k in kinds] == ["acquisition"]
 
 
+@pytest.mark.req("DUR-05", "STATE-02")
+def test_an_extraction_cancelled_while_its_call_is_out_keeps_and_shows_its_result(
+    infra: Infra, scenario: Scenario, sources: SourceServer, service_url: str
+) -> None:
+    # Review C M2: DUR-05 keeps a result already on its way; what the page shows agrees with
+    # what was recorded: read and counted.
+    worker(scenario, service_url, fake_delay_s="4")
+    body = submit(
+        scenario.api, scenario.token, scenario.workspace_id, {"urls": [url(sources, "/labelled")]}
+    )
+    run_id = body.json()["acquisition"]["run"]["run_id"]
+    wait_for(
+        lambda: any(
+            r["run_id"] is not None and scenario.attempts(str(r["run_id"]))
+            for r in extractions(infra, run_id)
+        ),
+        timeout_s=30.0,
+        what="the extraction's call",
+    )
+    [row] = extractions(infra, run_id)
+    extraction_run = str(row["run_id"])
+
+    assert (
+        _cancel(scenario.api, scenario.token, scenario.workspace_id, extraction_run).status_code
+        == 202
+    )
+    assert scenario.wait_terminal(extraction_run)["status"] == "cancelled"
+    wait_for(
+        lambda: extractions(infra, run_id)[0]["outcome"] is not None,
+        timeout_s=30.0,
+        what="the call's result",
+    )
+
+    assert extractions(infra, run_id)[0]["outcome"] == "postings_recorded"
+    listing = jobs(scenario.api, scenario.token, scenario.workspace_id)
+    assert (listing["total_jobs"], listing["coverage"]) == (1, {"succeeded": 1})
+    shown = acquisition(scenario.api, scenario.token, scenario.workspace_id, run_id)
+    model = shown["targets"][0]["attempts"][0]["model_extraction"]
+    assert (model["state"], model["run_id"]) == ("postings_read", extraction_run)
+
+
 def _worker_engine(infra: Infra) -> tuple[Engine, Keyring]:
     settings = infra.worker_settings()
     engine = create_engine(settings.app_database, application_name="test-extraction-checks")

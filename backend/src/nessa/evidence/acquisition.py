@@ -18,6 +18,7 @@ why it was not.
 """
 
 import base64
+import dataclasses
 import hashlib
 import json
 import uuid
@@ -434,22 +435,35 @@ class TargetStatus(StrEnum):
 class ModelExtractionState(StrEnum):
     """How model extraction went for a page it may read (fix round 2, rulings 9-10)."""
 
-    PENDING = "pending"  # its run is queued or running
-    POSTINGS_READ = "postings_read"  # its run recorded the postings it verified
+    PENDING = "pending"  # its run is queued or running, with nothing recorded yet
+    POSTINGS_READ = "postings_read"  # its run recorded postings, at least one published
+    # Its run recorded postings that all disagree on a critical field: none is published
+    # (review C M5).
+    POSTINGS_CONFLICTING = "postings_conflicting"
     NO_POSTING_FOUND = "no_posting_found"  # read, and no advert found: not "none found"
-    NOT_READ = "not_read"  # its run failed or was cancelled, or verified nothing it proposed
+    NOT_READ = "not_read"  # its run failed or was cancelled first, or verified nothing
     NOT_RUN = "not_run"  # never started: `not_run` says why
 
 
+_RECORDED_STATES = {
+    ExtractionOutcome.POSTINGS_RECORDED: ModelExtractionState.POSTINGS_READ,
+    ExtractionOutcome.POSTINGS_CONFLICTING: ModelExtractionState.POSTINGS_CONFLICTING,
+    ExtractionOutcome.NO_POSTING_FOUND: ModelExtractionState.NO_POSTING_FOUND,
+    ExtractionOutcome.POSTINGS_UNVERIFIED: ModelExtractionState.NOT_READ,
+}
+
+
 def extraction_state(row: store.ExtractionRow) -> ModelExtractionState:
+    """What was recorded decides, whatever the run's state: a run cancelled while its call
+    was out keeps its accepted result (DUR-05), so its page reads as what it recorded (review
+    C M2); with nothing recorded, the run's state does. `store.coverage` follows the same
+    order."""
     if row.run_id is None:
         return ModelExtractionState.NOT_RUN
+    if row.outcome is not None:
+        return _RECORDED_STATES[row.outcome]
     if row.run_status in (WorkState.QUEUED, WorkState.RUNNING):
         return ModelExtractionState.PENDING
-    if row.run_status is WorkState.COMPLETE and row.outcome is ExtractionOutcome.POSTINGS_RECORDED:
-        return ModelExtractionState.POSTINGS_READ
-    if row.run_status is WorkState.COMPLETE and row.outcome is ExtractionOutcome.NO_POSTING_FOUND:
-        return ModelExtractionState.NO_POSTING_FOUND
     return ModelExtractionState.NOT_READ
 
 
@@ -481,11 +495,23 @@ class AcquisitionView:
         )
 
 
+def _left_behind(attempt: store.AttemptRow) -> store.AttemptRow:
+    """An attempt still `pending` once its run has ended (its recording rolled back, or a
+    crash and then a cancel) reads as failed, interrupted: never as still in progress (fix
+    round 3, review B M1; read side only, like `store.coverage`)."""
+    if attempt.status is not AttemptStatus.PENDING:
+        return attempt
+    return dataclasses.replace(
+        attempt, status=AttemptStatus.FAILED, reason=AttemptReason.INTERRUPTED
+    )
+
+
 def acquisition(tx: Tx, workspace_id: uuid.UUID, run_id: uuid.UUID) -> AcquisitionView:
     run = visible_run(tx, workspace_id, run_id)
     if run.kind is not RunKind.ACQUISITION:
         raise NessaError(ErrorCode.NOT_FOUND, "No such acquisition.", stage=ErrorStage.EXECUTION)
-    attempts = store.attempts_of_run(tx, run_id)
+    ended = run.status not in (WorkState.QUEUED, WorkState.RUNNING)
+    attempts = [_left_behind(a) if ended else a for a in store.attempts_of_run(tx, run_id)]
     copies = store.copies_of_attempts(tx, [a.attempt_id for a in attempts])
     extractions = store.extractions_of_attempts(tx, [a.attempt_id for a in attempts])
     retrieved: dict[uuid.UUID, int] = {}
@@ -494,11 +520,12 @@ def acquisition(tx: Tx, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Acquisiti
     views = []
     for target in store.targets(tx, run_id):
         status = TargetStatus(target.status)
+        mine = [a for a in attempts if a.position == target.position]
         if status is TargetStatus.QUEUED and run.status is WorkState.CANCELLED:
             status = TargetStatus.CANCELLED
-        elif status is TargetStatus.QUEUED and run.status in (WorkState.COMPLETE, WorkState.FAILED):
-            status = TargetStatus.NOT_ATTEMPTED
-        mine = [a for a in attempts if a.position == target.position]
+        elif status is TargetStatus.QUEUED and ended:
+            # Tried, but its run ended with the try unrecorded: failed, never "not tried".
+            status = TargetStatus.FAILED if mine else TargetStatus.NOT_ATTEMPTED
         counts = {a.attempt_id: retrieved.get(a.attempt_id, 0) for a in mine}
         read = {
             a.attempt_id: extractions[a.attempt_id] for a in mine if a.attempt_id in extractions
@@ -667,6 +694,11 @@ def job_detail(
 def set_favourite(
     tx: Tx, actor: Actor, workspace_id: uuid.UUID, job_id: uuid.UUID, *, favourite: bool
 ) -> None:
+    """A mark never lands between a merge's move of the favourites and its removal of the
+    merged job, where the removal would take it with it (review B M2): the workspace's
+    recording lock is taken first, before the workspace's row, in the order the worker
+    takes them; a job a merge removed meanwhile is then not found."""
+    store.lock_workspace_records(tx, workspace_id)
     visible_workspace(tx, workspace_id, lock=True)
     if store.job(tx, workspace_id, job_id) is None:
         raise NessaError(ErrorCode.NOT_FOUND, "No such job.", stage=ErrorStage.EXECUTION)

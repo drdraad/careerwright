@@ -1545,6 +1545,7 @@ export type ModelExtractionOut = {
 export const ModelExtractionState = {
     PENDING: 'pending',
     POSTINGS_READ: 'postings_read',
+    POSTINGS_CONFLICTING: 'postings_conflicting',
     NO_POSTING_FOUND: 'no_posting_found',
     NOT_READ: 'not_read',
     NOT_RUN: 'not_run'

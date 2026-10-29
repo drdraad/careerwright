@@ -20,7 +20,13 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from nessa.evidence import extraction_runs
 from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_page
-from nessa.evidence.acquisition import Coverage, EmptyReason, _empty_reason
+from nessa.evidence.acquisition import (
+    Coverage,
+    EmptyReason,
+    ModelExtractionState,
+    _empty_reason,
+    extraction_state,
+)
 from nessa.evidence.extraction import (
     INSTRUCTIONS,
     MAX_POSTINGS,
@@ -54,6 +60,7 @@ from nessa.evidence.records import (
     WorkMode,
 )
 from nessa.evidence.redaction import EMAIL_REMOVED, PHONE_REMOVED
+from nessa.evidence.store import ExtractionRow
 from nessa.identity.failures import FailureClass, OutputTruncatedError, classify_failure
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.model_registry import ModelMode
@@ -61,7 +68,8 @@ from nessa.identity.records import RunKind
 from nessa.identity.runs import workflow_id
 from nessa.migrations.versions import r0021_page_extraction as r0021
 from nessa.migrations.versions import r0023_cancel_started_runs as r0023
-from nessa.vocabulary import DataMode
+from nessa.migrations.versions import r0024_postings_conflicting as r0024
+from nessa.vocabulary import DataMode, WorkState
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
 from tests.support.source_server import SYNTHETIC_MARKER, Scripted, source_server
@@ -326,6 +334,59 @@ def test_postings_for_one_title_that_disagree_on_pay_are_all_marked_and_none_pub
     )
 
     assert [p.extraction_error for p in proposal.postings] == ["conflicting_job_postings"] * 2
+    # Review C M5: every posting conflicts, so none is published: its own outcome.
+    assert proposal.outcome is ExtractionOutcome.POSTINGS_CONFLICTING
+
+
+def _extraction_row(status: WorkState, outcome: ExtractionOutcome | None) -> ExtractionRow:
+    return ExtractionRow(
+        attempt_id=uuid.UUID(int=1),
+        acquisition_run_id=uuid.UUID(int=2),
+        run_id=uuid.UUID(int=3),
+        not_run=None,
+        text_sha256="0" * 64,
+        outcome=outcome,
+        run_status=status,
+        failure_class=None,
+    )
+
+
+@pytest.mark.req("STATE-02", "DUR-05")
+@pytest.mark.parametrize(
+    ("status", "outcome", "state"),
+    [
+        (WorkState.QUEUED, None, ModelExtractionState.PENDING),
+        (WorkState.RUNNING, None, ModelExtractionState.PENDING),
+        (
+            WorkState.COMPLETE,
+            ExtractionOutcome.POSTINGS_RECORDED,
+            ModelExtractionState.POSTINGS_READ,
+        ),
+        # Review C M2: a cancelled run's accepted result is kept, and says so.
+        (
+            WorkState.CANCELLED,
+            ExtractionOutcome.POSTINGS_RECORDED,
+            ModelExtractionState.POSTINGS_READ,
+        ),
+        (
+            WorkState.RUNNING,
+            ExtractionOutcome.NO_POSTING_FOUND,
+            ModelExtractionState.NO_POSTING_FOUND,
+        ),
+        (
+            WorkState.COMPLETE,
+            ExtractionOutcome.POSTINGS_CONFLICTING,
+            ModelExtractionState.POSTINGS_CONFLICTING,
+        ),
+        (WorkState.COMPLETE, ExtractionOutcome.POSTINGS_UNVERIFIED, ModelExtractionState.NOT_READ),
+        (WorkState.CANCELLED, None, ModelExtractionState.NOT_READ),
+        (WorkState.PROVIDER_UNAVAILABLE, None, ModelExtractionState.NOT_READ),
+    ],
+)
+def test_an_extraction_s_state_follows_what_it_recorded_then_its_run(
+    status: WorkState, outcome: ExtractionOutcome | None, state: ModelExtractionState
+) -> None:
+    assert extraction_state(_extraction_row(status, outcome)) is state
 
 
 def test_postings_past_the_limit_are_dropped_not_read() -> None:
@@ -441,6 +502,11 @@ def test_no_date_or_more_than_one_is_none(text: str) -> None:
         ("Fully remote", WorkMode.REMOTE),
         ("Office-based in Leeds", WorkMode.ON_SITE),
         ("Remote or on-site", None),
+        # Review C M1: a negated mode is never read as that mode.
+        ("Not remote", None),
+        ("This role is not hybrid", None),
+        ("Non-remote, based in Leeds", None),
+        ("No remote working", None),
     ],
 )
 def test_the_work_mode_is_read_only_when_the_span_names_one(
@@ -644,7 +710,7 @@ def test_the_database_holds_extraction_labels_and_the_cap_to_the_code_s() -> Non
     # Each from the latest migration that sets it.
     not_run = _quoted(r"not_run IN \((.*?)\)\)", r0023.SCHEMA)
     assert not_run == {r.value for r in ExtractionNotRun}
-    outcome = _quoted(r"outcome IN \((.*?)\)\)", r0021.SCHEMA)
+    outcome = _quoted(r"outcome IN \((.*?)\)\)", r0024.SCHEMA)
     assert outcome == {o.value for o in ExtractionOutcome}
     validation = _quoted(r"validation IN \((.*?)\)\)", r0021.SCHEMA)
     assert validation == {v.value for v in ValidationState}

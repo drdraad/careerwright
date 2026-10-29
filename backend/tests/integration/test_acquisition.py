@@ -6,12 +6,14 @@ import dataclasses
 import itertools
 import json
 import secrets
+import threading
 import time
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
@@ -294,6 +296,120 @@ def test_a_listing_whose_sources_are_still_being_fetched_says_so(
 
     assert during["coverage"] == {"pending": 1}
     assert during["empty_reason"] == "sources_pending"
+
+
+def _left_behind_reads_as_failed(api: ApiClient, ada: str, workspace: str, run_id: str) -> None:
+    """Review B M1: an attempt its run left `pending` reads as failed, interrupted, in the
+    listing and the acquisition, never as still being fetched."""
+    listing = jobs(api, ada, workspace)
+    assert (listing["coverage"], listing["empty_reason"]) == (
+        {"failed": 1},
+        "no_source_retrieved",
+    )
+    [target] = acquisition(api, ada, workspace, run_id)["targets"]
+    [attempt] = target["attempts"]
+    assert (attempt["status"], attempt["reason"]) == ("failed", "interrupted")
+    assert target["status"] in ("failed", "cancelled")
+
+
+@pytest.mark.req("STATE-02")
+def test_an_attempt_whose_recording_rolled_back_never_reads_as_pending(
+    infra: Infra,
+    api: ApiClient,
+    ada: str,
+    workspace: str,
+    sources: SourceServer,
+    service_url: str,
+    tmp_path: Path,
+) -> None:
+    started = start_worker(
+        infra, tmp_path / "worker.log", acquisition_url=service_url, crash_at="recording_fails"
+    )
+    try:
+        urls = [url(sources, "careers.northwind.example", "/plain")]
+        run_id = submit(api, ada, workspace, {"urls": urls}).json()["acquisition"]["run"]["run_id"]
+        run = wait_terminal(infra, run_id)
+    finally:
+        started.stop()
+
+    [attempt] = infra.query("SELECT status FROM nessa.source_attempts WHERE run_id = %s", (run_id,))
+    assert (run["status"], attempt["status"]) == ("failed", "pending")  # left behind
+    _left_behind_reads_as_failed(api, ada, workspace, run_id)
+    assert acquisition(api, ada, workspace, run_id)["targets"][0]["status"] == "failed"
+
+
+@pytest.mark.req("STATE-02", "DUR-05")
+def test_an_attempt_a_crash_and_then_a_cancel_left_behind_never_reads_as_pending(
+    infra: Infra,
+    api: ApiClient,
+    ada: str,
+    workspace: str,
+    sources: SourceServer,
+    service_url: str,
+    tmp_path: Path,
+) -> None:
+    first = start_worker(infra, tmp_path / "first.log", acquisition_url=service_url)
+    urls = [url(sources, "slow.board.example", "/slow/2")]
+    run_id = submit(api, ada, workspace, {"urls": urls}).json()["acquisition"]["run"]["run_id"]
+    try:
+        wait_for(
+            lambda: bool(
+                infra.query(
+                    "SELECT 1 FROM nessa.source_attempts WHERE run_id = %s AND status = 'pending'",
+                    (run_id,),
+                )
+            ),
+            timeout_s=30,
+            what="the request under way",
+        )
+    finally:
+        first.kill()  # mid-request: the attempt stays pending
+    cancel = api.write("POST", f"/v1/workspaces/{workspace}/runs/{run_id}/cancel", ada)
+    assert cancel.status_code == 202
+    second = start_worker(infra, tmp_path / "second.log", acquisition_url=service_url)
+    try:
+        run = wait_terminal(infra, run_id)
+    finally:
+        second.stop()
+
+    [attempt] = infra.query("SELECT status FROM nessa.source_attempts WHERE run_id = %s", (run_id,))
+    assert (run["status"], attempt["status"]) == ("cancelled", "pending")  # left behind
+    _left_behind_reads_as_failed(api, ada, workspace, run_id)
+
+
+@pytest.mark.req("JOB-07", "JOB-02")
+def test_a_favourite_set_across_a_merge_waits_for_it_and_is_never_lost_silently(
+    infra: Infra, api: ApiClient, ada: str, workspace: str
+) -> None:
+    # Review B M2: a merge moves the favourites, then removes the merged job. A mark asked
+    # for in between waits for the merge's recording lock, then finds the job gone.
+    merged, kept = str(uuid.uuid4()), str(uuid.uuid4())
+    for job_id in (kept, merged):
+        infra.query(
+            "INSERT INTO nessa.jobs (job_id, workspace_id, exemplar, last_success_at, "
+            "last_attempt_at) VALUES (%s, %s, false, clock_timestamp(), clock_timestamp())",
+            (job_id, workspace),
+        )
+    answers: list[Any] = []
+    path = f"/v1/workspaces/{workspace}/jobs/{merged}/favourite"
+    with psycopg.connect(infra.url("pg_superuser", "nessa_app")) as merge:
+        merge.execute(
+            "SELECT pg_advisory_xact_lock(hashtextextended(%s::text, 7681))", (workspace,)
+        )
+        merge.execute("DELETE FROM nessa.jobs WHERE job_id = %s", (merged,))
+        marking = threading.Thread(target=lambda: answers.append(api.write("PUT", path, ada)))
+        marking.start()
+        marking.join(timeout=2.0)
+        assert marking.is_alive()  # it waits for the merge
+        merge.commit()
+    marking.join(timeout=20.0)
+
+    [answer] = answers
+    assert answer.status_code == 404  # the job is gone: said so, never a lost mark or a 500
+    assert (
+        infra.query("SELECT 1 FROM nessa.job_favourites WHERE workspace_id = %s", (workspace,))
+        == []
+    )
 
 
 @pytest.mark.req("STATE-02", "JOB-06")

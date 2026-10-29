@@ -13,6 +13,7 @@ import type {
   ErrorCode,
   FailureClass,
   FieldState,
+  ModelExtractionState,
   NotIncluded,
   PartialCompleteness,
   PayPeriod,
@@ -330,6 +331,39 @@ export const EMPTY_REASON: Record<EmptyReason, { title: string; detail: string }
   none_found_in_sources_checked: {
     title: "No matching listings found in the sources checked",
     detail: "Only these sources were checked. Others may list vacancies.",
+  },
+};
+
+/** How a page went that Nessa's model read for a job advert (fix round 3, review C M5).
+ * None says there are no vacancies. */
+export const MODEL_EXTRACTION_STATE: Record<
+  ModelExtractionState,
+  { title: string; detail: string }
+> = {
+  pending: {
+    title: "Nessa is reading this page",
+    detail: "Its job advert, if it has one, appears here when the reading is done.",
+  },
+  postings_read: {
+    title: "Nessa read a job advert on this page",
+    detail: "Each value was checked against the page's own words.",
+  },
+  postings_conflicting: {
+    title: "The adverts on this page disagree with each other",
+    detail:
+      "Nessa can't tell which is right, so none is shown. Paste the advert you mean, or try its own page.",
+  },
+  no_posting_found: {
+    title: "Nessa read this page and found no job advert on it",
+    detail: "This isn't a sign there are no vacancies. Paste the advert, or try another page.",
+  },
+  not_read: {
+    title: "Nessa couldn't read a job advert on this page",
+    detail: "This isn't a sign there are no vacancies. Paste the advert, or try another page.",
+  },
+  not_run: {
+    title: "Nessa didn't read this page",
+    detail: "This isn't a sign there are no vacancies. Paste the advert, or try another page.",
   },
 };
 

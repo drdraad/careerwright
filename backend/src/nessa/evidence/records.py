@@ -116,6 +116,9 @@ class ExtractionOutcome(StrEnum):
     POSTINGS_RECORDED = "postings_recorded"
     NO_POSTING_FOUND = "no_posting_found"  # read, and no advert found: not "none found"
     POSTINGS_UNVERIFIED = "postings_unverified"  # it proposed adverts; none verified
+    # Every posting it verified disagrees with another on a critical field: none published
+    # (review C M5).
+    POSTINGS_CONFLICTING = "postings_conflicting"
 
 
 class BodyNotKept(StrEnum):

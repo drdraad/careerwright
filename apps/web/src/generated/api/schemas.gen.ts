@@ -2185,6 +2185,7 @@ export const ModelExtractionStateSchema = {
     enum: [
         'pending',
         'postings_read',
+        'postings_conflicting',
         'no_posting_found',
         'not_read',
         'not_run'

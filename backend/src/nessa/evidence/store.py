@@ -431,28 +431,38 @@ def coverage(tx: Tx, workspace_id: uuid.UUID) -> dict[str, int]:
     no readable posting counted apart (spec section 7: "Display result count, deduplication
     count and coverage status"). Pasted text is the person's own input, not a source tried.
 
-    A page handed to model extraction (fix round 2) is `pending` while its run is queued or
-    running; `succeeded` once the run recorded a posting that is published; its own
-    `no_posting_found_by_model` when the run read it and found none; and otherwise (not run,
-    failed, cancelled, nothing verified, only conflicting postings) `no_posting_readable`."""
+    A page handed to model extraction (fix round 2) reads as what its run recorded,
+    whatever the run's state (a run cancelled while its call was out keeps its result,
+    DUR-05; fix round 3, review C M2): `succeeded` for a published posting, its own
+    `no_posting_found_by_model` when the run read it and found none, `no_posting_readable`
+    for nothing verified or only conflicting postings. With nothing recorded it is `pending`
+    while its run is queued or running, else (not run, failed, cancelled first)
+    `no_posting_readable`.
+
+    An attempt still `pending` counts as pending only while its own run is queued or
+    running; one its run left behind (a recording rolled back, a crash then a cancel) is
+    `failed`, interrupted, never "still checking" (fix round 3, review B M1)."""
     rows = tx.execute(
         sa.text(
             "SELECT CASE "
+            "WHEN latest.status = 'pending' THEN CASE "
+            "  WHEN ar.status IN ('queued', 'running') THEN 'pending' ELSE 'failed' END "
             "WHEN latest.status = 'succeeded' AND e.attempt_id IS NOT NULL THEN CASE "
             "  WHEN e.run_id IS NULL THEN :unread "
-            "  WHEN r.status IN ('queued', 'running') THEN 'pending' "
-            "  WHEN r.status <> 'complete' THEN :unread "
             "  WHEN e.outcome = 'no_posting_found' THEN :found_none "
-            "  WHEN EXISTS (SELECT 1 FROM nessa.job_copies c "
+            "  WHEN e.outcome = 'postings_recorded' AND EXISTS (SELECT 1 FROM nessa.job_copies c "
             "    WHERE c.attempt_id = latest.attempt_id AND c.job_id IS NOT NULL) "
             "    THEN 'succeeded' "
+            "  WHEN e.outcome IS NOT NULL THEN :unread "
+            "  WHEN r.status IN ('queued', 'running') THEN 'pending' "
             "  ELSE :unread END "
             "WHEN latest.status = 'succeeded' AND latest.extraction = ANY(:unreadable) "
             "THEN :unread ELSE latest.status END AS outcome, count(*) AS n "
             "FROM (SELECT DISTINCT ON (coalesce(requested_url, attempt_id::text)) attempt_id, "
-            "status, extraction FROM nessa.source_attempts "
+            "run_id, status, extraction FROM nessa.source_attempts "
             "WHERE workspace_id = :ws AND route <> 'pasted_text' "
             "ORDER BY coalesce(requested_url, attempt_id::text), started_at DESC) latest "
+            "LEFT JOIN nessa.runs ar ON ar.run_id = latest.run_id "
             "LEFT JOIN nessa.page_extractions e ON e.attempt_id = latest.attempt_id "
             "LEFT JOIN nessa.runs r ON r.run_id = e.run_id "
             "GROUP BY 1"

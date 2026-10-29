@@ -169,6 +169,8 @@ class ExtractionProposal(StrictModel):
 
     @property
     def outcome(self) -> ExtractionOutcome:
+        if self.postings and all(p.extraction_error for p in self.postings):
+            return ExtractionOutcome.POSTINGS_CONFLICTING
         if self.postings:
             return ExtractionOutcome.POSTINGS_RECORDED
         if self.dropped:
@@ -381,19 +383,29 @@ def date_from(text: str) -> date | None:
     return found.pop() if len(found) == 1 else None
 
 
-_WORK_MODES = {
-    WorkMode.HYBRID: re.compile(r"(?<![A-Za-z])hybrid(?![A-Za-z])", re.IGNORECASE),
-    WorkMode.REMOTE: re.compile(
-        r"(?<![A-Za-z])(?:remote(?:ly)?|work from home|home[- ]based)(?![A-Za-z])", re.IGNORECASE
-    ),
-    WorkMode.ON_SITE: re.compile(
-        r"(?<![A-Za-z])(?:on[- ]?site|office[- ]based|in the office)(?![A-Za-z])", re.IGNORECASE
-    ),
+_WORK_MODE_WORDS = {
+    WorkMode.HYBRID: r"hybrid",
+    WorkMode.REMOTE: r"remote(?:ly)?|work from home|home[- ]based",
+    WorkMode.ON_SITE: r"on[- ]?site|office[- ]based|in the office",
 }
+_WORK_MODES = {
+    mode: re.compile(rf"(?<![A-Za-z])(?:{words})(?![A-Za-z])", re.IGNORECASE)
+    for mode, words in _WORK_MODE_WORDS.items()
+}
+# A negator before a mode word ("not remote", "non-remote", "no remote working"): the span
+# says what the job is not, so it reads as unclear, never as the word (review C M1).
+_NEGATED_MODE = re.compile(
+    rf"(?<![A-Za-z])(?:not|no|non)(?:\s+|-)(?:{'|'.join(_WORK_MODE_WORDS.values())})"
+    r"(?![A-Za-z])",
+    re.IGNORECASE,
+)
 
 
 def work_mode_from(text: str) -> WorkMode | None:
-    """Hybrid when the span says so; otherwise remote or on-site when it names exactly one."""
+    """Hybrid when the span says so; otherwise remote or on-site when it names exactly one;
+    none when a mode word is negated."""
+    if _NEGATED_MODE.search(text):
+        return None
     named = [mode for mode, pattern in _WORK_MODES.items() if pattern.search(text)]
     if WorkMode.HYBRID in named:
         return WorkMode.HYBRID

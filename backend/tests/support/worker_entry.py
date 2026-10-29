@@ -7,6 +7,8 @@ a named moment, so DBOS recovery is exercised rather than simulated:
 - `after_dispatch_before_mark`: the workflow started, its outbox entry not yet marked;
 - `after_first_partial`: the first piece of a streamed reply is committed, mid-call.
 - `after_acquired_target`: an acquisition target's result is committed, its step is not.
+One fault point is not a crash: `recording_fails` makes every target's recording
+transaction fail for good, so it rolls back and leaves the attempt `pending`.
 
 The acquisition worker it calls is `NESSA_ACQUISITION_URL` (a test-started one).
 """
@@ -68,6 +70,13 @@ def install_crash_point(point: str) -> None:
             raise AssertionError("unreachable")
 
         acquisition.acquire_target = acquire_then_die
+    elif point == "recording_fails":
+        # Not a crash: the recording transaction fails for good, so it rolls back and the
+        # target's attempt is left `pending` (fix round 3, review B M1).
+        def fail(*args: object) -> None:
+            raise RuntimeError("synthetic recording failure")
+
+        acquisition.start_extraction = fail  # type: ignore[attr-defined,assignment]
     elif point:
         raise ValueError(f"unknown crash point {point!r}")
 
