@@ -506,6 +506,12 @@ def networks_of(stack: Stack, service: str) -> set[str]:
     return set(json.loads(inspected.stdout)[0]["NetworkSettings"]["Networks"])
 
 
+def demo_worker_networks(stack: Stack) -> set[str]:
+    """The worker's networks in demo mode: both internal (no route out), the second shared
+    with the acquisition worker alone (fix round 1, review A I4)."""
+    return {f"{stack.project}_internal", f"{stack.project}_acquisition"}
+
+
 NETWORKS_SEEN_BY = (
     "import json; from nessa.localnet import {name}, ROUTE_TABLE; "
     "print(json.dumps([str(n) for n in {call}]))"
@@ -651,7 +657,7 @@ def test_master_key_rotation_reloads_the_running_api_reseals_and_keeps_demo_offl
     )
     assert versions == [(2,)]
     # `restart` kept the demo configuration: the worker still has no route out.
-    assert networks_of(demo_stack, "worker") == {f"{demo_stack.project}_internal"}
+    assert networks_of(demo_stack, "worker") == demo_worker_networks(demo_stack)
 
 
 def key_versions(stack: Stack) -> set[int]:
@@ -688,7 +694,7 @@ def test_reseal_after_an_interrupted_rotation_reloads_the_running_api_first(
     )
     assert stored.status_code == 201
     assert key_versions(demo_stack) == {newest}
-    assert networks_of(demo_stack, "worker") == {f"{demo_stack.project}_internal"}
+    assert networks_of(demo_stack, "worker") == demo_worker_networks(demo_stack)
 
 
 @pytest.mark.req("BND1-14")

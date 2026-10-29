@@ -3,6 +3,7 @@ made after the client stopped waiting for the run (ruling R5). Offline: the smok
 orchestration (`tools.live_smoke.smoke`) drives the real API and a real worker process whose
 fake model fails every call and logs each one; nothing contacts Meta."""
 
+import json
 import secrets
 import time
 from collections.abc import Iterator
@@ -243,4 +244,10 @@ def test_the_search_smoke_runs_one_source_search_and_ledgers_its_one_request(
     assert result.status == "complete"
     assert result.findings == []
     assert (record.http_requests, record.purpose) == (1, SOURCE_SEARCH.purpose)
-    assert "candidates 2 (grounded 1)" in capsys.readouterr().out
+    assert '"candidates": 2, "grounded": 1' in capsys.readouterr().out
+    # The row's notes say what the search excluded and where its pages came from: hosts only.
+    notes = json.loads(record.notes)
+    assert (notes["candidates"], notes["grounded"], notes["empty_reason"]) == (2, 1, None)
+    assert notes["excluded"] == [{"reason": "source_not_permitted", "host": "www.linkedin.com"}]
+    assert notes["source_hosts"] == ["careers.northwind.example"]
+    assert "https://" not in record.notes
