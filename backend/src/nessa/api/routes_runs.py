@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from nessa.api.deps import CallerDep, Deps, IdempotencyKey
 from nessa.api.envelope import ERROR_RESPONSES
 from nessa.api.pagination import DEFAULT_LIMIT, MAX_LIMIT, decode_timestamped, encode
-from nessa.api.schemas import RunOut, RunPage
+from nessa.api.schemas import RunCancelOut, RunOut, RunPage
 from nessa.db import Tx, actor_transaction
 from nessa.identity import run_store
 from nessa.identity.keyring import Keyring
@@ -71,18 +71,29 @@ def submit(
 
 
 @router.post(
-    "/runs/{run_id}/cancel", status_code=202, response_model=RunOut, operation_id="cancel_run"
+    "/runs/{run_id}/cancel",
+    status_code=202,
+    response_model=RunCancelOut,
+    operation_id="cancel_run",
 )
 def cancel(
     workspace_id: uuid.UUID, run_id: uuid.UUID, caller: CallerDep, deps: Deps, key: IdempotencyKey
 ) -> JSONResponse:
-    """Ask a queued or running run to stop (DUR-05): 202 with the run, which ends
-    `cancelled` once the worker has stopped it. A finished run is `RUN_FINISHED`."""
+    """Ask a run, and the runs it started, to stop (DUR-05): 202 with the run as it stands
+    and `cancellation_requested`, the runs whose cancellation this asked for. A queued or
+    running run is among them and ends `cancelled` once the worker has stopped it. A run
+    that has finished keeps its own status; if runs it started have not settled (an
+    acquisition's extraction runs), the answer is still 202 and names only those. A finished
+    run with none is `RUN_FINISHED`."""
 
     def execute(tx: Tx) -> CommandResult:
-        run = cancel_run(tx, caller.actor, workspace_id, run_id)
+        cancellation = cancel_run(tx, caller.actor, workspace_id, run_id)
+        run = cancellation.run
         # The answer is kept as the receipt, in plaintext: never with model output in it.
-        answer = RunOut.of(run, run_store.attempts(tx, run.run_id), None)
+        answer = RunCancelOut(
+            **RunOut.of(run, run_store.attempts(tx, run.run_id), None).model_dump(),
+            cancellation_requested=cancellation.requested,
+        )
         return CommandResult(202, answer.model_dump(mode="json"), workspace_id)
 
     request = {"workspace_id": str(workspace_id), "run_id": str(run_id)}

@@ -2576,6 +2576,72 @@ export const RightsClass = {
 export type RightsClass = typeof RightsClass[keyof typeof RightsClass];
 
 /**
+ * RunCancelOut
+ *
+ * A cancel's answer (DUR-05): the run as it stands, and the runs whose cancellation the
+ * request asked for (review C-1 N2).
+ */
+export type RunCancelOut = {
+    /**
+     * Run Id
+     */
+    run_id: string;
+    kind: RunKind;
+    status: WorkState;
+    failure_class: FailureClass | null;
+    data_mode: DataMode;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    /**
+     * Model Id
+     *
+     * None for a run that calls no model (acquisition).
+     */
+    model_id: string | null;
+    model_mode: ModelMode | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Started At
+     */
+    started_at: string | null;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Cancel Requested At
+     *
+     * When the person asked to cancel it; the run ends `cancelled` once the worker has stopped it.
+     */
+    cancel_requested_at?: string | null;
+    /**
+     * Attempts
+     */
+    attempts: Array<AttemptOut>;
+    /**
+     * A connection check's result. An interview turn's proposals are read through the turn (`GET .../interview/turns/{turn_id}`).
+     */
+    output: ConnectionCheckResult | null;
+    /**
+     * Profile Version
+     *
+     * The profile version the run read, pinned at submission.
+     */
+    profile_version?: number | null;
+    /**
+     * Cancellation Requested
+     *
+     * The runs whose cancellation this asked for: the run itself while it is queued or running, and every run it started that has not settled (an acquisition's extraction runs), or both. Each ends `cancelled` once the worker has stopped it.
+     */
+    cancellation_requested: Array<string>;
+};
+
+/**
  * RunKind
  */
 export const RunKind = {
@@ -5324,7 +5390,7 @@ export type CancelRunResponses = {
     /**
      * Successful Response
      */
-    202: RunOut;
+    202: RunCancelOut;
 };
 
 export type CancelRunResponse = CancelRunResponses[keyof CancelRunResponses];

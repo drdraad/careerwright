@@ -3707,6 +3707,162 @@ export const RightsClassSchema = {
     description: 'The page classes of the session 1 rights policy (H-06; `corpus/README.md`).'
 } as const;
 
+export const RunCancelOutSchema = {
+    properties: {
+        run_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Run Id'
+        },
+        kind: {
+            $ref: '#/components/schemas/RunKind'
+        },
+        status: {
+            $ref: '#/components/schemas/WorkState'
+        },
+        failure_class: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/FailureClass'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        data_mode: {
+            $ref: '#/components/schemas/DataMode'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        },
+        model_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Model Id',
+            description: 'None for a run that calls no model (acquisition).'
+        },
+        model_mode: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ModelMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        started_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Started At'
+        },
+        finished_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Finished At'
+        },
+        cancel_requested_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cancel Requested At',
+            description: 'When the person asked to cancel it; the run ends `cancelled` once the worker has stopped it.'
+        },
+        attempts: {
+            items: {
+                $ref: '#/components/schemas/AttemptOut'
+            },
+            type: 'array',
+            title: 'Attempts'
+        },
+        output: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ConnectionCheckResult'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'A connection check\'s result. An interview turn\'s proposals are read through the turn (`GET .../interview/turns/{turn_id}`).'
+        },
+        profile_version: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Profile Version',
+            description: 'The profile version the run read, pinned at submission.'
+        },
+        cancellation_requested: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Cancellation Requested',
+            description: 'The runs whose cancellation this asked for: the run itself while it is queued or running, and every run it started that has not settled (an acquisition\'s extraction runs), or both. Each ends `cancelled` once the worker has stopped it.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'run_id',
+        'kind',
+        'status',
+        'failure_class',
+        'data_mode',
+        'synthetic',
+        'model_id',
+        'model_mode',
+        'created_at',
+        'started_at',
+        'finished_at',
+        'attempts',
+        'output',
+        'cancellation_requested'
+    ],
+    title: 'RunCancelOut',
+    description: 'A cancel\'s answer (DUR-05): the run as it stands, and the runs whose cancellation the\nrequest asked for (review C-1 N2).'
+} as const;
+
 export const RunKindSchema = {
     type: 'string',
     enum: [

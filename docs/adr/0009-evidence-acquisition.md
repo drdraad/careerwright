@@ -282,7 +282,9 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    proposal, a summary); an extraction's postings, recorded with that result, are evidence
    and are shown, and its page reads as what was recorded (decision 15). A finished run
    answers `RUN_FINISHED`, unless runs it started have not
-   settled: then those are cancelled (decision 15, fix round 3). The model workflow's step sequence is
+   settled: then those are cancelled (decision 15, fix round 3), with 202 and the run's own
+   status. Every 202 names the runs whose cancellation it asked for
+   (`cancellation_requested`, fix round 4). The model workflow's step sequence is
    unchanged and the acquisition workflow is new, so the DBOS `application_version` stays
    `nessa-l0-1`.
 
@@ -401,9 +403,18 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
       running), even once the run itself has finished, when only those are cancelled; the
       worker acts on each request on its own, so a queued one is never dispatched and makes
       no provider request. The cancel and the start hold the same advisory lock on the
-      acquisition (taken before any row lock, in the same order on both sides), so a page
-      recorded after a cancel is `acquisition_cancelled` and the SQL function refuses it too.
-      A run cancelled while its call is out keeps its accepted result, as every run does.
+      acquisition (`run_store.lock_started_runs`), each as its first lock: the cancel
+      before the workspace's row; the acquisition's recording transaction, whenever its
+      page is model-readable, before the workspace's recording lock and before any insert
+      (fix round 4, review C-1 N1: a kept body's document takes a key-share lock on the
+      workspace's row, which the cancel's row lock waits for, so a later lock could
+      deadlock;
+      `test_a_cancel_while_a_kept_page_for_extraction_is_recorded_ends_without_a_store_error`).
+      So a page recorded after a cancel is `acquisition_cancelled` and the SQL function
+      refuses it too. The cancel's 202 lists the runs whose cancellation it asked for
+      (`cancellation_requested`: the run itself while unsettled, the started runs, or both;
+      fix round 4, review C-1 N2). A run cancelled while its call is out keeps its accepted
+      result, as every run does.
     - *Input and retention.* The sealed input is that text, marked in the prompt as
       untrusted data. It is erased once the run is terminal, whatever its outcome, by
       `nessa.erase_run_input` (`RunTask.erases_input`), even after the requester's access
@@ -480,6 +491,13 @@ leak scan clean); `make live-adzuna` blocked: no `ADZUNA_APP_ID`/`ADZUNA_APP_KEY
 - Fix round 3 migrations: 0022 (`visible_text_detail`), 0023 (`runs.started_by_run`, the
   cancellation lock, `acquisition_cancelled`), 0024 (`postings_conflicting`). Fix round 4:
   0025 (`attribute_detail`).
+- Pre-existing lock pattern, not fixed in fix round 4 and carried to the final review:
+  `cancel_run` locks the workspace's row `FOR UPDATE` and then takes a key-share lock on
+  the run's row (the `run_cancellations` foreign key), while a worker transaction can hold
+  the run's row `FOR UPDATE` and then write an event, which updates the workspace's row;
+  the two can deadlock, and PostgreSQL then ends one with a store error (the worker's step
+  retries; the person repeats the cancel). The cascade makes this possible for up to five
+  more runs.
 - The live search proposed no candidate in two tries; candidate quality is unqualified.
 - The Adzuna live integration is unverified until credentials are in `.env` under those two
   names.

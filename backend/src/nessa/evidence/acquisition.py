@@ -41,6 +41,7 @@ from nessa.evidence.adzuna import CREDENTIAL_PARAMETERS, AdzunaQuery, recorded_u
 from nessa.evidence.extraction_runs import (
     ModelSpendEstimate,
     acquisition_model_spend,
+    model_readable,
     start_extraction,
 )
 from nessa.evidence.freshness import (
@@ -888,6 +889,12 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
         result = _unavailable(target, rt.clock())
     result = _kept_body_checked(result)
     with run_transaction(rt.engine, run_id) as tx:
+        if model_readable(result):
+            # First, before any other lock or insert: the page may start an extraction run,
+            # which a cancel must see or be seen by. The cancel takes this lock and then the
+            # workspace's row, which a kept body's document would already hold by its key
+            # here, so taking it any later could deadlock (review C-1 N1).
+            run_store.lock_started_runs(tx, run_id)
         # One recording at a time per workspace, from reading the candidates to the merge,
         # so a merge never deletes a job another run is recording onto (review B N2).
         store.lock_workspace_records(tx, run.workspace_id)

@@ -440,6 +440,7 @@ def test_a_run_cancelled_while_queued_never_calls_the_model_or_reserves_spend(
 
     assert requested["status"] == "queued"
     assert requested["cancel_requested_at"] is not None
+    assert requested["cancellation_requested"] == [run_id]  # the run alone (review C-1 N2)
     assert (run["status"], run["failure_class"], run["output_id"]) == ("cancelled", None, None)
     assert scenario.attempts(run_id) == []  # no call, no reservation
     assert scenario.journal(run_id)["status"] == []  # its workflow was never started

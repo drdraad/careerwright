@@ -6,6 +6,7 @@ synthetic and labelled so; none composes distress text."""
 
 import json
 import secrets
+import threading
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -39,7 +40,8 @@ from tools.leak_scan import Needle, scan
 pytestmark = pytest.mark.integration
 
 HOSTS = [f"p{n}.northwind.example" for n in range(1, 7)]
-NAMES = {host: [LOOPBACK] for host in ["careers.northwind.example", *HOSTS]}
+# www.gov.uk: a class whose body is kept, the controlled server standing in for it.
+NAMES = {host: [LOOPBACK] for host in ["careers.northwind.example", "www.gov.uk", *HOSTS]}
 BODY_SENTINEL = f"PAGE-BODY-{secrets.token_hex(6)}"
 
 
@@ -466,7 +468,11 @@ def test_cancelling_an_acquisition_cancels_its_queued_extractions_before_any_req
         for _ in range(2)
     ]
 
-    assert _cancel(api, ada, workspace, run_id).status_code == 202
+    answer = _cancel(api, ada, workspace, run_id)
+
+    assert answer.status_code == 202
+    # Review C-1 N2: the answer names what it asked to cancel: the run and its started runs.
+    assert answer.json()["cancellation_requested"] == [run_id, *started]
     requested = infra.query(
         "SELECT run_id::text AS id FROM nessa.run_cancellations WHERE workspace_id = %s",
         (workspace,),
@@ -516,6 +522,7 @@ def test_a_finished_acquisition_s_cancel_cancels_only_its_unsettled_extractions(
 
     assert response.status_code == 202
     assert response.json()["status"] == "failed"  # the acquisition itself stays as it ended
+    assert response.json()["cancellation_requested"] == [queued]  # its started run alone
     requested = infra.query(
         "SELECT run_id::text AS id FROM nessa.run_cancellations WHERE workspace_id = %s",
         (workspace,),
@@ -555,6 +562,105 @@ def test_an_acquisition_cancelled_while_fetching_hands_no_page_to_extraction(
         "SELECT kind FROM nessa.runs WHERE workspace_id = %s", (scenario.workspace_id,)
     )
     assert [k["kind"] for k in kinds] == ["acquisition"]
+
+
+def _lock_waits(infra: Infra, wait_event: str, statement: str) -> bool:
+    """Whether a session waits for a lock of this kind while running such a statement."""
+    rows = infra.query(
+        "SELECT 1 FROM pg_stat_activity WHERE datname = current_database() "
+        "AND wait_event_type = 'Lock' AND wait_event = %s AND query ILIKE %s",
+        (wait_event, f"%{statement}%"),
+    )
+    return bool(rows)
+
+
+@pytest.mark.req("DUR-05")
+def test_a_cancel_while_a_kept_page_for_extraction_is_recorded_ends_without_a_store_error(
+    infra: Infra, scenario: Scenario, sources: SourceServer, service_url: str
+) -> None:
+    # Review C-1 N1. Recording a kept body inserts its document, whose foreign key takes a
+    # key-share lock on the workspace's row; a cancel takes the acquisition's cancellation
+    # lock and then locks that row. A second connection holds the row (as an event write
+    # would) so the cancel waits there holding its lock while the page is recorded; then it
+    # lets go. Had the recording taken the cancellation lock after its insert, the two would
+    # wait on each other and PostgreSQL would end one with a deadlock error.
+    release = threading.Event()
+
+    def gated() -> Iterator[bytes]:
+        release.wait(timeout=20.0)
+        yield labelled("Kept Gardener")  # no structured data: model-readable
+
+    sources.routes["/gated"] = Scripted(body=gated)
+    worker(scenario, service_url)
+    submitted = submit(
+        scenario.api,
+        scenario.token,
+        scenario.workspace_id,
+        {"urls": [url(sources, "/gated", host="www.gov.uk")]},
+    )
+    run_id = submitted.json()["acquisition"]["run"]["run_id"]
+    wait_for(
+        lambda: bool(
+            infra.query(
+                "SELECT 1 FROM nessa.source_attempts WHERE run_id = %s AND status = 'pending'",
+                (run_id,),
+            )
+        ),
+        timeout_s=30.0,
+        what="the page's request",
+    )
+    answers: list[Any] = []
+    with psycopg.connect(infra.url("pg_superuser", "nessa_app")) as blocker:
+        blocker.execute(
+            "SELECT 1 FROM nessa.workspaces WHERE workspace_id = %s FOR NO KEY UPDATE",
+            (scenario.workspace_id,),
+        )
+        cancelling = threading.Thread(
+            target=lambda: answers.append(
+                _cancel(scenario.api, scenario.token, scenario.workspace_id, run_id)
+            )
+        )
+        cancelling.start()
+        wait_for(
+            lambda: _lock_waits(infra, "transactionid", "FOR UPDATE"),
+            timeout_s=10.0,
+            what="the cancel, holding its cancellation lock, at the workspace's row",
+        )
+        release.set()
+        wait_for(
+            lambda: _lock_waits(infra, "advisory", "pg_advisory_xact_lock"),
+            timeout_s=30.0,
+            what="the recording at the cancellation lock",
+        )
+        blocker.rollback()
+    cancelling.join(timeout=30.0)
+
+    [answer] = answers
+    assert answer.status_code == 202, answer.text  # the cancel: never a store error
+    assert wait_terminal(infra, run_id)["status"] == "cancelled"
+    # The recording: committed at its first try (a deadlock error would roll it back, leave
+    # the attempt pending and send the step round again, to find the run cancelled).
+    wait_for(
+        lambda: (
+            not infra.query(
+                "SELECT 1 FROM nessa.source_attempts WHERE run_id = %s AND status = 'pending'",
+                (run_id,),
+            )
+        ),
+        timeout_s=30.0,
+        what="the page's recording",
+    )
+    attempts = infra.query(
+        "SELECT status, retention FROM nessa.source_attempts WHERE run_id = %s", (run_id,)
+    )
+    assert attempts == [{"status": "succeeded", "retention": "body"}]  # recorded at once, kept
+    [row] = extractions(infra, run_id)
+    assert (row["run_id"], row["not_run"]) == (None, "acquisition_cancelled")
+    documents = infra.query(
+        "SELECT count(*) AS n FROM nessa.source_documents WHERE workspace_id = %s",
+        (scenario.workspace_id,),
+    )
+    assert documents == [{"n": 1}]
 
 
 @pytest.mark.req("DUR-05", "STATE-02")

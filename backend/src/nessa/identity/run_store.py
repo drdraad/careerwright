@@ -563,9 +563,12 @@ _STARTED_RUNS_LOCK = 8237
 
 
 def lock_started_runs(tx: Tx, run_id: uuid.UUID) -> None:
-    """Hold the run's cancellation lock until the transaction ends. Taken before any row
-    lock (the API's cancel takes it before the workspace's), so it never deadlocks with the
-    worker, which takes it before writing an event."""
+    """Hold the run's cancellation lock until the transaction ends. Each side takes it as
+    its first lock: the API's cancel before the workspace's row, and an acquisition's
+    recording transaction, when its page may start an extraction run, before the
+    workspace's recording lock and before any insert (review C-1 N1). So neither ever waits
+    for it while holding a lock the other waits for, and a run being started is either seen
+    by the cancel or refused by the start."""
     tx.execute(
         sa.text("SELECT pg_advisory_xact_lock(hashtextextended(CAST(:run AS text), :key))"),
         {"run": run_id, "key": _STARTED_RUNS_LOCK},

@@ -338,6 +338,17 @@ class RunOut(ResponseModel):
         )
 
 
+class RunCancelOut(RunOut):
+    """A cancel's answer (DUR-05): the run as it stands, and the runs whose cancellation the
+    request asked for (review C-1 N2)."""
+
+    cancellation_requested: list[uuid.UUID] = Field(
+        description="The runs whose cancellation this asked for: the run itself while it is "
+        "queued or running, and every run it started that has not settled (an acquisition's "
+        "extraction runs), or both. Each ends `cancelled` once the worker has stopped it."
+    )
+
+
 class RunPage(ResponseModel):
     items: list[RunOut]
     next_cursor: str | None

@@ -312,18 +312,29 @@ _TERMINAL = frozenset(
 )
 
 
-def cancel_run(tx: Tx, actor: Actor, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Run:
+@dataclass(frozen=True)
+class Cancellation:
+    """A cancel's answer: the run as it stands, and the runs whose cancellation it asked for
+    (the run itself while it is unsettled, the runs it started that are; review C-1 N2)."""
+
+    run: Run
+    requested: list[uuid.UUID]
+
+
+def cancel_run(tx: Tx, actor: Actor, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Cancellation:
     """Ask for a queued or running run to stop (DUR-05). The worker cancels its workflow, so
     nothing more is called or fetched for it, and publishes it `cancelled`, distinct from a
     failure; what it already finished is kept. A run that has finished cannot be cancelled.
-    The run ID is the precondition (like revoking a key); asking twice changes nothing.
+    The run ID is the precondition (like revoking a key); asking twice changes nothing, and
+    names the same runs.
 
     Cancelling a run also asks for the cancellation of every run it started that has not
     settled (an acquisition's extraction runs; fix round 3, item 4), even once the run itself
     has finished: then only those are cancelled. The worker acts on each request on its own.
-    The run's cancellation lock is taken first, before the workspace's row (the worker takes
-    it before writing an event, so the two never deadlock), so a run being started by it is
-    either seen here or refused there (migration 0023)."""
+    The run's cancellation lock is taken first, before the workspace's row; an acquisition's
+    recording takes it first too, when its page may start an extraction run
+    (`run_store.lock_started_runs`; review C-1 N1), so a run being started by it is either
+    seen here or refused there (migration 0023)."""
     run_store.lock_started_runs(tx, run_id)
     visible_workspace(tx, workspace_id, lock=True)
     # Not locked: the API may not lock runs. If the worker finishes the run meanwhile, the
@@ -339,19 +350,16 @@ def cancel_run(tx: Tx, actor: Actor, workspace_id: uuid.UUID, run_id: uuid.UUID)
             stage=ErrorStage.EXECUTION,
             details={"status": run.status.value},
         )
-    if run.status not in _TERMINAL and run_store.request_cancellation(tx, run, actor.actor_id):
-        store.append_event(tx, workspace_id, EventKind.RUN_CANCEL_REQUESTED, str(run_id))
-    for started in started_runs:
-        if run_store.request_cancellation(tx, started, actor.actor_id):
-            store.append_event(
-                tx, workspace_id, EventKind.RUN_CANCEL_REQUESTED, str(started.run_id)
-            )
+    unsettled = [] if run.status in _TERMINAL else [run]
+    for each in [*unsettled, *started_runs]:
+        if run_store.request_cancellation(tx, each, actor.actor_id):
+            store.append_event(tx, workspace_id, EventKind.RUN_CANCEL_REQUESTED, str(each.run_id))
     cancelled = run_store.run(tx, run_id)
     if cancelled is None:
         raise NessaError(
             ErrorCode.INTERNAL_ERROR, "The run was not recorded.", stage=ErrorStage.EXECUTION
         )
-    return cancelled
+    return Cancellation(cancelled, [each.run_id for each in [*unsettled, *started_runs]])
 
 
 def visible_run(tx: Tx, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Run:

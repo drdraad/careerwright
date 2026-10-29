@@ -112,6 +112,12 @@ def _not_run(
     return None
 
 
+def model_readable(result: AcquisitionResult) -> bool:
+    """Whether a recorded page goes to model extraction (or records why it does not): it was
+    retrieved and its structured data gave no posting."""
+    return result.status is AttemptStatus.SUCCEEDED and result.extraction in MODEL_READABLE
+
+
 def start_extraction(
     tx: Tx,
     keyring: Keyring,
@@ -122,12 +128,12 @@ def start_extraction(
     now: datetime,
 ) -> None:
     """Worker, in the acquisition's recording transaction: for a page model extraction may
-    read, its extraction run, or the reason none is started."""
-    if result.status is not AttemptStatus.SUCCEEDED or result.extraction not in MODEL_READABLE:
+    read, its extraction run, or the reason none is started. That transaction holds the
+    acquisition's cancellation lock, taken as its first lock (`run_store.lock_started_runs`;
+    `acquisition.acquire_target`), so a cancel either sees this run once it is started, or
+    is seen here (fix round 3, item 4; review C-1 N1)."""
+    if not model_readable(result):
         return
-    # A cancel either sees this run once it is started, or is seen here (fix round 3, item
-    # 4): both hold the acquisition's cancellation lock, taken before any event is written.
-    run_store.lock_started_runs(tx, run.run_id)
     current = run_store.run(tx, run.run_id)
     model = models.for_workspace(synthetic=run.synthetic)
     if current is None or current.cancel_requested_at is not None:

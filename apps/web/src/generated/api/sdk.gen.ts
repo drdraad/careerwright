@@ -258,8 +258,12 @@ export const submitRun = <ThrowOnError extends boolean = false>(options: Options
 /**
  * Cancel
  *
- * Ask a queued or running run to stop (DUR-05): 202 with the run, which ends
- * `cancelled` once the worker has stopped it. A finished run is `RUN_FINISHED`.
+ * Ask a run, and the runs it started, to stop (DUR-05): 202 with the run as it stands
+ * and `cancellation_requested`, the runs whose cancellation this asked for. A queued or
+ * running run is among them and ends `cancelled` once the worker has stopped it. A run
+ * that has finished keeps its own status; if runs it started have not settled (an
+ * acquisition's extraction runs), the answer is still 202 and names only those. A finished
+ * run with none is `RUN_FINISHED`.
  */
 export const cancelRun = <ThrowOnError extends boolean = false>(options: Options<CancelRunData, ThrowOnError>): RequestResult<CancelRunResponses, CancelRunErrors, ThrowOnError> => (options.client ?? client).post<CancelRunResponses, CancelRunErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
