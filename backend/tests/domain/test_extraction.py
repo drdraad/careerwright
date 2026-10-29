@@ -149,6 +149,31 @@ def test_the_model_input_is_normalised_before_it_is_redacted(form: str, removed:
     assert "ada@northwind.example" not in text
 
 
+@pytest.mark.req("ACQ-06", "SEC-05")
+@pytest.mark.parametrize(
+    "form",
+    [
+        "Write to jane<span>@</span>recruit.example today.",
+        "Write to jane@<b>recruit</b>.example today.",
+    ],
+    ids=["a span around the @", "a tag around the domain"],
+)
+def test_the_model_input_holds_no_email_split_by_inline_markup(form: str) -> None:
+    # Re-review 4 A R4-1: once text nodes are joined, a space stands by the "@" or a dot.
+    page = f"<html><head>{SYNTHETIC_MARKER}</head><body><p>{form}</p></body></html>"
+
+    text = visible_text(redact_page(page).text)
+
+    assert text == f"Write to {EMAIL_REMOVED} today."
+
+
+def test_the_model_input_keeps_an_ordinary_sentence_with_an_at_sign_and_no_domain() -> None:
+    sentence = "Tickets are £5 @ the door, or £8 for two."
+    page = f"<html><head>{SYNTHETIC_MARKER}</head><body><p>{sentence}</p></body></html>"
+
+    assert visible_text(redact_page(page).text) == sentence
+
+
 def _acquired(body: bytes) -> AcquisitionResult:
     host = "careers.northwind.example"
     with source_server({"/robots.txt": Scripted(404), "/jobs/1": Scripted(body=body)}) as server:

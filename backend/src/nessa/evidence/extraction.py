@@ -57,7 +57,7 @@ from nessa.evidence.records import (
     ValidationState,
     WorkMode,
 )
-from nessa.evidence.redaction import redact_text
+from nessa.evidence.redaction import redact_shown
 from nessa.identity.model_registry import worst_case_cost_nano_usd
 from nessa.profile.slate_explanation import span_offsets, unwrapped
 
@@ -435,7 +435,7 @@ class _Posting:
             reason: DropReason | None = DropReason.QUOTE_OUT_OF_BOUNDS
         elif found is None:
             reason = DropReason.QUOTE_NOT_IN_TEXT
-        elif redact_text(self.text[found[0] : found[1]]) != self.text[found[0] : found[1]]:
+        elif redact_shown(self.text[found[0] : found[1]]) != self.text[found[0] : found[1]]:
             reason = DropReason.PERSONAL_DETAILS
         else:
             reason = None

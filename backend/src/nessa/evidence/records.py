@@ -129,8 +129,12 @@ class BodyNotKept(StrEnum):
     CONTACT_UNLOCATED = "contact_unlocated"  # a script holding them was not found in the text
     BLOCK_UNREDACTABLE = "block_unredactable"  # a script that is not JSON held them
     # The page's visible text, normalised, still showed one: the markup hid it from the text
-    # patterns (an entity, a line break, an invisible character; fix round 3, review C I1).
+    # patterns (an entity, a line break, an invisible character; fix round 3, review C I1; an
+    # inline element splitting an email, fix round 4, re-review 4 A R4-1).
     VISIBLE_TEXT_DETAIL = "visible_text_detail"
+    # An attribute's value, its entities decoded and normalised, held one (an obfuscated
+    # `mailto:` link with no visible address; fix round 4, item 1).
+    ATTRIBUTE_DETAIL = "attribute_detail"
 
 
 class RightsClass(StrEnum):

@@ -386,7 +386,8 @@ export const BodyNotKeptSchema = {
     enum: [
         'contact_unlocated',
         'block_unredactable',
-        'visible_text_detail'
+        'visible_text_detail',
+        'attribute_detail'
     ],
     title: 'BodyNotKept',
     description: 'Why a body its rights class may keep was not kept: personal details in it could not\nbe removed (`pages.redact_page`), so only its hash and excerpts are. Each applies to any\nscript, JSON-LD or not (fix round 3 corrects 0020\'s wording, re-review 3 A R3-1).'

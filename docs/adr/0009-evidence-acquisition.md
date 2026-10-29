@@ -153,7 +153,16 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    since fix round 3 (review C I1), when the redacted page's visible text, normalised
    (entities decoded, every whitespace form one space, characters that do not print such as
    a zero-width space or a soft hyphen dropped), still shows one, because its markup hid it
-   from the text patterns (`visible_text_detail`, migration 0022). Migration 0020's
+   from the text patterns (`visible_text_detail`, migration 0022). Since fix round 4
+   (re-review 4 A R4-1), normalised text (a page's visible text, an attribute's value, the
+   model's input) is redacted and looked at with `redaction.redact_shown`, which also takes
+   an email address with whitespace around its "@" or its domain's dots, the TLD letters
+   only, since joining the text of `jane<span>@</span>recruit.example` gives `jane @
+   recruit.example`; no element is guessed to be inline or block, and such a hit in a kept
+   body is `visible_text_detail` too. And since fix round 4 (item 1), every attribute's
+   value is decoded (its entities, as the parser decodes them) and normalised, and a detail
+   found there, such as an obfuscated `mailto:` link with no visible address, means the
+   body is not kept (`attribute_detail`, migration 0025). Migration 0020's
    description said "a JSON-LD block" for the first two; they apply to any script (0022
    records the correction). The reason is its own typed column (migration 0020), the rights
    status the rights statement only (review B N5). Claims and excerpts come from decoded,
@@ -163,10 +172,13 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    **Known limits, for the product owner:** a personal name in running text (for example
    "ask for Jane in HR") cannot be told apart from other words deterministically and is
    not removed; nor is a detail written in another form (an email with "at" for "@", a
-   number spelt out or split by other characters). A detail hidden by markup (entities, line
-   breaks, invisible characters) is not removed from a kept body, which is then not kept
-   (above); an entity-encoded detail inside an attribute (such as an obfuscated `mailto:`
-   link with no visible address) is not looked for.
+   number spelt out or split by other characters, an address percent-encoded in a link
+   such as `mailto:jane%40recruit.example`). A detail hidden by markup (entities, line
+   breaks, invisible characters, inline elements, an attribute's entities) is not removed
+   from a kept body, which is then not kept (above). The spaced form errs towards removal:
+   an "@" between two words with a full stop after the second (a handle that ends a
+   sentence, "Follow @GOVUK. Sign up") reads as an address, so such a body is not kept and
+   those words leave the model's input.
 
 5. **Records (spec section 18).** `source_attempts`: every try by any route, blocked and
    failed ones included, written before the request and settled after, a retry naming the
@@ -353,8 +365,9 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
       already parsed source. The restricted acquisition worker returns that page's visible
       text (`pages.visible_text`: scripts and styles left out; then normalised (entities
       decoded, every whitespace form one space, characters that do not print dropped), then
-      redacted, then cut to 8,000 bytes of UTF-8, in that order, since normalising can reveal
-      a detail (fix round 3, review C I1)); it still holds no model key (GC8).
+      redacted (`redact_shown`, an email split by inline markup included: fix round 4), then
+      cut to 8,000 bytes of UTF-8, in that order, since normalising can reveal a detail (fix
+      round 3, review C I1)); it still holds no model key (GC8).
     - *Where it runs.* `page_extraction`, a model-backed run kind on the one bounded activity
       (`PAGE_EXTRACTION_TASK`; one `RunTask`, no second call path), started by the
       acquisition in the transaction that records the page, at most
@@ -457,7 +470,8 @@ leak scan clean); `make live-adzuna` blocked: no `ADZUNA_APP_ID`/`ADZUNA_APP_KEY
   of its own text; the pay, period and work-mode words and the date forms read are
   provisional (R6). The model-spend estimate is shown by Task 8.
 - Fix round 3 migrations: 0022 (`visible_text_detail`), 0023 (`runs.started_by_run`, the
-  cancellation lock, `acquisition_cancelled`), 0024 (`postings_conflicting`).
+  cancellation lock, `acquisition_cancelled`), 0024 (`postings_conflicting`). Fix round 4:
+  0025 (`attribute_detail`).
 - The live search proposed no candidate in two tries; candidate quality is unqualified.
 - The Adzuna live integration is unverified until credentials are in `.env` under those two
   names.

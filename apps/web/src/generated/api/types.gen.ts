@@ -303,7 +303,8 @@ export type Basis = typeof Basis[keyof typeof Basis];
 export const BodyNotKept = {
     CONTACT_UNLOCATED: 'contact_unlocated',
     BLOCK_UNREDACTABLE: 'block_unredactable',
-    VISIBLE_TEXT_DETAIL: 'visible_text_detail'
+    VISIBLE_TEXT_DETAIL: 'visible_text_detail',
+    ATTRIBUTE_DETAIL: 'attribute_detail'
 } as const;
 
 /**

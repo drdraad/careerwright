@@ -310,6 +310,61 @@ def test_a_kept_body_that_shows_a_detail_once_normalised_is_not_kept(text: str) 
     )
 
 
+# Fix round 4 (re-review 4 A R4-1): an email split by inline markup, which a reader sees whole
+# but which reads with a space by its "@" or a dot once the page's text is joined.
+SPLIT_EMAILS = {
+    "a span around the @": "Write to jane<span>@</span>recruit.example today.",
+    "a tag around the domain": "Write to jane@<b>recruit</b>.example today.",
+}
+ORDINARY_AT = "Tickets are £5 @ the door, or £8 for two."  # an "@" with no domain after it
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize("text", SPLIT_EMAILS.values(), ids=SPLIT_EMAILS.keys())
+def test_a_kept_body_with_an_email_split_by_inline_markup_is_not_kept(text: str) -> None:
+    result, kept = _acquire_kept(page_with_text(text))
+
+    assert kept == b""
+    assert (result.retention, result.body_not_kept) == (
+        Retention.EXCERPTS,
+        BodyNotKept.VISIBLE_TEXT_DETAIL,
+    )
+
+
+@pytest.mark.req("ACQ-06")
+def test_an_ordinary_sentence_with_an_at_sign_and_no_domain_keeps_its_body_unchanged() -> None:
+    result, kept = _acquire_kept(page_with_text(ORDINARY_AT))
+
+    assert (result.retention, result.body_not_kept) == (Retention.BODY, None)
+    assert ORDINARY_AT.encode() in kept
+
+
+@pytest.mark.req("ACQ-06")
+def test_an_entity_encoded_mailto_link_with_no_visible_address_means_no_body() -> None:
+    # Fix round 4, item 1: the address is written as entities inside the link, so the page's
+    # text holds no "@" for the text patterns, but a browser decodes it.
+    link = '<a href="mailto:&#106;&#97;&#110;&#101;&#64;recruit&#46;example">Write to us</a>'
+
+    result, kept = _acquire_kept(page_with_text(link))
+
+    assert kept == b""
+    assert (result.retention, result.body_not_kept) == (
+        Retention.EXCERPTS,
+        BodyNotKept.ATTRIBUTE_DETAIL,
+    )
+
+
+def test_a_plain_mailto_link_loses_its_address_and_the_body_is_kept() -> None:
+    # The control: an address the text patterns can see is removed in place.
+    result, kept = _acquire_kept(
+        page_with_text('<a href="mailto:jane@recruit.example">Write to us</a>')
+    )
+
+    assert (result.retention, result.body_not_kept) == (Retention.BODY, None)
+    assert b"jane@recruit.example" not in kept
+    assert f'href="mailto:{EMAIL_REMOVED}"'.encode() in kept
+
+
 @pytest.mark.req("ACQ-06")
 @pytest.mark.parametrize(
     "space", [chr(0x00A0), chr(0x202F), chr(0x2009), "\t"], ids=["nbsp", "narrow", "thin", "tab"]

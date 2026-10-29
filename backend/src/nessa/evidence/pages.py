@@ -44,7 +44,7 @@ from nessa.evidence.records import (
     ValidationState,
     WorkMode,
 )
-from nessa.evidence.redaction import redact_json, redact_text, redact_value
+from nessa.evidence.redaction import redact_json, redact_shown, redact_text, redact_value
 
 EXCERPT_CHARS = 200
 LOCALITY_CHARS, POSTAL_CODE_CHARS, COUNTRY_CHARS = 120, 20, 60  # `records.Location`'s bounds
@@ -456,11 +456,26 @@ def normalised_text(plain: str) -> str:
     return " ".join(word for word in words if word)
 
 
+def _shown_detail(shown: str) -> bool:
+    return redact_shown(shown) != shown
+
+
 def _shows_detail(html: str) -> bool:
     """Whether a page's visible text, normalised, still holds an email or a telephone
-    number: then its markup hid one from the text patterns, and its body is not kept."""
-    shown = normalised_text(_plain(html))
-    return redact_text(shown) != shown
+    number: then its markup hid one from the text patterns (an inline element splitting an
+    email included, fix round 4, re-review 4 A R4-1), and its body is not kept."""
+    return _shown_detail(normalised_text(_plain(html)))
+
+
+def _attribute_shows_detail(html: str) -> bool:
+    """Whether any attribute's value, its entities decoded (the parser decodes them) and
+    normalised, holds an email or a telephone number (fix round 4, item 1). Written as
+    entities, a detail is hidden from the text patterns, yet a browser decodes it: a
+    `mailto:` link with no visible address."""
+    return any(
+        _shown_detail(normalised_text(str(value)))
+        for value in Selector(content=html).xpath("//@*").getall()
+    )
 
 
 @dataclass(frozen=True)
@@ -468,8 +483,8 @@ class RedactedPage:
     text: str  # line endings normalised, personal details removed: what is parsed and kept
     # Personal details that may remain, so the body must never be kept: a script holding
     # them could not be found in the page's text to be written again, a script holding them
-    # is not JSON, so only its text could be redacted, or the page's visible text, once
-    # normalised, still shows one.
+    # is not JSON, so only its text could be redacted, the page's visible text, once
+    # normalised, still shows one, or an attribute's decoded value holds one.
     unremovable: BodyNotKept | None
 
 
@@ -481,7 +496,9 @@ def redact_page(text: str) -> RedactedPage:
     repeated key, changes it; a script that is not JSON, and the HTML around the scripts,
     are redacted as text (re-review A N-1). Then, fail safe, the result's visible text is
     normalised and looked at again: a detail the markup hid (an entity, a line break, an
-    invisible character) means the body is not kept (fix round 3, review C I1)."""
+    invisible character, an inline element splitting an email) means the body is not kept
+    (fix round 3, review C I1; fix round 4, re-review 4 A R4-1); and so does one in an
+    attribute's value once its entities are decoded (fix round 4, item 1)."""
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     cursor = 0
     parts: list[str] = []
@@ -511,6 +528,8 @@ def redact_page(text: str) -> RedactedPage:
     redacted = "".join(parts)
     if unremovable is None and _shows_detail(redacted):
         unremovable = BodyNotKept.VISIBLE_TEXT_DETAIL
+    if unremovable is None and _attribute_shows_detail(redacted):
+        unremovable = BodyNotKept.ATTRIBUTE_DETAIL
     return RedactedPage(redacted, unremovable)
 
 
@@ -549,10 +568,11 @@ def visible_text(text: str) -> str:
     """What model extraction reads of a redacted page (fix round 2, ruling 11; fix round 3,
     review C I1): its visible text (scripts and styles left out, entities decoded),
     normalised first (`normalised_text`), since decoding, collapsing whitespace and dropping
-    what does not print can each reveal a detail; then with personal details removed; then
-    cut to `EXTRACTION_TEXT_BYTES` of UTF-8. Spans index into exactly this text, and its
-    hash is theirs."""
-    redacted = redact_text(normalised_text(_plain(text)))
+    what does not print can each reveal a detail; then with personal details removed, an
+    email that inline markup split included (`redaction.redact_shown`; fix round 4,
+    re-review 4 A R4-1); then cut to `EXTRACTION_TEXT_BYTES` of UTF-8. Spans index into
+    exactly this text, and its hash is theirs."""
+    redacted = redact_shown(normalised_text(_plain(text)))
     cut = redacted.encode()[:EXTRACTION_TEXT_BYTES]
     return cut.decode(errors="ignore").rstrip()
 

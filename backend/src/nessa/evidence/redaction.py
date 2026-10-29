@@ -17,13 +17,17 @@ JSON is redacted in its decoded values, never as raw text: a value's escapes (`\
 `\\u003e`) are decoded first, so a detail right after one is still found and the JSON stays
 valid. IDs and URLs are never redacted (`NOT_TEXT`): an ID can look like a phone number.
 
+Text as a reader sees it (`pages.normalised_text`: a page's visible text, an attribute's
+value) is redacted with `redact_shown`, which also removes an email address with whitespace
+around its "@" or its domain's dots, where markup split it (fix round 4, re-review 4 A R4-1).
+
 A personal name in running text cannot be told apart from other words deterministically,
 so it is not removed; nor is a detail written in an unusual form (a number spelt out). A
-detail the page's markup hides (an entity, a line break, an invisible character) is not
-removed from a kept body either, but `pages.redact_page` then keeps no body, and the text a
-model reads is normalised before it is redacted (`pages.visible_text`). These are known
-limits, recorded in ADR 0009 for the product owner. A page's scripts are found by the parser
-(`pages.redact_page`).
+detail the page's markup hides (an entity, a line break, an invisible character, an inline
+element, an attribute's entities) is not removed from a kept body either, but
+`pages.redact_page` then keeps no body, and the text a model reads is normalised before it
+is redacted (`pages.visible_text`). These are known limits, recorded in ADR 0009 for the
+product owner. A page's scripts are found by the parser (`pages.redact_page`).
 """
 
 import json
@@ -42,6 +46,12 @@ NOT_TEXT = frozenset(
 )
 
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
+# The same, as normalised text shows an address that inline markup split: optional whitespace
+# around the "@" and the domain's dots ("jane<span>@</span>recruit.example" reads "jane @
+# recruit.example"). The TLD is letters only, so "£5 @ the door" is no address.
+_SHOWN_EMAIL = re.compile(
+    r"[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9-]+(?:\s*\.\s*[A-Za-z0-9-]+)*\s*\.\s*[A-Za-z]{2,}"
+)
 # Not preceded by a word character or anything that would put it inside a URL or a number.
 _NOT_INSIDE = r"(?<![\w/=?&#%.+-])"
 # What may separate a number's digit groups: a space of any horizontal kind (tab, no-break,
@@ -71,6 +81,13 @@ def _phone(match: re.Match[str]) -> str:
 def redact_text(text: str) -> str:
     """Email addresses and telephone numbers removed from plain text."""
     return _PHONE.sub(_phone, _EMAIL.sub(EMAIL_REMOVED, text))
+
+
+def redact_shown(text: str) -> str:
+    """`redact_text` for normalised text, where markup may have left whitespace around an
+    email's "@" or its domain's dots: an address written so goes too. Whole addresses go
+    first, so a sentence after one is never taken for its domain."""
+    return _SHOWN_EMAIL.sub(EMAIL_REMOVED, redact_text(text))
 
 
 def redact_value(value: Any) -> Any:
