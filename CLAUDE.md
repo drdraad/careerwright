@@ -24,11 +24,14 @@ Run from the repository root (details: `docs/runbook.md`).
   any API change (commit the regenerated client), `pnpm run review-screenshots` (visual
   review package).
 - Design references: `cd docs/design && pnpm run contrast && pnpm run screenshots`.
-- Live Meta calls run only through explicit, budget-capped commands, never from the checks
+- Live calls run only through explicit, budget-capped commands, never from the checks
   above: `make live-smoke` (test model; `PRODUCTION=1` qualifies the production model;
-  `INTERVIEW=1` runs one interview turn instead of a connection check) and `make
-  live-eval` (the representative evaluation cases, at most 6, test model only). Every call
-  is appended to `docs/evidence/live-usage.jsonl` and `.md` with its cost (R5).
+  `INTERVIEW=1` runs one interview turn instead of a connection check), `make live-eval`
+  (the representative evaluation cases, at most 6, test model only), `make live-smoke
+  SEARCH=1` (one source search, scope `live-search`), `make live-extract` (one page
+  extraction of the synthetic fixture page, scope `live-extract`) and `make live-adzuna`
+  (two free-tier Adzuna requests, ledgered at $0). Every call is appended to
+  `docs/evidence/live-usage.jsonl` and `.md` with its cost (R5).
 
 ## Repository facts
 - Requirement IDs and test IDs: `docs/requirements-register.md`. Tag each test with its
@@ -45,7 +48,10 @@ Run from the repository root (details: `docs/runbook.md`).
 - Layout: `nessa/identity` (identity and execution: access, workspaces, keys, runs,
   spend), `nessa/profile` (profile, interview contract, turns and preferences, the support
   policy, discovery, the slate and the early sketch, provisional concepts),
-  `nessa/catalogue` (the ESCO taxonomy and the English city list), `nessa/api` (HTTP only),
+  `nessa/catalogue` (the ESCO taxonomy and the English city list), `nessa/evidence`
+  (acquisition: the guarded fetcher, the source manifest `sources.json`, pages, Adzuna,
+  jobs, freshness, claims, model extraction), `nessa/acquisition.py` (the restricted
+  acquisition worker: no database, master key or model key), `nessa/api` (HTTP only),
   `nessa/migrations` (forward-only SQL), `nessa/worker.py` (worker entry point). Identity
   never imports profile or catalogue. Vendor and SQL imports are allowed only in the
   adapters listed in `backend/tests/architecture/test_boundaries.py`; add new ones there.
@@ -78,6 +84,17 @@ Run from the repository root (details: `docs/runbook.md`).
     for economic cost. Unknown money is `null`, never 0.
   - Unknown is never zero or ineligible. Failure is never an empty success. A truncated
     search is never "no route": `NO_ROUTE_IN_BOUNDED_MODEL` needs complete coverage.
+  - Evidence (ADR 0009): every fetch goes through `nessa.evidence.fetcher` (address,
+    robots.txt, pacing and every redirect checked); a page's class comes from the manifest,
+    never from the page; a body is kept only where the session 1 class permits. Third
+    parties' emails, phone numbers and contact fields are removed before anything is
+    hashed, sealed or sent to a model, and a body that still shows one is not kept. Apply
+    links are https only. A blocked, failed or unread source is never "none found"; only an
+    API's own empty answer is. Model extraction is the `page_extraction` run kind, started
+    for at most five pages without structured data: the model only quotes, deterministic
+    code approves values read from verified spans, and its input is erased when the run
+    ends. Lock order: a run's cancellation lock first, then `lock_workspace_records`, then
+    rows.
   - The monthly model (TIME-1) reserves every touched month. A prerequisite is usable
     only from the next month boundary. Cash is prefunded: a receipt counts only if proven
     available before the outflow. Fixture wages arrive late in the month.
@@ -88,8 +105,10 @@ Run from the repository root (details: `docs/runbook.md`).
     `fixtures/README.md`): never edit it. Fixtures never fill live fields; synthetic data
     is always labelled. ESCO comes only from the pinned, hash-checked release;
     `fixtures/esco-sample` is a labelled test subset, rebuilt only by `tools.esco_sample`.
-  - Secrets: `.env` holds `META_API_KEY` for `make live-smoke` only; the product takes
-    user keys through the API and seals them. Never print a key, pass it as an argument,
+  - Secrets: `.env` holds `META_API_KEY` for the live commands only, and
+    `ADZUNA_APPLICATION_ID` and `ADZUNA_API_KEY` for `make live-adzuna` and for `make
+    setup`, which copies them into `NESSA_HOME/adzuna/` for the restricted acquisition
+    worker alone; the product takes user keys through the API and seals them. Never print a key, pass it as an argument,
     log it or journal it. Database passwords and master keys live in `NESSA_HOME`, never in
     the repository. The test model `muse-spark-1.3-contributor` takes synthetic data only,
     enforced in code and by a database CHECK; production is `muse-spark-1.3` (ADR 0003).
