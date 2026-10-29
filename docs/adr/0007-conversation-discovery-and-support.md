@@ -61,7 +61,10 @@ inference, with at least 30 evaluation cases and a capped live run.
      "weekly", "annually"); a defaulted or different period is `inferred`. Until regional pay
      evidence exists (Sprint 3), nothing can apply it: the slate says so in
      `limits_not_applied` and removes nothing for pay, and unknown pay is never treated as
-     below it.
+     below it. *Amended by Task 7 slice B (2026-10-29):* the floor is now applied as a hard
+     filter, on the slate through reviewed official pay and on the job list through
+     advertised pay, and `limits_not_applied` is replaced by `salary_floor`, which counts
+     what it left out, what met it and why the rest were kept (ADR 0010 decision 8).
 
 3. **One useful question at a time** is the interviewer's job and part of the contract
    (`interview-turn-3`): the question lives only in `next_question`, which holds at most one

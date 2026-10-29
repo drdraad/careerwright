@@ -174,7 +174,7 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
   minimum_salary: {
     label: "Lowest pay you'd accept",
     kind: "salary",
-    hint: "Before tax, with its period. A firm limit: suggestions and vacancies whose stated pay in that period is below it are left out, and Nessa says how many.",
+    hint: "Before tax, with its period. A firm limit: vacancies whose advertised pay in that period is below it, and suggestions whose reviewed official pay is, are left out; Nessa says how many, and why the rest were kept.",
     lessPrecise:
       "No route is checked against pay. Unknown pay is never treated as below your limit.",
   },

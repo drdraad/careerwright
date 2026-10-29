@@ -1,7 +1,7 @@
 // The You chapter's states (S2.3-S2.5, S2.7) on a scripted API at the network edge: the
 // start, a reply streaming and to review, a failed reply, paused; the slate full and thin,
-// with its written note written, pending and unavailable; key consent and a stored key; and
-// the early sketch with a target. Every value is synthetic.
+// with its written note written, pending and unavailable, and with a salary floor applied;
+// key consent and a stored key; and the early sketch with a target. Every value is synthetic.
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
@@ -413,6 +413,40 @@ export const SlateNotePending: Story = { render: directions(full, "running") };
 export const SlateNoteUnavailable: Story = { render: directions(full, "failed") };
 /** The note was refused before any request reached a model: Try again, on a click. */
 export const SlateNoteRetry: Story = { render: directions(full, "failed", true) };
+/** A confirmed salary floor (slice 7B fix round 1, review A M8): applied, with what it left
+ *  out, what met it and why the rest were kept. In L0 no UK occupation mapping is reviewed,
+ *  so it leaves no suggestion out, and says so. */
+export const SlateWithSalaryFloor: Story = {
+  render: () => (
+    <Api
+      routes={[
+        {
+          method: "GET",
+          path: /\/slate$/,
+          answer: {
+            ...slate(full),
+            salary_floor: {
+              amount: { minor_units: 2_600_000, currency: "GBP" },
+              period: "year",
+              left_out: 0,
+              meets: 0,
+              kept_pay_unknown: 94,
+              kept_by_reason: [{ reason: "no_reviewed_mapping", count: 94 }],
+              summary:
+                "Your minimum salary of £26,000 a year (gross) is applied: 0 left out because their official pay is below it; 0 meet it; 94 kept because no reviewed UK occupation code links them to pay data. Unknown pay is never treated as below it.",
+            },
+          },
+        },
+      ]}
+    >
+      <Directions
+        workspaceId={WS}
+        profile={profile}
+        discovery={discoveryWith(note("complete", full, false))}
+      />
+    </Api>
+  ),
+};
 /** Asking for the note was refused because no answer has a word to quote: asking again
  *  would repeat it, so the person is told to change their answers (no Try again). */
 export const SlateNoteAnswersTooShort: Story = {

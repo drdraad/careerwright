@@ -214,7 +214,7 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
 
   it("[DIV1-07] says what the salary floor left out and why the rest was kept", async () => {
     const summary =
-      "Your minimum salary of £26,000 a year (gross) is applied: 0 left out because their official pay is below it; 4 kept because no reviewed UK occupation code links them to pay data. Unknown pay is never treated as below it.";
+      "Your minimum salary of £26,000 a year (gross) is applied: 0 left out because their official pay is below it; 0 meet it; 4 kept because no reviewed UK occupation code links them to pay data. Unknown pay is never treated as below it.";
     fakeApi([
       {
         method: "GET",

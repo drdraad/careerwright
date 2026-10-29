@@ -349,7 +349,10 @@ class SalaryFloorOut(ResponseModel):
             f".{floor.minor_units % 100:02d}" if floor.minor_units % 100 else ""
         )
         words = f"Your minimum salary of {pounds} {_PERIOD_WORDS[floor.period]} (gross) is applied"
-        parts = [f"{counts.left_out} left out because their official pay is below it"]
+        parts = [
+            f"{counts.left_out} left out because their official pay is below it",
+            f"{counts.meets} meet it",  # so the counts add up (fix round 1, review A M7)
+        ]
         for reason, n in counts.unknown.items():
             parts.append(f"{n} kept because {_FLOOR_REASON_WORDS.get(reason, reason.value)}")
         return cls(

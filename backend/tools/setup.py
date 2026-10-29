@@ -1,5 +1,6 @@
 """`make setup`: check prerequisites, create the local configuration, fetch and verify the
-pinned datasets (ESCO), build the images.
+pinned datasets (ESCO and the reference datasets: ONS ASHE and the SOC 2020 coding index,
+the ILO and Anthropic AI evidence, the ESCO to O*NET crosswalk; ADR 0010), build the images.
 
 Run from `backend/` after `uv sync --locked`: `uv run --locked python -m tools.setup`.
 Network access is allowed here (downloads, image builds); nothing after setup needs it in
