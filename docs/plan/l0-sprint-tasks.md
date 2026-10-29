@@ -217,9 +217,11 @@ Dependency rules:
 12. Task 15 after Task 14 has closed.
 13. Task 16 after every remaining task (6b, 6c, 7, 7d, 7b, 7c, 8, 9, 10, 11, 12, 13a, 13b,
     14 and 15) and after sessions 1, 2 and 3: release qualification needs all six chapters.
+14. Task 17 after Task 16 (plan v1.3): the manual describes the qualified candidate, and its
+    small fixes are re-qualified on top of it.
 
 Suggested order: 6b → 6c → 7 → 7d → 7b → 9 → 11 → session 2 → 7c → 10 → 12 → 8 → 13a →
-13b → 14 (closes after session 3) → 15 → 16. Session 1 can be held at any point before Task 8;
+13b → 14 (closes after session 3) → 15 → 16 → 17. Session 1 can be held at any point before Task 8;
 holding it before Task 7b lets 7b classify the pack's rights itself instead of leaving
 every page "pending human rights review".
 
@@ -889,3 +891,50 @@ manifests, licence notices, ADRs, runbook with quickstart/troubleshooting/reset/
 restore, release evidence). Release report `docs/release/L0-release-report.md`
 distinguishing passed / failed / blocked / not run. Tag the tested local release
 (`l0-rc1`); never publish a service. `docs/reviews/sprint-9.md`.
+
+## Task 17: Sprint 10 — operator's manual and friction pass (S10.1–S10.5)
+
+**Preconditions:** Task 16 complete. No human session. H-14, a person following the manual,
+is prepared as a checklist and recorded "not run — requires human" (R2); it is not a
+dispatch precondition.
+
+Sprint card: "Sprint 10 Write the operator's manual and smooth the friction it finds" (plan
+v1.3, added at the product owner's request on 2026-10-29). Spec sections 1 (the local
+boundary), 15 and 19 as the operator meets them; plan sections 2 and 5.
+
+Deliver:
+- The manual in `docs/manual/`, covering what S10.1 lists, written for the operator, not a
+  developer. Every command and on-screen word in it is the build's own: commands from the
+  command contract, words from `src/lib/vocabulary.ts`. Screenshots use synthetic data only,
+  labelled, at 1440 px and 390 px.
+- Write it by doing. Follow every procedure from a fresh checkout and a blank workspace, in
+  the real browser, in demo mode and in a capped live mode (test model, synthetic persona,
+  a new scope within R5's per-scope cap, every call ledgered; no production model). Log
+  every friction point in `docs/reviews/sprint-10-friction-log.md` with its steps, evidence,
+  severity (blocks, slows, annoys) and disposition.
+- Fix each friction point that a small change smooths. A small change alters no API
+  contract, schema, migration, workflow step sequence, deterministic computation or
+  verified requirement's behaviour. Each fix gets a test or an updated capture, and the
+  manual describes the fixed behaviour. Rulings R11 and R12 still apply: copy and
+  wording fixes are in scope, and new linguistic rules are not.
+- For a friction point that needs more, write a proposal only when conviction is high that
+  its benefit outweighs its cost. It names whom it affects and how often, what it removes,
+  the change, its risk and effort, and the manual's workaround until it is built. The
+  controller brings each proposal to the product owner as a yes/no decision. Nothing
+  larger is built in this task without that decision; an approved proposal becomes its own
+  task. Every other point is logged as known friction with its workaround.
+- A docs check in `make check` fails when:
+  - a `make` target named in the manual is missing;
+  - an error code in `vocabulary.ts` is missing from the troubleshooting chapter;
+  - a referenced screenshot is missing.
+- Add register rows for the manual and for H-14. Correct the runbook where the walkthrough
+  shows it is wrong.
+- Re-qualify: run `make check`, `make acceptance` and Task 16's automatable checks on the
+  final commit, and add a manual-and-friction addendum to
+  `docs/release/L0-release-report.md`. A new candidate tag only with the product owner's
+  approval. `docs/reviews/sprint-10.md`.
+
+Acceptance: the manual covers every S10.1 topic. The docs check passes. Every friction point
+has a disposition (fixed, proposed or known) and every fix has its test. Each proposal states
+its cost and benefit. The fast and full checks pass on the final commit. H-14 stays "not run —
+requires human" until a person records it.

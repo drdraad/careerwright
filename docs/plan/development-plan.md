@@ -2,7 +2,7 @@
 
 ## From product specification to a beautiful and verifiable local app
 
-29 October 2026 • Plan version 1.2 (1.1: 28 October 2026; 1.0: 27 October 2026) • Based on product specification 1.3
+29 October 2026 • Plan version 1.3 (1.2 and 1.1: 29 and 28 October 2026; 1.0: 27 October 2026) • Based on product specification 1.3
 
 Build a complete career-planning experience that runs on a developer’s computer, works without credentials in a labelled synthetic demo, and uses one user-supplied Meta API key for live conversation and research. The endpoint is a tested local release candidate with inspectable evidence, reproducible route comparisons and a printable plan. Public hosting is outside this plan.
 
@@ -18,7 +18,7 @@ Local completion is measurable. A fresh checkout can start the app, exercise all
 
 ## Delivery envelope
 
-Ten outcome-based sprints, numbered 0–9, with Sprint 6 delivered as 6a and 6b, and an initial estimate of 37–51 engineering days. For one experienced full-stack engineer using an LLM coding assistant, plan roughly 8–11 working weeks, with regular product and design input. This is a planning range, not a validated productivity forecast. Re-estimate after the technical spike and first real-source extraction work; external access and evidence review can add elapsed time.
+Eleven outcome-based sprints, numbered 0–10, with Sprint 6 delivered as 6a and 6b, and an initial estimate of 39–54 engineering days (Sprint 10, added in v1.3, is 2–3 of them). For one experienced full-stack engineer using an LLM coding assistant, plan roughly 8–11 working weeks, with regular product and design input. This is a planning range, not a validated productivity forecast. Re-estimate after the technical spike and first real-source extraction work; external access and evidence review can add elapsed time.
 
 With agent implementers, engineering days are a sizing unit, not a duration: Sprints 0–2, sized at 9–12 engineering days, took 16 hours of wall-clock time. Elapsed time is set by human review hours: the three scheduled review sessions (section 10) and the human checks of Sprints 8–9.
 
@@ -36,6 +36,8 @@ Scope and architecture come first, followed by the design contract, sprint roadm
 2. Real evidence is the next proof of progress. From the option pack to review session 2, the chain (option pack → Sprint 4 backend → Sprint 5 backend → session 2) takes priority. Infrastructure polish that no failing check or reproduced defect requires is listed for the final review instead. The option pack also reports an early, unreviewed accuracy read on its development split.
 3. Language rules (the support screen, explanation validation, redaction, and the pay, date and work-mode readers) grow only for a reproduced defect or an evaluation failure. A fail-safe outcome (unknown, unclear, not kept) is preferred to a new pattern. Safeguards and accepted limitations stay as recorded (section 12).
 4. Review session 2 also holds Sprint 2's design review, which tests scanning, understanding and choosing. Its findings are applied before more interface detail is added (sections 6 and 10).
+
+**Version 1.3 (29 October 2026)** adds Sprint 10 at the product owner's request: an operator's manual, written by doing every task it describes in the built product. Friction points found along the way are logged. Those a small change can smooth are fixed in the sprint. A larger refactor for user experience is put to the product owner only when there is high conviction that its benefit outweighs its cost. Nothing else changes.
 
 # 1 The local delivery boundary
 
@@ -200,6 +202,7 @@ Sprints are short, outcome-based increments rather than arbitrary two-week conta
 | 7 | Exceptional coordinated route comparison | 4–6 | About 1 (session 3, before Sprint 7 closes) | Real solver output, design system and session 2's findings |
 | 8 | Chosen plan, progress, revision and exports | 3–4 | Not estimated: Safari print (H-04) | Stable comparison and immutable snapshots |
 | 9 | Local release qualification and handover | 4–6 | Not estimated: design review, VoiceOver, Safari, five task sessions (H-01, H-03–H-05) | Complete product journey |
+| 10 | Operator's manual, with the friction it finds smoothed | 2–3 | Not estimated: a person follows the manual (H-14); decisions on any larger proposal | The qualified release candidate |
 | Total | Local release candidate | 37–51 | About 5 scheduled, plus Sprints 8–9 | Re-estimate after Sprints 0 and 3 |
 
 ## Responsibility and sequencing
@@ -219,7 +222,7 @@ The critical chain is validated inputs → evidence and outcomes → monthly fea
 5. Review session 2, then the reviewed option pack published from its record.
 6. Session 2's Sprint 2 design findings applied, then Sprint 4 Skills chapter and review, then Sprint 5 Options chapter and review.
 7. Sprint 3 Roles chapter (S3.5), job scoring and review, after review session 1.
-8. Sprints 6a, 6b, 7 (closing after review session 3), 8 and 9.
+8. Sprints 6a, 6b, 7 (closing after review session 3), 8, 9 and 10.
 
 Review session 1 can be held at any point before the Roles chapter; held before the option pack is curated, it lets the pack's pages be classified against its rights policy rather than left pending human review. Each sprint's review is written when its last slice finishes, so the Sprint 3 review follows those of Sprints 4 and 5. With one implementer at a time, slices without a dependency on each other run one after the other, in either order.
 
@@ -577,6 +580,57 @@ The final command report must distinguish passed, failed, blocked and not run. T
 
 A fresh reviewer completes the golden journey from a blank workspace and then deliberately changes an assumption. Check the entire system’s explanation, state transitions and exports against the canonical contracts. Close the sprint only after the findings are resolved or accurately recorded as non-blocking limitations.
 
+# Sprint 10 Write the operator's manual and smooth the friction it finds
+
+2–3 engineering days • Entry: the qualified local release candidate (Sprint 9) • Requirements: BND-1 (local operation), section 5 (usability acceptance), ARC-1 (keys, spend, recovery and deletion as the operator meets them)
+
+The operator is the person who runs Nessa on their own computer. They install it, enter their own key, use it, and keep it working. They need not be a developer. The developer runbook (`docs/runbook.md`) stays as it is; the manual is the operator's version.
+
+## Demonstrable outcome
+
+A person who did not build Nessa can install, start, use, maintain and recover it with the manual alone. Every friction point the manual's writing found is fixed, proposed or recorded, with its reason.
+
+## Deliverables
+
+S10.1 Write the manual (`docs/manual/`) in plain English, with numbered steps and synthetic-data screenshots at desktop and 390 px. It covers:
+- getting started: prerequisites, setup, the first run, and demo versus live mode;
+- keys and spending: entering, rotating and revoking a key, spend limits, what costs money, and the estimates shown before work starts;
+- each chapter (You, Roles, Skills, Options, Routes, Plan): what it shows, and what its states and labels mean (unknown, proposed, unscored, truncated, couldn't read versus none found);
+- evidence and sources: what is fetched, what is kept and why, and Adzuna;
+- exports and printing;
+- maintenance: stop, reset, backup and restore, deletion, and updating to a new version;
+- troubleshooting: every error message's words, what it means and what to do;
+- privacy and known limits, in plain words.
+
+Every command and on-screen word in the manual is the build's own.
+
+S10.2 Write the manual by doing. Follow every procedure from a fresh checkout and a blank workspace, in a real browser, in demo mode and in a capped live mode (test model, synthetic persona; R5). Log each friction point in `docs/reviews/sprint-10-friction-log.md`. A friction point is any place where an operator would hesitate, misread, repeat a step, need a step the product does not tell them, or meet a message that does not say what to do. Record its steps, its evidence (a screenshot or command output), its severity (blocks, slows or annoys) and its disposition.
+
+S10.3 Fix in the sprint any friction point that a small change smooths: wording, labels, an error message's words, a default, an order, focus, a missing link, or a command's output. A small change alters no API contract, schema, migration, workflow step sequence, deterministic computation or verified requirement's behaviour. Each fix has a test or an updated capture, and the manual describes the fixed behaviour.
+
+S10.4 Put a larger refactor for user experience to the product owner only with high conviction that its benefit outweighs its cost. The proposal states:
+- whom it affects and how often;
+- the steps, errors or confusion it removes;
+- the change, with its risk and effort;
+- what the manual says until it is done.
+
+Nothing larger is built in this sprint without the product owner's decision; an approved proposal becomes its own task. A point without that conviction stays in the friction log as known friction, with the manual's workaround.
+
+S10.5 Re-qualify the changed candidate. Re-run the fast and full acceptance checks and Sprint 9's automatable checks on the final commit, and add a manual-and-friction addendum to the release report. Tag a new candidate only with the product owner's approval.
+
+## Acceptance and tests
+
+A docs check in the fast checks fails when:
+- a command the manual names is not in the command contract;
+- an error code in the UI vocabulary is missing from the troubleshooting chapter;
+- a screenshot the manual uses is missing.
+
+Every friction point has a disposition: fixed, proposed or known. Every fix has its test. The fast and full checks pass on the final commit. A person following the manual from a fresh checkout to a printed plan (H-14) is prepared as a checklist and recorded "not run — requires human" until a person records it.
+
+## Coherence review
+
+A fresh reviewer follows only the manual, from a fresh checkout to a printed plan. Where they had to guess, the manual or the product is wrong. Close the sprint when every guess is fixed in one or the other, or is recorded as known friction.
+
 # 7 Testing that can expose real mistakes
 
 Test contracts and invariants, not coverage percentages or implementation-shaped assertions. Prefer independent oracles, hand-worked ledgers and focused regression examples.
@@ -729,6 +783,7 @@ Link this living checklist to code, tests, demonstrations or scope exclusions. P
 | Evidence lifecycle and chosen plan | 3, 8, 9 | Invalidation, immutable snapshots, replan and offline export |
 | ARC-1 and secret/privacy controls | 0, 1, 9 | Ownership, journals, spend, revocation, recovery, deletion and restore |
 | TEST-1 | All, final gate 9 | Five browser personas, two numeric fixtures and real Meta smoke |
+| Operator's manual (v1.3) | 10 | The manual, the friction log with every disposition, a test per small fix, proposals with their decisions, and the H-14 record |
 
 ## Final reviewer demonstration
 

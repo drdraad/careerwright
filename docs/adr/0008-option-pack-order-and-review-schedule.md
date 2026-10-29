@@ -212,3 +212,17 @@ points. Scope and architecture are unchanged.
    design review of the You chapter and the slate, which tests scanning, understanding and
    choosing. Task 10 applies its findings first, and Tasks 10, 12 and 8 build to them. The
    three sessions now total about five and a half hours.
+
+## Amendment (2026-10-29, plan v1.3)
+
+The product owner added a final sprint, Sprint 10 (Task 17, after Task 16): an operator's
+manual, written by doing every task it describes in the qualified candidate. Friction points
+it finds are logged:
+- those a small change smooths are fixed in the sprint, each with a test;
+- a larger refactor for user experience is put to the product owner only when there is high
+  conviction that its benefit outweighs its cost, and is built only on their decision;
+- everything else is recorded as known friction, with the manual's workaround.
+
+The changed candidate is re-qualified, and a new tag needs the product owner's approval. A
+new human gate, H-14 (a person follows the manual), is prepared and is not a dispatch
+precondition. The controller's final whole-branch review moves to after Task 17.
