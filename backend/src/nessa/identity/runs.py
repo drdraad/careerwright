@@ -331,12 +331,17 @@ def cancel_run(tx: Tx, actor: Actor, workspace_id: uuid.UUID, run_id: uuid.UUID)
     Cancelling a run also asks for the cancellation of every run it started that has not
     settled (an acquisition's extraction runs; fix round 3, item 4), even once the run itself
     has finished: then only those are cancelled. The worker acts on each request on its own.
-    The run's cancellation lock is taken first, before the workspace's row; an acquisition's
+
+    Lock order (ADR 0009 decision 15, Task 7d): the run's cancellation lock, then the runs'
+    rows, then the workspace's row. The cancellation lock comes first; an acquisition's
     recording takes it first too, when its page may start an extraction run
     (`run_store.lock_started_runs`; review C-1 N1), so a run being started by it is either
-    seen here or refused there (migration 0023)."""
+    seen here or refused there (migration 0023). Each request's foreign key takes a key-share
+    lock on its run's row. The worker locks a run's row and then writes the run's events,
+    which lock the workspace's row, so the requests are recorded before the workspace's row
+    is locked, never after: otherwise each would wait for the other."""
     run_store.lock_started_runs(tx, run_id)
-    visible_workspace(tx, workspace_id, lock=True)
+    visible_workspace(tx, workspace_id)
     # Not locked: the API may not lock runs. If the worker finishes the run meanwhile, the
     # request changes nothing (publication records a terminal state once).
     run = run_store.run(tx, run_id)
@@ -351,9 +356,10 @@ def cancel_run(tx: Tx, actor: Actor, workspace_id: uuid.UUID, run_id: uuid.UUID)
             details={"status": run.status.value},
         )
     asked = [*([] if run.status in _TERMINAL else [run]), *started_runs]
-    for each in asked:
-        if run_store.request_cancellation(tx, each, actor.actor_id):
-            store.append_event(tx, workspace_id, EventKind.RUN_CANCEL_REQUESTED, str(each.run_id))
+    recorded = [each for each in asked if run_store.request_cancellation(tx, each, actor.actor_id)]
+    visible_workspace(tx, workspace_id, lock=True)
+    for each in recorded:
+        store.append_event(tx, workspace_id, EventKind.RUN_CANCEL_REQUESTED, str(each.run_id))
     cancelled = run_store.run(tx, run_id)
     if cancelled is None:
         raise NessaError(

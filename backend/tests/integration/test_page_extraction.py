@@ -23,11 +23,14 @@ from nessa.evidence.extraction import DropReason
 from nessa.evidence.extraction_runs import MAX_EXTRACTIONS_PER_ACQUISITION, start_extraction
 from nessa.evidence.records import AttemptStatus, Extraction, InputRoute
 from nessa.identity import run_store
+from nessa.identity import store as identity_store
 from nessa.identity.activity import ACTIVITY_MAX_ATTEMPTS
 from nessa.identity.keyring import Keyring, SealedValue, load_keyring
 from nessa.identity.model_choice import ModelChoice
 from nessa.identity.model_registry import model_entry
+from nessa.identity.records import EventKind
 from nessa.identity.runs import output_context
+from nessa.vocabulary import WorkState
 from tests.integration.durable import Scenario, fresh_actor, make_scenario
 from tests.integration.test_acquisition import acquisition, jobs, submit, wait_terminal
 from tests.support.acquisition_service import LOOPBACK, acquisition_service
@@ -661,6 +664,78 @@ def test_a_cancel_while_a_kept_page_for_extraction_is_recorded_ends_without_a_st
         (scenario.workspace_id,),
     )
     assert documents == [{"n": 1}]
+
+
+@pytest.mark.req("DUR-05")
+@pytest.mark.parametrize("cascade", [False, True], ids=["a_run", "an_acquisition"])
+def test_a_cancel_while_the_worker_writes_a_run_s_event_ends_without_a_store_error(
+    infra: Infra, scenario: Scenario, cascade: bool
+) -> None:
+    # Task 7d (intermediate review, point 1). The worker locks a run's row and then writes the
+    # run's event, which locks the workspace's row (`activity._prepare` and `publish`,
+    # `acquisition.acquire_target`). A cancel's request takes a key-share lock on the run's
+    # row (the `run_cancellations` foreign key). Two connections: the worker's transaction
+    # holds the run's row until the cancel waits for it, then writes the event. Had the cancel
+    # locked the workspace's row before its requests, each would wait on the other and
+    # PostgreSQL would end one with a deadlock error. An acquisition's cancel asks for the runs
+    # it started too; the worker here holds the last of them.
+    workspace = scenario.workspace_id
+    if cascade:
+        cancelled = _unread_acquisition(scenario.api, infra, scenario.token, workspace)
+        started = [
+            _submit_as_worker(
+                infra, cancelled, _attempt(infra, cancelled, workspace, "no_structured_data")
+            )
+            for _ in range(2)
+        ]
+        publishing, asked = started[-1], [cancelled, *started]
+    else:
+        cancelled = publishing = scenario.submit()
+        asked = [cancelled]
+    answers: list[Any] = []
+    cancelling = threading.Thread(
+        target=lambda: answers.append(_cancel(scenario.api, scenario.token, workspace, cancelled))
+    )
+    engine, _ = _worker_engine(infra)
+    try:
+        with run_transaction(engine, uuid.UUID(publishing)) as tx:
+            run = run_store.run(tx, uuid.UUID(publishing), lock=True)  # the worker's first lock
+            assert run is not None
+            assert run_store.mark_running(tx, run.run_id)
+            cancelling.start()
+            wait_for(
+                lambda: _lock_waits(infra, "transactionid", "run_cancellations"),
+                timeout_s=10.0,
+                what="the cancel's request at the run's row",
+            )
+            identity_store.append_event(
+                tx,
+                run.workspace_id,
+                EventKind.RUN_STATE_CHANGED,
+                publishing,
+                state=WorkState.RUNNING,
+            )
+    finally:
+        if cancelling.ident is not None:
+            cancelling.join(timeout=30.0)
+        engine.dispose()
+
+    [answer] = answers
+    assert answer.status_code == 202, answer.text  # the cancel: never a store error
+    assert answer.json()["cancellation_requested"] == asked
+    requested = infra.query(
+        "SELECT run_id::text AS id FROM nessa.run_cancellations WHERE workspace_id = %s",
+        (workspace,),
+    )
+    assert sorted(r["id"] for r in requested) == sorted(asked)
+    # The worker's transaction: committed at its first try, with its event.
+    assert _status(infra, publishing) == "running"
+    events = infra.query(
+        "SELECT state FROM nessa.workspace_events WHERE workspace_id = %s AND subject_id = %s "
+        "AND kind = 'run.state_changed'",
+        (workspace, publishing),
+    )
+    assert {"state": "running"} in events
 
 
 @pytest.mark.req("DUR-05", "STATE-02")

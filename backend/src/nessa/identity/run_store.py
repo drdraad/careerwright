@@ -564,9 +564,9 @@ _STARTED_RUNS_LOCK = 8237
 
 def lock_started_runs(tx: Tx, run_id: uuid.UUID) -> None:
     """Hold the run's cancellation lock until the transaction ends. Each side takes it as
-    its first lock: the API's cancel before the workspace's row, and an acquisition's
-    recording transaction, when its page may start an extraction run, before the
-    workspace's recording lock and before any insert (review C-1 N1). So neither ever waits
+    its first lock: the API's cancel before any run's row or the workspace's row, and an
+    acquisition's recording transaction, when its page may start an extraction run, before
+    the workspace's recording lock and before any insert (review C-1 N1). So neither ever waits
     for it while holding a lock the other waits for, and a run being started is either seen
     by the cancel or refused by the start."""
     tx.execute(
