@@ -1,7 +1,8 @@
 # ADR 0009: Evidence acquisition, the restricted acquisition worker and run cancellation
 
-- Status: Accepted for Task 7A (Sprint 3, S3.1–S3.4 acquisition core). Decision 2 and the
-  agency word list in decision 6 are **provisional, need product owner confirmation (R6)**.
+- Status: Accepted for Task 7A (Sprint 3, S3.1–S3.4 acquisition core). Decision 2, the
+  agency word list in decision 6 and decision 15's word lists and date forms are
+  **provisional, need product owner confirmation (R6)**.
 - Date: 2026-10-29
 - Requirements: ACQ-01..10, JOB-01/02/05/06/08, FRESH-01..04, STATE-02, API-06, DUR-05,
   MODEL-08, SEC-05, SEC-08, PROP-02; spec sections 6, 7, 11 and 18; Global Constraint 8;
@@ -236,7 +237,8 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    `no_posting_readable` apart; `coverage` leaves out pasted text, which is not a source
    tried. The job list says why it is empty (`no_sources_checked`, `sources_pending` while
    a source is still being fetched or read (review B N7), `no_source_retrieved`,
-   `no_posting_readable`, `none_found_in_sources_checked`); its `total_jobs` and
+   `no_posting_readable`, `no_posting_found_by_model` (decision 15),
+   `none_found_in_sources_checked`); its `total_jobs` and
    `city_counts` count vacancies only (`exemplars` apart) and are counted in the database,
    without a cap. An Adzuna search keeps Adzuna's `count` (`total_matching`), so retrieved
    n of total is shown on each attempt, in the listing's `adverts` and as `partial`, never
@@ -323,24 +325,89 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
     view-or-apply link (pages and Adzuna): an `https` URL with a host after surrounding space
     is removed; `javascript:`, `data:`, hostless or unparsable links are no claim at all.
 
+15. **Model extraction reads what structured data could not (fix round 2, controller
+    rulings 9-15; ACQ-03, ACQ-04).** Spec section 6: "Use model extraction only for
+    remaining ambiguity ... deterministic code approves records".
+    - *What it reads.* Only a retrieved, permitted page whose structured data gave no
+      posting (`no_structured_data`, `no_job_posting`): never a refused, failed, pasted or
+      already parsed source. The restricted acquisition worker returns that page's visible
+      text (`pages.visible_text`: scripts and styles left out, entities decoded, personal
+      details removed again, whitespace collapsed, cut to 8,000 bytes); it still holds no
+      model key (GC8).
+    - *Where it runs.* `page_extraction`, a model-backed run kind on the one bounded activity
+      (`PAGE_EXTRACTION_TASK`; one `RunTask`, no second call path), started by the
+      acquisition in the transaction that records the page, at most
+      `MAX_EXTRACTIONS_PER_ACQUISITION` (5) per acquisition, through
+      `nessa.submit_page_extraction` (migration 0021), the worker's only way to start a run:
+      it checks that the attempt is its own run's page that extraction may read and holds
+      the same cap. Each is an ordinary model run (its own outbox entry, `nessa.model_run`
+      workflow, reservation, the requester's own model and key, two requests at most with
+      `RepairBound`): worst case $0.0034 on the test model and $0.048 on the production
+      model, so three attempts fit the default $0.15 run limit. A page not handed over keeps
+      a typed reason (`page_extractions.not_run`: `cap_reached`, `budget_exceeded`,
+      `no_model_key`, `model_not_permitted`, `demo_workspace`, `no_visible_text`) and stays
+      `no_posting_readable`. Demo workspaces never extract (a database CHECK as well).
+    - *Input and retention.* The sealed input is that text, marked in the prompt as
+      untrusted data. It is erased once the run is terminal, whatever its outcome, by
+      `nessa.erase_run_input` (`RunTask.erases_input`), even after the requester's access
+      ends; for every class, not only those whose body may not be kept, since a kept class
+      keeps its body anyway. What remains is the text's hash (`page_extractions.text_sha256`,
+      which every claim's span cites), the verified spans and their excerpts of at most 200
+      characters.
+    - *Output and approval.* The agent has no tools, only the output schema: for each advert
+      (at most 3) each field is a verbatim quote, never a value of the model's own.
+      `extraction.check_extraction` approves deterministically: a quote must be a span of
+      the hashed text at word boundaries (the 6b `span_offsets`), and its value is read from
+      that span by the JSON-LD path's rules (pay exact to the penny and in GBP, its period
+      only as stated; dates as they parse; `apply_link`; no personal details; the claim
+      bounds). A field without a verified span is dropped with its reason; a span whose
+      value cannot be read is a quarantined claim; postings for one title that disagree on
+      a critical field are all marked (`pages.mark_conflicts`); a posting without a verified
+      title is dropped whole. Approved claims are `validation: model` and cite offsets (a
+      CHECK). The run's output is this checked proposal; `RunTask.record` records its
+      postings, through the acquisition's own recording path and lock, in the transaction
+      that accepts it, and nothing goes into a receipt.
+    - *What the listing says.* A page whose run is queued or running is `pending`; one it
+      read with no advert found is its own `no_posting_found_by_model` (and the list's
+      `empty_reason` of that name, with words saying it is not evidence of no vacancies),
+      never `none_found_in_sources_checked`; one whose run failed, was cancelled or verified
+      nothing stays `no_posting_readable`. Each attempt says how its extraction went
+      (`model_extraction`).
+    - *What a page can still do.* It can lead the model to pick the wrong span of its own
+      text as a field; it cannot put a value, a link or a field there that its text does
+      not hold, start a run, reach the profile, a key or a tool, or have a URL fetched
+      (`test_page_extraction.py::test_page_text_that_instructs_the_model_changes_nothing_outside_its_run`).
+    - *Workflows.* Extraction runs are ordinary model runs and the acquisition step does more
+      inside itself, so no workflow's step sequence changes: DBOS `application_version`
+      stays `nessa-l0-1`.
+
 ## Evidence
 
-`make check`; `make acceptance` (`test_acquisition.py`, the cancellation cases in
-`test_durable_runs.py`, the stack's container checks); live: `make live-smoke SEARCH=1`
-twice on the test model (ledger rows 27–28: one request each, two searches, 21 and 14
-sources returned, $0.005562 and $0.005587, leak scans clean, but no candidate proposed);
-`make live-adzuna` blocked: no `ADZUNA_APP_ID`/`ADZUNA_APP_KEY` in `.env`.
+`make check`; `make acceptance` (`test_acquisition.py`, `test_page_extraction.py`, the
+cancellation cases in `test_durable_runs.py`, the stack's container checks); live: `make
+live-smoke SEARCH=1` twice on the test model (ledger rows 27–28: one request each, two
+searches, 21 and 14 sources returned, $0.005562 and $0.005587, leak scans clean, but no
+candidate proposed); `make live-extract` once on the test model (ledger row 31: one request
+on the synthetic fixture page, 700 input and 460 output tokens, $0.000162; one posting, all
+nine fields approved as `model`, none dropped, the page's own instruction not followed;
+leak scan clean); `make live-adzuna` blocked: no `ADZUNA_APP_ID`/`ADZUNA_APP_KEY` in `.env`.
 
 ## Consequences and open items
 
-- Not done in Task 7A: model extraction for pages without structured data (ACQ-03's
-  residual part: a page without JSON-LD gives no posting and says so; the person can paste
-  it); source-specific selectors (Task 7b assigns template families first, OI-09); the
-  Roles chapter and every UI over these endpoints (Task 8); research data in the workspace
-  export (T15); ASHE, UK-SOC and the AI evidence (Task 7B).
+- Not done in Task 7A: source-specific selectors and tuning extraction on real pages (Task
+  7b assigns template families first, OI-09; the live extraction read one synthetic page);
+  the Roles chapter and every UI over these endpoints (Task 8); research data in the
+  workspace export (T15); ASHE, UK-SOC and the AI evidence (Task 7B).
+- Model extraction (decision 15): cancelling an acquisition does not cancel the extraction
+  runs it already started (each is its own run, and cancellable); the budget check before
+  starting one counts that acquisition's unreserved runs only, so another run's
+  reservation can still refuse one (`budget_exceeded`, the page stays unread). A page can
+  lead the model to the wrong span of its own text; the period and work-mode word lists
+  and the date forms read are provisional (R6).
 - The live search proposed no candidate in two tries; candidate quality is unqualified.
 - The Adzuna live integration is unverified until credentials are in `.env` under those two
   names.
 - A new error code (`RUN_FINISHED`), failure classes (`retrieval_failed`,
   `source_blocked`), event kinds (`run.cancel_requested`, `research.updated`) and run kinds
-  (`acquisition`, `source_search`); migration 0013.
+  (`acquisition`, `source_search`, and in fix round 2 `page_extraction`); migrations 0013
+  and, for extraction, 0021 (also the `model` validation state and `page_extractions`).
