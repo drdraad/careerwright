@@ -217,6 +217,14 @@ def test_the_direct_budget_payment_cap_deficit_cap_and_reserve_are_four_limits()
     assert codes(result) == {"monthly_deficit_cap"}
     without_baseline = check(person(monthly_deficit_cap_minor=50000), option("c"))
     assert FindingCode.BASELINE_MISSING.value in codes(without_baseline)
+    # An economic-cost cap is an optional preference, never a hard limit.
+    preferring = inputs.model_copy(
+        update={"monthly_deficit_cap_minor": None, "economic_cost_cap_minor": 100000}
+    )
+    preferred = check(preferring, course)
+    [unmet] = preferred.findings
+    assert (unmet.code, unmet.kind) == (FindingCode.ECONOMIC_COST_CAP, FindingKind.PREFERENCE)
+    assert preferred.feasibility is Feasibility.FEASIBLE
 
 
 # TIME: the monthly grid's rules (TIME1-02, TIME1-03).
