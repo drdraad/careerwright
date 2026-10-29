@@ -43,8 +43,9 @@ from nessa.logs import configure_logging, register_secret
 
 DEFAULT_PORT = 8100
 MAX_REQUEST_BYTES = 16_384
-ADZUNA_ID_FILE = "adzuna_app_id"
-ADZUNA_KEY_FILE = "adzuna_app_key"
+# Placed by `make setup` from `.env`'s `ADZUNA_APPLICATION_ID` and `ADZUNA_API_KEY`.
+ADZUNA_ID_FILE = "adzuna_application_id"
+ADZUNA_KEY_FILE = "adzuna_api_key"
 _log = logging.getLogger("nessa.acquisition")
 
 

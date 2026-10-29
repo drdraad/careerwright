@@ -42,8 +42,8 @@ def fake_acquire(
 def settings(app_id: str | None = APP_ID, app_key: str | None = APP_KEY) -> AdzunaSettings:
     return AdzunaSettings.model_validate(
         {
-            "ADZUNA_APP_ID": SecretStr(app_id) if app_id else None,
-            "ADZUNA_APP_KEY": SecretStr(app_key) if app_key else None,
+            "ADZUNA_APPLICATION_ID": SecretStr(app_id) if app_id else None,
+            "ADZUNA_API_KEY": SecretStr(app_key) if app_key else None,
         }
     )
 
@@ -69,6 +69,8 @@ def test_each_request_is_ledgered_at_no_cost_without_its_credentials(tmp_path: P
     assert summary["adverts"] == 12
     assert summary["distinct_jobs"] == 6  # the second page repeats the first: deduplicated
     assert summary["results_holding_a_credential"] == 0
+    # Fix round 5: the results, the ledger rows written and the ledger table were scanned.
+    assert summary["leak_scan"] == {"cells": 5, "findings": []}
 
 
 @pytest.mark.req("SEC-05")
@@ -85,6 +87,12 @@ def test_a_result_that_would_store_a_credential_fails_the_qualification(tmp_path
 
     assert summary["status"] == "failed"
     assert summary["results_holding_a_credential"] == 2  # one per request
+    # Findings name where and which, never the value.
+    assert summary["leak_scan"] == {
+        "cells": 5,
+        "findings": ["result 1: ADZUNA_APPLICATION_ID", "result 2: ADZUNA_APPLICATION_ID"],
+    }
+    assert APP_ID not in json.dumps(summary)
 
 
 @pytest.mark.req("MODEL-09")
@@ -119,9 +127,9 @@ def test_the_scope_cap_refuses_before_any_request(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("app_id", "app_key", "missing"),
     [
-        (None, APP_KEY, ["ADZUNA_APP_ID"]),
-        (APP_ID, None, ["ADZUNA_APP_KEY"]),
-        (None, None, ["ADZUNA_APP_ID", "ADZUNA_APP_KEY"]),
+        (None, APP_KEY, ["ADZUNA_APPLICATION_ID"]),
+        (APP_ID, None, ["ADZUNA_API_KEY"]),
+        (None, None, ["ADZUNA_APPLICATION_ID", "ADZUNA_API_KEY"]),
     ],
 )
 def test_a_missing_credential_is_blocked_and_nothing_is_sent(
@@ -138,16 +146,18 @@ def test_a_missing_credential_is_blocked_and_nothing_is_sent(
 
 
 # Synthetic values only. The Adzuna-named variables are written in other spellings and
-# cases, beside a variable of another service, one whose value mentions Adzuna, a comment
-# and an empty expected name.
+# cases, beside a variable of another service, one whose value mentions Adzuna, a comment,
+# the names Task 7A first used (never read: no alias) and an empty expected name.
 SYNTHETIC_ENV = (
     "META_API_KEY=synthetic-meta-0000\n"
     "ADZUNA_ID=synthetic-adzuna-1111\n"
-    "export adzuna_api_key='synthetic-adzuna-2222'\n"
+    "export adzuna_token='synthetic-adzuna-2222'\n"
     'Adzuna_Secret = "synthetic-adzuna-3333"\n'
     "OTHER_SERVICE_TOKEN=ADZUNA-synthetic-4444\n"
     "# ADZUNA_COMMENTED=synthetic-adzuna-5555\n"
-    "ADZUNA_APP_KEY=\n"
+    "ADZUNA_APP_ID=synthetic-adzuna-6666\n"
+    "ADZUNA_APP_KEY=synthetic-adzuna-7777\n"
+    "ADZUNA_API_KEY=\n"
 )
 
 
@@ -169,12 +179,19 @@ def test_absent_credentials_list_the_adzuna_names_found_never_a_value(tmp_path: 
 
     assert summary == {
         "status": BLOCKED,
-        "missing": ["ADZUNA_APP_ID", "ADZUNA_APP_KEY"],  # an empty value is absent
-        "adzuna_names_in_env": ["ADZUNA_APP_KEY", "ADZUNA_ID", "Adzuna_Secret", "adzuna_api_key"],
+        "missing": ["ADZUNA_APPLICATION_ID", "ADZUNA_API_KEY"],  # an empty value is absent
+        "adzuna_names_in_env": [
+            "ADZUNA_API_KEY",
+            "ADZUNA_APP_ID",
+            "ADZUNA_APP_KEY",
+            "ADZUNA_ID",
+            "Adzuna_Secret",
+            "adzuna_token",
+        ],
     }
     shown = json.dumps(summary)
     assert "synthetic" not in shown
-    for digits in ("0000", "1111", "2222", "3333", "4444", "5555"):
+    for digits in ("0000", "1111", "2222", "3333", "4444", "5555", "6666", "7777"):
         assert digits not in shown
     for other in ("META_API_KEY", "OTHER_SERVICE_TOKEN", "ADZUNA_COMMENTED"):
         assert other not in shown

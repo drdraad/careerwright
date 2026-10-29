@@ -55,9 +55,13 @@ def _key_versions(keys: Path) -> list[int]:
 
 
 ADZUNA_DIR = "adzuna"
-# The Adzuna credentials' names in the repository `.env` (ruling R4) and the files the
-# acquisition worker reads them from (`nessa.acquisition`).
-ADZUNA_ENV = {"ADZUNA_APP_ID": "adzuna_app_id", "ADZUNA_APP_KEY": "adzuna_app_key"}
+# The Adzuna credentials' names in the repository `.env`, as the product owner wrote them
+# (ruling R4; controller ruling, fix round 5), and the files the acquisition worker reads
+# them from (`nessa.acquisition`; `test_the_acquisition_worker_reads_the_files_setup_places`).
+ADZUNA_ENV = {
+    "ADZUNA_APPLICATION_ID": "adzuna_application_id",
+    "ADZUNA_API_KEY": "adzuna_api_key",
+}
 ENV_FILE = REPO_ROOT / ".env"
 
 
