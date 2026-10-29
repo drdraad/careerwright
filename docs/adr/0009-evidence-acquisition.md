@@ -212,6 +212,19 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    unchanged and the acquisition workflow is new, so the DBOS `application_version` stays
    `nessa-l0-1`.
 
+    **Writes without an expected version (controller ruling 11; fix round 1, review B
+    M10).** Every write here goes through `run_idempotent` with an `Idempotency-Key`, but
+    four take no expected version, because none changes versioned state: a cancel (a
+    request recorded once, `ON CONFLICT DO NOTHING`, then `409 RUN_FINISHED` once the run is
+    terminal), a favourite mark or unmark (an idempotent flag on a job), pasted text (a new
+    attempt, copy and job each time, bounded by three per target) and an acquisition
+    submission (a new run; a URL in flight is joined, one that failed backs off). A source
+    search takes `expected_profile_version`, since it reads the profile. The cancel's
+    answer, kept as its receipt, never carries model output (review B M1), and a run's
+    output (a connection check's, a search's proposal, an acquisition's summary) is shown
+    only once the run is `complete` (review B M1, M2). The worker handles each cancellation
+    on its own, so one that fails never holds up the rest or dispatch (review B M8).
+
 10. **Pasted text is its own route (ACQ-10, JOB-06).** Recorded at once by the API (no run,
     no fetch) as a finished attempt of route `pasted_text`, its body sealed, its claims
     `user_supplied`, its job an `exemplar`: the person's example of a target, at most three

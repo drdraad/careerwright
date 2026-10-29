@@ -72,16 +72,24 @@ def act_on_cancellations(engine: Engine, runtime: ActivityRuntime) -> int:
     """DUR-05: cancel each requested run's DBOS workflow, so no further step (model call or
     fetch) starts, then publish the run `cancelled`. A step already under way finishes and
     its attempt is settled as usual (a sent request may have been billed); its result is
-    kept but the run stays cancelled. A run cancelled before dispatch is never started."""
+    kept but the run stays cancelled. A run cancelled before dispatch is never started.
+    Each is handled on its own: one that fails (logged by class, tried again next pass)
+    never holds up the others or dispatch."""
     with system_transaction(engine) as tx:
         pending = run_store.pending_cancellations(tx)
+    acted = 0
     for run_id, workflow_id, dispatched in pending:
-        if dispatched:
-            DBOS.cancel_workflow(workflow_id)
-        activity.publish(runtime, run_id, activity.cancelled())
-        with system_transaction(engine) as tx:
-            run_store.mark_cancellation_signalled(tx, run_id)
-    return len(pending)
+        try:
+            if dispatched:
+                DBOS.cancel_workflow(workflow_id)
+            activity.publish(runtime, run_id, activity.cancelled())
+            with system_transaction(engine) as tx:
+                run_store.mark_cancellation_signalled(tx, run_id)
+        except Exception as error:
+            _log.warning("cancellation failed", extra={"error_class": type(error).__name__})
+            continue
+        acted += 1
+    return acted
 
 
 def reconcile_errored_runs(runtime: ActivityRuntime) -> int:

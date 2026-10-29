@@ -7,6 +7,8 @@ import psycopg
 import pytest
 
 from nessa.cli import migrate_app, reset_demo, seed
+from nessa.identity.keyring import load_keyring
+from nessa.identity.runs import output_context
 from nessa.seed import FIXTURE_WORKSPACE_ID
 from tests.support.client import ApiClient, profile_with
 from tests.support.infra import Infra, migrator_engine
@@ -66,6 +68,44 @@ def test_reset_demo_removes_the_fixture_workspaces_receipts(infra: Infra) -> Non
         engine.dispose()
 
     assert receipts_for(infra, FIXTURE_WORKSPACE_ID, database) == 0
+
+
+@pytest.mark.req("DUR-05")
+def test_a_cancel_receipt_and_an_unfinished_run_never_show_its_model_output(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    # Review B M1: a cancel landing after the output was accepted but before the run was
+    # published. The receipt is kept in plaintext, so it must not carry the output.
+    workspace = api.create_workspace(ada, "Cancelled check")["workspace_id"]
+    run_id, output_id = uuid.uuid4(), uuid.uuid4()
+    sentinel = f"model-output-{uuid.uuid4().hex}"
+    infra.query(
+        "INSERT INTO nessa.runs (run_id, workspace_id, data_mode, synthetic, kind, requested_by, "
+        "model_id, model_mode, status) SELECT %s, workspace_id, data_mode, synthetic, "
+        "'connection_check', owner_actor_id, 'muse-spark-1.3-contributor', 'contributor', "
+        "'running' FROM nessa.workspaces WHERE workspace_id = %s",
+        (run_id, workspace),
+    )
+    body = f'{{"suggested_title": "{sentinel}", "reason": "{sentinel}"}}'.encode()
+    sealed = load_keyring(infra.home / "keys").seal(body, output_context(workspace, output_id))
+    infra.query(
+        "INSERT INTO nessa.run_outputs (output_id, run_id, workspace_id, key_version, nonce, "
+        "ciphertext, content_sha256) VALUES (%s, %s, %s, %s, %s, %s, repeat('0', 64))",
+        (output_id, run_id, workspace, sealed.key_version, sealed.nonce, sealed.ciphertext),
+    )
+
+    shown = api.get(f"/v1/workspaces/{workspace}/runs/{run_id}", ada)
+    cancelled = api.write("POST", f"/v1/workspaces/{workspace}/runs/{run_id}/cancel", ada)
+    receipts = infra.query(
+        "SELECT response::text AS response FROM nessa.command_receipts WHERE command = "
+        "'cancel_run' AND workspace_id = %s",
+        (workspace,),
+    )
+
+    assert shown.json()["output"] is None  # not complete: its result is not shown
+    assert cancelled.status_code == 202, cancelled.text
+    assert cancelled.json()["output"] is None
+    assert [sentinel in r["response"] for r in receipts] == [False]
 
 
 RECEIPT_AS_ACTOR = (

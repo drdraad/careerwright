@@ -81,9 +81,9 @@ def cancel(
 
     def execute(tx: Tx) -> CommandResult:
         run = cancel_run(tx, caller.actor, workspace_id, run_id)
-        return CommandResult(
-            202, run_out(tx, deps.keyring, run).model_dump(mode="json"), workspace_id
-        )
+        # The answer is kept as the receipt, in plaintext: never with model output in it.
+        answer = RunOut.of(run, run_store.attempts(tx, run.run_id), None)
+        return CommandResult(202, answer.model_dump(mode="json"), workspace_id)
 
     request = {"workspace_id": str(workspace_id), "run_id": str(run_id)}
     status, response = run_idempotent(

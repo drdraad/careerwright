@@ -5,15 +5,22 @@ SIGKILL. Every scenario ends with a leak scan of both databases and every worker
 import secrets
 import signal
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from dbos import DBOS
 from pydantic import SecretStr
 
+from nessa.db import create_engine
+from nessa.identity import worker as worker_loop
+from nessa.identity.activity import ActivityRuntime
+from nessa.identity.keyring import load_keyring
 from nessa.identity.workflow import ACTIVITY_MAX_ATTEMPTS
+from nessa.worker import TASKS, model_builder
 from tests.integration.durable import Scenario, make_scenario
 from tests.support.client import ApiClient
-from tests.support.fake_models import FakeFailure, key_fingerprint
+from tests.support.fake_models import FakeFailure, fake_model_builder, key_fingerprint
 from tests.support.infra import Infra
 from tests.support.workers import wait_for
 
@@ -438,6 +445,50 @@ def test_a_run_cancelled_while_queued_never_calls_the_model_or_reserves_spend(
     assert scenario.attempts(run_id) == []  # no call, no reservation
     assert scenario.journal(run_id)["status"] == []  # its workflow was never started
     assert scenario.leaks() == []
+
+
+@pytest.mark.req("DUR-05")
+def test_a_cancellation_that_fails_never_holds_up_the_next(
+    scenario: Scenario, infra: Infra, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Review B M8. In process, with only DBOS (the system edge) replaced: cancelling the
+    # first run's workflow fails; the second is still cancelled and published.
+    stuck, second = scenario.submit(), scenario.submit()
+    infra.query("UPDATE nessa.outbox SET dispatched_at = clock_timestamp()")  # both started
+    for run_id in (stuck, second):
+        cancel(scenario, run_id)
+    tried: list[str] = []
+
+    def cancel_workflow(workflow_id: str) -> None:
+        tried.append(workflow_id)
+        if workflow_id.endswith(stuck):
+            raise RuntimeError("synthetic DBOS failure")
+
+    monkeypatch.setattr(DBOS, "cancel_workflow", cancel_workflow)
+    settings = infra.worker_settings()
+    engine = create_engine(settings.app_database, application_name="test-cancellations")
+    try:
+        runtime = ActivityRuntime(
+            engine=engine,
+            keyring=load_keyring(settings.master_key_dir),
+            build_model=model_builder(fake_model_builder()),
+            clock=lambda: datetime.now(UTC),
+            tasks=TASKS,
+        )
+        acted = worker_loop.act_on_cancellations(engine, runtime)
+    finally:
+        engine.dispose()
+
+    assert acted == 1
+    assert sorted(tried) == sorted(f"nessa-run-{r}" for r in (stuck, second))
+    assert scenario.api_run(second)["status"] == "cancelled"
+    assert scenario.api_run(stuck)["status"] == "queued"  # tried again next pass
+    [left] = infra.query(
+        "SELECT run_id::text AS id FROM nessa.run_cancellations "
+        "WHERE signalled_at IS NULL AND run_id = ANY(%s::uuid[])",
+        ([stuck, second],),
+    )
+    assert left["id"] == stuck
 
 
 @pytest.mark.req("DUR-05", "MODEL-08")

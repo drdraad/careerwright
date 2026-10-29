@@ -360,7 +360,9 @@ def open_output(tx: Tx, keyring: Keyring, run: Run) -> bytes | None:
 def connection_check_output(
     tx: Tx, keyring: Keyring, run: Run
 ) -> connection_check.ConnectionCheckResult | None:
-    if run.kind is not RunKind.CONNECTION_CHECK:
+    """A complete connection check's output only: a run settled but not yet published, or
+    cancelled, shows none (its result is not used)."""
+    if run.kind is not RunKind.CONNECTION_CHECK or run.status is not WorkState.COMPLETE:
         return None
     plaintext = open_output(tx, keyring, run)
     if plaintext is None:

@@ -36,6 +36,7 @@ from nessa.identity.spend import SpendLimits
 from nessa.profile.commands import current_profile
 from nessa.profile.document import FieldState
 from nessa.profile.store import stale_version
+from nessa.vocabulary import WorkState
 
 PROMPT_VERSION = "source-search-2"  # 2: names the boards that cannot be used (live row 27)
 INPUT_FORMAT: Literal["nessa.source-search-input"] = "nessa.source-search-input"
@@ -254,5 +255,7 @@ def search_view(tx: Tx, keyring: Keyring, workspace_id: uuid.UUID, run_id: uuid.
     run = visible_run(tx, workspace_id, run_id)
     if run.kind is not RunKind.SOURCE_SEARCH:
         raise NessaError(ErrorCode.NOT_FOUND, "No such search.", stage=ErrorStage.EXECUTION)
+    if run.status is not WorkState.COMPLETE:  # a cancelled search's result is not used
+        return SearchView(run, None)
     raw = open_output(tx, keyring, run)
     return SearchView(run, None if raw is None else SearchProposal.model_validate_json(raw))
