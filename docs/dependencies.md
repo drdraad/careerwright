@@ -192,7 +192,7 @@ qualified pins.
 | Scrapling (HTTP fetch only) | 0.5 | Sprint 3 acquisition task | restricted worker without model or master key; verify licence and arm64 |
 | D3 | 7.9.0 | Sprint 3 map task | SVG rendering only; add to `apps/web` with its own ADR note |
 | ASHE data release | n/a | Sprint 3 data task (T7) | pinned URL and hash; fetched by `make setup` (R7), as ESCO is since Task 5 |
-| Adzuna API | n/a | Sprint 3 | unverified: no credentials (R4) |
+| Adzuna API | n/a | Sprint 3 | qualified on the free tier on 2026-10-29 by `make live-adzuna` (two requests, both 200; ledger rows 32–33, $0), credentials read from `.env` as `ADZUNA_APPLICATION_ID` and `ADZUNA_API_KEY` (R4; ADR 0009) |
 
 ## How these were checked
 

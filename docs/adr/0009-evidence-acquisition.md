@@ -338,7 +338,9 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
     document; descriptions are snippets. Its terms (read 2026-10-28) allow personal job
     search and require each displayed advert to be labelled "Adzuna" with a link; they do not
     clearly allow keeping more, so it is class `job-board`: hash and excerpts only. `make
-    setup` copies the credentials from `.env` into `NESSA_HOME/adzuna/` without printing them;
+    setup` copies the credentials from `.env`, under the names the product owner used
+    (`ADZUNA_APPLICATION_ID`, `ADZUNA_API_KEY`; controller ruling, fix round 5, with no alias
+    for the names Task 7A first read), into `NESSA_HOME/adzuna/` without printing them;
     the acquisition worker is the only container that mounts them (the one credential it may
     hold, GC8); the API knows only whether they are there, to allow live-vacancy workspaces.
 
@@ -502,9 +504,12 @@ searches, 21 and 14 sources returned, $0.005562 and $0.005587, leak scans clean,
 candidate proposed); `make live-extract` once on the test model (ledger row 31: one request
 on the synthetic fixture page, 700 input and 460 output tokens, $0.000162; one posting, all
 nine fields approved as `model`, none dropped, the page's own instruction not followed;
-leak scan clean); `make live-adzuna` blocked: no `ADZUNA_APP_ID`/`ADZUNA_APP_KEY` in `.env`.
-On 2026-10-29 (fix round 5, item 4) it named the Adzuna-named variables `.env` does set,
-names only: `ADZUNA_API_KEY` and `ADZUNA_APPLICATION_ID`; no request was sent.
+leak scan clean); `make live-adzuna` once on 2026-10-29 (fix round 5), after it had named
+the Adzuna-named variables `.env` sets (names only) and the controller ruled that Nessa reads
+those names: two free-tier requests through the adapter's own code, both 200 (ledger rows
+32–33, $0); 40 adverts of 68 matching, 39 distinct jobs; pay basis 26 advertised and 14
+predicted, none with a period; snippets only; 4 agency adverts; 357 claims; the scan of the
+results, the ledger rows it wrote and the ledger table found no credential.
 
 ## Consequences and open items
 
@@ -529,10 +534,10 @@ names only: `ADZUNA_API_KEY` and `ADZUNA_APPLICATION_ID`; no request was sent.
   retries; the person repeats the cancel). The cascade makes this possible for up to five
   more runs.
 - The live search proposed no candidate in two tries; candidate quality is unqualified.
-- The Adzuna live integration is unverified until credentials are in `.env` under those two
-  names. `.env` holds `ADZUNA_APPLICATION_ID` and `ADZUNA_API_KEY` (fix round 5): renaming
-  them to `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`, or a ruling that the tools read those
-  names, would let `make live-adzuna` qualify it. The names are never guessed in code.
+- The Adzuna live integration is qualified on the free tier by `make live-adzuna` (two
+  requests, above). A live-vacancy workspace also needs `make setup` to place the
+  credentials for the acquisition worker; that path is covered by unit tests (setup's files
+  are the ones the worker loads) and was not run against `NESSA_HOME` in fix round 5.
 - A new error code (`RUN_FINISHED`), failure classes (`retrieval_failed`,
   `source_blocked`), event kinds (`run.cancel_requested`, `research.updated`) and run kinds
   (`acquisition`, `source_search`, and in fix round 2 `page_extraction`); migrations 0013
