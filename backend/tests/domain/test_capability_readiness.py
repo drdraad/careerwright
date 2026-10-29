@@ -14,11 +14,14 @@ from nessa.capability.matrix import (
     Importance,
     Matrix,
     OccupationNote,
+    PackTargetNote,
     RowEdit,
+    RowKind,
     apply_edits,
     build_matrix,
     check_edit,
     find_pack_target,
+    pick_occupation,
 )
 from nessa.capability.outcomes import (
     Confidence,
@@ -31,7 +34,7 @@ from nessa.capability.outcomes import (
     pack_outcomes,
     user_override,
 )
-from nessa.capability.questions import question_graph
+from nessa.capability.questions import QuestionReason, question_graph
 from nessa.capability.readiness import (
     Assessment,
     GapKind,
@@ -42,9 +45,10 @@ from nessa.capability.readiness import (
     assess,
     ensure_current,
 )
-from nessa.capability.reference import load_reference
+from nessa.capability.reference import GateKind, load_reference
 from nessa.catalogue.esco import concept_id
 from nessa.catalogue.option_pack import load_pack
+from nessa.catalogue.records import LabelMatch
 from nessa.errors import ErrorCode, NessaError
 from tests.support.capability import (
     ADA,
@@ -777,7 +781,7 @@ def test_a_slate_chosen_nursing_label_reaches_the_pack_s_registration_gate() -> 
     title = "nurse responsible for general care"
     occupation = seed(title, concept=concept_id(NURSE_URI), regulated=True)
 
-    target, basis = find_pack_target(title, PACK, REFERENCE, occupation)
+    target, basis, _ = find_pack_target(title, PACK, REFERENCE, occupation)
     assert target is not None
     assert basis is not None
     matrix = build_matrix(
@@ -803,8 +807,12 @@ def test_a_slate_chosen_nursing_label_reaches_the_pack_s_registration_gate() -> 
     assert result.state is ReadinessState.NOT_YET_ASSESSED
     assert (NMC, RowStatus.UNRESOLVED) in [(b.row_id, b.kind) for b in result.blockers]
     assert find_pack_target("Registered nurse", PACK, REFERENCE, None)[1] == "title"
-    assert find_pack_target("Marine biologist", PACK, REFERENCE, None) == (None, None)
-    assert find_pack_target(title, PACK, REFERENCE, seed(title, regulated=True)) == (None, None)
+    assert find_pack_target("Marine biologist", PACK, REFERENCE, None) == (None, None, None)
+    assert find_pack_target(title, PACK, REFERENCE, seed(title, regulated=True)) == (
+        None,
+        None,
+        None,
+    )
 
 
 @pytest.mark.req("OUT1-04", "RDY1-02")
@@ -921,3 +929,294 @@ def test_a_synthetic_workspace_s_results_say_so() -> None:
 
     assert (matrix.synthetic, result.synthetic, graph.synthetic) == (True, True, True)
     assert pack_matrix("bookkeeping-assistant-leeds").synthetic is False
+
+
+# Fix round 2 -------------------------------------------------------------------------------
+
+BOOKKEEPER_URI = "http://data.europa.eu/esco/occupation/c3aae59e-1441-4b3e-bdd1-6da50dc7cf42"
+ACCOUNTANT = uuid.uuid4()
+
+
+def label(concept: uuid.UUID, kind: str, preferred: str) -> LabelMatch:
+    return LabelMatch(
+        concept_id=concept,
+        label="bookkeeper" if kind != "hidden" else None,
+        kind=kind,
+        preferred_label=preferred,
+        isco_code="4311",
+        isco_label="Accounting and bookkeeping clerks",
+    )
+
+
+@pytest.mark.req("MAP1-05", "RDY1-03")
+def test_a_chosen_occupation_or_its_own_preferred_label_resolves_a_shared_label() -> None:
+    # C1(b): "bookkeeper" is ESCO's preferred label for bookkeeper and an alternative label
+    # of accountant.
+    bookkeeper = concept_id(BOOKKEEPER_URI)
+    matches = [
+        label(bookkeeper, "preferred", "bookkeeper"),
+        label(ACCOUNTANT, "alternative", "accountant"),
+    ]
+
+    assert pick_occupation("bookkeeper", chosen=None, matches=matches) == (
+        bookkeeper,
+        "esco_label",
+        None,
+    )
+    # The person's own choice is read from its source, never re-derived from the label.
+    assert pick_occupation("bookkeeper", chosen=ACCOUNTANT, matches=matches) == (
+        ACCOUNTANT,
+        "occupation_choice",
+        None,
+    )
+    # Two occupations with that preferred label are equal: ambiguous, never guessed.
+    twins = [
+        label(bookkeeper, "preferred", "bookkeeper"),
+        label(ACCOUNTANT, "preferred", "bookkeeper"),
+    ]
+    assert pick_occupation("bookkeeper", chosen=None, matches=twins) == (
+        None,
+        None,
+        OccupationNote.AMBIGUOUS_LABEL,
+    )
+    assert pick_occupation("bookkeeper", chosen=None, matches=[]) == (
+        None,
+        None,
+        OccupationNote.NO_EXACT_LABEL,
+    )
+
+
+@pytest.mark.req("RDY1-03", "READINESS-03")
+def test_a_bookkeeper_chosen_in_the_product_reaches_p05_s_pack_target_and_can_apply_now() -> None:
+    occupation = seed("bookkeeper", concept=concept_id(BOOKKEEPER_URI), regulated=False)
+    target, basis, note = find_pack_target("bookkeeper", PACK, REFERENCE, occupation)
+    assert target is not None
+    assert basis is not None
+    matrix = build_matrix(
+        "bookkeeper",
+        pack=PACK,
+        reference=REFERENCE,
+        pack_target=target,
+        pack_target_basis=basis,
+        occupation=occupation,
+        exemplars=0,
+        synthetic=False,
+    )
+    rows = (
+        "pack:bookkeeping-assistant-leeds:reconciliation",
+        "pack:bookkeeping-assistant-leeds:records",
+    )
+    evidence = [self_report(subject_of(matrix, r), 2, rubric_of(matrix, r)) for r in rows]
+    work = [statement("gate:uk-right-to-work", Holding.HELD, verified=True)]
+
+    result = assess(
+        matrix, evidence=evidence, statements=work, outcomes=OUTCOMES, evidence_version=2
+    )
+
+    assert (target.target_id, basis, note) == (
+        "bookkeeping-assistant-leeds",
+        "esco_crosswalk",
+        None,
+    )
+    assert matrix.row("gate:uk-right-to-work") is not None
+    assert result.state is ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS
+
+
+@pytest.mark.req("MAP1-01")
+def test_two_pack_targets_for_one_occupation_record_why_neither_is_used() -> None:
+    # N4: never guessed between, and the matrix says so.
+    nurse = REFERENCE.crosswalk_for("registered-nurse-manchester")
+    assert nurse is not None
+    twinned = REFERENCE.model_copy(
+        update={
+            "targets": [
+                t.model_copy(update={"esco_occupation": nurse.esco_occupation})
+                if t.target_id == "bookkeeping-assistant-leeds"
+                else t
+                for t in REFERENCE.targets
+            ]
+        }
+    )
+    title = "nurse responsible for general care"
+    occupation = seed(title, concept=concept_id(NURSE_URI), regulated=True)
+
+    target, basis, note = find_pack_target(title, PACK, twinned, occupation)
+    matrix = build_matrix(
+        title,
+        pack=PACK,
+        reference=twinned,
+        pack_target=None,
+        pack_target_note=note,
+        occupation=occupation,
+        exemplars=0,
+        synthetic=False,
+    )
+
+    assert (target, basis, note) == (None, None, PackTargetNote.AMBIGUOUS_CROSSWALK)
+    assert matrix.sources.pack_target_note is PackTargetNote.AMBIGUOUS_CROSSWALK
+
+
+def at(minute: int) -> datetime:
+    return datetime(2026, 10, 29, 12, minute, tzinfo=UTC)
+
+
+@pytest.mark.req("ASSESS-01", "ASSESS-03")
+def test_a_level_free_answer_under_another_rubric_never_supersedes_a_row_s_own() -> None:
+    # N1, order 1: a concrete level 2 under rubric A, then "unsure" under rubric B.
+    evidence = [
+        self_report("fixture:shared", 2, "rubric-a", at=at(1)),
+        self_report("fixture:shared", None, "rubric-b", answer=Answer.UNSURE, at=at(2)),
+    ]
+
+    a = row_evidence("fixture:shared", "rubric-a", evidence)
+    b = row_evidence("fixture:shared", "rubric-b", evidence)
+
+    assert (a.level, a.conflict) == (2, False)
+    assert (b.level, b.answer) == (None, Answer.UNSURE)
+
+
+@pytest.mark.req("ASSESS-01", "ASSESS-03")
+def test_a_disagreeing_answer_under_another_rubric_asks_a_clarification() -> None:
+    # N1, order 2: a concrete level 2 under rubric A, then "not learned" under rubric B.
+    first = synthetic_matrix("Target A", [skill_row("fixture:shared", 2, "rubric-a")])
+    evidence = [
+        self_report("fixture:shared", 2, "rubric-a", at=at(1)),
+        self_report(
+            "fixture:shared", None, "rubric-b", answer=Answer.NOT_LEARNED, example=None, at=at(2)
+        ),
+    ]
+
+    a = row_evidence("fixture:shared", "rubric-a", evidence)
+    graph = question_graph([first], evidence=evidence, statements=[], evidence_version=2)
+
+    assert (a.level, a.conflict) == (2, True)
+    assert row_evidence("fixture:shared", "rubric-b", evidence).level == 0
+    assert [p.reason for p in graph.prompts] == [QuestionReason.CONFLICT]
+
+
+@pytest.mark.req("ASSESS-01", "ASSESS-03")
+def test_a_later_level_under_another_rubric_reopens_a_level_free_answer() -> None:
+    # N1, order 3: "not learned" under rubric A, then level 3 under rubric B.
+    first = synthetic_matrix("Target A", [skill_row("fixture:shared", 2, "rubric-a")])
+    later = self_report("fixture:shared", 3, "rubric-b", at=at(2))
+    evidence = [
+        self_report(
+            "fixture:shared", None, "rubric-a", answer=Answer.NOT_LEARNED, example=None, at=at(1)
+        ),
+        later,
+    ]
+
+    a = row_evidence("fixture:shared", "rubric-a", evidence)
+    graph = question_graph([first], evidence=evidence, statements=[], evidence_version=2)
+
+    assert (a.level, a.shared_from_other_rubric) == (None, True)
+    assert row_evidence("fixture:shared", "rubric-b", evidence).level == 3
+    [prompt] = graph.prompts
+    assert prompt.reason is QuestionReason.OTHER_RUBRIC
+    assert later.evidence_id in prompt.reuse_evidence_ids
+
+
+@pytest.mark.req("ASSESS-02")
+def test_a_level_free_answer_under_another_rubric_fills_a_row_with_no_answer_of_its_own() -> None:
+    said = [self_report("fixture:shared", None, None, answer=Answer.NOT_LEARNED, example=None)]
+
+    assert row_evidence("fixture:shared", "rubric-a", said).level == 0
+
+
+@pytest.mark.req("ASSESS-03")
+def test_only_unresolved_rows_left_is_its_own_state_never_asking_with_nothing_to_ask() -> None:
+    # N2: every remaining required row is the person's own "unsure".
+    matrix = synthetic_matrix("Synthetic", [skill_row("fixture:a", 2, RUBRIC)])
+    said = [self_report("fixture:a", None, RUBRIC, answer=Answer.UNSURE)]
+
+    graph = question_graph([matrix], evidence=said, statements=[], evidence_version=1)
+
+    assert (graph.state, graph.prompts) == ("only_unresolved", [])
+
+
+@pytest.mark.req("RDY1-03")
+def test_a_route_chart_is_shown_only_when_there_is_something_to_plan() -> None:
+    # N3: nothing to plan when the target cannot be assessed, nothing is known yet, or the
+    # person is ready now.
+    marine = assess(
+        unmatched("Marine biologist", None),
+        evidence=[],
+        statements=[],
+        outcomes=[],
+        evidence_version=0,
+    )
+    unanswered = assess(trace_matrix(), evidence=[], statements=[], outcomes=[], evidence_version=0)
+    below = assess(
+        trace_matrix(), evidence=trace_evidence(), statements=[], outcomes=[], evidence_version=1
+    )
+
+    assert marine.show_route_chart is False
+    assert unanswered.show_route_chart is False
+    assert below.show_route_chart is True
+
+
+@pytest.mark.req("RDY1-01", "MAP1-05")
+def test_a_requirement_answers_cannot_settle_is_a_coverage_gap_beside_modelled_rows() -> None:
+    # N5: an unmodelled regulation gate, or a required row with no rubric, beside modelled
+    # rows: no answer can settle it, so the target is not assessable, never "not yet assessed".
+    regulated = build_matrix(
+        "nurse responsible for general care",
+        pack=PACK,
+        reference=REFERENCE,
+        pack_target=next(
+            t for t in PACK.targets if t.target_id == "data-quality-analyst-manchester"
+        ),
+        occupation=seed("nurse responsible for general care", regulated=True),
+        exemplars=0,
+        synthetic=False,
+    )
+    unmodelled = synthetic_matrix(
+        "Synthetic",
+        [
+            skill_row("fixture:a", 2, RUBRIC),
+            skill_row("fixture:b", 2, RUBRIC).model_copy(
+                update={"rubric": None, "required_level": None}
+            ),
+        ],
+    )
+
+    first = assess(regulated, evidence=[], statements=[], outcomes=[], evidence_version=0)
+    second = assess(
+        unmodelled,
+        evidence=[self_report("fixture:a", 2, RUBRIC)],
+        statements=[],
+        outcomes=[],
+        evidence_version=1,
+    )
+
+    assert regulated.row("gate:occupation-regulation") is not None
+    assert first.state is ReadinessState.INSUFFICIENT_COVERAGE
+    assert second.state is ReadinessState.INSUFFICIENT_COVERAGE
+
+
+@pytest.mark.req("RDY1-01")
+def test_an_eligibility_gate_alone_is_not_coverage() -> None:
+    # N6 (provisional): the right to work alone cannot make a target "ready".
+    work = gate_row("fixture:work").model_copy(
+        update={
+            "subject": "gate:fixture:work",
+            "kind": RowKind.ELIGIBILITY,
+            "gate": gate_row("fixture:work").gate.model_copy(update={"kind": GateKind.ELIGIBILITY}),  # type: ignore[union-attr]
+        }
+    )
+    eligibility_only = synthetic_matrix("Synthetic", [work])
+    practice_only = synthetic_matrix("Synthetic", [gate_row("fixture:registration")])
+    verified = [
+        statement("gate:fixture:work", Holding.HELD, verified=True),
+        statement("gate:fixture:registration", Holding.HELD, verified=True),
+    ]
+
+    alone = assess(
+        eligibility_only, evidence=[], statements=verified, outcomes=[], evidence_version=1
+    )
+    practice = assess(
+        practice_only, evidence=[], statements=verified, outcomes=[], evidence_version=1
+    )
+
+    assert alone.state is ReadinessState.INSUFFICIENT_COVERAGE
+    assert practice.state is ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS

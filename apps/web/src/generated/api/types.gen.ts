@@ -2810,6 +2810,7 @@ export type MatrixSources = {
     occupation: OccupationLink | null;
     occupation_note: OccupationNote | null;
     pack_target: PackTargetLink | null;
+    pack_target_note?: PackTargetNote | null;
 };
 
 /**
@@ -3153,7 +3154,7 @@ export type OccupationLink = {
     /**
      * Basis
      */
-    basis: 'esco_label' | 'pack_crosswalk';
+    basis: 'occupation_choice' | 'esco_label' | 'pack_crosswalk';
     /**
      * Regulated
      */
@@ -3398,6 +3399,20 @@ export type PackTargetLink = {
      */
     basis: 'title' | 'esco_crosswalk';
 };
+
+/**
+ * PackTargetNote
+ *
+ * Why a matrix has no pack target although one could apply.
+ */
+export const PackTargetNote = { AMBIGUOUS_CROSSWALK: 'ambiguous_crosswalk' } as const;
+
+/**
+ * PackTargetNote
+ *
+ * Why a matrix has no pack target although one could apply.
+ */
+export type PackTargetNote = typeof PackTargetNote[keyof typeof PackTargetNote];
 
 /**
  * PartialCompleteness
@@ -4286,7 +4301,7 @@ export type QuestionGraph = {
     /**
      * State
      */
-    state: 'asking' | 'enough' | 'stopped' | 'insufficient_coverage';
+    state: 'asking' | 'enough' | 'stopped' | 'insufficient_coverage' | 'only_unresolved';
     /**
      * Synthetic
      */

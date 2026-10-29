@@ -4110,6 +4110,16 @@ export const MatrixSourcesSchema = {
                     type: 'null'
                 }
             ]
+        },
+        pack_target_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/PackTargetNote'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     additionalProperties: false,
@@ -4611,6 +4621,7 @@ export const OccupationLinkSchema = {
         basis: {
             type: 'string',
             enum: [
+                'occupation_choice',
                 'esco_label',
                 'pack_crosswalk'
             ],
@@ -4983,6 +4994,15 @@ export const PackTargetLinkSchema = {
         'basis'
     ],
     title: 'PackTargetLink'
+} as const;
+
+export const PackTargetNoteSchema = {
+    type: 'string',
+    enum: [
+        'ambiguous_crosswalk'
+    ],
+    title: 'PackTargetNote',
+    description: 'Why a matrix has no pack target although one could apply.'
 } as const;
 
 export const PartialCompletenessSchema = {
@@ -6394,7 +6414,8 @@ export const QuestionGraphSchema = {
                 'asking',
                 'enough',
                 'stopped',
-                'insufficient_coverage'
+                'insufficient_coverage',
+                'only_unresolved'
             ],
             title: 'State'
         },

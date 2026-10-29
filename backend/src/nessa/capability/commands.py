@@ -38,12 +38,14 @@ from nessa.capability.matrix import (
     EscoSkillRelation,
     Importance,
     Matrix,
+    OccupationBasis,
     OccupationNote,
     RowEdit,
     apply_edits,
     build_matrix,
     check_edit,
     find_pack_target,
+    pick_occupation,
 )
 from nessa.capability.outcomes import PlannedOutcome, pack_outcomes
 from nessa.capability.questions import QuestionGraph, question_graph
@@ -62,6 +64,7 @@ from nessa.identity import store as identity_store
 from nessa.identity.access import Actor
 from nessa.identity.records import EventKind
 from nessa.identity.workspaces import visible_workspace
+from nessa.profile import store as profile_store
 from nessa.profile.commands import current_profile
 from nessa.profile.document import FieldState, TextValue
 from nessa.vocabulary import DataMode
@@ -106,8 +109,17 @@ def capability_view(tx: Tx, workspace_id: uuid.UUID, data: CapabilityData) -> Ca
     matrices: list[Matrix] = []
     if targets:
         release = held_release(tx)  # TAXONOMY_UNAVAILABLE without one: never an empty matrix
+        chosen = _chosen(tx, workspace_id)
         matrices = [
-            _matrix(tx, workspace_id, title, data, release, synthetic=workspace.synthetic)
+            _matrix(
+                tx,
+                workspace_id,
+                title,
+                data,
+                release,
+                chosen=chosen.get(title_key(title)),
+                synthetic=workspace.synthetic,
+            )
             for title in targets
         ]
     state = store.state(tx, workspace_id)
@@ -130,20 +142,22 @@ def _matrix(
     data: CapabilityData,
     release: TaxonomyRelease,
     *,
+    chosen: uuid.UUID | None,
     synthetic: bool,
 ) -> Matrix:
     """A target found by its title, or else through its ESCO occupation, which is how a
     target chosen in the product is stored (ESCO's preferred label)."""
     key = title_key(title)
-    by_title, _ = find_pack_target(title, data.pack, data.reference, None)
-    seed, note = _seed(tx, title, by_title, data.reference, release)
-    pack_target, basis = find_pack_target(title, data.pack, data.reference, seed)
+    by_title, _, _ = find_pack_target(title, data.pack, data.reference, None)
+    seed, note = _seed(tx, title, by_title, data.reference, release, chosen)
+    pack_target, basis, pack_note = find_pack_target(title, data.pack, data.reference, seed)
     return build_matrix(
         title,
         pack=data.pack,
         reference=data.reference,
         pack_target=pack_target,
         pack_target_basis=basis or "title",
+        pack_target_note=pack_note,
         occupation=seed,
         exemplars=evidence_store.exemplar_count(tx, workspace_id, key),
         synthetic=synthetic,
@@ -152,28 +166,42 @@ def _matrix(
     )
 
 
+def _chosen(tx: Tx, workspace_id: uuid.UUID) -> dict[str, uuid.UUID]:
+    """The occupations the person chose as targets, read from each choice's own source (its
+    ESCO URI), by their preferred label's title key; a later choice of a title wins. A choice
+    from another release is absent (as in `nessa.profile.sketch`)."""
+    uris = profile_store.chosen_occupation_uris(tx, workspace_id)
+    concepts = taxonomy_store.concepts_by_uri(tx, uris)
+    chosen: dict[str, uuid.UUID] = {}
+    for uri in uris:
+        detail = taxonomy_store.occupation(tx, concepts[uri]) if uri in concepts else None
+        if detail is not None:
+            chosen[title_key(detail.preferred_label)] = detail.concept_id
+    return chosen
+
+
 def _seed(
     tx: Tx,
     title: str,
     pack_target: Target | None,
     reference: Reference,
     release: TaxonomyRelease,
+    chosen: uuid.UUID | None,
 ) -> tuple[EscoSeed | None, OccupationNote | None]:
-    """The ESCO occupation with exactly this label, or else the pack target's crosswalk."""
-    labelled = {
-        m.concept_id
-        for m in taxonomy_store.label_matches(tx, normalise_label(title))
-        if m.kind != "hidden"
-    }
+    """The occupation the person chose; else the one ESCO labels with the title (preferring
+    its preferred label where several do); else the pack target's crosswalk."""
+    concept, picked, note = pick_occupation(
+        title, chosen=chosen, matches=taxonomy_store.label_matches(tx, normalise_label(title))
+    )
     crosswalk = reference.crosswalk_for(pack_target.target_id) if pack_target else None
-    basis: Literal["esco_label", "pack_crosswalk"]
-    if len(labelled) == 1:
-        chosen, basis = next(iter(labelled)), "esco_label"
+    basis: OccupationBasis
+    if concept is not None and picked is not None:
+        basis = picked
     elif crosswalk is not None:
-        chosen, basis = concept_id(crosswalk.esco_occupation), "pack_crosswalk"
+        concept, basis = concept_id(crosswalk.esco_occupation), "pack_crosswalk"
     else:
-        return None, OccupationNote.AMBIGUOUS_LABEL if labelled else OccupationNote.NO_EXACT_LABEL
-    detail = taxonomy_store.occupation(tx, chosen)
+        return None, note
+    detail = taxonomy_store.occupation(tx, concept)
     if detail is None:
         return None, OccupationNote.NOT_IN_HELD_TAXONOMY
     seed = EscoSeed(

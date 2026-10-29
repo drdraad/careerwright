@@ -26,6 +26,7 @@ DATA = "Data quality analyst"
 NMC = "pack:registered-nurse-manchester:nmc-registration"
 VALIDATION = "pack:data-quality-analyst-manchester:data-validation"
 NURSE_URI = "http://data.europa.eu/esco/occupation/8d3e8aaa-791b-4c75-a465-f3f827028f50"
+BOOKKEEPER_URI = "http://data.europa.eu/esco/occupation/c3aae59e-1441-4b3e-bdd1-6da50dc7cf42"
 
 
 def workspace_with_targets(api: ApiClient, token: str, *targets: str) -> str:
@@ -452,6 +453,46 @@ def test_a_nursing_occupation_chosen_in_the_product_keeps_the_registration_gate(
     assert assessment["state"] == "not_yet_assessed"
     assert {"row_id": NMC, "kind": "unresolved"} in assessment["blockers"]
     assert graph["prompts"][0]["subject"] == "gate:nmc-registration"
+
+
+@pytest.mark.req("RDY1-03", "READINESS-03")
+def test_a_bookkeeper_chosen_in_the_product_reaches_p05_s_pack_target_despite_a_shared_label(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    # In ESCO "bookkeeper" is also an alternative label of "accountant"; the sample lacks
+    # accountant, so another occupation is given the label for this test (C1(b), round 2).
+    bookkeeper = str(concept_id(BOOKKEEPER_URI))
+    [other] = infra.query(
+        "SELECT concept_id FROM nessa.occupation_concepts WHERE preferred_label = %s",
+        ("accounting assistant",),
+    )
+    infra.query(
+        "INSERT INTO nessa.occupation_labels (concept_id, label, normalised, kind) "
+        "VALUES (%s, 'bookkeeper', 'bookkeeper', 'alternative')",
+        (other["concept_id"],),
+    )
+    try:
+        chosen = str(api.create_workspace(ada)["workspace_id"])
+        choose(api, ada, chosen, 0, bookkeeper)
+        typed = workspace_with_targets(api, ada, "bookkeeper")
+        found = {
+            name: matrices(api, ada, workspace)["matrices"][0]
+            for name, workspace in (("chosen", chosen), ("typed", typed))
+        }
+    finally:
+        infra.query(
+            "DELETE FROM nessa.occupation_labels WHERE concept_id = %s AND normalised = %s",
+            (other["concept_id"], "bookkeeper"),
+        )
+
+    # The choice is read from its own source; a typed title prefers ESCO's preferred label.
+    assert found["chosen"]["sources"]["occupation"]["basis"] == "occupation_choice"
+    assert found["typed"]["sources"]["occupation"]["basis"] == "esco_label"
+    for matrix_out in found.values():
+        assert matrix_out["sources"]["occupation"]["concept_id"] == bookkeeper
+        assert matrix_out["sources"]["pack_target"]["target_id"] == "bookkeeping-assistant-leeds"
+        assert matrix_out["sources"]["pack_target"]["basis"] == "esco_crosswalk"
+        assert row(matrix_out, "gate:uk-right-to-work")["gate"]["kind"] == "eligibility"
 
 
 @pytest.mark.req("RDY1-01", "MAP1-05")

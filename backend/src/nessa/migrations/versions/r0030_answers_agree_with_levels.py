@@ -8,7 +8,13 @@ anchors).
 
 The constraints are `NOT VALID`: before this rule the API accepted such answers, and a
 database that ran 0029 may hold one. It is kept as written, never rewritten or dropped;
-every new row is checked. (0029 has only ever run on this branch's test databases.)
+every new row is checked.
+
+0029 ran only on test databases, on this unpushed branch (Task 9 ran the test suites, never
+`make dev`). A legacy contradictory row would be refused when read back, by the domain
+validator in `nessa.capability.evidence`: every capability read for its workspace would
+answer `INTERNAL_ERROR`, an observable failure rather than a silent one. A populated-upgrade
+test is left for the final review (R12).
 
 Forward-only (see `docs/runbook.md`).
 

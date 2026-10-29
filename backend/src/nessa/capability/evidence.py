@@ -22,8 +22,9 @@ The five answers mean different things (spec section 9). "I have not learned thi
 understand it but have not tried" are a known level 0: nothing to ask again, a gap to learn.
 "I am unsure" is an unresolved assumption: unknown, never level 0, and not asked again.
 "I did it with help" is at most level 1, since levels 2 to 4 are defined by independence
-(spec section 8's anchors). An answer that contradicts its level is refused. These
-level-free answers hold for the subject whatever rubric a target uses.
+(spec section 8's anchors). An answer that contradicts its level is refused. A level-free
+answer given under one rubric fills another target's row only when that row has no answer
+of its own, never supersedes one, and is reopened by a later level under another rubric.
 
 Course enrolment and completion are not evidence at all: an assessed completion counts only
 once its evidence is reviewed (OUT1-05). Time in a job never adds a level by itself.
@@ -170,13 +171,10 @@ def row_evidence(
     subject: str, rubric_version: str | None, evidence: list[SkillEvidence]
 ) -> RowEvidence:
     on_subject = [e for e in evidence if e.subject == subject]
-    mine = [e for e in on_subject if _applies(e, rubric_version)]
-    shared = any(e not in mine for e in on_subject)
-    shown = [e for e in mine if e.method is not Method.SELF_REPORT and e.reviewed_on is not None]
-    reports = sorted(
-        (e for e in mine if e.method is Method.SELF_REPORT), key=lambda e: e.recorded_at
-    )
-    latest = reports[-1] if reports else None
+    own = [e for e in on_subject if _own(e, rubric_version)]
+    foreign = [e for e in on_subject if not _own(e, rubric_version)]
+    shown = [e for e in own if e.method is not Method.SELF_REPORT and e.reviewed_on is not None]
+    latest, disagreeing = _reading(own, foreign)
     demonstrated = max(
         (e.demonstrated_level for e in shown if e.demonstrated_level is not None), default=None
     )
@@ -213,21 +211,59 @@ def row_evidence(
         tools=latest.tools if latest is not None else None,
         ai_assisted=latest.ai_assisted if latest is not None else None,
         evidence_ids=[e.evidence_id for e in used],
-        shared_from_other_rubric=shared,
-        conflict=demonstrated is not None and claimed is not None and claimed != demonstrated,
+        shared_from_other_rubric=bool(foreign),
+        conflict=disagreeing
+        or (demonstrated is not None and claimed is not None and claimed != demonstrated),
     )
 
 
-def _applies(evidence: SkillEvidence, rubric_version: str | None) -> bool:
-    """A level counts only against its own rubric; an answer that needs no level (unsure, or
-    not yet done) holds for the subject under any rubric."""
-    if evidence.rubric_version is not None and evidence.rubric_version == rubric_version:
-        return True
-    level_free = evidence.self_assessed_level in (None, 0) and evidence.answer in LEVEL_FREE
-    return evidence.method is Method.SELF_REPORT and level_free
-
-
 LEVEL_FREE = frozenset({*NOT_YET_DONE, Answer.UNSURE})
+
+
+def _own(evidence: SkillEvidence, rubric_version: str | None) -> bool:
+    return evidence.rubric_version is not None and evidence.rubric_version == rubric_version
+
+
+def _level_free(evidence: SkillEvidence) -> bool:
+    return evidence.method is Method.SELF_REPORT and evidence.answer in LEVEL_FREE
+
+
+def _levelled(evidence: SkillEvidence) -> bool:
+    return (
+        evidence.method is Method.SELF_REPORT
+        and evidence.self_assessed_level is not None
+        and (evidence.answer not in LEVEL_FREE)
+    )
+
+
+def _reading(
+    own: list[SkillEvidence], foreign: list[SkillEvidence]
+) -> tuple[SkillEvidence | None, bool]:
+    """The self-report a row reads, and whether another rubric's answer disagrees with it.
+
+    A row's own answer (under its rubric) always wins. An answer that needs no level (unsure,
+    or not yet done) given under another rubric fills a row that has no answer of its own,
+    and never supersedes one: if it is later and says "not yet done" against an own level
+    above 0, that is a conflict, asked as a clarification (S4.2: shared, never assumed the
+    same). A later levelled answer under another rubric reopens a level-free reading, so the
+    row is asked again against its own rubric (review N1)."""
+    reports = sorted(
+        (e for e in own if e.method is Method.SELF_REPORT), key=lambda e: e.recorded_at
+    )
+    free = sorted((e for e in foreign if _level_free(e)), key=lambda e: e.recorded_at)
+    levelled_at = max((e.recorded_at for e in foreign if _levelled(e)), default=None)
+    latest = reports[-1] if reports else (free[-1] if free else None)
+    if latest is None:
+        return None, False
+    if _level_free(latest) and levelled_at is not None and levelled_at > latest.recorded_at:
+        return None, False  # reopened: another rubric's later level, asked again here
+    disagreeing = (
+        bool(reports)
+        and not _level_free(latest)
+        and (latest.self_assessed_level or 0) > 0
+        and any(e.answer in NOT_YET_DONE and e.recorded_at > latest.recorded_at for e in free)
+    )
+    return latest, disagreeing
 
 
 def latest_statement(

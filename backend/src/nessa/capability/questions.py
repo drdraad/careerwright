@@ -119,10 +119,15 @@ class QuestionCoverage(StrictModel):
     unresolved: list[str]  # subjects still unknown, kept as assumptions to resolve
 
 
+QuestionState = Literal["asking", "enough", "stopped", "insufficient_coverage", "only_unresolved"]
+
+
 class QuestionGraph(StrictModel):
     # insufficient_coverage: no required row or gate is modelled, so nothing can be asked and
-    # coverage is never "enough" (C1).
-    state: Literal["asking", "enough", "stopped", "insufficient_coverage"]
+    # coverage is never "enough" (C1). only_unresolved: coverage is short, and every open row
+    # is the person's own "unsure" or "don't know", which is not asked again: what remains is
+    # an optional work sample, or stopping (spec section 9).
+    state: QuestionState
     synthetic: bool  # any target's matrix is synthetic: the workspace's or a fixture's label
     evidence_version: int
     targets: list[TargetVersions]
@@ -176,13 +181,17 @@ def question_graph(
     )
     modelled = gates + rows_total > 0
     enough = gates_known == gates and weight_covered * ENOUGH_OF >= weight_total * ENOUGH_COVERED
-    state: Literal["asking", "enough", "stopped", "insufficient_coverage"]
+    state: QuestionState
     if stopped:
         state = "stopped"
     elif not modelled:
         state = "insufficient_coverage"
+    elif enough:
+        state = "enough"
     else:
-        state = "enough" if enough else "asking"
+        # Every remaining uncertainty is the person's own "unsure" or "don't know": nothing
+        # is asked again, so it is never "asking" with nothing to ask (review N2).
+        state = "asking" if prompts else "only_unresolved"
     return QuestionGraph(
         state=state,
         synthetic=any(m.synthetic for m in matrices),

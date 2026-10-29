@@ -45,6 +45,7 @@ from nessa.catalogue.option_pack import (
     Source,
     Target,
 )
+from nessa.catalogue.records import LabelMatch
 from nessa.errors import ErrorCode, ErrorStage, NessaError
 from nessa.evidence.jobs import title_key
 
@@ -232,10 +233,16 @@ class MatrixRow(StrictModel):
         return self.gate is not None or self.importance in REQUIRED_IMPORTANCE
 
 
+OccupationBasis = Literal["occupation_choice", "esco_label", "pack_crosswalk"]
+
+
 class OccupationLink(StrictModel):
     concept_id: uuid.UUID
     label: str
-    basis: Literal["esco_label", "pack_crosswalk"]
+    # occupation_choice: the occupation the person chose, read from the choice's own source
+    # (its ESCO URI); esco_label: the occupation ESCO labels with the title; pack_crosswalk:
+    # the pack target's crosswalk.
+    basis: OccupationBasis
     regulated: bool | None
 
 
@@ -256,6 +263,14 @@ class OccupationNote(StrEnum):
     NOT_IN_HELD_TAXONOMY = "not_in_held_taxonomy"
 
 
+class PackTargetNote(StrEnum):
+    """Why a matrix has no pack target although one could apply."""
+
+    # Several pack targets' crosswalks name the target's occupation: never guessed between,
+    # so the person chooses (spec section 8: a title mapping to several is asked about).
+    AMBIGUOUS_CROSSWALK = "ambiguous_crosswalk"
+
+
 class MatrixSources(StrictModel):
     pack_version: str
     pack_dated: date
@@ -266,6 +281,7 @@ class MatrixSources(StrictModel):
     occupation: OccupationLink | None
     occupation_note: OccupationNote | None
     pack_target: PackTargetLink | None
+    pack_target_note: PackTargetNote | None = None
 
 
 class MatrixCoverage(StrictModel):
@@ -334,7 +350,7 @@ class EscoSeed(StrictModel):
     concept_id: uuid.UUID
     label: str
     regulated: bool | None
-    basis: Literal["esco_label", "pack_crosswalk"]
+    basis: OccupationBasis
     skills: list[EscoSkillRelation]
 
 
@@ -348,6 +364,7 @@ def build_matrix(
     exemplars: int,
     synthetic: bool,
     pack_target_basis: Literal["title", "esco_crosswalk"] = "title",
+    pack_target_note: PackTargetNote | None = None,
     edits: Sequence[RowEdit] = (),
     occupation_note: OccupationNote | None = None,
 ) -> Matrix:
@@ -393,6 +410,7 @@ def build_matrix(
                 if pack_target is not None
                 else None
             ),
+            pack_target_note=None if pack_target is not None else pack_target_note,
         ),
         coverage=MatrixCoverage(
             exemplars=exemplars,
@@ -728,24 +746,51 @@ def _regulation(occupation: EscoSeed | None, rows: list[MatrixRow]) -> list[Matr
 
 def find_pack_target(
     title: str, pack: Pack, reference: Reference, occupation: EscoSeed | None
-) -> tuple[Target | None, Literal["title", "esco_crosswalk"] | None]:
+) -> tuple[Target | None, Literal["title", "esco_crosswalk"] | None, PackTargetNote | None]:
     """The pack target with the same title; otherwise the one pack target whose crosswalk
     names the target's ESCO occupation. Several such targets are never guessed between."""
     key = title_key(title)
     by_title = next((t for t in pack.targets if title_key(t.title) == key), None)
     if by_title is not None:
-        return by_title, "title"
+        return by_title, "title", None
     if occupation is None:
-        return None, None
+        return None, None, None
     crosswalked = [
         t
         for t in pack.targets
         if (crosswalk := reference.crosswalk_for(t.target_id)) is not None
         and concept_id(crosswalk.esco_occupation) == occupation.concept_id
     ]
-    if len(crosswalked) != 1:
-        return None, None
-    return crosswalked[0], "esco_crosswalk"
+    if len(crosswalked) > 1:
+        return None, None, PackTargetNote.AMBIGUOUS_CROSSWALK
+    if not crosswalked:
+        return None, None, None
+    return crosswalked[0], "esco_crosswalk", None
+
+
+def pick_occupation(
+    title: str, *, chosen: uuid.UUID | None, matches: Sequence[LabelMatch]
+) -> tuple[
+    uuid.UUID | None, Literal["occupation_choice", "esco_label"] | None, OccupationNote | None
+]:
+    """A target's ESCO occupation. The person's own choice, read from its source, wins;
+    otherwise the one occupation ESCO labels with the title; otherwise, where several do,
+    the one whose preferred label is the title (as the product stores a choice). Two equal
+    matches stay ambiguous: never guessed between."""
+    if chosen is not None:
+        return chosen, "occupation_choice", None
+    labelled = {m.concept_id for m in matches if m.kind != "hidden"}
+    if len(labelled) == 1:
+        return next(iter(labelled)), "esco_label", None
+    wanted = " ".join(title.casefold().split())
+    preferred = {
+        m.concept_id
+        for m in matches
+        if m.kind == "preferred" and " ".join(m.preferred_label.casefold().split()) == wanted
+    }
+    if len(preferred) == 1:
+        return next(iter(preferred)), "esco_label", None
+    return None, None, OccupationNote.AMBIGUOUS_LABEL if labelled else OccupationNote.NO_EXACT_LABEL
 
 
 def _digest(prefix: str, payload: object) -> str:

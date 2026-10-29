@@ -70,6 +70,7 @@ from nessa.capability.outcomes import (
     Provenance,
     planned_level,
 )
+from nessa.capability.reference import GateKind
 from nessa.errors import ErrorCode, ErrorStage, NessaError
 
 # The M0 planning horizon (spec section 12, `M0SearchLimits.max_months`): a pathway whose
@@ -96,10 +97,12 @@ class RowStatus(StrEnum):
 
 
 PASSING = frozenset({RowStatus.MET, RowStatus.SATISFIED})
-# Findings that are not yet known, as against a known shortfall.
-NOT_YET_KNOWN = frozenset(
-    {RowStatus.NO_USABLE_EVIDENCE, RowStatus.UNRESOLVED, RowStatus.NOT_MODELLED}
-)
+# Findings not yet known that the person's answers can settle, as against a known shortfall.
+# A row no rubric or typed gate models is a coverage gap instead (`insufficient_coverage`).
+NOT_YET_KNOWN = frozenset({RowStatus.NO_USABLE_EVIDENCE, RowStatus.UNRESOLVED})
+# What makes a target assessable at all (review N6, provisional): a modelled skill row, or a
+# modelled legal-practice or recognition gate. The right to work alone is not coverage.
+_COVERING_GATES = frozenset({GateKind.LEGAL_PRACTICE, GateKind.RECOGNITION})
 
 
 class GapKind(StrEnum):
@@ -337,11 +340,12 @@ def assess(
         )
         for r in rows
     )
-    modelled = [
-        r for r in rows if r.mandatory and r.status is not RowStatus.NOT_MODELLED and r.modelled
-    ]
-    if not modelled:
+    if not any(_covers(r, by_row[r.row_id]) for r in rows if r.mandatory):
         blockers = [Blocker(row_id=None, kind=RowStatus.NO_MODELLED_REQUIREMENTS), *blockers]
+        state = ReadinessState.INSUFFICIENT_COVERAGE
+    elif any(r.mandatory and (r.status is RowStatus.NOT_MODELLED or not r.modelled) for r in rows):
+        # A required row no rubric models, or a regulation no typed gate models: no answer
+        # can settle it, so the target is not assessable (review N5).
         state = ReadinessState.INSUFFICIENT_COVERAGE
     elif any(b.kind not in NOT_YET_KNOWN for b in blockers):
         state = ReadinessState.NOT_READY
@@ -352,6 +356,7 @@ def assess(
     else:
         state = ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS
     ready_now = state is ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS
+    training = any(g.mandatory and g.kind in _OPTION_GAPS for g in gaps)
     if ready_now:
         apply = AbstractAction(
             action_id="action:apply",
@@ -378,8 +383,12 @@ def assess(
             if ready_now
             else PrimaryAction.ADDRESS_GAPS
         ),
-        training_required=any(g.mandatory and g.kind in _OPTION_GAPS for g in gaps),
-        show_route_chart=not ready_now,
+        training_required=training,
+        # Only when there is something to plan: never when ready now (no degenerate
+        # frontier), when the target cannot be assessed, or before anything is known.
+        show_route_chart=training
+        and state is not ReadinessState.INSUFFICIENT_COVERAGE
+        and not ready_now,
         qualifications=_qualifications(
             matrix, rows, planned, scoring.used, _missing_level(rows, outcomes, completed)
         ),
@@ -585,6 +594,14 @@ def _action(
         state="outside_planning_model" if outside else "open",
         code=ErrorCode.MODEL_SCOPE_EXCEEDED if outside else None,
     )
+
+
+def _covers(assessed: RowAssessment, row: MatrixRow) -> bool:
+    """Whether a required row makes the target assessable: a skill row a rubric models, or a
+    modelled practice or recognition gate (review N6, provisional)."""
+    if row.gate is not None:
+        return row.gate.modelled and row.gate.kind in _COVERING_GATES
+    return row.kind in LEVELLED_KINDS and assessed.status is not RowStatus.NOT_MODELLED
 
 
 def _missing_level(
