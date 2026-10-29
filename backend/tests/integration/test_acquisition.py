@@ -18,7 +18,7 @@ from pydantic import SecretStr
 from nessa.api.app import create_app
 from nessa.api.deps import ApiDependencies
 from tests.domain.test_pages import POSTING, page
-from tests.integration.durable import make_scenario
+from tests.integration.durable import fresh_actor, make_scenario
 from tests.support.acquisition_service import LOOPBACK, acquisition_service
 from tests.support.client import ApiClient, profile_with
 from tests.support.infra import API_BASE, Infra
@@ -131,16 +131,27 @@ def test_an_acquisition_records_every_attempt_and_a_job_with_its_claims(
     shown = acquisition(api, ada, workspace, run_id)
 
     assert (run["status"], run["failure_class"]) == ("complete", None)
-    outcome = [(t["status"], t["attempts"][-1]["reason"]) for t in shown["targets"]]
-    assert outcome == [
-        ("succeeded", None),
-        ("succeeded", None),
-        ("succeeded", None),  # retrieved, with no structured posting on it
-        ("failed", "http_404"),
-        ("blocked", "address_not_allowed"),
-        ("blocked", "source_denied"),
+    outcome = [
+        (t["status"], t["attempts"][-1]["reason"], t["attempts"][-1]["extraction"])
+        for t in shown["targets"]
     ]
-    assert shown["summary"] == {"succeeded": 3, "blocked": 2, "failed": 1}
+    assert outcome == [
+        ("succeeded", None, None),
+        ("succeeded", None, None),
+        # Retrieved, with no structured data on it: it could not be read, never "none found".
+        ("succeeded", None, "no_structured_data"),
+        ("failed", "http_error", None),
+        ("blocked", "address_not_allowed", None),
+        ("blocked", "source_denied", None),
+    ]
+    assert shown["targets"][3]["attempts"][-1]["http_status"] == 404
+    assert shown["summary"] == {
+        "succeeded": 2,
+        "no_posting_readable": 1,
+        "blocked": 2,
+        "failed": 1,
+    }
+    assert shown["partial"] is False
     refused = shown["targets"][4]
     assert (refused["url"], refused["refusal"], refused["refused_host"]) == (
         None,
@@ -168,8 +179,14 @@ def test_an_acquisition_records_every_attempt_and_a_job_with_its_claims(
     assert job["salary_confirmed"] is True
     assert job["freshness"]["state"] == "current"
     assert listing["city_counts"] == {"Leeds": 1, "Manchester": 1}  # counted once in total
-    assert listing["coverage"] == {"succeeded": 3, "failed": 1, "blocked": 2}
+    assert listing["coverage"] == {
+        "succeeded": 2,
+        "no_posting_readable": 1,
+        "failed": 1,
+        "blocked": 2,
+    }
     assert listing["empty_reason"] is None
+    assert (listing["exemplars"], listing["adverts"]) == (0, None)
     detail = api.get(f"/v1/workspaces/{workspace}/jobs/{job['job_id']}", ada).json()
     salary = next(c for c in detail["claims"] if c["field"] == "salary")
     assert salary["span"]["start"] is not None
@@ -200,10 +217,79 @@ def test_every_source_failing_is_a_failed_run_never_no_vacancies(
     assert listing["total_jobs"] == 0
     assert listing["empty_reason"] == "no_source_retrieved"  # not "no vacancies"
     down = shown["targets"][1]["attempts"]
-    assert [a["reason"] for a in down] == ["http_503"] * 3  # the DBOS step's three tries
+    assert [(a["reason"], a["http_status"]) for a in down] == [("http_error", 503)] * 3  # 3 tries
     assert [a["transient"] for a in down] == [True] * 3
     assert down[1]["retry_of"] == down[0]["attempt_id"]
     assert down[2]["retry_of"] == down[1]["attempt_id"]
+
+
+@pytest.mark.req("STATE-02", "ACQ-03", "ACQ-07")
+def test_a_page_that_cannot_be_read_is_never_none_found(
+    infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker
+) -> None:
+    urls = [url(sources, "careers.northwind.example", "/plain")]  # an advert with no JSON-LD
+    run_id = submit(api, ada, workspace, {"urls": urls}).json()["acquisition"]["run"]["run_id"]
+
+    run = wait_terminal(infra, run_id)
+    shown = acquisition(api, ada, workspace, run_id)
+    listing = jobs(api, ada, workspace)
+
+    assert run["status"] == "complete"  # retrieved: its outcome says what could not be read
+    assert shown["summary"] == {"succeeded": 0, "no_posting_readable": 1, "blocked": 0, "failed": 0}
+    [attempt] = shown["targets"][0]["attempts"]
+    assert (attempt["status"], attempt["extraction"]) == ("succeeded", "no_structured_data")
+    assert listing["coverage"] == {"no_posting_readable": 1}
+    assert listing["empty_reason"] == "no_posting_readable"  # not "none found"
+
+
+@pytest.mark.req("STATE-02", "JOB-06")
+def test_a_pasted_example_never_counts_as_a_vacancy_or_a_source_tried(
+    infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker
+) -> None:
+    urls = [url(sources, "careers.northwind.example", p) for p in ("/gone", "/closed")]
+    run_id = submit(api, ada, workspace, {"urls": urls}).json()["acquisition"]["run"]["run_id"]
+    wait_terminal(infra, run_id)
+    example = {"target": "Gardener", "title": "Gardener", "text": "Gardener.", "city": "Leeds"}
+    pasted = api.write("POST", f"/v1/workspaces/{workspace}/research/pasted", ada, example)
+    assert pasted.status_code == 201, pasted.text
+
+    listing = jobs(api, ada, workspace)
+
+    assert (listing["total_jobs"], listing["exemplars"]) == (0, 1)
+    assert listing["city_counts"] == {}
+    assert listing["coverage"] == {"failed": 2}  # the pasted text is not a source tried
+    assert listing["empty_reason"] == "no_source_retrieved"  # the failure is not hidden
+    assert [j["exemplar"] for j in listing["items"]] == [True]  # still listed, as an example
+
+
+@pytest.mark.req("SEC-01", "DUR-05")
+def test_access_revoked_during_an_acquisition_records_nothing_and_leaves_nothing_pending(
+    infra: Infra, api: ApiClient, sources: SourceServer, worker: Worker
+) -> None:
+    email, token = fresh_actor(api, infra)
+    workspace = str(api.create_workspace(token, "Revoked")["workspace_id"])
+    urls = [url(sources, "slow.board.example", f"/slow/{n}") for n in (1, 2)]
+    run_id = submit(api, token, workspace, {"urls": urls}).json()["acquisition"]["run"]["run_id"]
+    wait_for(
+        lambda: bool(
+            infra.query(
+                "SELECT 1 FROM nessa.source_attempts WHERE run_id = %s AND status = 'pending'",
+                (run_id,),
+            )
+        ),
+        timeout_s=30,
+        what="the first request under way",
+    )
+
+    infra.query("UPDATE nessa.actors SET access = 'revoked' WHERE email = %s", (email,))
+    run = wait_terminal(infra, run_id)
+    attempts = infra.query(
+        "SELECT status, reason FROM nessa.source_attempts WHERE run_id = %s", (run_id,)
+    )
+
+    assert (run["status"], run["failure_class"]) == ("failed", "access_revoked")
+    assert attempts == [{"status": "failed", "reason": "access_revoked"}]  # none pending
+    assert not infra.query("SELECT 1 FROM nessa.job_copies WHERE workspace_id = %s", (workspace,))
 
 
 @pytest.mark.req("ACQ-06", "ACQ-01")
@@ -322,6 +408,44 @@ def test_a_worker_killed_after_a_target_resumes_at_the_next_one(
     assert run["status"] == "complete"
     assert [a["position"] for a in attempts].count(0) == 1  # the first target is not repeated
     assert [a["status"] for a in attempts] == ["succeeded", "succeeded"]
+
+
+@pytest.mark.req("JOB-08", "DUR-02")
+def test_a_target_that_failed_for_good_is_not_fetched_again_after_a_crash(
+    infra: Infra,
+    api: ApiClient,
+    ada: str,
+    workspace: str,
+    sources: SourceServer,
+    service_url: str,
+    tmp_path: Path,
+) -> None:
+    sources.routes["/gone/once"] = Scripted(404, body=b"gone")
+    urls = [
+        url(sources, "careers.northwind.example", "/gone/once"),
+        url(sources, "careers.northwind.example", "/plain"),
+    ]
+    run_id = submit(api, ada, workspace, {"urls": urls}).json()["acquisition"]["run"]["run_id"]
+    crashing = start_worker(
+        infra, tmp_path / "crash.log", acquisition_url=service_url, crash_at="after_acquired_target"
+    )
+    assert crashing.wait_exit(60) != 0  # killed after the 404 was committed, before its step
+
+    resumed = start_worker(infra, tmp_path / "resumed.log", acquisition_url=service_url)
+    try:
+        run = wait_terminal(infra, run_id)
+    finally:
+        resumed.stop()
+    attempts = infra.query(
+        "SELECT position, status, reason FROM nessa.source_attempts WHERE run_id = %s "
+        "ORDER BY started_at",
+        (run_id,),
+    )
+
+    assert run["status"] == "complete"
+    assert attempts[0] == {"position": 0, "status": "failed", "reason": "http_error"}
+    assert [a["position"] for a in attempts] == [0, 1]  # the 404 is not fetched again
+    assert sources.paths().count("/gone/once") == 1
 
 
 @pytest.mark.req("FRESH-03", "JOB-02")
@@ -611,6 +735,10 @@ def test_an_adzuna_search_keeps_its_pay_basis_and_snippets_and_never_its_credent
     )
     assert attempt["http_requests"] == 1
     assert attempt["cost_nano_usd"] == 0  # free tier
+    # One page of a search that matched more: retrieved 6 of 128, a partial result.
+    assert (attempt["adverts_retrieved"], attempt["total_matching"]) == (6, 128)
+    assert shown["partial"] is True
+    assert listing["adverts"] == {"searches": 1, "retrieved": 6, "matching": 128, "partial": True}
     assert "app_key" not in (attempt["requested_url"] or "")
     assert any(app_key in path for path in sent)  # the one request did carry the key
     assert listing["total_jobs"] == 6

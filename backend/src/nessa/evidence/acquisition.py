@@ -22,6 +22,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import StrEnum
 from typing import Annotated, Any
 from urllib.parse import urlsplit
 
@@ -52,6 +53,7 @@ from nessa.evidence.jobs import (
 )
 from nessa.evidence.records import (
     AdvertiserKind,
+    AttemptReason,
     AttemptStatus,
     Claim,
     ClaimField,
@@ -108,10 +110,15 @@ class SubmitAcquisition(StrictModel):
         return self
 
 
+class SkipReason(StrEnum):
+    IN_FLIGHT = "in_flight"  # another run is fetching it: joined
+    BACKING_OFF = "backing_off"  # it failed recently: tried again from `retry_at`
+
+
 @dataclass(frozen=True)
 class Skipped:
     url: str
-    reason: str  # "in_flight" or "backing_off"
+    reason: SkipReason
     run_id: uuid.UUID | None = None
     retry_at: datetime | None = None
 
@@ -201,9 +208,9 @@ def submit_acquisition(
             now=now,
         )
         if decision.action is RefreshDecision.Action.JOIN:
-            skipped.append(Skipped(url, "in_flight", run_id=in_flight[url]))
+            skipped.append(Skipped(url, SkipReason.IN_FLIGHT, run_id=in_flight[url]))
         elif decision.action is RefreshDecision.Action.BACK_OFF:
-            skipped.append(Skipped(url, "backing_off", retry_at=decision.retry_at))
+            skipped.append(Skipped(url, SkipReason.BACKING_OFF, retry_at=decision.retry_at))
         else:
             started.append(url)
     if not started and not refused and command.adzuna is None:
@@ -412,11 +419,21 @@ def paste_text(
 # --- reading (API) ----------------------------------------------------------------------
 
 
+class TargetStatus(StrEnum):
+    QUEUED = "queued"
+    SUCCEEDED = "succeeded"
+    BLOCKED = "blocked"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    NOT_ATTEMPTED = "not_attempted"  # queued when its run ended: never tried
+
+
 @dataclass(frozen=True)
 class TargetView:
     target: store.TargetRow
-    status: str  # as stored, or `cancelled` / `not_attempted` for a queued target of an ended run
+    status: TargetStatus  # as stored, or `cancelled`/`not_attempted` for one its run never tried
     attempts: list[store.AttemptRow]
+    retrieved: dict[uuid.UUID, int]  # attempt -> the adverts (copies) it returned
 
 
 @dataclass(frozen=True)
@@ -425,23 +442,37 @@ class AcquisitionView:
     targets: list[TargetView]
     job_ids: list[uuid.UUID]
 
+    @property
+    def partial(self) -> bool:
+        """A search here matched more adverts than it returned (or did not say how many)."""
+        return any(
+            a.route is InputRoute.ADZUNA
+            and a.status is AttemptStatus.SUCCEEDED
+            and (a.total_matching is None or a.total_matching > t.retrieved.get(a.attempt_id, 0))
+            for t in self.targets
+            for a in t.attempts[-1:]
+        )
+
 
 def acquisition(tx: Tx, workspace_id: uuid.UUID, run_id: uuid.UUID) -> AcquisitionView:
     run = visible_run(tx, workspace_id, run_id)
     if run.kind is not RunKind.ACQUISITION:
         raise NessaError(ErrorCode.NOT_FOUND, "No such acquisition.", stage=ErrorStage.EXECUTION)
     attempts = store.attempts_of_run(tx, run_id)
+    copies = store.copies_of_attempts(tx, [a.attempt_id for a in attempts])
+    retrieved: dict[uuid.UUID, int] = {}
+    for c in copies:
+        retrieved[c.attempt_id] = retrieved.get(c.attempt_id, 0) + 1
     views = []
     for target in store.targets(tx, run_id):
-        status = target.status
-        if status == "queued" and run.status is WorkState.CANCELLED:
-            status = "cancelled"
-        elif status == "queued" and run.status in (WorkState.COMPLETE, WorkState.FAILED):
-            status = "not_attempted"
-        views.append(
-            TargetView(target, status, [a for a in attempts if a.position == target.position])
-        )
-    copies = store.copies_of_attempts(tx, [a.attempt_id for a in attempts])
+        status = TargetStatus(target.status)
+        if status is TargetStatus.QUEUED and run.status is WorkState.CANCELLED:
+            status = TargetStatus.CANCELLED
+        elif status is TargetStatus.QUEUED and run.status in (WorkState.COMPLETE, WorkState.FAILED):
+            status = TargetStatus.NOT_ATTEMPTED
+        mine = [a for a in attempts if a.position == target.position]
+        counts = {a.attempt_id: retrieved.get(a.attempt_id, 0) for a in mine}
+        views.append(TargetView(target, status, mine, counts))
     job_ids = list(dict.fromkeys(c.job_id for c in copies if c.job_id is not None))
     return AcquisitionView(run, views, job_ids)
 
@@ -461,7 +492,12 @@ def _primary(copies: list[store.CopyRow]) -> JobCopy:
     return (full or copies)[-1].copy
 
 
-def _view(tx: Tx, job: store.JobRow, copies: list[store.CopyRow], now: datetime) -> JobView:
+def _view(
+    job: store.JobRow,
+    copies: list[store.CopyRow],
+    attempts: dict[uuid.UUID, store.AttemptRow],
+    now: datetime,
+) -> JobView:
     primary = _primary(copies)
     times = SourceTimes(
         last_attempt_at=job.last_attempt_at,
@@ -470,28 +506,66 @@ def _view(tx: Tx, job: store.JobRow, copies: list[store.CopyRow], now: datetime)
         valid_from=None,
         valid_until=primary.valid_through,
     )
-    attempts = {}
-    for c in copies:
-        found = store.attempt(tx, c.attempt_id)
-        if found is not None:
-            attempts[c.attempt_id] = found
     return JobView(
         job,
         copies,
         primary,
         freshness(FreshnessKind.JOB, times, closed=job.closed_at is not None, now=now),
-        attempts,
+        {c.attempt_id: attempts[c.attempt_id] for c in copies if c.attempt_id in attempts},
     )
+
+
+def _views(
+    tx: Tx, jobs: list[store.JobRow], copies: list[store.CopyRow], now: datetime
+) -> list[JobView]:
+    """Each job with its copies and their attempts, read in one query for the lot."""
+    attempts = store.attempts_by_id(tx, list({c.attempt_id for c in copies}))
+    return [_view(j, [c for c in copies if c.job_id == j.job_id], attempts, now) for j in jobs]
+
+
+class Coverage(StrEnum):
+    """The latest outcome of each source tried (pasted text is not a source tried)."""
+
+    SUCCEEDED = "succeeded"  # retrieved and read
+    NO_POSTING_READABLE = store.NO_POSTING_READABLE  # retrieved, but no posting could be read
+    BLOCKED = "blocked"
+    FAILED = "failed"
+    PENDING = "pending"  # being fetched now
+
+
+class EmptyReason(StrEnum):
+    """Why a listing has no vacancy (STATE-02): never a bare empty list. Only
+    `none_found_in_sources_checked` says the sources read held none, and even then only
+    in the sources checked."""
+
+    NO_SOURCES_CHECKED = "no_sources_checked"
+    NO_SOURCE_RETRIEVED = "no_source_retrieved"
+    NO_POSTING_READABLE = "no_posting_readable"
+    NONE_FOUND_IN_SOURCES_CHECKED = "none_found_in_sources_checked"
 
 
 @dataclass(frozen=True)
 class JobListing:
-    jobs: list[JobView]
+    jobs: list[JobView]  # the page: vacancies and the person's examples, newest first
     more: bool
-    total_jobs: int
-    city_counts: dict[str, int]
-    coverage: dict[str, int]
-    empty_reason: str | None  # STATE-02: why there is nothing, never a bare empty list
+    total_jobs: int  # vacancies only: an example is never one
+    exemplars: int
+    city_counts: dict[str, int]  # vacancies only
+    coverage: dict[Coverage, int]
+    adverts: store.AdvertCounts | None  # retrieved n of the total matching, for searches
+    empty_reason: EmptyReason | None
+
+
+def _empty_reason(total_jobs: int, covered: dict[Coverage, int]) -> EmptyReason | None:
+    if total_jobs:
+        return None
+    if not covered:
+        return EmptyReason.NO_SOURCES_CHECKED
+    if not (covered.get(Coverage.SUCCEEDED) or covered.get(Coverage.NO_POSTING_READABLE)):
+        return EmptyReason.NO_SOURCE_RETRIEVED
+    if covered.get(Coverage.NO_POSTING_READABLE):
+        return EmptyReason.NO_POSTING_READABLE
+    return EmptyReason.NONE_FOUND_IN_SOURCES_CHECKED
 
 
 def list_jobs(
@@ -503,37 +577,24 @@ def list_jobs(
     limit: int,
     now: datetime,
 ) -> JobListing:
+    """One page of jobs, and the workspace's totals, counted in the database (no cap)."""
     visible_workspace(tx, workspace_id)
     rows = store.jobs(
         tx, workspace_id, favourites_only=favourites_only, before=before, limit=limit + 1
     )
     page, more = rows[:limit], len(rows) > limit
-    copies = store.copies_of_jobs(tx, [j.job_id for j in page])
-    views = [_view(tx, j, [c for c in copies if c.job_id == j.job_id], now) for j in page]
-    everything = store.jobs(tx, workspace_id, favourites_only=False, before=None, limit=10_000)
-    all_copies = store.copies_of_jobs(tx, [j.job_id for j in everything])
-    cities: dict[str, set[uuid.UUID]] = {}
-    for c in all_copies:
-        for location in c.copy.locations:
-            label = location.locality or location.label
-            if c.job_id is not None:
-                cities.setdefault(label, set()).add(c.job_id)
-    covered = store.coverage(tx, workspace_id)
-    empty_reason = None
-    if not everything:
-        if not covered:
-            empty_reason = "no_sources_checked"
-        elif not covered.get(AttemptStatus.SUCCEEDED.value):
-            empty_reason = "no_source_retrieved"
-        else:
-            empty_reason = "none_found_in_sources_checked"
+    views = _views(tx, page, store.copies_of_jobs(tx, [j.job_id for j in page]), now)
+    total_jobs, exemplars = store.job_totals(tx, workspace_id)
+    covered = {Coverage(k): n for k, n in store.coverage(tx, workspace_id).items()}
     return JobListing(
         views,
         more,
-        len(everything),
-        {city: len(ids) for city, ids in sorted(cities.items())},
+        total_jobs,
+        exemplars,
+        store.city_counts(tx, workspace_id),
         covered,
-        empty_reason,
+        store.advert_counts(tx, workspace_id),
+        _empty_reason(total_jobs, covered),
     )
 
 
@@ -545,7 +606,8 @@ def job_detail(
     if job is None:
         raise NessaError(ErrorCode.NOT_FOUND, "No such job.", stage=ErrorStage.EXECUTION)
     copies = store.copies_of_jobs(tx, [job_id])
-    return _view(tx, job, copies, now), store.claims_of_copies(tx, [c.copy_id for c in copies])
+    [view] = _views(tx, [job], copies, now)
+    return view, store.claims_of_copies(tx, [c.copy_id for c in copies])
 
 
 def set_favourite(
@@ -623,20 +685,43 @@ def _provider(target: store.TargetRow) -> str:
     return urlsplit(target.url).hostname or "unknown"
 
 
+def _kept_body_checked(result: AcquisitionResult) -> AcquisitionResult:
+    """A source whose class keeps its body must arrive with a body that hashes to what its
+    spans index into; otherwise nothing of it is recorded and the attempt fails, labelled
+    (review B M6), never a success with its body silently missing."""
+    if result.status is not AttemptStatus.SUCCEEDED or result.retention is not Retention.BODY:
+        return result
+    body = base64.b64decode(result.body_b64) if result.body_b64 is not None else None
+    if body is not None and hashlib.sha256(body).hexdigest() == result.content_sha256:
+        return result
+    return result.model_copy(
+        update={
+            "status": AttemptStatus.FAILED,
+            "reason": AttemptReason.BODY_HASH_MISMATCH,
+            "transient": False,
+            "retention": None,
+            "body_b64": None,
+            "copies": [],
+            "extraction": None,
+            "total": None,
+        }
+    )
+
+
 def _record_copies(
     tx: Tx, rt: AcquisitionRuntime, run: Run, attempt_id: uuid.UUID, result: AcquisitionResult
 ) -> None:
     now = result.fetched_at
     if result.body_b64 is not None and result.retention is Retention.BODY:
-        body = base64.b64decode(result.body_b64)
-        if hashlib.sha256(body).hexdigest() == result.content_sha256:
-            store.insert_document(
-                tx,
-                attempt_id=attempt_id,
-                workspace_id=run.workspace_id,
-                sha256=result.content_sha256,
-                sealed=rt.keyring.seal(body, document_context(run.workspace_id, attempt_id)),
-            )
+        store.insert_document(
+            tx,
+            attempt_id=attempt_id,
+            workspace_id=run.workspace_id,
+            sha256=result.content_sha256 or "",
+            sealed=rt.keyring.seal(
+                base64.b64decode(result.body_b64), document_context(run.workspace_id, attempt_id)
+            ),
+        )
     for copy in result.copies:
         facts = canonical_facts(copy, provider=result.provider)
         job_id: uuid.UUID | None = None
@@ -693,7 +778,13 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
             return {"status": "cancelled"}
         if run.status not in (WorkState.QUEUED, WorkState.RUNNING):
             return {"status": target.status}
-        if target.status in ("succeeded", "blocked"):
+        previous = store.last_attempt(tx, run_id, position)
+        finished_for_good = (
+            target.status == "failed"
+            and previous is not None
+            and not (previous.transient or previous.status is AttemptStatus.PENDING)
+        )
+        if target.status in ("succeeded", "blocked") or finished_for_good:
             return {"status": target.status}  # recorded by an earlier execution of this step
         if run_store.mark_running(tx, run_id):
             identity_store.append_event(
@@ -709,8 +800,8 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
                 "status": AttemptStatus.FAILED.value,
                 "reason": FailureClass.ACCESS_REVOKED.value,
             }
-        store.settle_pending_attempts(tx, run_id, position)
-        previous = store.last_attempt(tx, run_id, position)
+        if store.settle_pending_attempts(tx, run_id, position):
+            previous = store.last_attempt(tx, run_id, position)
         attempt_id = uuid.uuid4()
         store.insert_attempt(
             tx,
@@ -739,8 +830,11 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
             )
     except AcquisitionUnavailableError:
         result = _unavailable(target, rt.clock())
+    result = _kept_body_checked(result)
     with run_transaction(rt.engine, run_id) as tx:
         if run_store.authorised_workspace(tx) != run.workspace_id:
+            # Nothing it found is recorded; its attempt is settled, never left pending.
+            store.settle_revoked_attempt(tx, attempt_id)
             store.set_target_status(tx, run_id, position, AttemptStatus.FAILED.value)
             return {
                 "status": AttemptStatus.FAILED.value,
@@ -771,17 +865,20 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
 
 class AcquisitionSummary(StrictModel):
     """A complete acquisition run's output: each target's outcome. The records themselves
-    are the attempts, copies and claims."""
+    are the attempts, copies and claims. A source retrieved with no posting that could be
+    read is counted apart from one that was read (`succeeded`), never as "none found"."""
 
     targets: list[dict[str, str | int]]
     succeeded: int
+    no_posting_readable: int = 0  # absent from summaries written before fix round 1
     blocked: int
     failed: int
 
 
 def publish_acquisition(rt: AcquisitionRuntime, run_id: uuid.UUID) -> None:
     """The run's terminal state from its targets: complete when at least one source was
-    retrieved (the output says which did not), otherwise failed, `source_blocked` when every
+    retrieved (the output says which did not, and which could not be read), otherwise
+    failed: `access_revoked` when the requester lost access, `source_blocked` when every
     source was refused by policy and `retrieval_failed` otherwise. Never an empty success."""
     with run_transaction(rt.engine, run_id) as tx:
         run = run_store.run(tx, run_id, lock=True)
@@ -789,13 +886,20 @@ def publish_acquisition(rt: AcquisitionRuntime, run_id: uuid.UUID) -> None:
             return
         if run.status is WorkState.CANCELLED or run.cancel_requested_at is not None:
             outcome: Outcome = cancelled()
+        elif run_store.authorised_workspace(tx) != run.workspace_id:
+            outcome = failed(FailureClass.ACCESS_REVOKED)
         else:
             rows = store.targets(tx, run_id)
             statuses = [t.status for t in rows]
+            last = {a.position: a for a in store.attempts_of_run(tx, run_id)}
+            unreadable = sum(
+                1 for t in rows if t.status == "succeeded" and last[t.position].unreadable
+            )
             if "succeeded" in statuses:
                 summary = AcquisitionSummary(
                     targets=[{"position": t.position, "status": t.status} for t in rows],
-                    succeeded=statuses.count("succeeded"),
+                    succeeded=statuses.count("succeeded") - unreadable,
+                    no_posting_readable=unreadable,
                     blocked=statuses.count("blocked"),
                     failed=len(statuses) - statuses.count("succeeded") - statuses.count("blocked"),
                 )
@@ -817,5 +921,8 @@ def publish_acquisition(rt: AcquisitionRuntime, run_id: uuid.UUID) -> None:
 
 
 def summary_of(tx: Tx, keyring: Keyring, run: Run) -> AcquisitionSummary | None:
+    """A complete run's summary only: a cancelled or failed run's output is never used."""
+    if run.status is not WorkState.COMPLETE:
+        return None
     raw = open_output(tx, keyring, run)
     return None if raw is None else AcquisitionSummary.model_validate(json.loads(raw))

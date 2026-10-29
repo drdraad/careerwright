@@ -80,7 +80,7 @@ def record(result: AcquisitionResult) -> dict[str, object]:
         "byte_count": result.byte_count,
         "rights_status": result.rights_status or "pending human rights review",
         "retention": result.retention.value if result.retention else None,
-        "issues": result.issues,
+        "extraction": result.extraction.value if result.extraction else None,
         "postings": [
             {
                 "title": copy.title,

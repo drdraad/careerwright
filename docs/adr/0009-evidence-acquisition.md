@@ -169,11 +169,27 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    (spec section 6): a transient source failure, the acquisition worker unreachable or the
    database busy is retried, three tries at most, each its own attempt row. Completed steps
    are not repeated after a crash, so a resumed run carries on at its next target
-   (`test_a_worker_killed_after_a_target_resumes_at_the_next_one`). A complete run's output
-   is a sealed summary; a run with no source retrieved ends `failed/retrieval_failed`, or
-   `source_blocked` when every source was refused, never an empty success (STATE-02). The
-   job list says why it is empty (`no_sources_checked`, `no_source_retrieved`,
-   `none_found_in_sources_checked`).
+   (`test_a_worker_killed_after_a_target_resumes_at_the_next_one`); a step re-run after a
+   crash also skips a target whose last attempt failed for good, such as a 404
+   (`test_a_target_that_failed_for_good_is_not_fetched_again_after_a_crash`). A complete
+   run's output is a sealed summary, shown only while the run is `complete`; a run with no
+   source retrieved ends `failed/retrieval_failed`, or `source_blocked` when every source
+   was refused, or `access_revoked` when the requester lost access (its in-flight attempt
+   is then settled `access_revoked`, recording nothing it returned, through a narrow worker
+   policy in migration 0016), never an empty success (STATE-02).
+   Fix round 1 (review B C1, I2, I3, I6, M7): an attempt's `reason` is one of a fixed set
+   (`records.AttemptReason`, held by a CHECK; an HTTP error is `http_error` with its
+   `http_status`), and a retrieved source with no publishable posting records why
+   (`extraction`): `no_structured_data`, `jsonld_invalid` or `conflicting_job_postings`
+   mean it could not be read, and only `no_job_posting` (structured data read, none in it)
+   may count as none found. The summary and the listing's `coverage` count
+   `no_posting_readable` apart; `coverage` leaves out pasted text, which is not a source
+   tried. The job list says why it is empty (`no_sources_checked`, `no_source_retrieved`,
+   `no_posting_readable`, `none_found_in_sources_checked`); its `total_jobs` and
+   `city_counts` count vacancies only (`exemplars` apart) and are counted in the database,
+   without a cap. An Adzuna search keeps Adzuna's `count` (`total_matching`), so retrieved
+   n of total is shown on each attempt, in the listing's `adverts` and as `partial`, never
+   as a complete result.
 
 9. **Cancellation (DUR-05).** `POST .../runs/{id}/cancel` records a request
    (`run_cancellations`, identifiers only, read unscoped by the worker like the outbox). The

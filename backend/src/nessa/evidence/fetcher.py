@@ -53,6 +53,7 @@ REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 ROBOTS_TOKEN = "NessaL0"  # noqa: S105 - the robots.txt user-agent token, not a secret
 ROBOTS_MAX_BYTES = 512_000  # RFC 9309: parse at least 500 KiB
 ROBOTS_CACHE_S = 600.0
+HTTP_ERROR = "http_error"  # the status itself is the failure's `http_status`
 MAX_ADDRESSES = 4  # tried in turn when a name resolves to several
 
 Resolve = Callable[[str, int], list[IPAddress]]
@@ -622,15 +623,11 @@ class Fetcher:
                 status = response.status
                 if status in REDIRECT_STATUSES:
                     location = _header(response.headers, b"location")
-                    return (
-                        _Redirect(location) if location else failed(f"http_{status}", status=status)
-                    )
+                    return _Redirect(location) if location else failed(HTTP_ERROR, status=status)
                 if status >= 400:
-                    return failed(
-                        f"http_{status}", status=status, transient=status in TRANSIENT_STATUSES
-                    )
+                    return failed(HTTP_ERROR, status=status, transient=status in TRANSIENT_STATUSES)
                 if not 200 <= status < 300 or status == 204:
-                    return failed(f"http_{status}", status=status)
+                    return failed(HTTP_ERROR, status=status)
                 content_type, charset = _content_type(_header(response.headers, b"content-type"))
                 if accept is not None and content_type not in accept:
                     return failed("unsupported_content_type", status=status)

@@ -20,9 +20,15 @@ export type AcquisitionOut = {
      */
     job_ids: Array<string>;
     /**
-     * A complete run's outcome per target; none until it is complete.
+     * A complete run's outcome per target; none unless it is complete.
      */
     summary: AcquisitionSummaryOut | null;
+    /**
+     * Partial
+     *
+     * A search here matched more adverts than it returned (each attempt's adverts_retrieved of total_matching), or did not say how many: a partial result.
+     */
+    partial: boolean;
 };
 
 /**
@@ -31,8 +37,16 @@ export type AcquisitionOut = {
 export type AcquisitionSummaryOut = {
     /**
      * Succeeded
+     *
+     * Sources retrieved and read.
      */
     succeeded: number;
+    /**
+     * No Posting Readable
+     *
+     * Sources retrieved whose postings could not be read: never 'none found'.
+     */
+    no_posting_readable: number;
     /**
      * Blocked
      */
@@ -74,6 +88,34 @@ export const AdvertiserKind = {
  * AdvertiserKind
  */
 export type AdvertiserKind = typeof AdvertiserKind[keyof typeof AdvertiserKind];
+
+/**
+ * AdvertsOut
+ *
+ * Retrieved n of the total matching, over each search's latest success.
+ */
+export type AdvertsOut = {
+    /**
+     * Searches
+     */
+    searches: number;
+    /**
+     * Retrieved
+     */
+    retrieved: number;
+    /**
+     * Matching
+     *
+     * Unknown when a search did not say.
+     */
+    matching: number | null;
+    /**
+     * Partial
+     *
+     * Some search matched more than it returned.
+     */
+    partial: boolean;
+};
 
 /**
  * AdzunaQuery
@@ -168,6 +210,50 @@ export type AttemptOut = {
      */
     requests_sent?: number | null;
 };
+
+/**
+ * AttemptReason
+ *
+ * Why an attempt was blocked or failed: a label, classified from types and statuses,
+ * never a message. The URL checks' refusals (`addresses.UrlRefusal`) are among them.
+ */
+export const AttemptReason = {
+    MALFORMED_URL: 'malformed_url',
+    URL_TOO_LONG: 'url_too_long',
+    SCHEME_NOT_ALLOWED: 'scheme_not_allowed',
+    CREDENTIALS_IN_URL: 'credentials_in_url',
+    PORT_NOT_ALLOWED: 'port_not_allowed',
+    HOST_NOT_ALLOWED: 'host_not_allowed',
+    ADDRESS_NOT_ALLOWED: 'address_not_allowed',
+    REDIRECT_DOWNGRADE: 'redirect_downgrade',
+    SOURCE_DENIED: 'source_denied',
+    SOURCE_API_ONLY: 'source_api_only',
+    ROBOTS_DISALLOWED: 'robots_disallowed',
+    ADZUNA_CREDENTIALS_NOT_CONFIGURED: 'adzuna_credentials_not_configured',
+    HTTP_ERROR: 'http_error',
+    ROBOTS_UNREACHABLE: 'robots_unreachable',
+    TIMEOUT: 'timeout',
+    TOO_LARGE: 'too_large',
+    TOO_MANY_REDIRECTS: 'too_many_redirects',
+    UNSUPPORTED_CONTENT_TYPE: 'unsupported_content_type',
+    UNSUPPORTED_CONTENT_ENCODING: 'unsupported_content_encoding',
+    HOST_NOT_FOUND: 'host_not_found',
+    TLS_FAILED: 'tls_failed',
+    CONNECTION_FAILED: 'connection_failed',
+    RESPONSE_INVALID: 'response_invalid',
+    BODY_HASH_MISMATCH: 'body_hash_mismatch',
+    ACQUISITION_WORKER_UNAVAILABLE: 'acquisition_worker_unavailable',
+    INTERRUPTED: 'interrupted',
+    ACCESS_REVOKED: 'access_revoked'
+} as const;
+
+/**
+ * AttemptReason
+ *
+ * Why an attempt was blocked or failed: a label, classified from types and statuses,
+ * never a message. The URL checks' refusals (`addresses.UrlRefusal`) are among them.
+ */
+export type AttemptReason = typeof AttemptReason[keyof typeof AttemptReason];
 
 /**
  * AttemptStatus
@@ -312,6 +398,26 @@ export const ConversationMode = {
  * The tone the person chose (spec section 4, "Uncertainty and emotional comfort").
  */
 export type ConversationMode = typeof ConversationMode[keyof typeof ConversationMode];
+
+/**
+ * Coverage
+ *
+ * The latest outcome of each source tried (pasted text is not a source tried).
+ */
+export const Coverage = {
+    SUCCEEDED: 'succeeded',
+    NO_POSTING_READABLE: 'no_posting_readable',
+    BLOCKED: 'blocked',
+    FAILED: 'failed',
+    PENDING: 'pending'
+} as const;
+
+/**
+ * Coverage
+ *
+ * The latest outcome of each source tried (pasted text is not a source tried).
+ */
+export type Coverage = typeof Coverage[keyof typeof Coverage];
 
 /**
  * CreateWorkspace
@@ -580,6 +686,29 @@ export const Emphasis = {
 export type Emphasis = typeof Emphasis[keyof typeof Emphasis];
 
 /**
+ * EmptyReason
+ *
+ * Why a listing has no vacancy (STATE-02): never a bare empty list. Only
+ * `none_found_in_sources_checked` says the sources read held none, and even then only
+ * in the sources checked.
+ */
+export const EmptyReason = {
+    NO_SOURCES_CHECKED: 'no_sources_checked',
+    NO_SOURCE_RETRIEVED: 'no_source_retrieved',
+    NO_POSTING_READABLE: 'no_posting_readable',
+    NONE_FOUND_IN_SOURCES_CHECKED: 'none_found_in_sources_checked'
+} as const;
+
+/**
+ * EmptyReason
+ *
+ * Why a listing has no vacancy (STATE-02): never a bare empty list. Only
+ * `none_found_in_sources_checked` says the sources read held none, and even then only
+ * in the sources checked.
+ */
+export type EmptyReason = typeof EmptyReason[keyof typeof EmptyReason];
+
+/**
  * EntryMode
  *
  * How the person chose to start (spec section 3, the You chapter).
@@ -824,6 +953,29 @@ export type ExplanationRunOut = {
      */
     can_retry: boolean;
 };
+
+/**
+ * Extraction
+ *
+ * Why a retrieved source gave no posting that could be published. Only `no_job_posting`
+ * (its structured data was read and holds none) says no vacancy was there; the others
+ * say the page could not be read, which is never "none found" (GC6).
+ */
+export const Extraction = {
+    NO_STRUCTURED_DATA: 'no_structured_data',
+    JSONLD_INVALID: 'jsonld_invalid',
+    CONFLICTING_JOB_POSTINGS: 'conflicting_job_postings',
+    NO_JOB_POSTING: 'no_job_posting'
+} as const;
+
+/**
+ * Extraction
+ *
+ * Why a retrieved source gave no posting that could be published. Only `no_job_posting`
+ * (its structured data was read and holds none) says no vacancy was there; the others
+ * say the page could not be read, which is never "none found" (GC6).
+ */
+export type Extraction = typeof Extraction[keyof typeof Extraction];
 
 /**
  * FailureClass
@@ -1159,6 +1311,8 @@ export type JobOut = {
 export type JobPage = {
     /**
      * Items
+     *
+     * Vacancies and the person's examples, newest first.
      */
     items: Array<JobOut>;
     /**
@@ -1168,13 +1322,19 @@ export type JobPage = {
     /**
      * Total Jobs
      *
-     * Distinct jobs: a multi-city job counts once.
+     * Distinct vacancies: a multi-city job counts once; an example never does.
      */
     total_jobs: number;
     /**
+     * Exemplars
+     *
+     * The person's pasted examples: never vacancies.
+     */
+    exemplars: number;
+    /**
      * City Counts
      *
-     * Jobs appearing in each city; a multi-city job appears in each.
+     * Vacancies appearing in each city; a multi-city job appears in each.
      */
     city_counts: {
         [key: string]: number;
@@ -1182,17 +1342,19 @@ export type JobPage = {
     /**
      * Coverage
      *
-     * Sources tried, by their latest attempt's status (succeeded, blocked, failed, pending).
+     * Sources tried (pasted text is not one), by their latest attempt's outcome; a source retrieved whose postings could not be read is no_posting_readable.
      */
     coverage: {
-        [key: string]: number;
+        [key in Coverage]?: number;
     };
     /**
-     * Empty Reason
-     *
-     * When there are no jobs: no_sources_checked, no_source_retrieved (every source failed or was blocked: not 'no vacancies') or none_found_in_sources_checked.
+     * For job searches: the adverts retrieved of those matching.
      */
-    empty_reason: string | null;
+    adverts: AdvertsOut | null;
+    /**
+     * When there are no vacancies, why: never a bare empty list (STATE-02).
+     */
+    empty_reason: EmptyReason | null;
 };
 
 /**
@@ -2610,6 +2772,16 @@ export type SkillRefOut = {
 };
 
 /**
+ * SkipReason
+ */
+export const SkipReason = { IN_FLIGHT: 'in_flight', BACKING_OFF: 'backing_off' } as const;
+
+/**
+ * SkipReason
+ */
+export type SkipReason = typeof SkipReason[keyof typeof SkipReason];
+
+/**
  * SkippedOut
  *
  * A URL not fetched by this request: another run is fetching it (`in_flight`), or it
@@ -2620,10 +2792,7 @@ export type SkippedOut = {
      * Url
      */
     url: string;
-    /**
-     * Reason
-     */
-    reason: string;
+    reason: SkipReason;
     /**
      * Run Id
      */
@@ -2810,11 +2979,13 @@ export type SourceAttemptOut = {
     redirects: Array<string>;
     status: AttemptStatus;
     /**
-     * Reason
-     *
      * Why it was blocked or failed: a label, never text.
      */
-    reason: string | null;
+    reason: AttemptReason | null;
+    /**
+     * Why a retrieved source gave no publishable posting. Only no_job_posting says its structured data held none; the others say it could not be read.
+     */
+    extraction: Extraction | null;
     /**
      * Transient
      */
@@ -2833,6 +3004,8 @@ export type SourceAttemptOut = {
     content_type: string | null;
     /**
      * Content Sha256
+     *
+     * Of what was kept, personal details removed.
      */
     content_sha256: string | null;
     /**
@@ -2847,8 +3020,22 @@ export type SourceAttemptOut = {
     retention: Retention | null;
     /**
      * Http Requests
+     *
+     * Sent for it, robots.txt included.
      */
     http_requests: number;
+    /**
+     * Total Matching
+     *
+     * For a search: the adverts it matched.
+     */
+    total_matching: number | null;
+    /**
+     * Adverts Retrieved
+     *
+     * The adverts (copies) it returned.
+     */
+    adverts_retrieved: number;
     /**
      * Cost Nano Usd
      *
@@ -3413,11 +3600,9 @@ export type TargetOut = {
         [key: string]: unknown;
     } | null;
     /**
-     * Status
-     *
-     * queued, succeeded, blocked, failed, cancelled, or not_attempted (the run ended before it).
+     * not_attempted: its run ended before it.
      */
-    status: string;
+    status: TargetStatus;
     /**
      * Attempts
      */
@@ -3466,6 +3651,23 @@ export type TargetSketchOut = {
      */
     research_status: string;
 };
+
+/**
+ * TargetStatus
+ */
+export const TargetStatus = {
+    QUEUED: 'queued',
+    SUCCEEDED: 'succeeded',
+    BLOCKED: 'blocked',
+    FAILED: 'failed',
+    CANCELLED: 'cancelled',
+    NOT_ATTEMPTED: 'not_attempted'
+} as const;
+
+/**
+ * TargetStatus
+ */
+export type TargetStatus = typeof TargetStatus[keyof typeof TargetStatus];
 
 /**
  * TaskListInput

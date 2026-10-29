@@ -14,6 +14,7 @@ from nessa.api.pagination import DEFAULT_LIMIT, MAX_LIMIT, decode_timestamped, e
 from nessa.api.research_schemas import (
     AcquisitionOut,
     AcquisitionSummaryOut,
+    AdvertsOut,
     JobDetailOut,
     JobOut,
     JobPage,
@@ -47,6 +48,7 @@ def acquisition_out(
         targets=[TargetOut.of(t) for t in view.targets],
         job_ids=view.job_ids,
         summary=AcquisitionSummaryOut.of(summary) if summary else None,
+        partial=view.partial,
     )
 
 
@@ -212,8 +214,10 @@ def list_jobs(
         if listing.more and last
         else None,
         total_jobs=listing.total_jobs,
+        exemplars=listing.exemplars,
         city_counts=listing.city_counts,
         coverage=listing.coverage,
+        adverts=AdvertsOut.of(listing.adverts) if listing.adverts else None,
         empty_reason=listing.empty_reason,
     )
 

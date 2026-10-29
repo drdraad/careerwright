@@ -42,6 +42,58 @@ class AttemptStatus(StrEnum):
     FAILED = "failed"  # tried and did not get a usable source
 
 
+class AttemptReason(StrEnum):
+    """Why an attempt was blocked or failed: a label, classified from types and statuses,
+    never a message. The URL checks' refusals (`addresses.UrlRefusal`) are among them."""
+
+    # The URL and address checks (blocked)
+    MALFORMED_URL = "malformed_url"
+    URL_TOO_LONG = "url_too_long"
+    SCHEME_NOT_ALLOWED = "scheme_not_allowed"
+    CREDENTIALS_IN_URL = "credentials_in_url"
+    PORT_NOT_ALLOWED = "port_not_allowed"
+    HOST_NOT_ALLOWED = "host_not_allowed"
+    ADDRESS_NOT_ALLOWED = "address_not_allowed"
+    REDIRECT_DOWNGRADE = "redirect_downgrade"
+    # The source permission manifest and robots.txt (blocked)
+    SOURCE_DENIED = "source_denied"
+    SOURCE_API_ONLY = "source_api_only"
+    ROBOTS_DISALLOWED = "robots_disallowed"
+    ADZUNA_CREDENTIALS_NOT_CONFIGURED = "adzuna_credentials_not_configured"
+    # Tried, and no usable source (failed); `http_status` gives an HTTP error's status
+    HTTP_ERROR = "http_error"
+    ROBOTS_UNREACHABLE = "robots_unreachable"
+    TIMEOUT = "timeout"
+    TOO_LARGE = "too_large"
+    TOO_MANY_REDIRECTS = "too_many_redirects"
+    UNSUPPORTED_CONTENT_TYPE = "unsupported_content_type"
+    UNSUPPORTED_CONTENT_ENCODING = "unsupported_content_encoding"
+    HOST_NOT_FOUND = "host_not_found"
+    TLS_FAILED = "tls_failed"
+    CONNECTION_FAILED = "connection_failed"
+    RESPONSE_INVALID = "response_invalid"
+    BODY_HASH_MISMATCH = "body_hash_mismatch"
+    ACQUISITION_WORKER_UNAVAILABLE = "acquisition_worker_unavailable"
+    INTERRUPTED = "interrupted"  # a crash during the request: settled when the step re-runs
+    ACCESS_REVOKED = "access_revoked"
+
+
+class Extraction(StrEnum):
+    """Why a retrieved source gave no posting that could be published. Only `no_job_posting`
+    (its structured data was read and holds none) says no vacancy was there; the others
+    say the page could not be read, which is never "none found" (GC6)."""
+
+    NO_STRUCTURED_DATA = "no_structured_data"  # no JSON-LD at all (model extraction: round 2)
+    JSONLD_INVALID = "jsonld_invalid"  # not valid JSON, or a job posting without a title
+    CONFLICTING_JOB_POSTINGS = "conflicting_job_postings"  # postings that disagree
+    NO_JOB_POSTING = "no_job_posting"  # structured data read: no job posting in it
+
+
+UNREADABLE = frozenset(
+    {Extraction.NO_STRUCTURED_DATA, Extraction.JSONLD_INVALID, Extraction.CONFLICTING_JOB_POSTINGS}
+)
+
+
 class RightsClass(StrEnum):
     """The page classes of the session 1 rights policy (H-06; `corpus/README.md`)."""
 

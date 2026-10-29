@@ -1,7 +1,7 @@
 {
   "__CLASS__": "Adzuna::API::Response::JobSearchResults",
   "_synthetic": "Synthetic fixture: not a real Adzuna response, advert or employer (fixtures/acquisition/README.md).",
-  "count": 6,
+  "count": 128,
   "mean": 34120.5,
   "results": [
     {

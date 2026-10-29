@@ -17,14 +17,22 @@ import sqlalchemy as sa
 from nessa.db import Tx
 from nessa.evidence.acquire import AcquisitionResult
 from nessa.evidence.addresses import UrlRefusal
-from nessa.evidence.records import AttemptStatus, Claim, InputRoute, JobCopy
+from nessa.evidence.records import (
+    UNREADABLE,
+    AttemptReason,
+    AttemptStatus,
+    Claim,
+    Extraction,
+    InputRoute,
+    JobCopy,
+)
 from nessa.identity.keyring import SealedValue
 
 _ATTEMPT_COLUMNS = (
     "attempt_id, run_id, position, retry_of, route, provider, requested_url, final_url, "
     "redirects, status, reason, transient, http_status, content_type, address, "
     "content_sha256, byte_count, rights_class, rights_status, retention, http_requests, "
-    "cost_nano_usd, created_by, started_at, finished_at"
+    "cost_nano_usd, created_by, started_at, finished_at, extraction, total_matching"
 )
 
 
@@ -52,7 +60,7 @@ class AttemptRow:
     final_url: str | None
     redirects: list[str]
     status: AttemptStatus
-    reason: str | None
+    reason: AttemptReason | None
     transient: bool
     http_status: int | None
     content_type: str | None
@@ -67,6 +75,12 @@ class AttemptRow:
     created_by: uuid.UUID | None
     started_at: datetime
     finished_at: datetime | None
+    extraction: Extraction | None  # why a retrieved source gave no publishable posting
+    total_matching: int | None  # Adzuna's count of matching adverts
+
+    @property
+    def unreadable(self) -> bool:
+        return self.status is AttemptStatus.SUCCEEDED and self.extraction in UNREADABLE
 
 
 @dataclass(frozen=True)
@@ -106,6 +120,8 @@ def _attempt(row: sa.RowMapping) -> AttemptRow:
     values = dict(row)
     values["route"] = InputRoute(values["route"])
     values["status"] = AttemptStatus(values["status"])
+    values["extraction"] = Extraction(values["extraction"]) if values["extraction"] else None
+    values["reason"] = AttemptReason(values["reason"]) if values["reason"] else None
     return AttemptRow(**values)
 
 
@@ -290,7 +306,7 @@ def finish_attempt(
             "UPDATE nessa.source_attempts SET final_url = :final, redirects = CAST(:redirects AS "
             "jsonb), status = :status, reason = :reason, transient = :transient, http_status = "
             ":http, content_type = :ctype, address = :address, content_sha256 = :sha, "
-            "retrieved_sha256 = :retrieved, "
+            "retrieved_sha256 = :retrieved, extraction = :extraction, total_matching = :total, "
             "byte_count = :bytes, rights_class = :class, rights_status = :rights, retention = "
             ":retention, http_requests = :requests, cost_nano_usd = 0, "
             "finished_at = clock_timestamp() WHERE attempt_id = :id"
@@ -300,13 +316,15 @@ def finish_attempt(
             "final": result.final_url,
             "redirects": json.dumps(result.redirects),
             "status": result.status.value,
-            "reason": result.reason,
+            "reason": result.reason.value if result.reason else None,
             "transient": result.transient,
             "http": result.http_status,
             "ctype": (result.content_type or None) and result.content_type[:120],
             "address": result.address,
             "sha": result.content_sha256,
             "retrieved": result.retrieved_sha256,
+            "extraction": result.extraction.value if result.extraction else None,
+            "total": result.total,
             "bytes": result.byte_count,
             "class": result.rights_class.value if result.rights_class else None,
             "rights": result.rights_status,
@@ -328,6 +346,19 @@ def settle_pending_attempts(tx: Tx, run_id: uuid.UUID, position: int) -> int:
         {"run": run_id, "position": position},
     )
     return int(updated.rowcount)
+
+
+def settle_revoked_attempt(tx: Tx, attempt_id: uuid.UUID) -> None:
+    """The requester lost access while the attempt's request was out: it fails as
+    `access_revoked` and keeps nothing the request returned (migration 0016's policy lets
+    the worker do only this once access is gone)."""
+    tx.execute(
+        sa.text(
+            "UPDATE nessa.source_attempts SET status = 'failed', reason = 'access_revoked', "
+            "finished_at = clock_timestamp() WHERE attempt_id = :id AND status = 'pending'"
+        ),
+        {"id": attempt_id},
+    )
 
 
 def last_attempt(tx: Tx, run_id: uuid.UUID, position: int) -> AttemptRow | None:
@@ -368,19 +399,87 @@ def attempt(tx: Tx, attempt_id: uuid.UUID) -> AttemptRow | None:
     return None if row is None else _attempt(row)
 
 
-def coverage(tx: Tx, workspace_id: uuid.UUID) -> dict[str, int]:
-    """Latest attempt status per source the workspace tried (spec section 7: "Display
-    result count, deduplication count and coverage status")."""
+def attempts_by_id(tx: Tx, attempt_ids: list[uuid.UUID]) -> dict[uuid.UUID, AttemptRow]:
+    if not attempt_ids:
+        return {}
     rows = tx.execute(
         sa.text(
-            "SELECT status, count(*) AS n FROM (SELECT DISTINCT ON (coalesce(requested_url, "
-            "attempt_id::text)) status FROM nessa.source_attempts WHERE workspace_id = :ws "
+            f"SELECT {_ATTEMPT_COLUMNS} FROM nessa.source_attempts WHERE attempt_id = ANY(:ids)"
+        ),
+        {"ids": attempt_ids},
+    ).mappings()
+    return {r["attempt_id"]: _attempt(r) for r in rows}
+
+
+NO_POSTING_READABLE = "no_posting_readable"
+
+
+def coverage(tx: Tx, workspace_id: uuid.UUID) -> dict[str, int]:
+    """The latest attempt's outcome per source the workspace tried, a retrieved source with
+    no readable posting counted apart (spec section 7: "Display result count, deduplication
+    count and coverage status"). Pasted text is the person's own input, not a source tried."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT CASE WHEN status = 'succeeded' AND extraction = ANY(:unreadable) "
+            "THEN :unread ELSE status END AS outcome, count(*) AS n FROM (SELECT DISTINCT ON "
+            "(coalesce(requested_url, attempt_id::text)) status, extraction "
+            "FROM nessa.source_attempts WHERE workspace_id = :ws AND route <> 'pasted_text' "
             "ORDER BY coalesce(requested_url, attempt_id::text), started_at DESC) latest "
-            "GROUP BY status"
+            "GROUP BY 1"
+        ),
+        {
+            "ws": workspace_id,
+            "unreadable": sorted(e.value for e in UNREADABLE),
+            "unread": NO_POSTING_READABLE,
+        },
+    )
+    return {r.outcome: int(r.n) for r in rows}
+
+
+@dataclass(frozen=True)
+class AdvertCounts:
+    searches: int
+    retrieved: int  # adverts the latest successful searches returned
+    matching: int | None  # adverts they matched, when every one said
+    partial: int  # searches that matched more than they returned, or did not say
+
+
+def advert_counts(tx: Tx, workspace_id: uuid.UUID) -> AdvertCounts | None:
+    """Over each Adzuna search's latest success: retrieved n of the total matching."""
+    row = tx.execute(
+        sa.text(
+            "SELECT count(*) AS searches, coalesce(sum(retrieved), 0) AS retrieved, "
+            "CASE WHEN bool_and(total_matching IS NOT NULL) THEN sum(total_matching) END "
+            "AS matching, count(*) FILTER (WHERE total_matching IS NULL "
+            "OR total_matching > retrieved) AS partial FROM (SELECT DISTINCT ON "
+            "(a.requested_url) a.total_matching, (SELECT count(*) FROM nessa.job_copies c "
+            "WHERE c.attempt_id = a.attempt_id) AS retrieved FROM nessa.source_attempts a "
+            "WHERE a.workspace_id = :ws AND a.route = 'adzuna' AND a.status = 'succeeded' "
+            "ORDER BY a.requested_url, a.started_at DESC) latest"
         ),
         {"ws": workspace_id},
+    ).one()
+    if not row.searches:
+        return None
+    return AdvertCounts(
+        int(row.searches),
+        int(row.retrieved),
+        None if row.matching is None else int(row.matching),
+        int(row.partial),
     )
-    return {r.status: int(r.n) for r in rows}
+
+
+def copy_counts(tx: Tx, attempt_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    if not attempt_ids:
+        return {}
+    rows = tx.execute(
+        sa.text(
+            "SELECT attempt_id, count(*) AS n FROM nessa.job_copies "
+            "WHERE attempt_id = ANY(:ids) GROUP BY attempt_id"
+        ),
+        {"ids": attempt_ids},
+    )
+    return {r.attempt_id: int(r.n) for r in rows}
 
 
 # --- documents --------------------------------------------------------------------------
@@ -403,16 +502,6 @@ def insert_document(
             "nonce": sealed.nonce,
             "ciphertext": sealed.ciphertext,
         },
-    )
-
-
-def document_kept(tx: Tx, attempt_id: uuid.UUID) -> bool:
-    return (
-        tx.execute(
-            sa.text("SELECT 1 FROM nessa.source_documents WHERE attempt_id = :id"),
-            {"id": attempt_id},
-        ).first()
-        is not None
     )
 
 
@@ -720,13 +809,30 @@ def job(tx: Tx, workspace_id: uuid.UUID, job_id: uuid.UUID) -> JobRow | None:
     return None if row is None else JobRow(**dict(row))
 
 
-def job_count(tx: Tx, workspace_id: uuid.UUID) -> int:
-    return int(
-        tx.execute(
-            sa.text("SELECT count(*) FROM nessa.jobs WHERE workspace_id = :ws"),
-            {"ws": workspace_id},
-        ).scalar_one()
+def job_totals(tx: Tx, workspace_id: uuid.UUID) -> tuple[int, int]:
+    """(vacancies, the person's pasted examples): an example is never a vacancy."""
+    row = tx.execute(
+        sa.text(
+            "SELECT count(*) FILTER (WHERE NOT exemplar) AS jobs, "
+            "count(*) FILTER (WHERE exemplar) AS exemplars FROM nessa.jobs WHERE workspace_id = :ws"
+        ),
+        {"ws": workspace_id},
+    ).one()
+    return int(row.jobs), int(row.exemplars)
+
+
+def city_counts(tx: Tx, workspace_id: uuid.UUID) -> dict[str, int]:
+    """City -> the vacancies seen there; a job in several cities counts in each."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT coalesce(nullif(l ->> 'locality', ''), l ->> 'label') AS city, "
+            "count(DISTINCT c.job_id) AS n FROM nessa.job_copies c JOIN nessa.jobs j "
+            "ON j.job_id = c.job_id CROSS JOIN LATERAL jsonb_array_elements(c.copy -> 'locations')"
+            " AS l WHERE c.workspace_id = :ws AND NOT j.exemplar GROUP BY 1"
+        ),
+        {"ws": workspace_id},
     )
+    return dict(sorted((r.city, int(r.n)) for r in rows))
 
 
 def set_favourite(tx: Tx, workspace_id: uuid.UUID, job_id: uuid.UUID, actor_id: uuid.UUID) -> None:

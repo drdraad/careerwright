@@ -8,14 +8,25 @@ from typing import Any
 from pydantic import Field
 
 from nessa.api.schemas import ResponseModel, RunOut
-from nessa.evidence.acquisition import AcquisitionSummary, JobView, Skipped, TargetView
+from nessa.evidence.acquisition import (
+    AcquisitionSummary,
+    Coverage,
+    EmptyReason,
+    JobView,
+    Skipped,
+    SkipReason,
+    TargetStatus,
+    TargetView,
+)
 from nessa.evidence.addresses import UrlRefusal
 from nessa.evidence.freshness import Freshness, FreshnessKind, FreshnessView
 from nessa.evidence.records import (
     AdvertiserKind,
+    AttemptReason,
     AttemptStatus,
     ClaimField,
     DescriptionKind,
+    Extraction,
     InputRoute,
     Location,
     Retention,
@@ -26,7 +37,7 @@ from nessa.evidence.records import (
     WorkMode,
 )
 from nessa.evidence.search import SearchProposal
-from nessa.evidence.store import AttemptRow, ClaimRow, CopyRow
+from nessa.evidence.store import AdvertCounts, AttemptRow, ClaimRow, CopyRow
 
 
 class SourceAttemptOut(ResponseModel):
@@ -40,23 +51,31 @@ class SourceAttemptOut(ResponseModel):
     final_url: str | None
     redirects: list[str]
     status: AttemptStatus
-    reason: str | None = Field(description="Why it was blocked or failed: a label, never text.")
+    reason: AttemptReason | None = Field(
+        description="Why it was blocked or failed: a label, never text."
+    )
+    extraction: Extraction | None = Field(
+        description="Why a retrieved source gave no publishable posting. Only no_job_posting "
+        "says its structured data held none; the others say it could not be read."
+    )
     transient: bool
     retry_of: uuid.UUID | None
     http_status: int | None
     content_type: str | None
-    content_sha256: str | None
+    content_sha256: str | None = Field(description="Of what was kept, personal details removed.")
     byte_count: int | None
     rights_class: RightsClass | None
     rights_status: str | None
     retention: Retention | None
-    http_requests: int
+    http_requests: int = Field(description="Sent for it, robots.txt included.")
+    total_matching: int | None = Field(description="For a search: the adverts it matched.")
+    adverts_retrieved: int = Field(description="The adverts (copies) it returned.")
     cost_nano_usd: int | None = Field(description="0 for page fetches and Adzuna's free tier.")
     started_at: datetime
     finished_at: datetime | None
 
     @classmethod
-    def of(cls, row: AttemptRow) -> "SourceAttemptOut":
+    def of(cls, row: AttemptRow, adverts_retrieved: int = 0) -> "SourceAttemptOut":
         return cls(
             attempt_id=row.attempt_id,
             route=row.route,
@@ -66,6 +85,7 @@ class SourceAttemptOut(ResponseModel):
             redirects=row.redirects,
             status=row.status,
             reason=row.reason,
+            extraction=row.extraction,
             transient=row.transient,
             retry_of=row.retry_of,
             http_status=row.http_status,
@@ -76,6 +96,8 @@ class SourceAttemptOut(ResponseModel):
             rights_status=row.rights_status,
             retention=Retention(row.retention) if row.retention else None,
             http_requests=row.http_requests,
+            total_matching=row.total_matching,
+            adverts_retrieved=adverts_retrieved,
             cost_nano_usd=row.cost_nano_usd,
             started_at=row.started_at,
             finished_at=row.finished_at,
@@ -91,10 +113,7 @@ class TargetOut(ResponseModel):
         description="A refused URL's host as plain text, never a link; the URL is not kept."
     )
     query: dict[str, Any] | None
-    status: str = Field(
-        description="queued, succeeded, blocked, failed, cancelled, or not_attempted (the run "
-        "ended before it)."
-    )
+    status: TargetStatus = Field(description="not_attempted: its run ended before it.")
     attempts: list[SourceAttemptOut]
 
     @classmethod
@@ -107,7 +126,9 @@ class TargetOut(ResponseModel):
             refused_host=view.target.refused_host,
             query=view.target.query,
             status=view.status,
-            attempts=[SourceAttemptOut.of(a) for a in view.attempts],
+            attempts=[
+                SourceAttemptOut.of(a, view.retrieved.get(a.attempt_id, 0)) for a in view.attempts
+            ],
         )
 
 
@@ -116,7 +137,7 @@ class SkippedOut(ResponseModel):
     failed recently and waits out its back-off (`backing_off`, until `retry_at`)."""
 
     url: str
-    reason: str
+    reason: SkipReason
     run_id: uuid.UUID | None
     retry_at: datetime | None
 
@@ -128,13 +149,21 @@ class SkippedOut(ResponseModel):
 
 
 class AcquisitionSummaryOut(ResponseModel):
-    succeeded: int
+    succeeded: int = Field(description="Sources retrieved and read.")
+    no_posting_readable: int = Field(
+        description="Sources retrieved whose postings could not be read: never 'none found'."
+    )
     blocked: int
     failed: int
 
     @classmethod
     def of(cls, summary: AcquisitionSummary) -> "AcquisitionSummaryOut":
-        return cls(succeeded=summary.succeeded, blocked=summary.blocked, failed=summary.failed)
+        return cls(
+            succeeded=summary.succeeded,
+            no_posting_readable=summary.no_posting_readable,
+            blocked=summary.blocked,
+            failed=summary.failed,
+        )
 
 
 class AcquisitionOut(ResponseModel):
@@ -142,7 +171,11 @@ class AcquisitionOut(ResponseModel):
     targets: list[TargetOut]
     job_ids: list[uuid.UUID] = Field(description="The jobs this run's sources produced so far.")
     summary: AcquisitionSummaryOut | None = Field(
-        description="A complete run's outcome per target; none until it is complete."
+        description="A complete run's outcome per target; none unless it is complete."
+    )
+    partial: bool = Field(
+        description="A search here matched more adverts than it returned (each attempt's "
+        "adverts_retrieved of total_matching), or did not say how many: a partial result."
     )
 
 
@@ -304,21 +337,44 @@ class JobDetailOut(ResponseModel):
     claims: list[SourceClaimOut]
 
 
+class AdvertsOut(ResponseModel):
+    """Retrieved n of the total matching, over each search's latest success."""
+
+    searches: int
+    retrieved: int
+    matching: int | None = Field(description="Unknown when a search did not say.")
+    partial: bool = Field(description="Some search matched more than it returned.")
+
+    @classmethod
+    def of(cls, counts: AdvertCounts) -> "AdvertsOut":
+        return cls(
+            searches=counts.searches,
+            retrieved=counts.retrieved,
+            matching=counts.matching,
+            partial=counts.partial > 0,
+        )
+
+
 class JobPage(ResponseModel):
     """A page of jobs, with counts that never double count a multi-city job and coverage
     that says how many sources were checked. An empty page says why (STATE-02)."""
 
-    items: list[JobOut]
+    items: list[JobOut] = Field(description="Vacancies and the person's examples, newest first.")
     next_cursor: str | None
-    total_jobs: int = Field(description="Distinct jobs: a multi-city job counts once.")
+    total_jobs: int = Field(
+        description="Distinct vacancies: a multi-city job counts once; an example never does."
+    )
+    exemplars: int = Field(description="The person's pasted examples: never vacancies.")
     city_counts: dict[str, int] = Field(
-        description="Jobs appearing in each city; a multi-city job appears in each."
+        description="Vacancies appearing in each city; a multi-city job appears in each."
     )
-    coverage: dict[str, int] = Field(
-        description="Sources tried, by their latest attempt's status (succeeded, blocked, "
-        "failed, pending)."
+    coverage: dict[Coverage, int] = Field(
+        description="Sources tried (pasted text is not one), by their latest attempt's "
+        "outcome; a source retrieved whose postings could not be read is no_posting_readable."
     )
-    empty_reason: str | None = Field(
-        description="When there are no jobs: no_sources_checked, no_source_retrieved (every "
-        "source failed or was blocked: not 'no vacancies') or none_found_in_sources_checked."
+    adverts: AdvertsOut | None = Field(
+        description="For job searches: the adverts retrieved of those matching."
+    )
+    empty_reason: EmptyReason | None = Field(
+        description="When there are no vacancies, why: never a bare empty list (STATE-02)."
     )

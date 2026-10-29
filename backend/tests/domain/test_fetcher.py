@@ -398,7 +398,7 @@ def test_http_errors_are_failures_classified_by_status(status: int, transient: b
         result = failure(fetcher(server).fetch(url(server, "/x"), accept=HTML_TYPES))
 
     assert result.outcome is AttemptStatus.FAILED
-    assert result.reason == f"http_{status}"
+    assert result.reason == "http_error"  # one label: the status is `http_status`
     assert result.http_status == status
     assert result.transient is transient
 

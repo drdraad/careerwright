@@ -30,7 +30,12 @@ export const AcquisitionOutSchema = {
                     type: 'null'
                 }
             ],
-            description: 'A complete run\'s outcome per target; none until it is complete.'
+            description: 'A complete run\'s outcome per target; none unless it is complete.'
+        },
+        partial: {
+            type: 'boolean',
+            title: 'Partial',
+            description: 'A search here matched more adverts than it returned (each attempt\'s adverts_retrieved of total_matching), or did not say how many: a partial result.'
         }
     },
     additionalProperties: false,
@@ -39,7 +44,8 @@ export const AcquisitionOutSchema = {
         'run',
         'targets',
         'job_ids',
-        'summary'
+        'summary',
+        'partial'
     ],
     title: 'AcquisitionOut'
 } as const;
@@ -48,7 +54,13 @@ export const AcquisitionSummaryOutSchema = {
     properties: {
         succeeded: {
             type: 'integer',
-            title: 'Succeeded'
+            title: 'Succeeded',
+            description: 'Sources retrieved and read.'
+        },
+        no_posting_readable: {
+            type: 'integer',
+            title: 'No Posting Readable',
+            description: 'Sources retrieved whose postings could not be read: never \'none found\'.'
         },
         blocked: {
             type: 'integer',
@@ -63,6 +75,7 @@ export const AcquisitionSummaryOutSchema = {
     type: 'object',
     required: [
         'succeeded',
+        'no_posting_readable',
         'blocked',
         'failed'
     ],
@@ -103,6 +116,46 @@ export const AdvertiserKindSchema = {
         'unknown'
     ],
     title: 'AdvertiserKind'
+} as const;
+
+export const AdvertsOutSchema = {
+    properties: {
+        searches: {
+            type: 'integer',
+            title: 'Searches'
+        },
+        retrieved: {
+            type: 'integer',
+            title: 'Retrieved'
+        },
+        matching: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Matching',
+            description: 'Unknown when a search did not say.'
+        },
+        partial: {
+            type: 'boolean',
+            title: 'Partial',
+            description: 'Some search matched more than it returned.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'searches',
+        'retrieved',
+        'matching',
+        'partial'
+    ],
+    title: 'AdvertsOut',
+    description: 'Retrieved n of the total matching, over each search\'s latest success.'
 } as const;
 
 export const AdzunaQuerySchema = {
@@ -263,6 +316,41 @@ export const AttemptOutSchema = {
         'output_tokens'
     ],
     title: 'AttemptOut'
+} as const;
+
+export const AttemptReasonSchema = {
+    type: 'string',
+    enum: [
+        'malformed_url',
+        'url_too_long',
+        'scheme_not_allowed',
+        'credentials_in_url',
+        'port_not_allowed',
+        'host_not_allowed',
+        'address_not_allowed',
+        'redirect_downgrade',
+        'source_denied',
+        'source_api_only',
+        'robots_disallowed',
+        'adzuna_credentials_not_configured',
+        'http_error',
+        'robots_unreachable',
+        'timeout',
+        'too_large',
+        'too_many_redirects',
+        'unsupported_content_type',
+        'unsupported_content_encoding',
+        'host_not_found',
+        'tls_failed',
+        'connection_failed',
+        'response_invalid',
+        'body_hash_mismatch',
+        'acquisition_worker_unavailable',
+        'interrupted',
+        'access_revoked'
+    ],
+    title: 'AttemptReason',
+    description: 'Why an attempt was blocked or failed: a label, classified from types and statuses,\nnever a message. The URL checks\' refusals (`addresses.UrlRefusal`) are among them.'
 } as const;
 
 export const AttemptStatusSchema = {
@@ -438,6 +526,19 @@ export const ConversationModeSchema = {
     ],
     title: 'ConversationMode',
     description: 'The tone the person chose (spec section 4, "Uncertainty and emotional comfort").'
+} as const;
+
+export const CoverageSchema = {
+    type: 'string',
+    enum: [
+        'succeeded',
+        'no_posting_readable',
+        'blocked',
+        'failed',
+        'pending'
+    ],
+    title: 'Coverage',
+    description: 'The latest outcome of each source tried (pasted text is not a source tried).'
 } as const;
 
 export const CreateWorkspaceSchema = {
@@ -842,6 +943,18 @@ export const EmphasisSchema = {
     description: 'The slate controls (REC1-08).'
 } as const;
 
+export const EmptyReasonSchema = {
+    type: 'string',
+    enum: [
+        'no_sources_checked',
+        'no_source_retrieved',
+        'no_posting_readable',
+        'none_found_in_sources_checked'
+    ],
+    title: 'EmptyReason',
+    description: 'Why a listing has no vacancy (STATE-02): never a bare empty list. Only\n`none_found_in_sources_checked` says the sources read held none, and even then only\nin the sources checked.'
+} as const;
+
 export const EntryModeSchema = {
     type: 'string',
     enum: [
@@ -1158,6 +1271,18 @@ export const ExplanationRunOutSchema = {
     ],
     title: 'ExplanationRunOut',
     description: 'A slate explanation\'s run, as asking for it answers: never what it wrote, since a\ncommand\'s answer is kept as its receipt and model output is kept sealed. The discovery\n(`GET .../discoveries/{id}`) carries the written text.'
+} as const;
+
+export const ExtractionSchema = {
+    type: 'string',
+    enum: [
+        'no_structured_data',
+        'jsonld_invalid',
+        'conflicting_job_postings',
+        'no_job_posting'
+    ],
+    title: 'Extraction',
+    description: 'Why a retrieved source gave no posting that could be published. Only `no_job_posting`\n(its structured data was read and holds none) says no vacancy was there; the others\nsay the page could not be read, which is never "none found" (GC6).'
 } as const;
 
 export const FailureClassSchema = {
@@ -1732,7 +1857,8 @@ export const JobPageSchema = {
                 $ref: '#/components/schemas/JobOut'
             },
             type: 'array',
-            title: 'Items'
+            title: 'Items',
+            description: 'Vacancies and the person\'s examples, newest first.'
         },
         next_cursor: {
             anyOf: [
@@ -1748,7 +1874,12 @@ export const JobPageSchema = {
         total_jobs: {
             type: 'integer',
             title: 'Total Jobs',
-            description: 'Distinct jobs: a multi-city job counts once.'
+            description: 'Distinct vacancies: a multi-city job counts once; an example never does.'
+        },
+        exemplars: {
+            type: 'integer',
+            title: 'Exemplars',
+            description: 'The person\'s pasted examples: never vacancies.'
         },
         city_counts: {
             additionalProperties: {
@@ -1756,27 +1887,40 @@ export const JobPageSchema = {
             },
             type: 'object',
             title: 'City Counts',
-            description: 'Jobs appearing in each city; a multi-city job appears in each.'
+            description: 'Vacancies appearing in each city; a multi-city job appears in each.'
         },
         coverage: {
             additionalProperties: {
                 type: 'integer'
             },
+            propertyNames: {
+                $ref: '#/components/schemas/Coverage'
+            },
             type: 'object',
             title: 'Coverage',
-            description: 'Sources tried, by their latest attempt\'s status (succeeded, blocked, failed, pending).'
+            description: 'Sources tried (pasted text is not one), by their latest attempt\'s outcome; a source retrieved whose postings could not be read is no_posting_readable.'
         },
-        empty_reason: {
+        adverts: {
             anyOf: [
                 {
-                    type: 'string'
+                    $ref: '#/components/schemas/AdvertsOut'
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Empty Reason',
-            description: 'When there are no jobs: no_sources_checked, no_source_retrieved (every source failed or was blocked: not \'no vacancies\') or none_found_in_sources_checked.'
+            description: 'For job searches: the adverts retrieved of those matching.'
+        },
+        empty_reason: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/EmptyReason'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'When there are no vacancies, why: never a bare empty list (STATE-02).'
         }
     },
     additionalProperties: false,
@@ -1785,8 +1929,10 @@ export const JobPageSchema = {
         'items',
         'next_cursor',
         'total_jobs',
+        'exemplars',
         'city_counts',
         'coverage',
+        'adverts',
         'empty_reason'
     ],
     title: 'JobPage',
@@ -4046,6 +4192,15 @@ export const SkillRefOutSchema = {
     title: 'SkillRefOut'
 } as const;
 
+export const SkipReasonSchema = {
+    type: 'string',
+    enum: [
+        'in_flight',
+        'backing_off'
+    ],
+    title: 'SkipReason'
+} as const;
+
 export const SkippedOutSchema = {
     properties: {
         url: {
@@ -4053,8 +4208,7 @@ export const SkippedOutSchema = {
             title: 'Url'
         },
         reason: {
-            type: 'string',
-            title: 'Reason'
+            $ref: '#/components/schemas/SkipReason'
         },
         run_id: {
             anyOf: [
@@ -4348,14 +4502,24 @@ export const SourceAttemptOutSchema = {
         reason: {
             anyOf: [
                 {
-                    type: 'string'
+                    $ref: '#/components/schemas/AttemptReason'
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Reason',
             description: 'Why it was blocked or failed: a label, never text.'
+        },
+        extraction: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Extraction'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Why a retrieved source gave no publishable posting. Only no_job_posting says its structured data held none; the others say it could not be read.'
         },
         transient: {
             type: 'boolean',
@@ -4404,7 +4568,8 @@ export const SourceAttemptOutSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Content Sha256'
+            title: 'Content Sha256',
+            description: 'Of what was kept, personal details removed.'
         },
         byte_count: {
             anyOf: [
@@ -4450,7 +4615,25 @@ export const SourceAttemptOutSchema = {
         },
         http_requests: {
             type: 'integer',
-            title: 'Http Requests'
+            title: 'Http Requests',
+            description: 'Sent for it, robots.txt included.'
+        },
+        total_matching: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Total Matching',
+            description: 'For a search: the adverts it matched.'
+        },
+        adverts_retrieved: {
+            type: 'integer',
+            title: 'Adverts Retrieved',
+            description: 'The adverts (copies) it returned.'
         },
         cost_nano_usd: {
             anyOf: [
@@ -4493,6 +4676,7 @@ export const SourceAttemptOutSchema = {
         'redirects',
         'status',
         'reason',
+        'extraction',
         'transient',
         'retry_of',
         'http_status',
@@ -4503,6 +4687,8 @@ export const SourceAttemptOutSchema = {
         'rights_status',
         'retention',
         'http_requests',
+        'total_matching',
+        'adverts_retrieved',
         'cost_nano_usd',
         'started_at',
         'finished_at'
@@ -5407,9 +5593,8 @@ export const TargetOutSchema = {
             title: 'Query'
         },
         status: {
-            type: 'string',
-            title: 'Status',
-            description: 'queued, succeeded, blocked, failed, cancelled, or not_attempted (the run ended before it).'
+            $ref: '#/components/schemas/TargetStatus',
+            description: 'not_attempted: its run ended before it.'
         },
         attempts: {
             items: {
@@ -5508,6 +5693,19 @@ export const TargetSketchOutSchema = {
         'research_status'
     ],
     title: 'TargetSketchOut'
+} as const;
+
+export const TargetStatusSchema = {
+    type: 'string',
+    enum: [
+        'queued',
+        'succeeded',
+        'blocked',
+        'failed',
+        'cancelled',
+        'not_attempted'
+    ],
+    title: 'TargetStatus'
 } as const;
 
 export const TaskListInputSchema = {

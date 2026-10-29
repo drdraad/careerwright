@@ -10,9 +10,11 @@ import pytest
 
 from nessa.evidence.pages import ParsedPage, parse_page
 from nessa.evidence.records import (
+    UNREADABLE,
     AdvertiserKind,
     ClaimField,
     DescriptionKind,
+    Extraction,
     PayBasis,
     SalaryPeriod,
     ValidationState,
@@ -202,10 +204,11 @@ def test_two_postings_that_disagree_on_a_critical_field_block_publication() -> N
         **POSTING,
         "baseSalary": {"currency": "GBP", "value": {"value": 55000, "unitText": "YEAR"}},
     }
-    postings = parse(page(POSTING, other)).postings
+    parsed = parse(page(POSTING, other))
 
-    assert len(postings) == 2
-    assert all(p.extraction_error == "conflicting_job_postings" for p in postings)
+    assert len(parsed.postings) == 2
+    assert all(p.extraction_error == "conflicting_job_postings" for p in parsed.postings)
+    assert parsed.extraction is Extraction.CONFLICTING_JOB_POSTINGS  # none can be published
 
 
 @pytest.mark.req("ACQ-03")
@@ -217,15 +220,35 @@ def test_invalid_json_ld_is_an_issue_not_a_crash_and_not_a_posting() -> None:
     parsed = parse(text)
 
     assert parsed.postings == []
-    assert parsed.issues == ["jsonld_invalid"]
+    assert parsed.extraction is Extraction.JSONLD_INVALID
 
 
 @pytest.mark.req("ACQ-03", "ACQ-07")
-def test_a_page_without_structured_data_yields_no_posting_and_says_so() -> None:
+def test_a_page_without_structured_data_yields_no_posting_and_says_it_could_not_be_read() -> None:
     parsed = parse(page(body="<h1>Gardener</h1><p>Apply by email.</p>"))
 
     assert parsed.postings == []
-    assert parsed.issues == ["no_structured_job_posting"]
+    assert parsed.extraction is Extraction.NO_STRUCTURED_DATA
+    assert parsed.extraction in UNREADABLE  # never "none found"
+
+
+@pytest.mark.req("ACQ-03")
+@pytest.mark.parametrize(
+    ("blocks", "extraction"),
+    [
+        ([{"@type": "Organization", "name": "Northwind"}], Extraction.NO_JOB_POSTING),
+        ([{"@type": "JobPosting", "description": "no title"}], Extraction.JSONLD_INVALID),
+        ([POSTING, {"@type": "Organization"}], None),
+    ],
+    ids=["structured data with no posting", "a posting without a title", "a posting"],
+)
+def test_only_structured_data_read_with_no_posting_in_it_says_no_posting(
+    blocks: list[object], extraction: Extraction | None
+) -> None:
+    parsed = parse(page(*blocks))
+
+    assert parsed.extraction is extraction
+    assert (extraction in UNREADABLE) is (extraction is Extraction.JSONLD_INVALID)
 
 
 UNSAFE_LINKS = [

@@ -67,7 +67,7 @@ def test_descriptions_are_snippets_and_never_full_descriptions() -> None:
 
     assert {c.description_kind for c in result.copies} == {DescriptionKind.SNIPPET}
     assert all(c.description_fingerprint is None for c in result.copies)
-    assert result.total == 6
+    assert result.total == 128  # more match than one page returns: a partial result
 
 
 @pytest.mark.req("JOB-05", "API-06")

@@ -33,6 +33,7 @@ from nessa.evidence.records import (
     ClaimField,
     ClaimValue,
     DescriptionKind,
+    Extraction,
     JobCopy,
     Location,
     PayBasis,
@@ -56,7 +57,7 @@ _MISSING = object()
 class ParsedPage:
     sha256: str
     postings: list[JobCopy]
-    issues: list[str] = field(default_factory=list)
+    extraction: Extraction | None = None  # why no posting could be published, if none could
 
 
 @dataclass(frozen=True)
@@ -425,9 +426,10 @@ def parse_page(text: str, *, sha256: str, page_url: str) -> ParsedPage:
     page_host = _host(page_url)
     selector = Selector(content=text)
     postings: list[JobCopy] = []
-    issues: list[str] = []
+    blocks = unreadable = 0
     cursor = 0
     for index, script in enumerate(selector.css('script[type="application/ld+json"]')):
+        blocks += 1
         raw = str(script.text)
         offset = text.find(raw, cursor) if raw else -1
         if offset != -1:
@@ -436,12 +438,24 @@ def parse_page(text: str, *, sha256: str, page_url: str) -> ParsedPage:
         try:
             data = json.loads(raw)
         except ValueError:
-            issues.append("jsonld_invalid")
+            unreadable += 1
             continue
         for posting in _postings(data):
             copy = _copy(posting, _Claims(text, sha256, block), page_host)
             if copy is not None:
                 postings.append(copy)
-    if not postings and not issues:
-        issues.append("no_structured_job_posting")
-    return ParsedPage(sha256, _conflicts(postings), sorted(set(issues)))
+            else:
+                unreadable += 1
+    marked = _conflicts(postings)
+    return ParsedPage(sha256, marked, _extraction(marked, blocks=blocks, unreadable=unreadable))
+
+
+def _extraction(postings: list[JobCopy], *, blocks: int, unreadable: int) -> Extraction | None:
+    """Why the page gave no publishable posting, or None when it gave one."""
+    if any(p.extraction_error is None for p in postings):
+        return None
+    if postings:
+        return Extraction.CONFLICTING_JOB_POSTINGS
+    if unreadable:
+        return Extraction.JSONLD_INVALID
+    return Extraction.NO_JOB_POSTING if blocks else Extraction.NO_STRUCTURED_DATA

@@ -29,7 +29,9 @@ from nessa.evidence.adzuna import AdzunaQuery
 from nessa.evidence.fetcher import JSON_TYPES, Admit, Fetched, Fetcher, FetchFailure
 from nessa.evidence.pages import parse_page, redact_page
 from nessa.evidence.records import (
+    AttemptReason,
     AttemptStatus,
+    Extraction,
     InputRoute,
     JobCopy,
     Retention,
@@ -60,7 +62,7 @@ class AcquisitionResult(StrictModel):
     final_url: str | None = None
     redirects: list[str] = Field(default_factory=list)  # checked URLs only
     status: AttemptStatus
-    reason: str | None = None
+    reason: AttemptReason | None = None
     transient: bool = False
     http_status: int | None = None
     content_type: str | None = None
@@ -73,8 +75,10 @@ class AcquisitionResult(StrictModel):
     retention: Retention | None = None
     body_b64: str | None = None  # only when the rights class permits keeping the body
     copies: list[JobCopy] = Field(default_factory=list)
-    issues: list[str] = Field(default_factory=list)
-    total: int | None = None  # Adzuna's count of matching adverts
+    # A retrieved source with no publishable posting says why; only `no_job_posting` may
+    # count as "none found".
+    extraction: Extraction | None = None
+    total: int | None = Field(default=None, ge=0)  # Adzuna's count of matching adverts
     http_requests: int = Field(default=0, ge=0)  # sent for it, robots.txt included
     fetched_at: datetime
 
@@ -199,7 +203,7 @@ def _page_result(
         retention=rights.retention,
         body_b64=base64.b64encode(kept).decode() if keep else None,
         copies=parsed.postings,
-        issues=parsed.issues,
+        extraction=parsed.extraction,
         http_requests=page.requests,
         fetched_at=now,
     )
@@ -261,5 +265,9 @@ def acquire_adzuna(
     if page.error is not None:
         return AcquisitionResult(**common, status=AttemptStatus.FAILED, reason=page.error)
     return AcquisitionResult(
-        **common, status=AttemptStatus.SUCCEEDED, copies=page.copies, total=page.total
+        **common,
+        status=AttemptStatus.SUCCEEDED,
+        copies=page.copies,
+        total=page.total,
+        extraction=None if page.copies else Extraction.NO_JOB_POSTING,  # the API's own answer
     )
