@@ -13,7 +13,9 @@ items.
   (`backend/src/nessa/catalogue/packs/england_option_pack/`, ADR 0011). Each slot's
   `labels.claims` names its claims there.
 - **Reviews:** label review (H-07, session 2: `docs/reviews/session-2-option-pack-questions.md`)
-  and the rights review of the one page pending (C08) are **not run - requires human**.
+  and the rights review of the one page pending (C08) are **not run - requires human**. The
+  package is generated from the pinned pack by `tools.option_pack_files` (from `backend/`),
+  never edited by hand.
 - **Split:** 20 pages are in the development split, 13 in holdout. The early accuracy read
   of the development pages is `docs/evidence/option-pack-accuracy-read.md`.
 - **Excluded:** synthetic personas and generated HTML do not count toward the corpus.
@@ -74,8 +76,9 @@ and the short quoted spans that prove each extracted value.
    record: `retrieved_at`, `http_status`, `content_type`, `sha256` of the exact bytes and each
    claim's offsets and excerpt. It never edits this manifest.
    - Add `--locate "<excerpt>"`, once per labelled excerpt, to get each excerpt's offsets in
-     the hashed text. A run of spaces matches any whitespace, and the tool prints the exact
-     text found. This is the only way to place an excerpt on a page whose body is not kept.
+     the hashed text and its real count (`count`; the first 5 spans are listed). A run of
+     spaces matches any whitespace, and the tool prints the exact text found. This is the
+     only way to place an excerpt on a page whose body is not kept.
    - For an Adzuna slot, run `--adzuna "<what>" "<where>"` in place of `--url`. That is one
      request through `make live-adzuna`'s own capped, ledgered, leak-scanned path.
    - Each run is one process with its own pacer. Leave at least the host's rate limit
@@ -127,3 +130,13 @@ For each retained page outside the rights policy's classes, or not clearly withi
 - [ ] Attribution required by the licence is recorded.
 - [ ] The decision is written into `rights_status`, with the reviewer's name and date in
       the commit message.
+
+Two questions for this review, both to be answered before any push:
+
+- [ ] **May C08's committed excerpts stay?** Its 18 excerpts in the option pack (1,322
+      characters, the most of any page) rest on ruling R3's default for a pending page,
+      yet the page is pending because its notice says its material "may not be reproduced
+      without permission".
+- [ ] **Should C01 and C08 be treated alike?** C01's "©Copyright 2026 all rights reserved"
+      was read as within A3, and its body is kept privately. C08's notice was read as not
+      clearly within A3.

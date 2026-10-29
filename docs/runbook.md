@@ -172,6 +172,10 @@ with the browser's Origin unchanged.
   development pages is `uv run --locked python -m tools.accuracy_read [--out <file>]`. It
   fetches the excerpt-only pages again through the product's fetcher, paced, with no model
   call. Its result is `docs/evidence/option-pack-accuracy-read.md`.
+- The pack's derived files: `uv run --locked python -m tools.option_pack_files` rewrites the
+  committed JSON Schema and the session 2 package from the pinned version. `--pack <file>`
+  publishes a pack file as its version, in canonical form; pin the printed SHA-256 in
+  `option_pack.PINS`. 0.1.0 is frozen, so a change is a new version.
 - Taxonomy: `GET /v1/taxonomy` (the ESCO release and its attribution), `GET
   /v1/taxonomy/occupations?q=...&match=all|any`, `GET /v1/taxonomy/occupations/{concept_id}`;
   English cities: `GET /v1/places`. A title ESCO lacks: `POST
