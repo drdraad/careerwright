@@ -232,8 +232,22 @@ def _host(url: object) -> str | None:
     return host.lower().removeprefix("www.") if host else None
 
 
+def _home_page_host(url: object) -> str | None:
+    """The host of a link to a site's home page. A link deeper into a site (a job board's
+    profile page for the advertiser, on the board's own host) says nothing about whose site
+    it is (Task 7b, reproduced on the option pack's J01 and J12)."""
+    if not isinstance(url, str):
+        return None
+    try:
+        path = urlsplit(url).path
+    except ValueError:
+        return None
+    return _host(url) if path in ("", "/") else None
+
+
 def _hiring(posting: dict[str, Any]) -> tuple[str | None, object, list[str]]:
-    """(name, the raw value holding it, hosts) of the hiring organisation."""
+    """(name, the raw value holding it, hosts of the home pages it links) of the hiring
+    organisation."""
     organisation = posting.get("hiringOrganization")
     if isinstance(organisation, str):
         return organisation.strip() or None, organisation, []
@@ -242,7 +256,7 @@ def _hiring(posting: dict[str, Any]) -> tuple[str | None, object, list[str]]:
     name = organisation.get("name")
     links = organisation.get("sameAs")
     candidates = [*(links if isinstance(links, list) else [links]), organisation.get("url")]
-    hosts = [h for h in (_host(c) for c in candidates) if h]
+    hosts = [h for h in (_home_page_host(c) for c in candidates) if h]
     return (name.strip() or None) if isinstance(name, str) else None, name, hosts
 
 

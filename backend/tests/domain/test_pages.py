@@ -98,6 +98,50 @@ def test_a_json_ld_job_posting_becomes_a_job_copy_with_every_value_typed() -> No
     assert job.salary.basis is PayBasis.ADVERTISED
 
 
+@pytest.mark.req("JOB-02")
+@pytest.mark.parametrize(
+    "link",
+    [
+        "https://www.reed.co.uk/company-profile/Cathcart-Technology-44440",
+        "https://www.reed.co.uk/company-profile/AWD-online-50141",
+    ],
+    ids=["an agency's profile (J12)", "an advertiser's profile (J01)"],
+)
+def test_a_board_s_profile_page_for_the_advertiser_is_not_its_own_site(link: str) -> None:
+    # Reproduced on the option pack's development pages (Task 7b, J01, J12): a job board's
+    # JSON-LD links the advertiser to the board's own profile page, on the board's host.
+    # That is no evidence the advertiser runs the site, so its kind stays unknown; J12's
+    # advertiser says it is "acting as an Employment Agency".
+    organisation = {"@type": "Organization", "name": "Cathcart Technology", "sameAs": link}
+    parsed = parse(
+        page({**POSTING, "hiringOrganization": organisation}),
+        url="https://www.reed.co.uk/jobs/data-analyst/57376369",
+    )
+
+    [job] = parsed.postings
+    assert job.advertiser is AdvertiserKind.UNKNOWN
+    assert job.employer == "Cathcart Technology"  # still the organisation the page names
+
+
+@pytest.mark.req("JOB-02")
+@pytest.mark.parametrize(
+    "link",
+    [
+        "https://northwind.example",
+        "https://northwind.example/",
+        "https://careers.northwind.example",
+    ],
+)
+def test_an_organisation_linking_its_own_site_s_home_page_advertises_on_its_own_site(
+    link: str,
+) -> None:
+    organisation = {"@type": "Organization", "name": "Northwind Analytics Ltd", "sameAs": link}
+
+    [job] = parse(page({**POSTING, "hiringOrganization": organisation})).postings
+
+    assert job.advertiser is AdvertiserKind.EMPLOYER
+
+
 @pytest.mark.req("ACQ-03", "API-06")
 def test_every_claim_has_a_span_into_the_hashed_text_that_holds_its_value() -> None:
     text = page(POSTING)
