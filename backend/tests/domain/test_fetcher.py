@@ -17,11 +17,14 @@ from nessa.evidence.addresses import IPAddress
 from nessa.evidence.fetcher import (
     DEFAULT_LIMITS,
     HTML_TYPES,
+    ROBOTS_TOKEN,
     Fetched,
     Fetcher,
     FetchFailure,
     FetchLimits,
     HostNotFoundError,
+    RobotsRules,
+    parse_robots,
 )
 from nessa.evidence.records import AttemptStatus
 from tests.support.source_server import Scripted, SourceServer, html, source_server
@@ -357,7 +360,7 @@ def test_connection_failures_and_unknown_hosts_are_typed_failures() -> None:
             AttemptStatus.BLOCKED,
             "robots_disallowed",
         ),
-        (Scripted(503, body=b"down"), AttemptStatus.BLOCKED, "robots_unreachable"),
+        (Scripted(503, body=b"down"), AttemptStatus.FAILED, "robots_unreachable"),
     ],
     ids=["path disallowed for every agent", "disallowed for Nessa", "robots unreachable"],
 )
@@ -370,6 +373,94 @@ def test_robots_txt_is_read_first_and_a_refusal_means_no_request_for_the_page(
 
     assert (result.outcome, result.reason) == (outcome, reason)
     assert server.paths() == ["/robots.txt"]
+
+
+@pytest.mark.req("ACQ-06")
+def test_an_unreachable_robots_txt_is_a_transient_failure_tried_again_next_time() -> None:
+    routes = {"/robots.txt": Scripted(503, body=b"down"), "/jobs/1": Scripted(body=PAGE)}
+    with source_server(routes) as server:
+        f = fetcher(server)
+        first = failure(f.fetch_page(url(server, "/jobs/1")))
+        server.routes["/robots.txt"] = Scripted(404, body=b"none")
+        second = f.fetch_page(url(server, "/jobs/1"))
+
+    assert (first.outcome, first.reason, first.transient) == (
+        AttemptStatus.FAILED,
+        "robots_unreachable",
+        True,
+    )
+    assert isinstance(second, Fetched)  # the outage was not remembered
+    assert server.paths() == ["/robots.txt", "/robots.txt", "/jobs/1"]
+
+
+def _robots(text: str) -> RobotsRules:
+    return parse_robots(text, ROBOTS_TOKEN)
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize(
+    ("robots", "path"),
+    [
+        ("User-agent: *\nDisallow: /*/apply\n", "/jobs/apply"),
+        ("User-agent: *\nDisallow: /*?\n", "/jobs?id=1"),
+        ("User-agent: *\nDisallow: /*.pdf$\n", "/a.pdf"),
+        ("User-agent: *\nAllow: /\nDisallow: /private\n", "/private/job"),
+        ("User-agent: *\nDisallow: /jobs/%7Eanna\n", "/jobs/~anna"),
+    ],
+    ids=["a wildcard segment", "any query", "an end anchor", "the longest rule wins", "encoding"],
+)
+def test_robots_rules_match_wildcards_end_anchors_and_the_longest_rule(
+    robots: str, path: str
+) -> None:
+    assert not _robots(robots).allows(path)
+
+
+@pytest.mark.req("ACQ-06")
+def test_robots_rules_allow_what_their_patterns_do_not_reach() -> None:
+    rules = _robots("User-agent: *\nDisallow: /*?\nDisallow: /*/apply\nDisallow: /\n")
+    anchored = _robots("User-agent: *\nDisallow: /*.pdf$\n")
+
+    assert _robots("User-agent: *\nDisallow: /*?\n").allows("/jobs")
+    assert anchored.allows("/a.pdf.html")  # `$` anchors the end
+    assert anchored.allows("/a.pdf?page=2")
+    assert _robots("User-agent: *\nDisallow: /*/apply\n").allows("/apply")  # needs a segment
+    assert rules.allows("/robots.txt")  # never disallowed
+
+
+@pytest.mark.req("ACQ-06")
+def test_an_allow_rule_wins_over_a_disallow_rule_of_equal_length() -> None:
+    rules = _robots("User-agent: *\nDisallow: /page\nAllow: /page\nDisallow: /pag*\n")
+
+    assert rules.allows("/page")
+    assert not _robots("User-agent: *\nAllow: /pag\nDisallow: /page\n").allows("/page")
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize(
+    ("robots", "allowed"),
+    [
+        ("User-agent: *\nDisallow: /\n\nUser-agent: NessaL0\nAllow: /\n", True),
+        ("User-agent: *\nAllow: /\n\nUser-agent: nessal0\nDisallow: /jobs\n", False),
+        ("User-agent: OtherBot\nDisallow: /\n", True),
+        ("User-agent: OtherBot\nUser-agent: NessaL0/1.0\nDisallow: /jobs\n", False),
+        ("User-agent: NessaL0\nSitemap: https://x.example/s.xml\nDisallow: /jobs\n", False),
+        ("User-agent: NessaL0\nDisallow: /a\n\nUser-agent: NessaL0\nDisallow: /jobs\n", False),
+        ("Disallow: /jobs\nUser-agent: *\nDisallow: /other\n", True),
+        ("﻿User-agent: * # every agent\nDisallow: /jobs # private\n", False),
+    ],
+    ids=[
+        "its own group beats the wildcard group",
+        "matched without regard to case",
+        "another agent's group does not apply",
+        "one group for several agents",
+        "another record does not end the group",
+        "its groups are combined",
+        "a rule before any group is ignored",
+        "a byte order mark and comments",
+    ],
+)
+def test_the_group_for_nessa_is_selected_by_its_product_token(robots: str, allowed: bool) -> None:
+    assert _robots(robots).allows("/jobs/1") is allowed
 
 
 @pytest.mark.req("ACQ-06")

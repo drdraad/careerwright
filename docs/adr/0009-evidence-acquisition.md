@@ -56,9 +56,16 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    rebinding cannot change the address; each redirect (at most 5) is a new hop with the
    same checks, and https never redirects to http. Bounds: 2 MB (also after gzip or deflate,
    so a decompression bomb is cut), 20 s in all (5 s connect, 10 s read), HTML only for
-   pages, JSON for Adzuna. robots.txt is read first for each origin (RFC 9309: a 4xx allows,
-   an unreachable one disallows; cached 10 minutes) and obeyed for the token `NessaL0`; each
-   host is paced to its manifest rate limit. Tested against a controlled loopback server
+   pages, JSON for Adzuna. robots.txt is read first for each origin and obeyed for the token
+   `NessaL0` by Nessa's own RFC 9309 matcher (`fetcher.parse_robots`; `urllib.robotparser`
+   was replaced in fix round 1 because it ignores `*` and `$` and takes the first matching
+   rule): the groups naming the token without regard to case, else the `*` groups,
+   combined; the matching rule with the most octets decides, an allow rule winning a tie;
+   paths and rules are compared after percent-encoding normalisation, by an iterative
+   matcher whose cost is bounded by the two lengths. A 4xx robots.txt allows (cached 10
+   minutes); an unreachable one disallows as a transient failure, with no page request, and
+   is not remembered, so the step's next try reads it again. Each host is paced to its
+   manifest rate limit. Tested against a controlled loopback server
    whose one origin is the fetcher's only extra allowance (`test_fetcher.py`, 36 cases).
 
 4. **The source permission manifest and the rights policy as code (OI-11).**

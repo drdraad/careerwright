@@ -16,14 +16,14 @@ statuses only; no exception message or response body is kept.
 """
 
 import ipaddress
+import re
 import socket
 import ssl
 import time
 import zlib
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
-from urllib.parse import urljoin
-from urllib.robotparser import RobotFileParser
+from dataclasses import dataclass, field, replace
+from urllib.parse import urljoin, urlsplit
 
 import certifi
 import httpcore2
@@ -222,6 +222,104 @@ class _Body:
         return b"".join(self.parts)
 
 
+_UNRESERVED = frozenset(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+_HEX = frozenset(b"0123456789abcdefABCDEF")
+_AGENT = re.compile(r"[A-Za-z0-9_-]+|\*")
+
+
+def _normalise(value: str) -> str:
+    """A path or rule as octets to compare (RFC 9309 section 2.2.2): octets outside printable
+    US-ASCII percent-encoded, percent-encoded unreserved characters decoded, other
+    percent-encodings in upper case."""
+    data = value.encode("utf-8")
+    out: list[str] = []
+    i = 0
+    while i < len(data):
+        octet = data[i]
+        if octet == 0x25 and i + 2 < len(data) and data[i + 1] in _HEX and data[i + 2] in _HEX:
+            decoded = int(data[i + 1 : i + 3], 16)
+            out.append(chr(decoded) if decoded in _UNRESERVED else f"%{decoded:02X}")
+            i += 3
+            continue
+        out.append(chr(octet) if 0x20 < octet < 0x7F else f"%{octet:02X}")
+        i += 1
+    return "".join(out)
+
+
+def _rule_matches(pattern: str, path: str) -> bool:
+    """Whether a rule matches the path from its start: `*` is any run of characters and a
+    final `$` the end of the path. Iterative, so a hostile pattern costs at most the product
+    of the two lengths."""
+    pattern = pattern[:-1] if pattern.endswith("$") else f"{pattern}*"
+    p = t = 0
+    star, mark = -1, 0
+    while t < len(path):
+        if p < len(pattern) and pattern[p] == "*":
+            star, mark = p, t
+            p += 1
+        elif p < len(pattern) and pattern[p] == path[t]:
+            p += 1
+            t += 1
+        elif star != -1:
+            p, mark = star + 1, mark + 1
+            t = mark
+        else:
+            return False
+    return all(c == "*" for c in pattern[p:])
+
+
+@dataclass(frozen=True)
+class RobotsRules:
+    """The allow and disallow rules that apply to one product token."""
+
+    rules: tuple[tuple[bool, str], ...] = ()  # (allow, normalised path pattern)
+
+    def allows(self, path: str) -> bool:
+        """`path`: the URL's path with its query. The matching rule with the most octets
+        decides, an allow rule winning a tie; no matching rule allows (RFC 9309 section
+        2.2.2). `/robots.txt` itself is always allowed."""
+        target = _normalise(path or "/")
+        if target == "/robots.txt":
+            return True
+        best: tuple[int, bool] | None = None
+        for allow, pattern in self.rules:
+            if _rule_matches(pattern, target) and (best is None or (len(pattern), allow) > best):
+                best = (len(pattern), allow)
+        return best is None or best[1]
+
+
+def parse_robots(text: str, token: str) -> RobotsRules:
+    """The rules for `token` (RFC 9309 section 2.2.1): every group with a user-agent line
+    naming it, without regard to case, combined; failing that every `*` group combined;
+    failing that none. Consecutive user-agent lines open one group; other records (a
+    sitemap, a crawl delay) are ignored without ending it; a rule before any group is
+    ignored."""
+    groups: list[tuple[set[str], list[tuple[bool, str]]]] = []
+    in_rules = False
+    for raw in text.removeprefix("﻿").splitlines():
+        key, colon, value = raw.partition("#")[0].partition(":")
+        if not colon:
+            continue
+        key, value = key.strip().lower(), value.strip()
+        if key == "user-agent":
+            if not groups or in_rules:
+                groups.append((set(), []))
+                in_rules = False
+            agent = _AGENT.match(value)
+            if agent is not None:
+                groups[-1][0].add(agent.group().lower())
+        elif key in ("allow", "disallow") and groups:
+            in_rules = True
+            if value:
+                groups[-1][1].append((key == "allow", _normalise(value)))
+    wanted = token.lower()
+    if not any(wanted in agents for agents, _ in groups):
+        wanted = "*"
+    return RobotsRules(
+        tuple(rule for agents, rules in groups if wanted in agents for rule in rules)
+    )
+
+
 def _header(headers: list[tuple[bytes, bytes]], name: bytes) -> str | None:
     for key, value in headers:
         if key.lower() == name:
@@ -262,7 +360,7 @@ class Fetcher:
         self._ports = ALLOWED_PORTS | {port for _, port in extra_allowed}
         self._clock = clock
         self._ssl = ssl.create_default_context(cafile=certifi.where())
-        self._robots: dict[str, tuple[float, RobotFileParser | str | None]] = {}
+        self._robots: dict[str, tuple[float, RobotsRules]] = {}
 
     def check(self, url: str) -> CheckedUrl | UrlRefusal:
         """`addresses.check_url` with this fetcher's ports."""
@@ -428,9 +526,10 @@ class Fetcher:
         except (httpcore2.NetworkError, httpcore2.ProtocolError):
             return failed("connection_failed", transient=True)
 
-    def robots_refusal(self, checked: CheckedUrl) -> str | None:
-        """None when robots.txt allows the page; otherwise why not (RFC 9309: a missing or
-        4xx robots.txt allows everything; one that cannot be reached disallows)."""
+    def robots_refusal(self, checked: CheckedUrl) -> FetchFailure | None:
+        """None when robots.txt allows the page; otherwise why not (RFC 9309 section 2.3.1:
+        a 4xx robots.txt allows everything; one that cannot be reached disallows, as a
+        transient failure that is not remembered, so the next try reads it again)."""
         netloc = (
             checked.host
             if checked.ip_literal is None or checked.ip_literal.version == 4
@@ -442,21 +541,22 @@ class Fetcher:
         cached = self._robots.get(origin)
         if cached is None or self._clock() - cached[0] > ROBOTS_CACHE_S:
             result = self.fetch(f"{origin}/robots.txt", accept=None, max_bytes=ROBOTS_MAX_BYTES)
-            rules: RobotFileParser | str | None
             if isinstance(result, Fetched):
-                rules = RobotFileParser()
-                rules.parse(result.text.splitlines())
+                rules = parse_robots(result.text, ROBOTS_TOKEN)
             elif result.http_status is not None and 400 <= result.http_status < 500:
-                rules = None  # unavailable: no restrictions
+                rules = RobotsRules()  # unavailable: no restrictions
             else:
-                rules = "robots_unreachable"
+                return FetchFailure(
+                    checked.url,
+                    AttemptStatus.FAILED,
+                    "robots_unreachable",
+                    transient=result.transient,
+                )
             cached = (self._clock(), rules)
             self._robots[origin] = cached
-        rules = cached[1]
-        if isinstance(rules, str):
-            return rules
-        if rules is not None and not rules.can_fetch(ROBOTS_TOKEN, checked.url):
-            return "robots_disallowed"
+        parts = urlsplit(checked.url)
+        if not cached[1].allows(f"{parts.path or '/'}{'?' if parts.query else ''}{parts.query}"):
+            return FetchFailure(checked.url, AttemptStatus.BLOCKED, "robots_disallowed")
         return None
 
     def fetch_page(self, url: str) -> Fetched | FetchFailure:
@@ -470,5 +570,5 @@ class Fetcher:
             return self._blocked(url, UrlRefusal.ADDRESS_NOT_ALLOWED.value, [])
         refusal = self.robots_refusal(checked)
         if refusal is not None:
-            return self._blocked(url, refusal, [])
+            return replace(refusal, requested_url=url)
         return self.fetch(checked.url, accept=HTML_TYPES)

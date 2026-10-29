@@ -5,7 +5,7 @@
   "open_item": "OI-11",
   "about": "The checked-in source permission manifest (spec section 6, 'Scrapling specific engineering contract'): permitted domains and purpose, robots and access decisions, rate limits, retained fields and attribution. The page classes and what each may keep are the session 1 rights policy (H-06; docs/reviews/session-1.md, corpus/README.md). A host not listed here is class 'other': it may be fetched when its robots.txt allows, but only the content hash and the claims' minimal excerpts are kept, and its rights status stays 'pending human rights review'. A person supplying a URL never overrides an entry here.",
   "user_agent": "NessaL0/1 (local career-planning research; one person's own job search)",
-  "robots": "robots.txt is read before every page fetch, per host, and obeyed for the user-agent token 'NessaL0' (RFC 9309: an unavailable robots.txt allows; an unreachable one disallows).",
+  "robots": "robots.txt is read before every page request, for each origin a page or its redirects reach, and obeyed for the user-agent token 'NessaL0' (RFC 9309: its own groups, else the '*' groups; the longest matching rule with '*' and '$', allow winning a tie; an unavailable (4xx) robots.txt allows; an unreachable one disallows, as a transient failure).",
   "default": {
     "rights_class": "other",
     "access": "permitted",
