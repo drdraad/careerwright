@@ -1521,11 +1521,9 @@ export type ModelExtractionOut = {
      */
     run_id: string | null;
     /**
-     * Failure Class
-     *
-     * Why the run failed, as a label.
+     * Why the extraction run failed.
      */
-    failure_class: string | null;
+    failure_class: FailureClass | null;
 };
 
 /**

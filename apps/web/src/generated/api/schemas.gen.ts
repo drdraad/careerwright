@@ -2145,14 +2145,13 @@ export const ModelExtractionOutSchema = {
         failure_class: {
             anyOf: [
                 {
-                    type: 'string'
+                    $ref: '#/components/schemas/FailureClass'
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Failure Class',
-            description: 'Why the run failed, as a label.'
+            description: 'Why the extraction run failed.'
         }
     },
     additionalProperties: false,

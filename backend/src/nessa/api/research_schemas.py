@@ -42,6 +42,7 @@ from nessa.evidence.records import (
 )
 from nessa.evidence.search import SearchProposal
 from nessa.evidence.store import AdvertCounts, AttemptRow, ClaimRow, CopyRow, ExtractionRow
+from nessa.identity.failures import FailureClass
 
 
 class ModelExtractionOut(ResponseModel):
@@ -55,7 +56,7 @@ class ModelExtractionOut(ResponseModel):
     )
     not_run: ExtractionNotRun | None = Field(description="Why no extraction run was started.")
     run_id: uuid.UUID | None = Field(description="The extraction run, if one was started.")
-    failure_class: str | None = Field(description="Why the run failed, as a label.")
+    failure_class: FailureClass | None = Field(description="Why the extraction run failed.")
 
     @classmethod
     def of(cls, row: ExtractionRow) -> "ModelExtractionOut":
@@ -63,7 +64,7 @@ class ModelExtractionOut(ResponseModel):
             state=extraction_state(row),
             not_run=row.not_run,
             run_id=row.run_id,
-            failure_class=row.failure_class,
+            failure_class=FailureClass(row.failure_class) if row.failure_class else None,
         )
 
 
