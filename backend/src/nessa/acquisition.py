@@ -143,7 +143,12 @@ def make_server(service: AcquisitionService, host: str, port: int) -> ThreadingH
                 self._send(404, {"error": "not_found"})
 
         def do_POST(self) -> None:
-            length = int(self.headers.get("Content-Length") or 0)
+            declared = self.headers.get("Content-Length") or "0"
+            if not (declared.isascii() and declared.isdigit()):  # negative or not a number
+                self.close_connection = True
+                self._send(400, {"error": "invalid_content_length"})
+                return
+            length = int(declared)
             if length > MAX_REQUEST_BYTES:
                 self._send(413, {"error": "request_too_large"})
                 return

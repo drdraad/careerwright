@@ -28,6 +28,7 @@ from nessa.evidence.addresses import apply_link
 from nessa.evidence.amounts import minor_units
 from nessa.evidence.jobs import advertiser_kind, description_fingerprints, title_key
 from nessa.evidence.records import (
+    CLAIM_TEXT_CHARS,
     Claim,
     ClaimField,
     ClaimValue,
@@ -273,7 +274,12 @@ def _copy(posting: dict[str, Any], claims: _Claims, page_host: str | None) -> Jo
 
     identifier = posting.get("identifier")
     source_id = identifier.get("value") if isinstance(identifier, dict) else identifier
-    if isinstance(source_id, (str, int)) and not isinstance(source_id, bool):
+    # An ID longer than an excerpt is left unknown: cut short, it could match another's.
+    if (
+        isinstance(source_id, (str, int))
+        and not isinstance(source_id, bool)
+        and len(str(source_id)) <= CLAIM_TEXT_CHARS
+    ):
         key = "value" if isinstance(identifier, dict) else "identifier"
         claims.add(ClaimField.SOURCE_JOB_ID, str(source_id), key, source_id)
         source_job_id: str | None = str(source_id)
@@ -352,8 +358,8 @@ def _copy(posting: dict[str, Any], claims: _Claims, page_host: str | None) -> Jo
 
     return JobCopy(
         source_job_id=source_job_id,
-        title=title.strip()[:300],
-        employer=employer[:300] if employer else None,
+        title=title.strip()[:CLAIM_TEXT_CHARS],
+        employer=employer[:CLAIM_TEXT_CHARS] if employer else None,
         advertiser=advertiser_kind(employer, on_own_site=on_own_site),
         locations=locations[:20],
         work_mode=work_mode,

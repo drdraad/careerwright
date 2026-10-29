@@ -116,10 +116,16 @@ def run(
                 break  # a failed page is recorded; the next would only repeat it
         ledger.write_markdown()
     copies = [("adzuna", c) for r in results for c in r.copies]
+    # Everything the worker would store (claims, URLs, excerpts) is scanned for either
+    # credential's value, which Adzuna may echo in a landing link (review A M3).
+    echoed = sum(
+        1 for r in results for s in credentials if s.get_secret_value() in r.model_dump_json()
+    )
     return {
         "status": "complete"
-        if all(r.status is AttemptStatus.SUCCEEDED for r in results)
+        if echoed == 0 and all(r.status is AttemptStatus.SUCCEEDED for r in results)
         else "failed",
+        "results_holding_a_credential": echoed,
         "requests": len(results),
         "outcomes": [
             f"{r.status.value} {r.http_status or ''} {r.reason or ''}".strip() for r in results

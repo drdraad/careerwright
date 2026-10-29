@@ -25,6 +25,7 @@ from nessa.evidence.addresses import apply_link
 from nessa.evidence.amounts import minor_units
 from nessa.evidence.jobs import advertiser_kind, description_fingerprints
 from nessa.evidence.records import (
+    CLAIM_TEXT_CHARS,
     Claim,
     ClaimField,
     ClaimValue,
@@ -95,6 +96,38 @@ def redact(url: str) -> str:
         if k.lower() not in CREDENTIAL_PARAMETERS and k.lower() != "content-type"
     ]
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(kept), ""))
+
+
+VALUE_REMOVED = "[removed]"
+
+
+def _without_value(url: str, secret: str) -> str:
+    parts = urlsplit(url)
+    pairs = parse_qsl(parts.query, keep_blank_values=True)
+    kept = [(k, v) for k, v in pairs if v != secret]
+    if len(kept) == len(pairs):
+        return url
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(kept), parts.fragment))
+
+
+def without_app_id(text: str, app_id: str) -> str:
+    """A search response with the app id gone (review A M3): Adzuna's landing links may
+    carry it as a parameter's value (`utm_source=<app id>`), so every result's
+    `redirect_url` loses each parameter whose value it is, and any other occurrence is
+    replaced. Only the acquisition worker, which holds the app id, calls this."""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return text.replace(app_id, VALUE_REMOVED)
+    results = data.get("results") if isinstance(data, dict) else None
+    changed = False
+    for result in results if isinstance(results, list) else []:
+        link = result.get("redirect_url") if isinstance(result, dict) else None
+        if isinstance(link, str) and (stripped := _without_value(link, app_id)) != link:
+            result["redirect_url"] = stripped
+            changed = True
+    out = json.dumps(data, ensure_ascii=False) if changed else text
+    return out.replace(app_id, VALUE_REMOVED)
 
 
 @dataclass(frozen=True)
@@ -188,15 +221,17 @@ def _copy(result: dict[str, Any], claims: _Claims) -> JobCopy | None:
     title = result.get("title")
     if not isinstance(title, str) or not _plain(title):
         return None
-    title = _plain(title)[:300]
+    title = _plain(title)[:CLAIM_TEXT_CHARS]
     claims.add(ClaimField.TITLE, title, "title", result["title"])
     source_id = result.get("id")
     source_job_id = str(source_id) if isinstance(source_id, (str, int)) else None
+    if source_job_id is not None and len(source_job_id) > CLAIM_TEXT_CHARS:
+        source_job_id = None  # left unknown: cut short, it could match another advert's
     if source_job_id is not None:
         claims.add(ClaimField.SOURCE_JOB_ID, source_job_id, "id", source_id)
     company = result.get("company")
     name = company.get("display_name") if isinstance(company, dict) else None
-    employer = _plain(name)[:300] if isinstance(name, str) and _plain(name) else None
+    employer = _plain(name)[:CLAIM_TEXT_CHARS] if isinstance(name, str) and _plain(name) else None
     if employer is not None:
         claims.add(ClaimField.EMPLOYER, employer, "company", company)
     locations: list[Location] = []

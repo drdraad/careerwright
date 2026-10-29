@@ -58,8 +58,11 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
 3. **Every hop is checked; refusals are attempts.** `addresses.check_url`: http or https,
    no credentials, port 80 or 443, a public IP literal or a multi-label name; local names
    and every encoded address form (one decimal or hex number, octal, short dotted forms,
-   percent-encoding, Unicode digits, IPv4-compatible IPv6) are refused, never decoded.
-   `address_refusal` refuses every non-global, multicast or reserved address and every IPv6
+   percent-encoding, any digit outside ASCII, an IPv6 zone ID, IPv4-compatible IPv6) are
+   refused, never decoded (fix round 1, review A M1 and M2: before, Unicode digits were
+   folded by IDNA and a zone ID parsed); one trailing dot is removed before the check.
+   `address_refusal` refuses every non-global, multicast or reserved address, the
+   deprecated site-local `fec0::/10` (which `is_global` passes) and every IPv6
    form embedding IPv4 (mapped, 6to4, Teredo, NAT64). The fetcher resolves at connect time,
    refuses a host if any answer fails, and connects to an answer that passed (at most 4
    tried), so DNS rebinding cannot change the address; each redirect (at most 5) is checked
@@ -135,7 +138,11 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    retention, request count and charge ($0 for fetches and Adzuna's free tier). Claims hold
    field, typed value, validation state (structured, user-supplied or quarantined with its
    issue), a span (offsets into the decoded text that was hashed, or a JSON pointer for an
-   API response, with an excerpt), retrieval, publication and expiry dates. Structured fields
+   API response, with an excerpt), retrieval, publication and expiry dates. A claim's text
+   value, and a copy's title and employer, keep at most 200 characters, the excerpt bound,
+   so a reference-only page's records never hold more of it; an apply link is a checked URL
+   and is kept whole; a source ID longer than that is left unknown rather than cut (fix
+   round 1, review A M4). Structured fields
    come first: JSON-LD `JobPosting` (also in `@graph` and type lists); a salary that is not
    whole pence, another currency or a malformed date is quarantined, never guessed; postings
    on one page that disagree on salary, expiry, contract or employer are all marked
@@ -185,7 +192,13 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
 
 11. **Adzuna (R4; controller ruling).** The adapter (`nessa.evidence.adzuna`) records the
     request without `app_id` and `app_key` and builds the credentialed URL only for the one
-    HTTP call; `redact` strips them from any URL. Pay keeps its basis (`salary_is_predicted`
+    HTTP call; `redact` strips them from any URL. Adzuna's landing links may carry the app
+    id as a parameter's value (`utm_source`), so the acquisition worker, which holds it,
+    removes every such parameter from each `redirect_url`, and any other occurrence, before
+    the response is parsed or hashed (`adzuna.without_app_id`); `make live-adzuna` fails
+    if any result it would store still holds either credential (fix round 1, review A M3).
+    Its HTTP endpoint answers a `Content-Length` that is not a non-negative integer with
+    400 before reading (review A M8). Pay keeps its basis (`salary_is_predicted`
     "1" predicted, "0" advertised, absent unknown) and no period, which Adzuna does not
     document; descriptions are snippets. Its terms (read 2026-10-28) allow personal job
     search and require each displayed advert to be labelled "Adzuna" with a link; they do not

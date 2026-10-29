@@ -4,9 +4,11 @@ security boundary"; ACQ-01). Pure: no network.
 A URL passes only with an `http` or `https` scheme, no credentials, port 80 or 443, and a
 host that is either a public IP literal or a multi-label DNS name. Anything that could be an
 encoded address (one decimal or hex number, octal or short dotted forms, percent-encoding,
-Unicode digits) is refused rather than decoded, so no parser disagreement can turn it into
-a private address. The fetcher applies `address_refusal` again to every address a name
-resolves to, at connect time, and checks every redirect target with `check_url` again.
+any digit outside ASCII, an IPv6 zone ID) is refused rather than decoded, so no parser
+disagreement can turn it into a private address. One trailing dot is removed (it names the
+same host) before the name or address is checked. The fetcher applies `address_refusal`
+again to every address a name resolves to, at connect time, and checks every redirect
+target with `check_url` again.
 """
 
 import ipaddress
@@ -69,20 +71,24 @@ def address_refusal(address: IPAddress) -> UrlRefusal | None:
         return UrlRefusal.ADDRESS_NOT_ALLOWED
     if not address.is_global or address.is_multicast or address.is_reserved:
         return UrlRefusal.ADDRESS_NOT_ALLOWED
+    if isinstance(address, ipaddress.IPv6Address) and address.is_site_local:
+        return UrlRefusal.ADDRESS_NOT_ALLOWED  # fec0::/10: deprecated, yet `is_global`
     return None
 
 
 def _ip_literal(host: str) -> IPAddress | UrlRefusal:
+    if "%" in host:  # a zone ID (Python would parse it): never needed for a public page
+        return UrlRefusal.HOST_NOT_ALLOWED
     try:
         return ipaddress.IPv6Address(host)
     except ValueError:
-        return UrlRefusal.HOST_NOT_ALLOWED  # a zone ID or any other non-address in brackets
+        return UrlRefusal.HOST_NOT_ALLOWED  # any other non-address in brackets
 
 
 def _name(host: str) -> str | IPAddress | UrlRefusal:
     """The host's ASCII name, or a canonical dotted-quad address, or the refusal."""
-    if "%" in host:
-        return UrlRefusal.HOST_NOT_ALLOWED
+    if "%" in host or any(ch.isdigit() and not ch.isascii() for ch in host):
+        return UrlRefusal.HOST_NOT_ALLOWED  # never decoded: IDNA would fold such digits
     host = host.removesuffix(".")
     try:
         ascii_host = host.encode("idna").decode("ascii").lower()

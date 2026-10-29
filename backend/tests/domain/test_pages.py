@@ -259,6 +259,36 @@ def test_a_valid_https_apply_link_is_kept_without_its_surrounding_space() -> Non
     assert ClaimField.APPLY_URL in {c.field for c in job.claims}
 
 
+@pytest.mark.req("ACQ-06")
+def test_no_claim_or_copy_text_keeps_more_of_the_page_than_an_excerpt() -> None:
+    long_link = f"https://careers.northwind.example/apply/7781?ref={'a' * 400}"
+    posting = {
+        **POSTING,
+        "title": "Data Quality Analyst " + "x" * 1_000,
+        "hiringOrganization": {"@type": "Organization", "name": "Northwind " + "y" * 1_000},
+        "identifier": "NW-" + "9" * 1_000,
+        "employmentType": "FULL_TIME " + "z" * 1_000,
+        "url": long_link,
+    }
+
+    [job] = parse(page(posting)).postings
+
+    texts = [c for c in job.claims if isinstance(c.value, str)]
+    assert {c.field for c in texts} >= {
+        ClaimField.TITLE,
+        ClaimField.EMPLOYER,
+        ClaimField.EMPLOYMENT_TYPE,
+    }
+    assert all(len(str(c.value)) <= 200 for c in texts if c.field is not ClaimField.APPLY_URL)
+    assert len(job.title) <= 200
+    assert job.source_job_id is None  # too long to be an ID: unknown, never cut
+    assert ClaimField.SOURCE_JOB_ID not in {c.field for c in job.claims}
+    assert job.employer is not None
+    assert len(job.employer) <= 200
+    apply = next(c for c in job.claims if c.field is ClaimField.APPLY_URL)
+    assert apply.value == long_link  # a checked link is kept whole, not cut
+
+
 @pytest.mark.req("ACQ-04")
 def test_instructions_in_page_text_change_nothing_the_parser_reads() -> None:
     hostile = (

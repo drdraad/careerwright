@@ -67,6 +67,23 @@ def test_each_request_is_ledgered_at_no_cost_without_its_credentials(tmp_path: P
     assert summary["status"] == "complete"
     assert summary["adverts"] == 12
     assert summary["distinct_jobs"] == 6  # the second page repeats the first: deduplicated
+    assert summary["results_holding_a_credential"] == 0
+
+
+@pytest.mark.req("SEC-05")
+def test_a_result_that_would_store_a_credential_fails_the_qualification(tmp_path: Path) -> None:
+    def echoing(
+        fetcher: Any, pacer: Any, query: AdzunaQuery, credentials: Any, *, now: datetime
+    ) -> AcquisitionResult:
+        result = fake_acquire(fetcher, pacer, query, credentials, now=now)
+        [first, *rest] = result.copies
+        echoed = first.model_copy(update={"apply_url": f"https://x.example/?utm_source={APP_ID}"})
+        return result.model_copy(update={"copies": [echoed, *rest]})
+
+    summary = run(settings(), Ledger(tmp_path / "usage.jsonl"), acquire=echoing, fetcher=object())  # type: ignore[arg-type]
+
+    assert summary["status"] == "failed"
+    assert summary["results_holding_a_credential"] == 2  # one per request
 
 
 @pytest.mark.req("MODEL-09")

@@ -11,7 +11,14 @@ job without discarding any. Money is integer minor units; unknown is null, never
 from datetime import date, datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 SHA256_PATTERN = r"^[0-9a-f]{64}$"
 
@@ -162,6 +169,10 @@ class Location(StrictModel):
 
 
 ClaimValue = str | Salary | Location | date | None
+# A text value keeps no more of its source than an excerpt does (review A M4), so a
+# reference-only page's claims never hold more than its excerpts. An apply link is a
+# checked URL, not page text, and is kept whole.
+CLAIM_TEXT_CHARS = 200
 
 
 class Claim(StrictModel):
@@ -172,6 +183,13 @@ class Claim(StrictModel):
     span: SourceSpan
     validation: ValidationState
     issue: str | None = Field(default=None, max_length=120)  # why a claim is quarantined
+
+    @field_validator("value")
+    @classmethod
+    def _bounded(cls, value: ClaimValue, info: ValidationInfo) -> ClaimValue:
+        if isinstance(value, str) and info.data.get("field") is not ClaimField.APPLY_URL:
+            return value[:CLAIM_TEXT_CHARS]
+        return value
 
 
 class JobCopy(StrictModel):

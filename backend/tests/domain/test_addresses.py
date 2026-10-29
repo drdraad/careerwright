@@ -84,21 +84,26 @@ def test_private_loopback_link_local_and_metadata_literals_are_refused(raw: str)
 
 @pytest.mark.req("ACQ-01")
 @pytest.mark.parametrize(
-    "raw",
+    ("raw", "refusal"),
     [
-        "http://2130706433/",  # 127.0.0.1 as one decimal number
-        "http://0x7f000001/",  # as one hex number
-        "http://0177.0.0.1/",  # octal first octet
-        "http://0x7f.0.0.1/",  # hex first octet
-        "http://127.1/",  # short form
-        "http://127.0.0.1./",  # trailing dot
-        "http://%31%32%37.0.0.1/",  # percent-encoded
-        "http://①②⑦.0.0.1/",  # Unicode digits that IDNA would fold to 127
-        "http://[::127.0.0.1]/",  # IPv4-compatible (deprecated) loopback
+        ("http://2130706433/", UrlRefusal.HOST_NOT_ALLOWED),  # 127.0.0.1 as one decimal
+        ("http://0x7f000001/", UrlRefusal.HOST_NOT_ALLOWED),  # as one hex number
+        ("http://0177.0.0.1/", UrlRefusal.HOST_NOT_ALLOWED),  # octal first octet
+        ("http://0x7f.0.0.1/", UrlRefusal.HOST_NOT_ALLOWED),  # hex first octet
+        ("http://127.1/", UrlRefusal.HOST_NOT_ALLOWED),  # short form
+        ("http://%31%32%37.0.0.1/", UrlRefusal.HOST_NOT_ALLOWED),  # percent-encoded
+        ("http://①②⑦.0.0.1/", UrlRefusal.HOST_NOT_ALLOWED),  # Unicode digits, never decoded
+        ("http://٩٣.١٨٤.٢١٥.١٤/", UrlRefusal.HOST_NOT_ALLOWED),  # a public one, the same
+        ("http://[2606:4700::1111%25eth0]/", UrlRefusal.HOST_NOT_ALLOWED),  # a zone ID
+        ("http://[fe80::1%25eth0]/", UrlRefusal.HOST_NOT_ALLOWED),
+        # A trailing dot is the same name: it is removed, and the address then checked.
+        ("http://127.0.0.1./", UrlRefusal.ADDRESS_NOT_ALLOWED),
+        ("http://[::127.0.0.1]/", UrlRefusal.ADDRESS_NOT_ALLOWED),  # IPv4-compatible loopback
+        ("http://[fec0::1]/", UrlRefusal.ADDRESS_NOT_ALLOWED),  # deprecated site-local
     ],
 )
-def test_encoded_address_forms_are_refused(raw: str) -> None:
-    assert check_url(raw) in (UrlRefusal.HOST_NOT_ALLOWED, UrlRefusal.ADDRESS_NOT_ALLOWED)
+def test_encoded_address_forms_are_refused(raw: str, refusal: UrlRefusal) -> None:
+    assert check_url(raw) is refusal
 
 
 @pytest.mark.req("ACQ-01")
@@ -130,6 +135,7 @@ def test_a_public_ip_literal_is_allowed_and_kept_as_an_address() -> None:
         ("::ffff:10.1.2.3", True),
         ("::ffff:93.184.215.14", True),  # every embedded-IPv4 form is refused, public or not
         ("2001:db8::1", True),  # documentation
+        ("fec0::1", True),  # deprecated site-local, which `is_global` passes
         ("198.18.0.1", True),  # benchmarking
         ("240.0.0.1", True),  # reserved
         ("255.255.255.255", True),

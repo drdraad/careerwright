@@ -241,7 +241,9 @@ def acquire_adzuna(
             http_status=result.http_status,
             http_requests=result.requests,
         )
-    kept = redact_text(result.text).encode()  # JSON stays JSON: only string content changes
+    # JSON stays JSON: only string content changes.
+    app_id = credentials[0].get_secret_value()
+    kept = redact_text(adzuna.without_app_id(result.text, app_id)).encode()
     digest = hashlib.sha256(kept).hexdigest()
     page = adzuna.parse_search(kept, sha256=digest)
     rights = classify_page("api.adzuna.com")

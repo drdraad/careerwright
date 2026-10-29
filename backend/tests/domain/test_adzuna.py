@@ -14,6 +14,7 @@ from nessa.evidence.adzuna import (
     recorded_url,
     redact,
     transport_url,
+    without_app_id,
 )
 from nessa.evidence.jobs import group_copies
 from nessa.evidence.records import (
@@ -131,6 +132,25 @@ def test_redaction_removes_credentials_from_any_url_however_they_are_written() -
     url = "https://api.adzuna.com/x?APP_KEY=k1&what=a&App_Id=i1&app_key=k2#frag"
 
     assert redact(url) == "https://api.adzuna.com/x?what=a"
+
+
+@pytest.mark.req("SEC-05")
+def test_the_app_id_echoed_in_a_landing_link_is_never_kept() -> None:
+    # Adzuna's landing links may carry the app id as a parameter's value (review A M3).
+    app_id = APP_ID.get_secret_value()
+    data = json.loads(body())
+    link = f"https://www.adzuna.co.uk/jobs/land/ad/1?se=s&utm_source={app_id}&v=2"
+    data["results"][0]["redirect_url"] = link
+    data["results"][1]["description"] = f"Ref {app_id} applies."
+
+    kept = without_app_id(json.dumps(data), app_id).encode()
+    page = parse_search(kept, sha256=hashlib.sha256(kept).hexdigest())
+
+    assert app_id not in kept.decode()
+    assert page.copies[0].apply_url == "https://www.adzuna.co.uk/jobs/land/ad/1?se=s&v=2"
+    claims = json.dumps([c.model_dump(mode="json") for p in page.copies for c in p.claims])
+    assert app_id not in claims
+    assert without_app_id(body().decode(), app_id) == body().decode()  # nothing to remove
 
 
 @pytest.mark.req("SEC-05")
