@@ -407,11 +407,12 @@ _WORK_MODES = {
     mode: re.compile(rf"(?<![A-Za-z])(?:{words})(?![A-Za-z])", re.IGNORECASE)
     for mode, words in _WORK_MODE_WORDS.items()
 }
-# A negator before a mode word ("not remote", "non-remote", "no remote working"): the span
-# says what the job is not, so it reads as unclear, never as the word (review C M1).
+# A negator up to two words before a mode word ("not remote", "non-remote", "not fully
+# remote", "this is not a remote role"): the span says what the job is not, or not wholly,
+# so it reads as unclear, never as the word (review C M1; fix round 4, item 7).
 _NEGATED_MODE = re.compile(
-    rf"(?<![A-Za-z])(?:not|no|non)(?:\s+|-)(?:{'|'.join(_WORK_MODE_WORDS.values())})"
-    r"(?![A-Za-z])",
+    r"(?<![A-Za-z])(?:not|no|non)(?:[\s-]+[^\s-]+){0,2}?[\s-]+"
+    rf"(?:{'|'.join(_WORK_MODE_WORDS.values())})(?![A-Za-z])",
     re.IGNORECASE,
 )
 

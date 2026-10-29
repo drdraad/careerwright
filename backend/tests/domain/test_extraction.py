@@ -539,6 +539,10 @@ def test_no_date_or_more_than_one_is_none(text: str) -> None:
         ("This role is not hybrid", None),
         ("Non-remote, based in Leeds", None),
         ("No remote working", None),
+        # Fix round 4, item 7: up to two words may stand between the negator and the mode.
+        ("Not fully remote", None),
+        ("This is not a remote role", None),
+        ("Not in the office every day", None),
     ],
 )
 def test_the_work_mode_is_read_only_when_the_span_names_one(

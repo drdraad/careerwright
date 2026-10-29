@@ -437,7 +437,10 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
       year and hour words the reader knows (`annual`, `annually`, `yearly`, `hourly`), so
       `£30,000pa`, `£14.50ph` and `£30kpa` are read exactly; an attached month, week or day
       form (`£2,000pcm`) is still refused. A negated work
-      mode ("not remote", "non-remote") is `work_mode_unclear` (review C M1). The input is
+      mode ("not remote", "non-remote") is `work_mode_unclear` (review C M1), also with up
+      to two words between the negator and the mode word ("not fully remote", "this is not
+      a remote role"; fix round 4, item 7), which errs towards unclear ("no commute, fully
+      remote" is unclear too). The input is
       held to 8,000 bytes of UTF-8, as its reservation assumes (review C M4). A field
       without a verified span is dropped with its reason; a span whose
       value cannot be read is a quarantined claim; postings for one title that disagree on
