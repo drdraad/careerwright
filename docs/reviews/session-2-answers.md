@@ -53,3 +53,359 @@ Quick checks:
 
 C2, C3, C5 and C6 were judged from the screenshots in `docs/reviews/sprint-2/screenshots/`
 (the 1440x900 versions); C1 and C4 from the app and the start screen's screenshot.
+
+## Part 3: facts from real pages (`session-2-option-pack-questions.md`)
+
+- Q1: yes
+- Q2: yes
+- Q3: yes
+- Q4: yes
+- Q5: yes
+- Q6: yes
+- Q7: yes
+- Q8: yes
+- Q9: yes
+- Q10: yes
+- Q11: yes
+- Q12: yes
+- Q13: yes
+- Q14: yes
+- Q15: yes
+
+## Part 3, continued: Q16–Q344 checked by an AI, not by the product owner
+
+The product owner found these rows too simple for a person to check one by one. Claude built a
+prompt (each question, its page link and the rules for answering); the product owner had an
+AI that can open web pages check them, and pasted its answers back on 2026-10-29. These are
+the AI's answers, not the product owner's own review. The links in its plain yes answers are
+dropped; its no and ? answers are kept as it wrote them.
+
+- Q16 (checked by AI): yes
+- Q17 (checked by AI): yes
+- Q18 (checked by AI): yes
+- Q19 (checked by AI): yes
+- Q20 (checked by AI): yes
+- Q21 (checked by AI): yes
+- Q22 (checked by AI): yes
+- Q23 (checked by AI): no - agency; embedded page data state ["jobRecruiterType":"Recruitment consultancy" and "isAgency":true](https://www.reed.co.uk/jobs/data-analyst/57482544).
+- Q24 (checked by AI): yes
+- Q25 (checked by AI): no - independent querying is not established as essential; the requirement permits alternatives: ["at least one tool such as SQL, Power BI or Python."](https://www.reed.co.uk/jobs/data-analyst/57482544)
+- Q26 (checked by AI): yes
+- Q27 (checked by AI): yes
+- Q28 (checked by AI): yes
+- Q29 (checked by AI): yes
+- Q30 (checked by AI): yes
+- Q31 (checked by AI): yes
+- Q32 (checked by AI): yes
+- Q33 (checked by AI): yes
+- Q34 (checked by AI): yes
+- Q35 (checked by AI): yes
+- Q36 (checked by AI): yes
+- Q37 (checked by AI): yes
+- Q38 (checked by AI): no - the page states ["195 hours"](https://www.netcomtraining.co.uk/course/certificate-in-data/), without identifying them as guided learning hours.
+- Q39 (checked by AI): no - the learner fee is £0 conditional on eligibility: ["You could train for free"](https://www.netcomtraining.co.uk/course/certificate-in-data/); an unfunded price is unspecified.
+- Q40 (checked by AI): yes
+- Q41 (checked by AI): yes
+- Q42 (checked by AI): yes
+- Q43 (checked by AI): yes
+- Q44 (checked by AI): no - the form lists preferred course times, including ["18:00pm - 21:00pm"](https://www.netcomtraining.co.uk/course/certificate-in-data/); these are choices, although no weekly timetable is confirmed.
+- Q45 (checked by AI): yes
+- Q46 (checked by AI): yes
+- Q47 (checked by AI): yes
+- Q48 (checked by AI): yes
+- Q49 (checked by AI): yes
+- Q50 (checked by AI): yes
+- Q51 (checked by AI): yes
+- Q52 (checked by AI): yes
+- Q53 (checked by AI): no - practice is advertised under this heading: ["Get hands-on experience with industry leading tools like Tableau and PowerBI."](https://www.netcomtraining.co.uk/course/certificate-in-data/)
+- Q54 (checked by AI): yes
+- Q55 (checked by AI): yes
+- Q56 (checked by AI): no - access lasts one year, rather than an unspecified duration bounded by one year: ["one year of 24/7 access"](https://www.reed.co.uk/jobs/junior-data-analyst/57424113).
+- Q57 (checked by AI): yes
+- Q58 (checked by AI): yes
+- Q59 (checked by AI): yes
+- Q60 (checked by AI): yes
+- Q61 (checked by AI): yes
+- Q62 (checked by AI): yes
+- Q63 (checked by AI): no - the page describes ["Flexible learning" and "Live, instructor-led online training"](https://www.reed.co.uk/jobs/junior-data-analyst/57424113), although session times are unspecified.
+- Q64 (checked by AI): yes
+- Q65 (checked by AI): yes
+- Q66 (checked by AI): yes
+- Q67 (checked by AI): yes
+- Q68 (checked by AI): yes
+- Q69 (checked by AI): yes
+- Q70 (checked by AI): yes
+- Q71 (checked by AI): yes
+- Q72 (checked by AI): yes
+- Q73 (checked by AI): yes
+- Q74 (checked by AI): yes
+- Q75 (checked by AI): yes
+- Q76 (checked by AI): yes
+- Q77 (checked by AI): yes
+- Q78 (checked by AI): yes
+- Q79 (checked by AI): yes
+- Q80 (checked by AI): yes
+- Q81 (checked by AI): yes
+- Q82 (checked by AI): yes
+- Q83 (checked by AI): yes
+- Q84 (checked by AI): yes
+- Q85 (checked by AI): yes
+- Q86 (checked by AI): yes
+- Q87 (checked by AI): yes
+- Q88 (checked by AI): yes
+- Q89 (checked by AI): yes
+- Q90 (checked by AI): yes
+- Q91 (checked by AI): yes
+- Q92 (checked by AI): no - the study pattern is stated as ["Self-paced"](https://www.reed.co.uk/courses/comptia-a-new-version/478800).
+- Q93 (checked by AI): yes
+- Q94 (checked by AI): yes
+- Q95 (checked by AI): no - the course provides exam preparation; students are ["prepared to take"](https://www.reed.co.uk/courses/comptia-a-new-version/478800) the exams, and “CompTIA exam fees are not included”.
+- Q96 (checked by AI): no - the course provides exam preparation; students are ["prepared to take"](https://www.reed.co.uk/courses/comptia-a-new-version/478800) the exams, and “CompTIA exam fees are not included”.
+- Q97 (checked by AI): yes
+- Q98 (checked by AI): no - quizzes require ["60% marks on the quiz test"](https://www.reed.co.uk/courses/adult-nursing-safeguarding-level-3-course/397579) before later modules; only additional assessments are excluded.
+- Q99 (checked by AI): yes
+- Q100 (checked by AI): yes
+- Q101 (checked by AI): yes
+- Q102 (checked by AI): no - the page describes instalments for ["course purchases between £50 and £6000"](https://www.reed.co.uk/courses/adult-nursing-safeguarding-level-3-course/397579); this £19 course alone falls below that minimum.
+- Q103 (checked by AI): yes
+- Q104 (checked by AI): yes
+- Q105 (checked by AI): yes
+- Q106 (checked by AI): no - the study pattern is stated as ["Self-paced"](https://www.reed.co.uk/courses/adult-nursing-safeguarding-level-3-course/397579).
+- Q107 (checked by AI): yes
+- Q108 (checked by AI): yes
+- Q109 (checked by AI): no - ["No formal qualification"](https://www.reed.co.uk/courses/adult-nursing-safeguarding-level-3-course/397579) does not mention NMC registration; the page establishes no outcome for that registration.
+- Q110 (checked by AI): yes
+- Q111 (checked by AI): yes
+- Q112 (checked by AI): yes
+- Q113 (checked by AI): yes
+- Q114 (checked by AI): yes
+- Q115 (checked by AI): yes
+- Q116 (checked by AI): yes
+- Q117 (checked by AI): yes
+- Q118 (checked by AI): yes
+- Q119 (checked by AI): yes
+- Q120 (checked by AI): yes
+- Q121 (checked by AI): yes
+- Q122 (checked by AI): yes
+- Q123 (checked by AI): yes
+- Q124 (checked by AI): yes
+- Q125 (checked by AI): yes
+- Q126 (checked by AI): yes
+- Q127 (checked by AI): no - ["Become eligible to register"](https://www.manchester.ac.uk/study/undergraduate/courses/2027/10971/bnurs-adult-nursing/) describes registration eligibility, not an assessed work sample demonstrating registration.
+- Q128 (checked by AI): yes
+- Q129 (checked by AI): yes
+- Q130 (checked by AI): yes
+- Q131 (checked by AI): yes
+- Q132 (checked by AI): yes
+- Q133 (checked by AI): yes
+- Q134 (checked by AI): yes
+- Q135 (checked by AI): yes
+- Q136 (checked by AI): yes
+- Q137 (checked by AI): yes
+- Q138 (checked by AI): yes
+- Q139 (checked by AI): yes
+- Q140 (checked by AI): yes
+- Q141 (checked by AI): yes
+- Q142 (checked by AI): no - ["Process receipts and payments"](https://leedscitycollege.ac.uk/courses/business-and-bookkeeping/) describes transaction processing; the page does not identify reconciliation.
+- Q143 (checked by AI): yes
+- Q144 (checked by AI): yes
+- Q145 (checked by AI): yes
+- Q146 (checked by AI): yes
+- Q147 (checked by AI): yes
+- Q148 (checked by AI): yes
+- Q149 (checked by AI): yes
+- Q150 (checked by AI): yes
+- Q151 (checked by AI): yes
+- Q152 (checked by AI): yes
+- Q153 (checked by AI): no - exam assessment is stated: ["There are four external exams during the course."](https://leedscitycollege.ac.uk/courses/accounting-2/)
+- Q154 (checked by AI): yes
+- Q155 (checked by AI): yes
+- Q156 (checked by AI): yes
+- Q157 (checked by AI): yes
+- Q158 (checked by AI): yes
+- Q159 (checked by AI): yes
+- Q160 (checked by AI): yes
+- Q161 (checked by AI): yes
+- Q162 (checked by AI): yes
+- Q163 (checked by AI): yes
+- Q164 (checked by AI): yes
+- Q165 (checked by AI): yes
+- Q166 (checked by AI): yes
+- Q167 (checked by AI): no - the module description says ["including recording financial transactions"](https://leedscitycollege.ac.uk/courses/accounting/); it does not establish reconciliation as examined content.
+- Q168 (checked by AI): yes
+- Q169 (checked by AI): yes
+- Q170 (checked by AI): yes
+- Q171 (checked by AI): yes
+- Q172 (checked by AI): yes
+- Q173 (checked by AI): yes
+- Q174 (checked by AI): yes
+- Q175 (checked by AI): yes
+- Q176 (checked by AI): yes
+- Q177 (checked by AI): yes
+- Q178 (checked by AI): yes
+- Q179 (checked by AI): yes
+- Q180 (checked by AI): yes
+- Q181 (checked by AI): yes
+- Q182 (checked by AI): yes
+- Q183 (checked by AI): yes
+- Q184 (checked by AI): yes
+- Q185 (checked by AI): yes
+- Q186 (checked by AI): yes
+- Q187 (checked by AI): no - the page says ["earn below £25,750 or are unemployed"](https://www.gov.uk/guidance/free-courses-for-jobs), without explicitly specifying an annual period or gross earnings.
+- Q188 (checked by AI): yes
+- Q189 (checked by AI): yes
+- Q190 (checked by AI): yes
+- Q191 (checked by AI): yes
+- Q192 (checked by AI): yes
+- Q193 (checked by AI): yes
+- Q194 (checked by AI): yes
+- Q195 (checked by AI): yes
+- Q196 (checked by AI): yes
+- Q197 (checked by AI): yes
+- Q198 (checked by AI): no - [HTML metadata](https://www.gov.uk/advanced-learner-loan/eligibility) state “govuk:first-published-at” as “2016-05-16T09:00:07+01:00”.
+- Q199 (checked by AI): no - [HTML metadata](https://www.gov.uk/advanced-learner-loan/eligibility) supply a public update date: “govuk:public-updated-at” is “2024-10-14T10:36:04+01:00”.
+- Q200 (checked by AI): yes
+- Q201 (checked by AI): no - the quotation appears on [F01](https://www.gov.uk/guidance/free-courses-for-jobs), “which you pay back when you’re earning over a certain amount”; this eligibility page does not state that repayment rule.
+- Q202 (checked by AI): yes
+- Q203 (checked by AI): yes
+- Q204 (checked by AI): yes
+- Q205 (checked by AI): yes
+- Q206 (checked by AI): no - the governing wording is ["may need"](https://www.gov.uk/advanced-learner-loan/eligibility) alternative finance, with instructions to check with the provider; the replacement is presented conditionally.
+- Q207 (checked by AI): no - the governing wording is ["may need"](https://www.gov.uk/advanced-learner-loan/eligibility) alternative finance, with instructions to check with the provider; the replacement is presented conditionally.
+- Q208 (checked by AI): yes
+- Q209 (checked by AI): yes
+- Q210 (checked by AI): yes
+- Q211 (checked by AI): yes
+- Q212 (checked by AI): yes
+- Q213 (checked by AI): yes
+- Q214 (checked by AI): yes
+- Q215 (checked by AI): yes
+- Q216 (checked by AI): yes
+- Q217 (checked by AI): yes
+- Q218 (checked by AI): yes
+- Q219 (checked by AI): yes
+- Q220 (checked by AI): yes
+- Q221 (checked by AI): yes
+- Q222 (checked by AI): yes
+- Q223 (checked by AI): no - agency: ["AWD online operates as an employment agency."](https://www.reed.co.uk/jobs/junior-it-support-technician-service-desk-analyst/57467424)
+- Q224 (checked by AI): no - AWD is the agency; the unnamed employer is described as ["our Client"](https://www.reed.co.uk/jobs/junior-it-support-technician-service-desk-analyst/57467424).
+- Q225 (checked by AI): yes
+- Q226 (checked by AI): yes
+- Q227 (checked by AI): ?
+- Q228 (checked by AI): ?
+- Q229 (checked by AI): yes
+- Q230 (checked by AI): ?
+- Q231 (checked by AI): ?
+- Q232 (checked by AI): ?
+- Q233 (checked by AI): ?
+- Q234 (checked by AI): ?
+- Q235 (checked by AI): yes
+- Q236 (checked by AI): ?
+- Q237 (checked by AI): ?
+- Q238 (checked by AI): ?
+- Q239 (checked by AI): ?
+- Q240 (checked by AI): yes
+- Q241 (checked by AI): ?
+- Q242 (checked by AI): ?
+- Q243 (checked by AI): yes
+- Q244 (checked by AI): yes
+- Q245 (checked by AI): yes
+- Q246 (checked by AI): yes
+- Q247 (checked by AI): yes
+- Q248 (checked by AI): yes
+- Q249 (checked by AI): yes
+- Q250 (checked by AI): yes
+- Q251 (checked by AI): yes
+- Q252 (checked by AI): yes
+- Q253 (checked by AI): yes
+- Q254 (checked by AI): yes
+- Q255 (checked by AI): yes
+- Q256 (checked by AI): yes
+- Q257 (checked by AI): yes
+- Q258 (checked by AI): yes
+- Q259 (checked by AI): yes
+- Q260 (checked by AI): yes
+- Q261 (checked by AI): no - ["Valid UK driving license"](https://www.jobs.nhs.uk/candidate/jobadvert/C9387-26-2139) is an essential official credential; it warrants a driving-licence verification gate using the [official checking service](https://www.gov.uk/check-driving-information).
+- Q262 (checked by AI): yes
+- Q263 (checked by AI): yes
+- Q264 (checked by AI): yes
+- Q265 (checked by AI): yes
+- Q266 (checked by AI): yes
+- Q267 (checked by AI): yes
+- Q268 (checked by AI): yes
+- Q269 (checked by AI): no - the page states ["Registered Nurse (RMN/RGN)"](https://www.jobs.nhs.uk/candidate/jobadvert/E0340-26-0027), but supplies no SOC codes; the proposed crosswalk is an inference.
+- Q270 (checked by AI): yes
+- Q271 (checked by AI): yes
+- Q272 (checked by AI): yes
+- Q273 (checked by AI): yes
+- Q274 (checked by AI): yes
+- Q275 (checked by AI): yes
+- Q276 (checked by AI): yes
+- Q277 (checked by AI): yes
+- Q278 (checked by AI): yes
+- Q279 (checked by AI): yes
+- Q280 (checked by AI): yes
+- Q281 (checked by AI): yes
+- Q282 (checked by AI): yes
+- Q283 (checked by AI): yes
+- Q284 (checked by AI): no - retain the pro-rata qualification: £32,073–£39,043 per year, ["pro rata per annum"](https://www.jobs.nhs.uk/candidate/jobadvert/C9245-26-0449).
+- Q285 (checked by AI): yes
+- Q286 (checked by AI): yes
+- Q287 (checked by AI): yes
+- Q288 (checked by AI): yes
+- Q289 (checked by AI): yes
+- Q290 (checked by AI): ? - the person specification allows pending registration, but the same page says ["Applicants must have current UK professional registration."](https://www.jobs.nhs.uk/candidate/jobadvert/C9245-26-0449)
+- Q291 (checked by AI): yes
+- Q292 (checked by AI): yes
+- Q293 (checked by AI): yes
+- Q294 (checked by AI): yes
+- Q295 (checked by AI): yes
+- Q296 (checked by AI): yes
+- Q297 (checked by AI): yes
+- Q298 (checked by AI): no - the page states ["Nurse (RMN or RNLD)"](https://www.jobs.nhs.uk/candidate/jobadvert/E0132-26-2428), but supplies no SOC codes; the proposed crosswalk is an inference.
+- Q299 (checked by AI): yes
+- Q300 (checked by AI): no - retain the pro-rata qualification: £32,073–£39,043 per year, ["pro rata per annum"](https://www.jobs.nhs.uk/candidate/jobadvert/C9362-26-0811).
+- Q301 (checked by AI): yes
+- Q302 (checked by AI): yes
+- Q303 (checked by AI): yes
+- Q304 (checked by AI): yes
+- Q305 (checked by AI): yes
+- Q306 (checked by AI): yes
+- Q307 (checked by AI): yes
+- Q308 (checked by AI): yes
+- Q309 (checked by AI): yes
+- Q310 (checked by AI): yes
+- Q311 (checked by AI): yes
+- Q312 (checked by AI): yes
+- Q313 (checked by AI): yes
+- Q314 (checked by AI): yes
+- Q315 (checked by AI): yes
+- Q316 (checked by AI): yes
+- Q317 (checked by AI): no - visible pay is unspecified, but [embedded salary data](https://www.reed.co.uk/jobs/bookkeeper/57462002) contain “fromPerAnnum”:33000 and “toPerAnnum”:38000; this is not a visibly advertised salary range.
+- Q318 (checked by AI): yes
+- Q319 (checked by AI): yes
+- Q320 (checked by AI): yes
+- Q321 (checked by AI): yes
+- Q322 (checked by AI): yes
+- Q323 (checked by AI): yes
+- Q324 (checked by AI): yes
+- Q325 (checked by AI): yes
+- Q326 (checked by AI): yes
+- Q327 (checked by AI): yes
+- Q328 (checked by AI): yes
+- Q329 (checked by AI): yes
+- Q330 (checked by AI): yes
+- Q331 (checked by AI): yes
+- Q332 (checked by AI): yes
+- Q333 (checked by AI): no - agency; embedded page data state ["jobRecruiterType":"Recruitment consultancy"](https://www.reed.co.uk/jobs/bookkeeper/57423448).
+- Q334 (checked by AI): no - PRATAP is the recruiter; the unnamed client is described as ["An exciting business operating across the renewable energy, utilities and infrastructure sectors"](https://www.reed.co.uk/jobs/bookkeeper/57423448).
+- Q335 (checked by AI): yes
+- Q336 (checked by AI): yes
+- Q337 (checked by AI): yes
+- Q338 (checked by AI): yes
+- Q339 (checked by AI): yes
+- Q340 (checked by AI): yes
+- Q341 (checked by AI): yes
+- Q342 (checked by AI): yes
+- Q343 (checked by AI): yes
+- Q344 (checked by AI): yes
