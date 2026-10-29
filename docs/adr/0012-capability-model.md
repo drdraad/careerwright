@@ -1,0 +1,188 @@
+# ADR 0012: The capability model: matrices, evidence, protected gates, outcomes and readiness
+
+- Status: Accepted for Task 9 (Sprint 4 backend, S4.1–S4.6).
+  - **Provisional, need product owner confirmation (R6):** decisions 3 (how importance is
+    derived, ESCO-only rows unknown, disputed counted as required), 4 (what verifies a
+    protected gate), 5 (what evidence counts towards readiness), 6 (who reviews an assessed
+    result), 8 (the question weights, the 80% stop and the twelve initial prompts) and 10
+    (how a target finds its pack target and ESCO seed).
+  - **Not run — requires human:** the domain review of the capability reference (its
+    rubrics, required levels, ESCO crosswalks and gate types). It is not in the session 2
+    package yet (consequences).
+- Date: 2026-10-29
+- Requirements: MAP1-01–MAP1-08, OUT1-01–OUT1-07, OUT1-11, RDY1-01–RDY1-05, BND1-08,
+  ASSESS-01, ASSESS-03–ASSESS-06, READINESS-01–04, TRACE01-06, VERSIONS-04, OPTN-09, PLN-04;
+  spec sections 8, 9, 10 and 18; rulings R6, R9, R11, R12; ADR 0011 decisions 2, 10 and 13
+
+## Context
+
+Task 7b left the England option pack 0.1.0: real postings with requirement rows mapped to
+pack-local rows (`pack:<target>:<row>`), course outcomes with an evidence kind and a
+confidence but no level, and every record `proposed`. The pack is frozen. Sprint 4 needs
+provisional matrices per target, evidence against behaviourally anchored levels, protected
+gates, the outcome rules of OUT-1, readiness with the apply-now case, gaps and an abstract
+action graph, and one question graph across the targets. Every one of these is
+deterministic code: a model may later propose mappings and answers, never commit them.
+
+## Decisions
+
+1. **Its own module.** `nessa/capability` (dispatch ruling 2; plan section 3, the capability
+   half of "Capability and catalogue"): `reference.py` (the reference data and its loader),
+   `matrix.py`, `evidence.py`, `outcomes.py`, `readiness.py`, `questions.py` (all pure),
+   `store.py` (the SQL adapter, migration 0029, listed in the architecture test) and
+   `commands.py` (use cases). It reads the catalogue (the pack, ESCO), the evidence module
+   (the title key and the count of the person's examples), the profile (its targets) and
+   identity. Only the API imports it.
+
+2. **The capability reference.** A committed JSON file beside the module, pinned by its
+   SHA-256 like the pack (`capability-reference-0.1.0.json`), written by an agent and
+   `proposed`:
+   - a rubric for each of the eight pack skill rows: an observable task, five behavioural
+     anchors (spec section 8: 0 no evidence of performance … 4 designs or leads), a proposed
+     required level (2 for every row: the postings are entry-level), acceptable proof,
+     prerequisites (none stated by the sources) and one ESCO skill crosswalk, each an
+     essential relation of the target's crosswalked occupation in ESCO v1.2.1;
+   - the two gates the postings name, typed: NMC registration as legal practice, the right
+     to work in the UK as eligibility;
+   - an ESCO occupation crosswalk for each pack target (data quality specialist, ICT help
+     desk agent, nurse responsible for general care, bookkeeper).
+
+   The loader refuses a reference that is not its pin or does not fit its pack, and checks
+   the pack references the capability model reads and Task 7b's validator leaves unchecked
+   (Task 7b M3, dispatch ruling 4): option and skill-row targets, a requirement's target
+   against its posting's, the sources postings and options name, and every gate wording
+   having exactly one typed gate. The pack and its pin are unchanged. A version holds its
+   rubric versions (`<row>@0.1.0`), so a revised rubric is a new rubric that earlier levels
+   do not count for.
+
+3. **Matrix rows and their importance (provisional).** A target's rows come from:
+   - **pack rows**, from the postings of the pack target with the same title, each citing
+     its claims (span, excerpt, hash, retrieval date, review state);
+   - **gates**, from requirements whose row is a credential (NMC registration) or that name
+     a gate without a row (the right to work);
+   - **one posting's own requirements** (no pack row), employer-specific;
+   - **ESCO seed rows**: the occupation's skill relations, except those a pack row's
+     crosswalk folds in.
+
+   Importance is what the postings state: all essential is essential, all preferred is
+   preferred, a mix is disputed (SQL for P01's target: three postings essential, one
+   preferred), none is unknown. An ESCO relation is a seed, not a requirement: an ESCO-only
+   row is unknown and has no rubric, so it is reported as not modelled and never enters
+   readiness (otherwise a nurse target would need evidence on 92 rows). One posting's
+   requirement says nothing about the target, so its row is unknown, with the posting's own
+   importance in its citation, and an essential one is listed as that posting's check. A
+   **disputed row counts as required** until the person decides: some postings require it,
+   so readiness never rests on leaving it out. Prevalence counts distinct vacancies
+   (copies once): full-description vacancies apart from snippets and unknown descriptions,
+   which are never evidence of absence.
+
+4. **Protected gates.** A gate row carries its type, issuing body, jurisdiction and
+   verification, and is always required. Setting any other importance is refused with the
+   new code `PROTECTED_GATE` (409), before anything is written, and a stored edit can never
+   demote one. The person may challenge its source: the reason is recorded on the row, the
+   gate stays. Relaxing an employer's requirement out of the definition needs the explicit
+   warning acknowledged (`CONFIRMATION_REQUIRED` otherwise), and then shows as a preference
+   conflict gap. A gate is satisfied only when the person states they hold it **and verified
+   it at its source** (their own entry on the NMC register; an employer's right to work
+   check), recorded as their confirmation (provisional: L0 checks no register). Held but
+   unverified, "don't know" and no answer are unresolved, never ineligible.
+
+5. **Evidence (provisional).** An answer is about a subject (an ESCO skill, a pack row, a
+   gate), so it is shared across targets, but a level counts only against the rubric it was
+   chosen for: another target's row with the same subject and another rubric asks for its
+   own level and offers the earlier example. Kept apart: the person's own level, a level a
+   reviewed demonstration or assessment showed, and the confidence. Towards readiness: a
+   reviewed demonstration's level (`corroborated`); otherwise the latest self-report with a
+   concrete example and when it was last done (`provisional`); a level with no example stays
+   `unsupported`, self-reported and not false, and counts for nothing. Unsure is unknown,
+   never level 0. Time in a job adds nothing by itself: no field turns duration into a
+   level. AI assistance is kept on every reading.
+
+6. **Outcomes (OUT-1).** The pack's planned outcomes load as provider claims with their
+   span, evidence kind, confidence, rubric version, claim state and review state. A level on
+   completion needs an assessed kind (exam or assessed work sample), the row's rubric and,
+   for a provider claim, a source that supports it; a topic mention or unassessed practice is
+   null. Credentials and supervised experience are their own outcome types and never have a
+   level: C08's degree leads to eligibility to apply to the NMC, never to the registration
+   gate itself. Accepting a mapping makes it `accepted_assumption`; a user override is a
+   separate record beside the provider's, `accepted_assumption` and never `reviewed`. An
+   outcome counts only in a conditional scenario, after its offering's completion gate and
+   once accepted or reviewed; it never changes current evidence, and overlapping outcomes
+   take the highest level, never a sum. An assessed completion changes evidence only as a
+   new assessment record, once its review date is recorded (provisional: in L0 the review is
+   the person's confirmation of the result and its assessor; there is no third-party
+   reviewer).
+
+7. **Readiness, gaps and the action graph.** For one matrix and definition version, ready
+   means every required skill row at its required evidenced level and every required
+   credential, experience and eligibility row satisfied. Blockers keep their kind: below the
+   required level, no usable evidence, not modelled, not held, unresolved, and a pathway
+   outside the model (every supporting pathway's shortest stated duration beyond the
+   24-month M0 horizon: C08's three years, `MODEL_SCOPE_EXCEEDED` on the action). Nothing
+   finds a person ineligible. Gaps are learn, demonstrate, credential, experience,
+   eligibility, information or preference conflict, one abstract action each; options are
+   offered only for learn, credential and experience gaps (and an unresolved credential gate
+   shows its pathways for the case it is not held), never for a demonstration or an
+   eligibility gap, and never before the person has said where they are. Each candidate says
+   whether its source supports the mapping and whether a numeric solve may use it (a null
+   level leaves a partial sketch). Ready now leads with reviewing current postings and
+   applying (P05): no forced training, no route chart as the main result, evidence recency,
+   the postings' own checks, optional development apart. Every L0 result is qualified: the
+   matrix is provisional, and proposed records, proposed rubrics, self-reported evidence and
+   assumptions are each named (OPTN-09, R9).
+
+8. **The question graph (provisional weights).** One graph across the targets, a shared
+   subject asked once. Requirements and gates first; then importance (essential 3, disputed
+   2, preferred 1) × uncertainty (4 no answer, 3 unsupported, 2 another rubric's answer or a
+   conflict, 0 usable) × route impact (targets served) / burden (1). The first twelve prompts
+   are the initial set. Asking is "enough" once every gate is known or marked unresolved and
+   at least 80% of the weighted required rows have usable evidence; "stopped" when the
+   person stops or pauses, with every open question kept. Coverage is counts, never a
+   percentage.
+
+9. **Versions.** A matrix has a `matrix_version` (a digest of its content) and a
+   `definition_version` (a digest of its required rows, their levels, rubrics and gate types).
+   The workspace has a capability version, the expected version of every capability write.
+   Every derived result carries the target, both matrix versions, the evidence version and
+   the pack and reference versions; `ensure_current` refuses a result against another
+   definition (`STALE_INPUT_VERSION`). An edit stores its actor, reason and old and new
+   versions; an edit whose row the sources no longer give is reported, never dropped. Each
+   gap depends only on its own row's subject and names the records it rests on, so an
+   evidence change alters only the gaps it affects.
+
+10. **Persistence and the API (provisional matching).** Migration 0029: `capability_states`
+    and the append-only `skill_evidence`, `requirement_statements` and `matrix_edits`, under
+    row-level security, their CHECKs repeating the domain rules. Nothing derived is stored:
+    matrices, questions and readiness are computed on read from the profile's targets. A
+    target's pack target is the one with the same title (case and punctuation folded); its
+    ESCO seed is the occupation ESCO labels with exactly that title, otherwise the pack
+    target's crosswalk; otherwise none, with the reason. Endpoints under
+    `/v1/workspaces/{id}/capability`: `GET matrices`, `GET questions`, `GET readiness`,
+    `POST evidence`, `POST statements`, `POST edits`, `PUT questions/state`, each write with
+    an expected version and an Idempotency-Key, returning the new version.
+
+11. **Not in this task.**
+    - **The person's examples' requirement rows** are not read: their count is shown
+      (`exemplar_rows_read: false`). Reading them needs a model proposal over the sealed
+      text, or the person's own selection of spans; neither exists yet.
+    - **Outcome decisions are not stored:** accept and override are domain functions. The
+      option checkpoint (Task 12) owns accepting modelling assumptions (OUT1-11) and their
+      persistence.
+    - **No run kind and no model call:** nothing here is model-backed, so DBOS
+      `application_version` is unchanged.
+    - **No conditional-readiness endpoint:** Tasks 11 and 13a call `assess(..., completed=)`
+      in the domain.
+
+## Consequences and open items
+
+- With pack 0.1.0 every readiness result is qualified, and every planned outcome's level is
+  null, so every pack option is excluded from a numeric readiness solve until a reviewed
+  version (Task 7c) or an accepted assumption gives a level. Task 11's TRACE-01 checker run
+  on P01's real option set can check finances; its readiness stays a partial sketch.
+- The capability reference needs the same human review as the pack's labels. Its rubrics,
+  required levels, crosswalks and gate types are proposed for session 2's package (Task 11),
+  whose generator today reads the pack only.
+- The P01 demo workspace's target has the pack target's title, so it shows the real pack
+  matrix (public reference data, as ESCO is), not TRACE-01's synthetic matrix.
+- Ranks do not exist yet: Tasks 11 and 13a must key planning inputs and ranks by
+  `definition_version`, so a changed definition makes them stale (MAP1-04).

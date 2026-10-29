@@ -401,7 +401,7 @@ def test_topic_mentions_and_practice_in_the_pack_add_no_level_even_together() ->
     assert row.status is RowStatus.BELOW_REQUIRED
 
 
-@pytest.mark.req("OUT1-02", "OUT1-04", "OUT1-10")
+@pytest.mark.req("OUT1-02", "OUT1-04")
 def test_an_unsupported_outcome_level_stays_null_and_leaves_a_partial_sketch() -> None:
     # Every planned outcome in pack 0.1.0 is null: topic mentions and unsupported ones must
     # be, and no stated assessment supports a rubric anchor.

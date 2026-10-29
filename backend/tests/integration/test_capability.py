@@ -98,7 +98,7 @@ def test_a_workspace_without_targets_has_no_matrices(api: ApiClient, ada: str) -
     assert (body["matrices"], body["profile_version"]) == ([], 0)
 
 
-@pytest.mark.req("MAP1-01", "JOB-06")
+@pytest.mark.req("MAP1-01")
 def test_the_person_s_own_examples_are_counted_for_their_target_and_never_as_postings(
     api: ApiClient, ada: str
 ) -> None:
