@@ -98,6 +98,32 @@ def test_a_workspace_without_targets_has_no_matrices(api: ApiClient, ada: str) -
     assert (body["matrices"], body["profile_version"]) == ([], 0)
 
 
+@pytest.mark.req("MAP1-01", "JOB-06")
+def test_the_person_s_own_examples_are_counted_for_their_target_and_never_as_postings(
+    api: ApiClient, ada: str
+) -> None:
+    workspace_id = workspace_with_targets(api, ada, DATA, NURSE)
+    pasted = api.write(
+        "POST",
+        f"/v1/workspaces/{workspace_id}/research/pasted",
+        ada,
+        {
+            "target": "data quality ANALYST",
+            "title": "Data Quality Analyst",
+            "text": "We need a data quality analyst who can write SQL and fix duplicates.",
+        },
+    )
+
+    body = matrices(api, ada, workspace_id)
+
+    assert pasted.status_code == 201, pasted.text
+    data = matrix(body, DATA)
+    assert data["coverage"]["exemplars"] == 1
+    assert data["coverage"]["exemplar_rows_read"] is False
+    assert data["coverage"]["posting_copies"] == 4  # the pack's, unchanged by the example
+    assert matrix(body, NURSE)["coverage"]["exemplars"] == 0
+
+
 @pytest.mark.req("RDY1-04", "READINESS-04", "MAP1-05")
 def test_the_registration_gate_cannot_be_demoted_through_the_api(
     api: ApiClient, ada: str, infra: Infra
