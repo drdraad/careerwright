@@ -93,7 +93,6 @@ def test_a_json_ld_job_posting_becomes_a_job_copy_with_every_value_typed() -> No
     assert job.salary.maximum_minor_units == 3_650_050  # exact pence, never a float
     assert job.salary.period is SalaryPeriod.YEAR
     assert job.salary.basis is PayBasis.ADVERTISED
-    assert parsed.hiring_hosts == ("northwind.example",)
 
 
 @pytest.mark.req("ACQ-03", "API-06")

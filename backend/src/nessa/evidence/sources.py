@@ -4,10 +4,12 @@ belong to, and what a workspace keeps of them (ACQ-06).
 
 The classes and what each permits come from the product owner's answers
 (`docs/reviews/session-1.md`, Part A; `corpus/README.md`). A page is classified by its
-host's manifest entry; an unlisted page is an employer posting only when its own structured
-data names a hiring organisation whose site it is on (session 1 line A5, "Employer job
-postings on their own careers site"); anything else is not clearly within a class and stays
-"pending human rights review" (line A7), keeping the hash and minimal excerpts only.
+host's manifest entry and nothing else: an employer's careers site or ATS host is an
+employer posting (session 1 line A5) only when the manifest lists it so. What a page says
+about itself (its JSON-LD `hiringOrganization`) never changes its class, since any page can
+claim any organisation. An unlisted page is not clearly within a class and stays "pending
+human rights review" (line A7), keeping the hash and minimal excerpts only, unless an
+agent's dated classification is recorded for it (`tools/corpus.py`).
 """
 
 import functools
@@ -99,27 +101,17 @@ class PageRights:
     retention: Retention
 
 
-def _own_site(host: str, hiring_host: str) -> bool:
-    hiring_host = hiring_host.lower().removeprefix("www.")
-    return "." in hiring_host and (host == hiring_host or host.endswith(f".{hiring_host}"))
-
-
-def classify_page(host: str, *, hiring_hosts: tuple[str, ...], on: date) -> PageRights:
-    """The page's class and rights status, and so what is kept of it."""
-    host = host.lower()
+def classify_page(host: str) -> PageRights:
+    """The page's class and rights status, and so what is kept of it: from its host's
+    manifest entry only."""
     rule = rule_for(host)
-    if rule.rights_class is not RightsClass.OTHER:
-        read_on = f"read {rule.terms_read_on}" if rule.terms_read_on else "no terms read"
-        status = f"{rule.rights_class.value}: {rule.terms} ({read_on})"
-        return PageRights(rule.rights_class, status, retention(rule.rights_class))
-    for hiring_host in hiring_hosts:
-        if _own_site(host, hiring_host):
-            status = (
-                f"{RightsClass.EMPLOYER_POSTING.value}: the page is on {host}, the site of the "
-                f"hiring organisation its JSON-LD JobPosting names ({hiring_host}); session 1 "
-                f"line A5 (classified {on})"
-            )
-            return PageRights(
-                RightsClass.EMPLOYER_POSTING, status, retention(RightsClass.EMPLOYER_POSTING)
-            )
-    return PageRights(RightsClass.OTHER, PENDING_REVIEW, Retention.EXCERPTS)
+    if rule.rights_class is RightsClass.OTHER:
+        return PageRights(RightsClass.OTHER, PENDING_REVIEW, Retention.EXCERPTS)
+    read_on = f"read {rule.terms_read_on}" if rule.terms_read_on else "no terms read"
+    status = f"{rule.rights_class.value}: {rule.terms} ({read_on})"
+    return PageRights(rule.rights_class, status, retention(rule.rights_class))
+
+
+def is_listed(host: str) -> bool:
+    """Whether the manifest has an entry for the host (else its default rule applies)."""
+    return any(_matches(e, host.lower()) for e in load_manifest().sources)

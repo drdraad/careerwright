@@ -48,7 +48,11 @@ and the short quoted spans that prove each extracted value.
    `attempt_cases`, not page slots.
 2. Fetch with the acquisition pipeline (Task 7A): from `backend/`, `uv run --locked python
    -m tools.corpus --slot <slot> --url <url>` (add `--rights-class <class> --terms "<terms,
-   quoted and dated>"` for a page the source manifest does not list). It applies the URL and
+   quoted and dated>"` to record your classification, dated with the run's date; it replaces
+   the class the pipeline derived in either direction before anything is kept, but never
+   keeps more of a listed host's page than the source manifest permits). A page's own
+   structured data never decides its class: an unlisted employer careers or ATS page is
+   `other` until you classify it. It applies the URL and
    address checks, the source permission manifest
    (`backend/src/nessa/evidence/sources.json`, OI-11), robots.txt and the fetch bounds, keeps
    the body under `var/evidence/corpus/<slot>/` only where the class permits, and prints the

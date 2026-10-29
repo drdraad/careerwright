@@ -65,9 +65,18 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    `backend/src/nessa/evidence/sources.json` lists hosts with their session 1 class, access
    (permitted, API only, denied with the reason), rate limit, retained fields, attribution
    and the terms relied on with the date read (GOV.UK and the National Careers Service:
-   the OGL footer; Adzuna: its API terms; LinkedIn and Indeed denied). An unlisted page is an
-   employer posting only when its own JSON-LD names a hiring organisation whose site it is
-   on (line A5); anything else is class `other`, "pending human rights review". A person
+   the OGL footer; Adzuna: its API terms; LinkedIn and Indeed denied). A page's class comes
+   from its final host's manifest entry and nothing else: an employer's careers site or an
+   ATS host is an employer posting (line A5) only when the manifest lists it so. What a page
+   says about itself never changes its class: its JSON-LD `hiringOrganization` can give a
+   cited `employer` claim and the advertiser kind, but any page can name any organisation
+   (a board naming itself, a public suffix such as `co.uk` or `github.io`), so it is never
+   evidence of whose site the page is on (fix round 1, review A C1). An unlisted page is class
+   `other`, "pending human rights review", unless an agent records a dated classification
+   with the terms relied on (`tools/corpus.py --rights-class --terms`, dated with the run's
+   date). That classification replaces the derived class in either direction before
+   anything is kept, but never keeps more of a listed host's page than its entry permits.
+   The product's runtime never takes one: there, unlisted is `other`. A person
    supplying a URL never overrides an entry. The body is kept, sealed to the workspace in
    `source_documents`, only for the classes that may keep it privately (lines A1–A5); job
    boards and `other` keep the hash and the claims' minimal excerpts (at most 200

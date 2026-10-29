@@ -54,7 +54,6 @@ _MISSING = object()
 class ParsedPage:
     sha256: str
     postings: list[JobCopy]
-    hiring_hosts: tuple[str, ...]  # hosts of the hiring organisations the postings name
     issues: list[str] = field(default_factory=list)
 
 
@@ -400,7 +399,6 @@ def parse_page(text: str, *, sha256: str, page_url: str) -> ParsedPage:
     page_host = _host(page_url)
     selector = Selector(content=text)
     postings: list[JobCopy] = []
-    hiring_hosts: list[str] = []
     issues: list[str] = []
     cursor = 0
     for index, script in enumerate(selector.css('script[type="application/ld+json"]')):
@@ -418,7 +416,6 @@ def parse_page(text: str, *, sha256: str, page_url: str) -> ParsedPage:
             copy = _copy(posting, _Claims(text, sha256, block), page_host)
             if copy is not None:
                 postings.append(copy)
-                hiring_hosts.extend(h for h in _hiring(posting)[2] if h not in hiring_hosts)
     if not postings and not issues:
         issues.append("no_structured_job_posting")
-    return ParsedPage(sha256, _conflicts(postings), tuple(hiring_hosts), sorted(set(issues)))
+    return ParsedPage(sha256, _conflicts(postings), sorted(set(issues)))

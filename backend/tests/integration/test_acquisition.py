@@ -30,6 +30,7 @@ pytestmark = pytest.mark.integration
 
 TERMINAL = {"complete", "failed", "provider_unavailable", "cancelled"}
 NAMES = {
+    "www.gov.uk": [LOOPBACK],
     "careers.northwind.example": [LOOPBACK],
     "jobs.board.example": [LOOPBACK],
     "slow.board.example": [LOOPBACK],
@@ -113,7 +114,9 @@ def test_an_acquisition_records_every_attempt_and_a_job_with_its_claims(
     infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker
 ) -> None:
     urls = [
-        url(sources, "careers.northwind.example", "/jobs/7781"),
+        # A keep-privately host by its manifest entry: the controlled server stands in for
+        # www.gov.uk through the scripted DNS.
+        url(sources, "www.gov.uk", "/jobs/7781"),
         url(sources, "jobs.board.example", "/ad/1"),
         url(sources, "careers.northwind.example", "/plain"),
         url(sources, "careers.northwind.example", "/gone"),
@@ -138,15 +141,16 @@ def test_an_acquisition_records_every_attempt_and_a_job_with_its_claims(
         ("blocked", "source_denied"),
     ]
     assert shown["summary"] == {"succeeded": 3, "blocked": 2, "failed": 1}
-    employer, board, plain = (t["attempts"][-1] for t in shown["targets"][:3])
-    assert (employer["rights_class"], employer["retention"]) == ("employer-posting", "body")
+    listed, board, plain = (t["attempts"][-1] for t in shown["targets"][:3])
+    assert (listed["rights_class"], listed["retention"]) == ("govuk", "body")
+    # The board page's JSON-LD names its hiring organisation; that never raises retention.
     assert (board["rights_class"], board["retention"]) == ("other", "excerpts")
     assert board["rights_status"] == "pending human rights review"
     kept = infra.query(
         "SELECT attempt_id::text AS id FROM nessa.source_documents WHERE workspace_id = %s",
         (workspace,),
     )
-    assert [k["id"] for k in kept] == [employer["attempt_id"]]  # only the permitted body
+    assert [k["id"] for k in kept] == [listed["attempt_id"]]  # only the permitted body
     assert plain["status"] == "succeeded"
     # The two copies of one advert are one job, with both copies kept.
     listing = jobs(api, ada, workspace)

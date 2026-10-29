@@ -1,14 +1,16 @@
 """The source permission manifest (OI-11) and the session 1 rights policy (H-06) as code:
 what may be fetched, from where, and what a workspace keeps of it (ACQ-06, FRESH-01)."""
 
+import base64
 import json
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
 
-from nessa.evidence.acquire import Pacer
-from nessa.evidence.records import Retention, RightsClass
+from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_page
+from nessa.evidence.fetcher import Fetcher
+from nessa.evidence.records import AttemptStatus, ClaimField, Retention, RightsClass
 from nessa.evidence.sources import (
     MANIFEST_PATH,
     PENDING_REVIEW,
@@ -18,6 +20,9 @@ from nessa.evidence.sources import (
     retention,
     rule_for,
 )
+from tests.domain.test_pages import POSTING, page
+from tests.support.acquisition_service import LOOPBACK, scripted_resolver
+from tests.support.source_server import Scripted, source_server
 
 REPO = Path(__file__).resolve().parents[3]
 ON = date(2026, 10, 28)
@@ -88,37 +93,91 @@ def test_only_the_keep_privately_classes_retain_a_body() -> None:
 
 @pytest.mark.req("ACQ-06")
 def test_a_listed_page_is_classified_by_its_host_with_the_terms_it_relied_on() -> None:
-    page = classify_page("www.gov.uk", hiring_hosts=(), on=ON)
+    page_rights = classify_page("www.gov.uk")
 
-    assert page.rights_class is RightsClass.GOVUK
-    assert page.rights_status.startswith("govuk: ")
-    assert "Open Government Licence v3.0" in page.rights_status
+    assert page_rights.rights_class is RightsClass.GOVUK
+    assert page_rights.rights_status.startswith("govuk: ")
+    assert "Open Government Licence v3.0" in page_rights.rights_status
 
 
-@pytest.mark.req("ACQ-06")
-def test_an_employer_s_own_careers_site_is_an_employer_posting() -> None:
-    page = classify_page("careers.northwind.example", hiring_hosts=("northwind.example",), on=ON)
+def _acquired(host: str, body: bytes) -> AcquisitionResult:
+    with source_server({"/robots.txt": Scripted(404), "/jobs/1": Scripted(body=body)}) as server:
+        fetcher = Fetcher(
+            resolve=scripted_resolver({host: [LOOPBACK]}),
+            user_agent="NessaL0/test",
+            extra_allowed=frozenset({("127.0.0.1", server.port)}),
+        )
+        return acquire_page(
+            fetcher,
+            Pacer(sleep=lambda seconds: None),
+            f"http://{host}:{server.port}/jobs/1",
+            now=datetime(2026, 10, 29, tzinfo=UTC),
+        )
 
-    assert page.rights_class is RightsClass.EMPLOYER_POSTING
-    assert page.rights_status.startswith("employer-posting: ")
-    assert "northwind.example" in page.rights_status
-    assert page.retention is Retention.BODY
+
+def _naming(host_links: list[str], name: str = "Northwind Analytics Ltd") -> bytes:
+    organisation = {"@type": "Organization", "name": name, "sameAs": host_links}
+    return page({**POSTING, "hiringOrganization": organisation, "url": host_links[0]}).encode()
 
 
 @pytest.mark.req("ACQ-06")
 @pytest.mark.parametrize(
-    "hiring_hosts",
-    [(), ("someone-else.example",), ("example",)],
-    ids=["no structured employer", "another employer", "a bare suffix"],
+    ("host", "links", "name"),
+    [
+        (
+            "careers.northwind.example",
+            ["https://careers.northwind.example", "https://northwind.example"],
+            "Northwind Analytics Ltd",
+        ),
+        ("www.totaljobs.co.uk", ["https://co.uk"], "Northwind Analytics Ltd"),
+        ("someone.github.io", ["https://github.io"], "Northwind Analytics Ltd"),
+        ("www.reed.co.uk", ["https://www.reed.co.uk", "https://reed.co.uk"], "Reed"),
+    ],
+    ids=[
+        "a page naming its own host",
+        "a public suffix (co.uk)",
+        "a public suffix (github.io)",
+        "an agency on its own board",
+    ],
 )
-def test_a_page_not_clearly_within_a_class_stays_pending_human_rights_review(
-    hiring_hosts: tuple[str, ...],
+def test_a_page_naming_itself_as_the_hiring_organisation_never_raises_its_retention(
+    host: str, links: list[str], name: str
 ) -> None:
-    page = classify_page("jobs.board.example", hiring_hosts=hiring_hosts, on=ON)
+    result = _acquired(host, _naming(links, name))
 
-    assert page.rights_class is RightsClass.OTHER
-    assert page.rights_status == PENDING_REVIEW == "pending human rights review"
-    assert page.retention is Retention.EXCERPTS
+    assert result.status is AttemptStatus.SUCCEEDED
+    assert result.rights_class is RightsClass.OTHER
+    assert result.rights_status == PENDING_REVIEW == "pending human rights review"
+    assert result.retention is Retention.EXCERPTS
+    assert result.body_b64 is None
+    [copy] = result.copies  # the posting is still read, and its employer still cited
+    assert copy.employer == name
+    assert ClaimField.EMPLOYER in {c.field for c in copy.claims}
+
+
+@pytest.mark.req("ACQ-06")
+def test_a_listed_keep_privately_host_keeps_its_body_by_its_manifest_entry() -> None:
+    # The controlled server stands in for www.gov.uk through the scripted DNS: the class
+    # comes from the manifest's entry for the host, not from anything on the page.
+    body = page(POSTING).encode()
+
+    result = _acquired("www.gov.uk", body)
+
+    assert (result.rights_class, result.retention) == (RightsClass.GOVUK, Retention.BODY)
+    assert result.body_b64 is not None
+    assert base64.b64decode(result.body_b64) == body
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize(
+    "host", ["jobs.board.example", "careers.unknown-employer.example", "www.reed.co.uk"]
+)
+def test_an_unlisted_page_stays_pending_human_rights_review(host: str) -> None:
+    page_rights = classify_page(host)
+
+    assert page_rights.rights_class is RightsClass.OTHER
+    assert page_rights.rights_status == PENDING_REVIEW
+    assert page_rights.retention is Retention.EXCERPTS
 
 
 def test_requests_to_one_host_are_paced_to_its_rate_limit_and_other_hosts_are_not() -> None:

@@ -7,8 +7,10 @@ permission manifest, robots.txt, the bounded fetch and the structured parser. Th
 rights policy decides what is kept: the body is written under the gitignored
 `var/evidence/corpus/<slot>/` only for a class that may keep it privately (lines A1 to A5);
 otherwise only its hash. `--rights-class` and `--terms` record an agent's classification of
-a page the manifest does not list (the terms quoted and dated, `corpus/README.md` step 3);
-class `other` is never named and stays "pending human rights review".
+the page (the terms quoted, `corpus/README.md` step 3), dated with the run's date. It
+replaces the class the pipeline derived in either direction, before anything is kept, except
+that it never keeps more of a page whose host the manifest lists than the manifest permits.
+Class `other` needs no terms and stays "pending human rights review".
 
 It prints the manifest record (URL, retrieval time, HTTP status, content type, SHA-256, the
 attempt's status and reason, rights status, retention, and each posting's claims as field,
@@ -22,36 +24,48 @@ import argparse
 import base64
 import json
 import sys
-from datetime import UTC, datetime
+from collections.abc import Callable
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_page
 from nessa.evidence.fetcher import Fetcher
 from nessa.evidence.records import Retention, RightsClass
-from nessa.evidence.sources import load_manifest, retention
+from nessa.evidence.sources import (
+    PENDING_REVIEW,
+    PageRights,
+    classify_page,
+    is_listed,
+    load_manifest,
+    retention,
+)
 from tools.localenv import REPO_ROOT
 
 EVIDENCE_DIR = REPO_ROOT / "var" / "evidence" / "corpus"
 
 
-def classified(
-    result: AcquisitionResult, rights_class: RightsClass | None, terms: str | None
-) -> AcquisitionResult:
-    """An agent's classification of a page outside the manifest replaces the default; a
-    page the manifest lists keeps its own class."""
-    if rights_class is None or result.rights_class not in (None, RightsClass.OTHER):
-        return result
-    if rights_class is RightsClass.OTHER or not terms:
+def agent_classification(
+    rights_class: RightsClass | None, terms: str | None, on: date
+) -> Callable[[str], PageRights]:
+    """The page's class from its final host: the agent's dated classification when one is
+    given, in either direction, else the manifest's. It never keeps more of a page whose host
+    the manifest lists than the manifest permits (a listed board stays reference only)."""
+    if rights_class is None:
+        return classify_page
+    if rights_class is not RightsClass.OTHER and not terms:
         raise SystemExit("a class other than `other` needs --terms (quoted and dated)")
     kept = retention(rights_class)
-    return result.model_copy(
-        update={
-            "rights_class": rights_class,
-            "rights_status": f"{rights_class.value}: {terms}",
-            "retention": kept,
-            "body_b64": result.body_b64 if kept is Retention.BODY else None,
-        }
-    )
+
+    def classify(host: str) -> PageRights:
+        listed = classify_page(host)
+        if is_listed(host) and kept is Retention.BODY and listed.retention is not Retention.BODY:
+            return listed
+        if rights_class is RightsClass.OTHER:
+            return PageRights(RightsClass.OTHER, PENDING_REVIEW, Retention.EXCERPTS)
+        status = f"{rights_class.value}: {terms} (classified by the curating agent on {on})"
+        return PageRights(rights_class, status, kept)
+
+    return classify
 
 
 def record(result: AcquisitionResult) -> dict[str, object]:
@@ -98,9 +112,9 @@ def acquire_for_corpus(
     terms: str | None = None,
     evidence_dir: Path = EVIDENCE_DIR,
 ) -> dict[str, object]:
-    result = classified(
-        acquire_page(fetcher, Pacer(), url, now=datetime.now(UTC)), rights_class, terms
-    )
+    now = datetime.now(UTC)
+    classify = agent_classification(rights_class, terms, now.date())
+    result = acquire_page(fetcher, Pacer(), url, now=now, classify=classify)
     body_path = None
     if result.body_b64 is not None and result.retention is Retention.BODY:
         directory = evidence_dir / slot

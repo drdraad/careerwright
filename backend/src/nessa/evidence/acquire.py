@@ -4,8 +4,9 @@ result it returns (spec section 6, "Retrieval pipeline and security boundary"; A
 A page: its URL is checked, its host's manifest entry decides whether it may be fetched at
 all (ACQ-06: a person supplying a URL never overrides it), robots.txt decides next, the host
 is paced to its rate limit, and the page is fetched within the fetcher's bounds. Structured
-fields are parsed, the page is classified under the session 1 rights policy, and the body
-is returned only when that class permits keeping it. An Adzuna search is one bounded API
+fields are parsed, the page is classified under the session 1 rights policy by its final
+host's manifest entry (never by what the page says about itself), and the body is returned
+only when that class permits keeping it. An Adzuna search is one bounded API
 request whose recorded URL never carries the credentials.
 
 The worker holds no user secret, model key, master key or database access (GC8; ADR 0009):
@@ -35,7 +36,7 @@ from nessa.evidence.records import (
     RightsClass,
     StrictModel,
 )
-from nessa.evidence.sources import Access, classify_page, retention, rule_for
+from nessa.evidence.sources import Access, PageRights, classify_page, retention, rule_for
 
 ADZUNA_PROVIDER = "adzuna"
 
@@ -116,7 +117,16 @@ def _failure_result(
     )
 
 
-def acquire_page(fetcher: Fetcher, pacer: Pacer, url: str, *, now: datetime) -> AcquisitionResult:
+def acquire_page(
+    fetcher: Fetcher,
+    pacer: Pacer,
+    url: str,
+    *,
+    now: datetime,
+    classify: Callable[[str], PageRights] = classify_page,
+) -> AcquisitionResult:
+    """`classify`: the page's class from its final host; the manifest's, except where the
+    corpus tool records an agent's classification (`tools.corpus`)."""
     checked = fetcher.check(url)
     if isinstance(checked, UrlRefusal):
         return AcquisitionResult(
@@ -142,18 +152,20 @@ def acquire_page(fetcher: Fetcher, pacer: Pacer, url: str, *, now: datetime) -> 
     result = fetcher.fetch_page(checked.url)
     if isinstance(result, FetchFailure):
         return _failure_result(InputRoute.FETCH, checked.host, checked.url, result, now)
-    return _page_result(fetcher, result, checked.host, now)
+    return _page_result(fetcher, result, checked.host, now, classify)
 
 
-def _page_result(fetcher: Fetcher, page: Fetched, host: str, now: datetime) -> AcquisitionResult:
+def _page_result(
+    fetcher: Fetcher,
+    page: Fetched,
+    host: str,
+    now: datetime,
+    classify: Callable[[str], PageRights],
+) -> AcquisitionResult:
     digest = hashlib.sha256(page.body).hexdigest()
     parsed = parse_page(page.text, sha256=digest, page_url=page.final_url)
     final_host = fetcher.check(page.final_url)
-    rights = classify_page(
-        final_host.host if not isinstance(final_host, UrlRefusal) else host,
-        hiring_hosts=parsed.hiring_hosts,
-        on=now.date(),
-    )
+    rights = classify(final_host.host if not isinstance(final_host, UrlRefusal) else host)
     keep = rights.retention is Retention.BODY
     return AcquisitionResult(
         route=InputRoute.FETCH,
@@ -214,7 +226,7 @@ def acquire_adzuna(
         )
     digest = hashlib.sha256(result.body).hexdigest()
     page = adzuna.parse_search(result.body, sha256=digest)
-    rights = classify_page("api.adzuna.com", hiring_hosts=(), on=now.date())
+    rights = classify_page("api.adzuna.com")
     common = {
         **base,
         "http_status": result.status,
