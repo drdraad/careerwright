@@ -1220,3 +1220,113 @@ def test_an_eligibility_gate_alone_is_not_coverage() -> None:
 
     assert alone.state is ReadinessState.INSUFFICIENT_COVERAGE
     assert practice.state is ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS
+
+
+# Fix round 3 -------------------------------------------------------------------------------
+
+
+@pytest.mark.req("RDY1-01", "RDY1-03")
+def test_a_known_shortfall_stays_not_ready_beside_a_requirement_no_answer_can_settle() -> None:
+    # R2-1: P01's data quality target with every modelled row at level 1, then an ESCO row
+    # with no rubric ("statistics") set to essential, which needs no warning.
+    target = next(t for t in PACK.targets if t.target_id == "data-quality-analyst-manchester")
+    statistics = EscoSkillRelation(
+        skill_id=uuid.uuid4(), label="statistics", skill_type="knowledge", relation="optional"
+    )
+    occupation = seed("data quality specialist", regulated=False).model_copy(
+        update={"skills": [statistics]}
+    )
+    before = build_matrix(
+        target.title,
+        pack=PACK,
+        reference=REFERENCE,
+        pack_target=target,
+        occupation=occupation,
+        exemplars=0,
+        synthetic=False,
+    )
+    essential = apply_edits(
+        before,
+        [
+            RowEdit(
+                edit_id=uuid.uuid4(),
+                row_id=f"esco:{statistics.skill_id}",
+                action="set_importance",
+                importance=Importance.ESSENTIAL,
+                reason="My target employers all ask for it",
+                warning_acknowledged=False,
+                recorded_by=ADA,
+                recorded_at=NOW,
+                from_matrix_version=before.matrix_version,
+                from_definition_version=before.definition_version,
+            )
+        ],
+    )
+    below = [
+        self_report(r.subject, 1, r.rubric.version_id) for r in before.rows if r.rubric is not None
+    ]
+
+    given = assess(before, evidence=below, statements=[], outcomes=OUTCOMES, evidence_version=1)
+    edited = assess(essential, evidence=below, statements=[], outcomes=OUTCOMES, evidence_version=2)
+
+    assert (given.state, given.show_route_chart) == (ReadinessState.NOT_READY, True)
+    # The known shortfall keeps "not ready" and its route chart; the coverage gap is carried
+    # as a blocker of its own.
+    assert (edited.state, edited.show_route_chart) == (ReadinessState.NOT_READY, True)
+    blockers = {(b.row_id, b.kind) for b in edited.blockers}
+    assert (f"esco:{statistics.skill_id}", RowStatus.NOT_MODELLED) in blockers
+    assert RowStatus.BELOW_REQUIRED in {b.kind for b in edited.blockers}
+
+
+@pytest.mark.req("RDY1-03", "ASSESS-01")
+def test_a_ready_result_with_an_open_conflict_says_so() -> None:
+    # R2-2, case 1: a row's own level 2, then "not learned" under another rubric.
+    matrix = synthetic_matrix("Target A", [skill_row("fixture:shared", 2, "rubric-a")])
+    contradicted = [
+        self_report("fixture:shared", 2, "rubric-a", at=at(1)),
+        self_report(
+            "fixture:shared", None, "rubric-b", answer=Answer.NOT_LEARNED, example=None, at=at(2)
+        ),
+    ]
+    settled = contradicted[:1]
+
+    open_conflict = assess(
+        matrix, evidence=contradicted, statements=[], outcomes=[], evidence_version=2
+    )
+    clear = assess(matrix, evidence=settled, statements=[], outcomes=[], evidence_version=1)
+
+    assert open_conflict.state is ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS
+    assert Qualification.OPEN_CONFLICT in open_conflict.qualifications
+    assert Qualification.OPEN_CONFLICT not in clear.qualifications
+
+
+@pytest.mark.req("RDY1-03", "ASSESS-01")
+def test_a_demonstration_that_disagrees_with_a_self_report_is_an_open_conflict_on_the_pack() -> (
+    None
+):
+    # R2-2, case 2, reachable with pack 0.1.0: P05's bookkeeping target, where the person
+    # reports level 3 at reconciliation and enters a work sample showing 2.
+    matrix = pack_matrix("bookkeeping-assistant-leeds")
+    reconciliation = "pack:bookkeeping-assistant-leeds:reconciliation"
+    records = "pack:bookkeeping-assistant-leeds:records"
+    evidence = [
+        self_report(subject_of(matrix, reconciliation), 3, rubric_of(matrix, reconciliation)),
+        demonstrated(
+            subject_of(matrix, reconciliation),
+            2,
+            rubric_of(matrix, reconciliation),
+            reviewed_on=date(2026, 10, 1),
+        ),
+        self_report(subject_of(matrix, records), 2, rubric_of(matrix, records)),
+    ]
+    work = [statement("gate:uk-right-to-work", Holding.HELD, verified=True)]
+
+    result = assess(
+        matrix, evidence=evidence, statements=work, outcomes=OUTCOMES, evidence_version=3
+    )
+
+    row = next(r for r in result.rows if r.row_id == reconciliation)
+    assert row.evidence is not None
+    assert (row.status, row.evidence.level, row.evidence.conflict) == (RowStatus.MET, 2, True)
+    assert result.state is ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS
+    assert Qualification.OPEN_CONFLICT in result.qualifications

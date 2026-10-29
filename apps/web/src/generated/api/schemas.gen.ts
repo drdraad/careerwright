@@ -6307,7 +6307,8 @@ export const QualificationSchema = {
         'user_assumption',
         'missing_outcome_level',
         'person_confirmed_demonstration',
-        'person_confirmed_verification'
+        'person_confirmed_verification',
+        'open_conflict'
     ],
     title: 'Qualification',
     description: 'Why a result is not unqualified. M0 matrices are always provisional.'

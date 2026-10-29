@@ -4209,7 +4209,8 @@ export const Qualification = {
     USER_ASSUMPTION: 'user_assumption',
     MISSING_OUTCOME_LEVEL: 'missing_outcome_level',
     PERSON_CONFIRMED_DEMONSTRATION: 'person_confirmed_demonstration',
-    PERSON_CONFIRMED_VERIFICATION: 'person_confirmed_verification'
+    PERSON_CONFIRMED_VERIFICATION: 'person_confirmed_verification',
+    OPEN_CONFLICT: 'open_conflict'
 } as const;
 
 /**

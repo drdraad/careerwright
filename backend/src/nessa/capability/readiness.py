@@ -100,6 +100,10 @@ PASSING = frozenset({RowStatus.MET, RowStatus.SATISFIED})
 # Findings not yet known that the person's answers can settle, as against a known shortfall.
 # A row no rubric or typed gate models is a coverage gap instead (`insufficient_coverage`).
 NOT_YET_KNOWN = frozenset({RowStatus.NO_USABLE_EVIDENCE, RowStatus.UNRESOLVED})
+# A known shortfall: "not ready" whatever else is unknown or not modelled.
+KNOWN_SHORTFALL = frozenset(
+    {RowStatus.BELOW_REQUIRED, RowStatus.NOT_HELD, RowStatus.PATHWAY_OUTSIDE_MODEL}
+)
 # What makes a target assessable at all (review N6, provisional): a modelled skill row, or a
 # modelled legal-practice or recognition gate. The right to work alone is not coverage.
 _COVERING_GATES = frozenset({GateKind.LEGAL_PRACTICE, GateKind.RECOGNITION})
@@ -147,6 +151,10 @@ class Qualification(StrEnum):
     # person's own statement.
     PERSON_CONFIRMED_DEMONSTRATION = "person_confirmed_demonstration"
     PERSON_CONFIRMED_VERIFICATION = "person_confirmed_verification"
+    # A met required row whose evidence is in conflict (a demonstration and a self-report
+    # disagree, or a later answer under another rubric says "not yet done"): the result rests
+    # on evidence awaiting the person's clarification (spec section 9; re-review 2, R2-2).
+    OPEN_CONFLICT = "open_conflict"
 
 
 ActionKind = Literal[
@@ -340,15 +348,20 @@ def assess(
         )
         for r in rows
     )
-    if not any(_covers(r, by_row[r.row_id]) for r in rows if r.mandatory):
+    uncovered = not any(_covers(r, by_row[r.row_id]) for r in rows if r.mandatory)
+    if uncovered:
         blockers = [Blocker(row_id=None, kind=RowStatus.NO_MODELLED_REQUIREMENTS), *blockers]
-        state = ReadinessState.INSUFFICIENT_COVERAGE
-    elif any(r.mandatory and (r.status is RowStatus.NOT_MODELLED or not r.modelled) for r in rows):
-        # A required row no rubric models, or a regulation no typed gate models: no answer
-        # can settle it, so the target is not assessable (review N5).
-        state = ReadinessState.INSUFFICIENT_COVERAGE
-    elif any(b.kind not in NOT_YET_KNOWN for b in blockers):
+    # A required row no rubric models, or a regulation no typed gate models: no answer can
+    # settle it, so the target is not assessable (review N5). It stays a blocker of its own.
+    coverage_gap = uncovered or any(
+        r.mandatory and (r.status is RowStatus.NOT_MODELLED or not r.modelled) for r in rows
+    )
+    if any(b.kind in KNOWN_SHORTFALL for b in blockers):
+        # A known shortfall is "not ready" whatever else is unknown or unmodelled: a coverage
+        # gap never hides it (re-review 2, R2-1).
         state = ReadinessState.NOT_READY
+    elif coverage_gap:
+        state = ReadinessState.INSUFFICIENT_COVERAGE
     elif blockers:
         state = ReadinessState.NOT_YET_ASSESSED
     elif planned:
@@ -384,11 +397,10 @@ def assess(
             else PrimaryAction.ADDRESS_GAPS
         ),
         training_required=training,
-        # Only when there is something to plan: never when ready now (no degenerate
-        # frontier), when the target cannot be assessed, or before anything is known.
-        show_route_chart=training
-        and state is not ReadinessState.INSUFFICIENT_COVERAGE
-        and not ready_now,
+        # From the plannable gaps, never the state: a mandatory gap an option could address
+        # (learn, credential, experience). So never when ready now (no degenerate frontier),
+        # nor when only unknowns or coverage gaps remain (re-review 2, R2-1).
+        show_route_chart=training,
         qualifications=_qualifications(
             matrix, rows, planned, scoring.used, _missing_level(rows, outcomes, completed)
         ),
@@ -648,6 +660,8 @@ def _qualifications(
         found.add(Qualification.PERSON_CONFIRMED_DEMONSTRATION)
     if any(r.protected and r.status is RowStatus.SATISFIED for r in rows):
         found.add(Qualification.PERSON_CONFIRMED_VERIFICATION)
+    if any(r.mandatory and r.evidence is not None and r.evidence.conflict for r in met):
+        found.add(Qualification.OPEN_CONFLICT)
     if planned:
         found.add(Qualification.PLANNED_OUTCOME_ASSUMPTION)
     if any(o.provenance is Provenance.USER_OVERRIDE for o in used):
