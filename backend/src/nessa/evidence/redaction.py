@@ -7,8 +7,9 @@ spans, parsed into claims or sealed. What it removes:
 
 - email addresses;
 - telephone numbers in UK national form (`020 7946 0958`, `(0161) 496 0000`,
-  `07700 900123`) and international form (`+44 (0)20 7946 0958`, `+1 555 123 4567`), not
-  inside a URL, a word or a longer number;
+  `07700 900123`) and international form (`+44 (0)20 7946 0958`, `+1 555 123 4567`), their
+  groups separated by any horizontal space (a no-break space included), a dot or a hyphen,
+  not inside a URL, a word or a longer number;
 - in JSON (a page's JSON-LD, Adzuna's response), every name, email, telephone and fax
   number of an `applicationContact` or `contactPoint`.
 
@@ -17,9 +18,12 @@ JSON is redacted in its decoded values, never as raw text: a value's escapes (`\
 valid. IDs and URLs are never redacted (`NOT_TEXT`): an ID can look like a phone number.
 
 A personal name in running text cannot be told apart from other words deterministically,
-so it is not removed; nor is a detail written in an unusual form (an email as HTML entities,
-a number spelt out). These are known limits, recorded in ADR 0009 for the product owner. A
-page's JSON-LD blocks are found by the parser (`pages.redact_page`).
+so it is not removed; nor is a detail written in an unusual form (a number spelt out). A
+detail the page's markup hides (an entity, a line break, an invisible character) is not
+removed from a kept body either, but `pages.redact_page` then keeps no body, and the text a
+model reads is normalised before it is redacted (`pages.visible_text`). These are known
+limits, recorded in ADR 0009 for the product owner. A page's scripts are found by the parser
+(`pages.redact_page`).
 """
 
 import json
@@ -40,10 +44,17 @@ NOT_TEXT = frozenset(
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
 # Not preceded by a word character or anything that would put it inside a URL or a number.
 _NOT_INSIDE = r"(?<![\w/=?&#%.+-])"
+# What may separate a number's digit groups: a space of any horizontal kind (tab, no-break,
+# narrow, thin and the other Unicode spaces), a dot or a hyphen; never a line break, so
+# separate values on separate lines are never joined (fix round 3, re-review 3 A R3-2).
+_HORIZONTAL_SPACES = "".join(
+    map(chr, (0x00A0, 0x1680, *range(0x2000, 0x200B), 0x202F, 0x205F, 0x3000))
+)
+_SEP = rf"[ \t.\-{_HORIZONTAL_SPACES}]"
 _PHONE = re.compile(
     _NOT_INSIDE
-    + r"(?:\+\d{1,3}(?:[ .-]?\(0\))?(?:[ .-]?\(?\d{1,5}\)?){2,6}"  # international
-    + r"|\(?0\d{2,4}\)?(?:[ .-]?\d{3,4}){2})"  # UK national
+    + rf"(?:\+\d{{1,3}}(?:{_SEP}?\(0\))?(?:{_SEP}?\(?\d{{1,5}}\)?){{2,6}}"  # international
+    + rf"|\(?0\d{{2,4}}\)?(?:{_SEP}?\d{{3,4}}){{2}})"  # UK national
     + r"(?![\w/])"
 )
 _INTERNATIONAL_DIGITS = range(8, 16)

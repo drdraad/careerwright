@@ -281,6 +281,80 @@ def page_with_block(block: str) -> bytes:
     ).encode()
 
 
+# Forms that show a detail only once the page's text is normalised (fix round 3: review C
+# I1, re-review 3 A R3-2): its entity decoded, its whitespace collapsed, a character that
+# does not print dropped.
+HIDDEN_FORMS = {
+    "a non-breaking space": "Call 0161&nbsp;496&nbsp;0000 today.",
+    "a number split by newlines": "Call 0161\n496\n0000 today.",
+    "a zero-width space": "Write to ada&#8203;@northwind.example today.",
+    "a soft hyphen": "Write to ada@north&shy;wind.example today.",
+}
+
+
+def page_with_text(text: str) -> bytes:
+    return (
+        f"<!doctype html><html><head>{SYNTHETIC_MARKER}</head><body><p>{text}</p></body></html>"
+    ).encode()
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize("text", HIDDEN_FORMS.values(), ids=HIDDEN_FORMS.keys())
+def test_a_kept_body_that_shows_a_detail_once_normalised_is_not_kept(text: str) -> None:
+    result, kept = _acquire_kept(page_with_text(text))
+
+    assert kept == b""
+    assert (result.retention, result.body_not_kept) == (
+        Retention.EXCERPTS,
+        BodyNotKept.VISIBLE_TEXT_DETAIL,
+    )
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize(
+    "space", [chr(0x00A0), chr(0x202F), chr(0x2009), "\t"], ids=["nbsp", "narrow", "thin", "tab"]
+)
+def test_a_number_spaced_with_horizontal_unicode_spaces_is_removed_and_the_body_kept(
+    space: str,
+) -> None:
+    number = space.join(["0161", "496", "0000"])
+    assert redact_text(f"Call {number} today.") == f"Call {PHONE_REMOVED} today."
+
+    result, kept = _acquire_kept(page_with_text(f"Call {number} today."))
+
+    assert (result.retention, result.body_not_kept) == (Retention.BODY, None)
+    assert b"0161" not in kept
+    assert PHONE_REMOVED.encode() in kept
+
+
+def test_a_line_break_never_joins_a_number() -> None:
+    # Only horizontal spaces separate a number's groups: text over several lines is several
+    # values (a split number is caught once normalised, above).
+    assert redact_text("Call 0161\n496\n0000 today.") == "Call 0161\n496\n0000 today."
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize(
+    "script",
+    [
+        'var d = "Call:\\x3e07700 900123";',  # re-review 3's probe case 15
+        'var d = "Call:\\u{3e}07700 900123";',
+        'var d = "Call:\\07607700 900123";',  # octal 076 is ">"
+    ],
+    ids=["\\x escape", "\\u{} escape", "octal escape"],
+)
+def test_a_script_hiding_a_detail_behind_a_javascript_escape_means_no_body(script: str) -> None:
+    body = (
+        f"<!doctype html><html><head>{SYNTHETIC_MARKER}<script>{script}</script></head>"
+        "<body>x</body></html>"
+    ).encode()
+
+    result, kept = _acquire_kept(body)
+
+    assert kept == b""
+    assert result.body_not_kept is BodyNotKept.BLOCK_UNREDACTABLE
+
+
 @pytest.mark.req("ACQ-06")
 @pytest.mark.parametrize(
     "description",

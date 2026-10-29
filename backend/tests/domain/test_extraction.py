@@ -52,6 +52,7 @@ from nessa.evidence.records import (
     ValidationState,
     WorkMode,
 )
+from nessa.evidence.redaction import EMAIL_REMOVED, PHONE_REMOVED
 from nessa.identity.failures import FailureClass, OutputTruncatedError, classify_failure
 from nessa.identity.model_registry import ModelMode
 from nessa.identity.records import RunKind
@@ -112,6 +113,34 @@ def test_the_text_read_is_the_page_s_visible_text_without_scripts_or_personal_de
 
     assert text == "Careers Park Gardener Questions to [email removed] or call [phone removed]."
     assert "SCRIPT-SENTINEL" not in text
+
+
+@pytest.mark.req("ACQ-06", "SEC-05")
+@pytest.mark.parametrize(
+    ("form", "removed"),
+    [
+        ("Call 0161&nbsp;496&nbsp;0000 today.", PHONE_REMOVED),
+        ("Call 0161\n496\n0000 today.", PHONE_REMOVED),
+        ("Write to ada&#8203;@northwind.example today.", EMAIL_REMOVED),
+        ("Write to ada@north&shy;wind.example today.", EMAIL_REMOVED),
+    ],
+    ids=[
+        "a non-breaking space",
+        "a number split by newlines",
+        "a zero-width space",
+        "a soft hyphen",
+    ],
+)
+def test_the_model_input_is_normalised_before_it_is_redacted(form: str, removed: str) -> None:
+    # Review C I1: decoding, collapsing whitespace and dropping what does not print can each
+    # reveal a detail, so they come first; then redaction; then the cut.
+    page = f"<html><head>{SYNTHETIC_MARKER}</head><body><p>{form}</p></body></html>"
+
+    text = visible_text(redact_page(page).text)
+
+    assert removed in text
+    assert "0161 496 0000" not in text
+    assert "ada@northwind.example" not in text
 
 
 def _acquired(body: bytes) -> AcquisitionResult:

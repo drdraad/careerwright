@@ -297,15 +297,21 @@ export type Basis = typeof Basis[keyof typeof Basis];
  * BodyNotKept
  *
  * Why a body its rights class may keep was not kept: personal details in it could not
- * be removed (`pages.redact_page`), so only its hash and excerpts are.
+ * be removed (`pages.redact_page`), so only its hash and excerpts are. Each applies to any
+ * script, JSON-LD or not (fix round 3 corrects 0020's wording, re-review 3 A R3-1).
  */
-export const BodyNotKept = { CONTACT_UNLOCATED: 'contact_unlocated', BLOCK_UNREDACTABLE: 'block_unredactable' } as const;
+export const BodyNotKept = {
+    CONTACT_UNLOCATED: 'contact_unlocated',
+    BLOCK_UNREDACTABLE: 'block_unredactable',
+    VISIBLE_TEXT_DETAIL: 'visible_text_detail'
+} as const;
 
 /**
  * BodyNotKept
  *
  * Why a body its rights class may keep was not kept: personal details in it could not
- * be removed (`pages.redact_page`), so only its hash and excerpts are.
+ * be removed (`pages.redact_page`), so only its hash and excerpts are. Each applies to any
+ * script, JSON-LD or not (fix round 3 corrects 0020's wording, re-review 3 A R3-1).
  */
 export type BodyNotKept = typeof BodyNotKept[keyof typeof BodyNotKept];
 

@@ -412,25 +412,64 @@ def mark_conflicts(postings: list[JobCopy]) -> list[JobCopy]:
     return marked
 
 
-_ESCAPE = re.compile(r"\\(?:u([0-9a-fA-F]{4})|([nrtbf/\\\"]))")
-_ESCAPED = {"n": "\n", "r": "\n", "t": "\t", "b": " ", "f": " ", "/": "/", "\\": "\\", '"': '"'}
+# JSON's escapes, and JavaScript's own (`\xNN`, `\u{...}`, octal): for detection only, never
+# to rewrite a script (fix round 3, re-review 3 A R3-1). No JavaScript is parsed.
+_ESCAPE = re.compile(
+    r"\\(?:u\{([0-9a-fA-F]{1,6})\}|u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})|([0-7]{1,3})"
+    r"|([nrtbfv/\\\"']))"
+)
+_ESCAPED = {
+    "n": "\n",
+    "r": "\n",
+    "t": "\t",
+    "b": " ",
+    "f": " ",
+    "v": " ",
+    "/": "/",
+    "\\": "\\",
+    '"': '"',
+    "'": "'",
+}
+_MAX_CODE_POINT = 0x10FFFF
+
+
+def _unescaped(match: re.Match[str]) -> str:
+    braced, unicode, hexadecimal, octal, single = match.groups()
+    if single is not None:
+        return _ESCAPED[single]
+    code = int(octal, 8) if octal is not None else int(braced or unicode or hexadecimal, 16)
+    return chr(code) if code <= _MAX_CODE_POINT else " "
 
 
 def _holds_escaped_details(raw: str) -> bool:
-    """Whether text that is not JSON holds an email or a telephone number once its
-    JSON-style escapes are decoded."""
-    decoded = _ESCAPE.sub(
-        lambda m: chr(int(m.group(1), 16)) if m.group(1) else _ESCAPED[m.group(2)], raw
-    )
+    """Whether text that is not JSON holds an email or a telephone number once its escapes
+    (JSON's and JavaScript's) are decoded."""
+    decoded = _ESCAPE.sub(_unescaped, raw)
     return redact_text(decoded) != decoded
+
+
+def normalised_text(plain: str) -> str:
+    """Decoded text as a reader sees it: each run of whitespace of any kind (no-break spaces,
+    line breaks, tabs) one space, and characters that do not print (a zero-width space, a
+    soft hyphen) dropped, so a detail they split shows whole (fix round 3, review C I1)."""
+    words = ("".join(ch for ch in word if ch.isprintable()) for word in plain.split())
+    return " ".join(word for word in words if word)
+
+
+def _shows_detail(html: str) -> bool:
+    """Whether a page's visible text, normalised, still holds an email or a telephone
+    number: then its markup hid one from the text patterns, and its body is not kept."""
+    shown = normalised_text(_plain(html))
+    return redact_text(shown) != shown
 
 
 @dataclass(frozen=True)
 class RedactedPage:
     text: str  # line endings normalised, personal details removed: what is parsed and kept
     # Personal details that may remain, so the body must never be kept: a script holding
-    # them could not be found in the page's text to be written again, or a JSON-LD block
-    # holding them is not JSON, so only its text could be redacted.
+    # them could not be found in the page's text to be written again, a script holding them
+    # is not JSON, so only its text could be redacted, or the page's visible text, once
+    # normalised, still shows one.
     unremovable: BodyNotKept | None
 
 
@@ -440,7 +479,9 @@ def redact_page(text: str) -> RedactedPage:
     CRLF page's scripts would not be found). Every script whose content is JSON (JSON-LD,
     an app's state) is redacted in its decoded values and written again when that, or a
     repeated key, changes it; a script that is not JSON, and the HTML around the scripts,
-    are redacted as text (re-review A N-1)."""
+    are redacted as text (re-review A N-1). Then, fail safe, the result's visible text is
+    normalised and looked at again: a detail the markup hid (an entity, a line break, an
+    invisible character) means the body is not kept (fix round 3, review C I1)."""
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     cursor = 0
     parts: list[str] = []
@@ -451,8 +492,8 @@ def redact_page(text: str) -> RedactedPage:
             continue
         cleaned = redact_json(raw)
         as_text = redact_text(raw) if cleaned is None else cleaned
-        # Whether it holds details, looked for with JSON-style escapes decoded too, since a
-        # detail right after `\n` is hidden from the text patterns.
+        # Whether it holds details, looked for with escapes decoded too, since a detail right
+        # after `\n` or `\x3e` is hidden from the text patterns.
         holds = as_text != raw or (cleaned is None and _holds_escaped_details(raw))
         offset = text.find(raw, cursor)
         if offset == -1:
@@ -467,7 +508,10 @@ def redact_page(text: str) -> RedactedPage:
         parts += [redact_text(text[cursor:offset]), as_text]
         cursor = offset + len(raw)
     parts.append(redact_text(text[cursor:]))
-    return RedactedPage("".join(parts), unremovable)
+    redacted = "".join(parts)
+    if unremovable is None and _shows_detail(redacted):
+        unremovable = BodyNotKept.VISIBLE_TEXT_DETAIL
+    return RedactedPage(redacted, unremovable)
 
 
 def parse_page(text: str, *, sha256: str, page_url: str) -> ParsedPage:
@@ -502,14 +546,14 @@ def parse_page(text: str, *, sha256: str, page_url: str) -> ParsedPage:
 
 
 def visible_text(text: str) -> str:
-    """What model extraction reads of a redacted page (fix round 2, ruling 11): its visible
-    text (scripts and styles left out, entities decoded) with personal details removed
-    again, since decoding can reveal one; each run of whitespace one space, characters that
-    do not print dropped, and cut to `EXTRACTION_TEXT_BYTES` of UTF-8. Spans index into
-    exactly this text, and its hash is theirs."""
-    plain = redact_text(_plain(text))
-    words = " ".join("".join(ch for ch in word if ch.isprintable()) for word in plain.split())
-    cut = " ".join(words.split()).encode()[:EXTRACTION_TEXT_BYTES]
+    """What model extraction reads of a redacted page (fix round 2, ruling 11; fix round 3,
+    review C I1): its visible text (scripts and styles left out, entities decoded),
+    normalised first (`normalised_text`), since decoding, collapsing whitespace and dropping
+    what does not print can each reveal a detail; then with personal details removed; then
+    cut to `EXTRACTION_TEXT_BYTES` of UTF-8. Spans index into exactly this text, and its
+    hash is theirs."""
+    redacted = redact_text(normalised_text(_plain(text)))
+    cut = redacted.encode()[:EXTRACTION_TEXT_BYTES]
     return cut.decode(errors="ignore").rstrip()
 
 

@@ -133,7 +133,9 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    pasted text is hashed for spans, parsed or sealed, `nessa.evidence.redaction` removes,
    deterministically, email addresses written as plain addresses and telephone numbers in
    UK national (10 or 11 digits from a leading 0) or international (`+`, 8 to 15 digits)
-   form, not inside a URL, a word or a longer number; and in JSON every name, email,
+   form, their groups separated by any horizontal space (no-break, narrow and thin spaces
+   included, fix round 3), a dot or a hyphen but never a line break, not inside a URL, a
+   word or a longer number; and in JSON every name, email,
    telephone and fax number of an `applicationContact` or `contactPoint`. How (addendum,
    re-review A C-1, I-1 to I-3, M-1; fix round 2, re-review A N-1): a page's line endings
    are normalised first; every script whose content is JSON (JSON-LD, an app's state) and
@@ -143,18 +145,28 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    stays valid; IDs and URLs (`identifier`, `url`, `sameAs`, Adzuna's `id` and
    `redirect_url`) are never redacted; a script that is not JSON, and the HTML around the
    scripts, are redacted as text. The body is never kept, whatever its class (only its hash
-   and the claims' excerpts), when a script holding such a detail cannot be found in the
-   page's text to be rewritten (`body_not_kept: contact_unlocated`) or is not JSON, so its
-   escapes could hide one (`block_unredactable`, looked for with the escapes decoded); the
-   reason is its own typed column (migration 0020), the rights status the rights statement
-   only (review B N5). Claims and excerpts come from decoded, redacted values, also for a
-   block cited by pointer. `content_sha256` is the hash of what was
+   and the claims' excerpts), when any script (JSON-LD or not) holding such a detail
+   cannot be found in the page's text to be rewritten (`body_not_kept: contact_unlocated`)
+   or is not JSON, so its escapes could hide one (`block_unredactable`, looked for with
+   JSON's escapes and, since fix round 3 (re-review 3 A R3-1), JavaScript's `\xNN`,
+   `\u{...}` and octal escapes decoded, for detection only: no JavaScript is parsed); or,
+   since fix round 3 (review C I1), when the redacted page's visible text, normalised
+   (entities decoded, every whitespace form one space, characters that do not print such as
+   a zero-width space or a soft hyphen dropped), still shows one, because its markup hid it
+   from the text patterns (`visible_text_detail`, migration 0022). Migration 0020's
+   description said "a JSON-LD block" for the first two; they apply to any script (0022
+   records the correction). The reason is its own typed column (migration 0020), the rights
+   status the rights statement only (review B N5). Claims and excerpts come from decoded,
+   redacted values, also for a block cited by pointer. `content_sha256` is the hash of what was
    kept; `retrieved_sha256` (migration 0015) is the hash of the bytes as retrieved, for
    change detection only. Kept bodies are UTF-8 with LF line endings.
    **Known limits, for the product owner:** a personal name in running text (for example
    "ask for Jane in HR") cannot be told apart from other words deterministically and is
-   not removed; nor is a detail written in another form (an email as HTML entities or with
-   "at" for "@", a number spelt out or split by other characters).
+   not removed; nor is a detail written in another form (an email with "at" for "@", a
+   number spelt out or split by other characters). A detail hidden by markup (entities, line
+   breaks, invisible characters) is not removed from a kept body, which is then not kept
+   (above); an entity-encoded detail inside an attribute (such as an obfuscated `mailto:`
+   link with no visible address) is not looked for.
 
 5. **Records (spec section 18).** `source_attempts`: every try by any route, blocked and
    failed ones included, written before the request and settled after, a retry naming the
@@ -331,9 +343,10 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
     - *What it reads.* Only a retrieved, permitted page whose structured data gave no
       posting (`no_structured_data`, `no_job_posting`): never a refused, failed, pasted or
       already parsed source. The restricted acquisition worker returns that page's visible
-      text (`pages.visible_text`: scripts and styles left out, entities decoded, personal
-      details removed again, whitespace collapsed, cut to 8,000 bytes); it still holds no
-      model key (GC8).
+      text (`pages.visible_text`: scripts and styles left out; then normalised (entities
+      decoded, every whitespace form one space, characters that do not print dropped), then
+      redacted, then cut to 8,000 bytes of UTF-8, in that order, since normalising can reveal
+      a detail (fix round 3, review C I1)); it still holds no model key (GC8).
     - *Where it runs.* `page_extraction`, a model-backed run kind on the one bounded activity
       (`PAGE_EXTRACTION_TASK`; one `RunTask`, no second call path), started by the
       acquisition in the transaction that records the page, at most

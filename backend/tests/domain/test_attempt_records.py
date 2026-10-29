@@ -15,6 +15,7 @@ from nessa.evidence.addresses import UrlRefusal
 from nessa.evidence.records import (
     AttemptReason,
     AttemptStatus,
+    BodyNotKept,
     ClaimField,
     Extraction,
     InputRoute,
@@ -24,6 +25,7 @@ from nessa.evidence.records import (
 from nessa.migrations.versions import r0017_job_merge_and_claim_integrity as r0017
 from nessa.migrations.versions import r0018_internal_error_reason as r0018
 from nessa.migrations.versions import r0019_only_an_api_says_none as r0019
+from nessa.migrations.versions import r0022_visible_text_detail as r0022
 
 BODY = b"<html>synthetic</html>"
 
@@ -41,6 +43,13 @@ def test_the_database_holds_attempt_reasons_to_the_code_s_labels() -> None:
     extraction = re.search(r"extraction IN \((.*?)\)\)", r0019.SCHEMA, re.DOTALL)  # latest
     assert extraction is not None
     assert set(re.findall(r"'([a-z_]+)'", extraction.group(1))) == {e.value for e in Extraction}
+
+
+def test_the_database_holds_why_a_body_was_not_kept_to_the_code_s_reasons() -> None:
+    found = re.search(r"body_not_kept IN \((.*?)\)\)", r0022.SCHEMA, re.DOTALL)  # latest
+
+    assert found is not None
+    assert set(re.findall(r"'([a-z_]+)'", found.group(1))) == {b.value for b in BodyNotKept}
 
 
 def test_the_database_holds_claim_fields_to_the_code_s_fields() -> None:

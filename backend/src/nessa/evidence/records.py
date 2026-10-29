@@ -119,10 +119,14 @@ class ExtractionOutcome(StrEnum):
 
 class BodyNotKept(StrEnum):
     """Why a body its rights class may keep was not kept: personal details in it could not
-    be removed (`pages.redact_page`), so only its hash and excerpts are."""
+    be removed (`pages.redact_page`), so only its hash and excerpts are. Each applies to any
+    script, JSON-LD or not (fix round 3 corrects 0020's wording, re-review 3 A R3-1)."""
 
-    CONTACT_UNLOCATED = "contact_unlocated"  # a JSON-LD block holding them was not found
-    BLOCK_UNREDACTABLE = "block_unredactable"  # a JSON-LD block that is not JSON held them
+    CONTACT_UNLOCATED = "contact_unlocated"  # a script holding them was not found in the text
+    BLOCK_UNREDACTABLE = "block_unredactable"  # a script that is not JSON held them
+    # The page's visible text, normalised, still showed one: the markup hid it from the text
+    # patterns (an entity, a line break, an invisible character; fix round 3, review C I1).
+    VISIBLE_TEXT_DETAIL = "visible_text_detail"
 
 
 class RightsClass(StrEnum):
