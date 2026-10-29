@@ -169,6 +169,116 @@ export const AcquisitionSummaryOutSchema = {
     title: 'AcquisitionSummaryOut'
 } as const;
 
+export const ActionConceptSchema = {
+    properties: {
+        concept_id: {
+            type: 'string',
+            title: 'Concept Id'
+        },
+        kind: {
+            $ref: '#/components/schemas/ActionKind'
+        },
+        title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        provider: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Provider'
+        },
+        review_state: {
+            $ref: '#/components/schemas/RecordState'
+        },
+        as_of: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'As Of'
+        },
+        exclusive_group: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Exclusive Group'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        },
+        cited: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Citation'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        facts: {
+            items: {
+                $ref: '#/components/schemas/Fact'
+            },
+            type: 'array',
+            title: 'Facts'
+        },
+        entry_requirements: {
+            items: {
+                $ref: '#/components/schemas/Fact'
+            },
+            type: 'array',
+            title: 'Entry Requirements'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concept_id',
+        'kind',
+        'title',
+        'provider',
+        'review_state',
+        'synthetic'
+    ],
+    title: 'ActionConcept'
+} as const;
+
+export const ActionKindSchema = {
+    type: 'string',
+    enum: [
+        'learning',
+        'apprenticeship',
+        'work',
+        'application'
+    ],
+    title: 'ActionKind'
+} as const;
+
 export const ActorOutSchema = {
     properties: {
         actor_id: {
@@ -1010,6 +1120,18 @@ export const AttemptStatusSchema = {
     title: 'AttemptStatus'
 } as const;
 
+export const AwardStateSchema = {
+    type: 'string',
+    enum: [
+        'not_applied',
+        'applied',
+        'approved',
+        'refused'
+    ],
+    title: 'AwardState',
+    description: 'Whether an award was actually made, apart from eligibility: an eligible person may\nstill not win a competitive award.'
+} as const;
+
 export const BandSchema = {
     type: 'string',
     enum: [
@@ -1021,16 +1143,6 @@ export const BandSchema = {
     ],
     title: 'Band',
     description: 'The rubric\'s ordinal bands (spec section 5). Never averaged, subtracted or read as\nprobabilities (AIR1-12).'
-} as const;
-
-export const BasisSchema = {
-    type: 'string',
-    enum: [
-        'stated',
-        'inferred'
-    ],
-    title: 'Basis',
-    description: 'How an answer relates to what the person said (spec section 3: factual confirmations\nand inferences are styled differently).'
 } as const;
 
 export const BlockerSchema = {
@@ -1237,6 +1349,78 @@ export const CapabilityChangeOutSchema = {
     title: 'CapabilityChangeOut'
 } as const;
 
+export const CatalogueSchema = {
+    properties: {
+        label: {
+            $ref: '#/components/schemas/CatalogueLabel'
+        },
+        concepts: {
+            items: {
+                $ref: '#/components/schemas/ActionConcept'
+            },
+            type: 'array',
+            title: 'Concepts'
+        },
+        offerings: {
+            items: {
+                $ref: '#/components/schemas/Offering'
+            },
+            type: 'array',
+            title: 'Offerings'
+        },
+        instruments: {
+            items: {
+                $ref: '#/components/schemas/FundingInstrument'
+            },
+            type: 'array',
+            title: 'Instruments'
+        },
+        variants: {
+            items: {
+                $ref: '#/components/schemas/Variant'
+            },
+            type: 'array',
+            title: 'Variants'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'label',
+        'concepts',
+        'offerings',
+        'variants'
+    ],
+    title: 'Catalogue'
+} as const;
+
+export const CatalogueLabelSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        dated: {
+            type: 'string',
+            format: 'date',
+            title: 'Dated'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'name',
+        'dated',
+        'synthetic'
+    ],
+    title: 'CatalogueLabel',
+    description: 'What the catalogue is: a pack version and its date, or a fixture (R9).'
+} as const;
+
 export const ChallengeSchema = {
     properties: {
         reason: {
@@ -1311,6 +1495,88 @@ export const ChooseTargetSchema = {
     ],
     title: 'ChooseTarget',
     description: 'Make an ESCO occupation one of the targets: added, or in place of `replaces` (a\ntarget title it is the occupation for).'
+} as const;
+
+export const CitationSchema = {
+    properties: {
+        basis: {
+            $ref: '#/components/schemas/nessa__planning__catalogue__Basis'
+        },
+        claim_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Claim Id'
+        },
+        source_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Id'
+        },
+        source_hash: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Hash'
+        },
+        locator: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Locator'
+        },
+        excerpt: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Excerpt'
+        },
+        retrieved_on: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Retrieved On'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'basis'
+    ],
+    title: 'Citation',
+    description: 'Where a value came from. A source value names its claim, span and exact excerpt.'
 } as const;
 
 export const CityListInputSchema = {
@@ -2017,6 +2283,18 @@ export const EditRowSchema = {
     description: 'Set a row\'s importance, or challenge its source, at the checkpoint.'
 } as const;
 
+export const EligibilityStatusSchema = {
+    type: 'string',
+    enum: [
+        'confirmed',
+        'potentially_eligible',
+        'ineligible',
+        'insufficient_information'
+    ],
+    title: 'EligibilityStatus',
+    description: 'A person\'s eligibility for one instrument on one offering (spec section 10): a status\nthe person or provider confirms, never computed by an eligibility engine in M0.'
+} as const;
+
 export const EmphasisSchema = {
     type: 'string',
     enum: [
@@ -2559,6 +2837,57 @@ export const ExtractionNotRunSchema = {
     description: 'Why a page model extraction may read was not handed to it (`nessa.evidence.\nextraction_runs`): the page stays `no_posting_readable`, never "none found".'
 } as const;
 
+export const FactSchema = {
+    properties: {
+        field: {
+            type: 'string',
+            title: 'Field'
+        },
+        value: {
+            $ref: '#/components/schemas/JsonValue'
+        },
+        unknown: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Unknown'
+        },
+        cited: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Citation'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        note: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Note'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'field'
+    ],
+    title: 'Fact',
+    description: 'One consequential field as a reviewer reads it: its value and citation, or why it is\nunknown (never zero, never a default).'
+} as const;
+
 export const FailureClassSchema = {
     type: 'string',
     enum: [
@@ -2778,6 +3107,73 @@ export const FreshnessOutSchema = {
     ],
     title: 'FreshnessOut',
     description: 'How current a source\'s data is, from its last successful retrieval (spec section 11).\nA failed refresh moves `last_attempt_at` only.'
+} as const;
+
+export const FundingInstrumentSchema = {
+    properties: {
+        instrument_id: {
+            type: 'string',
+            title: 'Instrument Id'
+        },
+        programme: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Programme'
+        },
+        kind: {
+            $ref: '#/components/schemas/InstrumentKind'
+        },
+        jurisdiction: {
+            type: 'string',
+            title: 'Jurisdiction'
+        },
+        review_state: {
+            $ref: '#/components/schemas/RecordState'
+        },
+        as_of: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'As Of'
+        },
+        rules: {
+            items: {
+                $ref: '#/components/schemas/Fact'
+            },
+            type: 'array',
+            title: 'Rules'
+        },
+        facts: {
+            items: {
+                $ref: '#/components/schemas/Fact'
+            },
+            type: 'array',
+            title: 'Facts'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'instrument_id',
+        'programme',
+        'kind',
+        'jurisdiction',
+        'review_state'
+    ],
+    title: 'FundingInstrument',
+    description: 'A scheme\'s rules (spec section 18, FundingInstrument): never a person\'s eligibility.'
 } as const;
 
 export const GapSchema = {
@@ -3160,6 +3556,19 @@ export const InputRouteSchema = {
     description: 'How a source reached Nessa. Pasted text is its own route, never a retrieval.'
 } as const;
 
+export const InstrumentKindSchema = {
+    type: 'string',
+    enum: [
+        'fee_waiver',
+        'grant',
+        'bursary',
+        'employer_support',
+        'loan',
+        'programme'
+    ],
+    title: 'InstrumentKind'
+} as const;
+
 export const IscoGroupOutSchema = {
     properties: {
         code: {
@@ -3538,6 +3947,8 @@ export const JobPageSchema = {
     title: 'JobPage',
     description: 'A page of jobs, with counts that never double count a multi-city job and coverage\nthat says how many sources were checked. An empty page says why (STATE-02).'
 } as const;
+
+export const JsonValueSchema = {} as const;
 
 export const LabelMatchOutSchema = {
     properties: {
@@ -4844,6 +5255,211 @@ export const OccupationSearchOutSchema = {
     description: 'Exact label matches (all of them, when several occupations share a label), then\nranked full-text matches. `full_text_total` counts every other full-text match, so a\nlimited page is never mistaken for the whole result.'
 } as const;
 
+export const OfferGateSchema = {
+    properties: {
+        accepted: {
+            type: 'boolean',
+            title: 'Accepted'
+        },
+        role_class: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Role Class'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'accepted'
+    ],
+    title: 'OfferGate',
+    description: 'A job or an apprenticeship starts only when an offer is accepted: its wages and its\nexperience start at that gate, never before (FIN1-04, PLN-05).'
+} as const;
+
+export const OfferingSchema = {
+    properties: {
+        offering_id: {
+            type: 'string',
+            title: 'Offering Id'
+        },
+        concept_id: {
+            type: 'string',
+            title: 'Concept Id'
+        },
+        review_state: {
+            $ref: '#/components/schemas/RecordState'
+        },
+        as_of: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'As Of'
+        },
+        start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start'
+        },
+        finish: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Finish'
+        },
+        unknown: {
+            additionalProperties: {
+                type: 'string'
+            },
+            type: 'object',
+            title: 'Unknown'
+        },
+        weekly_hours: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 168,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Weekly Hours'
+        },
+        sessions: {
+            items: {
+                $ref: '#/components/schemas/Session'
+            },
+            type: 'array',
+            title: 'Sessions'
+        },
+        payment_plans: {
+            items: {
+                $ref: '#/components/schemas/PaymentPlan'
+            },
+            type: 'array',
+            title: 'Payment Plans'
+        },
+        prerequisites: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Prerequisites'
+        },
+        grants: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Grants'
+        },
+        application_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Deadline'
+        },
+        application_gate: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Gate'
+        },
+        offer_gate: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/OfferGate'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        outcomes_from: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Outcomes From'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        },
+        cited: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Citation'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        facts: {
+            items: {
+                $ref: '#/components/schemas/Fact'
+            },
+            type: 'array',
+            title: 'Facts'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'offering_id',
+        'concept_id',
+        'review_state',
+        'start',
+        'finish',
+        'weekly_hours',
+        'synthetic'
+    ],
+    title: 'Offering',
+    description: 'One dated intake of a concept (spec section 18, Offering).'
+} as const;
+
 export const OnetMatchOutSchema = {
     properties: {
         onet_code: {
@@ -4904,6 +5520,41 @@ export const OnetMatchOutSchema = {
         'top_tasks'
     ],
     title: 'OnetMatchOut'
+} as const;
+
+export const OptionsOutSchema = {
+    properties: {
+        profile_version: {
+            type: 'integer',
+            title: 'Profile Version'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        },
+        data_mode: {
+            $ref: '#/components/schemas/DataMode'
+        },
+        pack: {
+            $ref: '#/components/schemas/PackLabel'
+        },
+        targets: {
+            items: {
+                $ref: '#/components/schemas/TargetOptions'
+            },
+            type: 'array',
+            title: 'Targets'
+        }
+    },
+    type: 'object',
+    required: [
+        'profile_version',
+        'synthetic',
+        'data_mode',
+        'pack',
+        'targets'
+    ],
+    title: 'OptionsOut'
 } as const;
 
 export const OutcomeReviewSchema = {
@@ -5300,6 +5951,116 @@ export const PayStatisticOutSchema = {
         'reliability'
     ],
     title: 'PayStatisticOut'
+} as const;
+
+export const PaymentSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            enum: [
+                'fee',
+                'instalment',
+                'extra'
+            ],
+            title: 'Kind'
+        },
+        amount_minor: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Amount Minor'
+        },
+        due: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Due'
+        },
+        month_offset: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Month Offset'
+        },
+        cited: {
+            $ref: '#/components/schemas/Citation'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'amount_minor',
+        'cited'
+    ],
+    title: 'Payment',
+    description: 'A contractual payment: a fee, an instalment or an extra cost (FIN1-02). Its date, or\nits month counted from the offering\'s start month (0 is the first). An outflow is taken\nas due on the first day of its month: conservative prefunding (TIME-1).'
+} as const;
+
+export const PaymentPlanSchema = {
+    properties: {
+        plan_id: {
+            type: 'string',
+            title: 'Plan Id'
+        },
+        label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
+        },
+        payments: {
+            items: {
+                $ref: '#/components/schemas/Payment'
+            },
+            type: 'array',
+            title: 'Payments'
+        },
+        recurring: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Recurring'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        unknown: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Unknown'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'plan_id'
+    ],
+    title: 'PaymentPlan',
+    description: 'One way of paying for an offering. With `unknown` set, its cost is not stated.'
 } as const;
 
 export const PlaceListSchema = {
@@ -6174,7 +6935,7 @@ export const ProposedChangeOutSchema = {
             description: 'The proposed answer, typed as the field\'s input; null unless provided. A list is the complete list after the change: accepting it replaces the field\'s list.'
         },
         basis: {
-            $ref: '#/components/schemas/Basis',
+            $ref: '#/components/schemas/nessa__profile__records__Basis',
             description: 'stated: the value appears in the cited messages (checked by the server); inferred: implied, or not found in them.'
         },
         message_ids: {
@@ -6834,6 +7595,16 @@ export const RecordPartSchema = {
     title: 'RecordPart'
 } as const;
 
+export const RecordStateSchema = {
+    type: 'string',
+    enum: [
+        'proposed',
+        'reviewed',
+        'accepted_assumption'
+    ],
+    title: 'RecordState'
+} as const;
+
 export const RecordStatementSchema = {
     properties: {
         expected_version: {
@@ -6879,6 +7650,45 @@ export const RecordStatementSchema = {
     ],
     title: 'RecordStatement',
     description: 'Whether the person holds a credential, experience or eligibility requirement.'
+} as const;
+
+export const RecurringSchema = {
+    properties: {
+        amount_minor: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Amount Minor'
+        },
+        at_least: {
+            type: 'boolean',
+            title: 'At Least'
+        },
+        count: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Count'
+        },
+        cited: {
+            $ref: '#/components/schemas/Citation'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'amount_minor',
+        'at_least',
+        'count',
+        'cited'
+    ],
+    title: 'Recurring',
+    description: 'Payments stated as "from £X a month" with or without their number: a total is known\nonly with the count and an exact amount.'
 } as const;
 
 export const ReferenceLabelSchema = {
@@ -8263,6 +9073,36 @@ export const SearchProposalSchema = {
     description: 'A source search\'s validated output: candidates only, never claims.'
 } as const;
 
+export const SessionSchema = {
+    properties: {
+        weekday: {
+            type: 'integer',
+            maximum: 6,
+            minimum: 0,
+            title: 'Weekday'
+        },
+        starts: {
+            type: 'string',
+            format: 'time',
+            title: 'Starts'
+        },
+        ends: {
+            type: 'string',
+            format: 'time',
+            title: 'Ends'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'weekday',
+        'starts',
+        'ends'
+    ],
+    title: 'Session',
+    description: 'A fixed timetable session, for clashes (TIME1-04): a weekday (0 is Monday) and times.'
+} as const;
+
 export const SetPreferencesSchema = {
     properties: {
         expected_version: {
@@ -9214,7 +10054,7 @@ export const SourceOutSchema = {
         basis: {
             anyOf: [
                 {
-                    $ref: '#/components/schemas/Basis'
+                    $ref: '#/components/schemas/nessa__profile__records__Basis'
                 },
                 {
                     type: 'null'
@@ -9814,6 +10654,90 @@ export const SuggestionOutSchema = {
     description: 'A career hypothesis (spec section 4\'s `CareerSuggestion`): an ESCO occupation, the\nanswers that found it and ESCO\'s facts about it, in words. Becoming a target needs the\nperson\'s choice (`POST .../targets`).'
 } as const;
 
+export const SupportSchema = {
+    properties: {
+        instrument_id: {
+            type: 'string',
+            title: 'Instrument Id'
+        },
+        kind: {
+            $ref: '#/components/schemas/InstrumentKind'
+        },
+        covers_fees_in_full: {
+            type: 'boolean',
+            title: 'Covers Fees In Full',
+            default: false
+        },
+        amount_minor: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Amount Minor'
+        },
+        paid_to: {
+            type: 'string',
+            enum: [
+                'provider',
+                'person'
+            ],
+            title: 'Paid To'
+        },
+        paid_month_offset: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Paid Month Offset'
+        },
+        proven_before_outflows: {
+            type: 'boolean',
+            title: 'Proven Before Outflows',
+            default: false
+        },
+        eligibility: {
+            $ref: '#/components/schemas/EligibilityStatus'
+        },
+        award: {
+            $ref: '#/components/schemas/AwardState'
+        },
+        assumed: {
+            type: 'boolean',
+            title: 'Assumed',
+            default: false
+        },
+        review_state: {
+            $ref: '#/components/schemas/RecordState'
+        },
+        cited: {
+            $ref: '#/components/schemas/Citation'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'instrument_id',
+        'kind',
+        'paid_to',
+        'eligibility',
+        'award',
+        'review_state',
+        'cited'
+    ],
+    title: 'Support',
+    description: 'One use of a non-repayable instrument on one variant. Paid to the provider, it reduces\nthe fees the person pays and is never also a receipt; paid to the person, it is a receipt\nin its month and reduces direct cost once (FIN1-10).'
+} as const;
+
 export const SupportNoteOutSchema = {
     properties: {
         policy_version: {
@@ -9915,6 +10839,61 @@ export const TargetListInputSchema = {
         'state'
     ],
     title: 'TargetListInput'
+} as const;
+
+export const TargetOptionsSchema = {
+    properties: {
+        target_title: {
+            type: 'string',
+            title: 'Target Title'
+        },
+        pack_target_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Pack Target Id'
+        },
+        note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: [
+                        'no_pack_target',
+                        'ambiguous_crosswalk'
+                    ]
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Note'
+        },
+        catalogue: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Catalogue'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'target_title',
+        'pack_target_id',
+        'note',
+        'catalogue'
+    ],
+    title: 'TargetOptions',
+    description: 'One target\'s options from the pack, or why it has none (never an empty success).'
 } as const;
 
 export const TargetOutSchema = {
@@ -10831,6 +11810,91 @@ export const ValidationStateSchema = {
     description: 'How a claim\'s value was established. Only deterministic code approves a value.'
 } as const;
 
+export const VariantSchema = {
+    properties: {
+        variant_id: {
+            type: 'string',
+            title: 'Variant Id'
+        },
+        offering_id: {
+            type: 'string',
+            title: 'Offering Id'
+        },
+        plan_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Plan Id'
+        },
+        work_pattern: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/WorkPattern'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        wage: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Wage'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        supports: {
+            items: {
+                $ref: '#/components/schemas/Support'
+            },
+            type: 'array',
+            title: 'Supports'
+        },
+        entry_requirements_met: {
+            type: 'boolean',
+            title: 'Entry Requirements Met',
+            default: false
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'variant_id',
+        'offering_id'
+    ],
+    title: 'Variant',
+    description: 'One reviewed start of a concept: an offering with the payment plan, work pattern, wage\nand support the person confirmed for it.'
+} as const;
+
+export const WageSchema = {
+    properties: {
+        net_income_minor: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Net Income Minor'
+        },
+        cited: {
+            $ref: '#/components/schemas/Citation'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'net_income_minor',
+        'cited'
+    ],
+    title: 'Wage',
+    description: 'A job\'s or an apprenticeship\'s take-home pay a month, as the person confirmed it: it\nstarts at the offer gate and never funds a payment before it arrives.'
+} as const;
+
 export const WorkModeSchema = {
     type: 'string',
     enum: [
@@ -10839,6 +11903,49 @@ export const WorkModeSchema = {
         'hybrid'
     ],
     title: 'WorkMode'
+} as const;
+
+export const WorkPatternSchema = {
+    properties: {
+        kind: {
+            $ref: '#/components/schemas/WorkPatternKind'
+        },
+        hours_per_week: {
+            type: 'integer',
+            maximum: 168,
+            minimum: 0,
+            title: 'Hours Per Week'
+        },
+        net_income_minor: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Net Income Minor'
+        },
+        cited: {
+            $ref: '#/components/schemas/Citation'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'hours_per_week',
+        'net_income_minor',
+        'cited'
+    ],
+    title: 'WorkPattern',
+    description: 'How the person\'s current job runs while a variant is active, as they confirmed it: its\nweekly hours and the take-home pay they confirmed (no tax or benefit is inferred).'
+} as const;
+
+export const WorkPatternKindSchema = {
+    type: 'string',
+    enum: [
+        'retain_work',
+        'reduced_hours',
+        'temporary_study_break',
+        'leave_current_job'
+    ],
+    title: 'WorkPatternKind'
 } as const;
 
 export const WorkStateSchema = {
@@ -11129,6 +12236,26 @@ export const WrittenWhyOutSchema = {
         'claims'
     ],
     title: 'WrittenWhyOut'
+} as const;
+
+export const nessa__planning__catalogue__BasisSchema = {
+    type: 'string',
+    enum: [
+        'source',
+        'person',
+        'fixture'
+    ],
+    title: 'Basis'
+} as const;
+
+export const nessa__profile__records__BasisSchema = {
+    type: 'string',
+    enum: [
+        'stated',
+        'inferred'
+    ],
+    title: 'Basis',
+    description: 'How an answer relates to what the person said (spec section 3: factual confirmations\nand inferences are styled differently).'
 } as const;
 
 export const MatricesOutWritableSchema = {

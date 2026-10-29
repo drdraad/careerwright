@@ -22,9 +22,11 @@ model needs more than a page states, the field stays unknown rather than guessed
 
 from calendar import monthrange
 from datetime import date, timedelta
+from typing import Literal
 
 from pydantic import JsonValue
 
+from nessa.capability.matrix import Matrix, PackTargetNote
 from nessa.catalogue.option_pack import (
     Claim,
     LearningOption,
@@ -54,6 +56,7 @@ from nessa.planning.catalogue import (
     PaymentPlan,
     RecordState,
     Recurring,
+    StrictModel,
     Variant,
 )
 
@@ -70,6 +73,34 @@ _INSTRUMENT_KINDS = {
     "loan": InstrumentKind.LOAN,
     "programme": InstrumentKind.PROGRAMME,
 }
+
+
+class TargetOptions(StrictModel):
+    """One target's options from the pack, or why it has none (never an empty success)."""
+
+    target_title: str
+    pack_target_id: str | None
+    note: Literal["no_pack_target", "ambiguous_crosswalk"] | None
+    catalogue: Catalogue | None
+
+
+def target_options(matrix: Matrix, pack: Pack) -> TargetOptions:
+    """The pack target the capability model matched for a target (ADR 0012 decision 10)."""
+    found = matrix.sources.pack_target
+    if found is None:
+        ambiguous = matrix.sources.pack_target_note is PackTargetNote.AMBIGUOUS_CROSSWALK
+        return TargetOptions(
+            target_title=matrix.target_title,
+            pack_target_id=None,
+            note="ambiguous_crosswalk" if ambiguous else "no_pack_target",
+            catalogue=None,
+        )
+    return TargetOptions(
+        target_title=matrix.target_title,
+        pack_target_id=found.target_id,
+        note=None,
+        catalogue=pack_catalogue(pack, found.target_id),
+    )
 
 
 def pack_catalogue(pack: Pack, target_id: str) -> Catalogue:

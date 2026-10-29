@@ -103,6 +103,62 @@ export type AcquisitionSummaryOut = {
 };
 
 /**
+ * ActionConcept
+ */
+export type ActionConcept = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    kind: ActionKind;
+    /**
+     * Title
+     */
+    title: string | null;
+    /**
+     * Provider
+     */
+    provider: string | null;
+    review_state: RecordState;
+    /**
+     * As Of
+     */
+    as_of?: string | null;
+    /**
+     * Exclusive Group
+     */
+    exclusive_group?: string | null;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    cited?: Citation | null;
+    /**
+     * Facts
+     */
+    facts?: Array<Fact>;
+    /**
+     * Entry Requirements
+     */
+    entry_requirements?: Array<Fact>;
+};
+
+/**
+ * ActionKind
+ */
+export const ActionKind = {
+    LEARNING: 'learning',
+    APPRENTICESHIP: 'apprenticeship',
+    WORK: 'work',
+    APPLICATION: 'application'
+} as const;
+
+/**
+ * ActionKind
+ */
+export type ActionKind = typeof ActionKind[keyof typeof ActionKind];
+
+/**
  * ActorOut
  */
 export type ActorOut = {
@@ -683,6 +739,27 @@ export const AttemptStatus = {
 export type AttemptStatus = typeof AttemptStatus[keyof typeof AttemptStatus];
 
 /**
+ * AwardState
+ *
+ * Whether an award was actually made, apart from eligibility: an eligible person may
+ * still not win a competitive award.
+ */
+export const AwardState = {
+    NOT_APPLIED: 'not_applied',
+    APPLIED: 'applied',
+    APPROVED: 'approved',
+    REFUSED: 'refused'
+} as const;
+
+/**
+ * AwardState
+ *
+ * Whether an award was actually made, apart from eligibility: an eligible person may
+ * still not win a competitive award.
+ */
+export type AwardState = typeof AwardState[keyof typeof AwardState];
+
+/**
  * Band
  *
  * The rubric's ordinal bands (spec section 5). Never averaged, subtracted or read as
@@ -703,22 +780,6 @@ export const Band = {
  * probabilities (AIR1-12).
  */
 export type Band = typeof Band[keyof typeof Band];
-
-/**
- * Basis
- *
- * How an answer relates to what the person said (spec section 3: factual confirmations
- * and inferences are styled differently).
- */
-export const Basis = { STATED: 'stated', INFERRED: 'inferred' } as const;
-
-/**
- * Basis
- *
- * How an answer relates to what the person said (spec section 3: factual confirmations
- * and inferences are styled differently).
- */
-export type Basis = typeof Basis[keyof typeof Basis];
 
 /**
  * Blocker
@@ -836,6 +897,49 @@ export type CapabilityChangeOut = {
 };
 
 /**
+ * Catalogue
+ */
+export type Catalogue = {
+    label: CatalogueLabel;
+    /**
+     * Concepts
+     */
+    concepts: Array<ActionConcept>;
+    /**
+     * Offerings
+     */
+    offerings: Array<Offering>;
+    /**
+     * Instruments
+     */
+    instruments?: Array<FundingInstrument>;
+    /**
+     * Variants
+     */
+    variants: Array<Variant>;
+};
+
+/**
+ * CatalogueLabel
+ *
+ * What the catalogue is: a pack version and its date, or a fixture (R9).
+ */
+export type CatalogueLabel = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Dated
+     */
+    dated: string;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+};
+
+/**
  * Challenge
  */
 export type Challenge = {
@@ -878,6 +982,39 @@ export type ChooseTarget = {
      * The discovery that suggested it, if any.
      */
     discovery_id?: string | null;
+};
+
+/**
+ * Citation
+ *
+ * Where a value came from. A source value names its claim, span and exact excerpt.
+ */
+export type Citation = {
+    basis: NessaPlanningCatalogueBasis;
+    /**
+     * Claim Id
+     */
+    claim_id?: string | null;
+    /**
+     * Source Id
+     */
+    source_id?: string | null;
+    /**
+     * Source Hash
+     */
+    source_hash?: string | null;
+    /**
+     * Locator
+     */
+    locator?: string | null;
+    /**
+     * Excerpt
+     */
+    excerpt?: string | null;
+    /**
+     * Retrieved On
+     */
+    retrieved_on?: string | null;
 };
 
 /**
@@ -1357,6 +1494,27 @@ export type EditRow = {
      */
     warning_acknowledged?: boolean;
 };
+
+/**
+ * EligibilityStatus
+ *
+ * A person's eligibility for one instrument on one offering (spec section 10): a status
+ * the person or provider confirms, never computed by an eligibility engine in M0.
+ */
+export const EligibilityStatus = {
+    CONFIRMED: 'confirmed',
+    POTENTIALLY_ELIGIBLE: 'potentially_eligible',
+    INELIGIBLE: 'ineligible',
+    INSUFFICIENT_INFORMATION: 'insufficient_information'
+} as const;
+
+/**
+ * EligibilityStatus
+ *
+ * A person's eligibility for one instrument on one offering (spec section 10): a status
+ * the person or provider confirms, never computed by an eligibility engine in M0.
+ */
+export type EligibilityStatus = typeof EligibilityStatus[keyof typeof EligibilityStatus];
 
 /**
  * Emphasis
@@ -1862,6 +2020,29 @@ export const ExtractionNotRun = {
 export type ExtractionNotRun = typeof ExtractionNotRun[keyof typeof ExtractionNotRun];
 
 /**
+ * Fact
+ *
+ * One consequential field as a reviewer reads it: its value and citation, or why it is
+ * unknown (never zero, never a default).
+ */
+export type Fact = {
+    /**
+     * Field
+     */
+    field: string;
+    value?: JsonValue;
+    /**
+     * Unknown
+     */
+    unknown?: string | null;
+    cited?: Citation | null;
+    /**
+     * Note
+     */
+    note?: string | null;
+};
+
+/**
  * FailureClass
  */
 export const FailureClass = {
@@ -2026,6 +2207,40 @@ export type FreshnessOut = {
      * Max Age Hours
      */
     max_age_hours: number;
+};
+
+/**
+ * FundingInstrument
+ *
+ * A scheme's rules (spec section 18, FundingInstrument): never a person's eligibility.
+ */
+export type FundingInstrument = {
+    /**
+     * Instrument Id
+     */
+    instrument_id: string;
+    /**
+     * Programme
+     */
+    programme: string | null;
+    kind: InstrumentKind;
+    /**
+     * Jurisdiction
+     */
+    jurisdiction: string;
+    review_state: RecordState;
+    /**
+     * As Of
+     */
+    as_of?: string | null;
+    /**
+     * Rules
+     */
+    rules?: Array<Fact>;
+    /**
+     * Facts
+     */
+    facts?: Array<Fact>;
 };
 
 /**
@@ -2286,6 +2501,23 @@ export const InputRoute = {
 export type InputRoute = typeof InputRoute[keyof typeof InputRoute];
 
 /**
+ * InstrumentKind
+ */
+export const InstrumentKind = {
+    FEE_WAIVER: 'fee_waiver',
+    GRANT: 'grant',
+    BURSARY: 'bursary',
+    EMPLOYER_SUPPORT: 'employer_support',
+    LOAN: 'loan',
+    PROGRAMME: 'programme'
+} as const;
+
+/**
+ * InstrumentKind
+ */
+export type InstrumentKind = typeof InstrumentKind[keyof typeof InstrumentKind];
+
+/**
  * IscoGroupOut
  */
 export type IscoGroupOut = {
@@ -2472,6 +2704,8 @@ export type JobPage = {
      */
     acquisition_model_spend: ModelSpendOut | null;
 };
+
+export type JsonValue = unknown;
 
 /**
  * LabelMatchOut
@@ -3290,6 +3524,100 @@ export type OccupationSearchOut = {
 };
 
 /**
+ * OfferGate
+ *
+ * A job or an apprenticeship starts only when an offer is accepted: its wages and its
+ * experience start at that gate, never before (FIN1-04, PLN-05).
+ */
+export type OfferGate = {
+    /**
+     * Accepted
+     */
+    accepted: boolean;
+    /**
+     * Role Class
+     */
+    role_class?: string | null;
+};
+
+/**
+ * Offering
+ *
+ * One dated intake of a concept (spec section 18, Offering).
+ */
+export type Offering = {
+    /**
+     * Offering Id
+     */
+    offering_id: string;
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    review_state: RecordState;
+    /**
+     * As Of
+     */
+    as_of?: string | null;
+    /**
+     * Start
+     */
+    start: string | null;
+    /**
+     * Finish
+     */
+    finish: string | null;
+    /**
+     * Unknown
+     */
+    unknown?: {
+        [key: string]: string;
+    };
+    /**
+     * Weekly Hours
+     */
+    weekly_hours: number | null;
+    /**
+     * Sessions
+     */
+    sessions?: Array<Session>;
+    /**
+     * Payment Plans
+     */
+    payment_plans?: Array<PaymentPlan>;
+    /**
+     * Prerequisites
+     */
+    prerequisites?: Array<string>;
+    /**
+     * Grants
+     */
+    grants?: Array<string>;
+    /**
+     * Application Deadline
+     */
+    application_deadline?: string | null;
+    /**
+     * Application Gate
+     */
+    application_gate?: string | null;
+    offer_gate?: OfferGate | null;
+    /**
+     * Outcomes From
+     */
+    outcomes_from?: string | null;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    cited?: Citation | null;
+    /**
+     * Facts
+     */
+    facts?: Array<Fact>;
+};
+
+/**
  * OnetMatchOut
  */
 export type OnetMatchOut = {
@@ -3320,6 +3648,26 @@ export type OnetMatchOut = {
      * Top Tasks
      */
     top_tasks: Array<ObservedTaskOut>;
+};
+
+/**
+ * OptionsOut
+ */
+export type OptionsOut = {
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    data_mode: DataMode;
+    pack: PackLabel;
+    /**
+     * Targets
+     */
+    targets: Array<TargetOptions>;
 };
 
 /**
@@ -3612,6 +3960,58 @@ export type PayStatisticOut = {
      * ONS's quality band for this statistic.
      */
     reliability: Reliability;
+};
+
+/**
+ * Payment
+ *
+ * A contractual payment: a fee, an instalment or an extra cost (FIN1-02). Its date, or
+ * its month counted from the offering's start month (0 is the first). An outflow is taken
+ * as due on the first day of its month: conservative prefunding (TIME-1).
+ */
+export type Payment = {
+    /**
+     * Kind
+     */
+    kind: 'fee' | 'instalment' | 'extra';
+    /**
+     * Amount Minor
+     */
+    amount_minor: number;
+    /**
+     * Due
+     */
+    due?: string | null;
+    /**
+     * Month Offset
+     */
+    month_offset?: number | null;
+    cited: Citation;
+};
+
+/**
+ * PaymentPlan
+ *
+ * One way of paying for an offering. With `unknown` set, its cost is not stated.
+ */
+export type PaymentPlan = {
+    /**
+     * Plan Id
+     */
+    plan_id: string;
+    /**
+     * Label
+     */
+    label?: string | null;
+    /**
+     * Payments
+     */
+    payments?: Array<Payment>;
+    recurring?: Recurring | null;
+    /**
+     * Unknown
+     */
+    unknown?: string | null;
 };
 
 /**
@@ -4119,7 +4519,7 @@ export type ProposedChangeOut = {
     /**
      * stated: the value appears in the cited messages (checked by the server); inferred: implied, or not found in them.
      */
-    basis: Basis;
+    basis: NessaProfileRecordsBasis;
     /**
      * Message Ids
      *
@@ -4522,6 +4922,20 @@ export const RecordPart = {
 export type RecordPart = typeof RecordPart[keyof typeof RecordPart];
 
 /**
+ * RecordState
+ */
+export const RecordState = {
+    PROPOSED: 'proposed',
+    REVIEWED: 'reviewed',
+    ACCEPTED_ASSUMPTION: 'accepted_assumption'
+} as const;
+
+/**
+ * RecordState
+ */
+export type RecordState = typeof RecordState[keyof typeof RecordState];
+
+/**
  * RecordStatement
  *
  * Whether the person holds a credential, experience or eligibility requirement.
@@ -4548,6 +4962,28 @@ export type RecordStatement = {
      * Verification Note
      */
     verification_note?: string | null;
+};
+
+/**
+ * Recurring
+ *
+ * Payments stated as "from £X a month" with or without their number: a total is known
+ * only with the count and an exact amount.
+ */
+export type Recurring = {
+    /**
+     * Amount Minor
+     */
+    amount_minor: number;
+    /**
+     * At Least
+     */
+    at_least: boolean;
+    /**
+     * Count
+     */
+    count: number | null;
+    cited: Citation;
 };
 
 /**
@@ -5412,6 +5848,26 @@ export type SearchProposal = {
 };
 
 /**
+ * Session
+ *
+ * A fixed timetable session, for clashes (TIME1-04): a weekday (0 is Monday) and times.
+ */
+export type Session = {
+    /**
+     * Weekday
+     */
+    weekday: number;
+    /**
+     * Starts
+     */
+    starts: string;
+    /**
+     * Ends
+     */
+    ends: string;
+};
+
+/**
  * SetPreferences
  *
  * The whole set of preferences; null means not chosen.
@@ -5955,7 +6411,7 @@ export type SourceOut = {
      * Message Ids
      */
     message_ids?: Array<string>;
-    basis?: Basis | null;
+    basis?: NessaProfileRecordsBasis | null;
     /**
      * Discovery Id
      *
@@ -6339,6 +6795,49 @@ export type SuggestionOut = {
 };
 
 /**
+ * Support
+ *
+ * One use of a non-repayable instrument on one variant. Paid to the provider, it reduces
+ * the fees the person pays and is never also a receipt; paid to the person, it is a receipt
+ * in its month and reduces direct cost once (FIN1-10).
+ */
+export type Support = {
+    /**
+     * Instrument Id
+     */
+    instrument_id: string;
+    kind: InstrumentKind;
+    /**
+     * Covers Fees In Full
+     */
+    covers_fees_in_full?: boolean;
+    /**
+     * Amount Minor
+     */
+    amount_minor?: number | null;
+    /**
+     * Paid To
+     */
+    paid_to: 'provider' | 'person';
+    /**
+     * Paid Month Offset
+     */
+    paid_month_offset?: number | null;
+    /**
+     * Proven Before Outflows
+     */
+    proven_before_outflows?: boolean;
+    eligibility: EligibilityStatus;
+    award: AwardState;
+    /**
+     * Assumed
+     */
+    assumed?: boolean;
+    review_state: RecordState;
+    cited: Citation;
+};
+
+/**
  * SupportNoteOut
  *
  * The support panel, shown beside a message that triggers the support screen
@@ -6406,6 +6905,27 @@ export type TargetListInput = {
      * Value
      */
     value?: Array<string> | null;
+};
+
+/**
+ * TargetOptions
+ *
+ * One target's options from the pack, or why it has none (never an empty success).
+ */
+export type TargetOptions = {
+    /**
+     * Target Title
+     */
+    target_title: string;
+    /**
+     * Pack Target Id
+     */
+    pack_target_id: string | null;
+    /**
+     * Note
+     */
+    note: 'no_pack_target' | 'ambiguous_crosswalk' | null;
+    catalogue: Catalogue | null;
 };
 
 /**
@@ -6967,6 +7487,51 @@ export const ValidationState = {
 export type ValidationState = typeof ValidationState[keyof typeof ValidationState];
 
 /**
+ * Variant
+ *
+ * One reviewed start of a concept: an offering with the payment plan, work pattern, wage
+ * and support the person confirmed for it.
+ */
+export type Variant = {
+    /**
+     * Variant Id
+     */
+    variant_id: string;
+    /**
+     * Offering Id
+     */
+    offering_id: string;
+    /**
+     * Plan Id
+     */
+    plan_id?: string | null;
+    work_pattern?: WorkPattern | null;
+    wage?: Wage | null;
+    /**
+     * Supports
+     */
+    supports?: Array<Support>;
+    /**
+     * Entry Requirements Met
+     */
+    entry_requirements_met?: boolean;
+};
+
+/**
+ * Wage
+ *
+ * A job's or an apprenticeship's take-home pay a month, as the person confirmed it: it
+ * starts at the offer gate and never funds a payment before it arrives.
+ */
+export type Wage = {
+    /**
+     * Net Income Minor
+     */
+    net_income_minor: number;
+    cited: Citation;
+};
+
+/**
  * WorkMode
  */
 export const WorkMode = {
@@ -6979,6 +7544,40 @@ export const WorkMode = {
  * WorkMode
  */
 export type WorkMode = typeof WorkMode[keyof typeof WorkMode];
+
+/**
+ * WorkPattern
+ *
+ * How the person's current job runs while a variant is active, as they confirmed it: its
+ * weekly hours and the take-home pay they confirmed (no tax or benefit is inferred).
+ */
+export type WorkPattern = {
+    kind: WorkPatternKind;
+    /**
+     * Hours Per Week
+     */
+    hours_per_week: number;
+    /**
+     * Net Income Minor
+     */
+    net_income_minor: number;
+    cited: Citation;
+};
+
+/**
+ * WorkPatternKind
+ */
+export const WorkPatternKind = {
+    RETAIN_WORK: 'retain_work',
+    REDUCED_HOURS: 'reduced_hours',
+    TEMPORARY_STUDY_BREAK: 'temporary_study_break',
+    LEAVE_CURRENT_JOB: 'leave_current_job'
+} as const;
+
+/**
+ * WorkPatternKind
+ */
+export type WorkPatternKind = typeof WorkPatternKind[keyof typeof WorkPatternKind];
 
 /**
  * WorkState
@@ -7175,6 +7774,36 @@ export type WrittenWhyOut = {
      */
     claims: Array<ClaimOut>;
 };
+
+/**
+ * Basis
+ */
+export const NessaPlanningCatalogueBasis = {
+    SOURCE: 'source',
+    PERSON: 'person',
+    FIXTURE: 'fixture'
+} as const;
+
+/**
+ * Basis
+ */
+export type NessaPlanningCatalogueBasis = typeof NessaPlanningCatalogueBasis[keyof typeof NessaPlanningCatalogueBasis];
+
+/**
+ * Basis
+ *
+ * How an answer relates to what the person said (spec section 3: factual confirmations
+ * and inferences are styled differently).
+ */
+export const NessaProfileRecordsBasis = { STATED: 'stated', INFERRED: 'inferred' } as const;
+
+/**
+ * Basis
+ *
+ * How an answer relates to what the person said (spec section 3: factual confirmations
+ * and inferences are styled differently).
+ */
+export type NessaProfileRecordsBasis = typeof NessaProfileRecordsBasis[keyof typeof NessaProfileRecordsBasis];
 
 /**
  * MatricesOut
@@ -9579,6 +10208,40 @@ export type SetCapabilityQuestionsResponses = {
 };
 
 export type SetCapabilityQuestionsResponse = SetCapabilityQuestionsResponses[keyof SetCapabilityQuestionsResponses];
+
+export type ListPlanningOptionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/options';
+};
+
+export type ListPlanningOptionsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ListPlanningOptionsError = ListPlanningOptionsErrors[keyof ListPlanningOptionsErrors];
+
+export type ListPlanningOptionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: OptionsOut;
+};
+
+export type ListPlanningOptionsResponse = ListPlanningOptionsResponses[keyof ListPlanningOptionsResponses];
 
 export type GetTaxonomyData = {
     body?: never;
