@@ -9,8 +9,10 @@ Decisions live in `docs/adr/`; the latest sprint review is in `docs/reviews/`.
 Run from the repository root (details: `docs/runbook.md`).
 - Setup: `make setup` (prerequisites, `uv sync --locked` on uv-managed Python 3.12, the
   web app and design tooling with Playwright's Chromium, local secrets and master key in
-  `NESSA_HOME`, default `~/.nessa/l0`, the pinned ESCO release fetched into the gitignored
-  `var/datasets/` and hash-checked, and the Docker images). The host Python is 3.14;
+  `NESSA_HOME`, default `~/.nessa/l0`, the pinned ESCO release and reference datasets (ONS
+  ASHE and the SOC 2020 coding index, the ILO and Anthropic AI evidence, the ESCO to O*NET
+  crosswalk) fetched into the gitignored `var/datasets/` and hash-checked, and the Docker
+  images). The host Python is 3.14;
   never use it for the backend. pnpm only, never npm.
 - Run: `make dev` (live: only the worker may reach Meta), `make demo` (no service has a
   route out), then open `http://127.0.0.1:53000`; `make stop` (bounded; keeps data),
@@ -32,6 +34,10 @@ Run from the repository root (details: `docs/runbook.md`).
   extraction of the synthetic fixture page, scope `live-extract`) and `make live-adzuna`
   (two free-tier Adzuna requests, ledgered at $0). Every call is appended to
   `docs/evidence/live-usage.jsonl` and `.md` with its cost (R5).
+- Corpus runs (`tools.corpus`) pace within one process only: leave a host's rate limit
+  between runs.
+- Generated review files (from `backend/`): `uv run --locked python -m tools.session_2_files`
+  rewrites session 2's T and R question sets.
 
 ## Repository facts
 - Requirement IDs and test IDs: `docs/requirements-register.md`. Tag each test with its
@@ -48,7 +54,17 @@ Run from the repository root (details: `docs/runbook.md`).
 - Layout: `nessa/identity` (identity and execution: access, workspaces, keys, runs,
   spend), `nessa/profile` (profile, interview contract, turns and preferences, the support
   policy, discovery, the slate and the early sketch, provisional concepts),
-  `nessa/catalogue` (the ESCO taxonomy and the English city list), `nessa/evidence`
+  `nessa/catalogue` (the ESCO taxonomy, the English city list, the pinned reference data,
+  the UK SOC mapping, modelled pay and the salary floor, and the AI Resilience record model
+  with its packs in `catalogue/packs/`, ADR 0010; and the England option pack,
+  `option_pack.py` and `packs/england_option_pack/`, ADR 0011, whose version files, schema
+  and session 2 package only `tools.option_pack_files` writes), `nessa/capability`
+  (capability assessment: the pinned capability reference with rubrics, ESCO crosswalks and
+  gate types; matrices, evidence, protected gates, OUT-1 outcomes, readiness, gaps and the
+  question graph; `capability.store` is its only SQL), `nessa/planning` (the monthly
+  planning model, pure: the planning catalogue and its pack adapter, the immutable monthly
+  input, the direct-spend, income-difference, liquidity and debt ledgers, and the route
+  checker), `nessa/evidence`
   (acquisition: the guarded fetcher, the source manifest `sources.json`, pages, Adzuna,
   jobs, freshness, claims, model extraction), `nessa/acquisition.py` (the restricted
   acquisition worker: no database, master key or model key), `nessa/api` (HTTP only),
@@ -93,11 +109,42 @@ Run from the repository root (details: `docs/runbook.md`).
     API's own empty answer is. Model extraction is the `page_extraction` run kind, started
     for at most five pages without structured data: the model only quotes, deterministic
     code approves values read from verified spans, and its input is erased when the run
-    ends. Lock order: a run's cancellation lock first, then `lock_workspace_records`, then
-    rows.
+    ends. Lock order (ADR 0009 decision 15): a run's cancellation lock first (the cancel; a
+    model-readable recording, before `lock_workspace_records`). Only the worker locks a
+    run's row `FOR UPDATE`, and only as its transaction's first lock; a cancel records its
+    requests (key shares on the runs' rows) before it locks the workspace's row.
+  - Pay and AI evidence (ADR 0010): ASHE is regional, never a city's; modelled pay exists
+    only through an accountable reviewer's UK SOC mapping (none in L0). The salary floor
+    leaves out only pay whose stated top, in its own period, is below it, never unknown,
+    predicted, open-ended or other-period pay, and says what it left out. The AI Resilience
+    Score is a reviewed range or unscored, never computed; exposure evidence alone never
+    publishes one, and a model's proposal never publishes.
+  - Option pack (ADR 0011): a committed version never changes; a correction or a review is
+    a new version with its own pin in `PINS`, loaded only through `load_pack`. Every field
+    cites a claim (value, span, excerpt) in its field's declared shape, or says why it is
+    unknown; where a page states two disagreeing values, the field stays unknown with both
+    kept. Session 2's question numbers are stable (Task 7c applies answers by number), and a
+    record becomes `reviewed` only when every one of its rows is answered yes. The accuracy
+    read reads development-split pages only.
+  - Capability (ADR 0012): a protected gate (legal practice, recognition, admission,
+    eligibility) is always required and never demoted (`PROTECTED_GATE`); held but
+    unverified is unresolved, and nothing finds a person ineligible. A level counts only
+    against the rubric it was chosen for; unknown is never level 0; ordinal levels take the
+    maximum, never a sum. A target with nothing modelled, or with eligibility alone, is
+    `insufficient_coverage`, never ready. A planned outcome counts only in a conditional
+    scenario and never changes current evidence. Every L0 readiness result is qualified,
+    and every derived result carries its `matrix_version` and `definition_version`.
   - The monthly model (TIME-1) reserves every touched month. A prerequisite is usable
     only from the next month boundary. Cash is prefunded: a receipt counts only if proven
     available before the outflow. Fixture wages arrive late in the month.
+  - Planning (ADR 0013): the checker lists every violation, each limit named apart
+    (direct-spend cap, monthly payment cap, reserve, deficit cap; an economic-cost cap is
+    only a preference), and a violation is "not feasible in this monthly model", never
+    "cannot afford". Unknown dates, cost, timetable or a hard limit leave a route
+    unresolved, never passed. Every readiness qualification qualifies the route. Only an
+    approved award counts unconditionally; a loan is never support. Readiness milestones
+    come from `nessa.capability.readiness.assess`, never from planning code, and Task 13a's
+    oracle shares no code with `nessa.planning.checker`.
   - Pareto layers are computed over the full archive, dominated schedules included.
     Equal points do not dominate each other.
   - TRACE-01 (economic cost) and DIRECTAI (direct spending) never share route IDs or
