@@ -176,6 +176,13 @@ with the browser's Origin unchanged.
   committed JSON Schema and the session 2 package from the pinned version. `--pack <file>`
   publishes a pack file as its version, in canonical form; pin the printed SHA-256 in
   `option_pack.PINS`. 0.1.0 is frozen, so a change is a new version.
+- Session 2's other question sets (ADR 0013): `uv run --locked python -m
+  tools.session_2_files` rewrites the TRACE-01 checker's run on P01's real option set (T1-T36)
+  and the capability reference with proposed outcome levels (R1-R58), beside the agenda
+  `docs/reviews/session-2.md`. Fast tests check both files against the tool.
+- Each target's pack options as the planning model reads them: `GET
+  /v1/workspaces/{id}/planning/options` (concepts, dated offerings, payment plans, funding;
+  every field cited or unknown with its reason).
 - Taxonomy: `GET /v1/taxonomy` (the ESCO release and its attribution), `GET
   /v1/taxonomy/occupations?q=...&match=all|any`, `GET /v1/taxonomy/occupations/{concept_id}`;
   English cities: `GET /v1/places`. A title ESCO lacks: `POST
