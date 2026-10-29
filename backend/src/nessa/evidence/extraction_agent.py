@@ -1,4 +1,4 @@
-"""Page extraction as a run task (adapter; ADR 0009 decision 13; fix round 2, rulings 10-13).
+"""Page extraction as a run task (adapter; ADR 0009 decision 15; fix round 2, rulings 10-13).
 
 One Pydantic AI agent on whatever Meta model the worker built for the run, with the
 workspace's own key: strict JSON output (`NativeOutput`), no tools of any kind (the agent can

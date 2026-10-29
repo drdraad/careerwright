@@ -20,13 +20,7 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from nessa.evidence import extraction_runs
 from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_page
-from nessa.evidence.acquisition import (
-    Coverage,
-    EmptyReason,
-    ModelExtractionState,
-    _empty_reason,
-    extraction_state,
-)
+from nessa.evidence.acquisition import ModelExtractionState, extraction_state
 from nessa.evidence.extraction import (
     INSTRUCTIONS,
     MAX_POSTINGS,
@@ -308,13 +302,10 @@ def test_a_posting_whose_title_is_not_on_the_page_is_dropped_whole() -> None:
 def test_a_page_read_with_no_advert_found_is_its_own_outcome_never_none_found() -> None:
     proposal = check_extraction(output(), CONTEXT)
 
+    # The listing that reads it is tested through the public job list (review C M7), in
+    # `test_page_extraction.py`: a page the model reads and finds no advert on, alone and
+    # beside an API's empty answer.
     assert proposal.outcome is ExtractionOutcome.NO_POSTING_FOUND
-    found_none = {Coverage.NO_POSTING_FOUND_BY_MODEL: 1}
-    assert _empty_reason(0, found_none) is EmptyReason.NO_POSTING_FOUND_BY_MODEL
-    # Even beside an API's own empty answer, a model finding none never reads as none found.
-    with_api = {Coverage.SUCCEEDED: 1, Coverage.NO_POSTING_FOUND_BY_MODEL: 1}
-    assert _empty_reason(0, with_api) is EmptyReason.NO_POSTING_FOUND_BY_MODEL
-    assert _empty_reason(0, {**found_none, Coverage.PENDING: 1}) is EmptyReason.SOURCES_PENDING
 
 
 @pytest.mark.req("ACQ-08")

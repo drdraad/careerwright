@@ -1,5 +1,5 @@
 """Model extraction end to end against real PostgreSQL 16 and DBOS (Task 7A fix round 2,
-rulings 9-13; ADR 0009 decision 13): a real worker process fetches a synthetic page with no
+rulings 9-13; ADR 0009 decision 15): a real worker process fetches a synthetic page with no
 structured data through the restricted acquisition worker, starts the workspace's own
 extraction run with the workspace's key, and a fake Meta reads the page. Every page is
 synthetic and labelled so; none composes distress text."""
@@ -224,6 +224,27 @@ def test_a_page_the_model_reads_and_finds_no_advert_on_is_never_none_found(
     )
     shown = acquisition(scenario.api, scenario.token, scenario.workspace_id, run_id)
     assert shown["targets"][0]["attempts"][0]["model_extraction"]["state"] == "no_posting_found"
+
+    # Beside an API's own empty answer (Adzuna's count of 0), it still never reads as none
+    # found (review C M7: through the public listing).
+    infra.query(
+        "INSERT INTO nessa.acquisition_targets (run_id, workspace_id, position, route, query, "
+        "status) VALUES (%s, %s, 1, 'adzuna', '{}'::jsonb, 'succeeded')",
+        (run_id, scenario.workspace_id),
+    )
+    infra.query(
+        "INSERT INTO nessa.source_attempts (attempt_id, workspace_id, run_id, position, route, "
+        "provider, requested_url, status, content_sha256, extraction, total_matching, "
+        "finished_at) VALUES (%s, %s, %s, 1, 'adzuna', 'adzuna', "
+        "'https://api.adzuna.com/v1/api/jobs/gb/search/1?what=gardener', 'succeeded', %s, "
+        "'no_matching_adverts', 0, clock_timestamp())",
+        (str(uuid.uuid4()), scenario.workspace_id, run_id, "0" * 64),
+    )
+    beside = jobs(scenario.api, scenario.token, scenario.workspace_id)
+    assert (beside["coverage"], beside["empty_reason"]) == (
+        {"succeeded": 1, "no_posting_found_by_model": 1},
+        "no_posting_found_by_model",
+    )
 
 
 @pytest.mark.req("ACQ-03", "STATE-02", "MODEL-04")
@@ -556,6 +577,8 @@ def test_an_extraction_cancelled_while_its_call_is_out_keeps_and_shows_its_resul
     )
     [row] = extractions(infra, run_id)
     extraction_run = str(row["run_id"])
+    during = jobs(scenario.api, scenario.token, scenario.workspace_id)
+    assert (during["coverage"], during["empty_reason"]) == ({"pending": 1}, "sources_pending")
 
     assert (
         _cancel(scenario.api, scenario.token, scenario.workspace_id, extraction_run).status_code

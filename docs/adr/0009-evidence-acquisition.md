@@ -247,7 +247,11 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    own empty answer (`no_matching_adverts`: Adzuna's count of 0; migration 0019) may count
    as none found. The summary and the listing's `coverage` count
    `no_posting_readable` apart; `coverage` leaves out pasted text, which is not a source
-   tried. The job list says why it is empty (`no_sources_checked`, `sources_pending` while
+   tried. An attempt still `pending` counts as pending only while its run is queued or
+   running; one its run left behind (a recording that rolled back, a crash and then a
+   cancel) reads as failed, `interrupted`, in coverage, the listing and the acquisition
+   view, its target `failed` (fix round 3, review B M1; read side only). The job list says
+   why it is empty (`no_sources_checked`, `sources_pending` while
    a source is still being fetched or read (review B N7), `no_source_retrieved`,
    `no_posting_readable`, `no_posting_found_by_model` (decision 15),
    `none_found_in_sources_checked`); its `total_jobs` and
@@ -261,8 +265,12 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    worker loop then calls `DBOS.cancel_workflow`, so no further step starts, and publishes
    the run `cancelled`, distinct from a failure. A run cancelled before dispatch is never
    started and reserves nothing; the model activity also refuses a cancelled run before any
-   reservation; a request already sent completes, is booked at its cost and its result is
-   not used. A finished run answers `RUN_FINISHED`. The model workflow's step sequence is
+   reservation; a request already sent completes, is booked at its cost and its accepted
+   result is kept, though a cancelled run's output is never shown as its answer (a
+   proposal, a summary); an extraction's postings, recorded with that result, are evidence
+   and are shown, and its page reads as what was recorded (decision 15). A finished run
+   answers `RUN_FINISHED`, unless runs it started have not
+   settled: then those are cancelled (decision 15, fix round 3). The model workflow's step sequence is
    unchanged and the acquisition workflow is new, so the DBOS `application_version` stays
    `nessa-l0-1`.
 
@@ -358,8 +366,28 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
       `RepairBound`): worst case $0.0034 on the test model and $0.048 on the production
       model, so three attempts fit the default $0.15 run limit. A page not handed over keeps
       a typed reason (`page_extractions.not_run`: `cap_reached`, `budget_exceeded`,
-      `no_model_key`, `model_not_permitted`, `demo_workspace`, `no_visible_text`) and stays
-      `no_posting_readable`. Demo workspaces never extract (a database CHECK as well).
+      `no_model_key`, `model_not_permitted`, `demo_workspace`, `no_visible_text`, and since
+      fix round 3 `acquisition_cancelled`) and stays `no_posting_readable`. Demo workspaces
+      never extract (a database CHECK as well). The budget check before a start counts the
+      committed spend plus only this acquisition's started runs that have not reserved yet
+      (no attempt, no cancellation), so a run that has reserved is never counted twice (fix
+      round 3, review C M3); the activity's reservation remains the enforcement.
+    - *Spend shown first (MODEL-08, fix round 3 item 5).* The job list (`GET .../jobs`, the
+      read the research view makes before an acquisition starts) carries
+      `acquisition_model_spend`: `MAX_EXTRACTIONS_PER_ACQUISITION` times one extraction
+      run's reservation on the workspace's model (`extraction_runs.acquisition_model_spend`,
+      deterministic): $0.017 on the test model, $0.239 on the production model; none for a
+      demo workspace. A retried attempt (a provider outage) reserves again within the key's
+      run limit, as the field says. Task 8 shows it on screen.
+    - *Cancellation (DUR-05, fix round 3 item 4).* Each extraction run records the
+      acquisition that started it (`runs.started_by_run`, migration 0023). Cancelling a run
+      also requests the cancellation of every run it started that has not settled (queued or
+      running), even once the run itself has finished, when only those are cancelled; the
+      worker acts on each request on its own, so a queued one is never dispatched and makes
+      no provider request. The cancel and the start hold the same advisory lock on the
+      acquisition (taken before any row lock, in the same order on both sides), so a page
+      recorded after a cancel is `acquisition_cancelled` and the SQL function refuses it too.
+      A run cancelled while its call is out keeps its accepted result, as every run does.
     - *Input and retention.* The sealed input is that text, marked in the prompt as
       untrusted data. It is erased once the run is terminal, whatever its outcome, by
       `nessa.erase_run_input` (`RunTask.erases_input`), even after the requester's access
@@ -373,19 +401,30 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
       the hashed text at word boundaries (the 6b `span_offsets`), and its value is read from
       that span by the JSON-LD path's rules (pay exact to the penny and in GBP, its period
       only as stated; dates as they parse; `apply_link`; no personal details; the claim
-      bounds). A field without a verified span is dropped with its reason; a span whose
+      bounds). Pay that cannot be read without a guess is refused, `salary_invalid` (fix
+      round 3, review C I2): a range with a multiplier on one side only (`£30-35k`), a
+      letter straight after a number that is not its `k` (`£1.2m`, `£30kpa`); "up to",
+      "max" or "maximum" after the amount gives a maximum, as before it. A negated work
+      mode ("not remote", "non-remote") is `work_mode_unclear` (review C M1). The input is
+      held to 8,000 bytes of UTF-8, as its reservation assumes (review C M4). A field
+      without a verified span is dropped with its reason; a span whose
       value cannot be read is a quarantined claim; postings for one title that disagree on
       a critical field are all marked (`pages.mark_conflicts`); a posting without a verified
       title is dropped whole. Approved claims are `validation: model` and cite offsets (a
       CHECK). The run's output is this checked proposal; `RunTask.record` records its
       postings, through the acquisition's own recording path and lock, in the transaction
       that accepts it, and nothing goes into a receipt.
-    - *What the listing says.* A page whose run is queued or running is `pending`; one it
-      read with no advert found is its own `no_posting_found_by_model` (and the list's
-      `empty_reason` of that name, with words saying it is not evidence of no vacancies),
-      never `none_found_in_sources_checked`; one whose run failed, was cancelled or verified
-      nothing stays `no_posting_readable`. Each attempt says how its extraction went
-      (`model_extraction`).
+    - *What the listing says.* What the run recorded decides first, whatever the run's
+      state (fix round 3, review C M2: a run cancelled while its call was out keeps its
+      result, so its posting reads as read and is counted): a published posting is
+      `succeeded` (`postings_read`); one read with no advert found is its own
+      `no_posting_found_by_model` (and the list's `empty_reason` of that name, with words
+      saying it is not evidence of no vacancies), never `none_found_in_sources_checked`;
+      postings that all conflict are `postings_conflicting` (migration 0024, review C M5) and
+      nothing verified is `not_read`, both `no_posting_readable`. With nothing recorded, a
+      page whose run is queued or running is `pending`; one whose run failed or was
+      cancelled first stays `no_posting_readable`. Each attempt says how its extraction went
+      (`model_extraction`; words for each state in `MODEL_EXTRACTION_STATE`).
     - *What a page can still do.* It can lead the model to pick the wrong span of its own
       text as a field; it cannot put a value, a link or a field there that its text does
       not hold, start a run, reach the profile, a key or a tool, or have a URL fetched
@@ -411,12 +450,14 @@ leak scan clean); `make live-adzuna` blocked: no `ADZUNA_APP_ID`/`ADZUNA_APP_KEY
   7b assigns template families first, OI-09; the live extraction read one synthetic page);
   the Roles chapter and every UI over these endpoints (Task 8); research data in the
   workspace export (T15); ASHE, UK-SOC and the AI evidence (Task 7B).
-- Model extraction (decision 15): cancelling an acquisition does not cancel the extraction
-  runs it already started (each is its own run, and cancellable); the budget check before
-  starting one counts that acquisition's unreserved runs only, so another run's
-  reservation can still refuse one (`budget_exceeded`, the page stays unread). A page can
-  lead the model to the wrong span of its own text; the period and work-mode word lists
-  and the date forms read are provisional (R6).
+- Model extraction (decision 15): the budget check before starting one counts the
+  committed spend and this acquisition's unreserved runs only, so a run elsewhere in the
+  workspace that reserves later can still refuse one at its own reservation
+  (`budget_exceeded`, the page stays unread). A page can lead the model to the wrong span
+  of its own text; the pay, period and work-mode words and the date forms read are
+  provisional (R6). The model-spend estimate is shown by Task 8.
+- Fix round 3 migrations: 0022 (`visible_text_detail`), 0023 (`runs.started_by_run`, the
+  cancellation lock, `acquisition_cancelled`), 0024 (`postings_conflicting`).
 - The live search proposed no candidate in two tries; candidate quality is unqualified.
 - The Adzuna live integration is unverified until credentials are in `.env` under those two
   names.

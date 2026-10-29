@@ -1,6 +1,6 @@
 """Model extraction of a page's job adverts (spec section 6: "Use model extraction only for
 remaining ambiguity ... deterministic code approves records"; ACQ-03, ACQ-04; ADR 0009
-decision 13; Task 7A fix round 2, rulings 9-13).
+decision 15; Task 7A fix round 2, rulings 9-13).
 
 A model-backed run kind on the one bounded activity (`extraction_agent.PAGE_EXTRACTION_TASK`).
 It reads only a retrieved, permitted page whose structured data gave no posting, as the

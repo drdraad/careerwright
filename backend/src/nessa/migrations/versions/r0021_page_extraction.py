@@ -1,5 +1,5 @@
 """Model extraction of a page's job advert (Task 7A fix round 2, rulings 9-12; ADR 0009
-decision 13).
+decision 15).
 
 - `page_extraction` runs are model-backed runs on the one bounded activity. They read one
   retrieved, permitted page whose structured data gave no posting, never in a demo
