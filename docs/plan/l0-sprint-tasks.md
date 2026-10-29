@@ -1,6 +1,6 @@
 # L0 sprint tasks (execution breakdown)
 
-This file breaks `docs/plan/development-plan.md` (the local development plan, v1.1) into
+This file breaks `docs/plan/development-plan.md` (the local development plan, v1.2) into
 implementation tasks for agent execution. Authority order: product specification
 (`Nessa_Product_Specification.md`, v1.3) → development plan local overrides → this file.
 Tasks 1–6 (Sprints 0–2) are complete. The remaining tasks follow the order, dependency
@@ -161,10 +161,28 @@ These bind every task and every review.
     dispatched after session 1 transcribes its outcome: H-06 into the register and
     `corpus/README.md`, H-12 into ADR 0007's checklist and the register. Task 8 does it at
     the latest.
-  - Session 2 (about 2 h). After Task 11. Closes H-07 for Sprints 4–5 on the option pack
+  - Session 2 (about 2½ h). After Task 11. Closes H-07 for Sprints 4–5 on the option pack
     and the TRACE-01 checker run on P01's real option set, and H-13, the formative
     comprehension session. Task 7c applies the H-07 record to the pack and publishes the
-    reviewed version that later tasks use.
+    reviewed version that later tasks use. From plan v1.2 it also closes H-01 for Sprint 2:
+    the design review of the You chapter and the slate at 1440 px and 390 px, using the
+    Sprint 2 checklist (`docs/reviews/sprint-2.md`). It tests scanning, understanding and
+    choosing (one suggestion explained, one chosen) and records where the first screen
+    hides the decision controls. Task 10 applies its findings first, and Tasks 10, 12 and 8
+    build their chapters to them.
+- R11 Language rules have a boundary (plan v1.2). The support screen's stems, the
+  explanation validation's word lists, redaction's patterns, the pay, date and work-mode
+  readers and the agency words grow only for a reproduced defect or an evaluation failure:
+  - a reproduced defect is a probe, fixture or corpus page that shows the wrong result;
+  - a hypothetical form is recorded as a known limit, not fixed.
+  Prefer a fail-safe outcome (unknown, unclear, body not kept) to a new pattern. Keep every
+  required safeguard and every accepted limitation as recorded. A reproduced leak of a third
+  party's contact detail, or a pay value approved wrong, is a defect and is fixed. More
+  exceptions do not make a rule understand language.
+- R12 Evidence before polish (plan v1.2). From Task 7b to session 2 (Tasks 7b, 9 and 11)
+  the critical chain takes priority. A refactor or hardening that no failing check, reproduced
+  defect or Global Constraint requires goes to the final-review list in the progress ledger,
+  never into these tasks.
   - Session 3 (about 1 h). Before Task 14 closes. Closes H-01 for Sprint 7, the design
     review, against what session 2 showed.
 
@@ -179,7 +197,9 @@ Dependency rules:
 
 1. Task 6b after Task 6 (it extends Task 6's discovery). By controller ruling, Task 6c
    follows 6b and Task 7 follows 6c; neither depends on 6b's code.
-2. Task 7b after Task 7 (it uses the Task 7 acquisition pipeline).
+2. Task 7d after Task 7, and Task 7b after Task 7d. Task 7b uses the Task 7 acquisition
+   pipeline; Task 7d fixes its cancellation lock order before the pipeline runs further
+   (plan v1.2).
 3. Task 9 after Tasks 7 and 7b: its outcome mappings cite Task 7's SourceClaim spans, and it
    loads the pack in the format Task 7b defines. The handover's "7b ∥ 9" therefore runs 7b
    first.
@@ -195,11 +215,11 @@ Dependency rules:
 11. Task 14 starts after Task 13b and after session 2's findings exist (the H-13 record),
     and closes only after session 3.
 12. Task 15 after Task 14 has closed.
-13. Task 16 after every remaining task (6b, 6c, 7, 7b, 7c, 8, 9, 10, 11, 12, 13a, 13b, 14
-    and 15) and after sessions 1, 2 and 3: release qualification needs all six chapters.
+13. Task 16 after every remaining task (6b, 6c, 7, 7d, 7b, 7c, 8, 9, 10, 11, 12, 13a, 13b,
+    14 and 15) and after sessions 1, 2 and 3: release qualification needs all six chapters.
 
-Suggested order: 6b → 6c → 7 → 7b → 9 → 11 → session 2 → 7c → 10 → 12 → 8 → 13a → 13b →
-14 (closes after session 3) → 15 → 16. Session 1 can be held at any point before Task 8;
+Suggested order: 6b → 6c → 7 → 7d → 7b → 9 → 11 → session 2 → 7c → 10 → 12 → 8 → 13a →
+13b → 14 (closes after session 3) → 15 → 16. Session 1 can be held at any point before Task 8;
 holding it before Task 7b lets 7b classify the pack's rights itself instead of leaving
 every page "pending human rights review".
 
@@ -489,10 +509,39 @@ unscored; lower-bound filtering; unscored visible by default in exploration). SS
 with a controlled server incl. IPv6/encoded addresses; prove the fetcher has neither user
 secrets nor private profile access; failed fetch never becomes "no vacancies".
 
+## Task 7d: Sprint 3 — cancellation lock order (plan v1.2)
+
+**Preconditions:** Task 7 complete. No human session.
+
+Source: the intermediate code review (`docs/reviews/intermediate-code-review-2026-10-29.md`,
+point 1) and ADR 0009's open item on the existing lock pattern. Cancelling a run and a
+worker publishing progress can take database locks in opposite orders:
+- `cancel_run` locks the workspace row `FOR UPDATE`, then takes a key share on the run's
+  row through the `run_cancellations` foreign key;
+- a worker transaction can hold the run's row `FOR UPDATE`, then write an event that
+  updates the workspace row.
+
+PostgreSQL then aborts one transaction, and the person has to cancel again. The acquisition
+cascade (ADR 0009 decision 15) can do this for up to five more runs.
+
+Deliver:
+- First, a concurrent regression test that reproduces the deadlock, run red: two connections,
+  a cancel against a worker publishing an event, for an ordinary run and for an acquisition
+  with started extraction runs.
+- One lock order for every transaction that can meet a cancel, with the cancellation lock
+  first (ADR 0009 decision 15). Do not add a retry loop in place of the order.
+- Correct ADR 0009's open item and decision 15 to say exactly what holds. Update the
+  register rows it closes (DUR-05 and any other).
+- Keep `application_version` unless a workflow's step sequence changes.
+
+Acceptance: the regression test fails before the change and passes after it, repeated
+enough times to show the race, and no other test changes its expectation. `make check` and
+`make acceptance` pass.
+
 ## Task 7b: Sprints 3–5 — the England option pack (curation and labels)
 
-**Preconditions:** Task 7 complete (its acquisition pipeline). No session is required to
-start. Until session 1 has happened, R3 governs retention: page bodies only in the private
+**Preconditions:** Tasks 7 and 7d complete (the acquisition pipeline, with its lock order
+fixed). No session is required to start. Until session 1 has happened, R3 governs retention: page bodies only in the private
 evidence directory, rights "pending human rights review" unless the terms clearly permit
 retention. After session 1, classify each page against its permitted source classes,
 recording the class and the terms relied on; a page outside them stays pending (R10).
@@ -521,6 +570,13 @@ Deliver:
   fetched and hash-checked like ESCO (R7), or committed only if it is small and its rights
   permit. No page body enters git unless its class permits it; no synthetic value enters
   the pack.
+- Early accuracy read (plan v1.2: real evidence is the next proof of progress). Once labels
+  and splits are assigned, run the Task 7 pipeline's deterministic path once over the
+  development-split pages. That path is structured data and Adzuna, with no model call; the
+  live model path is scored later, in Tasks 8, 10 and 12 (R5). Report field by
+  field: correct, incorrect, missing and unsupported, with denominators, against the labels.
+  Label the report "unreviewed labels, development split". Never tune on holdout pages
+  (OI-09). A pipeline defect it reproduces is fixed under R11; anything else is reported.
 - Hand the review to session 2: a package listing each record by persona target with every
   consequential field (salary basis, fees, dates, deadlines, award status, outcome levels)
   beside its span, as yes/no questions for the H-07 reviewer. Task 7c applies the answers.
@@ -530,8 +586,8 @@ Deliver:
 
 Acceptance: 33 pages in the manifest with URL, retrieval date, hash, rights status, template
 family, split and labels; the pack validates against its schema; every record is `proposed`
-and dated; nothing synthetic in the pack; no unpermitted body in git; the session 2 package
-is ready. `label_review` and rights review stay "not run — requires human" until a person
+and dated; nothing synthetic in the pack; no unpermitted body in git; the early accuracy
+read is reported with its denominators; the session 2 package is ready. `label_review` and rights review stay "not run — requires human" until a person
 records them.
 
 ## Task 7c: Sprints 3–5 — publish the reviewed option pack
@@ -632,7 +688,15 @@ earlier ranks.
 ## Task 10: Sprint 4 — Skills chapter, evidence questions and course corpus + Sprint 4 review
 
 **Preconditions:** Task 7c complete (the reviewed pack, after session 2's H-07 on its
-course outcomes; Task 11 comes before it). No dependency on Task 12 or Task 8.
+course outcomes; Task 11 comes before it); session 2's Sprint 2 design record (H-01, R10).
+No dependency on Task 12 or Task 8.
+
+First, as its own commits, apply the product owner's Sprint 2 design findings from
+session 2 to the You chapter and the slate. Shorten the initial presentation where the
+record asks, so that at 390 px a suggestion's decision controls show without a long
+scroll, and keep the evidence one step away. Transcribe the record; decide nothing on the
+reviewer's behalf (R2). Then build the Skills chapter to the same standard: initial
+presentation short, evidence one step away.
 
 Sprint card: "Sprint 4 Build trustworthy skills and outcome assessment". Slice: the Skills
 chapter UI, the question flow UI, the ten-course corpus labels, remaining acceptance, the
@@ -806,7 +870,7 @@ snapshots, exports, cache and workflow references. `docs/reviews/sprint-8.md`.
 
 ## Task 16: Sprint 9 — local release qualification and handover (S9.1–S9.6)
 
-**Preconditions:** every remaining task complete: 6b, 6c, 7, 7b, 7c, 8, 9, 10, 11, 12,
+**Preconditions:** every remaining task complete: 6b, 6c, 7, 7d, 7b, 7c, 8, 9, 10, 11, 12,
 13a, 13b, 14 and 15 (release qualification needs all six chapters); sessions 1, 2 and 3
 held (R10). The Sprint 9 human gates (H-01, H-03, H-04, H-05, H-08) are prepared as
 checklists and recorded "not run — requires human" (R2); none is a dispatch precondition.

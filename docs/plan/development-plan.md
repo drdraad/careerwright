@@ -2,7 +2,7 @@
 
 ## From product specification to a beautiful and verifiable local app
 
-28 October 2026 • Plan version 1.1 (version 1.0: 27 October 2026) • Based on product specification 1.3
+29 October 2026 • Plan version 1.2 (1.1: 28 October 2026; 1.0: 27 October 2026) • Based on product specification 1.3
 
 Build a complete career-planning experience that runs on a developer’s computer, works without credentials in a labelled synthetic demo, and uses one user-supplied Meta API key for live conversation and research. The endpoint is a tested local release candidate with inspectable evidence, reproducible route comparisons and a printable plan. Public hosting is outside this plan.
 
@@ -29,6 +29,13 @@ The earlier ten-day private-beta target is not adopted. The current instruction 
 Scope and architecture come first, followed by the design contract, sprint roadmap, detailed sprint cards, test strategy and release checklist. Each sprint card identifies deliverables, acceptance evidence and its coherence review. Keep the source specification alongside this plan for complete domain definitions.
 
 **Version 1.1 (28 October 2026)** applies the L0 assessment handover written after Sprints 0–2 (`docs/plan/l0-assessment-handover.md`), with its decisions D1–D3 confirmed by the product owner and recorded in ADR 0008. Human review becomes a scheduled resource with three sessions (sections 6 and 10). The required corpus becomes a reviewed England option pack (section 9). The remaining work follows the critical chain, and Sprint 6 is split into 6a and 6b (section 6). One formative comprehension session follows Sprint 5 (section 5). Adzuna stays optional (Sprint 3) and two risks are added (section 12). Sprint 2 gains the span-cited explanation the specification now permits (S2.7). Scope is otherwise unchanged: the dendrite, the three Pareto layers and the sliders all stay; only their order changes.
+
+**Version 1.2 (29 October 2026)** applies an intermediate code review held after the Sprint 3 acquisition core (`docs/reviews/intermediate-code-review-2026-10-29.md`; ADR 0008, amendment). Scope and architecture are unchanged. Four changes:
+
+1. A focused cancellation lock-order correction, with a concurrent regression test, runs right after the Sprint 3 backend and before the option pack (section 6).
+2. Real evidence is the next proof of progress. From the option pack to review session 2, the chain (option pack → Sprint 4 backend → Sprint 5 backend → session 2) takes priority. Infrastructure polish that no failing check or reproduced defect requires is listed for the final review instead. The option pack also reports an early, unreviewed accuracy read on its development split.
+3. Language rules (the support screen, explanation validation, redaction, and the pay, date and work-mode readers) grow only for a reproduced defect or an evaluation failure. A fail-safe outcome (unknown, unclear, not kept) is preferred to a new pattern. Safeguards and accepted limitations stay as recorded (section 12).
+4. Review session 2 also holds Sprint 2's design review, which tests scanning, understanding and choosing. Its findings are applied before more interface detail is added (sections 6 and 10).
 
 # 1 The local delivery boundary
 
@@ -206,17 +213,17 @@ The critical chain is validated inputs → evidence and outcomes → monthly fea
 **Order of the remaining work (v1.1).** The backend slices of Sprints 4 and 5 run before the Roles chapter UI, because in L0 the dendrite has no live vacancy data and every role is unscored: the Roles chapter is requested and stays in scope, but it does not feed the chain. After Sprint 2, work proceeds in this order:
 
 1. Sprint 2 addition S2.7, then the Sprint 0–1 visual corrections.
-2. Sprint 3 acquisition backend (S3.1–S3.4 and the reduced S3.6).
+2. Sprint 3 acquisition backend (S3.1–S3.4 and the reduced S3.6), then the cancellation lock-order correction (v1.2).
 3. The England option pack (section 9).
 4. Sprint 4 backend, then Sprint 5 backend.
 5. Review session 2, then the reviewed option pack published from its record.
-6. Sprint 4 Skills chapter and review, then Sprint 5 Options chapter and review.
+6. Session 2's Sprint 2 design findings applied, then Sprint 4 Skills chapter and review, then Sprint 5 Options chapter and review.
 7. Sprint 3 Roles chapter (S3.5), job scoring and review, after review session 1.
 8. Sprints 6a, 6b, 7 (closing after review session 3), 8 and 9.
 
 Review session 1 can be held at any point before the Roles chapter; held before the option pack is curated, it lets the pack's pages be classified against its rights policy rather than left pending human review. Each sprint's review is written when its last slice finishes, so the Sprint 3 review follows those of Sprints 4 and 5. With one implementer at a time, slices without a dependency on each other run one after the other, in either order.
 
-**Human review sessions.** Human review is a scheduled resource, not an event between sprints. Three fixed sessions, named in section 10 with the gates each closes, are dispatch preconditions for the work after them: no dependent slice starts until its session has happened. They total about five hours. The other human checks (the Sprint 3 and Sprint 9 design reviews, VoiceOver, Safari, the five Sprint 9 task sessions and the privacy decision) keep their positions in the sprint cards; none of them is a dispatch precondition.
+**Human review sessions.** Human review is a scheduled resource, not an event between sprints. Three fixed sessions, named in section 10 with the gates each closes, are dispatch preconditions for the work after them: no dependent slice starts until its session has happened. They total about five and a half hours. The other human checks (the Sprint 3 and Sprint 9 design reviews, VoiceOver, Safari, the five Sprint 9 task sessions and the privacy decision) keep their positions in the sprint cards; none of them is a dispatch precondition.
 
 # Sprint 0 Resolve the expensive uncertainties
 
@@ -684,12 +691,12 @@ Store a short record in docs/reviews/sprint-N.md: demonstrated journey, current 
 
 ## Human review sessions (v1.1)
 
-Human review is scheduled as three fixed sessions, about five hours in all. Each is a dispatch precondition for the work after it: an agent prepares the session's package (checklists, captures, the records to review), a person holds the session, and dependent work starts only after it has happened. If it has not, the work is recorded as “blocked: awaiting session N”, never started or self-certified. The product owner confirmed D1–D3 on 28 October 2026, so no session needs time for them.
+Human review is scheduled as three fixed sessions, about five and a half hours in all. Each is a dispatch precondition for the work after it: an agent prepares the session's package (checklists, captures, the records to review), a person holds the session, and dependent work starts only after it has happened. If it has not, the work is recorded as “blocked: awaiting session N”, never started or self-certified. The product owner confirmed D1–D3 on 28 October 2026, so no session needs time for them.
 
 | Session | When | Gates it closes | Precondition for |
 |---|---|---|---|
 | 1, about 2 hours | Before the Sprint 3 Roles chapter (S3.5) and before any page body is retained beyond the source classes it permits | H-06 as a rights policy for the permitted source classes of the corpus and the option pack, so agents can then classify pages themselves (a page outside those classes stays with a person); the H-12 checklist in ADR 0007 | The Roles chapter and job corpus; retaining or committing page bodies beyond ruling R3 |
-| 2, about 2 hours | After the Sprint 5 backend | H-07 for Sprints 4 and 5, on the option pack and the TRACE-01 checker run on P01's real option set; the formative comprehension session (section 5, H-13) | Publishing the reviewed option pack, and through it Sprint 6a and the Skills, Options and Roles chapters' scoring against reviewed values; the start of Sprint 7 |
+| 2, about 2½ hours | After the Sprint 5 backend | H-07 for Sprints 4 and 5, on the option pack and the TRACE-01 checker run on P01's real option set; the formative comprehension session (section 5, H-13); H-01 for Sprint 2, the design review of the You chapter and the slate at desktop and 390 px, testing scanning, understanding and choosing (v1.2) | Publishing the reviewed option pack, and through it Sprint 6a and the Skills, Options and Roles chapters' scoring against reviewed values; more interface detail in those chapters, which first applies the Sprint 2 design findings; the start of Sprint 7 |
 | 3, about 1 hour | Before Sprint 7 closes | H-01 for Sprint 7, the design review, against what session 2 showed | Closing Sprint 7, and so Sprint 8 |
 
 ## Use the supplied Claude Code starter kit
@@ -764,4 +771,6 @@ References checked on 27 October 2026. These narrow checks support the integrati
 | Design quality arrives too late | Approve signature compositions in Sprint 0, shell in 1, map in 3 and route view in 7. Fix interaction debt before final integration. |
 | Scope expands into public launch | Maintain the explicit L0 checklist. Schedule hosted/private-beta and M1 work as later milestones with their own acceptance evidence. |
 | Human review becomes the bottleneck | Sprints 0–2 took 16 hours of wall-clock time, so review points that assumed weeks between them now set elapsed time. Hold three fixed review sessions as dispatch preconditions (section 10) and size the remaining work in human review hours (section 6). |
+| Language-rule refinement becomes open-ended (support screen, explanation validation, redaction, value readers) | Grow a rule only for a reproduced defect or an evaluation failure. Prefer a fail-safe outcome (unknown, unclear, not kept) to a new pattern. Record a hypothetical form as a known limit. Keep the safeguards and accepted limitations as recorded (v1.2; ruling R11 in the task file). |
+| Infrastructure polish displaces evidence | From the option pack to review session 2, polish that no failing check or reproduced defect requires goes to the final review list (v1.2; ruling R12 in the task file). |
 | The numerical core is unexercised on real, reviewed options before Sprint 9 | Build the England option pack from the required corpus (section 9), run the TRACE-01 checker on P01's real option set and review it at session 2, and hold one formative comprehension session after Sprint 5 (section 5). |

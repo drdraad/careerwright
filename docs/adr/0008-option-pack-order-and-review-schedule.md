@@ -188,3 +188,27 @@ the handover's section 7 were considered and not adopted.
   an explicit cap, and is ledgered (R5).
 - ADR 0007 decision 6 is superseded in part by decision 4; ADR 0005 decision 1's exception is
   removed by Task 6c.
+
+## Amendment (2026-10-29, plan v1.2)
+
+Source: an intermediate code review that the product owner supplied after Task 7 slice 7A
+(`docs/reviews/intermediate-code-review-2026-10-29.md`). The product owner asked for the
+plan to be changed where the controller concurs. The controller concurred with all four
+points. Scope and architecture are unchanged.
+
+1. **Task 7d, the cancellation lock order.** This is a focused correction with a concurrent
+   regression test, run after Task 7 and before Task 7b. The existing lock pattern in ADR
+   0009's open items is fixed there, not at the final review.
+2. **Evidence before polish (ruling R12).** From Task 7b to session 2, the critical chain
+   takes priority. That chain is the option pack, then the capability and outcome model, the
+   monthly financial checker, and human review. Hardening that no failing check, reproduced
+   defect or Global Constraint requires goes to the final-review list. Task 7b also reports
+   an early, unreviewed accuracy read of the deterministic path on its development split.
+3. **A boundary on language rules (ruling R11).** Linguistic rules grow only for a
+   reproduced defect or an evaluation failure. A hypothetical form is recorded as a known
+   limit, and a fail-safe outcome is preferred to a new pattern. Safeguards and accepted
+   limitations stay as recorded.
+4. **Session 2 grows to about 2½ hours (decision 3).** It also holds H-01 for Sprint 2: the
+   design review of the You chapter and the slate, which tests scanning, understanding and
+   choosing. Task 10 applies its findings first, and Tasks 10, 12 and 8 build to them. The
+   three sessions now total about five and a half hours.
