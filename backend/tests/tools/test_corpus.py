@@ -157,6 +157,7 @@ def test_an_agent_s_classification_holds_only_for_the_host_it_was_given_for(
     assert not list(tmp_path.iterdir())
 
 
+@pytest.mark.req("TEST1-09")
 def test_a_label_s_excerpts_are_located_in_the_hashed_text_of_a_page_whose_body_is_not_kept(
     tmp_path: Path,
 ) -> None:
@@ -182,6 +183,7 @@ def test_a_label_s_excerpts_are_located_in_the_hashed_text_of_a_page_whose_body_
     assert missing == {"excerpt": "not on the page", "offsets": [], "texts": []}
 
 
+@pytest.mark.req("TEST1-09")
 def test_whitespace_in_an_excerpt_matches_a_line_break_in_the_markup_and_nothing_else() -> None:
     text = "<li>Experience of\n      Power BI</li><li>Experience of Power-BI</li>"
 

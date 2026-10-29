@@ -98,7 +98,7 @@ def test_a_json_ld_job_posting_becomes_a_job_copy_with_every_value_typed() -> No
     assert job.salary.basis is PayBasis.ADVERTISED
 
 
-@pytest.mark.req("JOB-02")
+@pytest.mark.req("JOB-01")
 @pytest.mark.parametrize(
     "link",
     [
@@ -123,7 +123,7 @@ def test_a_board_s_profile_page_for_the_advertiser_is_not_its_own_site(link: str
     assert job.employer == "Cathcart Technology"  # still the organisation the page names
 
 
-@pytest.mark.req("JOB-02")
+@pytest.mark.req("JOB-01")
 @pytest.mark.parametrize(
     "link",
     [

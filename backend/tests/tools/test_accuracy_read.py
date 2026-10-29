@@ -65,6 +65,7 @@ def copy(**changes: object) -> JobCopy:
     return JobCopy.model_validate({**base, **changes})
 
 
+@pytest.mark.req("TEST1-09")
 def test_a_copy_that_reads_every_field_the_page_states_scores_correct_and_keeps_unknowns() -> None:
     scores = score_job(copy(), LABELS)
 
@@ -78,6 +79,7 @@ def test_a_copy_that_reads_every_field_the_page_states_scores_correct_and_keeps_
     assert scores["work_mode"] is Outcome.MISSING  # hybrid is stated; the path reads none
 
 
+@pytest.mark.req("TEST1-09")
 def test_a_copy_calling_an_agency_the_employer_scores_incorrect_and_unsupported() -> None:
     scores = score_job(copy(advertiser=AdvertiserKind.EMPLOYER), LABELS)
 
@@ -86,6 +88,7 @@ def test_a_copy_calling_an_agency_the_employer_scores_incorrect_and_unsupported(
     assert scores["employer"] is Outcome.UNSUPPORTED
 
 
+@pytest.mark.req("TEST1-09")
 @pytest.mark.parametrize(
     ("salary", "outcome"),
     [
@@ -109,6 +112,7 @@ def test_pay_is_correct_only_when_every_part_matches(
     assert score_job(copy(salary=salary), LABELS)["salary"] is outcome
 
 
+@pytest.mark.req("TEST1-09")
 def test_pay_the_page_leaves_unknown_but_the_path_reads_is_unsupported() -> None:
     labels = {**LABELS, "salary": None}
 
@@ -116,12 +120,14 @@ def test_pay_the_page_leaves_unknown_but_the_path_reads_is_unsupported() -> None
     assert score_job(copy(salary=None), labels)["salary"] is Outcome.KEPT_UNKNOWN
 
 
+@pytest.mark.req("TEST1-09")
 def test_a_contract_word_the_label_does_not_state_is_incorrect() -> None:
     scores = score_job(copy(employment_type="FULL_TIME,CONTRACTOR"), LABELS)
 
     assert scores["employment_type"] is Outcome.INCORRECT
 
 
+@pytest.mark.req("TEST1-09")
 def test_no_copy_at_all_leaves_every_stated_field_missing() -> None:
     scores = score_job(None, LABELS)
 
@@ -134,6 +140,7 @@ def _no_such_host(host: str, port: int) -> list[IPAddress]:
     raise HostNotFoundError
 
 
+@pytest.mark.req("TEST1-09", "ACQ-06")
 def test_one_read_paces_every_page_of_a_host_to_its_rate_limit() -> None:
     """The read fetches the excerpt-only development pages again, twelve of them on one
     job board: each page after a host's first waits that host's rate limit (spec section 6),

@@ -423,6 +423,7 @@ def test_the_corpus_manifest_and_the_pack_record_the_same_pages_and_labels() -> 
         assert slot["label_review"].startswith("not run")
 
 
+@pytest.mark.req("OPTN-10")
 def test_the_format_exports_a_json_schema() -> None:
     exported = schema()
 
@@ -430,6 +431,7 @@ def test_the_format_exports_a_json_schema() -> None:
     assert "claims" in exported["properties"]
 
 
+@pytest.mark.req("OPTN-10")
 def test_identifiers_are_unique() -> None:
     data = minimal()
     data["claims"].append(copy.deepcopy(data["claims"][0]))
