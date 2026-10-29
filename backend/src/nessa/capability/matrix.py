@@ -108,6 +108,7 @@ class Uncertainty(StrEnum):
     SET_BY_PERSON = "set_by_person"
     RELAXED_BY_PERSON = "relaxed_by_person"  # an employer's requirement the person relaxed
     CHALLENGED = "challenged"
+    REGULATION_NOT_MODELLED = "regulation_not_modelled"  # a regulated occupation, no typed gate
 
 
 def derived_importance(stated: Iterable[str]) -> Importance:
@@ -164,10 +165,13 @@ class GateInfo(StrictModel):
     gate_key: str
     kind: GateKind
     protected: Literal[True] = True
+    # False: ESCO records the occupation as regulated and no typed gate models what it
+    # requires, so nothing the person states can satisfy it (never silence).
+    modelled: bool = True
     label: str
-    issuing_body: str
+    issuing_body: str | None  # None only for a gate that is not modelled
     jurisdiction: str
-    verification: str
+    verification: str | None  # None only for a gate that is not modelled
     acceptable_proof: list[str]
     notes: list[str] = Field(default_factory=list)  # a posting's own wording of the gate
 
@@ -239,6 +243,9 @@ class PackTargetLink(StrictModel):
     target_id: str
     title: str
     city: str  # where its postings are: a target in another city still reads them
+    # How it was found: the same title, or the target's ESCO occupation named by the pack
+    # target's crosswalk (a target chosen in the product is stored by ESCO's label).
+    basis: Literal["title", "esco_crosswalk"]
 
 
 class OccupationNote(StrEnum):
@@ -339,9 +346,12 @@ def build_matrix(
     pack_target: Target | None,
     occupation: EscoSeed | None,
     exemplars: int,
+    synthetic: bool,
+    pack_target_basis: Literal["title", "esco_crosswalk"] = "title",
     edits: Sequence[RowEdit] = (),
     occupation_note: OccupationNote | None = None,
 ) -> Matrix:
+    """`synthetic`: the workspace's label (or a fixture's), carried by every result."""
     rows: list[MatrixRow] = []
     vacancies: dict[str, str | None] = {}
     copies = 0
@@ -349,11 +359,12 @@ def build_matrix(
         found = _PackRows(pack, reference, pack_target, occupation)
         rows, vacancies, copies = found.rows(), found.vacancy_kinds, len(found.postings)
     covered = {r.subject for r in rows}
-    rows = _ordered([*rows, *_esco_rows(occupation, covered)])
+    rows = _ordered([*rows, *_regulation(occupation, rows), *_esco_rows(occupation, covered)])
     relations = occupation.skills if occupation is not None else []
     matrix = Matrix(
         target_key=title_key(target_title),
         target_title=target_title,
+        synthetic=synthetic,
         sources=MatrixSources(
             pack_version=pack.pack_version,
             pack_dated=pack.dated,
@@ -377,6 +388,7 @@ def build_matrix(
                     target_id=pack_target.target_id,
                     title=pack_target.title,
                     city=pack_target.city,
+                    basis=pack_target_basis,
                 )
                 if pack_target is not None
                 else None
@@ -679,6 +691,63 @@ def _esco_rows(occupation: EscoSeed | None, covered: set[str]) -> list[MatrixRow
     ]
 
 
+REGULATION_ROW = "gate:occupation-regulation"
+_PRACTICE_GATES = frozenset({GateKind.LEGAL_PRACTICE, GateKind.RECOGNITION})
+
+
+def _regulation(occupation: EscoSeed | None, rows: list[MatrixRow]) -> list[MatrixRow]:
+    """An unresolved protected gate for an occupation ESCO records as regulated when no
+    typed gate models its right to practise: the regulation is never silence (spec section
+    8, "Unverified gates remain unresolved"; C1)."""
+    if occupation is None or occupation.regulated is not True:
+        return []
+    if any(r.gate is not None and r.gate.kind in _PRACTICE_GATES for r in rows):
+        return []
+    return [
+        MatrixRow(
+            row_id=REGULATION_ROW,
+            subject=REGULATION_ROW,
+            label=f"Registration to practise as {occupation.label} (not yet modelled)",
+            kind=RowKind.CREDENTIAL,
+            importance=Importance.ESSENTIAL,
+            source_importance=Importance.UNKNOWN,
+            gate=GateInfo(
+                gate_key="occupation-regulation",
+                kind=GateKind.LEGAL_PRACTICE,
+                modelled=False,
+                label=f"Registration to practise as {occupation.label} (not yet modelled)",
+                issuing_body=None,
+                jurisdiction=JURISDICTION,
+                verification=None,
+                acceptable_proof=[],
+            ),
+            uncertainty=[Uncertainty.REGULATION_NOT_MODELLED],
+        )
+    ]
+
+
+def find_pack_target(
+    title: str, pack: Pack, reference: Reference, occupation: EscoSeed | None
+) -> tuple[Target | None, Literal["title", "esco_crosswalk"] | None]:
+    """The pack target with the same title; otherwise the one pack target whose crosswalk
+    names the target's ESCO occupation. Several such targets are never guessed between."""
+    key = title_key(title)
+    by_title = next((t for t in pack.targets if title_key(t.title) == key), None)
+    if by_title is not None:
+        return by_title, "title"
+    if occupation is None:
+        return None, None
+    crosswalked = [
+        t
+        for t in pack.targets
+        if (crosswalk := reference.crosswalk_for(t.target_id)) is not None
+        and concept_id(crosswalk.esco_occupation) == occupation.concept_id
+    ]
+    if len(crosswalked) != 1:
+        return None, None
+    return crosswalked[0], "esco_crosswalk"
+
+
 def _digest(prefix: str, payload: object) -> str:
     text = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return f"{prefix}-{hashlib.sha256(text.encode()).hexdigest()[:VERSION_DIGITS]}"
@@ -741,6 +810,8 @@ def _edited(row: MatrixRow, edit: RowEdit) -> MatrixRow:
         return row  # a protected gate is never demoted, whatever was recorded
     if relaxes(row, edit.importance):
         uncertainty.add(Uncertainty.RELAXED_BY_PERSON)
+    elif edit.importance in REQUIRED_IMPORTANCE:
+        uncertainty.discard(Uncertainty.RELAXED_BY_PERSON)  # back in the definition
     uncertainty.add(Uncertainty.SET_BY_PERSON)
     return row.model_copy(
         update={"importance": edit.importance, "uncertainty": sorted(uncertainty)}

@@ -1036,7 +1036,14 @@ export const BasisSchema = {
 export const BlockerSchema = {
     properties: {
         row_id: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Row Id'
         },
         kind: {
@@ -1144,6 +1151,11 @@ export const CandidateOptionSchema = {
         outside_planning_model: {
             type: 'boolean',
             title: 'Outside Planning Model'
+        },
+        as_of: {
+            type: 'string',
+            format: 'date',
+            title: 'As Of'
         }
     },
     additionalProperties: false,
@@ -1162,7 +1174,8 @@ export const CandidateOptionSchema = {
         'addresses',
         'numeric_use',
         'months_minimum',
-        'outside_planning_model'
+        'outside_planning_model',
+        'as_of'
     ],
     title: 'CandidateOption',
     description: 'An option whose planned outcome maps to the gap\'s row: "expected to address", never a\nrecommendation, and never a reason the gap is closed.'
@@ -2832,6 +2845,14 @@ export const GapSchema = {
                 }
             ],
             title: 'Statement Id'
+        },
+        review_state: {
+            type: 'string',
+            enum: [
+                'proposed',
+                'reviewed'
+            ],
+            title: 'Review State'
         }
     },
     additionalProperties: false,
@@ -2846,7 +2867,8 @@ export const GapSchema = {
         'required_level',
         'evidenced_level',
         'evidence_ids',
-        'statement_id'
+        'statement_id',
+        'review_state'
     ],
     title: 'Gap'
 } as const;
@@ -2880,12 +2902,24 @@ export const GateInfoSchema = {
             title: 'Protected',
             default: true
         },
+        modelled: {
+            type: 'boolean',
+            title: 'Modelled',
+            default: true
+        },
         label: {
             type: 'string',
             title: 'Label'
         },
         issuing_body: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Issuing Body'
         },
         jurisdiction: {
@@ -2893,7 +2927,14 @@ export const GateInfoSchema = {
             title: 'Jurisdiction'
         },
         verification: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Verification'
         },
         acceptable_proof: {
@@ -3667,6 +3708,13 @@ export const MatricesOutSchema = {
             type: 'integer',
             title: 'Profile Version'
         },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        },
+        data_mode: {
+            $ref: '#/components/schemas/DataMode'
+        },
         pack: {
             $ref: '#/components/schemas/PackLabel'
         },
@@ -3686,6 +3734,8 @@ export const MatricesOutSchema = {
         'version',
         'questions_stopped',
         'profile_version',
+        'synthetic',
+        'data_mode',
         'pack',
         'reference',
         'matrices'
@@ -4914,6 +4964,14 @@ export const PackTargetLinkSchema = {
         city: {
             type: 'string',
             title: 'City'
+        },
+        basis: {
+            type: 'string',
+            enum: [
+                'title',
+                'esco_crosswalk'
+            ],
+            title: 'Basis'
         }
     },
     additionalProperties: false,
@@ -4921,7 +4979,8 @@ export const PackTargetLinkSchema = {
     required: [
         'target_id',
         'title',
-        'city'
+        'city',
+        'basis'
     ],
     title: 'PackTargetLink'
 } as const;
@@ -5954,6 +6013,14 @@ export const PromptRowSchema = {
             },
             type: 'object',
             title: 'Anchors'
+        },
+        review_state: {
+            type: 'string',
+            enum: [
+                'proposed',
+                'reviewed'
+            ],
+            title: 'Review State'
         }
     },
     additionalProperties: false,
@@ -5966,7 +6033,8 @@ export const PromptRowSchema = {
         'rubric_version',
         'required_level',
         'observable_task',
-        'anchors'
+        'anchors',
+        'review_state'
     ],
     title: 'PromptRow'
 } as const;
@@ -6216,7 +6284,10 @@ export const QualificationSchema = {
         'proposed_rubrics',
         'self_reported_evidence',
         'planned_outcome_assumption',
-        'user_assumption'
+        'user_assumption',
+        'missing_outcome_level',
+        'person_confirmed_demonstration',
+        'person_confirmed_verification'
     ],
     title: 'Qualification',
     description: 'Why a result is not unqualified. M0 matrices are always provisional.'
@@ -6322,9 +6393,14 @@ export const QuestionGraphSchema = {
             enum: [
                 'asking',
                 'enough',
-                'stopped'
+                'stopped',
+                'insufficient_coverage'
             ],
             title: 'State'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
         },
         evidence_version: {
             type: 'integer',
@@ -6359,6 +6435,7 @@ export const QuestionGraphSchema = {
     type: 'object',
     required: [
         'state',
+        'synthetic',
         'evidence_version',
         'targets',
         'prompts',
@@ -6391,6 +6468,19 @@ export const QuestionsOutSchema = {
             type: 'integer',
             title: 'Profile Version'
         },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        },
+        data_mode: {
+            $ref: '#/components/schemas/DataMode'
+        },
+        pack: {
+            $ref: '#/components/schemas/PackLabel'
+        },
+        reference: {
+            $ref: '#/components/schemas/ReferenceLabel'
+        },
         graph: {
             $ref: '#/components/schemas/QuestionGraph'
         }
@@ -6399,6 +6489,10 @@ export const QuestionsOutSchema = {
     required: [
         'version',
         'profile_version',
+        'synthetic',
+        'data_mode',
+        'pack',
+        'reference',
         'graph'
     ],
     title: 'QuestionsOut'
@@ -6467,8 +6561,18 @@ export const ReadinessOutSchema = {
             type: 'integer',
             title: 'Profile Version'
         },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        },
+        data_mode: {
+            $ref: '#/components/schemas/DataMode'
+        },
         pack: {
             $ref: '#/components/schemas/PackLabel'
+        },
+        reference: {
+            $ref: '#/components/schemas/ReferenceLabel'
         },
         assessments: {
             items: {
@@ -6482,7 +6586,10 @@ export const ReadinessOutSchema = {
     required: [
         'version',
         'profile_version',
+        'synthetic',
+        'data_mode',
         'pack',
+        'reference',
         'assessments'
     ],
     title: 'ReadinessOut'
@@ -6493,7 +6600,9 @@ export const ReadinessStateSchema = {
     enum: [
         'ready_now_for_modelled_requirements',
         'conditional_on_assessed_completion',
-        'not_ready'
+        'not_ready',
+        'not_yet_assessed',
+        'insufficient_coverage'
     ],
     title: 'ReadinessState'
 } as const;
@@ -7122,6 +7231,19 @@ export const RowAssessmentSchema = {
             type: 'boolean',
             title: 'Eligible To Apply After Completion',
             default: false
+        },
+        review_state: {
+            type: 'string',
+            enum: [
+                'proposed',
+                'reviewed'
+            ],
+            title: 'Review State'
+        },
+        modelled: {
+            type: 'boolean',
+            title: 'Modelled',
+            default: true
         }
     },
     additionalProperties: false,
@@ -7137,7 +7259,8 @@ export const RowAssessmentSchema = {
         'required_level',
         'status',
         'evidence',
-        'statement'
+        'statement',
+        'review_state'
     ],
     title: 'RowAssessment'
 } as const;
@@ -7170,6 +7293,16 @@ export const RowEvidenceSchema = {
             anyOf: [
                 {
                     $ref: '#/components/schemas/Confidence'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        answer: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Answer'
                 },
                 {
                     type: 'null'
@@ -7273,6 +7406,7 @@ export const RowEvidenceSchema = {
         'level',
         'basis',
         'confidence',
+        'answer',
         'self_assessed_level',
         'demonstrated_level',
         'last_done',
@@ -7319,7 +7453,8 @@ export const RowStatusSchema = {
         'satisfied',
         'not_held',
         'unresolved',
-        'pathway_outside_model'
+        'pathway_outside_model',
+        'no_modelled_requirements'
     ],
     title: 'RowStatus'
 } as const;
@@ -10559,7 +10694,8 @@ export const UncertaintySchema = {
         'proposed_crosswalk',
         'set_by_person',
         'relaxed_by_person',
-        'challenged'
+        'challenged',
+        'regulation_not_modelled'
     ],
     title: 'Uncertainty'
 } as const;
@@ -10986,6 +11122,13 @@ export const MatricesOutWritableSchema = {
             type: 'integer',
             title: 'Profile Version'
         },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        },
+        data_mode: {
+            $ref: '#/components/schemas/DataMode'
+        },
         pack: {
             $ref: '#/components/schemas/PackLabel'
         },
@@ -11005,6 +11148,8 @@ export const MatricesOutWritableSchema = {
         'version',
         'questions_stopped',
         'profile_version',
+        'synthetic',
+        'data_mode',
         'pack',
         'reference',
         'matrices'

@@ -12,6 +12,7 @@ from nessa.capability.matrix import Matrix
 from nessa.capability.questions import QuestionGraph
 from nessa.capability.readiness import Assessment
 from nessa.catalogue.option_pack import ReviewState
+from nessa.vocabulary import DataMode
 
 
 class _Out(BaseModel):
@@ -62,6 +63,8 @@ class MatricesOut(_Out):
     version: int  # the capability version: every write's expected version
     questions_stopped: bool
     profile_version: int  # the profile whose targets these are
+    synthetic: bool  # the workspace's label: synthetic data is always labelled
+    data_mode: DataMode
     pack: PackLabel
     reference: ReferenceLabel
     matrices: list[Matrix]  # one per target, in the profile's order; none without targets
@@ -70,13 +73,20 @@ class MatricesOut(_Out):
 class QuestionsOut(_Out):
     version: int
     profile_version: int
+    synthetic: bool
+    data_mode: DataMode
+    pack: PackLabel  # the prompts show the pack's rows and the reference's anchors (R9)
+    reference: ReferenceLabel
     graph: QuestionGraph
 
 
 class ReadinessOut(_Out):
     version: int
     profile_version: int
+    synthetic: bool
+    data_mode: DataMode
     pack: PackLabel
+    reference: ReferenceLabel
     assessments: list[Assessment]  # one per target: the current scenario
 
 

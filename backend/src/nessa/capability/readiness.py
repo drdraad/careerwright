@@ -8,6 +8,18 @@ A planned outcome counts only in a conditional scenario, after its completion ga
 never changes the current evidence (RDY1-02). Nothing here ever finds a person ineligible:
 an unresolved gate and a pathway outside the planning model are their own findings (RDY1-04).
 
+The states keep what is known apart from what is not (Global Constraint 6):
+
+- `insufficient_coverage`: no required row or gate is modelled (no rubric, no typed gate),
+  so the target cannot be assessed and is never ready (an unknown target, or ESCO seed
+  rows only, or a regulated occupation whose registration no typed gate models);
+- `not_ready`: a known shortfall (below the required level, not held, beyond the model);
+- `not_yet_assessed`: only unknowns stand in the way (no usable evidence, unresolved);
+- `conditional_on_assessed_completion` and `ready_now_for_modelled_requirements`.
+
+A conditional scenario whose completed offering has an assessed outcome with no stated
+level for a required row is a partial sketch (`missing_outcome_level`).
+
 Gaps are classified as learn, demonstrate, credential, experience, eligibility, information
 or preference conflict, and each becomes one abstract action. No course is offered for an
 evidence gap a small demonstration could close, nor for an eligibility gap education cannot
@@ -25,6 +37,7 @@ unqualified readiness result (OPTN-09, R9).
 
 import uuid
 from collections.abc import Sequence
+from datetime import date
 from enum import StrEnum
 from typing import Literal
 
@@ -48,6 +61,7 @@ from nessa.capability.matrix import (
     Uncertainty,
 )
 from nessa.capability.outcomes import (
+    ASSESSED_KINDS,
     Confidence,
     EvidenceKind,
     OutcomeReview,
@@ -76,9 +90,16 @@ class RowStatus(StrEnum):
     NOT_HELD = "not_held"
     UNRESOLVED = "unresolved"  # not stated, "don't know", or a protected gate unverified
     PATHWAY_OUTSIDE_MODEL = "pathway_outside_model"  # a blocker only
+    # A blocker only, for the whole target: no required row or gate is modelled, so nothing
+    # can be assessed (C1). Its `row_id` is None.
+    NO_MODELLED_REQUIREMENTS = "no_modelled_requirements"
 
 
 PASSING = frozenset({RowStatus.MET, RowStatus.SATISFIED})
+# Findings that are not yet known, as against a known shortfall.
+NOT_YET_KNOWN = frozenset(
+    {RowStatus.NO_USABLE_EVIDENCE, RowStatus.UNRESOLVED, RowStatus.NOT_MODELLED}
+)
 
 
 class GapKind(StrEnum):
@@ -94,7 +115,12 @@ class GapKind(StrEnum):
 class ReadinessState(StrEnum):
     READY_NOW_FOR_MODELLED_REQUIREMENTS = "ready_now_for_modelled_requirements"
     CONDITIONAL_ON_ASSESSED_COMPLETION = "conditional_on_assessed_completion"
-    NOT_READY = "not_ready"
+    NOT_READY = "not_ready"  # a known shortfall: below the level, not held, beyond the model
+    NOT_YET_ASSESSED = "not_yet_assessed"  # only unknowns stand in the way: not a shortfall
+    # Nothing required for the target is modelled (no rubric, no typed gate): it cannot be
+    # assessed at all, so it is never ready (C1). Distinct from not yet assessed, which the
+    # person's answers can settle.
+    INSUFFICIENT_COVERAGE = "insufficient_coverage"
 
 
 class PrimaryAction(StrEnum):
@@ -111,6 +137,13 @@ class Qualification(StrEnum):
     SELF_REPORTED_EVIDENCE = "self_reported_evidence"
     PLANNED_OUTCOME_ASSUMPTION = "planned_outcome_assumption"
     USER_ASSUMPTION = "user_assumption"
+    # A partial sketch: a completed offering's assessed outcome for a required row states
+    # no level (not ruled out: not yet assessed), so the scenario cannot count it.
+    MISSING_OUTCOME_LEVEL = "missing_outcome_level"
+    # L0 has no reviewer: a demonstration, and a protected gate's verification, rest on the
+    # person's own statement.
+    PERSON_CONFIRMED_DEMONSTRATION = "person_confirmed_demonstration"
+    PERSON_CONFIRMED_VERIFICATION = "person_confirmed_verification"
 
 
 ActionKind = Literal[
@@ -162,10 +195,12 @@ class RowAssessment(StrictModel):
     statement: StatementView | None  # credential, experience and eligibility rows
     planned_level: int | None = None  # conditional scenarios only
     eligible_to_apply_after_completion: bool = False  # a completed credential outcome
+    review_state: Literal["proposed", "reviewed"]  # its matrix row's (R9)
+    modelled: bool = True  # False: a regulated occupation's gate no typed gate models
 
 
 class Blocker(StrictModel):
-    row_id: str
+    row_id: str | None  # None: the whole target (`no_modelled_requirements`)
     kind: RowStatus
 
 
@@ -180,6 +215,7 @@ class Gap(StrictModel):
     evidenced_level: int | None
     evidence_ids: list[uuid.UUID]  # what it was computed from
     statement_id: uuid.UUID | None
+    review_state: Literal["proposed", "reviewed"]  # its matrix row's (R9)
 
 
 class CandidateOption(StrictModel):
@@ -201,6 +237,7 @@ class CandidateOption(StrictModel):
     numeric_use: Literal["usable", "excluded_missing_level", "excluded_not_accepted", "not_a_level"]
     months_minimum: int | None
     outside_planning_model: bool
+    as_of: date  # the retrieval date of its evidence: never "current" (R9)
 
 
 class AbstractAction(StrictModel):
@@ -300,8 +337,16 @@ def assess(
         )
         for r in rows
     )
-    if blockers:
+    modelled = [
+        r for r in rows if r.mandatory and r.status is not RowStatus.NOT_MODELLED and r.modelled
+    ]
+    if not modelled:
+        blockers = [Blocker(row_id=None, kind=RowStatus.NO_MODELLED_REQUIREMENTS), *blockers]
+        state = ReadinessState.INSUFFICIENT_COVERAGE
+    elif any(b.kind not in NOT_YET_KNOWN for b in blockers):
         state = ReadinessState.NOT_READY
+    elif blockers:
+        state = ReadinessState.NOT_YET_ASSESSED
     elif planned:
         state = ReadinessState.CONDITIONAL_ON_ASSESSED_COMPLETION
     else:
@@ -335,7 +380,9 @@ def assess(
         ),
         training_required=any(g.mandatory and g.kind in _OPTION_GAPS for g in gaps),
         show_route_chart=not ready_now,
-        qualifications=_qualifications(matrix, rows, planned, scoring.used),
+        qualifications=_qualifications(
+            matrix, rows, planned, scoring.used, _missing_level(rows, outcomes, completed)
+        ),
         rows=rows,
         blockers=blockers,
         gaps=gaps,
@@ -398,14 +445,19 @@ class _Scoring:
             evidence=seen,
             statement=None,
             planned_level=planned,
+            review_state=row.review_state,
         )
         return assessed, _gap(row, gap_kind, seen.level, seen.evidence_ids, None)
 
     def _stated(self, row: MatrixRow) -> tuple[RowAssessment, Gap | None]:
         statement = latest_statement(row.subject, self.statements)
         protected = row.gate is not None
+        modelled = row.gate is None or row.gate.modelled
         gap_kind: GapKind | None
-        if statement is None or statement.holding is Holding.UNKNOWN:
+        if not modelled:
+            # Nobody has modelled what this regulation requires: no statement settles it.
+            status, gap_kind = RowStatus.UNRESOLVED, GapKind.INFORMATION
+        elif statement is None or statement.holding is Holding.UNKNOWN:
             status, gap_kind = RowStatus.UNRESOLVED, GapKind.INFORMATION
         elif statement.holding is Holding.NOT_HELD:
             status, gap_kind = RowStatus.NOT_HELD, _NOT_HELD_GAP.get(row.kind, GapKind.INFORMATION)
@@ -442,6 +494,8 @@ class _Scoring:
                 else None
             ),
             eligible_to_apply_after_completion=eligible,
+            review_state=row.review_state,
+            modelled=modelled,
         )
         statement_id = statement.statement_id if statement is not None else None
         return assessed, _gap(row, gap_kind, None, [], statement_id)
@@ -467,6 +521,7 @@ def _gap(
         evidenced_level=evidenced,
         evidence_ids=evidence_ids,
         statement_id=statement_id,
+        review_state=row.review_state,
     )
 
 
@@ -498,6 +553,7 @@ def _candidate(outcome: PlannedOutcome, row: MatrixRow) -> CandidateOption:
         numeric_use=use,
         months_minimum=months,
         outside_planning_model=months is not None and months > MAX_PLANNING_MONTHS,
+        as_of=outcome.as_of,
     )
 
 
@@ -531,8 +587,35 @@ def _action(
     )
 
 
+def _missing_level(
+    rows: list[RowAssessment],
+    outcomes: Sequence[PlannedOutcome],
+    completed: frozenset[str] | None,
+) -> bool:
+    """Whether a completed offering's assessed, supported outcome for a required skill row
+    states no level: its level is not yet assessed rather than ruled out (OUT-1's partial
+    sketch). A topic mention or unassessed practice rules a level out, so it is not missing."""
+    if completed is None:
+        return False
+    required = {r.row_id for r in rows if r.mandatory and r.evidence is not None}
+    return any(
+        o.offering_id in completed
+        and o.skill_id in required
+        and o.outcome_type is OutcomeType.SKILL_LEVEL
+        and o.evidence_kind in ASSESSED_KINDS
+        and o.confidence is not Confidence.UNSUPPORTED
+        and o.level_on_completion is None
+        and o.review_state is not OutcomeReview.REJECTED
+        for o in outcomes
+    )
+
+
 def _qualifications(
-    matrix: Matrix, rows: list[RowAssessment], planned: bool, used: list[PlannedOutcome]
+    matrix: Matrix,
+    rows: list[RowAssessment],
+    planned: bool,
+    used: list[PlannedOutcome],
+    missing_level: bool,
 ) -> list[Qualification]:
     by_row = {r.row_id: r for r in matrix.rows}
     mandatory = [by_row[r.row_id] for r in rows if r.mandatory]
@@ -541,15 +624,19 @@ def _qualifications(
         found.add(Qualification.PROPOSED_RECORDS)
     if any(r.rubric is not None and r.rubric.review_state == "proposed" for r in mandatory):
         found.add(Qualification.PROPOSED_RUBRICS)
-    if any(
-        r.status is RowStatus.MET and r.evidence is not None and r.evidence.basis == "self_reported"
-        for r in rows
-    ):
+    met = [r for r in rows if r.status is RowStatus.MET and r.evidence is not None]
+    if any(r.evidence is not None and r.evidence.basis == "self_reported" for r in met):
         found.add(Qualification.SELF_REPORTED_EVIDENCE)
+    if any(r.evidence is not None and r.evidence.basis == "demonstrated" for r in met):
+        found.add(Qualification.PERSON_CONFIRMED_DEMONSTRATION)
+    if any(r.protected and r.status is RowStatus.SATISFIED for r in rows):
+        found.add(Qualification.PERSON_CONFIRMED_VERIFICATION)
     if planned:
         found.add(Qualification.PLANNED_OUTCOME_ASSUMPTION)
     if any(o.provenance is Provenance.USER_OVERRIDE for o in used):
         found.add(Qualification.USER_ASSUMPTION)
+    if missing_level:
+        found.add(Qualification.MISSING_OUTCOME_LEVEL)
     return [q for q in Qualification if q in found]
 
 

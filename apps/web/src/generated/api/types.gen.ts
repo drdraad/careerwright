@@ -727,7 +727,7 @@ export type Blocker = {
     /**
      * Row Id
      */
-    row_id: string;
+    row_id: string | null;
     kind: RowStatus;
 };
 
@@ -803,6 +803,10 @@ export type CandidateOption = {
      * Outside Planning Model
      */
     outside_planning_model: boolean;
+    /**
+     * As Of
+     */
+    as_of: string;
 };
 
 /**
@@ -2064,6 +2068,10 @@ export type Gap = {
      * Statement Id
      */
     statement_id: string | null;
+    /**
+     * Review State
+     */
+    review_state: 'proposed' | 'reviewed';
 };
 
 /**
@@ -2098,13 +2106,17 @@ export type GateInfo = {
      */
     protected?: true;
     /**
+     * Modelled
+     */
+    modelled?: boolean;
+    /**
      * Label
      */
     label: string;
     /**
      * Issuing Body
      */
-    issuing_body: string;
+    issuing_body: string | null;
     /**
      * Jurisdiction
      */
@@ -2112,7 +2124,7 @@ export type GateInfo = {
     /**
      * Verification
      */
-    verification: string;
+    verification: string | null;
     /**
      * Acceptable Proof
      */
@@ -2592,6 +2604,11 @@ export type MatricesOut = {
      * Profile Version
      */
     profile_version: number;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    data_mode: DataMode;
     pack: PackLabel;
     reference: ReferenceLabel;
     /**
@@ -3376,6 +3393,10 @@ export type PackTargetLink = {
      * City
      */
     city: string;
+    /**
+     * Basis
+     */
+    basis: 'title' | 'esco_crosswalk';
 };
 
 /**
@@ -4005,6 +4026,10 @@ export type PromptRow = {
     anchors: {
         [key: string]: string;
     };
+    /**
+     * Review State
+     */
+    review_state: 'proposed' | 'reviewed';
 };
 
 /**
@@ -4166,7 +4191,10 @@ export const Qualification = {
     PROPOSED_RUBRICS: 'proposed_rubrics',
     SELF_REPORTED_EVIDENCE: 'self_reported_evidence',
     PLANNED_OUTCOME_ASSUMPTION: 'planned_outcome_assumption',
-    USER_ASSUMPTION: 'user_assumption'
+    USER_ASSUMPTION: 'user_assumption',
+    MISSING_OUTCOME_LEVEL: 'missing_outcome_level',
+    PERSON_CONFIRMED_DEMONSTRATION: 'person_confirmed_demonstration',
+    PERSON_CONFIRMED_VERIFICATION: 'person_confirmed_verification'
 } as const;
 
 /**
@@ -4258,7 +4286,11 @@ export type QuestionGraph = {
     /**
      * State
      */
-    state: 'asking' | 'enough' | 'stopped';
+    state: 'asking' | 'enough' | 'stopped' | 'insufficient_coverage';
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
     /**
      * Evidence Version
      */
@@ -4307,6 +4339,13 @@ export type QuestionsOut = {
      * Profile Version
      */
     profile_version: number;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    data_mode: DataMode;
+    pack: PackLabel;
+    reference: ReferenceLabel;
     graph: QuestionGraph;
 };
 
@@ -4353,7 +4392,13 @@ export type ReadinessOut = {
      * Profile Version
      */
     profile_version: number;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    data_mode: DataMode;
     pack: PackLabel;
+    reference: ReferenceLabel;
     /**
      * Assessments
      */
@@ -4366,7 +4411,9 @@ export type ReadinessOut = {
 export const ReadinessState = {
     READY_NOW_FOR_MODELLED_REQUIREMENTS: 'ready_now_for_modelled_requirements',
     CONDITIONAL_ON_ASSESSED_COMPLETION: 'conditional_on_assessed_completion',
-    NOT_READY: 'not_ready'
+    NOT_READY: 'not_ready',
+    NOT_YET_ASSESSED: 'not_yet_assessed',
+    INSUFFICIENT_COVERAGE: 'insufficient_coverage'
 } as const;
 
 /**
@@ -4789,6 +4836,14 @@ export type RowAssessment = {
      * Eligible To Apply After Completion
      */
     eligible_to_apply_after_completion?: boolean;
+    /**
+     * Review State
+     */
+    review_state: 'proposed' | 'reviewed';
+    /**
+     * Modelled
+     */
+    modelled?: boolean;
 };
 
 /**
@@ -4806,6 +4861,7 @@ export type RowEvidence = {
      */
     basis: 'demonstrated' | 'self_reported' | 'none';
     confidence: Confidence | null;
+    answer: Answer | null;
     /**
      * Self Assessed Level
      */
@@ -4887,7 +4943,8 @@ export const RowStatus = {
     SATISFIED: 'satisfied',
     NOT_HELD: 'not_held',
     UNRESOLVED: 'unresolved',
-    PATHWAY_OUTSIDE_MODEL: 'pathway_outside_model'
+    PATHWAY_OUTSIDE_MODEL: 'pathway_outside_model',
+    NO_MODELLED_REQUIREMENTS: 'no_modelled_requirements'
 } as const;
 
 /**
@@ -6777,7 +6834,8 @@ export const Uncertainty = {
     PROPOSED_CROSSWALK: 'proposed_crosswalk',
     SET_BY_PERSON: 'set_by_person',
     RELAXED_BY_PERSON: 'relaxed_by_person',
-    CHALLENGED: 'challenged'
+    CHALLENGED: 'challenged',
+    REGULATION_NOT_MODELLED: 'regulation_not_modelled'
 } as const;
 
 /**
@@ -7117,6 +7175,11 @@ export type MatricesOutWritable = {
      * Profile Version
      */
     profile_version: number;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    data_mode: DataMode;
     pack: PackLabel;
     reference: ReferenceLabel;
     /**

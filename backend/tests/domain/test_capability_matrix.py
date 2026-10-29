@@ -12,6 +12,7 @@ from nessa.capability.matrix import (
     Importance,
     Matrix,
     MatrixRow,
+    OccupationNote,
     RowEdit,
     RowScope,
     apply_edits,
@@ -19,6 +20,7 @@ from nessa.capability.matrix import (
     check_edit,
     derived_importance,
 )
+from nessa.capability.readiness import ReadinessState, assess
 from nessa.capability.reference import load_reference
 from nessa.catalogue.esco import concept_id
 from nessa.catalogue.option_pack import load_pack
@@ -45,6 +47,7 @@ def matrix_for(target_id: str, *, esco: EscoSeed | None = None, exemplars: int =
         pack_target=pack_target,
         occupation=esco,
         exemplars=exemplars,
+        synthetic=False,
     )
 
 
@@ -346,6 +349,7 @@ def test_the_same_inputs_give_the_same_versions() -> None:
     assert first.definition_version.startswith("d-")
 
 
+@pytest.mark.req("RDY1-01")
 def test_a_target_with_no_pack_target_and_no_seed_has_no_rows_and_says_why() -> None:
     matrix = build_matrix(
         "Marine biologist",
@@ -354,12 +358,46 @@ def test_a_target_with_no_pack_target_and_no_seed_has_no_rows_and_says_why() -> 
         pack_target=None,
         occupation=None,
         exemplars=0,
+        occupation_note=OccupationNote.NO_EXACT_LABEL,
+        synthetic=False,
     )
+
+    result = assess(matrix, evidence=[], statements=[], outcomes=[], evidence_version=0)
 
     assert matrix.rows == []
     assert matrix.sources.pack_target is None
     assert matrix.sources.occupation is None
+    assert matrix.sources.occupation_note is OccupationNote.NO_EXACT_LABEL
     assert matrix.coverage.full_text_vacancies == 0
+    # Nothing is modelled, so nothing can be ready (C1).
+    assert result.state is ReadinessState.INSUFFICIENT_COVERAGE
+
+
+@pytest.mark.req("MAP1-04")
+def test_a_row_set_back_to_required_is_no_longer_marked_relaxed() -> None:
+    before = matrix_for("data-quality-analyst-manchester")
+    validation = "pack:data-quality-analyst-manchester:data-validation"
+
+    def edit(importance: Importance) -> RowEdit:
+        return RowEdit(
+            edit_id=uuid.uuid4(),
+            row_id=validation,
+            action="set_importance",
+            importance=importance,
+            reason="r",
+            warning_acknowledged=True,
+            recorded_by=ADA,
+            recorded_at=NOW,
+            from_matrix_version=before.matrix_version,
+            from_definition_version=before.definition_version,
+        )
+
+    relaxed = apply_edits(before, [edit(Importance.PREFERRED)])
+    restored = apply_edits(before, [edit(Importance.PREFERRED), edit(Importance.ESSENTIAL)])
+
+    assert "relaxed_by_person" in row(relaxed, validation).uncertainty
+    assert "relaxed_by_person" not in row(restored, validation).uncertainty
+    assert restored.definition_version == before.definition_version
 
 
 @pytest.mark.req("MAP1-05")

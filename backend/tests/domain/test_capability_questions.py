@@ -2,10 +2,12 @@
 ADR 0012): one graph across the active targets, shared answers reused, gates first, then a
 decision-impact ordering; 8 to 12 initial prompts; stop or pause; coverage as counts."""
 
+import uuid
+
 import pytest
 
 from nessa.capability.evidence import Holding
-from nessa.capability.matrix import Importance, Matrix, build_matrix
+from nessa.capability.matrix import EscoSeed, Importance, Matrix, build_matrix
 from nessa.capability.questions import QuestionReason, question_graph
 from nessa.capability.reference import load_reference
 from nessa.catalogue.option_pack import load_pack
@@ -30,6 +32,7 @@ def pack_matrix(target_id: str) -> Matrix:
         pack_target=target,
         occupation=None,
         exemplars=0,
+        synthetic=False,
     )
 
 
@@ -167,3 +170,41 @@ def test_the_pack_targets_ask_their_gate_first_and_carry_their_versions() -> Non
     disputed = next(r for r in data.rows if r.importance is Importance.DISPUTED)
     essential = next(r for r in data.rows if r.importance is Importance.ESSENTIAL)
     assert importance[essential.subject] > importance[disputed.subject]
+
+
+@pytest.mark.req("ASSESS-03")
+def test_nothing_modelled_is_never_enough_and_an_unmodelled_regulation_is_listed() -> None:
+    # C1(a, c): no modelled row or gate means the questions cannot be "enough"; a regulated
+    # occupation's unmodelled registration has no question to ask, and stays unresolved.
+    marine = build_matrix(
+        "Marine biologist",
+        pack=PACK,
+        reference=REFERENCE,
+        pack_target=None,
+        occupation=None,
+        exemplars=0,
+        synthetic=False,
+    )
+    nurse = build_matrix(
+        "Adult nurse",
+        pack=PACK,
+        reference=REFERENCE,
+        pack_target=None,
+        occupation=EscoSeed(
+            release="esco-v1.2.1-en-csv",
+            concept_id=uuid.uuid4(),
+            label="nurse responsible for general care",
+            regulated=True,
+            basis="esco_label",
+            skills=[],
+        ),
+        exemplars=0,
+        synthetic=False,
+    )
+
+    nothing = question_graph([marine], evidence=[], statements=[], evidence_version=0)
+    regulated = question_graph([nurse], evidence=[], statements=[], evidence_version=0)
+
+    assert (nothing.state, nothing.prompts) == ("insufficient_coverage", [])
+    assert (regulated.state, regulated.prompts) == ("insufficient_coverage", [])
+    assert regulated.coverage.unresolved == ["gate:occupation-regulation"]

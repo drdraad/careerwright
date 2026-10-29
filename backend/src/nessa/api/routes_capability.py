@@ -49,6 +49,8 @@ def get_matrices(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> Matr
         version=view.version,
         questions_stopped=view.questions_stopped,
         profile_version=view.profile_version,
+        synthetic=view.synthetic,
+        data_mode=view.data_mode,
         pack=PackLabel.of(deps.capability),
         reference=ReferenceLabel.of(deps.capability),
         matrices=view.matrices,
@@ -61,7 +63,13 @@ def get_questions(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> Que
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
         view = capability_view(tx, workspace_id, deps.capability)
     return QuestionsOut(
-        version=view.version, profile_version=view.profile_version, graph=questions(view)
+        version=view.version,
+        profile_version=view.profile_version,
+        synthetic=view.synthetic,
+        data_mode=view.data_mode,
+        pack=PackLabel.of(deps.capability),
+        reference=ReferenceLabel.of(deps.capability),
+        graph=questions(view),
     )
 
 
@@ -73,7 +81,10 @@ def get_readiness(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> Rea
     return ReadinessOut(
         version=view.version,
         profile_version=view.profile_version,
+        synthetic=view.synthetic,
+        data_mode=view.data_mode,
         pack=PackLabel.of(deps.capability),
+        reference=ReferenceLabel.of(deps.capability),
         assessments=readiness(view, deps.capability),
     )
 

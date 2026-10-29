@@ -11,11 +11,19 @@ reviewed demonstration or assessment shows, and the confidence of the evidence. 
 unsupported claim stays self-reported, never false. What counts towards readiness
 (ADR 0012, provisional):
 
-- a reviewed demonstration or assessment: its level, `corroborated`;
+- a reviewed demonstration or assessment: its level, `provisional`, never `corroborated`:
+  L0 has no reviewer, so every demonstration is the person's own entry and a result that
+  rests on one says so (`person_confirmed_demonstration`);
 - otherwise the latest self-report with a concrete example and when it was last done: its
   level, `provisional`;
-- a self-report without an example is kept as `unsupported`, and counts for nothing;
-- "unsure" is unknown, which is never level 0.
+- a self-report without an example is kept as `unsupported`, and counts for nothing.
+
+The five answers mean different things (spec section 9). "I have not learned this" and "I
+understand it but have not tried" are a known level 0: nothing to ask again, a gap to learn.
+"I am unsure" is an unresolved assumption: unknown, never level 0, and not asked again.
+"I did it with help" is at most level 1, since levels 2 to 4 are defined by independence
+(spec section 8's anchors). An answer that contradicts its level is refused. These
+level-free answers hold for the subject whatever rubric a target uses.
 
 Course enrolment and completion are not evidence at all: an assessed completion counts only
 once its evidence is reviewed (OUT1-05). Time in a job never adds a level by itself.
@@ -52,6 +60,10 @@ class Answer(StrEnum):
     UNDERSTAND_NOT_TRIED = "understand_not_tried"
     NOT_LEARNED = "not_learned"
     UNSURE = "unsure"
+
+
+NOT_YET_DONE = frozenset({Answer.NOT_LEARNED, Answer.UNDERSTAND_NOT_TRIED})  # known level 0
+WITH_HELP_MAX = 1  # "1 performs with guidance"; 2 to 4 are independent (spec section 8)
 
 
 class Method(StrEnum):
@@ -95,8 +107,13 @@ class SkillEvidence(StrictModel):
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
-        if self.answer is Answer.UNSURE and self.self_assessed_level is not None:
+        level = self.self_assessed_level
+        if self.answer is Answer.UNSURE and level is not None:
             raise ValueError("an unsure answer has no level: unknown is not level 0")
+        if self.answer in NOT_YET_DONE and level not in (None, 0):
+            raise ValueError("that answer contradicts its level: no performance yet is level 0")
+        if self.answer is Answer.DONE_WITH_HELP and level is not None and level > WITH_HELP_MAX:
+            raise ValueError("'with help' contradicts an independent level (2 to 4)")
         if self.method is Method.SELF_REPORT:
             if self.demonstrated_level is not None or self.reviewed_on is not None:
                 raise ValueError("a self-report has no demonstrated level and no review")
@@ -136,7 +153,8 @@ class RowEvidence(StrictModel):
 
     level: Level | None  # what counts towards readiness; None is unknown
     basis: Literal["demonstrated", "self_reported", "none"]
-    confidence: Confidence | None
+    confidence: Confidence | None  # never corroborated while L0 has no reviewer
+    answer: Answer | None  # the latest self-report's answer, of the five
     self_assessed_level: Level | None
     demonstrated_level: Level | None
     last_done: str | None
@@ -152,10 +170,8 @@ def row_evidence(
     subject: str, rubric_version: str | None, evidence: list[SkillEvidence]
 ) -> RowEvidence:
     on_subject = [e for e in evidence if e.subject == subject]
-    mine = [
-        e for e in on_subject if rubric_version is not None and e.rubric_version == rubric_version
-    ]
-    shared = any(e.rubric_version != rubric_version for e in on_subject)
+    mine = [e for e in on_subject if _applies(e, rubric_version)]
+    shared = any(e not in mine for e in on_subject)
     shown = [e for e in mine if e.method is not Method.SELF_REPORT and e.reviewed_on is not None]
     reports = sorted(
         (e for e in mine if e.method is Method.SELF_REPORT), key=lambda e: e.recorded_at
@@ -165,12 +181,19 @@ def row_evidence(
         (e.demonstrated_level for e in shown if e.demonstrated_level is not None), default=None
     )
     claimed = latest.self_assessed_level if latest is not None else None
+    if latest is not None and latest.answer in NOT_YET_DONE:
+        claimed = 0  # no performance yet: a known level 0, whatever the rubric
     concrete = latest is not None and bool(latest.example) and latest.last_done is not None
     level: int | None
     basis: Literal["demonstrated", "self_reported", "none"]
     confidence: Confidence | None
     if demonstrated is not None:
-        level, basis, confidence = demonstrated, "demonstrated", Confidence.CORROBORATED
+        # The person entered the demonstration and its review: L0 has no reviewer.
+        level, basis, confidence = demonstrated, "demonstrated", Confidence.PROVISIONAL
+    elif latest is not None and latest.answer in NOT_YET_DONE:
+        level, basis, confidence = 0, "self_reported", Confidence.PROVISIONAL
+    elif latest is not None and latest.answer is Answer.UNSURE:
+        level, basis, confidence = None, "self_reported", None
     elif claimed is not None and concrete:
         level, basis, confidence = claimed, "self_reported", Confidence.PROVISIONAL
     elif claimed is not None:
@@ -182,6 +205,7 @@ def row_evidence(
         level=level,
         basis=basis,
         confidence=confidence,
+        answer=latest.answer if latest is not None else None,
         self_assessed_level=claimed,
         demonstrated_level=demonstrated,
         last_done=latest.last_done if latest is not None else None,
@@ -192,6 +216,18 @@ def row_evidence(
         shared_from_other_rubric=shared,
         conflict=demonstrated is not None and claimed is not None and claimed != demonstrated,
     )
+
+
+def _applies(evidence: SkillEvidence, rubric_version: str | None) -> bool:
+    """A level counts only against its own rubric; an answer that needs no level (unsure, or
+    not yet done) holds for the subject under any rubric."""
+    if evidence.rubric_version is not None and evidence.rubric_version == rubric_version:
+        return True
+    level_free = evidence.self_assessed_level in (None, 0) and evidence.answer in LEVEL_FREE
+    return evidence.method is Method.SELF_REPORT and level_free
+
+
+LEVEL_FREE = frozenset({*NOT_YET_DONE, Answer.UNSURE})
 
 
 def latest_statement(

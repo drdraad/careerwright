@@ -11,7 +11,7 @@ import psycopg
 import pytest
 
 from nessa.capability.commands import committed_data
-from nessa.catalogue.esco import ESCO_RELEASE, parse_release
+from nessa.catalogue.esco import ESCO_RELEASE, concept_id, parse_release
 from nessa.catalogue.releases import read_verified
 from nessa.seed import INVITED_ACTORS
 from tests.support.client import ApiClient, profile_with
@@ -25,6 +25,7 @@ NURSE = "Registered nurse"
 DATA = "Data quality analyst"
 NMC = "pack:registered-nurse-manchester:nmc-registration"
 VALIDATION = "pack:data-quality-analyst-manchester:data-validation"
+NURSE_URI = "http://data.europa.eu/esco/occupation/8d3e8aaa-791b-4c75-a465-f3f827028f50"
 
 
 def workspace_with_targets(api: ApiClient, token: str, *targets: str) -> str:
@@ -76,7 +77,11 @@ def test_matrices_are_served_for_each_target_with_the_pack_s_date_and_review_sta
     assert body["pack"]["records_reviewed"] == 0
     assert body["pack"]["records_proposed"] > 0
     assert body["reference"]["review_state"] == "proposed"
+    # A synthetic workspace's results say so (M8).
+    assert (body["synthetic"], body["data_mode"]) == (True, "live_assisted")
     nurse = matrix(body, NURSE)
+    assert nurse["synthetic"] is True
+    assert nurse["sources"]["pack_target"]["basis"] == "title"
     assert nurse["status"] == "provisional_no_specialist_review"
     assert nurse["sources"]["occupation"]["label"] == "nurse responsible for general care"
     assert nurse["sources"]["occupation"]["basis"] == "pack_crosswalk"
@@ -315,10 +320,27 @@ def test_evidence_for_a_subject_no_matrix_holds_is_refused_and_nothing_is_saved(
             "self_assessed_level": 2,
         },
     )
+    validation = row(matrix(matrices(api, ada, workspace_id), DATA), VALIDATION)
+    contradictory = api.write(
+        "POST",
+        f"{base(workspace_id)}/evidence",
+        ada,
+        {
+            "expected_version": 0,
+            "subject": validation["subject"],
+            "rubric_version": validation["rubric"]["version_id"],
+            "answer": "not_learned",
+            "self_assessed_level": 3,
+            "example": "an example",
+            "last_done": "2026-09",
+        },
+    )
 
     assert refused.status_code == 422
     assert refused.json()["error"]["code"] == "VALIDATION_FAILED"
     assert inconsistent.status_code == 422
+    assert contradictory.status_code == 422
+    assert contradictory.json()["error"]["details"]["reason"] == "inconsistent_evidence"
     assert infra.query(
         "SELECT count(*) AS n FROM nessa.skill_evidence WHERE workspace_id = %s", (workspace_id,)
     ) == [{"n": 0}]
@@ -401,6 +423,123 @@ def test_questions_ask_gates_first_and_can_be_stopped_and_resumed(api: ApiClient
     assert paused["graph"]["prompts"] == asking["graph"]["prompts"]
 
 
+def choose(api: ApiClient, token: str, workspace_id: str, version: int, concept: str) -> None:
+    """Choose a target the way the product does: an ESCO occupation, stored by its label."""
+    chosen = api.write(
+        "POST",
+        f"/v1/workspaces/{workspace_id}/targets",
+        token,
+        {"expected_version": version, "concept_id": concept},
+    )
+    assert chosen.status_code == 201, chosen.text
+
+
+@pytest.mark.req("MAP1-05", "RDY1-04", "READINESS-04")
+def test_a_nursing_occupation_chosen_in_the_product_keeps_the_registration_gate(
+    api: ApiClient, ada: str
+) -> None:
+    workspace_id = str(api.create_workspace(ada)["workspace_id"])
+    choose(api, ada, workspace_id, 0, str(concept_id(NURSE_URI)))
+
+    [found] = matrices(api, ada, workspace_id)["matrices"]
+    [assessment] = api.get(f"{base(workspace_id)}/readiness", ada).json()["assessments"]
+    graph = api.get(f"{base(workspace_id)}/questions", ada).json()["graph"]
+
+    assert found["target_title"] == "nurse responsible for general care"
+    assert found["sources"]["pack_target"]["target_id"] == "registered-nurse-manchester"
+    assert found["sources"]["pack_target"]["basis"] == "esco_crosswalk"
+    assert row(found, NMC)["gate"]["kind"] == "legal_practice"
+    assert assessment["state"] == "not_yet_assessed"
+    assert {"row_id": NMC, "kind": "unresolved"} in assessment["blockers"]
+    assert graph["prompts"][0]["subject"] == "gate:nmc-registration"
+
+
+@pytest.mark.req("RDY1-01", "MAP1-05")
+def test_an_unmodelled_target_or_a_regulated_one_without_a_typed_gate_is_never_ready_now(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    workspace_id = workspace_with_targets(api, ada, "Marine biologist")
+    [doctor] = infra.query(
+        "SELECT concept_id FROM nessa.occupation_concepts WHERE preferred_label = %s AND regulated",
+        ("general practitioner",),
+    )
+    choose(api, ada, workspace_id, 1, str(doctor["concept_id"]))
+
+    body = matrices(api, ada, workspace_id)
+    assessments = api.get(f"{base(workspace_id)}/readiness", ada).json()["assessments"]
+    graph = api.get(f"{base(workspace_id)}/questions", ada).json()["graph"]
+
+    assert [m["target_title"] for m in body["matrices"]] == [
+        "Marine biologist",
+        "general practitioner",
+    ]
+    assert matrix(body, "Marine biologist")["sources"]["occupation_note"] == "no_exact_esco_label"
+    regulation = row(matrix(body, "general practitioner"), "gate:occupation-regulation")
+    assert regulation["gate"]["modelled"] is False
+    assert [a["state"] for a in assessments] == ["insufficient_coverage"] * 2
+    assert "review_current_postings_and_apply" not in [a["primary_action"] for a in assessments]
+    assert {"row_id": "gate:occupation-regulation", "kind": "unresolved"} in assessments[1][
+        "blockers"
+    ]
+    assert graph["state"] == "insufficient_coverage"
+
+
+@pytest.mark.req("OPTN-08", "BND1-12")
+def test_questions_and_readiness_carry_the_pack_labels_and_the_workspace_s_synthetic_label(
+    api: ApiClient, ada: str
+) -> None:
+    workspace_id = workspace_with_targets(api, ada, DATA)
+    validation = row(matrix(matrices(api, ada, workspace_id), DATA), VALIDATION)
+    assert (
+        api.write(
+            "POST",
+            f"{base(workspace_id)}/evidence",
+            ada,
+            {
+                "expected_version": 0,
+                "subject": validation["subject"],
+                "rubric_version": validation["rubric"]["version_id"],
+                "answer": "done_with_help",
+                "self_assessed_level": 1,
+                "example": "Found duplicates with a colleague's help",
+                "last_done": "2026-07",
+            },
+        ).status_code
+        == 201
+    )
+    real = str(api.create_workspace(ada, "Not synthetic", synthetic=False)["workspace_id"])
+    assert (
+        api.write(
+            "PUT",
+            f"/v1/workspaces/{real}/profile",
+            ada,
+            {"expected_version": 0, "profile": profile_with(target_titles=[DATA])},
+        ).status_code
+        == 201
+    )
+
+    questions = api.get(f"{base(workspace_id)}/questions", ada).json()
+    readiness = api.get(f"{base(workspace_id)}/readiness", ada).json()
+    unlabelled = api.get(f"{base(real)}/readiness", ada).json()
+
+    assert questions["pack"]["dated"] == "2026-10-29"
+    assert questions["reference"]["review_state"] == "proposed"
+    prompt_rows = [r for p in questions["graph"]["prompts"] for r in p["rows"]]
+    assert prompt_rows
+    assert {r["review_state"] for r in prompt_rows} == {"proposed"}
+    [assessment] = readiness["assessments"]
+    assert {r["review_state"] for r in assessment["rows"]} == {"proposed"}
+    assert {g["review_state"] for g in assessment["gaps"]} == {"proposed"}
+    candidates = [c for a in assessment["actions"] for c in a["candidates"]]
+    assert {c["option_id"] for c in candidates} == {"option:C01", "option:C04"}
+    assert {c["as_of"] for c in candidates} == {"2026-10-29"}
+    labels = (questions["synthetic"], questions["graph"]["synthetic"])
+    assert labels == (True, True)
+    assert (readiness["synthetic"], assessment["synthetic"]) == (True, True)
+    assert (unlabelled["synthetic"], unlabelled["assessments"][0]["synthetic"]) == (False, False)
+    assert unlabelled["data_mode"] == "live_assisted"
+
+
 @pytest.mark.req("SEC-01", "SEC-02")
 def test_another_person_sees_and_writes_none_of_it(
     api: ApiClient, ada: str, ben: str, infra: Infra
@@ -451,6 +590,23 @@ def test_another_person_sees_and_writes_none_of_it(
             (uuid.uuid4(), workspace_id, BEN_ID),
             actor=BEN_ID,
         )
+
+
+@pytest.mark.req("ASSESS-02")
+def test_the_database_refuses_an_answer_that_contradicts_its_level(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    workspace_id = workspace_with_targets(api, ada, DATA)
+    for answer, level in (("not_learned", 2), ("understand_not_tried", 1), ("done_with_help", 3)):
+        with pytest.raises(psycopg.errors.CheckViolation):
+            infra.as_role(
+                "pg_api",
+                "INSERT INTO nessa.skill_evidence (evidence_id, workspace_id, state_version, "
+                "subject, answer, self_assessed_level, method, recorded_by) VALUES "
+                "(%s, %s, 1, 'esco:x', %s, %s, 'self_report', %s)",
+                (uuid.uuid4(), workspace_id, answer, level, ADA_ID),
+                actor=ADA_ID,
+            )
 
 
 @pytest.mark.req("SEC-02")

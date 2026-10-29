@@ -43,6 +43,7 @@ from nessa.capability.matrix import (
     apply_edits,
     build_matrix,
     check_edit,
+    find_pack_target,
 )
 from nessa.capability.outcomes import PlannedOutcome, pack_outcomes
 from nessa.capability.questions import QuestionGraph, question_graph
@@ -63,6 +64,7 @@ from nessa.identity.records import EventKind
 from nessa.identity.workspaces import visible_workspace
 from nessa.profile.commands import current_profile
 from nessa.profile.document import FieldState, TextValue
+from nessa.vocabulary import DataMode
 
 # The versions the capability model reads: Task 7c's reviewed pack is a new version here.
 PACK_VERSION = "0.1.0"
@@ -89,23 +91,33 @@ class CapabilityView:
     version: int
     questions_stopped: bool
     profile_version: int
+    synthetic: bool  # the workspace's label, carried by every result
+    data_mode: DataMode
     matrices: list[Matrix]
     evidence: list[SkillEvidence]
     statements: list[RequirementStatement]
 
 
 def capability_view(tx: Tx, workspace_id: uuid.UUID, data: CapabilityData) -> CapabilityView:
-    visible_workspace(tx, workspace_id)
+    workspace = visible_workspace(tx, workspace_id)
     profile = current_profile(tx, workspace_id)
     titles = profile.document.target_titles
     targets = list(titles.value or []) if titles.state is FieldState.PROVIDED else []
-    release = held_release(tx) if targets else None
+    matrices: list[Matrix] = []
+    if targets:
+        release = held_release(tx)  # TAXONOMY_UNAVAILABLE without one: never an empty matrix
+        matrices = [
+            _matrix(tx, workspace_id, title, data, release, synthetic=workspace.synthetic)
+            for title in targets
+        ]
     state = store.state(tx, workspace_id)
     return CapabilityView(
         version=state.version,
         questions_stopped=state.questions_stopped,
         profile_version=profile.version,
-        matrices=[_matrix(tx, workspace_id, title, data, release) for title in targets],
+        synthetic=workspace.synthetic,
+        data_mode=workspace.data_mode,
+        matrices=matrices,
         evidence=store.evidence(tx, workspace_id),
         statements=store.statements(tx, workspace_id),
     )
@@ -116,18 +128,25 @@ def _matrix(
     workspace_id: uuid.UUID,
     title: str,
     data: CapabilityData,
-    release: TaxonomyRelease | None,
+    release: TaxonomyRelease,
+    *,
+    synthetic: bool,
 ) -> Matrix:
+    """A target found by its title, or else through its ESCO occupation, which is how a
+    target chosen in the product is stored (ESCO's preferred label)."""
     key = title_key(title)
-    pack_target = next((t for t in data.pack.targets if title_key(t.title) == key), None)
-    seed, note = _seed(tx, title, pack_target, data.reference, release)
+    by_title, _ = find_pack_target(title, data.pack, data.reference, None)
+    seed, note = _seed(tx, title, by_title, data.reference, release)
+    pack_target, basis = find_pack_target(title, data.pack, data.reference, seed)
     return build_matrix(
         title,
         pack=data.pack,
         reference=data.reference,
         pack_target=pack_target,
+        pack_target_basis=basis or "title",
         occupation=seed,
         exemplars=evidence_store.exemplar_count(tx, workspace_id, key),
+        synthetic=synthetic,
         edits=store.edits(tx, workspace_id, key),
         occupation_note=note,
     )
@@ -138,11 +157,9 @@ def _seed(
     title: str,
     pack_target: Target | None,
     reference: Reference,
-    release: TaxonomyRelease | None,
+    release: TaxonomyRelease,
 ) -> tuple[EscoSeed | None, OccupationNote | None]:
     """The ESCO occupation with exactly this label, or else the pack target's crosswalk."""
-    if release is None:
-        return None, OccupationNote.NOT_IN_HELD_TAXONOMY
     labelled = {
         m.concept_id
         for m in taxonomy_store.label_matches(tx, normalise_label(title))
@@ -367,14 +384,19 @@ def record_statement(
 ) -> CapabilityChange:
     visible_workspace(tx, workspace_id, lock=True)
     view = capability_view(tx, workspace_id, data)
-    if not any(
-        r.subject == command.subject and (r.gate is not None or r.kind not in LEVELLED_KINDS)
+    rows = [
+        r
         for m in view.matrices
         for r in m.rows
-    ):
+        if r.subject == command.subject and (r.gate is not None or r.kind not in LEVELLED_KINDS)
+    ]
+    if not rows:
         raise _invalid(
             "not_a_requirement", "That requirement is not in your targets' matrices.", "subject"
         )
+    if all(r.gate is not None and not r.gate.modelled for r in rows):
+        # Nobody has modelled what this regulation requires, so no statement can settle it.
+        raise _invalid("not_modelled", "That requirement is not modelled yet.", "subject")
     try:
         statement = RequirementStatement(
             statement_id=uuid.uuid4(),

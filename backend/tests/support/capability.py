@@ -122,15 +122,18 @@ def self_report(
     *,
     example: str | None = "A recent piece of work, described",
     last_done: str | None = "2026-09",
-    answer: Answer = Answer.DONE_INDEPENDENTLY,
+    answer: Answer | None = None,
     at: datetime = NOW,
     ai_assisted: bool | None = None,
 ) -> SkillEvidence:
+    """A self-report; without an `answer`, "done independently" with a level, else unsure."""
+    if answer is None:
+        answer = Answer.DONE_INDEPENDENTLY if level is not None else Answer.UNSURE
     return SkillEvidence(
         evidence_id=uuid.uuid4(),
         subject=subject,
         rubric_version=rubric,
-        answer=answer if level is not None else Answer.UNSURE,
+        answer=answer,
         self_assessed_level=level,
         example=example,
         last_done=last_done,
@@ -162,6 +165,25 @@ def assessed(
         assessed_by="synthetic course assessment",
         reviewed_on=reviewed_on,
         outcome_id=outcome_id,
+        recorded_by=ADA,
+        recorded_at=at,
+    )
+
+
+def demonstrated(
+    subject: str, level: int, rubric: str, *, reviewed_on: date | None, at: datetime = NOW
+) -> SkillEvidence:
+    """A work sample the person entered themselves, as every L0 demonstration is."""
+    return SkillEvidence(
+        evidence_id=uuid.uuid4(),
+        subject=subject,
+        rubric_version=rubric,
+        answer=Answer.DONE_INDEPENDENTLY,
+        self_assessed_level=None,
+        method=Method.WORK_SAMPLE,
+        demonstrated_level=level,
+        assessed_by="a short work sample, checked against the anchors",
+        reviewed_on=reviewed_on,
         recorded_by=ADA,
         recorded_at=at,
     )

@@ -30,6 +30,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from nessa.capability.evidence import (
+    Answer,
     Holding,
     RequirementStatement,
     SkillEvidence,
@@ -82,6 +83,7 @@ class PromptRow(StrictModel):
     required_level: int | None
     observable_task: str | None
     anchors: dict[int, str]
+    review_state: Literal["proposed", "reviewed"]  # its matrix row's (R9)
 
 
 class Prompt(StrictModel):
@@ -118,7 +120,10 @@ class QuestionCoverage(StrictModel):
 
 
 class QuestionGraph(StrictModel):
-    state: Literal["asking", "enough", "stopped"]
+    # insufficient_coverage: no required row or gate is modelled, so nothing can be asked and
+    # coverage is never "enough" (C1).
+    state: Literal["asking", "enough", "stopped", "insufficient_coverage"]
+    synthetic: bool  # any target's matrix is synthetic: the workspace's or a fixture's label
     evidence_version: int
     targets: list[TargetVersions]
     prompts: list[Prompt]  # every open question: requirements and gates first
@@ -142,6 +147,9 @@ def question_graph(
     for matrix in matrices:
         for row in matrix.rows:
             levelled = row.kind in LEVELLED_KINDS and row.gate is None
+            if row.gate is not None and not row.gate.modelled:
+                unresolved.append(row.subject)  # nothing to ask until it is modelled
+                continue
             if not levelled and row.required:
                 reason, answered, resolved = _requirement(row, stated)
                 gates += 1
@@ -166,9 +174,18 @@ def question_graph(
         (_prompt(subject, found, known) for subject, found in open_rows.items()),
         key=lambda p: (p.kind != "requirement", -p.priority, p.label, p.subject),
     )
+    modelled = gates + rows_total > 0
     enough = gates_known == gates and weight_covered * ENOUGH_OF >= weight_total * ENOUGH_COVERED
+    state: Literal["asking", "enough", "stopped", "insufficient_coverage"]
+    if stopped:
+        state = "stopped"
+    elif not modelled:
+        state = "insufficient_coverage"
+    else:
+        state = "enough" if enough else "asking"
     return QuestionGraph(
-        state="stopped" if stopped else "enough" if enough else "asking",
+        state=state,
+        synthetic=any(m.synthetic for m in matrices),
         evidence_version=evidence_version,
         targets=[
             TargetVersions(
@@ -214,6 +231,8 @@ def _skill(row: MatrixRow, evidence: list[SkillEvidence]) -> tuple[QuestionReaso
         return QuestionReason.CONFLICT, seen.level is not None
     if seen.level is not None:
         return None, True
+    if seen.answer is Answer.UNSURE:
+        return None, False  # the person's own "unsure": unresolved, not asked again
     if seen.confidence is Confidence.UNSUPPORTED:
         return QuestionReason.UNSUPPORTED_CLAIM, False
     if seen.shared_from_other_rubric:
@@ -253,6 +272,7 @@ def _prompt(
                 required_level=row.required_level,
                 observable_task=row.observable_task,
                 anchors=dict(row.rubric.anchors) if row.rubric else {},
+                review_state=row.review_state,
             )
             for matrix, row, _ in found
         ],

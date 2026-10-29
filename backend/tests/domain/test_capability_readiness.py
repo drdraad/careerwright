@@ -7,14 +7,18 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from nessa.capability.evidence import Holding, row_evidence
+from nessa.capability.evidence import Answer, Holding, SkillEvidence, row_evidence
 from nessa.capability.matrix import (
+    EscoSeed,
+    EscoSkillRelation,
     Importance,
     Matrix,
+    OccupationNote,
     RowEdit,
     apply_edits,
     build_matrix,
     check_edit,
+    find_pack_target,
 )
 from nessa.capability.outcomes import (
     Confidence,
@@ -27,6 +31,7 @@ from nessa.capability.outcomes import (
     pack_outcomes,
     user_override,
 )
+from nessa.capability.questions import question_graph
 from nessa.capability.readiness import (
     Assessment,
     GapKind,
@@ -38,11 +43,13 @@ from nessa.capability.readiness import (
     ensure_current,
 )
 from nessa.capability.reference import load_reference
+from nessa.catalogue.esco import concept_id
 from nessa.catalogue.option_pack import load_pack
 from nessa.errors import ErrorCode, NessaError
 from tests.support.capability import (
     ADA,
     assessed,
+    demonstrated,
     fixture,
     gate_row,
     self_report,
@@ -70,6 +77,44 @@ def pack_matrix(target_id: str) -> Matrix:
         pack_target=target,
         occupation=None,
         exemplars=0,
+        synthetic=False,
+    )
+
+
+NURSE_URI = "http://data.europa.eu/esco/occupation/8d3e8aaa-791b-4c75-a465-f3f827028f50"
+NMC = "pack:registered-nurse-manchester:nmc-registration"
+
+
+def seed(label: str, *, concept: uuid.UUID | None = None, regulated: bool) -> EscoSeed:
+    """An ESCO occupation as the taxonomy store gives it, with three of its relations."""
+    return EscoSeed(
+        release="esco-v1.2.1-en-csv",
+        concept_id=concept or uuid.uuid4(),
+        label=label,
+        regulated=regulated,
+        basis="esco_label",
+        skills=[
+            EscoSkillRelation(
+                skill_id=uuid.uuid4(),
+                label=f"{label} skill {n}",
+                skill_type=None,
+                relation="essential",
+            )
+            for n in range(3)
+        ],
+    )
+
+
+def unmatched(title: str, occupation: EscoSeed | None) -> Matrix:
+    return build_matrix(
+        title,
+        pack=PACK,
+        reference=REFERENCE,
+        pack_target=None,
+        occupation=occupation,
+        exemplars=0,
+        occupation_note=OccupationNote.NO_EXACT_LABEL if occupation is None else None,
+        synthetic=False,
     )
 
 
@@ -109,13 +154,15 @@ def test_readiness_needs_every_required_row_and_gate_and_unknown_never_passes() 
     gate_open = assess(matrix, evidence=met, statements=[], outcomes=[], evidence_version=1)
 
     assert ready.state is ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS
-    assert unknown.state is ReadinessState.NOT_READY
+    # Nothing answered is "not yet assessed", never "not ready": unknown is not a shortfall.
+    assert unknown.state is ReadinessState.NOT_YET_ASSESSED
     # Unknown is not level 0: no evidence and "level 0" are different findings.
     assert status(unknown, "fixture:a") is RowStatus.NO_USABLE_EVIDENCE
     assert status(zero, "fixture:a") is RowStatus.BELOW_REQUIRED
+    assert zero.state is ReadinessState.NOT_READY  # a known shortfall
     assert next(r for r in zero.rows if r.row_id == "fixture:a").evidence.level == 0  # type: ignore[union-attr]
     assert next(r for r in unknown.rows if r.row_id == "fixture:a").evidence.level is None  # type: ignore[union-attr]
-    assert gate_open.state is ReadinessState.NOT_READY
+    assert gate_open.state is ReadinessState.NOT_YET_ASSESSED
     assert [b.kind for b in gate_open.blockers] == [RowStatus.UNRESOLVED]
 
 
@@ -138,6 +185,31 @@ def test_p05_leads_with_apply_now_and_no_forced_training() -> None:
     assert all(r.evidence is not None and r.evidence.last_done == "2026-09" for r in result.rows)
     assert Qualification.PROVISIONAL_MATRIX in result.qualifications
     assert Qualification.SELF_REPORTED_EVIDENCE in result.qualifications
+    assert Qualification.PERSON_CONFIRMED_DEMONSTRATION not in result.qualifications
+
+
+@pytest.mark.req("RDY1-03", "ASSESS-01")
+def test_p05_with_a_work_sample_the_person_entered_is_never_corroborated() -> None:
+    p05 = fixture("personas/P05.json")
+    first, second = (s["skill_id"] for s in p05["skills"])
+    matrix = synthetic_matrix(
+        "Bookkeeping assistant",
+        [skill_row(s["skill_id"], s["required"], RUBRIC) for s in p05["skills"]],
+    )
+    evidence = [
+        self_report(first, 2, RUBRIC),
+        demonstrated(second, 2, RUBRIC, reviewed_on=date(2026, 9, 30)),
+    ]
+
+    result = assess(matrix, evidence=evidence, statements=[], outcomes=[], evidence_version=3)
+
+    shown = next(r for r in result.rows if r.row_id == second).evidence
+    assert result.state is ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS
+    assert shown is not None
+    assert shown.basis == "demonstrated"
+    # L0 has no reviewer: the person's own entry is never "corroborated".
+    assert shown.confidence is Confidence.PROVISIONAL
+    assert Qualification.PERSON_CONFIRMED_DEMONSTRATION in result.qualifications
 
 
 @pytest.mark.req("RDY1-03", "OPTN-09")
@@ -160,6 +232,7 @@ def test_apply_now_on_the_pack_is_qualified_and_lists_employer_checks() -> None:
     # Every pack record is proposed (0.1.0), so this result is never unqualified (R9).
     assert Qualification.PROPOSED_RECORDS in result.qualifications
     assert Qualification.PROPOSED_RUBRICS in result.qualifications
+    assert Qualification.PERSON_CONFIRMED_VERIFICATION in result.qualifications
     checks = {c.requirement_id for c in result.employer_checks}
     assert {"req:J04.1", "req:J08.1", "req:J08.3"} <= checks  # postings' own essentials
     assert "req:J04.3" not in checks  # a preferred criterion is not a check to pass
@@ -222,13 +295,25 @@ def test_p04_cannot_become_ready_by_demoting_registration() -> None:
         evidence_version=1,
     )
 
+    verified = assess(
+        demoted,
+        evidence=[],
+        statements=[statement(gate.subject, Holding.HELD, verified=True)],
+        outcomes=[],
+        evidence_version=2,
+    )
+
     assert refused.value.code is ErrorCode.PROTECTED_GATE
     assert demoted.definition_version == matrix.definition_version
-    assert unverified.state is ReadinessState.NOT_READY
+    assert unverified.state is ReadinessState.NOT_YET_ASSESSED
     # Unverified is unresolved, never ineligible: no such finding exists.
     assert status(unverified, gate.row_id) is RowStatus.UNRESOLVED
     assert "ineligible" not in unverified.model_dump_json()
     assert [g.kind for g in unverified.gaps] == [GapKind.INFORMATION]
+    # Verified by the person's own statement: satisfied, and the result says what it rests on.
+    assert status(verified, gate.row_id) is RowStatus.SATISFIED
+    assert Qualification.PERSON_CONFIRMED_VERIFICATION in verified.qualifications
+    assert Qualification.PERSON_CONFIRMED_VERIFICATION not in unverified.qualifications
 
 
 @pytest.mark.req("BND1-08", "RDY1-04", "OUT1-06")
@@ -639,3 +724,200 @@ def test_results_carry_their_versions_and_an_essential_edit_makes_them_stale() -
     assert stale.value.code is ErrorCode.STALE_INPUT_VERSION
     relaxed = assess(edited, evidence=[], statements=[], outcomes=[], evidence_version=5)
     assert {g.kind for g in relaxed.gaps if g.row_id == validation} == {GapKind.PREFERENCE_CONFLICT}
+
+
+# Fix round 1 -------------------------------------------------------------------------------
+
+
+@pytest.mark.req("RDY1-01", "READINESS-01")
+def test_a_target_with_no_modelled_requirement_is_never_ready_now() -> None:
+    # C1(a): no pack target and no seed ("Marine biologist"), or only ESCO seed rows, which
+    # are unknown and not modelled ("Data analyst"): nothing here can be assessed.
+    for matrix in (
+        unmatched("Marine biologist", None),
+        unmatched("Data analyst", seed("data analyst", regulated=False)),
+    ):
+        result = assess(matrix, evidence=[], statements=[], outcomes=OUTCOMES, evidence_version=0)
+
+        assert result.state is ReadinessState.INSUFFICIENT_COVERAGE
+        assert result.primary_action is PrimaryAction.ADDRESS_GAPS
+        assert [(b.row_id, b.kind) for b in result.blockers] == [
+            (None, RowStatus.NO_MODELLED_REQUIREMENTS)
+        ]
+        assert "review_postings_and_apply" not in [a.kind for a in result.actions]
+
+
+@pytest.mark.req("MAP1-05", "RDY1-04")
+def test_a_regulated_occupation_with_no_typed_gate_has_an_unresolved_protected_gate() -> None:
+    # C1(c): ESCO records the occupation as regulated, and no typed gate models it.
+    matrix = unmatched("Adult nurse", seed("nurse responsible for general care", regulated=True))
+    gate = matrix.row("gate:occupation-regulation")
+    held = [statement("gate:occupation-regulation", Holding.HELD, verified=True)]
+
+    result = assess(matrix, evidence=[], statements=held, outcomes=OUTCOMES, evidence_version=1)
+
+    assert gate is not None
+    assert gate.gate is not None
+    assert gate.gate.protected is True
+    assert gate.gate.modelled is False
+    assert gate.required
+    assert "regulation_not_modelled" in gate.uncertainty
+    # Nothing the person states settles a requirement nobody has modelled.
+    assert status(result, gate.row_id) is RowStatus.UNRESOLVED
+    assert (gate.row_id, RowStatus.UNRESOLVED) in [(b.row_id, b.kind) for b in result.blockers]
+    assert result.state is ReadinessState.INSUFFICIENT_COVERAGE
+    with pytest.raises(NessaError) as refused:
+        check_edit(matrix, gate.row_id, Importance.PREFERRED, warning_acknowledged=True)
+    assert refused.value.code is ErrorCode.PROTECTED_GATE
+
+
+@pytest.mark.req("MAP1-05", "RDY1-04", "READINESS-04")
+def test_a_slate_chosen_nursing_label_reaches_the_pack_s_registration_gate() -> None:
+    # C1(b): choosing the occupation stores ESCO's preferred label, not the pack's title.
+    title = "nurse responsible for general care"
+    occupation = seed(title, concept=concept_id(NURSE_URI), regulated=True)
+
+    target, basis = find_pack_target(title, PACK, REFERENCE, occupation)
+    assert target is not None
+    assert basis is not None
+    matrix = build_matrix(
+        title,
+        pack=PACK,
+        reference=REFERENCE,
+        pack_target=target,
+        pack_target_basis=basis,
+        occupation=occupation,
+        exemplars=0,
+        synthetic=False,
+    )
+    result = assess(matrix, evidence=[], statements=[], outcomes=OUTCOMES, evidence_version=0)
+
+    assert (target.target_id, basis) == ("registered-nurse-manchester", "esco_crosswalk")
+    assert matrix.sources.pack_target is not None
+    assert matrix.sources.pack_target.basis == "esco_crosswalk"
+    gate = matrix.row(NMC)
+    assert gate is not None
+    assert gate.gate is not None
+    assert gate.gate.kind == "legal_practice"
+    assert matrix.row("gate:occupation-regulation") is None  # the typed gate models it
+    assert result.state is ReadinessState.NOT_YET_ASSESSED
+    assert (NMC, RowStatus.UNRESOLVED) in [(b.row_id, b.kind) for b in result.blockers]
+    assert find_pack_target("Registered nurse", PACK, REFERENCE, None)[1] == "title"
+    assert find_pack_target("Marine biologist", PACK, REFERENCE, None) == (None, None)
+    assert find_pack_target(title, PACK, REFERENCE, seed(title, regulated=True)) == (None, None)
+
+
+@pytest.mark.req("OUT1-04", "RDY1-02")
+def test_a_conditional_scenario_on_an_outcome_with_no_level_is_a_partial_sketch() -> None:
+    # I1: C06's exam outcome is provisional and its level is not stated, not ruled out.
+    matrix = pack_matrix("bookkeeping-assistant-leeds")
+    records = "pack:bookkeeping-assistant-leeds:records"
+    reconciliation = "pack:bookkeeping-assistant-leeds:reconciliation"
+    evidence = [
+        self_report(subject_of(matrix, records), 1, rubric_of(matrix, records)),
+        self_report(subject_of(matrix, reconciliation), 2, rubric_of(matrix, reconciliation)),
+    ]
+    work = [statement("gate:uk-right-to-work", Holding.HELD, verified=True)]
+    c06 = accept(next(o for o in OUTCOMES if o.outcome_id == "outcome:C06.1"), by=ADA, at=NOW)
+    c02 = accept(next(o for o in OUTCOMES if o.outcome_id == "outcome:C02.1"), by=ADA, at=NOW)
+
+    current = assess(matrix, evidence=evidence, statements=work, outcomes=[c06], evidence_version=1)
+    conditional = assess(
+        matrix,
+        evidence=evidence,
+        statements=work,
+        outcomes=[c06],
+        evidence_version=1,
+        completed=frozenset({c06.offering_id}),
+    )
+    mention = assess(
+        matrix,
+        evidence=evidence,
+        statements=work,
+        outcomes=[c02],
+        evidence_version=1,
+        completed=frozenset({c02.offering_id}),
+    )
+
+    assert Qualification.MISSING_OUTCOME_LEVEL in conditional.qualifications
+    assert Qualification.MISSING_OUTCOME_LEVEL not in current.qualifications
+    # A topic mention is not a missing level: the rule rules a level out.
+    assert Qualification.MISSING_OUTCOME_LEVEL not in mention.qualifications
+    assert conditional.state is ReadinessState.NOT_READY  # records is known to be below
+
+
+@pytest.mark.req("ASSESS-02", "ASSESS-01")
+def test_an_answer_that_contradicts_its_level_is_refused() -> None:
+    # I2: levels 2 to 4 are defined by independence (spec section 8), and "not learned" or
+    # "understand but not tried" is no evidence of performance.
+    for answer, level in (
+        (Answer.NOT_LEARNED, 1),
+        (Answer.UNDERSTAND_NOT_TRIED, 2),
+        (Answer.DONE_WITH_HELP, 2),
+        (Answer.DONE_WITH_HELP, 4),
+    ):
+        with pytest.raises(ValueError, match="contradicts"):
+            self_report("fixture:a", level, RUBRIC, answer=answer)
+    accepted: list[tuple[Answer, int | None]] = [
+        (Answer.NOT_LEARNED, 0),
+        (Answer.NOT_LEARNED, None),
+        (Answer.UNDERSTAND_NOT_TRIED, 0),
+        (Answer.DONE_WITH_HELP, 1),
+        (Answer.DONE_INDEPENDENTLY, 3),
+    ]
+    for answer, maybe in accepted:
+        assert isinstance(self_report("fixture:a", maybe, RUBRIC, answer=answer), SkillEvidence)
+
+
+@pytest.mark.req("ASSESS-02", "ASSESS-03", "ASSESS-06")
+@pytest.mark.parametrize("answer", [Answer.NOT_LEARNED, Answer.UNDERSTAND_NOT_TRIED])
+def test_not_learned_is_a_known_level_zero_and_is_not_asked_again(answer: Answer) -> None:
+    matrix = synthetic_matrix("Synthetic", [skill_row("fixture:a", 2, RUBRIC)])
+    said = [self_report("fixture:a", None, RUBRIC, answer=answer, example=None, last_done=None)]
+
+    seen = row_evidence("fixture:a", RUBRIC, said)
+    result = assess(matrix, evidence=said, statements=[], outcomes=[], evidence_version=1)
+    graph = question_graph([matrix], evidence=said, statements=[], evidence_version=1)
+
+    assert (seen.level, seen.answer) == (0, answer)
+    assert status(result, "fixture:a") is RowStatus.BELOW_REQUIRED
+    assert [g.kind for g in result.gaps] == [GapKind.LEARN]
+    assert result.state is ReadinessState.NOT_READY
+    assert graph.prompts == []
+
+
+@pytest.mark.req("ASSESS-02", "ASSESS-03")
+def test_unsure_is_an_unresolved_assumption_and_is_not_asked_again() -> None:
+    matrix = synthetic_matrix("Synthetic", [skill_row("fixture:a", 2, RUBRIC)])
+    said = [self_report("fixture:a", None, RUBRIC, answer=Answer.UNSURE)]
+
+    result = assess(matrix, evidence=said, statements=[], outcomes=[], evidence_version=1)
+    graph = question_graph([matrix], evidence=said, statements=[], evidence_version=1)
+
+    assert row_evidence("fixture:a", RUBRIC, said).answer is Answer.UNSURE
+    assert status(result, "fixture:a") is RowStatus.NO_USABLE_EVIDENCE
+    assert [g.kind for g in result.gaps] == [GapKind.INFORMATION]
+    assert result.state is ReadinessState.NOT_YET_ASSESSED
+    assert graph.prompts == []
+    assert "fixture:a" in graph.coverage.unresolved
+
+
+@pytest.mark.req("BND1-12")
+def test_a_synthetic_workspace_s_results_say_so() -> None:
+    # M8: a synthetic persona's matrix, readiness and questions are labelled synthetic.
+    target = next(t for t in PACK.targets if t.target_id == "bookkeeping-assistant-leeds")
+    matrix = build_matrix(
+        target.title,
+        pack=PACK,
+        reference=REFERENCE,
+        pack_target=target,
+        occupation=None,
+        exemplars=0,
+        synthetic=True,
+    )
+
+    result = assess(matrix, evidence=[], statements=[], outcomes=OUTCOMES, evidence_version=0)
+    graph = question_graph([matrix], evidence=[], statements=[], evidence_version=0)
+
+    assert (matrix.synthetic, result.synthetic, graph.synthetic) == (True, True, True)
+    assert pack_matrix("bookkeeping-assistant-leeds").synthetic is False
