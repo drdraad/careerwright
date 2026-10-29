@@ -4,14 +4,19 @@ evidence; every write takes an expected version and an Idempotency-Key; another 
 nothing; history is append-only."""
 
 import uuid
+from pathlib import Path
 from typing import Any
 
 import psycopg
 import pytest
 
+from nessa.capability.commands import committed_data
+from nessa.catalogue.esco import ESCO_RELEASE, parse_release
+from nessa.catalogue.releases import read_verified
 from nessa.seed import INVITED_ACTORS
 from tests.support.client import ApiClient, profile_with
 from tests.support.infra import Infra
+from tools.datasets import DATASETS_DIR
 
 pytestmark = pytest.mark.integration
 
@@ -123,6 +128,60 @@ def test_the_registration_gate_cannot_be_demoted_through_the_api(
     ) == [{"n": 0}]
     after = matrix(matrices(api, ada, workspace_id), NURSE)
     assert after["definition_version"] == nurse["definition_version"]
+
+
+@pytest.mark.req("MAP1-05")
+def test_a_gate_s_source_can_be_challenged_and_the_gate_stays(api: ApiClient, ada: str) -> None:
+    workspace_id = workspace_with_targets(api, ada, NURSE)
+    nurse = matrix(matrices(api, ada, workspace_id), NURSE)
+
+    challenged = api.write(
+        "POST",
+        f"{base(workspace_id)}/edits",
+        ada,
+        {
+            "expected_version": 0,
+            "target": NURSE,
+            "matrix_version": nurse["matrix_version"],
+            "row_id": NMC,
+            "action": "challenge",
+            "reason": "I registered abroad; my route may differ",
+        },
+    )
+    after = matrix(matrices(api, ada, workspace_id), NURSE)
+
+    assert challenged.status_code == 201, challenged.text
+    gate = row(after, NMC)
+    assert gate["required"] is True
+    assert gate["gate"]["protected"] is True
+    assert [c["reason"] for c in gate["challenges"]] == ["I registered abroad; my route may differ"]
+    assert after["definition_version"] == nurse["definition_version"]
+
+
+@pytest.mark.req("MAP1-01", "MAP1-07")
+def test_every_crosswalk_names_an_esco_concept_of_the_full_pinned_release() -> None:
+    release = Path(DATASETS_DIR) / ESCO_RELEASE.file_name
+    assert release.is_file(), f"run `make setup` first: {release} is missing"
+    catalogue = parse_release(read_verified(release, ESCO_RELEASE), ESCO_RELEASE)
+    occupations = {o.uri: o for o in catalogue.occupations}
+    skills = {s.uri: s for s in catalogue.skills}
+    relations = {(r.concept_id, r.skill_id): r.relation.value for r in catalogue.occupation_skills}
+    reference = committed_data().reference
+
+    for crosswalk in reference.targets:
+        occupation = occupations[crosswalk.esco_occupation]
+        assert occupation.preferred_label == crosswalk.esco_label
+        for rubric in reference.rubrics:
+            if not rubric.skill_id.startswith(f"pack:{crosswalk.target_id}:"):
+                continue
+            assert rubric.esco_skill is not None
+            skill = skills[rubric.esco_skill]
+            assert next(lbl.text for lbl in skill.labels if lbl.kind.value == "preferred") == (
+                rubric.esco_label
+            )
+            # Each crosswalked skill is an essential relation of its target's occupation.
+            assert relations[(occupation.concept_id, skill.skill_id)] == "essential"
+    assert reference.esco_release == ESCO_RELEASE.dataset_id
 
 
 @pytest.mark.req("RDY1-04", "BND1-08")

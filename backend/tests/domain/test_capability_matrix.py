@@ -360,3 +360,31 @@ def test_a_target_with_no_pack_target_and_no_seed_has_no_rows_and_says_why() -> 
     assert matrix.sources.pack_target is None
     assert matrix.sources.occupation is None
     assert matrix.coverage.full_text_vacancies == 0
+
+
+@pytest.mark.req("MAP1-05")
+def test_challenging_a_gate_s_source_records_the_challenge_and_keeps_the_gate() -> None:
+    before = matrix_for("registered-nurse-manchester")
+    gate = "pack:registered-nurse-manchester:nmc-registration"
+    challenge = RowEdit(
+        edit_id=uuid.uuid4(),
+        row_id=gate,
+        action="challenge",
+        importance=None,
+        reason="I trained abroad and think my registration route differs",
+        warning_acknowledged=False,
+        recorded_by=ADA,
+        recorded_at=NOW,
+        from_matrix_version=before.matrix_version,
+        from_definition_version=before.definition_version,
+    )
+
+    after = apply_edits(before, [challenge])
+
+    challenged = row(after, gate)
+    assert challenged.required
+    assert challenged.gate is not None
+    assert challenged.importance is Importance.ESSENTIAL
+    assert [c.reason for c in challenged.challenges] == [challenge.reason]
+    assert "challenged" in challenged.uncertainty
+    assert after.definition_version == before.definition_version
