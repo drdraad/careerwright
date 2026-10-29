@@ -95,7 +95,8 @@ def show(field: str, value: object) -> str:
         return _money(value["minor_units"])
     if isinstance(value, dict) and shape == "rate":
         bound = "at least " if value["at_least"] else ""
-        return f"{bound}{_money(value['minor_units'])} per {value['period']}"
+        repayable = {True: ", repayable", False: ", not repayable"}.get(value["repayable"], "")
+        return f"{bound}{_money(value['minor_units'])} per {value['period']}{repayable}"
     if isinstance(value, dict) and shape == "pay":
         return _pay(value)
     if isinstance(value, dict) and shape == "instalment":
@@ -151,6 +152,8 @@ def _duration(part: dict[str, object]) -> str:
         length = f"at least {low} {unit}"
     else:
         length = f"{low}{DASH}{high} {unit}"
+    if part["typical"]:
+        length = f"typically {length}"
     mode = part["mode"]
     return f"{length} ({str(mode).replace('_', ' ')})" if mode else length
 
@@ -339,7 +342,8 @@ HOW = """\
   "advertised" or "predicted" is the pay basis. "per unstated period" means the source gives
   no period (Adzuna's figures).
 - **Durations** say how the course is taken (full time, part time, self-paced) where the
-  excerpt does.
+  excerpt does. "typically" marks what is typical (an average), never a bound.
+- **Rates** say "not repayable" or "repayable" only where the page says so.
 - **Excerpts** are shown as code, exactly as in the hashed text, with runs of whitespace
   collapsed. So HTML appears as written: `&#163;`, `&pound;` and `&#xA3;` are £, and
   `&#8217;` is {rsquo}. Adzuna excerpts are the API's JSON, cut at 120 characters.

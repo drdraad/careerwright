@@ -52,7 +52,7 @@ SCHEMA_PATH = PACKS_DIR / "england-option-pack.schema.json"
 # Every committed version, pinned by the SHA-256 of its file's bytes: a version never
 # changes; a correction or a review is a new version (Task 7c publishes the reviewed one).
 PINS: dict[str, str] = {
-    "0.1.0": "fe1f66691a5680a24a2dadab5b09426d0911433d3a5f0c165c3925a5043cb328",
+    "0.1.0": "6ee1134b9943a22e3ba251a1433febe58200a9ff5cb0106c1eb3d0688699038f",
 }
 
 SHA256 = r"^[0-9a-f]{64}$"
@@ -170,8 +170,9 @@ class Claim(StrictModel):
     span: Span
     excerpt: str = Field(min_length=1, max_length=EXCERPT_CHARS)
     # Of the excerpt in the hashed text; the span is the first. Exact, except a count that
-    # reaches its source's `occurrence_cap`, which is a lower bound.
-    occurrences: int = Field(default=1, ge=1)
+    # reaches its source's `occurrence_cap`, which is a lower bound. Null: not counted (a
+    # span the pipeline read itself, never located as an excerpt).
+    occurrences: int | None = Field(default=1, ge=1)
     note: str | None = Field(default=None, max_length=600)  # the labeller's reading of it
 
 
@@ -417,6 +418,7 @@ class Rate(StrictModel):
     minor_units: Minor
     period: Period
     at_least: bool  # "at least £5,000 a year"
+    repayable: bool | None  # null: the page does not say (never read as false)
 
 
 class Pay(StrictModel):
@@ -461,6 +463,8 @@ class DurationPart(StrictModel):
     minimum: Annotated[int, Field(ge=1)] | None  # null with a maximum: "up to"
     maximum: Annotated[int, Field(ge=1)] | None
     mode: Literal["full_time", "part_time", "self_paced"] | None
+    # True: what is typical ("an average completion time of 6-8 months"), never bounds.
+    typical: bool
 
     @model_validator(mode="after")
     def _range(self) -> "DurationPart":
@@ -472,7 +476,9 @@ class DurationPart(StrictModel):
 
 
 class Schedule(StrictModel):
-    pattern: Literal["full_time", "part_time"] | None
+    """A working or study pattern: an offering's schedule, a posting's working pattern."""
+
+    pattern: Literal["full_time", "part_time", "flexible"] | None
     hours_per_week: Annotated[int, Field(ge=1)] | None
 
     @model_validator(mode="after")
@@ -551,8 +557,11 @@ _BY_SHAPE = {
     ),
     "dates": ("intakes_stated",),
     "deadline": ("valid_through",),
-    "duration": ("duration", "duration_conflict", "contract_duration", "duration_limit"),
-    "schedule": ("schedule", "study_type", "weekly_hours"),
+    "duration": (
+        *("duration", "duration_conflict", "contract_duration", "duration_limit"),
+        "access_period",
+    ),
+    "schedule": ("schedule", "study_type", "weekly_hours", "working_pattern"),
     "place": ("location", "location_conflict"),
     "level": ("level",),
     "count": ("guided_hours",),

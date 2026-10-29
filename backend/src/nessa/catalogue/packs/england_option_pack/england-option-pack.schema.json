@@ -32,10 +32,17 @@
           "type": "string"
         },
         "occurrences": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": 1,
-          "minimum": 1,
-          "title": "Occurrences",
-          "type": "integer"
+          "title": "Occurrences"
         },
         "note": {
           "anyOf": [
@@ -1636,13 +1643,18 @@
                 }
               ],
               "title": "Mode"
+            },
+            "typical": {
+              "title": "Typical",
+              "type": "boolean"
             }
           },
           "required": [
             "unit",
             "minimum",
             "maximum",
-            "mode"
+            "mode",
+            "typical"
           ],
           "title": "DurationPart",
           "type": "object"
@@ -2015,26 +2027,40 @@
         "at_least": {
           "title": "At Least",
           "type": "boolean"
+        },
+        "repayable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Repayable"
         }
       },
       "required": [
         "currency",
         "minor_units",
         "period",
-        "at_least"
+        "at_least",
+        "repayable"
       ],
       "title": "Rate",
       "type": "object"
     },
     "schedule": {
       "additionalProperties": false,
+      "description": "A working or study pattern: an offering's schedule, a posting's working pattern.",
       "properties": {
         "pattern": {
           "anyOf": [
             {
               "enum": [
                 "full_time",
-                "part_time"
+                "part_time",
+                "flexible"
               ],
               "type": "string"
             },
@@ -2078,6 +2104,7 @@
     }
   },
   "x-claim-field-shapes": {
+    "access_period": "duration",
     "advertiser": "advertiser",
     "application_deadline": "date",
     "contract_duration": "duration",
@@ -2123,7 +2150,8 @@
     "wage": "pay",
     "weekly_hours": "schedule",
     "work_locations": "names",
-    "work_mode": "work_mode"
+    "work_mode": "work_mode",
+    "working_pattern": "schedule"
   },
   "x-claim-field-shape-otherwise": "text",
   "x-record-field-shapes": {

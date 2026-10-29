@@ -331,6 +331,75 @@ def test_a_deadline_is_an_iso_date_or_a_datetime_with_its_offset(
 
 
 @pytest.mark.req("OPTN-10")
+@pytest.mark.parametrize(
+    ("claim_field", "value", "shape"),
+    [
+        ("working_pattern", "37 hours a week, Monday to Friday", "schedule"),
+        ("access_period", "12 months", "duration"),
+        (
+            "duration",
+            [{"unit": "months", "minimum": 6, "maximum": 8, "mode": None}],  # typical unsaid
+            "duration",
+        ),
+        (
+            "support_grant",
+            {"currency": "GBP", "minor_units": 500000, "period": "year", "at_least": True},
+            "rate",  # repayable unsaid
+        ),
+    ],
+    ids=["hours as text", "a duration as text", "typical unsaid", "repayable unsaid"],
+)
+def test_hours_durations_and_repayment_are_never_text_or_left_unsaid(
+    claim_field: str, value: object, shape: str
+) -> None:
+    data = minimal()
+    data["claims"].append(claim("C01.fact", "C01", claim_field, value))
+    data["learning_options"][0]["facts"] = ["C01.fact"]
+
+    assert problems(data) == [f"C01.fact is not {shape}"]
+
+
+@pytest.mark.req("OPTN-10")
+def test_a_typical_length_a_flexible_pattern_and_an_unknown_repayment_have_their_shapes() -> None:
+    data = minimal()
+    data["claims"] += [
+        claim(
+            "C01.duration",
+            "C01",
+            "duration",
+            [{"unit": "months", "minimum": 6, "maximum": 8, "mode": None, "typical": True}],
+        ),
+        claim(
+            "C01.pattern", "C01", "working_pattern", {"pattern": "flexible", "hours_per_week": None}
+        ),
+        claim(
+            "C01.grant",
+            "C01",
+            "support_grant",
+            {
+                "currency": "GBP",
+                "minor_units": 1,
+                "period": "year",
+                "at_least": False,
+                "repayable": None,
+            },
+        ),
+    ]
+    data["learning_options"][0]["facts"] = ["C01.duration", "C01.pattern", "C01.grant"]
+
+    assert problems(data) == []
+
+
+@pytest.mark.req("OPTN-10")
+def test_a_claim_whose_occurrences_were_not_counted_says_so_with_null() -> None:
+    data = minimal()
+    data["claims"][0]["occurrences"] = None
+
+    assert problems(data) == []
+    assert parse_pack(data).claims[0].occurrences is None
+
+
+@pytest.mark.req("OPTN-10")
 def test_a_structured_value_under_a_text_field_is_a_problem() -> None:
     data = minimal()
     data["claims"][0]["value"] = {"title": "Data Quality Analyst"}
@@ -468,6 +537,26 @@ def test_the_committed_pack_loads_with_every_record_proposed_and_dated() -> None
     assert {t.persona for t in pack.targets} == {"P01", "P03", "P04", "P05"}  # P02: none
     # Every planned outcome is conditional and, with no rubric yet, has no level (OUT-1).
     assert all(o.level_on_completion is None for o in pack.outcomes)
+
+
+@pytest.mark.req("OPTN-10", "OUT1-10")
+def test_the_committed_values_say_typical_repayable_and_not_counted_where_their_pages_do() -> None:
+    pack = load_pack("0.1.0")
+    months = {"unit": "months", "mode": None}
+
+    # "an average completion time of 6-8 months": typical, never bounds; "one year of
+    # access": at most 12 months (review N1).
+    assert pack.claim("C04.duration").value == [
+        {**months, "minimum": 6, "maximum": 8, "typical": True}
+    ]
+    assert pack.claim("C04.access_period").value == [
+        {**months, "minimum": None, "maximum": 12, "typical": False}
+    ]
+    support: Any = pack.claim("C08.support_grant").value
+    assert support["repayable"] is False  # "which they will not need to pay back" (N2)
+    pattern: Any = pack.claim("J19.working_pattern").value
+    assert pattern == {"pattern": "full_time", "hours_per_week": 36}  # "Full time (36 hours)"
+    assert pack.claim("J01.salary_point").occurrences is None  # its count was not taken (N4)
 
 
 @pytest.mark.req("TEST1-09", "OPTN-10")
