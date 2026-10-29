@@ -11,6 +11,7 @@ from nessa.capability.matrix import (
     EscoSkillRelation,
     Importance,
     Matrix,
+    MatrixRow,
     RowEdit,
     RowScope,
     apply_edits,
@@ -76,7 +77,7 @@ def seed() -> EscoSeed:
     )
 
 
-def row(matrix: Matrix, row_id: str):  # type: ignore[no-untyped-def]
+def row(matrix: Matrix, row_id: str) -> MatrixRow:
     return next(r for r in matrix.rows if r.row_id == row_id)
 
 
