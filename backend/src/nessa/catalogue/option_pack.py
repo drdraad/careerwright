@@ -30,19 +30,29 @@ from collections.abc import Iterator
 from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    TypeAdapter,
+    ValidationError,
+    model_validator,
+)
 
 PACK_NAME = "nessa-england-option-pack"
 FORMAT_VERSION = 1
 EXCERPT_CHARS = 200  # the excerpt bound of the evidence records (`nessa.evidence.pages`)
 PACKS_DIR = Path(__file__).parent / "packs" / "england_option_pack"
+SCHEMA_PATH = PACKS_DIR / "england-option-pack.schema.json"
 # Every committed version, pinned by the SHA-256 of its file's bytes: a version never
 # changes; a correction or a review is a new version (Task 7c publishes the reviewed one).
 PINS: dict[str, str] = {
-    "0.1.0": "74569ed099abd586675d1ec9fd01cdcddb780cde86eefc923e63609d8b49b243",
+    "0.1.0": "fe1f66691a5680a24a2dadab5b09426d0911433d3a5f0c165c3925a5043cb328",
 }
 
 SHA256 = r"^[0-9a-f]{64}$"
@@ -143,6 +153,10 @@ class Source(StrictModel):
     template_family: str = Field(min_length=1, max_length=80)
     split: Split
     advert_pointer: str | None = None  # the advert within an API response
+    # The most occurrences its excerpts were counted to: set where the page's text was not
+    # kept and its excerpts were located before the locator counted past 5. A claim whose
+    # `occurrences` equals it occurs at least that often. Null: every count is exact.
+    occurrence_cap: int | None = Field(default=None, ge=1)
 
 
 class Claim(StrictModel):
@@ -155,7 +169,9 @@ class Claim(StrictModel):
     value: JsonValue
     span: Span
     excerpt: str = Field(min_length=1, max_length=EXCERPT_CHARS)
-    occurrences: int = Field(default=1, ge=1)  # of the excerpt in the text; the span is the first
+    # Of the excerpt in the hashed text; the span is the first. Exact, except a count that
+    # reaches its source's `occurrence_cap`, which is a lower bound.
+    occurrences: int = Field(default=1, ge=1)
     note: str | None = Field(default=None, max_length=600)  # the labeller's reading of it
 
 
@@ -357,19 +373,244 @@ def _first_problem(error: ValidationError) -> str:
     return f"{where}: {first['msg']}"
 
 
-# Fields whose values are money, pay or dates: their shapes are checked (spec section 18:
-# money is integer minor units, unknown is null, never 0).
-MONEY_FIELDS = frozenset(
-    {"fee_total", "fee_was", "extra_cost", "exam_fee", "fee_per_year_home"}
-    | {"fee_per_year_international", "support_grant"}
-)
-PAY_FIELDS = frozenset({"salary", "salary_conflict", "salary_annual_statement", "wage"})
-DATE_FIELDS = frozenset(
-    {"date_posted", "intake", "application_deadline", "published_on", "rules_updated_on"}
-    | {"contract_end", "price_valid_until"}
-)
-PERIODS = frozenset({"year", "month", "week", "day", "hour"})
-BASES = frozenset({"advertised", "predicted", "unknown"})
+# Value shapes (ADR 0011 decision 13). A claim's value has the one shape its field declares,
+# and a record field checks the claim it cites against its own shape too, whatever that
+# claim's field is called. A null value is the page withholding or lacking the value, so it
+# has no shape. Every shape is numbers, ISO strings, fixed words or text: never a float and
+# never a range written as a string. Money is integer GBP minor units, never negative.
+Period = Literal["year", "month", "week", "day", "hour"]
+Minor = Annotated[int, Field(ge=0)]
+Text = Annotated[str, Field(min_length=1)]
+
+
+def _iso_date_or_month(value: str) -> str:
+    if len(value) == 7:
+        datetime.strptime(value, "%Y-%m")
+    elif len(value) == 10:
+        date.fromisoformat(value)
+    else:
+        raise ValueError("not an ISO date or month")
+    return value
+
+
+def _iso_date_or_datetime(value: str) -> str:
+    if len(value) == 10:
+        date.fromisoformat(value)
+    elif datetime.fromisoformat(value).utcoffset() is None:
+        raise ValueError("a datetime without its UTC offset")
+    return value
+
+
+IsoDate = Annotated[str, AfterValidator(_iso_date_or_month)]  # YYYY-MM-DD, or YYYY-MM
+Deadline = Annotated[str, AfterValidator(_iso_date_or_datetime)]
+
+
+class Money(StrictModel):
+    currency: Literal["GBP"]
+    minor_units: Minor
+
+
+class Rate(StrictModel):
+    """An amount per period: a yearly fee, a yearly grant."""
+
+    currency: Literal["GBP"]
+    minor_units: Minor
+    period: Period
+    at_least: bool  # "at least £5,000 a year"
+
+
+class Pay(StrictModel):
+    """Advertised or provider-predicted pay: a range, a point (equal ends) or one bound."""
+
+    currency: Literal["GBP"]
+    minimum_minor_units: Minor | None
+    maximum_minor_units: Minor | None
+    period: Period | None  # null: the source states no period
+    basis: Literal["advertised", "predicted", "unknown"]
+
+    @model_validator(mode="after")
+    def _range(self) -> "Pay":
+        low, high = self.minimum_minor_units, self.maximum_minor_units
+        if low is None and high is None:
+            raise ValueError("pay with no amount")
+        if low is not None and high is not None and high < low:
+            raise ValueError("a maximum below its minimum")
+        return self
+
+
+class Instalment(StrictModel):
+    """A payment plan: an amount per period, a number of payments, or both."""
+
+    currency: Literal["GBP"]
+    minor_units: Minor | None
+    period: Period | None
+    count: Annotated[int, Field(ge=1)] | None
+    at_least: bool  # "from £69.52 a month"
+
+    @model_validator(mode="after")
+    def _stated(self) -> "Instalment":
+        if self.minor_units is None and self.count is None:
+            raise ValueError("an instalment with neither an amount nor a count")
+        return self
+
+
+class DurationPart(StrictModel):
+    """One way of taking it (full time, part time, self-paced) and how long it lasts."""
+
+    unit: Literal["hours", "weeks", "months", "years"]
+    minimum: Annotated[int, Field(ge=1)] | None  # null with a maximum: "up to"
+    maximum: Annotated[int, Field(ge=1)] | None
+    mode: Literal["full_time", "part_time", "self_paced"] | None
+
+    @model_validator(mode="after")
+    def _range(self) -> "DurationPart":
+        if self.minimum is None and self.maximum is None:
+            raise ValueError("a duration with no length")
+        if self.minimum is not None and self.maximum is not None and self.maximum < self.minimum:
+            raise ValueError("a maximum below its minimum")
+        return self
+
+
+class Schedule(StrictModel):
+    pattern: Literal["full_time", "part_time"] | None
+    hours_per_week: Annotated[int, Field(ge=1)] | None
+
+    @model_validator(mode="after")
+    def _stated(self) -> "Schedule":
+        if self.pattern is None and self.hours_per_week is None:
+            raise ValueError("a schedule with neither a pattern nor hours")
+        return self
+
+
+class Place(StrictModel):
+    label: Text
+    locality: Text | None = None
+    region: Text | None = None
+    postal_code: Text | None = None
+
+
+class AgeRule(StrictModel):
+    minimum_age: Annotated[int, Field(ge=0, le=120)]
+    on: Text | None = None  # the day the age is taken on, as the page words it
+
+
+class EarningsRule(StrictModel):
+    below_annual_gross: Money
+    area: Text | None = None
+    or_unemployed: bool = False
+
+
+class LevelsRule(StrictModel):
+    levels: Annotated[list[Annotated[int, Field(ge=0, le=8)]], Field(min_length=1)]
+
+
+class LevelChange(StrictModel):
+    levels: Annotated[list[Annotated[int, Field(ge=0, le=8)]], Field(min_length=1)]
+    courses_starting_on_or_after: IsoDate
+    use_instead: Text
+
+
+class Crosswalk(StrictModel):
+    candidates: Annotated[list[Text], Field(min_length=2)]
+    resolved: Text | None
+
+
+SHAPES: dict[str, TypeAdapter[Any]] = {
+    "text": TypeAdapter(Text),
+    "money": TypeAdapter(Money),
+    "rate": TypeAdapter(Rate),
+    "pay": TypeAdapter(Pay),
+    "instalment": TypeAdapter(Instalment),
+    "date": TypeAdapter(IsoDate),
+    "dates": TypeAdapter(Annotated[list[IsoDate], Field(min_length=1)]),
+    "deadline": TypeAdapter(Deadline),
+    "duration": TypeAdapter(Annotated[list[DurationPart], Field(min_length=1)]),
+    "schedule": TypeAdapter(Schedule),
+    "place": TypeAdapter(Place),
+    "level": TypeAdapter(Annotated[int, Field(ge=0, le=8)]),  # RQF level
+    "count": TypeAdapter(Annotated[int, Field(ge=0)]),
+    "flag": TypeAdapter(bool),
+    "names": TypeAdapter(Annotated[list[Text], Field(min_length=1)]),
+    "age_rule": TypeAdapter(AgeRule),
+    "earnings_rule": TypeAdapter(EarningsRule),
+    "levels": TypeAdapter(LevelsRule),
+    "level_change": TypeAdapter(LevelChange),
+    "crosswalk": TypeAdapter(Crosswalk),
+    "advertiser": TypeAdapter(Literal["employer", "agency", "unknown"]),
+    "work_mode": TypeAdapter(Literal["on_site", "hybrid", "remote"]),
+    "description_kind": TypeAdapter(Literal["full", "snippet"]),
+}
+_BY_SHAPE = {
+    "money": ("fee_total", "fee_was", "extra_cost", "exam_fee"),
+    "rate": ("fee_per_year_home", "fee_per_year_international", "support_grant"),
+    "pay": ("salary", "salary_conflict", "salary_annual_statement", "salary_point", "wage"),
+    "instalment": ("instalment",),
+    "date": (
+        *("date_posted", "intake", "application_deadline", "published_on", "rules_updated_on"),
+        *("contract_end", "price_valid_until"),
+    ),
+    "dates": ("intakes_stated",),
+    "deadline": ("valid_through",),
+    "duration": ("duration", "duration_conflict", "contract_duration", "duration_limit"),
+    "schedule": ("schedule", "study_type", "weekly_hours"),
+    "place": ("location", "location_conflict"),
+    "level": ("level",),
+    "count": ("guided_hours",),
+    "flag": ("eligibility_no_other_funded_training",),
+    "names": ("eligibility_residency", "work_locations"),
+    "age_rule": ("eligibility_age", "rule_age"),
+    "earnings_rule": ("eligibility_earnings", "rule_earnings"),
+    "levels": ("rule_course_level",),
+    "level_change": ("lle_interaction",),
+    "crosswalk": ("occupation_crosswalk",),
+    "advertiser": ("advertiser",),
+    "work_mode": ("work_mode",),
+    "description_kind": ("description_kind",),
+}
+# A claim field's shape; a field not listed here holds text.
+CLAIM_FIELD_SHAPES: dict[str, str] = {f: shape for shape, fs in _BY_SHAPE.items() for f in fs}
+# A record field's shape, checked on the claim it cites (a list field: on each claim it
+# lists). Facts, rules and funding conditions take their claims' own field shapes.
+RECORD_FIELD_SHAPES: dict[str, str] = {
+    "JobPosting.title": "text",
+    "JobPosting.employer": "text",
+    "JobPosting.advertiser": "advertiser",
+    "JobPosting.location": "place",
+    "JobPosting.work_mode": "work_mode",
+    "JobPosting.salary": "pay",
+    "JobPosting.date_posted": "date",
+    "JobPosting.valid_through": "deadline",
+    "JobPosting.employment_type": "text",
+    "JobPosting.description_kind": "description_kind",
+    "JobPosting.status": "text",
+    "SkillRequirement.text": "text",
+    "LearningOption.title": "text",
+    "LearningOption.provider": "text",
+    "LearningOption.credential": "text",
+    "LearningOption.awarding_body": "text",
+    "LearningOption.recognising_body": "text",
+    "LearningOption.level": "level",
+    "LearningOption.delivery_mode": "text",
+    "LearningOption.assessment": "text",
+    "LearningOption.entry_requirements": "text",
+    "Offering.intake": "date",
+    "Offering.application_deadline": "date",
+    "Offering.duration": "duration",
+    "Offering.schedule": "schedule",
+    "Offering.fee_total": "money",
+    "Offering.instalment": "instalment",
+    "Offering.wage": "pay",
+    "Offering.location": "place",
+    "Offering.extra_costs": "money",
+    "Outcome.source_span": "text",
+    "FundingInstrument.programme": "text",
+    "FundingInstrument.eligible_costs": "text",
+    "FundingInstrument.timing": "text",
+    "FundingInstrument.repayment": "text",
+    "FundingInstrument.exclusions": "text",
+    "FundingInstrument.published_on": "date",
+    "FundingInstrument.rules_updated_on": "date",
+}
 
 
 def check_pack(pack: Pack) -> list[str]:
@@ -397,68 +638,37 @@ def _synthetic(pack: Pack) -> list[str]:
     return found
 
 
-def _floats(value: object) -> bool:
-    if isinstance(value, float):
+def _fits(shape: str, value: JsonValue) -> bool:
+    """Whether a value has a shape. Strict: no number in a string, no float for an integer."""
+    if value is None:
         return True
-    if isinstance(value, dict):
-        return any(_floats(v) for v in value.values())
-    if isinstance(value, list):
-        return any(_floats(v) for v in value)
-    return False
+    try:
+        SHAPES[shape].validate_python(value, strict=True)
+    except ValidationError:
+        return False
+    return True
 
 
 def _claim_values(pack: Pack) -> list[str]:
-    found = []
-    for claim in pack.claims:
-        if _floats(claim.value):
-            found.append(f"{claim.claim_id} holds a float")
-            continue
-        if claim.value is None:
-            continue
-        if claim.field in MONEY_FIELDS:
-            found += _money(claim.claim_id, claim.value)
-        elif claim.field in PAY_FIELDS:
-            found += _pay(claim.claim_id, claim.value)
-        elif claim.field in DATE_FIELDS:
-            found += _date(claim.claim_id, claim.value)
+    """Each claim's value against its own field's shape; then each record field's shape
+    against the claims it cites, where that differs."""
+    found = [
+        f"{c.claim_id} is not {shape}"
+        for c in pack.claims
+        if not _fits(shape := CLAIM_FIELD_SHAPES.get(c.field, "text"), c.value)
+    ]
+    claims = {c.claim_id: c for c in pack.claims}
+    for record in pack.records():
+        for name, claim_id in _refs(record):
+            declared = RECORD_FIELD_SHAPES.get(f"{type(record).__name__}.{name}")
+            claim = claims.get(claim_id)
+            if declared is None or claim is None:
+                continue
+            if declared != CLAIM_FIELD_SHAPES.get(claim.field, "text") and not _fits(
+                declared, claim.value
+            ):
+                found.append(f"{record.record_id}.{name} cites {claim_id}, which is not {declared}")
     return found
-
-
-def _money(claim_id: str, value: object) -> list[str]:
-    if not isinstance(value, dict) or not isinstance(value.get("minor_units"), int):
-        return [f"{claim_id} is not money (currency and minor_units)"]
-    if value.get("currency") != "GBP":
-        return [f"{claim_id} is not GBP"]
-    if value["minor_units"] < 0:
-        return [f"{claim_id} is negative money"]
-    return []
-
-
-def _pay(claim_id: str, value: object) -> list[str]:
-    if not isinstance(value, dict) or value.get("currency") != "GBP":
-        return [f"{claim_id} is not GBP pay"]
-    low, high = value.get("minimum_minor_units"), value.get("maximum_minor_units")
-    if low is None and high is None:
-        return [f"{claim_id} has no amount"]
-    if any(x is not None and (not isinstance(x, int) or x < 0) for x in (low, high)):
-        return [f"{claim_id} is not integer minor units"]
-    if isinstance(low, int) and isinstance(high, int) and high < low:
-        return [f"{claim_id}'s maximum is below its minimum"]
-    if value.get("period") is not None and value.get("period") not in PERIODS:
-        return [f"{claim_id} has no known period"]
-    if value.get("basis") not in BASES:
-        return [f"{claim_id} has no pay basis"]
-    return []
-
-
-def _date(claim_id: str, value: object) -> list[str]:
-    if not isinstance(value, str):
-        return [f"{claim_id} is not an ISO date"]
-    try:
-        date.fromisoformat(value) if len(value) == 10 else datetime.strptime(value, "%Y-%m")
-    except ValueError:
-        return [f"{claim_id} is not an ISO date"]
-    return []
 
 
 def _refs(record: Record) -> Iterator[tuple[str, str]]:
@@ -633,5 +843,33 @@ def load_pack(version: str, *, pins: dict[str, str] | None = None) -> Pack:
 
 
 def schema() -> dict[str, Any]:
-    """The format as JSON Schema, committed beside the packs (`england-option-pack.schema.json`)."""
-    return Pack.model_json_schema()
+    """The format as JSON Schema, committed beside the packs (`SCHEMA_PATH`): the pack's
+    structure, each value shape, and the shape each claim field and record field declares."""
+    exported = Pack.model_json_schema()
+    exported["x-value-shapes"] = {name: SHAPES[name].json_schema() for name in sorted(SHAPES)}
+    exported["x-claim-field-shapes"] = dict(sorted(CLAIM_FIELD_SHAPES.items()))
+    exported["x-claim-field-shape-otherwise"] = "text"
+    exported["x-record-field-shapes"] = dict(sorted(RECORD_FIELD_SHAPES.items()))
+    return exported
+
+
+def dump_pack(pack: Pack) -> str:
+    """A pack's canonical text: one target, skill, source, claim or record per line, in the
+    format's field order, defaults left out. Every committed version is in this form."""
+    data = pack.model_dump(mode="json", exclude_defaults=True)
+    lines = ["{"]
+    for n, (key, value) in enumerate(data.items()):
+        comma = "," if n < len(data) - 1 else ""
+        if isinstance(value, list) and key != "notes":
+            if not value:
+                lines.append(f"  {json.dumps(key)}: []{comma}")
+                continue
+            lines.append(f"  {json.dumps(key)}: [")
+            lines += [
+                "    " + json.dumps(item, ensure_ascii=False) + ("," if m < len(value) - 1 else "")
+                for m, item in enumerate(value)
+            ]
+            lines.append("  ]" + comma)
+        else:
+            lines.append(f"  {json.dumps(key)}: {json.dumps(value, ensure_ascii=False)}{comma}")
+    return "\n".join([*lines, "}"]) + "\n"

@@ -16,7 +16,9 @@ from nessa.catalogue.option_pack import (
     OptionPackError,
     ReviewState,
     check_pack,
+    dump_pack,
     load_pack,
+    pack_path,
     parse_pack,
     schema,
 )
@@ -245,20 +247,21 @@ def test_a_record_citing_another_source_s_claim_is_a_problem() -> None:
 
 @pytest.mark.req("OPTN-10")
 @pytest.mark.parametrize(
-    ("value", "problem"),
+    "value",
     [
-        ({"currency": "GBP", "minor_units": 1265.0}, "C01.fee_total holds a float"),
-        ({"currency": "GBP", "minor_units": -1}, "C01.fee_total is negative money"),
-        ({"currency": "EUR", "minor_units": 1}, "C01.fee_total is not GBP"),
-        ("£1,265", "C01.fee_total is not money (currency and minor_units)"),
+        {"currency": "GBP", "minor_units": 1265.0},
+        {"currency": "GBP", "minor_units": -1},
+        {"currency": "EUR", "minor_units": 1},
+        {"currency": "GBP", "minor_units": 126500, "for": "the course"},
+        "£1,265",
     ],
-    ids=["float", "negative", "currency", "text"],
+    ids=["float", "negative", "currency", "extra key", "text"],
 )
-def test_money_is_integer_gbp_minor_units_and_never_negative(value: object, problem: str) -> None:
+def test_money_is_integer_gbp_minor_units_and_never_negative(value: object) -> None:
     data = minimal()
     data["claims"][4]["value"] = value
 
-    assert problem in problems(data)
+    assert problems(data) == ["C01.fee_total is not money"]
 
 
 @pytest.mark.req("OPTN-10")
@@ -266,7 +269,73 @@ def test_a_salary_whose_maximum_is_below_its_minimum_is_a_problem() -> None:
     data = minimal()
     data["claims"][1]["value"]["maximum_minor_units"] = 100
 
-    assert problems(data) == ["J01.salary's maximum is below its minimum"]
+    assert problems(data) == ["J01.salary is not pay"]
+
+
+@pytest.mark.req("OPTN-10")
+@pytest.mark.parametrize(
+    ("claim_field", "value", "problem"),
+    [
+        ("duration", {"typical_months": "6-8"}, "C01.duration is not duration"),
+        ("duration", [{"unit": "months", "minimum": "6-8", "maximum": 8, "mode": None}], None),
+        ("duration", [{"unit": "months", "minimum": 8, "maximum": 6, "mode": None}], None),
+        ("intake", "16 November 2026", "C01.duration is not date"),
+        ("schedule", "part time", "C01.duration is not schedule"),
+    ],
+    ids=["a string range", "a text bound", "a reversed range", "a date in words", "text"],
+)
+def test_a_value_has_the_one_shape_its_field_declares(
+    claim_field: str, value: object, problem: str | None
+) -> None:
+    data = minimal()
+    data["claims"].append(claim("C01.duration", "C01", claim_field, value))
+    data["offerings"][0]["duration"] = "C01.duration"
+
+    found = problems(data)
+
+    assert (problem or "C01.duration is not duration") in found
+
+
+@pytest.mark.req("OPTN-10")
+def test_a_record_field_checks_the_shape_of_the_claim_it_cites_whatever_the_claim_is_called() -> (
+    None
+):
+    # Reproduced in 0.1.0 before its re-cut: an offering's intake cited a list of past months
+    # held under another field name, so no date check saw it.
+    data = minimal()
+    data["claims"].append(claim("C01.intakes_stated", "C01", "intakes_stated", ["2026-02"]))
+    data["offerings"][0]["intake"] = "C01.intakes_stated"
+
+    assert problems(data) == ["offering:C01.intake cites C01.intakes_stated, which is not date"]
+
+
+@pytest.mark.req("OPTN-10")
+@pytest.mark.parametrize(
+    ("value", "problem"),
+    [
+        ("2026-11-27T23:59:59+00:00", None),
+        ("2026-12-31", None),
+        ("2026-11-27T23:59:59", "J01.valid_through is not deadline"),  # no UTC offset
+        ("27 November 2026", "J01.valid_through is not deadline"),
+    ],
+    ids=["datetime", "date", "naive", "words"],
+)
+def test_a_deadline_is_an_iso_date_or_a_datetime_with_its_offset(
+    value: str, problem: str | None
+) -> None:
+    data = minimal()
+    data["claims"].append(claim("J01.valid_through", "J01", "valid_through", value))
+    data["job_postings"][0]["valid_through"] = "J01.valid_through"
+
+    assert problems(data) == ([problem] if problem else [])
+
+
+@pytest.mark.req("OPTN-10")
+def test_a_structured_value_under_a_text_field_is_a_problem() -> None:
+    data = minimal()
+    data["claims"][0]["value"] = {"title": "Data Quality Analyst"}
+
+    assert problems(data) == ["J01.title is not text"]
 
 
 @pytest.mark.req("OUT1-10")
@@ -424,11 +493,23 @@ def test_the_corpus_manifest_and_the_pack_record_the_same_pages_and_labels() -> 
 
 
 @pytest.mark.req("OPTN-10")
-def test_the_format_exports_a_json_schema() -> None:
+def test_the_format_exports_a_json_schema_that_states_every_value_shape() -> None:
     exported = schema()
 
     assert exported["title"] == "Pack"
     assert "claims" in exported["properties"]
+    shapes = exported["x-value-shapes"]
+    assert {"money", "pay", "date", "deadline", "duration", "schedule", "instalment"} <= set(shapes)
+    assert exported["x-record-field-shapes"]["Offering.duration"] == "duration"
+    assert exported["x-claim-field-shapes"]["valid_through"] == "deadline"
+
+
+@pytest.mark.req("OPTN-10")
+def test_every_committed_version_is_written_in_the_format_s_own_canonical_form() -> None:
+    for version in PINS:
+        text = pack_path(version).read_text(encoding="utf-8")
+
+        assert dump_pack(load_pack(version)) == text
 
 
 @pytest.mark.req("OPTN-10")
