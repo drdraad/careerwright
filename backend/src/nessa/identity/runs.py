@@ -350,8 +350,8 @@ def cancel_run(tx: Tx, actor: Actor, workspace_id: uuid.UUID, run_id: uuid.UUID)
             stage=ErrorStage.EXECUTION,
             details={"status": run.status.value},
         )
-    unsettled = [] if run.status in _TERMINAL else [run]
-    for each in [*unsettled, *started_runs]:
+    asked = [*([] if run.status in _TERMINAL else [run]), *started_runs]
+    for each in asked:
         if run_store.request_cancellation(tx, each, actor.actor_id):
             store.append_event(tx, workspace_id, EventKind.RUN_CANCEL_REQUESTED, str(each.run_id))
     cancelled = run_store.run(tx, run_id)
@@ -359,7 +359,7 @@ def cancel_run(tx: Tx, actor: Actor, workspace_id: uuid.UUID, run_id: uuid.UUID)
         raise NessaError(
             ErrorCode.INTERNAL_ERROR, "The run was not recorded.", stage=ErrorStage.EXECUTION
         )
-    return Cancellation(cancelled, [each.run_id for each in [*unsettled, *started_runs]])
+    return Cancellation(cancelled, [each.run_id for each in asked])
 
 
 def visible_run(tx: Tx, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Run:
