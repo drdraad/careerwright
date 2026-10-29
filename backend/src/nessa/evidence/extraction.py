@@ -34,7 +34,7 @@ from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from nessa.evidence.addresses import apply_link
 from nessa.evidence.amounts import minor_units
@@ -82,6 +82,14 @@ class ExtractionInput(StrictModel):
     format: Literal["nessa.page-extraction-input"] = INPUT_FORMAT
     prompt_version: str = PROMPT_VERSION
     text: str = Field(min_length=1, max_length=EXTRACTION_TEXT_BYTES)
+
+    @field_validator("text")
+    @classmethod
+    def _bytes_bounded(cls, text: str) -> str:
+        """The reservation assumes the text's bytes, not its characters (review C M4)."""
+        if len(text.encode()) > EXTRACTION_TEXT_BYTES:
+            raise ValueError(f"the page text is at most {EXTRACTION_TEXT_BYTES} bytes of UTF-8")
+        return text
 
     @property
     def sha256(self) -> str:
@@ -227,8 +235,12 @@ _MONEY = re.compile(
 )
 _GROUPED = re.compile(r"^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$")
 _CURRENCY_CODES = {"£": "GBP", "$": "USD", "€": "EUR"}
+# Before or after one amount: "up to", "max" and "maximum" make it a maximum; "from" and
+# "starting at" before it, or "min" and "minimum" either side, a minimum (fix round 3,
+# review C I2: "£40,000 max" is a maximum, never exactly £40,000).
 _UP_TO = re.compile(r"(?<![A-Za-z])(?:up to|maximum|max\.?)(?![A-Za-z])", re.IGNORECASE)
 _FROM = re.compile(r"(?<![A-Za-z])(?:from|starting at|minimum|min\.?)(?![A-Za-z])", re.IGNORECASE)
+_AT_LEAST = re.compile(r"(?<![A-Za-z])(?:minimum|min\.?)(?![A-Za-z])", re.IGNORECASE)
 _PERIOD_WORDS = {
     SalaryPeriod.YEAR: r"per (?:annum|year)|a year|annual(?:ly)?|yearly|p\.?a\.?",
     SalaryPeriod.MONTH: r"per (?:calendar )?month|a month|monthly|pcm",
@@ -252,12 +264,31 @@ def _pence(number: str, thousands: str | None) -> int | str:
     return minor_units(format(amount, "f"))
 
 
+def _misreadable(match: re.Match[str]) -> bool:
+    """Whether reading the match would guess (fix round 3, review C I2): a range with a
+    multiplier on one side only ("£30-35k": £30 or £30,000?), or a letter straight after a
+    number that is not its `k` ("£1.2m", "£30kpa")."""
+    if match["high"] is not None and (match["low_k"] is None) != (match["high_k"] is None):
+        return True
+    for side in ("low", "high"):
+        if match[side] is None:
+            continue
+        end = match.end(side)
+        if end < len(match.string) and match.string[end].isalpha():
+            multiplier = f"{side}_k"
+            if match[multiplier] is None or match.start(multiplier) != end:
+                return True
+    return False
+
+
 def salary_from(text: str) -> tuple[Salary | None, str | None]:
     """Pay as a span states it, or the issue that keeps it unknown: one amount or range with
     its currency sign or code, exact to the penny, in GBP; the period only when exactly one
-    is named. "Up to" gives a maximum, "from" a minimum; one amount otherwise is both."""
+    is named. "Up to" or "max" either side gives a maximum, "from" before or "minimum"
+    either side a minimum; one amount otherwise is both. What cannot be read without a
+    guess is refused (`salary_invalid`): unknown beats wrong."""
     found = list(_MONEY.finditer(text))
-    if len(found) != 1:
+    if len(found) != 1 or _misreadable(found[0]):
         return None, "salary_invalid"
     match = found[0]
     amounts: list[int | None] = []
@@ -274,10 +305,14 @@ def salary_from(text: str) -> tuple[Salary | None, str | None]:
         return None, "currency_not_supported"
     low, high = amounts
     if high is None:
-        before = text[: match.start()]
-        if _UP_TO.search(before):
+        before, after = text[: match.start()], text[match.end() :]
+        maximum = bool(_UP_TO.search(before) or _UP_TO.search(after))
+        minimum = bool(_FROM.search(before) or _AT_LEAST.search(after))
+        if maximum and minimum:
+            return None, "salary_invalid"
+        if maximum:
             low, high = None, low
-        elif not _FROM.search(before):
+        elif not minimum:
             high = low
     periods = [period for period, pattern in _PERIODS.items() if pattern.search(text)]
     try:

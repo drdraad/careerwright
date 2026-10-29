@@ -186,6 +186,17 @@ def test_the_text_read_is_cut_to_its_byte_bound_on_a_whole_character() -> None:
         ExtractionInput(text="a" * (EXTRACTION_TEXT_BYTES + 1))
 
 
+@pytest.mark.req("MODEL-08")
+def test_the_input_is_bounded_in_utf8_bytes_as_its_reservation_assumes() -> None:
+    # Review C M4: two-byte characters at the bound fit; one more is refused, though the
+    # text is far under 8,000 characters.
+    at_bound = "é" * (EXTRACTION_TEXT_BYTES // 2)
+    assert len(ExtractionInput(text=at_bound).text.encode()) == EXTRACTION_TEXT_BYTES
+    assert prompt_bytes(ExtractionInput(text=at_bound)) <= MAX_PROMPT_BYTES
+    with pytest.raises(ValidationError, match="at most 8000 bytes of UTF-8"):
+        ExtractionInput(text=at_bound + "é")
+
+
 # --- approval ---------------------------------------------------------------------------
 
 
@@ -335,6 +346,11 @@ def test_postings_past_the_limit_are_dropped_not_read() -> None:
         ("£2,500 a month", (250_000, 250_000, SalaryPeriod.MONTH)),
         ("£32,000 a year, 5 days a week", (3_200_000, 3_200_000, None)),  # two periods named
         ("GBP 410 per week", (41_000, 41_000, SalaryPeriod.WEEK)),
+        # Review C I2: a trailing "max", "maximum" or "up to" reads like a leading one.
+        ("£40,000 max", (None, 4_000_000, None)),
+        ("£40,000 maximum per year", (None, 4_000_000, SalaryPeriod.YEAR)),
+        ("£40,000 a year, up to", (None, 4_000_000, SalaryPeriod.YEAR)),
+        ("£30k to £35k", (3_000_000, 3_500_000, None)),  # a multiplier on both sides
     ],
 )
 def test_pay_is_read_exactly_as_the_span_states_it(
@@ -359,6 +375,14 @@ def test_pay_is_read_exactly_as_the_span_states_it(
         ("£30,000 or £35,000 with a £5,000 bonus", "salary_invalid"),  # which amount?
         ("£1,00 per year", "salary_invalid"),
         ("£36,000 to £32,000", "salary_invalid"),
+        # Review C I2: what cannot be read exactly is refused, never misread.
+        ("£30-35k per annum", "salary_invalid"),  # a multiplier on one side only
+        ("£25-30K a year", "salary_invalid"),
+        ("£30 - £35k", "salary_invalid"),
+        ("£30k - £35", "salary_invalid"),
+        ("£1.2m", "salary_invalid"),  # a letter straight after the number
+        ("£30kpa", "salary_invalid"),
+        ("£40,000 minimum and up to £45,000", "salary_invalid"),  # two amounts
     ],
 )
 def test_pay_that_cannot_be_read_exactly_stays_unknown_with_its_issue(
