@@ -1,7 +1,8 @@
 # ADR 0011: The England option pack's format, curation and labels
 
 - Status: Accepted for Task 7b (Sprints 3–5 corpus items; plan v1.2). Amended in Task 7b
-  fix round 1 (2026-10-29): decisions 3, 4, 7 and 9 changed, and 13 and 14 added.
+  fix round 1 (2026-10-29): decisions 3, 4, 7 and 9 changed, and 13 and 14 added. Amended
+  again in fix round 2: decisions 2, 3 and 13.
   - **Provisional, need product owner confirmation (R6):** decisions 8 (P02 has no
     records), 9 (conflicting statements stay unresolved, and a bound is the label over a
     point at the same amount), 10 (pack-local skill rows) and 12 (a restrictive copyright
@@ -46,7 +47,8 @@ be precise enough for a person to accept or reject each one with a yes or a no.
      is the first. The count is exact, except on the 21 fetched pages whose text is not
      kept: their excerpts were located before the locator counted past 5, so their source
      records `occurrence_cap: 5`, and a count of 5 there means at least 5. The Adzuna
-     claims cite JSON pointers, each found once.
+     claims cite JSON pointers, each found once. A null count means not counted: a span the
+     pipeline read itself, never located as an excerpt (`J01.salary_point`).
 3. **The pack is committed and pinned, not fetched.** Version 0.1.0 is about 212 KB and holds
    only excerpts and values, never a page body. R7's "committed only if small and its rights
    permit" holds as follows.
@@ -70,6 +72,16 @@ be precise enough for a person to accept or reject each one with a yes or a no.
          as a fact (decision 9);
        - kept bodies' counts were made exact.
      - `format_version` stayed 1, since no consumer had read the earlier form.
+     - Task 7b fix round 2, the last re-cut:
+       - working patterns took the schedule shape and access periods the duration shape;
+       - C04's 6 to 8 months became typical, never bounds, and its year of access became
+         its own fact (at most 12 months);
+       - rates state `repayable`, with C08's support grant not repayable, as its excerpt
+         says;
+       - J19's working pattern was reduced to its excerpt ("full time, 36 hours");
+       - `J01.salary_point`'s count became null (not counted), and `J01.salary`'s note
+         mentions the header again.
+     - `format_version` still stayed 1, for the same reason.
    - **0.1.0 is frozen from the end of Task 7b.** Any later change, Task 7c's reviewed
      version included, is a new file.
 4. **The validator runs in the fast checks.** `check_pack` returns named problems, and
@@ -157,13 +169,13 @@ be precise enough for a person to accept or reject each one with a yes or a no.
     | Shape | Value | Record fields that declare it |
     |---|---|---|
     | money | `{"currency": "GBP", "minor_units": int ≥ 0}` | `Offering.fee_total`, `Offering.extra_costs` |
-    | rate | money plus `"period"` and `"at_least": bool` (a yearly fee or grant) | (facts and conditions: `fee_per_year_*`, `support_grant`) |
+    | rate | money plus `"period"`, `"at_least": bool` and `"repayable": bool or null` (a yearly fee or grant; null means the page does not say, never false) | (facts and conditions: `fee_per_year_*`, `support_grant`) |
     | pay | `{"currency", "minimum_minor_units", "maximum_minor_units", "period", "basis"}`: integer ends, either may be null but not both, maximum ≥ minimum; `period` year, month, week, day, hour or null; `basis` advertised, predicted or unknown | `JobPosting.salary`, `Offering.wage` |
     | instalment | `{"currency", "minor_units": int or null, "period", "count": int or null, "at_least": bool}`, with an amount or a count | `Offering.instalment` |
     | date | an ISO date `YYYY-MM-DD` or month `YYYY-MM` | `Offering.intake`, `Offering.application_deadline`, `JobPosting.date_posted`, `FundingInstrument.published_on`, `FundingInstrument.rules_updated_on` |
     | deadline (datetime) | an ISO date, or an ISO datetime with its UTC offset | `JobPosting.valid_through` |
-    | duration | a list of `{"unit": hours, weeks, months or years, "minimum", "maximum", "mode": full_time, part_time, self_paced or null}`, one per way of taking it; integer ends, either may be null but not both | `Offering.duration` |
-    | schedule | `{"pattern": full_time, part_time or null, "hours_per_week": int or null}`, with at least one | `Offering.schedule` |
+    | duration | a list of `{"unit": hours, weeks, months or years, "minimum", "maximum", "mode": full_time, part_time, self_paced or null, "typical": bool}`, one per way of taking it; integer ends, either may be null but not both; `typical: true` is what is typical (an average), never bounds | `Offering.duration` (facts: `contract_duration`, `duration_limit`, `access_period`) |
+    | schedule | `{"pattern": full_time, part_time, flexible or null, "hours_per_week": int or null}`, with at least one | `Offering.schedule` (facts: a posting's `working_pattern`) |
     | place | `{"label", "locality", "region", "postal_code"}`, the label required | `JobPosting.location`, `Offering.location` |
     | level | an RQF level, 0 to 8 | `LearningOption.level` |
 
@@ -194,7 +206,7 @@ be precise enough for a person to accept or reject each one with a yes or a no.
 - **Consumers** (Tasks 9 and 11) read `load_pack(version)` and `Pack.value(ref)` and never
   parse the file themselves. They can rely on decision 13's shapes. A record is explorable
   but never in an unqualified recommendation until it is `reviewed` (OPTN-09).
-- **Session 2's package** asks 331 yes/no questions in three parts of about 17, 38 and 29
+- **Session 2's package** asks 344 yes/no questions in three parts of about 17, 38 and 32
   minutes (`docs/reviews/session-2-option-pack-questions.md`). The session may stop after
   any part, and anything unanswered stays `proposed`.
 - **The job corpus rests on job boards** (Reed and NHS Jobs), because no employer careers or
