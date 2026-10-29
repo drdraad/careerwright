@@ -442,17 +442,44 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
       worker acts on each request on its own, so a queued one is never dispatched and makes
       no provider request. The cancel and the start hold the same advisory lock on the
       acquisition (`run_store.lock_started_runs`), each as its first lock: the cancel
-      before the workspace's row; the acquisition's recording transaction, whenever its
-      page is model-readable, before the workspace's recording lock and before any insert
-      (fix round 4, review C-1 N1: a kept body's document takes a key-share lock on the
-      workspace's row, which the cancel's row lock waits for, so a later lock could
-      deadlock;
+      before any run's row and the workspace's row; the acquisition's recording
+      transaction, whenever its page is model-readable, before the workspace's recording
+      lock and before any insert (fix round 4, review C-1 N1: a kept body's document takes a
+      key-share lock on the workspace's row, which the cancel's row lock waits for, so a
+      later lock could deadlock;
       `test_a_cancel_while_a_kept_page_for_extraction_is_recorded_ends_without_a_store_error`).
       So a page recorded after a cancel is `acquisition_cancelled` and the SQL function
       refuses it too. The cancel's 202 lists the runs whose cancellation it asked for
       (`cancellation_requested`: the run itself while unsettled, the started runs, or both;
       fix round 4, review C-1 N2). A run cancelled while its call is out keeps its accepted
       result, as every run does.
+    - *Lock order (DUR-05; Task 7d, intermediate review point 1).* The cancel and the
+      worker keep one order: the run's cancellation lock first, wherever it is taken
+      (above), then a run's row before its workspace's row. A run's row is locked
+      `FOR UPDATE`, the only lock a key share on it waits for at run time, only by the
+      worker, as the first lock of its transaction (`activity._prepare` and `publish`,
+      `acquisition.acquire_target` and `publish_acquisition`), and that run's events, which
+      lock the workspace's row, come after it. The cancel records its requests, whose
+      foreign keys take a key-share lock on each run's row, and only then locks the
+      workspace's row and writes its events. So a cancel that waits for a run's row holds
+      only its cancellation lock and key shares, which the worker never waits for, and the
+      worker's event goes through. Until Task 7d the cancel locked the workspace's row
+      first: it then waited for the run's row while the worker waited for the workspace's
+      row, and PostgreSQL ended the cancel with a deadlock error (`40P01`, answered
+      `STORE_UNAVAILABLE`), so the person had to cancel again, and the cascade above made
+      that possible for up to five more runs. Reproduced first with two connections (the
+      worker's transaction holds the run's row until the cancel waits for it, then writes
+      the event), for a run and for an acquisition's started run, and fixed by the order,
+      with no retry loop
+      (`test_a_cancel_while_the_worker_writes_a_run_s_event_ends_without_a_store_error`).
+      Two kinds of key share on a run's row come after the workspace's row, and neither
+      closes a cycle. A recording that starts an extraction run takes one on the
+      acquisition's row (`started_by_run`) after its document's key share on the workspace's
+      row and before its events; a key share does not block the locks the `FOR UPDATE`
+      holder then takes on the workspace's row (its event, its inserts' key shares). An API
+      command that refers to a complete run (an interview decision's sources, a slate
+      explanation's discovery) takes one after locking the workspace's row; the worker
+      writes no event for a complete run (publishing it again records nothing).
     - *Input and retention.* The sealed input is that text, marked in the prompt as
       untrusted data. It is erased once the run is terminal, whatever its outcome, by
       `nessa.erase_run_input` (`RunTask.erases_input`), even after the requester's access
@@ -538,13 +565,14 @@ results, the ledger rows it wrote and the ledger table found no credential.
 - Fix round 3 migrations: 0022 (`visible_text_detail`), 0023 (`runs.started_by_run`, the
   cancellation lock, `acquisition_cancelled`), 0024 (`postings_conflicting`). Fix round 4:
   0025 (`attribute_detail`). Fix round 5: 0026 (`link_detail`).
-- Pre-existing lock pattern, not fixed in fix round 4 and carried to the final review:
-  `cancel_run` locks the workspace's row `FOR UPDATE` and then takes a key-share lock on
-  the run's row (the `run_cancellations` foreign key), while a worker transaction can hold
-  the run's row `FOR UPDATE` and then write an event, which updates the workspace's row;
-  the two can deadlock, and PostgreSQL then ends one with a store error (the worker's step
-  retries; the person repeats the cancel). The cascade makes this possible for up to five
-  more runs.
+- The lock pattern carried from fix round 4 is fixed by Task 7d (decision 15, *Lock
+  order*). `cancel_run` locked the workspace's row `FOR UPDATE` and then took a key-share
+  lock on each run's row (the `run_cancellations` foreign key), while a worker transaction
+  can hold a run's row `FOR UPDATE` and then write an event, which updates the workspace's
+  row; the two deadlocked, and PostgreSQL ended the cancel with a store error, so the
+  person had to cancel again. The cancel now records its requests before it locks the
+  workspace's row. No workflow's step sequence changed: DBOS `application_version` stays
+  `nessa-l0-1`.
 - The live search proposed no candidate in two tries; candidate quality is unqualified.
 - The Adzuna live integration is qualified on the free tier by `make live-adzuna` (two
   requests, above). A live-vacancy workspace also needs `make setup` to place the
