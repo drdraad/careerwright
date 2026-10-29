@@ -50,6 +50,7 @@ from psycopg.rows import dict_row
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from nessa.evidence import search
 from nessa.identity import connection_check
 from nessa.identity.activity import STORE_RETRY_BUDGET_S
 from nessa.identity.meta import REQUEST_TIMEOUT_S
@@ -119,6 +120,17 @@ INTERVIEW_TURN = SmokeKind(
     interview.worst_case_nano_usd,
     INTERVIEW_PURPOSE,
 )
+SOURCE_SEARCH = SmokeKind(
+    "source_search",
+    1,  # one attempt: the budget refuses a retry, which would pay for every search again
+    search.MAX_REQUESTS,
+    search.worst_case_nano_usd,
+    "source search via API, outbox and DBOS worker: Meta web search for a synthetic target "
+    "and city, candidates checked (key opened just in time)",
+)
+# The search kind's own budget scope (Task 7A): at most 9 requests and $0.30, test model.
+SEARCH_SCOPE = "live-search"
+SEARCH_TARGET, SEARCH_CITY = "Data analyst", "Manchester"
 RUN_TIMEOUT_S = CONNECTION_CHECK.run_timeout_s()
 
 
@@ -486,6 +498,55 @@ def _interview_turn(api: Api, base: str, model_id: str, timeout_s: float) -> str
     return "complete" if decided["profile"]["version"] == 1 else "decision changed nothing"
 
 
+def _source_search(api: Api, base: str, model_id: str, timeout_s: float) -> str:
+    """A synthetic target and city confirmed by direct entry, then one source search; its
+    candidates, grounding and the searches it ran are printed (no page is fetched)."""
+    fields = (
+        "preferred_name",
+        "current_role",
+        "cities",
+        "target_titles",
+        "weekly_study_hours",
+        "direct_spend_cap",
+        "monthly_payment_cap",
+        "enjoyed_tasks",
+        "confident_tasks",
+        "evidenced_tasks",
+        "work_style",
+        "minimum_salary",
+    )
+    profile: dict[str, Any] = {name: {"state": "unasked"} for name in fields}
+    profile["cities"] = {"state": "provided", "value": [SEARCH_CITY]}
+    profile["target_titles"] = {"state": "provided", "value": [SEARCH_TARGET]}
+    saved = api.call("PUT", f"{base}/profile", {"expected_version": 0, "profile": profile})
+    submitted = api.call(
+        "POST",
+        f"{base}/research/searches",
+        {
+            "expected_profile_version": saved["version"],
+            "target": SEARCH_TARGET,
+            "city": SEARCH_CITY,
+        },
+    )
+    if submitted["run"]["model_id"] != model_id:
+        raise RuntimeError(f"the run uses {submitted['run']['model_id']}, not {model_id}")
+    path = f"{base}/research/searches/{submitted['search_id']}"
+    shown = _wait(api, path, lambda body: body["run"], timeout_s)
+    run = shown["run"]
+    print(f"search {shown['search_id']}: {run['status']} {run['failure_class'] or ''}".rstrip())
+    proposal = shown["proposal"]
+    if run["status"] != "complete" or proposal is None:
+        return str(run["status"])
+    grounded = sum(1 for c in proposal["candidates"] if c["grounded"])
+    print(
+        f"candidates {len(proposal['candidates'])} (grounded {grounded}), excluded "
+        f"{[e['reason'] for e in proposal['excluded']]}, sources seen "
+        f"{proposal['sources_seen']}, searches {proposal['queries']}",
+        flush=True,
+    )
+    return "complete"
+
+
 def smoke(
     target: SmokeTarget,
     key: SecretStr,
@@ -528,7 +589,10 @@ def smoke(
             f"{base}/credentials",
             {"api_key": key.get_secret_value(), "consent_to_encrypted_storage": True},
         )
-        drive = _interview_turn if kind is INTERVIEW_TURN else _connection_check
+        drive = {
+            INTERVIEW_TURN.name: _interview_turn,
+            SOURCE_SEARCH.name: _source_search,
+        }.get(kind.name, _connection_check)
         status = drive(api, base, model_id, run_timeout_s)
         api.call("GET", f"{base}/export")
     finally:
@@ -640,6 +704,8 @@ def run_smoke(
         "production" if production else "test",
     )
     budget = settings.budget()
+    if kind is SOURCE_SEARCH:  # its own scope, whatever the smoke's scope is
+        budget = ScopeBudget(SEARCH_SCOPE, 9, 0, 300_000_000)
     # One invocation at a time, from the budget check to the last ledger row (N6).
     with ledger.exclusive():
         model_id, worst_case = authorise(
@@ -682,8 +748,15 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="one interview turn, its proposals confirmed, instead of a connection check",
     )
+    parser.add_argument(
+        "--search",
+        action="store_true",
+        help="one source search (Meta web search) for a synthetic target, in its own scope",
+    )
     args = parser.parse_args(argv)
-    kind = INTERVIEW_TURN if args.interview else CONNECTION_CHECK
+    if args.search and (args.interview or args.production_model):
+        raise SystemExit("--search runs alone, on the test model")
+    kind = SOURCE_SEARCH if args.search else INTERVIEW_TURN if args.interview else CONNECTION_CHECK
     sys.exit(
         run_smoke(SmokeSettings(), production=args.production_model, ledger=Ledger(), kind=kind)
     )

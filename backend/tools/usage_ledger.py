@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -32,6 +33,8 @@ class LiveCallEntry(BaseModel):
 
     budget_scope: str
     purpose: str
+    # Whose API the row records: Meta (every row before Task 7A) or Adzuna (`make live-adzuna`).
+    provider: Literal["meta", "adzuna"] = "meta"
     # HTTP requests the row stands for: one, or an activity attempt's call and its validation
     # repair (tokens and cost are the attempt's total). The caps count requests.
     http_requests: int = Field(default=1, ge=1)
@@ -158,8 +161,10 @@ class Ledger:
         self._path.with_suffix(".md").write_text(
             "# Live Meta usage log\n\n"
             "Every HTTP call to the Meta Model API made by Nessa tooling, including failures and\n"
-            "free calls (ruling R5). Generated from `live-usage.jsonl` by\n"
-            "`backend/tools/usage_ledger.py`; do not edit the table by hand.\n\n"
+            "free calls (ruling R5), and every Adzuna API request of `make live-adzuna` (scope\n"
+            "`live-adzuna`, free tier, model column `adzuna-jobs-api`). Generated from\n"
+            "`live-usage.jsonl` by `backend/tools/usage_ledger.py`; do not edit the table by\n"
+            "hand.\n\n"
             f"- Prices: {PRICE_SOURCE} (checked {PRICES_CHECKED_ON}); costs are estimates from\n"
             "  reported usage, in USD before tax. `unknown` means the charge could not be\n"
             "  determined; the budget then counts the call's full reservation.\n"
@@ -185,7 +190,10 @@ class Ledger:
             "  live-eval`): at most 6 evaluation cases per invocation, each one attempt of at\n"
             "  most 2 requests on the test model, never the production model; cumulatively at\n"
             "  most 24 requests and $0.05 worst case (`NESSA_LIVE_EVAL_*`), enforced in\n"
-            "  `backend/tools/live_eval.py`.\n"
+            "  `backend/tools/live_eval.py`. `live-adzuna` (`make live-adzuna`, Task 7A):\n"
+            "  Adzuna's free tier, not Meta: at most 2 requests per invocation and 10\n"
+            "  cumulatively, each at $0, enforced in `backend/tools/live_adzuna.py`; the\n"
+            "  endpoint is recorded without the credentials.\n"
             "- A row for an activity attempt that sent more than one request (the call and its\n"
             "  validation repair) shows `x N` after the endpoint; its tokens and cost are the\n"
             "  attempt's total, and the caps count every request.\n\n"

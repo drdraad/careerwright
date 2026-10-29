@@ -19,7 +19,13 @@ from tests.support.client import ApiClient
 from tests.support.fake_models import FakeFailure
 from tests.support.infra import WEB_ORIGIN, Infra, sign_in_seeded
 from tests.support.workers import Worker, start_worker
-from tools.live_smoke import INTERVIEW_TURN, MAX_CALLS, WorkerNotStoppedError, smoke
+from tools.live_smoke import (
+    INTERVIEW_TURN,
+    MAX_CALLS,
+    SOURCE_SEARCH,
+    WorkerNotStoppedError,
+    smoke,
+)
 from tools.usage_ledger import Ledger
 
 pytestmark = pytest.mark.integration
@@ -204,3 +210,37 @@ def test_the_interview_smoke_confirms_its_proposals_and_ledgers_the_attempt(
     assert (record.http_requests, record.purpose) == (1, INTERVIEW_TURN.purpose)
     assert record.estimated_cost_nano_usd is not None
     assert "streamed reply: superseded after" in capsys.readouterr().out
+
+
+@pytest.mark.req("MODEL-09")
+def test_the_search_smoke_runs_one_source_search_and_ledgers_its_one_request(
+    infra: Infra,
+    api: ApiClient,
+    ledger: Ledger,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The `SEARCH=1` orchestration, offline: a synthetic target and city confirmed, one
+    source search whose candidates are checked, one ledgered request."""
+    worker = start_worker(infra, tmp_path / "worker.log")
+    models = ModelChoice.configure(TEST_MODEL, "muse-spark-1.3", "test")
+    try:
+        result = smoke(
+            IntegrationTarget(infra, api.http, worker),
+            SecretStr(f"sk-smoke-{secrets.token_urlsafe(32)}"),
+            model_id=TEST_MODEL,
+            worst_case=SOURCE_SEARCH.per_attempt_nano_usd(TEST_MODEL),
+            models=models,
+            ledger=ledger,
+            scope="integration-search",
+            run_timeout_s=60,
+            kind=SOURCE_SEARCH,
+        )
+    finally:
+        worker.kill_if_running()
+
+    [record] = ledger.records()
+    assert result.status == "complete"
+    assert result.findings == []
+    assert (record.http_requests, record.purpose) == (1, SOURCE_SEARCH.purpose)
+    assert "candidates 2 (grounded 1)" in capsys.readouterr().out

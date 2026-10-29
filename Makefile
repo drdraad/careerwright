@@ -8,9 +8,12 @@
 #                           then the Storybook build and the browser journeys on their own stack
 #   make live-smoke         budget-capped real Meta smoke on the test model; PRODUCTION=1 (exactly)
 #                           qualifies the production model; INTERVIEW=1 (exactly) runs one
-#                           interview turn and confirms its proposals instead of a connection check
+#                           interview turn and confirms its proposals instead of a connection check;
+#                           SEARCH=1 runs one source search (Meta web search; scope live-search)
 #   make live-eval          budget-capped live run of the representative evaluation cases (at most
 #                           6) on the test model; CASES=INT-01,DSC-01 runs a chosen subset
+#   make live-adzuna        two real Adzuna search requests (free tier; at most 10 in its scope),
+#                           credentials read from .env in code, each request ledgered at $0
 #   make stop               stop every service, bounded; persisted work is kept
 #   make reset-demo         recreate the named fixture workspace only
 #   make rotate-master-key  add a master key version, reload it, reseal every sealed record
@@ -24,7 +27,7 @@ WEB := cd apps/web &&
 export NEXT_TELEMETRY_DISABLED := 1
 export STORYBOOK_DISABLE_TELEMETRY := 1
 
-.PHONY: setup dev demo check acceptance live-smoke live-eval stop reset-demo status rotate-master-key reseal
+.PHONY: setup dev demo check acceptance live-smoke live-eval live-adzuna stop reset-demo status rotate-master-key reseal
 
 setup:
 	$(BACKEND) uv python install 3.12 && uv sync --locked
@@ -52,10 +55,13 @@ acceptance:
 
 # Only PRODUCTION=1 opts in to the production model; any other value (0, false, no) does not.
 live-smoke:
-	$(BACKEND) $(UV) python -m tools.live_smoke $(if $(filter 1,$(PRODUCTION)),--production-model,) $(if $(filter 1,$(INTERVIEW)),--interview,)
+	$(BACKEND) $(UV) python -m tools.live_smoke $(if $(filter 1,$(PRODUCTION)),--production-model,) $(if $(filter 1,$(INTERVIEW)),--interview,) $(if $(filter 1,$(SEARCH)),--search,)
 
 live-eval:
 	$(BACKEND) $(UV) python -m tools.live_eval $(if $(CASES),--cases $(CASES),)
+
+live-adzuna:
+	$(BACKEND) $(UV) python -m tools.live_adzuna
 
 stop:
 	$(BACKEND) $(UV) python -m tools.stack stop
