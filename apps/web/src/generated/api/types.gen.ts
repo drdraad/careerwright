@@ -3392,8 +3392,20 @@ export type TargetOut = {
     route: InputRoute;
     /**
      * Url
+     *
+     * A checked http(s) URL; none for a query or a refusal.
      */
     url: string | null;
+    /**
+     * Why a submitted URL was refused unfetched.
+     */
+    refusal: UrlRefusal | null;
+    /**
+     * Refused Host
+     *
+     * A refused URL's host as plain text, never a link; the URL is not kept.
+     */
+    refused_host: string | null;
     /**
      * Query
      */
@@ -3695,6 +3707,28 @@ export type TurnSubmittedOut = {
     decision: DecisionOut | null;
     support_note: SupportNoteOut | null;
 };
+
+/**
+ * UrlRefusal
+ *
+ * Why a URL is not fetched. Each is a policy refusal, recorded as a blocked attempt.
+ */
+export const UrlRefusal = {
+    MALFORMED_URL: 'malformed_url',
+    URL_TOO_LONG: 'url_too_long',
+    SCHEME_NOT_ALLOWED: 'scheme_not_allowed',
+    CREDENTIALS_IN_URL: 'credentials_in_url',
+    PORT_NOT_ALLOWED: 'port_not_allowed',
+    HOST_NOT_ALLOWED: 'host_not_allowed',
+    ADDRESS_NOT_ALLOWED: 'address_not_allowed'
+} as const;
+
+/**
+ * UrlRefusal
+ *
+ * Why a URL is not fetched. Each is a policy refusal, recorded as a blocked attempt.
+ */
+export type UrlRefusal = typeof UrlRefusal[keyof typeof UrlRefusal];
 
 /**
  * ValidationState

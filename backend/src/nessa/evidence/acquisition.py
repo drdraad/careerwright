@@ -82,6 +82,7 @@ MAX_PASTED_CHARS = 50_000
 DOCUMENT_KIND = "source_document"
 PASTED_PROVIDER = "pasted_text"
 PASTED_RIGHTS = "pasted by the person: their own input, kept privately in this workspace"
+RECORDABLE_PORTS = frozenset(range(1, 65_536))
 
 Url = Annotated[str, StringConstraints(min_length=1, max_length=2_048)]
 
@@ -130,17 +131,38 @@ def _refused(reason: str) -> NessaError:
     )
 
 
-def _recordable(url: str) -> str:
-    """The URL as it will be recorded. One that cannot be recorded safely (a credential in
-    it, malformed, too long) is refused now; any other refusal is the worker's to record as
-    a blocked attempt, so a policy denial is always on record (ACQ-06)."""
-    checked = check_url(url)
+@dataclass(frozen=True)
+class RefusedTarget:
+    """A submitted URL the checks refuse (a `javascript:` scheme, a port, a local name, a
+    private address): recorded by its refusal and its host as plain text, never as a URL."""
+
+    refusal: UrlRefusal
+    host: str | None
+
+
+def _host_text(url: str) -> str | None:
+    try:
+        host = urlsplit(url).hostname
+    except ValueError:
+        return None
+    return host[:253] if host else None
+
+
+def _recordable(url: str) -> str | RefusedTarget:
+    """The checked URL as it will be recorded, or the refusal the worker records as a blocked
+    attempt, so a policy denial is always on record (ACQ-06). One that cannot be recorded
+    safely even as a refusal (a credential in it, malformed, too long) is refused now. Any
+    port is recordable: an http(s) URL to a public name is safe to show as a link, and the
+    worker's own check refuses a port other than 80 or 443 as a blocked attempt."""
+    checked = check_url(url, allowed_ports=RECORDABLE_PORTS)
     if checked in (UrlRefusal.MALFORMED, UrlRefusal.URL_TOO_LONG, UrlRefusal.CREDENTIALS_IN_URL):
         raise _refused(str(checked))
     lowered = url.lower()
     if any(f"{name}=" in lowered for name in CREDENTIAL_PARAMETERS):
         raise _refused(UrlRefusal.CREDENTIALS_IN_URL.value)
-    return checked.url if isinstance(checked, CheckedUrl) else url
+    if isinstance(checked, CheckedUrl):
+        return checked.url
+    return RefusedTarget(checked, _host_text(url))
 
 
 def submit_acquisition(
@@ -159,7 +181,13 @@ def submit_acquisition(
             "Adzuna searches run only in a live-vacancy workspace.",
             stage=ErrorStage.EXECUTION,
         )
-    urls = list(dict.fromkeys(_recordable(url) for url in command.urls))
+    each = [_recordable(url) for url in command.urls]
+    # A URL given twice is one target; each refused one is its own (it has no URL to match).
+    recordable = [
+        r for n, r in enumerate(each) if isinstance(r, RefusedTarget) or r not in each[:n]
+    ]
+    urls = [r for r in recordable if isinstance(r, str)]
+    refused = [r for r in recordable if isinstance(r, RefusedTarget)]
     skipped: list[Skipped] = []
     started: list[str] = []
     in_flight = store.urls_in_flight(tx, workspace_id, urls)
@@ -177,7 +205,7 @@ def submit_acquisition(
             skipped.append(Skipped(url, "backing_off", retry_at=decision.retry_at))
         else:
             started.append(url)
-    if not started and command.adzuna is None:
+    if not started and not refused and command.adzuna is None:
         return SubmittedAcquisition(None, skipped)
     run = submit_keyless_run(
         tx,
@@ -198,15 +226,18 @@ def submit_acquisition(
             url=None,
             query=command.adzuna.model_dump(),
         )
-    for position, url in enumerate(started):
+    queued = [r for r in recordable if r in started or isinstance(r, RefusedTarget)]
+    for position, target in enumerate(queued):
         store.insert_target(
             tx,
             run_id=run.run_id,
             workspace_id=workspace_id,
             position=position,
             route=InputRoute.FETCH,
-            url=url,
+            url=target if isinstance(target, str) else None,
             query=None,
+            refusal=target.refusal if isinstance(target, RefusedTarget) else None,
+            refused_host=target.host if isinstance(target, RefusedTarget) else None,
         )
     return SubmittedAcquisition(run, skipped)
 
@@ -240,6 +271,19 @@ def _user_claim(
     return Claim(field=field_name, value=value, span=span, validation=ValidationState.USER_SUPPLIED)
 
 
+def _reference_url(url: str) -> str:
+    """A pasted text's source, kept only as a checked URL (it is shown as a link)."""
+    recorded = _recordable(url)
+    if isinstance(recorded, RefusedTarget):
+        raise NessaError(
+            ErrorCode.VALIDATION_FAILED,
+            "That source address can't be kept. Give the page's web address, or leave it out.",
+            stage=ErrorStage.REQUEST,
+            details={"field": "source_url", "reason": recorded.refusal.value},
+        )
+    return recorded
+
+
 def paste_text(
     tx: Tx,
     actor: Actor,
@@ -266,7 +310,7 @@ def paste_text(
             stage=ErrorStage.REQUEST,
             details={"reason": "exemplars_per_target", "limit": MAX_EXEMPLARS_PER_TARGET},
         )
-    source_url = _recordable(command.source_url) if command.source_url else None
+    source_url = _reference_url(command.source_url) if command.source_url else None
     body = command.text.encode()
     sha256 = hashlib.sha256(body).hexdigest()
     attempt_id = uuid.uuid4()
@@ -554,22 +598,20 @@ def _unavailable(target: store.TargetRow, now: datetime) -> AcquisitionResult:
     )
 
 
-def _target_url(target: store.TargetRow) -> str:
+def _target_url(target: store.TargetRow) -> str | None:
     if target.route is InputRoute.ADZUNA and target.query is not None:
         return recorded_url(AdzunaQuery.model_validate(target.query))
-    return target.url or ""
+    return target.url
 
 
 def _provider(target: store.TargetRow) -> str:
-    """The host a target names (lower-case), before any check: the attempt records even a
-    refused URL against its host."""
+    """The host a target names (lower-case): the attempt records even a refused URL against
+    its host."""
     if target.route is InputRoute.ADZUNA:
         return ADZUNA_PROVIDER
-    try:
-        host = urlsplit(target.url or "").hostname
-    except ValueError:
-        host = None
-    return host or "unknown"
+    if target.url is None:
+        return target.refused_host or "unknown"
+    return urlsplit(target.url).hostname or "unknown"
 
 
 def _record_copies(
@@ -675,8 +717,17 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
     try:
         if target.route is InputRoute.ADZUNA and target.query is not None:
             result = rt.client.adzuna(AdzunaQuery.model_validate(target.query))
-        else:
-            result = rt.client.fetch(target.url or "")
+        elif target.url is not None:
+            result = rt.client.fetch(target.url)
+        else:  # refused when submitted: recorded as blocked, nothing is asked for
+            result = AcquisitionResult(
+                route=InputRoute.FETCH,
+                provider=_provider(target),
+                requested_url=None,
+                status=AttemptStatus.BLOCKED,
+                reason=target.refusal.value if target.refusal else None,  # CHECK: never None
+                fetched_at=rt.clock(),
+            )
     except AcquisitionUnavailableError:
         result = _unavailable(target, rt.clock())
     with run_transaction(rt.engine, run_id) as tx:

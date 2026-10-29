@@ -16,6 +16,7 @@ import sqlalchemy as sa
 
 from nessa.db import Tx
 from nessa.evidence.acquire import AcquisitionResult
+from nessa.evidence.addresses import UrlRefusal
 from nessa.evidence.records import AttemptStatus, Claim, InputRoute, JobCopy
 from nessa.identity.keyring import SealedValue
 
@@ -32,9 +33,11 @@ class TargetRow:
     run_id: uuid.UUID
     position: int
     route: InputRoute
-    url: str | None
+    url: str | None  # a checked URL; None for a query or a refused URL
     query: dict[str, Any] | None
     status: str
+    refusal: UrlRefusal | None = None  # why a submitted URL was refused
+    refused_host: str | None = None  # its host as plain text, never a link
 
 
 @dataclass(frozen=True)
@@ -118,11 +121,14 @@ def insert_target(
     route: InputRoute,
     url: str | None,
     query: dict[str, Any] | None,
+    refusal: UrlRefusal | None = None,
+    refused_host: str | None = None,
 ) -> None:
     tx.execute(
         sa.text(
             "INSERT INTO nessa.acquisition_targets (run_id, workspace_id, position, route, url, "
-            "query) VALUES (:run, :ws, :position, :route, :url, CAST(:query AS jsonb))"
+            "query, refusal, refused_host) VALUES (:run, :ws, :position, :route, :url, "
+            "CAST(:query AS jsonb), :refusal, :refused_host)"
         ),
         {
             "run": run_id,
@@ -131,6 +137,8 @@ def insert_target(
             "route": route.value,
             "url": url,
             "query": None if query is None else json.dumps(query),
+            "refusal": refusal.value if refusal else None,
+            "refused_host": refused_host,
         },
     )
 
@@ -138,14 +146,21 @@ def insert_target(
 def targets(tx: Tx, run_id: uuid.UUID) -> list[TargetRow]:
     rows = tx.execute(
         sa.text(
-            "SELECT run_id, position, route, url, query, status FROM nessa.acquisition_targets "
-            "WHERE run_id = :run ORDER BY position"
+            "SELECT run_id, position, route, url, query, status, refusal, refused_host "
+            "FROM nessa.acquisition_targets WHERE run_id = :run ORDER BY position"
         ),
         {"run": run_id},
     ).mappings()
     return [
         TargetRow(
-            r["run_id"], r["position"], InputRoute(r["route"]), r["url"], r["query"], r["status"]
+            r["run_id"],
+            r["position"],
+            InputRoute(r["route"]),
+            r["url"],
+            r["query"],
+            r["status"],
+            UrlRefusal(r["refusal"]) if r["refusal"] else None,
+            r["refused_host"],
         )
         for r in rows
     ]

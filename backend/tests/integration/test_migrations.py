@@ -270,3 +270,59 @@ def test_attempts_that_made_no_call_upgrade_to_a_known_zero_cost(infra: Infra) -
         {"spend_state": "reconciled", "cost_nano_usd": 40_000},
         {"spend_state": "unknown", "cost_nano_usd": None},
     ]
+
+
+@pytest.mark.req("ACQ-01")
+def test_0014_leaves_only_http_urls_in_url_fields(infra: Infra) -> None:
+    database = f"nessa_urls_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    engine = migrator_engine(infra, database)
+    unsafe = "javascript:alert(1)"
+    try:
+        migrate_app(engine, "0013")
+        seed(engine, infra.ops_settings(database))
+        with engine.begin() as tx:
+            workspace = add_edited_workspace(tx)
+            run, attempt = uuid.uuid4(), uuid.uuid4()
+            tx.exec_driver_sql(
+                "INSERT INTO nessa.runs (run_id, workspace_id, data_mode, synthetic, kind, "
+                "requested_by, status, failure_class, finished_at) SELECT %(run)s, workspace_id, "
+                "data_mode, synthetic, 'acquisition', owner_actor_id, 'failed', 'source_blocked', "
+                "clock_timestamp() FROM nessa.workspaces WHERE workspace_id = %(ws)s",
+                {"run": run, "ws": workspace},
+            )
+            tx.exec_driver_sql(
+                "INSERT INTO nessa.acquisition_targets (run_id, workspace_id, position, route, "
+                "url, status) VALUES (%(run)s, %(ws)s, 0, 'fetch', %(url)s, 'blocked')",
+                {"run": run, "ws": workspace, "url": unsafe},
+            )
+            tx.exec_driver_sql(
+                "INSERT INTO nessa.source_attempts (attempt_id, workspace_id, run_id, position, "
+                "route, provider, requested_url, redirects, status, reason, finished_at) VALUES "
+                "(%(id)s, %(ws)s, %(run)s, 0, 'fetch', 'unknown', %(url)s, %(redirects)s::jsonb, "
+                "'blocked', 'scheme_not_allowed', clock_timestamp())",
+                {
+                    "id": attempt,
+                    "ws": workspace,
+                    "run": run,
+                    "url": unsafe,
+                    "redirects": json.dumps(["https://ok.example/a", "file:///etc/passwd"]),
+                },
+            )
+
+        migrate_app(engine)
+    finally:
+        engine.dispose()
+
+    [target] = infra.query("SELECT url, refusal FROM nessa.acquisition_targets", database=database)
+    [kept] = infra.query(
+        "SELECT requested_url, redirects, status, reason FROM nessa.source_attempts",
+        database=database,
+    )
+    assert target == {"url": None, "refusal": "scheme_not_allowed"}
+    assert kept == {
+        "requested_url": None,
+        "redirects": ["https://ok.example/a"],
+        "status": "blocked",
+        "reason": "scheme_not_allowed",
+    }

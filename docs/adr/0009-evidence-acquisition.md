@@ -55,7 +55,15 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    refuses a host if any answer fails, and connects to an answer that passed (at most 4
    tried), so DNS rebinding cannot change the address; each redirect (at most 5) is checked
    before it is recorded or followed and is a new hop with the same checks, and https never
-   redirects to http. Only checked URLs are recorded (fix round 1, review A I5). Every new
+   redirects to http. Only checked http(s) URLs are recorded in a URL field (`url`,
+   `requested_url`, `final_url`, `redirects`, a pasted text's `source_url`), enforced by
+   CHECKs in migration 0014 (fix round 1, review A I5): a submitted URL refused for its
+   scheme, host or address is a target with its `refusal` and its host as plain text
+   (`refused_host`), never its URL, and its blocked attempt has no `requested_url`; a
+   redirect target is checked before it is recorded; a pasted `source_url` that fails the
+   checks is refused with 422. A port other than 80 or 443 is the fetch policy's refusal,
+   not the record's: such a URL is still an http(s) URL to a public name, kept on its
+   blocked attempt. Migration 0014 removes any other scheme recorded earlier. Every new
    host a page fetch reaches, a redirect's or a robots.txt redirect's included, is admitted
    before any request to it: the manifest's access (a denied or API-only host ends the
    attempt `source_denied` or `source_api_only`, with the redirects so far) and then its

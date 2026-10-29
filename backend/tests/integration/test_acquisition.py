@@ -141,6 +141,13 @@ def test_an_acquisition_records_every_attempt_and_a_job_with_its_claims(
         ("blocked", "source_denied"),
     ]
     assert shown["summary"] == {"succeeded": 3, "blocked": 2, "failed": 1}
+    refused = shown["targets"][4]
+    assert (refused["url"], refused["refusal"], refused["refused_host"]) == (
+        None,
+        "address_not_allowed",
+        "10.0.0.1",
+    )
+    assert refused["attempts"][-1]["requested_url"] is None
     listed, board, plain = (t["attempts"][-1] for t in shown["targets"][:3])
     assert (listed["rights_class"], listed["retention"]) == ("govuk", "body")
     # The board page's JSON-LD names its hiring organisation; that never raises retention.
@@ -199,16 +206,47 @@ def test_every_source_failing_is_a_failed_run_never_no_vacancies(
     assert down[2]["retry_of"] == down[1]["attempt_id"]
 
 
-@pytest.mark.req("ACQ-06")
-def test_a_run_whose_every_source_is_refused_is_source_blocked(
+@pytest.mark.req("ACQ-06", "ACQ-01")
+def test_a_run_whose_every_source_is_refused_is_source_blocked_and_records_no_unsafe_url(
     infra: Infra, api: ApiClient, ada: str, workspace: str, worker: Worker
 ) -> None:
-    body = {"urls": ["http://169.254.169.254/latest/meta-data/", "https://uk.indeed.com/jobs"]}
+    unsafe = ["javascript:alert(1)", "file:///etc/passwd", "data:text/html,x"]
+    body = {
+        "urls": [
+            "http://169.254.169.254/latest/meta-data/",
+            "https://uk.indeed.com/jobs",
+            *unsafe,
+        ]
+    }
     run_id = submit(api, ada, workspace, body).json()["acquisition"]["run"]["run_id"]
 
     run = wait_terminal(infra, run_id)
+    shown = acquisition(api, ada, workspace, run_id)
 
     assert (run["status"], run["failure_class"]) == ("failed", "source_blocked")
+    assert [(t["url"], t["refusal"]) for t in shown["targets"]] == [
+        (None, "address_not_allowed"),
+        ("https://uk.indeed.com/jobs", None),
+        (None, "scheme_not_allowed"),
+        (None, "scheme_not_allowed"),
+        (None, "scheme_not_allowed"),
+    ]
+    assert [t["attempts"][-1]["reason"] for t in shown["targets"]] == [
+        "address_not_allowed",
+        "source_denied",
+        "scheme_not_allowed",
+        "scheme_not_allowed",
+        "scheme_not_allowed",
+    ]
+    stored = json.dumps(
+        infra.query(
+            "SELECT t.url, t.refused_host, a.requested_url, a.final_url, a.redirects "
+            "FROM nessa.acquisition_targets t JOIN nessa.source_attempts a USING (run_id, "
+            "position) WHERE t.run_id = %s",
+            (run_id,),
+        )
+    )
+    assert not any(f"{u.split(':')[0]}:" in stored for u in unsafe)  # in no field at all
 
 
 @pytest.mark.req("DUR-05", "JOB-08")
@@ -386,6 +424,31 @@ def test_pasted_text_is_its_own_route_and_an_example_never_a_live_vacancy(
     }
     assert fourth.status_code == 422
     assert fourth.json()["error"]["details"]["reason"] == "exemplars_per_target"
+
+
+@pytest.mark.req("ACQ-10", "ACQ-01")
+def test_a_pasted_text_s_source_is_kept_only_as_a_checked_url(
+    api: ApiClient, ada: str, workspace: str
+) -> None:
+    base = {"target": "Gardener", "title": "Gardener", "text": "Gardener wanted in Leeds."}
+    path = f"/v1/workspaces/{workspace}/research/pasted"
+    refused = [
+        api.write("POST", path, ada, {**base, "source_url": unsafe})
+        for unsafe in ("javascript:alert(1)", "http://localhost/job", "http://10.0.0.1/")
+    ]
+    kept = api.write("POST", path, ada, {**base, "source_url": "HTTPS://Jobs.Example.org/a#x"})
+
+    for response in refused:
+        assert response.status_code == 422, response.text
+        assert response.json()["error"]["details"]["field"] == "source_url"
+    assert [r.json()["error"]["details"]["reason"] for r in refused] == [
+        "scheme_not_allowed",
+        "host_not_allowed",
+        "address_not_allowed",
+    ]
+    assert kept.status_code == 201, kept.text
+    [copy] = kept.json()["job"]["copies"]
+    assert copy["source_url"] == "https://jobs.example.org/a"  # the checked form
 
 
 @pytest.mark.req("JOB-07")

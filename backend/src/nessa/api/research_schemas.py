@@ -9,6 +9,7 @@ from pydantic import Field
 
 from nessa.api.schemas import ResponseModel, RunOut
 from nessa.evidence.acquisition import AcquisitionSummary, JobView, Skipped, TargetView
+from nessa.evidence.addresses import UrlRefusal
 from nessa.evidence.freshness import Freshness, FreshnessKind, FreshnessView
 from nessa.evidence.records import (
     AdvertiserKind,
@@ -84,7 +85,11 @@ class SourceAttemptOut(ResponseModel):
 class TargetOut(ResponseModel):
     position: int
     route: InputRoute
-    url: str | None
+    url: str | None = Field(description="A checked http(s) URL; none for a query or a refusal.")
+    refusal: UrlRefusal | None = Field(description="Why a submitted URL was refused unfetched.")
+    refused_host: str | None = Field(
+        description="A refused URL's host as plain text, never a link; the URL is not kept."
+    )
     query: dict[str, Any] | None
     status: str = Field(
         description="queued, succeeded, blocked, failed, cancelled, or not_attempted (the run "
@@ -98,6 +103,8 @@ class TargetOut(ResponseModel):
             position=view.target.position,
             route=view.target.route,
             url=view.target.url,
+            refusal=view.target.refusal,
+            refused_host=view.target.refused_host,
             query=view.target.query,
             status=view.status,
             attempts=[SourceAttemptOut.of(a) for a in view.attempts],

@@ -5368,7 +5368,31 @@ export const TargetOutSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Url'
+            title: 'Url',
+            description: 'A checked http(s) URL; none for a query or a refusal.'
+        },
+        refusal: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/UrlRefusal'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Why a submitted URL was refused unfetched.'
+        },
+        refused_host: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Refused Host',
+            description: 'A refused URL\'s host as plain text, never a link; the URL is not kept.'
         },
         query: {
             anyOf: [
@@ -5401,6 +5425,8 @@ export const TargetOutSchema = {
         'position',
         'route',
         'url',
+        'refusal',
+        'refused_host',
         'query',
         'status',
         'attempts'
@@ -5950,6 +5976,21 @@ export const TurnSubmittedOutSchema = {
     ],
     title: 'TurnSubmittedOut',
     description: 'A new turn, with the support panel when its message holds a risk stem.'
+} as const;
+
+export const UrlRefusalSchema = {
+    type: 'string',
+    enum: [
+        'malformed_url',
+        'url_too_long',
+        'scheme_not_allowed',
+        'credentials_in_url',
+        'port_not_allowed',
+        'host_not_allowed',
+        'address_not_allowed'
+    ],
+    title: 'UrlRefusal',
+    description: 'Why a URL is not fetched. Each is a policy refusal, recorded as a blocked attempt.'
 } as const;
 
 export const ValidationStateSchema = {
