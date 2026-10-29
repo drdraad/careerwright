@@ -82,6 +82,8 @@ class PayStatisticOut(ResponseModel):
     statistic: Statistic
     amount: Money | None = Field(description="Gross pay; null when ONS withholds it.")
     withheld: Marker | None = Field(description="ONS's marker for a withheld value.")
+    cv: str | None = Field(description="This statistic's own coefficient of variation, %.")
+    reliability: Reliability = Field(description="ONS's quality band for this statistic.")
 
 
 class PayBenchmarkOut(ResponseModel):
@@ -96,8 +98,6 @@ class PayBenchmarkOut(ResponseModel):
     period: AshePeriod
     pay_definition: str
     jobs_thousands: str | None
-    median_cv: str | None = Field(description="Coefficient of variation of the median, %.")
-    reliability: Reliability
     statistics: list[PayStatisticOut]
 
     @classmethod
@@ -112,13 +112,13 @@ class PayBenchmarkOut(ResponseModel):
             period=benchmark.period,
             pay_definition=benchmark.pay_definition,
             jobs_thousands=_decimal(benchmark.jobs_thousands),
-            median_cv=_decimal(benchmark.median_cv),
-            reliability=benchmark.reliability,
             statistics=[
                 PayStatisticOut(
                     statistic=Statistic(name),
                     amount=_money(benchmark.figures.get(name)),
                     withheld=Marker(benchmark.markers[name]) if name in benchmark.markers else None,
+                    cv=_decimal(benchmark.cvs.get(name)),
+                    reliability=benchmark.reliability(name),
                 )
                 for name in STATISTICS
             ],

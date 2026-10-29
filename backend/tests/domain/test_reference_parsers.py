@@ -58,7 +58,10 @@ def test_ashe_keeps_codes_regions_periods_pence_and_onss_markers() -> None:
     assert annual.figures["p90"] == 5_200_000
     assert annual.figures["p10"] is None  # withheld, never 0
     assert annual.markers["p10"] == "x"
-    assert annual.median_cv == Decimal("9.6")
+    # Fix round 1, A-M4: each statistic keeps its own CV from the "b" table.
+    assert annual.cvs["median"] == Decimal("9.6")
+    assert annual.cvs["p90"] == Decimal(samples.P90_CV)
+    assert annual.cvs["p10"] is None  # withheld in the "b" table too
     assert annual.jobs_thousands == Decimal("8")
     # A binary-float artefact is read as decimal text and rounded to the penny.
     books = _estimate(release, "4122", samples.NORTH_WEST, AshePeriod.YEAR)
@@ -71,7 +74,7 @@ def test_ashe_keeps_codes_regions_periods_pence_and_onss_markers() -> None:
     unreliable = _estimate(release, "2135", samples.NORTH_WEST, AshePeriod.YEAR)
     assert unreliable.figures["median"] is None
     assert unreliable.markers["median"] == "x"
-    assert unreliable.median_cv is None
+    assert unreliable.cvs["median"] is None
     assert {e.region_code for e in release.estimates} <= set(ashe.WORK_REGIONS.values())
 
 

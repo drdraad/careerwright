@@ -5971,7 +5971,9 @@
         "type": "string",
         "enum": [
           "no_pay",
+          "no_upper_amount",
           "predicted",
+          "basis_unknown",
           "period_differs",
           "period_not_stated",
           "other_currency",
@@ -7654,21 +7656,6 @@
             ],
             "title": "Jobs Thousands"
           },
-          "median_cv": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Median Cv",
-            "description": "Coefficient of variation of the median, %."
-          },
-          "reliability": {
-            "$ref": "#/components/schemas/Reliability"
-          },
           "statistics": {
             "items": {
               "$ref": "#/components/schemas/PayStatisticOut"
@@ -7689,8 +7676,6 @@
           "period",
           "pay_definition",
           "jobs_thousands",
-          "median_cv",
-          "reliability",
           "statistics"
         ],
         "title": "PayBenchmarkOut",
@@ -7732,6 +7717,22 @@
               }
             ],
             "description": "ONS's marker for a withheld value."
+          },
+          "cv": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cv",
+            "description": "This statistic's own coefficient of variation, %."
+          },
+          "reliability": {
+            "$ref": "#/components/schemas/Reliability",
+            "description": "ONS's quality band for this statistic."
           }
         },
         "additionalProperties": false,
@@ -7739,7 +7740,9 @@
         "required": [
           "statistic",
           "amount",
-          "withheld"
+          "withheld",
+          "cv",
+          "reliability"
         ],
         "title": "PayStatisticOut"
       },

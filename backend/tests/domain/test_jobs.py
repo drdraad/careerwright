@@ -9,6 +9,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from nessa.catalogue.pay import FloorUnknown, FloorVerdict, SalaryFloorRule
+from nessa.evidence.extraction import salary_from
 from nessa.evidence.jobs import (
     CanonicalFacts,
     Grouped,
@@ -32,6 +33,7 @@ from nessa.evidence.records import (
     Salary,
     SalaryPeriod,
 )
+from tests.domain.test_pages import POSTING, page, parse
 
 FULL = (
     "We are looking for a data quality analyst to join our Manchester team. You will "
@@ -305,15 +307,25 @@ def pay(
     [
         ([pay(1_800_000, 2_100_000)], FloorVerdict.BELOW, None),
         ([pay(2_400_000, 2_700_000)], FloorVerdict.MEETS, None),  # the top of the range decides
-        ([pay(2_500_000, None)], FloorVerdict.BELOW, None),  # a single amount is its own top
+        ([pay(2_500_000, 2_500_000)], FloorVerdict.BELOW, None),  # a single amount is its top
         ([pay(None, 2_500_000)], FloorVerdict.BELOW, None),  # "up to" is a top
+        # Fix round 1, A-I1: a minimum with no maximum ("from £25,000") is open above: its top
+        # is unknown, never below the floor, unless the minimum already meets it.
+        ([pay(2_500_000, None)], FloorVerdict.UNKNOWN, FloorUnknown.NO_UPPER_AMOUNT),
+        ([pay(2_700_000, None)], FloorVerdict.MEETS, None),
         ([pay(1_000_000, 1_200_000, basis=PayBasis.PREDICTED)], FloorVerdict.UNKNOWN,
          FloorUnknown.PREDICTED),
+        # Fix round 1, A-M5: stated pay whose basis is unknown is not "no pay".
+        ([pay(1_000_000, 1_200_000, basis=PayBasis.UNKNOWN)], FloorVerdict.UNKNOWN,
+         FloorUnknown.BASIS_UNKNOWN),
         ([pay(1_250, 1_400, SalaryPeriod.HOUR)], FloorVerdict.UNKNOWN, FloorUnknown.PERIOD_DIFFERS),
         ([pay(1_800_000, 2_000_000, None)], FloorVerdict.UNKNOWN, FloorUnknown.PERIOD_NOT_STATED),
         ([None], FloorVerdict.UNKNOWN, FloorUnknown.NO_PAY),
         # Copies of one job: advertised pay in the floor's period meets it in one copy.
         ([pay(1_800_000, 2_000_000), pay(2_600_000, None)], FloorVerdict.MEETS, None),
+        # One copy below and one open above: the top is not known, so it is kept.
+        ([pay(1_800_000, 2_000_000), pay(1_900_000, None)], FloorVerdict.UNKNOWN,
+         FloorUnknown.NO_UPPER_AMOUNT),
     ],
 )  # fmt: skip
 def test_a_job_is_below_the_floor_only_when_its_advertised_pay_in_the_period_is(
@@ -322,3 +334,32 @@ def test_a_job_is_below_the_floor_only_when_its_advertised_pay_in_the_period_is(
     floor = SalaryFloorRule(2_600_000, "year")
 
     assert job_against_floor(floor, salaries) == (verdict, reason)
+
+
+def _json_ld_salary(value: dict[str, object]) -> Salary | None:
+    posting = {**POSTING, "baseSalary": {"currency": "GBP", "value": value}}
+    [copy] = parse(page(posting)).postings
+    return copy.salary
+
+
+@pytest.mark.req("DIV1-07", "JOB-03")
+@pytest.mark.parametrize(
+    "salary",
+    [
+        salary_from("From £24,000 per annum")[0],
+        salary_from("Minimum £24,000 a year")[0],
+        salary_from("£24,000+ per annum")[0],
+        _json_ld_salary({"@type": "QuantitativeValue", "minValue": 24000, "unitText": "YEAR"}),
+    ],
+    ids=["from", "minimum", "plus", "json-ld minValue only"],
+)
+def test_open_ended_pay_as_the_readers_give_it_is_never_below_the_floor(
+    salary: Salary | None,
+) -> None:
+    # Fix round 1, A-I1: each states where pay starts, not where it ends.
+    assert salary is not None
+    assert salary.maximum_minor_units is None
+    assert job_against_floor(SalaryFloorRule(2_600_000, "year"), [salary]) == (
+        FloorVerdict.UNKNOWN,
+        FloorUnknown.NO_UPPER_AMOUNT,
+    )

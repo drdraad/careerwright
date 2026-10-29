@@ -644,12 +644,14 @@ def _empty_reason(
 ) -> EmptyReason | None:
     if total_jobs:
         return None
+    # An answer still coming is said first (review B N7), before what the floor left out
+    # (slice 7B fix round 1, review A M3).
+    if covered.get(Coverage.PENDING):
+        return EmptyReason.SOURCES_PENDING
     if left_out:
         return EmptyReason.ALL_BELOW_SALARY_FLOOR
     if not covered:
         return EmptyReason.NO_SOURCES_CHECKED
-    if covered.get(Coverage.PENDING):  # an answer is still coming (review B N7)
-        return EmptyReason.SOURCES_PENDING
     retrieved = (
         Coverage.SUCCEEDED,
         Coverage.NO_POSTING_READABLE,

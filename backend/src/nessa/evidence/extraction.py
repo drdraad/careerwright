@@ -306,8 +306,9 @@ def _misreadable(match: re.Match[str]) -> bool:
 def salary_from(text: str) -> tuple[Salary | None, str | None]:
     """Pay as a span states it, or the issue that keeps it unknown: one amount or range with
     its currency sign or code, exact to the penny, in GBP; the period only when exactly one
-    is named. "Up to" or "max" either side gives a maximum, "from" before or "minimum"
-    either side a minimum; one amount otherwise is both. What cannot be read without a
+    is named. "Up to" or "max" either side gives a maximum, "from" before, "minimum" either
+    side or a "+" attached to the amount a minimum; one amount otherwise is both. What
+    cannot be read without a
     guess is refused (`salary_invalid`): unknown beats wrong."""
     found = list(_MONEY.finditer(text))
     if len(found) != 1 or _misreadable(found[0]):
@@ -329,7 +330,11 @@ def salary_from(text: str) -> tuple[Salary | None, str | None]:
     if high is None:
         before, after = text[: match.start()], text[match.end() :]
         maximum = bool(_UP_TO.search(before) or _UP_TO.search(after))
-        minimum = bool(_FROM.search(before) or _AT_LEAST.search(after))
+        # "£24,000+": a "+" attached to the amount (or its k) is a minimum, open above (slice
+        # 7B fix round 1, review A I1).
+        amount_end = match.end("low_k") if match["low_k"] else match.end("low")
+        plus = text[amount_end : amount_end + 1] == "+"
+        minimum = bool(_FROM.search(before) or _AT_LEAST.search(after) or plus)
         if maximum and minimum:
             return None, "salary_invalid"
         if maximum:

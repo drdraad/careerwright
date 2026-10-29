@@ -761,6 +761,45 @@ def test_a_listing_the_floor_empties_says_so_never_that_none_were_found(
     assert listing["salary_floor"]["left_out"] == 1
 
 
+@pytest.mark.req("DIV1-07", "STATE-02")
+def test_a_floor_emptied_page_still_says_an_answer_is_coming_while_sources_are_pending(
+    infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker
+) -> None:
+    # Fix round 1, A-M3: "still checking" comes before "all below the floor".
+    sources.routes["/floor/below"] = Scripted(body=FLOOR_PAGES["/floor/below"].encode())
+    floor = {"amount": {"minor_units": 2_600_000, "currency": "GBP"}, "period": "year"}
+    put = api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace}/profile",
+        ada,
+        {"expected_version": 0, "profile": profile_with(minimum_salary=floor)},
+    )
+    assert put.status_code == 201, put.text
+    urls = [
+        url(sources, "careers.northwind.example", "/floor/below"),
+        url(sources, "slow.board.example", "/slow/2"),
+    ]
+    run_id = submit(api, ada, workspace, {"urls": urls}).json()["acquisition"]["run"]["run_id"]
+    wait_for(
+        lambda: bool(
+            infra.query(
+                "SELECT 1 FROM nessa.source_attempts a WHERE a.run_id = %s AND a.status = "
+                "'pending' AND EXISTS (SELECT 1 FROM nessa.jobs j WHERE j.workspace_id = "
+                "a.workspace_id)",
+                (run_id,),
+            )
+        ),
+        timeout_s=30,
+        what="the first job recorded and the slow page under way",
+    )
+
+    during = jobs(api, ada, workspace)
+    wait_terminal(infra, run_id)
+
+    assert (during["total_jobs"], during["salary_floor"]["left_out"]) == (0, 1)
+    assert during["empty_reason"] == "sources_pending"
+
+
 @pytest.mark.req("JOB-02", "DUR-02")
 def test_overlapping_acquisitions_in_one_workspace_lose_no_copy_or_claim(
     infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker

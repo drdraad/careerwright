@@ -1740,7 +1740,9 @@ export const FloorUnknownSchema = {
     type: 'string',
     enum: [
         'no_pay',
+        'no_upper_amount',
         'predicted',
+        'basis_unknown',
         'period_differs',
         'period_not_stated',
         'other_currency',
@@ -3465,21 +3467,6 @@ export const PayBenchmarkOutSchema = {
             ],
             title: 'Jobs Thousands'
         },
-        median_cv: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Median Cv',
-            description: 'Coefficient of variation of the median, %.'
-        },
-        reliability: {
-            $ref: '#/components/schemas/Reliability'
-        },
         statistics: {
             items: {
                 $ref: '#/components/schemas/PayStatisticOut'
@@ -3500,8 +3487,6 @@ export const PayBenchmarkOutSchema = {
         'period',
         'pay_definition',
         'jobs_thousands',
-        'median_cv',
-        'reliability',
         'statistics'
     ],
     title: 'PayBenchmarkOut',
@@ -3545,6 +3530,22 @@ export const PayStatisticOutSchema = {
                 }
             ],
             description: 'ONS\'s marker for a withheld value.'
+        },
+        cv: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cv',
+            description: 'This statistic\'s own coefficient of variation, %.'
+        },
+        reliability: {
+            $ref: '#/components/schemas/Reliability',
+            description: 'ONS\'s quality band for this statistic.'
         }
     },
     additionalProperties: false,
@@ -3552,7 +3553,9 @@ export const PayStatisticOutSchema = {
     required: [
         'statistic',
         'amount',
-        'withheld'
+        'withheld',
+        'cv',
+        'reliability'
     ],
     title: 'PayStatisticOut'
 } as const;

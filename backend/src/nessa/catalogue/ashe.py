@@ -6,8 +6,9 @@ its tables, gross weekly (15.1), hourly (15.5) and annual (15.7) pay, for full-t
 jobs (a provisional product decision, R6: a person's salary floor usually means a full-time
 salary), with each table's coefficients of variation (the "b" files). Each estimate keeps
 ONS's native code (SOC 2020), its geography (a work region, never a city), its period and
-pay definition, the number of jobs, and every published statistic with ONS's own marker
-where one is withheld, so missingness is kept and never read as zero.
+pay definition, the number of jobs, and every published statistic with its own
+coefficient of variation, and ONS's own marker where one is withheld, so missingness is kept
+and never read as zero.
 
 ONS writes its figures as binary numbers in the workbook; each is read as its decimal text
 and rounded to the penny (pay is integer pence, Global Constraint 4).
@@ -27,7 +28,8 @@ from enum import StrEnum
 from nessa.catalogue import xlsx
 from nessa.catalogue.releases import ReleaseIntegrityError, ReleasePin
 
-TRANSFORMATION_VERSION = "nessa-ashe-import-1"
+# 2: every statistic's CV is kept, not the median's only (slice 7B fix round 1, migration 0028).
+TRANSFORMATION_VERSION = "nessa-ashe-import-2"
 LICENCE = "Open Government Licence v3.0"
 ATTRIBUTION = (
     "Source: Office for National Statistics, Annual Survey of Hours and Earnings, licensed "
@@ -167,7 +169,9 @@ class AsheEstimate:
     jobs_thousands: Decimal | None
     figures: dict[str, int | None]  # statistic -> pence, None when ONS withholds it
     markers: dict[str, str]  # statistic -> ONS's marker for a withheld value
-    median_cv: Decimal | None
+    # statistic -> its coefficient of variation (%) from the "b" table, None when withheld:
+    # each statistic's own, so a P90's band is never the median's (fix round 1, review A M4)
+    cvs: dict[str, Decimal | None]
 
 
 @dataclass(frozen=True)
@@ -246,10 +250,13 @@ def _rows(data: bytes, expect_title: str, *, cv: bool) -> Iterator[_Row]:
 
 def _estimates(table: str, pay: bytes, variation: bytes) -> Iterator[AsheEstimate]:
     period, title, _ = _TABLES[table]
-    cvs: dict[tuple[str, str], Decimal | None] = {}
+    cvs: dict[tuple[str, str], dict[str, Decimal | None]] = {}
     for row in _rows(variation, title, cv=True):
-        median_cv = _decimal(row.cells[_COLUMNS["median"]])
-        cvs[(row.region_name, row.soc_code)] = median_cv if isinstance(median_cv, Decimal) else None
+        cells = {statistic: _decimal(row.cells[column]) for statistic, column in _COLUMNS.items()}
+        cvs[(row.region_name, row.soc_code)] = {
+            statistic: value if isinstance(value, Decimal) else None
+            for statistic, value in cells.items()
+        }
     for row in _rows(pay, title, cv=False):
         figures: dict[str, int | None] = {}
         markers: dict[str, str] = {}
@@ -271,7 +278,7 @@ def _estimates(table: str, pay: bytes, variation: bytes) -> Iterator[AsheEstimat
             jobs_thousands=jobs if isinstance(jobs, Decimal) else None,
             figures=figures,
             markers=markers,
-            median_cv=cvs[key],
+            cvs=cvs[key],
         )
 
 

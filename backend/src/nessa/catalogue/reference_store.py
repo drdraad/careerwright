@@ -132,7 +132,7 @@ def insert_ashe(tx: Tx, release: AsheRelease) -> None:
     _copy(
         tx,
         "COPY nessa.ashe_estimates (soc_code, region_code, period, population, soc_title, "
-        "region_name, jobs_thousands, figures, markers, median_cv) FROM STDIN",
+        "region_name, jobs_thousands, figures, markers, cvs) FROM STDIN",
         (
             (
                 e.soc_code,
@@ -144,7 +144,8 @@ def insert_ashe(tx: Tx, release: AsheRelease) -> None:
                 e.jobs_thousands,
                 json.dumps(e.figures),
                 json.dumps(e.markers),
-                e.median_cv,
+                # Decimal text, so no CV passes through a float.
+                json.dumps({s: None if cv is None else format(cv, "f") for s, cv in e.cvs.items()}),
             )
             for e in release.estimates
         ),
@@ -324,7 +325,7 @@ def _benchmark(row: Any) -> PayBenchmark:
         figures=dict(row.figures),
         markers=dict(row.markers),
         jobs_thousands=row.jobs_thousands,
-        median_cv=row.median_cv,
+        cvs={s: None if cv is None else Decimal(cv) for s, cv in row.cvs.items()},
     )
 
 
@@ -337,7 +338,7 @@ def ashe_benchmarks(
     rows = tx.execute(
         sa.text(
             "SELECT soc_code, soc_title, region_code, region_name, period, figures, markers, "
-            "jobs_thousands, median_cv FROM nessa.ashe_estimates WHERE soc_code = ANY(:codes) "
+            "jobs_thousands, cvs FROM nessa.ashe_estimates WHERE soc_code = ANY(:codes) "
             "AND region_code = ANY(:regions) ORDER BY soc_code, region_code, period"
         ),
         {"codes": codes, "regions": regions},

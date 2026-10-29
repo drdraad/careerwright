@@ -454,6 +454,9 @@ def test_postings_past_the_limit_are_dropped_not_read() -> None:
         ("£14.50hourly", (1_450, 1_450, SalaryPeriod.HOUR)),
         ("£30kpa", (3_000_000, 3_000_000, SalaryPeriod.YEAR)),  # after its multiplier
         ("£30,000-£35,000pa", (3_000_000, 3_500_000, SalaryPeriod.YEAR)),
+        # Slice 7B fix round 1, A-I1: a "+" attached to the amount is a minimum, open above.
+        ("£24,000+ per annum", (2_400_000, None, SalaryPeriod.YEAR)),
+        ("£24k+ a year", (2_400_000, None, SalaryPeriod.YEAR)),
     ],
 )
 def test_pay_is_read_exactly_as_the_span_states_it(

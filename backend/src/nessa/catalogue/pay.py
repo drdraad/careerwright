@@ -173,15 +173,16 @@ class PayBenchmark:
     figures: Mapping[str, int | None]  # statistic -> pence; None when ONS withholds it
     markers: Mapping[str, str]  # statistic -> ONS's marker for a withheld value
     jobs_thousands: Decimal | None
-    median_cv: Decimal | None
+    cvs: Mapping[str, Decimal | None]  # statistic -> its own coefficient of variation (%)
     geography: str = "region"
 
-    @property
-    def reliability(self) -> Reliability:
-        if self.figures.get("median") is None:
-            withheld = self.markers.get("median") == "x"
+    def reliability(self, statistic: str) -> Reliability:
+        """ONS's quality band for one statistic, from its own CV (fix round 1, review A M4):
+        a withheld value marked `x` is unreliable, any other withheld value unknown."""
+        if self.figures.get(statistic) is None:
+            withheld = self.markers.get(statistic) == "x"
             return Reliability.UNRELIABLE if withheld else Reliability.UNKNOWN
-        return reliability(self.median_cv)
+        return reliability(self.cvs.get(statistic))
 
     @property
     def pay_definition(self) -> str:
@@ -243,7 +244,11 @@ class FloorUnknown(StrEnum):
     """Why pay could not be compared with the floor; each is kept, and counted."""
 
     NO_PAY = "no_pay"  # no pay stated
+    # A minimum with no maximum ("from £24,000", "£24,000+"): where pay ends is not stated
+    # (fix round 1, review A I1).
+    NO_UPPER_AMOUNT = "no_upper_amount"
     PREDICTED = "predicted"  # a provider's estimate, never the advertiser's own figure
+    BASIS_UNKNOWN = "basis_unknown"  # stated, but not said to be advertised or predicted
     PERIOD_DIFFERS = "period_differs"  # another period: never converted
     PERIOD_NOT_STATED = "period_not_stated"
     OTHER_CURRENCY = "other_currency"
@@ -262,27 +267,45 @@ class SalaryFloorRule:
 
 @dataclass(frozen=True)
 class StatedPay:
-    """Pay as a source states it, for the floor: its basis, currency, period and highest
-    amount (the top of a range, or its only amount)."""
+    """Pay as a source states it, for the floor: its basis, currency, period and amounts. One
+    amount is both its minimum and maximum; a minimum with no maximum is open above ("from
+    £24,000"); a maximum with no minimum is "up to"."""
 
     basis: str  # "advertised", "predicted" or "unknown"
     currency: str
     period: str | None
-    highest_minor_units: int
+    minimum_minor_units: int | None
+    maximum_minor_units: int | None
+
+
+def _against(floor: SalaryFloorRule, pay: StatedPay) -> FloorVerdict:
+    """One comparable amount: its stated maximum decides; with none, its minimum can only
+    show that it meets the floor, never that it is below it."""
+    if pay.maximum_minor_units is not None:
+        below = pay.maximum_minor_units < floor.minor_units
+        return FloorVerdict.BELOW if below else FloorVerdict.MEETS
+    if pay.minimum_minor_units is not None and pay.minimum_minor_units >= floor.minor_units:
+        return FloorVerdict.MEETS
+    return FloorVerdict.UNKNOWN
 
 
 def floor_verdict(
     floor: SalaryFloorRule, stated: Iterable[StatedPay]
 ) -> tuple[FloorVerdict, FloorUnknown | None]:
-    """One job's or occupation's pay against the floor: advertised GBP pay in the floor's
-    period decides (its highest amount); anything else is unknown with its reason."""
+    """One job's pay (all its copies) against the floor: advertised GBP pay in the floor's
+    period decides. Any copy that meets it keeps the job; a copy open above (a minimum with
+    no maximum) keeps it as unknown; only stated maxima, all below, leave it out. Anything
+    else is unknown with its reason."""
     pays = list(stated)
     advertised = [p for p in pays if p.basis == "advertised"]
     comparable = [p for p in advertised if p.currency == "GBP" and p.period == floor.period]
     if comparable:
-        highest = max(p.highest_minor_units for p in comparable)
-        below = highest < floor.minor_units
-        return (FloorVerdict.BELOW if below else FloorVerdict.MEETS), None
+        verdicts = {_against(floor, p) for p in comparable}
+        if FloorVerdict.MEETS in verdicts:
+            return FloorVerdict.MEETS, None
+        if FloorVerdict.UNKNOWN in verdicts:
+            return FloorVerdict.UNKNOWN, FloorUnknown.NO_UPPER_AMOUNT
+        return FloorVerdict.BELOW, None
     if any(p.currency != "GBP" for p in advertised):
         return FloorVerdict.UNKNOWN, FloorUnknown.OTHER_CURRENCY
     if any(p.period is not None for p in advertised):
@@ -291,6 +314,8 @@ def floor_verdict(
         return FloorVerdict.UNKNOWN, FloorUnknown.PERIOD_NOT_STATED
     if any(p.basis == "predicted" for p in pays):
         return FloorVerdict.UNKNOWN, FloorUnknown.PREDICTED
+    if pays:
+        return FloorVerdict.UNKNOWN, FloorUnknown.BASIS_UNKNOWN
     return FloorVerdict.UNKNOWN, FloorUnknown.NO_PAY
 
 
@@ -314,8 +339,9 @@ def modelled_floor_verdict(
     ]
     if not figures or any(f is None for f in figures):
         return FloorVerdict.UNKNOWN, FloorUnknown.NOT_PUBLISHED
-    stated = [StatedPay("advertised", "GBP", floor.period, f) for f in figures if f is not None]
-    if all(floor_verdict(floor, [s])[0] is FloorVerdict.BELOW for s in stated):
+    # ASHE's own figure against the floor, never through the advertised-pay rule (fix round
+    # 1, review A M6): modelled pay is not advertised pay.
+    if all(f is not None and f < floor.minor_units for f in figures):
         return FloorVerdict.BELOW, None
     return FloorVerdict.MEETS, None
 

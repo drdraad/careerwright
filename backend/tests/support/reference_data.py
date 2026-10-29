@@ -100,6 +100,7 @@ _HEADER_ROWS: list[list[Cell]] = [
     ],
 ]  # fmt: skip
 _TITLES = {"1": "Weekly pay - Gross", "5": "Hourly Pay - Gross", "7": "Annual pay - Gross"}
+P90_CV = "14.2"  # synthetic: an "acceptable" band, worse than any median's here
 
 # (region, SOC code, SOC title, {table: (median, p90, CV)}): synthetic.
 ASHE_ROWS = [
@@ -128,10 +129,13 @@ def _ashe_table(table: str, *, cv: bool) -> bytes:
     rows: list[list[Cell]] = [[title], [], *_HEADER_ROWS]
     for region, code, label, figures in ASHE_ROWS:
         median, p90, cv_value = figures[table]
+        # Each statistic has its own CV in the "b" table: the median's and the mean's are
+        # `cv_value`; a published P90's is P90_CV, a withheld one's "x".
+        p90_cv = P90_CV if p90 != "x" else "x"
         value = cv_value if cv else median
         rows.append(
             [f"      {region}, {label}", f"'{code}", "8", value, None, value if cv else "x",
-             None, "x", "x", "x", "x", "x", "x", "x", "x", "x", cv_value if cv else p90]
+             None, "x", "x", "x", "x", "x", "x", "x", "x", "x", p90_cv if cv else p90]
         )  # fmt: skip
     rows += [[], ["Source: Annual Survey of Hours and Earnings, Office for National Statistics."]]
     return workbook({"Notes": [["Synthetic sample: not ONS data"]], "Full-Time": rows})

@@ -1370,7 +1370,9 @@ export type FloorReasonOut = {
  */
 export const FloorUnknown = {
     NO_PAY: 'no_pay',
+    NO_UPPER_AMOUNT: 'no_upper_amount',
     PREDICTED: 'predicted',
+    BASIS_UNKNOWN: 'basis_unknown',
     PERIOD_DIFFERS: 'period_differs',
     PERIOD_NOT_STATED: 'period_not_stated',
     OTHER_CURRENCY: 'other_currency',
@@ -2472,13 +2474,6 @@ export type PayBenchmarkOut = {
      */
     jobs_thousands: string | null;
     /**
-     * Median Cv
-     *
-     * Coefficient of variation of the median, %.
-     */
-    median_cv: string | null;
-    reliability: Reliability;
-    /**
      * Statistics
      */
     statistics: Array<PayStatisticOut>;
@@ -2512,6 +2507,16 @@ export type PayStatisticOut = {
      * ONS's marker for a withheld value.
      */
     withheld: Marker | null;
+    /**
+     * Cv
+     *
+     * This statistic's own coefficient of variation, %.
+     */
+    cv: string | null;
+    /**
+     * ONS's quality band for this statistic.
+     */
+    reliability: Reliability;
 };
 
 /**

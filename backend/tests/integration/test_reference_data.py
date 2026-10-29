@@ -135,10 +135,26 @@ def test_an_occupation_s_pay_keeps_every_uk_soc_candidate_regional_and_unmodelle
     annual = next(b for b in analysts["benchmarks"] if b["period"] == "year")
     statistics = {s["statistic"]: s for s in annual["statistics"]}
     assert statistics["median"]["amount"] == {"minor_units": 3_806_310, "currency": "GBP"}
-    assert statistics["p10"] == {"statistic": "p10", "amount": None, "withheld": "x"}
-    assert annual["reliability"] == "reasonably_precise"
+    assert statistics["p10"] == {
+        "statistic": "p10",
+        "amount": None,
+        "withheld": "x",
+        "cv": None,
+        "reliability": "unreliable",
+    }
+    # Fix round 1, A-M4: each statistic carries its own CV and band, P90 among them.
+    assert (statistics["median"]["cv"], statistics["median"]["reliability"]) == (
+        "9.6",
+        "reasonably_precise",
+    )
+    assert (statistics["p90"]["cv"], statistics["p90"]["reliability"]) == (
+        samples.P90_CV,
+        "acceptable",
+    )
     [withheld] = [b for b in systems["benchmarks"] if b["period"] == "year"]
-    assert withheld["reliability"] == "unreliable"
+    assert {s["statistic"]: s["reliability"] for s in withheld["statistics"]}["median"] == (
+        "unreliable"
+    )
     # No reviewed mapping: no modelled pay, so no ASHE figure is the occupation's own.
     assert found["modelled_pay"] is None
     assert found["modelled_pay_unavailable"] == "no_reviewed_mapping"

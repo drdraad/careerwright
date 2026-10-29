@@ -312,20 +312,18 @@ def job_against_floor(
     floor: SalaryFloorRule, salaries: Iterable[Salary | None]
 ) -> tuple[FloorVerdict, FloorUnknown | None]:
     """One job, from its copies' pay, against the person's salary floor (Task 7 slice B): it
-    is below only when advertised GBP pay in the floor's period, the highest of its copies'
-    amounts (the top of a range, or its one amount), is below. Advertised pay is read as
-    gross, as UK adverts state pay (provisional, R6). Predicted, unknown and other-period
-    pay is never below the floor (`pay.floor_verdict`)."""
+    is below only when every advertised GBP amount in the floor's period has a stated top
+    (the top of a range, an "up to", or one amount) below it. A minimum with no maximum
+    ("from £24,000") is open above, so never below it (fix round 1, review A I1). Advertised
+    pay is read as gross, as UK adverts state pay (provisional, R6). Predicted, unknown and
+    other-period pay is never below the floor (`pay.floor_verdict`)."""
     stated = [
         StatedPay(
             basis=s.basis.value,
             currency=s.currency,
             period=s.period.value if s.period else None,
-            highest_minor_units=max(
-                amount
-                for amount in (s.minimum_minor_units, s.maximum_minor_units)
-                if amount is not None
-            ),
+            minimum_minor_units=s.minimum_minor_units,
+            maximum_minor_units=s.maximum_minor_units,
         )
         for s in salaries
         if s is not None

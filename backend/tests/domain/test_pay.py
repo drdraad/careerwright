@@ -52,7 +52,7 @@ def benchmark(region: str, period: AshePeriod, p90: int | None, soc: str = "3544
         figures={"median": 3_000_000, "p90": p90},
         markers={} if p90 is not None else {"p90": "x"},
         jobs_thousands=None,
-        median_cv=None,
+        cvs={},
     )
 
 
@@ -121,35 +121,38 @@ def test_the_committed_review_pack_is_empty_until_an_accountable_reviewer_exists
         MappingReviewPack(pack_version="x", dated=date(2026, 10, 29), reviews=[review(), review()])
 
 
+def stated(
+    high: int | None,
+    *,
+    low: int | None = None,
+    basis: str = "advertised",
+    currency: str = "GBP",
+    period: str | None = "year",
+) -> StatedPay:
+    """Pay as a source states it: one amount (`high` alone) is both its minimum and maximum."""
+    return StatedPay(basis, currency, period, high if low is None else low, high)
+
+
 @pytest.mark.req("DIV1-07", "JOB-05")
 @pytest.mark.parametrize(
     ("stated", "verdict", "reason"),
     [
-        ([StatedPay("advertised", "GBP", "year", 2_500_000)], FloorVerdict.BELOW, None),
-        ([StatedPay("advertised", "GBP", "year", 2_600_000)], FloorVerdict.MEETS, None),
+        ([stated(2_500_000)], FloorVerdict.BELOW, None),
+        ([stated(2_600_000)], FloorVerdict.MEETS, None),
         # A range is below only when its top is: the highest stated amount decides.
-        (
-            [StatedPay("advertised", "GBP", "year", 2_400_000),
-             StatedPay("advertised", "GBP", "year", 2_700_000)],
-            FloorVerdict.MEETS,
-            None,
-        ),
-        ([StatedPay("predicted", "GBP", "year", 1_000_000)], FloorVerdict.UNKNOWN,
-         FloorUnknown.PREDICTED),
-        ([StatedPay("advertised", "GBP", "hour", 1_200)], FloorVerdict.UNKNOWN,
-         FloorUnknown.PERIOD_DIFFERS),
-        ([StatedPay("advertised", "GBP", None, 1_000_000)], FloorVerdict.UNKNOWN,
-         FloorUnknown.PERIOD_NOT_STATED),
-        ([StatedPay("advertised", "EUR", "year", 1_000_000)], FloorVerdict.UNKNOWN,
-         FloorUnknown.OTHER_CURRENCY),
+        ([stated(2_400_000), stated(2_700_000)], FloorVerdict.MEETS, None),
+        ([stated(2_000_000, low=1_800_000)], FloorVerdict.BELOW, None),
+        # Fix round 1, A-I1: a minimum alone is open above, unless it already meets the floor.
+        ([stated(None, low=2_400_000)], FloorVerdict.UNKNOWN, FloorUnknown.NO_UPPER_AMOUNT),
+        ([stated(None, low=2_600_000)], FloorVerdict.MEETS, None),
+        ([stated(1_000_000, basis="predicted")], FloorVerdict.UNKNOWN, FloorUnknown.PREDICTED),
+        ([stated(1_000_000, basis="unknown")], FloorVerdict.UNKNOWN, FloorUnknown.BASIS_UNKNOWN),
+        ([stated(1_200, period="hour")], FloorVerdict.UNKNOWN, FloorUnknown.PERIOD_DIFFERS),
+        ([stated(1_000_000, period=None)], FloorVerdict.UNKNOWN, FloorUnknown.PERIOD_NOT_STATED),
+        ([stated(1_000_000, currency="EUR")], FloorVerdict.UNKNOWN, FloorUnknown.OTHER_CURRENCY),
         ([], FloorVerdict.UNKNOWN, FloorUnknown.NO_PAY),
         # Advertised pay in the floor's period decides over a provider's prediction.
-        (
-            [StatedPay("predicted", "GBP", "year", 9_000_000),
-             StatedPay("advertised", "GBP", "year", 2_000_000)],
-            FloorVerdict.BELOW,
-            None,
-        ),
+        ([stated(9_000_000, basis="predicted"), stated(2_000_000)], FloorVerdict.BELOW, None),
     ],
 )  # fmt: skip
 def test_only_stated_gbp_pay_in_the_floor_s_period_can_be_below_it(
@@ -184,6 +187,23 @@ def test_modelled_pay_is_below_the_floor_only_in_every_region_and_on_the_publish
     assert modelled_floor_verdict(
         FLOOR, modelled_pay(unreviewed, [NORTH_WEST], [low_nw]), [NORTH_WEST]
     ) == (FloorVerdict.UNKNOWN, FloorUnknown.NO_REVIEWED_MAPPING)
+
+
+@pytest.mark.req("DIV1-07", "JOB-05")
+@pytest.mark.parametrize(
+    ("p90", "verdict"),
+    [(2_599_999, FloorVerdict.BELOW), (2_600_000, FloorVerdict.MEETS)],
+)
+def test_the_occupation_rule_compares_ashe_s_90th_percentile_with_the_floor_itself(
+    p90: int, verdict: FloorVerdict
+) -> None:
+    # Fix round 1, A-M6: the occupation rule is its own comparison of ASHE's figure with
+    # the floor, held here at its boundary, so a change to the advertised-pay rule (A-I1's
+    # open-ended pay) cannot change it.
+    reviewed = uk_soc_mapping("2511", LINKS, [], review())
+    modelled = modelled_pay(reviewed, [NORTH_WEST], [benchmark(NORTH_WEST, AshePeriod.YEAR, p90)])
+
+    assert modelled_floor_verdict(FLOOR, modelled, [NORTH_WEST]) == (verdict, None)
 
 
 @pytest.mark.req("DIV1-07")
