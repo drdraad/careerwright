@@ -11,6 +11,9 @@
 - **Precondition for:** Task 7c (the reviewed pack, from the H-07 record), and through it
   Sprint 6a and the Skills, Options and Roles chapters' scoring; Task 10 applies the Sprint 2
   design findings first; Task 14 reads the H-13 record (plan section 10).
+- **Before the session (about 5 minutes, outside the 150):** run `make demo` from the
+  repository root and open `http://127.0.0.1:53000`, so part 2's live-app checks are ready.
+  If the app is not running, those checks are optional: record them as not run.
 
 ## The agenda
 
@@ -203,7 +206,7 @@ rights review before any push (OI-07).
 | D12 | ADR 0013 decision 4 | A whole fee with no stated payment date is taken as due in the course's first month, and so is each stated extra cost (such as a £13.99 certificate). | |
 | D13 | ADR 0013 decision 4 | An intake given only as a month stands on the monthly grid as that month's first day. | |
 | D14 | ADR 0013 decision 6 | The monthly deficit limit, if you set one, counts each month's payments, less support received, plus the pay lost against your baseline. | |
-| D15 | ADR 0013 decision 6 | Today the model follows the specification (section 12: payments plus repayments within the monthly payment cap, `P_m + R_m ≤ M_m`), so repayments of debt you already have count against the cap as well as in the monthly cash. Should they sit outside the monthly payment cap instead? (Yes changes the model; no keeps it.) | |
+| D15 | ADR 0013 decision 6 | Today the model follows the specification (section 12: payments plus repayments within the monthly payment cap, `P_m + R_m ≤ M_m`), so repayments of debt you already have count against the cap as well as in the monthly cash. One effect: if those repayments alone are above the cap, every route fails the cap, even one that costs nothing. (The You chapter asks for the cap as the most you would spend in one month on the change.) Should they sit outside the monthly payment cap instead? (Yes changes the model; no keeps it.) | |
 | D16 | ADR 0013 decision 8 | A readiness milestone reached at the month boundary that ends the comparison horizon counts as within it. | |
 | D17 | ADR 0013 decision 9 | The delay scenario moves every conditional offer and award later by one number of months, declared for each comparison with no default, whoever the award is paid to: a fee waiver paid to the provider that arrives late leaves you paying the fees due before it. Course dates stay fixed. | |
 
