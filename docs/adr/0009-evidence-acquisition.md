@@ -503,6 +503,8 @@ candidate proposed); `make live-extract` once on the test model (ledger row 31: 
 on the synthetic fixture page, 700 input and 460 output tokens, $0.000162; one posting, all
 nine fields approved as `model`, none dropped, the page's own instruction not followed;
 leak scan clean); `make live-adzuna` blocked: no `ADZUNA_APP_ID`/`ADZUNA_APP_KEY` in `.env`.
+On 2026-10-29 (fix round 5, item 4) it named the Adzuna-named variables `.env` does set,
+names only: `ADZUNA_API_KEY` and `ADZUNA_APPLICATION_ID`; no request was sent.
 
 ## Consequences and open items
 
@@ -528,7 +530,9 @@ leak scan clean); `make live-adzuna` blocked: no `ADZUNA_APP_ID`/`ADZUNA_APP_KEY
   more runs.
 - The live search proposed no candidate in two tries; candidate quality is unqualified.
 - The Adzuna live integration is unverified until credentials are in `.env` under those two
-  names.
+  names. `.env` holds `ADZUNA_APPLICATION_ID` and `ADZUNA_API_KEY` (fix round 5): renaming
+  them to `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`, or a ruling that the tools read those
+  names, would let `make live-adzuna` qualify it. The names are never guessed in code.
 - A new error code (`RUN_FINISHED`), failure classes (`retrieval_failed`,
   `source_blocked`), event kinds (`run.cancel_requested`, `research.updated`) and run kinds
   (`acquisition`, `source_search`, and in fix round 2 `page_extraction`); migrations 0013
