@@ -18,6 +18,8 @@ from pydantic import SecretStr
 
 from nessa.api.app import create_app
 from nessa.api.deps import ApiDependencies
+from nessa.identity.keyring import load_keyring
+from nessa.identity.runs import output_context
 from tests.domain.test_pages import POSTING, page
 from tests.integration.durable import fresh_actor, make_scenario
 from tests.support.acquisition_service import LOOPBACK, acquisition_service
@@ -1081,6 +1083,69 @@ def test_a_search_past_its_reserved_bounds_is_booked_at_cost_and_its_output_neve
     assert attempt["cost_nano_usd"] > 0  # the actual cost, booked
     assert shown["proposal"] is None
     assert scenario.outputs(search_id) == []
+
+
+def _seal_output(infra: Infra, run_id: str, workspace: str, body: bytes) -> uuid.UUID:
+    """An accepted output for a run, as the worker would seal it (no worker runs here)."""
+    output_id = uuid.uuid4()
+    context = output_context(uuid.UUID(workspace), output_id)
+    sealed = load_keyring(infra.home / "keys").seal(body, context)
+    infra.query(
+        "INSERT INTO nessa.run_outputs (output_id, run_id, workspace_id, key_version, nonce, "
+        "ciphertext, content_sha256) VALUES (%s, %s, %s, %s, %s, %s, repeat('0', 64))",
+        (output_id, run_id, workspace, sealed.key_version, sealed.nonce, sealed.ciphertext),
+    )
+    return output_id
+
+
+def _end(infra: Infra, run_id: str, status: str, output_id: uuid.UUID | None = None) -> None:
+    infra.query(
+        "UPDATE nessa.runs SET status = %s, output_id = %s, finished_at = clock_timestamp(), "
+        "failure_class = CASE WHEN %s = 'failed' THEN 'unknown_failure' END WHERE run_id = %s",
+        (status, output_id, status, run_id),
+    )
+
+
+@pytest.mark.req("DUR-05", "STATE-02")
+@pytest.mark.parametrize("ended", ["cancelled", "failed"])
+def test_a_summary_and_a_proposal_are_shown_only_for_complete_runs(
+    infra: Infra, api: ApiClient, ada: str, tmp_path: Path, ended: str
+) -> None:
+    # Review B M2: an output accepted before a cancel (or a failure) is never shown.
+    scenario = make_scenario(infra, api, ada, tmp_path)
+    base = f"/v1/workspaces/{scenario.workspace_id}"
+    profile = profile_with(target_titles=["Data quality analyst"], cities=["Manchester"])
+    assert api.write("PUT", f"{base}/profile", ada, {"expected_version": 1, "profile": profile})
+    search = {"expected_profile_version": 2, "target": "Data quality analyst", "city": "Manchester"}
+    search_id = api.write("POST", f"{base}/research/searches", ada, search).json()["search_id"]
+    acquired = submit(api, ada, scenario.workspace_id, {"urls": ["https://jobs.example.org/a"]})
+    acquisition_id = acquired.json()["acquisition"]["run"]["run_id"]
+    summary = {"targets": [], "succeeded": 1, "no_posting_readable": 0, "blocked": 0, "failed": 0}
+    proposal = {
+        "target": "Data quality analyst",
+        "city": "Manchester",
+        "candidates": [{"url": "https://jobs.example.org/a", "title": "T", "grounded": True}],
+        "excluded": [],
+        "queries": ["q"],
+        "sources_seen": 1,
+    }
+    outputs = {
+        run_id: _seal_output(infra, run_id, scenario.workspace_id, json.dumps(body).encode())
+        for run_id, body in ((acquisition_id, summary), (search_id, proposal))
+    }
+
+    for run_id in outputs:
+        _end(infra, run_id, ended)
+    hidden_summary = acquisition(api, ada, scenario.workspace_id, acquisition_id)["summary"]
+    hidden_proposal = api.get(f"{base}/research/searches/{search_id}", ada).json()["proposal"]
+    for run_id, output_id in outputs.items():
+        _end(infra, run_id, "complete", output_id)
+    shown_summary = acquisition(api, ada, scenario.workspace_id, acquisition_id)["summary"]
+    shown_proposal = api.get(f"{base}/research/searches/{search_id}", ada).json()["proposal"]
+
+    assert (hidden_summary, hidden_proposal) == (None, None)
+    assert shown_summary["succeeded"] == 1  # the same outputs, once the runs are complete
+    assert [c["url"] for c in shown_proposal["candidates"]] == ["https://jobs.example.org/a"]
 
 
 def test_a_cancelled_unknown_run_is_not_found(api: ApiClient, ada: str, workspace: str) -> None:
