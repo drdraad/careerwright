@@ -557,6 +557,33 @@ def pending_outbox(tx: Tx, limit: int = 50) -> list[tuple[int, str, uuid.UUID, s
     return [(r.outbox_id, r.workflow_id, r.run_id, r.workflow_name) for r in rows]
 
 
+# The advisory lock a run's cancellation and the starting of a run by it both take, so a cancel
+# either sees a run that was started or the starting sees the cancel (migration 0023).
+_STARTED_RUNS_LOCK = 8237
+
+
+def lock_started_runs(tx: Tx, run_id: uuid.UUID) -> None:
+    """Hold the run's cancellation lock until the transaction ends. Taken before any row
+    lock (the API's cancel takes it before the workspace's), so it never deadlocks with the
+    worker, which takes it before writing an event."""
+    tx.execute(
+        sa.text("SELECT pg_advisory_xact_lock(hashtextextended(CAST(:run AS text), :key))"),
+        {"run": run_id, "key": _STARTED_RUNS_LOCK},
+    )
+
+
+def unsettled_started_runs(tx: Tx, run_id: uuid.UUID) -> list[Run]:
+    """API: the runs this run started (`started_by_run`) that are still queued or running."""
+    rows = tx.execute(
+        sa.text(
+            f"SELECT {_RUN_COLUMNS} FROM {_RUNS} WHERE r.started_by_run = :run "
+            "AND r.status IN ('queued', 'running') ORDER BY r.created_at"
+        ),
+        {"run": run_id},
+    ).mappings()
+    return [_run(row) for row in rows]
+
+
 def request_cancellation(tx: Tx, run: Run, requested_by: uuid.UUID) -> bool:
     """API: record the request once; returns whether this call recorded it."""
     inserted = tx.execute(

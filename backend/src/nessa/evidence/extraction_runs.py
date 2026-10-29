@@ -1,5 +1,5 @@
 """Model extraction runs: started by the acquisition that fetched a page, and what an
-accepted extraction records (Task 7A fix round 2, rulings 9-12; ADR 0009 decision 13).
+accepted extraction records (Task 7A fix round 2, rulings 9-12; ADR 0009 decision 15).
 
 Started in the transaction that records the page's attempt, for each retrieved, permitted
 page whose structured data gave no posting (`records.MODEL_READABLE`), at most
@@ -7,10 +7,12 @@ page whose structured data gave no posting (`records.MODEL_READABLE`), at most
 an ordinary model run, with its own outbox entry, workflow, reservation and repair bound, on
 the workspace's own model and key, requested by the acquisition's requester; the restricted
 acquisition worker never holds a key (GC8). A page not handed over (the cap, the spend
-limits, no key, the test model with data not synthetic, a demo workspace, no visible text)
-keeps its `extraction_not_run` reason and stays `no_posting_readable`, never "none found".
-The reservation itself is the activity's: these checks only avoid starting a run the
-activity would refuse.
+limits, no key, the test model with data not synthetic, a demo workspace, no visible text,
+a cancelled acquisition) keeps its `extraction_not_run` reason and stays
+`no_posting_readable`, never "none found". The reservation itself is the activity's: these
+checks only avoid starting a run the activity would refuse. Each run records its
+acquisition as `started_by_run`, so cancelling the acquisition cancels the runs it started
+that have not settled (fix round 3, item 4; `identity.runs.cancel_run`).
 
 Recorded in the transaction that accepts the run's output (`RunTask.record`): the postings,
 as copies of the page's own attempt, through the shared recording path under the
@@ -18,6 +20,7 @@ workspace's recording lock, and what the run found (`page_extractions.outcome`).
 """
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 
 from pydantic import BaseModel
@@ -41,6 +44,36 @@ from nessa.vocabulary import DataMode, WorkState
 MAX_EXTRACTIONS_PER_ACQUISITION = 5
 
 
+@dataclass(frozen=True)
+class ModelSpendEstimate:
+    """What an acquisition may spend on the person's key, shown before it starts (MODEL-08:
+    "display estimated incremental cost before deep research"; fix round 3, item 5): at most
+    `model_runs` extraction runs, each reserving at most `per_run_nano_usd` (one attempt's
+    worst case on the workspace's model) before its provider call."""
+
+    model_id: str
+    model_runs: int
+    per_run_nano_usd: int
+    worst_case_nano_usd: int
+
+
+def acquisition_model_spend(
+    models: ModelChoice, *, synthetic: bool, data_mode: DataMode
+) -> ModelSpendEstimate | None:
+    """Deterministic: the cap times one extraction run's reservation for the model the
+    workspace's runs pin. None for a demo workspace, which never extracts."""
+    if data_mode is DataMode.DEMO:
+        return None
+    model = models.for_workspace(synthetic=synthetic)
+    per_run = extraction.worst_case_nano_usd(model.model_id)
+    return ModelSpendEstimate(
+        model_id=model.model_id,
+        model_runs=MAX_EXTRACTIONS_PER_ACQUISITION,
+        per_run_nano_usd=per_run,
+        worst_case_nano_usd=MAX_EXTRACTIONS_PER_ACQUISITION * per_run,
+    )
+
+
 def _not_run(
     tx: Tx, run: Run, model: ModelEntry, text: str | None, now: datetime
 ) -> ExtractionNotRun | None:
@@ -61,10 +94,12 @@ def _not_run(
     limits = credential_store.spend_limits(tx, run.workspace_id)
     worst_case = extraction.worst_case_nano_usd(model.model_id)
     committed, _ = run_store.committed_spend(tx, run.workspace_id, run.run_id, period_start(now))
-    # The runs this acquisition already started have not reserved yet: count them as if.
+    # The committed spend holds every reservation made; this acquisition's started runs that
+    # have made none yet will, so they count as if (only they: review C M3).
+    unreserved = store.extractions_unreserved(tx, run.run_id)
     if limits is None or refused_scope(
         limits[0],
-        period_committed=committed + started * worst_case,
+        period_committed=committed + unreserved * worst_case,
         run_committed=0,
         worst_case=worst_case,
     ):
@@ -85,8 +120,15 @@ def start_extraction(
     read, its extraction run, or the reason none is started."""
     if result.status is not AttemptStatus.SUCCEEDED or result.extraction not in MODEL_READABLE:
         return
+    # A cancel either sees this run once it is started, or is seen here (fix round 3, item
+    # 4): both hold the acquisition's cancellation lock, taken before any event is written.
+    run_store.lock_started_runs(tx, run.run_id)
+    current = run_store.run(tx, run.run_id)
     model = models.for_workspace(synthetic=run.synthetic)
-    reason = _not_run(tx, run, model, result.extraction_text, now)
+    if current is None or current.cancel_requested_at is not None:
+        reason: ExtractionNotRun | None = ExtractionNotRun.ACQUISITION_CANCELLED
+    else:
+        reason = _not_run(tx, run, model, result.extraction_text, now)
     if reason is not None or result.extraction_text is None:
         store.insert_extraction_not_run(
             tx,

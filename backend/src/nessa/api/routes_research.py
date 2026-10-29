@@ -18,6 +18,7 @@ from nessa.api.research_schemas import (
     JobDetailOut,
     JobOut,
     JobPage,
+    ModelSpendOut,
     SearchOut,
     SkippedOut,
     SourceClaimOut,
@@ -206,6 +207,7 @@ def list_jobs(
             before=before,
             limit=limit,
             now=deps.clock(),
+            models=deps.models,
         )
     last = listing.jobs[-1].job if listing.jobs else None
     return JobPage(
@@ -219,6 +221,9 @@ def list_jobs(
         coverage=listing.coverage,
         adverts=AdvertsOut.of(listing.adverts) if listing.adverts else None,
         empty_reason=listing.empty_reason,
+        acquisition_model_spend=ModelSpendOut.of(listing.model_spend)
+        if listing.model_spend
+        else None,
     )
 
 

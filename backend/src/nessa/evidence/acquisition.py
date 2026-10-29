@@ -37,7 +37,11 @@ from nessa.evidence import store
 from nessa.evidence.acquire import ADZUNA_PROVIDER, AcquisitionResult
 from nessa.evidence.addresses import CheckedUrl, UrlRefusal, check_url
 from nessa.evidence.adzuna import CREDENTIAL_PARAMETERS, AdzunaQuery, recorded_url
-from nessa.evidence.extraction_runs import start_extraction
+from nessa.evidence.extraction_runs import (
+    ModelSpendEstimate,
+    acquisition_model_spend,
+    start_extraction,
+)
 from nessa.evidence.freshness import (
     FreshnessKind,
     FreshnessView,
@@ -587,6 +591,8 @@ class JobListing:
     coverage: dict[Coverage, int]
     adverts: store.AdvertCounts | None  # retrieved n of the total matching, for searches
     empty_reason: EmptyReason | None
+    # What the next acquisition may spend on the person's key (MODEL-08); None in demo.
+    model_spend: ModelSpendEstimate | None = None
 
 
 def _empty_reason(total_jobs: int, covered: dict[Coverage, int]) -> EmptyReason | None:
@@ -618,9 +624,12 @@ def list_jobs(
     before: tuple[datetime, uuid.UUID] | None,
     limit: int,
     now: datetime,
+    models: ModelChoice,
 ) -> JobListing:
-    """One page of jobs, and the workspace's totals, counted in the database (no cap)."""
-    visible_workspace(tx, workspace_id)
+    """One page of jobs, and the workspace's totals, counted in the database (no cap), with
+    what the next acquisition may spend on the person's key: the read the research view
+    makes before an acquisition starts (fix round 3, item 5)."""
+    workspace = visible_workspace(tx, workspace_id)
     rows = store.jobs(
         tx, workspace_id, favourites_only=favourites_only, before=before, limit=limit + 1
     )
@@ -637,6 +646,9 @@ def list_jobs(
         covered,
         store.advert_counts(tx, workspace_id),
         _empty_reason(total_jobs, covered),
+        acquisition_model_spend(
+            models, synthetic=workspace.synthetic, data_mode=workspace.data_mode
+        ),
     )
 
 

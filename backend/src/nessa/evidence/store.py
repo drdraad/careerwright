@@ -508,6 +508,24 @@ def extractions_started(tx: Tx, acquisition_run_id: uuid.UUID) -> int:
     )
 
 
+def extractions_unreserved(tx: Tx, acquisition_run_id: uuid.UUID) -> int:
+    """The acquisition's started extraction runs that have reserved nothing yet: no attempt,
+    and no cancellation request (a run cancelled before dispatch never reserves). One that
+    has an attempt is in the committed spend already (review C M3)."""
+    return int(
+        tx.execute(
+            sa.text(
+                "SELECT count(*) FROM nessa.page_extractions e "
+                "WHERE e.acquisition_run_id = :run AND e.run_id IS NOT NULL "
+                "AND NOT EXISTS (SELECT 1 FROM nessa.model_attempts a WHERE a.run_id = e.run_id) "
+                "AND NOT EXISTS (SELECT 1 FROM nessa.run_cancellations c "
+                "WHERE c.run_id = e.run_id)"
+            ),
+            {"run": acquisition_run_id},
+        ).scalar_one()
+    )
+
+
 def insert_extraction_not_run(
     tx: Tx,
     *,

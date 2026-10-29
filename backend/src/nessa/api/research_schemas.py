@@ -21,6 +21,7 @@ from nessa.evidence.acquisition import (
     extraction_state,
 )
 from nessa.evidence.addresses import UrlRefusal
+from nessa.evidence.extraction_runs import ModelSpendEstimate
 from nessa.evidence.freshness import Freshness, FreshnessKind, FreshnessView
 from nessa.evidence.records import (
     AdvertiserKind,
@@ -408,6 +409,28 @@ class AdvertsOut(ResponseModel):
         )
 
 
+class ModelSpendOut(ResponseModel):
+    """What one acquisition may spend on the person's model key, before it starts (MODEL-08;
+    computed in deterministic code). Each page whose structured data gives no posting may be
+    read by an extraction run on the workspace's model, at most `model_runs` per acquisition;
+    each run reserves at most `per_run_nano_usd` before its provider call, and a retried
+    attempt (a provider outage) reserves again within the key's run limit."""
+
+    model_id: str = Field(description="The model the workspace's extraction runs pin.")
+    model_runs: int = Field(description="At most this many extraction runs per acquisition.")
+    per_run_nano_usd: int = Field(description="One run's reservation, at its bounds.")
+    worst_case_nano_usd: int = Field(description="model_runs x per_run_nano_usd.")
+
+    @classmethod
+    def of(cls, estimate: ModelSpendEstimate) -> "ModelSpendOut":
+        return cls(
+            model_id=estimate.model_id,
+            model_runs=estimate.model_runs,
+            per_run_nano_usd=estimate.per_run_nano_usd,
+            worst_case_nano_usd=estimate.worst_case_nano_usd,
+        )
+
+
 class JobPage(ResponseModel):
     """A page of jobs, with counts that never double count a multi-city job and coverage
     that says how many sources were checked. An empty page says why (STATE-02)."""
@@ -431,4 +454,8 @@ class JobPage(ResponseModel):
     )
     empty_reason: EmptyReason | None = Field(
         description="When there are no vacancies, why: never a bare empty list (STATE-02)."
+    )
+    acquisition_model_spend: ModelSpendOut | None = Field(
+        description="What the next acquisition may spend on the person's key, shown before "
+        "it starts (MODEL-08); none for a demo workspace, which never calls a model."
     )

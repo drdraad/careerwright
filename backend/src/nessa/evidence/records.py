@@ -107,6 +107,7 @@ class ExtractionNotRun(StrEnum):
     MODEL_NOT_PERMITTED = "model_not_permitted"  # the test model with data not synthetic
     DEMO_WORKSPACE = "demo_workspace"  # demo workspaces never call a provider
     NO_VISIBLE_TEXT = "no_visible_text"  # the page has no text to read
+    ACQUISITION_CANCELLED = "acquisition_cancelled"  # cancelled before it could be handed over
 
 
 class ExtractionOutcome(StrEnum):

@@ -5479,7 +5479,8 @@
           "no_model_key",
           "model_not_permitted",
           "demo_workspace",
-          "no_visible_text"
+          "no_visible_text",
+          "acquisition_cancelled"
         ],
         "title": "ExtractionNotRun",
         "description": "Why a page model extraction may read was not handed to it (`nessa.evidence.\nextraction_runs`): the page stays `no_posting_readable`, never \"none found\"."
@@ -6106,6 +6107,17 @@
               }
             ],
             "description": "When there are no vacancies, why: never a bare empty list (STATE-02)."
+          },
+          "acquisition_model_spend": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelSpendOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the next acquisition may spend on the person's key, shown before it starts (MODEL-08); none for a demo workspace, which never calls a model."
           }
         },
         "additionalProperties": false,
@@ -6118,7 +6130,8 @@
           "city_counts",
           "coverage",
           "adverts",
-          "empty_reason"
+          "empty_reason",
+          "acquisition_model_spend"
         ],
         "title": "JobPage",
         "description": "A page of jobs, with counts that never double count a multi-city job and coverage\nthat says how many sources were checked. An empty page says why (STATE-02)."
@@ -6314,6 +6327,40 @@
           "fixture"
         ],
         "title": "ModelMode"
+      },
+      "ModelSpendOut": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "title": "Model Id",
+            "description": "The model the workspace's extraction runs pin."
+          },
+          "model_runs": {
+            "type": "integer",
+            "title": "Model Runs",
+            "description": "At most this many extraction runs per acquisition."
+          },
+          "per_run_nano_usd": {
+            "type": "integer",
+            "title": "Per Run Nano Usd",
+            "description": "One run's reservation, at its bounds."
+          },
+          "worst_case_nano_usd": {
+            "type": "integer",
+            "title": "Worst Case Nano Usd",
+            "description": "model_runs x per_run_nano_usd."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "model_runs",
+          "per_run_nano_usd",
+          "worst_case_nano_usd"
+        ],
+        "title": "ModelSpendOut",
+        "description": "What one acquisition may spend on the person's model key, before it starts (MODEL-08;\ncomputed in deterministic code). Each page whose structured data gives no posting may be\nread by an extraction run on the workspace's model, at most `model_runs` per acquisition;\neach run reserves at most `per_run_nano_usd` before its provider call, and a retried\nattempt (a provider outage) reserves again within the key's run limit."
       },
       "Money": {
         "properties": {

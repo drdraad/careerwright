@@ -1050,7 +1050,8 @@ export const ExtractionNotRun = {
     NO_MODEL_KEY: 'no_model_key',
     MODEL_NOT_PERMITTED: 'model_not_permitted',
     DEMO_WORKSPACE: 'demo_workspace',
-    NO_VISIBLE_TEXT: 'no_visible_text'
+    NO_VISIBLE_TEXT: 'no_visible_text',
+    ACQUISITION_CANCELLED: 'acquisition_cancelled'
 } as const;
 
 /**
@@ -1440,6 +1441,10 @@ export type JobPage = {
      * When there are no vacancies, why: never a bare empty list (STATE-02).
      */
     empty_reason: EmptyReason | null;
+    /**
+     * What the next acquisition may spend on the person's key, shown before it starts (MODEL-08); none for a demo workspace, which never calls a model.
+     */
+    acquisition_model_spend: ModelSpendOut | null;
 };
 
 /**
@@ -1565,6 +1570,42 @@ export const ModelMode = {
  * ModelMode
  */
 export type ModelMode = typeof ModelMode[keyof typeof ModelMode];
+
+/**
+ * ModelSpendOut
+ *
+ * What one acquisition may spend on the person's model key, before it starts (MODEL-08;
+ * computed in deterministic code). Each page whose structured data gives no posting may be
+ * read by an extraction run on the workspace's model, at most `model_runs` per acquisition;
+ * each run reserves at most `per_run_nano_usd` before its provider call, and a retried
+ * attempt (a provider outage) reserves again within the key's run limit.
+ */
+export type ModelSpendOut = {
+    /**
+     * Model Id
+     *
+     * The model the workspace's extraction runs pin.
+     */
+    model_id: string;
+    /**
+     * Model Runs
+     *
+     * At most this many extraction runs per acquisition.
+     */
+    model_runs: number;
+    /**
+     * Per Run Nano Usd
+     *
+     * One run's reservation, at its bounds.
+     */
+    per_run_nano_usd: number;
+    /**
+     * Worst Case Nano Usd
+     *
+     * model_runs x per_run_nano_usd.
+     */
+    worst_case_nano_usd: number;
+};
 
 /**
  * Money

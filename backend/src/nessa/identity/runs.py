@@ -316,22 +316,36 @@ def cancel_run(tx: Tx, actor: Actor, workspace_id: uuid.UUID, run_id: uuid.UUID)
     """Ask for a queued or running run to stop (DUR-05). The worker cancels its workflow, so
     nothing more is called or fetched for it, and publishes it `cancelled`, distinct from a
     failure; what it already finished is kept. A run that has finished cannot be cancelled.
-    The run ID is the precondition (like revoking a key); asking twice changes nothing."""
+    The run ID is the precondition (like revoking a key); asking twice changes nothing.
+
+    Cancelling a run also asks for the cancellation of every run it started that has not
+    settled (an acquisition's extraction runs; fix round 3, item 4), even once the run itself
+    has finished: then only those are cancelled. The worker acts on each request on its own.
+    The run's cancellation lock is taken first, before the workspace's row (the worker takes
+    it before writing an event, so the two never deadlock), so a run being started by it is
+    either seen here or refused there (migration 0023)."""
+    run_store.lock_started_runs(tx, run_id)
     visible_workspace(tx, workspace_id, lock=True)
     # Not locked: the API may not lock runs. If the worker finishes the run meanwhile, the
     # request changes nothing (publication records a terminal state once).
     run = run_store.run(tx, run_id)
     if run is None or run.workspace_id != workspace_id:
         raise NessaError(ErrorCode.NOT_FOUND, "No such run.", stage=ErrorStage.EXECUTION)
-    if run.status in _TERMINAL:
+    started_runs = run_store.unsettled_started_runs(tx, run_id)
+    if run.status in _TERMINAL and not started_runs:
         raise NessaError(
             ErrorCode.RUN_FINISHED,
             "This run has already finished, so there is nothing to cancel.",
             stage=ErrorStage.EXECUTION,
             details={"status": run.status.value},
         )
-    if run_store.request_cancellation(tx, run, actor.actor_id):
+    if run.status not in _TERMINAL and run_store.request_cancellation(tx, run, actor.actor_id):
         store.append_event(tx, workspace_id, EventKind.RUN_CANCEL_REQUESTED, str(run_id))
+    for started in started_runs:
+        if run_store.request_cancellation(tx, started, actor.actor_id):
+            store.append_event(
+                tx, workspace_id, EventKind.RUN_CANCEL_REQUESTED, str(started.run_id)
+            )
     cancelled = run_store.run(tx, run_id)
     if cancelled is None:
         raise NessaError(

@@ -39,6 +39,7 @@ from nessa.evidence.extraction import (
     worst_case_nano_usd,
 )
 from nessa.evidence.extraction_agent import PAGE_EXTRACTION_TASK, run_extraction
+from nessa.evidence.extraction_runs import acquisition_model_spend
 from nessa.evidence.fetcher import Fetcher
 from nessa.evidence.pages import EXTRACTION_TEXT_BYTES, redact_page, visible_text
 from nessa.evidence.records import (
@@ -54,10 +55,13 @@ from nessa.evidence.records import (
 )
 from nessa.evidence.redaction import EMAIL_REMOVED, PHONE_REMOVED
 from nessa.identity.failures import FailureClass, OutputTruncatedError, classify_failure
+from nessa.identity.model_choice import ModelChoice
 from nessa.identity.model_registry import ModelMode
 from nessa.identity.records import RunKind
 from nessa.identity.runs import workflow_id
 from nessa.migrations.versions import r0021_page_extraction as r0021
+from nessa.migrations.versions import r0023_cancel_started_runs as r0023
+from nessa.vocabulary import DataMode
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
 from tests.support.source_server import SYNTHETIC_MARKER, Scripted, source_server
@@ -605,25 +609,52 @@ def test_an_attempt_reserves_both_requests_at_their_bounds() -> None:
     assert 3 * worst_case_nano_usd("muse-spark-1.3") <= 150_000_000
 
 
+@pytest.mark.req("MODEL-08")
+def test_an_acquisition_s_model_spend_is_the_cap_times_one_run_s_reservation() -> None:
+    # Fix round 3, item 5: shown before an acquisition starts, for the workspace's model.
+    models = ModelChoice.configure("muse-spark-1.3-contributor", "muse-spark-1.3", "test")
+
+    personal = acquisition_model_spend(models, synthetic=False, data_mode=DataMode.LIVE_ASSISTED)
+    synthetic = acquisition_model_spend(models, synthetic=True, data_mode=DataMode.LIVE_VACANCY)
+
+    assert personal is not None
+    assert synthetic is not None
+    assert (personal.model_id, personal.model_runs, personal.worst_case_nano_usd) == (
+        "muse-spark-1.3",
+        extraction_runs.MAX_EXTRACTIONS_PER_ACQUISITION,
+        5 * 47_750_000,  # $0.239: five runs at the production model's reservation
+    )
+    assert (synthetic.model_id, synthetic.per_run_nano_usd) == (
+        "muse-spark-1.3-contributor",
+        3_400_000,
+    )
+    assert acquisition_model_spend(models, synthetic=True, data_mode=DataMode.DEMO) is None
+
+
 # --- the database holds the code's labels -----------------------------------------------
 
 
-def _quoted(pattern: str) -> set[str]:
-    found = re.search(pattern, r0021.SCHEMA, re.DOTALL)
+def _quoted(pattern: str, schema: str) -> set[str]:
+    found = re.search(pattern, schema, re.DOTALL)
     assert found is not None
     return set(re.findall(r"'([a-z_]+)'", found.group(1)))
 
 
 def test_the_database_holds_extraction_labels_and_the_cap_to_the_code_s() -> None:
-    assert _quoted(r"not_run IN \((.*?)\)\)") == {r.value for r in ExtractionNotRun}
-    assert _quoted(r"outcome IN \((.*?)\)\)") == {o.value for o in ExtractionOutcome}
-    assert _quoted(r"validation IN \((.*?)\)\)") == {v.value for v in ValidationState}
-    assert _quoted(r"runs_kind_check CHECK \(\s*kind IN \((.*?)\)") == {k.value for k in RunKind}
-    cap = re.search(r"e\.run_id IS NOT NULL\) >= (\d+)", r0021.SCHEMA)
+    # Each from the latest migration that sets it.
+    not_run = _quoted(r"not_run IN \((.*?)\)\)", r0023.SCHEMA)
+    assert not_run == {r.value for r in ExtractionNotRun}
+    outcome = _quoted(r"outcome IN \((.*?)\)\)", r0021.SCHEMA)
+    assert outcome == {o.value for o in ExtractionOutcome}
+    validation = _quoted(r"validation IN \((.*?)\)\)", r0021.SCHEMA)
+    assert validation == {v.value for v in ValidationState}
+    kinds = _quoted(r"runs_kind_check CHECK \(\s*kind IN \((.*?)\)", r0021.SCHEMA)
+    assert kinds == {k.value for k in RunKind}
+    cap = re.search(r"e\.run_id IS NOT NULL\) >= (\d+)", r0023.SCHEMA)
     assert cap is not None
     assert int(cap.group(1)) == extraction_runs.MAX_EXTRACTIONS_PER_ACQUISITION
     run_id = uuid.UUID(int=7)
-    assert "'nessa-run-' || p_run::text" in r0021.SCHEMA  # the API's own workflow IDs
+    assert "'nessa-run-' || p_run::text" in r0023.SCHEMA  # the API's own workflow IDs
     assert workflow_id(run_id) == f"nessa-run-{run_id}"
 
 
