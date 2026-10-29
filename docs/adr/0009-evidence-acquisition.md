@@ -163,8 +163,8 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    value is decoded (its entities, as the parser decodes them) and normalised, and a detail
    found there, such as an obfuscated `mailto:` link with no visible address, means the
    body is not kept (`attribute_detail`, migration 0025). Migration 0020's
-   description said "a JSON-LD block" for the first two; they apply to any script (0022
-   records the correction). The reason is its own typed column (migration 0020), the rights
+   description said "a JSON-LD block" for `contact_unlocated` and `block_unredactable`;
+   they apply to any script (0022 records the correction). The reason is its own typed column (migration 0020), the rights
    status the rights statement only (review B N5). Claims and excerpts come from decoded,
    redacted values, also for a block cited by pointer. `content_sha256` is the hash of what was
    kept; `retrieved_sha256` (migration 0015) is the hash of the bytes as retrieved, for
