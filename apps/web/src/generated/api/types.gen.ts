@@ -930,6 +930,30 @@ export type ExcludedOut = {
 };
 
 /**
+ * ExclusionReason
+ *
+ * Why a proposed page is not a candidate: the URL checks' refusals, or these.
+ */
+export const ExclusionReason = {
+    MALFORMED_URL: 'malformed_url',
+    URL_TOO_LONG: 'url_too_long',
+    SCHEME_NOT_ALLOWED: 'scheme_not_allowed',
+    CREDENTIALS_IN_URL: 'credentials_in_url',
+    PORT_NOT_ALLOWED: 'port_not_allowed',
+    HOST_NOT_ALLOWED: 'host_not_allowed',
+    ADDRESS_NOT_ALLOWED: 'address_not_allowed',
+    SOURCE_NOT_PERMITTED: 'source_not_permitted',
+    OVER_THE_LIMIT: 'over_the_limit'
+} as const;
+
+/**
+ * ExclusionReason
+ *
+ * Why a proposed page is not a candidate: the URL checks' refusals, or these.
+ */
+export type ExclusionReason = typeof ExclusionReason[keyof typeof ExclusionReason];
+
+/**
  * ExplanationRunOut
  *
  * A slate explanation's run, as asking for it answers: never what it wrote, since a
@@ -993,6 +1017,7 @@ export const FailureClass = {
     INVALID_MODEL_OUTPUT: 'invalid_model_output',
     MODEL_REFUSED: 'model_refused',
     OUTPUT_TRUNCATED: 'output_truncated',
+    BOUND_EXCEEDED: 'bound_exceeded',
     APP_STORE_UNAVAILABLE: 'app_store_unavailable',
     RETRIEVAL_FAILED: 'retrieval_failed',
     SOURCE_BLOCKED: 'source_blocked',
@@ -2593,17 +2618,45 @@ export type SearchCandidate = {
 };
 
 /**
+ * SearchEmptyReason
+ *
+ * Why a search proposes no candidate. None of them is evidence that there is no vacancy:
+ * only that this search found no page Nessa could check.
+ */
+export const SearchEmptyReason = {
+    SEARCH_RETURNED_NOTHING: 'search_returned_nothing',
+    NO_CANDIDATE_PROPOSED: 'no_candidate_proposed',
+    ALL_EXCLUDED: 'all_excluded'
+} as const;
+
+/**
+ * SearchEmptyReason
+ *
+ * Why a search proposes no candidate. None of them is evidence that there is no vacancy:
+ * only that this search found no page Nessa could check.
+ */
+export type SearchEmptyReason = typeof SearchEmptyReason[keyof typeof SearchEmptyReason];
+
+/**
  * SearchExcluded
+ *
+ * A proposed page that is not a candidate. A URL the checks refuse is never kept as a
+ * URL (it could be `javascript:`): only its host, as plain text.
  */
 export type SearchExcluded = {
     /**
      * Url
+     *
+     * A checked http(s) URL; none when the checks refused it.
      */
-    url: string;
+    url: string | null;
     /**
-     * Reason
+     * Refused Host
+     *
+     * A refused URL's host as plain text, never a link.
      */
-    reason: string;
+    refused_host?: string | null;
+    reason: ExclusionReason;
 };
 
 /**
@@ -2668,6 +2721,16 @@ export type SearchProposal = {
      * Distinct pages the search returned.
      */
     sources_seen: number;
+    /**
+     * Source Hosts
+     *
+     * The hosts of the pages the search returned.
+     */
+    source_hosts?: Array<string>;
+    /**
+     * Why there is no candidate: never evidence that there are no vacancies.
+     */
+    empty_reason?: SearchEmptyReason | null;
 };
 
 /**

@@ -11,19 +11,24 @@ from pydantic_ai import capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.usage import RequestUsage
 
 from nessa.evidence.search import (
+    INSTRUCTIONS,
     MAX_CANDIDATES,
     MAX_PROMPT_BYTES,
+    SearchEmptyReason,
     SearchInput,
     SearchOutput,
     check_search,
+    max_input_tokens,
     prompt_bytes,
+    refused_hosts,
     render_prompt,
     worst_case_nano_usd,
 )
 from nessa.evidence.search_agent import run_search, searched
-from nessa.identity.failures import FailureClass, classify_failure
+from nessa.identity.failures import BoundExceededError, FailureClass, classify_failure
 from nessa.identity.model_registry import ModelMode
 from tests.support.fake_models import SEARCHED, search_parts
 
@@ -72,8 +77,16 @@ def test_only_fetchable_permitted_candidates_are_kept_and_grounding_is_recorded(
         "address_not_allowed",
         "scheme_not_allowed",
     ]
+    # A refused URL is never kept as a URL (it could be `javascript:`): its host, as text.
+    assert [(e.url, e.refused_host) for e in proposal.excluded] == [
+        ("https://www.linkedin.com/jobs/view/1", None),
+        (None, "10.0.0.2"),
+        (None, None),
+    ]
     assert proposal.queries == ["data quality analyst jobs Manchester"]
     assert proposal.sources_seen == 1
+    assert proposal.source_hosts == ["careers.northwind.example"]
+    assert proposal.empty_reason is None
 
 
 def test_candidates_past_the_limit_are_excluded_not_kept() -> None:
@@ -85,16 +98,39 @@ def test_candidates_past_the_limit_are_excluded_not_kept() -> None:
     assert [e.reason for e in proposal.excluded] == ["over_the_limit"] * 2
 
 
-def test_an_empty_answer_is_a_valid_search_that_found_nothing() -> None:
-    proposal = check_search(output(), CONTEXT, sources=set(), queries=["q"])
+@pytest.mark.req("STATE-02")
+@pytest.mark.parametrize(
+    ("proposed", "sources", "reason"),
+    [
+        ((), set(), SearchEmptyReason.SEARCH_RETURNED_NOTHING),
+        ((), {"https://jobs.board.example/list"}, SearchEmptyReason.NO_CANDIDATE_PROPOSED),
+        (("https://uk.linkedin.com/jobs/view/1",), set(), SearchEmptyReason.ALL_EXCLUDED),
+    ],
+    ids=["nothing returned", "nothing proposed", "everything excluded"],
+)
+def test_a_search_with_no_candidate_says_why_and_never_that_there_is_no_vacancy(
+    proposed: tuple[str, ...], sources: set[str], reason: SearchEmptyReason
+) -> None:
+    proposal = check_search(output(*proposed), CONTEXT, sources=sources, queries=["q"])
 
     assert proposal.candidates == []
-    assert proposal.excluded == []
+    assert proposal.empty_reason is reason
+
+
+@pytest.mark.req("MODEL-08")
+def test_the_prompt_names_exactly_the_hosts_the_manifest_refuses() -> None:
+    hosts = refused_hosts()
+
+    assert hosts == ["adzuna.co.uk", "api.adzuna.com", "indeed.co.uk", "indeed.com", "linkedin.com"]
+    assert all(host in INSTRUCTIONS for host in hosts)
+    assert "sign-in" not in INSTRUCTIONS  # no open-ended class of sites
+    assert "individual job posting" in INSTRUCTIONS
 
 
 class Provider:
-    def __init__(self, parts: list[Any]) -> None:
+    def __init__(self, parts: list[Any], usage: RequestUsage | None = None) -> None:
         self.parts = parts
+        self.usage = usage
         self.settings: list[Any] = []
         self.requests = 0
 
@@ -102,9 +138,64 @@ class Provider:
         def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
             self.requests += 1
             self.settings.append(info.model_settings)
-            return ModelResponse(parts=self.parts)
+            if self.usage is None:
+                return ModelResponse(parts=self.parts)
+            return ModelResponse(parts=self.parts, usage=self.usage)
 
         return FunctionModel(respond)
+
+
+@pytest.mark.req("MODEL-08", "JOB-08")
+@pytest.mark.parametrize(
+    ("usage", "bound"),
+    [
+        (
+            RequestUsage(
+                input_tokens=20_000, output_tokens=300, details={"web_search_requests": 3}
+            ),
+            "web_searches",
+        ),
+        (
+            RequestUsage(
+                input_tokens=max_input_tokens() + 1,
+                output_tokens=300,
+                details={"web_search_requests": 2},
+            ),
+            "input_tokens",
+        ),
+    ],
+    ids=["a third search", "more input than reserved"],
+)
+def test_a_search_past_its_reserved_bounds_fails_and_its_output_is_never_used(
+    usage: RequestUsage, bound: str
+) -> None:
+    # Review B I4: Meta runs the searches inside the one request; its own usage is the check.
+    provider = Provider(search_parts(request(), "SENTINEL"), usage)
+
+    with capture_run_messages() as messages, pytest.raises(BoundExceededError) as raised:
+        run_search(
+            provider.model(), ModelMode.CONTRIBUTOR, CONTEXT.model_dump_json().encode(), ignore
+        )
+
+    classified = classify_failure(raised.value)
+    assert (classified.failure, classified.label) == (
+        FailureClass.BOUND_EXCEEDED,
+        f"bound_exceeded:{bound}",
+    )
+    responses = [m for m in messages if isinstance(m, ModelResponse)]
+    assert [r.usage.input_tokens for r in responses] == [usage.input_tokens]  # booked at cost
+
+
+@pytest.mark.req("MODEL-08")
+def test_a_search_within_its_bounds_is_accepted() -> None:
+    usage = RequestUsage(input_tokens=20_000, output_tokens=300, details={"web_search_requests": 2})
+    provider = Provider(search_parts(request(), "SENTINEL"), usage)
+
+    proposal = run_search(
+        provider.model(), ModelMode.CONTRIBUTOR, CONTEXT.model_dump_json().encode(), ignore
+    )
+
+    assert proposal.candidates
 
 
 def request() -> dict[str, object]:

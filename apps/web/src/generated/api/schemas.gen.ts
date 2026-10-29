@@ -1240,6 +1240,23 @@ export const ExcludedOutSchema = {
     title: 'ExcludedOut'
 } as const;
 
+export const ExclusionReasonSchema = {
+    type: 'string',
+    enum: [
+        'malformed_url',
+        'url_too_long',
+        'scheme_not_allowed',
+        'credentials_in_url',
+        'port_not_allowed',
+        'host_not_allowed',
+        'address_not_allowed',
+        'source_not_permitted',
+        'over_the_limit'
+    ],
+    title: 'ExclusionReason',
+    description: 'Why a proposed page is not a candidate: the URL checks\' refusals, or these.'
+} as const;
+
 export const ExplanationRunOutSchema = {
     properties: {
         explanation_id: {
@@ -1300,6 +1317,7 @@ export const FailureClassSchema = {
         'invalid_model_output',
         'model_refused',
         'output_truncated',
+        'bound_exceeded',
         'app_store_unavailable',
         'retrieval_failed',
         'source_blocked',
@@ -3907,16 +3925,45 @@ export const SearchCandidateSchema = {
     title: 'SearchCandidate'
 } as const;
 
+export const SearchEmptyReasonSchema = {
+    type: 'string',
+    enum: [
+        'search_returned_nothing',
+        'no_candidate_proposed',
+        'all_excluded'
+    ],
+    title: 'SearchEmptyReason',
+    description: 'Why a search proposes no candidate. None of them is evidence that there is no vacancy:\nonly that this search found no page Nessa could check.'
+} as const;
+
 export const SearchExcludedSchema = {
     properties: {
         url: {
-            type: 'string',
-            maxLength: 2048,
-            title: 'Url'
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Url',
+            description: 'A checked http(s) URL; none when the checks refused it.'
+        },
+        refused_host: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Refused Host',
+            description: 'A refused URL\'s host as plain text, never a link.'
         },
         reason: {
-            type: 'string',
-            title: 'Reason'
+            $ref: '#/components/schemas/ExclusionReason'
         }
     },
     additionalProperties: false,
@@ -3925,7 +3972,8 @@ export const SearchExcludedSchema = {
         'url',
         'reason'
     ],
-    title: 'SearchExcluded'
+    title: 'SearchExcluded',
+    description: 'A proposed page that is not a candidate. A URL the checks refuse is never kept as a\nURL (it could be `javascript:`): only its host, as plain text.'
 } as const;
 
 export const SearchMatchSchema = {
@@ -4006,6 +4054,25 @@ export const SearchProposalSchema = {
             type: 'integer',
             title: 'Sources Seen',
             description: 'Distinct pages the search returned.'
+        },
+        source_hosts: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Source Hosts',
+            description: 'The hosts of the pages the search returned.'
+        },
+        empty_reason: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SearchEmptyReason'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Why there is no candidate: never evidence that there are no vacancies.'
         }
     },
     additionalProperties: false,

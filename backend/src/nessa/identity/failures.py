@@ -41,6 +41,9 @@ class FailureClass(StrEnum):
     INVALID_MODEL_OUTPUT = "invalid_model_output"  # still invalid after the bounded repair
     MODEL_REFUSED = "model_refused"  # the provider's content filter refused to answer
     OUTPUT_TRUNCATED = "output_truncated"  # the output hit its token limit: never used
+    # The call went past a bound its reservation assumed (more searches or input tokens than
+    # it reserved for): its actual cost is booked and its output never used.
+    BOUND_EXCEEDED = "bound_exceeded"
     APP_STORE_UNAVAILABLE = "app_store_unavailable"
     # An acquisition run whose every source failed, or was refused by policy (Task 7A): never
     # an empty success ("no vacancies"), and the attempts say which and why.
@@ -58,6 +61,14 @@ _STATUS_FAILURES = {
 
 class OutputTruncatedError(Exception):
     """A response stopped at its token limit; raised before anything parses or repairs it."""
+
+
+class BoundExceededError(Exception):
+    """A completed call used more than its reservation assumed. Carries the bound's name."""
+
+    def __init__(self, bound: str) -> None:
+        super().__init__(f"bound exceeded ({bound})")
+        self.bound = bound
 
 
 class TransientProviderError(Exception):
@@ -107,6 +118,10 @@ def classify_failure(error: BaseException) -> Classified:
         return terminal(FailureClass.MODEL_REFUSED)
     if isinstance(error, OutputTruncatedError):
         return terminal(FailureClass.OUTPUT_TRUNCATED)
+    if isinstance(error, BoundExceededError):
+        return Classified(
+            f"{FailureClass.BOUND_EXCEEDED.value}:{error.bound}", FailureClass.BOUND_EXCEEDED
+        )
     if isinstance(error, UsageLimitExceeded | UnexpectedModelBehavior):
         return terminal(FailureClass.INVALID_MODEL_OUTPUT)
     if isinstance(error, StoreUnavailableError):

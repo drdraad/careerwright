@@ -38,6 +38,7 @@ from nessa.evidence.search import (
     render_prompt,
 )
 from nessa.identity.activity import PartialSink, RunTask, TruncationGuard
+from nessa.identity.failures import BoundExceededError
 from nessa.identity.model_registry import ModelMode
 
 
@@ -65,8 +66,15 @@ def searched(messages: list[ModelMessage]) -> tuple[set[str], list[str]]:
 
 
 def run_search(
-    model: Model, mode: ModelMode, raw_input: bytes | None, _sink: PartialSink
+    model: Model,
+    mode: ModelMode,
+    raw_input: bytes | None,
+    _sink: PartialSink,
+    *,
+    max_tool_calls: int = MAX_TOOL_CALLS,
 ) -> SearchProposal:
+    """`max_tool_calls` is the product's two; only the live qualification of the bound
+    (`tools.live_smoke --search-bound`) asks for one."""
     if raw_input is None:
         raise ValueError("a source search has a sealed input")
     context = SearchInput.model_validate_json(raw_input)
@@ -96,15 +104,23 @@ def run_search(
     settings = OpenAIResponsesModelSettings(
         max_tokens=MAX_OUTPUT_TOKENS,
         openai_include_web_search_sources=True,
-        extra_body={"max_tool_calls": MAX_TOOL_CALLS},
+        extra_body={"max_tool_calls": max_tool_calls},
     )
-    asyncio.run(
+    result = asyncio.run(
         agent.run(
             render_prompt(context),
             usage_limits=UsageLimits(request_limit=MAX_REQUESTS),
             model_settings=settings,
         )
     )
+    # Meta runs the searches inside the one request, so `request_limit` cannot bound them:
+    # the response's own usage is held to the reservation's bounds. An overrun is booked at
+    # its actual cost (the activity reads the usage) and its output is never used.
+    usage = result.usage
+    if usage.details.get("web_search_requests", 0) > max_tool_calls:
+        raise BoundExceededError("web_searches")
+    if usage.input_tokens > search.max_input_tokens(max_tool_calls):
+        raise BoundExceededError("input_tokens")
     return accepted[-1]
 
 

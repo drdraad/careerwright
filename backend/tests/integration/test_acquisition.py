@@ -911,13 +911,48 @@ def test_a_source_search_proposes_candidates_for_a_confirmed_target_and_city(
         ("https://jobs.board.example/ad/9", False),
     ]
     assert proposal["excluded"] == [
-        {"url": "https://www.linkedin.com/jobs/view/1", "reason": "source_not_permitted"}
+        {
+            "url": "https://www.linkedin.com/jobs/view/1",
+            "refused_host": None,
+            "reason": "source_not_permitted",
+        }
     ]
+    assert (proposal["source_hosts"], proposal["empty_reason"]) == (
+        ["careers.northwind.example"],
+        None,
+    )
     [attempt] = scenario.attempts(search_id)
     assert attempt["reserved_nano_usd"] == 8_000_000  # its one request at its bounds
     # The model saw a role and a city only: the profile's private text reached no journal or
     # log, and the model's output is sealed.
     assert scenario.leaks() == []
+
+
+@pytest.mark.req("MODEL-08", "JOB-08")
+def test_a_search_past_its_reserved_bounds_is_booked_at_cost_and_its_output_never_used(
+    infra: Infra, api: ApiClient, ada: str, tmp_path: Path
+) -> None:
+    scenario = make_scenario(infra, api, ada, tmp_path)
+    profile = profile_with(target_titles=["Data quality analyst"], cities=["Manchester"])
+    base = f"/v1/workspaces/{scenario.workspace_id}"
+    saved = api.write("PUT", f"{base}/profile", ada, {"expected_version": 1, "profile": profile})
+    assert saved.status_code == 201, saved.text
+    body = {"expected_profile_version": 2, "target": "Data quality analyst", "city": "Manchester"}
+    search_id = api.write("POST", f"{base}/research/searches", ada, body).json()["search_id"]
+    worker = scenario.worker("search", fake_failure="search_overrun")  # 3 searches reported
+    try:
+        run = scenario.wait_terminal(search_id)
+    finally:
+        worker.stop()
+    shown = api.get(f"{base}/research/searches/{search_id}", ada).json()
+    [attempt] = scenario.attempts(search_id)
+
+    assert (run["status"], run["failure_class"]) == ("failed", "bound_exceeded")
+    assert attempt["outcome"] == "bound_exceeded:web_searches"
+    assert (attempt["spend_state"], attempt["web_search_queries"]) == ("reconciled", 3)
+    assert attempt["cost_nano_usd"] > 0  # the actual cost, booked
+    assert shown["proposal"] is None
+    assert scenario.outputs(search_id) == []
 
 
 def test_a_cancelled_unknown_run_is_not_found(api: ApiClient, ada: str, workspace: str) -> None:

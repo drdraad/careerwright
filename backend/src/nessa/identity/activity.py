@@ -470,7 +470,9 @@ def _measured(messages: list[ModelMessage]) -> list[ModelResponse]:
     ]
 
 
-def _usage(messages: list[ModelMessage]) -> tuple[Usage | None, int | None, str | None]:
+def measured_usage(messages: list[ModelMessage]) -> tuple[Usage | None, int | None, str | None]:
+    """(usage, reasoning tokens, the last response's ID) over the measured responses; also
+    what a live qualification outside the activity books (`tools.live_smoke`)."""
     responses = _measured(messages)
     if not responses:
         return None, None, None
@@ -531,7 +533,7 @@ def _call(rt: ActivityRuntime, ready: _Ready) -> _CallResult:
                 output, classified, None, None, None, requests, responses, partial.latest
             )
         try:
-            usage, reasoning, response_id = _usage(messages)
+            usage, reasoning, response_id = measured_usage(messages)
         except ValueError as error:
             # Counts the registry rejects (more cached than input tokens): the provider's own
             # report is inconsistent, so the cost is unknown and the output is not accepted.

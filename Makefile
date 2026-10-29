@@ -9,7 +9,8 @@
 #   make live-smoke         budget-capped real Meta smoke on the test model; PRODUCTION=1 (exactly)
 #                           qualifies the production model; INTERVIEW=1 (exactly) runs one
 #                           interview turn and confirms its proposals instead of a connection check;
-#                           SEARCH=1 runs one source search (Meta web search; scope live-search)
+#                           SEARCH=1 runs one source search (Meta web search; scope live-search);
+#                           SEARCH_BOUND=1 asks one in-process search for max_tool_calls 1
 #   make live-eval          budget-capped live run of the representative evaluation cases (at most
 #                           6) on the test model; CASES=INT-01,DSC-01 runs a chosen subset
 #   make live-adzuna        two real Adzuna search requests (free tier; at most 10 in its scope),
@@ -55,7 +56,7 @@ acceptance:
 
 # Only PRODUCTION=1 opts in to the production model; any other value (0, false, no) does not.
 live-smoke:
-	$(BACKEND) $(UV) python -m tools.live_smoke $(if $(filter 1,$(PRODUCTION)),--production-model,) $(if $(filter 1,$(INTERVIEW)),--interview,) $(if $(filter 1,$(SEARCH)),--search,)
+	$(BACKEND) $(UV) python -m tools.live_smoke $(if $(filter 1,$(PRODUCTION)),--production-model,) $(if $(filter 1,$(INTERVIEW)),--interview,) $(if $(filter 1,$(SEARCH)),--search,) $(if $(filter 1,$(SEARCH_BOUND)),--search-bound,)
 
 live-eval:
 	$(BACKEND) $(UV) python -m tools.live_eval $(if $(CASES),--cases $(CASES),)

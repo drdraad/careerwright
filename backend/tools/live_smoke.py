@@ -26,8 +26,14 @@ Caps, checked before anything starts:
 The test model is a Contributor model, so the workspace is synthetic, and the interview
 message is a fixed synthetic persona.
 
+`--search` runs one source search through the stack, in its own scope (`live-search`), and
+its ledger row's notes record what it proposed, excluded (with reasons) and which hosts its
+pages came from (hosts only). `--search-bound` asks one search, in this process, through
+the product's task code, for `max_tool_calls` 1, and ledgers whether Meta kept to it (fix
+round 1, review B I4).
+
 Run from `backend/`: `uv run --locked python -m tools.live_smoke [--production-model]
-[--interview]`.
+[--interview | --search | --search-bound]`.
 """
 
 import argparse
@@ -42,20 +48,26 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
+from urllib.parse import urlsplit
 
 import httpx2
 import psycopg
 from psycopg import sql
 from psycopg.rows import dict_row
 from pydantic import Field, SecretStr
+from pydantic_ai import capture_run_messages
+from pydantic_ai.messages import ModelRequest
+from pydantic_ai.models import Model
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from nessa.evidence import search
+from nessa.evidence.search_agent import run_search
 from nessa.identity import connection_check
-from nessa.identity.activity import STORE_RETRY_BUDGET_S
-from nessa.identity.meta import REQUEST_TIMEOUT_S
+from nessa.identity.activity import STORE_RETRY_BUDGET_S, PartialWriter, measured_usage
+from nessa.identity.failures import classify_failure
+from nessa.identity.meta import REQUEST_TIMEOUT_S, meta_model
 from nessa.identity.model_choice import ModelChoice
-from nessa.identity.model_registry import format_usd
+from nessa.identity.model_registry import ModelMode, estimate_cost_nano_usd, format_usd
 from nessa.identity.workflow import (
     ACTIVITY_BACKOFF_RATE,
     ACTIVITY_INTERVAL_S,
@@ -128,6 +140,16 @@ SOURCE_SEARCH = SmokeKind(
     "source search via API, outbox and DBOS worker: Meta web search for a synthetic target "
     "and city, candidates checked (key opened just in time)",
 )
+# Fix round 1 (review B I4): whether Meta keeps to `max_tool_calls`, asked for one search.
+BOUND_TOOL_CALLS = 1
+SEARCH_BOUND = SmokeKind(
+    "source_search_bound",
+    1,
+    search.MAX_REQUESTS,
+    lambda model_id: search.worst_case_nano_usd(model_id, max_tool_calls=BOUND_TOOL_CALLS),
+    "source search in process with max_tool_calls 1, to qualify that Meta keeps to the bound "
+    "(synthetic target and city; the product's own task code and bound check)",
+)
 # The search kind's own budget scope (Task 7A): at most 9 requests and $0.30, test model.
 SEARCH_SCOPE = "live-search"
 SEARCH_TARGET, SEARCH_CITY = "Data analyst", "Manchester"
@@ -172,6 +194,9 @@ class ScopeBudget:
     max_calls: int
     max_production_calls: int
     max_cost_nano_usd: int  # known costs plus the full reservation of every unknown one
+
+
+SEARCH_BUDGET = ScopeBudget(SEARCH_SCOPE, 9, 0, 300_000_000)
 
 
 class CapExceededError(SystemExit):
@@ -277,6 +302,7 @@ def ledger_attempts(
     scope: str,
     production_model: str,
     kind: SmokeKind = CONNECTION_CHECK,
+    found: Mapping[str, object] | None = None,
 ) -> list[int]:
     """One ledger row per attempt that reached the provider (a reservation was taken), with
     the requests it sent; an attempt whose request count was not recorded counts every
@@ -306,7 +332,11 @@ def ledger_attempts(
                 web_search_queries=attempt["web_search_queries"],
                 provider_response_id=attempt["provider_response_id"],
                 notes=json.dumps(
-                    {"run_id": str(attempt["run_id"]), "attempt_id": attempt["attempt_id"]}
+                    {
+                        "run_id": str(attempt["run_id"]),
+                        "attempt_id": attempt["attempt_id"],
+                        **(found or {}),
+                    }
                 ),
             )
         )
@@ -371,10 +401,12 @@ def ledger_workspace_calls(
     scope: str,
     worker_stopped: bool,
     kind: SmokeKind = CONNECTION_CHECK,
+    found: Mapping[str, object] | None = None,
 ) -> list[int]:
     """Every attempt the smoke workspace recorded. If the worker may still be running, also
     every further attempt its spend limits allow (the kind's attempts in all,
-    `assert_attempt_bound`), as possible calls at the product's own per-attempt reservation."""
+    `assert_attempt_bound`), as possible calls at the product's own per-attempt reservation.
+    `found`: what the run reported (a search's exclusions and source hosts), for the notes."""
     per_attempt = kind.per_attempt_nano_usd(model_id)
     try:
         attempts = _workspace_attempts(target, workspace_id)
@@ -383,7 +415,12 @@ def ledger_workspace_calls(
             ledger, model_id, per_attempt, models, scope=scope, count=kind.attempts, kind=kind
         )
     seqs = ledger_attempts(
-        ledger, attempts, scope=scope, production_model=models.production.model_id, kind=kind
+        ledger,
+        attempts,
+        scope=scope,
+        production_model=models.production.model_id,
+        kind=kind,
+        found=found,
     )
     if not worker_stopped:
         seqs += ledger_possible_calls(
@@ -498,9 +535,38 @@ def _interview_turn(api: Api, base: str, model_id: str, timeout_s: float) -> str
     return "complete" if decided["profile"]["version"] == 1 else "decision changed nothing"
 
 
-def _source_search(api: Api, base: str, model_id: str, timeout_s: float) -> str:
+def search_notes(proposal: Mapping[str, Any]) -> dict[str, object]:
+    """What a search's ledger row records of it: counts, its exclusions with their reasons,
+    the hosts its pages came from (hosts only, never a URL) and why it proposed nothing."""
+    return {
+        "prompt_version": search.PROMPT_VERSION,
+        "candidates": len(proposal["candidates"]),
+        "grounded": sum(1 for c in proposal["candidates"] if c["grounded"]),
+        "excluded": [
+            {"reason": e["reason"], "host": e.get("refused_host") or _host_of(e.get("url"))}
+            for e in proposal["excluded"]
+        ],
+        "sources_seen": proposal["sources_seen"],
+        "source_hosts": proposal.get("source_hosts", []),
+        "searches": len(proposal["queries"]),
+        "empty_reason": proposal.get("empty_reason"),
+    }
+
+
+def _host_of(url: object) -> str | None:
+    return urlsplit(url).hostname if isinstance(url, str) else None
+
+
+def _source_search(
+    api: Api,
+    base: str,
+    model_id: str,
+    timeout_s: float,
+    found: dict[str, object] | None = None,
+) -> str:
     """A synthetic target and city confirmed by direct entry, then one source search; its
-    candidates, grounding and the searches it ran are printed (no page is fetched)."""
+    candidates, grounding and the searches it ran are printed (no page is fetched), and put
+    in `found` for the ledger row."""
     fields = (
         "preferred_name",
         "current_role",
@@ -537,13 +603,10 @@ def _source_search(api: Api, base: str, model_id: str, timeout_s: float) -> str:
     proposal = shown["proposal"]
     if run["status"] != "complete" or proposal is None:
         return str(run["status"])
-    grounded = sum(1 for c in proposal["candidates"] if c["grounded"])
-    print(
-        f"candidates {len(proposal['candidates'])} (grounded {grounded}), excluded "
-        f"{[e['reason'] for e in proposal['excluded']]}, sources seen "
-        f"{proposal['sources_seen']}, searches {proposal['queries']}",
-        flush=True,
-    )
+    notes = search_notes(proposal)
+    if found is not None:
+        found.update(notes)
+    print(f"{json.dumps(notes)}; searches {proposal['queries']}", flush=True)
     return "complete"
 
 
@@ -583,17 +646,18 @@ def smoke(
     assert_attempt_bound(spend, kind.per_attempt_nano_usd(model_id), kind.attempts)
     status = "not started"
     worker_stopped = True
+    found: dict[str, object] = {}
     try:
         api.call(
             "POST",
             f"{base}/credentials",
             {"api_key": key.get_secret_value(), "consent_to_encrypted_storage": True},
         )
-        drive = {
-            INTERVIEW_TURN.name: _interview_turn,
-            SOURCE_SEARCH.name: _source_search,
-        }.get(kind.name, _connection_check)
-        status = drive(api, base, model_id, run_timeout_s)
+        if kind is SOURCE_SEARCH:
+            status = _source_search(api, base, model_id, run_timeout_s, found)
+        else:
+            drive = _interview_turn if kind is INTERVIEW_TURN else _connection_check
+            status = drive(api, base, model_id, run_timeout_s)
         api.call("GET", f"{base}/export")
     finally:
         # First: an attempt read while the worker runs could miss one.
@@ -614,6 +678,7 @@ def smoke(
             scope=scope,
             worker_stopped=worker_stopped,
             kind=kind,
+            found=found,
         )
         ledger.write_markdown()
         print(f"ledger rows appended: {seqs}", flush=True)
@@ -705,7 +770,7 @@ def run_smoke(
     )
     budget = settings.budget()
     if kind is SOURCE_SEARCH:  # its own scope, whatever the smoke's scope is
-        budget = ScopeBudget(SEARCH_SCOPE, 9, 0, 300_000_000)
+        budget = SEARCH_BUDGET
     # One invocation at a time, from the budget check to the last ledger row (N6).
     with ledger.exclusive():
         model_id, worst_case = authorise(
@@ -736,6 +801,83 @@ def run_smoke(
     return 0 if result.status == "complete" and not result.findings else 1
 
 
+def qualify_search_bound(
+    settings: SmokeSettings,
+    ledger: Ledger,
+    *,
+    build: Callable[[str, SecretStr], Model] | None = None,
+) -> int:
+    """One source search asking Meta for at most one tool call (`max_tool_calls` 1), through
+    the product's own task code and bound check, in this process: no stack, no stored key
+    (the key stays a `SecretStr` here). Its usage says whether Meta kept to the bound; the
+    row is ledgered whatever happens. `build` replaces Meta in tests only."""
+    models = ModelChoice.configure(settings.meta_test_model, settings.meta_production_model, "test")
+    with ledger.exclusive():
+        model_id, worst_case = authorise(
+            models,
+            production=False,
+            budget=SEARCH_BUDGET,
+            spent=ledger.spent(SEARCH_SCOPE),
+            kind=SEARCH_BOUND,
+        )
+        print(
+            f"search bound ({SEARCH_BOUND.name}): model {model_id} (test); 1 request, "
+            f"max_tool_calls {BOUND_TOOL_CALLS}, worst case {format_usd(worst_case)}",
+            flush=True,
+        )
+        model = (build or _search_model)(model_id, settings.api_key)
+        context = search.SearchInput(profile_version=0, target=SEARCH_TARGET, city=SEARCH_CITY)
+        proposal = None
+        with capture_run_messages() as messages:
+            try:
+                proposal = run_search(
+                    model,
+                    ModelMode.CONTRIBUTOR,
+                    context.model_dump_json().encode(),
+                    PartialWriter(lambda text: None),
+                    max_tool_calls=BOUND_TOOL_CALLS,
+                )
+                outcome = "succeeded"
+            except Exception as error:  # the label only, never the message
+                outcome = classify_failure(error).label
+        usage, reasoning, response_id = measured_usage(messages)
+        requests = max(1, sum(isinstance(m, ModelRequest) for m in messages))
+        notes: dict[str, object] = {"max_tool_calls": BOUND_TOOL_CALLS}
+        if proposal is not None:
+            notes |= search_notes(proposal.model_dump(mode="json"))
+        record = ledger.append(
+            LiveCallEntry(
+                budget_scope=SEARCH_SCOPE,
+                purpose=SEARCH_BOUND.purpose,
+                http_requests=requests,
+                model_id=model_id,
+                is_production_model=False,
+                endpoint=RESPONSES_ENDPOINT,
+                outcome=CallOutcome.OK if outcome == "succeeded" else CallOutcome.FAILED,
+                reserved_nano_usd=worst_case,
+                estimated_cost_nano_usd=estimate_cost_nano_usd(model_id, usage) if usage else None,
+                error_type=None if outcome == "succeeded" else outcome,
+                input_tokens=usage.input_tokens if usage else None,
+                cached_input_tokens=usage.cached_input_tokens if usage else None,
+                output_tokens=usage.output_tokens if usage else None,
+                reasoning_tokens=reasoning,
+                web_search_queries=usage.web_search_queries if usage else None,
+                provider_response_id=response_id,
+                notes=json.dumps(notes),
+            )
+        )
+        ledger.write_markdown()
+    searches = usage.web_search_queries if usage else None
+    print(f"outcome {outcome}; searches {searches}; ledger row {record.seq}", flush=True)
+    return 0 if outcome == "succeeded" and searches is not None else 1
+
+
+def _search_model(model_id: str, api_key: SecretStr) -> Model:
+    return meta_model(
+        model_id, api_key, max_output_tokens=search.MAX_OUTPUT_TOKENS, effort="minimal"
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -753,9 +895,18 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="one source search (Meta web search) for a synthetic target, in its own scope",
     )
+    parser.add_argument(
+        "--search-bound",
+        action="store_true",
+        help="one in-process source search with max_tool_calls 1: does Meta keep to the bound",
+    )
     args = parser.parse_args(argv)
-    if args.search and (args.interview or args.production_model):
-        raise SystemExit("--search runs alone, on the test model")
+    if (args.search or args.search_bound) and (
+        args.interview or args.production_model or (args.search and args.search_bound)
+    ):
+        raise SystemExit("--search and --search-bound run alone, on the test model")
+    if args.search_bound:
+        sys.exit(qualify_search_bound(SmokeSettings(), Ledger()))
     kind = SOURCE_SEARCH if args.search else INTERVIEW_TURN if args.interview else CONNECTION_CHECK
     sys.exit(
         run_smoke(SmokeSettings(), production=args.production_model, ledger=Ledger(), kind=kind)

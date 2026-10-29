@@ -18,6 +18,7 @@ import type {
   ProfileInput,
   RecordPart,
   Resolution,
+  SearchEmptyReason,
   WorkState,
 } from "@/generated/api";
 import { listLimit } from "./bounds";
@@ -279,6 +280,10 @@ export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string
     title: "The reply was cut off",
     action: "Nothing was saved from it. Try a shorter message.",
   },
+  bound_exceeded: {
+    title: "The model did more work than Nessa allowed for",
+    action: "Its cost was recorded and nothing was saved from it. Try again later.",
+  },
   app_store_unavailable: {
     title: "Nessa couldn't save the result",
     action: "Try again in a moment.",
@@ -294,6 +299,26 @@ export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string
   unknown_failure: {
     title: "Something went wrong while Nessa was working",
     action: "Nothing was saved from it. Try again.",
+  },
+};
+
+/** Why a source search proposed no page (review B I5). None says there are no vacancies:
+ * only that this search found no posting page Nessa could check. */
+export const SEARCH_EMPTY_REASON: Record<SearchEmptyReason, { title: string; detail: string }> = {
+  search_returned_nothing: {
+    title: "The search returned no pages",
+    detail:
+      "This isn't a sign there are no vacancies. Try again later, or add a page you found yourself.",
+  },
+  no_candidate_proposed: {
+    title: "The search returned pages, but none was a single job posting",
+    detail:
+      "This isn't a sign there are no vacancies. Add a posting you found yourself, or paste the advert.",
+  },
+  all_excluded: {
+    title: "Every page the search suggested is one Nessa can't use",
+    detail:
+      "This isn't a sign there are no vacancies. Look on employers' own careers sites, or paste the advert.",
   },
 };
 

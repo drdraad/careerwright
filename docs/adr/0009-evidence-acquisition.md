@@ -257,6 +257,20 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
     candidates that pass decision 3's checks and the manifest, marks each grounded when the
     search returned it, and lists the rest as excluded with the reason. Candidates are never
     claims; the person chooses what to acquire.
+    Fix round 1 (review B I4, I5, I6): Meta runs the searches inside the one request, so
+    `request_limit` cannot bound them; after the call the response's own usage is held to
+    the reservation's bounds (`web_search_requests` at most `max_tool_calls`, input tokens
+    at most the reserved input), and an overrun fails the run `bound_exceeded` with the
+    bound named in the attempt's outcome (`bound_exceeded:web_searches`), booked at its
+    actual cost, its output never used. Whether Meta keeps to `max_tool_calls` is qualified
+    live by `make live-smoke SEARCH_BOUND=1` (one in-process search asked for one tool
+    call). A proposal with no candidate says why (`empty_reason`: `search_returned_nothing`,
+    `no_candidate_proposed`, `all_excluded`), none of which is evidence that there is no
+    vacancy, and records the hosts its pages came from (`source_hosts`). An exclusion's
+    reason is an enum, and a proposed URL the checks refuse is kept as its host in plain
+    text, never as a URL (addendum, re-review A I-4). The prompt (`source-search-3`) names
+    exactly the hosts the manifest refuses (`search.refused_hosts`) instead of "sites that
+    need a sign-in", and asks for individual postings.
 
 13. **The validation repair stays within its reservation (MODEL-08).** `RepairBound`, on
     every task's agent, rewrites Pydantic AI's schema feedback as each problem's location and

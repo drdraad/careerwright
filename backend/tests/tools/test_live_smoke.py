@@ -1,17 +1,26 @@
 """The live smoke's caps refuse before any call, and every provider attempt is ledgered
 (ruling R5). Offline: nothing here contacts Meta."""
 
+import json
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import SecretStr
+from pydantic_ai.messages import ModelMessage, ModelResponse
+from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.usage import RequestUsage
 
 from nessa.identity.model_choice import ModelChoice
+from tests.support.fake_models import search_parts
 from tools import live_smoke
 from tools.live_smoke import (
     INTERVIEW_TURN,
     MAX_CALLS,
+    SEARCH_CITY,
+    SEARCH_TARGET,
     CapExceededError,
     ScopeBudget,
     SmokeSettings,
@@ -19,6 +28,7 @@ from tools.live_smoke import (
     authorise,
     ledger_attempts,
     ledger_possible_calls,
+    qualify_search_bound,
 )
 from tools.localenv import REPO_ROOT
 from tools.usage_ledger import CallOutcome, Ledger, LedgerBusyError, ScopeSpend
@@ -266,3 +276,50 @@ def test_limits_that_would_allow_a_fourth_attempt_stop_the_smoke_before_its_key_
 
     with pytest.raises(CapExceededError, match="allow 4 attempts"):
         assert_attempt_bound(spend, PER_ATTEMPT)
+
+
+def _search_meta(searches: int) -> Callable[[str, SecretStr], FunctionModel]:
+    """Meta's place, offline: a search reply reporting `searches` searches."""
+
+    def build(model_id: str, api_key: SecretStr) -> FunctionModel:
+        def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            asked: dict[str, object] = {"role": SEARCH_TARGET, "city": SEARCH_CITY}
+            usage = RequestUsage(
+                input_tokens=9_000, output_tokens=200, details={"web_search_requests": searches}
+            )
+            return ModelResponse(parts=search_parts(asked, ""), usage=usage)
+
+        return FunctionModel(respond)
+
+    return build
+
+
+@pytest.mark.req("MODEL-09", "MODEL-08")
+@pytest.mark.parametrize(
+    ("searches", "outcome", "error"),
+    [(1, CallOutcome.OK, None), (2, CallOutcome.FAILED, "bound_exceeded:web_searches")],
+    ids=["Meta keeps to one search", "Meta runs a second"],
+)
+def test_the_search_bound_qualification_asks_for_one_search_and_ledgers_what_meta_did(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    searches: int,
+    outcome: CallOutcome,
+    error: str | None,
+) -> None:
+    monkeypatch.setenv("META_API_KEY", "not-a-real-key")
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+
+    code = qualify_search_bound(SmokeSettings(_env_file=None), ledger, build=_search_meta(searches))
+
+    [row] = ledger.records()
+    assert code == (0 if outcome is CallOutcome.OK else 1)
+    assert (row.budget_scope, row.outcome, row.error_type) == ("live-search", outcome, error)
+    assert (row.http_requests, row.web_search_queries) == (1, searches)
+    assert row.estimated_cost_nano_usd is not None  # booked at its cost either way
+    notes = json.loads(row.notes)
+    assert notes["max_tool_calls"] == 1
+    if outcome is CallOutcome.OK:  # hosts only, never a URL
+        assert notes["source_hosts"] == ["careers.northwind.example"]
+        assert notes["excluded"] == [{"reason": "source_not_permitted", "host": "www.linkedin.com"}]
+        assert "https://" not in row.notes
