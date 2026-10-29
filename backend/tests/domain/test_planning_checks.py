@@ -325,6 +325,9 @@ def test_total_hours_without_a_timetable_leave_the_envelope_unknown_never_a_pass
     assert codes(result) == {"workload_unknown"}
     assert result.feasibility is Feasibility.UNRESOLVED
     assert result.verdict is Verdict.UNRESOLVED
+    # Without dates as well, the missing timetable is still named on its own.
+    undated = check(person(availability=40), option("course", start=None, hours=None))
+    assert codes(undated) == {"dates_unknown", "workload_unknown"}
 
 
 @pytest.mark.req("WORKLOAD-04", "TIME1-04", "PLN-02")

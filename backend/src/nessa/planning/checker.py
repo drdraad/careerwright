@@ -667,7 +667,14 @@ class _Check:
         for timeline in self.present:
             hours = timeline.variant.weekly_hours
             pattern = timeline.variant.work_pattern
-            if timeline.placed or hours is None:
+            if timeline.placed:
+                continue
+            if hours is None:
+                self.add(
+                    FindingCode.WORKLOAD_UNKNOWN,
+                    variant_id=timeline.variant.variant_id,
+                    reason="no weekly hours or timetable are stated",
+                )
                 continue
             job = pattern.hours_per_week if pattern else self.inputs.continuation.hours_per_week
             if hours + job + fixed > max(availability):
