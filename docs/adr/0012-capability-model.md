@@ -2,7 +2,7 @@
 
 - Status: Accepted for Task 9 (Sprint 4 backend, S4.1–S4.6). Amended in fix round 1
   (2026-10-29): decisions 4, 5, 7, 8, 9 and 10 changed, as marked. Amended again in fix
-  round 2: decisions 4, 5, 7, 8 and 10, and the consequences.
+  round 2: decisions 4, 5, 7, 8 and 10, and the consequences; and in fix round 3: decision 7.
   - **Provisional, need product owner confirmation (R6):**
     - decision 3: how importance is derived, ESCO-only rows unknown, disputed counted as
       required;
@@ -187,7 +187,7 @@ deterministic code: a model may later propose mappings and answers, never commit
    | State | When |
    |---|---|
    | `insufficient_coverage` | Nothing covers the target: no required skill row a rubric models, and no modelled legal-practice or recognition gate (an unknown target, ESCO seed rows only, a regulated occupation with only the unmodelled gate, or the right to work alone). A target-level blocker `no_modelled_requirements` (row ID null). Also when a required row no answer can settle sits beside modelled ones: a row with no rubric, or the unmodelled regulation gate (fix round 2, N5). Never ready |
-   | `not_ready` | A known shortfall: below the required level, not held, or a pathway beyond the model |
+   | `not_ready` | A known shortfall: below the required level, not held, or a pathway beyond the model. It comes first: a coverage gap or an unknown never hides a known shortfall, and is carried as its own blocker (fix round 3, re-review 2 R2-1) |
    | `not_yet_assessed` | Only unknowns the person's answers can settle block: no usable evidence, unresolved |
    | `conditional_on_assessed_completion` | Met only by a scenario's planned outcomes |
    | `ready_now_for_modelled_requirements` | Met now |
@@ -204,10 +204,20 @@ deterministic code: a model may later propose mappings and answers, never commit
    alone is not coverage. Without this, a target whose skill rows the person had relaxed
    would read ready on the right to work. This is fail-safe, in the spirit of C1.
 
-   **A route chart only when there is something to plan** (fix round 2, review N3):
-   `show_route_chart` is true only when a mandatory gap an option could address (learn,
-   credential or experience) exists, and never when the target is not assessable or the
-   person is ready now.
+   **A route chart only when there is something to plan** (fix round 2, review N3; fix
+   round 3, R2-1): `show_route_chart` follows the plannable gaps, not the state. It is true
+   exactly when a mandatory gap an option could address (learn, credential or experience)
+   exists. So it is false when ready now, and when only unknowns or coverage gaps remain. It
+   stays true for a known shortfall beside a coverage gap: for example, P01's data quality
+   target with every modelled row at level 1, after an ESCO row with no rubric is set to
+   essential.
+
+   **An open conflict is named** (fix round 3, re-review 2 R2-2). A result whose met
+   required row rests on evidence in conflict is qualified `open_conflict`. That covers a
+   demonstration disagreeing with a self-report, and a later "not yet done" under another
+   rubric against the row's own level (decision 5). The result may still be ready now; the
+   qualification says it rests on evidence awaiting the person's clarification (spec
+   section 9). With pack 0.1.0 this is reachable through the demonstration case.
 
 8. **The question graph (provisional weights).** One graph across the targets, a shared
    subject asked once. Requirements and gates first; then importance (essential 3, disputed
