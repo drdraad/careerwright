@@ -171,7 +171,8 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    change detection only. Kept bodies are UTF-8 with LF line endings.
    **Known limits, for the product owner:** a personal name in running text (for example
    "ask for Jane in HR") cannot be told apart from other words deterministically and is
-   not removed; nor is a detail written in another form (an email with "at" for "@", a
+   not removed (the product owner accepted this for privately kept bodies on 2026-10-29,
+   `docs/reviews/session-1.md`, last addendum; excerpts and claims are not covered); nor is a detail written in another form (an email with "at" for "@", a
    number spelt out or split by other characters, an address percent-encoded in a link
    such as `mailto:jane%40recruit.example`). A detail hidden by markup (entities, line
    breaks, invisible characters, inline elements, an attribute's entities) is not removed

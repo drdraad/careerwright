@@ -106,3 +106,17 @@ Transcription note (agent, not part of the record): this addendum supersedes the
 that the written explanation and EXP-01 were not put to the product owner. ADR 0007's
 checklist ticks item 7 for what the five answers cover; what they do not cover stays an
 unticked open item.
+
+## Addendum (2026-10-29): names in running text (Part A's "always true" clause)
+
+Asked by the controller in the chat on 2026-10-29, after Task 7A found that a personal name
+in running text (for example "ask for Jane in HR") cannot be detected deterministically
+(ADR 0009 decision 4, known limits). The question as asked, and the product owner's answer as
+given ("yes"):
+
+1. May a person's name that appears in a page's running text stay in the copy kept privately
+   on your machine? — yes
+
+Not asked, so not covered by this answer: names in excerpts, claim values or anything
+committed to git; names in structured contact fields (still removed); email addresses and
+phone numbers (still never kept).
