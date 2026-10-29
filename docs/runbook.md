@@ -212,6 +212,9 @@ with the browser's Origin unchanged.
 ## Upgrades and backups
 
 - Migrations are forward-only: an upgrade cannot be rolled back by a downgrade migration.
+- Migration 0028 (Task 7 slice B fix round 1) removes the held ASHE import so the next
+  `make dev` or `make demo` imports the pinned file again with each statistic's CV; ASHE is
+  public reference data, so nothing private is lost.
 - Backup and restore are not implemented yet (SEC-07 is open). Until they are, an upgrade
   that goes wrong cannot be undone, and losing the Docker volumes or `NESSA_HOME` loses the
   data.

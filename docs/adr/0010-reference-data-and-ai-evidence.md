@@ -1,9 +1,10 @@
 # ADR 0010: Reference data, the salary floor and the AI Resilience record model
 
 - Status: Accepted for Task 7, slice 7B (Sprint 3: S3.1's ASHE and UK SOC part, the salary
-  floor, the reduced S3.6). Decisions 4 (full-time tables), 7 (the 90th percentile) and 8
-  (advertised pay read as gross) and every licence reading in decision 2 are **provisional,
-  need product owner confirmation (R6)**.
+  floor, the reduced S3.6). Decision 4 (the full-time tables), decision 8 (the 90th
+  percentile; advertised pay read as gross), decision 7's evidence-quality words and every
+  licence reading in decision 2 are **provisional, need product owner confirmation (R6)**.
+  Fix round 1 (2026-10-29) amended decisions 4, 6, 7, 8 and 10 as marked.
 - Date: 2026-10-29
 - Requirements: TAX1-02..07, AIR1-02, AIR1-03, AIR1-04, AIR1-05 (backend), AIR1-07,
   AIR1-10, AIR1-11, AIR1-12, JOB-05, DIV1-07, JOB-03 (the floor's part); spec sections 4, 5,
@@ -65,8 +66,11 @@ that is a reviewed range or unscored, never a formula. L0 has no accountable rev
    jobs in thousands, every statistic (median, mean, ten percentiles) in pence, rounded to
    the penny from its decimal text, and ONS's marker (`x` unreliable, `..` disclosive, `:`
    not applicable, `-` negligible) where a value is withheld: null with its marker, never 0.
-   The median's CV gives ONS's quality band. One release is held, so the trend is
-   `unavailable`, `single_snapshot`.
+   Each statistic keeps its own CV from the "b" table and so its own ONS quality band,
+   shown beside it, a P90's never the median's (fix round 1, review A M4; migration 0028,
+   transformation `nessa-ashe-import-2`, which removes the held ASHE import so
+   `setup-database` imports it again). One release is held, so the trend is `unavailable`,
+   `single_snapshot`.
 
 5. **UK SOC 2020 mapping (TAX1-02, TAX1-03).** ONS's coding index codes each of 32,435 job
    titles to a SOC 2020 unit group and an ISCO-08 group (235 entries without a code are
@@ -96,55 +100,85 @@ that is a reviewed range or unscored, never a formula. L0 has no accountable rev
    observed", never zero and never protection. None of this is a score.
 
 7. **The AI Resilience record model (AIR1-02, AIR1-04, AIR1-07, AIR1-12).** A record is data
-   entered through `AssessmentRecord`; a model's proposal can only be `model_proposal` with
-   no decision. `publication_failures` checks, deterministically: an accountable reviewer's
-   decision; a reviewed mapping; technological and geographic scope; observed supporting
-   evidence; at least two evidence families from at least two independent sources (two
-   named sources repeating one study are one); contradictions recorded (an empty list is
+   entered through `AssessmentRecord`. Its `origin` decides (fix round 1, review B I2): a
+   `model_proposal` never publishes, whatever its decision says; a reviewer who accepts one
+   enters it as their own `reviewer_entry`. No code path writes a record: the packs change
+   only by a reviewed commit, and the product pack is held empty by a test.
+   `publication_failures` checks, deterministically: a reviewer entry; an accountable
+   reviewer's decision, which records the bounds it approved, so a record whose bounds
+   differ does not publish (review B M1); a reviewed mapping; technological and geographic
+   scope; observed supporting evidence; at least two evidence families from at least two
+   independent sources (two named sources repeating one study are one), not all of them
+   exposure (task exposure and observed use alone are exposure evidence only and keep
+   resilience unscored, spec AIR-1 step 4; `exposure_only_evidence`, review B I1); the
+   reviewer's grade of the evidence (spec section 18's evidence quality: limited, moderate,
+   strong; provisional words, R6; review B M6); contradictions recorded (an empty list is
    "none found", a missing one is not recorded); physical-automation coverage stated; a
-   range on the rubric's band edges unless a documented anchor names the integer; no
-   reference point (M1); no seniority or local modifier (M0 inherits); a five-year horizon;
-   this method version; a missing observation never as protection; a synthetic record
-   labelled. A withdrawn record, or one a known material correction affects (by source or
-   record), is never published. Packs are committed, versioned and dated
-   (`catalogue/packs/`), loaded and checked when the API starts, before any session, so a
-   correction invalidates what it affects at once; every slate and evidence answer names
-   the pack's version and date. The product pack is empty (no reviewer, H-10), so every
-   real role is unscored. The fixture pack holds one conspicuously labelled synthetic record
-   (data quality specialist, 5-8) and applies only in the fixture workspace. The assessment
-   reads only a pack: `ai_resilience` imports no evidence table, so no formula can exist.
+   range on the rubric's band edges unless a documented anchor names the integer, and a
+   widening reason for a range across bands; no reference point (M1); no seniority or local
+   modifier (M0 inherits); a five-year horizon; this method version; a missing observation
+   never as protection; a synthetic record labelled. A reviewed null skips the
+   evidence-sufficiency checks (it is the reviewer's answer to evidence that cannot support
+   a range) and reads `reviewed_null` (review B M2). A withdrawn record, or one a known
+   material correction affects (by source or record), is never published. Packs are
+   committed, versioned and dated (`catalogue/packs/`), loaded and checked when the API
+   starts, before any session, so a correction invalidates what it affects at once; every
+   slate and evidence answer names the pack's version and date. The product pack is empty
+   (no reviewer, H-10), so every real role is unscored. The fixture pack holds one
+   conspicuously labelled synthetic record (data quality specialist, 5-8, with a synthetic
+   accountability family bearing protection beside the two exposure families) and applies
+   only in the fixture workspace. `synthetic` describes the record, false where a role has
+   none (review B M3). The assessment reads only a pack: `ai_resilience` imports no
+   evidence table, so no formula can exist. Beside a published range the imported
+   evidence's state is `assessed`, never `exposure_only` (review B I1).
 
 8. **The salary floor as a hard filter (DIV1-07, JOB-05; H-11 item 4).** Something is left
-   out only when the highest pay it states, in the floor's period and in GBP, is below the
-   floor; unknown, provider-predicted, other-period (never converted) and unpublished pay is
-   kept, and every case is counted with its reason (`pay.floor_verdict`).
+   out only when the top of the pay it states, in the floor's period and in GBP, is below
+   the floor; unknown, provider-predicted, unknown-basis (`basis_unknown`), other-period
+   (never converted), open-ended and unpublished pay is kept, and every case is counted with
+   its reason.
    - The slate (the floor of the discovery's pinned answers): an occupation's pay is its
      modelled pay, so only a reviewed mapping can put it below the floor, and then only when
      ASHE's 90th percentile for the floor's period is below it in every region of the
      person's cities (R6: a career most of whose jobs pay less but some pay enough is not
-     removed). Left-out occupations say `below_salary_floor` in "show why this wasn't
-     included"; `salary_floor` gives the counts and a sentence. In L0 no mapping is
-     reviewed, so the floor removes no suggestion and says why.
-   - The job listing (the current profile's floor): a vacancy is left out when its copies'
-     advertised GBP pay in the floor's period, at its highest, is below it. Advertised pay is
-     read as gross, as UK adverts state pay (R6). Adzuna states no period, so its pay is
-     never below a floor. The page, `total_jobs` and `city_counts` leave out what the floor
-     left out; `salary_floor` counts it; a listing the floor empties says
-     `all_below_salary_floor`, never "none found". Examples are never filtered.
+     removed). ASHE's figure is compared with the floor directly, never through the
+     advertised-pay rule (fix round 1, review A M6). Left-out occupations say
+     `below_salary_floor` in "show why this wasn't included"; `salary_floor` gives the
+     counts and a sentence with every count, `meets` included (review A M7). In L0 no
+     mapping is reviewed, so the floor removes no suggestion and says why.
+   - The job listing (the current profile's floor; `pay.floor_verdict`): a vacancy is left
+     out only when every advertised GBP amount its copies state in the floor's period has a
+     top (a range's maximum, an "up to", or one amount) below it. A minimum with no maximum
+     ("From £24,000", "Minimum £24,000", a JSON-LD `minValue` alone, and "£24,000+", which
+     the span reader now reads as a minimum) is open above: `no_upper_amount`, kept, unless
+     the minimum already meets the floor (fix round 1, review A I1). Advertised pay is read
+     as gross, as UK adverts state pay (R6). Adzuna states no period, so its pay is never
+     below a floor. The page, `total_jobs` and `city_counts` leave out what the floor left
+     out; `salary_floor` counts it; a listing the floor empties says
+     `all_below_salary_floor`, never "none found", and `sources_pending` first while a source
+     is still being read (review A M3). Examples are never filtered.
 
 9. **The AI Resilience filter (AIR1-05, backend part).** `min_ai_resilience` (Any when
    absent, 0 to 10) applies to the lower end of a published range; unscored occupations are
    kept unless `include_unscored` is false, and never read as 0 or 10. On the slate it is a
    view parameter, counted (`ai_resilience_filter`: scored, below the minimum, unscored,
-   unscored left out). It never constrains a plan (AIR1-06, T11/T13a).
+   unscored left out, and `synthetic` when a scored range is the fixture's, whose summary
+   then says "synthetic fixture range"; fix round 1, review B M8). It never constrains a
+   plan (AIR1-06, T11/T13a).
 
 10. **Contract changes.** New: `GET /v1/workspaces/{id}/occupations/{concept_id}/evidence`;
     the slate's `salary_floor` and `ai_resilience_filter` (replacing `limits_not_applied`)
     and its two query parameters; three `NotIncluded` reasons; the listing's
     `salary_floor` and `EmptyReason.all_below_salary_floor`; the error code
     `REFERENCE_DATA_UNAVAILABLE` (503); migration 0027. `setup-database` imports the six
-    datasets after ESCO. No workflow's step sequence changes: DBOS `application_version`
-    stays `nessa-l0-1`.
+    datasets after ESCO. Fix round 1: each ASHE statistic's `cv` and `reliability` beside
+    it (replacing the benchmark's `median_cv` and `reliability`; migration 0028); the
+    floor reasons `no_upper_amount` and `basis_unknown`; `ai_evidence.state` `assessed`;
+    `ai_resilience.evidence_quality`; the filter's `synthetic`; the publication failures
+    `exposure_only_evidence`, `model_proposal`, `bounds_not_decided`,
+    `evidence_quality_not_stated` and `widening_not_explained`; the decision's `lower` and
+    `upper`. No workflow's step sequence changes: DBOS `application_version` stays
+    `nessa-l0-1`.
 
 ## Evidence
 
@@ -153,13 +187,19 @@ refusal, the pinned files' counts, an occupation's evidence through the API, the
 record in the fixture workspace only, modelled pay through a synthetic reviewed mapping;
 `test_discovery.py`: the floor and the AI filter on a slate; `test_acquisition.py`: the floor
 on vacancies). Domain tests: `test_reference_parsers.py`, `test_pay.py`,
-`test_ai_resilience.py`, `test_slate.py`, `test_jobs.py`. No live call was made.
+`test_ai_resilience.py`, `test_slate.py`, `test_jobs.py`. No live call was made. Fix round
+1 added: open-ended pay as the readers give it (`test_jobs.py`), the occupation rule at its
+boundary (`test_pay.py`), each statistic's CV, the floor sentence's counts
+(`tests/api/test_floor_words.py`), a pending page the floor emptied, the new publication
+checks, a published synthetic range through the slate, the evidence state beside it, and the
+evidence endpoint's 503 and 404.
 
 ## Consequences and open items
 
 - Not run, requires a human (R2): H-10, every reviewed UK SOC mapping and every published
-  AI Resilience record; the licence readings above and the provisional decisions 4, 7 and 8
-  (R6).
+  AI Resilience record; the licence readings above, the provisional decisions 4 (the
+  full-time tables) and 8 (the 90th percentile; advertised pay read as gross) and decision
+  7's evidence-quality words (R6).
 - Jobs carry no occupation ID yet (JOB-01's open part), so a vacancy shows its own pay and no
   modelled pay; the Roles chapter that shows an occupation's evidence and the pay lens is
   Task 8.
