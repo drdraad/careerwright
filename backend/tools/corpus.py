@@ -15,7 +15,9 @@ Class `other` needs no terms and stays "pending human rights review".
 It prints the manifest record (URL, retrieval time, HTTP status, content type, SHA-256, the
 attempt's status and reason, rights status, retention, and each posting's claims as field,
 value, offsets and a minimal excerpt) for the person curating to place in the manifest. It
-never edits the manifest itself.
+never edits the manifest itself. `--locate EXCERPT` (repeatable) gives each of a label's
+excerpts its offsets in the text whose hash is recorded, also for a page whose class keeps no
+body: the page is held in memory for that only, never written.
 
 `--adzuna WHAT WHERE` runs one Adzuna search instead (the option pack's predicted-pay and
 snippet slots, Task 7b): through `make live-adzuna`'s own path (`tools.live_adzuna.search`:
@@ -28,9 +30,11 @@ or `... --slot J03 --adzuna "bookkeeping assistant" Leeds`.
 
 import argparse
 import base64
+import hashlib
 import json
+import re
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -38,9 +42,10 @@ from typing import Any
 from pydantic import SecretStr, TypeAdapter
 
 from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_adzuna, acquire_page
-from nessa.evidence.addresses import CheckedUrl
+from nessa.evidence.addresses import CheckedUrl, UrlRefusal
 from nessa.evidence.adzuna import AdzunaQuery
-from nessa.evidence.fetcher import Fetcher
+from nessa.evidence.fetcher import Admit, Fetched, Fetcher, FetchFailure
+from nessa.evidence.pages import redact_page
 from nessa.evidence.records import ClaimValue, Retention, RightsClass
 from nessa.evidence.sources import (
     PENDING_REVIEW,
@@ -56,6 +61,7 @@ from tools.usage_ledger import Ledger
 
 EVIDENCE_DIR = REPO_ROOT / "var" / "evidence" / "corpus"
 ADZUNA_RESULTS = 50  # one page of Adzuna's largest size: the fewest requests for a slot
+MAX_HITS = 5  # occurrences listed per excerpt: a label needs one, several say it is not unique
 
 
 def agent_classification(
@@ -124,6 +130,36 @@ def record(result: AcquisitionResult) -> dict[str, object]:
     }
 
 
+class _Witness(Fetcher):
+    """The fetcher, keeping in memory (never on disk) the last page it fetched, so that a
+    label's excerpts can be located in exactly the text that was hashed, also for a page
+    whose class keeps no body."""
+
+    def __init__(self, inner: Fetcher) -> None:  # delegates: no state of its own to set up
+        self._inner = inner
+        self.page: Fetched | None = None
+
+    def check(self, url: str) -> CheckedUrl | UrlRefusal:
+        return self._inner.check(url)
+
+    def fetch_page(self, url: str, admit: Admit | None = None) -> Fetched | FetchFailure:
+        result = self._inner.fetch_page(url, admit)
+        if isinstance(result, Fetched):
+            self.page = result
+        return result
+
+
+def locate(text: str, excerpts: Sequence[str]) -> list[dict[str, object]]:
+    """Every occurrence of each excerpt in the hashed text, as character offsets."""
+    found: list[dict[str, object]] = []
+    for excerpt in excerpts:
+        starts = [m.start() for m in re.finditer(re.escape(excerpt), text)] if excerpt else []
+        found.append(
+            {"excerpt": excerpt, "offsets": [[s, s + len(excerpt)] for s in starts[:MAX_HITS]]}
+        )
+    return found
+
+
 def acquire_for_corpus(
     slot: str,
     url: str,
@@ -132,12 +168,16 @@ def acquire_for_corpus(
     rights_class: RightsClass | None = None,
     terms: str | None = None,
     evidence_dir: Path = EVIDENCE_DIR,
+    excerpts: Sequence[str] = (),
 ) -> dict[str, object]:
+    """`excerpts`: a label's minimal excerpts, each located (`located`) in the text whose
+    hash is recorded, which is the pipeline's own redaction of the page it retrieved."""
     now = datetime.now(UTC)
     checked = fetcher.check(url)
     requested_host = checked.host if isinstance(checked, CheckedUrl) else ""
     classify = agent_classification(rights_class, terms, now.date(), requested_host=requested_host)
-    result = acquire_page(fetcher, Pacer(), url, now=now, classify=classify)
+    witness = _Witness(fetcher)
+    result = acquire_page(witness, Pacer(), url, now=now, classify=classify)
     body_path = None
     if result.body_b64 is not None and result.retention is Retention.BODY:
         directory = evidence_dir / slot
@@ -149,6 +189,11 @@ def acquire_for_corpus(
         body_path.relative_to(REPO_ROOT) if body_path.is_relative_to(REPO_ROOT) else body_path
     )
     out["kept_body"] = str(shown) if shown else None
+    if excerpts and witness.page is not None and result.content_sha256 is not None:
+        hashed = redact_page(witness.page.text).text
+        if hashlib.sha256(hashed.encode()).hexdigest() != result.content_sha256:
+            raise SystemExit("the located text is not the text whose hash is recorded")
+        out["located"] = locate(hashed, excerpts)
     return out
 
 
@@ -186,6 +231,13 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--rights-class", type=RightsClass, default=None)
     parser.add_argument("--terms", default=None, help="the terms relied on, quoted and dated")
+    parser.add_argument(
+        "--locate",
+        action="append",
+        default=[],
+        metavar="EXCERPT",
+        help="a label's excerpt to locate in the hashed text (repeat for each)",
+    )
     args = parser.parse_args(argv)
     if args.adzuna:
         if args.rights_class or args.terms:
@@ -200,7 +252,12 @@ def main(argv: list[str] | None = None) -> None:
     else:
         fetcher = Fetcher(user_agent=load_manifest().user_agent)
         out = acquire_for_corpus(
-            args.slot, args.url, fetcher=fetcher, rights_class=args.rights_class, terms=args.terms
+            args.slot,
+            args.url,
+            fetcher=fetcher,
+            rights_class=args.rights_class,
+            terms=args.terms,
+            excerpts=args.locate,
         )
     print(json.dumps(out, indent=2, ensure_ascii=False))
     sys.stdout.flush()

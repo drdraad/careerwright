@@ -157,6 +157,31 @@ def test_an_agent_s_classification_holds_only_for_the_host_it_was_given_for(
     assert not list(tmp_path.iterdir())
 
 
+def test_a_label_s_excerpts_are_located_in_the_hashed_text_of_a_page_whose_body_is_not_kept(
+    tmp_path: Path,
+) -> None:
+    body = page(POSTING).encode()
+    with source_server({"/jobs/1": Scripted(body=body)}) as server:
+        out = acquire_for_corpus(
+            "J12",
+            f"http://jobs.board.example:{server.port}/jobs/1",
+            fetcher=fetcher(server),
+            rights_class=RightsClass.JOB_BOARD,
+            terms='"Reference only" (terms page, read 2026-10-29)',
+            evidence_dir=tmp_path,
+            excerpts=["Data Quality Analyst", "not on the page"],
+        )
+
+    assert out["kept_body"] is None
+    assert not list(tmp_path.iterdir())  # located in memory, never written
+    text = body.decode()
+    located: Any = out["located"]
+    found, missing = located
+    assert found["offsets"]
+    assert all(text[s:e] == "Data Quality Analyst" for s, e in found["offsets"])
+    assert missing == {"excerpt": "not on the page", "offsets": []}
+
+
 CREDENTIALS = (SecretStr(APP_ID), SecretStr(APP_KEY))
 
 
