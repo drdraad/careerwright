@@ -61,7 +61,7 @@ from tools.usage_ledger import Ledger
 
 EVIDENCE_DIR = REPO_ROOT / "var" / "evidence" / "corpus"
 ADZUNA_RESULTS = 50  # one page of Adzuna's largest size: the fewest requests for a slot
-MAX_HITS = 5  # occurrences listed per excerpt: a label needs one, several say it is not unique
+MAX_HITS = 5  # spans listed per excerpt (a label needs one); its count is always the real one
 
 
 def agent_classification(
@@ -150,19 +150,21 @@ class _Witness(Fetcher):
 
 
 def locate(text: str, excerpts: Sequence[str]) -> list[dict[str, object]]:
-    """Every occurrence of each excerpt in the hashed text, as character offsets with the
-    exact text there. Whitespace in an excerpt matches any run of whitespace, since markup
-    breaks lines where a reader sees one space; nothing else is loosened."""
+    """Each excerpt's occurrences in the hashed text: their real count, and the first few
+    (`MAX_HITS`) as character offsets with the exact text there. Whitespace in an excerpt
+    matches any run of whitespace, since markup breaks lines where a reader sees one space;
+    nothing else is loosened."""
     found: list[dict[str, object]] = []
     for excerpt in excerpts:
         words = excerpt.split()
         pattern = re.compile(r"\s+".join(re.escape(w) for w in words)) if words else None
-        hits = list(pattern.finditer(text))[:MAX_HITS] if pattern else []
+        hits = list(pattern.finditer(text)) if pattern else []
         found.append(
             {
                 "excerpt": excerpt,
-                "offsets": [[m.start(), m.end()] for m in hits],
-                "texts": [m.group() for m in hits],
+                "count": len(hits),
+                "offsets": [[m.start(), m.end()] for m in hits[:MAX_HITS]],
+                "texts": [m.group() for m in hits[:MAX_HITS]],
             }
         )
     return found

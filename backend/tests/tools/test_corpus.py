@@ -180,7 +180,7 @@ def test_a_label_s_excerpts_are_located_in_the_hashed_text_of_a_page_whose_body_
     found, missing = located
     assert found["offsets"]
     assert all(text[s:e] == "Data Quality Analyst" for s, e in found["offsets"])
-    assert missing == {"excerpt": "not on the page", "offsets": [], "texts": []}
+    assert missing == {"excerpt": "not on the page", "count": 0, "offsets": [], "texts": []}
 
 
 @pytest.mark.req("TEST1-09")
@@ -191,6 +191,17 @@ def test_whitespace_in_an_excerpt_matches_a_line_break_in_the_markup_and_nothing
 
     assert found["offsets"] == [[4, 32]]
     assert found["texts"] == ["Experience of\n      Power BI"]
+
+
+@pytest.mark.req("TEST1-09")
+def test_a_located_excerpt_s_count_is_its_real_count_though_only_five_spans_are_listed() -> None:
+    text = " ".join(["Leeds City College"] * 29)
+
+    [found] = locate(text, ["Leeds City College"])
+    offsets: Any = found["offsets"]
+
+    assert found["count"] == 29
+    assert len(offsets) == 5
 
 
 CREDENTIALS = (SecretStr(APP_ID), SecretStr(APP_KEY))
