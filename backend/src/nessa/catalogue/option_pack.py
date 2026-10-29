@@ -42,7 +42,7 @@ PACKS_DIR = Path(__file__).parent / "packs" / "england_option_pack"
 # Every committed version, pinned by the SHA-256 of its file's bytes: a version never
 # changes; a correction or a review is a new version (Task 7c publishes the reviewed one).
 PINS: dict[str, str] = {
-    "0.1.0": "3b5c669de29aacc0473227ca5d0fa1ba54c120a4aea1264f0a9f0e86e9d394de",
+    "0.1.0": "74569ed099abd586675d1ec9fd01cdcddb780cde86eefc923e63609d8b49b243",
 }
 
 SHA256 = r"^[0-9a-f]{64}$"

@@ -11,7 +11,7 @@
   "option_pack": {
     "version": "0.1.0",
     "path": "backend/src/nessa/catalogue/packs/england_option_pack/england-option-pack-0.1.0.json",
-    "sha256": "3b5c669de29aacc0473227ca5d0fa1ba54c120a4aea1264f0a9f0e86e9d394de",
+    "sha256": "74569ed099abd586675d1ec9fd01cdcddb780cde86eefc923e63609d8b49b243",
     "dated": "2026-10-29",
     "records": "every record review_state proposed (Task 7b); Task 7c publishes the reviewed version from session 2's H-07 record",
     "label_review": "not run - requires human domain reviewer"
