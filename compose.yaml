@@ -2,11 +2,14 @@
 # never by hand: the Makefile sets NESSA_HOME (secrets and master keys, outside the
 # repository), the runtime mode and the ports.
 #
-# Every service sits on the `internal` network, which has no route out of the machine. The
-# `edge` relay is the only service also on a normal bridge: it publishes the API, the Auth
-# emulator, PostgreSQL and the web app on 127.0.0.1 only. `compose.live.yaml` gives the
-# worker (for Meta) and the restricted acquisition worker (for permitted pages and Adzuna),
-# and nothing else, a route out; demo mode omits it.
+# Every service but one sits on the `internal` network, which has no route out of the
+# machine. The restricted acquisition worker sits on `acquisition`, a second internal
+# network it shares with the DBOS worker only, so no other container can ask it to fetch
+# (its own route out, in live mode, is never anyone else's). The `edge` relay is the only
+# service also on a normal bridge: it publishes the API, the Auth emulator, PostgreSQL and
+# the web app on 127.0.0.1 only. `compose.live.yaml` gives the worker (for Meta) and the
+# restricted acquisition worker (for permitted pages and Adzuna), and nothing else, a route
+# out; demo mode omits it.
 name: nessa-l0
 
 x-local: &local
@@ -105,6 +108,7 @@ services:
   worker:
     <<: *backend
     command: ["python", "-m", "nessa.worker"]
+    networks: [internal, acquisition]
     environment:
       <<: [*local, *models]
       NESSA_APP_DATABASE_URL: postgresql+psycopg://nessa_worker@postgres:5432/nessa_app
@@ -131,10 +135,13 @@ services:
   # pages and runs Adzuna searches for the DBOS worker, and records nothing. It gets no
   # database secret, master key, model key or profile: no secret, and one read-only mount,
   # the Adzuna credentials that setup placed under NESSA_HOME (ruling R4). In live mode
-  # (compose.live.yaml) it has a route out; in demo mode it has none.
+  # (compose.live.yaml) it has a route out; in demo mode it has none. It listens without
+  # authentication, so it is on the `acquisition` network only: the DBOS worker alone can
+  # reach it.
   acquisition:
     <<: *backend
     command: ["python", "-m", "nessa.acquisition"]
+    networks: [acquisition]
     environment:
       NESSA_ENVIRONMENT: local
       NESSA_ADZUNA_CREDENTIALS_DIR: /run/nessa/adzuna
@@ -192,6 +199,8 @@ services:
 
 networks:
   internal:
+    internal: true
+  acquisition:
     internal: true
   edge: {}
 

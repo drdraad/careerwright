@@ -140,12 +140,15 @@ with the browser's Origin unchanged.
   `skipped`; `200` with no acquisition if nothing was started). A URL with a user name,
   password or `app_key` in it is refused (`422`, `credentials_in_url`); any other refusal
   (private address, scheme, port, a denied source, robots.txt) is recorded as a blocked
-  attempt. `GET .../research/acquisitions/{run_id}` shows each target's attempts (status,
+  attempt. A URL refused for its scheme, host or address is never kept as a URL: its target
+  shows the `refusal` and the host as plain text (`refused_host`). `GET
+  .../research/acquisitions/{run_id}` shows each target's attempts (status,
   reason, retries, rights class, what was kept), the jobs found so far and, once complete,
   the summary. A run whose every source failed is `failed/retrieval_failed`, or
   `source_blocked` when every source was refused: never "no vacancies".
 - Pasted text: `POST .../research/pasted` with `{target, title, text, employer?, city?,
-  source_url?}` returns `201` and the job: the person's own example of a target (at most 3
+  source_url?}` (a `source_url` that fails the URL checks is a `422`) returns `201` and the
+  job: the person's own example of a target (at most 3
   per target; `422 LIMIT_EXCEEDED` after that), never fetched, never a live vacancy
   (`exemplar: true`, freshness `never_verified`).
 - Jobs: `GET .../jobs?favourites=&cursor=&limit=` (each job's values, every source copy,

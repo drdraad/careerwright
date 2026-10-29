@@ -3,6 +3,7 @@
 These tests drive real containers through their published ports, the way a browser would.
 """
 
+import base64
 import json
 import socket
 import subprocess
@@ -10,6 +11,7 @@ import threading
 import time
 import uuid
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import httpx2 as httpx
@@ -168,6 +170,48 @@ def probe(stack: Stack, service: str, port: int, *, outside: bool = True) -> str
     return stack.exec(service, *command, timeout=60).stdout.strip()
 
 
+REACH_PYTHON = (
+    "import socket\ntry:\n    socket.create_connection(('acquisition', 8100), timeout=4).close()\n"
+    "    print('connected')\nexcept OSError as error:\n    print(type(error).__name__)\n"
+)
+REACH_NODE = (
+    "const s=require('net').connect({host:'acquisition',port:8100,timeout:4000});"
+    "s.on('connect',()=>{console.log('connected');s.destroy()});"
+    "s.on('error',e=>console.log(e.code));s.on('timeout',()=>{console.log('timeout');s.destroy()})"
+)
+REACH_BASH = (
+    'if timeout 4 bash -c "exec 3<>/dev/tcp/acquisition/8100" 2>/dev/null; '
+    "then echo connected; else echo blocked; fi"
+)
+
+
+def reaches_acquisition(stack: Stack, service: str) -> str:
+    """Whether `service` can open a connection to the acquisition worker's port."""
+    if service in ("api", "edge", "worker"):
+        command = ["python", "-c", REACH_PYTHON]
+    elif service in ("auth", "web"):
+        command = ["node", "-e", REACH_NODE]
+    else:
+        command = ["bash", "-c", REACH_BASH]
+    return stack.exec(service, *command, timeout=60).stdout.strip()
+
+
+def assert_only_the_worker_reaches_acquisition(stack: Stack) -> None:
+    outcomes = {
+        service: reaches_acquisition(stack, service)
+        for service in ("worker", "api", "web", "auth", "edge", "postgres")
+    }
+    assert outcomes["worker"] == "connected", outcomes  # positive control
+    assert [s for s, outcome in outcomes.items() if outcome == "connected"] == ["worker"], outcomes
+
+
+@pytest.mark.req("ACQ-05", "BND1-11")
+def test_only_the_dbos_worker_can_reach_the_acquisition_worker(demo_stack: Stack) -> None:
+    # The acquisition worker listens without authentication, so it shares a network with
+    # the DBOS worker alone: the API, the web app and the rest cannot ask it to fetch.
+    assert_only_the_worker_reaches_acquisition(demo_stack)
+
+
 @pytest.mark.req("BND1-11")
 def test_demo_mode_services_have_no_route_out_and_the_probe_can_see_one(
     demo_stack: Stack, host_listener: tuple[int, list[bool]]
@@ -216,6 +260,8 @@ def test_live_mode_gives_the_two_workers_and_nothing_else_a_route_out(
         assert web["outside"] != "connected"
         assert web["dns"] != "resolved"
         assert accepted == []
+        # The acquisition worker's route out is never a relay for anyone else (review A I4).
+        assert_only_the_worker_reaches_acquisition(live)
     finally:
         demo_stack.up(*CORE_SERVICES)  # back to demo for the remaining tests
     for service in ("worker", "acquisition"):
@@ -255,6 +301,83 @@ def test_the_acquisition_worker_holds_no_database_secret_master_key_or_model_key
         demo_stack.exec("acquisition", "python", "-m", "nessa.acquisition", "--check").returncode
         == 0
     )
+
+
+# Runs inside a container: reads the needles from stdin (never its arguments), searches
+# every process's environment and command line and every readable regular file, and prints
+# only where a needle was found and how much it searched, never a value.
+SECRET_SCAN = """
+import base64, json, os, sys
+needles = [base64.b64decode(n) for n in json.load(sys.stdin)]
+hits, files = set(), 0
+def scan(data, where):
+    if any(n in data for n in needles):
+        hits.add(where)
+for pid in filter(str.isdigit, os.listdir('/proc')):
+    for part in ('environ', 'cmdline'):
+        try:
+            with open(f'/proc/{pid}/{part}', 'rb') as f:
+                scan(f.read(), f'/proc/*/{part}')
+        except OSError:
+            pass
+for root, dirs, names in os.walk('/'):
+    dirs[:] = [d for d in dirs if os.path.join(root, d) not in ('/proc', '/sys', '/dev')]
+    for name in names:
+        path = os.path.join(root, name)
+        if os.path.islink(path) or not os.path.isfile(path):
+            continue
+        try:
+            with open(path, 'rb') as f:
+                scan(f.read(8_000_000), path)
+            files += 1
+        except OSError:
+            pass
+print(json.dumps({'files': files, 'hits': sorted(hits)}))
+"""
+
+
+def _secret_needles(home: Path) -> list[bytes]:
+    """The stack's real database passwords and master keys, in the forms they could be held
+    (the text, and a key's raw bytes, hex and base64)."""
+    needles = [p.read_bytes().strip() for p in sorted((home / "secrets").glob("pg_*"))]
+    for key in sorted((home / "keys").glob("v*.key")):
+        raw = key.read_bytes()
+        needles += [raw, raw.hex().encode(), base64.b64encode(raw), base64.urlsafe_b64encode(raw)]
+    assert len(needles) >= 10
+    assert all(len(n) >= 16 for n in needles)
+    return needles
+
+
+def _scan_for_secrets(stack: Stack, service: str, needles: list[bytes]) -> dict[str, Any]:
+    scanned = subprocess.run(  # noqa: S603
+        ["docker", "exec", "-i", stack.container_id(service), "python", "-c", SECRET_SCAN],  # noqa: S607
+        input=json.dumps([base64.b64encode(n).decode() for n in needles]),
+        capture_output=True,
+        text=True,
+        timeout=300,
+        check=True,
+    )
+    found: dict[str, Any] = json.loads(scanned.stdout)
+    return found
+
+
+@pytest.mark.req("ACQ-05")
+def test_no_database_password_or_master_key_value_is_anywhere_in_the_acquisition_worker(
+    demo_stack: Stack,
+) -> None:
+    # By value, not by name (review A M9): the running container's processes' environments
+    # and every file it can read hold none of the stack's database passwords or master keys.
+    # The DBOS worker, which does hold some, is the positive control.
+    needles = _secret_needles(demo_stack.home)
+
+    acquisition = _scan_for_secrets(demo_stack, "acquisition", needles)
+    worker = _scan_for_secrets(demo_stack, "worker", needles)
+    environment = " ".join(_inspect(demo_stack, "acquisition")["Config"]["Env"]).encode()
+
+    assert acquisition["files"] > 1_000  # it searched the whole filesystem
+    assert acquisition["hits"] == []
+    assert not any(n in environment for n in needles)
+    assert {"/run/secrets/pg_worker", "/run/nessa/keys/v1.key"} <= set(worker["hits"])
 
 
 @pytest.mark.req("ARC1-08")

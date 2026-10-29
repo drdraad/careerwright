@@ -19,18 +19,27 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
 ## Decisions
 
 1. **A restricted acquisition worker, without a database.** `python -m nessa.acquisition`
-   is a small standard-library HTTP service on the internal Compose network. It fetches one
+   is a small standard-library HTTP service on its own internal Compose network,
+   `acquisition`, which it shares with the DBOS worker alone: it listens without
+   authentication, so no other container (the API, the web app, Auth, the edge, PostgreSQL)
+   can reach it, and its route out in live mode is never a relay for them (fix round 1,
+   review A I4; `test_only_the_dbos_worker_can_reach_the_acquisition_worker`, and the same
+   check in live mode). It fetches one
    page, or runs one Adzuna search, per request and returns the result; it records nothing.
    Its configuration has no database, master-key or model setting; Compose gives it no
    secret and one read-only mount, the Adzuna credentials (decision 11). The DBOS worker,
    which holds the database role and the master key, calls it and records the result. In
    live mode (`compose.live.yaml`) the acquisition worker and the DBOS worker alone have a
-   route out; in demo mode neither does. Proven three ways: the import closure of
+   route out; in demo mode neither does. Proven four ways: the import closure of
    `nessa.acquisition` reaches no store, keyring, Meta, profile or API module
    (`test_the_acquisition_worker_cannot_reach_a_database_key_model_or_profile`), its
-   settings have three fields, and on the running container its only mount is the Adzuna
+   settings have three fields, on the running container its only mount is the Adzuna
    directory, `/run/secrets` does not exist and no environment name mentions a database,
-   master key or Meta (`test_the_acquisition_worker_holds_no_database_secret_master_key_or_model_key`).
+   master key or Meta (`test_the_acquisition_worker_holds_no_database_secret_master_key_or_model_key`),
+   and by value: none of the stack's database passwords or master keys (as text, raw, hex
+   or base64) is in any of its processes' environments or any file it can read, with the
+   DBOS worker as the positive control
+   (`test_no_database_password_or_master_key_value_is_anywhere_in_the_acquisition_worker`).
    A new database role was rejected: the init script that creates roles runs only on a new
    volume, so existing installations would not get it.
 
