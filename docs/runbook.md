@@ -6,8 +6,8 @@ Everything runs on this machine (ADR 0001). Run commands from the repository roo
 
 | Command | What it does |
 |---|---|
-| `make setup` | Checks Docker (Compose v2), uv, pnpm 10.33.2 and Node 24; installs the locked backend, web-app and design-tooling dependencies and Playwright's Chromium; creates `NESSA_HOME` (default `~/.nessa/l0`) with generated database passwords and master key `v1`, all owner-only; downloads the pinned ESCO release (10 MB) into `var/datasets/` and keeps it only if its size and SHA-256 match; builds the images (backend, Auth emulator, web). Network is needed here only. Safe to re-run: it never replaces an existing password or key, and re-verifies a dataset already present instead of fetching it again. |
-| `make dev` | Starts the stack in **live** mode and waits until healthy: migrates, seeds, imports the ESCO release on the first start (about 6 s; later starts find it imported), starts the web app, prints the URLs. Only the worker (for Meta) and the restricted acquisition worker (for permitted pages and Adzuna) can reach the internet. Live-vacancy workspaces are offered only if setup placed Adzuna credentials. |
+| `make setup` | Checks Docker (Compose v2), uv, pnpm 10.33.2 and Node 24; installs the locked backend, web-app and design-tooling dependencies and Playwright's Chromium; creates `NESSA_HOME` (default `~/.nessa/l0`) with generated database passwords and master key `v1`, all owner-only; downloads the pinned ESCO release (10 MB) and the pinned reference datasets (ONS ASHE Table 15, 67 MB; the ONS SOC 2020 coding index; the ILO exposure index; two Anthropic Economic Index files; the ESCO to O*NET crosswalk: ADR 0010) into `var/datasets/` and keeps each only if its size and SHA-256 match; builds the images (backend, Auth emulator, web). Network is needed here only. Safe to re-run: it never replaces an existing password or key, and re-verifies a dataset already present instead of fetching it again. |
+| `make dev` | Starts the stack in **live** mode and waits until healthy: migrates, seeds, imports the ESCO release and the reference datasets on the first start (ESCO about 6 s; later starts find them imported), starts the web app, prints the URLs. Only the worker (for Meta) and the restricted acquisition worker (for permitted pages and Adzuna) can reach the internet. Live-vacancy workspaces are offered only if setup placed Adzuna credentials. |
 | `make demo` | Same, in **demo** mode: no Nessa service has a route out of the machine. Calls to Meta are refused; a demo workspace's interview turns are answered by the offline fixture interviewer, labelled as such. |
 | `make stop` | Stops every service within a bound (SIGTERM, then SIGKILL after the grace period). Volumes and `NESSA_HOME` are kept; DBOS recovers in-flight runs on the next start. |
 | `make reset-demo` | Recreates the fixture workspace "P01 demo (synthetic)" only. Event numbers continue, so a resumed stream sees the reset. |
@@ -169,6 +169,27 @@ with the browser's Origin unchanged.
   /v1/taxonomy/occupations?q=...&match=all|any`, `GET /v1/taxonomy/occupations/{concept_id}`;
   English cities: `GET /v1/places`. A title ESCO lacks: `POST
   /v1/workspaces/{id}/occupations/provisional` with `{title}`.
+- Pay and AI evidence for an occupation (ADR 0010): `GET
+  /v1/workspaces/{id}/occupations/{concept_id}/evidence` gives its UK SOC 2020 candidates
+  with ONS ASHE pay for your cities' regions (never a city's figure), modelled pay (only
+  through a reviewed mapping; none exists in L0), the trend (unavailable: one snapshot), ILO
+  exposure and Anthropic observed use (each as its source measures it), and the AI
+  Resilience Score (a reviewed range, or unscored: every real role in L0), each with the
+  release it comes from. The slate's `min_ai_resilience` (0-10; Any when absent) and
+  `include_unscored` (default true) filter on the lower end of a reviewed range, counted in
+  `ai_resilience_filter`.
+- The salary floor (`minimum_salary`, confirmed) is applied as a hard filter: the slate
+  leaves out a suggestion only when its reviewed official pay is below it, and the job list a
+  vacancy only when its advertised pay in the floor's period is below it; unknown, predicted
+  or other-period pay is kept, and both say what was left out and why the rest was kept
+  (`salary_floor`). A job list the floor empties says `all_below_salary_floor`.
+- Reviewed packs (H-10, human only): an accountable reviewer's UK SOC mapping decisions go
+  in `backend/src/nessa/catalogue/packs/uk_soc_mapping_reviews.json` and AI Resilience
+  records, with any known corrections, in `packs/ai_resilience.json`; each pack is versioned
+  and dated, checked when the API starts (a record failing a publication check is never
+  published; a correction invalidates what it names), and needs a commit and an API restart.
+  `packs/ai_resilience_fixture.json` holds the one synthetic record, applied only in the
+  fixture workspace.
 
 ## Keys and secrets
 
@@ -206,6 +227,18 @@ with the browser's Origin unchanged.
   `var/datasets/esco-v1.2.1-classification-en-csv.zip`, then run `make setup` again. Its
   SHA-256 must be `f9761b0b52be1828b38a3e5e0ae59a93a7b0ce358bc800f52f57a8b002adeb3e`;
   any other file is refused.
+- The `migrate` service fails with `... is not at /datasets/...` for an ONS, ILO, Anthropic
+  or crosswalk file, or the API answers `REFERENCE_DATA_UNAVAILABLE`: run `make setup`,
+  which fetches every pinned file (`cd backend && uv run --locked python -m tools.datasets`
+  fetches them alone). If a download fails, the **manual step** (ruling R7): download the
+  URL `make setup` prints for that file (each is also in `docs/dependencies.md`, "Reference
+  data (Task 7, slice B)") and save it under the file name it prints in `var/datasets/`, then
+  run `make setup` again; a file whose size or SHA-256 differs from its pin is refused. The
+  ONS ASHE file is on the dataset page
+  https://www.ons.gov.uk/employmentandlabourmarket/peopleinwork/earningsandworkinghours/datasets/regionbyoccupation4digitsoc2010ashetable15
+  (edition "2026 provisional"); the SOC coding index on
+  https://www.ons.gov.uk/methodology/classificationsandstandards/standardoccupationalclassificationsoc/soc2020/soc2020volume2codingrulesandconventions
+  (the Excel file); the crosswalk on https://esco.ec.europa.eu/en/use-esco/other-crosswalks.
 - Saving the profile is refused with `VALIDATION_FAILED` (`unknown_city`): a work area must
   be one of the 55 English cities (`GET /v1/places`), such as Leeds or Kingston-upon-Hull.
 - A service refuses to start with a `ValidationError`: the configuration is unsafe by

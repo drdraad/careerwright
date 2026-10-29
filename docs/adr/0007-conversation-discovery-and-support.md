@@ -493,8 +493,8 @@ inference, with at least 30 evaluation cases and a capped live run.
   gains `explanation`; export format 4. Fix round 1: migration 0012 (a replaced link, one
   current link per discovery), `retry_failed` and `can_retry`, error code
   `SLATE_ALREADY_EXPLAINED` (409).
-- Not done: applying the salary floor (Sprint 3, with pay evidence); a salary floor per
-  target; a human review of decision 12's full readiness, pay and hiring word lists, claim
+- Not done: applying the salary floor (done in Task 7 slice B: a hard filter on the slate
+  and the job listing, with counts, ADR 0010 decision 8); a salary floor per target; a human review of decision 12's full readiness, pay and hiring word lists, claim
   and quotation bounds, function-word list and "first view" definition (H-12; not asked at
   session 1 or in its addendum).
 

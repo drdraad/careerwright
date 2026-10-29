@@ -180,6 +180,27 @@ is in `docs/runbook.md`; the hash check still applies. A different release needs
 a re-run of `make acceptance` (the full-release test checks counts) and a reviewed migration:
 the import refuses to replace a release already held.
 
+## Reference data (Task 7, slice B; ADR 0010)
+
+Pinned, fetched and verified the same way (`nessa.catalogue.reference.DATASETS`), imported
+by `setup-database` after ESCO into native-code tables (migration 0027), each recorded in
+`reference_releases`. All were fetched from these URLs on 2026-10-29. Licence readings are
+the implementing agent's, recorded for the product owner (R6); ONS's falls under session 1's
+policy (line A2). The tests import labelled synthetic samples in the same layouts
+(`backend/tests/support/reference_data.py`), never these files.
+
+| Dataset | Pin | Source | Licence and attribution | Import |
+|---|---|---|---|---|
+| ONS ASHE Table 15 (region by occupation, four-digit SOC 2020), 2026 provisional | `ons-ashe-table15-2026-provisional.zip`, 67,460,310 bytes, SHA-256 `fefd20c5a746a9ad6a563a0edf6c3ac204b093c9d23a500b7d4234122595f081` (`nessa.catalogue.ashe.ASHE_RELEASE`) | https://www.ons.gov.uk/file?uri=/employmentandlabourmarket/peopleinwork/earningsandworkinghours/datasets/regionbyoccupation4digitsoc2010ashetable15/2026provisional/ashetable152026provisional.zip (the dataset page's 2026 provisional edition) | Open Government Licence v3.0; "Source: Office for National Statistics, Annual Survey of Hours and Earnings, licensed under the Open Government Licence v3.0." | Tables 15.1, 15.5 and 15.7 with their CV tables, the Full-Time sheet: 13,596 estimates (412 unit groups, 11 work regions, 3 periods); 8,505 with the median withheld (null with ONS's marker) |
+| ONS SOC 2020 Volume 2: the coding index, version 14 | `ons-soc2020-volume2-coding-index-v14.xlsx`, 3,717,451 bytes, SHA-256 `59d3ec71d0e9eef2a27d7d0f4720f5c4bd584b61dc6902cc33dd8ee2ced40b9a` (`nessa.catalogue.soc.SOC_INDEX_RELEASE`) | https://www.ons.gov.uk/file?uri=/methodology/classificationsandstandards/standardoccupationalclassificationsoc/soc2020/soc2020volume2codingrulesandconventions/soc2020volume2thecodingindexexcel20260827v2.xlsx | Open Government Licence v3.0 (the page footer); ONS attribution | 412 unit groups; 32,435 coded index entries with their ISCO-08 codes; 235 without a code counted |
+| ILO-NASK refined global index of occupational exposure to generative AI (ILO Working Paper 140, 2025), occupation scores | `ilo-genai-exposure-2025-final-scores.xlsx`, 2,598,951 bytes, SHA-256 `c1940b87e7293b1eb95b530b6d3da7cd806b61d217c4bff1e69372b2cff5c90a` (`nessa.catalogue.ai_evidence.ILO_RELEASE`) | https://raw.githubusercontent.com/pgmyrek/2025_GenAI_scores_ISCO08/ce5fc25c2a0db2757c5bfa797c4cfc8b408431ea/Final_Scores_ISCO08_Gmyrek_et_al_2025.xlsx, the lead author's repository (the ILO page, https://www.ilo.org/publications/generative-ai-and-jobs-refined-global-index-occupational-exposure, offers only the paper) | CC BY 4.0 (the repository's LICENSE and README): cite Gmyrek et al. 2025, © ILO, doi 10.54394/HETP0387, with the ILO's adaptation disclaimer (`ILO_ATTRIBUTION`) | 427 ISCO-08 unit groups (3,265 task rows): mean and SD of the 2025 task scores and the gradient |
+| Anthropic Economic Index, release 2025-03-27, `task_pct_v2.csv` | `anthropic-economic-index-2025-03-27-task-pct-v2.csv`, 435,372 bytes, SHA-256 `0c20f184cd4a1e3d8ef3d77f500b32b62431ce61a3c2f133c3af7fa8429f97db` | https://huggingface.co/datasets/Anthropic/EconomicIndex/resolve/4e5f69fab13a9c3f7d0dcc31a6f893a9818738f6/release_2025_03_27/task_pct_v2.csv (dataset commit `4e5f69f`) | "Data released under CC-BY" (the dataset README; no version stated); attribution to the release and Handa et al. 2025 (arXiv:2503.04761) | 3,364 tasks' shares (the release's "none" row is not a task) |
+| Anthropic Economic Index, release 2025-03-27, `onet_task_statements.csv` | `anthropic-economic-index-2025-03-27-onet-task-statements.csv`, 3,592,256 bytes, SHA-256 `82e4c418dc08475ef1263ad1e8c66ffa3357291370cd35ee1065ecea590597ec` | the same release | As above; O*NET content of USDOL/ETA under CC BY 4.0, "O*NET is a trademark of USDOL/ETA" | 19,530 tasks of 974 O*NET-SOC 2019 occupations |
+| ESCO to O*NET crosswalk, version 1 (September 2022) | `esco-onet-crosswalk-v1-2022-09.csv`, 2,986,823 bytes, SHA-256 `82179a0a3340da97b63df90134d8d941ec3c2c478334d855b69e4dd57a91b620` | https://esco.ec.europa.eu/system/files/2023-08/ONET_%28Occupations%29_0_updated.csv (linked from https://esco.ec.europa.eu/en/use-esco/other-crosswalks) | Commission Decision 2011/833/EU with the ESCO acknowledgement; its O*NET titles under CC BY 4.0 | 4,253 rows (O*NET-SOC 2019 to ESCO v1.1.0); bridge to v1.2.1 by URI: 3 rows name occupations v1.2.1 lacks, 235 O*NET codes have no task in the release, 43 rows name an ISCO group |
+
+The import was not timed on its own; the whole `test_reference_data.py` run, which also
+starts its database and imports the full ESCO release, took 38 s on this machine.
+
 ## Not yet introduced (owner and disposition)
 
 These belong to the fixed stack but no task has installed them yet. Each introducing task
@@ -191,7 +212,6 @@ qualified pins.
 |---|---|---|---|
 | Scrapling (HTTP fetch only) | 0.5 | Sprint 3 acquisition task | restricted worker without model or master key; verify licence and arm64 |
 | D3 | 7.9.0 | Sprint 3 map task | SVG rendering only; add to `apps/web` with its own ADR note |
-| ASHE data release | n/a | Sprint 3 data task (T7) | pinned URL and hash; fetched by `make setup` (R7), as ESCO is since Task 5 |
 | Adzuna API | n/a | Sprint 3 | qualified on the free tier on 2026-10-29 by `make live-adzuna` (two requests, both 200; ledger rows 32–33, $0), credentials read from `.env` as `ADZUNA_APPLICATION_ID` and `ADZUNA_API_KEY` (R4; ADR 0009) |
 
 ## How these were checked

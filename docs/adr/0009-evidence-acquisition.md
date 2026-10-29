@@ -527,7 +527,8 @@ results, the ledger rows it wrote and the ledger table found no credential.
 - Not done in Task 7A: source-specific selectors and tuning extraction on real pages (Task
   7b assigns template families first, OI-09; the live extraction read one synthetic page);
   the Roles chapter and every UI over these endpoints (Task 8); research data in the
-  workspace export (T15); ASHE, UK-SOC and the AI evidence (Task 7B).
+  workspace export (T15); ASHE, UK-SOC and the AI evidence (done in Task 7 slice B, ADR
+  0010, which also applies the salary floor to the job listing).
 - Model extraction (decision 15): the budget check before starting one counts the
   committed spend and this acquisition's unreserved runs only, so a run elsewhere in the
   workspace that reserves later can still refuse one at its own reservation
