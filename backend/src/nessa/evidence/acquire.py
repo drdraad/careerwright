@@ -289,5 +289,13 @@ def acquire_adzuna(
         status=AttemptStatus.SUCCEEDED,
         copies=page.copies,
         total=page.total,
-        extraction=None if page.copies else Extraction.NO_JOB_POSTING,  # the API's own answer
+        extraction=_adzuna_extraction(page),
     )
+
+
+def _adzuna_extraction(page: adzuna.SearchPage) -> Extraction | None:
+    """Only Adzuna's own count of none says no advert matched; results it returned that
+    could not be read, or an empty page of a search that matched some, say nothing."""
+    if page.copies:
+        return None
+    return Extraction.NO_MATCHING_ADVERTS if page.total == 0 else Extraction.NO_JOB_POSTING

@@ -5110,12 +5110,13 @@
         "type": "string",
         "enum": [
           "no_sources_checked",
+          "sources_pending",
           "no_source_retrieved",
           "no_posting_readable",
           "none_found_in_sources_checked"
         ],
         "title": "EmptyReason",
-        "description": "Why a listing has no vacancy (STATE-02): never a bare empty list. Only\n`none_found_in_sources_checked` says the sources read held none, and even then only\nin the sources checked."
+        "description": "Why a listing has no vacancy (STATE-02): never a bare empty list. Only\n`none_found_in_sources_checked` says the sources read held none, and only an API's own\nempty answer can give it (fix round 2, review B N1)."
       },
       "EntryMode": {
         "type": "string",
@@ -5446,10 +5447,11 @@
           "no_structured_data",
           "jsonld_invalid",
           "conflicting_job_postings",
-          "no_job_posting"
+          "no_job_posting",
+          "no_matching_adverts"
         ],
         "title": "Extraction",
-        "description": "Why a retrieved source gave no posting that could be published. Only `no_job_posting`\n(its structured data was read and holds none) says no vacancy was there; the others\nsay the page could not be read, which is never \"none found\" (GC6)."
+        "description": "Why a retrieved source gave no posting that could be published. Only an API's own\nempty answer (`no_matching_adverts`: Adzuna matched none) says no vacancy was there. A\nfetched page's structured data holding no posting says nothing about its HTML, so\n`no_job_posting` is unread too (fix round 2, review B N1): never \"none found\" (GC6)."
       },
       "FailureClass": {
         "type": "string",

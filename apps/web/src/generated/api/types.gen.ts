@@ -690,11 +690,12 @@ export type Emphasis = typeof Emphasis[keyof typeof Emphasis];
  * EmptyReason
  *
  * Why a listing has no vacancy (STATE-02): never a bare empty list. Only
- * `none_found_in_sources_checked` says the sources read held none, and even then only
- * in the sources checked.
+ * `none_found_in_sources_checked` says the sources read held none, and only an API's own
+ * empty answer can give it (fix round 2, review B N1).
  */
 export const EmptyReason = {
     NO_SOURCES_CHECKED: 'no_sources_checked',
+    SOURCES_PENDING: 'sources_pending',
     NO_SOURCE_RETRIEVED: 'no_source_retrieved',
     NO_POSTING_READABLE: 'no_posting_readable',
     NONE_FOUND_IN_SOURCES_CHECKED: 'none_found_in_sources_checked'
@@ -704,8 +705,8 @@ export const EmptyReason = {
  * EmptyReason
  *
  * Why a listing has no vacancy (STATE-02): never a bare empty list. Only
- * `none_found_in_sources_checked` says the sources read held none, and even then only
- * in the sources checked.
+ * `none_found_in_sources_checked` says the sources read held none, and only an API's own
+ * empty answer can give it (fix round 2, review B N1).
  */
 export type EmptyReason = typeof EmptyReason[keyof typeof EmptyReason];
 
@@ -982,23 +983,26 @@ export type ExplanationRunOut = {
 /**
  * Extraction
  *
- * Why a retrieved source gave no posting that could be published. Only `no_job_posting`
- * (its structured data was read and holds none) says no vacancy was there; the others
- * say the page could not be read, which is never "none found" (GC6).
+ * Why a retrieved source gave no posting that could be published. Only an API's own
+ * empty answer (`no_matching_adverts`: Adzuna matched none) says no vacancy was there. A
+ * fetched page's structured data holding no posting says nothing about its HTML, so
+ * `no_job_posting` is unread too (fix round 2, review B N1): never "none found" (GC6).
  */
 export const Extraction = {
     NO_STRUCTURED_DATA: 'no_structured_data',
     JSONLD_INVALID: 'jsonld_invalid',
     CONFLICTING_JOB_POSTINGS: 'conflicting_job_postings',
-    NO_JOB_POSTING: 'no_job_posting'
+    NO_JOB_POSTING: 'no_job_posting',
+    NO_MATCHING_ADVERTS: 'no_matching_adverts'
 } as const;
 
 /**
  * Extraction
  *
- * Why a retrieved source gave no posting that could be published. Only `no_job_posting`
- * (its structured data was read and holds none) says no vacancy was there; the others
- * say the page could not be read, which is never "none found" (GC6).
+ * Why a retrieved source gave no posting that could be published. Only an API's own
+ * empty answer (`no_matching_adverts`: Adzuna matched none) says no vacancy was there. A
+ * fetched page's structured data holding no posting says nothing about its HTML, so
+ * `no_job_posting` is unread too (fix round 2, review B N1): never "none found" (GC6).
  */
 export type Extraction = typeof Extraction[keyof typeof Extraction];
 

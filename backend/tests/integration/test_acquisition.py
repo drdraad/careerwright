@@ -48,6 +48,12 @@ def sources() -> Iterator[SourceServer]:
         "/jobs/7781": Scripted(body=page(POSTING).encode()),
         "/ad/1": Scripted(body=page(POSTING).encode()),
         "/plain": Scripted(body=html("<h1>Gardener</h1><p>Apply by email.</p>")),
+        "/org-only": Scripted(
+            body=page(
+                {"@context": "https://schema.org", "@type": "Organization", "name": "Northwind"},
+                body="<h1>Gardener</h1><p>Apply by email.</p>",
+            ).encode()
+        ),
         "/gone": Scripted(404, body=b"gone"),
         "/closed": Scripted(410, body=b"closed"),
         "/down": Scripted(503, body=b"down"),
@@ -225,10 +231,22 @@ def test_every_source_failing_is_a_failed_run_never_no_vacancies(
 
 
 @pytest.mark.req("STATE-02", "ACQ-03", "ACQ-07")
+@pytest.mark.parametrize(
+    ("path", "extraction"),
+    [("/plain", "no_structured_data"), ("/org-only", "no_job_posting")],
+    ids=["no JSON-LD", "JSON-LD with no posting (review B N1)"],
+)
 def test_a_page_that_cannot_be_read_is_never_none_found(
-    infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker
+    infra: Infra,
+    api: ApiClient,
+    ada: str,
+    workspace: str,
+    sources: SourceServer,
+    worker: Worker,
+    path: str,
+    extraction: str,
 ) -> None:
-    urls = [url(sources, "careers.northwind.example", "/plain")]  # an advert with no JSON-LD
+    urls = [url(sources, "careers.northwind.example", path)]  # an advert the parser can't read
     run_id = submit(api, ada, workspace, {"urls": urls}).json()["acquisition"]["run"]["run_id"]
 
     run = wait_terminal(infra, run_id)
@@ -238,9 +256,34 @@ def test_a_page_that_cannot_be_read_is_never_none_found(
     assert run["status"] == "complete"  # retrieved: its outcome says what could not be read
     assert shown["summary"] == {"succeeded": 0, "no_posting_readable": 1, "blocked": 0, "failed": 0}
     [attempt] = shown["targets"][0]["attempts"]
-    assert (attempt["status"], attempt["extraction"]) == ("succeeded", "no_structured_data")
+    assert (attempt["status"], attempt["extraction"]) == ("succeeded", extraction)
     assert listing["coverage"] == {"no_posting_readable": 1}
     assert listing["empty_reason"] == "no_posting_readable"  # not "none found"
+
+
+@pytest.mark.req("STATE-02")
+def test_a_listing_whose_sources_are_still_being_fetched_says_so(
+    infra: Infra, api: ApiClient, ada: str, workspace: str, sources: SourceServer, worker: Worker
+) -> None:
+    # Review B N7: while the only source is in flight, the listing never reads as failed.
+    urls = [url(sources, "slow.board.example", "/slow/3")]
+    run_id = submit(api, ada, workspace, {"urls": urls}).json()["acquisition"]["run"]["run_id"]
+    wait_for(
+        lambda: bool(
+            infra.query(
+                "SELECT 1 FROM nessa.source_attempts WHERE run_id = %s AND status = 'pending'",
+                (run_id,),
+            )
+        ),
+        timeout_s=30,
+        what="the request under way",
+    )
+
+    during = jobs(api, ada, workspace)
+    wait_terminal(infra, run_id)
+
+    assert during["coverage"] == {"pending": 1}
+    assert during["empty_reason"] == "sources_pending"
 
 
 @pytest.mark.req("STATE-02", "JOB-06")
@@ -836,6 +879,51 @@ def test_an_adzuna_search_keeps_its_pay_basis_and_snippets_and_never_its_credent
     responses = [("api", json.dumps(shown)), ("api", json.dumps(listing))]
     needles = [Needle("Adzuna app id", app_id), Needle("Adzuna key", app_key, fragment_length=12)]
     assert scan([*cells, *logs, *responses], needles) == []
+
+
+@pytest.mark.req("STATE-02", "JOB-05")
+def test_only_an_api_s_own_empty_answer_reads_as_none_found(
+    infra: Infra, adzuna_api: ApiClient, ada: str, tmp_path: Path
+) -> None:
+    # Review B N1: Adzuna's count of 0 is the one answer that says no advert matched.
+    body = json.dumps({"_synthetic": "synthetic test response", "count": 0, "results": []})
+    routes = {
+        "/v1/api/jobs/gb/search/1": Scripted(
+            headers=(("Content-Type", "application/json"),), body=body.encode()
+        )
+    }
+    with (
+        source_server(routes) as adzuna_server,
+        acquisition_service(
+            adzuna_server,
+            names={"api.adzuna.test.example": [LOOPBACK]},
+            credentials=(SecretStr("synthetic-id"), SecretStr("synthetic-key")),
+            adzuna_host="api.adzuna.test.example",
+        ) as service,
+    ):
+        worker = start_worker(infra, tmp_path / "adzuna-empty.log", acquisition_url=service)
+        workspace = adzuna_api.write(
+            "POST",
+            "/v1/workspaces",
+            ada,
+            {"name": "Live vacancy, none", "data_mode": "live_vacancy", "synthetic": True},
+        ).json()["workspace_id"]
+        query = {"adzuna": {"what": "orbital gardener", "where": "Manchester"}}
+        run_id = adzuna_api.write(
+            "POST", f"/v1/workspaces/{workspace}/research/acquisitions", ada, query
+        ).json()["acquisition"]["run"]["run_id"]
+        try:
+            wait_terminal(infra, run_id)
+        finally:
+            worker.stop()
+        shown = acquisition(adzuna_api, ada, workspace, run_id)
+        listing = jobs(adzuna_api, ada, workspace)
+
+    [attempt] = shown["targets"][0]["attempts"]
+    assert (attempt["extraction"], attempt["total_matching"]) == ("no_matching_adverts", 0)
+    assert listing["coverage"] == {"succeeded": 1}
+    assert listing["empty_reason"] == "none_found_in_sources_checked"
+    assert shown["partial"] is False
 
 
 @pytest.mark.req("BND1-11")

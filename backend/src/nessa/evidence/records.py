@@ -80,19 +80,21 @@ class AttemptReason(StrEnum):
 
 
 class Extraction(StrEnum):
-    """Why a retrieved source gave no posting that could be published. Only `no_job_posting`
-    (its structured data was read and holds none) says no vacancy was there; the others
-    say the page could not be read, which is never "none found" (GC6)."""
+    """Why a retrieved source gave no posting that could be published. Only an API's own
+    empty answer (`no_matching_adverts`: Adzuna matched none) says no vacancy was there. A
+    fetched page's structured data holding no posting says nothing about its HTML, so
+    `no_job_posting` is unread too (fix round 2, review B N1): never "none found" (GC6)."""
 
-    NO_STRUCTURED_DATA = "no_structured_data"  # no JSON-LD at all (model extraction: round 2)
+    NO_STRUCTURED_DATA = "no_structured_data"  # no JSON-LD at all
     JSONLD_INVALID = "jsonld_invalid"  # not valid JSON, or a job posting without a title
     CONFLICTING_JOB_POSTINGS = "conflicting_job_postings"  # postings that disagree
-    NO_JOB_POSTING = "no_job_posting"  # structured data read: no job posting in it
+    NO_JOB_POSTING = "no_job_posting"  # structured data, but no job posting in it
+    NO_MATCHING_ADVERTS = "no_matching_adverts"  # an API's own answer: it matched none
 
 
-UNREADABLE = frozenset(
-    {Extraction.NO_STRUCTURED_DATA, Extraction.JSONLD_INVALID, Extraction.CONFLICTING_JOB_POSTINGS}
-)
+UNREADABLE = frozenset(set(Extraction) - {Extraction.NO_MATCHING_ADVERTS})
+# What model extraction may read (fix round 2): a page whose structured data gave no posting.
+MODEL_READABLE = frozenset({Extraction.NO_STRUCTURED_DATA, Extraction.NO_JOB_POSTING})
 
 
 class RightsClass(StrEnum):

@@ -243,13 +243,15 @@ def test_a_page_without_structured_data_yields_no_posting_and_says_it_could_not_
     ],
     ids=["structured data with no posting", "a posting without a title", "a posting"],
 )
-def test_only_structured_data_read_with_no_posting_in_it_says_no_posting(
+def test_a_page_whose_structured_data_holds_no_posting_is_unread_never_none_found(
     blocks: list[object], extraction: Extraction | None
 ) -> None:
+    # Review B N1: structured data with no posting says nothing about the page's HTML.
     parsed = parse(page(*blocks))
 
     assert parsed.extraction is extraction
-    assert (extraction in UNREADABLE) is (extraction is Extraction.JSONLD_INVALID)
+    assert (extraction in UNREADABLE) is (extraction is not None)
+    assert Extraction.NO_MATCHING_ADVERTS not in UNREADABLE  # an API's own empty answer only
 
 
 UNSAFE_LINKS = [

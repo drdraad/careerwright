@@ -216,11 +216,14 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    being unavailable (addendum, re-review A M-7; migration 0018); an HTTP error is
    `http_error` with its
    `http_status`), and a retrieved source with no publishable posting records why
-   (`extraction`): `no_structured_data`, `jsonld_invalid` or `conflicting_job_postings`
-   mean it could not be read, and only `no_job_posting` (structured data read, none in it)
-   may count as none found. The summary and the listing's `coverage` count
+   (`extraction`): `no_structured_data`, `jsonld_invalid`, `conflicting_job_postings` and,
+   since fix round 2 (review B N1), `no_job_posting` (a fetched page's structured data held
+   no posting, which says nothing about its HTML) all mean it was not read. Only an API's
+   own empty answer (`no_matching_adverts`: Adzuna's count of 0; migration 0019) may count
+   as none found. The summary and the listing's `coverage` count
    `no_posting_readable` apart; `coverage` leaves out pasted text, which is not a source
-   tried. The job list says why it is empty (`no_sources_checked`, `no_source_retrieved`,
+   tried. The job list says why it is empty (`no_sources_checked`, `sources_pending` while
+   a source is still being fetched or read (review B N7), `no_source_retrieved`,
    `no_posting_readable`, `none_found_in_sources_checked`); its `total_jobs` and
    `city_counts` count vacancies only (`exemplars` apart) and are counted in the database,
    without a cap. An Adzuna search keeps Adzuna's `count` (`total_matching`), so retrieved

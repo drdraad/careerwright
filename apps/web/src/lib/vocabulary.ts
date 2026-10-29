@@ -8,6 +8,7 @@ import type {
   DataMode,
   Direction,
   Emphasis,
+  EmptyReason,
   EntryMode,
   ErrorCode,
   FailureClass,
@@ -299,6 +300,31 @@ export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string
   unknown_failure: {
     title: "Something went wrong while Nessa was working",
     action: "Nothing was saved from it. Try again.",
+  },
+};
+
+/** Why a job listing has no vacancy (STATE-02). Only `none_found_in_sources_checked` says
+ * none was there, and only an API's own empty answer gives it. */
+export const EMPTY_REASON: Record<EmptyReason, { title: string; detail: string }> = {
+  no_sources_checked: {
+    title: "No sources checked yet",
+    detail: "Add a page to check, or run a search.",
+  },
+  sources_pending: {
+    title: "Still checking your sources",
+    detail: "Nessa is fetching or reading them now. The list updates when it's done.",
+  },
+  no_source_retrieved: {
+    title: "None of the sources could be fetched",
+    detail: "This isn't a sign there are no vacancies. Try again later, or paste the advert.",
+  },
+  no_posting_readable: {
+    title: "Nessa couldn't read a job advert on these pages",
+    detail: "This isn't a sign there are no vacancies. Paste the advert, or try another page.",
+  },
+  none_found_in_sources_checked: {
+    title: "No matching listings found in the sources checked",
+    detail: "Only these sources were checked. Others may list vacancies.",
   },
 };
 

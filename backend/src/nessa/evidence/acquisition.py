@@ -535,10 +535,11 @@ class Coverage(StrEnum):
 
 class EmptyReason(StrEnum):
     """Why a listing has no vacancy (STATE-02): never a bare empty list. Only
-    `none_found_in_sources_checked` says the sources read held none, and even then only
-    in the sources checked."""
+    `none_found_in_sources_checked` says the sources read held none, and only an API's own
+    empty answer can give it (fix round 2, review B N1)."""
 
     NO_SOURCES_CHECKED = "no_sources_checked"
+    SOURCES_PENDING = "sources_pending"  # still being fetched or read: no answer yet
     NO_SOURCE_RETRIEVED = "no_source_retrieved"
     NO_POSTING_READABLE = "no_posting_readable"
     NONE_FOUND_IN_SOURCES_CHECKED = "none_found_in_sources_checked"
@@ -561,6 +562,8 @@ def _empty_reason(total_jobs: int, covered: dict[Coverage, int]) -> EmptyReason 
         return None
     if not covered:
         return EmptyReason.NO_SOURCES_CHECKED
+    if covered.get(Coverage.PENDING):  # an answer is still coming (review B N7)
+        return EmptyReason.SOURCES_PENDING
     if not (covered.get(Coverage.SUCCEEDED) or covered.get(Coverage.NO_POSTING_READABLE)):
         return EmptyReason.NO_SOURCE_RETRIEVED
     if covered.get(Coverage.NO_POSTING_READABLE):

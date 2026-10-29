@@ -21,9 +21,9 @@ from nessa.evidence.records import (
     Retention,
     RightsClass,
 )
-from nessa.migrations.versions import r0016_unreadable_and_partial as r0016
 from nessa.migrations.versions import r0017_job_merge_and_claim_integrity as r0017
 from nessa.migrations.versions import r0018_internal_error_reason as r0018
+from nessa.migrations.versions import r0019_only_an_api_says_none as r0019
 
 BODY = b"<html>synthetic</html>"
 
@@ -38,7 +38,7 @@ def _quoted(constraint: str) -> set[str]:
 def test_the_database_holds_attempt_reasons_to_the_code_s_labels() -> None:
     assert _quoted("attempt_reasons_are_labels") == {r.value for r in AttemptReason}
     assert {r.value for r in UrlRefusal} <= {r.value for r in AttemptReason}
-    extraction = re.search(r"extraction IN \((.*?)\)\)", r0016.SCHEMA, re.DOTALL)
+    extraction = re.search(r"extraction IN \((.*?)\)\)", r0019.SCHEMA, re.DOTALL)  # latest
     assert extraction is not None
     assert set(re.findall(r"'([a-z_]+)'", extraction.group(1))) == {e.value for e in Extraction}
 
