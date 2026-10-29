@@ -426,6 +426,32 @@ def test_pasted_text_is_its_own_route_and_an_example_never_a_live_vacancy(
     assert fourth.json()["error"]["details"]["reason"] == "exemplars_per_target"
 
 
+@pytest.mark.req("ACQ-10")
+def test_a_pasted_text_keeps_no_third_party_s_email_or_telephone_number(
+    infra: Infra, api: ApiClient, ada: str, workspace: str
+) -> None:
+    body = {
+        "target": "Gardener",
+        "title": "Gardener",
+        "text": "Gardener wanted in Leeds. Call Sam on 07700 900123 or sam@agency.example.",
+    }
+    pasted = api.write("POST", f"/v1/workspaces/{workspace}/research/pasted", ada, body)
+
+    assert pasted.status_code == 201, pasted.text
+    shown = json.dumps(pasted.json())
+    assert "07700" not in shown
+    assert "sam@agency.example" not in shown
+    [description] = [c for c in pasted.json()["claims"] if c["field"] == "description"]
+    assert "[phone removed]" in description["span"]["excerpt"]
+    [attempt] = infra.query(
+        "SELECT content_sha256, byte_count FROM nessa.source_attempts "
+        "WHERE workspace_id = %s AND route = 'pasted_text'",
+        (workspace,),
+    )
+    redacted = "Gardener wanted in Leeds. Call Sam on [phone removed] or [email removed]."
+    assert attempt["byte_count"] == len(redacted.encode())  # the sealed body is the redacted text
+
+
 @pytest.mark.req("ACQ-10", "ACQ-01")
 def test_a_pasted_text_s_source_is_kept_only_as_a_checked_url(
     api: ApiClient, ada: str, workspace: str

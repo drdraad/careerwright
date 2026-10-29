@@ -64,6 +64,7 @@ from nessa.evidence.records import (
     StrictModel,
     ValidationState,
 )
+from nessa.evidence.redaction import redact_text
 from nessa.evidence.service_client import AcquisitionClient, AcquisitionUnavailableError
 from nessa.identity import run_store
 from nessa.identity import store as identity_store
@@ -311,6 +312,14 @@ def paste_text(
             details={"reason": "exemplars_per_target", "limit": MAX_EXEMPLARS_PER_TARGET},
         )
     source_url = _reference_url(command.source_url) if command.source_url else None
+    # Third parties' contact details go before anything is hashed, sealed or claimed.
+    command = command.model_copy(
+        update={
+            "text": redact_text(command.text),
+            "title": redact_text(command.title),
+            "employer": redact_text(command.employer) if command.employer else None,
+        }
+    )
     body = command.text.encode()
     sha256 = hashlib.sha256(body).hexdigest()
     attempt_id = uuid.uuid4()

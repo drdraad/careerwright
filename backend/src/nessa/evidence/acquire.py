@@ -27,7 +27,7 @@ from nessa.evidence import adzuna
 from nessa.evidence.addresses import CheckedUrl, UrlRefusal
 from nessa.evidence.adzuna import AdzunaQuery
 from nessa.evidence.fetcher import JSON_TYPES, Admit, Fetched, Fetcher, FetchFailure
-from nessa.evidence.pages import parse_page
+from nessa.evidence.pages import parse_page, redact_page
 from nessa.evidence.records import (
     AttemptStatus,
     InputRoute,
@@ -36,6 +36,7 @@ from nessa.evidence.records import (
     RightsClass,
     StrictModel,
 )
+from nessa.evidence.redaction import redact_text
 from nessa.evidence.sources import Access, PageRights, classify_page, retention, rule_for
 
 ADZUNA_PROVIDER = "adzuna"
@@ -64,7 +65,8 @@ class AcquisitionResult(StrictModel):
     http_status: int | None = None
     content_type: str | None = None
     address: str | None = None
-    content_sha256: str | None = None
+    content_sha256: str | None = None  # of what was kept: personal details removed
+    retrieved_sha256: str | None = None  # of the bytes as retrieved, for change detection
     byte_count: int | None = None
     rights_class: RightsClass | None = None
     rights_status: str | None = None
@@ -170,8 +172,12 @@ def _page_result(
     now: datetime,
     classify: Callable[[str], PageRights],
 ) -> AcquisitionResult:
-    digest = hashlib.sha256(page.body).hexdigest()
-    parsed = parse_page(page.text, sha256=digest, page_url=page.final_url)
+    # Third parties' personal details go first, so the hash that spans index into, the
+    # claims and any kept body are all without them; the retrieved bytes keep their own hash.
+    text = redact_page(page.text)
+    kept = text.encode()
+    digest = hashlib.sha256(kept).hexdigest()
+    parsed = parse_page(text, sha256=digest, page_url=page.final_url)
     final_host = fetcher.check(page.final_url)
     rights = classify(final_host.host if not isinstance(final_host, UrlRefusal) else host)
     keep = rights.retention is Retention.BODY
@@ -186,11 +192,12 @@ def _page_result(
         content_type=page.content_type,
         address=page.address,
         content_sha256=digest,
-        byte_count=len(page.body),
+        retrieved_sha256=hashlib.sha256(page.body).hexdigest(),
+        byte_count=len(kept),
         rights_class=rights.rights_class,
         rights_status=rights.rights_status,
         retention=rights.retention,
-        body_b64=base64.b64encode(page.body).decode() if keep else None,
+        body_b64=base64.b64encode(kept).decode() if keep else None,
         copies=parsed.postings,
         issues=parsed.issues,
         http_requests=page.requests,
@@ -234,8 +241,9 @@ def acquire_adzuna(
             http_status=result.http_status,
             http_requests=result.requests,
         )
-    digest = hashlib.sha256(result.body).hexdigest()
-    page = adzuna.parse_search(result.body, sha256=digest)
+    kept = redact_text(result.text).encode()  # JSON stays JSON: only string content changes
+    digest = hashlib.sha256(kept).hexdigest()
+    page = adzuna.parse_search(kept, sha256=digest)
     rights = classify_page("api.adzuna.com")
     common = {
         **base,
@@ -243,7 +251,8 @@ def acquire_adzuna(
         "http_status": result.status,
         "content_type": result.content_type,
         "content_sha256": digest,
-        "byte_count": len(result.body),
+        "retrieved_sha256": hashlib.sha256(result.body).hexdigest(),
+        "byte_count": len(kept),
         "rights_status": rights.rights_status,
         "retention": retention(rule.rights_class),
     }

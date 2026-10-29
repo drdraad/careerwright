@@ -41,6 +41,7 @@ from nessa.evidence.records import (
     ValidationState,
     WorkMode,
 )
+from nessa.evidence.redaction import redact_text, without_contacts
 
 EXCERPT_CHARS = 200
 _DECODER = json.JSONDecoder()
@@ -392,6 +393,25 @@ def _conflicts(postings: list[JobCopy]) -> list[JobCopy]:
             else job
         )
     return marked
+
+
+def redact_page(text: str) -> str:
+    """A page's text without third parties' personal details (`nessa.evidence.redaction`):
+    a JSON-LD block that names a contact is written again without it, every other block and
+    all other text are kept as they were, then emails and telephone numbers go everywhere."""
+    cursor = 0
+    parts: list[str] = []
+    for script in Selector(content=text).css('script[type="application/ld+json"]'):
+        raw = str(script.text)
+        offset = text.find(raw, cursor) if raw else -1
+        if offset == -1:
+            continue
+        cleaned = without_contacts(raw)
+        if cleaned is not None:
+            parts += [text[cursor:offset], cleaned]
+            cursor = offset + len(raw)
+    parts.append(text[cursor:])
+    return redact_text("".join(parts))
 
 
 def parse_page(text: str, *, sha256: str, page_url: str) -> ParsedPage:

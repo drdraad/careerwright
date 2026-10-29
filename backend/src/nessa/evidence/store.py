@@ -290,6 +290,7 @@ def finish_attempt(
             "UPDATE nessa.source_attempts SET final_url = :final, redirects = CAST(:redirects AS "
             "jsonb), status = :status, reason = :reason, transient = :transient, http_status = "
             ":http, content_type = :ctype, address = :address, content_sha256 = :sha, "
+            "retrieved_sha256 = :retrieved, "
             "byte_count = :bytes, rights_class = :class, rights_status = :rights, retention = "
             ":retention, http_requests = :requests, cost_nano_usd = 0, "
             "finished_at = clock_timestamp() WHERE attempt_id = :id"
@@ -305,6 +306,7 @@ def finish_attempt(
             "ctype": (result.content_type or None) and result.content_type[:120],
             "address": result.address,
             "sha": result.content_sha256,
+            "retrieved": result.retrieved_sha256,
             "bytes": result.byte_count,
             "class": result.rights_class.value if result.rights_class else None,
             "rights": result.rights_status,

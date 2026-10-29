@@ -115,6 +115,18 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    `source_documents`, only for the classes that may keep it privately (lines A1–A5); job
    boards and `other` keep the hash and the claims' minimal excerpts (at most 200
    characters each). A test holds the code's classes to the corpus manifest's.
+   Session 1's "always true" clause ("a third party's personal details (recruiter names,
+   phone numbers) never kept") binds everything kept: bodies, excerpts and claim values
+   (controller ruling, fix round 1, review A M6). So before a page, an API response or a
+   pasted text is hashed for spans, parsed or sealed, `nessa.evidence.redaction` removes,
+   deterministically, every email address, every telephone number in UK national or
+   international form (not inside a URL, a word or a longer number), and in JSON-LD every
+   name, email, telephone and fax number of an `applicationContact` or `contactPoint`.
+   `content_sha256` is the hash of what was kept; `retrieved_sha256` (migration 0015) is
+   the hash of the bytes as retrieved, for change detection only. Kept bodies are UTF-8.
+   **Known limit, for the product owner:** a personal name in running text (for example
+   "ask for Jane in HR") cannot be told apart from other words deterministically and is
+   not removed; nor is a number written in an unusual form.
 
 5. **Records (spec section 18).** `source_attempts`: every try by any route, blocked and
    failed ones included, written before the request and settled after, a retry naming the
