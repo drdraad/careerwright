@@ -14,10 +14,16 @@ Class `other` needs no terms and stays "pending human rights review".
 
 It prints the manifest record (URL, retrieval time, HTTP status, content type, SHA-256, the
 attempt's status and reason, rights status, retention, and each posting's claims as field,
-offsets and a minimal excerpt) for the person curating to place in the manifest. It never
-edits the manifest itself.
+value, offsets and a minimal excerpt) for the person curating to place in the manifest. It
+never edits the manifest itself.
 
-Run from `backend/`: `uv run --locked python -m tools.corpus --slot J12 --url https://...`.
+`--adzuna WHAT WHERE` runs one Adzuna search instead (the option pack's predicted-pay and
+snippet slots, Task 7b): through `make live-adzuna`'s own path (`tools.live_adzuna.search`:
+the product's adapter, the `live-adzuna` scope's cap, a ledger row at $0, the leak scan), its
+class the manifest's job board, so only its hash and the claims' excerpts (JSON pointers).
+
+Run from `backend/`: `uv run --locked python -m tools.corpus --slot J12 --url https://...`
+or `... --slot J03 --adzuna "bookkeeping assistant" Leeds`.
 """
 
 import argparse
@@ -27,11 +33,15 @@ import sys
 from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Any
 
-from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_page
+from pydantic import SecretStr, TypeAdapter
+
+from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_adzuna, acquire_page
 from nessa.evidence.addresses import CheckedUrl
+from nessa.evidence.adzuna import AdzunaQuery
 from nessa.evidence.fetcher import Fetcher
-from nessa.evidence.records import Retention, RightsClass
+from nessa.evidence.records import ClaimValue, Retention, RightsClass
 from nessa.evidence.sources import (
     PENDING_REVIEW,
     PageRights,
@@ -40,9 +50,12 @@ from nessa.evidence.sources import (
     load_manifest,
     retention,
 )
+from tools.live_adzuna import Acquire, AdzunaSettings, missing_credentials, search
 from tools.localenv import REPO_ROOT
+from tools.usage_ledger import Ledger
 
 EVIDENCE_DIR = REPO_ROOT / "var" / "evidence" / "corpus"
+ADZUNA_RESULTS = 50  # one page of Adzuna's largest size: the fewest requests for a slot
 
 
 def agent_classification(
@@ -90,10 +103,12 @@ def record(result: AcquisitionResult) -> dict[str, object]:
         "postings": [
             {
                 "title": copy.title,
+                "advertiser": copy.advertiser.value,
                 "extraction_error": copy.extraction_error,
                 "claims": [
                     {
                         "field": c.field.value,
+                        "value": TypeAdapter(ClaimValue).dump_python(c.value, mode="json"),
                         "start": c.span.start,
                         "end": c.span.end,
                         "pointer": c.span.pointer,
@@ -137,19 +152,61 @@ def acquire_for_corpus(
     return out
 
 
+def adzuna_for_corpus(
+    slot: str,
+    query: AdzunaQuery,
+    credentials: tuple[SecretStr, SecretStr],
+    ledger: Ledger,
+    *,
+    acquire: Acquire = acquire_adzuna,
+    fetcher: Fetcher | None = None,
+) -> dict[str, object]:
+    """One Adzuna search for a slot, through `make live-adzuna`'s own capped, ledgered path
+    (the product's adapter; the `live-adzuna` scope's cap; the leak scan). Its class is the
+    manifest's (`api.adzuna.com`, a job board): the hash and the claims' excerpts, never the
+    response. The record fails when the scan finds a credential in it."""
+    searched = search(
+        credentials, ledger, (query,), acquire=acquire, fetcher=fetcher, purpose=f"corpus {slot}: "
+    )
+    [result] = searched.results
+    out = record(result)
+    out["total_matching"] = result.total
+    out["kept_body"] = None
+    out["leak_scan"] = {"cells": searched.cells, "findings": searched.findings}
+    return out
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--slot", required=True, help="the manifest slot, e.g. J12 or X01")
-    parser.add_argument("--url", required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--url")
+    source.add_argument(
+        "--adzuna", nargs=2, metavar=("WHAT", "WHERE"), help="one Adzuna search (50 results)"
+    )
     parser.add_argument("--rights-class", type=RightsClass, default=None)
     parser.add_argument("--terms", default=None, help="the terms relied on, quoted and dated")
     args = parser.parse_args(argv)
-    fetcher = Fetcher(user_agent=load_manifest().user_agent)
-    out = acquire_for_corpus(
-        args.slot, args.url, fetcher=fetcher, rights_class=args.rights_class, terms=args.terms
-    )
+    if args.adzuna:
+        if args.rights_class or args.terms:
+            parser.error("an Adzuna search takes the manifest's class: no --rights-class")
+        settings = AdzunaSettings()
+        if settings.app_id is None or settings.app_key is None:
+            print(json.dumps(missing_credentials(settings), indent=2))
+            sys.exit(2)
+        what, where = args.adzuna
+        query = AdzunaQuery(what=what, where=where, results_per_page=ADZUNA_RESULTS)
+        out = adzuna_for_corpus(args.slot, query, (settings.app_id, settings.app_key), Ledger())
+    else:
+        fetcher = Fetcher(user_agent=load_manifest().user_agent)
+        out = acquire_for_corpus(
+            args.slot, args.url, fetcher=fetcher, rights_class=args.rights_class, terms=args.terms
+        )
     print(json.dumps(out, indent=2, ensure_ascii=False))
     sys.stdout.flush()
+    leak: Any = out.get("leak_scan")
+    if leak and leak["findings"]:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

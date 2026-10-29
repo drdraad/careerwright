@@ -3,19 +3,25 @@ it keeps a body only where the rights policy permits, and its record carries eve
 span. Pages are synthetic."""
 
 import hashlib
+import json
 from datetime import date
 from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import SecretStr
 
+from nessa.evidence.adzuna import AdzunaQuery, recorded_url
 from nessa.evidence.fetcher import Fetcher
 from nessa.evidence.records import Retention, RightsClass
 from nessa.evidence.sources import PageRights
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
 from tests.support.source_server import Scripted, SourceServer, source_server
-from tools.corpus import acquire_for_corpus, agent_classification
+from tests.tools.test_live_adzuna import APP_ID, APP_KEY, fake_acquire
+from tools.corpus import acquire_for_corpus, adzuna_for_corpus, agent_classification
+from tools.live_adzuna import MAX_SCOPE_REQUESTS, SCOPE
+from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry
 
 EMPLOYER_TERMS = '"Apply on our careers site" (careers page footer, read 2026-10-29)'
 
@@ -149,6 +155,73 @@ def test_an_agent_s_classification_holds_only_for_the_host_it_was_given_for(
     assert "jobs.board.example" in status  # both hosts recorded
     assert out["kept_body"] is None
     assert not list(tmp_path.iterdir())
+
+
+CREDENTIALS = (SecretStr(APP_ID), SecretStr(APP_KEY))
+
+
+@pytest.mark.req("MODEL-09")
+def test_an_adzuna_slot_is_one_capped_ledgered_request_whose_record_cites_pointers(
+    tmp_path: Path,
+) -> None:
+    ledger = Ledger(tmp_path / "usage.jsonl")
+    query = AdzunaQuery(what="bookkeeping assistant", where="Leeds", results_per_page=50)
+
+    out = adzuna_for_corpus(
+        "J03",
+        query,
+        CREDENTIALS,
+        ledger,
+        acquire=fake_acquire,
+        fetcher=object(),  # type: ignore[arg-type]
+    )
+
+    [row] = ledger.records()
+    assert (row.budget_scope, row.http_requests, row.estimated_cost_nano_usd) == (SCOPE, 1, 0)
+    assert row.purpose.startswith("corpus J03: ")
+    assert out["url"] == recorded_url(query)  # as recorded: never with the credentials
+    assert out["total_matching"] is not None
+    assert out["kept_body"] is None
+    assert out["leak_scan"] == {"cells": 3, "findings": []}
+    postings: Any = out["postings"]
+    salary = next(c for p in postings for c in p["claims"] if c["field"] == "salary")
+    assert salary["pointer"].startswith("/results/")
+    assert salary["value"]["basis"] in {"predicted", "advertised", "unknown"}
+    text = json.dumps(out) + (tmp_path / "usage.jsonl").read_text()
+    assert APP_ID not in text
+    assert APP_KEY not in text
+
+
+@pytest.mark.req("MODEL-09")
+def test_an_adzuna_slot_past_the_scope_cap_is_refused_before_any_request(tmp_path: Path) -> None:
+    ledger = Ledger(tmp_path / "usage.jsonl")
+    for _ in range(MAX_SCOPE_REQUESTS):
+        ledger.append(
+            LiveCallEntry(
+                budget_scope=SCOPE,
+                provider="adzuna",
+                purpose="earlier",
+                model_id="adzuna-jobs-api",
+                is_production_model=False,
+                endpoint="GET x",
+                outcome=CallOutcome.OK,
+                reserved_nano_usd=0,
+                estimated_cost_nano_usd=0,
+            )
+        )
+    sent: list[object] = []
+
+    with pytest.raises(SystemExit, match="refused"):
+        adzuna_for_corpus(
+            "J03",
+            AdzunaQuery(what="x", where="Leeds"),
+            CREDENTIALS,
+            ledger,
+            acquire=lambda *args, **kwargs: sent.append(args),  # type: ignore[arg-type]
+            fetcher=object(),  # type: ignore[arg-type]
+        )
+
+    assert sent == []
 
 
 def test_a_class_other_than_other_without_its_terms_is_refused() -> None:
