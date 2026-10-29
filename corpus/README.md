@@ -7,7 +7,9 @@ in `derived_from`) with one slot per required page, intended case types, owners 
 items.
 
 **Status: not collected (0 of 20 job postings, 0 of 10 course pages, 0 of 3 funding
-pages).** Synthetic personas and generated HTML do not count toward it.
+pages).** Synthetic personas and generated HTML do not count toward it. The two attempt
+cases are recorded (Task 7A, 2026-10-29): X01, a GOV.UK address that returns 404, and X02, a
+LinkedIn posting the source manifest refuses without a request.
 
 ## What lives where (ruling R3; the session 1 rights policy)
 
@@ -44,8 +46,14 @@ and the short quoted spans that prove each extracted value.
 1. Check robots.txt and the site terms, and record `robots_and_terms_checked_at`. Never
    fetch past a sign-in, paywall or access control. Policy-denied fetches become
    `attempt_cases`, not page slots.
-2. Fetch with the acquisition pipeline once it exists (Task 7). Record `retrieved_at`,
-   `http_status`, `content_type` and `sha256` of the exact bytes kept.
+2. Fetch with the acquisition pipeline (Task 7A): from `backend/`, `uv run --locked python
+   -m tools.corpus --slot <slot> --url <url>` (add `--rights-class <class> --terms "<terms,
+   quoted and dated>"` for a page the source manifest does not list). It applies the URL and
+   address checks, the source permission manifest
+   (`backend/src/nessa/evidence/sources.json`, OI-11), robots.txt and the fetch bounds, keeps
+   the body under `var/evidence/corpus/<slot>/` only where the class permits, and prints the
+   record: `retrieved_at`, `http_status`, `content_type`, `sha256` of the exact bytes and each
+   claim's offsets and excerpt. It never edits this manifest.
 3. Set `rights_status` from the rights policy above. Name the page's class and the terms
    relied on, quoted and dated: `<class id>: <terms, quoted and dated>` for any class but
    `other`, for example
