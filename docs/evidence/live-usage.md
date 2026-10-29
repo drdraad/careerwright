@@ -1,8 +1,10 @@
 # Live Meta usage log
 
 Every HTTP call to the Meta Model API made by Nessa tooling, including failures and
-free calls (ruling R5). Generated from `live-usage.jsonl` by
-`backend/tools/usage_ledger.py`; do not edit the table by hand.
+free calls (ruling R5), and every Adzuna API request of `make live-adzuna` (scope
+`live-adzuna`, free tier, model column `adzuna-jobs-api`). Generated from
+`live-usage.jsonl` by `backend/tools/usage_ledger.py`; do not edit the table by
+hand.
 
 - Prices: https://dev.meta.ai/docs/pricing-rate-limits (checked 2026-10-27); costs are estimates from
   reported usage, in USD before tax. `unknown` means the charge could not be
@@ -29,7 +31,10 @@ free calls (ruling R5). Generated from `live-usage.jsonl` by
   live-eval`): at most 6 evaluation cases per invocation, each one attempt of at
   most 2 requests on the test model, never the production model; cumulatively at
   most 24 requests and $0.05 worst case (`NESSA_LIVE_EVAL_*`), enforced in
-  `backend/tools/live_eval.py`.
+  `backend/tools/live_eval.py`. `live-adzuna` (`make live-adzuna`, Task 7A):
+  Adzuna's free tier, not Meta: at most 2 requests per invocation and 10
+  cumulatively, each at $0, enforced in `backend/tools/live_adzuna.py`; the
+  endpoint is recorded without the credentials.
 - A row for an activity attempt that sent more than one request (the call and its
   validation repair) shows `x N` after the endpoint; its tokens and cost are the
   attempt's total, and the caps count every request.
@@ -62,3 +67,5 @@ free calls (ruling R5). Generated from `live-usage.jsonl` by
 | 24 | 2026-10-28 14:08:04 | live-eval-fix1 | live evaluation: one discovery case via API and DBOS worker (synthetic case; key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 530 (0) | 629 (382) | 0 | $0.000179 | $0.023098 | resp_6ae201bf43e4d022e31445a3 |
 | 25 | 2026-10-28 18:54:26 | live-eval-6b | live evaluation: one discovery and its slate's written explanation via API and DBOS worker (synthetic case; key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 530 (0) | 761 (524) | 0 | $0.000205 | $0.023303 | resp_6ae244cee5ec84de50944024 |
 | 26 | 2026-10-28 18:54:26 | live-eval-6b | live evaluation: one discovery and its slate's written explanation via API and DBOS worker (synthetic case; key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses x 2 | ok | 2,747 (881) | 1,323 (359) | 0 | $0.000453 | $0.023756 | resp_6ae244dd7a9ec3f7584344ad |
+| 27 | 2026-10-29 00:10:16 | live-search | source search via API, outbox and DBOS worker: Meta web search for a synthetic target and city, candidates checked (key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 4,800 (0) | 411 (258) | 2 | $0.005562 | $0.029319 | resp_6ae28edf74bd96b650df49d5 |
+| 28 | 2026-10-29 00:11:19 | live-search | source search via API, outbox and DBOS worker: Meta web search for a synthetic target and city, candidates checked (key opened just in time) | `muse-spark-1.3-contributor` | POST /v1/responses | ok | 5,100 (0) | 384 (171) | 2 | $0.005587 | $0.034905 | resp_6ae28f1cba3230844dcc4bce |
