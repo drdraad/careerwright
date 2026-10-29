@@ -1,8 +1,8 @@
 """Money in integer minor units (Global Constraint 4). Unknown money is null, never zero.
 
 L0 is GBP only (ADR 0001). The minor-unit exponent is metadata of the currency; code never
-assumes a division by 100. `SignedMoney` (economic values, spec section 18) arrives with its
-first user, the monthly compiler.
+assumes a division by 100. `SignedMoney` holds economic values (spec section 18), which may be
+negative against a baseline and are never cash available today.
 """
 
 from typing import Literal
@@ -18,4 +18,13 @@ class Money(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     minor_units: int = Field(ge=0)
+    currency: Currency
+
+
+class SignedMoney(BaseModel):
+    """An economic cost or an income change: negative is a gain against the baseline."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    minor_units: int
     currency: Currency

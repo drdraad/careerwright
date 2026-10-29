@@ -2234,6 +2234,7 @@ export const ErrorStageSchema = {
         'profile',
         'catalogue',
         'capability',
+        'planning',
         'credential',
         'execution',
         'spend',

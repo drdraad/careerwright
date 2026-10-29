@@ -68,6 +68,7 @@ class ErrorStage(StrEnum):
     PROFILE = "profile"
     CATALOGUE = "catalogue"
     CAPABILITY = "capability"
+    PLANNING = "planning"
     CREDENTIAL = "credential"
     EXECUTION = "execution"
     SPEND = "spend"
