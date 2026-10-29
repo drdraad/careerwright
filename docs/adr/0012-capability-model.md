@@ -1,7 +1,8 @@
 # ADR 0012: The capability model: matrices, evidence, protected gates, outcomes and readiness
 
 - Status: Accepted for Task 9 (Sprint 4 backend, S4.1–S4.6). Amended in fix round 1
-  (2026-10-29): decisions 4, 5, 7, 8, 9 and 10 changed, as marked.
+  (2026-10-29): decisions 4, 5, 7, 8, 9 and 10 changed, as marked. Amended again in fix
+  round 2: decisions 4, 5, 7, 8 and 10, and the consequences.
   - **Provisional, need product owner confirmation (R6):**
     - decision 3: how importance is derived, ESCO-only rows unknown, disputed counted as
       required;
@@ -10,6 +11,7 @@
     - decision 5: what evidence counts towards readiness, "with help" capped at level 1, and
       a reviewed demonstration below a self-report (review M4, parked);
     - decision 6: who reviews an assessed result;
+    - decision 7: that the right to work alone is not coverage (fix round 2, review N6);
     - decision 8: the question weights, the 80% stop and the twelve initial prompts;
     - decision 10: how a target finds its pack target and ESCO seed.
   - **Not run — requires human:** the domain review of the capability reference (its
@@ -127,7 +129,12 @@ deterministic code: a model may later propose mappings and answers, never commit
      a learn gap, not asked again.
    - "I am unsure" is unknown, never level 0: an unresolved assumption, listed and not asked
      again.
-   - These level-free answers hold for the subject under any target's rubric.
+   - These level-free answers are shared across targets, never assumed the same (fix round
+     2, review N1). One given under another rubric fills a row only when the row has no
+     answer under its own rubric, and never supersedes one. If it is later and says "not yet
+     done" against the row's own level above 0, that is a `conflict`, asked as a
+     clarification. A later levelled answer under another rubric reopens a level-free
+     reading, so the row is asked again (`other_rubric`).
    - An answer that contradicts its level is refused (`VALIDATION_FAILED`,
      `inconsistent_evidence`), as are the not-yet-done answers above level 0. Migration 0030
      repeats the rules as CHECKs (`NOT VALID`, so an earlier row is kept as written).
@@ -179,9 +186,9 @@ deterministic code: a model may later propose mappings and answers, never commit
 
    | State | When |
    |---|---|
-   | `insufficient_coverage` | No required row or gate is modelled (no rubric, no typed gate): an unknown target, ESCO seed rows only, or a regulated occupation with only the unmodelled gate. A target-level blocker `no_modelled_requirements` (row ID null). Never ready |
+   | `insufficient_coverage` | Nothing covers the target: no required skill row a rubric models, and no modelled legal-practice or recognition gate (an unknown target, ESCO seed rows only, a regulated occupation with only the unmodelled gate, or the right to work alone). A target-level blocker `no_modelled_requirements` (row ID null). Also when a required row no answer can settle sits beside modelled ones: a row with no rubric, or the unmodelled regulation gate (fix round 2, N5). Never ready |
    | `not_ready` | A known shortfall: below the required level, not held, or a pathway beyond the model |
-   | `not_yet_assessed` | Only unknowns block: no usable evidence, unresolved, or a required row with no rubric |
+   | `not_yet_assessed` | Only unknowns the person's answers can settle block: no usable evidence, unresolved |
    | `conditional_on_assessed_completion` | Met only by a scenario's planned outcomes |
    | `ready_now_for_modelled_requirements` | Met now |
 
@@ -190,6 +197,17 @@ deterministic code: a model may later propose mappings and answers, never commit
    qualified `missing_outcome_level`, when a completed offering has an assessed, supported
    outcome for a required row with no stated level. A topic mention or unassessed practice
    rules a level out, so it is not "missing" (C06's exam is; C02's topic mention is not).
+
+   **What counts as coverage (fix round 2, review N6; provisional).** "Ready" needs at
+   least one required skill row a rubric models, or a modelled legal-practice or
+   recognition gate. The right to work, or another eligibility or credential statement,
+   alone is not coverage. Without this, a target whose skill rows the person had relaxed
+   would read ready on the right to work. This is fail-safe, in the spirit of C1.
+
+   **A route chart only when there is something to plan** (fix round 2, review N3):
+   `show_route_chart` is true only when a mandatory gap an option could address (learn,
+   credential or experience) exists, and never when the target is not assessable or the
+   person is ready now.
 
 8. **The question graph (provisional weights).** One graph across the targets, a shared
    subject asked once. Requirements and gates first; then importance (essential 3, disputed
@@ -200,7 +218,9 @@ deterministic code: a model may later propose mappings and answers, never commit
    person stops or pauses, with every open question kept. Coverage is counts, never a
    percentage. With no modelled row or gate the state is `insufficient_coverage`, never
    "enough" (fix round 1). An unsure answer and a gate's "don't know" are not asked again
-   and stay in `unresolved`.
+   and stay in `unresolved`. When coverage is short and they are all that remains, the
+   state is `only_unresolved`, never "asking" with nothing to ask (fix round 2, review N2):
+   what remains is an optional work sample, or stopping (spec section 9).
 
 9. **Versions.** A matrix has a `matrix_version` (a digest of its content) and a
    `definition_version` (a digest of its required rows, their levels, rubrics and gate types).
@@ -227,10 +247,23 @@ deterministic code: a model may later propose mappings and answers, never commit
     else the one pack target whose crosswalk names the target's ESCO occupation (fix round
     1, C1(b)). Choosing an occupation in the product stores ESCO's preferred label ("nurse
     responsible for general care"), and the second route brings it to the pack's rows and
-    the NMC gate. Several such pack targets are never guessed between. The match is recorded
-    as `pack_target.basis`. The ESCO seed is the occupation ESCO labels with exactly that
-    title, otherwise the pack target's crosswalk; otherwise none, with the reason. Migration
-    0030 adds the answer CHECKs (decision 5). Endpoints under
+    the NMC gate. Several such pack targets are never guessed between, and the matrix says
+    why it has none (`pack_target_note: ambiguous_crosswalk`, fix round 2, review N4). The
+    match is recorded as `pack_target.basis`.
+
+    **The ESCO seed, in order** (fix round 2, C1(b)):
+    1. the occupation the person chose, read from the choice's own source (its locator is
+       the ESCO URI), never re-derived from the label (`occupation.basis:
+       occupation_choice`);
+    2. otherwise the one occupation ESCO labels with the title;
+    3. otherwise, where several carry the label, the one whose *preferred* label is the
+       title, which is how the product stores a choice. "bookkeeper" is ESCO's preferred
+       label for bookkeeper and an alternative label of accountant;
+    4. otherwise the pack target's crosswalk;
+    5. otherwise none, with the reason.
+
+    Two equal matches stay ambiguous. Migration 0030 adds the answer CHECKs (decision 5).
+    Endpoints under
     `/v1/workspaces/{id}/capability`: `GET matrices`, `GET questions`, `GET readiness`,
     `POST evidence`, `POST statements`, `POST edits`, `PUT questions/state`, each write with
     an expected version and an Idempotency-Key, returning the new version.
@@ -260,3 +293,13 @@ deterministic code: a model may later propose mappings and answers, never commit
   matrix (public reference data, as ESCO is), not TRACE-01's synthetic matrix.
 - Ranks do not exist yet: Tasks 11 and 13a must key planning inputs and ranks by
   `definition_version`, so a changed definition makes them stale (MAP1-04).
+- **The regulation guard rests on ESCO's flag** (fix round 2, review N7; forward risk).
+  ESCO v1.2.1 flags 16 occupations. UK-regulated roles it does not flag (social worker,
+  physiotherapist, occupational therapist, diagnostic radiographer) are kept from reading
+  ready today only because nothing models them (decision 7). Task 7c's reviewed pack and
+  live research must type a UK-regulated role's gate, whatever ESCO's flag says.
+- **Migration 0030's `NOT VALID` CHECKs** (fix round 2, review N8). 0029 ran only on test
+  databases, on this unpushed branch. A legacy row contradicting its level would be refused
+  when read back by the domain validator, so every capability read for its workspace
+  would answer `INTERNAL_ERROR`, observable, never silent. A populated-upgrade test is left
+  for the final review (R12).
