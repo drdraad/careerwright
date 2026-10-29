@@ -73,6 +73,7 @@ ADAPTERS: dict[str, frozenset[str]] = {
     "nessa.evidence.store": frozenset({"sqlalchemy"}),
     "nessa.evidence.workflow": frozenset({"dbos"}),
     "nessa.evidence.search_agent": frozenset({"pydantic_ai"}),
+    "nessa.evidence.extraction_agent": frozenset({"pydantic_ai"}),  # fix round 2, ruling 10
     "nessa.api.": frozenset({"fastapi", "starlette", "anyio"}),
 }
 EXCLUDED_PACKAGES = frozenset(

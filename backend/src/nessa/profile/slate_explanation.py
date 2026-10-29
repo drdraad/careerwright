@@ -346,7 +346,9 @@ def _bare(text: str) -> str:
     return text
 
 
-def _unwrapped(text: str) -> str:
+def unwrapped(text: str) -> str:
+    """A quotation as the check reads it: spaces, double quotation marks and closing
+    punctuation off its ends, and single quotes only as a matching pair."""
     text = _bare(text)
     for opening, closing in _SINGLE_PAIRS:
         if len(text) > 2 and text.startswith(opening) and text.endswith(closing):
@@ -404,10 +406,11 @@ def _in_word(folded: str, i: int) -> bool:
     return (letter_before and letter_after) or (i > 0 and folded[i - 1] == "s" and not letter_after)
 
 
-def find_span(quote: str, source: str) -> str | None:
-    """The source's own characters for the first place the quotation appears in it whole
-    (case, spacing and apostrophe forms aside), starting and ending at a word boundary; None
-    if it appears nowhere so."""
+def span_offsets(quote: str, source: str) -> tuple[int, int] | None:
+    """The start and end, in the source, of the first place the quotation appears in it
+    whole (case, spacing and apostrophe forms aside), starting and ending at a word
+    boundary; None if it appears nowhere so. Page extraction cites these offsets
+    (`nessa.evidence.extraction`)."""
     wanted, _ = _folded(quote)
     folded, index = _folded(source)
     if not wanted:
@@ -418,9 +421,16 @@ def find_span(quote: str, source: str) -> str | None:
         before = start == 0 or not _in_word(folded, start - 1)
         after = end == len(folded) or not _in_word(folded, end)
         if before and after:
-            return source[index[start] : index[end - 1] + 1]
+            return index[start], index[end - 1] + 1
         start = folded.find(wanted, start + 1)
     return None
+
+
+def find_span(quote: str, source: str) -> str | None:
+    """The source's own characters where `span_offsets` finds the quotation; None if it
+    appears nowhere whole."""
+    found = span_offsets(quote, source)
+    return None if found is None else source[found[0] : found[1]]
 
 
 def _record_parts(record: OccupationRecord) -> list[tuple[RecordPart, str]]:
@@ -435,7 +445,7 @@ def quoted_span(quote: str, source: str) -> str | None:
     """The source's own characters for a quotation of it, read as the check reads one: its
     ends unwrapped, bounded, whole words; None if it is no quotation of the source. (Whether
     the span says something is `quotable`.)"""
-    text = _unwrapped(quote)
+    text = unwrapped(quote)
     if not QUOTE_CHARS[0] <= len(text) <= QUOTE_CHARS[1] or not any(c.isalpha() for c in text):
         return None
     return find_span(text, source)

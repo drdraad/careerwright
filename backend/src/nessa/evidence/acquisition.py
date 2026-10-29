@@ -12,7 +12,9 @@ result is recorded in one transaction: the attempt, the body where the rights cl
 keeping it (sealed), each job copy with its claims, attached to a canonical job by
 `jobs.same_job`. A failed or blocked source is an attempt with its reason, never "no
 vacancies"; a failed refresh moves a job's last attempt and never its last success. A
-cancelled run fetches nothing more.
+cancelled run fetches nothing more. A page whose structured data gave no posting is handed,
+in the same transaction, to a model extraction run of its own (`extraction_runs`), or says
+why it was not.
 """
 
 import base64
@@ -35,6 +37,7 @@ from nessa.evidence import store
 from nessa.evidence.acquire import ADZUNA_PROVIDER, AcquisitionResult
 from nessa.evidence.addresses import CheckedUrl, UrlRefusal, check_url
 from nessa.evidence.adzuna import CREDENTIAL_PARAMETERS, AdzunaQuery, recorded_url
+from nessa.evidence.extraction_runs import start_extraction
 from nessa.evidence.freshness import (
     FreshnessKind,
     FreshnessView,
@@ -43,14 +46,8 @@ from nessa.evidence.freshness import (
     freshness,
     refresh_decision,
 )
-from nessa.evidence.jobs import (
-    canonical_facts,
-    description_fingerprints,
-    facts_from_json,
-    facts_json,
-    jobs_joined,
-    title_key,
-)
+from nessa.evidence.jobs import canonical_facts, description_fingerprints, facts_json, title_key
+from nessa.evidence.recording import record_copies
 from nessa.evidence.records import (
     AdvertiserKind,
     AttemptReason,
@@ -58,6 +55,7 @@ from nessa.evidence.records import (
     Claim,
     ClaimField,
     DescriptionKind,
+    ExtractionOutcome,
     InputRoute,
     JobCopy,
     Location,
@@ -74,6 +72,7 @@ from nessa.identity.access import Actor
 from nessa.identity.activity import ActivityRuntime, Outcome, cancelled, failed, publish, succeeded
 from nessa.identity.failures import FailureClass
 from nessa.identity.keyring import Keyring, RecordContext
+from nessa.identity.model_choice import ModelChoice
 from nessa.identity.records import EventKind, Run, RunKind
 from nessa.identity.runs import open_output, output_context, submit_keyless_run, visible_run
 from nessa.identity.workspaces import visible_workspace
@@ -428,12 +427,36 @@ class TargetStatus(StrEnum):
     NOT_ATTEMPTED = "not_attempted"  # queued when its run ended: never tried
 
 
+class ModelExtractionState(StrEnum):
+    """How model extraction went for a page it may read (fix round 2, rulings 9-10)."""
+
+    PENDING = "pending"  # its run is queued or running
+    POSTINGS_READ = "postings_read"  # its run recorded the postings it verified
+    NO_POSTING_FOUND = "no_posting_found"  # read, and no advert found: not "none found"
+    NOT_READ = "not_read"  # its run failed or was cancelled, or verified nothing it proposed
+    NOT_RUN = "not_run"  # never started: `not_run` says why
+
+
+def extraction_state(row: store.ExtractionRow) -> ModelExtractionState:
+    if row.run_id is None:
+        return ModelExtractionState.NOT_RUN
+    if row.run_status in (WorkState.QUEUED, WorkState.RUNNING):
+        return ModelExtractionState.PENDING
+    if row.run_status is WorkState.COMPLETE and row.outcome is ExtractionOutcome.POSTINGS_RECORDED:
+        return ModelExtractionState.POSTINGS_READ
+    if row.run_status is WorkState.COMPLETE and row.outcome is ExtractionOutcome.NO_POSTING_FOUND:
+        return ModelExtractionState.NO_POSTING_FOUND
+    return ModelExtractionState.NOT_READ
+
+
 @dataclass(frozen=True)
 class TargetView:
     target: store.TargetRow
     status: TargetStatus  # as stored, or `cancelled`/`not_attempted` for one its run never tried
     attempts: list[store.AttemptRow]
     retrieved: dict[uuid.UUID, int]  # attempt -> the adverts (copies) it returned
+    # attempt -> its page's model extraction, for a page extraction may read
+    extractions: dict[uuid.UUID, store.ExtractionRow] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -460,6 +483,7 @@ def acquisition(tx: Tx, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Acquisiti
         raise NessaError(ErrorCode.NOT_FOUND, "No such acquisition.", stage=ErrorStage.EXECUTION)
     attempts = store.attempts_of_run(tx, run_id)
     copies = store.copies_of_attempts(tx, [a.attempt_id for a in attempts])
+    extractions = store.extractions_of_attempts(tx, [a.attempt_id for a in attempts])
     retrieved: dict[uuid.UUID, int] = {}
     for c in copies:
         retrieved[c.attempt_id] = retrieved.get(c.attempt_id, 0) + 1
@@ -472,7 +496,10 @@ def acquisition(tx: Tx, workspace_id: uuid.UUID, run_id: uuid.UUID) -> Acquisiti
             status = TargetStatus.NOT_ATTEMPTED
         mine = [a for a in attempts if a.position == target.position]
         counts = {a.attempt_id: retrieved.get(a.attempt_id, 0) for a in mine}
-        views.append(TargetView(target, status, mine, counts))
+        read = {
+            a.attempt_id: extractions[a.attempt_id] for a in mine if a.attempt_id in extractions
+        }
+        views.append(TargetView(target, status, mine, counts, read))
     job_ids = list(dict.fromkeys(c.job_id for c in copies if c.job_id is not None))
     return AcquisitionView(run, views, job_ids)
 
@@ -528,20 +555,25 @@ class Coverage(StrEnum):
 
     SUCCEEDED = "succeeded"  # retrieved and read
     NO_POSTING_READABLE = store.NO_POSTING_READABLE  # retrieved, but no posting could be read
+    # Retrieved and read by model extraction, which found no advert on it: not evidence
+    # that there is no vacancy (fix round 2, ruling 9).
+    NO_POSTING_FOUND_BY_MODEL = store.NO_POSTING_FOUND_BY_MODEL
     BLOCKED = "blocked"
     FAILED = "failed"
-    PENDING = "pending"  # being fetched now
+    PENDING = "pending"  # being fetched, or being read by model extraction, now
 
 
 class EmptyReason(StrEnum):
     """Why a listing has no vacancy (STATE-02): never a bare empty list. Only
     `none_found_in_sources_checked` says the sources read held none, and only an API's own
-    empty answer can give it (fix round 2, review B N1)."""
+    empty answer can give it (fix round 2, review B N1); a page model extraction read and
+    found no advert on gives `no_posting_found_by_model`, never that (ruling 9)."""
 
     NO_SOURCES_CHECKED = "no_sources_checked"
     SOURCES_PENDING = "sources_pending"  # still being fetched or read: no answer yet
     NO_SOURCE_RETRIEVED = "no_source_retrieved"
     NO_POSTING_READABLE = "no_posting_readable"
+    NO_POSTING_FOUND_BY_MODEL = "no_posting_found_by_model"
     NONE_FOUND_IN_SOURCES_CHECKED = "none_found_in_sources_checked"
 
 
@@ -564,10 +596,17 @@ def _empty_reason(total_jobs: int, covered: dict[Coverage, int]) -> EmptyReason 
         return EmptyReason.NO_SOURCES_CHECKED
     if covered.get(Coverage.PENDING):  # an answer is still coming (review B N7)
         return EmptyReason.SOURCES_PENDING
-    if not (covered.get(Coverage.SUCCEEDED) or covered.get(Coverage.NO_POSTING_READABLE)):
+    retrieved = (
+        Coverage.SUCCEEDED,
+        Coverage.NO_POSTING_READABLE,
+        Coverage.NO_POSTING_FOUND_BY_MODEL,
+    )
+    if not any(covered.get(c) for c in retrieved):
         return EmptyReason.NO_SOURCE_RETRIEVED
     if covered.get(Coverage.NO_POSTING_READABLE):
         return EmptyReason.NO_POSTING_READABLE
+    if covered.get(Coverage.NO_POSTING_FOUND_BY_MODEL):
+        return EmptyReason.NO_POSTING_FOUND_BY_MODEL
     return EmptyReason.NONE_FOUND_IN_SOURCES_CHECKED
 
 
@@ -641,6 +680,7 @@ class TransientAcquisitionError(Exception):
 class AcquisitionRuntime:
     activity: ActivityRuntime  # the worker's engine, keyring and clock, and run publication
     client: AcquisitionClient
+    models: ModelChoice  # the model an extraction run started for a page pins
 
     @property
     def engine(self) -> Engine:
@@ -706,6 +746,7 @@ def _kept_body_checked(result: AcquisitionResult) -> AcquisitionResult:
             "body_b64": None,
             "copies": [],
             "extraction": None,
+            "extraction_text": None,
             "total": None,
         }
     )
@@ -725,48 +766,14 @@ def _record_copies(
                 base64.b64decode(result.body_b64), document_context(run.workspace_id, attempt_id)
             ),
         )
-    for copy in result.copies:
-        facts = canonical_facts(copy, provider=result.provider)
-        job_id: uuid.UUID | None = None
-        if copy.extraction_error is None:
-            # The grouping rule the property tests cover, over the candidates: a copy that
-            # bridges stored jobs makes them one job, the oldest (JOB-02, PROP-02).
-            candidates = store.candidate_copies(
-                tx,
-                run.workspace_id,
-                provider=result.provider,
-                source_job_id=copy.source_job_id,
-                title_key=facts.title_key,
-            )
-            joined = jobs_joined([(job, facts_from_json(f)) for job, f in candidates], facts)
-            if not joined:
-                job_id = uuid.uuid4()
-                store.insert_job(
-                    tx, job_id=job_id, workspace_id=run.workspace_id, exemplar=False, at=now
-                )
-            else:
-                job_id = joined[0]
-                store.merge_jobs(tx, run.workspace_id, keep=job_id, merged=joined[1:])
-                store.job_verified(tx, job_id, now)
-        copy_id = uuid.uuid4()
-        store.insert_copy(
-            tx,
-            copy_id=copy_id,
-            workspace_id=run.workspace_id,
-            job_id=job_id,
-            attempt_id=attempt_id,
-            provider=result.provider,
-            copy=copy,
-            facts=facts_json(facts),
-        )
-        store.insert_claims(
-            tx,
-            workspace_id=run.workspace_id,
-            attempt_id=attempt_id,
-            copy_id=copy_id,
-            copy=copy,
-            retrieved_at=now,
-        )
+    record_copies(
+        tx,
+        workspace_id=run.workspace_id,
+        attempt_id=attempt_id,
+        provider=result.provider,
+        copies=result.copies,
+        at=now,
+    )
 
 
 def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> dict[str, str]:
@@ -851,6 +858,9 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
         store.finish_attempt(tx, attempt_id, result, http_requests=result.http_requests)
         if result.status is AttemptStatus.SUCCEEDED:
             _record_copies(tx, rt, run, attempt_id, result)
+            # A page whose structured data gave no posting goes to the workspace's own model
+            # extraction run, or says why not (fix round 2, rulings 9-10).
+            start_extraction(tx, rt.keyring, rt.models, run, attempt_id, result, rt.clock())
         elif target.url and result.requested_url:
             store.job_attempted(
                 tx,
@@ -874,11 +884,14 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
 class AcquisitionSummary(StrictModel):
     """A complete acquisition run's output: each target's outcome. The records themselves
     are the attempts, copies and claims. A source retrieved with no posting that could be
-    read is counted apart from one that was read (`succeeded`), never as "none found"."""
+    read is counted apart from one that was read (`succeeded`), never as "none found"; one
+    handed to a model extraction run is counted apart again, since that run says how it
+    went (each attempt's `model_extraction`)."""
 
     targets: list[dict[str, str | int]]
     succeeded: int
     no_posting_readable: int = 0  # absent from summaries written before fix round 1
+    model_extractions: int = 0  # absent from summaries written before fix round 2
     blocked: int
     failed: int
 
@@ -900,14 +913,19 @@ def publish_acquisition(rt: AcquisitionRuntime, run_id: uuid.UUID) -> None:
             rows = store.targets(tx, run_id)
             statuses = [t.status for t in rows]
             last = {a.position: a for a in store.attempts_of_run(tx, run_id)}
-            unreadable = sum(
-                1 for t in rows if t.status == "succeeded" and last[t.position].unreadable
-            )
+            unread = [
+                last[t.position].attempt_id
+                for t in rows
+                if t.status == "succeeded" and last[t.position].unreadable
+            ]
+            started = store.extractions_of_attempts(tx, unread)
+            handed = sum(1 for e in started.values() if e.run_id is not None)
             if "succeeded" in statuses:
                 summary = AcquisitionSummary(
                     targets=[{"position": t.position, "status": t.status} for t in rows],
-                    succeeded=statuses.count("succeeded") - unreadable,
-                    no_posting_readable=unreadable,
+                    succeeded=statuses.count("succeeded") - len(unread),
+                    no_posting_readable=len(unread) - handed,
+                    model_extractions=handed,
                     blocked=statuses.count("blocked"),
                     failed=len(statuses) - statuses.count("succeeded") - statuses.count("blocked"),
                 )

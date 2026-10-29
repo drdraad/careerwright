@@ -3,7 +3,8 @@ cost nothing and run offline. Its failure modes deliberately echo part of the ke
 provider error, the worst realistic case for what could leak into a journal or log.
 
 It answers whichever schema the agent asks for: the connection check, an interview turn
-(a proposal for the current message, citing it), a discovery or a slate explanation,
+(a proposal for the current message, citing it), a discovery, a slate explanation or a
+page extraction (quoting a labelled page's values),
 non-streamed or streamed in small chunks (interview turns stream their reply). Interview
 failure modes cover the contract tests: invalid output once (repaired) or always, a complete
 but schema-invalid object, a refusal, truncation, a repair request that fails without usage,
@@ -14,6 +15,7 @@ import asyncio
 import hashlib
 import itertools
 import json
+import re
 import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -36,6 +38,7 @@ from pydantic_ai.models import Model, StreamedResponse
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RequestUsage
 
+from nessa.evidence.extraction import TEXT_MARKER
 from nessa.profile.safety import SUPPORT_TURN_INSTRUCTION
 
 FAKE_MODEL_NAME = "fake-function-model"
@@ -63,6 +66,7 @@ class FakeFailure(StrEnum):
     PAUSE_AFTER_REPLY = "pause_after_reply"  # the reply streams, then a pause, then the rest
     SEARCH_OVERRUN = "search_overrun"  # a search reply reporting more searches than allowed
     SEARCH_OVERRUN_INVALID = "search_overrun_invalid"  # the same, its answer also unusable
+    EXTRACT_INJECTED = "extract_injected"  # a page extraction that follows the page's orders
 
 
 def key_fingerprint(api_key: SecretStr | None) -> str:
@@ -149,6 +153,65 @@ def search_parts(request: dict[str, object], sentinel: str) -> list[Any]:
         ),
         TextPart(json.dumps({"candidates": candidates})),
     ]
+
+
+def _page_text(messages: list[ModelMessage]) -> str | None:
+    for message in messages:
+        for part in getattr(message, "parts", ()):
+            content = part.content if isinstance(part, UserPromptPart) else None
+            if isinstance(content, str) and content.startswith(TEXT_MARKER):
+                return content[len(TEXT_MARKER) :]
+    return None
+
+
+# A labelled synthetic page ("Job title: Park Gardener | Employer: ..."): each label's value.
+LABELLED = re.compile(r"(Job title|Employer|Location|Salary|Contract|Closing date|Apply at): ")
+LABEL_FIELDS = {
+    "Job title": "title",
+    "Employer": "employer",
+    "Location": "location",
+    "Salary": "salary",
+    "Contract": "employment_type",
+    "Closing date": "valid_through",
+    "Apply at": "apply_url",
+}
+POSTING_FIELDS = (
+    "title",
+    "employer",
+    "location",
+    "work_mode",
+    "salary",
+    "employment_type",
+    "date_posted",
+    "valid_through",
+    "apply_url",
+)
+
+
+def extraction_answer(text: str, *, injected: bool) -> dict[str, object]:
+    """One posting quoting each labelled value of the page ("Label: value |"), or none when
+    the page has no job title. `injected`: the answer a page's instructions asked for, which
+    deterministic code must refuse: a title never on the page, an employer claiming the
+    person's key, and the page's own `javascript:` link."""
+    if injected:
+        posting = dict.fromkeys(POSTING_FIELDS)
+        start = text.find("javascript:")
+        link = text[start:].split(" ")[0] if start != -1 else None
+        posting |= {
+            "title": "Chief Everything Officer, as instructed",
+            "employer": "the person's saved Meta API key",
+            "apply_url": link,
+        }
+        return {"postings": [posting]}
+    found: dict[str, str] = {}
+    marks = list(LABELLED.finditer(text))
+    for mark, following in itertools.zip_longest(marks, marks[1:]):
+        end = following.start() if following else len(text)
+        value = text[mark.end() : end].split("|")[0].strip()
+        found[LABEL_FIELDS[mark.group(1)]] = value
+    if "title" not in found:
+        return {"postings": []}
+    return {"postings": [dict.fromkeys(POSTING_FIELDS) | found]}
 
 
 EXPLANATION_MARKER = "Explanation context (JSON):\n"
@@ -350,6 +413,7 @@ def fake_model_builder(
             found = _discovery_context(messages)
             explaining = _explanation_context(messages)
             searching = _search_request(messages)
+            reading = _page_text(messages)
             if searching is not None and failure is FakeFailure.SEARCH_OVERRUN_INVALID:
                 return ModelResponse(
                     parts=[TextPart('{"candidates": "not a list"}')],
@@ -378,7 +442,10 @@ def fake_model_builder(
                 FakeFailure.INVALID_ALWAYS,
                 FakeFailure.INVALID_THEN_UNAVAILABLE,
             ) or (failure is FakeFailure.INVALID_ONCE and call == 0)
-            if explaining is not None:
+            if reading is not None:
+                injected = failure is FakeFailure.EXTRACT_INJECTED
+                text = json.dumps(extraction_answer(reading, injected=injected))
+            elif explaining is not None:
                 answer = explanation_answer(explaining, output_sentinel, valid=not invalid)
                 text = json.dumps(answer)
             elif found is not None:

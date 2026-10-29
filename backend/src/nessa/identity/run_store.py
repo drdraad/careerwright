@@ -121,6 +121,13 @@ def sealed_input(tx: Tx, run_id: uuid.UUID) -> SealedValue | None:
     return SealedValue(row.key_version, bytes(row.nonce), bytes(row.ciphertext))
 
 
+def erase_input(tx: Tx) -> bool:
+    """Worker: erase the executed run's sealed input, if its kind's input is erased once it
+    is terminal and it is (migration 0021, `nessa.erase_run_input`), whether or not its
+    requester may still act. Returns whether an input was erased."""
+    return bool(tx.execute(sa.text("SELECT nessa.erase_run_input()")).scalar_one())
+
+
 def all_sealed_inputs(tx: Tx) -> list[tuple[uuid.UUID, uuid.UUID, SealedValue]]:
     """Setup only (master-key rotation): every sealed run input, locked."""
     rows = tx.execute(

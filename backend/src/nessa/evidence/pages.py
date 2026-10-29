@@ -48,6 +48,9 @@ from nessa.evidence.redaction import redact_json, redact_text, redact_value
 
 EXCERPT_CHARS = 200
 LOCALITY_CHARS, POSTAL_CODE_CHARS, COUNTRY_CHARS = 120, 20, 60  # `records.Location`'s bounds
+# The most of a page's visible text model extraction reads (`visible_text`): one advert's
+# text fits, and the run's reservation is bounded by it (`nessa.evidence.extraction`).
+EXTRACTION_TEXT_BYTES = 8_000
 _DECODER = json.JSONDecoder()
 _COLON = re.compile(r"\s*:\s*")
 _DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
@@ -382,9 +385,10 @@ def _copy(posting: dict[str, Any], claims: _Claims, page_host: str | None) -> Jo
     )
 
 
-def _conflicts(postings: list[JobCopy]) -> list[JobCopy]:
+def mark_conflicts(postings: list[JobCopy]) -> list[JobCopy]:
     """Postings for one title that disagree on salary, expiry, contract or employer are all
-    marked: which is right cannot be decided by code, so none is published."""
+    marked: which is right cannot be decided by code, so none is published. Model extraction
+    marks its postings by the same rule (`nessa.evidence.extraction`)."""
     marked = []
     for job in postings:
         rivals = [
@@ -493,8 +497,20 @@ def parse_page(text: str, *, sha256: str, page_url: str) -> ParsedPage:
                 postings.append(copy)
             else:
                 unreadable += 1
-    marked = _conflicts(postings)
+    marked = mark_conflicts(postings)
     return ParsedPage(sha256, marked, _extraction(marked, blocks=blocks, unreadable=unreadable))
+
+
+def visible_text(text: str) -> str:
+    """What model extraction reads of a redacted page (fix round 2, ruling 11): its visible
+    text (scripts and styles left out, entities decoded) with personal details removed
+    again, since decoding can reveal one; each run of whitespace one space, characters that
+    do not print dropped, and cut to `EXTRACTION_TEXT_BYTES` of UTF-8. Spans index into
+    exactly this text, and its hash is theirs."""
+    plain = redact_text(_plain(text))
+    words = " ".join("".join(ch for ch in word if ch.isprintable()) for word in plain.split())
+    cut = " ".join(words.split()).encode()[:EXTRACTION_TEXT_BYTES]
+    return cut.decode(errors="ignore").rstrip()
 
 
 def _extraction(postings: list[JobCopy], *, blocks: int, unreadable: int) -> Extraction | None:

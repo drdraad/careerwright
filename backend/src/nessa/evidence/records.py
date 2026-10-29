@@ -97,6 +97,26 @@ UNREADABLE = frozenset(set(Extraction) - {Extraction.NO_MATCHING_ADVERTS})
 MODEL_READABLE = frozenset({Extraction.NO_STRUCTURED_DATA, Extraction.NO_JOB_POSTING})
 
 
+class ExtractionNotRun(StrEnum):
+    """Why a page model extraction may read was not handed to it (`nessa.evidence.
+    extraction_runs`): the page stays `no_posting_readable`, never "none found"."""
+
+    CAP_REACHED = "cap_reached"  # the acquisition already started its most extractions
+    BUDGET_EXCEEDED = "budget_exceeded"  # the key's spend limits leave no room for one
+    NO_MODEL_KEY = "no_model_key"  # the workspace has no unrevoked Meta key
+    MODEL_NOT_PERMITTED = "model_not_permitted"  # the test model with data not synthetic
+    DEMO_WORKSPACE = "demo_workspace"  # demo workspaces never call a provider
+    NO_VISIBLE_TEXT = "no_visible_text"  # the page has no text to read
+
+
+class ExtractionOutcome(StrEnum):
+    """What an accepted model extraction recorded (`page_extractions.outcome`)."""
+
+    POSTINGS_RECORDED = "postings_recorded"
+    NO_POSTING_FOUND = "no_posting_found"  # read, and no advert found: not "none found"
+    POSTINGS_UNVERIFIED = "postings_unverified"  # it proposed adverts; none verified
+
+
 class BodyNotKept(StrEnum):
     """Why a body its rights class may keep was not kept: personal details in it could not
     be removed (`pages.redact_page`), so only its hash and excerpts are."""
@@ -129,6 +149,9 @@ class ValidationState(StrEnum):
 
     STRUCTURED = "structured"  # parsed from structured data (JSON-LD, an official API)
     USER_SUPPLIED = "user_supplied"  # stated by the person with pasted text
+    # Read by a model from the page's text, then approved by deterministic code: its quote is
+    # a span of the hashed text and its value is read from that span (`evidence.extraction`).
+    MODEL = "model"
     QUARANTINED = "quarantined"  # malformed, conflicting or unsupported: never used
 
 
@@ -184,7 +207,8 @@ class WorkMode(StrEnum):
 
 class SourceSpan(StrictModel):
     """Where a value is in its source: character offsets into the source's text (a page's
-    decoded HTML or the pasted text), or for an API response a JSON pointer; with a minimal
+    decoded HTML, the pasted text, or the page's visible text that model extraction read,
+    whose hash is `source_sha256`), or for an API response a JSON pointer; with a minimal
     excerpt either way, so a reviewer can find what supported the value at retrieval time."""
 
     source_sha256: str = Field(pattern=SHA256_PATTERN)

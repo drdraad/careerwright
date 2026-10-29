@@ -322,6 +322,11 @@ export const EMPTY_REASON: Record<EmptyReason, { title: string; detail: string }
     title: "Nessa couldn't read a job advert on these pages",
     detail: "This isn't a sign there are no vacancies. Paste the advert, or try another page.",
   },
+  no_posting_found_by_model: {
+    title: "Nessa read these pages and found no job advert on them",
+    detail:
+      "This isn't a sign there are no vacancies: only these pages were read. Paste the advert, or try another page.",
+  },
   none_found_in_sources_checked: {
     title: "No matching listings found in the sources checked",
     detail: "Only these sources were checked. Others may list vacancies.",

@@ -157,6 +157,7 @@ def test_an_acquisition_records_every_attempt_and_a_job_with_its_claims(
     assert shown["summary"] == {
         "succeeded": 2,
         "no_posting_readable": 1,
+        "model_extractions": 0,  # this workspace has no key: nothing reads the plain page
         "blocked": 2,
         "failed": 1,
     }
@@ -256,9 +257,16 @@ def test_a_page_that_cannot_be_read_is_never_none_found(
     listing = jobs(api, ada, workspace)
 
     assert run["status"] == "complete"  # retrieved: its outcome says what could not be read
-    assert shown["summary"] == {"succeeded": 0, "no_posting_readable": 1, "blocked": 0, "failed": 0}
+    assert shown["summary"] == {
+        "succeeded": 0,
+        "no_posting_readable": 1,
+        "model_extractions": 0,  # this workspace has no key (fix round 2)
+        "blocked": 0,
+        "failed": 0,
+    }
     [attempt] = shown["targets"][0]["attempts"]
     assert (attempt["status"], attempt["extraction"]) == ("succeeded", extraction)
+    assert attempt["model_extraction"]["not_run"] == "no_model_key"
     assert listing["coverage"] == {"no_posting_readable": 1}
     assert listing["empty_reason"] == "no_posting_readable"  # not "none found"
 

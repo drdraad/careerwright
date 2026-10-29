@@ -13,10 +13,12 @@ from nessa.evidence.acquisition import (
     Coverage,
     EmptyReason,
     JobView,
+    ModelExtractionState,
     Skipped,
     SkipReason,
     TargetStatus,
     TargetView,
+    extraction_state,
 )
 from nessa.evidence.addresses import UrlRefusal
 from nessa.evidence.freshness import Freshness, FreshnessKind, FreshnessView
@@ -28,6 +30,7 @@ from nessa.evidence.records import (
     ClaimField,
     DescriptionKind,
     Extraction,
+    ExtractionNotRun,
     InputRoute,
     Location,
     Retention,
@@ -38,7 +41,30 @@ from nessa.evidence.records import (
     WorkMode,
 )
 from nessa.evidence.search import SearchProposal
-from nessa.evidence.store import AdvertCounts, AttemptRow, ClaimRow, CopyRow
+from nessa.evidence.store import AdvertCounts, AttemptRow, ClaimRow, CopyRow, ExtractionRow
+
+
+class ModelExtractionOut(ResponseModel):
+    """How model extraction went for a retrieved page whose structured data gave no posting
+    (fix round 2). Its claims are `validation: model`; nothing here says there is no
+    vacancy."""
+
+    state: ModelExtractionState = Field(
+        description="no_posting_found: the page was read and no job advert was found on it, "
+        "which is not evidence that there are no vacancies."
+    )
+    not_run: ExtractionNotRun | None = Field(description="Why no extraction run was started.")
+    run_id: uuid.UUID | None = Field(description="The extraction run, if one was started.")
+    failure_class: str | None = Field(description="Why the run failed, as a label.")
+
+    @classmethod
+    def of(cls, row: ExtractionRow) -> "ModelExtractionOut":
+        return cls(
+            state=extraction_state(row),
+            not_run=row.not_run,
+            run_id=row.run_id,
+            failure_class=row.failure_class,
+        )
 
 
 class SourceAttemptOut(ResponseModel):
@@ -56,8 +82,12 @@ class SourceAttemptOut(ResponseModel):
         description="Why it was blocked or failed: a label, never text."
     )
     extraction: Extraction | None = Field(
-        description="Why a retrieved source gave no publishable posting. Only no_job_posting "
-        "says its structured data held none; the others say it could not be read."
+        description="Why a retrieved source gave no publishable posting. Only "
+        "no_matching_adverts (an API's own empty answer) says none matched; the others say "
+        "its postings could not be read from its structured data."
+    )
+    model_extraction: ModelExtractionOut | None = Field(
+        description="For a page whose structured data gave no posting: its model extraction."
     )
     transient: bool
     retry_of: uuid.UUID | None
@@ -80,7 +110,12 @@ class SourceAttemptOut(ResponseModel):
     finished_at: datetime | None
 
     @classmethod
-    def of(cls, row: AttemptRow, adverts_retrieved: int = 0) -> "SourceAttemptOut":
+    def of(
+        cls,
+        row: AttemptRow,
+        adverts_retrieved: int = 0,
+        extraction: ExtractionRow | None = None,
+    ) -> "SourceAttemptOut":
         return cls(
             attempt_id=row.attempt_id,
             route=row.route,
@@ -91,6 +126,7 @@ class SourceAttemptOut(ResponseModel):
             status=row.status,
             reason=row.reason,
             extraction=row.extraction,
+            model_extraction=None if extraction is None else ModelExtractionOut.of(extraction),
             transient=row.transient,
             retry_of=row.retry_of,
             http_status=row.http_status,
@@ -133,7 +169,10 @@ class TargetOut(ResponseModel):
             query=view.target.query,
             status=view.status,
             attempts=[
-                SourceAttemptOut.of(a, view.retrieved.get(a.attempt_id, 0)) for a in view.attempts
+                SourceAttemptOut.of(
+                    a, view.retrieved.get(a.attempt_id, 0), view.extractions.get(a.attempt_id)
+                )
+                for a in view.attempts
             ],
         )
 
@@ -159,6 +198,9 @@ class AcquisitionSummaryOut(ResponseModel):
     no_posting_readable: int = Field(
         description="Sources retrieved whose postings could not be read: never 'none found'."
     )
+    model_extractions: int = Field(
+        description="Pages handed to a model extraction run; each attempt says how it went."
+    )
     blocked: int
     failed: int
 
@@ -167,6 +209,7 @@ class AcquisitionSummaryOut(ResponseModel):
         return cls(
             succeeded=summary.succeeded,
             no_posting_readable=summary.no_posting_readable,
+            model_extractions=summary.model_extractions,
             blocked=summary.blocked,
             failed=summary.failed,
         )
@@ -305,7 +348,10 @@ class SourceClaimOut(ResponseModel):
     attempt_id: uuid.UUID
     field: ClaimField
     value: Any
-    validation: ValidationState
+    validation: ValidationState = Field(
+        description="model: a model read it from the page's text and deterministic code "
+        "approved it (its quote is a span of that text, whose hash the span gives)."
+    )
     issue: str | None
     span: SourceSpan
     retrieved_at: datetime
@@ -376,7 +422,8 @@ class JobPage(ResponseModel):
     )
     coverage: dict[Coverage, int] = Field(
         description="Sources tried (pasted text is not one), by their latest attempt's "
-        "outcome; a source retrieved whose postings could not be read is no_posting_readable."
+        "outcome; a source retrieved whose postings could not be read is no_posting_readable, "
+        "and a page model extraction read and found no advert on is no_posting_found_by_model."
     )
     adverts: AdvertsOut | None = Field(
         description="For job searches: the adverts retrieved of those matching."

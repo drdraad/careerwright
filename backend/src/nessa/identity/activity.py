@@ -14,7 +14,8 @@ that run:
    the sealed key just in time and runs the kind's task: a plain Pydantic AI agent, no
    durability capability, no transport retries, at most the task's requests (a validation
    repair is one more request, owned by the agent's output-retry budget, never the step's);
-4. stores the validated output sealed and the usage on the attempt in one transaction.
+4. stores the validated output sealed and the usage on the attempt in one transaction, with
+   whatever records the kind derives from it (`RunTask.record`).
 
 While a task's reply streams, the reply so far is sealed into the run's partial store
 (`run_partials`; its status events carry the run ID and a sequence only). The validated
@@ -105,12 +106,18 @@ class RunTask:
     `worst_case_nano_usd` bounds one attempt's cost (every request it may send) for a
     model ID. `exceeded_bound`, for a kind whose provider can do more inside one request
     than the reservation assumed (Meta's searches), names the bound its measured usage went
-    past; the activity then fails the attempt `bound_exceeded`, whatever else happened."""
+    past; the activity then fails the attempt `bound_exceeded`, whatever else happened.
+    `record`, for a kind whose accepted output other records follow from (a page
+    extraction's job copies), writes them in the transaction that accepts the output, once;
+    if it fails, nothing is accepted and the attempt fails. `erases_input`: the run's sealed
+    input is erased once the run is terminal, whatever its outcome."""
 
     call: Callable[[Model, ModelMode, bytes | None, PartialSink], BaseModel]
     worst_case_nano_usd: Callable[[str], int]
     has_input: bool
     exceeded_bound: Callable[[Usage], str | None] | None = None
+    record: Callable[[Tx, Keyring, Run, BaseModel], None] | None = None
+    erases_input: bool = False
 
 
 @dataclass(frozen=True)
@@ -582,6 +589,9 @@ def _settle(rt: ActivityRuntime, ready: _Ready, call: _CallResult) -> ActivityEn
             )
             end = ActivityEnd("succeeded" if newly else "reused_accepted", succeeded(accepted))
             run_store.delete_partial(tx, ready.run.run_id)  # superseded by the validated output
+            record = rt.tasks[ready.run.kind].record
+            if newly and record is not None:
+                record(tx, rt.keyring, ready.run, call.output)
         # Usage is recorded in the same transaction as the accepted output (carry-forward M4).
         run_store.finish_attempt(
             tx,
@@ -665,6 +675,9 @@ def publish(rt: ActivityRuntime, run_id: uuid.UUID, outcome: Outcome) -> None:
                 state=status,
                 detail=detail,
             )
+        task = rt.tasks.get(run.kind)
+        if task is not None and task.erases_input:
+            run_store.erase_input(tx)  # the run is terminal now, or was already
 
 
 def reconcile(rt: ActivityRuntime, run_id: uuid.UUID) -> bool:

@@ -62,6 +62,11 @@ export const AcquisitionSummaryOutSchema = {
             title: 'No Posting Readable',
             description: 'Sources retrieved whose postings could not be read: never \'none found\'.'
         },
+        model_extractions: {
+            type: 'integer',
+            title: 'Model Extractions',
+            description: 'Pages handed to a model extraction run; each attempt says how it went.'
+        },
         blocked: {
             type: 'integer',
             title: 'Blocked'
@@ -76,6 +81,7 @@ export const AcquisitionSummaryOutSchema = {
     required: [
         'succeeded',
         'no_posting_readable',
+        'model_extractions',
         'blocked',
         'failed'
     ],
@@ -544,6 +550,7 @@ export const CoverageSchema = {
     enum: [
         'succeeded',
         'no_posting_readable',
+        'no_posting_found_by_model',
         'blocked',
         'failed',
         'pending'
@@ -961,10 +968,11 @@ export const EmptyReasonSchema = {
         'sources_pending',
         'no_source_retrieved',
         'no_posting_readable',
+        'no_posting_found_by_model',
         'none_found_in_sources_checked'
     ],
     title: 'EmptyReason',
-    description: 'Why a listing has no vacancy (STATE-02): never a bare empty list. Only\n`none_found_in_sources_checked` says the sources read held none, and only an API\'s own\nempty answer can give it (fix round 2, review B N1).'
+    description: 'Why a listing has no vacancy (STATE-02): never a bare empty list. Only\n`none_found_in_sources_checked` says the sources read held none, and only an API\'s own\nempty answer can give it (fix round 2, review B N1); a page model extraction read and\nfound no advert on gives `no_posting_found_by_model`, never that (ruling 9).'
 } as const;
 
 export const EntryModeSchema = {
@@ -1313,6 +1321,20 @@ export const ExtractionSchema = {
     ],
     title: 'Extraction',
     description: 'Why a retrieved source gave no posting that could be published. Only an API\'s own\nempty answer (`no_matching_adverts`: Adzuna matched none) says no vacancy was there. A\nfetched page\'s structured data holding no posting says nothing about its HTML, so\n`no_job_posting` is unread too (fix round 2, review B N1): never "none found" (GC6).'
+} as const;
+
+export const ExtractionNotRunSchema = {
+    type: 'string',
+    enum: [
+        'cap_reached',
+        'budget_exceeded',
+        'no_model_key',
+        'model_not_permitted',
+        'demo_workspace',
+        'no_visible_text'
+    ],
+    title: 'ExtractionNotRun',
+    description: 'Why a page model extraction may read was not handed to it (`nessa.evidence.\nextraction_runs`): the page stays `no_posting_readable`, never "none found".'
 } as const;
 
 export const FailureClassSchema = {
@@ -1929,7 +1951,7 @@ export const JobPageSchema = {
             },
             type: 'object',
             title: 'Coverage',
-            description: 'Sources tried (pasted text is not one), by their latest attempt\'s outcome; a source retrieved whose postings could not be read is no_posting_readable.'
+            description: 'Sources tried (pasted text is not one), by their latest attempt\'s outcome; a source retrieved whose postings could not be read is no_posting_readable, and a page model extraction read and found no advert on is no_posting_found_by_model.'
         },
         adverts: {
             anyOf: [
@@ -2088,6 +2110,74 @@ export const LocationSchema = {
         'label'
     ],
     title: 'Location'
+} as const;
+
+export const ModelExtractionOutSchema = {
+    properties: {
+        state: {
+            $ref: '#/components/schemas/ModelExtractionState',
+            description: 'no_posting_found: the page was read and no job advert was found on it, which is not evidence that there are no vacancies.'
+        },
+        not_run: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ExtractionNotRun'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Why no extraction run was started.'
+        },
+        run_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Run Id',
+            description: 'The extraction run, if one was started.'
+        },
+        failure_class: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Failure Class',
+            description: 'Why the run failed, as a label.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'state',
+        'not_run',
+        'run_id',
+        'failure_class'
+    ],
+    title: 'ModelExtractionOut',
+    description: 'How model extraction went for a retrieved page whose structured data gave no posting\n(fix round 2). Its claims are `validation: model`; nothing here says there is no\nvacancy.'
+} as const;
+
+export const ModelExtractionStateSchema = {
+    type: 'string',
+    enum: [
+        'pending',
+        'postings_read',
+        'no_posting_found',
+        'not_read',
+        'not_run'
+    ],
+    title: 'ModelExtractionState',
+    description: 'How model extraction went for a page it may read (fix round 2, rulings 9-10).'
 } as const;
 
 export const ModelModeSchema = {
@@ -3575,7 +3665,8 @@ export const RunKindSchema = {
         'discovery',
         'slate_explanation',
         'acquisition',
-        'source_search'
+        'source_search',
+        'page_extraction'
     ],
     title: 'RunKind'
 } as const;
@@ -4599,7 +4690,18 @@ export const SourceAttemptOutSchema = {
                     type: 'null'
                 }
             ],
-            description: 'Why a retrieved source gave no publishable posting. Only no_job_posting says its structured data held none; the others say it could not be read.'
+            description: 'Why a retrieved source gave no publishable posting. Only no_matching_adverts (an API\'s own empty answer) says none matched; the others say its postings could not be read from its structured data.'
+        },
+        model_extraction: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ModelExtractionOut'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'For a page whose structured data gave no posting: its model extraction.'
         },
         transient: {
             type: 'boolean',
@@ -4768,6 +4870,7 @@ export const SourceAttemptOutSchema = {
         'status',
         'reason',
         'extraction',
+        'model_extraction',
         'transient',
         'retry_of',
         'http_status',
@@ -4812,7 +4915,8 @@ export const SourceClaimOutSchema = {
             title: 'Value'
         },
         validation: {
-            $ref: '#/components/schemas/ValidationState'
+            $ref: '#/components/schemas/ValidationState',
+            description: 'model: a model read it from the page\'s text and deterministic code approved it (its quote is a span of that text, whose hash the span gives).'
         },
         issue: {
             anyOf: [
@@ -5119,7 +5223,7 @@ export const SourceSpanSchema = {
         'excerpt'
     ],
     title: 'SourceSpan',
-    description: 'Where a value is in its source: character offsets into the source\'s text (a page\'s\ndecoded HTML or the pasted text), or for an API response a JSON pointer; with a minimal\nexcerpt either way, so a reviewer can find what supported the value at retrieval time.'
+    description: 'Where a value is in its source: character offsets into the source\'s text (a page\'s\ndecoded HTML, the pasted text, or the page\'s visible text that model extraction read,\nwhose hash is `source_sha256`), or for an API response a JSON pointer; with a minimal\nexcerpt either way, so a reviewer can find what supported the value at retrieval time.'
 } as const;
 
 export const SpendOutSchema = {
@@ -6288,6 +6392,7 @@ export const ValidationStateSchema = {
     enum: [
         'structured',
         'user_supplied',
+        'model',
         'quarantined'
     ],
     title: 'ValidationState',

@@ -26,6 +26,7 @@ from nessa.evidence.service_client import HttpAcquisitionClient
 from nessa.identity import activity, run_store, worker
 from nessa.identity.activity import ActivityRuntime
 from nessa.identity.keyring import load_keyring
+from nessa.identity.model_choice import ModelChoice
 from nessa.identity.records import Run
 from nessa.logs import configure_logging
 from nessa.worker import TASKS, WORKFLOWS, model_builder
@@ -95,8 +96,11 @@ def main() -> None:
         ),
     )
     install_crash_point(os.environ.get("NESSA_TEST_CRASH_AT", ""))
+    models = ModelChoice.configure(
+        settings.meta_test_model, settings.meta_production_model, settings.synthetic_model_role
+    )
     acquisition_workflow.configure(
-        AcquisitionRuntime(runtime, HttpAcquisitionClient(settings.acquisition_url))
+        AcquisitionRuntime(runtime, HttpAcquisitionClient(settings.acquisition_url), models)
     )
     worker.run(runtime.engine, runtime, url_with_password(settings.dbos_database), WORKFLOWS)
 

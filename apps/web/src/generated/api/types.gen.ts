@@ -48,6 +48,12 @@ export type AcquisitionSummaryOut = {
      */
     no_posting_readable: number;
     /**
+     * Model Extractions
+     *
+     * Pages handed to a model extraction run; each attempt says how it went.
+     */
+    model_extractions: number;
+    /**
      * Blocked
      */
     blocked: number;
@@ -424,6 +430,7 @@ export type ConversationMode = typeof ConversationMode[keyof typeof Conversation
 export const Coverage = {
     SUCCEEDED: 'succeeded',
     NO_POSTING_READABLE: 'no_posting_readable',
+    NO_POSTING_FOUND_BY_MODEL: 'no_posting_found_by_model',
     BLOCKED: 'blocked',
     FAILED: 'failed',
     PENDING: 'pending'
@@ -707,13 +714,15 @@ export type Emphasis = typeof Emphasis[keyof typeof Emphasis];
  *
  * Why a listing has no vacancy (STATE-02): never a bare empty list. Only
  * `none_found_in_sources_checked` says the sources read held none, and only an API's own
- * empty answer can give it (fix round 2, review B N1).
+ * empty answer can give it (fix round 2, review B N1); a page model extraction read and
+ * found no advert on gives `no_posting_found_by_model`, never that (ruling 9).
  */
 export const EmptyReason = {
     NO_SOURCES_CHECKED: 'no_sources_checked',
     SOURCES_PENDING: 'sources_pending',
     NO_SOURCE_RETRIEVED: 'no_source_retrieved',
     NO_POSTING_READABLE: 'no_posting_readable',
+    NO_POSTING_FOUND_BY_MODEL: 'no_posting_found_by_model',
     NONE_FOUND_IN_SOURCES_CHECKED: 'none_found_in_sources_checked'
 } as const;
 
@@ -722,7 +731,8 @@ export const EmptyReason = {
  *
  * Why a listing has no vacancy (STATE-02): never a bare empty list. Only
  * `none_found_in_sources_checked` says the sources read held none, and only an API's own
- * empty answer can give it (fix round 2, review B N1).
+ * empty answer can give it (fix round 2, review B N1); a page model extraction read and
+ * found no advert on gives `no_posting_found_by_model`, never that (ruling 9).
  */
 export type EmptyReason = typeof EmptyReason[keyof typeof EmptyReason];
 
@@ -1021,6 +1031,29 @@ export const Extraction = {
  * `no_job_posting` is unread too (fix round 2, review B N1): never "none found" (GC6).
  */
 export type Extraction = typeof Extraction[keyof typeof Extraction];
+
+/**
+ * ExtractionNotRun
+ *
+ * Why a page model extraction may read was not handed to it (`nessa.evidence.
+ * extraction_runs`): the page stays `no_posting_readable`, never "none found".
+ */
+export const ExtractionNotRun = {
+    CAP_REACHED: 'cap_reached',
+    BUDGET_EXCEEDED: 'budget_exceeded',
+    NO_MODEL_KEY: 'no_model_key',
+    MODEL_NOT_PERMITTED: 'model_not_permitted',
+    DEMO_WORKSPACE: 'demo_workspace',
+    NO_VISIBLE_TEXT: 'no_visible_text'
+} as const;
+
+/**
+ * ExtractionNotRun
+ *
+ * Why a page model extraction may read was not handed to it (`nessa.evidence.
+ * extraction_runs`): the page stays `no_posting_readable`, never "none found".
+ */
+export type ExtractionNotRun = typeof ExtractionNotRun[keyof typeof ExtractionNotRun];
 
 /**
  * FailureClass
@@ -1388,7 +1421,7 @@ export type JobPage = {
     /**
      * Coverage
      *
-     * Sources tried (pasted text is not one), by their latest attempt's outcome; a source retrieved whose postings could not be read is no_posting_readable.
+     * Sources tried (pasted text is not one), by their latest attempt's outcome; a source retrieved whose postings could not be read is no_posting_readable, and a page model extraction read and found no advert on is no_posting_found_by_model.
      */
     coverage: {
         [key in Coverage]?: number;
@@ -1464,6 +1497,56 @@ export type Location = {
      */
     country?: string | null;
 };
+
+/**
+ * ModelExtractionOut
+ *
+ * How model extraction went for a retrieved page whose structured data gave no posting
+ * (fix round 2). Its claims are `validation: model`; nothing here says there is no
+ * vacancy.
+ */
+export type ModelExtractionOut = {
+    /**
+     * no_posting_found: the page was read and no job advert was found on it, which is not evidence that there are no vacancies.
+     */
+    state: ModelExtractionState;
+    /**
+     * Why no extraction run was started.
+     */
+    not_run: ExtractionNotRun | null;
+    /**
+     * Run Id
+     *
+     * The extraction run, if one was started.
+     */
+    run_id: string | null;
+    /**
+     * Failure Class
+     *
+     * Why the run failed, as a label.
+     */
+    failure_class: string | null;
+};
+
+/**
+ * ModelExtractionState
+ *
+ * How model extraction went for a page it may read (fix round 2, rulings 9-10).
+ */
+export const ModelExtractionState = {
+    PENDING: 'pending',
+    POSTINGS_READ: 'postings_read',
+    NO_POSTING_FOUND: 'no_posting_found',
+    NOT_READ: 'not_read',
+    NOT_RUN: 'not_run'
+} as const;
+
+/**
+ * ModelExtractionState
+ *
+ * How model extraction went for a page it may read (fix round 2, rulings 9-10).
+ */
+export type ModelExtractionState = typeof ModelExtractionState[keyof typeof ModelExtractionState];
 
 /**
  * ModelMode
@@ -2453,7 +2536,8 @@ export const RunKind = {
     DISCOVERY: 'discovery',
     SLATE_EXPLANATION: 'slate_explanation',
     ACQUISITION: 'acquisition',
-    SOURCE_SEARCH: 'source_search'
+    SOURCE_SEARCH: 'source_search',
+    PAGE_EXTRACTION: 'page_extraction'
 } as const;
 
 /**
@@ -3067,9 +3151,13 @@ export type SourceAttemptOut = {
      */
     reason: AttemptReason | null;
     /**
-     * Why a retrieved source gave no publishable posting. Only no_job_posting says its structured data held none; the others say it could not be read.
+     * Why a retrieved source gave no publishable posting. Only no_matching_adverts (an API's own empty answer) says none matched; the others say its postings could not be read from its structured data.
      */
     extraction: Extraction | null;
+    /**
+     * For a page whose structured data gave no posting: its model extraction.
+     */
+    model_extraction: ModelExtractionOut | null;
     /**
      * Transient
      */
@@ -3163,6 +3251,9 @@ export type SourceClaimOut = {
      * Value
      */
     value: unknown;
+    /**
+     * model: a model read it from the page's text and deterministic code approved it (its quote is a span of that text, whose hash the span gives).
+     */
     validation: ValidationState;
     /**
      * Issue
@@ -3289,7 +3380,8 @@ export type SourceRefOut = {
  * SourceSpan
  *
  * Where a value is in its source: character offsets into the source's text (a page's
- * decoded HTML or the pasted text), or for an API response a JSON pointer; with a minimal
+ * decoded HTML, the pasted text, or the page's visible text that model extraction read,
+ * whose hash is `source_sha256`), or for an API response a JSON pointer; with a minimal
  * excerpt either way, so a reviewer can find what supported the value at retrieval time.
  */
 export type SourceSpan = {
@@ -4028,6 +4120,7 @@ export type UrlRefusal = typeof UrlRefusal[keyof typeof UrlRefusal];
 export const ValidationState = {
     STRUCTURED: 'structured',
     USER_SUPPLIED: 'user_supplied',
+    MODEL: 'model',
     QUARANTINED: 'quarantined'
 } as const;
 

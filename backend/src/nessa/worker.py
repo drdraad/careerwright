@@ -19,6 +19,7 @@ from nessa.config import WorkerSettings
 from nessa.db import create_engine, url_with_password
 from nessa.evidence import workflow as acquisition_workflow
 from nessa.evidence.acquisition import AcquisitionRuntime
+from nessa.evidence.extraction_agent import PAGE_EXTRACTION_TASK
 from nessa.evidence.search_agent import SOURCE_SEARCH_TASK
 from nessa.evidence.service_client import HttpAcquisitionClient
 from nessa.identity import connection_check, run_store, worker, workflow
@@ -45,6 +46,7 @@ TASKS: Mapping[RunKind, RunTask] = {
     RunKind.DISCOVERY: DISCOVERY_TASK,
     RunKind.SLATE_EXPLANATION: SLATE_EXPLANATION_TASK,
     RunKind.SOURCE_SEARCH: SOURCE_SEARCH_TASK,
+    RunKind.PAGE_EXTRACTION: PAGE_EXTRACTION_TASK,
 }
 # Each run's workflow, by the name its outbox entry carries.
 WORKFLOWS: worker.Workflows = {
@@ -100,7 +102,7 @@ def main() -> None:
     configure_logging("worker")
     settings = WorkerSettings()
     # Fail closed on an unusable model configuration before any work is accepted.
-    ModelChoice.configure(
+    models = ModelChoice.configure(
         settings.meta_test_model, settings.meta_production_model, settings.synthetic_model_role
     )
     engine = create_engine(settings.app_database, application_name="nessa-worker")
@@ -112,7 +114,7 @@ def main() -> None:
         tasks=TASKS,
     )
     acquisition_workflow.configure(
-        AcquisitionRuntime(runtime, HttpAcquisitionClient(settings.acquisition_url))
+        AcquisitionRuntime(runtime, HttpAcquisitionClient(settings.acquisition_url), models)
     )
     worker.run(engine, runtime, url_with_password(settings.dbos_database), WORKFLOWS)
 

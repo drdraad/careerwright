@@ -1,5 +1,5 @@
 """SQL for acquisition targets, source attempts, sealed source documents, jobs, their source
-copies, claims and favourites (adapter).
+copies, claims and favourites, and page extractions (adapter).
 
 The API runs these inside `actor_transaction` and the worker inside `run_transaction`;
 row-level security limits each to its workspace, and the worker to the run it executes
@@ -24,10 +24,13 @@ from nessa.evidence.records import (
     BodyNotKept,
     Claim,
     Extraction,
+    ExtractionNotRun,
+    ExtractionOutcome,
     InputRoute,
     JobCopy,
 )
 from nessa.identity.keyring import SealedValue
+from nessa.vocabulary import WorkState
 
 _ATTEMPT_COLUMNS = (
     "attempt_id, run_id, position, retry_of, route, provider, requested_url, final_url, "
@@ -420,28 +423,177 @@ def attempts_by_id(tx: Tx, attempt_ids: list[uuid.UUID]) -> dict[uuid.UUID, Atte
 
 
 NO_POSTING_READABLE = "no_posting_readable"
+NO_POSTING_FOUND_BY_MODEL = "no_posting_found_by_model"
 
 
 def coverage(tx: Tx, workspace_id: uuid.UUID) -> dict[str, int]:
     """The latest attempt's outcome per source the workspace tried, a retrieved source with
     no readable posting counted apart (spec section 7: "Display result count, deduplication
-    count and coverage status"). Pasted text is the person's own input, not a source tried."""
+    count and coverage status"). Pasted text is the person's own input, not a source tried.
+
+    A page handed to model extraction (fix round 2) is `pending` while its run is queued or
+    running; `succeeded` once the run recorded a posting that is published; its own
+    `no_posting_found_by_model` when the run read it and found none; and otherwise (not run,
+    failed, cancelled, nothing verified, only conflicting postings) `no_posting_readable`."""
     rows = tx.execute(
         sa.text(
-            "SELECT CASE WHEN status = 'succeeded' AND extraction = ANY(:unreadable) "
-            "THEN :unread ELSE status END AS outcome, count(*) AS n FROM (SELECT DISTINCT ON "
-            "(coalesce(requested_url, attempt_id::text)) status, extraction "
-            "FROM nessa.source_attempts WHERE workspace_id = :ws AND route <> 'pasted_text' "
+            "SELECT CASE "
+            "WHEN latest.status = 'succeeded' AND e.attempt_id IS NOT NULL THEN CASE "
+            "  WHEN e.run_id IS NULL THEN :unread "
+            "  WHEN r.status IN ('queued', 'running') THEN 'pending' "
+            "  WHEN r.status <> 'complete' THEN :unread "
+            "  WHEN e.outcome = 'no_posting_found' THEN :found_none "
+            "  WHEN EXISTS (SELECT 1 FROM nessa.job_copies c "
+            "    WHERE c.attempt_id = latest.attempt_id AND c.job_id IS NOT NULL) "
+            "    THEN 'succeeded' "
+            "  ELSE :unread END "
+            "WHEN latest.status = 'succeeded' AND latest.extraction = ANY(:unreadable) "
+            "THEN :unread ELSE latest.status END AS outcome, count(*) AS n "
+            "FROM (SELECT DISTINCT ON (coalesce(requested_url, attempt_id::text)) attempt_id, "
+            "status, extraction FROM nessa.source_attempts "
+            "WHERE workspace_id = :ws AND route <> 'pasted_text' "
             "ORDER BY coalesce(requested_url, attempt_id::text), started_at DESC) latest "
+            "LEFT JOIN nessa.page_extractions e ON e.attempt_id = latest.attempt_id "
+            "LEFT JOIN nessa.runs r ON r.run_id = e.run_id "
             "GROUP BY 1"
         ),
         {
             "ws": workspace_id,
             "unreadable": sorted(e.value for e in UNREADABLE),
             "unread": NO_POSTING_READABLE,
+            "found_none": NO_POSTING_FOUND_BY_MODEL,
         },
     )
     return {r.outcome: int(r.n) for r in rows}
+
+
+# --- page extractions (fix round 2) -----------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ExtractionRow:
+    attempt_id: uuid.UUID
+    acquisition_run_id: uuid.UUID
+    run_id: uuid.UUID | None  # None: not started, `not_run` says why
+    not_run: ExtractionNotRun | None
+    text_sha256: str | None
+    outcome: ExtractionOutcome | None  # set when the run's output was accepted
+    run_status: WorkState | None
+    failure_class: str | None
+
+
+_EXTRACTION_COLUMNS = (
+    "e.attempt_id, e.acquisition_run_id, e.run_id, e.not_run, e.text_sha256, e.outcome, "
+    "r.status AS run_status, r.failure_class"
+)
+
+
+def _extraction(row: sa.RowMapping) -> ExtractionRow:
+    values = dict(row)
+    values["not_run"] = ExtractionNotRun(values["not_run"]) if values["not_run"] else None
+    values["outcome"] = ExtractionOutcome(values["outcome"]) if values["outcome"] else None
+    values["run_status"] = WorkState(values["run_status"]) if values["run_status"] else None
+    return ExtractionRow(**values)
+
+
+def extractions_started(tx: Tx, acquisition_run_id: uuid.UUID) -> int:
+    return int(
+        tx.execute(
+            sa.text(
+                "SELECT count(*) FROM nessa.page_extractions "
+                "WHERE acquisition_run_id = :run AND run_id IS NOT NULL"
+            ),
+            {"run": acquisition_run_id},
+        ).scalar_one()
+    )
+
+
+def insert_extraction_not_run(
+    tx: Tx,
+    *,
+    attempt_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    acquisition_run_id: uuid.UUID,
+    reason: ExtractionNotRun,
+) -> None:
+    tx.execute(
+        sa.text(
+            "INSERT INTO nessa.page_extractions (attempt_id, workspace_id, acquisition_run_id, "
+            "not_run) VALUES (:attempt, :ws, :run, :reason)"
+        ),
+        {
+            "attempt": attempt_id,
+            "ws": workspace_id,
+            "run": acquisition_run_id,
+            "reason": reason.value,
+        },
+    )
+
+
+def submit_extraction(
+    tx: Tx,
+    *,
+    attempt_id: uuid.UUID,
+    run_id: uuid.UUID,
+    model_id: str,
+    model_mode: str,
+    sealed: SealedValue,
+    text_sha256: str,
+) -> None:
+    """Worker, in the acquisition run's transaction: the extraction run, its sealed input,
+    its outbox entry and its link, through `nessa.submit_page_extraction` (migration 0021),
+    which checks the attempt is its own run's page that extraction may read."""
+    tx.execute(
+        sa.text(
+            "SELECT nessa.submit_page_extraction(:attempt, :run, :model, :mode, :version, "
+            ":nonce, :ciphertext, :sha)"
+        ),
+        {
+            "attempt": attempt_id,
+            "run": run_id,
+            "model": model_id,
+            "mode": model_mode,
+            "version": sealed.key_version,
+            "nonce": sealed.nonce,
+            "ciphertext": sealed.ciphertext,
+            "sha": text_sha256,
+        },
+    )
+
+
+def extraction_of_run(tx: Tx, run_id: uuid.UUID) -> ExtractionRow | None:
+    row = (
+        tx.execute(
+            sa.text(
+                f"SELECT {_EXTRACTION_COLUMNS} FROM nessa.page_extractions e "
+                "LEFT JOIN nessa.runs r ON r.run_id = e.run_id WHERE e.run_id = :run"
+            ),
+            {"run": run_id},
+        )
+        .mappings()
+        .one_or_none()
+    )
+    return None if row is None else _extraction(row)
+
+
+def set_extraction_outcome(tx: Tx, run_id: uuid.UUID, outcome: ExtractionOutcome) -> None:
+    tx.execute(
+        sa.text("UPDATE nessa.page_extractions SET outcome = :outcome WHERE run_id = :run"),
+        {"run": run_id, "outcome": outcome.value},
+    )
+
+
+def extractions_of_attempts(tx: Tx, attempt_ids: list[uuid.UUID]) -> dict[uuid.UUID, ExtractionRow]:
+    if not attempt_ids:
+        return {}
+    rows = tx.execute(
+        sa.text(
+            f"SELECT {_EXTRACTION_COLUMNS} FROM nessa.page_extractions e "
+            "LEFT JOIN nessa.runs r ON r.run_id = e.run_id WHERE e.attempt_id = ANY(:ids)"
+        ),
+        {"ids": attempt_ids},
+    ).mappings()
+    return {r["attempt_id"]: _extraction(r) for r in rows}
 
 
 @dataclass(frozen=True)

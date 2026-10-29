@@ -6,7 +6,9 @@ all (ACQ-06: a person supplying a URL never overrides it), robots.txt decides ne
 is paced to its rate limit, and the page is fetched within the fetcher's bounds. Structured
 fields are parsed, the page is classified under the session 1 rights policy by its final
 host's manifest entry (never by what the page says about itself), and the body is returned
-only when that class permits keeping it. An Adzuna search is one bounded API
+only when that class permits keeping it. A page whose structured data gave no posting also
+returns its redacted visible text, for the workspace's model extraction run, which runs in
+the DBOS worker with the workspace's own key. An Adzuna search is one bounded API
 request whose recorded URL never carries the credentials.
 
 The worker holds no user secret, model key, master key or database access (GC8; ADR 0009):
@@ -28,8 +30,9 @@ from nessa.evidence import adzuna
 from nessa.evidence.addresses import CheckedUrl, UrlRefusal
 from nessa.evidence.adzuna import AdzunaQuery
 from nessa.evidence.fetcher import JSON_TYPES, Admit, Fetched, Fetcher, FetchFailure
-from nessa.evidence.pages import parse_page, redact_page
+from nessa.evidence.pages import EXTRACTION_TEXT_BYTES, parse_page, redact_page, visible_text
 from nessa.evidence.records import (
+    MODEL_READABLE,
     AttemptReason,
     AttemptStatus,
     BodyNotKept,
@@ -79,9 +82,14 @@ class AcquisitionResult(StrictModel):
     body_not_kept: BodyNotKept | None = None
     body_b64: str | None = None  # only when the rights class permits keeping the body
     copies: list[JobCopy] = Field(default_factory=list)
-    # A retrieved source with no publishable posting says why; only `no_job_posting` may
-    # count as "none found".
+    # A retrieved source with no publishable posting says why; only `no_matching_adverts` (an
+    # API's own empty answer) may count as "none found".
     extraction: Extraction | None = None
+    # A page whose structured data gave no posting (`MODEL_READABLE`): its redacted visible
+    # text, for the workspace's own model extraction run (`pages.visible_text`). Permitted
+    # text only, whatever the class keeps of the body; the DBOS worker seals it as that run's
+    # input and erases it once the run settles (fix round 2, rulings 9-11).
+    extraction_text: str | None = Field(default=None, max_length=EXTRACTION_TEXT_BYTES)
     total: int | None = Field(default=None, ge=0)  # Adzuna's count of matching adverts
     http_requests: int = Field(default=0, ge=0)  # sent for it, robots.txt included
     fetched_at: datetime
@@ -222,6 +230,7 @@ def _page_result(
         body_b64=base64.b64encode(kept).decode() if keep else None,
         copies=parsed.postings,
         extraction=parsed.extraction,
+        extraction_text=visible_text(text) if parsed.extraction in MODEL_READABLE else None,
         http_requests=page.requests,
         fetched_at=now,
     )

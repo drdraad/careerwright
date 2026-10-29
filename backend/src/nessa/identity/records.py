@@ -89,6 +89,9 @@ class RunKind(StrEnum):
     # no model, so it names none and needs no key.
     ACQUISITION = "acquisition"
     SOURCE_SEARCH = "source_search"  # Meta search proposes candidate pages for a target
+    # A model reads one fetched page's visible text for its job advert; started by the
+    # acquisition that fetched it, never by the API (`nessa.evidence.extraction_runs`).
+    PAGE_EXTRACTION = "page_extraction"
 
 
 KEYLESS_KINDS = frozenset({RunKind.ACQUISITION})
