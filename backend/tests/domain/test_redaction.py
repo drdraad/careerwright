@@ -14,7 +14,7 @@ from nessa.evidence import adzuna
 from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_adzuna, acquire_page
 from nessa.evidence.fetcher import Fetcher
 from nessa.evidence.pages import redact_page
-from nessa.evidence.records import AttemptStatus, BodyNotKept, Retention
+from nessa.evidence.records import AttemptStatus, BodyNotKept, ClaimField, Retention
 from nessa.evidence.redaction import CONTACT_REMOVED, EMAIL_REMOVED, PHONE_REMOVED, redact_text
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
@@ -316,7 +316,13 @@ SPLIT_EMAILS = {
     "a span around the @": "Write to jane<span>@</span>recruit.example today.",
     "a tag around the domain": "Write to jane@<b>recruit</b>.example today.",
 }
-ORDINARY_AT = "Tickets are £5 @ the door, or £8 for two."  # an "@" with no domain after it
+# An "@" with no address after it: no domain at all, or one sentence ending and the next
+# starting with a capital, which never continues a domain (fix round 5, re-review 5 A R5-1).
+ORDINARY_AT = {
+    "no domain": "Tickets are £5 @ the door, or £8 for two.",
+    "a handle ending a sentence": "Follow @GOVUK. Sign up",
+    "a time ending a sentence": "Drop in @ 10am. Bring photo ID.",
+}
 
 
 @pytest.mark.req("ACQ-06")
@@ -332,11 +338,67 @@ def test_a_kept_body_with_an_email_split_by_inline_markup_is_not_kept(text: str)
 
 
 @pytest.mark.req("ACQ-06")
-def test_an_ordinary_sentence_with_an_at_sign_and_no_domain_keeps_its_body_unchanged() -> None:
-    result, kept = _acquire_kept(page_with_text(ORDINARY_AT))
+@pytest.mark.parametrize("sentence", ORDINARY_AT.values(), ids=ORDINARY_AT.keys())
+def test_an_ordinary_sentence_with_an_at_sign_and_no_domain_keeps_its_body_unchanged(
+    sentence: str,
+) -> None:
+    result, kept = _acquire_kept(page_with_text(sentence))
 
     assert (result.retention, result.body_not_kept) == (Retention.BODY, None)
-    assert ORDINARY_AT.encode() in kept
+    assert sentence.encode() in kept
+
+
+# Fix round 5 (re-review 5 A R5-2): a link in the page's JSON is kept as written (an ID or a
+# URL can look like a detail), so it is only looked at, its entities and percent-encoding
+# decoded; a detail there means no body.
+JSON_LINKS = {
+    "a plain mailto: url": {"url": "mailto:jane@recruit.example"},
+    "an entity-encoded url": {"url": "mailto:jane&#64;recruit.example"},
+    "a percent-encoded sameAs": {"sameAs": "mailto:jane%40recruit.example"},
+}
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize("link", JSON_LINKS.values(), ids=JSON_LINKS.keys())
+def test_a_json_ld_link_to_an_address_means_no_body(link: dict[str, str]) -> None:
+    result, kept = _acquire_kept(page_with_block(json.dumps({**POSTING, **link})))
+
+    assert kept == b""
+    assert (result.retention, result.body_not_kept) == (
+        Retention.EXCERPTS,
+        BodyNotKept.LINK_DETAIL,
+    )
+
+
+@pytest.mark.req("ACQ-06")
+def test_a_percent_encoded_mailto_link_with_no_visible_address_means_no_body() -> None:
+    link = '<a href="mailto:jane%40recruit.example">Write to us</a>'
+
+    result, kept = _acquire_kept(page_with_text(link))
+
+    assert kept == b""
+    assert (result.retention, result.body_not_kept) == (
+        Retention.EXCERPTS,
+        BodyNotKept.ATTRIBUTE_DETAIL,
+    )
+
+
+@pytest.mark.req("ACQ-06")
+def test_an_entity_encoded_email_in_a_json_ld_string_leaves_the_body_and_its_excerpt() -> None:
+    description = "<p>Email jane&#64;recruit.example for the details.</p>"
+
+    result, kept = _acquire_kept(
+        page_with_block(json.dumps({**POSTING, "description": description}))
+    )
+
+    assert (result.retention, result.body_not_kept) == (Retention.BODY, None)  # rewritten
+    assert b"jane" not in kept
+    assert b"recruit.example" not in kept
+    [copy] = result.copies
+    [claim] = [c for c in copy.claims if c.field is ClaimField.DESCRIPTION]
+    assert claim.span.excerpt is not None
+    assert "jane" not in claim.span.excerpt
+    assert EMAIL_REMOVED in claim.span.excerpt
 
 
 @pytest.mark.req("ACQ-06")

@@ -132,9 +132,13 @@ class BodyNotKept(StrEnum):
     # patterns (an entity, a line break, an invisible character; fix round 3, review C I1; an
     # inline element splitting an email, fix round 4, re-review 4 A R4-1).
     VISIBLE_TEXT_DETAIL = "visible_text_detail"
-    # An attribute's value, its entities decoded and normalised, held one (an obfuscated
-    # `mailto:` link with no visible address; fix round 4, item 1).
+    # An attribute's value, its entities and percent-encoding decoded and normalised, held
+    # one (an obfuscated `mailto:` link with no visible address; fix round 4, item 1; fix
+    # round 5, re-review 5 A R5-2).
     ATTRIBUTE_DETAIL = "attribute_detail"
+    # A link in the page's JSON (`url`, `sameAs` and the like, kept as written), decoded the
+    # same way, held one (a JSON-LD `"url": "mailto:..."`; fix round 5, re-review 5 A R5-2).
+    LINK_DETAIL = "link_detail"
 
 
 class RightsClass(StrEnum):

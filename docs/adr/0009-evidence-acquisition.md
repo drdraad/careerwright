@@ -165,7 +165,19 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    body is `visible_text_detail` too. And since fix round 4 (item 1), every attribute's
    value is decoded (its entities, as the parser decodes them) and normalised, and a detail
    found there, such as an obfuscated `mailto:` link with no visible address, means the
-   body is not kept (`attribute_detail`, migration 0025). Migration 0020's
+   body is not kept (`attribute_detail`, migration 0025). Since fix round 5 (re-review 5 A
+   R5-1, R5-2): after a dot with whitespace after it, the next label of a spaced address
+   must start lowercase, and nothing that continues a word may follow its TLD, so a
+   sentence's end never continues a domain; an attribute's value is percent-decoded as
+   well before it is looked at (`mailto:jane%40recruit.example`); a JSON string whose HTML
+   entities, decoded, show a detail (`jane&#64;recruit.example`) is replaced by its decoded,
+   redacted form and the JSON is written again, so the body and every claim's excerpt
+   lose it; a link in the page's JSON (`redaction.LINK_KEYS`: `url`, `sameAs`, `image` and
+   the like, kept as written) is looked at with its entities and percent-encoding decoded,
+   and a detail there means the body is not kept (`link_detail`, migration 0026); and an
+   apply link holding a detail, as written or decoded, is no claim on any path (claims are
+   kept for every class). Percent-encoding is decoded only to look at links and attributes,
+   never in page text, a JSON string or pasted text, where `%40` is no address. Migration 0020's
    description said "a JSON-LD block" for `contact_unlocated` and `block_unredactable`;
    they apply to any script (0022 records the correction). The reason is its own typed column (migration 0020), the rights
    status the rights statement only (review B N5). Claims and excerpts come from decoded,
@@ -178,13 +190,14 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    `docs/reviews/session-1.md`, last addendum; for excerpts and claims the controller decided
    the same under the product owner's delegation, with committed excerpts reviewed for names
    before any push); nor is a detail written in another form (an email with "at" for "@", a
-   number spelt out or split by other characters, an address percent-encoded in a link
-   such as `mailto:jane%40recruit.example`). A detail hidden by markup (entities, line
-   breaks, invisible characters, inline elements, an attribute's entities) is not removed
-   from a kept body, which is then not kept (above). The spaced form errs towards removal:
-   an "@" between two words with a full stop after the second (a handle that ends a
-   sentence, "Follow @GOVUK. Sign up") reads as an address, so such a body is not kept and
-   those words leave the model's input.
+   number spelt out or split by other characters). A detail hidden by markup (entities, line
+   breaks, invisible characters, inline elements, an attribute's entities or
+   percent-encoding, a JSON link's) is not removed from a kept body, which is then not kept
+   (above). A sentence that starts with a capital after an "@" and a full stop ("Follow
+   @GOVUK. Sign up", "Drop in @ 10am. Bring photo ID.") is not taken for an address (fix
+   round 5); the spaced form still errs towards removal where the next sentence starts
+   lowercase ("Follow us @GOVUK. or email us" reads as an address), so such a body is not
+   kept and those words leave the model's input.
 
 5. **Records (spec section 18).** `source_attempts`: every try by any route, blocked and
    failed ones included, written before the request and settled after, a retry naming the
@@ -499,7 +512,7 @@ leak scan clean); `make live-adzuna` blocked: no `ADZUNA_APP_ID`/`ADZUNA_APP_KEY
   provisional (R6). The model-spend estimate is shown by Task 8.
 - Fix round 3 migrations: 0022 (`visible_text_detail`), 0023 (`runs.started_by_run`, the
   cancellation lock, `acquisition_cancelled`), 0024 (`postings_conflicting`). Fix round 4:
-  0025 (`attribute_detail`).
+  0025 (`attribute_detail`). Fix round 5: 0026 (`link_detail`).
 - Pre-existing lock pattern, not fixed in fix round 4 and carried to the final review:
   `cancel_run` locks the workspace's row `FOR UPDATE` and then takes a key-share lock on
   the run's row (the `run_cancellations` foreign key), while a worker transaction can hold

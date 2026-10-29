@@ -169,8 +169,19 @@ def test_the_model_input_holds_no_email_split_by_inline_markup(form: str) -> Non
     assert text == f"Write to {EMAIL_REMOVED} today."
 
 
-def test_the_model_input_keeps_an_ordinary_sentence_with_an_at_sign_and_no_domain() -> None:
-    sentence = "Tickets are £5 @ the door, or £8 for two."
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Tickets are £5 @ the door, or £8 for two.",
+        # Re-review 5 A R5-1: a new sentence starting with a capital never continues a domain.
+        "Follow @GOVUK. Sign up",
+        "Drop in @ 10am. Bring photo ID.",
+    ],
+    ids=["no domain", "a handle ending a sentence", "a time ending a sentence"],
+)
+def test_the_model_input_keeps_an_ordinary_sentence_with_an_at_sign_and_no_domain(
+    sentence: str,
+) -> None:
     page = f"<html><head>{SYNTHETIC_MARKER}</head><body><p>{sentence}</p></body></html>"
 
     assert visible_text(redact_page(page).text) == sentence
@@ -605,6 +616,24 @@ def test_output_that_follows_the_page_s_instructions_is_dropped(
     assert [c.field for c in copy.claims] == [ClaimField.TITLE]
     assert (copy.salary, copy.apply_url, copy.employer, copy.locations) == (None, None, None, [])
     assert [(d.field, d.reason) for d in proposal.dropped] == [dropped]
+
+
+@pytest.mark.req("ACQ-06")
+def test_a_quoted_apply_link_that_holds_an_address_once_decoded_is_dropped() -> None:
+    # Fix round 5 (with re-review 5 A R5-2): percent-encoding is not redacted in page text
+    # (`%40` is no address there), but in a link a browser decodes it.
+    link = "https://careers.northwind.example/apply?contact=jane%40recruit.example"
+    text = f"Synthetic test page. Data Quality Analyst. Apply at {link} today."
+
+    proposal = check_extraction(
+        output(posting(title="Data Quality Analyst", apply_url=link)), ExtractionInput(text=text)
+    )
+
+    [copy] = proposal.postings
+    assert copy.apply_url is None
+    assert [(d.field, d.reason) for d in proposal.dropped] == [
+        (ClaimField.APPLY_URL, DropReason.PERSONAL_DETAILS)
+    ]
 
 
 # --- the agent --------------------------------------------------------------------------

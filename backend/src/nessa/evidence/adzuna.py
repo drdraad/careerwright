@@ -24,6 +24,7 @@ from pydantic import Field, SecretStr
 from nessa.evidence.addresses import apply_link
 from nessa.evidence.amounts import minor_units
 from nessa.evidence.jobs import advertiser_kind, description_fingerprints
+from nessa.evidence.pages import decoded_holds_detail
 from nessa.evidence.records import (
     CLAIM_TEXT_CHARS,
     Claim,
@@ -281,6 +282,8 @@ def _copy(result: dict[str, Any], claims: _Claims) -> JobCopy | None:
         )
     redirect = result.get("redirect_url")
     apply_url = apply_link(redirect)  # the one check for every apply link
+    if apply_url is not None and decoded_holds_detail(apply_url):
+        apply_url = None  # kept as written, so never one holding a detail (fix round 5)
     if apply_url is not None:
         claims.add(ClaimField.APPLY_URL, apply_url, "redirect_url", redirect)
     return JobCopy(

@@ -39,7 +39,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from nessa.evidence.addresses import apply_link
 from nessa.evidence.amounts import minor_units
 from nessa.evidence.jobs import advertiser_kind
-from nessa.evidence.pages import EXCERPT_CHARS, EXTRACTION_TEXT_BYTES, mark_conflicts
+from nessa.evidence.pages import (
+    EXCERPT_CHARS,
+    EXTRACTION_TEXT_BYTES,
+    decoded_holds_detail,
+    mark_conflicts,
+)
 from nessa.evidence.records import (
     CLAIM_TEXT_CHARS,
     SHA256_PATTERN,
@@ -546,6 +551,9 @@ def _checked(
         apply_url = apply_link(link[0])
         if apply_url is None:
             checking.drop(ClaimField.APPLY_URL, DropReason.NOT_A_SAFE_LINK)
+        elif decoded_holds_detail(apply_url):  # a link's `%40` is an "@" (fix round 5)
+            apply_url = None
+            checking.drop(ClaimField.APPLY_URL, DropReason.PERSONAL_DETAILS)
         else:
             checking.claim(ClaimField.APPLY_URL, apply_url, link[1])
 

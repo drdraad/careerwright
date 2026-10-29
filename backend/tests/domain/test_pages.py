@@ -275,6 +275,24 @@ def test_an_apply_link_that_is_not_plain_https_is_no_claim_at_all(link: str) -> 
     assert ClaimField.APPLY_URL not in {c.field for c in job.claims}
 
 
+# Fix round 5 (with re-review 5 A R5-2): a link is kept as written, so one that holds a third
+# party's detail, as written or once decoded, is no claim; claims are kept for every class.
+ADDRESS_LINKS = [
+    "https://careers.northwind.example/apply?contact=jane@recruit.example",
+    "https://careers.northwind.example/apply?contact=jane%40recruit.example",
+    "https://careers.northwind.example/apply?contact=jane&#64;recruit.example",
+]
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize("link", ADDRESS_LINKS, ids=["plain", "percent-encoded", "entity"])
+def test_an_apply_link_holding_a_third_party_s_detail_is_no_claim(link: str) -> None:
+    [job] = parse(page({**POSTING, "url": link})).postings
+
+    assert job.apply_url is None
+    assert ClaimField.APPLY_URL not in {c.field for c in job.claims}
+
+
 @pytest.mark.req("ACQ-04")
 def test_a_valid_https_apply_link_is_kept_without_its_surrounding_space() -> None:
     [job] = parse(

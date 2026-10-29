@@ -15,11 +15,15 @@ spans, parsed into claims or sealed. What it removes:
 
 JSON is redacted in its decoded values, never as raw text: a value's escapes (`\\n`,
 `\\u003e`) are decoded first, so a detail right after one is still found and the JSON stays
-valid. IDs and URLs are never redacted (`NOT_TEXT`): an ID can look like a phone number.
+valid. A string whose HTML entities, decoded, show a detail (`jane&#64;recruit.example`) is
+replaced by its decoded, redacted form, so the JSON is written again (fix round 5, re-review
+5 A R5-2). IDs and URLs are never redacted (`NOT_TEXT`): an ID can look like a phone number.
+Links (`LINK_KEYS`) are only looked at, decoded, by `pages.redact_page`.
 
 Text as a reader sees it (`pages.normalised_text`: a page's visible text, an attribute's
 value) is redacted with `redact_shown`, which also removes an email address with whitespace
-around its "@" or its domain's dots, where markup split it (fix round 4, re-review 4 A R4-1).
+around its "@" or its domain's dots, where markup split it (fix round 4, re-review 4 A R4-1),
+but never across a sentence's end (fix round 5, re-review 5 A R5-1).
 
 A personal name in running text cannot be told apart from other words deterministically,
 so it is not removed; nor is a detail written in an unusual form (a number spelt out). A
@@ -30,8 +34,10 @@ is redacted (`pages.visible_text`). These are known limits, recorded in ADR 0009
 product owner. A page's scripts are found by the parser (`pages.redact_page`).
 """
 
+import html
 import json
 import re
+from collections.abc import Iterator
 from typing import Any
 
 EMAIL_REMOVED = "[email removed]"
@@ -44,13 +50,23 @@ NOT_TEXT = frozenset(
     {"@context", "@id", "@type", "identifier", "url", "sameAs", "logo", "image"}
     | {"id", "adref", "redirect_url", "__CLASS__"}  # Adzuna's
 )
+# The `NOT_TEXT` keys whose values are links (and what a link object holds): kept exactly,
+# but looked at once decoded (`pages.redact_page`; fix round 5, re-review 5 A R5-2). IDs are
+# not looked at: one can look like a telephone number.
+LINK_KEYS = frozenset({"@context", "@id", "url", "sameAs", "logo", "image", "redirect_url"})
 
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
 # The same, as normalised text shows an address that inline markup split: optional whitespace
 # around the "@" and the domain's dots ("jane<span>@</span>recruit.example" reads "jane @
-# recruit.example"). The TLD is letters only, so "£5 @ the door" is no address.
+# recruit.example"). The TLD is letters only, so "£5 @ the door" is no address. A dot with
+# whitespace after it may end a sentence, so the label after it must start lowercase (or, in
+# the middle, with a digit), and nothing that continues a word may follow the TLD: "Follow
+# @GOVUK. Sign up" is no address (fix round 5, re-review 5 A R5-1).
+_DOT_BEFORE_LABEL = r"(?:\.|\s+\.|\s*\.\s+(?=[a-z0-9]))"
+_DOT_BEFORE_TLD = r"(?:\.|\s+\.|\s*\.\s+(?=[a-z]))"
 _SHOWN_EMAIL = re.compile(
-    r"[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9-]+(?:\s*\.\s*[A-Za-z0-9-]+)*\s*\.\s*[A-Za-z]{2,}"
+    rf"[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9-]+(?:{_DOT_BEFORE_LABEL}[A-Za-z0-9-]+)*"
+    rf"{_DOT_BEFORE_TLD}[A-Za-z]{{2,}}(?![\w-])"
 )
 # Not preceded by a word character or anything that would put it inside a URL or a number.
 _NOT_INSIDE = r"(?<![\w/=?&#%.+-])"
@@ -90,13 +106,32 @@ def redact_shown(text: str) -> str:
     return _SHOWN_EMAIL.sub(EMAIL_REMOVED, redact_text(text))
 
 
+def unescaped(text: str) -> str:
+    """`text` with its HTML entities decoded until none is left (`&amp;#64;` too), so a
+    detail written as entities shows."""
+    while (decoded := html.unescape(text)) != text:
+        text = decoded
+    return text
+
+
+def _redacted_string(value: str) -> str:
+    """A JSON string's emails and telephone numbers removed; if its entities, decoded, show
+    one more (`jane&#64;recruit.example`), its decoded form, redacted (fix round 5, re-review
+    5 A R5-2). Applied again, it changes nothing, so a rewritten block reads the same."""
+    redacted = redact_text(value)
+    decoded = unescaped(redacted)
+    shown = redact_text(decoded)
+    return redacted if shown == decoded else shown
+
+
 def redact_value(value: Any) -> Any:
     """A decoded JSON value with personal details removed: a contact's fields replaced, every
-    other string's emails and telephone numbers removed, IDs and URLs kept as they are."""
+    other string's emails and telephone numbers removed (also those its HTML entities hide),
+    IDs and URLs kept as they are."""
     if isinstance(value, list):
         return [redact_value(item) for item in value]
     if isinstance(value, str):
-        return redact_text(value)
+        return _redacted_string(value)
     if not isinstance(value, dict):
         return value
     out: dict[str, Any] = {}
@@ -123,6 +158,28 @@ def _contact(value: Any) -> Any:
         else redact_value(item)
         for key, item in value.items()
     }
+
+
+def link_strings(value: Any) -> Iterator[str]:
+    """Every string a decoded JSON value holds under a link key (`LINK_KEYS`), at any depth:
+    what `redact_value` keeps as written, for `pages.redact_page` to look at."""
+    if isinstance(value, list):
+        for item in value:
+            yield from link_strings(item)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if key in LINK_KEYS:
+                yield from _strings(item)
+            elif key not in NOT_TEXT:
+                yield from link_strings(item)
+
+
+def _strings(value: Any) -> Iterator[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, (list, dict)):
+        for item in value if isinstance(value, list) else value.values():
+            yield from _strings(item)
 
 
 def loads_json(raw: str) -> tuple[Any, bool]:

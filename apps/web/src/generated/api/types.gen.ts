@@ -304,7 +304,8 @@ export const BodyNotKept = {
     CONTACT_UNLOCATED: 'contact_unlocated',
     BLOCK_UNREDACTABLE: 'block_unredactable',
     VISIBLE_TEXT_DETAIL: 'visible_text_detail',
-    ATTRIBUTE_DETAIL: 'attribute_detail'
+    ATTRIBUTE_DETAIL: 'attribute_detail',
+    LINK_DETAIL: 'link_detail'
 } as const;
 
 /**

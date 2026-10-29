@@ -20,7 +20,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from scrapling.parser import Selector
 
@@ -44,7 +44,15 @@ from nessa.evidence.records import (
     ValidationState,
     WorkMode,
 )
-from nessa.evidence.redaction import redact_json, redact_shown, redact_text, redact_value
+from nessa.evidence.redaction import (
+    link_strings,
+    loads_json,
+    redact_json,
+    redact_shown,
+    redact_text,
+    redact_value,
+    unescaped,
+)
 
 EXCERPT_CHARS = 200
 LOCALITY_CHARS, POSTAL_CODE_CHARS, COUNTRY_CHARS = 120, 20, 60  # `records.Location`'s bounds
@@ -360,9 +368,11 @@ def _copy(posting: dict[str, Any], claims: _Claims, page_host: str | None) -> Jo
         fingerprint, lead = description_fingerprints(_plain(description))
         claims.add(ClaimField.DESCRIPTION, DescriptionKind.FULL.value, "description", description)
 
-    # Untrusted: only a plain https link is kept (`addresses.apply_link`); anything else is
-    # no claim at all.
+    # Untrusted: only a plain https link is kept (`addresses.apply_link`), and only one with
+    # no third party's detail in it, decoded (fix round 5); anything else is no claim at all.
     apply_url = apply_link(posting.get("url"))
+    if apply_url is not None and decoded_holds_detail(apply_url):
+        apply_url = None
     if apply_url is not None:
         claims.add(ClaimField.APPLY_URL, apply_url, "url", posting["url"])
 
@@ -467,15 +477,28 @@ def _shows_detail(html: str) -> bool:
     return _shown_detail(normalised_text(_plain(html)))
 
 
+def decoded_holds_detail(value: str) -> bool:
+    """Detection only, never a rewrite: whether a value kept as written (an attribute's, a
+    JSON link's) holds an email or a telephone number once its HTML entities and its
+    percent-encoding are decoded and it is normalised (fix round 4, item 1; fix round 5,
+    re-review 5 A R5-2). A browser decodes both: `mailto:jane%40recruit.example`."""
+    decoded = unescaped(value)
+    return any(_shown_detail(normalised_text(v)) for v in (decoded, unquote(decoded)))
+
+
 def _attribute_shows_detail(html: str) -> bool:
-    """Whether any attribute's value, its entities decoded (the parser decodes them) and
-    normalised, holds an email or a telephone number (fix round 4, item 1). Written as
-    entities, a detail is hidden from the text patterns, yet a browser decodes it: a
-    `mailto:` link with no visible address."""
+    """Whether any attribute's value (its entities decoded by the parser) holds a detail
+    once decoded (`decoded_holds_detail`): a `mailto:` link with no visible address."""
     return any(
-        _shown_detail(normalised_text(str(value)))
-        for value in Selector(content=html).xpath("//@*").getall()
+        decoded_holds_detail(str(value)) for value in Selector(content=html).xpath("//@*").getall()
     )
+
+
+def _links_show_detail(cleaned_json: str) -> bool:
+    """Whether a JSON script's links (`redaction.LINK_KEYS`, kept as written) hold a detail
+    once decoded: a JSON-LD `"url": "mailto:jane@recruit.example"`."""
+    data, _ = loads_json(cleaned_json)
+    return any(decoded_holds_detail(link) for link in link_strings(data))
 
 
 @dataclass(frozen=True)
@@ -508,6 +531,9 @@ def redact_page(text: str) -> RedactedPage:
         if not raw:
             continue
         cleaned = redact_json(raw)
+        if cleaned is not None and _links_show_detail(cleaned):
+            # Its links are kept as written, so a detail in one cannot be removed.
+            unremovable = unremovable or BodyNotKept.LINK_DETAIL
         as_text = redact_text(raw) if cleaned is None else cleaned
         # Whether it holds details, looked for with escapes decoded too, since a detail right
         # after `\n` or `\x3e` is hidden from the text patterns.

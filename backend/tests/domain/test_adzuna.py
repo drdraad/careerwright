@@ -24,7 +24,7 @@ from nessa.evidence.records import (
     PayBasis,
     ValidationState,
 )
-from tests.domain.test_pages import POSTING, UNSAFE_LINKS, page, parse
+from tests.domain.test_pages import ADDRESS_LINKS, POSTING, UNSAFE_LINKS, page, parse
 
 FIXTURE = Path(__file__).resolve().parents[3] / "fixtures" / "acquisition" / "adzuna-search-gb.json"
 APP_ID = SecretStr("id-0123456789")
@@ -177,6 +177,15 @@ def with_redirect(link: str) -> bytes:
 @pytest.mark.req("ACQ-04")
 @pytest.mark.parametrize("link", UNSAFE_LINKS)
 def test_an_adzuna_link_that_is_not_plain_https_is_no_claim_at_all(link: str) -> None:
+    [copy] = parse_search(with_redirect(link), sha256="0" * 64).copies
+
+    assert copy.apply_url is None
+    assert ClaimField.APPLY_URL not in {c.field for c in copy.claims}
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize("link", ADDRESS_LINKS, ids=["plain", "percent-encoded", "entity"])
+def test_an_adzuna_link_holding_a_third_party_s_detail_is_no_claim(link: str) -> None:
     [copy] = parse_search(with_redirect(link), sha256="0" * 64).copies
 
     assert copy.apply_url is None
