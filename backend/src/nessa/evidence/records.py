@@ -76,6 +76,7 @@ class AttemptReason(StrEnum):
     ACQUISITION_WORKER_UNAVAILABLE = "acquisition_worker_unavailable"
     INTERRUPTED = "interrupted"  # a crash during the request: settled when the step re-runs
     ACCESS_REVOKED = "access_revoked"
+    INTERNAL_ERROR = "internal_error"  # a defect in the acquisition worker, never transient
 
 
 class Extraction(StrEnum):

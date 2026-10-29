@@ -58,9 +58,10 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
 3. **Every hop is checked; refusals are attempts.** `addresses.check_url`: http or https,
    no credentials, port 80 or 443, a public IP literal or a multi-label name; local names
    and every encoded address form (one decimal or hex number, octal, short dotted forms,
-   percent-encoding, any digit outside ASCII, an IPv6 zone ID, IPv4-compatible IPv6) are
-   refused, never decoded (fix round 1, review A M1 and M2: before, Unicode digits were
-   folded by IDNA and a zone ID parsed); one trailing dot is removed before the check.
+   percent-encoding, any digit outside ASCII, a full stop IDNA folds to "." (U+3002,
+   U+FF0E, U+FF61), an IPv6 zone ID, IPv4-compatible IPv6) are refused, never decoded (fix
+   round 1, review A M1 and M2, addendum M-3: before, Unicode digits and dots were folded
+   by IDNA and a zone ID parsed); one trailing ASCII dot is removed before the check.
    `address_refusal` refuses every non-global, multicast or reserved address, the
    deprecated site-local `fec0::/10` (which `is_global` passes) and every IPv6
    form embedding IPv4 (mapped, 6to4, Teredo, NAT64). The fetcher resolves at connect time,
@@ -85,7 +86,9 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    included, enforced in every phase (the name lookup, on a thread it does not wait past;
    each connect; every read, write and TLS start; so a trickled status line or an endless
    run of 1xx responses ends at the bound), with at most 5 s per connect and 10 s per
-   read; the first host's pacing comes before the bound starts. HTML only for pages, JSON
+   read. The first host's pacing comes before the bound starts; a later host is admitted
+   with what is left of the bound, and if its next slot is further away the hop fails as a
+   transient `timeout` at once, with no wait and no slot taken (addendum, re-review A M-2). HTML only for pages, JSON
    for Adzuna. robots.txt is read first for each origin and obeyed for the token
    `NessaL0` by Nessa's own RFC 9309 matcher (`fetcher.parse_robots`; `urllib.robotparser`
    was replaced in fix round 1 because it ignores `*` and `$` and takes the first matching
@@ -112,7 +115,10 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    `other`, "pending human rights review", unless an agent records a dated classification
    with the terms relied on (`tools/corpus.py --rights-class --terms`, dated with the run's
    date). That classification replaces the derived class in either direction before
-   anything is kept, but never keeps more of a listed host's page than its entry permits.
+   anything is kept, but never keeps more of a listed host's page than its entry permits,
+   and holds only for the host it was given for: a page a redirect took to another host
+   gets the manifest's class, its rights status naming both hosts (addendum, re-review A
+   M-6).
    The product's runtime never takes one: there, unlisted is `other`. A person
    supplying a URL never overrides an entry. The body is kept, sealed to the workspace in
    `source_documents`, only for the classes that may keep it privately (lines A1–A5); job
@@ -122,14 +128,25 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    phone numbers) never kept") binds everything kept: bodies, excerpts and claim values
    (controller ruling, fix round 1, review A M6). So before a page, an API response or a
    pasted text is hashed for spans, parsed or sealed, `nessa.evidence.redaction` removes,
-   deterministically, every email address, every telephone number in UK national or
-   international form (not inside a URL, a word or a longer number), and in JSON-LD every
-   name, email, telephone and fax number of an `applicationContact` or `contactPoint`.
-   `content_sha256` is the hash of what was kept; `retrieved_sha256` (migration 0015) is
-   the hash of the bytes as retrieved, for change detection only. Kept bodies are UTF-8.
-   **Known limit, for the product owner:** a personal name in running text (for example
+   deterministically, email addresses written as plain addresses and telephone numbers in
+   UK national (10 or 11 digits from a leading 0) or international (`+`, 8 to 15 digits)
+   form, not inside a URL, a word or a longer number; and in JSON every name, email,
+   telephone and fax number of an `applicationContact` or `contactPoint`. How (addendum,
+   re-review A C-1, I-1 to I-3, M-1): a page's line endings are normalised first; each
+   JSON-LD block, and Adzuna's response, is redacted in its decoded values and written again
+   only if that changed it, with every `</` escaped, so a detail right after an escape
+   (`\n`, `\t`, `>`) is found and the JSON stays valid; IDs and URLs (`identifier`,
+   `url`, `sameAs`, Adzuna's `id` and `redirect_url`) are never redacted; the HTML around
+   the blocks is redacted as text. If a block holding such a detail cannot be found in the
+   page's text to be rewritten, the body is never kept, whatever its class: only the hash
+   and the claims' excerpts, its rights status labelled `body_not_kept:contact_unlocated`.
+   Claims and excerpts come from the redacted text. `content_sha256` is the hash of what was
+   kept; `retrieved_sha256` (migration 0015) is the hash of the bytes as retrieved, for
+   change detection only. Kept bodies are UTF-8 with LF line endings.
+   **Known limits, for the product owner:** a personal name in running text (for example
    "ask for Jane in HR") cannot be told apart from other words deterministically and is
-   not removed; nor is a number written in an unusual form.
+   not removed; nor is a detail written in another form (an email as HTML entities or with
+   "at" for "@", a number spelt out or split by other characters).
 
 5. **Records (spec section 18).** `source_attempts`: every try by any route, blocked and
    failed ones included, written before the request and settled after, a retry naming the
@@ -140,9 +157,14 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    issue), a span (offsets into the decoded text that was hashed, or a JSON pointer for an
    API response, with an excerpt), retrieval, publication and expiry dates. A claim's text
    value, and a copy's title and employer, keep at most 200 characters, the excerpt bound,
-   so a reference-only page's records never hold more of it; an apply link is a checked URL
-   and is kept whole; a source ID longer than that is left unknown rather than cut (fix
-   round 1, review A M4). The database holds claims to that shape (migration 0017, review
+   so a reference-only page's records never hold more of it; a location's parts are cut to
+   their own bounds (120, 120, 20 and 60 characters) so no page fails on their length; a
+   source ID longer than 200 is left unknown rather than cut (fix round 1, review A M4;
+   addendum M-7). An apply link is exempt from the cut, because a cut URL is a wrong URL
+   (controller ruling, addendum item 10): it is a checked https link kept whole only up to
+   the URL bound, 2,048 characters (`addresses.MAX_URL_CHARS`), and past it there is no
+   apply claim at all
+   (`test_an_apply_link_is_kept_whole_up_to_the_url_bound_and_past_it_is_no_claim`). The database holds claims to that shape (migration 0017, review
    B M3): `field` is a claim field, `span` has a 64-hex `source_sha256`, an excerpt and
    offsets or a pointer, and a claim's attempt is its copy's (`(copy_id, attempt_id)`
    references the copy). Structured fields
@@ -189,7 +211,10 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    is then settled `access_revoked`, recording nothing it returned, through a narrow worker
    policy in migration 0016), never an empty success (STATE-02).
    Fix round 1 (review B C1, I2, I3, I6, M7): an attempt's `reason` is one of a fixed set
-   (`records.AttemptReason`, held by a CHECK; an HTTP error is `http_error` with its
+   (`records.AttemptReason`, held by a CHECK; a defect in the acquisition worker is
+   `internal_error`, not transient, never a 422 the client would take for the worker
+   being unavailable (addendum, re-review A M-7; migration 0018); an HTTP error is
+   `http_error` with its
    `http_status`), and a retrieved source with no publishable posting records why
    (`extraction`): `no_structured_data`, `jsonld_invalid` or `conflicting_job_postings`
    mean it could not be read, and only `no_job_posting` (structured data read, none in it)

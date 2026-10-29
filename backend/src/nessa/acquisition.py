@@ -27,6 +27,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from nessa.evidence import adzuna
 from nessa.evidence.acquire import (
+    ADZUNA_PROVIDER,
     AcquisitionResult,
     AdzunaRequest,
     FetchRequest,
@@ -34,7 +35,9 @@ from nessa.evidence.acquire import (
     acquire_adzuna,
     acquire_page,
 )
+from nessa.evidence.addresses import CheckedUrl, check_url
 from nessa.evidence.fetcher import Fetcher
+from nessa.evidence.records import AttemptReason, AttemptStatus, InputRoute
 from nessa.evidence.sources import load_manifest
 from nessa.logs import configure_logging, register_secret
 
@@ -77,6 +80,27 @@ def load_adzuna_credentials(directory: Path | None) -> tuple[SecretStr, SecretSt
     return SecretStr(app_id), SecretStr(app_key)
 
 
+def internal_failure(request: FetchRequest | AdzunaRequest, now: datetime) -> AcquisitionResult:
+    """The attempt a defect ends: recorded against what was asked for, as far as it is safe
+    to record (a checked URL, or the Adzuna request without its credentials)."""
+    if isinstance(request, AdzunaRequest):
+        route, provider = InputRoute.ADZUNA, ADZUNA_PROVIDER
+        requested: str | None = adzuna.recorded_url(request.query)
+    else:
+        checked = check_url(request.url)
+        route = InputRoute.FETCH
+        provider = checked.host if isinstance(checked, CheckedUrl) else "unknown"
+        requested = checked.url if isinstance(checked, CheckedUrl) else None
+    return AcquisitionResult(
+        route=route,
+        provider=provider,
+        requested_url=requested,
+        status=AttemptStatus.FAILED,
+        reason=AttemptReason.INTERNAL_ERROR,
+        fetched_at=now,
+    )
+
+
 class AcquisitionService:
     def __init__(
         self,
@@ -98,26 +122,36 @@ class AcquisitionService:
         return self._credentials is not None
 
     def handle(self, path: str, body: bytes) -> tuple[int, dict[str, object]]:
+        """Only a malformed request is a 422. A failure while acquiring (a defect, never the
+        source's fault) is answered as the attempt it is: failed `internal_error`, not
+        transient, so the client never takes it for this worker being unavailable."""
         try:
             if path == "/v1/fetch":
-                url = FetchRequest.model_validate_json(body).url
-                result: AcquisitionResult = acquire_page(
-                    self._fetcher, self._pacer, url, now=self._clock()
-                )
+                request: FetchRequest | AdzunaRequest = FetchRequest.model_validate_json(body)
             elif path == "/v1/adzuna":
-                query = AdzunaRequest.model_validate_json(body).query
-                result = acquire_adzuna(
-                    self._fetcher,
-                    self._pacer,
-                    query,
-                    self._credentials,
-                    now=self._clock(),
-                    search_url=self._adzuna_search_url,
-                )
+                request = AdzunaRequest.model_validate_json(body)
             else:
                 return 404, {"error": "not_found"}
         except ValidationError:
             return 422, {"error": "invalid_request"}
+        now = self._clock()
+        try:
+            if isinstance(request, FetchRequest):
+                result: AcquisitionResult = acquire_page(
+                    self._fetcher, self._pacer, request.url, now=now
+                )
+            else:
+                result = acquire_adzuna(
+                    self._fetcher,
+                    self._pacer,
+                    request.query,
+                    self._credentials,
+                    now=now,
+                    search_url=self._adzuna_search_url,
+                )
+        except Exception as error:  # its class only, never its message
+            _log.warning("acquisition failed", extra={"error_class": type(error).__name__})
+            result = internal_failure(request, now)
         return 200, json.loads(result.model_dump_json())
 
 

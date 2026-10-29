@@ -8,6 +8,10 @@ import pytest
 
 from nessa.evidence.addresses import CheckedUrl, UrlRefusal, address_refusal, check_url
 
+# Full stops IDNA folds to "." (re-review A M-3), written as code points so none is mistaken
+# for an ASCII dot.
+IDEOGRAPHIC, FULLWIDTH, HALFWIDTH = chr(0x3002), chr(0xFF0E), chr(0xFF61)
+
 
 @pytest.mark.req("ACQ-01")
 def test_a_public_https_url_is_normalised_and_its_fragment_dropped() -> None:
@@ -94,6 +98,9 @@ def test_private_loopback_link_local_and_metadata_literals_are_refused(raw: str)
         ("http://%31%32%37.0.0.1/", UrlRefusal.HOST_NOT_ALLOWED),  # percent-encoded
         ("http://①②⑦.0.0.1/", UrlRefusal.HOST_NOT_ALLOWED),  # Unicode digits, never decoded
         ("http://٩٣.١٨٤.٢١٥.١٤/", UrlRefusal.HOST_NOT_ALLOWED),  # a public one, the same
+        (f"http://93{FULLWIDTH}184{FULLWIDTH}215{FULLWIDTH}14/", UrlRefusal.HOST_NOT_ALLOWED),
+        (f"http://127{IDEOGRAPHIC}0{IDEOGRAPHIC}0{IDEOGRAPHIC}1/", UrlRefusal.HOST_NOT_ALLOWED),
+        (f"http://jobs{HALFWIDTH}example{HALFWIDTH}org/", UrlRefusal.HOST_NOT_ALLOWED),  # a name
         ("http://[2606:4700::1111%25eth0]/", UrlRefusal.HOST_NOT_ALLOWED),  # a zone ID
         ("http://[fe80::1%25eth0]/", UrlRefusal.HOST_NOT_ALLOWED),
         # A trailing dot is the same name: it is removed, and the address then checked.

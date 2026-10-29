@@ -347,7 +347,8 @@ export const AttemptReasonSchema = {
         'body_hash_mismatch',
         'acquisition_worker_unavailable',
         'interrupted',
-        'access_revoked'
+        'access_revoked',
+        'internal_error'
     ],
     title: 'AttemptReason',
     description: 'Why an attempt was blocked or failed: a label, classified from types and statuses,\nnever a message. The URL checks\' refusals (`addresses.UrlRefusal`) are among them.'

@@ -29,6 +29,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_page
+from nessa.evidence.addresses import CheckedUrl
 from nessa.evidence.fetcher import Fetcher
 from nessa.evidence.records import Retention, RightsClass
 from nessa.evidence.sources import (
@@ -45,11 +46,13 @@ EVIDENCE_DIR = REPO_ROOT / "var" / "evidence" / "corpus"
 
 
 def agent_classification(
-    rights_class: RightsClass | None, terms: str | None, on: date
+    rights_class: RightsClass | None, terms: str | None, on: date, *, requested_host: str
 ) -> Callable[[str], PageRights]:
     """The page's class from its final host: the agent's dated classification when one is
     given, in either direction, else the manifest's. It never keeps more of a page whose host
-    the manifest lists than the manifest permits (a listed board stays reference only)."""
+    the manifest lists than the manifest permits (a listed board stays reference only), and
+    it holds only for the host the agent classified: a page a redirect took elsewhere gets
+    the manifest's class, its rights status naming both hosts (re-review A M-6)."""
     if rights_class is None:
         return classify_page
     if rights_class is not RightsClass.OTHER and not terms:
@@ -58,6 +61,9 @@ def agent_classification(
 
     def classify(host: str) -> PageRights:
         listed = classify_page(host)
+        if host != requested_host:
+            moved = f"{listed.rights_status} [classified {requested_host}; the page is on {host}]"
+            return PageRights(listed.rights_class, moved, listed.retention)
         if is_listed(host) and kept is Retention.BODY and listed.retention is not Retention.BODY:
             return listed
         if rights_class is RightsClass.OTHER:
@@ -113,7 +119,9 @@ def acquire_for_corpus(
     evidence_dir: Path = EVIDENCE_DIR,
 ) -> dict[str, object]:
     now = datetime.now(UTC)
-    classify = agent_classification(rights_class, terms, now.date())
+    checked = fetcher.check(url)
+    requested_host = checked.host if isinstance(checked, CheckedUrl) else ""
+    classify = agent_classification(rights_class, terms, now.date(), requested_host=requested_host)
     result = acquire_page(fetcher, Pacer(), url, now=now, classify=classify)
     body_path = None
     if result.body_b64 is not None and result.retention is Retention.BODY:

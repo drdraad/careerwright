@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_page
-from nessa.evidence.fetcher import Fetcher
+from nessa.evidence.fetcher import DEFAULT_LIMITS, Fetcher, FetchLimits
 from nessa.evidence.records import AttemptStatus, ClaimField, Retention, RightsClass
 from nessa.evidence.sources import (
     MANIFEST_PATH,
@@ -180,11 +180,16 @@ CROSS_HOST_NAMES = {
 
 
 def _cross_host(
-    server: SourceServer, pacer: Pacer | None = None, *, other: SourceServer | None = None
+    server: SourceServer,
+    pacer: Pacer | None = None,
+    *,
+    other: SourceServer | None = None,
+    limits: FetchLimits = DEFAULT_LIMITS,
 ) -> Callable[[str], AcquisitionResult]:
     ports = {server.port} | ({other.port} if other else set())
     fetcher = Fetcher(
         resolve=scripted_resolver(CROSS_HOST_NAMES),
+        limits=limits,
         user_agent="NessaL0/test",
         extra_allowed=frozenset(("127.0.0.1", port) for port in ports),
     )
@@ -254,6 +259,33 @@ def test_a_redirect_to_another_host_waits_for_that_host_s_rate_limit() -> None:
     assert result.status is AttemptStatus.SUCCEEDED
     assert result.final_url == target
     assert slept == [5.0]  # the default rate limit, waited before the redirect's request
+
+
+@pytest.mark.req("ACQ-02", "ACQ-06")
+def test_a_redirect_whose_pacing_would_outlast_the_time_bound_is_a_timeout_without_waiting() -> (
+    None
+):
+    # Re-review A M-2: the other host's next slot is 5 s away; the page has 2 s in all.
+    now = [100.0]
+    slept: list[float] = []
+    pacer = Pacer(clock=lambda: now[0], sleep=slept.append)
+    with source_server() as first, source_server({"/job": Scripted(body=PAGE_BODY)}) as other:
+        acquire = _cross_host(first, pacer, other=other, limits=FetchLimits(total_s=2.0))
+        target = f"http://jobs.other.example:{other.port}/job"
+        first.routes["/go"] = Scripted(302, headers=(("Location", target),))
+        acquire(target)  # takes the other host's slot
+        seen = len(other.seen)
+        result = acquire(f"http://jobs.board.example:{first.port}/go")
+        after = len(other.seen)
+
+    assert (result.status, result.reason, result.transient) == (
+        AttemptStatus.FAILED,
+        "timeout",
+        True,
+    )
+    assert slept == []  # no wait, and no slot taken for it
+    assert after == seen  # nothing was sent to the other host
+    assert pacer.wait("jobs.other.example", 5.0, within_s=0.0) is False  # its slot is unchanged
 
 
 @pytest.mark.req("ACQ-06")

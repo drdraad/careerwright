@@ -16,6 +16,7 @@ source's failure: every outcome is a result with a status and a label.
 
 import base64
 import hashlib
+import math
 import threading
 import time
 from collections.abc import Callable
@@ -38,10 +39,13 @@ from nessa.evidence.records import (
     RightsClass,
     StrictModel,
 )
-from nessa.evidence.redaction import redact_text
+from nessa.evidence.redaction import redact_json
 from nessa.evidence.sources import Access, PageRights, classify_page, retention, rule_for
 
 ADZUNA_PROVIDER = "adzuna"
+# The label a rights status carries when a body its class may keep is not kept, because a
+# JSON-LD block with personal details in it could not be rewritten (`pages.redact_page`).
+BODY_NOT_KEPT_CONTACT_UNLOCATED = "body_not_kept:contact_unlocated"
 
 
 class FetchRequest(StrictModel):
@@ -97,13 +101,18 @@ class Pacer:
         self._next: dict[str, float] = {}
         self._lock = threading.Lock()
 
-    def wait(self, host: str, interval_s: float) -> None:
+    def wait(self, host: str, interval_s: float, *, within_s: float = math.inf) -> bool:
+        """Waits for the host's next slot and takes it; or, when that slot is more than
+        `within_s` away, takes nothing, waits not at all and answers False."""
         with self._lock:
             now = self._clock()
             start = max(now, self._next.get(host, now))
+            if start - now > within_s:
+                return False
             self._next[host] = start + interval_s
         if start > now:
             self._sleep(start - now)
+        return True
 
 
 def _failure_result(
@@ -128,15 +137,17 @@ def _failure_result(
 def admission(pacer: Pacer) -> Admit:
     """The source permission manifest for each host a page fetch reaches, the first and
     every redirect's (ACQ-06): a denied or API-only host is refused before any request to
-    it; a permitted one is paced to its rate limit."""
+    it; a permitted one is paced to its rate limit, unless its next slot is past what is left
+    of the page's time bound: then it is a transient timeout, with no wait and no slot taken."""
 
-    def admit(checked: CheckedUrl) -> str | None:
+    def admit(checked: CheckedUrl, within_s: float) -> str | None:
         rule = rule_for(checked.host)
         if rule.access is Access.DENIED:
-            return "source_denied"
+            return AttemptReason.SOURCE_DENIED.value
         if rule.access is Access.API_ONLY:
-            return "source_api_only"
-        pacer.wait(checked.host, rule.rate_limit_seconds)
+            return AttemptReason.SOURCE_API_ONLY.value
+        if not pacer.wait(checked.host, rule.rate_limit_seconds, within_s=within_s):
+            return AttemptReason.TIMEOUT.value
         return None
 
     return admit
@@ -178,12 +189,20 @@ def _page_result(
 ) -> AcquisitionResult:
     # Third parties' personal details go first, so the hash that spans index into, the
     # claims and any kept body are all without them; the retrieved bytes keep their own hash.
-    text = redact_page(page.text)
+    redacted = redact_page(page.text)
+    text = redacted.text
     kept = text.encode()
     digest = hashlib.sha256(kept).hexdigest()
     parsed = parse_page(text, sha256=digest, page_url=page.final_url)
     final_host = fetcher.check(page.final_url)
     rights = classify(final_host.host if not isinstance(final_host, UrlRefusal) else host)
+    if redacted.unlocated and rights.retention is Retention.BODY:
+        # Fail safe: personal details may remain in a block that could not be rewritten.
+        rights = PageRights(
+            rights.rights_class,
+            f"{rights.rights_status} [{BODY_NOT_KEPT_CONTACT_UNLOCATED}]",
+            Retention.EXCERPTS,
+        )
     keep = rights.retention is Retention.BODY
     return AcquisitionResult(
         route=InputRoute.FETCH,
@@ -245,9 +264,10 @@ def acquire_adzuna(
             http_status=result.http_status,
             http_requests=result.requests,
         )
-    # JSON stays JSON: only string content changes.
-    app_id = credentials[0].get_secret_value()
-    kept = redact_text(adzuna.without_app_id(result.text, app_id)).encode()
+    # Redacted in its decoded values, so it stays JSON; text that is not JSON is left for the
+    # parser to report (`response_invalid`).
+    stripped = adzuna.without_app_id(result.text, credentials[0].get_secret_value())
+    kept = (redact_json(stripped) or stripped).encode()
     digest = hashlib.sha256(kept).hexdigest()
     page = adzuna.parse_search(kept, sha256=digest)
     rights = classify_page("api.adzuna.com")

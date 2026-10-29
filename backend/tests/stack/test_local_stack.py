@@ -196,13 +196,23 @@ def reaches_acquisition(stack: Stack, service: str) -> str:
     return stack.exec(service, *command, timeout=60).stdout.strip()
 
 
+# What a probe that ran and could not connect prints (re-review A M-4): a name that does not
+# resolve, a refused or timed-out connection. An empty or unknown output fails the test, so a
+# probe that did not run is never taken for "unreachable".
+UNREACHABLE = frozenset(
+    {"gaierror", "ConnectionRefusedError", "TimeoutError"}  # Python
+    | {"ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "timeout"}  # Node
+    | {"blocked"}  # bash
+)
+
+
 def assert_only_the_worker_reaches_acquisition(stack: Stack) -> None:
     outcomes = {
         service: reaches_acquisition(stack, service)
         for service in ("worker", "api", "web", "auth", "edge", "postgres")
     }
-    assert outcomes["worker"] == "connected", outcomes  # positive control
-    assert [s for s, outcome in outcomes.items() if outcome == "connected"] == ["worker"], outcomes
+    assert outcomes.pop("worker") == "connected", outcomes  # positive control
+    assert {s: o for s, o in outcomes.items() if o not in UNREACHABLE} == {}, outcomes
 
 
 @pytest.mark.req("ACQ-05", "BND1-11")

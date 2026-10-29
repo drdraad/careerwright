@@ -4,7 +4,8 @@ security boundary"; ACQ-01). Pure: no network.
 A URL passes only with an `http` or `https` scheme, no credentials, port 80 or 443, and a
 host that is either a public IP literal or a multi-label DNS name. Anything that could be an
 encoded address (one decimal or hex number, octal or short dotted forms, percent-encoding,
-any digit outside ASCII, an IPv6 zone ID) is refused rather than decoded, so no parser
+any digit outside ASCII, a full stop IDNA would fold to ".", an IPv6 zone ID) is refused
+rather than decoded, so no parser
 disagreement can turn it into a private address. One trailing dot is removed (it names the
 same host) before the name or address is checked. The fetcher applies `address_refusal`
 again to every address a name resolves to, at connect time, and checks every redirect
@@ -26,6 +27,8 @@ ALLOWED_PORTS = frozenset(DEFAULT_PORTS.values())
 LOCAL_NAMES = frozenset({"localhost"})
 LOCAL_SUFFIXES = (".localhost", ".local", ".internal", ".arpa", ".lan", ".home", ".corp")
 MAX_NAME_CHARS = 253
+# The full stops IDNA folds to "." (ideographic, fullwidth, halfwidth ideographic).
+IDNA_DOTS = frozenset({chr(0x3002), chr(0xFF0E), chr(0xFF61)})
 _LABEL = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)$")
 _NUMERIC_LABEL = re.compile(r"^(0x[0-9a-f]*|[0-9]+)$")
 _DECIMAL_OCTET = re.compile(r"^(0|[1-9][0-9]{0,2})$")
@@ -87,8 +90,8 @@ def _ip_literal(host: str) -> IPAddress | UrlRefusal:
 
 def _name(host: str) -> str | IPAddress | UrlRefusal:
     """The host's ASCII name, or a canonical dotted-quad address, or the refusal."""
-    if "%" in host or any(ch.isdigit() and not ch.isascii() for ch in host):
-        return UrlRefusal.HOST_NOT_ALLOWED  # never decoded: IDNA would fold such digits
+    if "%" in host or any((ch.isdigit() or ch in IDNA_DOTS) and not ch.isascii() for ch in host):
+        return UrlRefusal.HOST_NOT_ALLOWED  # never decoded: IDNA would fold such digits, dots
     host = host.removesuffix(".")
     try:
         ascii_host = host.encode("idna").decode("ascii").lower()

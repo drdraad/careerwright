@@ -21,6 +21,7 @@ from types and statuses only; no exception message or response body is kept.
 """
 
 import ipaddress
+import math
 import re
 import socket
 import ssl
@@ -57,9 +58,11 @@ HTTP_ERROR = "http_error"  # the status itself is the failure's `http_status`
 MAX_ADDRESSES = 4  # tried in turn when a name resolves to several
 
 Resolve = Callable[[str, int], list[IPAddress]]
-# Called before the first request to each host of a page fetch: None once the host is
-# admitted (and paced), else the refusal label.
-Admit = Callable[[CheckedUrl], str | None]
+# Called before the first request to each host of a page fetch, with the seconds left of its
+# time bound: None once the host is admitted (and paced), `PACING_TIMEOUT` when its pacing
+# would outlast the bound (a transient failure), else the refusal label (blocked).
+Admit = Callable[[CheckedUrl, float], str | None]
+PACING_TIMEOUT = "timeout"
 
 
 @dataclass(frozen=True)
@@ -572,7 +575,9 @@ class Fetcher:
                 checked.url, AttemptStatus.BLOCKED, UrlRefusal.ADDRESS_NOT_ALLOWED.value
             )
         if visit.admit is not None and checked.host not in visit.admitted:
-            reason = visit.admit(checked)
+            reason = visit.admit(checked, visit.deadline - self._clock())
+            if reason == PACING_TIMEOUT:
+                return FetchFailure(checked.url, AttemptStatus.FAILED, reason, transient=True)
             if reason is not None:
                 return FetchFailure(checked.url, AttemptStatus.BLOCKED, reason)
             visit.admitted.add(checked.host)
@@ -711,7 +716,7 @@ class Fetcher:
             return self._blocked(url, checked.value, [])
         visit = _Visit(0.0, admit=admit)
         if admit is not None:
-            reason = admit(checked)
+            reason = admit(checked, math.inf)  # before the bound starts: the pacer may wait
             if reason is not None:
                 return FetchFailure(checked.url, AttemptStatus.BLOCKED, reason)
             visit.admitted.add(checked.host)

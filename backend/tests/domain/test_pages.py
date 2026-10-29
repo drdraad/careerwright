@@ -8,6 +8,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 
+from nessa.evidence.addresses import MAX_URL_CHARS
 from nessa.evidence.pages import ParsedPage, parse_page
 from nessa.evidence.records import (
     UNREADABLE,
@@ -310,6 +311,43 @@ def test_no_claim_or_copy_text_keeps_more_of_the_page_than_an_excerpt() -> None:
     assert len(job.employer) <= 200
     apply = next(c for c in job.claims if c.field is ClaimField.APPLY_URL)
     assert apply.value == long_link  # a checked link is kept whole, not cut
+
+
+@pytest.mark.req("ACQ-03")
+def test_a_long_location_part_is_cut_and_never_fails_the_page() -> None:
+    # Re-review A M-7: a part past its bound used to raise and fail the whole page.
+    address = {
+        "addressLocality": "Manchester " + "m" * 500,
+        "addressRegion": "r" * 500,
+        "postalCode": "M1 1AA" + "9" * 50,
+        "addressCountry": "GB" + "g" * 100,
+    }
+
+    [job] = parse(page({**POSTING, "jobLocation": {"address": address}})).postings
+
+    [location] = job.locations
+    assert location.locality is not None
+    assert location.locality.startswith("Manchester")
+    assert (len(location.locality), len(location.region or "")) == (120, 120)
+    assert (len(location.postal_code or ""), len(location.country or "")) == (20, 60)
+
+
+@pytest.mark.req("ACQ-04", "ACQ-06")
+def test_an_apply_link_is_kept_whole_up_to_the_url_bound_and_past_it_is_no_claim() -> None:
+    # The apply link is exempt from the 200-character cut because a cut URL is a wrong URL;
+    # that holds only because the URL bound limits it (ADR 0009 decision 5).
+    base = "https://careers.northwind.example/apply/7781?ref="
+    at_bound = base + "a" * (MAX_URL_CHARS - len(base))
+    past_bound = at_bound + "a"
+
+    [kept] = parse(page({**POSTING, "url": at_bound})).postings
+    [dropped] = parse(page({**POSTING, "url": past_bound})).postings
+
+    assert kept.apply_url == at_bound
+    assert len(kept.apply_url) == MAX_URL_CHARS
+    assert next(c for c in kept.claims if c.field is ClaimField.APPLY_URL).value == at_bound
+    assert dropped.apply_url is None
+    assert ClaimField.APPLY_URL not in {c.field for c in dropped.claims}
 
 
 @pytest.mark.req("ACQ-04")

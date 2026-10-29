@@ -23,12 +23,14 @@ from nessa.evidence.records import (
 )
 from nessa.migrations.versions import r0016_unreadable_and_partial as r0016
 from nessa.migrations.versions import r0017_job_merge_and_claim_integrity as r0017
+from nessa.migrations.versions import r0018_internal_error_reason as r0018
 
 BODY = b"<html>synthetic</html>"
 
 
 def _quoted(constraint: str) -> set[str]:
-    found = re.search(rf"{constraint} CHECK \(reason IN \((.*?)\)\)", r0016.SCHEMA, re.DOTALL)
+    """The reasons the latest migration that sets the constraint allows (0018)."""
+    found = re.search(rf"{constraint} CHECK \(reason IN \((.*?)\)\)", r0018.SCHEMA, re.DOTALL)
     assert found is not None
     return set(re.findall(r"'([a-z_]+)'", found.group(1)))
 

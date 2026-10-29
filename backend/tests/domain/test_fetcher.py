@@ -533,6 +533,7 @@ def test_an_allow_rule_wins_over_a_disallow_rule_of_equal_length() -> None:
         ("User-agent: NessaL0\nDisallow: /a\n\nUser-agent: NessaL0\nDisallow: /jobs\n", False),
         ("Disallow: /jobs\nUser-agent: *\nDisallow: /other\n", True),
         ("﻿User-agent: * # every agent\nDisallow: /jobs # private\n", False),
+        ("User-agent: NessaL0\nDisallow:\n\nUser-agent: *\nDisallow: /\n", True),
     ],
     ids=[
         "its own group beats the wildcard group",
@@ -543,6 +544,7 @@ def test_an_allow_rule_wins_over_a_disallow_rule_of_equal_length() -> None:
         "its groups are combined",
         "a rule before any group is ignored",
         "a byte order mark and comments",
+        "its own group's empty Disallow allows all, whatever the wildcard group says",
     ],
 )
 def test_the_group_for_nessa_is_selected_by_its_product_token(robots: str, allowed: bool) -> None:

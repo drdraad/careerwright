@@ -11,13 +11,14 @@ import pytest
 from pydantic import SecretStr
 
 from nessa.evidence import adzuna
-from nessa.evidence.acquire import Pacer, acquire_adzuna, acquire_page
+from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_adzuna, acquire_page
 from nessa.evidence.fetcher import Fetcher
 from nessa.evidence.pages import redact_page
+from nessa.evidence.records import AttemptStatus, Retention
 from nessa.evidence.redaction import CONTACT_REMOVED, EMAIL_REMOVED, PHONE_REMOVED, redact_text
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
-from tests.support.source_server import Scripted, source_server
+from tests.support.source_server import SYNTHETIC_MARKER, Scripted, source_server
 
 PHONES = [
     "020 7946 0958",
@@ -96,11 +97,12 @@ PERSONAL = [
 def test_json_ld_contacts_are_removed_and_the_rest_of_the_page_kept() -> None:
     redacted = redact_page(CONTACT_PAGE)
 
-    assert not [p for p in PERSONAL if p in redacted]
-    assert CONTACT_REMOVED in redacted
-    assert "Northwind Analytics Ltd" in redacted  # the organisation is not a person
-    assert "Data Quality Analyst" in redacted
-    assert redact_page(page(POSTING)) == page(POSTING)  # nothing to remove: unchanged
+    assert not redacted.unlocated
+    assert not [p for p in PERSONAL if p in redacted.text]
+    assert CONTACT_REMOVED in redacted.text
+    assert "Northwind Analytics Ltd" in redacted.text  # the organisation is not a person
+    assert "Data Quality Analyst" in redacted.text
+    assert redact_page(page(POSTING)).text == page(POSTING)  # nothing to remove: unchanged
 
 
 @pytest.mark.req("ACQ-06")
@@ -133,17 +135,110 @@ def test_a_kept_body_its_excerpts_and_its_claims_hold_no_personal_details() -> N
             assert text[claim.span.start : claim.span.end].startswith(claim.span.excerpt[:20])
 
 
+def _acquire_kept(body: bytes) -> tuple[AcquisitionResult, bytes]:
+    with source_server({"/jobs/1": Scripted(body=body)}) as server:
+        fetcher = Fetcher(
+            resolve=scripted_resolver({"www.gov.uk": [LOOPBACK]}),
+            user_agent="NessaL0/test",
+            extra_allowed=frozenset({("127.0.0.1", server.port)}),
+        )
+        result = acquire_page(
+            fetcher,
+            Pacer(sleep=lambda seconds: None),
+            f"http://www.gov.uk:{server.port}/jobs/1",
+            now=datetime(2026, 10, 29, tzinfo=UTC),
+        )
+    return result, base64.b64decode(result.body_b64) if result.body_b64 else b""
+
+
+# Raw JSON-LD as a page writes it: escapes (`\n`, `\t`, `>`) right before an email or a
+# telephone number, an identifier that looks like a number, and a contact (re-review A I-1,
+# I-2, M-1).
+ESCAPED_BLOCK = (
+    '{"@context": "https://schema.org/", "@type": "JobPosting", "title": "Data Quality Analyst",'
+    ' "identifier": {"@type": "PropertyValue", "value": "0123456789"},'
+    ' "description": "Send your CV to:\\njane.smith@recruit.example\\tor call:\\n07700 900123'
+    ' \\u003cp\\u003esam@agency.example\\u003c/p\\u003e Ask for\\u003e+44 20 7946 0958",'
+    ' "applicationContact": {"@type": "ContactPoint", "name": "Jane Smith"},'
+    ' "jobLocation": {"address": {"addressLocality": "Manchester"}}}'
+)
+ESCAPED_PERSONAL = [
+    "jane.smith@recruit.example",
+    "sam@agency.example",
+    "07700",
+    "7946",
+    "Jane Smith",
+]
+
+
+def _escaped_page(newline: str = "\n") -> bytes:
+    text = (
+        f'<!doctype html><html><head>{SYNTHETIC_MARKER}{newline}<script type="application/ld+json">'
+        f"{newline}{ESCAPED_BLOCK}{newline}</script></head><body><p>Or write to"
+        f"{newline}hr@northwind.example</p></body></html>"
+    )
+    return text.encode()
+
+
 @pytest.mark.req("ACQ-06")
-def test_an_api_response_s_claims_hold_no_personal_details() -> None:
+@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["LF", "CRLF"])
+def test_details_after_json_escapes_and_on_crlf_pages_go_and_the_posting_still_parses(
+    newline: str,
+) -> None:
+    result, kept = _acquire_kept(_escaped_page(newline))
+
+    [copy] = result.copies  # the redacted block is still valid JSON-LD
+    assert copy.title == "Data Quality Analyst"
+    assert copy.source_job_id == "0123456789"  # an ID is never taken for a phone number
+    assert not [p for p in [*ESCAPED_PERSONAL, "hr@northwind.example"] if p.encode() in kept]
+    assert b"\r" not in kept  # line endings are normalised before anything else
+    stored = json.dumps([c.model_dump(mode="json") for c in copy.claims])
+    assert not [p for p in ESCAPED_PERSONAL if p in stored]
+    assert kept.count(b"</script>") == 1  # the escaped `<\/p>` closes nothing early
+
+
+@pytest.mark.req("ACQ-06")
+def test_a_contact_block_that_cannot_be_located_means_the_body_is_never_kept() -> None:
+    # A NUL inside the block: the parser's view of it differs from the page's text, so the
+    # block cannot be rewritten in place; its contact would stay, so the body is not kept.
+    block = ESCAPED_BLOCK.replace('"Data Quality Analyst"', '"Data Quality\x00Analyst"')
+    body = page_with_block(block)
+
+    result, kept = _acquire_kept(body)
+
+    assert kept == b""
+    assert result.retention is Retention.EXCERPTS
+    assert result.rights_status is not None
+    assert "body_not_kept:contact_unlocated" in result.rights_status
+
+
+def page_with_block(block: str) -> bytes:
+    return (
+        f'<!doctype html><html><head>{SYNTHETIC_MARKER}<script type="application/ld+json">'
+        f"{block}</script></head><body>x</body></html>"
+    ).encode()
+
+
+@pytest.mark.req("ACQ-06")
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Call Jane on 07700 900123 or jane@recruit.example.",
+        "Apply:\njane@recruit.example\nor call:\n07700 900123",  # escaped as \n in the JSON
+        "<p>jane@recruit.example</p>\t07700 900123",  # json.dumps keeps < and >, \t escaped
+    ],
+    ids=["plain", "after newline escapes", "after a tag and a tab escape"],
+)
+def test_an_api_response_s_claims_hold_no_personal_details(description: str) -> None:
     body = json.dumps(
         {
             "count": 1,
             "results": [
                 {
-                    "id": "1",
+                    "id": "01234567890",
                     "title": "Data Quality Analyst",
-                    "description": "Call Jane on 07700 900123 or jane@recruit.example.",
-                    "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/1?se=synthetic",
+                    "description": description,
+                    "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/01234567890?se=s",
                     "company": {"display_name": "Northwind"},
                 }
             ],
@@ -169,10 +264,12 @@ def test_an_api_response_s_claims_hold_no_personal_details() -> None:
             search_url=f"http://api.adzuna.test.example:{server.port}/v1/api/jobs/gb/search/{{page}}",
         )
 
+    assert result.status is AttemptStatus.SUCCEEDED  # the redacted response is still JSON
     [copy] = result.copies
     stored = json.dumps([c.model_dump(mode="json") for c in copy.claims])
     assert "07700" not in stored
     assert "jane@" not in stored
-    assert copy.apply_url == "https://www.adzuna.co.uk/jobs/land/ad/1?se=synthetic"
+    assert copy.source_job_id == "01234567890"  # IDs and URLs are never redacted
+    assert copy.apply_url == "https://www.adzuna.co.uk/jobs/land/ad/01234567890?se=s"
     assert result.retrieved_sha256 == hashlib.sha256(body).hexdigest()
     assert result.content_sha256 != result.retrieved_sha256

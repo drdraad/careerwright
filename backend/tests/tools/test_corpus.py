@@ -11,6 +11,7 @@ import pytest
 
 from nessa.evidence.fetcher import Fetcher
 from nessa.evidence.records import Retention, RightsClass
+from nessa.evidence.sources import PageRights
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
 from tests.support.source_server import Scripted, SourceServer, source_server
@@ -108,7 +109,10 @@ def test_an_agent_s_classification_lowers_a_listed_page_s_class_too(
 
 @pytest.mark.req("ACQ-06")
 def test_an_agent_s_classification_never_keeps_more_of_a_listed_host_than_its_entry() -> None:
-    classify = agent_classification(RightsClass.EMPLOYER_POSTING, EMPLOYER_TERMS, date(2026, 1, 1))
+    def classify(host: str) -> PageRights:
+        return agent_classification(
+            RightsClass.EMPLOYER_POSTING, EMPLOYER_TERMS, date(2026, 1, 1), requested_host=host
+        )(host)
 
     board = classify("www.adzuna.co.uk")  # listed: a job board, reference only
     unlisted = classify("careers.northwind.example")
@@ -120,6 +124,35 @@ def test_an_agent_s_classification_never_keeps_more_of_a_listed_host_than_its_en
     )
 
 
+@pytest.mark.req("ACQ-06")
+def test_an_agent_s_classification_holds_only_for_the_host_it_was_given_for(
+    tmp_path: Path,
+) -> None:
+    # Re-review A M-6: the classified URL redirects to another unlisted host.
+    body = page(POSTING).encode()
+    with source_server({"/jobs/1": Scripted(body=body)}) as server:
+        server.routes["/go"] = Scripted(
+            302, headers=(("Location", f"http://jobs.board.example:{server.port}/jobs/1"),)
+        )
+        out = acquire_for_corpus(
+            "J12",
+            f"http://careers.northwind.example:{server.port}/go",
+            fetcher=fetcher(server),
+            rights_class=RightsClass.EMPLOYER_POSTING,
+            terms=EMPLOYER_TERMS,
+            evidence_dir=tmp_path,
+        )
+
+    status = str(out["rights_status"])
+    assert status.startswith("pending human rights review")  # the manifest's class
+    assert "careers.northwind.example" in status
+    assert "jobs.board.example" in status  # both hosts recorded
+    assert out["kept_body"] is None
+    assert not list(tmp_path.iterdir())
+
+
 def test_a_class_other_than_other_without_its_terms_is_refused() -> None:
     with pytest.raises(SystemExit, match="needs --terms"):
-        agent_classification(RightsClass.EMPLOYER_POSTING, None, date(2026, 1, 1))
+        agent_classification(
+            RightsClass.EMPLOYER_POSTING, None, date(2026, 1, 1), requested_host="x"
+        )

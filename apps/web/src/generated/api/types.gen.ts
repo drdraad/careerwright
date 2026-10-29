@@ -244,7 +244,8 @@ export const AttemptReason = {
     BODY_HASH_MISMATCH: 'body_hash_mismatch',
     ACQUISITION_WORKER_UNAVAILABLE: 'acquisition_worker_unavailable',
     INTERRUPTED: 'interrupted',
-    ACCESS_REVOKED: 'access_revoked'
+    ACCESS_REVOKED: 'access_revoked',
+    INTERNAL_ERROR: 'internal_error'
 } as const;
 
 /**

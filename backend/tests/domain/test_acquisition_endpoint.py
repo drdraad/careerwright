@@ -3,6 +3,7 @@ reading it (review A M8): a Content-Length that is not a non-negative integer is
 it can neither block a thread reading to the end of a kept-alive connection nor escape the
 handler."""
 
+import json
 import socket
 import threading
 from collections.abc import Iterator
@@ -10,8 +11,10 @@ from collections.abc import Iterator
 import pytest
 
 from nessa.acquisition import AcquisitionService, make_server
-from nessa.evidence.acquire import Pacer
+from nessa.evidence.acquire import AcquisitionResult, Pacer
+from nessa.evidence.addresses import IPAddress
 from nessa.evidence.fetcher import Fetcher
+from nessa.evidence.records import AttemptReason, AttemptStatus
 
 
 @pytest.fixture
@@ -65,3 +68,33 @@ def test_a_well_formed_request_is_answered(endpoint: int) -> None:
 
     assert answer.startswith(b"HTTP/1.1 200 ")
     assert b"address_not_allowed" in answer
+
+
+def _defective_resolve(host: str, port: int) -> list[IPAddress]:
+    raise RuntimeError("a defect, not the source's fault")
+
+
+@pytest.mark.req("ACQ-05", "ACQ-02")
+def test_a_defect_while_acquiring_is_a_failed_attempt_never_a_malformed_request() -> None:
+    # Re-review A M-7: an internal error used to be answered 422, which the client takes for
+    # the worker being unavailable (a transient retry).
+    service = AcquisitionService(
+        Fetcher(user_agent="NessaL0/test", resolve=_defective_resolve),
+        credentials=None,
+        pacer=Pacer(sleep=lambda s: None),
+    )
+
+    status, payload = service.handle(
+        "/v1/fetch", json.dumps({"url": "https://jobs.example.org/job/1"}).encode()
+    )
+    malformed, _ = service.handle("/v1/fetch", b'{"no": "url"}')
+
+    result = AcquisitionResult.model_validate(payload)
+    assert status == 200
+    assert (result.status, result.reason, result.transient) == (
+        AttemptStatus.FAILED,
+        AttemptReason.INTERNAL_ERROR,
+        False,
+    )
+    assert result.requested_url == "https://jobs.example.org/job/1"
+    assert malformed == 422  # only a request that does not parse is one

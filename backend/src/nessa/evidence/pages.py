@@ -43,9 +43,10 @@ from nessa.evidence.records import (
     ValidationState,
     WorkMode,
 )
-from nessa.evidence.redaction import redact_text, without_contacts
+from nessa.evidence.redaction import redact_json, redact_text
 
 EXCERPT_CHARS = 200
+LOCALITY_CHARS, POSTAL_CODE_CHARS, COUNTRY_CHARS = 120, 20, 60  # `records.Location`'s bounds
 _DECODER = json.JSONDecoder()
 _COLON = re.compile(r"\s*:\s*")
 _DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
@@ -242,11 +243,15 @@ def _location(place: object) -> tuple[Location | None, str, object]:
     country = address.get("addressCountry")
     country = country.get("name") if isinstance(country, dict) else country
 
-    def text(key: str) -> str | None:
-        value = address.get(key)
-        return value.strip() or None if isinstance(value, str) else None
+    def text(value: object, bound: int) -> str | None:
+        """A part cut to its bound, like other claim text: a page cannot fail on its length
+        (re-review A M-7)."""
+        return (value.strip()[:bound] or None) if isinstance(value, str) else None
 
-    locality, region, postal = text("addressLocality"), text("addressRegion"), text("postalCode")
+    locality = text(address.get("addressLocality"), LOCALITY_CHARS)
+    region = text(address.get("addressRegion"), LOCALITY_CHARS)
+    postal = text(address.get("postalCode"), POSTAL_CODE_CHARS)
+    country = text(country, COUNTRY_CHARS)
     parts = [p for p in (locality, region) if p] or [p for p in (postal, country) if p]
     if not parts:
         return None, "address", address
@@ -256,7 +261,7 @@ def _location(place: object) -> tuple[Location | None, str, object]:
             locality=locality,
             region=region,
             postal_code=postal,
-            country=country if isinstance(country, str) else None,
+            country=country,
         ),
         "address",
         address,
@@ -402,23 +407,39 @@ def _conflicts(postings: list[JobCopy]) -> list[JobCopy]:
     return marked
 
 
-def redact_page(text: str) -> str:
-    """A page's text without third parties' personal details (`nessa.evidence.redaction`):
-    a JSON-LD block that names a contact is written again without it, every other block and
-    all other text are kept as they were, then emails and telephone numbers go everywhere."""
+@dataclass(frozen=True)
+class RedactedPage:
+    text: str  # line endings normalised, personal details removed: what is parsed and kept
+    # A JSON-LD block held personal details but could not be found in the page's text to
+    # be written again, so they may remain: the body must never be kept.
+    unlocated: bool
+
+
+def redact_page(text: str) -> RedactedPage:
+    """A page's text without third parties' personal details (`nessa.evidence.redaction`).
+    Line endings are normalised first (the parser reports a block's text with LF, so a CRLF
+    page's blocks would not be found). Each JSON-LD block is redacted in its decoded values
+    and written again only if that changed it; the HTML around the blocks is redacted as
+    text."""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
     cursor = 0
     parts: list[str] = []
+    unlocated = False
     for script in Selector(content=text).css('script[type="application/ld+json"]'):
         raw = str(script.text)
+        cleaned = redact_json(raw)
         offset = text.find(raw, cursor) if raw else -1
         if offset == -1:
+            redacted = redact_text(raw) if cleaned is None else cleaned
+            unlocated = unlocated or redacted != raw
             continue
-        cleaned = without_contacts(raw)
-        if cleaned is not None:
-            parts += [text[cursor:offset], cleaned]
-            cursor = offset + len(raw)
-    parts.append(text[cursor:])
-    return redact_text("".join(parts))
+        parts += [
+            redact_text(text[cursor:offset]),
+            redact_text(raw) if cleaned is None else cleaned,
+        ]
+        cursor = offset + len(raw)
+    parts.append(redact_text(text[cursor:]))
+    return RedactedPage("".join(parts), unlocated)
 
 
 def parse_page(text: str, *, sha256: str, page_url: str) -> ParsedPage:
