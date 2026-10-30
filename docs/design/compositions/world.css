@@ -94,21 +94,42 @@ button {
   pointer-events: none;
 }
 
+/* A long name wraps rather than leaving the window: it stays beside its light, never hidden. */
 .world-label {
   position: absolute;
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  column-gap: 6px;
+  max-width: min(360px, calc(100vw - 32px));
+  width: max-content;
   padding: 2px var(--space-12);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   background: var(--surface-label);
   color: var(--text-on-space);
   font-family: var(--font-display);
   font-weight: 500;
   font-size: var(--type-14);
   line-height: 1.5;
-  white-space: nowrap;
   transform: translateX(-50%);
+}
+
+.world-label[data-leader="above"]::after,
+.world-label[data-leader="below"]::after {
+  content: "";
+  position: absolute;
+  left: var(--leader-x, 50%);
+  width: 1px;
+  height: var(--leader, 0);
+  background: rgb(242 246 255 / 0.45);
+}
+
+.world-label[data-leader="above"]::after {
+  top: 100%;
+}
+
+.world-label[data-leader="below"]::after {
+  bottom: 100%;
 }
 
 .world-label .caption {
@@ -121,25 +142,22 @@ button {
   font-weight: 700;
 }
 
+/* A destination's name carries its light's shape: a warm disc, or a warm ring when suggested.
+   The diamond is kept for gates and conditions. */
 .world-label[data-kind="destination"]::before,
-.key-destination {
+.world-label[data-kind="suggested"]::before {
   content: "";
   display: inline-block;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   background: var(--light-destination);
-  transform: rotate(45deg);
   flex: none;
 }
 
 .world-label[data-kind="suggested"]::before {
-  content: "";
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border: 1.5px solid var(--light-destination);
-  transform: rotate(45deg);
-  flex: none;
+  background: transparent;
+  border: 2px solid var(--light-destination);
 }
 
 .world-label[data-selected="true"] {
@@ -151,18 +169,38 @@ button {
   font-weight: 600;
 }
 
+/* The key to the lights: open on a wide screen, "What the lights mean" on a narrow one. It sits
+   above the shell (it is a control) wherever the world leaves room; names stay clear of it. */
 .legend {
   position: fixed;
   right: var(--space-24);
   bottom: var(--space-24);
-  z-index: 1;
+  z-index: 3;
+  max-width: calc(100vw - 32px);
+  border: 1px solid var(--line-reading-hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface-reading);
+  backdrop-filter: blur(var(--glass-blur));
+  color: var(--text-on-reading-muted);
+  font-size: var(--type-14);
+}
+
+.legend summary {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-12);
+  color: var(--text-on-reading);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.legend ul {
   display: grid;
   gap: var(--space-4);
-  padding: var(--space-8) var(--space-12);
-  border-radius: var(--radius-control);
-  background: var(--surface-label);
-  color: var(--text-on-space-muted);
-  font-size: var(--type-14);
+  padding: 0 var(--space-12) var(--space-12);
 }
 
 .legend li {
@@ -171,46 +209,117 @@ button {
   gap: var(--space-8);
 }
 
-.key-ring,
-.key-said,
-.key-shadow,
-.key-gate,
-.key-chosen {
+/* Each key is drawn as the world draws its light or trail. */
+.key {
   display: inline-block;
   flex: none;
+  width: 18px;
+  height: 10px;
+  position: relative;
 }
 
-.key-ring {
+.key::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+.key-disc-destination::after {
   width: 10px;
   height: 10px;
-  border: 2px solid var(--trail-near);
   border-radius: 50%;
+  background: var(--light-destination);
 }
 
-.key-said {
+.key-ring-destination::after {
   width: 10px;
   height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--light-destination);
+}
+
+.key-disc-said::after {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
   background: #cfe0ff;
-  border-radius: 50%;
   box-shadow: 0 0 6px 1px var(--trail-near);
 }
 
-.key-shadow {
+.key-ring-usual::after {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--trail-near);
+}
+
+.key-ring-none::after {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--trail-shadow);
+}
+
+.key-ring-next::after {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--light-chosen);
+}
+
+.key-dot-opening::after,
+.key-dot-stale::after {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--light-person);
+}
+
+.key-dot-stale::after {
+  background: var(--trail-stale);
+}
+
+.key-line-shadow::after,
+.key-line-said::after,
+.key-line-usual::after,
+.key-line-route::after,
+.key-line-bridge::after,
+.key-line-chosen::after,
+.key-line-stale::after {
   width: 18px;
-  height: 2px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.key-line-shadow::after {
   background: var(--trail-shadow);
 }
 
-.key-chosen {
-  width: 18px;
-  height: 3px;
+.key-line-said::after,
+.key-line-route::after,
+.key-line-bridge::after {
+  background: linear-gradient(90deg, var(--trail-near), var(--trail-far));
+}
+
+.key-line-usual::after {
+  height: 2px;
+  background: linear-gradient(90deg, var(--trail-near), var(--trail-far));
+  opacity: var(--trail-opacity-usual);
+}
+
+.key-line-chosen::after {
   background: var(--light-chosen);
 }
 
-.key-gate {
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--text-on-space);
+.key-line-stale::after {
+  background: var(--trail-stale);
+}
+
+.key-gate::after {
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--text-on-reading);
   transform: rotate(45deg);
 }
 
@@ -220,7 +329,7 @@ button {
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
+  grid-template-columns: 96px minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 100dvh;
 }
@@ -232,7 +341,7 @@ button {
   align-items: center;
   gap: var(--space-24);
   padding: var(--space-24) 0;
-  background-image: linear-gradient(90deg, rgb(3 5 11 / 0.94) 55%, rgb(3 5 11 / 0.6));
+  background-image: linear-gradient(90deg, var(--surface-rail) 55%, var(--surface-rail-edge));
 }
 
 .wordmark {
@@ -249,6 +358,12 @@ button {
 .wordmark svg {
   width: 30px;
   height: 30px;
+}
+
+/* The wordmark takes its own width, inside the rail (a chapter's link is 72 px). */
+.rail .wordmark {
+  width: auto;
+  padding: 0;
 }
 
 .rail ol {
@@ -304,7 +419,7 @@ button {
   box-shadow:
     0 0 0 4px var(--surface-space),
     0 0 0 5px var(--selection-space),
-    0 0 14px 4px rgb(69 247 212 / 0.35);
+    0 0 14px 4px var(--glow-selection);
 }
 
 .strip {
@@ -499,7 +614,7 @@ button {
 .btn-primary {
   background: var(--action-reading);
   color: var(--text-on-action-reading);
-  box-shadow: 0 0 22px -6px rgb(69 247 212 / 0.7);
+  box-shadow: 0 0 22px -6px var(--glow-action);
 }
 
 .btn-secondary {
@@ -508,14 +623,30 @@ button {
   color: var(--text-on-reading);
 }
 
+/* A link or quiet action is white and underlined: teal stays with the one primary action. */
 .link {
-  color: var(--action-reading);
+  color: var(--text-on-reading);
   text-decoration: underline;
   text-underline-offset: 3px;
   background: none;
   border: 0;
   padding: 0;
   font-weight: 600;
+}
+
+/* What a place not built yet will hold, one step away. */
+.more summary {
+  width: max-content;
+  color: var(--text-on-reading);
+  font-size: var(--type-14);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.more p {
+  margin-top: var(--space-8);
 }
 
 .answer {
@@ -676,6 +807,11 @@ button {
   font-weight: 600;
 }
 
+.instrument .axis-name {
+  fill: var(--text-on-reading);
+  font-size: 13px;
+}
+
 /* ---------- Tablet and phone ---------- */
 
 @media (max-width: 1100px) {
@@ -705,13 +841,41 @@ button {
     border-bottom: 1px solid var(--line-space-hairline);
   }
 
+  /* The phone's header is two rows: the top bar (chapter and the synthetic label) and the
+     strip (the saved state, live updates, the world's controls and the account menu); the
+     target is named in the world. */
   .strip {
     grid-column: 1;
     padding: var(--space-8) var(--space-16);
     min-height: 0;
   }
 
-  .strip .optional,
+  .strip .synthetic-slot,
+  .strip .optional-phone {
+    display: none;
+  }
+
+  .strip-end {
+    margin-left: 0;
+    gap: var(--space-8);
+  }
+
+  /* The world's controls become glyph buttons; on, a button is ringed in white. */
+  .strip .toggle .switch {
+    display: none;
+  }
+
+  .strip .toggle {
+    justify-content: center;
+    min-width: 40px;
+    padding: 0;
+  }
+
+  .strip .toggle[aria-pressed="true"] {
+    border-color: var(--text-on-space);
+    background: var(--surface-space-raised-2);
+  }
+
   .toggle .label {
     position: absolute;
     width: 1px;
@@ -743,15 +907,15 @@ button {
     font-size: var(--type-25);
   }
 
-  /* A phone's sheet leaves no room for the key: each name in the world carries its own
-     meaning in words, and the key stays for assistive tech. */
-  .legend {
+  /* A phone names each light by its name alone; what its look means is in the key, and the
+     caption stays in the list for assistive tech. */
+  .world-label .caption {
     position: absolute;
     width: 1px;
     height: 1px;
-    padding: 0;
     overflow: hidden;
     clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 

@@ -9,7 +9,7 @@ Reserved Font Name.
 | Role | Family | File | Upstream source (pinned commit) | Version | SHA-256 |
 |---|---|---|---|---|---|
 | Body and interface: humanist sans | Source Sans 3 (variable, `wght` 200–900) | `source-sans-3/SourceSans3-Variable.ttf` | `google/fonts` @ `914ec116571b1162d886aa402e715552221f0b77`, `ofl/sourcesans3/SourceSans3[wght].ttf` | 3.052 | `042fe2cc0b933e328410d7acbd0aa6a1873dca5aef81875f4bc214b08825c7b9` |
-| Display: bold geometric sans | Outfit (variable, `wght` 100–900) | `outfit/Outfit-Variable.ttf` | `google/fonts` @ `8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5`, `ofl/outfit/Outfit[wght].ttf` (from `Outfitio/Outfit-Fonts` @ `902773808eb372f70fb34e8946dd1ffe604efc79`) | 1.100 | `fc7287273e66929776e2ba54f144fe699080bec29f61bf649d70d871468aeade` |
+| Display: bold geometric sans | Outfit (variable, `wght` 100–900) | `outfit/Outfit-Variable.ttf` | `google/fonts` @ `8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5` (committed 2026-03-12, 232 days old when taken on 2026-10-30), `ofl/outfit/Outfit[wght].ttf` (from `Outfitio/Outfit-Fonts` @ `902773808eb372f70fb34e8946dd1ffe604efc79`) | 1.100 | `fc7287273e66929776e2ba54f144fe699080bec29f61bf649d70d871468aeade` |
 
 | Licence file | SHA-256 | Copyright line |
 |---|---|---|
@@ -34,8 +34,9 @@ ADR 0014). Its files are in git history before Sprint W.
   section 4 asks. Its default figures are tabular: all ten digits share one advance width
   (472 units, measured with fontTools 4.60.1), so money and months align without a feature
   switch. It has a slashed zero (`zero`) and about 2,500 glyphs. The spike set its words in
-  Atkinson Hyperlegible Next; session W1 chose only the heading lettering, and nothing calls
-  for a second body face (ruling in ADR 0014, decision 6).
+  Atkinson Hyperlegible Next; session W1 chose only the heading lettering. Keeping Source
+  Sans 3 is **provisional, to confirm with the product owner at session W2** (ADR 0014,
+  decision 6).
 
 ## Verified
 

@@ -14,15 +14,15 @@ requires a human** (session W2, ruling R2).
 
 | Path | What it is |
 |---|---|
-| `tokens/tokens.css` | Canonical tokens, v0.2.0: primitives, semantic tokens, the `.on-space` and `.on-reading` contexts, type, space, radius and the motion vocabulary |
-| `tokens/contrast-pairs.json` | Every text and meaningful non-text pairing, glass panels measured over the darkest ground and over the brightest light in the world |
-| `tokens/contrast-report.md` | Generated measurements: **81 of 81 pass** (67 pairs) |
+| `tokens/tokens.css` | Canonical tokens, v0.2.1: primitives, semantic tokens, the `.on-space` and `.on-reading` contexts, type, space, radius, each trail's drawn strength and the motion vocabulary |
+| `tokens/contrast-pairs.json` | Every text and meaningful non-text pairing: glass panels measured over the darkest ground and over the brightest light in the world, and each trail measured as drawn, at its strength |
+| `tokens/contrast-report.md` | Generated measurements: **120 of 120 pass** (91 pairs) |
 | `fonts/` | Outfit (display) and Source Sans 3 (body), with licence texts and provenance (`fonts/README.md`) |
 | `compositions/index.html` | Gallery: every place and state |
 | `compositions/world.html` | One place in one state: `?place=you\|roles\|skills\|options\|routes\|plan&state=…` |
 | `compositions/world.js`, `world.css` | The still world in Horizon's geometry, and the exact layer over it |
 | `compositions/data.js` | Fixture values (checked) and invented listings (labelled synthetic) |
-| `screenshots/` | 28 PNGs (the six places at 1440×900, 768×1024 and 390×844, and each honest state) and `checks.md` |
+| `screenshots/` | 31 PNGs (the six places at 1440×900, 768×1024 and 390×844, each honest state, and three long targets at all three sizes) and `checks.md` |
 | `tools/` | `contrast.mjs`, `check-fixture-data.mjs`, `screenshots.mjs` |
 | `reference/luminous-path-forward.png` | The product owner's image: palette and mood |
 
@@ -39,10 +39,15 @@ pnpm run screenshots     # runs check-data, then captures every place and state,
 
 `screenshots` serves the folder on an ephemeral 127.0.0.1 port. Its checks per capture: axe
 (WCAG 2.0, 2.1 and 2.2, A and AA tags), no horizontal overflow, no console errors, both fonts
-loaded, every name in the world inside the window and clear of the panels and of each other,
-the time and cost instrument's labels clear of each other and its marks, and at most one
-filled primary action in view. The captures are the still world (reduced motion), which is
-what calm mode and reduced motion draw; the moving world is in the app.
+loaded, the wordmark inside the rail, a visible "Synthetic demo" label, every name in the world
+inside the window and clear of the panels, the key and each other, every light and gate in view
+named (and no name left for a light out of view or under a panel), the revelation's subject in
+view and named, no name, gate or key over a light's centre, the key clear of the panels, the
+time and cost instrument's labels clear of each other and its marks, and at most one filled
+primary action in view. The lights and gates come from the drawing (`window.__worldCheck`);
+whether a name can be seen is measured in the page, so the check can fail. The captures are the
+still world (reduced motion), which is what calm mode and reduced motion draw; the moving world
+is in the app.
 
 ## The direction: Horizon, made livelier
 
@@ -56,12 +61,14 @@ others, and its a bit too [noisy] with the dashed lines." So:
 - **Quiet solid trails.** No dashes anywhere. "Not known yet" is a solid slate trail, quieter
   than any known one, never absent. No side fibres: in the busiest scene they read as
   scattered strokes.
-- **Livelier light.** The horizon breathes; an aurora of blue and violet drifts above it; a
-  slow shimmer travels along the horizon line; mist drifts towards you across the plain;
-  motes travel past; stars twinkle; trails sway a little (never at their ends, so lights never
-  move); light flows outward along what is known; destinations breathe, each in its own phase,
-  with a shimmering reflection on the plain. All of it is atmosphere: the same for every item,
-  low in amplitude, held still while the person reads or types, and stopped by Pause motion.
+- **Livelier light, never overwhelming.** The horizon breathes; an aurora of blue and violet
+  drifts above it; mist drifts towards you across the plain; a few hundred motes travel past;
+  stars twinkle; light flows outward along what is known; destinations breathe, each in its own
+  phase, with a shimmering reflection on the plain. All of it is atmosphere: the same for every
+  item, low in amplitude, held still while the person reads or types, and stopped by Pause
+  motion. After the product owner saw the busiest scene ("too busy … overwhelming"), the
+  travelling shimmer along the horizon and the trails' sway were taken out, and the motes cut
+  from 2,400 to 360: nothing moves without meaning, one idea at a time.
 - **Sound** (session W1: "subtle and evocative, not cheesy!"): a low swell when the person's
   light comes on, a soft two-note chime when a connection lights up, a small glass tick when a
   skill is picked. Off until the person turns sound on.
@@ -74,9 +81,16 @@ others, and its a bit too [noisy] with the dashed lines." So:
 | Orange (`--light-destination` `#FF9433`) | A destination: a place the person chose (filled) or one suggested (ring) | Status, a job offer, a rank |
 | Sea-glass (`--seaglass-300` `#45F7D4`) | Selection, the chosen path and the one primary action | Focus (white), "on" for a switch (white) |
 | Blue to violet (`--trail-near`, `--trail-far`) | The journey, graded the same along every trail from the person (blue) to the horizon (violet) | A category or an industry |
-| Slate (`--trail-shadow` `#6F7EA3`) | Not known yet: shadow, never absence, never zero | |
-| White | The person's light; focus rings; type | |
-| Crimson (`--crimson-300`) and sand (`--sand-300`) | Failed and stale, always after a glyph and words | Any world meaning (ΔE76 ≥ 53 from every meaning hue) |
+| Grey, the slate (`--trail-shadow` `#6F7EA3`) | Not known yet: shadow, never absence, never zero | Kept or failed results |
+| White | The person's light; focus rings; type; links and quiet actions (underlined) | |
+| Crimson (`--crimson-300`) and sand (`--sand-300`) | Failed and stale, always after a glyph and words; sand also draws what is kept from an earlier search (openings, routes) | Any world meaning (ΔE76 ≥ 53 from every meaning hue) |
+
+The key to the lights lists only the kinds drawn at that place, each mark drawn as the world
+draws it (a warm disc for a chosen destination, a warm ring for a suggested one, the diamond
+only for a gate). Its words are plain: "Teal", "Grey", "Sand", never a token's name. At Routes
+teal is "the route you're looking at"; only at Plan is it "the path you chose". On a wide
+screen the key is open; at 1100 px and below it is a "What the lights mean" control, placed
+where the world is clear.
 
 Industry is shown by glyph and label, never by colour (spec VIS-1's industry colours are
 replaced, ADR 0014 decision 5).
@@ -95,9 +109,18 @@ in the world can reach. Measured highlights (`tokens/contrast-report.md`):
 
 - Primary text on a glass panel over the brightest light: 14.85:1. Captions there: 6.58:1.
 - A light's caption on its label in the world, over the brightest light: 6.05:1.
-- The tightest pairs: a control boundary on glass over the brightest light, 3.59:1; a shadow
-  stretch where it meets the horizon's glow, 3.61:1 (both against 3:1).
+- Trails are measured as drawn: each state's strength is a token (`--trail-opacity-usual`
+  0.85, `--trail-opacity-shadow` 0.9, `--trail-opacity-stale` 0.6; said, chosen and bridges at
+  full strength), composited over the ground and over the horizon's glow. The tightest: a grey
+  "not known yet" stretch where it meets the horizon's glow, 3.19:1; a usual trail there,
+  3.43:1 (violet end; along the blue to violet grade, worked out by hand, never below 3.38:1);
+  a control boundary on glass
+  over the brightest light, 3.59:1 (all against 3:1). The app's still world draws the same
+  strengths, and the moving world draws each trail's core at least at them (its glow and the
+  light flowing along it only add).
 - A destination's orange on the horizon's glow: 6.64:1.
+- The rail: solid (94%) where its landmarks sit and 80% at its outer edge, where a chapter's
+  name is still 7.39:1 over the brightest light.
 
 ## Type
 
@@ -133,15 +156,31 @@ while the tab is hidden.
 | Place | Where it is | Its moment | Reference states |
 |---|---|---|---|
 | You | The origin: the person's light, skills around it, and the conversation's console | The first answer lights it and grows the first trails | default; distress (the world stills and dims, the calm support panel); failed (the message kept, the reply missing) |
-| Roles | The horizon: suggested and chosen destinations, openings grouped by city | An unexpected connection, joined by shared essential skills | default; stale (sand, a clock and an age); unknown ("none found in the 4 sources checked", never "no jobs"); not built yet |
-| Skills | The ground between the person and a destination, stretch by stretch | An answer lights a stretch already covered | default, with a gate ("Ready if you pass the assessed report"); unknown (all shadow); not built yet |
-| Options | Bridges across the dark stretches | A gap gets its first bridge | default; unknown ("No bridge found yet", never "none exist"); not built yet |
-| Routes | Whole journeys, compared on an exact time and cost instrument | A credible, checked route burns through | default (route B, conditional); failed (the last comparison kept, labelled); not built yet |
+| Roles | The horizon: suggested and chosen destinations; the chosen one's openings clustered below it by area, each count with its sources and date | An unexpected connection, joined by shared essential skills | default; stale (sand, a clock, the age on each count); unknown ("none found in the 4 sources checked", never "no jobs"); three long targets; not built yet (and, in the gallery, the key opened on a narrow screen) |
+| Skills | The ground between the person and a destination, stretch by stretch (the skills around the person belong to You) | An answer lights a stretch already covered | default, with a gate ("Ready if you pass the assessed report"); unknown (all shadow); not built yet |
+| Options | Bridges across the dark stretches | A gap gets its first bridge | default; unknown ("No bridge found yet. That doesn't mean there are none."); not built yet |
+| Routes | Whole journeys, compared on an exact time and cost instrument | A credible, checked route burns through | default (route B, conditional); failed (the last comparison kept in sand, marked "Kept from your last search", "Search again"); not built yet |
 | Plan | The chosen path made solid, the next move glowing at its start | Committing | default; not built yet |
 
-On a phone the world is the backdrop and each place is a sheet over its lower half; the world's
-focus rises above the sheet. A chapter not built yet shows its place with a small card: "Not
-built yet", where it is in the world, and what to do now.
+Seen from above, the ground's stretches spread across the clear part of the window: each is cut
+at an equal length on screen (where a stretch begins means nothing), and a gate stands where the
+last stretch begins, clear of the destination's light.
+
+The cost words are plain and kept apart: TRACE-01's economic cost is "Total cost, including pay
+you'd give up" (the instrument's upright axis), its direct spending "What you'd pay out"; the
+DIRECTAI routes' direct spending keeps its own label.
+
+The view stands the place where the panels leave the world clear: beside the panel on a wide
+screen (moved only where its usual place would be too near the panel), and above (or below) the
+panels on a tablet or a phone, made smaller only if it must be. The app does the same
+(`apps/web/src/lib/world/geometry.ts`). A light that is still under a panel hides its name. On a
+phone the header is two rows (the chapter and the synthetic label; then the saved state, live
+updates, Pause motion and Sound as glyph buttons, ringed in white when on, and the account menu,
+where calm mode lives); the target is named in the world. A
+long name wraps; on a phone a name shows without its caption (the key explains each look, and
+the caption stays in the list for assistive tech). A chapter not built yet shows its place with
+a short card: "Not built yet", the place, where it is in the world, one sentence on why it is
+empty and the one action; what it will hold is one step away ("More about this place").
 
 ## Honest states (glyph first)
 
@@ -149,11 +188,14 @@ built yet", where it is in the world, and what to do now.
 |---|---|---|---|
 | Unknown | circle with a question mark | Solid slate trail, quieter than any known one | "Not known yet", "No bridge found yet", "none found in the 4 sources checked" |
 | Conditional | diamond gate | A gate across the trail | "Ready if you pass the assessed report" |
-| Stale | clock | Openings faded to sand | "Last checked 2 days ago" |
-| Failed | triangle with a mark | Earlier results kept, faded | "The route search failed", "Careerwright's reply didn't arrive" |
-| Synthetic | flask | Labelled in the strip and the top bar | "Synthetic demo"; invented examples say "an example" |
-| Distress | (the support panel) | The world stills and dims; nothing glows | "Support is here, any time", with UK resources |
+| Stale | clock | Openings in sand, with their age on each count | "Last checked 2 days ago", "…, 2 days ago" |
+| Failed | triangle with a mark | Earlier results kept, in sand, marked as kept | "The route search failed", "Kept from your last search", "Careerwright's reply didn't arrive" |
+| Synthetic | flask | Labelled in the strip at every width, and in the phone's top bar | "Synthetic demo"; invented examples say "an example" |
+| Distress | lifebuoy (support) | The world stills and dims; nothing glows. Pause motion keeps showing the person's own choice; the strip says "Still while support is shown" | "Support is here, any time", with UK resources |
 | Not built yet | circle with a bar | The place, with nothing drawn that is not known | "Not built yet" |
+
+"You said so" has its own glyph (a speech bubble), never the tick that means complete, and "Set
+aside" its own (down into a tray), never "not built yet".
 
 ## Kept from Sprint 0
 
@@ -167,7 +209,10 @@ never a fill), synthetic data always labelled, and fixture values checked by `ch
 - Motion itself: these references are still. The moving world is in the app
   (`apps/web/src/lib/world/`, `src/components/World.tsx`) and its Storybook stories.
 - The You chapter in the world, the first ten seconds and the revelations: Sprint W's next
-  slices. Their words here are illustrative.
+  slices. Their words here are illustrative. The unexpected connection is named in the world
+  but not yet singled out by light (W2C).
+- Industry shown by glyph and label: no reference draws an industry yet (Sprint 3, Roles).
+- The strip's words ("Saved, version 3", "Updates: Live") and its reductions: W2C.
 - The map at 100 openings, measured label placement and aggregation: Sprint 3 (Roles).
 - The route instrument's full design (all nine DIRECTAI routes, the Gantt and the ledger):
   Sprint 7.

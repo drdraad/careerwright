@@ -1,5 +1,5 @@
 /*
- * Careerwright design tokens, v0.2.0: the living world, Horizon made livelier (Sprint W).
+ * Careerwright design tokens, v0.2.1: the living world, Horizon made livelier (Sprint W).
  *
  * Canonical source for colour, type, space, radius and motion. Components use the semantic
  * tokens (the second block) and the context aliases (.on-space / .on-reading), never the
@@ -53,6 +53,9 @@
   --ember-100: #FFD2A1;
   --seaglass-300: #45F7D4;
   --seaglass-950: #022A22;
+  /* Sea-glass light spilling around a selection and the primary action (their glow only). */
+  --seaglass-glow-35: #45F7D459;
+  --seaglass-glow-70: #45F7D4B3;
   --journey-blue: #408CFF;
   --journey-violet: #9E6BFF;
   --slate-400: #6F7EA3;
@@ -63,6 +66,9 @@
   --glass-900: #070B17E8;
   --glass-950: #050812F5;
   --glass-label: #03050BBF;
+  /* The chapter rail: solid where its words and landmarks sit, thinner at its outer edge. */
+  --glass-rail: #03050BF0;
+  --glass-rail-edge: #03050BCC;
 
   /* ---- Semantic tokens ---- */
   /* Surfaces */
@@ -73,6 +79,8 @@
   --surface-glass-strong: var(--glass-950);
   --surface-label: var(--glass-label);
   --surface-reading: var(--glass-900);
+  --surface-rail: var(--glass-rail);
+  --surface-rail-edge: var(--glass-rail-edge);
   --surface-card: var(--void-850);
   --surface-card-sunken: var(--void-900);
   --surface-band: var(--void-700);
@@ -101,6 +109,8 @@
   --selection-reading: var(--seaglass-300);
   --focus-ring-space: var(--mist-50);
   --focus-ring-reading: var(--mist-50);
+  --glow-selection: var(--seaglass-glow-35);
+  --glow-action: var(--seaglass-glow-70);
 
   /* Status: carried by glyph and text first; only error and stale add a hue, and neither is
      a hue the world uses for a meaning. Unknown is slate: shadow, never absence. */
@@ -130,6 +140,14 @@
   --trail-near: var(--journey-blue);
   --trail-far: var(--journey-violet);
   --trail-shadow: var(--slate-400);
+  /* Kept from an earlier search that may be out of date: sand, the stale hue. */
+  --trail-stale: var(--sand-300);
+  /* How strongly each trail's core is drawn, as measured (contrast-pairs.json composites each
+     trail at this opacity over the ground and the horizon's glow; 3:1 or more). Said, chosen
+     and bridges are drawn at full strength. Glow and flowing light only ever add to this. */
+  --trail-opacity-usual: 0.85;
+  --trail-opacity-shadow: 0.9;
+  --trail-opacity-stale: 0.6;
 
   /* ---- Type ---- */
   --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
@@ -239,5 +257,6 @@
     --motion-ignite: 0ms;
     --motion-reveal: 0ms;
     --motion-settle: 0ms;
+    --motion-breathe: 0ms;
   }
 }

@@ -1,10 +1,14 @@
 // Captures the living world's references (compositions/world.html): every place at 1440x900,
 // 768x1024 and 390x844, and each honest state, with Playwright's pinned Chromium. Records the
 // automatable checks (ruling R2): axe (WCAG 2.2 A/AA rules), horizontal overflow, console
-// errors, both fonts loaded, every name in the world inside the window and clear of the panels
-// and of each other, the time and cost instrument's labels clear of each other and its marks,
-// and at most one filled primary action in view. Writes screenshots/*.png and
-// screenshots/checks.md. Exits 1 if any check fails.
+// errors, both fonts loaded, the wordmark inside the rail, a visible "Synthetic demo" label,
+// every name in the world inside
+// the window and clear of the panels and of each other, every light in view named and every
+// named light in view (the revelation's subject always), no name, gate or key over a light's
+// centre, the key clear of the panels, the time and cost instrument's labels clear of each
+// other and its marks, and at most one filled primary action in view. The lights and gates
+// come from the drawing (window.__worldCheck); whether a name is seen comes from the page.
+// Writes screenshots/*.png and screenshots/checks.md. Exits 1 if any check fails.
 //   pnpm --dir docs/design run screenshots            (all)
 //   pnpm --dir docs/design run screenshots routes     (one place)
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -45,6 +49,7 @@ const CAPTURES = [
   { place: "you", state: "failed", viewports: [DESKTOP] },
   { place: "roles", state: "stale", viewports: [DESKTOP] },
   { place: "roles", state: "unknown", viewports: [DESKTOP] },
+  { place: "roles", state: "three-targets", viewports: ALL },
   { place: "roles", state: "not-built", viewports: [DESKTOP, PHONE] },
   { place: "skills", state: "unknown", viewports: [DESKTOP] },
   { place: "options", state: "unknown", viewports: [DESKTOP] },
@@ -56,15 +61,16 @@ mkdirSync(out, { recursive: true });
 if (!only) for (const file of readdirSync(out)) if (file.endsWith(".png")) rmSync(join(out, file));
 const browser = await chromium.launch();
 const results = [];
-for (const { place, state, viewports } of CAPTURES.filter((c) => !only || c.place === only)) {
+for (const { place, state, query, name, viewports } of CAPTURES.filter((c) => !only || c.place === only)) {
   for (const viewport of viewports) {
     const context = await browser.newContext({ viewport, deviceScaleFactor: 1, reducedMotion: "reduce", colorScheme: "dark" });
     const page = await context.newPage();
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
-    await page.goto(`${origin}/compositions/world.html?place=${place}&state=${state}`, { waitUntil: "load" });
+    await page.goto(`${origin}/compositions/world.html?place=${place}&state=${state}${query ? `&${query}` : ""}`, { waitUntil: "load" });
     await page.evaluate(() => document.fonts.ready);
+    await page.waitForFunction(() => window.__worldReady === true);
     const fonts = await page.evaluate(() => ({
       body: document.fonts.check('16px "Source Sans 3"'),
       display: document.fonts.check('600 39px "Outfit"'),
@@ -74,14 +80,49 @@ for (const { place, state, viewports } of CAPTURES.filter((c) => !only || c.plac
       const problems = [];
       const box = (e) => e.getBoundingClientRect();
       const hit = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+      const holds = (b, p) => p.x >= b.left && p.x <= b.right && p.y >= b.top && p.y <= b.bottom;
+      const seen = (e) => {
+        const r = box(e);
+        const style = getComputedStyle(e);
+        return r.width > 1 && r.height > 1 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && style.visibility !== "hidden" && style.display !== "none";
+      };
+      // The wordmark stays inside its rail, where the rail is shown.
+      const rail = document.querySelector(".rail");
+      const mark = document.querySelector(".wordmark span");
+      if (rail && mark && box(rail).width > 0 && (box(mark).left < box(rail).left || box(mark).right > box(rail).right)) problems.push("the wordmark leaves the rail");
+      // The synthetic label is visible at every size (Global Constraint 5).
+      if (![...document.querySelectorAll(".synthetic")].some((e) => e.textContent.trim() === "Synthetic demo" && seen(e))) problems.push(`no visible "Synthetic demo" label`);
       const names = [...document.querySelectorAll(".world-label")];
-      const panels = [...document.querySelectorAll(".panel, .strip, .rail, .topbar, .legend")].filter((e) => box(e).width > 0);
+      const panels = [...document.querySelectorAll(".panel, .strip, .rail, .topbar")].filter((e) => box(e).width > 0);
+      const key = document.querySelector(".legend");
+      const keyShown = key !== null && seen(key);
+      const covers = keyShown ? [...panels, key] : panels;
       names.forEach((n, i) => {
         const a = box(n);
         if (a.left < 0 || a.top < 0 || a.right > innerWidth || a.bottom > innerHeight) problems.push(`"${n.textContent}" leaves the window`);
-        for (const p of panels) if (hit(a, box(p))) problems.push(`"${n.textContent}" is under a panel`);
+        for (const p of covers) if (hit(a, box(p))) problems.push(`"${n.textContent}" is under a panel or the key`);
         for (const m of names.slice(i + 1)) if (hit(a, box(m))) problems.push(`"${n.textContent}" overlaps "${m.textContent}"`);
       });
+      if (keyShown) for (const p of panels) if (hit(box(key), box(p))) problems.push("the key to the lights is under a panel");
+      // Every light in view has its name in view; a light under a panel or out of the window
+      // has none; the revelation's subject is in view and named. Nothing covers a light.
+      const { lights, gates } = window.__worldCheck;
+      const inWindow = (p) => p.visible && p.x >= 0 && p.y >= 0 && p.x <= innerWidth && p.y <= innerHeight;
+      const inView = (p) => inWindow(p) && !panels.some((c) => holds(box(c), p));
+      const nameOf = (id) => document.querySelector(`.world-label[data-for="${CSS.escape(id)}"]`);
+      for (const l of [...lights, ...gates]) {
+        const n = nameOf(l.name);
+        if (inView(l) && n === null) problems.push(`the light "${l.id}" is in view without a name`);
+        if (l.revelation && !inView(l)) problems.push(`the revelation's subject "${l.id}" is not in view`);
+      }
+      for (const n of names) {
+        const its = [...lights, ...gates].filter((l) => l.name === n.dataset.for);
+        if (its.length > 0 && !its.some(inView)) problems.push(`"${n.textContent}" names a light that is not in view`);
+      }
+      const centres = lights.filter(inWindow);
+      for (const n of names) for (const c of centres) if (c.name !== n.dataset.for && holds(box(n), c)) problems.push(`"${n.textContent}" covers the light "${c.id}"`);
+      for (const g of gates.filter(inWindow)) for (const c of centres) if (Math.abs(g.x - c.x) <= g.r && Math.abs(g.y - c.y) <= g.r) problems.push(`the gate "${g.id}" covers the light "${c.id}"`);
+      if (keyShown) for (const c of centres) if (holds(box(key), c)) problems.push(`the key covers the light "${c.id}"`);
       for (const svg of document.querySelectorAll(".instrument svg")) {
         const texts = [...svg.querySelectorAll("text")];
         const marks = [...svg.querySelectorAll("circle")];
@@ -99,7 +140,7 @@ for (const { place, state, viewports } of CAPTURES.filter((c) => !only || c.plac
     });
     const primaries = await page.evaluate(() => [...document.querySelectorAll(".btn-primary")].filter((b) => b.getClientRects().length).length);
     const shown = await page.evaluate(() => document.querySelectorAll(".world-label").length);
-    const file = `${place}--${state}--${viewport.name}.png`;
+    const file = `${place}--${name ?? state}--${viewport.name}.png`;
     await page.screenshot({ path: join(out, file) });
     results.push({ place, state, viewport: viewport.name, file, fonts, overflow, axe, errors, labels, primaries, shown });
     await context.close();
@@ -112,11 +153,11 @@ const failed = results.filter((r) => r.axe.length || r.overflow > 0 || r.errors.
 const lines = [
   "# Screenshot checks",
   "",
-  "Generated by `docs/design/tools/screenshots.mjs` (Playwright 1.64.1, its pinned Chromium, reduced motion, device scale 1): the still world, as reduced motion and calm mode draw it. Automated checks only: axe-core 4.14.0 with the WCAG 2.0/2.1/2.2 A and AA rule tags, horizontal overflow, console errors, both fonts loaded, every name in the world inside the window and clear of the panels and of each other, the time and cost instrument's labels clear of each other and its marks, and at most one filled primary action in view. They are not a design review, a VoiceOver test or a Safari check (ruling R2).",
+  "Generated by `docs/design/tools/screenshots.mjs` (Playwright 1.64.1, its pinned Chromium, reduced motion, device scale 1): the still world, as reduced motion and calm mode draw it. Automated checks only: axe-core 4.14.0 with the WCAG 2.0/2.1/2.2 A and AA rule tags, horizontal overflow, console errors, both fonts loaded, the wordmark inside the rail, a visible \"Synthetic demo\" label, every name in the world inside the window and clear of the panels, the key and each other, every light and gate in view named and no name for a light out of view (the revelation's subject always in view), no name, gate or key over a light's centre, the key clear of the panels, the time and cost instrument's labels clear of each other and its marks, and at most one filled primary action in view. The lights and gates are taken from the drawing; whether a name is seen is measured in the page. They are not a design review, a VoiceOver test or a Safari check (ruling R2).",
   "",
   `Result: **${results.length - failed.length} of ${results.length} captures pass**.`,
   "",
-  "| Screenshot | Fonts loaded | Horizontal overflow | axe violations | Console errors | Names placed in the world | Name or label collisions | Filled primaries |",
+  "| Screenshot | Fonts loaded | Horizontal overflow | axe violations | Console errors | Names placed in the world | Label, name and light problems | Filled primaries |",
   "|---|---|---:|---|---|---:|---|---:|",
   ...results.map((r) => `| \`${r.file}\` | ${r.fonts.body && r.fonts.display ? "yes" : "**no**"} | ${r.overflow > 0 ? `**${r.overflow}px**` : "0"} | ${r.axe.length ? r.axe.map((v) => `**${v.id}** (${v.impact}, ${v.nodes}: \`${v.target}\`)`).join("; ") : "none"} | ${r.errors.length ? `**${r.errors.join("; ")}**` : "none"} | ${r.shown} | ${r.labels.length ? `**${r.labels.join("; ")}**` : "none"} | ${r.primaries > 1 ? `**${r.primaries}**` : r.primaries} |`),
   "",

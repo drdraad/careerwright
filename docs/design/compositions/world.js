@@ -1,9 +1,12 @@
 // The living world's design reference: one place and one state per page
-// (world.html?place=you|roles|skills|options|routes|plan&state=...). The world is drawn still,
-// as SVG, in Horizon's geometry (the app's apps/web/src/lib/world/geometry.ts holds the same
-// views); every word, figure and control is in the DOM over it. Values from fixtures/ come from
-// data.js FIXTURES (checked by tools/check-fixture-data.mjs); everything else is invented for
-// design review and says so on the page.
+// (world.html?place=you|roles|skills|options|routes|plan&state=...; &key=open opens the key to
+// the lights on a narrow screen). The world is drawn still, as SVG, in Horizon's geometry: the
+// app's apps/web/src/lib/world/geometry.ts holds the same resting views and the same rule for
+// standing the place in the part of the window its panels leave clear. Every word, figure and
+// control is in the DOM over it. Values from fixtures/ come from data.js FIXTURES (checked by
+// tools/check-fixture-data.mjs); everything else is invented for design review and says so on
+// the page. When the page is laid out it leaves window.__worldCheck (every light, gate and name
+// as drawn) for tools/screenshots.mjs.
 (() => {
   const { FIXTURES: F, DESIGN_LISTINGS: L } = window.CAREERWRIGHT;
   const T = F.trace01;
@@ -11,6 +14,7 @@
   const PLACES = ["you", "roles", "skills", "options", "routes", "plan"];
   const place = PLACES.includes(params.get("place")) ? params.get("place") : "you";
   const state = params.get("state") ?? "default";
+  const keyOpen = params.get("key") === "open";
   const LABEL = { you: "You", roles: "Roles", skills: "Skills", options: "Options", routes: "Routes", plan: "Plan" };
 
   // ---------- Words and numbers ----------
@@ -20,8 +24,12 @@
   };
   const day = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
   // The product's glyphs (apps/web/src/components/Glyph.tsx), drawn in the same 24-unit style.
+  // `support`, `said` and `setAside` are new here: each meaning has its own glyph, so the support
+  // panel never borrows "not known yet", "set aside" never borrows "not built yet" and "you said
+  // so" never borrows "complete" (the app adds them with the slices that show them).
   const S = 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
   const GLYPH = {
     mark: `<circle cx="9" cy="15" r="5.2" ${S}/><path d="M12.6 11.3C14.6 8.6 16 7.3 18.4 6.2" ${S}/><circle cx="19.6" cy="5.6" r="1.9" ${S}/>`,
@@ -32,8 +40,10 @@
     synthetic: `<path d="M9.5 3.5h5M10.5 3.5v5.8L5.6 17.8a2 2 0 0 0 1.7 3h9.4a2 2 0 0 0 1.7-3l-4.9-8.5V3.5" ${S}/><path d="M7.8 14.5h8.4" ${S}/>`,
     blocked: `<circle cx="12" cy="12" r="9" ${S}/><path d="M7.5 12h9" ${S}/>`,
     complete: `<circle cx="12" cy="12" r="9" ${S}/><path d="M7.8 12.4l2.8 2.8 5.6-6" ${S}/>`,
+    said: `<path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H11l-4.2 3.3V16h-.3a2 2 0 0 1-2-2z" ${S}/>`,
+    support: `<circle cx="12" cy="12" r="8.5" ${S}/><circle cx="12" cy="12" r="3.8" ${S}/><path d="M6 6l3.3 3.3M18 6l-3.3 3.3M6 18l3.3-3.3M18 18l-3.3-3.3" ${S}/>`,
+    setAside: `<path d="M4 15.5v3h16v-3" ${S}/><path d="M12 4.5v9M8.5 10l3.5 3.5 3.5-3.5" ${S}/>`,
     pause: `<circle cx="12" cy="12" r="9" ${S}/><path d="M10 8.5v7M14 8.5v7" ${S}/>`,
-    calm: `<path d="M3.5 9.5c2.8-2 5.7-2 8.5 0s5.7 2 8.5 0" ${S}/><path d="M3.5 15.5h17" ${S}/>`,
     sound: `<path d="M4.5 9.5h3.2L12 5.5v13l-4.3-4H4.5z" ${S}/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11" ${S}/>`,
     menu: `<path d="M4 7h16M4 12h16M4 17h10" ${S}/>`,
     live: `<circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="12" cy="12" r="7.5" ${S}/>`,
@@ -46,24 +56,79 @@
   const kx = Math.min(1, vp.w / vp.h / 1.6);
   const ORIGIN = [0, 0.04, 1.7];
   const HORIZON_Z = 17;
-  const VIEWS = {
-    you: { x: 0, z: 0.25, eye: 0.62, horizon: 0.36, centre: phone ? 0.5 : 0.7, focal: 0.6 },
-    roles: { x: 0, z: -1, eye: 1, horizon: 0.4, centre: phone ? 0.5 : 0.62, focal: 1.0 },
-    skills: { x: 0, z: -0.4, eye: 0.42, horizon: 0.3, centre: phone ? 0.5 : 0.64, focal: 0.8 },
-    options: { x: 0, z: -1.2, eye: 2.4, horizon: 0.22, centre: phone ? 0.5 : 0.64, focal: 0.8 },
-    routes: { x: 0, z: -2.6, eye: 3.2, horizon: 0.2, centre: phone ? 0.5 : 0.66, focal: 0.72 },
-    plan: { x: 0, z: -0.6, eye: 0.9, horizon: 0.34, centre: phone ? 0.5 : 0.64, focal: 0.66 },
+  /** Where the view rests at each place before the panels are measured (fractions of the window). */
+  function restingView(id) {
+    const right = phone ? 0.5 : 0.7;
+    const { w, h } = vp;
+    switch (id) {
+      case "you":
+        return { x: 0, z: 0.25, eye: 0.62, horizon: h * 0.36, centre: w * right, focal: h * 0.6 };
+      case "roles":
+        return { x: 0, z: -1, eye: 1, horizon: h * 0.4, centre: w * (phone ? 0.5 : 0.62), focal: h };
+      case "skills":
+        return { x: 0, z: -1.6, eye: 2.6, horizon: h * 0.2, centre: w * (phone ? 0.5 : 0.64), focal: h * 0.62 };
+      case "options":
+        return { x: 0, z: -2.2, eye: 3.6, horizon: h * 0.18, centre: w * (phone ? 0.5 : 0.64), focal: h * 0.62 };
+      case "routes":
+        return { x: 0, z: -2.6, eye: 3.2, horizon: h * 0.2, centre: w * (phone ? 0.5 : 0.66), focal: h * 0.72 };
+      default:
+        return { x: 0, z: -1.2, eye: 1.8, horizon: h * 0.26, centre: w * (phone ? 0.5 : 0.64), focal: h * 0.62 };
+    }
+  }
+  const MIN_CLEAR = 240;
+  const MIN_BAND = 240;
+  const ROOM_ABOVE = 56;
+  const ROOM_BELOW = 48;
+  /**
+   * The resting view, stood in the part of the window the panels leave clear (as the app does):
+   * moved across only where its usual place would be too near the panel beside it, and fitted
+   * between the bars above and the panels below, smaller only if it must be.
+   */
+  function placeView(id, clear) {
+    const view = restingView(id);
+    if (clear === undefined) return view;
+    const near = view.centre < clear.left + MIN_CLEAR / 2 || view.centre > clear.right - MIN_CLEAR / 2;
+    const span = ((view.eye - ORIGIN[1]) * view.focal) / (ORIGIN[2] - view.z);
+    const room = clear.bottom - clear.top - ROOM_ABOVE - ROOM_BELOW;
+    const scale = span > room ? room / span : 1;
+    const highest = clear.top + ROOM_ABOVE;
+    const lowest = clear.bottom - ROOM_BELOW - span * scale;
+    return {
+      ...view,
+      centre: near ? (clear.left + clear.right) / 2 : view.centre,
+      focal: view.focal * scale,
+      horizon: Math.min(Math.max(view.horizon, highest), lowest),
+    };
+  }
+  const box = (e) => {
+    const r = e.getBoundingClientRect();
+    return { x: r.left, y: r.top, w: r.width, h: r.height };
   };
-  const v = VIEWS[place];
-  const view = { ...v, horizon: v.horizon * vp.h, centre: v.centre * vp.w, focal: v.focal * vp.h };
-  // On a phone the place's sheet covers the lower half: the world's focus rises above it.
-  if (phone) view.horizon -= vp.h * 0.16;
-  const project = (p) => {
-    const d = p[2] - view.z;
-    if (d < 0.05) return { x: -1e5, y: -1e5, scale: 0, visible: false };
-    const scale = view.focal / d;
-    return { x: view.centre + (p[0] - view.x) * scale, y: view.horizon + (view.eye - p[1]) * scale, scale, visible: true };
-  };
+  /** The part of the window the panels leave clear: beside them on a wide screen, above them otherwise. */
+  function clearArea() {
+    let top = 0;
+    let left = 0;
+    let right = vp.w;
+    // The rail down the left edge, and the bars stacked along the top (a phone's top bar, then the strip).
+    const bars = [...document.querySelectorAll(".strip, .topbar, .rail")].map(box).filter((b) => b.w > 0).sort((a, b) => a.y - b.y);
+    for (const bar of bars) {
+      if (bar.x <= 1 && bar.h >= vp.h * 0.9) left = Math.max(left, bar.x + bar.w);
+      else if (bar.y <= top + 1) top = Math.max(top, bar.y + bar.h);
+    }
+    const panels = [...document.querySelectorAll(".panel")].map(box).filter((b) => b.w > 0);
+    let sideLeft = left;
+    let sideRight = right;
+    for (const p of panels) {
+      if (p.x + p.w / 2 < vp.w / 2) sideLeft = Math.max(sideLeft, p.x + p.w);
+      else sideRight = Math.min(sideRight, p.x);
+    }
+    if (sideRight - sideLeft >= MIN_CLEAR) return { left: sideLeft, right: sideRight, top, bottom: vp.h };
+    // Otherwise the taller of the bands above and below the panels.
+    const above = { left, right, top, bottom: Math.min(vp.h, ...panels.map((p) => p.y)) };
+    const below = { left, right, top: Math.max(top, ...panels.map((p) => p.y + p.h)), bottom: vp.h };
+    const band = above.bottom - above.top >= below.bottom - below.top ? above : below;
+    return band.bottom - band.top >= MIN_BAND ? band : undefined;
+  }
   function seeded(seed) {
     let h = 2166136261;
     for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
@@ -96,10 +161,12 @@
     return [ORIGIN[0] + Math.sin(rad) * 2.05 * 1.15 * kx, 0.02, ORIGIN[2] + Math.cos(rad) * 2.05];
   };
 
-  // ---------- What each place shows (the world's states) ----------
+  // ---------- What each place shows (its states, before it is drawn) ----------
   // Destinations: P01's target (fixture) and, at Roles, suggested places (invented examples).
   const target = { id: "target", title: T.targetTitle, kind: "destination" };
   const SUGGESTED = ["Records manager", "Data steward", "Statistician", "Business analyst"].map((title) => ({ id: title, title, kind: "suggested" }));
+  // D-M10: three chosen targets with long names (P01's, and two invented), as plan section 5 asks.
+  const LONG = ["Senior data governance and information quality manager", "Clinical data standards and interoperability specialist"].map((title) => ({ id: title, title, kind: "destination" }));
   const SKILLS = [
     { id: "s1", label: "Check data for errors", state: "said" },
     { id: "s2", label: "Explain findings clearly", state: "said" },
@@ -107,127 +174,30 @@
     { id: "s4", label: "Work to deadlines", state: "usual" },
     { id: "s5", label: "Use spreadsheets", state: "usual" },
   ];
+  const STRETCHES = [
+    { name: "Check data for errors", state: state === "unknown" ? "shadow" : "said" },
+    { name: "Query related tables", state: state === "unknown" ? "shadow" : "usual" },
+    { name: "Validate keys and missing values", state: "shadow" },
+    { name: "Write reproducible checks", state: "shadow" },
+    { name: "Pass the assessed report", state: "shadow", gate: true },
+  ];
   const lit = !(place === "you" && state === "not-built");
-  const world = { lit, destinations: [], skills: [], trails: [], gates: [], marks: [], labels: [], legend: new Set() };
-  const addLabel = (anchor, name, kind, extra = {}) => world.labels.push({ anchor, name, kind, ...extra });
-
-  const destinations = place === "roles" && state !== "not-built" ? [...SUGGESTED, target].sort((a, b) => a.title.localeCompare(b.title)) : [target];
+  const roles = place === "roles" && state !== "not-built";
+  const destinations = roles
+    ? state === "three-targets"
+      ? [target, ...LONG]
+      : [...SUGGESTED, target]
+    : [target];
+  destinations.sort((a, b) => a.title.localeCompare(b.title));
   destinations.forEach((d, j) => {
     d.p = destinationAt(j, destinations.length);
-    world.destinations.push(d);
   });
   const goal = target.p;
+  const revelation = roles && state !== "three-targets" ? "Statistician" : null;
 
-  if (place === "you" || place === "skills") {
-    SKILLS.forEach((s, i) => {
-      const p = skillAt(i, SKILLS.length);
-      world.skills.push({ ...s, p });
-      world.trails.push({ points: lift(cubic(ORIGIN, [ORIGIN[0] + (p[0] - ORIGIN[0]) * 0.2, 0.02, ORIGIN[2] + (p[2] - ORIGIN[2]) * 0.45], [ORIGIN[0] + (p[0] - ORIGIN[0]) * 0.75, 0.02, ORIGIN[2] + (p[2] - ORIGIN[2]) * 0.8], p, 24), ORIGIN, p), state: s.state, width: [0.016, 0.013], hue: [0, 0.3] });
-      world.legend.add(s.state);
-    });
-  }
-
-  if (place === "you" || place === "roles") {
-    for (const d of world.destinations) {
-      world.trails.push({ points: sweep(ORIGIN, d.p, `shadow:${d.id}`), state: "shadow", width: [0.011, 0.05], hue: [0.1, 1] });
-    }
-    world.legend.add("shadow");
-    world.legend.add("destination");
-    if (place === "roles" && state !== "not-built") world.legend.add("suggested");
-  }
-
-  if (place === "roles" && state !== "not-built") {
-    // Openings around the chosen destination, grouped by city (VIS-1's hierarchy).
-    const areas = L.areas.map((a) => ({ ...a, count: L.jobs.filter((j) => L.companies.find((c) => c.id === j.company)?.area === a.id).length }));
-    const rand = seeded("openings");
-    areas.forEach((area, k) => {
-      const centre = [goal[0] + (k - 1) * 2.6 * kx, 0.03, goal[2] - 3.2 + Math.abs(k - 1) * 0.6];
-      const shown = state === "unknown" && area.id === "leeds" ? 0 : area.count;
-      for (let i = 0; i < shown; i++) {
-        const p = [centre[0] + (rand() - 0.5) * 1.6 * kx, 0.03, centre[2] + (rand() - 0.5) * 1.2];
-        world.marks.push({ kind: "opening", p, stale: state === "stale" && area.id !== "remote" });
-      }
-      world.marks.push({ kind: "area", p: centre, empty: shown === 0 });
-      const words = shown === 0 ? `${area.label}: none found in the ${L.totals.sourcesChecked} sources checked` : `${area.label}: ${shown} openings`;
-      addLabel(centre, words, "area", { side: "below" });
-    });
-  }
-
-  if (place === "skills" || place === "options" || place === "plan") {
-    // The ground between the person and the destination, stretch by stretch. Its states come
-    // from readiness (the Skills chapter, Sprint 4); here they are examples.
-    const path = sweep(ORIGIN, goal, "ground", 0.6);
-    const unknownAll = state === "unknown";
-    const STRETCHES = [
-      { name: "Check data for errors", state: unknownAll ? "shadow" : "said" },
-      { name: "Query related tables", state: unknownAll ? "shadow" : "usual" },
-      { name: "Validate keys and missing values", state: "shadow" },
-      { name: "Write reproducible checks", state: "shadow" },
-      { name: "Pass the assessed report", state: "shadow", gate: true },
-    ];
-    const per = Math.floor((path.length - 1) / STRETCHES.length);
-    STRETCHES.forEach((stretch, k) => {
-      const from = k * per;
-      const to = k === STRETCHES.length - 1 ? path.length - 1 : (k + 1) * per;
-      const chosen = place === "plan";
-      world.trails.push({ points: path.slice(from, to + 1), state: chosen ? "chosen" : stretch.state, width: [0.02, 0.05], hue: [k / STRETCHES.length, (k + 1) / STRETCHES.length] });
-      const mid = path[Math.floor((from + to) / 2)];
-      if (stretch.gate && place !== "options") {
-        world.gates.push({ p: path[from + 2] });
-        addLabel(path[from + 2], "Ready if you pass the assessed report", "gate", { side: "above" });
-      } else if (place === "skills") {
-        addLabel(mid, stretch.name, "stretch", { side: k % 2 ? "above" : "below", state: stretch.state });
-      }
-      if (place === "options" && (stretch.state === "shadow" || stretch.gate)) {
-        // A bridge across a dark stretch: placed (lit) or still to find (none drawn, words say so).
-        const bridged = state !== "unknown" && (k === 2 || stretch.gate);
-        if (bridged) {
-          const a = path[from];
-          const b = path[to];
-          const top = [(a[0] + b[0]) / 2, 0.55, (a[2] + b[2]) / 2];
-          world.trails.push({ points: cubic(a, top, top, b, 24), state: "bridge", width: [0.03, 0.04], hue: [0.4, 0.8] });
-          addLabel(top, k === 2 ? "Bridge: part-time course" : "Bridge: assessed report, with the course", "bridge", { side: "above" });
-        } else {
-          addLabel(mid, `${stretch.name}: no bridge yet`, "stretch", { side: "below", state: "shadow" });
-        }
-      }
-    });
-    world.legend.add(place === "plan" ? "chosen" : "shadow");
-    if (place !== "plan") world.legend.add("gate");
-    world.legend.add("destination");
-    if (place === "plan") {
-      // Landmarks along the chosen path: one per month of route B (TRACE-01), the next move first.
-      const months = T.routes.find((r) => r.id === T.selectedRoute).timeMonths;
-      for (let m = 0; m <= months; m++) {
-        const p = path[Math.min(path.length - 1, Math.round((m / months) * (path.length - 1)))];
-        world.marks.push({ kind: m === 0 ? "next" : "landmark", p });
-      }
-      addLabel(path[2], "Next: start the course", "next", { side: "below" });
-    }
-  }
-
-  if (place === "routes") {
-    // Whole journeys from the person to the destination: TRACE-01's five routes. Where each
-    // runs is layout only; the instrument beside it carries time and cost exactly.
-    const bends = { A: -5, B: -2, C: 1, D: 4, E: 7 };
-    for (const route of T.routes) {
-      const selected = route.id === T.selectedRoute && state !== "failed";
-      const pts = sweep(ORIGIN, goal, `route:${route.id}`, bends[route.id] * kx);
-      world.trails.push({ points: pts, state: selected ? "chosen" : state === "failed" ? "stale" : "usual", width: [0.02, 0.05], hue: [0.1, 1] });
-      addLabel(pts[Math.floor(pts.length * 0.55)], `Route ${route.id}`, "route", { side: "above", selected });
-    }
-    world.legend.add(state === "failed" ? "stale" : "chosen");
-    world.legend.add("destination");
-    if (state !== "failed") {
-      world.gates.push({ p: sweep(ORIGIN, goal, "route:B", bends.B * kx)[40] });
-      world.legend.add("gate");
-    }
-  }
-
-  addLabel(ORIGIN, "You", "origin", { side: "below" });
-  for (const d of world.destinations) {
-    addLabel(d.p, d.title, d.kind === "suggested" ? "suggested" : "destination", { side: "above", selected: place === "roles" && d.id === "target" && state !== "not-built" });
-  }
+  // The ground between the person and the destination: a long S across the plain, so that its
+  // stretches spread across the clear part of the window wherever the view stands.
+  const ground = lift(cubic(ORIGIN, [3.2 * kx, 0.02, 6.5], [-3.2 * kx, 0.02, 11.5], goal, 96), ORIGIN, goal);
 
   // ---------- Drawing the still world ----------
   const BLUE = [64, 140, 255];
@@ -237,7 +207,156 @@
     return `rgb(${BLUE.map((b, i) => Math.round(b + (VIOLET[i] - b) * t)).join(",")})`;
   };
   const f = (n) => n.toFixed(1);
-  function drawWorld() {
+  const token = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  /** The world at this place and state, as drawn from `view`: lights, trails, gates and names. */
+  function build(view) {
+    const project = (p) => {
+      const d = p[2] - view.z;
+      if (d < 0.05) return { x: -1e5, y: -1e5, scale: 0, visible: false };
+      const scale = view.focal / d;
+      return { x: view.centre + (p[0] - view.x) * scale, y: view.horizon + (view.eye - p[1]) * scale, scale, visible: true };
+    };
+    const world = { project, trails: [], lights: [], gates: [], marks: [], labels: [], legend: new Set() };
+    const label = (id, anchor, name, kind, extra = {}) => world.labels.push({ id, anchor, name, kind, ...extra });
+    const light = (id, p, kind, name, extra = {}) => world.lights.push({ id, p, kind, name, ...extra });
+
+    light("origin", ORIGIN, lit ? "origin" : "waiting", "origin");
+    label("origin", ORIGIN, "You", "origin", { side: "below" });
+    for (const d of destinations) {
+      light(`destination:${d.id}`, d.p, d.kind, `destination:${d.id}`, { selected: roles && d.id === "target", revelation: d.id === revelation });
+      label(`destination:${d.id}`, d.p, d.title, d.kind, { side: "above", selected: roles && d.id === "target" });
+      world.legend.add(d.kind);
+    }
+
+    if (place === "you") {
+      SKILLS.forEach((s, i) => {
+        const p = skillAt(i, SKILLS.length);
+        const a = ORIGIN;
+        world.trails.push({ points: lift(cubic(a, [a[0] + (p[0] - a[0]) * 0.2, 0.02, a[2] + (p[2] - a[2]) * 0.45], [a[0] + (p[0] - a[0]) * 0.75, 0.02, a[2] + (p[2] - a[2]) * 0.8], p, 24), a, p), state: s.state, width: [0.016, 0.013], hue: [0, 0.3] });
+        light(`skill:${s.id}`, p, s.state, `skill:${s.id}`);
+        label(`skill:${s.id}`, p, s.label, "skill", { side: "above", state: s.state });
+        world.legend.add(s.state);
+      });
+    }
+
+    if (place === "you" || place === "roles") {
+      for (const d of destinations) world.trails.push({ points: sweep(ORIGIN, d.p, `shadow:${d.id}`), state: "shadow", width: [0.011, 0.05], hue: [0.1, 1] });
+      world.legend.add("shadow");
+    }
+
+    if (roles) {
+      // Openings around the chosen destination only, grouped by area (VIS-1's hierarchy): each
+      // area's count says how many sources were searched and when.
+      const sources = L.totals.sourcesChecked;
+      const areas = L.areas.map((a) => ({ ...a, count: L.jobs.filter((j) => L.companies.find((c) => c.id === j.company)?.area === a.id).length }));
+      const rand = seeded("openings");
+      areas.forEach((area, k) => {
+        const centre = [goal[0] + (k - 1) * 0.9 * kx, 0.03, goal[2] - 2.2];
+        const shown = state === "unknown" && area.id === "leeds" ? 0 : area.count;
+        const stale = state === "stale" && area.id !== "remote";
+        const id = `area:${area.id}`;
+        for (let i = 0; i < shown; i++) {
+          const p = [centre[0] + (rand() - 0.5) * 0.55 * kx, 0.03, centre[2] + (rand() - 0.5) * 0.7];
+          world.marks.push({ kind: "opening", p, stale });
+          light(`${id}:${i}`, p, stale ? "stale-opening" : "opening", id);
+        }
+        if (shown === 0) {
+          world.marks.push({ kind: "area", p: centre, empty: true });
+          light(id, centre, "none-found", id);
+        }
+        const when = stale ? "2 days ago" : "today";
+        const words = shown === 0 ? `${area.label}: none found in the ${sources} sources checked` : `${area.label}: ${count(shown, "opening", "openings")}, ${sources} sources, ${when}`;
+        label(id, centre, words, "area", { side: "below" });
+        world.legend.add(shown === 0 ? "none-found" : stale ? "stale-opening" : "opening");
+      });
+    }
+
+    if (place === "skills" || place === "options" || place === "plan") {
+      // The ground, stretch by stretch. Its states come from readiness (the Skills chapter,
+      // Sprint 4); here they are examples. Stretches are cut at equal lengths on screen, so each
+      // has room for its words (where a stretch begins or ends means nothing, VIS-1).
+      const screen = ground.map(project);
+      const along = [0];
+      for (let i = 1; i < screen.length; i++) along.push(along[i - 1] + Math.hypot(screen[i].x - screen[i - 1].x, screen[i].y - screen[i - 1].y));
+      const total = along[along.length - 1];
+      const cut = (k) => (k <= 0 ? 0 : k >= STRETCHES.length ? ground.length - 1 : along.findIndex((a) => a >= (total * k) / STRETCHES.length));
+      const plan = place === "plan";
+      STRETCHES.forEach((stretch, k) => {
+        const from = cut(k);
+        const to = cut(k + 1);
+        const mid = ground[Math.floor((from + to) / 2)];
+        const sid = `stretch:${k}`;
+        world.trails.push({ points: ground.slice(from, to + 1), state: plan ? "chosen" : stretch.state, width: [0.02, 0.05], hue: [k / STRETCHES.length, (k + 1) / STRETCHES.length] });
+        if (stretch.gate && place !== "options") {
+          // The gate stands where the last stretch begins, clear of the destination's light.
+          const g = ground[from];
+          world.gates.push({ id: "gate", p: g, name: "gate" });
+          label("gate", g, "Ready if you pass the assessed report", "gate", { side: "right" });
+          world.legend.add("gate");
+        } else if (place === "skills") {
+          label(sid, mid, stretch.name, "stretch", { side: k % 2 ? "left" : "right", state: stretch.state });
+        }
+        if (!plan) world.legend.add(`stretch-${stretch.state}`);
+        if (place === "options" && (stretch.state === "shadow" || stretch.gate)) {
+          // A bridge across a dark stretch: placed (lit) or still to find (none drawn, words say so).
+          const bridged = state !== "unknown" && (k === 2 || stretch.gate);
+          if (bridged) {
+            const a = ground[from];
+            const b = ground[to];
+            const top = [(a[0] + b[0]) / 2, 0.7, (a[2] + b[2]) / 2];
+            world.trails.push({ points: cubic(a, top, top, b, 24), state: "bridge", width: [0.03, 0.04], hue: [0.4, 0.8] });
+            label(`bridge:${k}`, top, k === 2 ? "Bridge: part-time course" : "Bridge: assessed report, with the course", "bridge", { side: k % 2 ? "left" : "right" });
+            world.legend.add("bridge");
+          } else {
+            label(sid, mid, `${stretch.name}: no bridge yet`, "stretch", { side: k % 2 ? "left" : "right", state: "shadow" });
+          }
+        }
+      });
+      if (plan) {
+        // The chosen path made solid, with the next move glowing at its start.
+        const next = ground[cut(0.35)];
+        world.marks.push({ kind: "next", p: next });
+        light("next", next, "next", "next");
+        label("next", next, "Next: start the course", "next", { side: "right" });
+        world.legend.add("chosen");
+        world.legend.add("next");
+      }
+    }
+
+    if (place === "routes") {
+      // Whole journeys from the person to the destination: TRACE-01's five routes. Where each
+      // runs is layout only; the instrument beside it carries time and cost exactly.
+      const failed = state === "failed";
+      const bends = { A: -5, B: -2, C: 1, D: 4, E: 7 };
+      for (const route of T.routes) {
+        const selected = route.id === T.selectedRoute && !failed;
+        const pts = sweep(ORIGIN, goal, `route:${route.id}`, bends[route.id] * kx);
+        world.trails.push({ points: pts, state: selected ? "chosen" : failed ? "stale" : "said", width: [0.02, 0.05], hue: [0.1, 1] });
+        label(`route:${route.id}`, pts[Math.floor(pts.length * 0.55)], `Route ${route.id}`, "route", { side: "above", selected });
+        if (selected) {
+          // The gate on the selected route, where it is clear of both lights.
+          const at = Math.floor(pts.length * 0.4);
+          world.gates.push({ id: "gate", p: pts[at], name: "gate" });
+          label("gate", pts[at], "Ready if you pass the assessed report", "gate", { side: "left" });
+        }
+      }
+      world.legend.add(failed ? "stale" : "looking");
+      if (!failed) {
+        world.legend.add("route");
+        world.legend.add("gate");
+      }
+    }
+    return world;
+  }
+
+  function drawWorld(world, view) {
+    const { project } = world;
+    const opacity = {
+      usual: Number(token("--trail-opacity-usual")),
+      shadow: Number(token("--trail-opacity-shadow")),
+      stale: Number(token("--trail-opacity-stale")),
+    };
     const at = (y) => Math.min(1, Math.max(0, y / vp.h)).toFixed(3);
     const hy = view.horizon;
     const rand = seeded("stars");
@@ -266,29 +385,30 @@
       if (pts.length < 2) return;
       const first = pts[0];
       const last = pts[pts.length - 1];
+      // Each declared state at its measured strength (contrast-pairs.json composites it as drawn).
       let stroke;
-      let opacity = 0.6;
+      let strength = 1;
       if (trail.state === "chosen") stroke = "#45F7D4";
       else if (trail.state === "shadow") {
         stroke = "#6F7EA3";
-        opacity = 0.8;
+        strength = opacity.shadow;
       } else if (trail.state === "stale") {
-        stroke = "#6F7EA3";
-        opacity = 0.45;
+        stroke = "#D6CBAE";
+        strength = opacity.stale;
       } else {
         parts.push(`<defs><linearGradient id="t${n}" gradientUnits="userSpaceOnUse" x1="${f(first.x)}" y1="${f(first.y)}" x2="${f(last.x)}" y2="${f(last.y)}"><stop offset="0" stop-color="${journey(trail.hue[0])}"/><stop offset="1" stop-color="${journey(trail.hue[1])}"/></linearGradient></defs>`);
         stroke = `url(#t${n})`;
-        opacity = trail.state === "said" || trail.state === "bridge" ? 1 : 0.55;
+        strength = trail.state === "usual" ? opacity.usual : 1;
       }
       for (let i = 0; i < pts.length - 1; i += 6) {
         const part = pts.slice(i, Math.min(pts.length, i + 7));
         const mid = part[Math.floor(part.length / 2)];
         const u = (i + 3) / Math.max(1, pts.length - 1);
-        const w = Math.max(0.8, (trail.width[0] + (trail.width[1] - trail.width[0]) * Math.min(1, u)) * mid.scale);
+        const w = Math.max(1, (trail.width[0] + (trail.width[1] - trail.width[0]) * Math.min(1, u)) * mid.scale);
         const d = `M${part.map((p) => `${f(p.x)} ${f(p.y)}`).join("L")}`;
-        lines.push(`<path d="${d}" stroke="${stroke}" stroke-width="${f(w)}" stroke-opacity="${opacity}" fill="none" stroke-linecap="round"/>`);
+        lines.push(`<path d="${d}" stroke="${stroke}" stroke-width="${f(w)}" stroke-opacity="${strength}" fill="none" stroke-linecap="round"/>`);
         const bright = trail.state === "said" || trail.state === "chosen" || trail.state === "bridge";
-        glow.push(`<path d="${d}" stroke="${stroke}" stroke-width="${f(w * 4 + 4)}" stroke-opacity="${bright ? 0.3 : trail.state === "shadow" ? 0.07 : 0.12}" fill="none" stroke-linecap="round"/>`);
+        glow.push(`<path d="${d}" stroke="${stroke}" stroke-width="${f(w * 4 + 4)}" stroke-opacity="${bright ? 0.3 : trail.state === "shadow" || trail.state === "stale" ? 0.07 : 0.12}" fill="none" stroke-linecap="round"/>`);
       }
     });
     parts.push(`<g filter="url(#bloom)">${glow.join("")}</g><g>${lines.join("")}</g>`);
@@ -298,37 +418,36 @@
       parts.push(`<circle cx="${f(o.x)}" cy="${f(o.y)}" r="${f(r * (lit ? 9 : 5))}" fill="url(#halo-person)" opacity="${lit ? 0.85 : 0.35}"/>`);
       parts.push(`<circle cx="${f(o.x)}" cy="${f(o.y)}" r="${f(r * (lit ? 1 : 0.5))}" fill="#EDF5FF"/>`);
     }
-    for (const s of world.skills) {
-      const p = project(s.p);
-      const r = Math.max(2.6, 0.026 * p.scale);
-      parts.push(
-        s.state === "said"
-          ? `<circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r * 3)}" fill="url(#halo-person)" opacity="0.7"/><circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r)}" fill="#cfe0ff"/>`
-          : `<circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r * 0.85)}" fill="none" stroke="${journey(0.3)}" stroke-width="${f(Math.max(1.4, r * 0.32))}"/>`,
-      );
-      addLabel(s.p, s.label, "skill", { side: "above", state: s.state });
-    }
-    for (const d of world.destinations) {
-      const p = project(d.p);
-      const r = Math.max(2.6, 0.22 * p.scale);
-      if (d.kind === "suggested") {
-        parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r * 2.4)}" fill="url(#halo-destination)" opacity="0.45"/><circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r * 0.85)}" fill="none" stroke="#FF9433" stroke-width="2"/>`);
-      } else {
-        parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r * 4)}" fill="url(#halo-destination)"/><circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r)}" fill="#FFD2A1"/>`);
-        if (place === "roles" && state !== "not-built") parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r * 2.3)}" fill="none" stroke="#45F7D4" stroke-width="2"/>`);
+    for (const l of world.lights) {
+      const p = project(l.p);
+      if (!p.visible) continue;
+      if (l.kind === "said" || l.kind === "usual") {
+        const r = Math.max(2.6, 0.026 * p.scale);
+        parts.push(
+          l.kind === "said"
+            ? `<circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r * 3)}" fill="url(#halo-person)" opacity="0.7"/><circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r)}" fill="#cfe0ff"/>`
+            : `<circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r * 0.85)}" fill="none" stroke="${journey(0.3)}" stroke-width="${f(Math.max(1.4, r * 0.32))}"/>`,
+        );
+      } else if (l.kind === "destination" || l.kind === "suggested") {
+        const r = Math.max(2.6, 0.22 * p.scale);
+        if (l.kind === "suggested") {
+          parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r * 2.4)}" fill="url(#halo-destination)" opacity="0.45"/><circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r * 0.85)}" fill="none" stroke="#FF9433" stroke-width="2"/>`);
+        } else {
+          parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r * 4)}" fill="url(#halo-destination)"/><circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r)}" fill="#FFD2A1"/>`);
+          if (l.selected) parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r * 2.3)}" fill="none" stroke="#45F7D4" stroke-width="2"/>`);
+        }
       }
     }
     for (const m of world.marks) {
       const p = project(m.p);
       if (!p.visible) continue;
-      if (m.kind === "opening") parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="2.2" fill="${m.stale ? "#D6CBAE" : "#EDF5FF"}" opacity="${m.stale ? 0.55 : 0.75}"/>`);
-      if (m.kind === "area") parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="${m.empty ? 9 : 4}" fill="none" stroke="${m.empty ? "#6F7EA3" : "#C2CCE2"}" stroke-width="1.5" opacity="0.8"/>`);
-      if (m.kind === "landmark") parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="4" fill="none" stroke="#45F7D4" stroke-width="1.5"/>`);
+      if (m.kind === "opening") parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="2.2" fill="${m.stale ? "#D6CBAE" : "#EDF5FF"}" opacity="${m.stale ? opacity.stale : 1}"/>`);
+      if (m.kind === "area") parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="9" fill="none" stroke="#6F7EA3" stroke-width="1.5" stroke-opacity="${opacity.shadow}"/>`);
       if (m.kind === "next") parts.push(`<circle cx="${f(p.x)}" cy="${f(p.y)}" r="9" fill="none" stroke="#45F7D4" stroke-width="2.5"/><circle cx="${f(p.x)}" cy="${f(p.y)}" r="16" fill="none" stroke="#45F7D4" stroke-width="1" opacity="0.5"/>`);
     }
     for (const g of world.gates) {
       const p = project(g.p);
-      const s = Math.max(7, 0.12 * p.scale);
+      const s = 7;
       parts.push(`<rect x="${f(p.x - s)}" y="${f(p.y - s)}" width="${f(s * 2)}" height="${f(s * 2)}" fill="#03050B" stroke="#F2F6FF" stroke-width="2" transform="rotate(45 ${f(p.x)} ${f(p.y)})"/>`);
     }
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vp.w} ${vp.h}" aria-hidden="true" focusable="false">${parts.join("")}</svg>`;
@@ -336,10 +455,12 @@
 
   // ---------- The exact layer: shell and the place's panel ----------
   const synthetic = `<span class="synthetic">${glyph("synthetic")}Synthetic demo</span>`;
-  const toggles = `
-    <button type="button" class="toggle" aria-pressed="${state === "distress" ? "true" : "false"}">${glyph("pause")}<span class="label">Pause motion</span><span class="switch" aria-hidden="true"></span></button>
-    <button type="button" class="toggle" aria-pressed="false">${glyph("calm")}<span class="label">Calm mode</span><span class="switch" aria-hidden="true"></span></button>
-    <button type="button" class="toggle" aria-pressed="false">${glyph("sound")}<span class="label">Sound</span><span class="switch" aria-hidden="true"></span></button>`;
+  // Pause shows the person's own choice; distress stills the world on its own and says so.
+  const controls = `
+    <button type="button" class="toggle" aria-pressed="false">${glyph("pause")}<span class="label">Pause motion</span><span class="switch" aria-hidden="true"></span></button>
+    ${state === "distress" ? `<span class="status" data-tone="neutral" role="status">${glyph("support")}<span class="label">Still while support is shown</span></span>` : ""}
+    <button type="button" class="toggle" aria-pressed="false">${glyph("sound")}<span class="label">Sound</span><span class="switch" aria-hidden="true"></span></button>
+    <button type="button" class="toggle account" aria-label="Account and settings">${glyph("menu")}</button>`;
   const rail = `
     <nav class="rail" aria-label="Chapters">
       <a class="wordmark" href="index.html"><svg viewBox="0 0 24 24" aria-hidden="true">${GLYPH.mark}</svg><span>Careerwright</span></a>
@@ -347,39 +468,46 @@
     </nav>`;
   const strip = `
     <header class="strip">
-      <span class="optional">${synthetic}</span>
-      <span>Target <strong>${esc(F.p01.targetTitles.join(", "))}</strong></span>
+      <span class="synthetic-slot">${synthetic}</span>
+      <span class="optional-phone">Target <strong>${esc(F.p01.targetTitles.join(", "))}</strong></span>
       <span class="optional">Work area <strong>${esc(F.p01.cities.join(", "))}</strong></span>
       <span class="strip-end">
-        <span class="optional">Saved, version 3</span>
+        <span>Saved, version 3</span>
         <span class="status" data-tone="neutral" role="status">${glyph("live")}Updates: Live</span>
-        ${toggles}
+        ${controls}
       </span>
     </header>`;
   const topbar = `<div class="topbar"><button type="button" class="toggle" aria-label="${LABEL[place]}, open chapter menu">${glyph("menu")}<strong>${LABEL[place]}</strong></button>${synthetic}</div>`;
 
-  const notBuilt = (where, purpose) => `
+  // A place not built yet: the honest state, where it is, why it is empty and the one action;
+  // what it will hold is one step away.
+  const notBuilt = (where, why, holds) => `
     <section class="panel low" aria-labelledby="title">
       <p class="kicker" data-tone="unknown">${glyph("blocked")}Not built yet</p>
       <h1 id="title" class="title">${LABEL[place]}</h1>
       <p class="where">${where}</p>
-      <p class="small muted">${purpose}</p>
+      <p class="small muted">${why}</p>
       <div class="row"><a class="btn btn-secondary" href="world.html?place=you">Review what we know</a></div>
+      <details class="more"><summary>More about this place</summary><p class="small muted">${holds}</p></details>
     </section>`;
 
   const NOT_BUILT = {
-    roles: ["The horizon: places you could head for.", "Role research isn't part of this build yet, so no listings have been searched."],
-    skills: ["The ground between you and a destination.", "The skills matrix isn't part of this build yet. Nothing has been assessed, so nothing is marked missing."],
-    options: ["Bridges across the dark stretches: courses, work routes and funding.", "Option research isn't part of this build yet. No courses or funding have been searched."],
-    routes: ["Whole journeys from you to a destination, compared on time and cost.", "Careerwright's route search isn't part of this build yet, so no route has been computed."],
-    plan: ["The path you choose, made solid, with your next move glowing at its start.", "Plan selection isn't part of this build yet, so no plan has been made."],
+    roles: ["The horizon: places you could head for.", "Role research isn't ready yet, so no listings have been searched.", "Roles you could head for, and openings for them in your work areas, with the sources checked."],
+    skills: ["The ground between you and a destination.", "Skills checking isn't ready yet, so nothing has been assessed or marked missing.", "What each target needs, what you have shown, and what is still not known."],
+    options: ["Bridges across the dark stretches: courses, work routes and funding.", "Option research isn't ready yet, so no courses or funding have been searched.", "Courses, work routes and funding for each gap, with their dates and costs."],
+    routes: ["Whole journeys from you to a destination, compared on time and cost.", "Route search isn't ready yet, so no route has been worked out.", "Every way to a destination, with how long it takes and what it costs."],
+    plan: ["The path you choose, made solid, with your next move glowing at its start.", "Plan selection isn't ready yet, so no plan has been made.", "The route you choose, as a dated plan with one next step."],
   };
 
-  function instrument() {
-    // Time (months) across, economic cost up: TRACE-01's routes, layers told apart without colour.
+  // The plain names for TRACE-01's two costs; DIRECTAI's direct spending keeps its own words.
+  const TOTAL_COST = "Total cost, including pay you'd give up";
+  const PAID_OUT = "What you'd pay out";
+
+  function instrument(failed) {
+    // Time (months) across, TRACE-01's total cost up: its routes, layers told apart without colour.
     const W = 520;
-    const H = 236;
-    const pad = { l: 56, r: 24, t: 16, b: 52 };
+    const H = 252;
+    const pad = { l: 56, r: 24, t: 32, b: 52 };
     const maxT = 6;
     const maxC = 600000;
     const x = (t) => pad.l + (t / maxT) * (W - pad.l - pad.r);
@@ -388,7 +516,7 @@
     const labelled = [];
     const marks = T.routes.map((r) => {
       const l = layer(r.id);
-      const sel = r.id === T.selectedRoute;
+      const sel = r.id === T.selectedRoute && !failed;
       const cx = x(r.timeMonths);
       const cy = y(r.economicMinor);
       // A letter goes right of its mark, or left where a mark at the same time sits close by.
@@ -399,11 +527,13 @@
     });
     const ticks = [0, 2, 4, 6].map((t) => `<text x="${x(t)}" y="${H - 30}" text-anchor="middle">${t}</text>`).join("");
     const cticks = [0, 200000, 400000, 600000].map((c) => `<text x="${pad.l - 8}" y="${y(c) + 4}" text-anchor="end">${money(c)}</text>`).join("");
-    return `<figure class="instrument"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Time and economic cost of routes A to E">${ticks}${cticks}<text x="${(pad.l + W - pad.r) / 2}" y="${H - 8}" text-anchor="middle">Months to ready</text>${marks.join("")}</svg></figure>`;
+    const axis = `<text class="axis-name" x="0" y="12">${esc(TOTAL_COST)}</text><text class="axis-name" x="${(pad.l + W - pad.r) / 2}" y="${H - 8}" text-anchor="middle">Months to ready</text>`;
+    return `<figure class="instrument"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Months to ready and total cost, including pay you'd give up, of routes A to E">${axis}${ticks}${cticks}${marks.join("")}</svg></figure>`;
   }
 
   const route = (id) => T.routes.find((r) => r.id === id);
   const B = route(T.selectedRoute);
+  const unpaid = L.jobs.filter((j) => j.pay.kind === "unknown").length;
 
   function panel() {
     if (state === "not-built" && NOT_BUILT[place]) return notBuilt(...NOT_BUILT[place]);
@@ -415,7 +545,7 @@
             <p class="answer">Synthetic: I've been feeling hopeless about work lately.</p>
             <p>Thank you for telling me. We can take this slowly. Would a smaller next step help, like naming one thing you've enjoyed doing?</p>
             <section class="alert support" data-tone="neutral" aria-labelledby="support">
-              ${glyph("unknown")}
+              ${glyph("support")}
               <div class="list">
                 <h2 id="support" class="small"><strong>Support is here, any time</strong></h2>
                 <p class="small">If anything you mentioned is about how you are feeling, people trained to help are available. Your message was sent as usual.</p>
@@ -427,7 +557,6 @@
                 </ul>
               </div>
             </section>
-            <p class="small muted">The world goes quiet while you read: no revelations, no celebrations.</p>
           </section>`;
       }
       const failed = state === "failed";
@@ -444,6 +573,15 @@
     if (place === "roles") {
       const stale = state === "stale";
       const unknown = state === "unknown";
+      if (state === "three-targets") {
+        return `
+          <section class="panel low" aria-labelledby="title">
+            <h1 id="title" class="title">Roles</h1>
+            <p class="where">Three places you chose to head for.</p>
+            <p class="small muted">Openings are shown around the one you're looking at: data quality analyst. Not job offers.</p>
+            <div class="row"><button type="button" class="btn btn-primary">Look at another</button></div>
+          </section>`;
+      }
       return `
         <section class="panel low" aria-labelledby="title">
           <h1 id="title" class="title">Roles</h1>
@@ -451,7 +589,7 @@
           <p class="sentence">Data quality analysts and statisticians share 6 essential skills.</p>
           <p class="small muted">A field you didn't name, joined to yours by skills, not job titles. A place you could head for. Not a job offer.</p>
           ${stale ? `<div class="alert" data-tone="stale">${glyph("stale")}<div><p><strong>Last checked 2 days ago</strong></p><p class="small muted">The job board didn't answer today. Its openings are kept from 2 days ago and may have closed.</p></div></div>` : ""}
-          ${unknown ? `<div class="alert" data-tone="unknown">${glyph("unknown")}<div><p><strong>Leeds: none found in the ${L.totals.sourcesChecked} sources checked</strong></p><p class="small muted">Not "no jobs": only these sources were searched. Pay not stated on 3 openings.</p></div></div>` : ""}
+          ${unknown ? `<div class="alert" data-tone="unknown">${glyph("unknown")}<div><p><strong>Leeds: none found in the ${L.totals.sourcesChecked} sources checked</strong></p><p class="small muted">Not "no jobs": only these sources were searched. Pay not stated on ${count(unpaid, "opening", "openings")}.</p></div></div>` : ""}
           <div class="row"><button type="button" class="btn btn-primary">Keep statistician in view</button><button type="button" class="link">Why?</button></div>
         </section>`;
     }
@@ -462,13 +600,13 @@
           <h1 id="title" class="title">Skills</h1>
           <p class="where">The ground between you and ${esc(T.targetTitle.toLowerCase())}.</p>
           <ul class="list">
-            <li>${glyph(unknown ? "unknown" : "complete")}<span>Check data for errors</span><span class="small muted">${unknown ? "Not known yet" : "You said so"}</span></li>
+            <li>${glyph(unknown ? "unknown" : "said")}<span>Check data for errors</span><span class="small muted">${unknown ? "Not known yet" : "You said so"}</span></li>
             <li>${glyph("unknown")}<span>Query related tables</span><span class="small muted">${unknown ? "Not known yet" : "Usual in your role, not confirmed yet"}</span></li>
             <li>${glyph("unknown")}<span>Validate keys and missing values</span><span class="small muted">Not known yet</span></li>
             <li>${glyph("conditional")}<span>Pass the assessed report</span><span class="small muted">A gate</span></li>
           </ul>
           <p class="status" data-tone="neutral">${glyph("conditional")}Ready if you pass the assessed report</p>
-          <div class="row"><button type="button" class="btn btn-primary">Tell me about a stretch</button></div>
+          <div class="row"><button type="button" class="btn btn-primary">Tell me about a skill</button></div>
         </section>`;
     }
     if (place === "options") {
@@ -477,12 +615,12 @@
         <section class="panel low" aria-labelledby="title">
           <h1 id="title" class="title">Options</h1>
           <p class="where">Bridges across the dark stretches.</p>
-          ${unknown ? `<div class="alert" data-tone="unknown">${glyph("unknown")}<div><p><strong>No bridge found yet</strong></p><p class="small muted">Nothing searched covers "Validate keys and missing values". That is not "none exist".</p></div></div>` : `
+          ${unknown ? `<div class="alert" data-tone="unknown">${glyph("unknown")}<div><p><strong>No bridge found yet</strong></p><p class="small muted">Nothing searched covers "Validate keys and missing values". That doesn't mean there are none.</p></div></div>` : `
           <ul class="list">
             <li data-selected="true">${glyph("complete")}<span>Part-time course, ${B.timeMonths} months, ${B.studyHours} hours a week</span><span class="tnum">${money(B.directMinor)}</span></li>
-            <li>${glyph("blocked")}<span>Full-time course, ${route("A").timeMonths} months, ${route("A").studyHours} hours a week</span><span class="small muted">Set aside</span></li>
+            <li>${glyph("setAside")}<span>Full-time course, ${route("A").timeMonths} months, ${route("A").studyHours} hours a week</span><span class="small muted">Set aside</span></li>
           </ul>`}
-          <div class="row"><button type="button" class="btn btn-primary">Place this bridge</button></div>
+          <div class="row"><button type="button" class="btn btn-primary">${unknown ? "Look for a course" : "Use this course"}</button></div>
         </section>`;
     }
     if (place === "routes") {
@@ -490,16 +628,17 @@
       return `
         <section class="panel panel-wide" aria-labelledby="title">
           <h1 id="title" class="title">Routes</h1>
-          ${failed ? `<div class="alert" data-tone="error" role="alert">${glyph("error")}<div><p><strong>The route search failed</strong></p><p class="small muted">The last comparison stays below, from version 14. It may be out of date.</p></div></div>` : ""}
-          ${instrument()}
+          ${failed ? `<div class="alert" data-tone="error" role="alert">${glyph("error")}<div><p><strong>The route search failed</strong></p><p class="small muted">Your last comparison is kept below. It may be out of date.</p></div></div>` : ""}
+          ${failed ? `<p class="status" data-tone="stale">${glyph("stale")}Kept from your last search</p>` : ""}
+          ${instrument(failed)}
           <dl class="facts">
             <dt>Route ${B.id}: ready in</dt><dd>${B.timeMonths} months, from ${day(B.start)}</dd>
-            <dt>Economic cost</dt><dd>${money(B.economicMinor)}</dd>
-            <dt>Direct spending</dt><dd>${money(B.directMinor)}</dd>
+            <dt>${TOTAL_COST}</dt><dd>${money(B.economicMinor)}</dd>
+            <dt>${PAID_OUT}</dt><dd>${money(B.directMinor)}</dd>
             <dt>Lowest cash point</dt><dd>${money(T.print.minimumPrefundedCashMinor)}</dd>
           </dl>
           <p class="status" data-tone="neutral">${glyph("conditional")}Ready if you pass the assessed report</p>
-          <div class="row"><button type="button" class="btn btn-primary">Choose route ${B.id}</button></div>
+          <div class="row"><button type="button" class="btn btn-primary">${failed ? "Search again" : `Choose route ${B.id}`}</button></div>
         </section>`;
     }
     return `
@@ -516,23 +655,35 @@
       </section>`;
   }
 
+  // The key to the lights: each kind drawn here, with its mark drawn as the world draws it.
   const KEY = {
-    destination: `<li><span class="key-destination" aria-hidden="true"></span>Warm lights: places you chose to head for</li>`,
-    suggested: `<li><span class="key-ring" style="border-color:var(--light-destination);transform:rotate(45deg);border-radius:0" aria-hidden="true"></span>Warm rings: places suggested to you</li>`,
-    said: `<li><span class="key-said" aria-hidden="true"></span>Bright: you said you've done it</li>`,
-    usual: `<li><span class="key-ring" aria-hidden="true"></span>Faint ring: usual in your role, not confirmed yet</li>`,
-    shadow: `<li><span class="key-shadow" aria-hidden="true"></span>Slate: not known yet</li>`,
-    gate: `<li><span class="key-gate" aria-hidden="true"></span>Gate: a condition, in words beside it</li>`,
-    chosen: `<li><span class="key-chosen" aria-hidden="true"></span>Sea-glass: the path you chose</li>`,
-    stale: `<li><span class="key-shadow" style="opacity:0.6" aria-hidden="true"></span>Faded: from the last comparison</li>`,
+    destination: ["disc-destination", "Warm lights: places you chose to head for"],
+    suggested: ["ring-destination", "Warm rings: places suggested to you"],
+    said: ["disc-said", "Bright: you said you've done it"],
+    usual: ["ring-usual", "Faint ring: usual in your role, not confirmed yet"],
+    shadow: ["line-shadow", "Grey: not known yet"],
+    "stretch-said": ["line-said", "Bright: a skill you said you have"],
+    "stretch-usual": ["line-usual", "Fainter: usual in your role, not confirmed yet"],
+    "stretch-shadow": ["line-shadow", "Grey: not known yet"],
+    next: ["ring-next", "Teal ring: your next step"],
+    opening: ["dot-opening", "Small lights: openings, by area"],
+    "stale-opening": ["dot-stale", "Sand: openings kept from an earlier search"],
+    "none-found": ["ring-none", "Grey ring: none found in the sources checked"],
+    gate: ["gate", "Gate: a condition, in words beside it"],
+    bridge: ["line-bridge", "Bright arc: a bridge you placed"],
+    route: ["line-route", "Blue to violet: a whole route"],
+    looking: ["line-chosen", "Teal: the route you're looking at"],
+    chosen: ["line-chosen", "Teal: the path you chose"],
+    stale: ["line-stale", "Sand: kept from your last search, may be out of date"],
   };
+  const ORDER = ["destination", "suggested", "said", "usual", "shadow", "stretch-said", "stretch-usual", "stretch-shadow", "opening", "stale-opening", "none-found", "gate", "bridge", "route", "looking", "chosen", "next", "stale"];
 
   // ---------- Assemble ----------
   document.title = `${LABEL[place]}, ${state} · Careerwright world reference`;
   document.body.innerHTML = `
-    <div class="world" data-distress="${state === "distress"}">${drawWorld()}</div>
+    <div class="world" data-distress="${state === "distress"}"></div>
     <aside class="world-words" aria-label="Your world"><ul></ul></aside>
-    <ul class="legend" aria-label="What the lights mean">${[...world.legend].map((k) => KEY[k]).join("")}</ul>
+    <details class="legend"${vp.w > 1100 ? " open" : ""}><summary>What the lights mean</summary><ul></ul></details>
     <div class="shell">
       ${rail}
       ${topbar}
@@ -540,41 +691,107 @@
       <main class="work" id="main">${panel()}</main>
     </div>`;
 
-  // Words beside their lights, clear of the panels and of each other (as the app places them).
-  const host = document.querySelector(".world-words ul");
-  const covers = [...document.querySelectorAll(".panel, .strip, .rail, .topbar, .legend")].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
-  const placed = [];
-  const meets = (a, b, pad) => a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
-  const box = (r) => ({ x: r.left, y: r.top, w: r.width, h: r.height });
-  const ORDER = { origin: 0, destination: 1, gate: 2, next: 2, route: 3, area: 4, bridge: 4, suggested: 5, stretch: 6, skill: 7 };
-  for (const label of world.labels.sort((a, b) => ORDER[a.kind] - ORDER[b.kind])) {
-    const p = project(label.anchor);
-    const li = document.createElement("li");
-    li.className = "world-label";
-    li.dataset.kind = label.kind;
-    if (label.selected) li.dataset.selected = "true";
-    li.innerHTML = `<span>${esc(label.name)}</span>`;
-    if (label.state === "usual") li.innerHTML += `<span class="caption">usual in your role, not confirmed yet</span>`;
-    if (label.state === "said") li.innerHTML += `<span class="caption">you said so</span>`;
-    if (label.state === "shadow" && label.kind !== "stretch") li.innerHTML += `<span class="caption">not known yet</span>`;
-    if (label.state === "shadow" && label.kind === "stretch" && !label.name.includes("no bridge")) li.innerHTML += `<span class="caption">not known yet</span>`;
-    host.append(li);
-    const w = li.offsetWidth;
-    const h = li.offsetHeight;
-    const other = label.side === "above" ? "below" : "above";
-    const tries = [[label.side, 0], [label.side, 1], [other, 0], [other, 1]].map(([s, row]) => {
-      const out = 14 + row * (h + 6);
-      return { x: p.x - w / 2, y: s === "above" ? p.y - out - h : p.y + out, w, h };
-    });
-    const spot = p.visible
-      ? tries.find((b) => b.x >= 8 && b.y >= 8 && b.x + b.w <= vp.w - 8 && b.y + b.h <= vp.h - 8 && !covers.some((c) => meets(b, box(c), 0)) && !placed.some((o) => meets(b, o, 4)))
-      : undefined;
-    if (spot) {
-      placed.push(spot);
-      li.style.left = `${spot.x + w / 2}px`;
-      li.style.top = `${spot.y}px`;
-    } else {
-      li.className = "sr-only";
+  /** Lays the world out once the fonts are in: the view, the drawing, the names and the key. */
+  function layout() {
+    const clear = clearArea();
+    const view = placeView(place, clear);
+    const world = build(view);
+    const { project } = world;
+    document.querySelector(".world").innerHTML = drawWorld(world, view);
+
+    const legend = document.querySelector(".legend");
+    legend.querySelector("ul").innerHTML = ORDER.filter((k) => world.legend.has(k))
+      .map((k) => `<li data-kind="${k}"><span class="key key-${KEY[k][0]}" aria-hidden="true"></span>${KEY[k][1]}</li>`)
+      .join("");
+
+    const covers = [...document.querySelectorAll(".panel, .strip, .rail, .topbar")].map(box).filter((r) => r.w > 0);
+    const inside = (b, pad = 8) => b.x >= pad && b.y >= pad && b.x + b.w <= vp.w - pad && b.y + b.h <= vp.h - pad;
+    const meets = (a, b, pad) => a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
+    const holds = (b, p) => p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+    // Every light's centre and every gate stays uncovered: names step round them.
+    const centres = world.lights.map((l) => project(l.p)).filter((p) => p.visible).map((p) => ({ x: p.x - 4, y: p.y - 4, w: 8, h: 8 }));
+    const gates = world.gates.map((g) => project(g.p)).map((p) => ({ x: p.x - 10, y: p.y - 10, w: 20, h: 20 }));
+
+    // The key: open on a wide screen, bottom right; otherwise "What the lights mean", closed,
+    // at the right of the clear part of the window, above any panel. Names stay clear of it.
+    legend.style.visibility = "hidden";
+    const size = box(legend);
+    const corners = [vp.h - 24, ...covers.filter((c) => c.y > 1).map((c) => c.y - 12)].sort((a, b) => b - a);
+    const keySpot = corners
+      .map((bottom) => ({ x: vp.w - (phone ? 16 : 24) - size.w, y: bottom - size.h, w: size.w, h: size.h }))
+      .find((b) => inside(b, 4) && !covers.some((c) => meets(b, c, 0)) && !centres.some((c) => meets(b, c, 0)) && !gates.some((g) => meets(b, g, 0)));
+    const placed = [];
+    if (keySpot) {
+      legend.style.right = `${vp.w - keySpot.x - keySpot.w}px`;
+      legend.style.bottom = `${vp.h - keySpot.y - keySpot.h}px`;
+      legend.style.visibility = "visible";
+      placed.push(keySpot);
     }
+
+    // Names beside their lights, clear of the panels, the key, the lights and each other. A name
+    // whose light is out of view or under a panel is hidden from sight; it stays in the list.
+    const host = document.querySelector(".world-words ul");
+    const PRIORITY = { origin: 0, destination: 1, suggested: 1, gate: 2, next: 2, route: 3, area: 4, bridge: 4, stretch: 5, skill: 6 };
+    for (const l of world.labels.sort((a, b) => PRIORITY[a.kind] - PRIORITY[b.kind])) {
+      const p = project(l.anchor);
+      const li = document.createElement("li");
+      li.className = "world-label";
+      li.dataset.kind = l.kind;
+      li.dataset.for = l.id;
+      if (l.selected) li.dataset.selected = "true";
+      li.innerHTML = `<span>${esc(l.name)}</span>`;
+      if (l.state === "usual") li.innerHTML += `<span class="caption">usual in your role, not confirmed yet</span>`;
+      if (l.state === "said") li.innerHTML += `<span class="caption">you said so</span>`;
+      if (l.state === "shadow" && !l.name.includes("no bridge")) li.innerHTML += `<span class="caption">not known yet</span>`;
+      host.append(li);
+      const w = li.offsetWidth;
+      const h = li.offsetHeight;
+      const GAP = 14;
+      // Centred on its light, or slid along its row (inside the window, still over its light).
+      const across = (x) => Math.min(Math.max(x, 8), vp.w - 8 - w);
+      const row = (side, n, x) => {
+        const out = GAP + n * (h + 6);
+        return { x: across(x), y: side === "above" ? p.y - out - h : p.y + out, w, h };
+      };
+      const beside = (side) => ({ x: side === "left" ? p.x - GAP - w : p.x + GAP, y: p.y - h / 2, w, h });
+      const flip = { above: "below", below: "above", left: "right", right: "left" };
+      // Its own side first, then rows further out (with a leader line back), then the other side.
+      const ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
+      const rows = (side) => ROWS.flatMap((n) => [p.x - w / 2, p.x - w + 16, p.x - 16].map((x) => row(side, n, x)));
+      const tries =
+        l.side === "left" || l.side === "right"
+          ? [beside(l.side), beside(flip[l.side]), ...rows("above"), ...rows("below")]
+          : [...rows(l.side), ...rows(flip[l.side])];
+      const seen = p.visible && holds({ x: 0, y: 0, w: vp.w, h: vp.h }, p) && !covers.some((c) => holds(c, p));
+      // The line from a light to its name never passes under a panel: a name never hops one.
+      const leader = (b) => ({ x: p.x, y: Math.min(p.y, b.y + b.h), w: 1, h: Math.abs(Math.max(p.y, b.y) - Math.min(p.y, b.y + b.h)) });
+      const spot = seen
+        ? tries.find((b) => inside(b) && !covers.some((c) => meets(b, c, 0) || meets(leader(b), c, 0)) && !placed.some((o) => meets(b, o, 4)) && !centres.some((c) => meets(b, c, 0)) && !gates.some((g) => meets(b, g, 2)))
+        : undefined;
+      if (spot) {
+        placed.push(spot);
+        li.style.left = `${spot.x + w / 2}px`;
+        li.style.top = `${spot.y}px`;
+        const above = spot.y + spot.h <= p.y;
+        const gap = above ? p.y - (spot.y + spot.h) : spot.y - p.y;
+        if (gap > 20 && spot.x <= p.x && p.x <= spot.x + spot.w) {
+          li.dataset.leader = above ? "above" : "below";
+          li.style.setProperty("--leader", `${Math.round(gap - 8)}px`);
+          li.style.setProperty("--leader-x", `${Math.round(p.x - spot.x)}px`);
+        }
+      } else {
+        li.className = "sr-only";
+      }
+    }
+
+    // For tools/screenshots.mjs: every light, gate and name as drawn, to check independently.
+    window.__worldCheck = {
+      lights: world.lights.map((l) => ({ id: l.id, kind: l.kind, name: l.name, revelation: Boolean(l.revelation), ...project(l.p) })),
+      gates: world.gates.map((g) => ({ id: g.id, name: g.name, ...project(g.p), r: 10 })),
+    };
+    // Opened as a person would open it: over the world, from where it was placed closed.
+    if (keyOpen) legend.open = true;
+    window.__worldReady = true;
   }
+  document.fonts.ready.then(layout);
 })();
