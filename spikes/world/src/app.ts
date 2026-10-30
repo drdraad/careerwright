@@ -1,8 +1,11 @@
 // One direction, running: the exact DOM layer (every word and control) over the world layer
 // (WebGL when moving, SVG when still). The words are the same in every direction and mode.
+// One idea at a time: what just changed speaks; everything else stays quiet until the person
+// points at it or focuses it.
 import { DATA_LABEL, ROLES, type Role, skillLabel } from "./data.ts";
 import {
   type Camera,
+  DEFAULT_FONT,
   type Direction,
   type FontId,
   ViewTween,
@@ -28,7 +31,8 @@ type SpikeProbe = {
   mode: "moving" | "still";
   renderer: string;
   firstFrame: number | null;
-  keyToFrame: number[];
+  /** Milliseconds from an input's handler (a keystroke or a skill picked) to the end of the frame that answers it. */
+  inputToFrame: number[];
   stats: unknown;
 };
 
@@ -43,8 +47,8 @@ const params = new URLSearchParams(location.search);
 const lowerFirst = (s: string): string => (/^[A-Z]{2}/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1));
 
 const STATE_WORDS = {
-  usual: "not confirmed yet",
-  said: "you said so",
+  usual: "usual in your role, not confirmed yet",
+  said: "you said you've done this",
 } as const;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -54,18 +58,20 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
   return node;
 }
 
+// Static markup from the spike's own constants; nothing the person types is ever put into HTML.
 const SKELETON = (d: Direction, all: readonly Direction[]) => `
 <canvas class="world" aria-hidden="true"></canvas>
 <div class="still-world" aria-hidden="true"></div>
+<svg class="leaders" aria-hidden="true"></svg>
 <header class="top">
   <a class="wordmark" href="./">Careerwright</a>
-  <nav class="directions" aria-label="Directions to try">
+  <nav class="directions" aria-label="Looks to try">
     ${all.map((x) => `<a href="?d=${x.id}"${x.id === d.id ? ' aria-current="page"' : ""}>${x.name}</a>`).join("")}
   </nav>
   <div class="controls">
     <button type="button" class="control" data-control="pause" aria-pressed="false">Pause motion</button>
     <button type="button" class="control" data-control="calm" aria-pressed="false">Calm mode</button>
-    <button type="button" class="control" data-control="sound" aria-pressed="false">Sound off</button>
+    <button type="button" class="control" data-control="sound" aria-pressed="false">Sound</button>
   </div>
 </header>
 <main class="stage">
@@ -76,28 +82,27 @@ const SKELETON = (d: Direction, all: readonly Direction[]) => `
         <input id="role-input" class="role-input" type="text" role="combobox" aria-expanded="false"
           aria-controls="role-options" aria-autocomplete="list" autocomplete="off" spellcheck="false"
           aria-labelledby="question" aria-describedby="ask-hint" placeholder="Start typing a job title">
-        <ul id="role-options" class="options" role="listbox" aria-label="Matching jobs" hidden></ul>
       </div>
+      <ul id="role-options" class="options" role="listbox" aria-label="Matching jobs" hidden></ul>
       <p id="ask-hint" class="hint">Try chef, care worker or electrician.</p>
     </div>
     <div class="answered" hidden>
       <p class="you-role"></p>
       <p class="answer-line"></p>
-      <p class="prompt">Pick any skill you've used, and it lights up.</p>
+      <p class="prompt">Pick any you've used, and it lights up.</p>
       <button type="button" class="quiet start-again">Start again</button>
     </div>
   </section>
   <ul class="legend" aria-label="What the lights mean">
-    <li><span class="glyph glyph-usual" aria-hidden="true"></span>Faint: usual in your role, not confirmed yet</li>
-    <li><span class="glyph glyph-said" aria-hidden="true"></span>Bright: you said you've done it</li>
-    <li><span class="glyph glyph-shadow" aria-hidden="true"></span>Shadow: not known yet</li>
-    <li><span class="glyph glyph-place" aria-hidden="true"></span>Orange: a place you could head for</li>
+    <li data-legend="usual"><span class="glyph glyph-usual" aria-hidden="true"></span>Faint ring: usual in your role, not confirmed yet</li>
+    <li data-legend="said" hidden><span class="glyph glyph-said" aria-hidden="true"></span>Bright: you said you've done it</li>
+    <li data-legend="shadow" hidden><span class="glyph glyph-shadow" aria-hidden="true"></span>Dashed: not known yet</li>
   </ul>
   <section class="world-words" aria-label="Your world">
-    <p class="node-label origin-label" data-node="origin">You</p>
+    <p class="node-label origin-label" data-node="origin" data-shown="1">You</p>
     <ul class="skills" aria-label="Skills your job usually needs"></ul>
     <ul class="places" aria-label="Places you could head for"></ul>
-    <ul class="unknowns" aria-label="Skills not known yet"></ul>
+    <ul class="unknowns" aria-label="Not known yet"></ul>
   </section>
   <aside class="card" aria-labelledby="card-title" hidden>
     <h2 id="card-title" class="card-kicker">An unexpected connection</h2>
@@ -109,6 +114,7 @@ const SKELETON = (d: Direction, all: readonly Direction[]) => `
     <div id="why" class="why" hidden>
       <p>Both jobs list these as essential:</p>
       <ul class="why-list"></ul>
+      <p class="why-unknown"></p>
       <p class="why-source">Where this comes from: the made-up example list in this preview. Code counted the skills both jobs list. Nothing was guessed.</p>
     </div>
     <div class="card-actions">
@@ -129,7 +135,7 @@ const SKELETON = (d: Direction, all: readonly Direction[]) => `
         ${Object.entries(FONTS)
           .map(
             ([id, name]) =>
-              `<label><input type="radio" name="font" value="${id}"${id === d.font ? " checked" : ""}> ${name}</label>`,
+              `<label><input type="radio" name="font" value="${id}"${id === DEFAULT_FONT ? " checked" : ""}> ${name}</label>`,
           )
           .join("")}
       </fieldset>
@@ -154,6 +160,7 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
   const sound = new Sound(direction.id);
   const canvas = $<HTMLCanvasElement>("canvas.world");
   const stillHost = $<HTMLDivElement>(".still-world");
+  const leaders = $<SVGSVGElement>("svg.leaders");
   const input = $<HTMLInputElement>(".role-input");
   const options = $<HTMLUListElement>(".options");
   const status = $<HTMLParagraphElement>(".status");
@@ -191,25 +198,29 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
   let running = false;
   let lastTyped = -1e6;
   let keystroke = -1e6;
-  let answeredKey = -1e6;
-  let cpuSamples: number[] = [];
+  let inputAt = -1e6;
+  let answeredInput = -1e6;
+  let scriptSamples: number[] = [];
   let reading = false;
   let lastCamera: Camera | null = null;
   let settleNeeded = true;
+  let leadersShown = false;
   let revealTimer = 0;
   let cardTimer = 0;
   let activeOption = -1;
   let matches: Role[] = [];
+  /** A destination the person clicked to keep its shared skills showing (touch has no hover). */
+  let pinned: string | null = null;
   window.__spike = {
     direction: direction.id,
     mode: "moving",
     renderer: "",
     firstFrame: null,
-    keyToFrame: [],
+    inputToFrame: [],
     stats: null,
   };
 
-  setFont((params.get("font") as FontId | null) ?? direction.font);
+  setFont((params.get("font") as FontId | null) ?? DEFAULT_FONT);
 
   function viewport(): Viewport {
     return { w: window.innerWidth, h: window.innerHeight, narrow: window.innerWidth < 760 };
@@ -237,13 +248,16 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
     calmButton.disabled = reducedMotion.matches;
     calmButton.title = reducedMotion.matches ? "Your computer asks for less motion, so the world is drawn still." : "";
     pauseButton.disabled = still;
-    pauseButton.textContent = still ? "Motion is off" : paused ? "Play motion" : "Pause motion";
-    pauseButton.setAttribute("aria-pressed", String(paused && !still));
+    pauseButton.setAttribute("aria-pressed", String(paused || still));
+    pauseButton.title = still ? "Motion is already off." : "";
     modeNote.textContent = !hasGL
       ? "This browser can't draw the moving world, so it is drawn still."
       : still
         ? "The world is drawn still: the same lights and words, without motion."
         : "";
+    // Words never wait for an entry animation after a change of mode: whatever is in the world
+    // is shown at once.
+    for (const li of labelFor.values()) li.dataset.shown = "1";
     if (still) {
       gl?.dispose();
       gl = null;
@@ -251,7 +265,7 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
       stillHost.hidden = false;
       tween.aim(direction.view(vp, story), now(), true);
       drawStillWorld();
-      placeLabels(direction.view(vp, story));
+      placeLabels(direction.view(vp, story), true);
     } else {
       stillHost.hidden = true;
       canvas.hidden = false;
@@ -261,6 +275,8 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
         gl.setScene(scene);
         window.__spike.renderer = gl.rendererName();
       }
+      settleNeeded = true;
+      lastCamera = null;
       wake();
     }
   }
@@ -275,87 +291,109 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
 
   // ---- Scene and labels -----------------------------------------------------------------
 
-  function rebuild(): void {
+  /** Redraws the world for the story as it stands; words are re-placed unless only a pointer moved. */
+  function rebuild(resettle = true): void {
     scene = buildScene(direction, vp, story);
     gl?.setScene(scene);
     syncLabels();
+    updateLegend();
     tween.aim(direction.view(vp, story), now(), still);
-    settleNeeded = true;
+    if (resettle) settleNeeded = true;
     if (still) {
       drawStillWorld();
-      placeLabels(direction.view(vp, story), true);
+      if (resettle) placeLabels(direction.view(vp, story), true);
     } else {
-      lastCamera = null;
+      if (resettle) {
+        placeLabels(tween.current(now()));
+        lastCamera = null;
+      }
       wake();
     }
   }
 
-  const labelFor = new Map<string, HTMLElement>();
+  const labelFor = new Map<string, HTMLLIElement>();
 
-  function labelItem(list: HTMLUListElement, id: string, build: (li: HTMLLIElement) => void): HTMLLIElement {
-    let li = labelFor.get(id) as HTMLLIElement | undefined;
+  /** Creates a label once; later syncs update it in place, so focus and hover survive. */
+  function ensureLabel(list: HTMLUListElement, node: SceneNode, create: () => HTMLElement[]): HTMLLIElement {
+    let li = labelFor.get(node.id);
     if (!li) {
       li = el("li", "node-label");
-      li.dataset.node = id;
+      li.dataset.node = node.id;
+      li.dataset.side = node.side;
+      li.append(...create());
+      const delay = node.birth - now();
+      if (still || delay <= 0) li.dataset.shown = "1";
+      else {
+        // The entry animation plays once; after it, or after any change of mode, it never replays.
+        li.style.setProperty("--delay", `${delay.toFixed(2)}s`);
+        li.addEventListener(
+          "animationend",
+          () => {
+            if (li) li.dataset.shown = "1";
+          },
+          { once: true },
+        );
+      }
       list.append(li);
-      labelFor.set(id, li);
+      labelFor.set(node.id, li);
     }
-    li.replaceChildren();
-    build(li);
     return li;
   }
 
   function syncLabels(): void {
     const seen = new Set<string>();
-    const t = now();
-    const born = (node: SceneNode, li: HTMLElement) => {
-      li.dataset.side = node.side;
-      const delay = node.birth - t;
-      if (!li.dataset.born) {
-        li.style.setProperty("--delay", `${Math.max(0, delay).toFixed(2)}s`);
-        li.dataset.born = "1";
-      }
-    };
+    const revealedPhase = story.phase === "revealed";
+    const shared = new Set(story.connection?.shared ?? []);
     for (const node of scene.nodes) {
       const [kind, key] = node.id.split(":") as [string, string | undefined];
       if (!key) continue;
       if (kind === "skill") {
-        const li = labelItem(lists.skills, node.id, (li) => {
+        const li = ensureLabel(lists.skills, node, () => {
           const button = el("button", "skill-toggle");
           button.type = "button";
-          button.setAttribute("aria-pressed", String(node.state === "said"));
           button.dataset.skill = key;
-          button.append(el("span", "name", skillLabel(key)), el("span", "state", STATE_WORDS[node.state === "said" ? "said" : "usual"]));
-          li.append(button);
+          button.append(el("span", "name", skillLabel(key)), el("span", "state"));
+          return [button];
         });
+        const said = node.state === "said";
+        const button = li.querySelector("button");
+        button?.setAttribute("aria-pressed", String(said));
+        const state = li.querySelector(".state");
+        if (state) state.textContent = STATE_WORDS[said ? "said" : "usual"];
         li.dataset.state = node.state;
-        born(node, li);
+        // After the revelation, only the skills the two jobs share keep speaking.
+        li.dataset.voice = !revealedPhase || shared.has(key) ? "speak" : "quiet";
         seen.add(node.id);
       } else if (kind === "dest" || kind === "revealed") {
         const dest =
-          kind === "dest" ? story.destinations.find((d) => d.role.id === key) : story.connection ?? undefined;
+          kind === "dest" ? story.destinations.find((d) => d.role.id === key) : (story.connection ?? undefined);
         if (!dest) continue;
-        const li = labelItem(lists.places, node.id, (li) => {
-          li.append(el("span", "name", dest.role.title), el("span", "state", `${dest.shared.length} shared skills`));
+        const li = ensureLabel(lists.places, node, () => {
+          const button = el("button", "place-toggle");
+          button.type = "button";
+          button.dataset.place = key;
+          button.append(el("span", "name", dest.role.title), el("span", "state", `${dest.shared.length} shared skills`));
+          return [button];
         });
         li.dataset.kind = kind;
         li.dataset.selected = String(node.selected);
-        born(node, li);
+        li.querySelector("button")?.setAttribute("aria-pressed", String(story.focus === key));
+        li.dataset.voice = kind === "revealed" || story.focus === key ? "speak" : "quiet";
+        if (kind === "revealed") li.dataset.caption = "1";
         seen.add(node.id);
       }
     }
-    // The shadowed skills share one label, on the middle one; their names are in the card.
+    // The shadowed skills share one label, on the middle one; their names are behind Why?.
     const unknowns = scene.nodes.filter((n) => n.kind === "unknown");
     const middle = unknowns[Math.floor(unknowns.length / 2)];
     const found = story.connection;
     if (middle && found) {
-      const li = labelItem(lists.unknowns, middle.id, (li) => {
-        li.append(
-          el("span", "name", "Not known yet"),
-          el("span", "state", `${found.unknown.length} more skills ${lowerFirst(found.role.plural)} need`),
-        );
-      });
-      born(middle, li);
+      const li = ensureLabel(lists.unknowns, middle, () => [
+        el("span", "name", "Not known yet"),
+        el("span", "state", `${found.unknown.length} more skills ${lowerFirst(found.role.plural)} need`),
+      ]);
+      li.dataset.voice = "speak";
+      li.dataset.caption = "1";
       seen.add(middle.id);
     }
     for (const [id, li] of labelFor) {
@@ -364,6 +402,17 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
         labelFor.delete(id);
       }
     }
+  }
+
+  /** Each legend line appears when its state first appears in the world. */
+  function updateLegend(): void {
+    const show = (name: string, on: boolean) => {
+      const line = root.querySelector<HTMLLIElement>(`[data-legend="${name}"]`);
+      if (line) line.hidden = !on;
+    };
+    show("usual", story.phase !== "ask");
+    show("said", story.said.size > 0);
+    show("shadow", story.phase === "revealed");
   }
 
   function placeLabels(cam: Camera, settle = false): void {
@@ -376,9 +425,20 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
       elm.style.transform = `translate3d(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px, 0)`;
       elm.style.setProperty("--r", `${Math.max(3, node.size * p.scale).toFixed(1)}px`);
     };
-    place(originLabel, nodes.get("origin"));
+    const origin = nodes.get("origin");
+    place(originLabel, origin);
+    if (origin) {
+      // The question sits by the person's light before the first answer.
+      const p = direction.project(origin.p, cam, vp);
+      root.style.setProperty("--ox", `${p.x.toFixed(1)}px`);
+      root.style.setProperty("--oy", `${p.y.toFixed(1)}px`);
+    }
     for (const [id, li] of labelFor) place(li, nodes.get(id));
     if (settle) settleLabels(cam, nodes);
+    else if (leadersShown) {
+      leaders.replaceChildren();
+      leadersShown = false;
+    }
   }
 
   type Box = { x0: number; y0: number; x1: number; y1: number };
@@ -407,18 +467,19 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
     }
   }
 
-  const NEAR_AND_FAR = [1, 2.4];
+  const REACHES = [1, 2.2, 3.6];
   const overlap = (a: Box, b: Box): number =>
     Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
 
   /**
-   * Chooses each label's side so that words do not cover panels, lights or each other. Runs only
-   * when the view is at rest; the label's preferred side wins ties.
+   * Chooses each label's place so that words do not cover panels, lights or each other. A label
+   * placed away from its light gets a fine leader line back to it, so no word floats free. Runs
+   * only when the view is at rest; the label's preferred side wins ties.
    */
   function settleLabels(cam: Camera, nodes: Map<string, SceneNode>): void {
-    const panels = [".console", ".card", ".legend", ".status", ".wordmark", ".directions", ".controls", ".data-label", ".spike"]
+    const panels = [".console", ".card", ".legend", ".wordmark", ".directions", ".controls", ".data-label", ".spike"]
       .map((s) => root.querySelector<HTMLElement>(s))
-      .filter((e): e is HTMLElement => !!e && e.offsetParent !== null && e.textContent !== "")
+      .filter((e): e is HTMLElement => !!e && e.offsetParent !== null && !e.hidden)
       .map((e) => {
         const r = e.getBoundingClientRect();
         return { x0: r.left - 6, y0: r.top - 6, x1: r.right + 6, y1: r.bottom + 6 };
@@ -432,6 +493,7 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
     }
     const order = [...labelFor.entries()].sort(([a], [b]) => rank(a) - rank(b));
     const placed: Box[] = [];
+    const lines: string[] = [];
     for (const [id, li] of order) {
       const node = nodes.get(id);
       if (!node) continue;
@@ -439,8 +501,8 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
       const gap = Math.max(3, node.size * p.scale) + 8;
       const w = li.offsetWidth;
       const h = li.offsetHeight;
-      let best: { box: Box; score: number } | null = null;
-      for (const reach of NEAR_AND_FAR) {
+      let best: { box: Box; score: number; reach: number } | null = null;
+      for (const reach of REACHES) {
         for (const side of [node.side, ...SIDES.filter((s) => s !== node.side)]) {
           const box = boxFor(side, p.x, p.y, w, h, gap * reach);
           const outside =
@@ -448,19 +510,30 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
             Math.max(0, box.x1 - (vp.w - 8)) +
             Math.max(0, 60 - box.y0) +
             Math.max(0, box.y1 - (vp.h - 8));
-          let score = outside * h * 4 + (side === node.side ? 0 : 300) + (reach > 1 ? 500 : 0);
+          let score = outside * h * 4 + (side === node.side ? 0 : 300) + (reach - 1) * 450;
           for (const b of panels) score += overlap(box, b) * 3;
-          for (const b of placed) score += overlap(box, b) * 4;
+          for (const b of placed) score += overlap(box, b) * 5;
           for (const b of lights) score += overlap(box, b);
-          if (!best || score < best.score) best = { box, score };
+          if (!best || score < best.score) best = { box, score, reach };
         }
       }
       if (!best) continue;
+      const { box } = best;
       // The label's own offset from its light; its text aligns towards the light.
-      li.style.translate = `${(best.box.x0 - p.x).toFixed(1)}px ${(best.box.y0 - p.y).toFixed(1)}px`;
-      li.dataset.align = best.box.x1 <= p.x ? "end" : best.box.x0 >= p.x ? "start" : "centre";
-      placed.push(best.box);
+      li.style.translate = `${(box.x0 - p.x).toFixed(1)}px ${(box.y0 - p.y).toFixed(1)}px`;
+      li.dataset.align = box.x1 <= p.x ? "end" : box.x0 >= p.x ? "start" : "centre";
+      placed.push(box);
+      if (best.reach > 1 && li.style.visibility !== "hidden") {
+        const tx = Math.min(Math.max(p.x, box.x0), box.x1);
+        const ty = Math.min(Math.max(p.y, box.y0), box.y1);
+        const len = Math.hypot(tx - p.x, ty - p.y) || 1;
+        const sx = p.x + ((tx - p.x) / len) * (gap - 4);
+        const sy = p.y + ((ty - p.y) / len) * (gap - 4);
+        lines.push(`<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${tx.toFixed(1)}" y2="${ty.toFixed(1)}"/>`);
+      }
     }
+    leaders.innerHTML = lines.join("");
+    leadersShown = lines.length > 0;
   }
 
   const rank = (id: string): number =>
@@ -470,11 +543,12 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
 
   function animating(t: number): boolean {
     return (
-      t < keystroke + 1 ||
+      t < keystroke + 1.2 ||
       t < story.igniteAt + 3 ||
       story.isRevealing(t) ||
       t < story.revealAt + TIMING.revealLength + 1 ||
       t < (story.kept ?? -1e6) + 2 ||
+      t < story.focusAt + 0.6 ||
       [...story.said.values()].some((s) => t < s + 2) ||
       tween.moving(t)
     );
@@ -510,13 +584,13 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
       ignite: story.igniteAt,
       reveal: story.revealAt,
       key: keystroke,
+      typed: story.phase === "ask" ? input.value.length : 0,
       camera,
     });
     if (window.__spike.firstFrame === null) window.__spike.firstFrame = performance.now();
-    if (keystroke > answeredKey) {
-      // From the keystroke's handler to the end of the frame that answers it.
-      window.__spike.keyToFrame.push(Math.round((now() - keystroke) * 10000) / 10);
-      answeredKey = keystroke;
+    if (inputAt > answeredInput) {
+      window.__spike.inputToFrame.push(Math.round((now() - inputAt) * 10000) / 10);
+      answeredInput = inputAt;
     }
     const moved = !lastCamera || camera.some((v, i) => v !== lastCamera?.[i]);
     const settle = settleNeeded && !tween.moving(t);
@@ -525,7 +599,8 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
       lastCamera = camera;
       if (settle) settleNeeded = false;
     }
-    if (measuring) cpuSamples.push(performance.now() - started);
+    // Script time inside this frame callback (not style, layout, paint or compositing).
+    if (measuring) scriptSamples.push(performance.now() - started);
     if (measuring || !paused || live > 0.002 || animating(t)) requestAnimationFrame(frame);
     else running = false;
   }
@@ -554,6 +629,7 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
     window.clearTimeout(revealTimer);
     window.clearTimeout(cardTimer);
     closeOptions();
+    pinned = null;
     story.answer(role);
     card.hidden = true;
     sound.play("ignite");
@@ -589,13 +665,15 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
     if (!role || !found) return;
     $<HTMLParagraphElement>(".card-sentence").textContent = connectionSentence(role, found);
     $<HTMLParagraphElement>(".card-reason").textContent =
-      `It's in a different field (${lowerFirst(found.role.field)}), and you didn't name it. ` +
-      "The link is the skills both jobs need, not words in their titles.";
-    const unknownNames = found.unknown.map((s) => lowerFirst(skillLabel(s)));
+      `A field you didn't name (${lowerFirst(found.role.field)}), joined to yours by skills, not job titles.`;
     $<HTMLParagraphElement>(".card-unknown").textContent =
       found.unknown.length === 0
         ? `Nothing else ${lowerFirst(found.role.plural)} need is unknown in this list.`
-        : `Not known yet: ${found.unknown.length} more skills ${lowerFirst(found.role.plural)} need (${unknownNames.join(", ")}).`;
+        : `Not known yet: ${found.unknown.length} more skills ${lowerFirst(found.role.plural)} need.`;
+    $<HTMLParagraphElement>(".why-unknown").textContent =
+      found.unknown.length === 0
+        ? ""
+        : `Not known yet: ${found.unknown.map((s) => lowerFirst(skillLabel(s))).join(", ")}.`;
     const list = $<HTMLUListElement>(".why-list");
     list.replaceChildren(
       ...found.shared.map((s) => {
@@ -615,6 +693,7 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
   function reset(): void {
     window.clearTimeout(revealTimer);
     window.clearTimeout(cardTimer);
+    pinned = null;
     story.reset();
     root.classList.remove("is-answered");
     $<HTMLDivElement>(".ask").hidden = false;
@@ -622,11 +701,16 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
     card.hidden = true;
     why.hidden = true;
     whyToggle.setAttribute("aria-expanded", "false");
+    whyToggle.textContent = "Why?";
     busyButton.setAttribute("aria-pressed", "false");
     input.value = "";
     say("");
     rebuild();
     input.focus();
+  }
+
+  function point(destination: string | null): void {
+    if (story.point(destination ?? pinned)) rebuild(false);
   }
 
   // ---- The question and its type-ahead ---------------------------------------------------
@@ -674,6 +758,7 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
     renderOptions();
     // Feedback within 100 ms: the person's light answers each keystroke.
     keystroke = now();
+    inputAt = keystroke;
     wake();
   });
 
@@ -705,19 +790,33 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
     if (skill?.dataset.skill) {
       const id = skill.dataset.skill;
       story.toggleSaid(id);
+      inputAt = now();
       sound.play("touch");
       say(story.said.has(id) ? `${skillLabel(id)}: you said you've done this.` : `${skillLabel(id)}: back to not confirmed yet.`);
       fillCard();
       rebuild();
-      root.querySelector<HTMLButtonElement>(`.skill-toggle[data-skill="${id}"]`)?.focus();
       return;
     }
     if (target.closest(".start-again")) return reset();
     if (target.closest('[data-node^="revealed"]')) {
       if (card.hidden) showCard();
       keep.focus();
+      return;
+    }
+    const place = target.closest<HTMLButtonElement>(".place-toggle");
+    if (place?.dataset.place) {
+      pinned = pinned === place.dataset.place ? null : place.dataset.place;
+      point(pinned);
     }
   });
+
+  // Pointing at or focusing a destination shows the skills it shares; leaving it hides them.
+  const placeOf = (event: Event): string | null =>
+    (event.target as HTMLElement).closest<HTMLElement>(".place-toggle")?.dataset.place ?? null;
+  lists.places.addEventListener("pointerover", (event) => point(placeOf(event)));
+  lists.places.addEventListener("pointerleave", () => point(null));
+  lists.places.addEventListener("focusin", (event) => point(placeOf(event)));
+  lists.places.addEventListener("focusout", () => point(null));
 
   keep.addEventListener("click", () => {
     const found = story.connection;
@@ -761,7 +860,6 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
   soundButton.addEventListener("click", () => {
     sound.setEnabled(!sound.enabled);
     soundButton.setAttribute("aria-pressed", String(sound.enabled));
-    soundButton.textContent = sound.enabled ? "Sound on" : "Sound off";
   });
 
   busyButton.addEventListener("click", () => {
@@ -780,7 +878,12 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
 
   root.addEventListener("change", (event) => {
     const target = event.target as HTMLInputElement;
-    if (target.name === "font") setFont(target.value as FontId);
+    if (target.name === "font") {
+      setFont(target.value as FontId);
+      settleNeeded = true;
+      if (still) placeLabels(direction.view(vp, story), true);
+      else wake();
+    }
   });
 
   for (const panel of [card, $<HTMLElement>(".console")]) {
@@ -840,14 +943,14 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
     const world = gl as GLWorld | null;
     const gpuTimed = world?.measureGpu() ?? false;
     const warm = () => {
-      cpuSamples = [];
+      scriptSamples = [];
       world?.takeGpuSamples();
     };
     void sampleFrames(3, 12, warm).then((frames) => {
       const gpu = world?.takeGpuSamples() ?? [];
       const stats = {
         frames,
-        cpu: summarise(cpuSamples),
+        script: summarise(scriptSamples),
         gpu: gpuTimed && gpu.length > 0 ? summarise(gpu) : "not available",
       };
       window.__spike.stats = stats;

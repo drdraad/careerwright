@@ -22,7 +22,7 @@
 #   make rotate-master-key  add a master key version, reload it, reseal every sealed record
 #   make reseal             reseal every sealed record under the current master key
 #   make spike-world        the throwaway spike of three world directions (session W1), opened in
-#                           the browser at http://127.0.0.1:53300; made-up data, not the product
+#                           Google Chrome at http://127.0.0.1:53300; made-up data, not the product
 # Local secrets and master keys live in CAREERWRIGHT_HOME (default ~/.careerwright/l0), never in the repository.
 
 UV := uv run --locked

@@ -53,12 +53,14 @@ for (const font of ["outfit", "sora", "unbounded"]) {
   const page = await context.newPage();
   await page.goto(`${ORIGIN}/?d=growth&font=${font}`);
   await page.waitForTimeout(700);
-  const question = await page.screenshot({ clip: { x: 300, y: 450, width: 840, height: 170 } });
+  const q = await page.locator(".question").boundingBox();
+  const question = await page.screenshot({ clip: { x: q.x - 12, y: q.y - 12, width: Math.min(620, q.width + 24), height: q.height + 24 } });
   await page.locator("#role-input").pressSequentially("customer", { delay: 30 });
   await page.keyboard.press("Enter");
   await page.locator(".card").waitFor({ state: "visible" });
   await page.waitForTimeout(400);
-  const card = await page.screenshot({ clip: { x: 1048, y: 84, width: 360, height: 230 } });
+  const c = await page.locator(".card").boundingBox();
+  const card = await page.screenshot({ clip: { x: c.x - 2, y: c.y - 2, width: c.width + 4, height: 230 } });
   crops[font] = { question: question.toString("base64"), card: card.toString("base64") };
   await context.close();
 }
@@ -66,12 +68,12 @@ for (const font of ["outfit", "sora", "unbounded"]) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 400 } });
   const column = (font, name, note) => `
     <section><h2>${name}</h2><p>${note}</p>
-    <img src="data:image/png;base64,${crops[font].question}" width="420">
-    <img src="data:image/png;base64,${crops[font].card}" width="360"></section>`;
+    <img src="data:image/png;base64,${crops[font].question}" style="max-width:100%;display:block;margin-bottom:12px">
+    <img src="data:image/png;base64,${crops[font].card}" width="344"></section>`;
   await page.setContent(`<!doctype html><html><body style="margin:0;background:#03050b;color:#c2cce2;font:15px system-ui">
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;padding:24px">
-    ${column("outfit", "Outfit", "Recommended. Closest to the reference image; the narrowest, so long job names wrap least.")}
-    ${column("sora", "Sora", "Wider and more technical. Strong in Circuit; long names take an extra line.")}
+    ${column("outfit", "Outfit", "Suggested, and used in all three looks. Closest to the reference image; the narrowest, so long job names wrap least.")}
+    ${column("sora", "Sora", "Wider and more technical. Long names take an extra line.")}
     ${column("unbounded", "Unbounded", "Most like a game title. Needs a smaller size and still wraps most.")}
     </div></body></html>`);
   await page.waitForTimeout(300);

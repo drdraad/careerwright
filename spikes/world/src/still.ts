@@ -98,10 +98,16 @@ export function drawStill(direction: Direction, vp: Viewport, cam: Camera, scene
       case "destination":
       case "revealed":
         marks.push(halo(PALETTE.orange, r * (node.kind === "revealed" ? 4.2 : 3.2), 0.55));
-        if (direction.id === "horizon")
+        if (direction.id === "horizon") {
           marks.push(
             `<rect x="${fmt(p.x - r * 0.35)}" y="${fmt(p.y + r * 1.2)}" width="${fmt(r * 0.7)}" height="${fmt(r * 6)}" fill="${PALETTE.orange}" opacity="0.28" filter="url(#soft)"/>`,
           );
+          // The revealed destination's steady column of light, as in the moving world.
+          if (node.kind === "revealed")
+            marks.push(
+              `<rect x="${fmt(p.x - r * 0.5)}" y="${fmt(p.y - r * 16)}" width="${fmt(r)}" height="${fmt(r * 16)}" fill="${PALETTE.orange}" opacity="0.3" filter="url(#soft)"/>`,
+            );
+        }
         marks.push(shape(r, `fill="#ffd2a1"`, true));
         if (node.selected)
           marks.push(`<circle cx="${x}" cy="${y}" r="${fmt(r * 2.3)}" fill="none" stroke="${PALETTE.teal}" stroke-width="2"/>`);

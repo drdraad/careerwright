@@ -14,6 +14,8 @@ import { type Story, TIMING } from "./story.ts";
 
 export type DirectionId = "growth" | "horizon" | "circuit";
 export type FontId = "outfit" | "sora" | "unbounded";
+/** One heading face for every look by default, so the comparison is of worlds, not lettering. */
+export const DEFAULT_FONT: FontId = "outfit";
 
 export type Viewport = { readonly w: number; readonly h: number; readonly narrow: boolean };
 
@@ -52,13 +54,14 @@ export type GlslChunks = {
   readonly node: string;
   /** float pulse(float dist, float state) — ambient light travelling along the trails */
   readonly pulse: string;
+  /** vec2 sway(vec2 px, float envelope) — a screen-space offset for trail points (atmosphere) */
+  readonly sway: string;
 };
 
 export type Direction = {
   readonly id: DirectionId;
   readonly name: string;
   readonly blurb: string;
-  readonly font: FontId;
   readonly particles: number;
   geometry(vp: Viewport, story: Story): Geometry;
   /** Where the view rests for the story as it stands. */
@@ -185,22 +188,30 @@ export function buildScene(direction: Direction, vp: Viewport, story: Story): Sc
     });
   });
 
-  // The first scatter of destinations, joined by the skills they share with the person's role.
+  // The first scatter of destinations. Each grows one quiet trail from the shared skill nearest
+  // to it; all the skills it shares light up only when the person points at it (one idea at a
+  // time), and always for the revealed destination.
   const skillIndex = (skill: string): number => role.skills.indexOf(skill);
   story.destinations.forEach((dest, j) => {
     const place = g.destinations[j];
     if (!place) return;
     const birth = ignite + 0.85 + j * 0.07;
-    dest.shared.forEach((skill, k) => {
+    const pointed = story.focus === dest.role.id;
+    const nearest = [...dest.shared].sort(
+      (a, b) =>
+        dist3(g.skills[skillIndex(a)]?.p ?? g.origin, place.p) - dist3(g.skills[skillIndex(b)]?.p ?? g.origin, place.p),
+    )[0];
+    dest.shared.forEach((skill) => {
       const from = g.skills[skillIndex(skill)];
-      if (!from) return;
+      if (!from || (!pointed && skill !== nearest)) return;
+      const quiet = skill === nearest;
       const points = g.path(from.p, place.p, "reach", skillIndex(skill), j);
       addTrail(
         `reach:${dest.role.id}:${skill}`,
         points,
         stateOf(skill),
-        birth + k * 0.03,
-        0.8,
+        quiet ? birth : story.focusAt,
+        quiet ? 0.8 : 0.35,
         g.widths.reach,
         [0.35, 1],
         rootLength.get(skill) ?? 0,

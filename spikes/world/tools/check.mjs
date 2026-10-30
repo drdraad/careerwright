@@ -3,6 +3,10 @@
 // - the first answer changes the world within ten seconds and the revelation's sentence and
 //   evidence are in the DOM;
 // - the words are the same moving, with the system's reduced-motion setting, and in calm mode;
+// - words stay shown, with no entry animation replaying, after calm mode or the system's reduced
+//   motion setting is turned on and off again;
+// - teal appears only on selection, the kept path and the primary action;
+// - pointing at a destination (keyboard focus) shows what it shares;
 // - picking a skill and keeping the destination in view work from the keyboard;
 // - no request leaves 127.0.0.1.
 // Usage: node tools/check.mjs [--headed]
@@ -92,8 +96,56 @@ for (const direction of DIRECTIONS) {
       );
   }
 
-  // Keyboard: say a skill was done, keep the destination in view, undo.
   const page = moving.page;
+
+  // Teal means selection, the kept path and the primary action only: before anything is kept,
+  // the primary button is the only element (or pseudo-element) painted teal.
+  const teal = await page.evaluate(() => {
+    const hits = [];
+    for (const el of document.querySelectorAll("body *")) {
+      for (const pseudo of [null, "::before", "::after"]) {
+        const s = getComputedStyle(el, pseudo);
+        const paint = [s.color, s.backgroundColor, s.backgroundImage, s.borderTopColor, s.borderLeftColor, s.outlineColor, s.boxShadow].join(" ");
+        if (paint.includes("69, 247, 212") && el.offsetParent !== null && s.display !== "none" && s.content !== "none")
+          hits.push(`${el.className || el.tagName}${pseudo ?? ""}`);
+      }
+    }
+    return [...new Set(hits)];
+  });
+  if (teal.length === 1 && teal[0].startsWith("primary")) pass("teal is spent only on the primary action");
+  else fail(`teal also used on: ${teal.join(", ")}`);
+
+  // Words stay readable through every change of mode: no label waits for an entry animation.
+  const wordsShown = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll(".world-words li")].every(
+        (li) => li.getAnimations().length === 0 && Number(getComputedStyle(li).opacity) >= 0.59,
+      ),
+    );
+  await page.locator('[data-control="calm"]').click();
+  await page.locator('[data-control="calm"]').click();
+  await page.waitForTimeout(150);
+  if (await wordsShown()) pass("every word stays shown after calm mode is turned on and off");
+  else fail("words vanished after calm mode was turned off");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.waitForTimeout(150);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.waitForTimeout(150);
+  if (await wordsShown()) pass("every word stays shown after reduced motion is turned on and off");
+  else fail("words vanished after reduced motion was turned off");
+
+  // Pointing at a destination (here by keyboard focus) shows what it shares.
+  const place = page.locator(".places [data-kind='dest'] .place-toggle").first();
+  await place.focus();
+  await page.waitForTimeout(150);
+  const pointed = await place.evaluate((b) => ({
+    pressed: b.getAttribute("aria-pressed"),
+    caption: getComputedStyle(b.querySelector(".state")).clipPath,
+  }));
+  if (pointed.pressed === "true" && pointed.caption === "none") pass("focusing a destination shows how many skills it shares");
+  else fail(`pointing did not show the destination's skills: ${JSON.stringify(pointed)}`);
+
+  // Keyboard: say a skill was done, keep the destination in view, undo.
   const toggle = page.locator('.skill-toggle[data-skill="calm"]');
   await toggle.focus();
   await page.keyboard.press("Enter");
@@ -114,7 +166,8 @@ for (const direction of DIRECTIONS) {
 
   const pause = page.locator('[data-control="pause"]');
   await pause.click();
-  if ((await pause.textContent()) === "Play motion") pass("the pause control is visible and works");
+  if ((await pause.getAttribute("aria-pressed")) === "true" && (await pause.textContent()) === "Pause motion")
+    pass("the pause control is visible and works (fixed label, pressed state)");
   else fail("pause control did not toggle");
 
   for (const run of [moving, still, calm]) {

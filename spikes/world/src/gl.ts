@@ -28,6 +28,7 @@ uniform float uPhase;
 uniform float uIgnite;
 uniform float uReveal;
 uniform float uKey;
+uniform float uTyped;
 uniform vec2 uRes;
 uniform float uDpr;
 uniform vec4 uCamA;
@@ -74,6 +75,7 @@ void main() {
 
 const trailVert = (d: Direction) => /* glsl */ `
 ${d.glsl.project}
+${d.glsl.sway}
 in vec3 position;
 in vec3 aPrev;
 in vec3 aNext;
@@ -90,9 +92,15 @@ flat out vec4 vB;
 flat out float vChanged;
 void main() {
   float s0; float s1; float s2;
+  // Sway is atmosphere: the same gentle movement for every trail, zero at both ends so the
+  // lights never move.
+  float envelope = sin(3.14159 * aA.y);
   vec2 a = project(aPrev, s0);
   vec2 p = project(position, s1);
   vec2 b = project(aNext, s2);
+  a += sway(a, envelope);
+  p += sway(p, envelope);
+  b += sway(b, envelope);
   vec2 tangent = b - a;
   float len = length(tangent);
   tangent = len > 1e-4 ? tangent / len : vec2(1.0, 0.0);
@@ -233,6 +241,7 @@ type Uniforms = {
   uIgnite: { value: number };
   uReveal: { value: number };
   uKey: { value: number };
+  uTyped: { value: number };
   uRes: { value: [number, number] };
   uDpr: { value: number };
   uCamA: { value: [number, number, number, number] };
@@ -248,6 +257,8 @@ export type FrameState = {
   ignite: number;
   reveal: number;
   key: number;
+  /** Characters typed into the question so far (0 once answered). */
+  typed: number;
   camera: ViewCamera;
 };
 
@@ -297,6 +308,7 @@ export class GLWorld {
       uIgnite: { value: -1e6 },
       uReveal: { value: -1e6 },
       uKey: { value: -1e6 },
+      uTyped: { value: 0 },
       uRes: { value: [1, 1] },
       uDpr: { value: 1 },
       uCamA: { value: [0, 0, 1, 0] },
@@ -472,6 +484,7 @@ export class GLWorld {
     u.uIgnite.value = frame.ignite;
     u.uReveal.value = frame.reveal;
     u.uKey.value = frame.key;
+    u.uTyped.value = frame.typed;
     u.uCamA.value = [frame.camera[0], frame.camera[1], frame.camera[2], frame.camera[3]];
     u.uCamB.value = [frame.camera[4], frame.camera[5], frame.camera[6], frame.camera[7]];
     const timing = this.timing;

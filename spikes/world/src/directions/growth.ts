@@ -1,5 +1,6 @@
-// Growth: organic first. A network of roots and nerves grown from the person. Ambient light
-// beats outward through the whole network from the person, like a pulse along nerves.
+// Growth: organic first. A network of roots and nerves grown from the person. Before the first
+// answer the light is a seed whose tendrils reach further with every keystroke; after it, roots
+// grow and sway gently, and a pulse beats outward through them like a signal along nerves.
 import { type Camera, type Direction, type Geometry, type Placed, type Viewport, skillSlots } from "../direction.ts";
 import { type LabelSide, type Vec3, cubic, seeded } from "../scene.ts";
 import type { Story } from "../story.ts";
@@ -106,19 +107,20 @@ function geometry(vp: Viewport, story: Story): Geometry {
       return out;
     },
     widths: {
-      root: [3.4, 1.8],
-      reach: [1.6, 1.1],
-      link: [2.4, 1.6],
+      root: [3.6, 1.6],
+      reach: [1.5, 1.0],
+      link: [2.4, 1.5],
       shadow: [1.3, 1.3],
       opening: [0.8, 0.6],
-      fibre: [1.0, 0.35],
+      fibre: [1.0, 0.3],
     },
-    sizes: { origin: 9, skill: 5.5, destination: 6.5, revealed: 8.5, unknown: 5, opening: 2.2 },
+    sizes: { origin: 9, skill: 5.5, destination: 7, revealed: 9, unknown: 5, opening: 2.2 },
   };
 }
 
 function view(vp: Viewport, story: Story): Camera {
-  if (story.phase === "ask") return [vp.w * 0.5, vp.h * (vp.narrow ? 0.34 : 0.4), 1, 0, 0, 0, 0, 0];
+  // Before the first answer the seed sits left of centre, with the question beside it.
+  if (story.phase === "ask") return [vp.w * (vp.narrow ? 0.5 : 0.3), vp.h * (vp.narrow ? 0.3 : 0.52), 1, 0, 0, 0, 0, 0];
   if (vp.narrow) return [vp.w * 0.5, vp.h * 0.62, 0.62, 0, 0, 0, 0, 0];
   // The revelation shifts the view a little, making room for its card: the world stays.
   if (story.phase === "revealed") return [vp.w * 0.39, vp.h * 0.89, 0.94, 0, 0, 0, 0, 0];
@@ -128,6 +130,11 @@ function view(vp: Viewport, story: Story): Camera {
 const GLSL = {
   project: /* glsl */ `
 vec2 project(vec3 p, out float scale) { scale = uCamA.z; return uCamA.xy + p.xy * uCamA.z; }
+`,
+  sway: /* glsl */ `
+vec2 sway(vec2 px, float envelope) {
+  return vec2(sin(px.y * 0.013 + uAmbient * 0.7), cos(px.x * 0.011 + uAmbient * 0.55)) * 2.8 * envelope;
+}
 `,
   background: /* glsl */ `
 vec3 background(vec2 px) {
@@ -175,8 +182,25 @@ vec3 nodeLook(vec2 q, float kind, float state, float age, float flare, float sel
     float lit = uPhase > 0.5 ? 1.0 : 0.6;
     float ign = clamp(1.0 - (uTime - uIgnite) / 1.4, 0.0, 1.0) * step(uIgnite, uTime);
     col = WHITE * disc * 1.3
-        + mix(BLUE, WHITE, 0.4) * (exp(-r * r * 0.3) * 0.7 + exp(-r * 0.75) * 0.3) * breathe * lit
-        + WHITE * ign * exp(-r * 0.35) * 1.4;
+        + mix(BLUE, WHITE, 0.4) * (exp(-r * r * 0.3) * 0.7 + exp(-r * 0.75) * 0.3) * breathe * lit;
+    col += WHITE * ign * exp(-r * 0.35) * 1.4;
+    // The seed's tendrils: before the first answer they reach a little further with every
+    // keystroke, then give way to the roots. Atmosphere: they carry no state.
+    float seedTime = 1.0 - step(0.5, uPhase);
+    if (seedTime > 0.0) {
+      float reach = 3.2 + min(uTyped, 14.0) * 0.75;
+      float a = atan(q.y, q.x);
+      float tendrils = 0.0;
+      for (int i = 0; i < 7; i++) {
+        float fi = float(i);
+        float bend = 0.32 * sin(r * 0.55 + uAmbient * 0.6 + fi * 1.7);
+        float d = mod(a - (fi * 0.8976 + 0.3 + bend) + 3.14159, 6.28318) - 3.14159;
+        float across = abs(d) * r * px;
+        float along = smoothstep(1.0, 1.8, r) * (1.0 - smoothstep(reach - 1.6, reach, r));
+        tendrils += exp(-across * across * 0.35) * along * (1.0 - r / (reach + 1.0));
+      }
+      col += mix(BLUE, VIOLET, clamp(r / 12.0, 0.0, 1.0)) * tendrils * 0.9 * seedTime;
+    }
   } else if (kind < 1.5) {
     vec3 c = journey(0.35);
     if (state > 0.5) {
@@ -186,9 +210,14 @@ vec3 nodeLook(vec2 q, float kind, float state, float age, float flare, float sel
       col = c * ring * 0.75 + c * exp(-r * 1.3) * 0.22;
     }
   } else if (kind < 3.5) {
+    // Destinations are warm orange lights, as in the reference image: a hot core, never white.
     float big = kind > 2.5 ? 1.0 : 0.0;
-    col = mix(ORANGE, WHITE, 0.55) * disc * 1.2 + ORANGE * (exp(-r * 0.85) * 0.65 + exp(-r * r * 0.2) * 0.25) * breathe;
-    col += ORANGE * big * exp(-r * 0.4) * clamp(1.0 - age / 1.2, 0.0, 1.0) * 2.2;
+    float core = 1.0 - smoothstep(0.55 - aa, 0.55 + aa, r);
+    col = mix(ORANGE, vec3(1.0, 0.85, 0.6), 0.45) * core * 0.95 + ORANGE * disc * 0.45
+        + ORANGE * (exp(-r * 0.8) * 0.6 + exp(-r * r * 0.18) * 0.3) * breathe;
+    // The revealed destination keeps a steady wider glow once settled: it stands out by light.
+    col += ORANGE * big * exp(-r * 0.32) * 0.35;
+    col += ORANGE * big * exp(-r * 0.4) * clamp(1.0 - age / 1.2, 0.0, 1.0) * 2.0;
     if (sel > 0.5) {
       float lock = 1.0 - smoothstep(0.07, 0.07 + aa, abs(r - 2.3));
       col += TEAL * lock * 1.3;
@@ -235,7 +264,6 @@ export const growth: Direction = {
   id: "growth",
   name: "Growth",
   blurb: "A living network of roots and nerves, grown from you.",
-  font: "outfit",
   particles: 1600,
   geometry,
   view,

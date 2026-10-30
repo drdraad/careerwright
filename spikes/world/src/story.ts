@@ -34,16 +34,9 @@ export class Story {
   revealAt = -1e6;
   /** The measurement scene: 100 made-up openings around the destinations. */
   busy = false;
-
-  private readonly listeners = new Set<() => void>();
-
-  onChange(listener: () => void): void {
-    this.listeners.add(listener);
-  }
-
-  private emit(): void {
-    for (const listener of this.listeners) listener();
-  }
+  /** The destination the person is pointing at or has focused: it shows its shared skills. */
+  focus: string | null = null;
+  focusAt = -1e6;
 
   answer(role: Role, at = now()): void {
     this.role = role;
@@ -55,10 +48,10 @@ export class Story {
     );
     this.said.clear();
     this.kept = null;
+    this.focus = null;
     this.phase = "grown";
     this.igniteAt = at;
     this.revealAt = -1e6;
-    this.emit();
   }
 
   /** Stages the revelation, if there is one to show. A revelation with no source is not shown. */
@@ -66,7 +59,6 @@ export class Story {
     if (this.phase !== "grown" || !this.connection) return;
     this.phase = "revealed";
     this.revealAt = at;
-    this.emit();
   }
 
   isRevealing(at = now()): boolean {
@@ -77,24 +69,28 @@ export class Story {
   completeReveal(at = now()): void {
     if (!this.isRevealing(at)) return;
     this.revealAt = at - TIMING.revealLength;
-    this.emit();
   }
 
   toggleSaid(skill: string, at = now()): void {
     if (this.said.has(skill)) this.said.delete(skill);
     else this.said.set(skill, at);
-    this.emit();
   }
 
   keep(at = now()): void {
     if (this.phase !== "revealed") return;
     this.kept = at;
-    this.emit();
   }
 
   undoKeep(): void {
     this.kept = null;
-    this.emit();
+  }
+
+  /** Returns true when what the person points at changed. */
+  point(destination: string | null, at = now()): boolean {
+    if (destination === this.focus) return false;
+    this.focus = destination;
+    this.focusAt = at;
+    return true;
   }
 
   reset(): void {
@@ -104,10 +100,10 @@ export class Story {
     this.destinations = [];
     this.said.clear();
     this.kept = null;
+    this.focus = null;
     this.igniteAt = -1e6;
     this.revealAt = -1e6;
     this.busy = false;
-    this.emit();
   }
 
   /** Jumps straight to the settled, busiest state (measurement and screenshots only). */
@@ -116,13 +112,11 @@ export class Story {
     this.reveal(at - 30 + TIMING.revealDelay);
     if (options.kept) this.kept = at - 20;
     this.busy = options.busy;
-    this.emit();
   }
 
   /** Replays the revelation's staging without changing what it says (measurement only). */
   replayReveal(at = now()): void {
     if (this.phase !== "revealed") return;
     this.revealAt = at;
-    this.emit();
   }
 }

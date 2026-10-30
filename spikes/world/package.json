@@ -9,7 +9,7 @@
     "node": ">=24.11 <25"
   },
   "scripts": {
-    "start": "vite build && vite preview --host 127.0.0.1 --port 53300 --strictPort --open",
+    "start": "vite build && BROWSER=tools/open-chrome.js vite preview --host 127.0.0.1 --port 53300 --strictPort --open",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 53300 --strictPort",
     "dev": "vite --host 127.0.0.1 --port 53300 --strictPort",

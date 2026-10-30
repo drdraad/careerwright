@@ -1,6 +1,8 @@
-// Horizon: journey first. A dark plain under a faint horizon, like the reference image. The
-// person stands in the foreground; destinations are lights on the horizon; the view travels.
-// Layout is in world units: x across, y height, z depth. The camera is
+// Horizon: journey first. A smooth dark plain under a glowing horizon, like the reference image.
+// The person stands in the foreground; destinations are lights along the horizon; the view
+// travels. Depth means nothing: every destination stands at the same distance, and the revealed
+// one is singled out by its light, never by being further away. Every skill sits at the same
+// distance from the person. Layout is in world units: x across, y height, z depth. The camera is
 // [camX, camZ, horizon y (px), focal length (px), centre x (px), eye height, 0, 0].
 import { type Camera, type Direction, type Geometry, type Placed, type Viewport, skillSlots } from "../direction.ts";
 import { type Vec3, cubic, seeded } from "../scene.ts";
@@ -9,6 +11,8 @@ import type { Story } from "../story.ts";
 const DEG = Math.PI / 180;
 const EYE = 1;
 const ORIGIN_Z = 1.7;
+/** Every destination, revealed or not, stands this far out. */
+const HORIZON_Z = 17;
 
 /** Narrow screens squeeze the world sideways rather than shrinking it. */
 const across = (vp: Viewport): number => Math.min(1, vp.w / vp.h / 1.6);
@@ -21,15 +25,13 @@ function geometry(vp: Viewport, story: Story): Geometry {
   const skills: Placed[] = [];
   for (let i = 0; i < skillCount; i++) {
     const slot = slots[i] ?? i;
-    const deg = -48 + (106 * slot) / Math.max(1, skillCount - 1);
-    const near = slot % 2 === 0;
-    const r = near ? 1.45 : 2.5;
+    const deg = -62 + (124 * slot) / Math.max(1, skillCount - 1);
     skills.push({
-      p: [origin[0] + Math.sin(deg * DEG) * r * 1.25 * kx, 0.02, ORIGIN_Z + Math.cos(deg * DEG) * r],
-      side: near ? "below" : "above",
+      p: [origin[0] + Math.sin(deg * DEG) * 2.05 * 1.3 * kx, 0.02, ORIGIN_Z + Math.cos(deg * DEG) * 2.05],
+      side: slot % 2 === 0 ? "below" : "above",
     });
   }
-  // Destinations line the horizon on both sides, leaving the far centre for the revelation.
+  // Destinations line the horizon on both sides of the centre, which the revelation takes.
   // Their order is by title; where one sits never means how near or how good it is.
   const destCount = story.destinations.length;
   const leftCount = Math.ceil(destCount / 2);
@@ -39,21 +41,26 @@ function geometry(vp: Viewport, story: Story): Geometry {
     const k = onLeft ? j : j - leftCount;
     const n = onLeft ? leftCount : destCount - leftCount;
     const t = n > 1 ? k / (n - 1) : 0.5;
-    const x = onLeft ? -16 + 11 * t : 5 + 4.5 * t;
-    destinations.push({ p: [x * kx, 0.25, 16 + (j % 2) * 2.2], side: "above" });
+    const x = onLeft ? -15 + 10 * t : 5 + 6 * t;
+    destinations.push({ p: [x * kx, 0.25, HORIZON_Z], side: "above" });
   }
+  const revealed: Placed = { p: [0, 0.25, HORIZON_Z], side: "above" };
   // What is not known yet: dark stepping stones on the ground between the person and it.
   const unknownCount = story.connection?.unknown.length ?? 0;
   const unknown: Placed[] = [];
-  const depths = [5, 7.5, 12, 17];
   for (let k = 0; k < unknownCount; k++) {
-    unknown.push({ p: [(2.2 + k) * kx, 0.02, depths[k] ?? 5 + k * 4], side: "right" });
+    const t = 0.35 + (0.3 * k) / Math.max(1, unknownCount - 1);
+    const side = k % 2 === 0 ? 1 : -1;
+    unknown.push({
+      p: [origin[0] + (revealed.p[0] - origin[0]) * t + side * 0.9 * kx, 0.02, ORIGIN_Z + (HORIZON_Z - ORIGIN_Z) * t],
+      side: "right",
+    });
   }
   return {
     origin,
     skills,
     destinations,
-    revealed: { p: [1.5 * kx, 0.5, 30], side: "above" },
+    revealed,
     unknown,
     openings(dest, count, place) {
       const rand = seeded(`horizon-openings:${place}`);
@@ -83,14 +90,14 @@ function geometry(vp: Viewport, story: Story): Geometry {
       return lift(cubic(from, c1, c2, to, 56), from, to);
     },
     widths: {
-      root: [0.014, 0.012],
-      reach: [0.011, 0.075],
-      link: [0.015, 0.1],
+      root: [0.016, 0.013],
+      reach: [0.012, 0.075],
+      link: [0.016, 0.1],
       shadow: [0.01, 0.045],
       opening: [0.03, 0.03],
       fibre: [0, 0],
     },
-    sizes: { origin: 0.032, skill: 0.026, destination: 0.21, revealed: 0.45, unknown: 0.05, opening: 0.05 },
+    sizes: { origin: 0.032, skill: 0.026, destination: 0.22, revealed: 0.3, unknown: 0.05, opening: 0.05 },
   };
 }
 
@@ -106,9 +113,10 @@ function lift(points: Vec3[], from: Vec3, to: Vec3): Vec3[] {
 function view(vp: Viewport, story: Story): Camera {
   const kx = across(vp);
   const f = vp.h * (vp.narrow ? 0.56 : 0.62);
-  if (story.phase === "ask") return [-0.75 * kx, -0.25, vp.h * 0.32, f, vp.w * 0.5, EYE, 0, 0];
-  // The revelation travels a short way out across the plain, towards the newly lit destination.
-  if (story.phase === "revealed") return [0.3 * kx, 0.2, vp.h * 0.35, f, vp.w * 0.46, EYE, 0, 0];
+  // Before the first answer: close to the person, standing on the plain, the horizon far off.
+  if (story.phase === "ask") return [-0.75 * kx, 0.51, vp.h * 0.3, f, vp.w * 0.5, EYE, 0, 0];
+  // The revelation travels a short way out across the plain, towards the newly lit light.
+  if (story.phase === "revealed") return [0.15 * kx, 0.2, vp.h * 0.35, f, vp.w * 0.46, EYE, 0, 0];
   return [0, 0, vp.h * 0.36, f, vp.w * (vp.narrow ? 0.5 : 0.46), EYE, 0, 0];
 }
 
@@ -128,40 +136,48 @@ vec2 project(vec3 p, out float scale) {
   return vec2(uCamB.x + (p.x - uCamA.x) * scale, uCamA.z + (uCamB.y - p.y) * scale);
 }
 `,
+  sway: /* glsl */ `
+vec2 sway(vec2 px, float envelope) { return vec2(0.0); }
+`,
   background: /* glsl */ `
 vec3 background(vec2 px) {
   float hy = uCamA.z;
   float f = uCamA.w;
   float above = hy - px.y;
-  vec3 col = vec3(0.008, 0.011, 0.024);
-  col += vec3(0.06, 0.10, 0.24) * exp(-abs(above) / 90.0) * 0.55;
-  col += vec3(0.22, 0.16, 0.42) * exp(-abs(above) / 14.0) * 0.25;
-  // The ground, computed for every pixel so its derivatives stay well defined.
-  float depth = f * uCamB.y / max(px.y - hy, 0.25);
-  vec2 g = vec2(uCamA.x + (px.x - uCamB.x) * depth / f, uCamA.y + depth);
-  vec2 w = max(fwidth(g), vec2(1e-4));
-  vec2 cell = abs(fract(g - 0.5) - 0.5) / w;
-  float line = 1.0 - min(min(cell.x, cell.y), 1.0);
+  // Sky: near-black, deepening upward, with a band of light along the horizon.
+  vec3 col = mix(vec3(0.012, 0.018, 0.040), vec3(0.004, 0.006, 0.014), clamp(above / (uRes.y * 0.5), 0.0, 1.0));
+  col += vec3(0.07, 0.11, 0.26) * exp(-abs(above) / 80.0) * 0.6;
+  col += vec3(0.24, 0.18, 0.46) * exp(-abs(above) / 12.0) * 0.28;
   if (above > 0.0) {
     vec2 c = floor(px / 46.0);
     float h = hash12(c);
-    if (h > 0.82) {
+    if (h > 0.84) {
       vec2 sp = (c + vec2(hash12(c + 3.1), hash12(c + 7.7))) * 46.0;
       float d = length(px - sp);
       float tw = 0.6 + 0.4 * sin(uAmbient * (0.3 + h * 0.4) + h * 50.0);
-      col += WHITE * exp(-d * d * 0.8) * tw * (h - 0.8) * 3.0 * smoothstep(0.0, 90.0, above);
+      col += WHITE * exp(-d * d * 0.8) * tw * (h - 0.82) * 3.0 * smoothstep(20.0, 120.0, above);
     }
   } else {
-    float fade = exp(-depth * 0.1) * smoothstep(0.0, 3.0, -above);
-    col += vec3(0.09, 0.16, 0.36) * line * 0.55 * fade;
-    col += vec3(0.04, 0.06, 0.15) * exp(above / 36.0) * 0.7;
+    // The plain: smooth dark ground, a sheen near the horizon and slow mist; no grid.
+    float depth = f * uCamB.y / max(px.y - hy, 0.25);
+    vec2 g = vec2(uCamA.x + (px.x - uCamB.x) * depth / f, uCamA.y + depth);
+    float mist = vnoise(g * vec2(0.25, 0.12) + vec2(uAmbient * 0.02, 0.0));
+    col = mix(vec3(0.010, 0.014, 0.030), vec3(0.020, 0.030, 0.065), exp(above / 140.0));
+    col += vec3(0.05, 0.08, 0.18) * pow(mist, 2.0) * 0.35 * exp(-depth * 0.04);
+    col += vec3(0.05, 0.08, 0.18) * exp(above / 26.0) * 0.8;
     float od = length(g - uOrigin.xz);
-    col += vec3(0.10, 0.18, 0.40) * exp(-od * od * 1.2) * mix(0.35, 0.9, step(0.5, uPhase));
+    col += vec3(0.10, 0.18, 0.40) * exp(-od * od * 1.1) * mix(0.35, 0.9, step(0.5, uPhase));
     float ia = uTime - uIgnite;
     if (ia > 0.0 && ia < 2.6) {
       float r = ia * 5.0;
       float ring = exp(-pow((od - r) / (0.06 + ia * 0.22), 2.0));
       col += mix(BLUE, WHITE, 0.35) * ring * (1.0 - ia / 2.6) * 0.9 * exp(-depth * 0.05);
+    }
+    // Each keystroke sends a small ripple across the plain from the person's light.
+    float ka = uTime - uKey;
+    if (ka > 0.0 && ka < 1.2) {
+      float ring = exp(-pow((od - ka * 3.0) / (0.05 + ka * 0.12), 2.0));
+      col += mix(BLUE, WHITE, 0.4) * ring * (1.0 - ka / 1.2) * 0.55;
     }
   }
   vec2 v = px / uRes - 0.5;
@@ -195,7 +211,8 @@ vec3 nodeLook(vec2 q, float kind, float state, float age, float flare, float sel
     float ign = clamp(1.0 - (uTime - uIgnite) / 1.4, 0.0, 1.0) * step(uIgnite, uTime);
     col = WHITE * disc * 1.3 + mix(BLUE, WHITE, 0.4) * (exp(-r * r * 0.28) * 0.7 + exp(-r * 0.7) * 0.32) * breathe * lit;
     col += WHITE * ign * exp(-r * 0.3) * 1.5;
-    col += mix(BLUE, WHITE, 0.3) * exp(-q.x * q.x * 0.08) * exp(-abs(q.y) * 3.0) * 0.5 * lit;
+    // Its reflection on the plain.
+    col += mix(BLUE, WHITE, 0.3) * exp(-q.x * q.x * 1.2) * exp(-max(q.y - 1.0, 0.0) * 0.3) * step(1.0, q.y) * 0.35 * lit;
   } else if (kind < 1.5) {
     vec3 c = journey(0.35);
     if (state > 0.5) {
@@ -206,13 +223,16 @@ vec3 nodeLook(vec2 q, float kind, float state, float age, float flare, float sel
     }
   } else if (kind < 3.5) {
     float big = kind > 2.5 ? 1.0 : 0.0;
-    col = mix(ORANGE, WHITE, 0.6) * disc * 1.25 + ORANGE * (exp(-r * 0.8) * 0.7 + exp(-r * r * 0.15) * 0.25) * breathe;
+    float core = 1.0 - smoothstep(0.55 - aa, 0.55 + aa, r);
+    col = mix(ORANGE, vec3(1.0, 0.85, 0.6), 0.45) * core * 0.95 + ORANGE * disc * 0.45
+        + ORANGE * (exp(-r * 0.8) * 0.65 + exp(-r * r * 0.15) * 0.25) * breathe;
     // Its reflection on the plain below.
     col += ORANGE * exp(-q.x * q.x * 2.5) * exp(-max(q.y - 1.0, 0.0) * 0.35) * step(1.0, q.y) * 0.32;
-    // The revelation: a column of light rises from the newly lit destination, then settles.
+    // The revealed destination: a column of light rises at the revelation and stays, steady and
+    // dimmer, so it stands out by light once settled.
     float rise = clamp(age / 0.5, 0.0, 1.0) * clamp(1.0 - (age - 0.6) / 1.4, 0.0, 1.0);
-    col += ORANGE * big * exp(-q.x * q.x * 1.4) * step(q.y, 0.0) * exp(q.y * 0.08) * rise * 1.6;
-    col += ORANGE * big * exp(-r * 0.35) * clamp(1.0 - age / 1.2, 0.0, 1.0) * 1.8;
+    col += ORANGE * big * exp(-q.x * q.x * 1.4) * step(q.y, 0.0) * exp(q.y * 0.08) * (rise * 1.6 + 0.4);
+    col += ORANGE * big * (exp(-r * 0.35) * clamp(1.0 - age / 1.2, 0.0, 1.0) * 1.8 + exp(-r * 0.45) * 0.4);
     if (sel > 0.5) {
       float lock = 1.0 - smoothstep(0.07, 0.07 + aa, abs(r - 2.3));
       col += TEAL * lock * 1.3;
@@ -239,51 +259,32 @@ float pulse(float dist, float state) {
 
 function stillBackdrop(vp: Viewport, cam: Camera): string {
   const hy = cam[2];
-  const lines: string[] = [];
-  // The plain's grid, drawn in the same perspective as the moving world.
-  for (let z = Math.ceil(cam[1] + 0.6); z < cam[1] + 30; z++) {
-    const p = project([0, 0, z], cam);
-    if (p.y > vp.h) continue;
-    const o = Math.max(0.04, 0.5 * Math.exp(-(z - cam[1]) * 0.1));
-    lines.push(`<line x1="0" x2="${vp.w}" y1="${p.y.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="#20366b" stroke-opacity="${o.toFixed(2)}"/>`);
-  }
-  for (let x = Math.floor(cam[0] - 40); x <= cam[0] + 40; x++) {
-    const near = project([x, 0, cam[1] + 0.6], cam);
-    const far = project([x, 0, cam[1] + 40], cam);
-    lines.push(
-      `<line x1="${near.x.toFixed(1)}" y1="${near.y.toFixed(1)}" x2="${far.x.toFixed(1)}" y2="${far.y.toFixed(1)}" stroke="url(#h-fade)" stroke-opacity="0.5"/>`,
-    );
-  }
   const rand = seeded("stars");
   const stars = Array.from({ length: 70 }, () => {
     const x = rand() * vp.w;
-    const y = rand() * (hy - 60);
+    const y = rand() * (hy - 70);
     return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(0.6 + rand()).toFixed(2)}" fill="#edf5ff" opacity="${(0.25 + rand() * 0.5).toFixed(2)}"/>`;
   });
+  const at = (y: number) => Math.min(1, Math.max(0, y / vp.h)).toFixed(3);
   return `
   <defs>
-    <linearGradient id="h-sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#02040a"/>
-      <stop offset="${(hy / vp.h - 0.06).toFixed(3)}" stop-color="#060b1c"/>
-      <stop offset="${(hy / vp.h).toFixed(3)}" stop-color="#1a2350"/>
-      <stop offset="${(hy / vp.h + 0.03).toFixed(3)}" stop-color="#081028"/>
+    <linearGradient id="h-world" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#010309"/>
+      <stop offset="${at(hy - 90)}" stop-color="#050a1a"/>
+      <stop offset="${at(hy)}" stop-color="#1c2552"/>
+      <stop offset="${at(hy + 18)}" stop-color="#0a1230"/>
+      <stop offset="${at(hy + 160)}" stop-color="#050916"/>
       <stop offset="1" stop-color="#03050b"/>
     </linearGradient>
-    <linearGradient id="h-fade" gradientUnits="userSpaceOnUse" x1="0" y1="${vp.h}" x2="0" y2="${hy}">
-      <stop offset="0" stop-color="#2a4a8c"/>
-      <stop offset="1" stop-color="#2a4a8c" stop-opacity="0"/>
-    </linearGradient>
   </defs>
-  <rect width="${vp.w}" height="${vp.h}" fill="url(#h-sky)"/>
-  ${stars.join("")}
-  ${lines.join("")}`;
+  <rect width="${vp.w}" height="${vp.h}" fill="url(#h-world)"/>
+  ${stars.join("")}`;
 }
 
 export const horizon: Direction = {
   id: "horizon",
   name: "Horizon",
   blurb: "A journey across a dark plain, towards lights on the horizon.",
-  font: "unbounded",
   particles: 2200,
   geometry,
   view,
