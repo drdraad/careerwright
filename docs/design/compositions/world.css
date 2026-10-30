@@ -143,19 +143,21 @@ button {
 }
 
 /* A destination's name carries its light's shape: a warm disc, or a warm ring when suggested.
-   The diamond is kept for gates and conditions. */
-.world-label[data-kind="destination"]::before,
-.world-label[data-kind="suggested"]::before {
+   The diamond is kept for gates and conditions. The mark leads the name's own text, so a long
+   name wraps after it and never leaves it on a line of its own. */
+.world-label[data-kind="destination"] .name::before,
+.world-label[data-kind="suggested"] .name::before {
   content: "";
   display: inline-block;
   width: 8px;
   height: 8px;
+  margin-right: 6px;
   border-radius: 50%;
   background: var(--light-destination);
-  flex: none;
+  vertical-align: middle;
 }
 
-.world-label[data-kind="suggested"]::before {
+.world-label[data-kind="suggested"] .name::before {
   background: transparent;
   border: 2px solid var(--light-destination);
 }
@@ -531,6 +533,11 @@ button {
   max-width: 760px;
 }
 
+/* Narrower, so the chosen destination's openings have room for their names beside it. */
+.panel-roles {
+  max-width: 480px;
+}
+
 .panel.low {
   margin-top: auto;
 }
@@ -853,6 +860,17 @@ button {
   .strip .synthetic-slot,
   .strip .optional-phone {
     display: none;
+  }
+
+  /* "Still while support is shown" moves to the top bar, beside the chapter, where it adds no
+     row; it wraps there if it must. */
+  .strip .world-status {
+    display: none;
+  }
+
+  .topbar .world-status {
+    min-width: 0;
+    line-height: 1.25;
   }
 
   .strip-end {

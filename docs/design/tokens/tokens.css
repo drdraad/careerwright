@@ -143,8 +143,10 @@
   /* Kept from an earlier search that may be out of date: sand, the stale hue. */
   --trail-stale: var(--sand-300);
   /* How strongly each trail's core is drawn, as measured (contrast-pairs.json composites each
-     trail at this opacity over the ground and the horizon's glow; 3:1 or more). Said, chosen
-     and bridges are drawn at full strength. Glow and flowing light only ever add to this. */
+     trail at this opacity over the ground and the horizon's glow; 3:1 or more). Said, chosen,
+     bridges and whole routes are drawn at full strength. Glow and flowing light only ever add
+     to this. The one recorded exception: while the calm support panel shows, the world is
+     dimmed and its trails may fall below 3:1. */
   --trail-opacity-usual: 0.85;
   --trail-opacity-shadow: 0.9;
   --trail-opacity-stale: 0.6;

@@ -5,7 +5,7 @@
 // standing the place in the part of the window its panels leave clear. Every word, figure and
 // control is in the DOM over it. Values from fixtures/ come from data.js FIXTURES (checked by
 // tools/check-fixture-data.mjs); everything else is invented for design review and says so on
-// the page. When the page is laid out it leaves window.__worldCheck (every light, gate and name
+// the page. When the page is laid out it leaves window.__worldCheck (every light, gate and trail
 // as drawn) for tools/screenshots.mjs.
 (() => {
   const { FIXTURES: F, DESIGN_LISTINGS: L } = window.CAREERWRIGHT;
@@ -195,6 +195,20 @@
   const goal = target.p;
   const revelation = roles && state !== "three-targets" ? "Statistician" : null;
 
+  // Openings for the chosen destination, by area (invented listings): each count says how many
+  // sources answered for it and when. In the stale state the job board didn't answer today:
+  // today's counts cover the sources that did, and the kept counts the search of two days ago,
+  // when every source answered.
+  const sources = L.totals.sourcesChecked;
+  const AREAS = L.areas.map((a) => {
+    const all = L.jobs.filter((j) => L.companies.find((c) => c.id === j.company)?.area === a.id).length;
+    const shown = state === "unknown" && a.id === "leeds" ? 0 : all;
+    const stale = state === "stale" && a.id !== "remote";
+    const answered = state === "stale" && !stale ? sources - 1 : sources;
+    const words = shown === 0 ? `${a.label}: none found in the ${sources} sources checked` : `${a.label}: ${count(shown, "opening", "openings")}, ${answered} sources, ${stale ? "2 days ago" : "today"}`;
+    return { id: a.id, shown, stale, words };
+  });
+
   // The ground between the person and the destination: a long S across the plain, so that its
   // stretches spread across the clear part of the window wherever the view stands.
   const ground = lift(cubic(ORIGIN, [3.2 * kx, 0.02, 6.5], [-3.2 * kx, 0.02, 11.5], goal, 96), ORIGIN, goal);
@@ -245,31 +259,35 @@
       world.legend.add("shadow");
     }
 
-    if (roles) {
-      // Openings around the chosen destination only, grouped by area (VIS-1's hierarchy): each
-      // area's count says how many sources were searched and when.
-      const sources = L.totals.sourcesChecked;
-      const areas = L.areas.map((a) => ({ ...a, count: L.jobs.filter((j) => L.companies.find((c) => c.id === j.company)?.area === a.id).length }));
+    if (roles && !phone) {
+      // Openings around the chosen destination only, grouped by area (VIS-1's hierarchy), each
+      // area's count with its coverage and date (AREAS). On a phone the areas would stand a few
+      // pixels apart, too close to name apart, so the sheet lists them instead.
+      // They stand just in front of it, clear of its ring, and under it as Roles sees it: a nearer
+      // light is spread wider by perspective, so their across is drawn in to match.
+      const front = goal[2] - 5.5;
+      const roleZ = restingView("roles").z;
+      const under = goal[0] * ((front - roleZ) / (goal[2] - roleZ));
       const rand = seeded("openings");
-      areas.forEach((area, k) => {
-        const centre = [goal[0] + (k - 1) * 0.9 * kx, 0.03, goal[2] - 2.2];
-        const shown = state === "unknown" && area.id === "leeds" ? 0 : area.count;
-        const stale = state === "stale" && area.id !== "remote";
+      const names = AREAS.map((area, k) => {
+        const centre = [under + (k - 1) * 0.5 * kx, 0.03, front];
         const id = `area:${area.id}`;
-        for (let i = 0; i < shown; i++) {
-          const p = [centre[0] + (rand() - 0.5) * 0.55 * kx, 0.03, centre[2] + (rand() - 0.5) * 0.7];
-          world.marks.push({ kind: "opening", p, stale });
-          light(`${id}:${i}`, p, stale ? "stale-opening" : "opening", id);
+        for (let i = 0; i < area.shown; i++) {
+          const p = [centre[0] + (rand() - 0.5) * 0.32 * kx, 0.03, centre[2] + (rand() - 0.5) * 0.7];
+          world.marks.push({ kind: "opening", p, stale: area.stale });
+          light(`${id}:${i}`, p, area.stale ? "stale-opening" : "opening", id);
         }
-        if (shown === 0) {
+        if (area.shown === 0) {
           world.marks.push({ kind: "area", p: centre, empty: true });
           light(id, centre, "none-found", id);
         }
-        const when = stale ? "2 days ago" : "today";
-        const words = shown === 0 ? `${area.label}: none found in the ${sources} sources checked` : `${area.label}: ${count(shown, "opening", "openings")}, ${sources} sources, ${when}`;
-        label(id, centre, words, "area", { side: "below" });
-        world.legend.add(shown === 0 ? "none-found" : stale ? "stale-opening" : "opening");
+        world.legend.add(area.shown === 0 ? "none-found" : area.stale ? "stale-opening" : "opening");
+        return [id, centre, area.words];
       });
+      // The areas stand close together, so their names step down from the rightmost, each
+      // starting just left of its own lights: the line from each area further left passes the
+      // names already placed, never through them.
+      for (const [id, centre, words] of names.reverse()) label(id, centre, words, "area", { side: "below", align: "start" });
     }
 
     if (place === "skills" || place === "options" || place === "plan") {
@@ -332,7 +350,7 @@
       for (const route of T.routes) {
         const selected = route.id === T.selectedRoute && !failed;
         const pts = sweep(ORIGIN, goal, `route:${route.id}`, bends[route.id] * kx);
-        world.trails.push({ points: pts, state: selected ? "chosen" : failed ? "stale" : "said", width: [0.02, 0.05], hue: [0.1, 1] });
+        world.trails.push({ points: pts, state: selected ? "chosen" : failed ? "stale" : "route", width: [0.02, 0.05], hue: [0.1, 1] });
         label(`route:${route.id}`, pts[Math.floor(pts.length * 0.55)], `Route ${route.id}`, "route", { side: "above", selected });
         if (selected) {
           // The gate on the selected route, where it is clear of both lights.
@@ -385,7 +403,9 @@
       if (pts.length < 2) return;
       const first = pts[0];
       const last = pts[pts.length - 1];
-      // Each declared state at its measured strength (contrast-pairs.json composites it as drawn).
+      // Each declared state at its measured strength (contrast-pairs.json composites it as drawn):
+      // usual, shadow and stale at their tokens; said, chosen, bridges and whole routes in full.
+      // Only said, chosen and bridges glow brightly; a whole route glows as quietly as a usual one.
       let stroke;
       let strength = 1;
       if (trail.state === "chosen") stroke = "#45F7D4";
@@ -455,10 +475,12 @@
 
   // ---------- The exact layer: shell and the place's panel ----------
   const synthetic = `<span class="synthetic">${glyph("synthetic")}Synthetic demo</span>`;
-  // Pause shows the person's own choice; distress stills the world on its own and says so.
+  // Pause shows the person's own choice; distress stills the world on its own and says so: in the
+  // strip, or on a phone in the top bar, where it adds no row (the other copy is not displayed).
+  const stillStatus = state === "distress" ? `<span class="status world-status" data-tone="neutral" role="status">${glyph("support")}<span>Still while support is shown</span></span>` : "";
   const controls = `
     <button type="button" class="toggle" aria-pressed="false">${glyph("pause")}<span class="label">Pause motion</span><span class="switch" aria-hidden="true"></span></button>
-    ${state === "distress" ? `<span class="status" data-tone="neutral" role="status">${glyph("support")}<span class="label">Still while support is shown</span></span>` : ""}
+    ${stillStatus}
     <button type="button" class="toggle" aria-pressed="false">${glyph("sound")}<span class="label">Sound</span><span class="switch" aria-hidden="true"></span></button>
     <button type="button" class="toggle account" aria-label="Account and settings">${glyph("menu")}</button>`;
   const rail = `
@@ -466,10 +488,12 @@
       <a class="wordmark" href="index.html"><svg viewBox="0 0 24 24" aria-hidden="true">${GLYPH.mark}</svg><span>Careerwright</span></a>
       <ol>${PLACES.map((id) => `<li><a href="world.html?place=${id}" data-progress="${id === "you" ? "visited" : "todo"}"${id === place ? ' aria-current="page"' : ""}><span class="landmark" aria-hidden="true"></span>${LABEL[id]}${id === place ? "" : `<span class="sr-only">, ${id === "you" ? "visited" : "not started"}</span>`}</a></li>`).join("")}</ol>
     </nav>`;
+  // The person's targets, as the app's strip names them: P01's, and the two long invented ones.
+  const targetTitles = [...F.p01.targetTitles, ...(state === "three-targets" ? LONG.map((d) => d.title) : [])];
   const strip = `
     <header class="strip">
       <span class="synthetic-slot">${synthetic}</span>
-      <span class="optional-phone">Target <strong>${esc(F.p01.targetTitles.join(", "))}</strong></span>
+      <span class="optional-phone">Target <strong>${esc(targetTitles.join(", "))}</strong></span>
       <span class="optional">Work area <strong>${esc(F.p01.cities.join(", "))}</strong></span>
       <span class="strip-end">
         <span>Saved, version 3</span>
@@ -477,7 +501,7 @@
         ${controls}
       </span>
     </header>`;
-  const topbar = `<div class="topbar"><button type="button" class="toggle" aria-label="${LABEL[place]}, open chapter menu">${glyph("menu")}<strong>${LABEL[place]}</strong></button>${synthetic}</div>`;
+  const topbar = `<div class="topbar"><button type="button" class="toggle" aria-label="${LABEL[place]}, open chapter menu">${glyph("menu")}<strong>${LABEL[place]}</strong></button>${stillStatus}${synthetic}</div>`;
 
   // A place not built yet: the honest state, where it is, why it is empty and the one action;
   // what it will hold is one step away.
@@ -573,21 +597,24 @@
     if (place === "roles") {
       const stale = state === "stale";
       const unknown = state === "unknown";
+      // On a phone the openings are listed here, by area, rather than drawn (see build).
+      const openings = AREAS.map((a) => a.words).join("; ");
       if (state === "three-targets") {
         return `
-          <section class="panel low" aria-labelledby="title">
+          <section class="panel low panel-roles" aria-labelledby="title">
             <h1 id="title" class="title">Roles</h1>
             <p class="where">Three places you chose to head for.</p>
-            <p class="small muted">Openings are shown around the one you're looking at: data quality analyst. Not job offers.</p>
+            <p class="small muted">${phone ? `Openings for the one you're looking at, data quality analyst: ${openings}.` : "Openings are shown around the one you're looking at: data quality analyst."} Not job offers.</p>
             <div class="row"><button type="button" class="btn btn-primary">Look at another</button></div>
           </section>`;
       }
       return `
-        <section class="panel low" aria-labelledby="title">
+        <section class="panel low panel-roles" aria-labelledby="title">
           <h1 id="title" class="title">Roles</h1>
           <p class="kicker">${glyph("synthetic")}An unexpected connection: an example</p>
           <p class="sentence">Data quality analysts and statisticians share 6 essential skills.</p>
           <p class="small muted">A field you didn't name, joined to yours by skills, not job titles. A place you could head for. Not a job offer.</p>
+          ${phone ? `<p class="small muted">Openings for ${esc(T.targetTitle.toLowerCase())}: ${openings}.</p>` : ""}
           ${stale ? `<div class="alert" data-tone="stale">${glyph("stale")}<div><p><strong>Last checked 2 days ago</strong></p><p class="small muted">The job board didn't answer today. Its openings are kept from 2 days ago and may have closed.</p></div></div>` : ""}
           ${unknown ? `<div class="alert" data-tone="unknown">${glyph("unknown")}<div><p><strong>Leeds: none found in the ${L.totals.sourcesChecked} sources checked</strong></p><p class="small muted">Not "no jobs": only these sources were searched. Pay not stated on ${count(unpaid, "opening", "openings")}.</p></div></div>` : ""}
           <div class="row"><button type="button" class="btn btn-primary">Keep statistician in view</button><button type="button" class="link">Why?</button></div>
@@ -683,7 +710,7 @@
   document.body.innerHTML = `
     <div class="world" data-distress="${state === "distress"}"></div>
     <aside class="world-words" aria-label="Your world"><ul></ul></aside>
-    <details class="legend"${vp.w > 1100 ? " open" : ""}><summary>What the lights mean</summary><ul></ul></details>
+    <details class="legend"><summary>What the lights mean</summary><ul></ul></details>
     <div class="shell">
       ${rail}
       ${topbar}
@@ -700,6 +727,8 @@
     document.querySelector(".world").innerHTML = drawWorld(world, view);
 
     const legend = document.querySelector(".legend");
+    // Open on a wide screen where the world beside the panels has room for it (as the app).
+    legend.open = vp.w > 1100 && clear !== undefined && clear.right - clear.left >= 360;
     legend.querySelector("ul").innerHTML = ORDER.filter((k) => world.legend.has(k))
       .map((k) => `<li data-kind="${k}"><span class="key key-${KEY[k][0]}" aria-hidden="true"></span>${KEY[k][1]}</li>`)
       .join("");
@@ -709,85 +738,169 @@
     const meets = (a, b, pad) => a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
     const holds = (b, p) => p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
     // Every light's centre and every gate stays uncovered: names step round them.
-    const centres = world.lights.map((l) => project(l.p)).filter((p) => p.visible).map((p) => ({ x: p.x - 4, y: p.y - 4, w: 8, h: 8 }));
-    const gates = world.gates.map((g) => project(g.p)).map((p) => ({ x: p.x - 10, y: p.y - 10, w: 20, h: 20 }));
+    const centres = world.lights
+      .map((l) => ({ name: l.name, p: project(l.p) }))
+      .filter(({ p }) => p.visible)
+      .map(({ name, p }) => ({ name, x: p.x - 4, y: p.y - 4, w: 8, h: 8 }));
+    const gates = world.gates.map((g) => ({ name: g.name, p: project(g.p) })).map(({ name, p }) => ({ name, x: p.x - 10, y: p.y - 10, w: 20, h: 20 }));
+    // In view: inside the window and not under a panel.
+    const inView = (p) => p.visible && holds({ x: 0, y: 0, w: vp.w, h: vp.h }, p) && !covers.some((c) => holds(c, p));
 
-    // The key: open on a wide screen, bottom right; otherwise "What the lights mean", closed,
-    // at the right of the clear part of the window, above any panel. Names stay clear of it.
+    // The key: open on a wide screen with room, bottom right; otherwise "What the lights mean",
+    // closed, at the right of the clear part of the window, above any panel, or else just below
+    // the bars along the top; failing those, at its left. It takes the first of those spots from
+    // which every light can still be named (below), and names stay clear of it. It explains
+    // every light but the person's, the gates and the trails, so it shows only while one of them
+    // is in view.
     legend.style.visibility = "hidden";
     const size = box(legend);
-    const corners = [vp.h - 24, ...covers.filter((c) => c.y > 1).map((c) => c.y - 12)].sort((a, b) => b - a);
-    const keySpot = corners
-      .map((bottom) => ({ x: vp.w - (phone ? 16 : 24) - size.w, y: bottom - size.h, w: size.w, h: size.h }))
-      .find((b) => inside(b, 4) && !covers.some((c) => meets(b, c, 0)) && !centres.some((c) => meets(b, c, 0)) && !gates.some((g) => meets(b, g, 0)));
-    const placed = [];
+    const explained = [...world.lights.filter((l) => l.name !== "origin").map((l) => l.p), ...world.gates.map((g) => g.p), ...world.trails.flatMap((t) => t.points)];
+    let barsBottom = 0;
+    for (const c of [...covers].sort((a, b) => a.y - b.y)) if (c.y <= barsBottom + 1 && !(c.x <= 1 && c.h >= vp.h * 0.9)) barsBottom = Math.max(barsBottom, c.y + c.h);
+    const corners = [vp.h - 24, ...covers.filter((c) => c.y > 1).map((c) => c.y - 12)].sort((a, b) => b - a).concat(barsBottom + 12 + size.h);
+    const margin = phone ? 16 : 24;
+    const railEdge = Math.max(0, ...covers.filter((c) => c.x <= 1 && c.h >= vp.h * 0.9).map((c) => c.x + c.w));
+    const keySpots = explained.some((p) => inView(project(p)))
+      ? [vp.w - margin - size.w, railEdge + margin]
+          .flatMap((x) => corners.map((bottom) => ({ x, y: bottom - size.h, w: size.w, h: size.h })))
+          .filter((b) => inside(b, 4) && !covers.some((c) => meets(b, c, 0)) && !centres.some((c) => meets(b, c, 0)) && !gates.some((g) => meets(b, g, 0)))
+      : [];
+
+    // Names beside their lights, clear of the panels, the key, the lights, the lines already drawn
+    // and each other. A name whose light is out of view or under a panel is hidden from sight; it
+    // stays in the list. Every name is measured first, then placed, then written.
+    const host = document.querySelector(".world-words ul");
+    const PRIORITY = { origin: 0, destination: 1, suggested: 1, gate: 2, next: 2, route: 3, area: 4, bridge: 4, stretch: 5, skill: 6 };
+    const items = world.labels
+      .sort((a, b) => PRIORITY[a.kind] - PRIORITY[b.kind])
+      .map((l) => {
+        const li = document.createElement("li");
+        li.className = "world-label";
+        li.dataset.kind = l.kind;
+        li.dataset.for = l.id;
+        if (l.selected) li.dataset.selected = "true";
+        li.innerHTML = `<span class="name">${esc(l.name)}</span>`;
+        if (l.state === "usual") li.innerHTML += `<span class="caption">usual in your role, not confirmed yet</span>`;
+        if (l.state === "said") li.innerHTML += `<span class="caption">you said so</span>`;
+        if (l.state === "shadow" && !l.name.includes("no bridge")) li.innerHTML += `<span class="caption">not known yet</span>`;
+        host.append(li);
+        return { l, li, p: project(l.anchor) };
+      });
+    for (const item of items) {
+      item.w = item.li.offsetWidth;
+      item.h = item.li.offsetHeight;
+    }
+    // A name further than this from its light is joined to it by a line, stopping short of it.
+    const LEADER_FROM = 20;
+    const LEADER_CLEAR = 8;
+    const GAP = 14;
+    const flip = { above: "below", below: "above", left: "right", right: "left" };
+
+    /** Each name's spot (or null) and the line back to its light (or null), placing in `order`. */
+    function placeNames(order, keySpot) {
+      const placed = keySpot ? [keySpot] : [];
+      const lines = [];
+      const spots = new Map();
+      for (const item of order) {
+        const { l, p, w, h } = item;
+        // Centred on its light, or slid along its row (inside the window, still over its light).
+        const across = (x) => Math.min(Math.max(x, 8), vp.w - 8 - w);
+        const row = (side, n, x) => {
+          const out = GAP + n * (h + 6);
+          return { x: across(x), y: side === "above" ? p.y - out - h : p.y + out, w, h };
+        };
+        const beside = (side) => ({ x: side === "left" ? p.x - GAP - w : p.x + GAP, y: p.y - h / 2, w, h });
+        // Its own side first, then rows further out (with a line back), then the other side. Along
+        // a row it is centred, then slid either way while it still reaches over its light, as far
+        // as its light standing at its very end. A name that starts at its light tries beginning
+        // just left of it on every row first.
+        const ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
+        const rows = (side, xs = [p.x - w / 2, p.x - w + 16, p.x - 16, p.x - w + 8, p.x - 8]) => ROWS.flatMap((n) => xs.map((x) => row(side, n, x)));
+        const tries =
+          l.side === "left" || l.side === "right"
+            ? [beside(l.side), beside(flip[l.side]), ...rows("above"), ...rows("below")]
+            : [...(l.align === "start" ? rows(l.side, [p.x - 8]) : []), ...rows(l.side), ...rows(flip[l.side])];
+        // The line from a light to its name never passes under a panel (a name never hops one),
+        // and the line a name draws never crosses another light, gate or name, or the key: a line
+        // joins a name to its own light only.
+        const leader = (b) => ({ x: p.x, y: Math.min(p.y, b.y + b.h), w: 1, h: Math.abs(Math.max(p.y, b.y) - Math.min(p.y, b.y + b.h)) });
+        const gapTo = (b) => (b.y + b.h <= p.y ? p.y - (b.y + b.h) : b.y - p.y);
+        const lineTo = (b) => (gapTo(b) > LEADER_FROM && b.x <= p.x && p.x <= b.x + b.w ? leader(b) : null);
+        const clearLine = (line) => line === null || (!placed.some((o) => meets(line, o, 0)) && !centres.some((c) => c.name !== l.id && meets(line, c, 0)) && !gates.some((g) => g.name !== l.id && meets(line, g, 0)));
+        const spot = inView(p)
+          ? tries.find((b) => inside(b) && !covers.some((c) => meets(b, c, 0) || meets(leader(b), c, 0)) && !placed.some((o) => meets(b, o, 4)) && !lines.some((line) => meets(b, line, 0)) && !centres.some((c) => meets(b, c, 0)) && !gates.some((g) => meets(b, g, 2)) && clearLine(lineTo(b)))
+          : undefined;
+        if (spot === undefined) {
+          spots.set(item, null);
+          continue;
+        }
+        const line = lineTo(spot);
+        placed.push(spot);
+        if (line !== null) lines.push(line);
+        spots.set(item, { spot, line, gap: gapTo(spot) });
+      }
+      return spots;
+    }
+
+    // A name left without a spot while its light is in view chooses first next time, so the
+    // hardest names choose first. The placing kept leaves the fewest lights and gates unnamed,
+    // then the fewest other names (a route's or a stretch's) out of sight.
+    const named = new Set([...world.lights, ...world.gates].map((l) => l.name));
+    const unnamed = (spots) => items.filter((item) => spots.get(item) === null && inView(item.p));
+    const score = (spots) => {
+      const left = unnamed(spots);
+      return left.filter((item) => named.has(item.l.id)).length * 1000 + left.length;
+    };
+    function placeAll(keySpot) {
+      let order = items;
+      let latest = placeNames(order, keySpot);
+      let best = latest;
+      for (let attempt = 0; attempt < 6 && unnamed(latest).length > 0; attempt++) {
+        const left = unnamed(latest).sort((a, b) => Number(named.has(b.l.id)) - Number(named.has(a.l.id)));
+        order = [...left, ...order.filter((item) => !left.includes(item))];
+        latest = placeNames(order, keySpot);
+        if (score(latest) < score(best)) best = latest;
+      }
+      return best;
+    }
+    let keySpot;
+    let best;
+    for (const spot of keySpots) {
+      const spots = placeAll(spot);
+      if (best === undefined || score(spots) < score(best)) {
+        keySpot = spot;
+        best = spots;
+      }
+      if (score(best) < 1000) break;
+    }
+    best ??= placeAll(undefined);
     if (keySpot) {
       legend.style.right = `${vp.w - keySpot.x - keySpot.w}px`;
       legend.style.bottom = `${vp.h - keySpot.y - keySpot.h}px`;
       legend.style.visibility = "visible";
-      placed.push(keySpot);
     }
-
-    // Names beside their lights, clear of the panels, the key, the lights and each other. A name
-    // whose light is out of view or under a panel is hidden from sight; it stays in the list.
-    const host = document.querySelector(".world-words ul");
-    const PRIORITY = { origin: 0, destination: 1, suggested: 1, gate: 2, next: 2, route: 3, area: 4, bridge: 4, stretch: 5, skill: 6 };
-    for (const l of world.labels.sort((a, b) => PRIORITY[a.kind] - PRIORITY[b.kind])) {
-      const p = project(l.anchor);
-      const li = document.createElement("li");
-      li.className = "world-label";
-      li.dataset.kind = l.kind;
-      li.dataset.for = l.id;
-      if (l.selected) li.dataset.selected = "true";
-      li.innerHTML = `<span>${esc(l.name)}</span>`;
-      if (l.state === "usual") li.innerHTML += `<span class="caption">usual in your role, not confirmed yet</span>`;
-      if (l.state === "said") li.innerHTML += `<span class="caption">you said so</span>`;
-      if (l.state === "shadow" && !l.name.includes("no bridge")) li.innerHTML += `<span class="caption">not known yet</span>`;
-      host.append(li);
-      const w = li.offsetWidth;
-      const h = li.offsetHeight;
-      const GAP = 14;
-      // Centred on its light, or slid along its row (inside the window, still over its light).
-      const across = (x) => Math.min(Math.max(x, 8), vp.w - 8 - w);
-      const row = (side, n, x) => {
-        const out = GAP + n * (h + 6);
-        return { x: across(x), y: side === "above" ? p.y - out - h : p.y + out, w, h };
-      };
-      const beside = (side) => ({ x: side === "left" ? p.x - GAP - w : p.x + GAP, y: p.y - h / 2, w, h });
-      const flip = { above: "below", below: "above", left: "right", right: "left" };
-      // Its own side first, then rows further out (with a leader line back), then the other side.
-      const ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
-      const rows = (side) => ROWS.flatMap((n) => [p.x - w / 2, p.x - w + 16, p.x - 16].map((x) => row(side, n, x)));
-      const tries =
-        l.side === "left" || l.side === "right"
-          ? [beside(l.side), beside(flip[l.side]), ...rows("above"), ...rows("below")]
-          : [...rows(l.side), ...rows(flip[l.side])];
-      const seen = p.visible && holds({ x: 0, y: 0, w: vp.w, h: vp.h }, p) && !covers.some((c) => holds(c, p));
-      // The line from a light to its name never passes under a panel: a name never hops one.
-      const leader = (b) => ({ x: p.x, y: Math.min(p.y, b.y + b.h), w: 1, h: Math.abs(Math.max(p.y, b.y) - Math.min(p.y, b.y + b.h)) });
-      const spot = seen
-        ? tries.find((b) => inside(b) && !covers.some((c) => meets(b, c, 0) || meets(leader(b), c, 0)) && !placed.some((o) => meets(b, o, 4)) && !centres.some((c) => meets(b, c, 0)) && !gates.some((g) => meets(b, g, 2)))
-        : undefined;
-      if (spot) {
-        placed.push(spot);
-        li.style.left = `${spot.x + w / 2}px`;
-        li.style.top = `${spot.y}px`;
-        const above = spot.y + spot.h <= p.y;
-        const gap = above ? p.y - (spot.y + spot.h) : spot.y - p.y;
-        if (gap > 20 && spot.x <= p.x && p.x <= spot.x + spot.w) {
-          li.dataset.leader = above ? "above" : "below";
-          li.style.setProperty("--leader", `${Math.round(gap - 8)}px`);
-          li.style.setProperty("--leader-x", `${Math.round(p.x - spot.x)}px`);
-        }
-      } else {
+    for (const item of items) {
+      const { li, p, w } = item;
+      const placing = best.get(item);
+      if (placing === null) {
         li.className = "sr-only";
+        continue;
+      }
+      const { spot, line, gap } = placing;
+      li.style.left = `${spot.x + w / 2}px`;
+      li.style.top = `${spot.y}px`;
+      if (line !== null) {
+        li.dataset.leader = spot.y + spot.h <= p.y ? "above" : "below";
+        li.style.setProperty("--leader", `${Math.round(gap - LEADER_CLEAR)}px`);
+        li.style.setProperty("--leader-x", `${Math.round(p.x - spot.x)}px`);
       }
     }
 
-    // For tools/screenshots.mjs: every light, gate and name as drawn, to check independently.
+    // For tools/screenshots.mjs: every light, gate and trail as drawn, to check independently.
     window.__worldCheck = {
       lights: world.lights.map((l) => ({ id: l.id, kind: l.kind, name: l.name, revelation: Boolean(l.revelation), ...project(l.p) })),
       gates: world.gates.map((g) => ({ id: g.id, name: g.name, ...project(g.p), r: 10 })),
+      trails: world.trails.map((t) => t.points.map(project)),
     };
     // Opened as a person would open it: over the world, from where it was placed closed.
     if (keyOpen) legend.open = true;

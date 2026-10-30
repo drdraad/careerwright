@@ -42,10 +42,13 @@ pnpm run screenshots     # runs check-data, then captures every place and state,
 loaded, the wordmark inside the rail, a visible "Synthetic demo" label, every name in the world
 inside the window and clear of the panels, the key and each other, every light and gate in view
 named (and no name left for a light out of view or under a panel), the revelation's subject in
-view and named, no name, gate or key over a light's centre, the key clear of the panels, the
-time and cost instrument's labels clear of each other and its marks, and at most one filled
-primary action in view. The lights and gates come from the drawing (`window.__worldCheck`);
-whether a name can be seen is measured in the page, so the check can fail. The captures are the
+view and named, no name, gate or key over a light's centre, every line from a name to its
+light (as drawn) clear of the other lights, gates and names and of the key, the key clear of
+the panels, shown whenever a light it explains is in view and only while something it explains
+is, the time and cost instrument's labels clear of each other and its marks, and at most one
+filled primary action in view. The lights, gates and trails come from the drawing
+(`window.__worldCheck`); whether a name, a line or the key can be seen is measured in the page,
+so the check can fail. The captures are the
 still world (reduced motion), which is what calm mode and reduced motion draw; the moving world
 is in the app.
 
@@ -89,8 +92,12 @@ The key to the lights lists only the kinds drawn at that place, each mark drawn 
 draws it (a warm disc for a chosen destination, a warm ring for a suggested one, the diamond
 only for a gate). Its words are plain: "Teal", "Grey", "Sand", never a token's name. At Routes
 teal is "the route you're looking at"; only at Plan is it "the path you chose". On a wide
-screen the key is open; at 1100 px and below it is a "What the lights mean" control, placed
-where the world is clear.
+screen the key is open where the world beside the panels has room for it (360 px or more);
+at 1100 px and below, or with less room, it is a "What the lights mean" control, placed
+where the world is clear: at the right, low down, just above a panel or just below the bars,
+and failing those at the left, taking the first spot from which every light can still be
+named. It shows only while something it explains is in view (a light other than the person's,
+a gate or a trail), and the menus open over it.
 
 Industry is shown by glyph and label, never by colour (spec VIS-1's industry colours are
 replaced, ADR 0014 decision 5).
@@ -110,14 +117,18 @@ in the world can reach. Measured highlights (`tokens/contrast-report.md`):
 - Primary text on a glass panel over the brightest light: 14.85:1. Captions there: 6.58:1.
 - A light's caption on its label in the world, over the brightest light: 6.05:1.
 - Trails are measured as drawn: each state's strength is a token (`--trail-opacity-usual`
-  0.85, `--trail-opacity-shadow` 0.9, `--trail-opacity-stale` 0.6; said, chosen and bridges at
-  full strength), composited over the ground and over the horizon's glow. The tightest: a grey
-  "not known yet" stretch where it meets the horizon's glow, 3.19:1; a usual trail there,
-  3.43:1 (violet end; along the blue to violet grade, worked out by hand, never below 3.38:1);
-  a control boundary on glass
-  over the brightest light, 3.59:1 (all against 3:1). The app's still world draws the same
-  strengths, and the moving world draws each trail's core at least at them (its glow and the
-  light flowing along it only add).
+  0.85, `--trail-opacity-shadow` 0.9, `--trail-opacity-stale` 0.6; said, chosen, bridges and
+  whole routes at full strength), composited over the ground and over the horizon's glow. The
+  tightest: a grey "not known yet" stretch where it meets the horizon's glow, 3.19:1; a usual
+  trail there, 3.43:1 (violet end; along the blue to violet grade, worked out by hand, never
+  below 3.38:1); a control boundary on glass over the brightest light, 3.59:1 (all against
+  3:1). The app's still world draws the same strengths (`TRAIL_OPACITY`, and a test holds its
+  strokes to it), and the moving world draws each trail's core at least at them (its glow and
+  the light flowing along it only add).
+- One recorded exception: while the calm support panel shows, the world is a dimmed, still
+  backdrop (plan section 4: distress "stills and dims"), and its trails may then fall below
+  3:1. Every name and state stays in the list beside it, and the person is not reading the
+  world then. Nothing else is exempt.
 - A destination's orange on the horizon's glow: 6.64:1.
 - The rail: solid (94%) where its landmarks sit and 80% at its outer edge, where a chapter's
   name is still 7.39:1 over the brightest light.
@@ -156,7 +167,7 @@ while the tab is hidden.
 | Place | Where it is | Its moment | Reference states |
 |---|---|---|---|
 | You | The origin: the person's light, skills around it, and the conversation's console | The first answer lights it and grows the first trails | default; distress (the world stills and dims, the calm support panel); failed (the message kept, the reply missing) |
-| Roles | The horizon: suggested and chosen destinations; the chosen one's openings clustered below it by area, each count with its sources and date | An unexpected connection, joined by shared essential skills | default; stale (sand, a clock, the age on each count); unknown ("none found in the 4 sources checked", never "no jobs"); three long targets; not built yet (and, in the gallery, the key opened on a narrow screen) |
+| Roles | The horizon: suggested and chosen destinations; the chosen one's openings clustered below it by area, each count with its sources and date (on a phone, listed in the sheet) | An unexpected connection, joined by shared essential skills | default; stale (sand, a clock, the age on each count); unknown ("none found in the 4 sources checked", never "no jobs"); three long targets; not built yet (and, in the gallery, the key opened on a narrow screen) |
 | Skills | The ground between the person and a destination, stretch by stretch (the skills around the person belong to You) | An answer lights a stretch already covered | default, with a gate ("Ready if you pass the assessed report"); unknown (all shadow); not built yet |
 | Options | Bridges across the dark stretches | A gap gets its first bridge | default; unknown ("No bridge found yet. That doesn't mean there are none."); not built yet |
 | Routes | Whole journeys, compared on an exact time and cost instrument | A credible, checked route burns through | default (route B, conditional); failed (the last comparison kept in sand, marked "Kept from your last search", "Search again"); not built yet |
@@ -176,11 +187,24 @@ panels on a tablet or a phone, made smaller only if it must be. The app does the
 (`apps/web/src/lib/world/geometry.ts`). A light that is still under a panel hides its name. On a
 phone the header is two rows (the chapter and the synthetic label; then the saved state, live
 updates, Pause motion and Sound as glyph buttons, ringed in white when on, and the account menu,
-where calm mode lives); the target is named in the world. A
-long name wraps; on a phone a name shows without its caption (the key explains each look, and
-the caption stays in the list for assistive tech). A chapter not built yet shows its place with
-a short card: "Not built yet", the place, where it is in the world, one sentence on why it is
-empty and the one action; what it will hold is one step away ("More about this place").
+where calm mode keeps its words and its switch); the target is named in the world. While the
+calm support panel shows, "Still while support is shown" sits in the strip, or on a phone in
+the top bar beside the chapter, where it adds no row.
+
+A name sits beside its light; a crowded one steps out a row with a fine line back to its light.
+That line never crosses another light, gate or name, or the key, and no name sits on a line
+already drawn: a line joins a name to its own light only. A name left without a spot chooses
+first on the next try, and the try that leaves the fewest lights unnamed is kept. A long name
+wraps, its mark staying on its first line; on a phone a name shows without its caption (the
+key explains each look, and the caption stays in the list for assistive tech). At Roles the
+chosen destination's openings stand just in front of it, by area, their names stepping down
+from the rightmost so each line passes the names above it; the Roles card is narrower (480 px)
+so they have room beside it. On a phone the areas would stand a few pixels apart, too close to
+name apart, so the sheet lists each area's openings in the same words instead.
+
+A chapter not built yet shows its place with a short card: "Not built yet", the place, where it
+is in the world, one sentence on why it is empty and the one action; what it will hold is one
+step away ("More about this place").
 
 ## Honest states (glyph first)
 
@@ -191,7 +215,7 @@ empty and the one action; what it will hold is one step away ("More about this p
 | Stale | clock | Openings in sand, with their age on each count | "Last checked 2 days ago", "…, 2 days ago" |
 | Failed | triangle with a mark | Earlier results kept, in sand, marked as kept | "The route search failed", "Kept from your last search", "Careerwright's reply didn't arrive" |
 | Synthetic | flask | Labelled in the strip at every width, and in the phone's top bar | "Synthetic demo"; invented examples say "an example" |
-| Distress | lifebuoy (support) | The world stills and dims; nothing glows. Pause motion keeps showing the person's own choice; the strip says "Still while support is shown" | "Support is here, any time", with UK resources |
+| Distress | lifebuoy (support) | The world stills and dims; nothing glows. Pause motion keeps showing the person's own choice; the strip (on a phone, the top bar) says "Still while support is shown" | "Support is here, any time", with UK resources |
 | Not built yet | circle with a bar | The place, with nothing drawn that is not known | "Not built yet" |
 
 "You said so" has its own glyph (a speech bubble), never the tick that means complete, and "Set

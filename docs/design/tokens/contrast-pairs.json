@@ -1,5 +1,5 @@
 {
-  "about": "Pairs measured by tools/contrast.mjs. 'text' needs 4.5:1 (WCAG 2.2 SC 1.4.3, normal-size text); 'non-text' needs 3:1 (SC 1.4.11: component boundaries, focus indicators and graphics needed to understand content). A translucent background (glass) names the backdrops it is measured over in 'over': the world's darkest ground and the brightest light anything in the world reaches. A foreground the world draws translucent names its strength in 'alpha' (a number or an opacity token) and is measured as drawn. Every pairing a component uses must appear here.",
+  "about": "Pairs measured by tools/contrast.mjs. 'text' needs 4.5:1 (WCAG 2.2 SC 1.4.3, normal-size text); 'non-text' needs 3:1 (SC 1.4.11: component boundaries, focus indicators and graphics needed to understand content). A translucent background (glass) names the backdrops it is measured over in 'over': the world's darkest ground and the brightest light anything in the world reaches. A foreground the world draws translucent names its strength in 'alpha' (a number or an opacity token) and is measured as drawn. One recorded exception: while the calm support panel shows, the world is a dimmed, still backdrop and its trails may fall below 3:1 (every name and state stays in the list beside it); nothing else is exempt. Every pairing a component uses must appear here.",
   "pairs": [
     {"fg": "--text-on-space", "bg": "--surface-space", "kind": "text", "use": "primary text straight on the world's ground"},
     {"fg": "--text-on-space-muted", "bg": "--surface-space", "kind": "text", "use": "secondary text on the ground"},
@@ -76,8 +76,8 @@
     {"fg": "--light-destination", "bg": "--world-horizon", "kind": "non-text", "use": "a destination's light on the horizon's glow"},
     {"fg": "--light-chosen", "bg": "--world-ground", "kind": "non-text", "use": "the chosen path, the selected route and the lock-on ring"},
     {"fg": "--light-chosen", "bg": "--world-horizon", "kind": "non-text", "use": "the chosen path where it meets the horizon's glow"},
-    {"fg": "--trail-near", "bg": "--world-ground", "kind": "non-text", "use": "a said trail or a bridge near the person (blue end, full strength)"},
-    {"fg": "--trail-far", "bg": "--world-horizon", "kind": "non-text", "use": "a said trail or a bridge where it meets the horizon's glow (violet end, full strength)"},
+    {"fg": "--trail-near", "bg": "--world-ground", "kind": "non-text", "use": "a said trail, a bridge or a whole route near the person (blue end, full strength)"},
+    {"fg": "--trail-far", "bg": "--world-horizon", "kind": "non-text", "use": "a said trail, a bridge or a whole route where it meets the horizon's glow (violet end, full strength)"},
     {"fg": "--trail-near", "alpha": "--trail-opacity-usual", "bg": "--world-ground", "kind": "non-text", "use": "a usual trail near the person, as drawn"},
     {"fg": "--trail-near", "alpha": "--trail-opacity-usual", "bg": "--world-horizon", "kind": "non-text", "use": "a usual trail on the horizon's glow, blue end, as drawn"},
     {"fg": "--trail-far", "alpha": "--trail-opacity-usual", "bg": "--world-ground", "kind": "non-text", "use": "a usual trail (or an opening's) near the horizon, as drawn"},

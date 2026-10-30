@@ -85,7 +85,11 @@ process." Their reference image is "Careerwright's luminous path forward".
    atmosphere keeps the breathing horizon, the aurora and light flowing along known trails; the
    shimmer that travelled the horizon and the trails' sway are gone, and the motes are cut from
    2,400 to 360. Every trail is drawn at least at its measured strength (3:1 as drawn, over the
-   ground and the horizon's glow, in the references and in both of the app's worlds).
+   ground and the horizon's glow, in the references and in both of the app's worlds), with one
+   recorded exception: while the calm support panel shows, the world is a dimmed, still
+   backdrop and its trails may fall below 3:1, because every name and state stays in the list
+   beside it and the person is not reading the world then (the controller's ruling in Task W2's
+   second round of fixes). Nothing else is exempt.
    **Frame evidence:** `docs/evidence/world-frames.json` stays the record of the run on commit
    `65aed2f` (2,400 motes, before these changes). The measurement tool now records the commit,
    marks the scene synthetic, pairs each frame's main-thread and WebGL GPU time by frame number
