@@ -1,0 +1,38 @@
+{
+  "name": "careerwright-world-spike",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Spike, throwaway: three directions for Careerwright's living world, to try at session W1. Not product code.",
+  "type": "module",
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=24.11 <25"
+  },
+  "scripts": {
+    "start": "vite build && vite preview --host 127.0.0.1 --port 53300 --strictPort --open",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 53300 --strictPort",
+    "dev": "vite --host 127.0.0.1 --port 53300 --strictPort",
+    "test": "node --test src/model.test.ts",
+    "typecheck": "tsc --noEmit",
+    "measure": "node tools/measure.mjs",
+    "screenshots": "node tools/screenshots.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/atkinson-hyperlegible-next": "5.3.0",
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@fontsource-variable/outfit": "5.3.0",
+    "@fontsource-variable/sora": "5.3.0",
+    "@fontsource-variable/unbounded": "5.3.0",
+    "ogl": "1.0.11",
+    "pixi.js": "8.22.0",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/three": "0.186.0",
+    "playwright": "1.64.1",
+    "typescript": "6.0.3",
+    "vite": "8.3.4"
+  }
+}

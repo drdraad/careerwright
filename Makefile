@@ -21,6 +21,8 @@
 #   make reset-demo         recreate the named fixture workspace only
 #   make rotate-master-key  add a master key version, reload it, reseal every sealed record
 #   make reseal             reseal every sealed record under the current master key
+#   make spike-world        the throwaway spike of three world directions (session W1), opened in
+#                           the browser at http://127.0.0.1:53300; made-up data, not the product
 # Local secrets and master keys live in CAREERWRIGHT_HOME (default ~/.careerwright/l0), never in the repository.
 
 UV := uv run --locked
@@ -30,7 +32,7 @@ WEB := cd apps/web &&
 export NEXT_TELEMETRY_DISABLED := 1
 export STORYBOOK_DISABLE_TELEMETRY := 1
 
-.PHONY: setup dev demo check acceptance live-smoke live-eval live-adzuna live-extract stop reset-demo status rotate-master-key reseal
+.PHONY: setup dev demo check acceptance live-smoke live-eval live-adzuna live-extract stop reset-demo status rotate-master-key reseal spike-world
 
 setup:
 	$(BACKEND) uv python install 3.12 && uv sync --locked
@@ -83,3 +85,8 @@ reseal:
 
 status:
 	$(BACKEND) $(UV) python -m tools.stack status
+
+# Spike (throwaway, session W1): builds and serves the three directions on loopback only and
+# opens the chooser. Its own package and lockfile (spikes/world); no product check touches it.
+spike-world:
+	cd spikes/world && pnpm install --frozen-lockfile && pnpm run start

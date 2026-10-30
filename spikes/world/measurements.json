@@ -1,0 +1,345 @@
+{
+  "date": "2026-10-30T15:14:54.511Z",
+  "device": {
+    "cpu": "Apple M4",
+    "memoryGB": 16,
+    "model": "Mac16,1",
+    "os": "27.0"
+  },
+  "browser": "Google Chrome 156.0.8078.76",
+  "scene": "busiest: 100 made-up openings with their trails, all destinations, the kept path, ambient particles; revelation (and its travel) replayed every 4 s; 1440x900 window",
+  "method": "rAF deltas, 3 s warm-up then 12 s sample, headed system Chrome",
+  "vsync": {
+    "growth": {
+      "direction": "growth",
+      "mode": "moving",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "firstFrame": 257.5,
+      "keyToFrame": [],
+      "stats": {
+        "frames": {
+          "frames": 1441,
+          "seconds": 12.01,
+          "p50": 8.3,
+          "p95": 10,
+          "p99": 10.3,
+          "max": 10.4,
+          "over8": 920,
+          "over16": 0
+        },
+        "cpu": {
+          "frames": 1441,
+          "seconds": 0.19,
+          "p50": 0.1,
+          "p95": 0.2,
+          "p99": 0.3,
+          "max": 2.9,
+          "over8": 0,
+          "over16": 0
+        },
+        "gpu": {
+          "frames": 1440,
+          "seconds": 3.89,
+          "p50": 2.53,
+          "p95": 5.52,
+          "p99": 8.55,
+          "max": 10.26,
+          "over8": 42,
+          "over16": 0
+        }
+      },
+      "dpr": 2,
+      "css": [
+        1440,
+        809
+      ],
+      "canvas": [
+        2880,
+        1618
+      ]
+    },
+    "horizon": {
+      "direction": "horizon",
+      "mode": "moving",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "firstFrame": 133.80000019073486,
+      "keyToFrame": [],
+      "stats": {
+        "frames": {
+          "frames": 1439,
+          "seconds": 12,
+          "p50": 8.3,
+          "p95": 10.1,
+          "p99": 10.3,
+          "max": 15.3,
+          "over8": 908,
+          "over16": 0
+        },
+        "cpu": {
+          "frames": 1439,
+          "seconds": 0.2,
+          "p50": 0.1,
+          "p95": 0.2,
+          "p99": 0.3,
+          "max": 3.1,
+          "over8": 0,
+          "over16": 0
+        },
+        "gpu": {
+          "frames": 1440,
+          "seconds": 2.63,
+          "p50": 2.09,
+          "p95": 3.24,
+          "p99": 3.79,
+          "max": 4.81,
+          "over8": 0,
+          "over16": 0
+        }
+      },
+      "dpr": 2,
+      "css": [
+        1440,
+        809
+      ],
+      "canvas": [
+        2880,
+        1618
+      ]
+    },
+    "circuit": {
+      "direction": "circuit",
+      "mode": "moving",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "firstFrame": 129,
+      "keyToFrame": [],
+      "stats": {
+        "frames": {
+          "frames": 1439,
+          "seconds": 11.99,
+          "p50": 8.3,
+          "p95": 10.1,
+          "p99": 10.3,
+          "max": 10.4,
+          "over8": 897,
+          "over16": 0
+        },
+        "cpu": {
+          "frames": 1439,
+          "seconds": 0.2,
+          "p50": 0.1,
+          "p95": 0.2,
+          "p99": 0.3,
+          "max": 3.1,
+          "over8": 0,
+          "over16": 0
+        },
+        "gpu": {
+          "frames": 1439,
+          "seconds": 1.91,
+          "p50": 1.07,
+          "p95": 2.51,
+          "p99": 3.05,
+          "max": 4.5,
+          "over8": 0,
+          "over16": 0
+        }
+      },
+      "dpr": 2,
+      "css": [
+        1440,
+        809
+      ],
+      "canvas": [
+        2880,
+        1618
+      ]
+    }
+  },
+  "unthrottled": {
+    "growth": {
+      "direction": "growth",
+      "mode": "moving",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "firstFrame": 232.90000009536743,
+      "keyToFrame": [],
+      "stats": {
+        "frames": {
+          "frames": 10147,
+          "seconds": 11.52,
+          "p50": 0.2,
+          "p95": 2.8,
+          "p99": 3,
+          "max": 23.1,
+          "over8": 6,
+          "over16": 5
+        },
+        "cpu": {
+          "frames": 10147,
+          "seconds": 8.57,
+          "p50": 0.1,
+          "p95": 2.5,
+          "p99": 2.6,
+          "max": 8.8,
+          "over8": 1,
+          "over16": 0
+        },
+        "gpu": {
+          "frames": 8430,
+          "seconds": 11.18,
+          "p50": 1.21,
+          "p95": 1.85,
+          "p99": 2.01,
+          "max": 3.8,
+          "over8": 0,
+          "over16": 0
+        }
+      },
+      "dpr": 2,
+      "css": [
+        1440,
+        809
+      ],
+      "canvas": [
+        2880,
+        1618
+      ]
+    },
+    "horizon": {
+      "direction": "horizon",
+      "mode": "moving",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "firstFrame": 126.30000019073486,
+      "keyToFrame": [],
+      "stats": {
+        "frames": {
+          "frames": 10309,
+          "seconds": 11.94,
+          "p50": 0.2,
+          "p95": 2.8,
+          "p99": 3,
+          "max": 24.7,
+          "over8": 8,
+          "over16": 5
+        },
+        "cpu": {
+          "frames": 10309,
+          "seconds": 9.19,
+          "p50": 0.1,
+          "p95": 2.5,
+          "p99": 2.7,
+          "max": 8,
+          "over8": 0,
+          "over16": 0
+        },
+        "gpu": {
+          "frames": 8595,
+          "seconds": 11.35,
+          "p50": 1.27,
+          "p95": 1.87,
+          "p99": 2.26,
+          "max": 3.58,
+          "over8": 0,
+          "over16": 0
+        }
+      },
+      "dpr": 2,
+      "css": [
+        1440,
+        809
+      ],
+      "canvas": [
+        2880,
+        1618
+      ]
+    },
+    "circuit": {
+      "direction": "circuit",
+      "mode": "moving",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "firstFrame": 170.69999980926514,
+      "keyToFrame": [],
+      "stats": {
+        "frames": {
+          "frames": 10374,
+          "seconds": 11.91,
+          "p50": 0.2,
+          "p95": 2.8,
+          "p99": 3,
+          "max": 31.4,
+          "over8": 5,
+          "over16": 5
+        },
+        "cpu": {
+          "frames": 10374,
+          "seconds": 8.64,
+          "p50": 0.1,
+          "p95": 2.6,
+          "p99": 2.7,
+          "max": 6.2,
+          "over8": 0,
+          "over16": 0
+        },
+        "gpu": {
+          "frames": 8657,
+          "seconds": 11.41,
+          "p50": 1.22,
+          "p95": 1.85,
+          "p99": 2.35,
+          "max": 3.63,
+          "over8": 0,
+          "over16": 0
+        }
+      },
+      "dpr": 2,
+      "css": [
+        1440,
+        809
+      ],
+      "canvas": [
+        2880,
+        1618
+      ]
+    }
+  },
+  "first": {
+    "growth": {
+      "firstFrameMs": 95,
+      "firstFrameRuns": [
+        231,
+        77,
+        95
+      ],
+      "keyToFrameMs": {
+        "median": 3.4,
+        "max": 9.5,
+        "samples": 12
+      }
+    },
+    "horizon": {
+      "firstFrameMs": 91,
+      "firstFrameRuns": [
+        112,
+        87,
+        91
+      ],
+      "keyToFrameMs": {
+        "median": 5,
+        "max": 8.1,
+        "samples": 12
+      }
+    },
+    "circuit": {
+      "firstFrameMs": 91,
+      "firstFrameRuns": [
+        91,
+        96,
+        71
+      ],
+      "keyToFrameMs": {
+        "median": 2.7,
+        "max": 7.5,
+        "samples": 12
+      }
+    }
+  }
+}
