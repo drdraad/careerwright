@@ -53,21 +53,90 @@ export function project(p: Vec3, view: View): Projected {
   };
 }
 
-/** The span of the window (CSS pixels across) that the chapter's panels leave clear. */
-export type Clear = { readonly left: number; readonly right: number };
+/** The part of the window (CSS pixels) that the bars and panels over the world leave clear. */
+export type Clear = {
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+};
 
-/** Narrower than this, a clear span is no place to stand: the view keeps its usual centre. */
+/** A box on screen (CSS pixels). */
+export type Rect = {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+};
+
+/** Narrower than this, a span beside the panels is no place to stand. */
 const MIN_CLEAR = 240;
+/** Shorter than this, a band above or below the panels is no place to stand either. */
+const MIN_BAND = 240;
+/** Room kept above the horizon's lights and below the person's light for their names. */
+const ROOM_ABOVE = 56;
+const ROOM_BELOW = 48;
 
 /**
- * Where the view rests at each place. Where the chapter's panels leave a clear span wide
- * enough, the place's focus stands in its middle; otherwise desktop views keep it right of
- * the panel's usual place, and phone views sit behind the sheets.
+ * The part of the window the place can stand in. `bars` are the rail down the left edge and the
+ * bars along the top; `panels` are where a person reads (the chapter's panel, the drawer). On a
+ * wide screen it is the span beside the panels; otherwise the taller band above or below them;
+ * undefined when neither leaves room (the world is then a backdrop behind the panels).
+ */
+export function clearArea(
+  vp: Viewport,
+  bars: readonly Rect[],
+  panels: readonly Rect[],
+): Clear | undefined {
+  let top = 0;
+  let left = 0;
+  const right = vp.w;
+  for (const bar of [...bars].sort((a, b) => a.y - b.y)) {
+    if (bar.x <= 1 && bar.h >= vp.h * 0.9) left = Math.max(left, bar.x + bar.w);
+    else if (bar.y <= top + 1) top = Math.max(top, bar.y + bar.h);
+  }
+  let sideLeft = left;
+  let sideRight = right;
+  for (const p of panels) {
+    if (p.x + p.w / 2 < vp.w / 2) sideLeft = Math.max(sideLeft, p.x + p.w);
+    else sideRight = Math.min(sideRight, p.x);
+  }
+  if (sideRight - sideLeft >= MIN_CLEAR)
+    return { left: sideLeft, right: sideRight, top, bottom: vp.h };
+  const above = { left, right, top, bottom: Math.min(vp.h, ...panels.map((p) => p.y)) };
+  const below = {
+    left,
+    right,
+    top: Math.max(top, ...panels.map((p) => p.y + p.h)),
+    bottom: vp.h,
+  };
+  const band = above.bottom - above.top >= below.bottom - below.top ? above : below;
+  return band.bottom - band.top >= MIN_BAND ? band : undefined;
+}
+
+/**
+ * Where the view rests at each place, stood in the part of the window the panels leave clear:
+ * moved across only where its usual place would be too near the panel beside it, and fitted
+ * between the bars above and the panels below, made smaller only if it must be. Without a clear
+ * part the view keeps its usual place, behind the panels.
  */
 export function placeView(place: ChapterId, vp: Viewport, clear?: Clear): View {
   const view = restingView(place, vp);
-  if (clear === undefined || clear.right - clear.left < MIN_CLEAR) return view;
-  return { ...view, centre: (clear.left + clear.right) / 2 };
+  if (clear === undefined) return view;
+  const near =
+    view.centre < clear.left + MIN_CLEAR / 2 || view.centre > clear.right - MIN_CLEAR / 2;
+  // From the horizon down to the person's light, on screen.
+  const span = ((view.eye - ORIGIN[1]) * view.focal) / (ORIGIN[2] - view.z);
+  const room = clear.bottom - clear.top - ROOM_ABOVE - ROOM_BELOW;
+  const scale = span > room ? room / span : 1;
+  const highest = clear.top + ROOM_ABOVE;
+  const lowest = clear.bottom - ROOM_BELOW - span * scale;
+  return {
+    ...view,
+    centre: near ? (clear.left + clear.right) / 2 : view.centre,
+    focal: view.focal * scale,
+    horizon: Math.min(Math.max(view.horizon, highest), lowest),
+  };
 }
 
 function restingView(place: ChapterId, vp: Viewport): View {
@@ -89,24 +158,25 @@ function restingView(place: ChapterId, vp: Viewport): View {
         focal: h * 1.0,
       };
     case "skills":
-      // Low along the ground between the person and the destinations.
+      // Raised over the ground between the person and the destinations, so its stretches
+      // spread out below.
       return {
         x: 0,
-        z: -0.4,
-        eye: 0.42,
-        horizon: h * 0.3,
+        z: -1.6,
+        eye: 2.6,
+        horizon: h * 0.2,
         centre: w * (phone ? 0.5 : 0.64),
-        focal: h * 0.8,
+        focal: h * 0.62,
       };
     case "options":
-      // Raised over the middle ground, looking across the dark stretches.
+      // Higher again over the middle ground, looking across the dark stretches.
       return {
         x: 0,
-        z: -1.2,
-        eye: 2.4,
-        horizon: h * 0.22,
+        z: -2.2,
+        eye: 3.6,
+        horizon: h * 0.18,
         centre: w * (phone ? 0.5 : 0.64),
-        focal: h * 0.8,
+        focal: h * 0.62,
       };
     case "routes":
       // High and wide: whole journeys from the person to the horizon.
@@ -119,27 +189,42 @@ function restingView(place: ChapterId, vp: Viewport): View {
         focal: h * 0.72,
       };
     case "plan":
-      // Behind the person, looking down the path ahead.
+      // Behind the person and a little above, looking down the path ahead.
       return {
         x: 0,
-        z: -0.6,
-        eye: 0.9,
-        horizon: h * 0.34,
+        z: -1.2,
+        eye: 1.8,
+        horizon: h * 0.26,
         centre: w * (phone ? 0.5 : 0.64),
-        focal: h * 0.66,
+        focal: h * 0.62,
       };
   }
 }
 
-/** The view's uniforms for the shaders: [x, z, horizon, focal] and [centre, eye, 0, 0]. */
-export function viewUniforms(
+/**
+ * Writes the view into the shaders' uniforms in place (no allocation per frame):
+ * a = [x, z, horizon, focal], b = [centre, eye, 0, 0].
+ */
+export function writeViewUniforms(
   view: View,
-): [[number, number, number, number], [number, number, number, number]] {
-  return [
-    [view.x, view.z, view.horizon, view.focal],
-    [view.centre, view.eye, 0, 0],
-  ];
+  a: [number, number, number, number],
+  b: [number, number, number, number],
+): void {
+  a[0] = view.x;
+  a[1] = view.z;
+  a[2] = view.horizon;
+  a[3] = view.focal;
+  b[0] = view.centre;
+  b[1] = view.eye;
 }
+
+export const sameView = (a: View, b: View): boolean =>
+  a.x === b.x &&
+  a.z === b.z &&
+  a.eye === b.eye &&
+  a.horizon === b.horizon &&
+  a.centre === b.centre &&
+  a.focal === b.focal;
 
 const WIDTHS = {
   root: [0.016, 0.013],
@@ -317,11 +402,15 @@ export function buildScene(input: WorldInput, vp: Viewport, births: Births): Sce
   return { nodes, trails };
 }
 
+type MutableView = { -readonly [K in keyof View]: View[K] };
+
 /** Eases the view from one resting place to the next: travel, or a cut when the world is still. */
 export class ViewTween {
   private from: View;
   private to: View;
   private start = SETTLED;
+  /** Reused every frame: `current` writes into it rather than allocating. */
+  private readonly now: MutableView = { x: 0, z: 0, eye: 0, horizon: 0, centre: 0, focal: 0 };
 
   constructor(
     initial: View,
@@ -333,9 +422,8 @@ export class ViewTween {
 
   /** Aims at a new resting view; `still` cuts straight to it. */
   aim(target: View, at: number, still: boolean): void {
-    const same = (Object.keys(target) as (keyof View)[]).every((k) => target[k] === this.to[k]);
-    if (same && !still) return;
-    this.from = still ? target : this.current(at);
+    if (sameView(target, this.to) && !still) return;
+    this.from = still ? target : { ...this.current(at) };
     this.to = target;
     this.start = still ? SETTLED : at;
   }
@@ -344,18 +432,18 @@ export class ViewTween {
     return at - this.start < this.seconds;
   }
 
+  /** The view at `at`; the same object every call, valid until the next. */
   current(at: number): View {
     const t = Math.min(1, Math.max(0, (at - this.start) / this.seconds));
     // The travel easing (--ease-travel): slow away, quick across, slow to rest.
     const e = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
-    const mix = (k: keyof View) => this.from[k] + (this.to[k] - this.from[k]) * e;
-    return {
-      x: mix("x"),
-      z: mix("z"),
-      eye: mix("eye"),
-      horizon: mix("horizon"),
-      centre: mix("centre"),
-      focal: mix("focal"),
-    };
+    const { from, to, now } = this;
+    now.x = from.x + (to.x - from.x) * e;
+    now.z = from.z + (to.z - from.z) * e;
+    now.eye = from.eye + (to.eye - from.eye) * e;
+    now.horizon = from.horizon + (to.horizon - from.horizon) * e;
+    now.centre = from.centre + (to.centre - from.centre) * e;
+    now.focal = from.focal + (to.focal - from.focal) * e;
+    return now;
   }
 }

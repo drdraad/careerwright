@@ -67,13 +67,31 @@ process." Their reference image is "Careerwright's luminous path forward".
    self-hosted; Newsreader retires. The spike chooses the faces.
    **Chosen: Outfit** for display (the product owner at session W1: "Keep Outfit"), the OFL
    variable font from `google/fonts`, pinned and unmodified (`docs/design/fonts/README.md`).
-   **Body: Source Sans 3 stays** (Task W2's ruling): session W1 chose only the heading
-   lettering; Source Sans 3 is already licensed, self-hosted and measured, and its default
-   figures are tabular, which money and months need. The spike's Atkinson Hyperlegible Next
-   stood in for body text in a throwaway preview and is not adopted.
+   **Body: Source Sans 3, provisional, to confirm with the product owner at session W2**
+   (R6). This decision delegated the faces to the spike, and the spike set its words in
+   Atkinson Hyperlegible Next, which the product owner saw; session W1 chose only the heading
+   lettering. Task W2 keeps Source Sans 3 until session W2 says otherwise: it is already
+   licensed, self-hosted and measured, and its default figures are tabular, which money and
+   months need.
 7. **Stillness is a first-class version.** Reduced motion, calm mode and a browser without
    WebGL2 draw the same states and words without motion. A visible control pauses ambient
    motion.
+   **In the app (Task W2):** the still world is also drawn while the calm support panel shows
+   (Pause keeps showing the person's own choice, and the strip says "Still while support is
+   shown"), and for the rest of a visit once the moving world fails (its WebGL context lost,
+   or its renderer unable to start). Calm mode is a setting in the account menu; Pause motion
+   and Sound stay in the strip. **Never overwhelming** (the product owner, shown the busiest
+   scene: "too busy … overwhelming"): one idea at a time, and nothing moves without meaning. The
+   atmosphere keeps the breathing horizon, the aurora and light flowing along known trails; the
+   shimmer that travelled the horizon and the trails' sway are gone, and the motes are cut from
+   2,400 to 360. Every trail is drawn at least at its measured strength (3:1 as drawn, over the
+   ground and the horizon's glow, in the references and in both of the app's worlds).
+   **Frame evidence:** `docs/evidence/world-frames.json` stays the record of the run on commit
+   `65aed2f` (2,400 motes, before these changes). The measurement tool now records the commit,
+   marks the scene synthetic, pairs each frame's main-thread and WebGL GPU time by frame number
+   and counts frames over 16.7 ms; it was not run again, because its headed runs open a window
+   on the product owner's screen. Task W2's acceptance slice measures again, with the product
+   owner warned first.
 8. **Sound is not in L0** unless the product owner asks for it at session W1.
    **The product owner asked for it** at session W1: "YEs, all three, but I want them subtle
    and evocative, not cheesy!" So L0 has three short cues, synthesised in the browser (no

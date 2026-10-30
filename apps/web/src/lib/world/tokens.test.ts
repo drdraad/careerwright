@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { MOTION } from "./motion";
-import { PALETTE, PALETTE_TOKENS } from "./palette";
+import { PALETTE, PALETTE_TOKENS, TRAIL_OPACITY, TRAIL_OPACITY_TOKENS } from "./palette";
 
 const css = readFileSync(
   fileURLToPath(new URL("../../design/tokens/tokens.css", import.meta.url)),
@@ -38,5 +38,14 @@ describe("[UI-04][UI-05] the world uses the design tokens", () => {
 
   it.each(Object.entries(PALETTE_TOKENS))("colours %s with %s", (key, name) => {
     expect(PALETTE[key as keyof typeof PALETTE].toUpperCase()).toBe(token(name).toUpperCase());
+  });
+
+  // The contrast tool measures each trail at its token's strength: the world draws it so.
+  it.each(Object.entries(TRAIL_OPACITY_TOKENS))("draws %s trails at %s", (key, name) => {
+    expect(TRAIL_OPACITY[key as keyof typeof TRAIL_OPACITY]).toBe(Number(token(name as string)));
+  });
+
+  it("draws said trails at full strength", () => {
+    expect(TRAIL_OPACITY.said).toBe(1);
   });
 });

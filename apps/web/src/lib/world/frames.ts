@@ -1,6 +1,9 @@
 // Frame-time instrumentation for the world (plan section 4's budgets, ruled as per-frame cost:
-// main-thread work in the frame callback plus GPU time, with the requestAnimationFrame interval
-// reported beside them). Used only when the world is asked to measure.
+// main-thread work in the frame callback plus the frame's WebGL GPU time, with the
+// requestAnimationFrame interval reported beside them). Used only when the world is asked to
+// measure. WebGL GPU time covers the world's own passes, not the compositor's work on the
+// page's glass over the canvas; the unthrottled interval is the whole pipeline's cost.
+import type { GpuSample } from "./gl";
 
 export type FrameStats = {
   frames: number;
@@ -10,8 +13,13 @@ export type FrameStats = {
   max: number;
   /** Samples above 8 ms (the M4 headroom) and above 16.7 ms (the M1 budget). */
   over8: number;
-  over16: number;
+  over16_7: number;
 };
+
+/** The M1 budget: one frame at 60 Hz. */
+const BUDGET_MS = 16.7;
+/** The headroom kept on the faster machine measured: half the budget. */
+const HEADROOM_MS = 8;
 
 export const percentile = (sorted: readonly number[], p: number): number => {
   if (sorted.length === 0) return Number.NaN;
@@ -28,19 +36,24 @@ export function summarise(samples: readonly number[]): FrameStats {
     p95: round(percentile(sorted, 95)),
     p99: round(percentile(sorted, 99)),
     max: round(sorted[sorted.length - 1] ?? Number.NaN),
-    over8: samples.filter((d) => d > 8).length,
-    over16: samples.filter((d) => d > 16.7).length,
+    over8: samples.filter((d) => d > HEADROOM_MS).length,
+    over16_7: samples.filter((d) => d > BUDGET_MS).length,
   };
 }
 
-/** Per-frame cost: the frame callback's own time (ms) plus that frame's GPU time when known. */
-export function frameCost(script: readonly number[], gpu: readonly number[]): number[] {
-  if (gpu.length === 0) return [];
-  const n = Math.min(script.length, gpu.length);
-  // GPU results arrive a frame or two late, so pair the most recent samples of each.
-  const s = script.slice(script.length - n);
-  const g = gpu.slice(gpu.length - n);
-  return s.map((value, i) => value + (g[i] as number));
+/** One frame's main-thread time (ms) in its callback, by frame number. */
+export type ScriptSample = { frame: number; ms: number };
+
+/**
+ * Per-frame cost: each frame's callback time plus that same frame's WebGL GPU time, paired by
+ * frame number (GPU results arrive a frame or two late). Frames without both are left out.
+ */
+export function frameCost(script: readonly ScriptSample[], gpu: readonly GpuSample[]): number[] {
+  const gpuByFrame = new Map(gpu.map((s) => [s.frame, s.ms]));
+  return script.flatMap((s) => {
+    const g = gpuByFrame.get(s.frame);
+    return g === undefined ? [] : [s.ms + g];
+  });
 }
 
 export type WorldMeasurement = {
@@ -51,14 +64,15 @@ export type WorldMeasurement = {
   firstFrame: number | null;
   interval: FrameStats;
   script: FrameStats;
-  gpu: FrameStats | "not available";
+  /** The world's WebGL passes only (timer queries). */
+  webglGpu: FrameStats | "not available";
   cost: FrameStats | "not available";
 };
 
 /** Collects samples while measuring; the world loop calls it once per frame. */
 export class FrameMeter {
   private intervals: number[] = [];
-  private scripts: number[] = [];
+  private scripts: ScriptSample[] = [];
   private last = -1;
   private started = -1;
   private warm = false;
@@ -71,7 +85,7 @@ export class FrameMeter {
   ) {}
 
   /** `at` is the frame's rAF timestamp (ms); `script` the callback's own time (ms). */
-  record(at: number, script: number): void {
+  record(frame: number, at: number, script: number): void {
     if (this.done) return;
     if (this.started < 0) this.started = at;
     const elapsed = at - this.started;
@@ -81,7 +95,7 @@ export class FrameMeter {
         this.onWarm();
       } else {
         this.intervals.push(at - this.last);
-        this.scripts.push(script);
+        this.scripts.push({ frame, ms: script });
       }
     }
     this.last = at;
@@ -89,13 +103,14 @@ export class FrameMeter {
   }
 
   result(
-    gpu: readonly number[] | null,
+    gpu: readonly GpuSample[] | null,
   ): Omit<WorldMeasurement, "renderer" | "devicePixelRatio" | "canvas" | "firstFrame"> {
     const cost = gpu === null ? [] : frameCost(this.scripts, gpu);
     return {
       interval: summarise(this.intervals),
-      script: summarise(this.scripts),
-      gpu: gpu === null || gpu.length === 0 ? "not available" : summarise(gpu),
+      script: summarise(this.scripts.map((s) => s.ms)),
+      webglGpu:
+        gpu === null || gpu.length === 0 ? "not available" : summarise(gpu.map((s) => s.ms)),
       cost: cost.length === 0 ? "not available" : summarise(cost),
     };
   }

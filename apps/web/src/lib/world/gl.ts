@@ -3,9 +3,12 @@
 // the scene, and every word is in the DOM. Horizon, made livelier (session W1): the same calm,
 // lined-up layout as the spike's Horizon, with quiet solid trails and more life in the light.
 //
-// Atmosphere (the breathing horizon, the aurora, stars, mist, motes, sway and the light
+// Atmosphere (the breathing horizon, the aurora, stars, mist, a few hundred motes and the light
 // flowing along known trails) looks the same for every item and carries no meaning. Meaning is
 // carried only by the scene's states: lit or waiting, usual or said, shadow (not known yet).
+// Never overwhelming (the product owner, on the busiest scene): no shimmer travels the horizon
+// and no trail sways; each trail's core is drawn at least at its measured strength (palette.ts),
+// and its glow and the light flowing along it only add.
 import {
   AdditiveBlending,
   BufferAttribute,
@@ -22,12 +25,20 @@ import {
   Scene as ThreeScene,
   WebGLRenderer,
 } from "three";
-import { type View, type Viewport, viewUniforms } from "./geometry";
+import { type View, type Viewport, writeViewUniforms } from "./geometry";
 import { MOTION } from "./motion";
+import { PALETTE, rgb, TRAIL_OPACITY } from "./palette";
 import { KIND_CODE, type Scene, STATE_CODE, type Vec3 } from "./scene";
 
-/** Drifting motes: atmosphere. */
-const PARTICLES = 2400;
+/** Drifting motes: atmosphere, a few hundred. */
+const PARTICLES = 360;
+
+/** A token's colour as a GLSL vec3, so the shaders hold the palette's own values. */
+const vec3 = (hex: string): string =>
+  `vec3(${rgb(hex)
+    .map((c) => (c / 255).toFixed(3))
+    .join(", ")})`;
+const float = (n: number): string => n.toFixed(3);
 
 const PRELUDE = /* glsl */ `
 precision highp float;
@@ -43,13 +54,18 @@ uniform vec4 uCamB;
 uniform vec3 uOrigin;
 
 // One colour, one meaning (docs/design/tokens/tokens.css): blue to violet is the journey,
-// orange a destination, sea-glass the chosen path, slate not known yet.
-const vec3 BLUE = vec3(0.251, 0.549, 1.0);
-const vec3 VIOLET = vec3(0.620, 0.420, 1.0);
-const vec3 ORANGE = vec3(1.0, 0.580, 0.200);
-const vec3 SHADOW = vec3(0.435, 0.494, 0.639);
-const vec3 WHITE = vec3(0.929, 0.961, 1.0);
+// orange a destination, slate not known yet; written from the palette (palette.ts).
+const vec3 BLUE = ${vec3(PALETTE.near)};
+const vec3 VIOLET = ${vec3(PALETTE.far)};
+const vec3 ORANGE = ${vec3(PALETTE.destination)};
+const vec3 SHADOW = ${vec3(PALETTE.shadow)};
+const vec3 WHITE = ${vec3(PALETTE.person)};
 const float BREATHE = ${MOTION.breathe.toFixed(1)};
+// Each declared state's measured strength (contrast-pairs.json).
+const float USUAL = ${float(TRAIL_OPACITY.usual)};
+const float SAID = ${float(TRAIL_OPACITY.said)};
+const float SHADOWED = ${float(TRAIL_OPACITY.shadow)};
+const float OPENING = ${float(TRAIL_OPACITY.opening)};
 
 vec3 journey(float h) { return mix(BLUE, VIOLET, smoothstep(0.0, 1.0, h)); }
 float breath(float phase) { return 0.5 + 0.5 * sin(uAmbient * 6.2832 / BREATHE + phase); }
@@ -92,10 +108,6 @@ void main() {
   // The horizon's glow breathes slowly.
   col += vec3(0.07, 0.11, 0.26) * exp(-abs(above) / 80.0) * (0.52 + 0.14 * b);
   col += vec3(0.24, 0.18, 0.46) * exp(-abs(above) / 12.0) * (0.24 + 0.08 * b);
-  // A slow shimmer travels along the horizon line.
-  float run = uRes.x * 1.8;
-  float sx = mod(uAmbient * 38.0, run) - uRes.x * 0.4;
-  col += vec3(0.32, 0.40, 0.80) * exp(-pow((px.x - sx) / 220.0, 2.0)) * exp(-abs(above) / 5.0) * 0.32;
   if (above > 0.0) {
     // Aurora: soft curtains of blue and violet drifting above the horizon, with fine rays.
     float a = vnoise(vec2(px.x * 0.0032 + uAmbient * 0.012, uAmbient * 0.006));
@@ -161,13 +173,10 @@ void main() {
   float len = length(tangent);
   tangent = len > 1e-4 ? tangent / len : vec2(1.0, 0.0);
   vec2 normal = vec2(-tangent.y, tangent.x);
-  // Sway is atmosphere: the same slow movement for every trail, zero at both ends so the lights
-  // never move, and stilled with the rest of the ambient motion.
-  float envelope = sin(3.14159 * aA.y);
-  float sway = sin(uAmbient * 0.7 + aA.z * 1.3 + aB.w * 6.2832) * 2.4 * envelope * uLive;
+  // A trail is still: it never sways, so a known path never looks unsettled.
   float core = max(aWidth * s1, 0.7);
   float half_ = core * 0.5 + max(5.0, core * 2.6);
-  gl_Position = s1 > 0.0 ? toClip(p + normal * (aA.x * half_ + sway)) : vec4(2.0, 2.0, 2.0, 1.0);
+  gl_Position = s1 > 0.0 ? toClip(p + normal * aA.x * half_) : vec4(2.0, 2.0, 2.0, 1.0);
   vSide = aA.x;
   vT = aA.y;
   vDist = aA.z;
@@ -197,17 +206,25 @@ void main() {
   float sigma = max(2.2, vCore * 1.3);
   float glow = exp(-x * x / (2.0 * sigma * sigma));
   vec3 col = journey(vHue);
-  // Declared meanings: usual is dimmer than said; shadow is a quiet solid slate, never absent.
-  float level = 0.42;
+  // Declared meanings, each core at its measured strength: usual is fainter than said, with
+  // less glow; shadow is a quiet solid slate, never absent.
+  float level = USUAL;
+  float halo = 0.5;
   bool known = state < 1.5;
-  if (state > 0.5 && state < 1.5) level = 1.0;
+  if (state > 0.5 && state < 1.5) {
+    level = SAID;
+    halo = 1.0;
+  }
   if (state > 1.5 && state < 2.5) {
     col = SHADOW;
-    level = 0.62;
-    glow *= 0.4;
+    level = SHADOWED;
+    halo = 0.25;
   }
-  if (state > 3.5) level = 0.34;
-  // Atmosphere, the same for every trail: a slow breath along its length.
+  if (state > 3.5) {
+    level = OPENING;
+    halo = 0.4;
+  }
+  // Atmosphere, the same for every trail: a slow breath along its glow.
   float flow = 0.86 + 0.14 * sin(vDist * 2.1 - uAmbient * 1.4 + vB.w * 6.2832);
   // Light flows outward along what is known (usual or said), never along what is not.
   float pulse = 0.0;
@@ -216,7 +233,9 @@ void main() {
     pulse = exp(-k * 10.0) * 1.7 * uLive;
   }
   float head = grow < 1.0 ? exp(-(grow - vT) * 28.0) : 0.0;
-  float light = level * (core + glow * 0.55) * flow + (core * 0.8 + glow * 0.6) * (head * 1.4 + pulse * 0.55);
+  // The core is added at its level over the ground, at least as bright as drawing it at that
+  // opacity; glow, flow, growth and the pulse only add to it.
+  float light = level * core + glow * 0.55 * halo * flow + (core * 0.8 + glow * 0.6) * (head * 1.4 + pulse * 0.55);
   fragColor = vec4(col * light, 1.0);
 }
 `;
@@ -347,6 +366,8 @@ type Uniforms = {
 };
 
 export type FrameState = {
+  /** The frame's number, so its GPU time can be paired with its main-thread time. */
+  index: number;
   /** Seconds on the page's clock. */
   time: number;
   /** The ambient clock: it advances only while ambient motion runs. */
@@ -359,20 +380,27 @@ export type FrameState = {
   view: View;
 };
 
+/** Whether this browser offers WebGL2; the probe's context is released at once. */
 export function webgl2Available(): boolean {
   try {
-    return document.createElement("canvas").getContext("webgl2") !== null;
+    const probe = document.createElement("canvas").getContext("webgl2");
+    if (probe === null) return false;
+    probe.getExtension("WEBGL_lose_context")?.loseContext();
+    return true;
   } catch {
     return false;
   }
 }
 
+/** One frame's WebGL GPU time (the world's passes only, not the page's compositing). */
+export type GpuSample = { frame: number; ms: number };
+
 type Timing = {
   gl: WebGL2RenderingContext;
   elapsed: number;
   disjoint: number;
-  pending: WebGLQuery[];
-  samples: number[];
+  pending: { query: WebGLQuery; frame: number }[];
+  samples: GpuSample[];
 };
 
 export class GLWorld {
@@ -588,16 +616,14 @@ export class GLWorld {
     u.uLive.value = frame.live;
     u.uLit.value = frame.lit ? 1 : 0;
     u.uIgnite.value = frame.ignite;
-    const [camA, camB] = viewUniforms(frame.view);
-    u.uCamA.value = camA;
-    u.uCamB.value = camB;
+    writeViewUniforms(frame.view, u.uCamA.value, u.uCamB.value);
     const timing = this.timing;
     const query = timing?.gl.createQuery() ?? null;
     if (timing && query) timing.gl.beginQuery(timing.elapsed, query);
     this.renderer.render(this.scene, this.camera);
     if (timing && query) {
       timing.gl.endQuery(timing.elapsed);
-      timing.pending.push(query);
+      timing.pending.push({ query, frame: frame.index });
       this.collectTimings();
     }
   }
@@ -620,8 +646,8 @@ export class GLWorld {
     return true;
   }
 
-  /** GPU milliseconds per frame since the last call. */
-  takeGpuSamples(): number[] {
+  /** Each frame's WebGL GPU milliseconds since the last call, by frame number. */
+  takeGpuSamples(): GpuSample[] {
     const samples = this.timing?.samples ?? [];
     if (this.timing) this.timing.samples = [];
     return samples;
@@ -631,11 +657,13 @@ export class GLWorld {
     const t = this.timing;
     if (!t) return;
     while (t.pending.length > 0) {
-      const query = t.pending[0] as WebGLQuery;
+      const { query, frame } = t.pending[0] as { query: WebGLQuery; frame: number };
       if (!t.gl.getQueryParameter(query, t.gl.QUERY_RESULT_AVAILABLE)) break;
       const disjoint = t.gl.getParameter(t.disjoint) as boolean;
-      if (!disjoint)
-        t.samples.push((t.gl.getQueryParameter(query, t.gl.QUERY_RESULT) as number) / 1e6);
+      if (!disjoint) {
+        const ns = t.gl.getQueryParameter(query, t.gl.QUERY_RESULT) as number;
+        t.samples.push({ frame, ms: ns / 1e6 });
+      }
       t.gl.deleteQuery(query);
       t.pending.shift();
     }
@@ -647,7 +675,8 @@ export class GLWorld {
     this.trailMaterial.dispose();
     this.nodeMaterial.dispose();
     this.renderer.dispose();
-    // Release the context itself: browsers hold only a few, and calm mode can come and go.
-    this.renderer.forceContextLoss();
+    // Release the context itself (browsers hold only a few, and calm mode can come and go),
+    // unless the browser has already taken it.
+    if (!this.renderer.getContext().isContextLost()) this.renderer.forceContextLoss();
   }
 }

@@ -22,7 +22,7 @@ function Mark({ progress, current }: { progress: ChapterProgress | undefined; cu
 
 export function ChapterRail({ workspaceId, current, progress }: Props) {
   return (
-    <div className="rail">
+    <div className="rail" data-covers-world>
       <Link className="rail-mark" href="/">
         <span className="sr-only">Careerwright: your workspaces</span>
         <Glyph name="mark" />

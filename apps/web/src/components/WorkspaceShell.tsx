@@ -1,7 +1,8 @@
 "use client";
 // The six-chapter shell around one workspace (spec section 3, UI-09): one persistent world
 // behind everything (plan section 4), with the chapter rail or menu, the workspace strip and
-// its world controls, the chapter's place and the evidence drawer over it. It owns the session
+// its world controls, the chapter's place and the evidence drawer over it. While the calm
+// support panel shows, the world is still (ADR 0007, plan section 4). It owns the session
 // checks (signed in, invited, workspace visible) and the workspace's live status events;
 // chapters read the same server state through `useWorkspaceData`.
 import { usePathname, useRouter, useSelectedLayoutSegment } from "next/navigation";
@@ -21,14 +22,14 @@ import {
   useWorkspaces,
 } from "@/lib/queries";
 import { worldFromProfile } from "@/lib/world/model";
-import { useWorldSettings } from "@/lib/world/settings";
+import { SupportShown, useWorldSettings } from "@/lib/world/settings";
 import { ChapterMenu, ChapterRail } from "./ChapterNav";
 import { EvidenceDrawer, useEvidence } from "./EvidenceDrawer";
 import { NotInvited, PageFrame, PageLoading, RequestFailure } from "./PageState";
 import { SyntheticLabel } from "./Status";
 import { WorkspaceStrip } from "./WorkspaceStrip";
 import { World } from "./World";
-import { WorldControls } from "./WorldControls";
+import { CalmMode, WorldControls } from "./WorldControls";
 
 type WorkspaceData = {
   workspace: WorkspaceOut;
@@ -98,6 +99,8 @@ export function WorkspaceShell({
   const pathname = usePathname();
   const { evidence, close } = useEvidence();
   const world = useWorldSettings();
+  // The calm support panel is showing (the conversation reports it): the world stays still.
+  const [supportShown, setSupportShown] = useState(false);
   const signedIn = auth.state.status === "signed_in";
 
   useEffect(() => {
@@ -177,43 +180,47 @@ export function WorkspaceShell({
 
   return (
     <WorkspaceContext.Provider value={data}>
-      <a
-        className="on-space btn btn-primary sr-only focus:not-sr-only focus:absolute focus:left-16 focus:top-16 focus:z-40"
-        href="#main"
-      >
-        Skip to the chapter
-      </a>
-      <div className="app" data-drawer={evidence === null ? "closed" : "open"}>
-        <ChapterRail workspaceId={workspaceId} current={chapter} progress={progress} />
-        <div className="topbar on-space" data-covers-world>
-          <ChapterMenu workspaceId={workspaceId} current={chapter} progress={progress} />
-          {workspace.data.synthetic && <SyntheticLabel />}
+      <SupportShown.Provider value={setSupportShown}>
+        <a
+          className="on-space btn btn-primary sr-only focus:not-sr-only focus:absolute focus:left-16 focus:top-16 focus:z-40"
+          href="#main"
+        >
+          Skip to the chapter
+        </a>
+        <div className="app" data-drawer={evidence === null ? "closed" : "open"}>
+          <ChapterRail workspaceId={workspaceId} current={chapter} progress={progress} />
+          <div className="topbar on-space" data-covers-world>
+            <ChapterMenu workspaceId={workspaceId} current={chapter} progress={progress} />
+            {workspace.data.synthetic && <SyntheticLabel />}
+          </div>
+          <WorkspaceStrip
+            workspace={workspace.data}
+            profile={profile.data}
+            profileFailed={profile.isError}
+            workspaces={workspaces.data ?? [workspace.data]}
+            workspacesFailed={workspaces.isError}
+            events={events.status}
+            onReconnect={events.restart}
+            refreshFailed={refreshFailed(me, workspace, profile)}
+            email={auth.state.email}
+            controls={<WorldControls settings={world} supportShown={supportShown} />}
+            settings={<CalmMode settings={world} />}
+            onSignOut={() => void auth.signOut()}
+          />
+          <main id="main" tabIndex={-1} className="workarea">
+            {children}
+          </main>
+          <EvidenceDrawer />
         </div>
-        <WorkspaceStrip
-          workspace={workspace.data}
-          profile={profile.data}
-          profileFailed={profile.isError}
-          workspaces={workspaces.data ?? [workspace.data]}
-          workspacesFailed={workspaces.isError}
-          events={events.status}
-          onReconnect={events.restart}
-          refreshFailed={refreshFailed(me, workspace, profile)}
-          email={auth.state.email}
-          controls={<WorldControls settings={world} />}
-          onSignOut={() => void auth.signOut()}
+        <World
+          place={chapter}
+          input={worldInput}
+          calm={world.calm}
+          paused={world.paused}
+          distress={supportShown}
+          sound={world.sound}
         />
-        <main id="main" tabIndex={-1} className="workarea">
-          {children}
-        </main>
-        <EvidenceDrawer />
-      </div>
-      <World
-        place={chapter}
-        input={worldInput}
-        calm={world.calm}
-        paused={world.paused}
-        sound={world.sound}
-      />
+      </SupportShown.Provider>
     </WorkspaceContext.Provider>
   );
 }

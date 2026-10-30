@@ -4,6 +4,7 @@
 // chapters that compute them (the You chapter's first moments, Roles); until then the world
 // draws none, and the ground between the person and each destination stays in shadow.
 import type { ProfileOut } from "@/generated/api";
+import { PROFILE_FIELD_ORDER } from "@/lib/vocabulary";
 
 export type WorldSkill = {
   readonly id: string;
@@ -35,14 +36,7 @@ const byTitle = (a: string, b: string): number => a.localeCompare(b, "en-GB");
 
 /** Answered, Unknown, Skipped and Prefer not to say are all answers; only "Not asked yet" is not. */
 function hasAnswered(profile: ProfileOut): boolean {
-  return Object.entries(profile.document).some(
-    ([name, field]) =>
-      name !== "schema_version" &&
-      typeof field === "object" &&
-      field !== null &&
-      "state" in field &&
-      field.state !== "unasked",
-  );
+  return PROFILE_FIELD_ORDER.some((name) => profile.document[name].state !== "unasked");
 }
 
 export function worldFromProfile(profile: ProfileOut | undefined): WorldInput {

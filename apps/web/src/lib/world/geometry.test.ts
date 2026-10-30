@@ -6,9 +6,11 @@ import { CHAPTERS } from "@/lib/chapters";
 import {
   type Births,
   buildScene,
+  clearArea,
   HORIZON_Z,
   placeView,
   project,
+  type Rect,
   type Viewport,
   ViewTween,
 } from "./geometry";
@@ -31,6 +33,17 @@ const world = (overrides: Partial<WorldInput> = {}): WorldInput => ({
   openings: 0,
   ...overrides,
 });
+
+/** The rail down the left edge, and a bar along the top (the strip or a phone's top bar). */
+const RAIL = (vp: Viewport): Rect => ({ x: 0, y: 0, w: 96, h: vp.h });
+const STRIP = (vp: Viewport, h: number, y = 0): Rect => ({
+  x: vp.w > 760 ? 96 : 0,
+  y,
+  w: vp.w > 760 ? vp.w - 96 : vp.w,
+  h,
+});
+const origin = (vp: Viewport) =>
+  buildScene(world(), vp, SETTLED).nodes.find((n) => n.kind === "origin")?.p ?? [0, 0, 0];
 
 describe("[UI-04] the world's layout never says more than the evidence", () => {
   it("stands every destination at one depth and height, in title order from left to right", () => {
@@ -125,13 +138,52 @@ describe("[UI-09] each chapter is a place the view travels to", () => {
   );
 
   it("centres the place in the part of the world the chapter's panel leaves clear", () => {
-    // The You panel spans x 120–1160 at 1440 wide: the person's light stands in what is left.
-    const clear = { left: 1160, right: 1440 };
-    const origin = buildScene(world(), DESKTOP, SETTLED).nodes.find((n) => n.kind === "origin");
-    const p = project(origin?.p ?? [0, 0, 0], placeView("you", DESKTOP, clear));
+    // The You panel spans x 128–1160 at 1440 wide: the person's light stands in what is left.
+    const clear = clearArea(
+      DESKTOP,
+      [RAIL(DESKTOP), STRIP(DESKTOP, 65)],
+      [{ x: 128, y: 89, w: 1032, h: 780 }],
+    );
+    expect(clear).toEqual({ left: 1160, right: 1440, top: 65, bottom: 900 });
+    const p = project(origin(DESKTOP), placeView("you", DESKTOP, clear));
     expect(p.x).toBe(1300);
-    // Too little room to stand in (a tablet's full-width panel): the usual view.
-    expect(placeView("you", TABLET, { left: 700, right: 768 })).toEqual(placeView("you", TABLET));
+  });
+
+  it("keeps a place where it rests when the panel beside it leaves it clear", () => {
+    // Roles' short card, low on the left: the horizon and the person stand where they rest.
+    const clear = clearArea(
+      DESKTOP,
+      [RAIL(DESKTOP), STRIP(DESKTOP, 65)],
+      [{ x: 128, y: 545, w: 520, h: 323 }],
+    );
+    expect(placeView("roles", DESKTOP, clear)).toEqual(placeView("roles", DESKTOP));
+  });
+
+  it.each([
+    ["tablet", TABLET, [RAIL(TABLET), STRIP(TABLET, 186)], { x: 128, y: 700, w: 520, h: 292 }],
+    ["phone", PHONE, [STRIP(PHONE, 65, 0), STRIP(PHONE, 57, 65)], { x: 0, y: 500, w: 390, h: 344 }],
+  ] as const)("on a %s, stands the place above the short sheet, in view", (_, vp, bars, card) => {
+    const clear = clearArea(vp, bars, [card]);
+    expect(clear).toBeDefined();
+    const view = placeView("roles", vp, clear);
+    const scene = buildScene(world(), vp, SETTLED);
+    const top = bars
+      .filter((bar) => bar.h < vp.h / 2)
+      .reduce((y, bar) => Math.max(y, bar.y + bar.h), 0);
+    for (const node of scene.nodes) {
+      const p = project(node.p, view);
+      expect(p.y, node.id).toBeGreaterThan(top);
+      expect(p.y, node.id).toBeLessThan(card.y);
+      expect(p.x, node.id).toBeGreaterThan(0);
+      expect(p.x, node.id).toBeLessThan(vp.w);
+    }
+  });
+
+  it("leaves the world as a backdrop where the panels leave no room to stand", () => {
+    // A phone's You chapter fills the screen below the header.
+    const clear = clearArea(PHONE, [STRIP(PHONE, 122, 0)], [{ x: 0, y: 134, w: 390, h: 710 }]);
+    expect(clear).toBeUndefined();
+    expect(placeView("you", PHONE, clear)).toEqual(placeView("you", PHONE));
   });
 
   it("gives every place its own view", () => {

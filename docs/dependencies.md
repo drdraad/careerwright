@@ -140,16 +140,22 @@ registry, checked 2026-10-28.
 
 Task W2 (2026-10-30) added `three` and `@types/three` with its six transitive packages, each
 published more than 14 days before (pnpm's `minimumReleaseAge` enforced it on install). The
-display face Outfit 1.100 (OFL-1.1) is a font file, not a package: it is pinned to a
-`google/fonts` commit and hashed in `docs/design/fonts/README.md`, and mirrored byte for byte
-in `apps/web/src/design/fonts/`.
+display face Outfit 1.100 (OFL-1.1) is a font file, not a package: it is pinned to the
+`google/fonts` commit `8b0a1d0` of 2026-03-12 (232 days old when it was taken on 2026-10-30)
+and hashed in `docs/design/fonts/README.md`, and mirrored byte for byte in
+`apps/web/src/design/fonts/`. The body face stays Source Sans 3 (already pinned and hashed
+there): **provisional, to confirm with the product owner at session W2** (ADR 0014 decision
+6; the world spike had set its words in Atkinson Hyperlegible Next).
 
-Lockfile: 438 packages before Task W2. Licences across the whole tree (`pnpm licenses list`, 2026-10-28):
-MIT (271), Apache-2.0 (16), ISC (11), BlueOak-1.0.0 (6), BSD-2-Clause (5), BSD-3-Clause
-(3), MPL-2.0 (3: `axe-core`, `lightningcss` and its arm64 binary, both build or test tools,
-used unmodified), MIT OR Apache-2.0 (2), MIT-0 (2), CC-BY-4.0 (1: `caniuse-lite`, browser
-data used by the build), CC0-1.0 (1), Python-2.0 (1), 0BSD (1). All are permissive or weak
-copyleft and compatible with local use. Not a legal review.
+Lockfile: 482 packages (`packages:` entries in `apps/web/pnpm-lock.yaml`), 8 of them added by
+Task W2. Licences across the installed tree (`pnpm licenses list`, 2026-10-30, 331 packages):
+MIT (278), Apache-2.0 (17, one of them `@dimforge/rapier3d-compat`, a dev-only type
+dependency of `@types/three` that is neither imported nor shipped), ISC (11), BlueOak-1.0.0
+(6), BSD-2-Clause (5), BSD-3-Clause (3), MPL-2.0 (3: `axe-core`, `lightningcss` and its arm64
+binary, both build or test tools, used unmodified), MIT OR Apache-2.0 (2), MIT-0 (2),
+CC-BY-4.0 (1: `caniuse-lite`, browser data used by the build), CC0-1.0 (1), Python-2.0 (1),
+0BSD (1). All are permissive or weak copyleft and compatible with local use. Not a legal
+review.
 
 Exceptions and accepted advisories (`pnpm audit`, 2026-10-28). No age exception remains: the
 provisional one for `next` 16.4.1 (pinned at 13.5 days old) was removed in Task 6c once it

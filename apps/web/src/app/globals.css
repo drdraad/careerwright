@@ -167,24 +167,27 @@
   }
 
   /* Each light's name sits beside it on a small dark label (measured over the brightest
-     light). A name that cannot be placed clear of the panels is hidden from sight only: it
-     stays in the list for assistive tech. */
+     light). A long name wraps rather than leaving the window. A name that cannot be placed
+     clear of the panels, or whose light is under one, is hidden from sight only: it stays in
+     the list for assistive tech. */
   .world-label {
     position: absolute;
     top: 0;
     left: 0;
     display: inline-flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    column-gap: 6px;
+    width: max-content;
+    max-width: min(360px, calc(100vw - 32px));
     padding: 2px var(--space-12);
-    border-radius: 999px;
+    border-radius: var(--radius-control);
     background: var(--surface-label);
     color: var(--text-on-space);
     font-family: var(--font-display);
     font-weight: 500;
     font-size: var(--type-14);
     line-height: 1.5;
-    white-space: nowrap;
     transition: opacity var(--motion-panel) var(--ease-settle);
   }
 
@@ -200,7 +203,7 @@
   .world-label[data-leader="below"]::after {
     content: "";
     position: absolute;
-    left: 50%;
+    left: var(--leader-x, 50%);
     width: 1px;
     height: var(--leader, 0);
     background: rgb(242 246 255 / 0.45);
@@ -214,54 +217,94 @@
     bottom: 100%;
   }
 
-  /* Orange means a destination: its glyph is a small warm diamond, its name stays white. */
+  /* Orange means a destination: its name carries its light's shape, a small warm disc (the
+     diamond is a gate's), and stays white. */
   .world-label[data-kind="destination"]::before {
     content: "";
-    width: 7px;
-    height: 7px;
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
     background: var(--light-destination);
-    transform: rotate(45deg);
   }
 
-  .world-legend {
-    position: absolute;
+  /* While the calm support panel shows, the world is still and dims: nothing glows. */
+  .world[data-distress="true"] .world-layer {
+    filter: saturate(0.35) brightness(0.45);
+  }
+
+  /* The key to the lights: open on a wide screen, "What the lights mean" on a narrow one. It is
+     a control, so it sits over the shell, wherever the world leaves room (World.tsx places it,
+     and the names stay clear of it); with no room it is hidden. */
+  .world-key {
+    position: fixed;
     right: var(--space-24);
     bottom: var(--space-24);
-    display: grid;
-    gap: var(--space-4);
-    padding: var(--space-8) var(--space-12);
+    z-index: 5;
+    max-width: calc(100vw - 32px);
+    border: 1px solid var(--line-reading-hairline);
     border-radius: var(--radius-control);
-    background: var(--surface-label);
-    color: var(--text-on-space-muted);
+    background: var(--surface-reading);
+    backdrop-filter: blur(var(--glass-blur));
+    color: var(--text-on-reading-muted);
     font-size: var(--type-14);
   }
 
-  .world-legend[data-shown="false"] {
-    opacity: 0;
+  .world-key[data-placed="false"] {
+    visibility: hidden;
   }
 
-  .world-legend li {
+  .world-key summary {
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 0 var(--space-12);
+    color: var(--text-on-reading);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .world-key ul {
+    display: grid;
+    gap: var(--space-4);
+    padding: 0 var(--space-12) var(--space-12);
+  }
+
+  .world-key li {
     display: flex;
     align-items: center;
     gap: var(--space-8);
   }
 
-  .world-key {
+  /* Each mark drawn as the world draws it. */
+  .world-key-mark {
+    position: relative;
     display: inline-block;
     flex: none;
-  }
-
-  .world-key[data-key="destination"] {
-    width: 9px;
-    height: 9px;
-    background: var(--light-destination);
-    transform: rotate(45deg);
-  }
-
-  .world-key[data-key="shadow"] {
     width: 18px;
-    height: 2px;
-    border-radius: 1px;
+    height: 10px;
+  }
+
+  .world-key-mark::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+  }
+
+  .world-key-mark[data-key="destination"]::after {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--light-destination);
+  }
+
+  .world-key-mark[data-key="shadow"]::after {
+    width: 18px;
+    height: 3px;
+    border-radius: 2px;
     background: var(--trail-shadow);
   }
 
@@ -271,12 +314,13 @@
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: 88px minmax(0, 1fr);
+    grid-template-columns: 96px minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
     min-height: 100dvh;
   }
 
-  /* The rail is the journey through the six places: a fine trail of light joins them. */
+  /* The rail is the journey through the six places: a fine trail of light joins them. Solid
+     where its landmarks sit, thinner at its outer edge (both measured with their words). */
   .rail {
     position: relative;
     grid-row: 1 / span 2;
@@ -286,7 +330,7 @@
     align-items: center;
     gap: var(--space-24);
     padding: var(--space-24) 0;
-    background-image: linear-gradient(90deg, rgb(3 5 11 / 0.94) 55%, rgb(3 5 11 / 0.6));
+    background-image: linear-gradient(90deg, var(--surface-rail) 55%, var(--surface-rail-edge));
   }
 
   .rail-mark {
@@ -371,7 +415,7 @@
     box-shadow:
       0 0 0 4px var(--surface-space),
       0 0 0 5px var(--selection-space),
-      0 0 14px 4px rgb(69 247 212 / 0.35);
+      0 0 14px 4px var(--glow-selection);
   }
 
   .strip {
@@ -438,12 +482,15 @@
     font-size: var(--type-31);
   }
 
-  .chapter-place .empty {
-    padding: var(--space-16) 0 0;
-    border: 0;
-    border-top: 1px solid var(--line);
-    border-radius: 0;
-    background: transparent;
+  /* What a place not built yet will hold, one step away. */
+  .place-more summary {
+    width: max-content;
+    color: var(--fg);
+    font-size: var(--type-14);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
   }
 
   .place-kicker {
@@ -541,7 +588,7 @@
   .btn-primary {
     background: var(--action);
     color: var(--on-action);
-    box-shadow: 0 0 22px -6px rgb(69 247 212 / 0.7);
+    box-shadow: 0 0 22px -6px var(--glow-action);
   }
 
   .btn-secondary {
@@ -550,17 +597,21 @@
     color: var(--fg);
   }
 
+  /* Quiet and icon actions take the text colour, marked by an underline or their glyph: teal
+     stays with the one primary action, selection and the chosen path. */
   .btn-quiet {
     background: transparent;
-    color: var(--action);
+    color: var(--fg);
     padding: 0 var(--space-8);
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   .btn-icon {
     min-width: 40px;
     padding: 0;
     background: transparent;
-    color: var(--action);
+    color: var(--fg);
   }
 
   /* Disabled keeps full-contrast text and says why beside it; it is never the only cue. */
@@ -879,7 +930,7 @@
 
 @media (min-width: 1180px) {
   .app[data-drawer="open"] {
-    grid-template-columns: 88px minmax(0, 1fr) 368px;
+    grid-template-columns: 96px minmax(0, 1fr) 368px;
   }
 
   .app[data-drawer="open"] .drawer {
@@ -915,15 +966,40 @@
     border-bottom: 1px solid var(--line-space-hairline);
   }
 
+  /* The phone's header is two rows: the top bar (the chapter and the synthetic label) and the
+     strip (the saved state, live updates, the world's controls as glyph buttons and the
+     account menu, which also leads to the workspaces). The target is named in the world; a
+     failure still shows in the strip, on a row of its own if it must. */
   .strip {
     grid-column: 1;
     padding: var(--space-8) var(--space-16);
     min-height: 0;
-    gap: var(--space-8) var(--space-16);
+    gap: var(--space-8) var(--space-12);
   }
 
   .strip .strip-optional {
     display: none;
+  }
+
+  .strip-end {
+    margin-left: 0;
+    gap: var(--space-8);
+  }
+
+  .strip .world-switch {
+    display: none;
+  }
+
+  .strip .world-toggle {
+    justify-content: center;
+    min-width: 40px;
+    padding: 0;
+  }
+
+  /* On, a glyph button is ringed in white (white means "on"; teal stays for selection). */
+  .strip .world-toggle[aria-pressed="true"] {
+    border-color: var(--text-on-space);
+    background: var(--surface-space-raised-2);
   }
 
   .workarea {
@@ -1010,7 +1086,7 @@
     font-size: var(--type-31);
   }
 
-  .world-toggle-label {
+  .strip .world-toggle-label {
     position: absolute;
     width: 1px;
     height: 1px;

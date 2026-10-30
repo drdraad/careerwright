@@ -1,5 +1,5 @@
 // The motion vocabulary's timings in seconds, for the moving world (plan section 4). They are
-// the design tokens' values (`--motion-*` in src/design/tokens/tokens.css); `motion.test.ts`
+// the design tokens' values (`--motion-*` in src/design/tokens/tokens.css); `tokens.test.ts`
 // holds the two to each other.
 export const MOTION = {
   /** Travel between places: the world stays, the view moves. */

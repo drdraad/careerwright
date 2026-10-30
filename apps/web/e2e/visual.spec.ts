@@ -540,7 +540,9 @@ const shots = (scratch: Scratch): Shot[] => [
     as: "ada",
     url: chapterUrl("routes", scratch.empty),
     ready: async (page) => {
-      await expect(page.getByRole("heading", { name: "No routes yet" })).toBeVisible();
+      // A place not built yet: the reference's short card, one sentence on why it is empty.
+      await expect(page.getByText("Not built yet")).toBeVisible();
+      await expect(page.getByText(/^Route search isn't ready yet/)).toBeVisible();
       await expect(page.getByRole("banner").getByText("Nothing saved yet")).toBeVisible();
       await expect(liveUpdates(page, "Live")).toBeVisible();
     },

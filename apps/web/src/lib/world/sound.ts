@@ -5,6 +5,11 @@
 
 export type Cue = "swell" | "chime" | "tick";
 
+/**
+ * Only the swell has a trigger so far (the person's light coming on, World.tsx). The chime and
+ * the tick have no trigger until W2C brings connections lighting up and picking a skill; until
+ * then they play only from the `World / Three sounds` story.
+ */
 export const CUES: readonly Cue[] = ["swell", "chime", "tick"];
 
 /** Kept low: the cues sit under the world, never over the person's own thoughts. */
@@ -96,6 +101,14 @@ export class Sound {
     }
     if (on) void this.context?.resume();
     else void this.context?.suspend();
+  }
+
+  /** Releases the audio context; sound starts again only from another click. */
+  close(): void {
+    void this.context?.close();
+    this.context = null;
+    this.bus = null;
+    this.enabled = false;
   }
 
   play(cue: Cue): void {

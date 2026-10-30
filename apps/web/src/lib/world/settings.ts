@@ -1,11 +1,27 @@
 "use client";
 // How the world moves and sounds for this viewer: calm mode (kept between visits, a per-viewer
 // convenience), pausing ambient motion and sound (both for this visit only: sound is off until
-// the person turns it on, every visit). The system's reduced-motion setting always wins.
-import { useEffect, useRef, useState } from "react";
+// the person turns it on, every visit). The system's reduced-motion setting always wins. And
+// whether the calm support panel is showing, which stills the world while it does.
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Sound } from "./sound";
 
 const CALM_KEY = "careerwright.calm";
+
+/**
+ * Tells the workspace shell that the calm support panel is showing: the world is drawn still
+ * while it does (plan section 4, ADR 0007). Outside a shell nothing listens.
+ */
+export const SupportShown = createContext<(shown: boolean) => void>(() => {});
+
+/** Called by the support panel itself: shown while it is mounted. */
+export function useSupportShown(): void {
+  const report = useContext(SupportShown);
+  useEffect(() => {
+    report(true);
+    return () => report(false);
+  }, [report]);
+}
 
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -38,6 +54,8 @@ export function useWorldSettings(): WorldSettings {
   const [soundOn, setSoundOnState] = useState(false);
   const sound = useRef<Sound | null>(null);
   sound.current ??= new Sound();
+  // The audio context goes with the shell: browsers hold only a few.
+  useEffect(() => () => sound.current?.close(), []);
 
   useEffect(() => {
     try {

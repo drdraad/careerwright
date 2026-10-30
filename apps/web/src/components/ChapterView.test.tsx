@@ -1,7 +1,9 @@
 // A planned chapter as rendered: Unknown, Skipped and Prefer not to say are answers, so they
 // never block it and never read as unanswered (spec section 3; the "unknown is never zero or
-// ineligible" invariant).
+// ineligible" invariant). Its card is short (the design reference's five elements); what it
+// will hold and the answers it uses are one step away, under "More about this place".
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type { ProfileDocument, ProfileOut } from "@/generated/api";
 import { PlannedChapter } from "./ChapterView";
@@ -33,13 +35,19 @@ function profile(changes: Partial<ProfileDocument>): ProfileOut {
   };
 }
 
+/** Opens "More about this place", one step away. */
+async function more() {
+  await userEvent.setup().click(screen.getByText("More about this place"));
+}
+
 describe("[STATE-01][UI-04] a planned chapter treats every chosen state as an answer", () => {
-  it("does not block Options on an Unknown, Skipped or Prefer-not-to-say budget", () => {
+  it("does not block Options on an Unknown, Skipped or Prefer-not-to-say budget", async () => {
     render(<PlannedChapter id="options" profile={profile({})} workspaceId="w1" />);
 
-    expect(screen.getByText("No options yet")).toBeInTheDocument();
-    expect(screen.queryByText("Needs answers in You first")).not.toBeInTheDocument();
+    expect(screen.getByText(/^Option research isn't ready yet/)).toBeVisible();
+    expect(screen.queryByText(/Needs answers in You first/)).not.toBeInTheDocument();
     expect(screen.queryByText(/not answered|not asked/i)).not.toBeInTheDocument();
+    await more();
     expect(screen.getByText(/Less precise without weekly study hours \(Unknown\)/)).toBeVisible();
     expect(screen.getByText(/Less precise without total spending limit \(Skipped\)/)).toBeVisible();
     expect(
@@ -58,8 +66,9 @@ describe("[STATE-01][UI-04] a planned chapter treats every chosen state as an an
       />,
     );
 
-    expect(screen.getByText("Needs answers in You first")).toBeInTheDocument();
-    expect(screen.getByText(/Not asked yet: target roles/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Needs answers in You first. Not asked yet: target roles."),
+    ).toBeVisible();
   });
 
   it.each([
@@ -75,11 +84,25 @@ describe("[STATE-01][UI-04] a planned chapter treats every chosen state as an an
     expect(screen.getByText(where)).toBeVisible();
   });
 
+  it("is the reference's short card: one state, one sentence, one action, the rest one step away", () => {
+    render(<PlannedChapter id="roles" profile={profile({})} workspaceId="w1" />);
+
+    // One honest-state heading only: the place's own name.
+    expect(screen.getAllByRole("heading")).toHaveLength(1);
+    expect(
+      screen.getByText("Role research isn't ready yet, so no listings have been searched."),
+    ).toBeVisible();
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.getByText(/Role cards and a map of employers/)).not.toBeVisible();
+    expect(screen.getByText("Uses these answers from You")).not.toBeVisible();
+  });
+
   it("says plan selection isn't built, and what its one action is for (V-06)", () => {
     render(<PlannedChapter id="plan" profile={profile({})} workspaceId="w1" />);
 
-    expect(screen.getByText("No plan yet")).toBeInTheDocument();
-    expect(screen.getByText(/Plan selection isn't part of this build yet/)).toBeVisible();
+    expect(
+      screen.getByText(/Plan selection isn't ready yet, so no plan has been made/),
+    ).toBeVisible();
     expect(screen.getByText(/never from a fixture preview/)).toBeVisible();
     expect(screen.queryByText(/route you select in Routes/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Review your answers in You" })).toHaveAttribute(
@@ -88,7 +111,7 @@ describe("[STATE-01][UI-04] a planned chapter treats every chosen state as an an
     );
   });
 
-  it("says an Unknown target leaves nothing to start from, without blocking", () => {
+  it("says an Unknown target leaves nothing to start from, without blocking", async () => {
     render(
       <PlannedChapter
         id="options"
@@ -99,8 +122,9 @@ describe("[STATE-01][UI-04] a planned chapter treats every chosen state as an an
       />,
     );
 
-    expect(screen.getByText("No options yet")).toBeInTheDocument();
-    expect(screen.queryByText("Needs answers in You first")).not.toBeInTheDocument();
+    expect(screen.getByText(/^Option research isn't ready yet/)).toBeVisible();
+    expect(screen.queryByText(/Needs answers in You first/)).not.toBeInTheDocument();
+    await more();
     expect(
       screen.getByText(/is not a specific one, so there is nothing to start from/),
     ).toBeVisible();

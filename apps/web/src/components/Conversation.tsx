@@ -27,6 +27,7 @@ import {
   OPENING_QUESTION,
   PARTIAL_REPLY,
 } from "@/lib/vocabulary";
+import { useSupportShown } from "@/lib/world/settings";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { Glyph } from "./Glyph";
@@ -112,6 +113,8 @@ function Reply({
 /** Beside a sent message that holds a risk stem: calm, not blocking, dismissible. The
  *  message went to Careerwright as usual. */
 function SupportNote({ note, onDismiss }: { note: SupportNoteOut; onDismiss(): void }) {
+  // While it shows, the world is still (plan section 4: distress stills the world).
+  useSupportShown();
   const titleId = useId();
   const checked = note.resources[0]?.checked_on;
   return (
@@ -300,8 +303,9 @@ export function Conversation({
           ))}
         </select>
         {!entryNeeded && (
+          // Named for what it pauses: the world's "Pause motion" is on the same screen.
           <Button variant="secondary" onClick={() => save({ paused: !preferences.paused })}>
-            {preferences.paused ? "Resume" : "Pause"}
+            {preferences.paused ? "Resume the interview" : "Pause the interview"}
           </Button>
         )}
         {demo && (

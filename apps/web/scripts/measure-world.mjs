@@ -1,11 +1,16 @@
 // Measures the world's frame costs in its busiest scene (plan section 4's budgets). Per the
 // Sprint W ruling, the budget is per-frame cost: main-thread work in the frame callback plus
-// GPU time (timer queries); the requestAnimationFrame interval is reported beside it, since a
-// 120 Hz display floors it at 8.33 ms. Runs the static Storybook's "World / Busiest scene"
-// story (100 openings, 12 skills, 5 destinations, the motes, travel every 3 s and the ignition
-// every 4 s) three ways in Google Chrome on this machine: headed at the display's refresh,
-// headed unthrottled (its interval is the whole pipeline's cost), and headless (a 60 Hz frame
-// clock). Writes the results, with device, browser and renderer, as JSON.
+// that same frame's WebGL GPU time (timer queries, paired by frame number); the
+// requestAnimationFrame interval is reported beside it, since a 120 Hz display floors it at
+// 8.33 ms. WebGL GPU time covers the world's own passes only, not the compositor's work on the
+// page's glass; the unthrottled interval is the whole pipeline's cost. Runs the static
+// Storybook's "World / Busiest scene" story (synthetic: 100 openings, 12 skills, 5
+// destinations, the motes, travel every 3 s and the ignition every 4 s) three ways in Google
+// Chrome on this machine: headed at the display's refresh, headed unthrottled, and headless (a
+// 60 Hz frame clock). Writes the results, with the commit, device, browser and renderer, as JSON.
+//
+// The two headed runs open a browser window on this machine's screen: warn the person at the
+// screen first, and never run it from a check (`make check`, `make acceptance`).
 //   pnpm run build-storybook && node scripts/measure-world.mjs <out.json>
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -90,10 +95,18 @@ for (const run of RUNS) {
 }
 server.close();
 
+const commit = sh("git", ["rev-parse", "HEAD"]);
+const dirty = sh("git", ["status", "--porcelain", "--", "src", "scripts"]) !== "";
 const report = {
   measuredAt: new Date().toISOString(),
-  scene:
-    "World / Busiest scene: 100 openings and their trails, 12 skills, 5 destinations, 2,400 motes; travel every 3 s; ignition every 4 s; warm-up 3 s, then 12 s",
+  commit: dirty ? `${commit} (with uncommitted changes)` : commit,
+  scene: {
+    story: "World / Busiest scene",
+    synthetic: true,
+    contents:
+      "Invented for measurement, never shown in the app: 100 openings and their trails, 12 skills, 5 destinations, 360 motes; travel every 3 s; ignition every 4 s; warm-up 3 s, then 12 s",
+  },
+  costIs: "main-thread time in the frame callback plus the same frame's WebGL GPU time",
   device,
   results,
 };
@@ -103,7 +116,8 @@ for (const r of results) {
     typeof r.cost === "string"
       ? r.cost
       : `p50 ${r.cost.p50} / p95 ${r.cost.p95} / max ${r.cost.max} ms`;
+  const gpu = typeof r.webglGpu === "string" ? r.webglGpu : `p95 ${r.webglGpu.p95} ms`;
   console.log(
-    `${r.run}: interval p95 ${r.interval.p95} ms; script p95 ${r.script.p95} ms; per-frame cost ${cost}; ${r.renderer}`,
+    `${r.run}: interval p95 ${r.interval.p95} ms; script p95 ${r.script.p95} ms; WebGL GPU time ${gpu}; per-frame cost ${cost}; ${r.renderer}`,
   );
 }

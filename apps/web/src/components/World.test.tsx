@@ -1,12 +1,39 @@
 // The world behind every chapter (plan section 4): the canvas holds nothing unique, so every
 // light it draws has its words in the DOM; the still world carries the same states; changing
-// chapter moves the view to that chapter's place. jsdom has no WebGL, so these tests see the
-// still world unless WebGL2 is faked; the moving world is covered in the browser suites.
-import { render, screen, within } from "@testing-library/react";
+// chapter moves the view to that chapter's place. jsdom has no WebGL, so the moving world's
+// renderer is replaced by a stand-in here; the real one is covered in the browser suites.
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorldInput } from "@/lib/world/model";
 import type { Sound } from "@/lib/world/sound";
 import { World } from "./World";
+
+const gl = vi.hoisted(() => ({ available: false, refuses: false }));
+
+vi.mock("@/lib/world/gl", () => ({
+  webgl2Available: () => gl.available,
+  GLWorld: class {
+    constructor() {
+      if (gl.refuses) throw new Error("Error creating WebGL context.");
+    }
+    resize() {}
+    setScene() {}
+    render() {}
+    dispose() {}
+    measureGpu() {
+      return false;
+    }
+    takeGpuSamples() {
+      return [];
+    }
+    rendererName() {
+      return "stand-in";
+    }
+    canvasSize() {
+      return [1, 1];
+    }
+  },
+}));
 
 const input: WorldInput = {
   lit: true,
@@ -24,16 +51,24 @@ function motion({ reduce, webgl2 }: { reduce: boolean; webgl2: boolean }) {
     addEventListener: () => {},
     removeEventListener: () => {},
   }));
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
-    () => (webgl2 ? ({} as RenderingContext) : null) as never,
-  );
+  gl.available = webgl2;
 }
 
 const world = () => document.querySelector<HTMLElement>(".world");
+const names = () =>
+  within(screen.getByRole("complementary", { name: "Your world" }))
+    .getAllByRole("listitem")
+    .map((item) => item.textContent);
 
 describe("[UI-07][UI-05] the world behind every chapter", () => {
-  beforeEach(() => motion({ reduce: false, webgl2: false }));
-  afterEach(() => vi.unstubAllGlobals());
+  beforeEach(() => {
+    gl.refuses = false;
+    motion({ reduce: false, webgl2: false });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
   it("draws the still world without WebGL2, with every light's words in the DOM", () => {
     render(<World place="roles" input={input} calm={false} paused={false} />);
@@ -45,9 +80,9 @@ describe("[UI-07][UI-05] the world behind every chapter", () => {
     expect(items[0]).toHaveTextContent("You: Your light, lit by your answers");
     expect(within(words).getByText("Data quality analyst")).toBeInTheDocument();
     expect(within(words).getByText("Statistician")).toBeInTheDocument();
-    const legend = within(words).getByRole("list", { name: "What the lights mean" });
+    const legend = screen.getByRole("list", { name: "What the lights mean" });
     expect(legend).toHaveTextContent("Warm lights: places you chose to head for");
-    expect(legend).toHaveTextContent("Slate trails: not known yet");
+    expect(legend).toHaveTextContent("Grey trails: not known yet");
   });
 
   it("waits with one light until the first answer, and explains nothing it cannot show", () => {
@@ -72,15 +107,87 @@ describe("[UI-07][UI-05] the world behind every chapter", () => {
   });
 
   it.each([
-    ["calm mode", { reduce: false, calm: true }],
-    ["reduced motion", { reduce: true, calm: false }],
-  ])("is drawn still under %s even where WebGL2 works", (_, { reduce, calm }) => {
+    ["calm mode", { reduce: false, calm: true, distress: false }],
+    ["reduced motion", { reduce: true, calm: false, distress: false }],
+    ["the calm support panel", { reduce: false, calm: false, distress: true }],
+  ])("is drawn still under %s even where WebGL2 works", (_, { reduce, calm, distress }) => {
     motion({ reduce, webgl2: true });
-    render(<World place="you" input={input} calm={calm} paused={false} />);
+    render(<World place="you" input={input} calm={calm} paused={false} distress={distress} />);
 
     expect(world()).toHaveAttribute("data-world-mode", "still");
     expect(screen.queryByTestId("moving-world")).toBeNull();
     expect(screen.getByTestId("still-world")).toBeInTheDocument();
+  });
+
+  it("moves again when the support panel closes", () => {
+    motion({ reduce: false, webgl2: true });
+    const { rerender } = render(
+      <World place="you" input={input} calm={false} paused={false} distress />,
+    );
+    expect(world()).toHaveAttribute("data-distress", "true");
+    expect(world()).toHaveAttribute("data-world-mode", "still");
+    rerender(<World place="you" input={input} calm={false} paused={false} />);
+    expect(world()).toHaveAttribute("data-world-mode", "moving");
+  });
+
+  it("falls back to the still world, with the same names, when the WebGL context is lost", () => {
+    motion({ reduce: false, webgl2: true });
+    render(<World place="roles" input={input} calm={false} paused={false} />);
+    expect(world()).toHaveAttribute("data-world-mode", "moving");
+    const before = names();
+
+    act(() => {
+      screen.getByTestId("moving-world").dispatchEvent(new Event("webglcontextlost"));
+    });
+
+    expect(world()).toHaveAttribute("data-world-mode", "still");
+    expect(screen.getByTestId("still-world")).toBeInTheDocument();
+    expect(names()).toEqual(before);
+  });
+
+  it("falls back to the still world, and keeps the page, when the renderer cannot start", () => {
+    motion({ reduce: false, webgl2: true });
+    gl.refuses = true;
+    render(<World place="roles" input={input} calm={false} paused={false} />);
+
+    expect(world()).toHaveAttribute("data-world-mode", "still");
+    expect(screen.getByTestId("still-world")).toBeInTheDocument();
+    expect(names()).toHaveLength(3);
+  });
+
+  it("holds ambient motion while the person types, then moves again on its own", async () => {
+    vi.useFakeTimers({
+      toFake: [
+        "requestAnimationFrame",
+        "cancelAnimationFrame",
+        "performance",
+        "setTimeout",
+        "clearTimeout",
+      ],
+    });
+    motion({ reduce: false, webgl2: true });
+    render(
+      <>
+        <input aria-label="Reply" />
+        <World place="roles" input={input} calm={false} paused={false} />
+      </>,
+    );
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(world()).toHaveAttribute("data-motion", "running");
+
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Reply" }), { key: "a" });
+    await act(async () => {
+      vi.advanceTimersByTime(1400);
+    });
+    expect(world()).toHaveAttribute("data-motion", "still");
+
+    // Nothing else happens: no pointer, no change, no chapter. The hold ends by itself.
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(world()).toHaveAttribute("data-motion", "running");
   });
 
   it("swells when the person's light comes on, never for what was there on arrival", () => {

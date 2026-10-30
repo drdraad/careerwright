@@ -2,8 +2,9 @@
 // What each chapter shows in this build, as its place in the world (plan section 4). You holds
 // the conversation, what we know and the directions to explore; Routes shows the labelled
 // fixture preview in the fixture workspace; the other chapters are places not built yet, and
-// say so plainly: what the place is, what it will hold, which answers it depends on and what
-// to do next (spec section 3: useful, honest empty states).
+// say so plainly in a short card: where the place is, why it is empty and what to do next,
+// with what it will hold and which answers it depends on one step away (spec section 3:
+// useful, honest empty states).
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { ProfileOut } from "@/generated/api";
@@ -14,7 +15,6 @@ import { type ChapterNeeds, chapterNeeds } from "@/lib/readiness";
 import { PROFILE_FIELDS, type ProfileFieldName } from "@/lib/vocabulary";
 import { PLACES } from "@/lib/world/places";
 import { Button } from "./Button";
-import { EmptyState } from "./EmptyState";
 import { Glyph } from "./Glyph";
 import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
@@ -24,9 +24,9 @@ import { YouChapter } from "./YouChapter";
 
 type Planned = {
   title: string;
-  /** What the chapter will hold, in one or two sentences. */
+  /** What the chapter will hold, in one or two sentences (one step away, under "More"). */
   purpose: string;
-  /** Why it is empty now, when nothing it starts from is missing. */
+  /** Why it is empty now, when nothing it starts from is missing: one sentence on the card. */
   notYet: string;
   /** The one action's label, saying what it is for. */
   next: string;
@@ -36,25 +36,22 @@ const PLANNED: Record<Exclude<ChapterId, "you" | "routes">, Planned> = {
   roles: {
     title: "Roles",
     purpose:
-      "Role cards and a map of employers and listings for your targets in your work areas, with the sources checked and their coverage.",
-    notYet:
-      "Role research isn't part of this build yet, so no listings have been searched. When it arrives, a search that finds nothing will say which sources it checked.",
+      "Role cards and a map of employers and listings for your targets in your work areas, with the sources checked and their coverage. A search that finds nothing will say which sources it checked.",
+    notYet: "Role research isn't ready yet, so no listings have been searched.",
     next: "Review what we know",
   },
   skills: {
     title: "Skills",
     purpose:
       "What each target requires, what you have shown, what is planned and what is still unresolved, with the evidence behind each.",
-    notYet:
-      "The skills matrix isn't part of this build yet. Nothing has been assessed, so nothing is marked missing.",
+    notYet: "Skills checking isn't ready yet, so nothing has been assessed or marked missing.",
     next: "Review what we know",
   },
   options: {
     title: "Options",
     purpose:
       "Courses, work routes and funding for each gap, with provider, dates, cost and evidence to review.",
-    notYet:
-      "Option research isn't part of this build yet. No courses or funding have been searched.",
+    notYet: "Option research isn't ready yet, so no courses or funding have been searched.",
     next: "Review what we know",
   },
   plan: {
@@ -63,7 +60,7 @@ const PLANNED: Record<Exclude<ChapterId, "you" | "routes">, Planned> = {
       "The route you choose, as a dated plan with its conditions, costs and one next action.",
     // V-06: the limitation in words, and never a hint that a fixture preview becomes a plan.
     notYet:
-      "Plan selection isn't part of this build yet, so no plan has been made. When it is, a plan will start from a route Careerwright computes from your answers, never from a fixture preview.",
+      "Plan selection isn't ready yet, so no plan has been made. When it is, a plan will start from a route Careerwright computes from your answers, never from a fixture preview.",
     next: "Review your answers in You",
   },
 };
@@ -94,8 +91,24 @@ function Needs({ profile, needs }: { profile: ProfileOut; needs: ChapterNeeds })
   );
 }
 
-/** The head of a place not built yet: the honest state first, then where it is in the world. */
-function NotBuiltYet({ id, title }: { id: ChapterId; title: string }) {
+/**
+ * A place not built yet, as the design reference draws it: the honest state, the place's
+ * name, where it is in the world, one sentence on why it is empty and the one action. What it
+ * will hold and the answers it uses are one step away, under "More about this place".
+ */
+function NotBuiltYet({
+  id,
+  title,
+  why,
+  next,
+  more,
+}: {
+  id: ChapterId;
+  title: string;
+  why: ReactNode;
+  next: ReactNode;
+  more: ReactNode;
+}) {
   return (
     <>
       <p className="place-kicker">
@@ -104,11 +117,17 @@ function NotBuiltYet({ id, title }: { id: ChapterId; title: string }) {
       </p>
       <h1 className="page-title">{title}</h1>
       <p className="place-where">{PLACES[id].where}</p>
+      <p className="measure small muted">{why}</p>
+      <div className="flex flex-wrap gap-8">{next}</div>
+      <details className="place-more">
+        <summary>More about this place</summary>
+        <div className="grid gap-12 pt-12">{more}</div>
+      </details>
     </>
   );
 }
 
-/** A chapter whose feature belongs to a later sprint: its purpose and the answers it uses. */
+/** A chapter whose feature belongs to a later sprint: its place, and why it is empty. */
 export function PlannedChapter({
   id,
   profile,
@@ -125,35 +144,36 @@ export function PlannedChapter({
       {planned.next}
     </Link>
   );
+  // A starting answer never asked is the reason it cannot start; otherwise, the build.
+  const why =
+    needs.notAsked.length > 0
+      ? `Needs answers in You first. Not asked yet: ${labels(needs.notAsked)}.`
+      : planned.notYet;
   return (
-    <>
-      <NotBuiltYet id={id} title={planned.title} />
-      <p className="measure small muted">{planned.purpose}</p>
-      {needs.notAsked.length > 0 ? (
-        <EmptyState
-          state="blocked_missing_information"
-          title="Needs answers in You first"
-          next={you}
-        >
-          <p>
-            Not asked yet: {labels(needs.notAsked)}. This chapter starts from them. Unknown is an
-            answer too: it is never filled in with a guess.
-          </p>
-          <Needs profile={profile} needs={needs} />
-        </EmptyState>
-      ) : (
-        <EmptyState state="notStarted" title={`No ${planned.title.toLowerCase()} yet`} next={you}>
-          <p>{planned.notYet}</p>
+    <NotBuiltYet
+      id={id}
+      title={planned.title}
+      why={why}
+      next={you}
+      more={
+        <>
+          <p className="small">{planned.purpose}</p>
+          {needs.notAsked.length > 0 && (
+            <p className="small">
+              This chapter starts from {labels(needs.notAsked)}. Unknown is an answer too: it is
+              never filled in with a guess.
+            </p>
+          )}
           {needs.withoutStart.length > 0 && (
-            <p>
+            <p className="small">
               Your answer for {labels(needs.withoutStart)} is not a specific one, so there is
               nothing to start from yet. Helping you choose arrives with the interview.
             </p>
           )}
           <Needs profile={profile} needs={needs} />
-        </EmptyState>
-      )}
-    </>
+        </>
+      }
+    />
   );
 }
 
@@ -207,23 +227,22 @@ export function ChapterView({
   } else if (chapter === "routes") {
     shape = "place";
     body = (
-      <>
-        <NotBuiltYet id="routes" title="Routes" />
-        <EmptyState
-          state="notStarted"
-          title="No routes yet"
-          next={
-            <Link className="btn btn-secondary" href={chapterHref(workspace.workspace_id, "you")}>
-              Review what we know
-            </Link>
-          }
-        >
-          <p>
-            Routes are compared once your options are reviewed. Careerwright's route search isn't
-            part of this build yet, so no route has been computed for this workspace.
+      <NotBuiltYet
+        id="routes"
+        title="Routes"
+        why="Route search isn't ready yet, so no route has been worked out for this workspace."
+        next={
+          <Link className="btn btn-secondary" href={chapterHref(workspace.workspace_id, "you")}>
+            Review what we know
+          </Link>
+        }
+        more={
+          <p className="small">
+            Routes are compared once your options are reviewed: every way to a destination, with how
+            long it takes and what it costs.
           </p>
-        </EmptyState>
-      </>
+        }
+      />
     );
   } else {
     shape = "place";

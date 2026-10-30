@@ -1,9 +1,11 @@
 "use client";
 // The one persistent world behind every chapter (plan section 4, ADR 0014). It is drawn by
-// WebGL2 when it may move, and as still SVG under reduced motion, calm mode or without WebGL2;
-// both draw the same scene. Each chapter is a place: changing chapter is travel, the world
-// stays and the view moves (a cut when still). Every light it draws has its words in the DOM
-// beside it (`Your world`), so the canvas holds nothing unique.
+// WebGL2 when it may move, and as still SVG under reduced motion, calm mode, while the calm
+// support panel shows, without WebGL2, or once the moving world has failed (its context lost or
+// its renderer unable to start); both draw the same scene. Each chapter is a place: changing
+// chapter is travel, the world stays and the view moves (a cut when still). Every light it
+// draws has its words in the DOM beside it (`Your world`), so the canvas holds nothing unique;
+// the key to the lights lists only what is drawn.
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChapterId } from "@/lib/chapters";
 import type { WorldMeasurement } from "@/lib/world/frames";
@@ -12,14 +14,17 @@ import {
   type Births,
   buildScene,
   type Clear,
+  clearArea,
   isPhone,
   placeView,
   project,
+  type Rect,
+  sameView,
   type View,
   type Viewport,
   ViewTween,
 } from "@/lib/world/geometry";
-import { GLWorld, webgl2Available } from "@/lib/world/gl";
+import { type FrameState, GLWorld, webgl2Available } from "@/lib/world/gl";
 import { type Box, layoutLabels } from "@/lib/world/labels";
 import { EMPTY_WORLD, type WorldInput } from "@/lib/world/model";
 import { MOTION, now, TYPING_HOLD_SECONDS } from "@/lib/world/motion";
@@ -44,6 +49,8 @@ type Props = {
   input: WorldInput | null;
   calm: boolean;
   paused: boolean;
+  /** The calm support panel is showing: the world is still while it does. */
+  distress?: boolean;
   sound?: Sound;
   /** Measurement only (the busiest-scene story): samples frame costs and reports them. */
   measure?: MeasureOptions;
@@ -51,13 +58,28 @@ type Props = {
 
 const SETTLED = -1e6;
 
+/** The window's size, measured again when it resizes or moves to a display of another density. */
 function useViewport(): Viewport | null {
   const [vp, setVp] = useState<Viewport | null>(null);
   useEffect(() => {
     const measure = () => setVp({ w: window.innerWidth, h: window.innerHeight });
     measure();
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    let density: MediaQueryList | null = null;
+    const watchDensity = () => {
+      density?.removeEventListener("change", changed);
+      density = window.matchMedia?.(`(resolution: ${window.devicePixelRatio}dppx)`) ?? null;
+      density?.addEventListener("change", changed);
+    };
+    const changed = () => {
+      measure();
+      watchDensity();
+    };
+    watchDensity();
+    return () => {
+      window.removeEventListener("resize", measure);
+      density?.removeEventListener("change", changed);
+    };
   }, []);
   return vp;
 }
@@ -149,25 +171,53 @@ function labelsFor(scene: Scene, input: WorldInput): Label[] {
   return labels;
 }
 
+/** Where a person reads: the chapter's panel and the evidence drawer. */
+const PANELS = "[data-world-panel]";
+/** Everything over the world: the rail, the bars along the top, and the panels. */
+const COVERS = "[data-covers-world]";
+/** Wider than this, the key to the lights is open; narrower, it is "What the lights mean". */
+const KEY_OPEN_FROM = 1100;
+
+const rectOf = (element: Element): Rect => {
+  const r = element.getBoundingClientRect();
+  return { x: r.left, y: r.top, w: r.width, h: r.height };
+};
+const shown = (r: Rect) => r.w > 0 && r.h > 0;
+
+/** The part of the window the place can stand in, measured from the bars and panels over it. */
+function measureClear(vp: Viewport): Clear | undefined {
+  const bars = [...document.querySelectorAll(`${COVERS}:not(${PANELS})`)].map(rectOf).filter(shown);
+  const panels = [...document.querySelectorAll(PANELS)].map(rectOf).filter(shown);
+  return clearArea(vp, bars, panels);
+}
+
+const sameClear = (a: Clear | undefined, b: Clear | undefined) =>
+  a?.left === b?.left && a?.right === b?.right && a?.top === b?.top && a?.bottom === b?.bottom;
+
+/** A name further than this from its light (CSS pixels) gets a leader line, stopping short of it. */
+const LEADER_FROM = 20;
+const LEADER_CLEAR = 8;
+/** The key keeps this far from the window's edge and from a panel below it. */
+const KEY_MARGIN = { wide: 24, narrow: 16, abovePanel: 12 };
+
+const meets = (a: Box, b: Box) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
 /**
- * Places each light's words beside it, clear of the panels over the world and of each other;
- * words that cannot be placed are hidden from sight but stay in the list for assistive tech.
+ * Places the key to the lights, then each light's words beside it, clear of the panels over the
+ * world, the key, the other lights and each other. Words that cannot be placed, or whose light is
+ * out of view or under a panel, are hidden from sight but stay in the list for assistive tech.
+ * Every size is read before anything is written, so placing never forces a layout per name.
  */
-function placeLabels(host: HTMLElement, labels: readonly Label[], view: View, vp: Viewport): void {
-  const covers: Box[] = [];
-  for (const element of document.querySelectorAll("[data-covers-world]")) {
-    const r = element.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0) covers.push({ x: r.left, y: r.top, w: r.width, h: r.height });
-  }
-  // The key, like a name, is shown only where no panel covers it.
-  const key = host.querySelector<HTMLElement>(".world-legend");
-  if (key) {
-    const r = key.getBoundingClientRect();
-    const box = { x: r.left, y: r.top, w: r.width, h: r.height };
-    const meets = (c: Box) =>
-      box.x < c.x + c.w && c.x < box.x + box.w && box.y < c.y + c.h && c.y < box.y + box.h;
-    key.dataset.shown = String(!covers.some(meets));
-  }
+function placeLabels(
+  host: HTMLElement,
+  key: HTMLElement | null,
+  labels: readonly Label[],
+  view: View,
+  vp: Viewport,
+): void {
+  // Read.
+  const covers: Box[] = [...document.querySelectorAll(COVERS)].map(rectOf).filter(shown);
   const elements = new Map<string, HTMLElement>();
   for (const element of host.querySelectorAll<HTMLElement>("[data-label]")) {
     elements.set(element.dataset.label ?? "", element);
@@ -178,54 +228,63 @@ function placeLabels(host: HTMLElement, labels: readonly Label[], view: View, vp
     const size = { w: element.offsetWidth, h: element.offsetHeight };
     return [{ id: label.id, at: project(label.anchor, view), size, side: label.side }];
   });
-  const lights = new Map(requests.map((request) => [request.id, request.at]));
-  for (const [id, spot] of layoutLabels(requests, covers, vp)) {
+  const keySize = key === null ? null : { w: key.offsetWidth, h: key.offsetHeight };
+
+  // The key: bottom right, or else just above a panel at the right, clear of every light.
+  let keySpot: Box | null = null;
+  if (key !== null && keySize !== null && keySize.w > 0) {
+    const margin = vp.w > KEY_OPEN_FROM ? KEY_MARGIN.wide : KEY_MARGIN.narrow;
+    const bottoms = [
+      vp.h - margin,
+      ...covers.filter((c) => c.y > 1).map((c) => c.y - KEY_MARGIN.abovePanel),
+    ].sort((a, b) => b - a);
+    const centres = requests
+      .filter((r) => r.at.visible)
+      .map((r) => ({ x: r.at.x - 4, y: r.at.y - 4, w: 8, h: 8 }));
+    keySpot =
+      bottoms
+        .map((bottom) => ({
+          x: vp.w - margin - keySize.w,
+          y: bottom - keySize.h,
+          w: keySize.w,
+          h: keySize.h,
+        }))
+        .find(
+          (b) => b.y >= 4 && !covers.some((c) => meets(b, c)) && !centres.some((c) => meets(b, c)),
+        ) ?? null;
+  }
+  const spots = layoutLabels(requests, covers, vp, keySpot === null ? [] : [keySpot]);
+
+  // Write.
+  if (key !== null) {
+    // Unplaced, it is hidden from sight and from assistive tech (the names carry the words).
+    key.dataset.placed = String(keySpot !== null);
+    if (keySpot !== null) {
+      key.style.right = `${Math.round(vp.w - keySpot.x - keySpot.w)}px`;
+      key.style.bottom = `${Math.round(vp.h - keySpot.y - keySpot.h)}px`;
+    }
+  }
+  for (const { id, at } of requests) {
     const element = elements.get(id);
-    const light = lights.get(id);
-    if (element === undefined || light === undefined) continue;
+    const spot = spots.get(id) ?? null;
+    if (element === undefined) continue;
     element.dataset.shown = String(spot !== null);
     if (spot === null) continue;
     element.style.transform = `translate(${Math.round(spot.x)}px, ${Math.round(spot.y)}px)`;
     // A name a row out from its light keeps a fine leader line back to it.
-    const above = spot.y + spot.h <= light.y;
-    const gap = above ? light.y - (spot.y + spot.h) : spot.y - light.y;
-    const far = gap > LEADER_FROM;
-    element.dataset.leader = far ? (above ? "above" : "below") : "none";
+    const above = spot.y + spot.h <= at.y;
+    const gap = above ? at.y - (spot.y + spot.h) : spot.y - at.y;
+    element.dataset.leader = gap > LEADER_FROM ? (above ? "above" : "below") : "none";
     element.style.setProperty("--leader", `${Math.round(gap - LEADER_CLEAR)}px`);
+    element.style.setProperty("--leader-x", `${Math.round(at.x - spot.x)}px`);
   }
 }
-
-/** Where a person reads: the chapter's panel and the evidence drawer. */
-const PANELS = "[data-world-panel]";
-
-/**
- * The span across the window that the chapter's panel (on the left) and an open drawer (on
- * the right) leave clear, where the place's focus can stand. None on a phone: the world is the
- * backdrop behind the sheets there.
- */
-function clearSpan(vp: Viewport): Clear | undefined {
-  if (isPhone(vp)) return undefined;
-  let left = 0;
-  let right = vp.w;
-  for (const panel of document.querySelectorAll(PANELS)) {
-    const r = panel.getBoundingClientRect();
-    if (r.width === 0) continue;
-    if (r.left < vp.w / 2) left = Math.max(left, Math.round(r.right));
-    else right = Math.min(right, Math.round(r.left));
-  }
-  return left === 0 && right === vp.w ? undefined : { left, right };
-}
-
-const sameClear = (a: Clear | undefined, b: Clear | undefined) =>
-  a?.left === b?.left && a?.right === b?.right;
-
-/** A name further than this from its light (CSS pixels) gets a leader line, stopping short of it. */
-const LEADER_FROM = 20;
-const LEADER_CLEAR = 8;
 
 type Loop = {
   gl: GLWorld | null;
   tween: ViewTween;
+  /** The frame passed to the renderer, reused every frame. */
+  frame: FrameState;
   ambient: number;
   live: number;
   last: number;
@@ -236,16 +295,28 @@ type Loop = {
   typedAt: number;
   reading: boolean;
   settle: boolean;
-  lastView: View | null;
+  /** The view the names were last placed for (copied, never the tween's own). */
+  placedFor: View | null;
   birthsUntil: number;
 };
 
-export function World({ place, input: loaded, calm, paused, sound, measure }: Props) {
+export function World({
+  place,
+  input: loaded,
+  calm,
+  paused,
+  distress = false,
+  sound,
+  measure,
+}: Props) {
   const reduced = useReducedMotion();
   const vp = useViewport();
   const [capable, setCapable] = useState<boolean | null>(null);
   useEffect(() => setCapable(webgl2Available()), []);
-  const still = reduced || calm || capable !== true;
+  // The moving world failed: its context was lost or its renderer could not start. The still
+  // world takes over for the rest of the visit, with the same names.
+  const [failed, setFailed] = useState(false);
+  const still = reduced || calm || distress || failed || capable !== true;
   const mode: WorldMode = still ? "still" : "moving";
 
   const births = useBirths(loaded, () => sound?.play("swell"));
@@ -258,14 +329,17 @@ export function World({ place, input: loaded, calm, paused, sound, measure }: Pr
 
   const canvas = useRef<HTMLCanvasElement>(null);
   const words = useRef<HTMLDivElement>(null);
+  const keyRef = useRef<HTMLDetailsElement>(null);
   const [live, setLive] = useState<"running" | "still">("still");
-  // Where the chapter's panels leave the world in view; measured after each layout change.
+  // Where the bars and panels leave the world in view; measured after each layout change.
   const [clear, setClear] = useState<Clear | undefined>(undefined);
   const loop = useRef<Loop | null>(null);
   if (loop.current === null && vp !== null) {
+    const start = placeView(place, vp);
     loop.current = {
       gl: null,
-      tween: new ViewTween(placeView(place, vp), MOTION.travel),
+      tween: new ViewTween(start, MOTION.travel),
+      frame: { index: 0, time: 0, ambient: 0, live: 1, lit: false, ignite: SETTLED, view: start },
       ambient: 0,
       live: 1,
       last: now(),
@@ -276,7 +350,7 @@ export function World({ place, input: loaded, calm, paused, sound, measure }: Pr
       typedAt: SETTLED,
       reading: false,
       settle: true,
-      lastView: null,
+      placedFor: null,
       birthsUntil: SETTLED,
     };
   }
@@ -289,21 +363,35 @@ export function World({ place, input: loaded, calm, paused, sound, measure }: Pr
   const ready = vp !== null;
 
   // The moving world's renderer exists only while the world may move; resizes and scenes are
-  // applied to it by the effects below.
+  // applied to it by the effects below. A lost context or a renderer that cannot start falls
+  // back to the still world, never to a black world or a broken shell.
   useEffect(() => {
     const l = loop.current;
     const at = size.current;
-    if (still || !ready || canvas.current === null || l === null || at === null) return;
-    const gl = new GLWorld(canvas.current);
+    const element = canvas.current;
+    if (still || !ready || element === null || l === null || at === null) return;
+    let gl: GLWorld;
+    try {
+      gl = new GLWorld(element);
+    } catch {
+      setFailed(true);
+      return;
+    }
+    const lost = (event: Event) => {
+      event.preventDefault();
+      setFailed(true);
+    };
+    element.addEventListener("webglcontextlost", lost);
     gl.resize(at);
     if (drawn.current !== null) gl.setScene(drawn.current);
     l.gl = gl;
     l.settle = true;
-    l.lastView = null;
+    l.placedFor = null;
     wake.current();
     return () => {
-      gl.dispose();
+      element.removeEventListener("webglcontextlost", lost);
       l.gl = null;
+      gl.dispose();
     };
   }, [still, ready]);
 
@@ -342,12 +430,16 @@ export function World({ place, input: loaded, calm, paused, sound, measure }: Pr
 
   // Ambient motion holds still while the person types, or reads the chapter's panel or the
   // evidence drawer (plan section 4); pointing at the strip or its controls is not reading.
+  // When a typing hold ends the world wakes again by itself.
   useEffect(() => {
+    let holdEnds = 0;
     const typed = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest("input, textarea, [contenteditable='true']") && loop.current) {
         loop.current.typedAt = now();
         wake.current();
+        window.clearTimeout(holdEnds);
+        holdEnds = window.setTimeout(() => wake.current(), TYPING_HOLD_SECONDS * 1000 + 50);
       }
     };
     const pointed = (event: PointerEvent) => {
@@ -366,6 +458,7 @@ export function World({ place, input: loaded, calm, paused, sound, measure }: Pr
     document.addEventListener("pointerover", pointed, true);
     document.addEventListener("visibilitychange", visible);
     return () => {
+      window.clearTimeout(holdEnds);
       document.removeEventListener("keydown", typed, true);
       document.removeEventListener("pointerover", pointed, true);
       document.removeEventListener("visibilitychange", visible);
@@ -410,14 +503,19 @@ export function World({ place, input: loaded, calm, paused, sound, measure }: Pr
       if (l.live < 0.002) l.live = 0;
       l.ambient += dt * l.live;
       const view = l.tween.current(t);
-      gl.render({ time: t, ambient: l.ambient, live: l.live, lit: l.lit, ignite: l.ignite, view });
+      const f = l.frame;
+      f.index += 1;
+      f.time = t;
+      f.ambient = l.ambient;
+      f.live = l.live;
+      f.lit = l.lit;
+      f.ignite = l.ignite;
+      f.view = view;
+      gl.render(f);
       firstFrame ??= performance.now();
-      const moved =
-        l.lastView === null ||
-        (Object.keys(view) as (keyof View)[]).some((k) => view[k] !== l.lastView?.[k]);
-      if ((moved || l.settle) && words.current) {
-        placeLabels(words.current, labels, view, vp);
-        l.lastView = view;
+      if ((l.placedFor === null || !sameView(view, l.placedFor) || l.settle) && words.current) {
+        placeLabels(words.current, keyRef.current, labels, view, vp);
+        l.placedFor = { ...view };
         l.settle = false;
       }
       const state = l.live > 0 ? "running" : "still";
@@ -426,7 +524,7 @@ export function World({ place, input: loaded, calm, paused, sound, measure }: Pr
         setLive(state);
       }
       if (meter) {
-        meter.record(stamp, performance.now() - started);
+        meter.record(f.index, stamp, performance.now() - started);
         if (meter.done && measure) {
           const result = meter.result(gpuTimed ? gl.takeGpuSamples() : null);
           const measurement: WorldMeasurement = {
@@ -460,11 +558,12 @@ export function World({ place, input: loaded, calm, paused, sound, measure }: Pr
   // Still: words are placed once per change; nothing runs between changes.
   useEffect(() => {
     if (!still || vp === null || words.current === null) return;
-    placeLabels(words.current, labels, placeView(place, vp, clear), vp);
+    placeLabels(words.current, keyRef.current, labels, placeView(place, vp, clear), vp);
   }, [still, vp, labels, place, clear]);
 
-  // The panels over the world change as chapters load, grow and scroll: the place's focus moves
-  // into the span they leave clear, and the words move clear of them, at most once a frame.
+  // The bars and panels over the world change as chapters load, grow and scroll, and the names
+  // change size when the display face arrives: the place moves into the part they leave clear,
+  // and the words move clear of them, at most once a frame.
   useEffect(() => {
     if (vp === null) return;
     let queued = 0;
@@ -472,11 +571,11 @@ export function World({ place, input: loaded, calm, paused, sound, measure }: Pr
       if (queued !== 0) return;
       queued = requestAnimationFrame(() => {
         queued = 0;
-        const span = clearSpan(vp);
-        setClear((current) => (sameClear(current, span) ? current : span));
+        const area = measureClear(vp);
+        setClear((current) => (sameClear(current, area) ? current : area));
         const l = loop.current;
         if (still && words.current) {
-          placeLabels(words.current, labels, placeView(place, vp, span), vp);
+          placeLabels(words.current, keyRef.current, labels, placeView(place, vp, area), vp);
         } else if (l) {
           l.settle = true;
           wake.current();
@@ -487,10 +586,14 @@ export function World({ place, input: loaded, calm, paused, sound, measure }: Pr
     const changes = new MutationObserver(replace);
     changes.observe(document.body, { childList: true, subtree: true, characterData: true });
     window.addEventListener("scroll", replace, { passive: true, capture: true });
+    const fonts = document.fonts;
+    fonts?.addEventListener?.("loadingdone", replace);
+    void fonts?.ready.then(replace);
     return () => {
       cancelAnimationFrame(queued);
       changes.disconnect();
       window.removeEventListener("scroll", replace, { capture: true });
+      fonts?.removeEventListener?.("loadingdone", replace);
     };
   }, [still, vp, labels, place]);
 
@@ -499,57 +602,64 @@ export function World({ place, input: loaded, calm, paused, sound, measure }: Pr
     shadow: input.destinations.length > 0,
   };
   const view = vp === null ? null : placeView(place, vp, clear);
+  const keyOpen = vp !== null && vp.w > KEY_OPEN_FROM;
 
   return (
-    <div
-      className="world"
-      data-world-mode={vp === null ? "loading" : mode}
-      data-place={place}
-      data-motion={still ? "still" : live}
-      data-phone={vp !== null && isPhone(vp) ? "true" : "false"}
-    >
-      {!still && (
-        <div className="world-layer" aria-hidden="true">
-          <canvas ref={canvas} data-testid="moving-world" />
-        </div>
-      )}
-      {still && scene !== null && view !== null && vp !== null && (
-        <div className="world-layer">
-          <StillWorld scene={scene} view={view} vp={vp} />
-        </div>
-      )}
-      <aside className="world-words on-space" aria-label="Your world" ref={words}>
-        <ul>
-          {labels.map((label) => (
-            <li
-              key={label.id}
-              className="world-label"
-              data-label={label.id}
-              data-shown="false"
-              data-kind={label.id === "origin" ? "origin" : "destination"}
-            >
-              <span className="world-label-name">{label.name}</span>
-              <span className="sr-only">: {label.caption}</span>
-            </li>
-          ))}
-        </ul>
-        {(legend.destinations || legend.shadow) && (
-          <ul className="world-legend" aria-label="What the lights mean">
+    <>
+      <div
+        className="world"
+        data-world-mode={vp === null ? "loading" : mode}
+        data-place={place}
+        data-motion={still ? "still" : live}
+        data-distress={distress ? "true" : "false"}
+        data-phone={vp !== null && isPhone(vp) ? "true" : "false"}
+      >
+        {!still && (
+          <div className="world-layer" aria-hidden="true">
+            <canvas ref={canvas} data-testid="moving-world" />
+          </div>
+        )}
+        {still && scene !== null && view !== null && vp !== null && (
+          <div className="world-layer">
+            <StillWorld scene={scene} view={view} vp={vp} />
+          </div>
+        )}
+        <aside className="world-words on-space" aria-label="Your world" ref={words}>
+          <ul>
+            {labels.map((label) => (
+              <li
+                key={label.id}
+                className="world-label"
+                data-label={label.id}
+                data-shown="false"
+                data-kind={label.id === "origin" ? "origin" : "destination"}
+              >
+                <span className="world-label-name">{label.name}</span>
+                <span className="sr-only">: {label.caption}</span>
+              </li>
+            ))}
+          </ul>
+        </aside>
+      </div>
+      {(legend.destinations || legend.shadow) && (
+        <details className="world-key on-reading" ref={keyRef} open={keyOpen} data-placed="false">
+          <summary>What the lights mean</summary>
+          <ul aria-label="What the lights mean">
             {legend.destinations && (
               <li>
-                <span className="world-key" data-key="destination" aria-hidden="true" />
+                <span className="world-key-mark" data-key="destination" aria-hidden="true" />
                 Warm lights: places you chose to head for
               </li>
             )}
             {legend.shadow && (
               <li>
-                <span className="world-key" data-key="shadow" aria-hidden="true" />
-                Slate trails: not known yet
+                <span className="world-key-mark" data-key="shadow" aria-hidden="true" />
+                Grey trails: not known yet
               </li>
             )}
           </ul>
-        )}
-      </aside>
-    </div>
+        </details>
+      )}
+    </>
   );
 }

@@ -37,6 +37,7 @@ function Place({
         <div
           className="chapter on-reading chapter-place"
           data-covers-world
+          data-world-panel
           style={{ gridColumn: 2 }}
         >
           <h1 className="page-title">{label}</h1>
@@ -81,6 +82,7 @@ function Travel() {
         <div
           className="chapter on-reading chapter-place"
           data-covers-world
+          data-world-panel
           style={{ gridColumn: 2 }}
         >
           <h1 className="page-title">Travel between places</h1>
@@ -173,6 +175,7 @@ function Busiest() {
         <div
           className="chapter on-reading chapter-place"
           data-covers-world
+          data-world-panel
           style={{ gridColumn: 2 }}
         >
           <h1 className="page-title">The busiest scene</h1>
@@ -194,13 +197,20 @@ const CUE_WORDS: Record<Cue, string> = {
   tick: "Tick: you pick a skill",
 };
 
-/** The three cues, each played from a click (the browser allows sound only after one). */
+/**
+ * The three cues, each played from a click (the browser allows sound only after one). Only the
+ * swell has a trigger in the app so far; the chime and the tick have none until W2C.
+ */
 function Sounds() {
   const sound = useMemo(() => new Sound(), []);
   return (
     <div className="chapter on-reading" style={{ maxWidth: 520 }}>
       <h1 className="page-title">The world's sounds</h1>
-      <p>Off until the person turns sound on. Each is short and quiet.</p>
+      <p>
+        Off until the person turns sound on. Each is short and quiet. In the app only the swell
+        plays so far (the person's light coming on); the chime and the tick wait for the moments
+        that trigger them.
+      </p>
       <div className="flex flex-wrap gap-8">
         {CUES.map((cue) => (
           <Button

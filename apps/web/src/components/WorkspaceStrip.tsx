@@ -2,6 +2,10 @@
 // The compact strip (spec section 3): active targets, work areas, the current budget and the
 // saved state, plus the synthetic label, live-update state, the world's controls and account.
 // Each value is the API's own; an unanswered one reads as its state (STATE-08), never as zero.
+// Settings such as calm mode live in the account menu, never on the first screen (plan section
+// 4). On a phone the strip keeps the saved state, live updates, the world's controls, the
+// account menu (which also leads to the workspaces) and any failure: the top bar carries the
+// chapter and the synthetic label, and the world names the target.
 import * as Popover from "@radix-ui/react-popover";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -24,8 +28,10 @@ type Props = {
   /** A refresh failed after a successful load: what is shown is what was last loaded. */
   refreshFailed: boolean;
   email: string | null;
-  /** The world's visible controls: pause motion, calm mode and sound. */
+  /** The world's visible controls: pause motion and sound. */
   controls?: ReactNode;
+  /** Settings shown in the account menu (calm mode). */
+  settings?: ReactNode;
   onSignOut(): void;
 };
 
@@ -94,6 +100,7 @@ export function WorkspaceStrip({
   refreshFailed,
   email,
   controls,
+  settings,
   onSignOut,
 }: Props) {
   return (
@@ -104,7 +111,7 @@ export function WorkspaceStrip({
         </span>
       )}
       <Popover.Root>
-        <Popover.Trigger className="strip-switch">
+        <Popover.Trigger className="strip-switch strip-optional">
           <span className="strip-optional">Workspace</span>
           <strong>{workspace.name}</strong>
           <Glyph name="collapse" />
@@ -140,7 +147,7 @@ export function WorkspaceStrip({
       </Popover.Root>
       {profile !== undefined && (
         <>
-          <span className="strip-item">
+          <span className="strip-item strip-optional">
             Target <strong>{describeField(profile.document.target_titles)}</strong>
           </span>
           <span className="strip-item strip-optional">
@@ -185,7 +192,13 @@ export function WorkspaceStrip({
             <p className="small">
               Signed in as <strong>{email ?? "an emulator account"}</strong>
             </p>
-            <p className="small muted">{DATA_MODE[workspace.data_mode]} workspace</p>
+            <p className="small muted">
+              {workspace.name}: {DATA_MODE[workspace.data_mode].toLowerCase()} workspace
+            </p>
+            <Link className="menu-chapter" href="/">
+              All workspaces
+            </Link>
+            {settings}
             <button type="button" className="btn btn-secondary" onClick={onSignOut}>
               <Glyph name="signOut" />
               Sign out

@@ -165,6 +165,14 @@ const PATHS = {
       <path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11" {...stroke} />
     </>
   ),
+  // The calm support panel's own glyph, a lifebuoy (docs/design: never "not known yet").
+  support: (
+    <>
+      <circle cx="12" cy="12" r="8.5" {...stroke} />
+      <circle cx="12" cy="12" r="3.8" {...stroke} />
+      <path d="M6 6l3.3 3.3M18 6l-3.3 3.3M6 18l3.3-3.3M18 18l-3.3-3.3" {...stroke} />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type GlyphName = keyof typeof PATHS;
