@@ -209,8 +209,16 @@ be precise enough for a person to accept or reject each one with a yes or a no.
     - **Built, not edited:** `tools.session_2_pack` reads the product owner's record
       (`docs/reviews/session-2-answers.md`) and applies it to 0.1.0;
       `tools.option_pack_files --pack` publishes the result, pinned as
-      `b4afe250f47813032c9df70e9d43c88eefd60e75e60574b4413c5b7d6ccf9cc4`. A fast test checks
+      `162d2773e295c7832ff3b311738bdd20d111538b15f1df49932fecfc82702a56`. A fast test checks
       the committed file is exactly that output, so every change traces to an answer.
+    - **Amended in place once, in Task 7c's fix round 1,** by the controller's ruling. Its
+      review found values that the record says not to serve (the "?" answers, J10's pay
+      without its pro-rata basis) and a dropped earnings rule. No consumer had pinned 0.2.0
+      and the branch was unmerged. "A committed version never changes" protects versions
+      something relies on; leaving a version with known-wrong values for a later task to pin
+      by mistake would be worse. So 0.2.0 was rebuilt through the same tool and its pin
+      moved. Pack 0.1.0 and capability reference 0.1.0 stayed byte-identical. From here on,
+      0.2.0 is frozen like 0.1.0.
     - **Whose answers:** Q1-Q15 are the product owner's own. An AI checked Q16-Q344, T1-T36
       and R1-R58; the product owner ruled on 2026-10-30 that those count as their review.
       Each record's review names the product owner, session 2 and which rows were whose.
@@ -220,28 +228,35 @@ be precise enough for a person to accept or reject each one with a yes or a no.
       capability reference are not pack records.
     - **Reviewed** only when a record has at least one row, every row was answered yes, and
       no answer changed it. Otherwise it stays `proposed`. A record no row asks about (29
-      requirement rows) carries no review, since nobody decided it. A bare "?" leaves its
-      record undecided, its values as they were.
-    - **A "no" with the right value, quoted from the same page, in the field's declared
-      shape** becomes a new claim: its span checked in the kept body, or inside a stored
-      claim's excerpt, and its note naming the question. Seven such claims were added. The
-      record stays `proposed`, because the corrected value itself was not reviewed. Where
-      the answer speaks about another record of the same page, that record is corrected too
-      (Q153 gives C05's assessment as well as its outcome).
-    - **Any other "no"** makes the field unknown with the review's reason (14 fields: nine
-      newly unknown, and five already unknown whose reason now records the review). A
-      fact or rule whose reading the field's shape cannot hold is left out (four), a
-      requirement's importance becomes `unknown` (one), and an outcome the reviewer says its
-      page does not support becomes `unsupported` (three). A "no" whose own words keep the
-      value (the same range with a qualification the shape cannot hold, or evidence from a
-      document outside the corpus) is recorded in the record's review, and the value kept.
+      requirement rows) carries no review, since nobody decided it.
+    - **A "no" with the right value, quoted from the same page,** becomes a new claim: its
+      span checked in the kept body, or inside a stored claim's excerpt, and its note naming
+      the question. A reading a structured shape cannot hold is kept as a text claim of the
+      page's own words (Q38's "195 hours", Q187's "earn below £25,750 or are unemployed").
+      Nine such claims were added. The record stays `proposed`, because the corrected value
+      itself was not reviewed. Where the answer speaks about another record of the same
+      page, that record is corrected too (Q153 gives C05's assessment as well as its
+      outcome).
+    - **Any other "no", and every "?"** (the reviewer could not decide), makes the field
+      unknown with the review's reason (the controller's ruling for this task). That is 27
+      fields: 19 newly unknown, and eight already unknown whose reason now records the
+      review. Three facts are left out (two inferred SOC crosswalks, and one duplicate link
+      the reviewer could not confirm), a requirement's importance becomes `unknown` (one),
+      an outcome the reviewer says its page does not support becomes `unsupported` (three),
+      and J10.1's gate keeps only the registration both of the page's statements require
+      (Q290). Where the format has no unknown for a label (C08.1's evidence kind, C10.1 and
+      C10.2's "exam", C02.2's topic mention, J15.4's missing gate), or the reviewer's
+      evidence is a document outside the corpus, the answer is recorded in the record's
+      review and the value kept; the controller carries those to Task 10.
     - **No answer rejected a whole record,** so none is left out. Every row asked whether a
       value is right as the page states it.
     - **Outcome levels:** session 2 accepted no proposed level (R50 and R51, the only
       numbers, were no), so every level stays null. A reviewed outcome names the rubric its
       null level was judged against.
-    - **Result:** 55 of 121 records reviewed, 66 proposed, 473 claims (15 left out, 7 added).
+    - **Result:** 55 of 121 records reviewed, 66 proposed, 464 claims (26 left out, 9 added).
       Version 0.1.0 and its pin are unchanged.
+    - **Never shown as current, never a live field:** every pack record, reviewed or
+      proposed, keeps ruling R9's labels; the version's notes say so.
     - **The capability reference 0.2.0** carries 0.1.0's rubrics and gates unchanged to this
       pack, since a reference fits one pack version. It records R1-R40's answers and stays
       `proposed` (ADR 0012).

@@ -5,6 +5,7 @@ span-cited, nothing is left out, and 0.1.0 is unchanged."""
 
 import hashlib
 import json
+import re
 from datetime import date
 from typing import Any
 
@@ -15,6 +16,7 @@ from careerwright.capability.outcomes import pack_outcomes
 from careerwright.capability.reference import GateKind, load_reference
 from careerwright.catalogue.option_pack import (
     PINS,
+    Retention,
     ReviewState,
     Unknown,
     check_pack,
@@ -46,6 +48,8 @@ REVIEWED = load_pack(VERSION)
 ANSWERS = answers()
 ROWS = record_rows(SOURCE)
 EVIDENCE = REPO_ROOT / "var" / "evidence" / "corpus"
+# Pages whose class keeps the body, on the curating machine only (R3): never in git or CI.
+BODY_KEPT = [s for s in SOURCE.sources if s.retention is Retention.BODY]
 MANIFEST = REPO_ROOT / "corpus" / "manifest.json"
 FROZEN_0_1_0 = "d7ff17d73a9b17b43529b5cbbe4349ef016f7268c4ac4c2a6a53a13f97e6a3d3"
 # UK-regulated roles among the pack's targets, with the gate that types each (the regulated
@@ -151,15 +155,11 @@ def test_a_record_is_reviewed_only_when_every_row_about_it_is_yes_and_nothing_ch
 def test_every_answer_other_than_yes_is_applied_or_recorded_and_none_is_invented() -> None:
     named = {q for rows in ROWS.values() for q in rows}
     decided = {d.question for d in DECISIONS}
-    needs_decision = {
-        q
-        for q in named
-        if ANSWERS[q].verdict == "no" or (ANSWERS[q].verdict == "?" and ANSWERS[q].words)
-    }
-    undecided = {q for q in named if ANSWERS[q].verdict == "?" and not ANSWERS[q].words}
+    # A "no", or a "?" (the reviewer could not decide), each has its decision: a "?" with no
+    # citable value makes its field unknown with the review's reason (the dispatch's ruling).
+    needs_decision = {q for q in named if ANSWERS[q].verdict != "yes"}
 
     assert decided == needs_decision
-    assert not decided & undecided  # a bare "?" leaves its record undecided, values as they were
     for decision in DECISIONS:
         own = [r for r, rows in ROWS.items() if decision.question in rows]
         assert own, decision.question
@@ -191,7 +191,11 @@ def test_every_changed_value_cites_its_span_on_the_same_page() -> None:
 
 
 @pytest.mark.req("OPTN-10", "OUT1-10")
-@pytest.mark.parametrize("claim", [c for c in new_claims() if c.within is None], ids=str)
+@pytest.mark.parametrize(
+    "claim",
+    [c for c in new_claims() if c.claim_id[:3] in {s.source_id for s in BODY_KEPT}],
+    ids=str,
+)
 def test_a_correction_located_in_a_kept_body_is_exactly_its_text_there(claim: object) -> None:
     from tools.session_2_pack import NewClaim
 
@@ -257,10 +261,71 @@ def test_the_reviewed_values_read_as_the_reviewer_stated_them() -> None:
     assert by_id["outcome:C05.1"].evidence_kind == "exam"
     for outcome_id in ("outcome:C10.1", "outcome:C10.2", "outcome:C06.2"):
         assert by_id[outcome_id].confidence == "unsupported"
-    # Q187, Q38, Q269, Q298: a reading the field's shape cannot hold is left out.
-    assert "F01.rule_earnings" not in by_id["funding:F01"].rules
-    assert "C01.guided_hours" not in by_id["option:C01"].facts
+    # Q187, Q38: a reading a structured shape cannot hold stays as the page's own words.
+    rules = {pack.claim(c).field: pack.claim(c).value for c in by_id["funding:F01"].rules}
+    assert rules["rule_earnings_stated"] == "earn below £25,750 or are unemployed"
+    assert "rule_earnings" not in rules  # never a yearly gross cap the page does not state
+    facts = {pack.claim(c).field: pack.claim(c).value for c in by_id["option:C01"].facts}
+    assert facts == {"stated_hours": "195 hours"}  # not "guided learning hours"
+    # Q269, Q298: an inferred crosswalk is left out.
     assert "J06.occupation_crosswalk" not in by_id["job:J06"].facts
+    # Q284: a range is never served without the pro-rata basis the reviewer said to keep.
+    assert isinstance(by_id["job:J10"].salary, Unknown)
+    assert "pro rata per annum" in by_id["job:J10"].salary.unknown
+    # Q290: the gate keeps only the registration both of the page's statements require.
+    assert by_id["req:J10.1"].gate == "statutory registration"
+
+
+@pytest.mark.req("OPTN-10")
+def test_a_value_the_reviewer_could_not_decide_is_not_served() -> None:
+    by_id = records()
+    undecided = {
+        "job:J02": ("salary", "valid_through", "advertiser", "employer"),
+        "job:J03": ("salary", "valid_through", "advertiser", "employer"),
+        "job:J07": ("salary", "valid_through", "advertiser", "employer"),
+    }
+    for record_id, fields in undecided.items():
+        for field in fields:
+            value = getattr(by_id[record_id], field)
+            assert isinstance(value, Unknown), (record_id, field)
+            assert "(?)" in value.unknown, (record_id, field)
+    # One vacancy, one answer: no copy of J01's vacancy names AWD online as its employer.
+    copies = [j for j in REVIEWED.job_postings if j.vacancy_id == by_id["job:J01"].vacancy_id]
+    assert {j.record_id for j in copies} == {"job:J01", "job:J02", "job:J07"}
+    assert all(isinstance(j.employer, Unknown) for j in copies)
+    assert "J02.duplicate_of" not in by_id["job:J02"].facts
+
+
+@pytest.mark.req("OPTN-10")
+def test_the_notes_keep_the_curation_and_the_rules_every_record_follows() -> None:
+    notes = " ".join(REVIEWED.notes)
+
+    assert "curated by an agent (Task 7b) from 33 real pages" in notes
+    assert "Every record, reviewed or proposed, is never shown as current" in notes
+    assert "never fills a live field" in notes
+
+
+@pytest.mark.req("OPTN-10", "OUT1-10")
+def test_outcomes_follow_the_record_read_without_the_tool_s_parser() -> None:
+    # An independent reading of session-2-answers.md: each outcome's rows, as the question
+    # files number them, and whether every one was answered yes.
+    text = (REPO_ROOT / "docs" / "reviews" / "session-2-answers.md").read_text(encoding="utf-8")
+    said = dict(re.findall(r"^- ([QTR]\d+)[^:]*: (yes|no|\?)", text, flags=re.MULTILINE))
+    rows = {
+        "outcome:C04.1": ["Q66", "T35", "R47"],
+        "outcome:C02.1": ["Q141", "R44"],
+        "outcome:C09.2": ["Q179", "R56"],
+        "outcome:C06.1": ["Q166", "R50"],
+        "outcome:C07.1": ["Q81", "R52"],
+        "outcome:C10.1": ["Q95", "R57"],
+        "outcome:C01.1": ["Q51", "T32", "R41"],
+    }
+    by_id = records()
+    for outcome_id, questions in rows.items():
+        all_yes = all(said[q] == "yes" for q in questions)
+        expected = ReviewState.REVIEWED if all_yes else ReviewState.PROPOSED
+        assert by_id[outcome_id].review_state is expected, outcome_id
+    assert [said[q] for q in ("Q166", "R50", "Q81", "R52")] == ["yes", "no", "yes", "no"]
 
 
 @pytest.mark.req("OUT1-10")

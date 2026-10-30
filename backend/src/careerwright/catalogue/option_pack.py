@@ -56,7 +56,7 @@ SCHEMA_PATH = PACKS_DIR / "england-option-pack.schema.json"
 # proposed; 0.2.0 is session 2's review of it (Task 7c, `tools.session_2_pack`).
 PINS: dict[str, str] = {
     "0.1.0": "d7ff17d73a9b17b43529b5cbbe4349ef016f7268c4ac4c2a6a53a13f97e6a3d3",
-    "0.2.0": "b4afe250f47813032c9df70e9d43c88eefd60e75e60574b4413c5b7d6ccf9cc4",
+    "0.2.0": "162d2773e295c7832ff3b311738bdd20d111538b15f1df49932fecfc82702a56",
 }
 
 SHA256 = r"^[0-9a-f]{64}$"

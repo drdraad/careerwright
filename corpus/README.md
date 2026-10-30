@@ -7,14 +7,15 @@ in `derived_from`) with one slot per required page, intended case types, owners 
 items.
 
 **Status: collected (20 of 20 job postings, 10 of 10 course pages, 3 of 3 funding pages;
-Task 7b, 2026-10-29); labels reviewed at session 2 (2026-10-29 to 2026-10-30; Task 7c).**
+Task 7b, 2026-10-29); label review applied, 55 of 121 records reviewed (session 2,
+2026-10-29 to 2026-10-30; Task 7c).**
 
-- **Labels:** the labels live in the England option pack 0.2.0, the reviewed version
-  (`backend/src/careerwright/catalogue/packs/england_option_pack/`, ADR 0011). Each slot's
+- **Labels:** the labels live in the England option pack 0.2.0, the version session 2
+  reviewed (`backend/src/careerwright/catalogue/packs/england_option_pack/`, ADR 0011). Each slot's
   `labels.claims` names its claims there. Version 0.1.0, every record proposed, is kept
   unchanged beside it.
-- **Label review (H-07, session 2):** done. The product owner answered Q1-Q15. An AI checked
-  Q16-Q344, T1-T36 and R1-R58, and the product owner ruled on 2026-10-30 that those answers
+- **Label review (H-07, session 2):** applied. The product owner answered Q1-Q15. An AI
+  checked Q16-Q344, T1-T36 and R1-R58, and the product owner ruled on 2026-10-30 that those answers
   count as their review (`docs/reviews/session-2-answers.md`). Task 7c applied the record
   with `tools.session_2_pack`: 55 of 121 records are reviewed and 66 stay proposed; none
   was left out. Each slot's `label_review` says how many of its records were accepted, and

@@ -11,18 +11,20 @@ does, so the published version traces to the record line by line.
   reference (R1-R40) are not pack records.
 - **Reviewed** only when at least one row is a record's, every one was answered yes, and no
   answer changed it. Anything else stays `proposed`; a record no row asks about carries no
-  review, since nobody decided it. A bare "?" leaves its record undecided, its values as
-  they were.
-- **A "no" that states the right value, quoting the same page, in the field's declared
-  shape** is applied as a new claim, span-cited (offsets checked against the kept body, or
-  inside a stored claim's excerpt), whose note names the question. Its record stays
-  `proposed`: the corrected value has not been reviewed.
-- **Otherwise** the field becomes unknown with the review's reason; a fact or rule the
-  reviewer called wrong is left out; a requirement's importance becomes `unknown`; an
-  outcome the reviewer says its page does not support becomes `unsupported`. A "no" whose
-  own words keep the value as served (the same range with a qualification the shape cannot
-  hold, or evidence from a document outside the corpus) is recorded and the value kept.
-  Never a value the reviewer called wrong, and never one they did not state.
+  review, since nobody decided it.
+- **A "no" that states the right value, quoting the same page,** is applied as a new claim,
+  span-cited (offsets checked against the kept body, or inside a stored claim's excerpt),
+  whose note names the question. A reading a structured field's shape cannot hold is kept
+  as a text claim of the page's own words. Its record stays `proposed`: the corrected value
+  has not been reviewed.
+- **Otherwise, a "no" or a "?"** (the reviewer could not decide) makes the field unknown
+  with the review's reason, and a fact the reviewer could not confirm is left out (the
+  controller's ruling for Task 7c). A requirement's importance becomes `unknown`; an outcome
+  the reviewer says its page does not support becomes `unsupported`; a gate keeps only what
+  the page's conflicting statements share. Where the format has no unknown for a label, or
+  the reviewer's evidence is a document outside the corpus, the answer is recorded in the
+  record's review and the value kept. Never a value the reviewer called wrong where the
+  format can say unknown, and never one they did not state.
 - **Provenance.** Q1-Q15 are the product owner's own answers; the rest were checked by an AI
   and count as their review by their ruling of 2026-10-30.
 
@@ -51,9 +53,9 @@ from careerwright.catalogue.option_pack import (
     parse_pack,
 )
 from tools.localenv import REPO_ROOT
-from tools.option_pack_files import PACKAGE_VERSION, parts
+from tools.option_pack_files import parts
 
-SOURCE_VERSION = PACKAGE_VERSION  # the version session 2 reviewed
+SOURCE_VERSION = "0.1.0"  # the version session 2 reviewed
 VERSION = "0.2.0"
 DATED = date(2026, 10, 30)
 REVIEWS = REPO_ROOT / "docs" / "reviews"
@@ -314,15 +316,49 @@ F02_HTQ = NewClaim(
     f"Session 2 correction (Q207): {_MAY_NEED}",
     within="F02.htq_interaction",
 )
+# Readings a structured shape cannot hold, kept as text claims of the page's own words.
+C01_HOURS = NewClaim(
+    "C01.stated_hours",
+    "stated_hours",
+    "195 hours",
+    57939,
+    57948,
+    "195 hours",
+    1,
+    "Session 2 correction (Q38): the page states '195 hours' and does not say they are guided "
+    "learning hours.",
+    within="C01.guided_hours",
+)
+F01_EARNINGS = NewClaim(
+    "F01.rule_earnings_stated",
+    "rule_earnings_stated",
+    "earn below £25,750 or are unemployed",
+    7233,
+    7269,
+    "earn below £25,750 or are unemployed",
+    2,
+    "Session 2 correction (Q187): the page states no period, and neither gross nor net, so this "
+    "is never read as a yearly gross cap.",
+    within="F01.rule_earnings",
+)
 
 _SELF_PACED = "the page states the study pattern as 'Self-paced', and no weekly hours or timetable"
 _OVERVIEW = "the course overview, a PDF outside the corpus,"
-_PRO_RATA = "the range stands with 'pro rata per annum'"
 _NO_SOC = "the page states no SOC code; the crosswalk was an inference: left out"
+_UNDECIDED = "the reviewer could not decide: unknown"
+_ADZUNA = "the reviewer could not confirm it from the API's advert, so it is not served"
+_AWD_AGENCY = "for the same vacancy (J01), Q224 says AWD online is the agency, not the employer"
 _PREPARES = (
     "the course prepares for the exams ('prepared to take') and excludes their fees: an exam "
     "outcome is unsupported"
 )
+
+
+def _undecided(question: str, record_id: str, field: str, why: str = _ADZUNA) -> Decision:
+    """A bare "?": the field becomes unknown with the review's reason (the dispatch's ruling)."""
+    reason = f"session 2, {question} (?): {why}"
+    return Decision(question, record_id, _UNDECIDED, (MarkUnknown(field, reason),))
+
 
 DECISIONS: tuple[Decision, ...] = (
     # Part 1: P01 (Q1-Q67)
@@ -349,8 +385,8 @@ DECISIONS: tuple[Decision, ...] = (
     Decision(
         "Q38",
         "option:C01",
-        "'195 hours' is not said to be guided learning hours: left out",
-        (Drop("facts", "C01.guided_hours"),),
+        "'195 hours' is not said to be guided learning hours: kept as the page's words",
+        (Cite("facts", C01_HOURS, replaces="C01.guided_hours"),),
     ),
     Decision(
         "Q39",
@@ -486,8 +522,8 @@ DECISIONS: tuple[Decision, ...] = (
     Decision(
         "Q187",
         "funding:F01",
-        "'earn below £25,750' states no period and not gross: the yearly gross cap is left out",
-        (Drop("rules", "F01.rule_earnings"),),
+        "'earn below £25,750' states no period and not gross: kept as the page's words",
+        (Cite("rules", F01_EARNINGS, replaces="F01.rule_earnings"),),
     ),
     Decision(
         "Q198",
@@ -551,6 +587,25 @@ DECISIONS: tuple[Decision, ...] = (
             ),
         ),
     ),
+    # The Adzuna copies the reviewer could not decide (a bare "?").
+    _undecided("Q227", "job:J02", "salary"),
+    _undecided("Q228", "job:J02", "valid_through", f"{_ADZUNA}: no closing date is cited"),
+    _undecided("Q230", "job:J02", "advertiser"),
+    _undecided("Q231", "job:J02", "employer", f"{_ADZUNA}; {_AWD_AGENCY}"),
+    Decision(
+        "Q232",
+        "job:J02",
+        "the reviewer could not decide: left out",
+        (Drop("facts", "J02.duplicate_of"),),
+    ),
+    _undecided("Q233", "job:J03", "salary"),
+    _undecided("Q234", "job:J03", "valid_through", f"{_ADZUNA}: no closing date is cited"),
+    _undecided("Q236", "job:J03", "advertiser"),
+    _undecided("Q237", "job:J03", "employer"),
+    _undecided("Q238", "job:J07", "salary"),
+    _undecided("Q239", "job:J07", "valid_through", f"{_ADZUNA}: no closing date is cited"),
+    _undecided("Q241", "job:J07", "advertiser"),
+    _undecided("Q242", "job:J07", "employer", f"{_ADZUNA}; {_AWD_AGENCY}"),
     Decision(
         "Q261",
         "req:J15.4",
@@ -566,13 +621,22 @@ DECISIONS: tuple[Decision, ...] = (
     Decision(
         "Q284",
         "job:J10",
-        f"{_PRO_RATA}, which the pay shape cannot hold and no stored excerpt cites",
+        "the range holds only 'pro rata per annum', a basis no stored excerpt cites: unknown",
+        (
+            MarkUnknown(
+                "salary",
+                "session 2, Q284 (no): the page states £32,073 to £39,043 a year 'pro rata per "
+                "annum'; the pay shape cannot hold that basis and no stored excerpt cites it, so "
+                "the range is not served without it",
+            ),
+        ),
     ),
     Decision(
         "Q290",
         "req:J10.1",
-        "the page also says 'Applicants must have current UK professional registration.': a "
-        "conflict left open",
+        "the page also says 'Applicants must have current UK professional registration.': the "
+        "gate keeps only the registration both require",
+        (Assign("gate", "statutory registration"),),
     ),
     Decision(
         "Q298",
@@ -580,7 +644,11 @@ DECISIONS: tuple[Decision, ...] = (
         _NO_SOC,
         (Drop("facts", "J11.occupation_crosswalk"),),
     ),
-    Decision("Q300", "job:J13", f"{_PRO_RATA}, kept as the fact J13.salary_basis_note"),
+    Decision(
+        "Q300",
+        "job:J13",
+        "the range stands with 'pro rata per annum', kept as the fact J13.salary_basis_note",
+    ),
     Decision(
         "Q317",
         "job:J04",
@@ -663,15 +731,18 @@ NOTES = [
     "(docs/reviews/session-2-answers.md). Q1-Q15 were answered by the product owner; "
     "Q16-Q344, T1-T36 and R1-R58 were checked by an AI and count as the product owner's review "
     "by their ruling of 2026-10-30. Version 0.1.0 is unchanged.",
+    "The records were curated by an agent (Task 7b) from 33 real pages retrieved on 2026-10-29 "
+    "through the acquisition pipeline. Every record, reviewed or proposed, is never shown as "
+    "current and never fills a live field (ruling R9).",
     "A record is reviewed only when at least one session 2 row states one of its values, every "
     "such row was answered yes, and no answer changed it. Any other record stays proposed: "
-    "explorable, never shown as current, never in an unqualified affordable-and-feasible or "
-    "readiness result (ruling R9). A record no row asks about carries no review.",
-    "A no that states the right value, quoting the same page, in the field's declared shape, "
-    "is a new span-cited claim whose note names the question. Otherwise the field is unknown "
-    "with the review's reason, or a fact or rule the reviewer called wrong is left out, with "
-    "its reason in the record's review. No answer rejected a whole record, so none is left "
-    "out.",
+    "explorable only, never in an unqualified affordable-and-feasible or readiness result "
+    "(ruling R9). A record no row asks about carries no review.",
+    "A no that states the right value, quoting the same page, is a new span-cited claim whose "
+    "note names the question; a reading a structured shape cannot hold is kept as the page's "
+    "own words. Otherwise a no, or a ? (the reviewer could not decide), makes the field "
+    "unknown with the review's reason, or leaves out a fact, with its reason in the record's "
+    "review. No answer rejected a whole record, so none is left out.",
 ]
 SKILL_ROWS_NOTE = (
     "Skill rows are pack-local (pack:<target>:<row>); the capability reference gives them "
@@ -753,7 +824,7 @@ def _decision_text(
     for question in [*rows, *(q for q in noted if q not in rows)]:
         answer = answered[question]
         if answer.verdict != "yes":
-            found.append(f"{question} {answer.verdict}: {noted.get(question, 'not decided')}")
+            found.append(f"{question} {answer.verdict}: {noted[question]}")
     return "; ".join(found) + ". " + _provenance(rows, answered)
 
 
