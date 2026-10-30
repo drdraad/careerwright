@@ -1,11 +1,13 @@
-"""SQL for the capability state, skill evidence, requirement statements and matrix edits
-(adapter; migration 0029). The evidence, statement and edit tables are append-only."""
+"""SQL for the capability state, skill evidence, requirement statements, matrix edits and
+overlooked strengths (adapter; migrations 0029 and 0031). Every table but the state is
+append-only."""
 
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
 import sqlalchemy as sa
+from sqlalchemy import exc
 
 from careerwright.capability.evidence import (
     Answer,
@@ -16,7 +18,8 @@ from careerwright.capability.evidence import (
     SkillEvidence,
 )
 from careerwright.capability.matrix import Importance, RowEdit
-from careerwright.db import Tx
+from careerwright.capability.strength import StrengthChoice, StrengthDecision, StrengthRequest
+from careerwright.db import Tx, is_unique_violation
 
 
 @dataclass(frozen=True)
@@ -190,3 +193,79 @@ def edits(tx: Tx, workspace_id: uuid.UUID, target_key: str) -> list[RowEdit]:
         )
         for row in rows
     ]
+
+
+def insert_strength(tx: Tx, request: StrengthRequest) -> None:
+    tx.execute(
+        sa.text(
+            "INSERT INTO careerwright.strength_proposals (strength_id, workspace_id, turn_id, "
+            "created_by, created_at) VALUES (:id, :ws, :turn, :by, :at)"
+        ),
+        {
+            "id": request.strength_id,
+            "ws": request.workspace_id,
+            "turn": request.turn_id,
+            "by": request.created_by,
+            "at": request.created_at,
+        },
+    )
+
+
+def strength_for_turn(
+    tx: Tx, workspace_id: uuid.UUID, turn_id: uuid.UUID
+) -> StrengthRequest | None:
+    row = (
+        tx.execute(
+            sa.text(
+                "SELECT strength_id, workspace_id, turn_id, created_by, created_at "
+                "FROM careerwright.strength_proposals WHERE workspace_id = :ws AND turn_id = :turn"
+            ),
+            {"ws": workspace_id, "turn": turn_id},
+        )
+        .mappings()
+        .one_or_none()
+    )
+    return None if row is None else StrengthRequest(**dict(row))
+
+
+def insert_strength_decision(tx: Tx, decided: StrengthDecision) -> bool:
+    """False if the strength already has a decision (the first one stands)."""
+    try:
+        with tx.begin_nested():
+            tx.execute(
+                sa.text(
+                    "INSERT INTO careerwright.strength_decisions (strength_id, workspace_id, "
+                    "decision, evidence_id, decided_by, decided_at) VALUES (:id, :ws, :decision, "
+                    ":evidence, :by, :at)"
+                ),
+                {
+                    "id": decided.strength_id,
+                    "ws": decided.workspace_id,
+                    "decision": decided.decision.value,
+                    "evidence": decided.evidence_id,
+                    "by": decided.decided_by,
+                    "at": decided.decided_at,
+                },
+            )
+    except exc.IntegrityError as error:
+        if is_unique_violation(error):
+            return False
+        raise
+    return True
+
+
+def strength_decision(tx: Tx, strength_id: uuid.UUID) -> StrengthDecision | None:
+    row = (
+        tx.execute(
+            sa.text(
+                "SELECT strength_id, workspace_id, decision, evidence_id, decided_by, decided_at "
+                "FROM careerwright.strength_decisions WHERE strength_id = :id"
+            ),
+            {"id": strength_id},
+        )
+        .mappings()
+        .one_or_none()
+    )
+    if row is None:
+        return None
+    return StrengthDecision(**{**row, "decision": StrengthChoice(row["decision"])})

@@ -231,6 +231,8 @@ const slate = (suggestions: SuggestionOut[]): SlateOut => ({
   unsearchable_queries: [],
   unsupported_hypotheses: [],
   not_included: [],
+  unmatched_titles: [],
+  connection: null,
 });
 const full = [
   suggestion("agricultural machinery technician", "723", "close_to_current"),

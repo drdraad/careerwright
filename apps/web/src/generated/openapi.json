@@ -3039,6 +3039,431 @@
         }
       }
     },
+    "/v1/workspaces/{workspace_id}/origin": {
+      "get": {
+        "tags": [
+          "origin"
+        ],
+        "summary": "Get Origin",
+        "operationId": "get_origin",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OriginOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/origin/role": {
+      "post": {
+        "tags": [
+          "origin"
+        ],
+        "summary": "Post Role",
+        "description": "The first answer: the ESCO occupation the person does now or did last, saved as\ntheir current role through the one profile write path.",
+        "operationId": "choose_role",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChooseRole"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already the role; nothing changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/strength": {
+      "post": {
+        "tags": [
+          "origin"
+        ],
+        "summary": "Post Strength",
+        "description": "Look for one overlooked strength in the answers this turn's decision saved, as one\nbounded run: at most one per turn (asking again answers 200 with its run), never on a\nturn the support screen answered, live only with the person's key within their spend\nlimit, and the demo's scripted example in a demo workspace. The answer never holds the\nproposal (it is kept as the command's receipt); read it with GET.",
+        "operationId": "submit_strength",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "turn_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Turn Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitStrength"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrengthRunOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already asked for: the turn's one strength run, in its state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrengthRunOut"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "origin"
+        ],
+        "summary": "Get Strength",
+        "operationId": "get_strength",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "turn_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Turn Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrengthOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/strength/decision": {
+      "post": {
+        "tags": [
+          "origin"
+        ],
+        "summary": "Post Strength Decision",
+        "description": "Confirm the proposed strength (recorded as the person's own claim, self-reported, with\nthe verified quotation as its example) or decline it (nothing about the skill is\nrecorded). Once per strength.",
+        "operationId": "decide_strength",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "turn_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Turn Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideStrength"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrengthDecidedOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/workspaces/{workspace_id}/research/acquisitions": {
       "post": {
         "tags": [
@@ -4559,6 +4984,78 @@
         }
       }
     },
+    "/v1/taxonomy/titles": {
+      "get": {
+        "tags": [
+          "taxonomy"
+        ],
+        "summary": "Titles",
+        "description": "The type-ahead for \"What do you do now, or what did you do last?\": ESCO titles whose\nwords begin with what was typed. Works before a key is connected and in the demo.",
+        "operationId": "match_titles",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "default": 8,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TitleMatchesOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/taxonomy/occupations/{concept_id}": {
       "get": {
         "tags": [
@@ -5546,10 +6043,11 @@
           "done_with_help",
           "understand_not_tried",
           "not_learned",
-          "unsure"
+          "unsure",
+          "used"
         ],
         "title": "Answer",
-        "description": "The five answers the interview pattern distinguishes, each in the same neutral tone."
+        "description": "The five answers the interview pattern distinguishes, each in the same neutral tone,\nand the world's \"I've used this\" (Sprint W)."
       },
       "AnsweredState": {
         "type": "string",
@@ -6310,6 +6808,29 @@
         ],
         "title": "Challenge"
       },
+      "ChooseRole": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version"
+          },
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id",
+            "description": "An occupation from `GET /v1/taxonomy/titles`."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "concept_id"
+        ],
+        "title": "ChooseRole",
+        "description": "The first answer: the ESCO occupation the person does now, or did last."
+      },
       "ChooseTarget": {
         "properties": {
           "expected_version": {
@@ -6638,6 +7159,57 @@
         "title": "ConnectionCheckResult",
         "description": "What the model proposes for the synthetic persona. Structurally valid is not true.\n\nLengths are checked by a validator rather than schema keywords, so the JSON schema sent\nto Meta stays within strict mode (Meta then enforces the structure itself)."
       },
+      "ConnectionOut": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "role_title": {
+            "type": "string",
+            "title": "Role Title",
+            "description": "The person's role, as ESCO titles it."
+          },
+          "sentence": {
+            "type": "string",
+            "title": "Sentence"
+          },
+          "shared_skill_count": {
+            "type": "integer",
+            "title": "Shared Skill Count"
+          },
+          "shared_skills": {
+            "items": {
+              "$ref": "#/components/schemas/SharedSkillOut"
+            },
+            "type": "array",
+            "title": "Shared Skills",
+            "description": "The essential skills both list."
+          },
+          "still_uncertain": {
+            "type": "string",
+            "title": "Still Uncertain"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "title",
+          "role_title",
+          "sentence",
+          "shared_skill_count",
+          "shared_skills",
+          "still_uncertain"
+        ],
+        "title": "ConnectionOut",
+        "description": "The unexpected connection: one suggestion joined to the person's role by the\nessential skills the two share in ESCO, outside the role's own kind of work and never a\ntitle the person named; the one sharing the most. Its sentence is a fact about the two\nroles, never about the person, and the shared skills are its evidence, one step away."
+      },
       "ConversationMode": {
         "type": "string",
         "enum": [
@@ -6804,6 +7376,28 @@
         "title": "DataMode",
         "description": "Recorded on every workspace and run (Global Constraint 5, plan section 2)."
       },
+      "DecideStrength": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version",
+            "description": "The capability version shown."
+          },
+          "confirm": {
+            "type": "boolean",
+            "title": "Confirm",
+            "description": "True: it is the person's own claim, recorded as self-reported. False: declined, and nothing about the skill is recorded."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "confirm"
+        ],
+        "title": "DecideStrength"
+      },
       "DecideTurn": {
         "properties": {
           "expected_version": {
@@ -6934,6 +7528,14 @@
           "snippet"
         ],
         "title": "DescriptionKind"
+      },
+      "DestinationKind": {
+        "type": "string",
+        "enum": [
+          "target",
+          "horizon"
+        ],
+        "title": "DestinationKind"
       },
       "Direction": {
         "type": "string",
@@ -10319,6 +10921,81 @@
         ],
         "title": "OptionsOut"
       },
+      "OriginOut": {
+        "properties": {
+          "profile_version": {
+            "type": "integer",
+            "title": "Profile Version"
+          },
+          "capability_version": {
+            "type": "integer",
+            "title": "Capability Version"
+          },
+          "release": {
+            "$ref": "#/components/schemas/ReleaseRefOut"
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleOut"
+          },
+          "usual_skills": {
+            "items": {
+              "$ref": "#/components/schemas/UsualSkillOut"
+            },
+            "type": "array",
+            "title": "Usual Skills"
+          },
+          "destinations": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionOut"
+            },
+            "type": "array",
+            "title": "Destinations"
+          },
+          "fewer_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fewer Reasons",
+            "description": "Why there are fewer than six, if there are."
+          },
+          "connection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConnectionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "salary_floor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SalaryFloorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "profile_version",
+          "capability_version",
+          "release",
+          "role",
+          "usual_skills",
+          "destinations",
+          "fewer_reasons",
+          "connection",
+          "salary_floor"
+        ],
+        "title": "OriginOut",
+        "description": "The world's answer to the first question, recomputed on each read with no model call:\nit works before a key is connected and in the demo. `destinations` are the first slate,\njoined to the role only by the essential skills they share in ESCO (never by words in a\ntitle), chosen by the slate's rules and the confirmed salary floor; the role itself is\nthe origin, never a destination."
+      },
       "OutcomeReview": {
         "type": "string",
         "enum": [
@@ -11700,6 +12377,60 @@
         ],
         "title": "ProposedChangeOut"
       },
+      "ProposedStrengthOut": {
+        "properties": {
+          "destination": {
+            "$ref": "#/components/schemas/StrengthDestinationOut"
+          },
+          "skill_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Skill Id"
+          },
+          "skill_label": {
+            "type": "string",
+            "title": "Skill Label"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "quotation": {
+            "type": "string",
+            "title": "Quotation",
+            "description": "The person's words, in their own characters."
+          },
+          "answer_field": {
+            "$ref": "#/components/schemas/ProfileField",
+            "description": "Which of their answers it quotes."
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "Set for the demo's scripted, synthetic example."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "destination",
+          "skill_id",
+          "skill_label",
+          "subject",
+          "quotation",
+          "answer_field",
+          "label"
+        ],
+        "title": "ProposedStrengthOut",
+        "description": "A proposal, never yet a fact: the person's own words (verified as a span of their\nanswers) against a skill ESCO lists as essential to one of their destinations. It shows\nas a strength only once the person confirms it, and then as their own claim."
+      },
       "Provenance": {
         "type": "string",
         "enum": [
@@ -12296,7 +13027,7 @@
           "answer"
         ],
         "title": "RecordEvidence",
-        "description": "An answer about a skill: the level is chosen against `rubric_version`'s anchors."
+        "description": "An answer about a skill: the level is chosen against `rubric_version`'s anchors. The\nsubject is a skill of a target's matrix, or one of the essential skills the person's\nrole usually needs (`esco:<skill ID>`): \"I've used this\" is `answer: used`, no level."
       },
       "RecordPart": {
         "type": "string",
@@ -12681,6 +13412,101 @@
         ],
         "title": "RightsClass",
         "description": "The page classes of the session 1 rights policy (H-06; `corpus/README.md`)."
+      },
+      "RoleOccupationOut": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "esco_uri": {
+            "type": "string",
+            "title": "Esco Uri"
+          },
+          "isco_group": {
+            "$ref": "#/components/schemas/IscoGroupOut",
+            "description": "Its ISCO-08 unit group."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "title",
+          "esco_uri",
+          "isco_group"
+        ],
+        "title": "RoleOccupationOut"
+      },
+      "RoleOut": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text",
+            "description": "The person's answer; null before they answer."
+          },
+          "state": {
+            "$ref": "#/components/schemas/RoleState"
+          },
+          "chosen": {
+            "type": "boolean",
+            "title": "Chosen",
+            "description": "The person chose the occupation from ESCO."
+          },
+          "occupation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleOccupationOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it names one occupation."
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/RoleOccupationOut"
+            },
+            "type": "array",
+            "title": "Choices",
+            "description": "When several hold it as a title."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "state",
+          "chosen",
+          "occupation",
+          "choices"
+        ],
+        "title": "RoleOut",
+        "description": "What the person's answer to \"What do you do now, or what did you do last?\" names in\nESCO. Nothing is guessed: an answer ESCO does not hold joins nothing, and one several\noccupations hold asks the person to choose."
+      },
+      "RoleState": {
+        "type": "string",
+        "enum": [
+          "not_answered",
+          "esco",
+          "ambiguous",
+          "not_in_esco"
+        ],
+        "title": "RoleState",
+        "description": "What the person's current or last role names in ESCO."
       },
       "RowAssessment": {
         "properties": {
@@ -13177,7 +14003,8 @@
           "slate_explanation",
           "acquisition",
           "source_search",
-          "page_extraction"
+          "page_extraction",
+          "strength_proposal"
         ],
         "title": "RunKind"
       },
@@ -13869,6 +14696,38 @@
         ],
         "title": "SetSpendLimits"
       },
+      "SharedSkillOut": {
+        "properties": {
+          "skill_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Skill Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "skill_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "skill_id",
+          "label",
+          "skill_type"
+        ],
+        "title": "SharedSkillOut"
+      },
       "SketchOut": {
         "properties": {
           "label": {
@@ -14026,7 +14885,8 @@
           "transferable",
           "cross_industry",
           "less_familiar",
-          "hypothesis"
+          "hypothesis",
+          "shared_skills"
         ],
         "title": "SlateChannel",
         "description": "How a candidate was found: the model's channels plus Careerwright's own."
@@ -14200,6 +15060,25 @@
             "type": "array",
             "title": "Not Included",
             "description": "Show why this wasn't included."
+          },
+          "unmatched_titles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unmatched Titles",
+            "description": "Titles of the person's own that ESCO does not list: nothing is joined to them until the person chooses the ESCO occupation closest to each."
+          },
+          "connection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConnectionOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The unexpected connection to the person's role; null without one."
           }
         },
         "additionalProperties": false,
@@ -14221,10 +15100,12 @@
           "queries",
           "unsearchable_queries",
           "unsupported_hypotheses",
-          "not_included"
+          "not_included",
+          "unmatched_titles",
+          "connection"
         ],
         "title": "SlateOut",
-        "description": "A varied slate of up to six career hypotheses from the discovery's searches, computed\ndeterministically each time it is read, with every count that explains it."
+        "description": "A varied slate of up to six career hypotheses from the discovery's searches, computed\ndeterministically each time it is read, with every count that explains it. A title of\nthe person's own (their role, a target, or a search naming one) joins other work only by\nshared essential skills, never by its words."
       },
       "SocCandidateOut": {
         "properties": {
@@ -15007,6 +15888,189 @@
         ],
         "title": "StoreKey"
       },
+      "StrengthChoice": {
+        "type": "string",
+        "enum": [
+          "confirmed",
+          "declined"
+        ],
+        "title": "StrengthChoice"
+      },
+      "StrengthDecidedOut": {
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/StrengthDecisionOut"
+          },
+          "capability_version": {
+            "type": "integer",
+            "title": "Capability Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision",
+          "capability_version"
+        ],
+        "title": "StrengthDecidedOut"
+      },
+      "StrengthDecisionOut": {
+        "properties": {
+          "strength_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Strength Id"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/StrengthChoice"
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id",
+            "description": "The self-report a confirmation recorded."
+          },
+          "decided_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Decided By"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Decided At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "strength_id",
+          "decision",
+          "evidence_id",
+          "decided_by",
+          "decided_at"
+        ],
+        "title": "StrengthDecisionOut"
+      },
+      "StrengthDestinationOut": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DestinationKind",
+            "description": "target: one the person chose; horizon: on their horizon."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "title",
+          "kind"
+        ],
+        "title": "StrengthDestinationOut"
+      },
+      "StrengthOut": {
+        "properties": {
+          "strength_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Strength Id"
+          },
+          "turn_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Turn Id"
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunOut"
+          },
+          "found": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Found",
+            "description": "null until the run is complete."
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedStrengthOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrengthDecisionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "strength_id",
+          "turn_id",
+          "run",
+          "found",
+          "proposal",
+          "decision"
+        ],
+        "title": "StrengthOut",
+        "description": "The run, and once it is complete what it found: a proposal, or none (`found: false`,\nan answer, never a failure). A failed run's failure class says why there is none."
+      },
+      "StrengthRunOut": {
+        "properties": {
+          "strength_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Strength Id"
+          },
+          "turn_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Turn Id"
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunOut"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "strength_id",
+          "turn_id",
+          "run"
+        ],
+        "title": "StrengthRunOut",
+        "description": "The turn's one strength run (the command's answer: never the proposal itself)."
+      },
       "SubmitAcquisition": {
         "properties": {
           "urls": {
@@ -15118,6 +16182,22 @@
           "city"
         ],
         "title": "SubmitSearch"
+      },
+      "SubmitStrength": {
+        "properties": {
+          "expected_profile_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Profile Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_profile_version"
+        ],
+        "title": "SubmitStrength",
+        "description": "Ask for the one strength proposal of a turn whose decision added answers."
       },
       "SubmitTurn": {
         "properties": {
@@ -15997,6 +17077,90 @@
         ],
         "title": "TextListInput"
       },
+      "TitleMatchOut": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "concept_kind": {
+            "type": "string",
+            "const": "esco",
+            "title": "Concept Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "The occupation's ESCO title (its preferred label)."
+          },
+          "matched_label": {
+            "type": "string",
+            "title": "Matched Label",
+            "description": "The label that matched what was typed."
+          },
+          "label_kind": {
+            "type": "string",
+            "enum": [
+              "preferred",
+              "alternative"
+            ],
+            "title": "Label Kind"
+          },
+          "isco_group": {
+            "$ref": "#/components/schemas/IscoGroupOut",
+            "description": "Its ISCO-08 unit group."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "concept_kind",
+          "title",
+          "matched_label",
+          "label_kind",
+          "isco_group"
+        ],
+        "title": "TitleMatchOut"
+      },
+      "TitleMatchesOut": {
+        "properties": {
+          "release": {
+            "$ref": "#/components/schemas/TaxonomyReleaseOut"
+          },
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/TitleMatchOut"
+            },
+            "type": "array",
+            "title": "Matches"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "release",
+          "query",
+          "matches",
+          "total",
+          "limit"
+        ],
+        "title": "TitleMatchesOut",
+        "description": "The first question's type-ahead: occupations whose ESCO titles (preferred and\nalternative labels) have a word beginning with each word typed, best first, one per\noccupation. Deterministic, no model call. No match is an honest empty list: nothing is\ninvented. `total` counts every occupation that matched."
+      },
       "TrendOut": {
         "properties": {
           "state": {
@@ -16347,6 +17511,81 @@
         ],
         "title": "UrlRefusal",
         "description": "Why a URL is not fetched. Each is a policy refusal, recorded as a blocked attempt."
+      },
+      "UsualSkillOut": {
+        "properties": {
+          "skill_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Skill Id"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "skill_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Type"
+          },
+          "state": {
+            "$ref": "#/components/schemas/UsualState"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Answer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The person's latest answer about it, if any."
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "skill_id",
+          "subject",
+          "label",
+          "skill_type",
+          "state",
+          "answer",
+          "evidence_id"
+        ],
+        "title": "UsualSkillOut",
+        "description": "An essential skill of the person's role in ESCO. `usual_in_role`: usual in your role,\nnot confirmed yet, for display only (wherever anything is computed it is unresolved).\n`self_reported`: the person said they have used or done it (their own claim, never\nevidence). Record \"I've used this\" with `POST .../capability/evidence`, its `subject` and\n`answer: used`."
+      },
+      "UsualState": {
+        "type": "string",
+        "enum": [
+          "usual_in_role",
+          "self_reported"
+        ],
+        "title": "UsualState"
       },
       "VacancyFloorReasonOut": {
         "properties": {

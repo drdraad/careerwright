@@ -910,6 +910,32 @@ def test_unsure_is_an_unresolved_assumption_and_is_not_asked_again() -> None:
     assert "fixture:a" in graph.coverage.unresolved
 
 
+@pytest.mark.req("ASSESS-01")
+def test_i_ve_used_this_stays_self_reported_counts_for_nothing_and_is_asked_its_level() -> None:
+    # Sprint W: "I've used this" (or a confirmed strength) is the person's own claim, with no
+    # level: never evidence, so the row stays unresolved and is still asked for its level.
+    matrix = synthetic_matrix("Synthetic", [skill_row("fixture:a", 2, RUBRIC)])
+    claim = self_report(
+        "fixture:a", None, None, answer=Answer.USED, example="I cleaned the sales data"
+    )
+
+    result = assess(matrix, evidence=[claim], statements=[], outcomes=[], evidence_version=1)
+    graph = question_graph([matrix], evidence=[claim], statements=[], evidence_version=1)
+
+    seen = row_evidence("fixture:a", RUBRIC, [claim])
+    assert (seen.answer, seen.level, seen.basis) == (Answer.USED, None, "self_reported")
+    assert seen.confidence is Confidence.UNSUPPORTED
+    assert status(result, "fixture:a") is RowStatus.NO_USABLE_EVIDENCE
+    assert result.state is ReadinessState.NOT_YET_ASSESSED
+    [prompt] = graph.prompts
+    assert prompt.reason is QuestionReason.UNSUPPORTED_CLAIM
+    # Its own level, chosen later against the row's rubric, is what counts.
+    levelled = self_report("fixture:a", 2, RUBRIC, at=NOW.replace(hour=10))
+    assert row_evidence("fixture:a", RUBRIC, [claim, levelled]).level == 2
+    with pytest.raises(ValueError, match="no level"):
+        self_report("fixture:a", 1, None, answer=Answer.USED)
+
+
 @pytest.mark.req("BND1-12")
 def test_a_synthetic_workspace_s_results_say_so() -> None:
     # M8: a synthetic persona's matrix, readiness and questions are labelled synthetic.

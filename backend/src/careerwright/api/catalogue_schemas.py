@@ -26,8 +26,9 @@ from careerwright.catalogue.records import (
     ProvisionalConcept,
     SkillRef,
     TaxonomyRelease,
+    TitleMatch,
 )
-from careerwright.catalogue.taxonomy import OccupationSearch
+from careerwright.catalogue.taxonomy import OccupationSearch, TitleMatches
 
 
 class SearchMatch(StrEnum):
@@ -162,6 +163,49 @@ class IscoGroupOut(ResponseModel):
     @classmethod
     def of(cls, group: IscoGroupRef) -> "IscoGroupOut":
         return cls(code=group.code, label=group.label)
+
+
+class TitleMatchOut(ResponseModel):
+    concept_id: uuid.UUID
+    concept_kind: EscoKind
+    title: str = Field(description="The occupation's ESCO title (its preferred label).")
+    matched_label: str = Field(description="The label that matched what was typed.")
+    label_kind: Literal["preferred", "alternative"]
+    isco_group: IscoGroupOut = Field(description="Its ISCO-08 unit group.")
+
+    @classmethod
+    def of(cls, match: TitleMatch) -> "TitleMatchOut":
+        return cls(
+            concept_id=match.concept_id,
+            concept_kind=ConceptKind.ESCO,
+            title=match.preferred_label,
+            matched_label=match.label,
+            label_kind="preferred" if match.kind == "preferred" else "alternative",
+            isco_group=IscoGroupOut(code=match.isco_code, label=match.isco_label),
+        )
+
+
+class TitleMatchesOut(ResponseModel):
+    """The first question's type-ahead: occupations whose ESCO titles (preferred and
+    alternative labels) have a word beginning with each word typed, best first, one per
+    occupation. Deterministic, no model call. No match is an honest empty list: nothing is
+    invented. `total` counts every occupation that matched."""
+
+    release: TaxonomyReleaseOut
+    query: str
+    matches: list[TitleMatchOut]
+    total: int
+    limit: int
+
+    @classmethod
+    def of(cls, found: TitleMatches) -> "TitleMatchesOut":
+        return cls(
+            release=TaxonomyReleaseOut.of(found.release),
+            query=found.query,
+            matches=[TitleMatchOut.of(m) for m in found.matches],
+            total=found.total,
+            limit=found.limit,
+        )
 
 
 class SkillRefOut(ResponseModel):

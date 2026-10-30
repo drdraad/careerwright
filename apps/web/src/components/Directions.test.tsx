@@ -175,6 +175,8 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
       duplicate_of_title: null,
     },
   ],
+  unmatched_titles: [],
+  connection: null,
 });
 
 function renderDirections(shown: DiscoveryOut = discovery, unavailable?: string) {

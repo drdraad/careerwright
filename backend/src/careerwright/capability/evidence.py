@@ -54,13 +54,18 @@ class StrictModel(BaseModel):
 
 
 class Answer(StrEnum):
-    """The five answers the interview pattern distinguishes, each in the same neutral tone."""
+    """The five answers the interview pattern distinguishes, each in the same neutral tone,
+    and the world's "I've used this" (Sprint W)."""
 
     DONE_INDEPENDENTLY = "done_independently"
     DONE_WITH_HELP = "done_with_help"
     UNDERSTAND_NOT_TRIED = "understand_not_tried"
     NOT_LEARNED = "not_learned"
     UNSURE = "unsure"
+    # "I've used this", or a strength the person confirmed: their own claim, with no level
+    # and no word on independence. Self-reported, never evidenced: it counts for nothing
+    # towards readiness, and a row it is read on is still asked for its level.
+    USED = "used"
 
 
 NOT_YET_DONE = frozenset({Answer.NOT_LEARNED, Answer.UNDERSTAND_NOT_TRIED})  # known level 0
@@ -111,6 +116,10 @@ class SkillEvidence(StrictModel):
         level = self.self_assessed_level
         if self.answer is Answer.UNSURE and level is not None:
             raise ValueError("an unsure answer has no level: unknown is not level 0")
+        if self.answer is Answer.USED and (
+            level is not None or self.method is not Method.SELF_REPORT
+        ):
+            raise ValueError("'I've used this' is the person's own claim, with no level")
         if self.answer in NOT_YET_DONE and level not in (None, 0):
             raise ValueError("that answer contradicts its level: no performance yet is level 0")
         if self.answer is Answer.DONE_WITH_HELP and level is not None and level > WITH_HELP_MAX:
@@ -192,6 +201,8 @@ def row_evidence(
         level, basis, confidence = 0, "self_reported", Confidence.PROVISIONAL
     elif latest is not None and latest.answer is Answer.UNSURE:
         level, basis, confidence = None, "self_reported", None
+    elif latest is not None and latest.answer is Answer.USED:
+        level, basis, confidence = None, "self_reported", Confidence.UNSUPPORTED
     elif claimed is not None and concrete:
         level, basis, confidence = claimed, "self_reported", Confidence.PROVISIONAL
     elif claimed is not None:
@@ -217,7 +228,7 @@ def row_evidence(
     )
 
 
-LEVEL_FREE = frozenset({*NOT_YET_DONE, Answer.UNSURE})
+LEVEL_FREE = frozenset({*NOT_YET_DONE, Answer.UNSURE, Answer.USED})
 
 
 def _own(evidence: SkillEvidence, rubric_version: str | None) -> bool:

@@ -8,6 +8,7 @@ ambiguity is the caller's to resolve, never silently decided here. A search with
 release, or without a searchable term, is an error, never an empty result.
 """
 
+import re
 import uuid
 from dataclasses import dataclass
 
@@ -18,6 +19,7 @@ from careerwright.catalogue.records import (
     OccupationDetail,
     OccupationHit,
     TaxonomyRelease,
+    TitleMatch,
 )
 from careerwright.catalogue.releases import ReleasePin
 from careerwright.db import Tx
@@ -83,10 +85,13 @@ class OccupationSearch:
 
 
 def search_occupations(
-    tx: Tx, query: str, limit: int, *, any_word: bool = False
+    tx: Tx, query: str, limit: int, *, any_word: bool = False, titles: bool = True
 ) -> OccupationSearch:
     """`any_word=False` needs every word (web-search syntax); `True` ranks occupations by
-    how many of the words they match, for broad task and interest queries."""
+    how many of the words they match, for broad task and interest queries. `titles=False`
+    (discovery's task searches): a match on the words of an occupation's preferred or
+    alternative labels alone is no match, so work is never found by a shared word in a
+    title."""
     release = held_release(tx)
     text = query.strip()
     if not text or len(text) > MAX_QUERY or not 1 <= limit <= MAX_LIMIT:
@@ -107,9 +112,48 @@ def search_occupations(
             details={"field": "q", "reason": "no_search_terms"},
         )
     hits, total = taxonomy_store.full_text(
-        tx, text, limit, any_word=any_word, exclude={m.concept_id for m in labels}
+        tx, text, limit, any_word=any_word, exclude={m.concept_id for m in labels}, titles=titles
     )
     return OccupationSearch(release, any_word, labels, hits, total, limit)
+
+
+TITLE_LIMIT = 20
+_WORD = re.compile(r"[^\W_]+")
+
+
+@dataclass(frozen=True)
+class TitleMatches:
+    release: TaxonomyRelease
+    query: str
+    matches: list[TitleMatch]
+    total: int  # every occupation that matches, of which `matches` are the best
+    limit: int
+
+
+def match_titles(tx: Tx, typed: str, limit: int) -> TitleMatches:
+    """The type-ahead for "What do you do now, or what did you do last?": occupations whose
+    preferred or alternative labels have a word beginning with each word typed, best first.
+    Deterministic and offline (no model, no key). Nothing matching is an honest empty
+    answer, never an invented match; a query with no letter or digit is refused."""
+    release = held_release(tx)
+    text = " ".join(typed.split())
+    words = list(dict.fromkeys(_WORD.findall(text.casefold())))
+    if len(text) > MAX_QUERY or not 1 <= limit <= TITLE_LIMIT:
+        raise CareerwrightError(
+            ErrorCode.VALIDATION_FAILED,
+            f"Type at most {MAX_QUERY} characters, with a limit of 1-{TITLE_LIMIT}.",
+            stage=ErrorStage.CATALOGUE,
+            details={"field": "q", "reason": "length"},
+        )
+    if not words:
+        raise CareerwrightError(
+            ErrorCode.VALIDATION_FAILED,
+            "Type a word of the job title.",
+            stage=ErrorStage.CATALOGUE,
+            details={"field": "q", "reason": "no_search_terms"},
+        )
+    matches, total = taxonomy_store.title_matches(tx, words, normalise_label(text), limit)
+    return TitleMatches(release, text, matches, total, limit)
 
 
 def occupation_detail(tx: Tx, concept_id: uuid.UUID) -> OccupationDetail:

@@ -144,6 +144,17 @@ deterministic code: a model may later propose mappings and answers, never commit
      define level 1 as "performs with guidance" and levels 2 to 4 by independence, which is
      this reading's basis. The anchors do not state the ceiling in so many words.
 
+   **"I've used this" (Task W2 slice W2B, plan section 4 "Usual is not confirmed"; provisional,
+   R6).** A sixth answer, `used`: the person says they have used the skill, with no level and
+   no word on independence (migration 0031 keeps it level-free and a self-report). It is how
+   the world records a usual skill of the person's role picked as theirs, and a confirmed
+   overlooked strength (ADR 0014 decision 3). It is level-free like "unsure", so it fills a
+   row with no answer of its own, and reads as self-reported, `unsupported`, level unknown:
+   it counts for nothing towards readiness and the row is still asked for its level
+   (`UNSUPPORTED_CLAIM`). The evidence command also accepts, as subjects, the essential
+   skills of the occupation the person's current or last role names (`esco:<skill ID>`);
+   with no rubric there, only level-free answers fit.
+
    **Parked for session 2's decision sheet and the final review (review M4):** a reviewed
    demonstration below a concrete self-report sets the current level to the demonstration's
    (a self-report of 3 and a course assessment of 1 give 1, with `conflict: true`). An

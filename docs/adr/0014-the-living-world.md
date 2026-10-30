@@ -54,6 +54,28 @@ process." Their reference image is "Careerwright's luminous path forward".
    shows. It is a new bounded run kind (ADR 0006), live only, within the person's spend
    limit; the demo shows a scripted, labelled example. The model never decides a revelation,
    and a kind of revelation with no such source is not shown.
+   **In the app (Task W2 slice W2B):** the run kind `strength_proposal`
+   (`careerwright.capability.strength`, prompt `overlooked-strength-1`; one `RunTask` composed
+   in `worker.py`, run by the one model-run workflow as its own run, so the DBOS step
+   sequence and `careerwright-l0-1` are unchanged). The person's client asks for it
+   (`POST .../interview/turns/{id}/strength`, expected profile version and Idempotency-Key)
+   once a turn's decision saved something they enjoy, can do or have done: at most one per
+   turn, never on a turn the support screen answered (refused before any run, nothing
+   stored), only while those answers are current, with the person's key and within their
+   spend limit (the activity checks again). The model reads those answers (never a title,
+   a name, a place or money) and each destination's essential skills (ESCO), and returns at
+   most one destination, skill and quotation, and no prose; finding none is an answer. Its
+   destinations are the person's targets that name one ESCO occupation and the first
+   slate's (ADR 0007 decision 14), each with the essential skills not yet claimed. Code
+   checks the destination, that the skill is listed as essential to it, and the quotation as
+   a span of an answer (ADR 0007 decision 12's verifier); one repair, then
+   `invalid_model_output`. Confirmed (`POST .../strength/decision`, the capability version,
+   Idempotency-Key), it is recorded as the person's own claim (ADR 0012's `used` answer, no
+   level, the quotation as its example): self-reported, never evidence, so it counts for
+   nothing towards readiness. Declined, nothing about the skill is recorded. A demo
+   workspace uses `careerwright-fixture-strength-1` (the first answer sharing a content word
+   with a destination's essential skill, quoted whole; labelled "Demo example (synthetic)").
+   Every rule above is provisional (R6) until the product owner confirms it at session W2.
 4. **The world never shows more than the evidence.** Everything that varies has a computed
    meaning; position is layout only; unknown is shadow, never zero; a condition is a gate in
    plain words; nothing implies a job offer. Skills a role usually needs show as "usual in

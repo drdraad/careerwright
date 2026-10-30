@@ -761,13 +761,13 @@ def test_a_demo_workspace_interviews_offline_with_the_labelled_fixture_interview
             "contributor",
             "demo_workspaces_use_only_the_fixture_model",
         ),
-        # ...and the fixture models answer interview turns, discoveries (0010) and slate
-        # explanations (0011) only.
+        # ...and the fixture models answer interview turns, discoveries (0010), slate
+        # explanations (0011) and strength proposals (0031) only.
         (
             "connection_check",
             "careerwright-fixture-interviewer-1",
             "fixture",
-            "the_fixture_models_only_interview_discover_or_explain",
+            "the_fixture_models_only_profile_runs",
         ),
     ],
 )

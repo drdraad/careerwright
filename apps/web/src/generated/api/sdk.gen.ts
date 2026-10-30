@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelRunData, CancelRunErrors, CancelRunResponses, ChooseTargetData, ChooseTargetErrors, ChooseTargetResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, DecideTurnData, DecideTurnErrors, DecideTurnResponses, EditMatrixRowData, EditMatrixRowErrors, EditMatrixRowResponses, ExportWorkspaceData, ExportWorkspaceErrors, ExportWorkspaceResponses, FavouriteJobData, FavouriteJobErrors, FavouriteJobResponses, GetAcquisitionData, GetAcquisitionErrors, GetAcquisitionResponses, GetCapabilityQuestionsData, GetCapabilityQuestionsErrors, GetCapabilityQuestionsResponses, GetCapabilityReadinessData, GetCapabilityReadinessErrors, GetCapabilityReadinessResponses, GetDiscoveryData, GetDiscoveryErrors, GetDiscoveryResponses, GetJobData, GetJobErrors, GetJobResponses, GetMeData, GetMeErrors, GetMeResponses, GetOccupationData, GetOccupationErrors, GetOccupationEvidenceData, GetOccupationEvidenceErrors, GetOccupationEvidenceResponses, GetOccupationResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetProfileVersionData, GetProfileVersionErrors, GetProfileVersionResponses, GetRunData, GetRunErrors, GetRunResponses, GetSearchData, GetSearchErrors, GetSearchResponses, GetSketchData, GetSketchErrors, GetSketchResponses, GetSlateData, GetSlateErrors, GetSlateResponses, GetSpendData, GetSpendErrors, GetSpendResponses, GetTaxonomyData, GetTaxonomyErrors, GetTaxonomyResponses, GetTurnData, GetTurnErrors, GetTurnReplyData, GetTurnReplyErrors, GetTurnReplyResponses, GetTurnResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, HealthzData, HealthzResponses, ListCapabilityMatricesData, ListCapabilityMatricesErrors, ListCapabilityMatricesResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListDiscoveriesData, ListDiscoveriesErrors, ListDiscoveriesResponses, ListEventsData, ListEventsErrors, ListEventsResponses, ListJobsData, ListJobsErrors, ListJobsResponses, ListPlacesData, ListPlacesErrors, ListPlacesResponses, ListPlanningOptionsData, ListPlanningOptionsErrors, ListPlanningOptionsResponses, ListProfileVersionsData, ListProfileVersionsErrors, ListProfileVersionsResponses, ListProvisionalConceptsData, ListProvisionalConceptsErrors, ListProvisionalConceptsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListTurnsData, ListTurnsErrors, ListTurnsResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, PasteTextData, PasteTextErrors, PasteTextResponses, PutPreferencesData, PutPreferencesErrors, PutPreferencesResponses, PutProfileData, PutProfileErrors, PutProfileResponses, PutSpendLimitsData, PutSpendLimitsErrors, PutSpendLimitsResponses, ReadyzData, ReadyzResponses, RecordRequirementStatementData, RecordRequirementStatementErrors, RecordRequirementStatementResponses, RecordSkillEvidenceData, RecordSkillEvidenceErrors, RecordSkillEvidenceResponses, RegisterProvisionalConceptData, RegisterProvisionalConceptErrors, RegisterProvisionalConceptResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, RevertProfileData, RevertProfileErrors, RevertProfileResponses, RevokeCredentialData, RevokeCredentialErrors, RevokeCredentialResponses, RotateCredentialData, RotateCredentialErrors, RotateCredentialResponses, SearchOccupationsData, SearchOccupationsErrors, SearchOccupationsResponses, SetCapabilityQuestionsData, SetCapabilityQuestionsErrors, SetCapabilityQuestionsResponses, StoreCredentialData, StoreCredentialErrors, StoreCredentialResponses, StreamEventsData, StreamEventsErrors, StreamEventsResponse, StreamEventsResponses, SubmitAcquisitionData, SubmitAcquisitionErrors, SubmitAcquisitionResponses, SubmitDiscoveryData, SubmitDiscoveryErrors, SubmitDiscoveryResponses, SubmitExplanationData, SubmitExplanationErrors, SubmitExplanationResponses, SubmitRunData, SubmitRunErrors, SubmitRunResponses, SubmitSearchData, SubmitSearchErrors, SubmitSearchResponses, SubmitTurnData, SubmitTurnErrors, SubmitTurnResponses, UnfavouriteJobData, UnfavouriteJobErrors, UnfavouriteJobResponses } from './types.gen';
+import type { CancelRunData, CancelRunErrors, CancelRunResponses, ChooseRoleData, ChooseRoleErrors, ChooseRoleResponses, ChooseTargetData, ChooseTargetErrors, ChooseTargetResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, DecideStrengthData, DecideStrengthErrors, DecideStrengthResponses, DecideTurnData, DecideTurnErrors, DecideTurnResponses, EditMatrixRowData, EditMatrixRowErrors, EditMatrixRowResponses, ExportWorkspaceData, ExportWorkspaceErrors, ExportWorkspaceResponses, FavouriteJobData, FavouriteJobErrors, FavouriteJobResponses, GetAcquisitionData, GetAcquisitionErrors, GetAcquisitionResponses, GetCapabilityQuestionsData, GetCapabilityQuestionsErrors, GetCapabilityQuestionsResponses, GetCapabilityReadinessData, GetCapabilityReadinessErrors, GetCapabilityReadinessResponses, GetDiscoveryData, GetDiscoveryErrors, GetDiscoveryResponses, GetJobData, GetJobErrors, GetJobResponses, GetMeData, GetMeErrors, GetMeResponses, GetOccupationData, GetOccupationErrors, GetOccupationEvidenceData, GetOccupationEvidenceErrors, GetOccupationEvidenceResponses, GetOccupationResponses, GetOriginData, GetOriginErrors, GetOriginResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetProfileVersionData, GetProfileVersionErrors, GetProfileVersionResponses, GetRunData, GetRunErrors, GetRunResponses, GetSearchData, GetSearchErrors, GetSearchResponses, GetSketchData, GetSketchErrors, GetSketchResponses, GetSlateData, GetSlateErrors, GetSlateResponses, GetSpendData, GetSpendErrors, GetSpendResponses, GetStrengthData, GetStrengthErrors, GetStrengthResponses, GetTaxonomyData, GetTaxonomyErrors, GetTaxonomyResponses, GetTurnData, GetTurnErrors, GetTurnReplyData, GetTurnReplyErrors, GetTurnReplyResponses, GetTurnResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, HealthzData, HealthzResponses, ListCapabilityMatricesData, ListCapabilityMatricesErrors, ListCapabilityMatricesResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListDiscoveriesData, ListDiscoveriesErrors, ListDiscoveriesResponses, ListEventsData, ListEventsErrors, ListEventsResponses, ListJobsData, ListJobsErrors, ListJobsResponses, ListPlacesData, ListPlacesErrors, ListPlacesResponses, ListPlanningOptionsData, ListPlanningOptionsErrors, ListPlanningOptionsResponses, ListProfileVersionsData, ListProfileVersionsErrors, ListProfileVersionsResponses, ListProvisionalConceptsData, ListProvisionalConceptsErrors, ListProvisionalConceptsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListTurnsData, ListTurnsErrors, ListTurnsResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, MatchTitlesData, MatchTitlesErrors, MatchTitlesResponses, PasteTextData, PasteTextErrors, PasteTextResponses, PutPreferencesData, PutPreferencesErrors, PutPreferencesResponses, PutProfileData, PutProfileErrors, PutProfileResponses, PutSpendLimitsData, PutSpendLimitsErrors, PutSpendLimitsResponses, ReadyzData, ReadyzResponses, RecordRequirementStatementData, RecordRequirementStatementErrors, RecordRequirementStatementResponses, RecordSkillEvidenceData, RecordSkillEvidenceErrors, RecordSkillEvidenceResponses, RegisterProvisionalConceptData, RegisterProvisionalConceptErrors, RegisterProvisionalConceptResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, RevertProfileData, RevertProfileErrors, RevertProfileResponses, RevokeCredentialData, RevokeCredentialErrors, RevokeCredentialResponses, RotateCredentialData, RotateCredentialErrors, RotateCredentialResponses, SearchOccupationsData, SearchOccupationsErrors, SearchOccupationsResponses, SetCapabilityQuestionsData, SetCapabilityQuestionsErrors, SetCapabilityQuestionsResponses, StoreCredentialData, StoreCredentialErrors, StoreCredentialResponses, StreamEventsData, StreamEventsErrors, StreamEventsResponse, StreamEventsResponses, SubmitAcquisitionData, SubmitAcquisitionErrors, SubmitAcquisitionResponses, SubmitDiscoveryData, SubmitDiscoveryErrors, SubmitDiscoveryResponses, SubmitExplanationData, SubmitExplanationErrors, SubmitExplanationResponses, SubmitRunData, SubmitRunErrors, SubmitRunResponses, SubmitSearchData, SubmitSearchErrors, SubmitSearchResponses, SubmitStrengthData, SubmitStrengthErrors, SubmitStrengthResponses, SubmitTurnData, SubmitTurnErrors, SubmitTurnResponses, UnfavouriteJobData, UnfavouriteJobErrors, UnfavouriteJobResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -447,6 +447,76 @@ export const getSketch = <ThrowOnError extends boolean = false>(options: Options
 });
 
 /**
+ * Get Origin
+ */
+export const getOrigin = <ThrowOnError extends boolean = false>(options: Options<GetOriginData, ThrowOnError>): RequestResult<GetOriginResponses, GetOriginErrors, ThrowOnError> => (options.client ?? client).get<GetOriginResponses, GetOriginErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/origin',
+    ...options
+});
+
+/**
+ * Post Role
+ *
+ * The first answer: the ESCO occupation the person does now or did last, saved as
+ * their current role through the one profile write path.
+ */
+export const chooseRole = <ThrowOnError extends boolean = false>(options: Options<ChooseRoleData, ThrowOnError>): RequestResult<ChooseRoleResponses, ChooseRoleErrors, ThrowOnError> => (options.client ?? client).post<ChooseRoleResponses, ChooseRoleErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/origin/role',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get Strength
+ */
+export const getStrength = <ThrowOnError extends boolean = false>(options: Options<GetStrengthData, ThrowOnError>): RequestResult<GetStrengthResponses, GetStrengthErrors, ThrowOnError> => (options.client ?? client).get<GetStrengthResponses, GetStrengthErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/strength',
+    ...options
+});
+
+/**
+ * Post Strength
+ *
+ * Look for one overlooked strength in the answers this turn's decision saved, as one
+ * bounded run: at most one per turn (asking again answers 200 with its run), never on a
+ * turn the support screen answered, live only with the person's key within their spend
+ * limit, and the demo's scripted example in a demo workspace. The answer never holds the
+ * proposal (it is kept as the command's receipt); read it with GET.
+ */
+export const submitStrength = <ThrowOnError extends boolean = false>(options: Options<SubmitStrengthData, ThrowOnError>): RequestResult<SubmitStrengthResponses, SubmitStrengthErrors, ThrowOnError> => (options.client ?? client).post<SubmitStrengthResponses, SubmitStrengthErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/strength',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Post Strength Decision
+ *
+ * Confirm the proposed strength (recorded as the person's own claim, self-reported, with
+ * the verified quotation as its example) or decline it (nothing about the skill is
+ * recorded). Once per strength.
+ */
+export const decideStrength = <ThrowOnError extends boolean = false>(options: Options<DecideStrengthData, ThrowOnError>): RequestResult<DecideStrengthResponses, DecideStrengthErrors, ThrowOnError> => (options.client ?? client).post<DecideStrengthResponses, DecideStrengthErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/strength/decision',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Submit
  *
  * 202 with the run that fetches the sources; 200 with no run when every URL is being
@@ -683,6 +753,18 @@ export const getTaxonomy = <ThrowOnError extends boolean = false>(options?: Opti
 export const searchOccupations = <ThrowOnError extends boolean = false>(options: Options<SearchOccupationsData, ThrowOnError>): RequestResult<SearchOccupationsResponses, SearchOccupationsErrors, ThrowOnError> => (options.client ?? client).get<SearchOccupationsResponses, SearchOccupationsErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/taxonomy/occupations',
+    ...options
+});
+
+/**
+ * Titles
+ *
+ * The type-ahead for "What do you do now, or what did you do last?": ESCO titles whose
+ * words begin with what was typed. Works before a key is connected and in the demo.
+ */
+export const matchTitles = <ThrowOnError extends boolean = false>(options: Options<MatchTitlesData, ThrowOnError>): RequestResult<MatchTitlesResponses, MatchTitlesErrors, ThrowOnError> => (options.client ?? client).get<MatchTitlesResponses, MatchTitlesErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/taxonomy/titles',
     ...options
 });
 

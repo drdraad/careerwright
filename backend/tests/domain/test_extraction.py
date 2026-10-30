@@ -65,6 +65,7 @@ from careerwright.identity.runs import workflow_id
 from careerwright.migrations.versions import r0021_page_extraction as r0021
 from careerwright.migrations.versions import r0023_cancel_started_runs as r0023
 from careerwright.migrations.versions import r0024_postings_conflicting as r0024
+from careerwright.migrations.versions import r0031_first_moments as r0031
 from careerwright.vocabulary import DataMode, WorkState
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
@@ -817,7 +818,7 @@ def test_the_database_holds_extraction_labels_and_the_cap_to_the_code_s() -> Non
     assert outcome == {o.value for o in ExtractionOutcome}
     validation = _quoted(r"validation IN \((.*?)\)\)", r0021.SCHEMA)
     assert validation == {v.value for v in ValidationState}
-    kinds = _quoted(r"runs_kind_check CHECK \(\s*kind IN \((.*?)\)", r0021.SCHEMA)
+    kinds = _quoted(r"runs_kind_check CHECK \(\s*kind IN \((.*?)\)", r0031.SCHEMA)
     assert kinds == {k.value for k in RunKind}
     cap = re.search(r"e\.run_id IS NOT NULL\) >= (\d+)", r0023.SCHEMA)
     assert cap is not None

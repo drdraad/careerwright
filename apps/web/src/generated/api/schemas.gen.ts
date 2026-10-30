@@ -675,10 +675,11 @@ export const AnswerSchema = {
         'done_with_help',
         'understand_not_tried',
         'not_learned',
-        'unsure'
+        'unsure',
+        'used'
     ],
     title: 'Answer',
-    description: 'The five answers the interview pattern distinguishes, each in the same neutral tone.'
+    description: 'The five answers the interview pattern distinguishes, each in the same neutral tone,\nand the world\'s "I\'ve used this" (Sprint W).'
 } as const;
 
 export const AnsweredStateSchema = {
@@ -1458,6 +1459,30 @@ export const ChallengeSchema = {
     title: 'Challenge'
 } as const;
 
+export const ChooseRoleSchema = {
+    properties: {
+        expected_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Version'
+        },
+        concept_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Concept Id',
+            description: 'An occupation from `GET /v1/taxonomy/titles`.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_version',
+        'concept_id'
+    ],
+    title: 'ChooseRole',
+    description: 'The first answer: the ESCO occupation the person does now, or did last.'
+} as const;
+
 export const ChooseTargetSchema = {
     properties: {
         expected_version: {
@@ -1795,6 +1820,58 @@ export const ConnectionCheckResultSchema = {
     description: 'What the model proposes for the synthetic persona. Structurally valid is not true.\n\nLengths are checked by a validator rather than schema keywords, so the JSON schema sent\nto Meta stays within strict mode (Meta then enforces the structure itself).'
 } as const;
 
+export const ConnectionOutSchema = {
+    properties: {
+        concept_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Concept Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        role_title: {
+            type: 'string',
+            title: 'Role Title',
+            description: 'The person\'s role, as ESCO titles it.'
+        },
+        sentence: {
+            type: 'string',
+            title: 'Sentence'
+        },
+        shared_skill_count: {
+            type: 'integer',
+            title: 'Shared Skill Count'
+        },
+        shared_skills: {
+            items: {
+                $ref: '#/components/schemas/SharedSkillOut'
+            },
+            type: 'array',
+            title: 'Shared Skills',
+            description: 'The essential skills both list.'
+        },
+        still_uncertain: {
+            type: 'string',
+            title: 'Still Uncertain'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concept_id',
+        'title',
+        'role_title',
+        'sentence',
+        'shared_skill_count',
+        'shared_skills',
+        'still_uncertain'
+    ],
+    title: 'ConnectionOut',
+    description: 'The unexpected connection: one suggestion joined to the person\'s role by the\nessential skills the two share in ESCO, outside the role\'s own kind of work and never a\ntitle the person named; the one sharing the most. Its sentence is a fact about the two\nroles, never about the person, and the shared skills are its evidence, one step away.'
+} as const;
+
 export const ConversationModeSchema = {
     type: 'string',
     enum: [
@@ -1968,6 +2045,29 @@ export const DataModeSchema = {
     description: 'Recorded on every workspace and run (Global Constraint 5, plan section 2).'
 } as const;
 
+export const DecideStrengthSchema = {
+    properties: {
+        expected_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Version',
+            description: 'The capability version shown.'
+        },
+        confirm: {
+            type: 'boolean',
+            title: 'Confirm',
+            description: 'True: it is the person\'s own claim, recorded as self-reported. False: declined, and nothing about the skill is recorded.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_version',
+        'confirm'
+    ],
+    title: 'DecideStrength'
+} as const;
+
 export const DecideTurnSchema = {
     properties: {
         expected_version: {
@@ -2101,6 +2201,15 @@ export const DescriptionKindSchema = {
         'snippet'
     ],
     title: 'DescriptionKind'
+} as const;
+
+export const DestinationKindSchema = {
+    type: 'string',
+    enum: [
+        'target',
+        'horizon'
+    ],
+    title: 'DestinationKind'
 } as const;
 
 export const DirectionSchema = {
@@ -5578,6 +5687,82 @@ export const OptionsOutSchema = {
     title: 'OptionsOut'
 } as const;
 
+export const OriginOutSchema = {
+    properties: {
+        profile_version: {
+            type: 'integer',
+            title: 'Profile Version'
+        },
+        capability_version: {
+            type: 'integer',
+            title: 'Capability Version'
+        },
+        release: {
+            $ref: '#/components/schemas/ReleaseRefOut'
+        },
+        role: {
+            $ref: '#/components/schemas/RoleOut'
+        },
+        usual_skills: {
+            items: {
+                $ref: '#/components/schemas/UsualSkillOut'
+            },
+            type: 'array',
+            title: 'Usual Skills'
+        },
+        destinations: {
+            items: {
+                $ref: '#/components/schemas/SuggestionOut'
+            },
+            type: 'array',
+            title: 'Destinations'
+        },
+        fewer_reasons: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Fewer Reasons',
+            description: 'Why there are fewer than six, if there are.'
+        },
+        connection: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ConnectionOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        salary_floor: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SalaryFloorOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'profile_version',
+        'capability_version',
+        'release',
+        'role',
+        'usual_skills',
+        'destinations',
+        'fewer_reasons',
+        'connection',
+        'salary_floor'
+    ],
+    title: 'OriginOut',
+    description: 'The world\'s answer to the first question, recomputed on each read with no model call:\nit works before a key is connected and in the demo. `destinations` are the first slate,\njoined to the role only by the essential skills they share in ESCO (never by words in a\ntitle), chosen by the slate\'s rules and the confirmed salary floor; the role itself is\nthe origin, never a destination.'
+} as const;
+
 export const OutcomeReviewSchema = {
     type: 'string',
     enum: [
@@ -6991,6 +7176,61 @@ export const ProposedChangeOutSchema = {
     title: 'ProposedChangeOut'
 } as const;
 
+export const ProposedStrengthOutSchema = {
+    properties: {
+        destination: {
+            $ref: '#/components/schemas/StrengthDestinationOut'
+        },
+        skill_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Skill Id'
+        },
+        skill_label: {
+            type: 'string',
+            title: 'Skill Label'
+        },
+        subject: {
+            type: 'string',
+            title: 'Subject'
+        },
+        quotation: {
+            type: 'string',
+            title: 'Quotation',
+            description: 'The person\'s words, in their own characters.'
+        },
+        answer_field: {
+            $ref: '#/components/schemas/ProfileField',
+            description: 'Which of their answers it quotes.'
+        },
+        label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label',
+            description: 'Set for the demo\'s scripted, synthetic example.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'destination',
+        'skill_id',
+        'skill_label',
+        'subject',
+        'quotation',
+        'answer_field',
+        'label'
+    ],
+    title: 'ProposedStrengthOut',
+    description: 'A proposal, never yet a fact: the person\'s own words (verified as a span of their\nanswers) against a skill ESCO lists as essential to one of their destinations. It shows\nas a strength only once the person confirms it, and then as their own claim.'
+} as const;
+
 export const ProvenanceSchema = {
     type: 'string',
     enum: [
@@ -7601,7 +7841,7 @@ export const RecordEvidenceSchema = {
         'answer'
     ],
     title: 'RecordEvidence',
-    description: 'An answer about a skill: the level is chosen against `rubric_version`\'s anchors.'
+    description: 'An answer about a skill: the level is chosen against `rubric_version`\'s anchors. The\nsubject is a skill of a target\'s matrix, or one of the essential skills the person\'s\nrole usually needs (`esco:<skill ID>`): "I\'ve used this" is `answer: used`, no level.'
 } as const;
 
 export const RecordPartSchema = {
@@ -8002,6 +8242,104 @@ export const RightsClassSchema = {
     ],
     title: 'RightsClass',
     description: 'The page classes of the session 1 rights policy (H-06; `corpus/README.md`).'
+} as const;
+
+export const RoleOccupationOutSchema = {
+    properties: {
+        concept_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Concept Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        esco_uri: {
+            type: 'string',
+            title: 'Esco Uri'
+        },
+        isco_group: {
+            $ref: '#/components/schemas/IscoGroupOut',
+            description: 'Its ISCO-08 unit group.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concept_id',
+        'title',
+        'esco_uri',
+        'isco_group'
+    ],
+    title: 'RoleOccupationOut'
+} as const;
+
+export const RoleOutSchema = {
+    properties: {
+        text: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Text',
+            description: 'The person\'s answer; null before they answer.'
+        },
+        state: {
+            $ref: '#/components/schemas/RoleState'
+        },
+        chosen: {
+            type: 'boolean',
+            title: 'Chosen',
+            description: 'The person chose the occupation from ESCO.'
+        },
+        occupation: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/RoleOccupationOut'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'When it names one occupation.'
+        },
+        choices: {
+            items: {
+                $ref: '#/components/schemas/RoleOccupationOut'
+            },
+            type: 'array',
+            title: 'Choices',
+            description: 'When several hold it as a title.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'text',
+        'state',
+        'chosen',
+        'occupation',
+        'choices'
+    ],
+    title: 'RoleOut',
+    description: 'What the person\'s answer to "What do you do now, or what did you do last?" names in\nESCO. Nothing is guessed: an answer ESCO does not hold joins nothing, and one several\noccupations hold asks the person to choose.'
+} as const;
+
+export const RoleStateSchema = {
+    type: 'string',
+    enum: [
+        'not_answered',
+        'esco',
+        'ambiguous',
+        'not_in_esco'
+    ],
+    title: 'RoleState',
+    description: 'What the person\'s current or last role names in ESCO.'
 } as const;
 
 export const RowAssessmentSchema = {
@@ -8506,7 +8844,8 @@ export const RunKindSchema = {
         'slate_explanation',
         'acquisition',
         'source_search',
-        'page_extraction'
+        'page_extraction',
+        'strength_proposal'
     ],
     title: 'RunKind'
 } as const;
@@ -9217,6 +9556,39 @@ export const SetSpendLimitsSchema = {
     title: 'SetSpendLimits'
 } as const;
 
+export const SharedSkillOutSchema = {
+    properties: {
+        skill_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Skill Id'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        skill_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Skill Type'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'skill_id',
+        'label',
+        'skill_type'
+    ],
+    title: 'SharedSkillOut'
+} as const;
+
 export const SketchOutSchema = {
     properties: {
         label: {
@@ -9378,7 +9750,8 @@ export const SlateChannelSchema = {
         'transferable',
         'cross_industry',
         'less_familiar',
-        'hypothesis'
+        'hypothesis',
+        'shared_skills'
     ],
     title: 'SlateChannel',
     description: 'How a candidate was found: the model\'s channels plus Careerwright\'s own.'
@@ -9554,6 +9927,25 @@ export const SlateOutSchema = {
             type: 'array',
             title: 'Not Included',
             description: 'Show why this wasn\'t included.'
+        },
+        unmatched_titles: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Unmatched Titles',
+            description: 'Titles of the person\'s own that ESCO does not list: nothing is joined to them until the person chooses the ESCO occupation closest to each.'
+        },
+        connection: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ConnectionOut'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'The unexpected connection to the person\'s role; null without one.'
         }
     },
     additionalProperties: false,
@@ -9575,10 +9967,12 @@ export const SlateOutSchema = {
         'queries',
         'unsearchable_queries',
         'unsupported_hypotheses',
-        'not_included'
+        'not_included',
+        'unmatched_titles',
+        'connection'
     ],
     title: 'SlateOut',
-    description: 'A varied slate of up to six career hypotheses from the discovery\'s searches, computed\ndeterministically each time it is read, with every count that explains it.'
+    description: 'A varied slate of up to six career hypotheses from the discovery\'s searches, computed\ndeterministically each time it is read, with every count that explains it. A title of\nthe person\'s own (their role, a target, or a search naming one) joins other work only by\nshared essential skills, never by its words.'
 } as const;
 
 export const SocCandidateOutSchema = {
@@ -10369,6 +10763,195 @@ export const StoreKeySchema = {
     title: 'StoreKey'
 } as const;
 
+export const StrengthChoiceSchema = {
+    type: 'string',
+    enum: [
+        'confirmed',
+        'declined'
+    ],
+    title: 'StrengthChoice'
+} as const;
+
+export const StrengthDecidedOutSchema = {
+    properties: {
+        decision: {
+            $ref: '#/components/schemas/StrengthDecisionOut'
+        },
+        capability_version: {
+            type: 'integer',
+            title: 'Capability Version'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'decision',
+        'capability_version'
+    ],
+    title: 'StrengthDecidedOut'
+} as const;
+
+export const StrengthDecisionOutSchema = {
+    properties: {
+        strength_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Strength Id'
+        },
+        decision: {
+            $ref: '#/components/schemas/StrengthChoice'
+        },
+        evidence_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Evidence Id',
+            description: 'The self-report a confirmation recorded.'
+        },
+        decided_by: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Decided By'
+        },
+        decided_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Decided At'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'strength_id',
+        'decision',
+        'evidence_id',
+        'decided_by',
+        'decided_at'
+    ],
+    title: 'StrengthDecisionOut'
+} as const;
+
+export const StrengthDestinationOutSchema = {
+    properties: {
+        concept_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Concept Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        kind: {
+            $ref: '#/components/schemas/DestinationKind',
+            description: 'target: one the person chose; horizon: on their horizon.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concept_id',
+        'title',
+        'kind'
+    ],
+    title: 'StrengthDestinationOut'
+} as const;
+
+export const StrengthOutSchema = {
+    properties: {
+        strength_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Strength Id'
+        },
+        turn_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Turn Id'
+        },
+        run: {
+            $ref: '#/components/schemas/RunOut'
+        },
+        found: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Found',
+            description: 'null until the run is complete.'
+        },
+        proposal: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ProposedStrengthOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        decision: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/StrengthDecisionOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'strength_id',
+        'turn_id',
+        'run',
+        'found',
+        'proposal',
+        'decision'
+    ],
+    title: 'StrengthOut',
+    description: 'The run, and once it is complete what it found: a proposal, or none (`found: false`,\nan answer, never a failure). A failed run\'s failure class says why there is none.'
+} as const;
+
+export const StrengthRunOutSchema = {
+    properties: {
+        strength_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Strength Id'
+        },
+        turn_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Turn Id'
+        },
+        run: {
+            $ref: '#/components/schemas/RunOut'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'strength_id',
+        'turn_id',
+        'run'
+    ],
+    title: 'StrengthRunOut',
+    description: 'The turn\'s one strength run (the command\'s answer: never the proposal itself).'
+} as const;
+
 export const SubmitAcquisitionSchema = {
     properties: {
         urls: {
@@ -10484,6 +11067,23 @@ export const SubmitSearchSchema = {
         'city'
     ],
     title: 'SubmitSearch'
+} as const;
+
+export const SubmitStrengthSchema = {
+    properties: {
+        expected_profile_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Profile Version'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_profile_version'
+    ],
+    title: 'SubmitStrength',
+    description: 'Ask for the one strength proposal of a turn whose decision added answers.'
 } as const;
 
 export const SubmitTurnSchema = {
@@ -11382,6 +11982,92 @@ export const TextListInputSchema = {
     title: 'TextListInput'
 } as const;
 
+export const TitleMatchOutSchema = {
+    properties: {
+        concept_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Concept Id'
+        },
+        concept_kind: {
+            type: 'string',
+            const: 'esco',
+            title: 'Concept Kind'
+        },
+        title: {
+            type: 'string',
+            title: 'Title',
+            description: 'The occupation\'s ESCO title (its preferred label).'
+        },
+        matched_label: {
+            type: 'string',
+            title: 'Matched Label',
+            description: 'The label that matched what was typed.'
+        },
+        label_kind: {
+            type: 'string',
+            enum: [
+                'preferred',
+                'alternative'
+            ],
+            title: 'Label Kind'
+        },
+        isco_group: {
+            $ref: '#/components/schemas/IscoGroupOut',
+            description: 'Its ISCO-08 unit group.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concept_id',
+        'concept_kind',
+        'title',
+        'matched_label',
+        'label_kind',
+        'isco_group'
+    ],
+    title: 'TitleMatchOut'
+} as const;
+
+export const TitleMatchesOutSchema = {
+    properties: {
+        release: {
+            $ref: '#/components/schemas/TaxonomyReleaseOut'
+        },
+        query: {
+            type: 'string',
+            title: 'Query'
+        },
+        matches: {
+            items: {
+                $ref: '#/components/schemas/TitleMatchOut'
+            },
+            type: 'array',
+            title: 'Matches'
+        },
+        total: {
+            type: 'integer',
+            title: 'Total'
+        },
+        limit: {
+            type: 'integer',
+            title: 'Limit'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'release',
+        'query',
+        'matches',
+        'total',
+        'limit'
+    ],
+    title: 'TitleMatchesOut',
+    description: 'The first question\'s type-ahead: occupations whose ESCO titles (preferred and\nalternative labels) have a word beginning with each word typed, best first, one per\noccupation. Deterministic, no model call. No match is an honest empty list: nothing is\ninvented. `total` counts every occupation that matched.'
+} as const;
+
 export const TrendOutSchema = {
     properties: {
         state: {
@@ -11742,6 +12428,83 @@ export const UrlRefusalSchema = {
     ],
     title: 'UrlRefusal',
     description: 'Why a URL is not fetched. Each is a policy refusal, recorded as a blocked attempt.'
+} as const;
+
+export const UsualSkillOutSchema = {
+    properties: {
+        skill_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Skill Id'
+        },
+        subject: {
+            type: 'string',
+            title: 'Subject'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        skill_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Skill Type'
+        },
+        state: {
+            $ref: '#/components/schemas/UsualState'
+        },
+        answer: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Answer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'The person\'s latest answer about it, if any.'
+        },
+        evidence_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Evidence Id'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'skill_id',
+        'subject',
+        'label',
+        'skill_type',
+        'state',
+        'answer',
+        'evidence_id'
+    ],
+    title: 'UsualSkillOut',
+    description: 'An essential skill of the person\'s role in ESCO. `usual_in_role`: usual in your role,\nnot confirmed yet, for display only (wherever anything is computed it is unresolved).\n`self_reported`: the person said they have used or done it (their own claim, never\nevidence). Record "I\'ve used this" with `POST .../capability/evidence`, its `subject` and\n`answer: used`.'
+} as const;
+
+export const UsualStateSchema = {
+    type: 'string',
+    enum: [
+        'usual_in_role',
+        'self_reported'
+    ],
+    title: 'UsualState'
 } as const;
 
 export const VacancyFloorReasonOutSchema = {

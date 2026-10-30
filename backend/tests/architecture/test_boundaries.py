@@ -69,6 +69,7 @@ ADAPTERS: dict[str, frozenset[str]] = {
     "careerwright.profile.interview_agent": frozenset({"pydantic_ai"}),
     "careerwright.profile.discovery_agent": frozenset({"pydantic_ai"}),
     "careerwright.profile.slate_explanation_agent": frozenset({"pydantic_ai"}),
+    "careerwright.capability.strength_agent": frozenset({"pydantic_ai"}),  # Task W2, ADR 0014
     "careerwright.worker": frozenset({"pydantic_ai"}),
     # Evidence and acquisition (Task 7, ADR 0009): the guarded HTTP client and the parser.
     "careerwright.evidence.fetcher": frozenset({"httpcore2", "certifi"}),

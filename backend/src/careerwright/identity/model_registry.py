@@ -58,6 +58,7 @@ _SPARK_1_3 = frozenset(Capability)
 FIXTURE_MODEL_ID = "careerwright-fixture-interviewer-1"
 FIXTURE_DISCOVERY_MODEL_ID = "careerwright-fixture-discovery-1"
 FIXTURE_EXPLAINER_MODEL_ID = "careerwright-fixture-explainer-1"
+FIXTURE_STRENGTH_MODEL_ID = "careerwright-fixture-strength-1"
 
 _REGISTRY = {
     entry.model_id: entry
@@ -100,6 +101,13 @@ _REGISTRY = {
             TokenPrice(0, 0, 0),
             frozenset({Capability.SCHEMA_OUTPUT}),
             "deterministic demo explainer; tested offline (ADR 0007 decision 12)",
+        ),
+        ModelEntry(
+            FIXTURE_STRENGTH_MODEL_ID,
+            ModelMode.FIXTURE,
+            TokenPrice(0, 0, 0),
+            frozenset({Capability.SCHEMA_OUTPUT}),
+            "deterministic demo strength finder; tested offline (ADR 0014 decision 3)",
         ),
     )
 }

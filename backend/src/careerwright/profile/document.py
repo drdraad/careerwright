@@ -334,10 +334,15 @@ def checked_input(name: str, field: FieldInput) -> FieldInput:
 
 
 def apply_updates(
-    previous: ProfileDocument, updates: Mapping[str, tuple[FieldInput, uuid.UUID | None]]
+    previous: ProfileDocument,
+    updates: Mapping[str, tuple[FieldInput, uuid.UUID | None]],
+    *,
+    recite: frozenset[str] = frozenset(),
 ) -> tuple[ProfileDocument, list[str]]:
     """The next document and the fields it changes. Each updated field that changes cites
-    its update's source; every other field keeps its value and its source."""
+    its update's source; every other field keeps its value and its source. A field named in
+    `recite` cites its update's source even when its answer is unchanged: the source itself
+    is the change (the ESCO occupation the person chose for words they had already given)."""
     unknown = set(updates) - set(FIELD_NAMES)
     if unknown:
         raise _invalid(sorted(unknown)[0], "not_a_field", "That is not a profile field.")
@@ -350,7 +355,8 @@ def apply_updates(
             continue
         raw, source_ref_id = updates[name]
         after = checked_input(name, input_type(name).model_validate(raw.model_dump()))
-        if (before.state, before.value) == (after.state, after.value):
+        same_answer = (before.state, before.value) == (after.state, after.value)
+        if same_answer and (name not in recite or before.source_ref_id == source_ref_id):
             fields[name] = before.model_dump()
             continue
         changed.append(name)

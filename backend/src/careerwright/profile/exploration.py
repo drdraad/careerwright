@@ -30,6 +30,7 @@ import re
 import uuid
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -50,7 +51,12 @@ from careerwright.catalogue.pay import (
     floor_counts,
     modelled_floor_verdict,
 )
-from careerwright.catalogue.records import OccupationFacts, TaxonomyRelease
+from careerwright.catalogue.records import (
+    OccupationDetail,
+    OccupationFacts,
+    SkillRef,
+    TaxonomyRelease,
+)
 from careerwright.catalogue.reference import modelled_pay_of, region_codes
 from careerwright.catalogue.taxonomy import held_release, search_occupations
 from careerwright.config import RuntimeMode
@@ -64,7 +70,7 @@ from careerwright.identity.records import Attempt, Run, RunKind
 from careerwright.identity.runs import RunRequest, open_output, submit_run
 from careerwright.identity.spend import SpendLimits, SpendState
 from careerwright.identity.workspaces import visible_workspace
-from careerwright.profile import discovery, explanation_store, slate_explanation
+from careerwright.profile import discovery, explanation_store, slate_explanation, titles
 from careerwright.profile import store as profile_store
 from careerwright.profile.commands import (
     FieldUpdate,
@@ -79,11 +85,19 @@ from careerwright.profile.discovery import (
     EvidenceItem,
     evidence_of,
 )
-from careerwright.profile.document import FieldState, ProfileDocument, TextListInput, TextValue
+from careerwright.profile.document import (
+    FieldState,
+    ProfileDocument,
+    TextInput,
+    TextListInput,
+    TextValue,
+)
 from careerwright.profile.interview import ProfileField
 from careerwright.profile.records import ExplanationRequest, SourceKind
 from careerwright.profile.role_evidence import cities_of, salary_floor
 from careerwright.profile.slate import (
+    MIN_SHARED_SKILLS,
+    SLATE_SIZE,
     Candidate,
     Direction,
     Hit,
@@ -96,6 +110,8 @@ from careerwright.profile.slate import (
     SlateControls,
     build_pool,
     choose_slate,
+    skill_join_hits,
+    unexpected_connection,
 )
 from careerwright.profile.slate_explanation import (
     RECORD_STEPS,
@@ -104,9 +120,11 @@ from careerwright.profile.slate_explanation import (
     build_input,
 )
 from careerwright.profile.store import stale_version
+from careerwright.profile.titles import ResolvedTitle
 from careerwright.vocabulary import WorkState
 
 QUERY_HITS = 30  # occupations kept per search (the taxonomy search's bound is 50)
+ROLE_JOIN = "j1"  # the query ID of the work joined to the person's role by shared skills
 # An occupation that matches only some of a query's words counts for at most half as much
 # as one that matches them all (product policy, subject to evaluation).
 PARTIAL_MATCH_WEIGHT = 0.5
@@ -114,6 +132,7 @@ SKILLS_SHOWN = 3
 DESCRIPTION_CHARS = 360
 CHOSEN_FROM_SUGGESTIONS = "Chosen from Careerwright's suggestions"
 CHOSEN_FROM_ESCO = "Chosen from the ESCO occupations"
+CHOSEN_AS_ROLE = "Chosen from the ESCO occupations as your current or last role"
 _SOURCE_WORDS = {
     ProfileField.CURRENT_ROLE: "Your current role",
     ProfileField.TARGET_TITLES: "A role you named",
@@ -222,6 +241,34 @@ class SlateView:
     # the AI Resilience filter's (Task 7 slice B, ADR 0010).
     salary_floor: FloorCounts | None
     ai_filter: "AiFilterView"
+    # The person's titles ESCO does not hold: nothing is joined to them (Sprint W).
+    unmatched_titles: list[str] = field(default_factory=list)
+    connection: "ConnectionView | None" = None
+
+
+STILL_UNCERTAIN = (
+    "These are the skills ESCO lists for both roles. They aren't compared with your own "
+    "experience yet."
+)
+
+
+@dataclass(frozen=True)
+class ConnectionView:
+    """The unexpected connection (plan section 4; ADR 0007 decision 13): a fact about two
+    roles, never about the person, with the essential skills both list one step away."""
+
+    role_title: str  # the person's role as ESCO titles it
+    candidate: Candidate
+    destination: OccupationFacts
+    shared: list[SkillRef]  # the essential skills ESCO lists for both, by label
+
+    @property
+    def sentence(self) -> str:
+        first = with_article(self.role_title)
+        return (
+            f"{first[0].upper()}{first[1:]} and {with_article(self.destination.preferred_label)} "
+            f"share {len(self.shared)} essential skills."
+        )
 
 
 @dataclass(frozen=True)
@@ -420,12 +467,13 @@ def submit_discovery(
 
 def _search_hits(tx: Tx, text: str) -> tuple[Hit, ...] | None:
     """Exact label matches score 1. Occupations that match every word score their rank over
-    the best such rank; those that match only some words (any-word search, which ranks a
-    common word in a title highly) at most `PARTIAL_MATCH_WEIGHT`. None: the query has no
-    searchable word, so nothing ran (never an empty result)."""
+    the best such rank; those that match only some words at most `PARTIAL_MATCH_WEIGHT`. A
+    match on the words of an occupation's titles alone is no match (Sprint W: work is never
+    found by a shared word in a title). None: the query has no searchable word, so nothing
+    ran (never an empty result)."""
     try:
-        every = search_occupations(tx, text, QUERY_HITS, any_word=False)
-        some = search_occupations(tx, text, QUERY_HITS, any_word=True)
+        every = search_occupations(tx, text, QUERY_HITS, any_word=False, titles=False)
+        some = search_occupations(tx, text, QUERY_HITS, any_word=True, titles=False)
     except CareerwrightError as error:
         if error.details.get("reason") == "no_search_terms":
             return None
@@ -446,6 +494,31 @@ def _label_hits(tx: Tx, title: str) -> tuple[Hit, ...]:
     """Occupations that hold this title as a label (`careerwright.concept_key`), all scoring 1."""
     matches = taxonomy_store.concept_key_matches(tx, title)
     return tuple(Hit(m.concept_id, 1.0, label_match=True) for m in matches)
+
+
+def _named_hits(occupations: tuple[uuid.UUID, ...]) -> tuple[Hit, ...]:
+    return tuple(Hit(concept, 1.0, label_match=True) for concept in occupations)
+
+
+def _joined(
+    tx: Tx,
+    query_id: str,
+    title: ResolvedTitle,
+    channel: SlateChannel,
+    based_on: tuple[EvidenceItem, ...],
+) -> PoolQuery:
+    """The work joined to a title's occupations by shared essential skills: never a search
+    of the title's words."""
+    essential, neighbours = taxonomy_store.skill_neighbours(
+        tx, title.occupations, MIN_SHARED_SKILLS
+    )
+    return PoolQuery(
+        query_id, title.text, channel, based_on, skill_join_hits(essential, neighbours)
+    )
+
+
+def _title_key(text: str) -> str:
+    return " ".join(text.casefold().split())
 
 
 def _provided(document: ProfileDocument, field: ProfileField) -> list[str]:
@@ -497,7 +570,13 @@ def explain(candidate: Candidate, facts: OccupationFacts, familiarity_known: boo
             if key in seen or len(why) == 3:
                 continue
             seen.add(key)
-            if match.query.channel is SlateChannel.HYPOTHESIS:
+            if match.shared_skills is not None:
+                why.append(
+                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. ESCO lists "
+                    f"{match.shared_skills} of the same essential skills for both, so Careerwright "
+                    "joined them by those skills."
+                )
+            elif match.query.channel is SlateChannel.HYPOTHESIS:
                 why.append(
                     f"{_SOURCE_WORDS[item.field]}: “{item.text}”. Careerwright thought of this "
                     "title "
@@ -610,9 +689,21 @@ def compute_slate(
     taxonomy tables are all it reads, and the offline evaluation runs it unchanged against
     the full release."""
     release = held_release(tx)
+    role = titles.current_role(tx, view.run.workspace_id, document)
+    named = titles.targets(tx, view.run.workspace_id, document)
+    own = {_title_key(t.text): t for t in ([role] if role else []) + named}
     queries: list[PoolQuery] = []
     unsearchable: list[str] = []
+    role_joins: set[str] = set()
     for query in proposal.queries:
+        title = own.get(_title_key(query.text))
+        if title is not None:  # a title of the person's own: joined by skills, never searched
+            if title.occupations:
+                channel = SlateChannel(query.channel.value)
+                queries.append(_joined(tx, query.query_id, title, channel, tuple(query.based_on)))
+                if title is role:
+                    role_joins.add(query.query_id)
+            continue
         hits = _search_hits(tx, query.text)
         if hits is None:
             unsearchable.append(query.text)
@@ -627,22 +718,21 @@ def compute_slate(
             )
         )
     familiar: set[uuid.UUID] = set()
-    for index, role in enumerate(_provided(document, ProfileField.CURRENT_ROLE), start=1):
-        item = EvidenceItem(field=ProfileField.CURRENT_ROLE, text=role)
-        searched = _search_hits(tx, role)
-        if searched is None:  # no searchable word: reported, never a search that found nothing
-            if role not in unsearchable:
-                unsearchable.append(role)
-            continue
-        hits = searched
-        queries.append(PoolQuery(f"r{index}", role, SlateChannel.CURRENT, (item,), hits))
-        labelled = [hit.concept_id for hit in hits if hit.label_match]
-        familiar.update(labelled or [hit.concept_id for hit in hits[:1]])
-    for index, target in enumerate(_provided(document, ProfileField.TARGET_TITLES), start=1):
-        item = EvidenceItem(field=ProfileField.TARGET_TITLES, text=target)
-        hits = _label_hits(tx, target)
-        familiar.update(hit.concept_id for hit in hits)
-        queries.append(PoolQuery(f"t{index}", target, SlateChannel.USER_PROPOSED, (item,), hits))
+    if role is not None and role.occupations:
+        item = EvidenceItem(field=ProfileField.CURRENT_ROLE, text=role.text)
+        queries.append(
+            PoolQuery("r1", role.text, SlateChannel.CURRENT, (item,), _named_hits(role.occupations))
+        )
+        queries.append(_joined(tx, ROLE_JOIN, role, SlateChannel.SHARED_SKILLS, (item,)))
+        role_joins.add(ROLE_JOIN)
+        familiar.update(role.occupations)
+    for index, target in enumerate(named, start=1):
+        item = EvidenceItem(field=ProfileField.TARGET_TITLES, text=target.text)
+        hits = _named_hits(target.occupations)
+        familiar.update(target.occupations)
+        queries.append(
+            PoolQuery(f"t{index}", target.text, SlateChannel.USER_PROPOSED, (item,), hits)
+        )
     unsupported: list[str] = []
     for index, hypothesis in enumerate(proposal.hypotheses, start=1):
         hits = _label_hits(tx, hypothesis.title)
@@ -660,7 +750,36 @@ def compute_slate(
         )
     found = {hit.concept_id for query in queries for hit in query.hits}
     facts = taxonomy_store.occupation_facts(tx, found, skills_shown=SKILLS_SHOWN)
-    occupations = {
+    occupations = _occupations(facts)
+    familiar_families = frozenset(facts[c].family.code for c in familiar if c in facts)
+    pool = build_pool(queries, occupations, familiar_families)
+    esco_uris = {concept_id: fact.esco_uri for concept_id, fact in facts.items()}
+    left_out, floor, ai_filter = _hard_filters(tx, pool, document, controls, hard, esco_uris)
+    slate = choose_slate(pool, controls, left_out)
+    changed = release_note(proposal.release, release.dataset_id)
+    if changed is not None:
+        slate = replace(slate, notes=[changed, *slate.notes])
+    unmatched = [t.text for t in ([role] if role else []) + named if not t.occupations]
+    if unmatched and len(slate.suggestions) < SLATE_SIZE:
+        slate = replace(slate, fewer_reasons=[*slate.fewer_reasons, *map(_unmatched, unmatched)])
+    return SlateView(
+        discovery=view,
+        release=release,
+        slate=slate,
+        suggestions=_suggestions(slate, facts, bool(familiar_families)),
+        queries=queries,
+        unsupported_hypotheses=unsupported,
+        unsearchable_queries=unsearchable,
+        titles={concept_id: occupation.title for concept_id, occupation in occupations.items()},
+        salary_floor=floor,
+        ai_filter=ai_filter,
+        unmatched_titles=unmatched,
+        connection=_connection(tx, slate, role, named, facts, frozenset(role_joins)),
+    )
+
+
+def _occupations(facts: dict[uuid.UUID, OccupationFacts]) -> dict[uuid.UUID, Occupation]:
+    return {
         concept_id: Occupation(
             concept_id=concept_id,
             title=fact.preferred_label,
@@ -672,34 +791,51 @@ def compute_slate(
         )
         for concept_id, fact in facts.items()
     }
-    familiar_families = frozenset(facts[c].family.code for c in familiar if c in facts)
-    pool = build_pool(queries, occupations, familiar_families)
-    esco_uris = {concept_id: fact.esco_uri for concept_id, fact in facts.items()}
-    left_out, floor, ai_filter = _hard_filters(tx, pool, document, controls, hard, esco_uris)
-    slate = choose_slate(pool, controls, left_out)
-    changed = release_note(proposal.release, release.dataset_id)
-    if changed is not None:
-        slate = replace(slate, notes=[changed, *slate.notes])
-    suggestions = [
+
+
+def _suggestions(
+    slate: Slate, facts: dict[uuid.UUID, OccupationFacts], familiarity_known: bool
+) -> list[Suggestion]:
+    return [
         Suggestion(
             candidate,
             facts[candidate.occupation.concept_id],
-            explain(candidate, facts[candidate.occupation.concept_id], bool(familiar_families)),
+            explain(candidate, facts[candidate.occupation.concept_id], familiarity_known),
         )
         for candidate in slate.suggestions
     ]
-    return SlateView(
-        discovery=view,
-        release=release,
-        slate=slate,
-        suggestions=suggestions,
-        queries=queries,
-        unsupported_hypotheses=unsupported,
-        unsearchable_queries=unsearchable,
-        titles={concept_id: occupation.title for concept_id, occupation in occupations.items()},
-        salary_floor=floor,
-        ai_filter=ai_filter,
+
+
+def _unmatched(title: str) -> str:
+    return (
+        f"“{title}” isn't a title ESCO lists, so Careerwright can't join other work to it by "
+        "shared skills. Choose the ESCO occupation closest to it."
     )
+
+
+def _connection(
+    tx: Tx,
+    slate: Slate,
+    role: ResolvedTitle | None,
+    named: list[ResolvedTitle],
+    facts: dict[uuid.UUID, OccupationFacts],
+    role_joins: frozenset[str],
+) -> ConnectionView | None:
+    """The slate's unexpected connection to the person's role, with the skills the two
+    share (ESCO) one step away. None without a role ESCO holds."""
+    if role is None or not role.occupations:
+        return None
+    families = frozenset(facts[c].family.code for c in role.occupations if c in facts)
+    names = frozenset(c for t in [role, *named] for c in t.occupations)
+    found = unexpected_connection(slate, role_joins, families, names)
+    if found is None:
+        return None
+    destination = found.candidate.occupation.concept_id
+    shared = taxonomy_store.shared_essential_skills(tx, role.occupations, destination)
+    # One occupation: its ESCO title. Several share the person's title as a label: their words.
+    one = role.occupations[0] if len(role.occupations) == 1 else None
+    role_title = facts[one].preferred_label if one in facts else role.text
+    return ConnectionView(role_title, found.candidate, facts[destination], shared)
 
 
 def submit_explanation(
@@ -879,3 +1015,132 @@ def choose_target(
         tx, actor, workspace_id, command.expected_version, {"target_titles": update}
     )
     return view, bool(changed)
+
+
+class ChooseRole(BaseModel):
+    """The first answer: the ESCO occupation the person does now, or did last."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    expected_version: int = Field(ge=0)
+    concept_id: uuid.UUID = Field(description="An occupation from `GET /v1/taxonomy/titles`.")
+
+
+def choose_role(
+    tx: Tx, actor: Actor, workspace_id: uuid.UUID, command: ChooseRole, now: datetime
+) -> tuple[ProfileView, bool]:
+    """Answer "What do you do now, or what did you do last?" with an ESCO occupation, through
+    the one profile write path: the current role becomes its title, citing an
+    `occupation_choice` source with its ESCO URI. Choosing the occupation the role already
+    names changes nothing. Returns the profile and whether it changed."""
+    visible_workspace(tx, workspace_id, lock=True)
+    held_release(tx)
+    occupation = taxonomy_store.occupation(tx, command.concept_id)
+    if occupation is None:
+        raise CareerwrightError(
+            ErrorCode.NOT_FOUND, "No such ESCO occupation.", stage=ErrorStage.PROFILE
+        )
+    profile = current_profile(tx, workspace_id)
+    if command.expected_version != profile.version:
+        raise stale_version(profile.version)
+    role = titles.current_role(tx, workspace_id, profile.document)
+    label = occupation.preferred_label
+    if role == ResolvedTitle(label, ProfileField.CURRENT_ROLE, (occupation.concept_id,), True):
+        return profile, False  # already the role, chosen from ESCO
+    source = NewSource(
+        source_ref_id=uuid.uuid4(),
+        kind=SourceKind.OCCUPATION_CHOICE,
+        label=CHOSEN_AS_ROLE,
+        observed_at=now,
+        recorded_by=actor.actor_id,
+        locator=occupation.esco_uri,
+    )
+    update = FieldUpdate(TextInput(state=FieldState.PROVIDED, value=label), source)
+    view, changed = commit_profile_version(
+        tx,
+        actor,
+        workspace_id,
+        command.expected_version,
+        {"current_role": update},
+        recite=frozenset({"current_role"}),
+    )
+    return view, bool(changed)
+
+
+class RoleState(StrEnum):
+    """What the person's current or last role names in ESCO."""
+
+    NOT_ANSWERED = "not_answered"
+    ESCO = "esco"  # one ESCO occupation
+    AMBIGUOUS = "ambiguous"  # several hold it as a label: the person chooses, none is guessed
+    NOT_IN_ESCO = "not_in_esco"  # no ESCO label: nothing is joined to it
+
+
+@dataclass(frozen=True)
+class FirstSlate:
+    """The world's answer to the first question, computed by deterministic code over the
+    held ESCO release with no model call: the person's role, the essential skills it usually
+    needs, and the first destinations, joined to it by shared essential skills, with the
+    unexpected connection among them. Recomputed on each read."""
+
+    profile_version: int
+    release: TaxonomyRelease
+    role: ResolvedTitle | None
+    state: RoleState
+    occupation: OccupationDetail | None = None  # the role's occupation, when it names one
+    choices: list[OccupationFacts] = field(default_factory=list)  # an ambiguous role's
+    slate: Slate | None = None  # None until the role names one occupation
+    suggestions: list[Suggestion] = field(default_factory=list)
+    connection: ConnectionView | None = None
+    salary_floor: FloorCounts | None = None
+
+
+def first_slate(tx: Tx, workspace_id: uuid.UUID, hard: HardFilterInput) -> FirstSlate:
+    """The first scatter of destinations follows from the first answer alone: the role's
+    occupation joined to others by shared essential skills (the role itself is the origin,
+    never a destination), chosen by the slate's rules and its hard filters (the confirmed
+    salary floor), with the unexpected connection singled out."""
+    release = held_release(tx)
+    profile = current_profile(tx, workspace_id)
+    role = titles.current_role(tx, workspace_id, profile.document)
+    nothing = FirstSlate(profile.version, release, role, RoleState.NOT_ANSWERED)
+    if role is None:
+        return nothing
+    if len(role.occupations) != 1:
+        choices = taxonomy_store.occupation_facts(tx, role.occupations, skills_shown=SKILLS_SHOWN)
+        state = RoleState.AMBIGUOUS if role.occupations else RoleState.NOT_IN_ESCO
+        return replace(
+            nothing, state=state, choices=sorted(choices.values(), key=lambda f: f.preferred_label)
+        )
+    [concept] = role.occupations
+    item = EvidenceItem(field=ProfileField.CURRENT_ROLE, text=role.text)
+    join = _joined(tx, ROLE_JOIN, role, SlateChannel.SHARED_SKILLS, (item,))
+    found = {hit.concept_id for hit in join.hits} | {concept}
+    facts = taxonomy_store.occupation_facts(tx, found, skills_shown=SKILLS_SHOWN)
+    familiar = frozenset({facts[concept].family.code})
+    pool = build_pool([join], _occupations(facts), familiar)
+    esco_uris = {concept_id: fact.esco_uri for concept_id, fact in facts.items()}
+    controls = SlateControls()
+    left_out, floor, _ = _hard_filters(tx, pool, profile.document, controls, hard, esco_uris)
+    slate = choose_slate(pool, controls, left_out)
+    if not join.hits:
+        slate = replace(
+            slate,
+            fewer_reasons=[
+                f"No other occupation in ESCO shares {MIN_SHARED_SKILLS} or more essential skills "
+                f"with {with_article(facts[concept].preferred_label)}."
+            ],
+        )
+    named = titles.targets(tx, workspace_id, profile.document)
+    return FirstSlate(
+        profile_version=profile.version,
+        release=release,
+        role=role,
+        state=RoleState.ESCO,
+        occupation=taxonomy_store.occupation(tx, concept),
+        choices=[],
+        slate=slate,
+        suggestions=_suggestions(slate, facts, familiarity_known=True),
+        connection=_connection(tx, slate, role, named, facts, frozenset({ROLE_JOIN})),
+        salary_floor=floor,
+    )

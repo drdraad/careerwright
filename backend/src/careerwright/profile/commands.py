@@ -110,9 +110,12 @@ def commit_profile_version(
     workspace_id: uuid.UUID,
     expected_version: int,
     updates: Mapping[str, FieldUpdate],
+    *,
+    recite: frozenset[str] = frozenset(),
 ) -> tuple[ProfileView, list[str]]:
     """The one write path. Returns the resulting profile and the fields it changed (none:
-    no new version)."""
+    no new version). `recite`: fields whose new source counts as a change by itself
+    (`apply_updates`)."""
     visible_workspace(tx, workspace_id, lock=True)
     current = current_profile(tx, workspace_id)
     if expected_version != current.version:
@@ -120,6 +123,7 @@ def commit_profile_version(
     document, changed = apply_updates(
         current.document,
         {name: (u.value, u.source.source_ref_id) for name, u in updates.items()},
+        recite=recite,
     )
     if not changed:
         return current, []

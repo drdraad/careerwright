@@ -21,7 +21,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from careerwright.capability import store
+from careerwright.capability import store, usual
 from careerwright.capability.evidence import (
     Answer,
     EvidenceContext,
@@ -253,7 +253,9 @@ class _Command(BaseModel):
 
 
 class RecordEvidence(_Command):
-    """An answer about a skill: the level is chosen against `rubric_version`'s anchors."""
+    """An answer about a skill: the level is chosen against `rubric_version`'s anchors. The
+    subject is a skill of a target's matrix, or one of the essential skills the person's
+    role usually needs (`esco:<skill ID>`): "I've used this" is `answer: used`, no level."""
 
     subject: str = Field(min_length=1, max_length=200)
     rubric_version: str | None = Field(default=None, max_length=200)
@@ -365,8 +367,16 @@ def record_evidence(
         for r in m.rows
         if r.subject == command.subject and r.kind in LEVELLED_KINDS and r.gate is None
     ]
-    if not rows:
-        raise _invalid("not_a_skill", "That skill is not in your targets' matrices.", "subject")
+    role = usual.role_occupation(tx, workspace_id)
+    usual_subjects = (
+        {usual.subject_of(s.skill_id) for s in usual.essential_skills(role)} if role else set()
+    )
+    if not rows and command.subject not in usual_subjects:
+        raise _invalid(
+            "not_a_skill",
+            "That skill is not in your targets' matrices or your role's usual skills.",
+            "subject",
+        )
     rubrics = {r.rubric.version_id for r in rows if r.rubric is not None}
     levelled = command.self_assessed_level is not None or command.demonstrated_level is not None
     if command.rubric_version is not None and command.rubric_version not in rubrics:
@@ -395,7 +405,15 @@ def record_evidence(
         raise _invalid(
             "inconsistent_evidence", "Those answers don't fit together; check them.", "answer"
         ) from None
-    version, stopped = _advance(tx, actor, workspace_id, command.expected_version)
+    return record_checked_evidence(tx, actor, workspace_id, command.expected_version, evidence)
+
+
+def record_checked_evidence(
+    tx: Tx, actor: Actor, workspace_id: uuid.UUID, expected_version: int, evidence: SkillEvidence
+) -> CapabilityChange:
+    """Record evidence its command already checked, as the next capability version; the
+    caller holds the workspace lock."""
+    version, stopped = _advance(tx, actor, workspace_id, expected_version)
     store.insert_evidence(tx, workspace_id, version, evidence)
     _event(tx, workspace_id, version)
     return CapabilityChange(version, stopped, evidence.evidence_id)

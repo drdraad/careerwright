@@ -422,13 +422,14 @@
       "title": "A current role finds close and transferable directions",
       "requirements": ["DIV1-10", "DIV1-12"],
       "synthetic": true,
-      "profile": {"current_role": "Warehouse shift supervisor", "confident_tasks": ["training new starters", "planning shift rotas"]},
+      "profile": {"current_role": "warehouse supervisor", "confident_tasks": ["training new starters", "planning shift rotas"]},
       "expect": [
         {"check": "grounded"},
         {"check": "includes_direction", "direction": "close_to_current"},
         {"check": "includes_direction", "direction": "transferable"},
         {"check": "distinct"}
-      ]
+      ],
+      "note": "Task W2 slice W2B: the role was \"Warehouse shift supervisor\", which ESCO does not list, so it was searched by its words. A title now joins work only by shared essential skills, so the case names an ESCO title (an alternative label of the warehouse manager); a title ESCO does not list is DSC-11's."
     },
     {
       "id": "DSC-04",
@@ -483,6 +484,83 @@
       "synthetic": true,
       "profile": {"enjoyed_tasks": ["repairing bicycles"], "minimum_salary": {"amount": {"minor_units": 2600000, "currency": "GBP"}, "period": "year"}},
       "expect": [{"check": "limit_reported"}, {"check": "size_at_least", "count": 1}, {"check": "grounded"}]
+    },
+    {
+      "id": "DSC-10",
+      "kind": "discovery",
+      "title": "\"data analyst\" (session 2): every suggestion joins the role by shared essential skills, never by a word in a title, with an unexpected connection",
+      "requirements": ["DIV1-06", "DIV1-10", "DIV1-12", "REC1-06"],
+      "synthetic": true,
+      "profile": {"current_role": "data analyst"},
+      "expect": [
+        {"check": "size_at_least", "count": 4},
+        {"check": "joined_by_skills"},
+        {"check": "connection"},
+        {"check": "includes_direction", "direction": "close_to_current"},
+        {"check": "includes_direction", "direction": "transferable"},
+        {"check": "family_limit"},
+        {"check": "grounded"},
+        {"check": "distinct"},
+        {"check": "no_percentage"}
+      ],
+      "note": "Task W2 slice W2B. At session 2 the product owner judged this slate \"arbitrary matching on keywords\" (call centre analyst, data entry clerk, data protection officer, material stress analyst)."
+    },
+    {
+      "id": "DSC-11",
+      "kind": "discovery",
+      "title": "P04: a target ESCO does not list joins nothing and says so, never searched by its words",
+      "requirements": ["DIV1-03", "DIV1-04", "DIV1-06"],
+      "synthetic": true,
+      "profile": {"target_titles": ["Registered nurse"]},
+      "expect": [
+        {"check": "titles_unmatched", "words": ["Registered nurse"]},
+        {"check": "fewer_has_reason"},
+        {"check": "grounded"}
+      ],
+      "note": "Task W2 slice W2B. Before, the title's words found nurse-titled work (veterinary nurse, nursing lecturer)."
+    },
+    {
+      "id": "DSC-12",
+      "kind": "discovery",
+      "title": "P01: a target ESCO does not list joins nothing; the tasks and work style still search ESCO's skills and descriptions",
+      "requirements": ["DIV1-03", "DIV1-10", "REC1-03"],
+      "synthetic": true,
+      "profile": {"target_titles": ["Data quality analyst"], "enjoyed_tasks": ["finding inconsistencies", "explaining evidence"], "work_style": ["structured", "collaborative"], "cities": ["Manchester"]},
+      "expect": [
+        {"check": "titles_unmatched", "words": ["Data quality analyst"]},
+        {"check": "size_at_least", "count": 3},
+        {"check": "grounded"},
+        {"check": "distinct"}
+      ]
+    },
+    {
+      "id": "DSC-13",
+      "kind": "discovery",
+      "title": "P03: a target ESCO lists under another title is that occupation, and joins others by shared essential skills",
+      "requirements": ["DIV1-10", "REC1-10"],
+      "synthetic": true,
+      "profile": {"target_titles": ["IT support technician"]},
+      "expect": [
+        {"check": "joined_by_skills"},
+        {"check": "includes_direction", "direction": "close_to_current"},
+        {"check": "size_at_least", "count": 4},
+        {"check": "grounded"},
+        {"check": "family_limit"}
+      ]
+    },
+    {
+      "id": "DSC-14",
+      "kind": "discovery",
+      "title": "P05: a target ESCO does not list joins nothing and says so",
+      "requirements": ["DIV1-03", "DIV1-06"],
+      "synthetic": true,
+      "profile": {"target_titles": ["Bookkeeping assistant"]},
+      "expect": [
+        {"check": "titles_unmatched", "words": ["Bookkeeping assistant"]},
+        {"check": "fewer_has_reason"},
+        {"check": "grounded"}
+      ],
+      "note": "Task W2 slice W2B. Before, the title's words found any \"assistant\" (shop assistant, assistant lecturer, physiotherapy assistant)."
     },
     {
       "id": "EXP-01",

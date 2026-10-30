@@ -11,11 +11,17 @@ from pydantic import Field
 from careerwright.api.catalogue_schemas import IscoGroupOut
 from careerwright.api.schemas import ResponseModel, RunOut
 from careerwright.catalogue.pay import FloorCounts, FloorUnknown
-from careerwright.catalogue.records import ConceptKind, TaxonomyRelease
+from careerwright.catalogue.records import ConceptKind, SkillRef, TaxonomyRelease
 from careerwright.money import Money
 from careerwright.profile.discovery import DiscoveryProposal, EvidenceItem, QueryChannel
 from careerwright.profile.document import FieldState
-from careerwright.profile.exploration import AiFilterView, SlateView, Suggestion
+from careerwright.profile.exploration import (
+    STILL_UNCERTAIN,
+    AiFilterView,
+    ConnectionView,
+    SlateView,
+    Suggestion,
+)
 from careerwright.profile.interview import ProfileField, ProposalOrigin
 from careerwright.profile.sketch import OccupationRef, Resolution, Sketch, Step, TargetSketch
 from careerwright.profile.slate import (
@@ -420,9 +426,50 @@ class AiResilienceFilterOut(ResponseModel):
         )
 
 
+class SharedSkillOut(ResponseModel):
+    skill_id: uuid.UUID
+    label: str
+    skill_type: str | None
+
+    @classmethod
+    def of(cls, skill: SkillRef) -> "SharedSkillOut":
+        return cls(
+            skill_id=skill.skill_id, label=skill.preferred_label, skill_type=skill.skill_type
+        )
+
+
+class ConnectionOut(ResponseModel):
+    """The unexpected connection: one suggestion joined to the person's role by the
+    essential skills the two share in ESCO, outside the role's own kind of work and never a
+    title the person named; the one sharing the most. Its sentence is a fact about the two
+    roles, never about the person, and the shared skills are its evidence, one step away."""
+
+    concept_id: uuid.UUID
+    title: str
+    role_title: str = Field(description="The person's role, as ESCO titles it.")
+    sentence: str
+    shared_skill_count: int
+    shared_skills: list[SharedSkillOut] = Field(description="The essential skills both list.")
+    still_uncertain: str
+
+    @classmethod
+    def of(cls, view: ConnectionView) -> "ConnectionOut":
+        return cls(
+            concept_id=view.destination.concept_id,
+            title=view.destination.preferred_label,
+            role_title=view.role_title,
+            sentence=view.sentence,
+            shared_skill_count=len(view.shared),
+            shared_skills=[SharedSkillOut.of(s) for s in view.shared],
+            still_uncertain=STILL_UNCERTAIN,
+        )
+
+
 class SlateOut(ResponseModel):
     """A varied slate of up to six career hypotheses from the discovery's searches, computed
-    deterministically each time it is read, with every count that explains it."""
+    deterministically each time it is read, with every count that explains it. A title of
+    the person's own (their role, a target, or a search naming one) joins other work only by
+    shared essential skills, never by its words."""
 
     discovery_id: uuid.UUID
     profile_version: int
@@ -447,6 +494,13 @@ class SlateOut(ResponseModel):
         description="Titles Careerwright thought of that ESCO does not list: never suggested."
     )
     not_included: list[NotIncludedOut] = Field(description="Show why this wasn't included.")
+    unmatched_titles: list[str] = Field(
+        description="Titles of the person's own that ESCO does not list: nothing is joined to "
+        "them until the person chooses the ESCO occupation closest to each."
+    )
+    connection: ConnectionOut | None = Field(
+        description="The unexpected connection to the person's role; null without one."
+    )
 
     @classmethod
     def of(cls, view: SlateView, emphasis: Emphasis) -> "SlateOut":
@@ -469,6 +523,8 @@ class SlateOut(ResponseModel):
             unsearchable_queries=view.unsearchable_queries,
             unsupported_hypotheses=view.unsupported_hypotheses,
             not_included=[NotIncludedOut.of(left, view.titles) for left in slate.not_included],
+            unmatched_titles=view.unmatched_titles,
+            connection=ConnectionOut.of(view.connection) if view.connection else None,
         )
 
 

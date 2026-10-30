@@ -66,12 +66,14 @@ from careerwright.profile.interview import (
     context_profile,
 )
 from careerwright.profile.safety import has_risk_stem
-from careerwright.profile.slate import Emphasis, SlateControls
+from careerwright.profile.slate import MIN_SHARED_SKILLS, Emphasis, SlateControls
 from careerwright.profile.slate_explanation import RECORD_STEPS, build_input, check_explanation
 from careerwright.profile.slate_explanation import render_prompt as render_explanation_prompt
 from careerwright.vocabulary import DataMode, WorkState
 
 CASES_PATH = Path(__file__).with_name("evaluation_cases.json")
+# A suggestion joined to a title by shared essential skills says so in its words.
+_SHARED = re.compile(r"ESCO lists (\d+) of the same essential skills")
 Json = dict[str, Any]
 
 
@@ -288,6 +290,41 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
     if e.check == "fewer_has_reason":
         short = len(suggestions) < observed["target_size"] and not observed["fewer_reasons"]
         return Failure(FailureType.THIN_EVIDENCE, "fewer, with no reason") if short else None
+    if e.check == "joined_by_skills":
+        # Sprint W: work joins a title of the person's own only by shared essential skills,
+        # never by its words. Every suggestion but the title's own occupation (found as the
+        # person's role or target) says how many it shares.
+        loose = [
+            s["title"]
+            for s in suggestions
+            if not {"current", "user_proposed"} & set(s["channels"])
+            and not any(
+                int(m.group(1)) >= MIN_SHARED_SKILLS
+                for line in s["why_it_could_suit"]
+                if (m := _SHARED.search(line))
+            )
+        ]
+        return Failure(FailureType.GROUNDING, f"not joined by skills: {loose}") if loose else None
+    if e.check == "connection":
+        connection = observed.get("connection")
+        if connection is None:
+            return Failure(FailureType.DIVERSITY, "no unexpected connection")
+        by_id = {s["concept_id"]: s for s in suggestions}
+        count = connection["shared_skill_count"]
+        ok = (
+            count >= MIN_SHARED_SKILLS
+            and len(connection["shared_skills"]) == count
+            and f"share {count} essential skills" in connection["sentence"]
+            and connection["concept_id"] in by_id
+            and by_id[connection["concept_id"]]["direction"] != "close_to_current"
+        )
+        return None if ok else Failure(FailureType.GROUNDING, f"connection {connection}")
+    if e.check == "titles_unmatched":
+        unmatched = observed["unmatched_titles"]
+        missing = [title for title in e.words if title not in unmatched]
+        searched = [q["text"] for q in observed["queries"] if q["text"] in e.words and q["hits"]]
+        bad = missing or searched
+        return Failure(FailureType.GROUNDING, f"{missing} {searched}") if bad else None
     if e.check == "limit_reported":
         # The floor is applied with its counts, and pay it cannot compare is never below it
         # (Task 7 slice B). The evaluation holds no reviewed UK SOC mapping, so every pooled

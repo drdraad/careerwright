@@ -257,6 +257,40 @@ def explanation_answer(
     }
 
 
+STRENGTH_MARKER = "Strength context (JSON):\n"
+
+
+def _strength_context(messages: list[ModelMessage]) -> dict[str, object] | None:
+    for message in messages:
+        for part in getattr(message, "parts", ()):
+            content = part.content if isinstance(part, UserPromptPart) else None
+            if isinstance(content, str) and content.startswith(STRENGTH_MARKER):
+                loaded: dict[str, object] = json.loads(content[len(STRENGTH_MARKER) :])
+                return loaded
+    return None
+
+
+def strength_answer(context: dict[str, object], *, valid: bool) -> dict[str, object]:
+    """The first destination's first skill, quoting the person's first answer whole (an
+    invalid answer quotes something never said)."""
+    answers = context["answers"]
+    destinations = context["destinations"]
+    assert isinstance(answers, dict)
+    assert isinstance(destinations, list)
+    first = next(str(text) for texts in answers.values() for text in texts)
+    destination = destinations[0]
+    skill = next(iter(destination["essential_skills"]))
+    return {
+        "strengths": [
+            {
+                "destination": destination["ref"],
+                "skill": skill,
+                "quotation": first if valid else "never said this",
+            }
+        ]
+    }
+
+
 def interview_answer(
     context: dict[str, object], sentinel: str, *, valid: bool, smaller_step: bool = False
 ) -> dict[str, object]:
@@ -274,7 +308,7 @@ def interview_answer(
         if isinstance(messages, list)
         else ""
     )
-    salary = (
+    extra = (
         [
             {
                 "field": "minimum_salary",
@@ -289,13 +323,26 @@ def interview_answer(
         if "26,000 a year" in text
         else []
     )
+    enjoyed = re.search(r"\bI enjoy ([^.,;!?]{3,80})", text)
+    if enjoyed:  # what the person enjoys, stated (Sprint W: a turn that adds an answer)
+        extra.append(
+            {
+                "field": "enjoyed_tasks",
+                "state": "provided",
+                "text": None,
+                "items": [enjoyed.group(1)],
+                "basis": "stated",
+                "message_refs": [current],
+                "reason": "You said you enjoy this.",
+            }
+        )
     return {
         "reply": (
             f"{sentinel} Thanks for telling me. I have noted where you could work and roughly "
             "what you could spend, for you to review." + (SMALLER_STEP_MARK if smaller_step else "")
         ).strip(),
         "proposed_updates": [
-            *salary,
+            *extra,
             {
                 "field": "cities",
                 "state": "provided",
@@ -412,6 +459,7 @@ def fake_model_builder(
             context = _context(messages)
             found = _discovery_context(messages)
             explaining = _explanation_context(messages)
+            strengthening = _strength_context(messages)
             searching = _search_request(messages)
             reading = _page_text(messages)
             if searching is not None and failure is FakeFailure.SEARCH_OVERRUN_INVALID:
@@ -448,6 +496,8 @@ def fake_model_builder(
             elif explaining is not None:
                 answer = explanation_answer(explaining, output_sentinel, valid=not invalid)
                 text = json.dumps(answer)
+            elif strengthening is not None:
+                text = json.dumps(strength_answer(strengthening, valid=not invalid))
             elif found is not None:
                 text = json.dumps(discovery_answer(found, output_sentinel, valid=not invalid))
             elif context is not None:

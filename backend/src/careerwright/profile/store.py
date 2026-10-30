@@ -128,8 +128,24 @@ def list_sources(
     return [_source(row) for row in rows]
 
 
+def source(tx: Tx, workspace_id: uuid.UUID, source_ref_id: uuid.UUID) -> SourceReference | None:
+    row = (
+        tx.execute(
+            sa.text(
+                f"SELECT {_SOURCE_COLUMNS} FROM careerwright.source_references "
+                "WHERE workspace_id = :ws AND source_ref_id = :id"
+            ),
+            {"ws": workspace_id, "id": source_ref_id},
+        )
+        .mappings()
+        .one_or_none()
+    )
+    return None if row is None else _source(row)
+
+
 def chosen_occupation_uris(tx: Tx, workspace_id: uuid.UUID) -> list[str]:
-    """The ESCO URIs of the occupations the person chose as targets, oldest first."""
+    """The ESCO URIs of the occupations the person chose from the taxonomy (as targets, or
+    as their current or last role), oldest first."""
     return list(
         tx.execute(
             sa.text(

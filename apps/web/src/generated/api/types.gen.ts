@@ -414,20 +414,23 @@ export type AiResilienceOut = {
 /**
  * Answer
  *
- * The five answers the interview pattern distinguishes, each in the same neutral tone.
+ * The five answers the interview pattern distinguishes, each in the same neutral tone,
+ * and the world's "I've used this" (Sprint W).
  */
 export const Answer = {
     DONE_INDEPENDENTLY: 'done_independently',
     DONE_WITH_HELP: 'done_with_help',
     UNDERSTAND_NOT_TRIED: 'understand_not_tried',
     NOT_LEARNED: 'not_learned',
-    UNSURE: 'unsure'
+    UNSURE: 'unsure',
+    USED: 'used'
 } as const;
 
 /**
  * Answer
  *
- * The five answers the interview pattern distinguishes, each in the same neutral tone.
+ * The five answers the interview pattern distinguishes, each in the same neutral tone,
+ * and the world's "I've used this" (Sprint W).
  */
 export type Answer = typeof Answer[keyof typeof Answer];
 
@@ -974,6 +977,24 @@ export type Challenge = {
 };
 
 /**
+ * ChooseRole
+ *
+ * The first answer: the ESCO occupation the person does now, or did last.
+ */
+export type ChooseRole = {
+    /**
+     * Expected Version
+     */
+    expected_version: number;
+    /**
+     * Concept Id
+     *
+     * An occupation from `GET /v1/taxonomy/titles`.
+     */
+    concept_id: string;
+};
+
+/**
  * ChooseTarget
  *
  * Make an ESCO occupation one of the targets: added, or in place of `replaces` (a
@@ -1186,6 +1207,49 @@ export type ConnectionCheckResult = {
 };
 
 /**
+ * ConnectionOut
+ *
+ * The unexpected connection: one suggestion joined to the person's role by the
+ * essential skills the two share in ESCO, outside the role's own kind of work and never a
+ * title the person named; the one sharing the most. Its sentence is a fact about the two
+ * roles, never about the person, and the shared skills are its evidence, one step away.
+ */
+export type ConnectionOut = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Role Title
+     *
+     * The person's role, as ESCO titles it.
+     */
+    role_title: string;
+    /**
+     * Sentence
+     */
+    sentence: string;
+    /**
+     * Shared Skill Count
+     */
+    shared_skill_count: number;
+    /**
+     * Shared Skills
+     *
+     * The essential skills both list.
+     */
+    shared_skills: Array<SharedSkillOut>;
+    /**
+     * Still Uncertain
+     */
+    still_uncertain: string;
+};
+
+/**
  * ConversationMode
  *
  * The tone the person chose (spec section 4, "Uncertainty and emotional comfort").
@@ -1322,6 +1386,24 @@ export const DataMode = {
 export type DataMode = typeof DataMode[keyof typeof DataMode];
 
 /**
+ * DecideStrength
+ */
+export type DecideStrength = {
+    /**
+     * Expected Version
+     *
+     * The capability version shown.
+     */
+    expected_version: number;
+    /**
+     * Confirm
+     *
+     * True: it is the person's own claim, recorded as self-reported. False: declined, and nothing about the skill is recorded.
+     */
+    confirm: boolean;
+};
+
+/**
  * DecideTurn
  *
  * Which proposals to apply. A hard-constraint field is applied only if it is also named
@@ -1404,6 +1486,16 @@ export const DescriptionKind = { FULL: 'full', SNIPPET: 'snippet' } as const;
  * DescriptionKind
  */
 export type DescriptionKind = typeof DescriptionKind[keyof typeof DescriptionKind];
+
+/**
+ * DestinationKind
+ */
+export const DestinationKind = { TARGET: 'target', HORIZON: 'horizon' } as const;
+
+/**
+ * DestinationKind
+ */
+export type DestinationKind = typeof DestinationKind[keyof typeof DestinationKind];
 
 /**
  * Direction
@@ -3705,6 +3797,44 @@ export type OptionsOut = {
 };
 
 /**
+ * OriginOut
+ *
+ * The world's answer to the first question, recomputed on each read with no model call:
+ * it works before a key is connected and in the demo. `destinations` are the first slate,
+ * joined to the role only by the essential skills they share in ESCO (never by words in a
+ * title), chosen by the slate's rules and the confirmed salary floor; the role itself is
+ * the origin, never a destination.
+ */
+export type OriginOut = {
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    /**
+     * Capability Version
+     */
+    capability_version: number;
+    release: ReleaseRefOut;
+    role: RoleOut;
+    /**
+     * Usual Skills
+     */
+    usual_skills: Array<UsualSkillOut>;
+    /**
+     * Destinations
+     */
+    destinations: Array<SuggestionOut>;
+    /**
+     * Fewer Reasons
+     *
+     * Why there are fewer than six, if there are.
+     */
+    fewer_reasons: Array<string>;
+    connection: ConnectionOut | null;
+    salary_floor: SalaryFloorOut | null;
+};
+
+/**
  * OutcomeReview
  */
 export const OutcomeReview = {
@@ -4570,6 +4700,45 @@ export type ProposedChangeOut = {
 };
 
 /**
+ * ProposedStrengthOut
+ *
+ * A proposal, never yet a fact: the person's own words (verified as a span of their
+ * answers) against a skill ESCO lists as essential to one of their destinations. It shows
+ * as a strength only once the person confirms it, and then as their own claim.
+ */
+export type ProposedStrengthOut = {
+    destination: StrengthDestinationOut;
+    /**
+     * Skill Id
+     */
+    skill_id: string;
+    /**
+     * Skill Label
+     */
+    skill_label: string;
+    /**
+     * Subject
+     */
+    subject: string;
+    /**
+     * Quotation
+     *
+     * The person's words, in their own characters.
+     */
+    quotation: string;
+    /**
+     * Which of their answers it quotes.
+     */
+    answer_field: ProfileField;
+    /**
+     * Label
+     *
+     * Set for the demo's scripted, synthetic example.
+     */
+    label: string | null;
+};
+
+/**
  * Provenance
  */
 export const Provenance = { PROVIDER_CLAIM: 'provider_claim', USER_OVERRIDE: 'user_override' } as const;
@@ -4872,7 +5041,9 @@ export type ReadinessState = typeof ReadinessState[keyof typeof ReadinessState];
 /**
  * RecordEvidence
  *
- * An answer about a skill: the level is chosen against `rubric_version`'s anchors.
+ * An answer about a skill: the level is chosen against `rubric_version`'s anchors. The
+ * subject is a skill of a target's matrix, or one of the essential skills the person's
+ * role usually needs (`esco:<skill ID>`): "I've used this" is `answer: used`, no level.
  */
 export type RecordEvidence = {
     /**
@@ -5277,6 +5448,80 @@ export const RightsClass = {
 export type RightsClass = typeof RightsClass[keyof typeof RightsClass];
 
 /**
+ * RoleOccupationOut
+ */
+export type RoleOccupationOut = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Esco Uri
+     */
+    esco_uri: string;
+    /**
+     * Its ISCO-08 unit group.
+     */
+    isco_group: IscoGroupOut;
+};
+
+/**
+ * RoleOut
+ *
+ * What the person's answer to "What do you do now, or what did you do last?" names in
+ * ESCO. Nothing is guessed: an answer ESCO does not hold joins nothing, and one several
+ * occupations hold asks the person to choose.
+ */
+export type RoleOut = {
+    /**
+     * Text
+     *
+     * The person's answer; null before they answer.
+     */
+    text: string | null;
+    state: RoleState;
+    /**
+     * Chosen
+     *
+     * The person chose the occupation from ESCO.
+     */
+    chosen: boolean;
+    /**
+     * When it names one occupation.
+     */
+    occupation: RoleOccupationOut | null;
+    /**
+     * Choices
+     *
+     * When several hold it as a title.
+     */
+    choices: Array<RoleOccupationOut>;
+};
+
+/**
+ * RoleState
+ *
+ * What the person's current or last role names in ESCO.
+ */
+export const RoleState = {
+    NOT_ANSWERED: 'not_answered',
+    ESCO: 'esco',
+    AMBIGUOUS: 'ambiguous',
+    NOT_IN_ESCO: 'not_in_esco'
+} as const;
+
+/**
+ * RoleState
+ *
+ * What the person's current or last role names in ESCO.
+ */
+export type RoleState = typeof RoleState[keyof typeof RoleState];
+
+/**
  * RowAssessment
  */
 export type RowAssessment = {
@@ -5529,7 +5774,8 @@ export const RunKind = {
     SLATE_EXPLANATION: 'slate_explanation',
     ACQUISITION: 'acquisition',
     SOURCE_SEARCH: 'source_search',
-    PAGE_EXTRACTION: 'page_extraction'
+    PAGE_EXTRACTION: 'page_extraction',
+    STRENGTH_PROPOSAL: 'strength_proposal'
 } as const;
 
 /**
@@ -5954,6 +6200,24 @@ export type SetSpendLimits = {
 };
 
 /**
+ * SharedSkillOut
+ */
+export type SharedSkillOut = {
+    /**
+     * Skill Id
+     */
+    skill_id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Skill Type
+     */
+    skill_type: string | null;
+};
+
+/**
  * SketchOut
  *
  * The early requirement sketch: never a feasible or optimal route, never priced or
@@ -6059,7 +6323,8 @@ export const SlateChannel = {
     TRANSFERABLE: 'transferable',
     CROSS_INDUSTRY: 'cross_industry',
     LESS_FAMILIAR: 'less_familiar',
-    HYPOTHESIS: 'hypothesis'
+    HYPOTHESIS: 'hypothesis',
+    SHARED_SKILLS: 'shared_skills'
 } as const;
 
 /**
@@ -6101,7 +6366,9 @@ export type SlateExplanationOut = {
  * SlateOut
  *
  * A varied slate of up to six career hypotheses from the discovery's searches, computed
- * deterministically each time it is read, with every count that explains it.
+ * deterministically each time it is read, with every count that explains it. A title of
+ * the person's own (their role, a target, or a search naming one) joins other work only by
+ * shared essential skills, never by its words.
  */
 export type SlateOut = {
     /**
@@ -6189,6 +6456,16 @@ export type SlateOut = {
      * Show why this wasn't included.
      */
     not_included: Array<NotIncludedOut>;
+    /**
+     * Unmatched Titles
+     *
+     * Titles of the person's own that ESCO does not list: nothing is joined to them until the person chooses the ESCO occupation closest to each.
+     */
+    unmatched_titles: Array<string>;
+    /**
+     * The unexpected connection to the person's role; null without one.
+     */
+    connection: ConnectionOut | null;
 };
 
 /**
@@ -6635,6 +6912,113 @@ export type StoreKey = {
 };
 
 /**
+ * StrengthChoice
+ */
+export const StrengthChoice = { CONFIRMED: 'confirmed', DECLINED: 'declined' } as const;
+
+/**
+ * StrengthChoice
+ */
+export type StrengthChoice = typeof StrengthChoice[keyof typeof StrengthChoice];
+
+/**
+ * StrengthDecidedOut
+ */
+export type StrengthDecidedOut = {
+    decision: StrengthDecisionOut;
+    /**
+     * Capability Version
+     */
+    capability_version: number;
+};
+
+/**
+ * StrengthDecisionOut
+ */
+export type StrengthDecisionOut = {
+    /**
+     * Strength Id
+     */
+    strength_id: string;
+    decision: StrengthChoice;
+    /**
+     * Evidence Id
+     *
+     * The self-report a confirmation recorded.
+     */
+    evidence_id: string | null;
+    /**
+     * Decided By
+     */
+    decided_by: string;
+    /**
+     * Decided At
+     */
+    decided_at: string;
+};
+
+/**
+ * StrengthDestinationOut
+ */
+export type StrengthDestinationOut = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * target: one the person chose; horizon: on their horizon.
+     */
+    kind: DestinationKind;
+};
+
+/**
+ * StrengthOut
+ *
+ * The run, and once it is complete what it found: a proposal, or none (`found: false`,
+ * an answer, never a failure). A failed run's failure class says why there is none.
+ */
+export type StrengthOut = {
+    /**
+     * Strength Id
+     */
+    strength_id: string;
+    /**
+     * Turn Id
+     */
+    turn_id: string;
+    run: RunOut;
+    /**
+     * Found
+     *
+     * null until the run is complete.
+     */
+    found: boolean | null;
+    proposal: ProposedStrengthOut | null;
+    decision: StrengthDecisionOut | null;
+};
+
+/**
+ * StrengthRunOut
+ *
+ * The turn's one strength run (the command's answer: never the proposal itself).
+ */
+export type StrengthRunOut = {
+    /**
+     * Strength Id
+     */
+    strength_id: string;
+    /**
+     * Turn Id
+     */
+    turn_id: string;
+    run: RunOut;
+};
+
+/**
  * SubmitAcquisition
  *
  * Up to ten URLs, or one Adzuna search: never both.
@@ -6708,6 +7092,18 @@ export type SubmitSearch = {
      * One of your cities.
      */
     city: string;
+};
+
+/**
+ * SubmitStrength
+ *
+ * Ask for the one strength proposal of a turn whose decision added answers.
+ */
+export type SubmitStrength = {
+    /**
+     * Expected Profile Version
+     */
+    expected_profile_version: number;
 };
 
 /**
@@ -7223,6 +7619,68 @@ export type TextListInput = {
 };
 
 /**
+ * TitleMatchOut
+ */
+export type TitleMatchOut = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Concept Kind
+     */
+    concept_kind: 'esco';
+    /**
+     * Title
+     *
+     * The occupation's ESCO title (its preferred label).
+     */
+    title: string;
+    /**
+     * Matched Label
+     *
+     * The label that matched what was typed.
+     */
+    matched_label: string;
+    /**
+     * Label Kind
+     */
+    label_kind: 'preferred' | 'alternative';
+    /**
+     * Its ISCO-08 unit group.
+     */
+    isco_group: IscoGroupOut;
+};
+
+/**
+ * TitleMatchesOut
+ *
+ * The first question's type-ahead: occupations whose ESCO titles (preferred and
+ * alternative labels) have a word beginning with each word typed, best first, one per
+ * occupation. Deterministic, no model call. No match is an honest empty list: nothing is
+ * invented. `total` counts every occupation that matched.
+ */
+export type TitleMatchesOut = {
+    release: TaxonomyReleaseOut;
+    /**
+     * Query
+     */
+    query: string;
+    /**
+     * Matches
+     */
+    matches: Array<TitleMatchOut>;
+    /**
+     * Total
+     */
+    total: number;
+    /**
+     * Limit
+     */
+    limit: number;
+};
+
+/**
  * TrendOut
  */
 export type TrendOut = {
@@ -7442,6 +7900,53 @@ export const UrlRefusal = {
  * Why a URL is not fetched. Each is a policy refusal, recorded as a blocked attempt.
  */
 export type UrlRefusal = typeof UrlRefusal[keyof typeof UrlRefusal];
+
+/**
+ * UsualSkillOut
+ *
+ * An essential skill of the person's role in ESCO. `usual_in_role`: usual in your role,
+ * not confirmed yet, for display only (wherever anything is computed it is unresolved).
+ * `self_reported`: the person said they have used or done it (their own claim, never
+ * evidence). Record "I've used this" with `POST .../capability/evidence`, its `subject` and
+ * `answer: used`.
+ */
+export type UsualSkillOut = {
+    /**
+     * Skill Id
+     */
+    skill_id: string;
+    /**
+     * Subject
+     */
+    subject: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Skill Type
+     */
+    skill_type: string | null;
+    state: UsualState;
+    /**
+     * The person's latest answer about it, if any.
+     */
+    answer: Answer | null;
+    /**
+     * Evidence Id
+     */
+    evidence_id: string | null;
+};
+
+/**
+ * UsualState
+ */
+export const UsualState = { USUAL_IN_ROLE: 'usual_in_role', SELF_REPORTED: 'self_reported' } as const;
+
+/**
+ * UsualState
+ */
+export type UsualState = typeof UsualState[keyof typeof UsualState];
 
 /**
  * VacancyFloorReasonOut
@@ -9517,6 +10022,220 @@ export type GetSketchResponses = {
 
 export type GetSketchResponse = GetSketchResponses[keyof GetSketchResponses];
 
+export type GetOriginData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/origin';
+};
+
+export type GetOriginErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetOriginError = GetOriginErrors[keyof GetOriginErrors];
+
+export type GetOriginResponses = {
+    /**
+     * Successful Response
+     */
+    200: OriginOut;
+};
+
+export type GetOriginResponse = GetOriginResponses[keyof GetOriginResponses];
+
+export type ChooseRoleData = {
+    body: ChooseRole;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/origin/role';
+};
+
+export type ChooseRoleErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ChooseRoleError = ChooseRoleErrors[keyof ChooseRoleErrors];
+
+export type ChooseRoleResponses = {
+    /**
+     * Already the role; nothing changed.
+     */
+    200: ProfileOut;
+    /**
+     * Successful Response
+     */
+    201: ProfileOut;
+};
+
+export type ChooseRoleResponse = ChooseRoleResponses[keyof ChooseRoleResponses];
+
+export type GetStrengthData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Turn Id
+         */
+        turn_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/strength';
+};
+
+export type GetStrengthErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetStrengthError = GetStrengthErrors[keyof GetStrengthErrors];
+
+export type GetStrengthResponses = {
+    /**
+     * Successful Response
+     */
+    200: StrengthOut;
+};
+
+export type GetStrengthResponse = GetStrengthResponses[keyof GetStrengthResponses];
+
+export type SubmitStrengthData = {
+    body: SubmitStrength;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Turn Id
+         */
+        turn_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/strength';
+};
+
+export type SubmitStrengthErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type SubmitStrengthError = SubmitStrengthErrors[keyof SubmitStrengthErrors];
+
+export type SubmitStrengthResponses = {
+    /**
+     * Already asked for: the turn's one strength run, in its state.
+     */
+    200: StrengthRunOut;
+    /**
+     * Successful Response
+     */
+    202: StrengthRunOut;
+};
+
+export type SubmitStrengthResponse = SubmitStrengthResponses[keyof SubmitStrengthResponses];
+
+export type DecideStrengthData = {
+    body: DecideStrength;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Turn Id
+         */
+        turn_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/interview/turns/{turn_id}/strength/decision';
+};
+
+export type DecideStrengthErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type DecideStrengthError = DecideStrengthErrors[keyof DecideStrengthErrors];
+
+export type DecideStrengthResponses = {
+    /**
+     * Successful Response
+     */
+    201: StrengthDecidedOut;
+};
+
+export type DecideStrengthResponse = DecideStrengthResponses[keyof DecideStrengthResponses];
+
 export type SubmitAcquisitionData = {
     body: SubmitAcquisition;
     headers?: {
@@ -10309,6 +11028,44 @@ export type SearchOccupationsResponses = {
 };
 
 export type SearchOccupationsResponse = SearchOccupationsResponses[keyof SearchOccupationsResponses];
+
+export type MatchTitlesData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Q
+         */
+        q: string;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/v1/taxonomy/titles';
+};
+
+export type MatchTitlesErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type MatchTitlesError = MatchTitlesErrors[keyof MatchTitlesErrors];
+
+export type MatchTitlesResponses = {
+    /**
+     * Successful Response
+     */
+    200: TitleMatchesOut;
+};
+
+export type MatchTitlesResponse = MatchTitlesResponses[keyof MatchTitlesResponses];
 
 export type GetOccupationData = {
     body?: never;

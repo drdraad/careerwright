@@ -343,11 +343,13 @@ def test_a_suggestion_becomes_a_target_only_by_the_person_s_choice(scenario: Sce
     assert scenario.profile()["version"] == 3
 
 
-@pytest.mark.req("DIV1-06")
-def test_a_current_role_with_no_searchable_word_is_reported_never_a_search_that_found_nothing(
+@pytest.mark.req("DIV1-06", "DIV1-03")
+def test_a_role_esco_does_not_list_is_reported_never_searched_by_its_words(
     scenario: Scenario,
 ) -> None:
-    # Task 6 review A-M6: like a model query, it is listed as unsearchable, not run.
+    # Task 6 review A-M6 said a role with no searchable word is never a search that found
+    # nothing. Since Sprint W no title is searched by its words at all: a role ESCO does not
+    # list joins nothing and is listed, whatever its words.
     put = scenario.api.write(
         "PUT",
         f"{base(scenario)}/profile",
@@ -361,8 +363,34 @@ def test_a_current_role_with_no_searchable_word_is_reported_never_a_search_that_
 
     result = slate(scenario, discover(scenario, version=3)["discovery_id"])
 
-    assert "Of the" in result["unsearchable_queries"]
+    assert result["unmatched_titles"] == ["Of the"]
     assert "Of the" not in [q["text"] for q in result["queries"]]
+    assert result["connection"] is None  # no role ESCO holds, so nothing to connect to
+
+
+@pytest.mark.req("DIV1-10", "DIV1-12")
+def test_a_role_esco_lists_joins_other_work_by_shared_essential_skills_only(
+    scenario: Scenario,
+) -> None:
+    put = scenario.api.write(
+        "PUT",
+        f"{base(scenario)}/profile",
+        scenario.token,
+        {
+            "expected_version": 2,
+            "profile": {**ANSWERS, "current_role": {"state": "provided", "value": "bus driver"}},
+        },
+    )
+    assert put.status_code == 201, put.text
+
+    result = slate(scenario, discover(scenario, version=3)["discovery_id"])
+
+    joined = next(q for q in result["queries"] if q["channel"] == "shared_skills")
+    assert (joined["text"], joined["hits"]) == ("bus driver", 1)
+    [trolley] = [s for s in result["suggestions"] if s["title"] == "trolley bus driver"]
+    assert "shared_skills" in trolley["channels"]
+    assert "ESCO lists 4 of the same essential skills" in " ".join(trolley["why_it_could_suit"])
+    assert result["unmatched_titles"] == []
 
 
 @pytest.mark.req("PROF-05", "MODEL-02")

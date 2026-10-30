@@ -10,10 +10,20 @@ well the person's own answers retrieved it: its best normalised rank in any quer
 little for each further query that found it. No pay, popularity, prestige or AI-resilience
 figure enters (DIV1-07), and no percentage is ever produced (REC1-05).
 
+**Titles are joined by skills, never by their words** (plan section 4, Sprint W; ADR 0007
+decision 13). The person's role or a title they named is resolved to its ESCO occupation, and
+other occupations join it only by the essential skills the two share (`skill_join_hits`):
+at least `MIN_SHARED_SKILLS`, ranked by their share of both roles' essential skills.
+
 **Direction** is relative to the person (DIV1-12): close to what they do now (its ISCO
 family is one of their current role's or targets', or their role or a target found it),
-building on skills they could carry over (a transferable or cross-industry query found it),
-or something different (anything else).
+building on skills they could carry over (a transferable or cross-industry query, or a skill
+join, found it), or something different (anything else).
+
+**The unexpected connection** (`unexpected_connection`) singles out one suggestion joined to
+the person's role by shared essential skills, outside their own kind of work and never a
+title they named: the one sharing the most. It is a fact about two roles, never about the
+person.
 
 **Slate.** A constrained greedy reranker, with no claim of optimality: each step takes the
 eligible candidate with the highest relevance plus bonuses for a family, an ISCO major group
@@ -32,6 +42,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
+from careerwright.catalogue.records import SkillNeighbour
 from careerwright.profile.discovery import EvidenceItem, QueryChannel
 
 SLATE_SIZE = 6
@@ -49,6 +60,11 @@ NEW_FAMILY_BONUS = 0.3
 NEW_SECTOR_BONUS = 0.15
 DIRECTION_BONUS = 0.4
 SAME_FAMILY_PENALTY = 0.3
+# A skill join (product policy, provisional R6): two occupations join only when ESCO lists at
+# least this many of the same essential skills for both (ESCO v1.2.1 lists 3 to 99 per
+# occupation, 22 on average), and a join keeps its best `JOIN_HITS` like a search.
+MIN_SHARED_SKILLS = 3
+JOIN_HITS = 30
 
 
 class SlateChannel(StrEnum):
@@ -62,6 +78,8 @@ class SlateChannel(StrEnum):
     CROSS_INDUSTRY = QueryChannel.CROSS_INDUSTRY.value
     LESS_FAMILIAR = QueryChannel.LESS_FAMILIAR.value
     HYPOTHESIS = "hypothesis"  # a model title that ESCO holds
+    # Joined to the person's role by shared essential skills, by Careerwright.
+    SHARED_SKILLS = "shared_skills"
 
 
 # How much a hit counts by the channel that found it. How someone likes to work informs the
@@ -70,6 +88,7 @@ class SlateChannel(StrEnum):
 CHANNEL_WEIGHT: Mapping[SlateChannel, float] = {
     SlateChannel.CURRENT: 1.0,
     SlateChannel.USER_PROPOSED: 1.0,
+    SlateChannel.SHARED_SKILLS: 1.0,
     SlateChannel.TASKS: 1.0,
     SlateChannel.TRANSFERABLE: 1.0,
     SlateChannel.CROSS_INDUSTRY: 0.9,
@@ -116,6 +135,26 @@ class Hit:
     concept_id: uuid.UUID
     score: float  # rank normalised within its query, 0-1; an exact label match is 1
     label_match: bool
+    # A skill join's hit: how many essential skills it shares with the title joined.
+    shared_skills: int | None = None
+
+
+def skill_join_hits(
+    essential: int, neighbours: list[SkillNeighbour], *, limit: int = JOIN_HITS
+) -> tuple[Hit, ...]:
+    """A title's occupation (with `essential` essential skills) joined to others by the
+    essential skills they share: each with at least `MIN_SHARED_SKILLS`, scored by the share
+    of both roles' essential skills they have in common (Jaccard) over the best such share,
+    as a search's ranks are over its best. The best `limit`, in a deterministic order."""
+    joined = [n for n in neighbours if n.shared >= MIN_SHARED_SKILLS]
+    share = {n.concept_id: n.shared / (essential + n.essential - n.shared) for n in joined}
+    kept = sorted(joined, key=lambda n: (-share[n.concept_id], -n.shared, str(n.concept_id)))
+    kept = kept[:limit]
+    top = max((share[n.concept_id] for n in kept), default=0.0)
+    return tuple(
+        Hit(n.concept_id, share[n.concept_id] / top, label_match=False, shared_skills=n.shared)
+        for n in kept
+    )
 
 
 @dataclass(frozen=True)
@@ -145,6 +184,7 @@ class Match:
     query: PoolQuery
     score: float
     label_match: bool
+    shared_skills: int | None = None
 
 
 @dataclass(frozen=True)
@@ -197,7 +237,9 @@ class Slate:
 
 
 _CLOSE_CHANNELS = frozenset({SlateChannel.CURRENT, SlateChannel.USER_PROPOSED})
-_TRANSFER_CHANNELS = frozenset({SlateChannel.TRANSFERABLE, SlateChannel.CROSS_INDUSTRY})
+_TRANSFER_CHANNELS = frozenset(
+    {SlateChannel.TRANSFERABLE, SlateChannel.CROSS_INDUSTRY, SlateChannel.SHARED_SKILLS}
+)
 
 
 def _direction(
@@ -292,7 +334,7 @@ def build_pool(
         for hit in query.hits:
             if hit.concept_id in occupations:
                 found.setdefault(hit.concept_id, []).append(
-                    Match(query, hit.score * weight, hit.label_match)
+                    Match(query, hit.score * weight, hit.label_match, hit.shared_skills)
                 )
     candidates = [
         _candidate(occupations[concept_id], matches, familiar_families)
@@ -454,3 +496,40 @@ def choose_slate(
         fewer_reasons=fewer,
         notes=[policy.note] if policy.note else [],
     )
+
+
+@dataclass(frozen=True)
+class Connection:
+    """The unexpected connection: a suggestion joined to the person's role by the essential
+    skills the two share, in another kind of work, never a title the person named."""
+
+    candidate: Candidate
+    shared_skills: int
+
+
+def unexpected_connection(
+    slate: Slate,
+    role_joins: frozenset[str],
+    own_families: frozenset[str],
+    named: frozenset[uuid.UUID],
+) -> Connection | None:
+    """Of the slate's suggestions that a join from the person's role found (`role_joins`:
+    those queries' IDs), outside the role's own kinds of work (`own_families`) and not a
+    title the person named: the one sharing the most essential skills with the role, then
+    the larger share of both roles' skills, then the first in the slate. None when no
+    suggestion qualifies: a revelation with no source is never shown."""
+    best: tuple[tuple[int, float, int], Connection] | None = None
+    for position, candidate in enumerate(slate.suggestions):
+        occupation = candidate.occupation
+        if occupation.family_code in own_families or occupation.concept_id in named:
+            continue
+        joined = [
+            m for m in candidate.matches if m.query.query_id in role_joins and m.shared_skills
+        ]
+        if not joined:
+            continue
+        top = max(joined, key=lambda m: (m.shared_skills or 0, m.score))
+        rank = (top.shared_skills or 0, top.score, -position)
+        if best is None or rank > best[0]:
+            best = (rank, Connection(candidate, top.shared_skills or 0))
+    return None if best is None else best[1]

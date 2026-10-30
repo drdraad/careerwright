@@ -58,6 +58,28 @@ class LabelMatch:
 
 
 @dataclass(frozen=True)
+class TitleMatch:
+    """An occupation whose preferred or alternative label matches what the person typed:
+    the label that matched best, and the occupation's own title."""
+
+    concept_id: uuid.UUID
+    label: str
+    kind: str  # preferred or alternative (hidden labels are never offered)
+    preferred_label: str
+    isco_code: str
+    isco_label: str
+
+
+@dataclass(frozen=True)
+class SkillNeighbour:
+    """An occupation sharing essential skills with another's (ESCO)."""
+
+    concept_id: uuid.UUID
+    shared: int  # essential skills both have
+    essential: int  # its own essential skills
+
+
+@dataclass(frozen=True)
 class IscoGroupRef:
     code: str
     label: str

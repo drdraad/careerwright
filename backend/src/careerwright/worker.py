@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from pydantic import SecretStr
 from pydantic_ai.models import Model
 
+from careerwright.capability.strength_agent import STRENGTH_PROPOSAL_TASK, fixture_strength_model
 from careerwright.config import WorkerSettings
 from careerwright.db import create_engine, url_with_password
 from careerwright.evidence import workflow as acquisition_workflow
@@ -36,6 +37,7 @@ from careerwright.identity.model_registry import (
     FIXTURE_DISCOVERY_MODEL_ID,
     FIXTURE_EXPLAINER_MODEL_ID,
     FIXTURE_MODEL_ID,
+    FIXTURE_STRENGTH_MODEL_ID,
     ModelMode,
     model_entry,
 )
@@ -55,6 +57,7 @@ TASKS: Mapping[RunKind, RunTask] = {
     RunKind.SLATE_EXPLANATION: SLATE_EXPLANATION_TASK,
     RunKind.SOURCE_SEARCH: SOURCE_SEARCH_TASK,
     RunKind.PAGE_EXTRACTION: PAGE_EXTRACTION_TASK,
+    RunKind.STRENGTH_PROPOSAL: STRENGTH_PROPOSAL_TASK,
 }
 # Each run's workflow, by the name its outbox entry carries.
 WORKFLOWS: worker.Workflows = {
@@ -66,6 +69,7 @@ FIXTURE_MODELS: Mapping[str, Callable[[], Model]] = {
     FIXTURE_MODEL_ID: fixture_interviewer_model,
     FIXTURE_DISCOVERY_MODEL_ID: fixture_discovery_model,
     FIXTURE_EXPLAINER_MODEL_ID: fixture_explainer_model,
+    FIXTURE_STRENGTH_MODEL_ID: fixture_strength_model,
 }
 
 

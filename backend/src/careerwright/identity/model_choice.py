@@ -4,9 +4,9 @@ Non-synthetic workspaces always use the Standard production model. A synthetic w
 uses the configured role: by default the cheaper test model (ruling R5). The Contributor
 test model lets Meta train on traffic, so it is refused for any workspace not labelled
 synthetic, at submission and again inside the activity (ADR 0003; carried-forward ruling).
-Demo workspaces never reach a Meta model: their interview turns, discoveries and slate
-explanations use the deterministic fixture models (`fixture_model`), which no configuration
-can make a test or production model.
+Demo workspaces never reach a Meta model: their interview turns, discoveries, slate
+explanations and strength proposals use the deterministic fixture models (`fixture_model`),
+which no configuration can make a test or production model.
 """
 
 from collections.abc import Mapping
@@ -18,6 +18,7 @@ from careerwright.identity.model_registry import (
     FIXTURE_DISCOVERY_MODEL_ID,
     FIXTURE_EXPLAINER_MODEL_ID,
     FIXTURE_MODEL_ID,
+    FIXTURE_STRENGTH_MODEL_ID,
     ModelEntry,
     ModelMode,
     UnknownModelError,
@@ -70,6 +71,7 @@ FIXTURE_MODELS: Mapping[RunKind, str] = {
     RunKind.INTERVIEW_TURN: FIXTURE_MODEL_ID,
     RunKind.DISCOVERY: FIXTURE_DISCOVERY_MODEL_ID,
     RunKind.SLATE_EXPLANATION: FIXTURE_EXPLAINER_MODEL_ID,
+    RunKind.STRENGTH_PROPOSAL: FIXTURE_STRENGTH_MODEL_ID,
 }
 
 

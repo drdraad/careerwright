@@ -95,6 +95,10 @@ class RunKind(StrEnum):
     # A model reads one fetched page's visible text for its job advert; started by the
     # acquisition that fetched it, never by the API (`careerwright.evidence.extraction_runs`).
     PAGE_EXTRACTION = "page_extraction"
+    # From the answers a conversation turn added, at most one overlooked strength: a
+    # quotation of the person's words against an essential skill of one of their
+    # destinations (`careerwright.capability.strength`).
+    STRENGTH_PROPOSAL = "strength_proposal"
 
 
 KEYLESS_KINDS = frozenset({RunKind.ACQUISITION})
