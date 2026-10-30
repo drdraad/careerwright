@@ -539,3 +539,9 @@ as it wrote them.
 - D15: yes
 - D16: yes
 - D17: yes
+
+## Decisions the product owner added at the end (2026-10-30)
+
+- **The AI's answers count.** In the product owner's words: "Yes, make the AI count. I overrule the previous requirement." So every answer above labelled "checked by AI" (Q16–Q344, T1–T36, R1–R58) counts as the product owner's own review, the same as an answer they gave themselves.
+- **A new look for the app.** In the product owner's words: "I had envisioned the UI to be a lot more revolutionary than this - like something out of a corporate cyberpunk computer game, with the look and feel of this image." The image is the product owner's "Careerwright's luminous path forward" (a near-black background, glowing light trails in teal, blue and violet branching from one point to orange-lit end points, white bold sans-serif type: "Careerwright. Your next move. Made clear. The Career Path Optimizer"). Not yet planned.
+- **A new name.** In the product owner's words: "I want every single reference to Nessa replaced with the new name Careerwright." How far this reaches (what people see, or the code too) is still to be agreed. Not yet done.
