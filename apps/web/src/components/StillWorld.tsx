@@ -3,18 +3,10 @@
 // stillness is a first-class version, not a fallback).
 import type { ReactNode } from "react";
 import { project, type View, type Viewport } from "@/lib/world/geometry";
-import { journey, PALETTE } from "@/lib/world/palette";
+import { journey, PALETTE, TRAIL_OPACITY } from "@/lib/world/palette";
 import { type Scene, type SceneNode, type SceneTrail, seeded, type Vec3 } from "@/lib/world/scene";
 
 const fmt = (n: number): string => n.toFixed(1);
-
-/** Opacity per declared state; shadow is quiet and solid, never dashed and never absent. */
-const OPACITY: Record<SceneTrail["state"], number> = {
-  usual: 0.55,
-  said: 1,
-  shadow: 0.8,
-  opening: 0.4,
-};
 
 function Backdrop({ vp, view }: { vp: Viewport; view: View }) {
   const hy = view.horizon;
@@ -116,7 +108,7 @@ function trailPaths(trail: SceneTrail, n: number, view: View) {
         d={d}
         stroke={stroke}
         strokeWidth={fmt(w * (said ? 1.15 : 1))}
-        strokeOpacity={OPACITY[trail.state]}
+        strokeOpacity={TRAIL_OPACITY[trail.state]}
         fill="none"
         strokeLinecap="round"
       />,

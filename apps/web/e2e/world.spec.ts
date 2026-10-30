@@ -65,6 +65,24 @@ function inSight(page: Page) {
   }));
 }
 
+/**
+ * Shown names whose label is taller than the name itself: a mark left on a line of its own
+ * above a long, wrapped name (the label's padding is 2 px above and below).
+ */
+function marksOnTheirOwn(page: Page) {
+  return page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>(".world-label[data-shown='true']")]
+      .filter((label) => {
+        const name = label.querySelector(".world-label-name");
+        return (
+          name !== null &&
+          label.getBoundingClientRect().height > name.getBoundingClientRect().height + 6
+        );
+      })
+      .map((label) => label.textContent ?? ""),
+  );
+}
+
 /** The visible names in the world, with their boxes, and the panels over it. */
 function layout(page: Page) {
   return page.evaluate(() => {
@@ -99,6 +117,32 @@ async function toggleCalm(page: Page) {
   await page.getByRole("button", { name: "Account and settings" }).click();
   await page.getByRole("button", { name: /^Calm mode/ }).click();
   await page.keyboard.press("Escape");
+}
+
+/**
+ * Opens a menu, stands the key to the lights where the menu is and reports whether the menu is
+ * what shows there: wherever the two meet, the menu is on top.
+ */
+async function menuOverKey(page: Page, opener: { name: string | RegExp }) {
+  await page.getByRole("button", opener).click();
+  await expect(page.locator(".popover")).toBeVisible();
+  // Let the world re-place its names for the open menu first (once a frame).
+  await page.waitForTimeout(200);
+  const onTop = await page.evaluate(() => {
+    const key = document.querySelector<HTMLElement>(".world-key");
+    const menu = document.querySelector<HTMLElement>(".popover");
+    if (key === null || menu === null) return null;
+    const m = menu.getBoundingClientRect();
+    key.dataset.placed = "true";
+    key.style.right = `${window.innerWidth - m.right}px`;
+    key.style.bottom = `${window.innerHeight - m.bottom}px`;
+    const k = key.getBoundingClientRect();
+    const x = (Math.max(k.left, m.left) + Math.min(k.right, m.right)) / 2;
+    const y = (Math.max(k.top, m.top) + Math.min(k.bottom, m.bottom)) / 2;
+    return menu.contains(document.elementFromPoint(x, y));
+  });
+  await page.keyboard.press("Escape");
+  return onTop;
 }
 
 test.describe("moving", () => {
@@ -200,6 +244,62 @@ test.describe("moving", () => {
   });
 });
 
+test("[UI-06] the menus open over the key to the lights", async ({ page }) => {
+  await signIn(page, "ada", chapterUrl("roles"));
+  await expect(page.locator(".world-key")).toHaveAttribute("data-placed", "true");
+  expect(await menuOverKey(page, { name: /^Workspace/ }), "the workspace menu").toBe(true);
+  expect(await menuOverKey(page, { name: "Account and settings" }), "the account menu").toBe(true);
+});
+
+test.describe("phone", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("[UI-05] calm mode in the account menu keeps its words and its switch", async ({ page }) => {
+    await signIn(page, "ada", chapterUrl("you"));
+    await page.getByRole("button", { name: "Account and settings" }).click();
+    const calm = page.getByRole("button", { name: /^Calm mode/ });
+    await expect(calm).toBeVisible();
+    // The strip's own controls become glyph buttons on a phone; the menu's must not.
+    const words = await calm.getByText("Calm mode", { exact: true }).boundingBox();
+    expect(words?.width ?? 0, "calm mode's words are shown").toBeGreaterThan(40);
+    await expect(calm.locator(".world-switch")).toBeVisible();
+  });
+
+  test("[UI-06] the chapter menu opens over the key to the lights", async ({ page }) => {
+    await signIn(page, "ada", chapterUrl("roles"));
+    expect(await menuOverKey(page, { name: /open chapter menu/ })).toBe(true);
+  });
+
+  test("[UI-05][PROF-09] the support status sits in the top bar and adds no row to the strip", async ({
+    page,
+  }) => {
+    const token = await emulatorToken("ada");
+    const { workspace_id: id } = await asBrowser<{ workspace_id: string }>(
+      "POST",
+      "/v1/workspaces",
+      token,
+      { name: "Support, phone (synthetic)", data_mode: "demo", synthetic: true },
+    );
+    await signIn(page, "ada", chapterUrl("you", id));
+    const strip = page.getByRole("banner");
+    const before = (await strip.boundingBox())?.height ?? 0;
+    await page.getByRole("button", { name: "Help me explore" }).click();
+    await page
+      .getByRole("textbox", { name: "Reply to Careerwright" })
+      .fill("Some days I just want to die.");
+    await page.getByRole("button", { name: "Send" }).click();
+
+    await expect(page.getByRole("region", { name: "Support is available" })).toBeVisible();
+    await expect(
+      page
+        .locator(".topbar")
+        .getByRole("status")
+        .filter({ hasText: "Still while support is shown" }),
+    ).toBeVisible();
+    expect((await strip.boundingBox())?.height, "the strip keeps its height").toBe(before);
+  });
+});
+
 test("[UI-09] a chapter not built yet shows its place, and says so", async ({ page }) => {
   await signIn(page, "ada", chapterUrl("skills"));
   await expect(page.getByRole("heading", { level: 1, name: "Skills" })).toBeVisible();
@@ -260,13 +360,15 @@ for (const viewport of VIEWPORTS) {
       for (const mode of MODES) {
         expect(seen.get(mode), `${chapter}, ${mode} against moving`).toEqual(moving);
       }
-      // At Roles the person and a destination are named at every size, in every mode.
+      // At Roles the person and a destination are named at every size, in every mode, and a
+      // long name's mark stays on its first line.
       if (chapter === "Roles") {
         expect(moving?.names, "Roles: the person is named").toContain("You");
         expect(
           moving?.names.some((name) => LONG_TARGETS.includes(name)),
           "Roles: a destination is named",
         ).toBe(true);
+        expect(await marksOnTheirOwn(pages.get("moving") as Page), "Roles: marks").toEqual([]);
       }
     }
     for (const page of pages.values()) await page.context().close();
@@ -294,6 +396,10 @@ for (const viewport of VIEWPORTS) {
           for (const panel of panels) expect(overlap(label, panel), where).toBe(false);
           if (key !== null) expect(overlap(label, key), `${where} and the key`).toBe(false);
           for (const other of labels.slice(i + 1)) expect(overlap(label, other), where).toBe(false);
+        }
+        // Lights are in view whenever a name is: the key to the lights is then shown too.
+        if (labels.length > 0) {
+          expect(key, `${chapter}, ${reducedMotion}: names in view, but no key`).not.toBeNull();
         }
         // The key to the lights, when shown, is not under a panel either.
         if (key !== null) {

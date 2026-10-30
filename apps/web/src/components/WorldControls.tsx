@@ -3,7 +3,8 @@
 // any time, and sound (off until the person turns it on). In the account menu: calm mode (the
 // world drawn still, kept between visits), a setting kept off the first screen. Each is a toggle
 // button whose pressed state is its setting. While the calm support panel shows, the world is
-// still on its own: Pause keeps showing the person's own choice, and a status says why.
+// still on its own: Pause keeps showing the person's own choice, and a status says why (in the
+// strip, or on a phone in the top bar, where it adds no row; the other copy is not displayed).
 import type { WorldSettings } from "@/lib/world/settings";
 import { Glyph, type GlyphName } from "./Glyph";
 
@@ -60,12 +61,7 @@ export function WorldControls({
         fixed={still ? "the world is already drawn still" : undefined}
         onToggle={() => settings.setPaused(!paused)}
       />
-      {supportShown && (
-        <span className="status world-still-status" role="status">
-          <Glyph name="support" />
-          <span>Still while support is shown</span>
-        </span>
-      )}
+      {supportShown && <StillWhileSupport />}
       <Toggle
         glyph="sound"
         label="Sound"
@@ -73,6 +69,16 @@ export function WorldControls({
         onToggle={() => settings.setSoundOn(!soundOn)}
       />
     </fieldset>
+  );
+}
+
+/** Why the world is still while the calm support panel shows. */
+export function StillWhileSupport() {
+  return (
+    <span className="status world-still-status" role="status">
+      <Glyph name="support" />
+      <span>Still while support is shown</span>
+    </span>
   );
 }
 

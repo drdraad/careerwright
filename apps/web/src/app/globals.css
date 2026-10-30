@@ -218,14 +218,17 @@
   }
 
   /* Orange means a destination: its name carries its light's shape, a small warm disc (the
-     diamond is a gate's), and stays white. */
-  .world-label[data-kind="destination"]::before {
+     diamond is a gate's), and stays white. The disc leads the name's own text, so a long name
+     wraps after it and never leaves it on a line of its own. */
+  .world-label[data-kind="destination"] .world-label-name::before {
     content: "";
-    flex: none;
+    display: inline-block;
     width: 8px;
     height: 8px;
+    margin-right: 6px;
     border-radius: 50%;
     background: var(--light-destination);
+    vertical-align: middle;
   }
 
   /* While the calm support panel shows, the world is still and dims: nothing glows. */
@@ -235,7 +238,8 @@
 
   /* The key to the lights: open on a wide screen, "What the lights mean" on a narrow one. It is
      a control, so it sits over the shell, wherever the world leaves room (World.tsx places it,
-     and the names stay clear of it); with no room it is hidden. */
+     and the names stay clear of it); with no room, or nothing it explains in view, it is
+     hidden. The menus open through a portal, over it. */
   .world-key {
     position: fixed;
     right: var(--space-24);
@@ -986,20 +990,33 @@
     gap: var(--space-8);
   }
 
-  .strip .world-switch {
+  /* The strip's world controls, and only they, become glyph buttons: calm mode in the account
+     menu keeps its words and its switch. */
+  .world-controls .world-switch {
     display: none;
   }
 
-  .strip .world-toggle {
+  .world-controls .world-toggle {
     justify-content: center;
     min-width: 40px;
     padding: 0;
   }
 
   /* On, a glyph button is ringed in white (white means "on"; teal stays for selection). */
-  .strip .world-toggle[aria-pressed="true"] {
+  .world-controls .world-toggle[aria-pressed="true"] {
     border-color: var(--text-on-space);
     background: var(--surface-space-raised-2);
+  }
+
+  /* "Still while support is shown" moves to the top bar, beside the chapter, where it adds no
+     row; it wraps there if it must. */
+  .world-controls .world-still-status {
+    display: none;
+  }
+
+  .topbar .world-still-status {
+    min-width: 0;
+    line-height: 1.25;
   }
 
   .workarea {
@@ -1086,7 +1103,7 @@
     font-size: var(--type-31);
   }
 
-  .strip .world-toggle-label {
+  .world-controls .world-toggle-label {
     position: absolute;
     width: 1px;
     height: 1px;

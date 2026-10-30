@@ -116,34 +116,39 @@ export function WorkspaceStrip({
           <strong>{workspace.name}</strong>
           <Glyph name="collapse" />
         </Popover.Trigger>
-        <Popover.Content className="popover on-space" align="start" sideOffset={8}>
-          <nav aria-label="Workspaces">
-            <ul>
-              {workspaces.map((item) => (
-                <li key={item.workspace_id}>
-                  <Link
-                    className="menu-chapter"
-                    href={`/w/${item.workspace_id}/you`}
-                    aria-current={item.workspace_id === workspace.workspace_id ? "page" : undefined}
-                  >
-                    {item.name}
-                    <span className="small muted">{DATA_MODE[item.data_mode]}</span>
+        {/* Menus open through a portal, so they stand over everything, the key included. */}
+        <Popover.Portal>
+          <Popover.Content className="popover on-space" align="start" sideOffset={8}>
+            <nav aria-label="Workspaces">
+              <ul>
+                {workspaces.map((item) => (
+                  <li key={item.workspace_id}>
+                    <Link
+                      className="menu-chapter"
+                      href={`/w/${item.workspace_id}/you`}
+                      aria-current={
+                        item.workspace_id === workspace.workspace_id ? "page" : undefined
+                      }
+                    >
+                      {item.name}
+                      <span className="small muted">{DATA_MODE[item.data_mode]}</span>
+                    </Link>
+                  </li>
+                ))}
+                <li>
+                  <Link className="menu-chapter" href="/">
+                    All workspaces
                   </Link>
                 </li>
-              ))}
-              <li>
-                <Link className="menu-chapter" href="/">
-                  All workspaces
-                </Link>
-              </li>
-            </ul>
-            {workspacesFailed && (
-              <p className="small px-12 py-8" role="alert">
-                Your other workspaces couldn't be loaded.
-              </p>
-            )}
-          </nav>
-        </Popover.Content>
+              </ul>
+              {workspacesFailed && (
+                <p className="small px-12 py-8" role="alert">
+                  Your other workspaces couldn't be loaded.
+                </p>
+              )}
+            </nav>
+          </Popover.Content>
+        </Popover.Portal>
       </Popover.Root>
       {profile !== undefined && (
         <>
@@ -188,22 +193,24 @@ export function WorkspaceStrip({
           <Popover.Trigger className="strip-switch" aria-label="Account and settings">
             <Glyph name="menu" />
           </Popover.Trigger>
-          <Popover.Content className="popover on-space grid gap-8" align="end" sideOffset={8}>
-            <p className="small">
-              Signed in as <strong>{email ?? "an emulator account"}</strong>
-            </p>
-            <p className="small muted">
-              {workspace.name}: {DATA_MODE[workspace.data_mode].toLowerCase()} workspace
-            </p>
-            <Link className="menu-chapter" href="/">
-              All workspaces
-            </Link>
-            {settings}
-            <button type="button" className="btn btn-secondary" onClick={onSignOut}>
-              <Glyph name="signOut" />
-              Sign out
-            </button>
-          </Popover.Content>
+          <Popover.Portal>
+            <Popover.Content className="popover on-space grid gap-8" align="end" sideOffset={8}>
+              <p className="small">
+                Signed in as <strong>{email ?? "an emulator account"}</strong>
+              </p>
+              <p className="small muted">
+                {workspace.name}: {DATA_MODE[workspace.data_mode].toLowerCase()} workspace
+              </p>
+              <Link className="menu-chapter" href="/">
+                All workspaces
+              </Link>
+              {settings}
+              <button type="button" className="btn btn-secondary" onClick={onSignOut}>
+                <Glyph name="signOut" />
+                Sign out
+              </button>
+            </Popover.Content>
+          </Popover.Portal>
         </Popover.Root>
       </span>
     </header>

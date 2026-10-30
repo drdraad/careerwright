@@ -60,27 +60,30 @@ export function ChapterMenu({ workspaceId, current, progress }: Props) {
         <span>{label}</span>
         <span className="sr-only">, open chapter menu</span>
       </Popover.Trigger>
-      <Popover.Content className="popover on-space" align="start" sideOffset={8}>
-        <nav aria-label="Chapters">
-          <ul>
-            {CHAPTERS.map((chapter) => (
-              <li key={chapter.id}>
-                <Link
-                  className="menu-chapter"
-                  href={chapterHref(workspaceId, chapter.id)}
-                  data-progress={progress[chapter.id] ?? "todo"}
-                  aria-current={chapter.id === current ? "page" : undefined}
-                  onClick={() => setOpen(false)}
-                >
-                  <span className="landmark" aria-hidden="true" />
-                  {chapter.label}
-                  <Mark progress={progress[chapter.id]} current={chapter.id === current} />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </Popover.Content>
+      {/* Through a portal, so the menu stands over everything on the page, the key included. */}
+      <Popover.Portal>
+        <Popover.Content className="popover on-space" align="start" sideOffset={8}>
+          <nav aria-label="Chapters">
+            <ul>
+              {CHAPTERS.map((chapter) => (
+                <li key={chapter.id}>
+                  <Link
+                    className="menu-chapter"
+                    href={chapterHref(workspaceId, chapter.id)}
+                    data-progress={progress[chapter.id] ?? "todo"}
+                    aria-current={chapter.id === current ? "page" : undefined}
+                    onClick={() => setOpen(false)}
+                  >
+                    <span className="landmark" aria-hidden="true" />
+                    {chapter.label}
+                    <Mark progress={progress[chapter.id]} current={chapter.id === current} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </Popover.Content>
+      </Popover.Portal>
     </Popover.Root>
   );
 }

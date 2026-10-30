@@ -29,7 +29,7 @@ import { NotInvited, PageFrame, PageLoading, RequestFailure } from "./PageState"
 import { SyntheticLabel } from "./Status";
 import { WorkspaceStrip } from "./WorkspaceStrip";
 import { World } from "./World";
-import { CalmMode, WorldControls } from "./WorldControls";
+import { CalmMode, StillWhileSupport, WorldControls } from "./WorldControls";
 
 type WorkspaceData = {
   workspace: WorkspaceOut;
@@ -191,6 +191,7 @@ export function WorkspaceShell({
           <ChapterRail workspaceId={workspaceId} current={chapter} progress={progress} />
           <div className="topbar on-space" data-covers-world>
             <ChapterMenu workspaceId={workspaceId} current={chapter} progress={progress} />
+            {supportShown && <StillWhileSupport />}
             {workspace.data.synthetic && <SyntheticLabel />}
           </div>
           <WorkspaceStrip

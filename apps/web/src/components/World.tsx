@@ -25,7 +25,7 @@ import {
   ViewTween,
 } from "@/lib/world/geometry";
 import { type FrameState, GLWorld, webgl2Available } from "@/lib/world/gl";
-import { type Box, layoutLabels } from "@/lib/world/labels";
+import { type Box, inView, LEADER_FROM, layoutLabels } from "@/lib/world/labels";
 import { EMPTY_WORLD, type WorldInput } from "@/lib/world/model";
 import { MOTION, now, TYPING_HOLD_SECONDS } from "@/lib/world/motion";
 import type { Scene, Vec3 } from "@/lib/world/scene";
@@ -177,6 +177,8 @@ const PANELS = "[data-world-panel]";
 const COVERS = "[data-covers-world]";
 /** Wider than this, the key to the lights is open; narrower, it is "What the lights mean". */
 const KEY_OPEN_FROM = 1100;
+/** The open key needs about this much clear world beside the panels; with less it is closed. */
+const KEY_OPEN_ROOM = 360;
 
 const rectOf = (element: Element): Rect => {
   const r = element.getBoundingClientRect();
@@ -194,25 +196,35 @@ function measureClear(vp: Viewport): Clear | undefined {
 const sameClear = (a: Clear | undefined, b: Clear | undefined) =>
   a?.left === b?.left && a?.right === b?.right && a?.top === b?.top && a?.bottom === b?.bottom;
 
-/** A name further than this from its light (CSS pixels) gets a leader line, stopping short of it. */
-const LEADER_FROM = 20;
+/** A name's line back to its light stops this short of it (CSS pixels). */
 const LEADER_CLEAR = 8;
-/** The key keeps this far from the window's edge and from a panel below it. */
-const KEY_MARGIN = { wide: 24, narrow: 16, abovePanel: 12 };
+/** The key keeps this far from the window's edge, from a panel below it and from the bars above. */
+const KEY_MARGIN = { wide: 24, narrow: 16, abovePanel: 12, belowBars: 12 };
 
 const meets = (a: Box, b: Box) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
+/** What the key explains, where the world draws it: the destinations' lights and the grey trails. */
+function keyPoints(scene: Scene): Vec3[] {
+  return [
+    ...scene.nodes.filter((node) => node.kind === "destination").map((node) => node.p),
+    ...scene.trails.filter((trail) => trail.state === "shadow").flatMap((trail) => trail.points),
+  ];
+}
+
 /**
  * Places the key to the lights, then each light's words beside it, clear of the panels over the
- * world, the key, the other lights and each other. Words that cannot be placed, or whose light is
- * out of view or under a panel, are hidden from sight but stay in the list for assistive tech.
- * Every size is read before anything is written, so placing never forces a layout per name.
+ * world, the key, the other lights and each other. The key shows only while something it explains
+ * is in view, at the first of its spots from which every light in view can still be named. Words
+ * that cannot be placed, or whose light is out of view or under a panel, are hidden from sight but
+ * stay in the list for assistive tech. Every size is read before anything is written, so placing
+ * never forces a layout per name.
  */
 function placeLabels(
   host: HTMLElement,
   key: HTMLElement | null,
   labels: readonly Label[],
+  explained: readonly Vec3[],
   view: View,
   vp: Viewport,
 ): void {
@@ -230,30 +242,64 @@ function placeLabels(
   });
   const keySize = key === null ? null : { w: key.offsetWidth, h: key.offsetHeight };
 
-  // The key: bottom right, or else just above a panel at the right, clear of every light.
+  // The key: at the right, low down, just above a panel or just below the bars along the top;
+  // failing those, at the left, beside the rail; always clear of the panels and every light.
+  const spotsFor = (taken: Box | null) => layoutLabels(requests, covers, vp, taken ? [taken] : []);
+  const unnamed = (spots: Map<string, Box | null>) =>
+    requests.filter((r) => spots.get(r.id) === null && inView(r.at, covers, vp)).length;
   let keySpot: Box | null = null;
-  if (key !== null && keySize !== null && keySize.w > 0) {
+  let spots: Map<string, Box | null> | null = null;
+  if (
+    key !== null &&
+    keySize !== null &&
+    keySize.w > 0 &&
+    explained.some((p) => inView(project(p, view), covers, vp))
+  ) {
     const margin = vp.w > KEY_OPEN_FROM ? KEY_MARGIN.wide : KEY_MARGIN.narrow;
+    let barsBottom = 0;
+    for (const c of [...covers].sort((a, b) => a.y - b.y)) {
+      const rail = c.x <= 1 && c.h >= vp.h * 0.9;
+      if (!rail && c.y <= barsBottom + 1) barsBottom = Math.max(barsBottom, c.y + c.h);
+    }
+    const railEdge = Math.max(
+      0,
+      ...covers.filter((c) => c.x <= 1 && c.h >= vp.h * 0.9).map((c) => c.x + c.w),
+    );
     const bottoms = [
       vp.h - margin,
-      ...covers.filter((c) => c.y > 1).map((c) => c.y - KEY_MARGIN.abovePanel),
-    ].sort((a, b) => b - a);
+      ...covers
+        .filter((c) => c.y > 1)
+        .map((c) => c.y - KEY_MARGIN.abovePanel)
+        .sort((a, b) => b - a),
+      barsBottom + KEY_MARGIN.belowBars + keySize.h,
+    ];
     const centres = requests
       .filter((r) => r.at.visible)
       .map((r) => ({ x: r.at.x - 4, y: r.at.y - 4, w: 8, h: 8 }));
-    keySpot =
-      bottoms
-        .map((bottom) => ({
-          x: vp.w - margin - keySize.w,
-          y: bottom - keySize.h,
-          w: keySize.w,
-          h: keySize.h,
-        }))
-        .find(
-          (b) => b.y >= 4 && !covers.some((c) => meets(b, c)) && !centres.some((c) => meets(b, c)),
-        ) ?? null;
+    const candidates = [vp.w - margin - keySize.w, railEdge + margin]
+      .flatMap((x) =>
+        bottoms.map((bottom) => ({ x, y: bottom - keySize.h, w: keySize.w, h: keySize.h })),
+      )
+      .filter(
+        (b) =>
+          b.y >= 4 &&
+          b.x >= 4 &&
+          !covers.some((c) => meets(b, c)) &&
+          !centres.some((c) => meets(b, c)),
+      );
+    // The first spot from which every light in view can still be named, else the best.
+    let fewest = Number.POSITIVE_INFINITY;
+    for (const candidate of candidates) {
+      const placed = spotsFor(candidate);
+      if (unnamed(placed) < fewest) {
+        fewest = unnamed(placed);
+        keySpot = candidate;
+        spots = placed;
+      }
+      if (fewest === 0) break;
+    }
   }
-  const spots = layoutLabels(requests, covers, vp, keySpot === null ? [] : [keySpot]);
+  spots ??= spotsFor(null);
 
   // Write.
   if (key !== null) {
@@ -326,6 +372,7 @@ export function World({
     [input, vp, births],
   );
   const labels = useMemo(() => (scene === null ? [] : labelsFor(scene, input)), [scene, input]);
+  const explained = useMemo(() => (scene === null ? [] : keyPoints(scene)), [scene]);
 
   const canvas = useRef<HTMLCanvasElement>(null);
   const words = useRef<HTMLDivElement>(null);
@@ -514,7 +561,7 @@ export function World({
       gl.render(f);
       firstFrame ??= performance.now();
       if ((l.placedFor === null || !sameView(view, l.placedFor) || l.settle) && words.current) {
-        placeLabels(words.current, keyRef.current, labels, view, vp);
+        placeLabels(words.current, keyRef.current, labels, explained, view, vp);
         l.placedFor = { ...view };
         l.settle = false;
       }
@@ -553,13 +600,13 @@ export function World({
       l.running = false;
       wake.current = () => {};
     };
-  }, [vp, still, scene, labels, measure]);
+  }, [vp, still, scene, labels, explained, measure]);
 
   // Still: words are placed once per change; nothing runs between changes.
   useEffect(() => {
     if (!still || vp === null || words.current === null) return;
-    placeLabels(words.current, keyRef.current, labels, placeView(place, vp, clear), vp);
-  }, [still, vp, labels, place, clear]);
+    placeLabels(words.current, keyRef.current, labels, explained, placeView(place, vp, clear), vp);
+  }, [still, vp, labels, explained, place, clear]);
 
   // The bars and panels over the world change as chapters load, grow and scroll, and the names
   // change size when the display face arrives: the place moves into the part they leave clear,
@@ -575,7 +622,14 @@ export function World({
         setClear((current) => (sameClear(current, area) ? current : area));
         const l = loop.current;
         if (still && words.current) {
-          placeLabels(words.current, keyRef.current, labels, placeView(place, vp, area), vp);
+          placeLabels(
+            words.current,
+            keyRef.current,
+            labels,
+            explained,
+            placeView(place, vp, area),
+            vp,
+          );
         } else if (l) {
           l.settle = true;
           wake.current();
@@ -595,14 +649,18 @@ export function World({
       window.removeEventListener("scroll", replace, { capture: true });
       fonts?.removeEventListener?.("loadingdone", replace);
     };
-  }, [still, vp, labels, place]);
+  }, [still, vp, labels, explained, place]);
 
   const legend = {
     destinations: input.destinations.length > 0,
     shadow: input.destinations.length > 0,
   };
   const view = vp === null ? null : placeView(place, vp, clear);
-  const keyOpen = vp !== null && vp.w > KEY_OPEN_FROM;
+  const keyOpen =
+    vp !== null &&
+    vp.w > KEY_OPEN_FROM &&
+    clear !== undefined &&
+    clear.right - clear.left >= KEY_OPEN_ROOM;
 
   return (
     <>

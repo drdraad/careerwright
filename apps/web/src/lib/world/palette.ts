@@ -26,9 +26,11 @@ export const PALETTE_TOKENS: Record<keyof typeof PALETTE, string> = {
 };
 
 /**
- * How strongly each trail's core is drawn: the opacity the design references measure it at
- * (contrast-pairs.json composites each one as drawn; 3:1 or more over the ground and the
- * horizon's glow). Said trails are drawn at full strength; an opening's trail as a usual one.
+ * How strongly each trail's core is drawn, in the still world (StillWorld.test.tsx) and the
+ * moving one: the opacity the design references measure it at (contrast-pairs.json composites
+ * each one as drawn; 3:1 or more over the ground and the horizon's glow). Said trails are drawn
+ * at full strength; an opening's trail as a usual one. The one recorded exception: while the
+ * calm support panel shows, the world is dimmed and its trails may fall below 3:1.
  */
 export const TRAIL_OPACITY: Record<TrailState, number> = {
   usual: 0.85,
