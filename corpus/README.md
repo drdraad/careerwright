@@ -6,16 +6,23 @@ section 9). It extends the pack's `fixtures/m0/source_corpus_manifest.json` (has
 in `derived_from`) with one slot per required page, intended case types, owners and open
 items.
 
-**Status: collected, labels unreviewed (20 of 20 job postings, 10 of 10 course pages, 3 of
-3 funding pages; Task 7b, 2026-10-29).**
+**Status: collected (20 of 20 job postings, 10 of 10 course pages, 3 of 3 funding pages;
+Task 7b, 2026-10-29); labels reviewed at session 2 (2026-10-29 to 2026-10-30; Task 7c).**
 
-- **Labels:** the labels live in the England option pack 0.1.0
+- **Labels:** the labels live in the England option pack 0.2.0, the reviewed version
   (`backend/src/careerwright/catalogue/packs/england_option_pack/`, ADR 0011). Each slot's
-  `labels.claims` names its claims there.
-- **Reviews:** label review (H-07, session 2: `docs/reviews/session-2-option-pack-questions.md`)
-  and the rights review of the one page pending (C08) are **not run - requires human**. The
-  package is generated from the pinned pack by `tools.option_pack_files` (from `backend/`),
-  never edited by hand.
+  `labels.claims` names its claims there. Version 0.1.0, every record proposed, is kept
+  unchanged beside it.
+- **Label review (H-07, session 2):** done. The product owner answered Q1-Q15. An AI checked
+  Q16-Q344, T1-T36 and R1-R58, and the product owner ruled on 2026-10-30 that those answers
+  count as their review (`docs/reviews/session-2-answers.md`). Task 7c applied the record
+  with `tools.session_2_pack`: 55 of 121 records are reviewed and 66 stay proposed; none
+  was left out. Each slot's `label_review` says how many of its records were accepted, and
+  each record in the pack carries its decision.
+- **Rights review** of the one page pending (C08) is **not run - requires human**. Session 2
+  took no rights decision.
+- **The question package** is generated from the pinned 0.1.0 by `tools.option_pack_files`
+  (from `backend/`), never edited by hand.
 - **Split:** 20 pages are in the development split, 13 in holdout. The early accuracy read
   of the development pages is `docs/evidence/option-pack-accuracy-read.md`.
 - **Excluded:** synthetic personas and generated HTML do not count toward the corpus.
@@ -92,8 +99,9 @@ and the short quoted spans that prove each extracted value.
    within one, stays `pending human rights review`.
 4. Assign `template_family` and `split` before any tuning uses the page.
 5. Label fields: value, unit or currency, the span (offsets or a stable selector plus a
-   minimal excerpt), expected unknowns and expected failure states. `label_review` stays
-   `not run - requires human domain reviewer` until a person reviews it.
+   minimal excerpt), expected unknowns and expected failure states. A new slot's
+   `label_review` stays `not run - requires human domain reviewer` until a person reviews
+   it, and its labels go into a new option pack version.
 6. Update `collected_samples` and the slot's `status`.
 
 A page that later disappears keeps its slot. Record the failed recheck, or replace the page
@@ -102,13 +110,13 @@ and give the documented reason (plan section 9).
 ## Open items
 
 Every unresolved access or reviewer need is in `open_items`, each with an owner and a
-disposition. The human-only items (OI-07 rights review of pages outside the policy's
-classes, OI-08 label review) are **not run - requires human** (ruling R2). No agent
-records them as passed.
+disposition. The human-only item OI-07 (rights review of pages outside the policy's
+classes) is **not run - requires human** (ruling R2). No agent records it as passed. OI-08,
+the label review, was held at session 2 and applied by Task 7c.
 
-After Task 7b, the items still open:
+After Task 7c, the items still open:
 
-- **Human gates:** OI-07 (C08's rights) and OI-08 (the H-07 label review).
+- **Human gate:** OI-07 (C08's rights).
 - **Corpus gaps and later captures:**
   - OI-05: no real prompt-injection page was found, so a labelled synthetic page covers
     the case.

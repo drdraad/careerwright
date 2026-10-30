@@ -81,7 +81,9 @@ def test_a_reference_whose_bytes_are_not_its_pin_is_refused(tmp_path: Any) -> No
         load_reference(REFERENCE, pack, pins={REFERENCE: "0" * 64})
     with pytest.raises(ReferenceError, match="no committed capability reference"):
         load_reference("9.9.9", pack)
-    assert set(PINS) == {REFERENCE}
+    with pytest.raises(ReferenceError, match=r"written for option pack 0\.2\.0, not 0\.1\.0"):
+        load_reference("0.2.0", pack)  # each version fits the pack it was written for
+    assert set(PINS) == {REFERENCE, "0.2.0"}
 
 
 def test_a_rubric_missing_an_anchor_is_named() -> None:

@@ -601,14 +601,18 @@ def test_the_committed_values_say_typical_repayable_and_not_counted_where_their_
 
 @pytest.mark.req("TEST1-09", "OPTN-10")
 def test_the_corpus_manifest_and_the_pack_record_the_same_pages_and_labels() -> None:
-    pack = load_pack("0.1.0")
+    # The manifest records the latest version: session 2's reviewed one (Task 7c).
+    latest = max(PINS, key=lambda v: tuple(int(n) for n in v.split(".")))
+    pack = load_pack(latest)
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     slots = {s["id"]: s for s in manifest["slots"]}
     claims_by_slot: dict[str, list[str]] = {}
     for c in pack.claims:
         claims_by_slot.setdefault(c.source_id, []).append(c.claim_id)
 
-    assert manifest["option_pack"]["sha256"] == PINS["0.1.0"]
+    assert latest == manifest["option_pack"]["version"] == "0.2.0"
+    assert manifest["option_pack"]["sha256"] == PINS[latest]
+    assert pack.sources == load_pack("0.1.0").sources  # the review changed no page
     assert set(slots) == {s.source_id for s in pack.sources}
     for source in pack.sources:
         slot = slots[source.source_id]
@@ -618,7 +622,7 @@ def test_the_corpus_manifest_and_the_pack_record_the_same_pages_and_labels() -> 
         assert slot["split"] == source.split.value
         assert datetime.fromisoformat(slot["retrieved_at"]) == source.retrieved_at
         assert slot["labels"]["claims"] == claims_by_slot[source.source_id]
-        assert slot["label_review"].startswith("not run")
+        assert slot["label_review"].startswith("session 2 (H-07)")
 
 
 @pytest.mark.req("OPTN-10")

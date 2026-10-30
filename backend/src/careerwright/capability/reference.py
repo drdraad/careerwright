@@ -36,9 +36,12 @@ from careerwright.catalogue.option_pack import Pack, SourceKind
 REFERENCE_NAME = "nessa-capability-reference"
 FORMAT_VERSION = 1
 REFERENCE_DIR = Path(__file__).parent / "reference"
-# Every committed version, pinned by the SHA-256 of its file's bytes.
+# Every committed version, pinned by the SHA-256 of its file's bytes. 0.2.0 carries 0.1.0's
+# rubrics and gates unchanged to the reviewed option pack 0.2.0, with session 2's answers on
+# them recorded (R1-R40, Task 7c).
 PINS: dict[str, str] = {
     "0.1.0": "906b4e9670bd930213c8a9a6d95c78af342e1fd1b2023e5a68d8902d911bb640",
+    "0.2.0": "2df1c70d156ee036c990be688b9722dea496a6a699d76ce0e16ac82b01c72e86",
 }
 ESCO_OCCUPATION_URI = r"^http://data\.europa\.eu/esco/occupation/[0-9a-f-]{36}$"
 ESCO_SKILL_URI = r"^http://data\.europa\.eu/esco/skill/[0-9a-f-]{36}$"

@@ -52,9 +52,11 @@ EXCERPT_CHARS = 200  # the excerpt bound of the evidence records (`careerwright.
 PACKS_DIR = Path(__file__).parent / "packs" / "england_option_pack"
 SCHEMA_PATH = PACKS_DIR / "england-option-pack.schema.json"
 # Every committed version, pinned by the SHA-256 of its file's bytes: a version never
-# changes; a correction or a review is a new version (Task 7c publishes the reviewed one).
+# changes; a correction or a review is a new version. 0.1.0 is Task 7b's, every record
+# proposed; 0.2.0 is session 2's review of it (Task 7c, `tools.session_2_pack`).
 PINS: dict[str, str] = {
     "0.1.0": "d7ff17d73a9b17b43529b5cbbe4349ef016f7268c4ac4c2a6a53a13f97e6a3d3",
+    "0.2.0": "b4afe250f47813032c9df70e9d43c88eefd60e75e60574b4413c5b7d6ccf9cc4",
 }
 
 SHA256 = r"^[0-9a-f]{64}$"
