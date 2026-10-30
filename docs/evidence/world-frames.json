@@ -1,0 +1,156 @@
+{
+  "measuredAt": "2026-10-30T19:52:05.513Z",
+  "scene": "World / Busiest scene: 100 openings and their trails, 12 skills, 5 destinations, 2,400 motes; travel every 3 s; ignition every 4 s; warm-up 3 s, then 12 s",
+  "device": {
+    "model": "Mac16,1",
+    "chip": "Apple M4",
+    "memoryGB": 16,
+    "os": "macOS 27.0"
+  },
+  "results": [
+    {
+      "run": "headed, vsync (display refresh)",
+      "browser": "Google Chrome 156.0.8078.76",
+      "viewport": "1440x900 at device scale 2",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "devicePixelRatio": 2,
+      "canvas": [
+        2880,
+        1800
+      ],
+      "firstFrame": 692.5999999046326,
+      "interval": {
+        "frames": 1440,
+        "p50": 8.3,
+        "p95": 9.3,
+        "p99": 9.4,
+        "max": 9.4,
+        "over8": 1134,
+        "over16": 0
+      },
+      "script": {
+        "frames": 1440,
+        "p50": 0.2,
+        "p95": 0.4,
+        "p99": 0.5,
+        "max": 0.9,
+        "over8": 0,
+        "over16": 0
+      },
+      "gpu": {
+        "frames": 1440,
+        "p50": 2.91,
+        "p95": 4.74,
+        "p99": 5.37,
+        "max": 6.23,
+        "over8": 0,
+        "over16": 0
+      },
+      "cost": {
+        "frames": 1440,
+        "p50": 3.09,
+        "p95": 4.91,
+        "p99": 5.56,
+        "max": 6.43,
+        "over8": 0,
+        "over16": 0
+      }
+    },
+    {
+      "run": "headed, unthrottled",
+      "browser": "Google Chrome 156.0.8078.76",
+      "viewport": "1440x900 at device scale 2",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "devicePixelRatio": 2,
+      "canvas": [
+        2880,
+        1800
+      ],
+      "firstFrame": 369,
+      "interval": {
+        "frames": 9517,
+        "p50": 1.9,
+        "p95": 2.5,
+        "p99": 3.1,
+        "max": 16.2,
+        "over8": 9,
+        "over16": 0
+      },
+      "script": {
+        "frames": 9517,
+        "p50": 0.1,
+        "p95": 2.3,
+        "p99": 2.5,
+        "max": 9.1,
+        "over8": 1,
+        "over16": 0
+      },
+      "gpu": {
+        "frames": 9512,
+        "p50": 1.21,
+        "p95": 1.82,
+        "p99": 1.95,
+        "max": 3.07,
+        "over8": 0,
+        "over16": 0
+      },
+      "cost": {
+        "frames": 9512,
+        "p50": 1.75,
+        "p95": 4,
+        "p99": 4.21,
+        "max": 10.29,
+        "over8": 5,
+        "over16": 0
+      }
+    },
+    {
+      "run": "headless, 60 Hz frame clock",
+      "browser": "Google Chrome 156.0.8078.76",
+      "viewport": "1440x900 at device scale 2",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "devicePixelRatio": 2,
+      "canvas": [
+        2880,
+        1800
+      ],
+      "firstFrame": 195.40000009536743,
+      "interval": {
+        "frames": 720,
+        "p50": 16.7,
+        "p95": 16.7,
+        "p99": 16.8,
+        "max": 16.8,
+        "over8": 720,
+        "over16": 210
+      },
+      "script": {
+        "frames": 720,
+        "p50": 0.2,
+        "p95": 0.6,
+        "p99": 0.8,
+        "max": 0.9,
+        "over8": 0,
+        "over16": 0
+      },
+      "gpu": {
+        "frames": 720,
+        "p50": 2.3,
+        "p95": 4,
+        "p99": 4.37,
+        "max": 4.75,
+        "over8": 0,
+        "over16": 0
+      },
+      "cost": {
+        "frames": 720,
+        "p50": 2.6,
+        "p95": 4.28,
+        "p99": 4.71,
+        "max": 4.99,
+        "over8": 0,
+        "over16": 0
+      }
+    }
+  ]
+}
