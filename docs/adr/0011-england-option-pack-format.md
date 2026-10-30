@@ -8,8 +8,9 @@
     the same amount).
   - **Provisional, need product owner confirmation (R6):** decisions 10 (pack-local skill
     rows) and 12 (a restrictive copyright notice keeps a page pending).
-  - **Not run — requires human:** the labels' review (H-07, session 2) and C08's rights
-    review (OI-07).
+  - **Not run — requires human:** C08's rights review (OI-07).
+  - **Amended in Task 7c (2026-10-30):** decision 15 added. The labels' review (H-07) was
+    held at session 2 and published as version 0.2.0.
 - Date: 2026-10-29
 - Requirements: OPTN-08, OPTN-10, TEST1-09, OUT1-10, JOB-01; spec sections 6, 10, 11, 18
   and 20; ADR 0008 decision 1; rulings R2, R3, R6, R7, R9, R10, R11, R12
@@ -204,12 +205,54 @@ be precise enough for a person to accept or reject each one with a yes or a no.
     - **The partial-record rule, which Task 7c applies:** a record becomes `reviewed` only
       when every one of its rows is answered yes. Otherwise it stays `proposed`, and a "no"
       records the correction for a later version.
+15. **Version 0.2.0 is session 2's review of 0.1.0 (Task 7c, 2026-10-30).**
+    - **Built, not edited:** `tools.session_2_pack` reads the product owner's record
+      (`docs/reviews/session-2-answers.md`) and applies it to 0.1.0;
+      `tools.option_pack_files --pack` publishes the result, pinned as
+      `b4afe250f47813032c9df70e9d43c88eefd60e75e60574b4413c5b7d6ccf9cc4`. A fast test checks
+      the committed file is exactly that output, so every change traces to an answer.
+    - **Whose answers:** Q1-Q15 are the product owner's own. An AI checked Q16-Q344, T1-T36
+      and R1-R58; the product owner ruled on 2026-10-30 that those count as their review.
+      Each record's review names the product owner, session 2 and which rows were whose.
+    - **A record's rows:** every question that states one of its values. That is Q1-Q344,
+      T11-T27 and T32-T36 (what the checker read from an offering or an outcome) and R41-R58
+      (each outcome's proposed level). The fixture person, the checker's conclusions and the
+      capability reference are not pack records.
+    - **Reviewed** only when a record has at least one row, every row was answered yes, and
+      no answer changed it. Otherwise it stays `proposed`. A record no row asks about (29
+      requirement rows) carries no review, since nobody decided it. A bare "?" leaves its
+      record undecided, its values as they were.
+    - **A "no" with the right value, quoted from the same page, in the field's declared
+      shape** becomes a new claim: its span checked in the kept body, or inside a stored
+      claim's excerpt, and its note naming the question. Seven such claims were added. The
+      record stays `proposed`, because the corrected value itself was not reviewed. Where
+      the answer speaks about another record of the same page, that record is corrected too
+      (Q153 gives C05's assessment as well as its outcome).
+    - **Any other "no"** makes the field unknown with the review's reason (14 fields: nine
+      newly unknown, and five already unknown whose reason now records the review). A
+      fact or rule whose reading the field's shape cannot hold is left out (four), a
+      requirement's importance becomes `unknown` (one), and an outcome the reviewer says its
+      page does not support becomes `unsupported` (three). A "no" whose own words keep the
+      value (the same range with a qualification the shape cannot hold, or evidence from a
+      document outside the corpus) is recorded in the record's review, and the value kept.
+    - **No answer rejected a whole record,** so none is left out. Every row asked whether a
+      value is right as the page states it.
+    - **Outcome levels:** session 2 accepted no proposed level (R50 and R51, the only
+      numbers, were no), so every level stays null. A reviewed outcome names the rubric its
+      null level was judged against.
+    - **Result:** 55 of 121 records reviewed, 66 proposed, 473 claims (15 left out, 7 added).
+      Version 0.1.0 and its pin are unchanged.
+    - **The capability reference 0.2.0** carries 0.1.0's rubrics and gates unchanged to this
+      pack, since a reference fits one pack version. It records R1-R40's answers and stays
+      `proposed` (ADR 0012).
 
 ## Consequences
 
 - **Consumers** (Tasks 9 and 11) read `load_pack(version)` and `Pack.value(ref)` and never
   parse the file themselves. They can rely on decision 13's shapes. A record is explorable
   but never in an unqualified recommendation until it is `reviewed` (OPTN-09).
+- **Tasks 10, 12, 8 and 13a pin version 0.2.0** (with capability reference 0.2.0) and score
+  or solve against it. The app still reads 0.1.0 until each of those tasks moves its pin.
 - **Session 2's package** asks 344 yes/no questions in three parts of about 17, 38 and 32
   minutes (`docs/reviews/session-2-option-pack-questions.md`). The session may stop after
   any part, and anything unanswered stays `proposed`.

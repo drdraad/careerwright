@@ -180,6 +180,11 @@ with the browser's Origin unchanged.
   tools.session_2_files` rewrites the TRACE-01 checker's run on P01's real option set (T1-T36)
   and the capability reference with proposed outcome levels (R1-R58), beside the agenda
   `docs/reviews/session-2.md`. Fast tests check both files against the tool.
+- The reviewed pack 0.2.0 (ADR 0011 decision 15): `uv run --locked python -m
+  tools.session_2_pack --out <file>` applies session 2's record
+  (`docs/reviews/session-2-answers.md`) to 0.1.0 and writes the candidate; publish it with
+  `tools.option_pack_files --pack <file>`. A fast test checks the committed 0.2.0 is exactly
+  that output. Capability reference 0.2.0 is the one that fits it.
 - Each target's pack options as the planning model reads them: `GET
   /v1/workspaces/{id}/planning/options` (concepts, dated offerings, payment plans, funding;
   every field cited or unknown with its reason).

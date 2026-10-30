@@ -301,6 +301,20 @@ deterministic code: a model may later propose mappings and answers, never commit
 - The capability reference needs the same human review as the pack's labels. Its rubrics,
   required levels, crosswalks and gate types are in session 2's package (Task 11, generated
   by `tools.session_2_files`).
+- **Session 2's answers on the reference (R1-R40; Task 7c, 2026-10-30).** Yes to the four
+  occupation crosswalks, every observable task, every ESCO skill, both gate types and the
+  right-to-work check. "?" to every required level 2: the postings do not establish that
+  entry threshold. No to every anchor set ("No evidence yet" must stay unknown, never level
+  0) and to the NMC check (a matching PIN is not enough: check the registration's status,
+  its register entry and any restrictions). Those answers change this model's own rules, so
+  they are carried to Task 10 and nothing changes yet. Reference 0.2.0 carries 0.1.0's
+  rubrics and gates unchanged to the reviewed pack 0.2.0, records these answers and stays
+  `proposed`, so a readiness result resting on a rubric stays qualified `proposed_rubrics`.
+  With pack 0.2.0 every outcome level is still null: session 2 accepted no proposed level.
+- **UK-regulated roles in the reviewed pack** (Task 9 re-review 1, N7). The only one is the
+  registered nurse, whose NMC registration is typed as a legal-practice gate (R37 yes),
+  whatever ESCO's flag says; a test checks it. Live research must type such gates itself
+  (Tasks 8, 10 and 12).
 - The P01 demo workspace's target has the pack target's title, so it shows the real pack
   matrix (public reference data, as ESCO is), not TRACE-01's synthetic matrix.
 - Ranks do not exist yet: Tasks 11 and 13a must key planning inputs and ranks by
