@@ -1,6 +1,6 @@
 # Session 2: the product owner's answers
 
-Held 2026-10-29. Written down word for word as given. Anything not listed here is unreviewed.
+Held 2026-10-29 to 2026-10-30. Written down word for word as given. Anything not listed here is unreviewed.
 
 ## Part 1: explain a route screen (route B, in the app)
 
@@ -417,7 +417,6 @@ question, the page links, the app's agreed rules, the rules still awaiting decis
 context only, and P01's synthetic fixture data), and pasted its answers back on
 2026-10-30. These are the AI's answers, not the product owner's own review. They are kept
 as it wrote them.
-Answers:
 
 - T1 (checked by AI): yes
 - T2 (checked by AI): yes
@@ -463,7 +462,6 @@ question, the page links, the app's agreed rules, the rules still awaiting decis
 context only, and P01's synthetic fixture data), and pasted its answers back on
 2026-10-30. These are the AI's answers, not the product owner's own review. They are kept
 as it wrote them.
-Answers:
 
 - R1 (checked by AI): yes — ESCO (http://data.europa.eu/esco/occupation/7086d0ca-1e77-4690-89c9-7ed1a0478fa3).
 - R2 (checked by AI): yes — ESCO (http://data.europa.eu/esco/occupation/aaeec9a7-dc57-4485-890c-86b3eef735f9).
@@ -523,3 +521,21 @@ Answers:
 - R56 (checked by AI): yes — C09 (https://www.findapprenticeship.service.gov.uk/apprenticeship/VAC2000061204).
 - R57 (checked by AI): yes — C10 (https://www.reed.co.uk/courses/comptia-a-new-version/478800).
 - R58 (checked by AI): yes - No learner exam results were checked; course completion alone establishes no rubric level. C10 (https://www.reed.co.uk/courses/comptia-a-new-version/478800).
+
+## Part 6: yes or no to 15 rules (D1 and D2 were already answered yes)
+
+- D3: yes. In the product owner's words: "yes, though I have to say, this feels a bit parochial. A skill frequency analysis across many jobs at a similar level would be a much more sensible way of determining skill requirements."
+- D4: yes
+- D5: yes
+- D6: yes
+- D7: yes
+- D8: no — Accept it
+- D9: yes, unless it's an apprenticeship
+- D10: no — The lower of 14 questions or 100% of the must haves
+- D11: yes
+- D12: yes
+- D13: yes
+- D14: yes
+- D15: yes
+- D16: yes
+- D17: yes
