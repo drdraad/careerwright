@@ -530,6 +530,10 @@ as it wrote them.
 - D6: yes
 - D7: yes
 - D8: no — Accept it
+  - Clarified on 2026-10-30, when asked whether a test result should count without saying who
+    assessed you. In the product owner's words: "no, I guess it should say who assessed you
+    after all". So D8's original rule stands: a test result counts once you confirm the result
+    and who assessed you.
 - D9: yes, unless it's an apprenticeship
 - D10: no — The lower of 14 questions or 100% of the must haves
 - D11: yes
