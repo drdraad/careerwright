@@ -1,4 +1,5 @@
-// Data for the Sprint 0 design compositions.
+// Data for the design references (the living world, compositions/world.js; first written for
+// the Sprint 0 compositions, which the world replaced).
 //
 // FIXTURES holds values copied from fixtures/m0 (TRACE-01, P01, P02) and
 // fixtures/reconstructed/directai.json. tools/check-fixture-data.mjs asserts that every
@@ -6,7 +7,8 @@
 //
 // DESIGN_LISTINGS is invented for the design review only. The fixture pack has no job
 // postings, so every employer, listing and salary below is synthetic and labelled so on
-// the page. None is a real organisation, vacancy or pay figure.
+// the page. None is a real organisation, vacancy or pay figure. Industry is shown by glyph
+// and label in the world, never by colour (ADR 0014 decision 5); the keys below are labels.
 window.CAREERWRIGHT = {
   FIXTURES: {
     trace01: {
@@ -82,8 +84,8 @@ window.CAREERWRIGHT = {
     },
   },
 
-  // Synthetic, design-only. Industry keys map to tokens: finance=blue, health=coral,
-  // retail=amber, technology=violet, public=olive, other=other.
+  // Synthetic, design-only. Industry keys are labels (finance, health, retail, technology,
+  // public, other), shown by glyph and words.
   DESIGN_LISTINGS: {
     areas: [
       { id: "manchester", label: "Manchester", note: "Greater Manchester, England" },

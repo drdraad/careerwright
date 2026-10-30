@@ -2,7 +2,7 @@
   "name": "careerwright-design-references",
   "version": "0.1.0",
   "private": true,
-  "description": "Tooling for the Sprint 0 design references: contrast measurement, fixture-data check and screenshots.",
+  "description": "Tooling for the design references (the living world): contrast measurement, fixture-data check and screenshots.",
   "type": "module",
   "packageManager": "pnpm@10.33.2",
   "engines": {

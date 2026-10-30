@@ -1,15 +1,18 @@
 /*
- * Careerwright design tokens, v0.1.0 (Sprint 0 design reference).
+ * Careerwright design tokens, v0.2.0: the living world, Horizon made livelier (Sprint W).
  *
- * Canonical source for colour, type, space, radius and motion. Components use the
- * semantic tokens (the second block) and the context aliases (.on-space / .on-reading),
- * never the primitives. Every text and meaningful non-text pairing is measured by
- * tools/contrast.mjs against contrast-pairs.json; results: contrast-report.md.
+ * Canonical source for colour, type, space, radius and motion. Components use the semantic
+ * tokens (the second block) and the context aliases (.on-space / .on-reading), never the
+ * primitives. Every text and meaningful non-text pairing is measured by tools/contrast.mjs
+ * against contrast-pairs.json, glass panels over the darkest ground and over the brightest
+ * light in the world; results: contrast-report.md.
  *
- * Two surface contexts, not two themes: exploration happens on ink ("space"), reading
- * and decisions on light canvas and cards ("reading"). Spec section 14 starting values
- * are kept: ink #09121F, raised ink #142338, light canvas #F5F7FA, cards #FFFFFF,
- * text #EEF4FC / #B1C1D6 on dark, #142338 on light, sea-glass #5DE0C1.
+ * One world, two ways of sitting in it: "space" is text and marks straight on the world;
+ * "reading" is a dark glass panel over it, opaque enough that nothing glowing behind can pull
+ * text below WCAG AA. One colour, one meaning (plan section 4, ADR 0014): orange is a
+ * destination; sea-glass teal is selection, the chosen path and the primary action; blue to
+ * violet is the journey, graded the same along every trail; slate is "not known yet"; crimson
+ * is failure and sand is stale, each after a glyph and words. Focus rings are white.
  */
 
 @font-face {
@@ -21,103 +24,117 @@
 }
 
 @font-face {
-  font-family: "Newsreader";
-  src: url("../fonts/newsreader/Newsreader-Variable.ttf") format("truetype");
-  font-weight: 200 800;
+  font-family: "Outfit";
+  src: url("../fonts/outfit/Outfit-Variable.ttf") format("truetype");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 
 :root {
   /* ---- Primitives (do not use in components) ---- */
-  --ink-900: #09121F;
-  --ink-800: #142338;
-  --ink-700: #1C2F4A;
-  --ink-600: #2A4060;
-  --ink-500: #5C7394;
-  --mist-100: #EEF4FC;
-  --mist-300: #B1C1D6;
-  --mist-400: #93A6BF;
-  --paper-50: #F5F7FA;
-  --paper-0: #FFFFFF;
-  --paper-200: #E3E8EF;
-  --slate-400: #7A899E;
-  --slate-600: #4B5B72;
-  --seaglass-400: #5DE0C1;
-  --seaglass-700: #0A7360;
+  /* The world: near-black space, deepening upward, with a faint horizon. */
+  --void-950: #03050B;
+  --void-900: #070B17;
+  --void-850: #0B1122;
+  --void-800: #111A31;
+  --void-700: #1C2744;
+  --void-600: #26324F;
+  --void-500: #66779E;
+  --horizon-500: #1C2552;
+  /* Words. */
+  --mist-50: #F2F6FF;
+  --mist-200: #C2CCE2;
+  --mist-400: #9AA6C2;
+  /* Lights. White is the brightest anything in the world gets (additive light clamps there). */
+  --light-white: #FFFFFF;
+  --light-origin: #EDF5FF;
+  --ember-400: #FF9433;
+  --ember-100: #FFD2A1;
+  --seaglass-300: #45F7D4;
+  --seaglass-950: #022A22;
+  --journey-blue: #408CFF;
+  --journey-violet: #9E6BFF;
+  --slate-400: #6F7EA3;
+  --slate-200: #AAB6D2;
   --crimson-300: #FF7D90;
-  --crimson-700: #B1243B;
   --sand-300: #D6CBAE;
-  --sand-700: #665A40;
-
-  /* Industry hues: categorical only, never status (spec section 14). */
-  --industry-blue-on-space: #74ABFF;
-  --industry-amber-on-space: #E8B04F;
-  --industry-violet-on-space: #B49DFF;
-  --industry-coral-on-space: #F29470;
-  --industry-olive-on-space: #B0C15C;
-  --industry-other-on-space: #8E9DB3;
-  --industry-blue-on-reading: #2A61C2;
-  --industry-amber-on-reading: #865800;
-  --industry-violet-on-reading: #6849CF;
-  --industry-coral-on-reading: #B0452A;
-  --industry-olive-on-reading: #5A6A10;
-  --industry-other-on-reading: #5A6A80;
+  /* Glass: dark panels over the world, with their opacity in the last two digits. */
+  --glass-900: #070B17E8;
+  --glass-950: #050812F5;
+  --glass-label: #03050BBF;
 
   /* ---- Semantic tokens ---- */
   /* Surfaces */
-  --surface-space: var(--ink-900);
-  --surface-space-raised: var(--ink-800);
-  --surface-space-raised-2: var(--ink-700);
-  --surface-reading: var(--paper-50);
-  --surface-card: var(--paper-0);
-  --surface-card-sunken: var(--paper-50);
-  --surface-band: var(--paper-200);
+  --surface-space: var(--void-950);
+  --surface-space-raised: var(--void-900);
+  --surface-space-raised-2: var(--void-800);
+  --surface-glass: var(--glass-900);
+  --surface-glass-strong: var(--glass-950);
+  --surface-label: var(--glass-label);
+  --surface-reading: var(--glass-900);
+  --surface-card: var(--void-850);
+  --surface-card-sunken: var(--void-900);
+  --surface-band: var(--void-700);
 
   /* Text */
-  --text-on-space: var(--mist-100);
-  --text-on-space-muted: var(--mist-300);
+  --text-on-space: var(--mist-50);
+  --text-on-space-muted: var(--mist-200);
   --text-on-space-subtle: var(--mist-400);
-  --text-on-reading: var(--ink-800);
-  --text-on-reading-muted: var(--slate-600);
-  --text-on-action-space: var(--ink-900);
-  --text-on-action-reading: var(--paper-0);
+  --text-on-reading: var(--mist-50);
+  --text-on-reading-muted: var(--mist-200);
+  --text-on-action-space: var(--seaglass-950);
+  --text-on-action-reading: var(--seaglass-950);
 
   /* Lines. "-control" lines identify a component boundary and must reach 3:1;
      "-hairline" lines only separate content and are exempt from 1.4.11. */
-  --line-space-hairline: var(--ink-600);
-  --line-space-control: var(--ink-500);
-  --line-reading-hairline: var(--paper-200);
-  --line-reading-control: var(--slate-400);
-  --branch-space: var(--mist-300);
+  --line-space-hairline: var(--void-600);
+  --line-space-control: var(--void-500);
+  --line-reading-hairline: var(--void-600);
+  --line-reading-control: var(--void-500);
 
-  /* Action, selection and focus: sea-glass is reserved for these. */
-  --action-space: var(--seaglass-400);
-  --action-reading: var(--seaglass-700);
-  --selection-space: var(--seaglass-400);
-  --selection-reading: var(--seaglass-700);
-  --focus-ring-space: var(--seaglass-400);
-  --focus-ring-reading: var(--seaglass-700);
+  /* Action, selection and focus. Sea-glass is reserved for selection, the chosen path and the
+     primary action; focus is white, so a focused control is never read as a selected one. */
+  --action-space: var(--seaglass-300);
+  --action-reading: var(--seaglass-300);
+  --selection-space: var(--seaglass-300);
+  --selection-reading: var(--seaglass-300);
+  --focus-ring-space: var(--mist-50);
+  --focus-ring-reading: var(--mist-50);
 
-  /* Status: carried by glyph and text first; only error and stale add a hue, and
-     neither hue is an industry hue. */
+  /* Status: carried by glyph and text first; only error and stale add a hue, and neither is
+     a hue the world uses for a meaning. Unknown is slate: shadow, never absence. */
   --status-error-on-space: var(--crimson-300);
-  --status-error-on-reading: var(--crimson-700);
+  --status-error-on-reading: var(--crimson-300);
   --status-stale-on-space: var(--sand-300);
-  --status-stale-on-reading: var(--sand-700);
-  --status-neutral-on-space: var(--mist-100);
-  --status-neutral-on-reading: var(--ink-800);
-  --status-unknown-on-space: var(--mist-300);
-  --status-unknown-on-reading: var(--slate-600);
+  --status-stale-on-reading: var(--sand-300);
+  --status-neutral-on-space: var(--mist-50);
+  --status-neutral-on-reading: var(--mist-50);
+  --status-unknown-on-space: var(--slate-200);
+  --status-unknown-on-reading: var(--slate-200);
 
-  /* Data marks on space. Dominated layers stay readable grey, never disabled. */
-  --mark-front-1: var(--mist-100);
+  /* Data marks. Dominated layers stay readable grey, never disabled. */
+  --mark-front-1: var(--mist-50);
   --mark-front-later: var(--mist-400);
-  --mark-selected: var(--seaglass-400);
+  --mark-selected: var(--seaglass-300);
+
+  /* The world's lights and trails (the still world draws with these; the moving world's
+     shaders hold the same values). */
+  --world-ground: var(--void-950);
+  --world-horizon: var(--horizon-500);
+  --light-brightest: var(--light-white);
+  --light-person: var(--light-origin);
+  --light-destination: var(--ember-400);
+  --light-destination-core: var(--ember-100);
+  --light-chosen: var(--seaglass-300);
+  --trail-near: var(--journey-blue);
+  --trail-far: var(--journey-violet);
+  --trail-shadow: var(--slate-400);
 
   /* ---- Type ---- */
   --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Newsreader", Georgia, serif;
+  --font-display: "Outfit", "Segoe UI", system-ui, sans-serif;
+  --weight-display: 650;
   /* Modular scale, ratio 1.25 from a 16px body (12px is the floor). */
   --type-12: 0.75rem;
   --type-14: 0.875rem;
@@ -128,7 +145,8 @@
   --type-39: 2.441rem;
   --type-49: 3.052rem;
   --leading-body: 1.5;
-  --leading-display: 1.15;
+  --leading-display: 1.1;
+  --tracking-display: -0.015em;
   --measure: 66ch;
 
   /* ---- Space, radius ---- */
@@ -140,17 +158,35 @@
   --space-32: 32px;
   --space-48: 48px;
   --radius-control: 12px;
-  --radius-card: 16px;
+  --radius-card: 18px;
   --radius-sheet: 24px;
   /* Phone bottom sheets open at this height so the main task above stays visible. */
   --sheet-peek: 212px;
-  --shadow-card-on-space: 0 18px 40px -18px rgb(3 8 15 / 0.75);
+  --shadow-card-on-space: 0 24px 60px -24px rgb(0 0 0 / 0.85);
+  --glass-blur: 14px;
 
-  /* ---- Motion (spec section 14; plan section 5) ---- */
+  /* ---- Motion: the vocabulary (plan section 4). Motion always means something. ---- */
+  /* Feedback to any input. */
+  --motion-feedback: 90ms;
   --motion-control: 150ms;
+  /* Panels open and close. */
   --motion-panel: 260ms;
-  --motion-graph-reveal: 420ms;
+  /* Travel between places: the world stays, the view moves. */
+  --motion-travel: 600ms;
+  /* Growth: a new possibility grows its trail. */
+  --motion-grow: 650ms;
+  /* Dimming: something the person's decision ruled out. */
+  --motion-dim: 400ms;
+  /* Ignition: new evidence lights the person's light. */
+  --motion-ignite: 1400ms;
+  /* A revelation is staged over this long, then settles; any input completes it at once. */
+  --motion-reveal: 1800ms;
+  /* Settling into a stable fact. */
+  --motion-settle: 320ms;
+  /* Atmosphere: one slow breath of light, the same for every item. */
+  --motion-breathe: 7000ms;
   --ease-settle: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-travel: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 /* Context aliases: components read these generic names. */
@@ -170,19 +206,13 @@
   --status-stale: var(--status-stale-on-space);
   --status-neutral: var(--status-neutral-on-space);
   --status-unknown: var(--status-unknown-on-space);
-  --industry-blue: var(--industry-blue-on-space);
-  --industry-amber: var(--industry-amber-on-space);
-  --industry-violet: var(--industry-violet-on-space);
-  --industry-coral: var(--industry-coral-on-space);
-  --industry-olive: var(--industry-olive-on-space);
-  --industry-other: var(--industry-other-on-space);
   color: var(--fg);
 }
 
 .on-reading {
   --fg: var(--text-on-reading);
   --fg-muted: var(--text-on-reading-muted);
-  --fg-subtle: var(--text-on-reading-muted);
+  --fg-subtle: var(--text-on-space-subtle);
   --bg: var(--surface-reading);
   --bg-raised: var(--surface-card);
   --line: var(--line-reading-hairline);
@@ -195,19 +225,19 @@
   --status-stale: var(--status-stale-on-reading);
   --status-neutral: var(--status-neutral-on-reading);
   --status-unknown: var(--status-unknown-on-reading);
-  --industry-blue: var(--industry-blue-on-reading);
-  --industry-amber: var(--industry-amber-on-reading);
-  --industry-violet: var(--industry-violet-on-reading);
-  --industry-coral: var(--industry-coral-on-reading);
-  --industry-olive: var(--industry-olive-on-reading);
-  --industry-other: var(--industry-other-on-reading);
   color: var(--fg);
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root {
+    --motion-feedback: 0ms;
     --motion-control: 0ms;
     --motion-panel: 0ms;
-    --motion-graph-reveal: 0ms;
+    --motion-travel: 0ms;
+    --motion-grow: 0ms;
+    --motion-dim: 0ms;
+    --motion-ignite: 0ms;
+    --motion-reveal: 0ms;
+    --motion-settle: 0ms;
   }
 }
