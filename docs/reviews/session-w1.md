@@ -42,8 +42,8 @@ In each one, do this:
 2. Watch for ten seconds. Don't click.
    Your light comes on, and a few seconds later something new lights up.
 3. Read the card on the right. Click **Why?**
-4. Point at a few of the orange lights (or press Tab to reach them).
-   Each one shows the skills it shares with your job.
+4. Point at a few of the orange lights, or at their names (or press Tab to reach them).
+   Each one shows the skills it shares with your job. Click one to keep them showing.
 5. Click two skills you've used. Watch what changes.
 6. Click the bright button, **Keep … in view**. Then click **Undo**.
 7. Turn on **Calm mode**. It's the same world, standing still. Turn it off again.
