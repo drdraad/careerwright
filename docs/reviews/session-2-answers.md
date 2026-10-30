@@ -409,3 +409,117 @@ dropped; its no and ? answers are kept as it wrote them.
 - Q342 (checked by AI): yes
 - Q343 (checked by AI): yes
 - Q344 (checked by AI): yes
+
+## Part 4: the money checker on P01 (`session-2-checker-questions.md`), checked by an AI
+
+The product owner had the same kind of AI check these from a prompt Claude built (each
+question, the page links, the app's agreed rules, the rules still awaiting decision as
+context only, and P01's synthetic fixture data), and pasted its answers back on
+2026-10-30. These are the AI's answers, not the product owner's own review. They are kept
+as it wrote them.
+Answers:
+
+- T1 (checked by AI): yes
+- T2 (checked by AI): yes
+- T3 (checked by AI): yes
+- T4 (checked by AI): yes
+- T5 (checked by AI): no - Both caps are correct, but the supplied profile does not state debt repayments; “Unknown is never zero” prevents assuming P01 has none.
+- T6 (checked by AI): yes
+- T7 (checked by AI): yes
+- T8 (checked by AI): yes
+- T9 (checked by AI): no - TRACE-01 uses “fixture-matrix-1” and “fixture-rubric-1”; an agent’s mapping cannot transfer levels because “A level counts only against the grading scale (rubric) it was given for.”
+- T10 (checked by AI): yes — C01 (https://www.netcomtraining.co.uk/course/certificate-in-data/), F01 (https://www.gov.uk/guidance/free-courses-for-jobs).
+- T11 (checked by AI): yes — C01 (https://www.netcomtraining.co.uk/course/certificate-in-data/).
+- T12 (checked by AI): yes — C01 (https://www.netcomtraining.co.uk/course/certificate-in-data/).
+- T13 (checked by AI): yes — C01 (https://www.netcomtraining.co.uk/course/certificate-in-data/).
+- T14 (checked by AI): yes — C01 (https://www.netcomtraining.co.uk/course/certificate-in-data/).
+- T15 (checked by AI): yes — C01 (https://www.netcomtraining.co.uk/course/certificate-in-data/).
+- T16 (checked by AI): yes — C01 (https://www.netcomtraining.co.uk/course/certificate-in-data/).
+- T17 (checked by AI): yes — C01 (https://www.netcomtraining.co.uk/course/certificate-in-data/).
+- T18 (checked by AI): yes — C01 (https://www.netcomtraining.co.uk/course/certificate-in-data/).
+- T19 (checked by AI): yes — C01 (https://www.netcomtraining.co.uk/course/certificate-in-data/).
+- T20 (checked by AI): yes — C01 (https://www.netcomtraining.co.uk/course/certificate-in-data/).
+- T21 (checked by AI): yes — C01 (https://www.netcomtraining.co.uk/course/certificate-in-data/).
+- T22 (checked by AI): yes — C04 (https://www.reed.co.uk/jobs/junior-data-analyst/57424113).
+- T23 (checked by AI): yes — C04 (https://www.reed.co.uk/jobs/junior-data-analyst/57424113).
+- T24 (checked by AI): yes — C04 (https://www.reed.co.uk/jobs/junior-data-analyst/57424113).
+- T25 (checked by AI): yes — C04 (https://www.reed.co.uk/jobs/junior-data-analyst/57424113).
+- T26 (checked by AI): yes — C04 (https://www.reed.co.uk/jobs/junior-data-analyst/57424113).
+- T27 (checked by AI): yes — C04 (https://www.reed.co.uk/jobs/junior-data-analyst/57424113).
+- T28 (checked by AI): no - Unresolved remains appropriate, but the currently linked overview says “Internally assessed by tutors”; classifying C01’s outcomes as unassessed topics is incorrect. C01 overview (https://www.netcomtraining.co.uk/wp-content/uploads/2025/12/Certificate-in-Data-L3-.pdf).
+- T29 (checked by AI): no - Unresolved remains appropriate, but the current overview specifies a “portfolio of evidence”; excluding these outcomes from levels even after review is unjustified. C01 overview (https://www.netcomtraining.co.uk/wp-content/uploads/2025/12/Certificate-in-Data-L3-.pdf).
+- T30 (checked by AI): yes — C04 (https://www.reed.co.uk/jobs/junior-data-analyst/57424113).
+- T31 (checked by AI): yes — C04 (https://www.reed.co.uk/jobs/junior-data-analyst/57424113).
+- T32 (checked by AI): no - The overview assesses work involving “joins”; SQL-specific independence remains unverified. Retain no confirmed level pending rubric matching. C01 overview (https://www.netcomtraining.co.uk/wp-content/uploads/2025/12/Certificate-in-Data-L3-.pdf).
+- T33 (checked by AI): no - The overview assesses learners who “apply validation”; this supports assessed work, although the complete rubric anchor remains unverified. C01 overview (https://www.netcomtraining.co.uk/wp-content/uploads/2025/12/Certificate-in-Data-L3-.pdf).
+- T34 (checked by AI): no - The overview includes assessed “Presentations”; classification as an unassessed topic is incorrect. No exact rubric level is established. C01 overview (https://www.netcomtraining.co.uk/wp-content/uploads/2025/12/Certificate-in-Data-L3-.pdf).
+- T35 (checked by AI): yes — C04 (https://www.reed.co.uk/jobs/junior-data-analyst/57424113).
+- T36 (checked by AI): yes — C04 (https://www.reed.co.uk/jobs/junior-data-analyst/57424113).
+
+## Part 5: skill levels (`session-2-capability-questions.md`), checked by an AI
+
+The product owner had the same kind of AI check these from a prompt Claude built (each
+question, the page links, the app's agreed rules, the rules still awaiting decision as
+context only, and P01's synthetic fixture data), and pasted its answers back on
+2026-10-30. These are the AI's answers, not the product owner's own review. They are kept
+as it wrote them.
+Answers:
+
+- R1 (checked by AI): yes — ESCO (http://data.europa.eu/esco/occupation/7086d0ca-1e77-4690-89c9-7ed1a0478fa3).
+- R2 (checked by AI): yes — ESCO (http://data.europa.eu/esco/occupation/aaeec9a7-dc57-4485-890c-86b3eef735f9).
+- R3 (checked by AI): yes — ESCO (http://data.europa.eu/esco/occupation/8d3e8aaa-791b-4c75-a465-f3f827028f50).
+- R4 (checked by AI): yes — ESCO (http://data.europa.eu/esco/occupation/c3aae59e-1441-4b3e-bdd1-6da50dc7cf42).
+- R5 (checked by AI): yes — Data Quality Analyst advert (https://www.jobs.nhs.uk/candidate/jobadvert/C9242-25-0210).
+- R6 (checked by AI): ? - The advert requires strong SQL skills but does not establish this exact anchor as a sufficient entry threshold. Manchester advert (https://www.reed.co.uk/jobs/junior-data-analyst/57492098).
+- R7 (checked by AI): no - “No evidence yet” must remain unknown, not level 0: “Unknown is never zero.”
+- R8 (checked by AI): yes — ESCO (http://data.europa.eu/esco/skill/9cf681c7-89ec-470c-b651-7fe03786f586).
+- R9 (checked by AI): yes — Data Quality Analyst advert (https://www.jobs.nhs.uk/candidate/jobadvert/C9242-25-0210).
+- R10 (checked by AI): ? - Investigating data quality problems is supported, but the exact level-2 entry threshold is not established. Data Quality Analyst advert (https://www.jobs.nhs.uk/candidate/jobadvert/C9242-25-0210).
+- R11 (checked by AI): no - “No evidence yet” must remain unknown, not level 0: “Unknown is never zero.”
+- R12 (checked by AI): yes — ESCO (http://data.europa.eu/esco/skill/713fb616-118e-40bc-9366-4a69879a49d5).
+- R13 (checked by AI): yes — Manchester advert (https://www.reed.co.uk/jobs/junior-data-analyst/57492098).
+- R14 (checked by AI): ? - Explaining findings to non-technical colleagues is supported, but the exact level-2 entry threshold is not established. Manchester advert (https://www.reed.co.uk/jobs/junior-data-analyst/57492098).
+- R15 (checked by AI): no - “No evidence yet” must remain unknown, not level 0: “Unknown is never zero.”
+- R16 (checked by AI): yes — ESCO (http://data.europa.eu/esco/skill/c544a9f3-5945-4b54-afed-de0697852817).
+- R17 (checked by AI): yes — Bristol advert (https://www.reed.co.uk/jobs/ict-helpdesk-technician/57432432).
+- R18 (checked by AI): ? - Hardware diagnosis and escalation are supported, but the exact level-2 entry threshold is not established. Bristol advert (https://www.reed.co.uk/jobs/ict-helpdesk-technician/57432432).
+- R19 (checked by AI): no - “No evidence yet” must remain unknown, not level 0: “Unknown is never zero.”
+- R20 (checked by AI): yes — ESCO (http://data.europa.eu/esco/skill/9e06bac6-6b91-48ca-8b7d-c1f48cdecd7c).
+- R21 (checked by AI): yes — Bristol advert (https://www.reed.co.uk/jobs/ict-helpdesk-technician/57432432).
+- R22 (checked by AI): ? - Windows and Microsoft 365 support are supported, but the exact level-2 entry threshold is not established. Bristol advert (https://www.reed.co.uk/jobs/ict-helpdesk-technician/57432432).
+- R23 (checked by AI): no - “No evidence yet” must remain unknown, not level 0: “Unknown is never zero.”
+- R24 (checked by AI): yes — ESCO (http://data.europa.eu/esco/skill/db36f7f1-5900-45bd-9ffb-f2b19c4362ac).
+- R25 (checked by AI): yes — Bristol advert (https://www.reed.co.uk/jobs/ict-helpdesk-technician/57432432).
+- R26 (checked by AI): ? - Ticket management is supported, but the exact level-2 entry threshold is not established. Bristol advert (https://www.reed.co.uk/jobs/ict-helpdesk-technician/57432432).
+- R27 (checked by AI): no - “No evidence yet” must remain unknown, not level 0: “Unknown is never zero.”
+- R28 (checked by AI): yes — ESCO (http://data.europa.eu/esco/skill/6430eb0d-c6de-46b7-a7fc-3dd2e8e62a69).
+- R29 (checked by AI): yes — Leeds advert (https://www.reed.co.uk/jobs/accounts-assistant/57485940).
+- R30 (checked by AI): ? - Reconciliation is supported, but this advert seeks an experienced assistant and does not establish the proposed entry-level cutoff. Leeds advert (https://www.reed.co.uk/jobs/accounts-assistant/57485940).
+- R31 (checked by AI): no - “No evidence yet” must remain unknown, not level 0: “Unknown is never zero.”
+- R32 (checked by AI): yes — ESCO (http://data.europa.eu/esco/skill/8a326ee1-169c-4c44-b38b-8f1bb20ec79b).
+- R33 (checked by AI): yes — Leeds advert (https://www.reed.co.uk/jobs/accounts-assistant/57485940).
+- R34 (checked by AI): ? - Ledger maintenance is supported, but this advert seeks an experienced assistant and does not establish the proposed entry-level cutoff. Leeds advert (https://www.reed.co.uk/jobs/accounts-assistant/57485940).
+- R35 (checked by AI): no - “No evidence yet” must remain unknown, not level 0: “Unknown is never zero.”
+- R36 (checked by AI): yes — ESCO (http://data.europa.eu/esco/skill/faf8943c-72ff-4736-a587-25508695d6f0).
+- R37 (checked by AI): yes — Registered Nurse: official regulatory record (https://www.regulated-professions.service.gov.uk/professions/registered-nurse).
+- R38 (checked by AI): no - A matching PIN alone is insufficient; verify current registration status, relevant register entry and restrictions. Suspended registrants are “not allowed to practise.” NMC register guidance (https://www.nmc.org.uk/registration/search-the-register/how-to-use-search-the-register/).
+- R39 (checked by AI): yes — GOV.UK (https://www.gov.uk/check-job-applicant-right-to-work).
+- R40 (checked by AI): yes — GOV.UK (https://www.gov.uk/check-job-applicant-right-to-work).
+- R41 (checked by AI): no - The assessed unit permits “Excel and/or open-source such as SQL”; classify assessed work samples, but do not infer an independent SQL assessment. C01 overview (https://www.netcomtraining.co.uk/wp-content/uploads/2025/12/Certificate-in-Data-L3-.pdf).
+- R42 (checked by AI): no - “Test integrity” forms part of assessed portfolio work; the complete level-2 anchor still needs verification. C01 overview (https://www.netcomtraining.co.uk/wp-content/uploads/2025/12/Certificate-in-Data-L3-.pdf).
+- R43 (checked by AI): no - Communication for the “appropriate audience” is assessed; the complete level-2 anchor still needs verification. C01 overview (https://www.netcomtraining.co.uk/wp-content/uploads/2025/12/Certificate-in-Data-L3-.pdf).
+- R44 (checked by AI): yes — C02 (https://leedscitycollege.ac.uk/courses/business-and-bookkeeping/).
+- R45 (checked by AI): yes — C02 (https://leedscitycollege.ac.uk/courses/business-and-bookkeeping/).
+- R46 (checked by AI): no - “No formal qualification” supports neither NMC registration nor eligibility to apply through this course. No level is correct, but the credential explanation is wrong. C03 (https://www.reed.co.uk/courses/adult-nursing-safeguarding-level-3-course/397579).
+- R47 (checked by AI): yes — C04 (https://www.reed.co.uk/jobs/junior-data-analyst/57424113).
+- R48 (checked by AI): yes — C04 (https://www.reed.co.uk/jobs/junior-data-analyst/57424113).
+- R49 (checked by AI): no - The current page states “There are four external exams during the course.” Record exam evidence; the excerpt still does not establish the records rubric’s level. C05 (https://leedscitycollege.ac.uk/courses/accounting-2/).
+- R50 (checked by AI): no - Bookkeeping Controls explicitly assesses “Reconcile a bank statement with the cash book”; reassess its mapping to reconciliation. Exams alone do not establish this records anchor at level 2. AAT specification (https://www.aat.org.uk/files/AAT-Level-2-Certificate-in-Bookkeeping-Q2022-qualification-specification.pdf).
+- R51 (checked by AI): no - Introduction to Bookkeeping assesses “Process transactions into the ledger accounts”; map this evidence to records, not an assumed reconciliation level 2. AAT specification (https://www.aat.org.uk/files/AAT-Level-2-Certificate-in-Bookkeeping-Q2022-qualification-specification.pdf).
+- R52 (checked by AI): no - “The opportunity to achieve” does not establish that the exam is optional. Its completion requirement is unclear; retain no level until assessment and rubric coverage are confirmed. C07 (https://nationalcareers.service.gov.uk/find-a-course/details?courseId=b9c6a8bc-81ad-4682-90a1-5ffdc9883067&runId=7a206bd8-1622-4e90-8844-bee5d0ac3b9f).
+- R53 (checked by AI): no - “The opportunity to achieve” does not establish optionality. No level is justified while the assessment requirement and rubric coverage remain unclear. C07 (https://nationalcareers.service.gov.uk/find-a-course/details?courseId=b9c6a8bc-81ad-4682-90a1-5ffdc9883067&runId=7a206bd8-1622-4e90-8844-bee5d0ac3b9f).
+- R54 (checked by AI): yes — C08 (https://www.manchester.ac.uk/study/undergraduate/courses/2027/10971/bnurs-adult-nursing/).
+- R55 (checked by AI): yes — C09 (https://www.findapprenticeship.service.gov.uk/apprenticeship/VAC2000061204).
+- R56 (checked by AI): yes — C09 (https://www.findapprenticeship.service.gov.uk/apprenticeship/VAC2000061204).
+- R57 (checked by AI): yes — C10 (https://www.reed.co.uk/courses/comptia-a-new-version/478800).
+- R58 (checked by AI): yes - No learner exam results were checked; course completion alone establishes no rubric level. C10 (https://www.reed.co.uk/courses/comptia-a-new-version/478800).
