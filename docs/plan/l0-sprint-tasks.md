@@ -1,6 +1,6 @@
 # L0 sprint tasks (execution breakdown)
 
-This file breaks `docs/plan/development-plan.md` (the local development plan, v1.2) into
+This file breaks `docs/plan/development-plan.md` (the local development plan, v1.4) into
 implementation tasks for agent execution. Authority order: product specification
 (`Careerwright_Product_Specification.md`, v1.3) → development plan local overrides → this file.
 Tasks 1–6 (Sprints 0–2) are complete. The remaining tasks follow the order, dependency
@@ -56,12 +56,14 @@ These bind every task and every review.
 9. Loopback only: published ports bind 127.0.0.1; reject non-local Host/Origin.
 10. Generate the TypeScript client from FastAPI's OpenAPI contract; do not duplicate
     money/state/error enums by hand.
-11. Visual language: calm observatory — ink #09121F, raised ink #142338, light canvas
-    #F5F7FA, sea-glass accent #5DE0C1 as starting tokens (contrast validated, not
-    assumed). Semantic tokens; industry colour never means success/error. Motion:
-    120–180 ms controls, 220–320 ms panels, ≤450 ms staged graph reveal, no continuous
-    force motion; reduced-motion/calm mode removes spatial animation, not information.
-    WCAG 2.2 AA target.
+11. The experience: the living world of plan section 4 (v1.4, ADR 0014), which replaces
+    the calm observatory. One persistent world in which chapters are places; everything
+    that varies has a computed meaning; revelations come only from deterministic sources
+    and verified spans; a still version (reduced motion, calm mode, no WebGL) carries
+    every state and word; an exact DOM and SVG layer over a WebGL world that holds nothing
+    unique. Semantic tokens with measured contrast; one colour, one meaning; industry is
+    shown by glyph and label, never by colour or as status.
+    WCAG 2.2 AA target. A screen that works but is bland fails review.
 12. Tests assert contracts and invariants, not implementation shape or exact LLM prose.
     Never soften assertions to get green. SQLite is not a substitute for PostgreSQL.
     A test that could not start or collected nothing is not evidence.
@@ -219,8 +221,15 @@ Dependency rules:
     14 and 15) and after sessions 1, 2 and 3: release qualification needs all six chapters.
 14. Task 17 after Task 16 (plan v1.3): the manual describes the qualified candidate, and its
     small fixes are re-qualified on top of it.
+15. The world (plan v1.4): Task W1 has no dependency (synthetic data only). Session W1
+    after Task W1. Task W2 after session W1. Session W2 after Task W2. Tasks 10, 12, 8, 14
+    and 15 also wait for session W2. Task 16 also waits for Tasks W1 and W2 and sessions
+    W1 and W2.
 
-Suggested order: 6b → 6c → 7 → 7d → 7b → 9 → 11 → session 2 → 7c → 10 → 12 → 8 → 13a →
+Suggested order (plan v1.4, after session 2): W1 → session W1 → 7c → W2 → session W2 → 10
+→ 12 → 8 → 13a → 13b → 14 (closes after session 3) → 15 → 16 → 17. Backend tasks (7c,
+13a, 13b) may run while a session is awaited; interface tasks wait for session W2. The
+v1.1 order was 6b → 6c → 7 → 7d → 7b → 9 → 11 → session 2 → 7c → 10 → 12 → 8 → 13a →
 13b → 14 (closes after session 3) → 15 → 16 → 17. Session 1 can be held at any point before Task 8;
 holding it before Task 7b lets 7b classify the pack's rights itself instead of leaving
 every page "pending human rights review".
@@ -624,11 +633,65 @@ Acceptance: the published version validates; every `reviewed` record traces to a
 the product owner's record; no rejected record is in it; every changed value is span-cited;
 undecided records stay `proposed`; the earlier version is unchanged.
 
+## Task W1: Sprint W — the spike of three directions (SW.1)
+
+**Preconditions:** none (plan v1.4). Synthetic data only. Ends at session W1, held by the
+product owner: until they have chosen, Task W2 is not dispatched.
+
+Sprint card: "Sprint W Build the world". Slice: SW.1. Read plan section 4 in full first;
+the product owner's words there are the brief.
+
+Deliver section 4's three directions (Growth, Horizon and Circuit). Each shows the same
+first ten seconds (one light, one plain question, the first answer igniting the origin and
+growing the first trails) and one revelation on synthetic data, labelled as such. Each has
+its still version (reduced motion and calm mode) and a visible pause control. Measure each
+direction's frame times on this Mac in Chrome (p50 and p95, busiest scene: 100 job nodes,
+their trails and ambient particles) and its first-frame time, against the plan's headroom
+budget for this faster Mac (p95 within 8 ms). Compare the WebGL library
+candidates and two or three licensed display faces, and recommend one of each. The spike is
+throwaway: it starts with one command, makes no external request, lives outside the product
+code (its location is the implementer's call) and is labelled as a spike. Any dependency it
+pins is at least 14 days old. Prepare session W1's package in plain words (CLAUDE.md
+"Talking to the user"): how to open each direction, what to try in two minutes, and the
+questions to answer (which direction, or which mix, in their words; whether sound is
+wanted). Agent pre-review only (R2).
+
+Acceptance: the three directions open from one command; each shows the same first ten
+seconds and revelation, and the same words with motion off; frame and first-frame times
+reported with device, browser and scene; no external request; the package is ready.
+
+## Task W2: Sprint W — the world in the app (SW.2–SW.6) + Sprint W review
+
+**Preconditions:** session W1 held, with the product owner's own choice recorded (R10).
+Ends at session W2 (H-01 for Sprint W): until it is held, and every rubric category has
+reached at least 4 (plan section 5), Tasks 10, 12, 8, 14 and 15 are not dispatched.
+
+Sprint card: "Sprint W Build the world". Slices: SW.2–SW.6, the acceptance and the
+coherence review. Plan section 4; spec sections 3, 7, 13, 14 and 15 as section 4 overrides
+them; ADR 0014 (record the spike's choices there).
+
+Deliver, in this order: the design references for the chosen direction (SW.2), replacing
+the Sprint 0 compositions, with every new pairing in `contrast-pairs.json` and the mirror
+in `apps/web/src/design` updated; the world layer and the still world in the app, behind
+all six chapters (SW.3); the You chapter rebuilt in the world with session 2's design
+findings applied (SW.4), transcribing the product owner's record and deciding nothing on
+their behalf (R2); the first moments and the two revelations (SW.5): the unexpected
+connection from the slate, joined by shared essential skills and checked on "data analyst"
+and the five personas (amending ADR 0007), and the overlooked strength as a new bounded run
+kind whose quotation is span-verified and confirmed by the person (live calls R5; tests use
+the test model or fixtures only); the new requirement family in the register
+(SW.6). Prepare session W2's package: captures at the three viewports, motion on and off,
+and the rubric with the three v1.4 questions. `docs/reviews/sprint-w.md`, completed with
+session W2's outcome from the product owner's own record.
+
+Acceptance: the plan's Sprint W acceptance; `make check` and `make acceptance` pass; the
+design references' contrast and screenshot checks pass.
+
 ## Task 8: Sprint 3 — living opportunity map and the job corpus (S3.5) + Sprint 3 review
 
 **Preconditions:** Task 7c complete (the reviewed job values this task scores against;
-Task 11 and session 2 come before it); session 1 held (H-06 rights policy; R10). In the
-suggested order it runs after Task 12.
+Task 11 and session 2 come before it); session 1 held (H-06 rights policy; R10); session W2
+held (plan v1.4). In the suggested order it runs after Task 12.
 
 Sprint card: "Sprint 3 Make the evidence and opportunity map real". Slice: S3.5, the
 20-job corpus portion, remaining acceptance, the coherence review. Spec sections 5, 7
@@ -639,7 +702,9 @@ because, in L0, it has no live vacancy data and every role is unscored; its deli
 unchanged. It consumes the option pack's 20 job postings, curated and labelled by Task 7b,
 in the reviewed version Task 7c published; it does not curate pages.
 
-Deliver the Roles chapter per the opportunity-map composition: SVG/D3 dendrite with stable
+Deliver the Roles chapter as its place in the world, the horizon, with its moment, the
+unexpected connection (plan section 4; Task W2's design references), keeping VIS-1's
+hierarchy and industry shown by glyph and label (ADR 0014): SVG/D3 dendrite with stable
 anchors, company expansion, up to 100 visible job nodes, explicit aggregation counts;
 numeric salary and AI-range filters; pay lanes / pay lens; mobile-first list; one shared
 selection and filter contract across list, map and pay lens; focus retention and keyboard
@@ -690,15 +755,12 @@ earlier ranks.
 ## Task 10: Sprint 4 — Skills chapter, evidence questions and course corpus + Sprint 4 review
 
 **Preconditions:** Task 7c complete (the reviewed pack, after session 2's H-07 on its
-course outcomes; Task 11 comes before it); session 2's Sprint 2 design record (H-01, R10).
-No dependency on Task 12 or Task 8.
+course outcomes; Task 11 comes before it); session W2 held (plan v1.4, R10). No dependency
+on Task 12 or Task 8.
 
-First, as its own commits, apply the product owner's Sprint 2 design findings from
-session 2 to the You chapter and the slate. Shorten the initial presentation where the
-record asks, so that at 390 px a suggestion's decision controls show without a long
-scroll, and keep the evidence one step away. Transcribe the record; decide nothing on the
-reviewer's behalf (R2). Then build the Skills chapter to the same standard: initial
-presentation short, evidence one step away.
+Session 2's Sprint 2 design findings are applied by Task W2 (plan v1.4). Build the Skills
+chapter as its place in the world, with its moment, the overlooked strength (plan section
+4; Task W2's design references): initial presentation short, evidence one step away.
 
 Sprint card: "Sprint 4 Build trustworthy skills and outcome assessment". Slice: the Skills
 chapter UI, the question flow UI, the ten-course corpus labels, remaining acceptance, the
@@ -753,7 +815,11 @@ uncertain) and a record sheet. Record each item as "not run — requires human".
 ## Task 12: Sprint 5 — option review checkpoint and funding corpus + Sprint 5 review
 
 **Preconditions:** Task 7c complete (the reviewed pack; session 2, with its H-07 and H-13
-records, and Task 11 come before it). No dependency on Task 10 or Task 8.
+records, and Task 11 come before it); session W2 held (plan v1.4, R10). No dependency on
+Task 10 or Task 8.
+
+Build the Options chapter as its place in the world, with its moment, a gap's first
+credible bridge (plan section 4; Task W2's design references).
 
 Sprint card: "Sprint 5 Compile real options into an honest monthly model". Slice: S5.3,
 the Options chapter UI, the three-funding-page corpus, remaining acceptance, the
@@ -823,7 +889,7 @@ Benchmark 50,000-point ranking. `docs/reviews/sprint-6.md`, covering 6a and 6b.
 ## Task 14: Sprint 7 — coordinated route comparison (S7.1–S7.6) + Sprint 7 review
 
 **Preconditions:** Task 13b complete; session 2's findings exist (the H-13 record, read as
-scope input). Closes only after session 3 (H-01 for Sprint 7; R10): until the product owner
+scope input); session W2 held (plan v1.4). Closes only after session 3 (H-01 for Sprint 7; R10): until the product owner
 has held it, the task stays open with its review package ready, and Task 15 is not
 dispatched.
 
@@ -836,13 +902,14 @@ near the bound (OPT1-15): lead with "Best trade-offs found", state the instance 
 name the narrowing that would let the search complete, using Task 13a's measured sizes. Show
 the option pack's date and review states wherever pack records appear in a route (R9).
 
-Deliver the Routes chapter per the route-comparison composition using real solver output:
+Deliver the Routes chapter as its place in the world, with its moment, the credible route
+(plan section 4; Task W2's design references), using real solver output:
 per-target discrete time–cost scatter with cost definition/baseline/horizon/currency/
 bounds/coverage beside the chart; readable F1–F3 with family grouping and named dominance
 explanations; one documented deterministic comparator rule; stress scenarios shown
 separately; exact numeric inputs + keyboard sliders; view filtering preserves ranks;
 explicit reranking; linked Gantt, step cards, monthly financial table, evidence drawer;
-purposeful transitions and calm/reduced motion; paginated archive and bounded projection
+section 4's motion with its still version; paginated archive and bounded projection
 with shown/total counts. Property and browser tests for selection/filter consistency;
 TRACE-01 renders A/B/C F1, D F2, E F3; A–I fixture uses direct-spending labels; measure
 interaction budgets. Third visual review package (R2), prepared for session 3 and checked
@@ -851,9 +918,12 @@ outcome from the product owner's own record.
 
 ## Task 15: Sprint 8 — chosen plan, progress, revision and exports (S8.1–S8.6) + Sprint 8 review
 
-**Preconditions:** Task 14 closed (after session 3). No further session; H-04 (Safari,
-print) is recorded "not run — requires human" with its checklist (R2) and is not a dispatch
-precondition.
+**Preconditions:** Task 14 closed (after session 3, and so after session W2). No further
+session; H-04 (Safari, print) is recorded "not run — requires human" with its checklist (R2)
+and is not a dispatch precondition.
+
+Build the Plan chapter as its place in the world, with its moment, committing to the chosen
+path (plan section 4; Task W2's design references). Print stays light and ink-efficient.
 
 Sprint card: "Sprint 8 Turn a selected route into a durable plan". Whole sprint. Spec
 sections 11, 15 (FIN-1, AIR-1).
@@ -873,8 +943,8 @@ snapshots, exports, cache and workflow references. `docs/reviews/sprint-8.md`.
 ## Task 16: Sprint 9 — local release qualification and handover (S9.1–S9.6)
 
 **Preconditions:** every remaining task complete: 6b, 6c, 7, 7d, 7b, 7c, 8, 9, 10, 11, 12,
-13a, 13b, 14 and 15 (release qualification needs all six chapters); sessions 1, 2 and 3
-held (R10). The Sprint 9 human gates (H-01, H-03, H-04, H-05, H-08) are prepared as
+13a, 13b, 14, 15, W1 and W2 (release qualification needs all six chapters); sessions 1, 2,
+3, W1 and W2 held (R10). The Sprint 9 human gates (H-01, H-03, H-04, H-05, H-08) are prepared as
 checklists and recorded "not run — requires human" (R2); none is a dispatch precondition.
 
 Sprint card: "Sprint 9 Qualify and hand over the local release". Whole sprint plus the

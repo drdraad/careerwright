@@ -2,7 +2,7 @@
 
 ## From product specification to a beautiful and verifiable local app
 
-29 October 2026 • Plan version 1.3 (1.2 and 1.1: 29 and 28 October 2026; 1.0: 27 October 2026) • Based on product specification 1.3
+30 October 2026 • Plan version 1.4 (1.3 and 1.2: 29 October 2026; 1.1: 28 October 2026; 1.0: 27 October 2026) • Based on product specification 1.3, with the product owner's experience direction of 30 October 2026 (section 4)
 
 Build a complete career-planning experience that runs on a developer’s computer, works without credentials in a labelled synthetic demo, and uses one user-supplied Meta API key for live conversation and research. The endpoint is a tested local release candidate with inspectable evidence, reproducible route comparisons and a printable plan. Public hosting is outside this plan.
 
@@ -12,15 +12,15 @@ The delivery strategy is to prove the risky integration and mathematical boundar
 
 Product integrity is structural. The language model proposes facts and interpretations; validated application commands commit them. Deterministic Python computes readiness, affordability and route rankings.
 
-Visual quality is a delivery requirement. The conversation, opportunity map and route comparison receive explicit design reviews, responsive states and usability tests throughout development.
+The experience is a delivery requirement. Careerwright is a living world, not a tool (section 4): within ten seconds a person has changed something, and as they go on it shows them true things about themselves they did not know. Every chapter receives explicit design reviews, responsive states and usability tests throughout development. A screen that works but is bland fails.
 
 Local completion is measurable. A fresh checkout can start the app, exercise all five personas, use a real key, survive a worker restart and reproduce the selected plan across screen, print, JSON and ICS.
 
 ## Delivery envelope
 
-Eleven outcome-based sprints, numbered 0–10, with Sprint 6 delivered as 6a and 6b, and an initial estimate of 39–54 engineering days (Sprint 10, added in v1.3, is 2–3 of them). For one experienced full-stack engineer using an LLM coding assistant, plan roughly 8–11 working weeks, with regular product and design input. This is a planning range, not a validated productivity forecast. Re-estimate after the technical spike and first real-source extraction work; external access and evidence review can add elapsed time.
+Twelve outcome-based sprints: 0–10, with Sprint 6 delivered as 6a and 6b, and Sprint W (the world, added in v1.4). The initial estimate was 39–54 engineering days (Sprint 10, added in v1.3, is 2–3 of them); v1.4 adds 13–16 for the world (Sprint W, and one more day in each later interface sprint and in Sprint 9), making 52–70. For one experienced full-stack engineer using an LLM coding assistant, plan roughly 8–11 working weeks, with regular product and design input. This is a planning range, not a validated productivity forecast. Re-estimate after the technical spike and first real-source extraction work; external access and evidence review can add elapsed time.
 
-With agent implementers, engineering days are a sizing unit, not a duration: Sprints 0–2, sized at 9–12 engineering days, took 16 hours of wall-clock time. Elapsed time is set by human review hours: the three scheduled review sessions (section 10) and the human checks of Sprints 8–9.
+With agent implementers, engineering days are a sizing unit, not a duration: Sprints 0–2, sized at 9–12 engineering days, took 16 hours of wall-clock time. Elapsed time is set by human review hours: the five scheduled review sessions (section 10) and the human checks of Sprints 8–9.
 
 The earlier ten-day private-beta target is not adopted. The current instruction changes the endpoint to local operation and places a higher bar on UX. A compelling early demonstration should emerge in Sprint 1; a demonstration is not the completed product.
 
@@ -39,6 +39,8 @@ Scope and architecture come first, followed by the design contract, sprint roadm
 
 **Version 1.3 (29 October 2026)** adds Sprint 10 at the product owner's request: an operator's manual, written by doing every task it describes in the built product. Friction points found along the way are logged. Those a small change can smooth are fixed in the sprint. A larger refactor for user experience is put to the product owner only when there is high conviction that its benefit outweighs its cost. Nothing else changes.
 
+**Version 1.4 (30 October 2026)** applies the product owner's experience direction, given after review session 2 (ADR 0014). Careerwright becomes one living world in which the six chapters are places, not pages (section 4, rewritten). It replaces the calm observatory of the specification's art direction and lifts the visual scope limits of section 1. A new Sprint W builds the world before more chapter interfaces: a spike of three directions, session W1 to choose one, new design references, the world in the app with the You chapter rebuilt, and session W2 to judge it (sections 6 and 10). The review rubric gains three questions (section 5). The estimate grows by 13–16 engineering days and about two hours of the product owner's time. The domain, the numbers and the integrity rules are unchanged.
+
 # 1 The local delivery boundary
 
 Call this milestone L0 to distinguish it from the specification’s hosted private beta, M0. Preserve M0’s business semantics and bounded model. The differences below are deliberate local adaptations, not claims that all M0 or M1 gates have been completed.
@@ -54,9 +56,9 @@ Call this milestone L0 to distinguish it from the specification’s hosted priva
 | Transport | Loopback-only HTTP is an explicit development exception to hosted TLS. Reject non-local host/origin access. No LAN binding or tunnel in the delivered configuration. |
 | Data credentials | A Meta key suffices for the live-assisted journey. Adzuna app ID/key enables a separately qualified live vacancy integration; it is not silently assumed to be part of the Meta key. |
 | Export | Browser print CSS, JSON and ICS from one plan snapshot. No server PDF service, calendar connection or automatic external action. |
-| Visual scope | Full M0 surfaces plus a narrow promotion of purposeful panel and graph-reveal transitions. Semantic zoom, mini-map, pulsing halos, generated illustrations and multiple animated journey overlays remain deferred. |
+| Visual scope | The living world of section 4 (v1.4; ADR 0014): one persistent world, travel between chapters, staged revelations, consequences shown before a decision is confirmed, ambient motion with a pause control, celebrations of real progress, and a still version of all of it. Semantic zoom, the mini-map and generated illustrations stay deferred; sound is not in L0 unless the product owner asks for it at session W1. |
 
-The selected stack stays React/Next.js, SVG/D3, FastAPI/Pydantic AI, DBOS and PostgreSQL. Do not introduce another solver, workflow engine, renderer, scraper vendor, vector database or general agent platform.
+The selected stack stays React/Next.js, SVG/D3, FastAPI/Pydantic AI, DBOS and PostgreSQL. Do not introduce another solver, workflow engine, scraper vendor, vector database or general agent platform. The one added renderer is section 4's WebGL world layer, chosen by Sprint W's spike; it never holds information the DOM and SVG layer lacks.
 
 Local does not remove provenance, money, isolation, secret, cancellation or deletion requirements. Use synthetic personas for development and live-provider qualification. Processing real people’s information requires the specification’s applicable privacy assessment and disclosures; no claim of legal compliance follows from passing engineering tests.
 
@@ -128,30 +130,99 @@ Keep comments for why a rule exists, particularly conservative timing, negative 
 
 Use uv and pnpm lockfiles, Ruff, one Python type checker, TypeScript strict mode and one established JavaScript lint/format toolchain. Pin compatible versions after the spike. Reject circular module imports and raw vendor/SQL access from domain code through automated architecture checks.
 
-# 4 Design the experience before expanding it
+# 4 The experience: a world that answers you
 
-The visual concept is the specification’s calm observatory: an ink-blue space for exploration, fine luminous branches, generous typography and warm light cards for reading and decisions. The spectacular moments should reveal real relationships. Small datasets, uncertainty and errors must look as considered as the ideal view.
+**Version 1.4 (30 October 2026).** This section replaces the calm observatory. It is the product owner's direction, given after review session 2, and for L0 it overrides the specification's art direction (spec section 14) and this plan's earlier visual scope (section 1); ADR 0014 records the decision. The specification's domain rules are unchanged. The Sprint 0 design references and the current shell belong to the old direction: Sprint W replaces them, and they are not polished further.
 
-## Signature compositions
+## The ambition
 
-| Surface | Intended experience | Required implementation detail |
+In the product owner's words, the interface should be "revolutionary, not the current bland corporate borefest". It should "verge on computer game rather than typical tool, conveying a sense of travelling through a brave new world, and progression towards your destiny". It should "feel organic and cybernetic", "thrum with power and possibility" and "leave users astonished and breathless and excite them with revealed insight".
+
+The first ten seconds, in their words: "By ten seconds, they have changed something. They understand that exploring, learning and making decisions will reshape this world. As they share their experience, the revelations become personal and grounded: an overlooked strength, an unexpected connection, a credible route towards something they thought was beyond them."
+
+The feeling it must leave: "My future is larger than I realised—and I can start moving towards it."
+
+Three rules govern the whole interaction model, in their words: "Progress should visibly transform the world. Evidence should unlock understanding. Decisions should have tangible consequences."
+
+**What failure looks like.** A screen that reads as a form, a dashboard of cards or a generic business tool fails review, even when it works. So does a world that says more than the evidence, motion someone needs in order to understand a result, and words a newcomer cannot follow. The baseline to beat is the product owner's session 2 record of the first screens: "Feels incoherent", "Don't even know where to start", and route wording that "Sounds like psychobabble".
+
+## The world
+
+Careerwright is one persistent, living world rather than a set of pages. It is deep, dark space with a faint horizon. The person is the bright point of light at its origin. Possible futures are destinations: warm, orange-lit points ahead. Trails of light grow between them. The trails branch like roots or nerves (organic) and are drawn with the precision of an instrument (cybernetic): exact readouts, crisp glyphs, numbers in tabular type and a lock-on ring around whatever is selected. The product owner's image, "Careerwright's luminous path forward" (`docs/design/reference/luminous-path-forward.png`), sets the palette and mood: a near-black ground, trails in teal, blue and violet, orange end points and bold white type.
+
+The six chapters stay (spec section 3), but they become places in the one world, not pages. Moving between them is travel: the world stays and the view moves. Each place has one moment that makes it worth reaching.
+
+| Chapter | Its place in the world | Its moment |
 |---|---|---|
-| You | A spacious conversation beside an editable account of what is known. One useful question at a time. | Proposed changes appear in a review tray with accept, edit and undo. Show an early labelled route sketch after minimum inputs. |
-| Roles | A stable map of cities, companies and opportunities, linked to a precise list and pay lens. | SVG hierarchy, curved branches, stable IDs, restrained industry colours, readable selected card and explicit coverage counts. |
-| Skills | A clear picture of demonstrated, self-reported, planned and unresolved requirements. | Behavioural anchors, inspectable evidence, shared questions across targets and visibly protected gates. |
-| Options | A curated comparison by gap, with enough detail to judge cost, time and evidence. | Pin/exclude controls, provider provenance, conditional funding and an explicit review checkpoint. |
-| Routes | A striking but exact time–cost composition that becomes a tangible journey on selection. | Discrete schedule points, readable F1–F3, equivalent-point groups, a selected Gantt and synchronised route cards. |
-| Plan | A calm, complete document with one next action and a dependable financial story. | Version and condition labels, evidence links, revision comparison, clean print hierarchy and portable downloads. |
+| You | The origin: the person's light, with their experience and strengths as filaments around it, and a console for the conversation | The first answer changes the world: the origin ignites and the first destinations appear |
+| Roles | The horizon: suggested and chosen destinations and, around a chosen one, its real openings grouped by city and employer (VIS-1's hierarchy, kept) | An unexpected connection: a destination the person never named lights up, joined to their own role by the essential skills the two share |
+| Skills | The ground between the person and a destination: each requirement is a stretch of trail, lit by evidence and in shadow while unknown, with protected gates drawn as gates | An overlooked strength: an answer lights a stretch of trail the person did not know they had already covered |
+| Options | Bridges across the dark stretches: courses, work routes and funding, each placed or set aside by the person | A gap gets its first credible bridge |
+| Routes | Whole journeys from origin to destination, compared on an exact time and cost instrument linked to the trails | A credible route: the first complete, checked path burns through to something the person thought was beyond them |
+| Plan | The chosen path made solid, with the next move glowing at its start | Committing: the world settles around the chosen path, and later real-world progress lights permanent landmarks along it |
+
+## How the world tells the truth
+
+The world's power comes from being true. The product's integrity rules (CLAUDE.md; ADRs 0006–0013) apply to everything drawn:
+
+- **Everything that varies has a declared meaning.** Brightness, solidity, size and gates come from states the backend computed: evidenced, self-reported, planned, usual in your role (below) and unresolved; ready, ready if, and not feasible in this monthly model. Anything else is atmosphere and looks the same for every item. Position is layout only: where a destination sits never means how likely, how good or how near it is (VIS-1). The interface computes no rank, readiness or affordability.
+- **Unknown is shadow, not absence.** An unknown stretch is drawn in shadow and says "not known yet". It is never empty, never zero and never the dimmest rank.
+- **Usual is not confirmed** (the plan's call, v1.4). The essential skills a person's role usually needs (ESCO) are drawn as a state of their own, "usual in your role, not confirmed yet": brighter than shadow, dimmer than anything the person has said or shown. It is for display only: wherever something is computed, such a skill is still unresolved (ADR 0012). An unexpected connection is worded as a fact about the two roles ("Data analysts and statisticians share 7 essential skills"), never as a claim about the person.
+- **A condition is a gate on the trail,** with the condition in plain words ("Ready if you pass the assessed report"). A destination is a place the person could reach, never a promise: no revelation, glow or sound suggests a job offer. "Destiny" is the feeling; the words stay plain and honest.
+- **Revelations are earned.** Each comes from a deterministic source: the slate over ESCO (an unexpected connection), readiness and gaps (closer than you thought), the route checker (a credible route) or a reviewed option (a bridge). The one exception is an overlooked strength. By the product owner's answer of 30 October 2026, the model may propose one: a quotation of the person's own words against an essential skill of one of their destinations. Code verifies the quotation as a span of their answers and the skill as essential, and the strength appears only once the person confirms it. A revelation's sentence is built from computed facts, and a quotation appears only when it is verified as a span (ADR 0007). The model never decides a revelation. Each says what changed, why (the evidence is one step away) and what is still uncertain. A kind of revelation with no deterministic source is not shown.
+- **Failure, stale, conditional and synthetic stay distinct,** and synthetic data stays labelled.
+- **The world goes quiet for distress.** Any risk word stills and dims the world, holds back every revelation and celebration, and shows the calm support panel (ADR 0007). Nothing about it glows.
+
+## The interaction model
+
+**The first ten seconds.** The world is dark, with one light: the person. One plain question invites them in: "What do you do now, or what did you do last?" As they type, matching job titles from the pinned ESCO release appear to pick from (the plan's call, v1.4). Their first answer changes the world at once: the origin ignites, and deterministic code over ESCO grows the first trails, showing the skills that role usually needs ("usual in your role, not confirmed yet") and a first scatter of destinations on the horizon. No model call stands between the first answer and the world's response, so it works before a key is connected and in the demo. The sure or unsure entry (spec section 3) follows this first answer, and the conversation takes it from there. If nothing matches, the world still responds and asks a sharper question; it never invents a match. A returning person sees what changed since their last visit, never a debt of missed tasks.
+
+**Act, see the consequence, then confirm.** Every decision shows its consequence in the world before it is committed. Trails a new limit would cut dim and say why; a chosen target draws its trails forward; an excluded option's bridges wither. The person confirms or backs out (spec section 3: a changed constraint shows affected results before invalidating them). Once confirmed, the change is real and announced in words, and undo stays available.
+
+**Revelations are rare and staged.** One at a time; others wait their turn. A revelation holds the ambient motion, stages its light, then settles into a stable state with a short card: the insight in one sentence, why, and what is uncertain. Any input completes it at once.
+
+**Progress you can see.** Planning progress, evidence acquired and real-world action stay distinct (spec section 15). A recorded decision lights a landmark, evidence lights the ground, and a real action (an application sent, a course finished) leaves the brightest permanent mark. The specification's M1 celebrations move into L0 in this form. Never streaks, leaderboards, points, made-up levels, countdowns, shame, rewards for spending or comparison with other people.
+
+**One idea at a time.** The product owner asked for "minimum ideas per page". Each view has one question or decision and one primary action, which is bright and unmistakable ("Needs to be a bright colour"). Accept and undo are colour coded as well as worded (session 2, C3). Settings such as how Careerwright talks with you live in preferences, never on the first screen. Chat is immediate. Helper text appears only where it helps.
+
+**Plain words carry the wonder.** The spectacle never replaces words. Words the product owner could not follow at session 2 ("conditional", "fixture", "economic cost" against "direct cost", "once its assessed report is passed", "print snapshot") give way to plain phrases on screen. TRACE-01 and DIRECTAI keep their separate labels.
+
+## Motion, stillness and sound
+
+Motion always means something: growth is a new possibility, ignition is new evidence, dimming is something the person's decision ruled out, a flare is a revelation, and settling is a stable fact. Ambient motion (a slow breathing of light, drifting particles) is low in amplitude and stills while the person reads or types.
+
+Proposed timings: feedback to any input within 100 ms; panels 220–320 ms; travel between places up to 600 ms; revelations staged over 0.6–1.8 s and interruptible. These replace the earlier limits.
+
+Stillness is a first-class version, not a fallback. With `prefers-reduced-motion` or calm mode, the world is drawn still: the same states and the same words, travel as a cut, and each revelation as an instant change with its card. A visible control pauses ambient motion at any time (WCAG 2.2.2). Nothing flashes more than three times a second. No information exists only in motion.
+
+Sound is not part of L0. The spike may try a short, off-by-default sound for ignition and revelations; it ships only if the product owner asks for it at session W1.
+
+## How it is built
+
+The rendering split is this plan's call, to be proven by Sprint W's spike:
+
+- **The world layer** (atmosphere, glow, particles, depth and travel) is drawn with WebGL2 in one canvas behind everything. The spike chooses the library from mature candidates (for example three.js, PixiJS or OGL); it is pinned at least 14 days old and recorded in `docs/dependencies.md`.
+- **The exact layer** is everything a person reads or operates: labels, cards, the console, the time and cost instrument and the Gantt, in DOM and SVG, with D3 for layout and geometry. The canvas holds nothing unique. Every place has a DOM list with the same selection, and every action works from the keyboard and that list (spec section 14).
+- **The still world** is drawn without WebGL when motion is reduced, calm mode is on or WebGL2 is unavailable. It shows every state.
+
+Proposed lab budgets in Chrome and Safari, with the world at its busiest (100 job nodes, their trails and ambient particles): 95th-percentile frame time within 16.7 ms on the specification's target Mac (spec section 14: MacBook Air M1, 8 GB) during ambient motion, travel and revelations. The machine available is faster (an M4 MacBook Pro, 16 GB), so measurements on it must leave headroom: within 8 ms there, half the budget. A check on an M1-class Mac is a human check in Sprint 9 if one is available (the plan's call, v1.4). Also: input feedback within 100 ms; the world's first frame within one second of the page appearing; ambient motion stops while the tab is hidden. Report device, browser, scene and percentiles; these are lab targets, not field measurements. On a phone the world is the backdrop behind focused views, with the console and cards in sheets. Phones get their own layout; never shrink the desktop world to phone size and call it responsive.
+
+## Type, colour and tokens
+
+- Bold geometric sans display type in white on the dark world, as in the product owner's image; a highly readable sans for body text at 16 px and up; tabular numerals for money and time; an optional mono for instrument readouts. Each face is licensed (for example under the OFL), self-hosted and recorded. Newsreader retires.
+- One colour, one meaning. From the image: the near-black ground; orange for destinations only; the brightest teal (the sea-glass family) for selection, the chosen path and the primary action only; blue and violet for the other trails, graded the same way along every trail so they never mean a category. Error and stale keep hues no other meaning uses, after a glyph and words. Industry moves from colour to glyph and label so that colour stays free for meaning; spec VIS-1's industry colours are replaced.
+- Reading happens on dark glass panels opaque enough that nothing glowing behind them can pull text below WCAG AA. Every pairing, including a panel over the brightest light in the world, goes into `contrast-pairs.json` and is measured. Print stays light and ink-efficient.
+- Kept from the Sprint 0 references: semantic token names, glyph-first status, unknown drawn rather than omitted, Pareto layers told apart without colour, one primary action per view, chapters never numbered and synthetic data always labelled.
 
 ## Design deliverables
 
-Before feature expansion, produce three complete high-fidelity compositions: conversation with evidence drawer, opportunity map with selected role, and route comparison with selected journey. Use actual fixture numbers and realistic long labels. Include mobile variants, unknown data and one failure state for each. Preserve the designs in a versioned local design reference and implement their components in Storybook.
+Sprint W delivers them (section 6):
 
-Use the specification’s ink #09121F, raised ink #142338, light canvas #F5F7FA and sea-glass action accent #5DE0C1 as starting tokens. Validate contrast rather than assuming these combinations pass. Choose one licensed self-hosted humanist body face and one restrained display face; record licence and files before adoption. Use tabular numerals and consistent currency/date formatting.
+1. **A spike of three directions**, each showing the same first ten seconds and one revelation on synthetic data, each with its still version: *Growth* (organic first: a network of roots and nerves grown from the person), *Horizon* (journey first: a horizon plane like the image's, with destinations ahead and travel towards them) and *Circuit* (cybernetic first: a precise luminous circuit with instrument readouts and lock-on). The spike is throwaway. The product owner plays all three and chooses at session W1.
+2. **New design references** for the chosen direction: tokens, type, the motion vocabulary, the six places, phone layouts and every honest state (unknown, conditional, stale, failed, synthetic and distress), with contrast measured. They replace the Sprint 0 compositions.
+3. **The world in the app**: the shell, the world layer and travel, and the You chapter rebuilt in it with its moment, applying session 2's design findings.
 
-Define semantic tokens for surfaces, text, focus, selection, industry and status. Industry colour must never also mean success or error. Use fixed licensed icons, meaningful labels and clear hierarchy. No decorative photographic assets are necessary for L0.
-
-On desktop, use a slim chapter rail, central work area and evidence drawer. On mobile, lead with cards and lists, with focused graph views and a bottom evidence sheet. Do not shrink the desktop graph to phone size and call it responsive.
+Every later chapter is then built as its place in the world, with its moment, by its own sprint (Sprints 3, 4, 5, 7 and 8).
 
 # 5 Visual and usability acceptance
 
@@ -159,7 +230,7 @@ On desktop, use a slim chapter rail, central work area and evidence drawer. On m
 
 ## Design review rubric
 
-At Sprints 1, 3, 7 and 9, the product owner and a design reviewer assess hierarchy, typography, spacing, visual identity, chart legibility, uncertainty communication, responsive composition and interaction continuity. Record a 1–5 score with concrete defects; require every category to reach at least 4 before the final local release. This is a proposed internal review convention, not a validated UX measurement.
+At Sprints 1, W, 3, 7 and 9, the product owner and a design reviewer assess hierarchy, typography, spacing, visual identity, chart legibility, uncertainty communication, responsive composition and interaction continuity. From v1.4 they also score three questions from section 4: does it feel like a world answering you, not a tool; did it show you something true you did not know, and why; and do decisions show their consequences? Record a 1–5 score with concrete defects; require every category to reach at least 4 at session W2 before more chapters are built in the world, and again before the final local release. This is a proposed internal review convention, not a validated UX measurement.
 
 A screenshot approval covers all six chapters at 1440 × 900 and 390 × 844, plus a tablet check at 768 × 1024. Review default, selected, empty, partial, stale, unavailable and failed states for the components that support them. Test long role/provider names, three targets, negative economic cost, zero results and the 100-visible-job limit. Never approve only the attractive fixture.
 
@@ -169,7 +240,7 @@ Maintain one shared selection and filter contract across list, map, pay lens, sc
 
 Show progress with actual stages and counts. Do not invent percentage completion for an unbounded provider call. Keep earlier results readable during refresh, with their version and freshness visible.
 
-Use short transitions only to explain selection, expansion or change. Proposed timings: 120–180 ms for controls, 220–320 ms for panels and up to 450 ms for a staged graph reveal. Do not run continuous force motion.
+Motion follows section 4: it always means something, ambient motion stays low and stills while the person reads or types, and a visible control pauses it. Section 4 holds the proposed timings. Layout never moves on its own: no continuous force-directed motion; the world's ambient motion is atmosphere, not layout.
 
 Calm mode and prefers-reduced-motion remove spatial animation without removing information. Every essential interaction must work with motion off and through a DOM list.
 
@@ -179,9 +250,9 @@ A conditional route, stale claim and failed request must look distinct. Grey Par
 
 Target WCAG 2.2 AA. Check keyboard-only completion, visible focus, proper headings, accessible names, focus return from drawers, 200% zoom, narrow-screen reflow, contrast and error announcements. Use axe plus manual VoiceOver testing on the actual target Mac; Playwright WebKit does not replace testing Safari and assistive technology.
 
-Set measured local budgets: immediate input feedback within 100 ms; p95 linked filtering/selection within 150 ms at 100 visible jobs and a bounded 1,000-mark route projection; no horizontal page overflow at 390 px. Report device, browser, dataset and measured percentiles. These are proposed lab budgets, not field Web Vitals or a guarantee on every laptop. The complete archive stays accessible through paginated groups; projection counts disclose hidden marks and never change ranks.
+Set measured local budgets: immediate input feedback within 100 ms; p95 linked filtering/selection within 150 ms at 100 visible jobs and a bounded 1,000-mark route projection; no horizontal page overflow at 390 px; and the world's frame and first-frame budgets in section 4. Report device, browser, dataset and measured percentiles. These are proposed lab budgets, not field Web Vitals or a guarantee on every laptop. The complete archive stays accessible through paginated groups; projection counts disclose hidden marks and never change ranks.
 
-Run five short synthetic-data task sessions near Sprint 9, covering sure/unsure entry, evidence inspection, route choice and print. Aim for four of five participants to finish the core task without assistance and correctly explain cost, conditional readiness and uncertainty. Any dangerous misunderstanding is a blocker regardless of the aggregate result; this small study is formative, not statistical validation.
+Run five short synthetic-data task sessions near Sprint 9, covering sure/unsure entry, evidence inspection, route choice and print. Aim for four of five participants to finish the core task without assistance and correctly explain cost, conditional readiness and uncertainty. Record each person's first two minutes too: what they changed, and what they say they learnt about themselves. Any dangerous misunderstanding is a blocker regardless of the aggregate result; this small study is formative, not statistical validation.
 
 Hold one earlier formative comprehension session after Sprint 5, so that user contact precedes the two most expensive UI sprints. One person spends 30 minutes with synthetic data on the fixture route comparison and the TRACE-01 ledger; screenshots or Storybook are acceptable surfaces. Ask them to explain the cost shown, what “conditional readiness” means and what is uncertain. Record any dangerous misunderstanding as a Sprint 7 scope input. The product owner runs it at review session 2 (section 10). It is formative, not statistical, and leaves the five Sprint 9 sessions unchanged.
 
@@ -194,16 +265,19 @@ Sprints are short, outcome-based increments rather than arbitrary two-week conta
 | 0 | Verify provider, durability and local constraints; freeze contracts | 2–3 | Done: approvals given 2026-10-28, not timed | Supplied specification and access checks |
 | 1 | Beautiful local shell and persisted fixture journey | 3–4 | Done: approval given 2026-10-28, not timed | Sprint 0 decisions |
 | 2 | Live interview and grounded career discovery | 4–5 | H-11 done 2026-10-28, not timed; H-12 in session 1 | Identity, versions, Meta contract, ESCO import |
-| 3 | Reliable evidence acquisition and living opportunity map | 4–5 | About 2 (session 1, before the Roles chapter); the design review is not estimated | Source policy, taxonomy, run lifecycle |
-| 4 | Skills, protected gates and evidence-based outcomes | 4–5 | H-07 in session 2 | Profile, targets and source claims |
-| 5 | Reviewed options and correct monthly finances | 4–6 | About 2 (session 2, after the Sprint 5 backend) | Capability model and offerings |
+| 3 | Reliable evidence acquisition and living opportunity map | 5–6 | About 2 (session 1, before the Roles chapter); the design review is not estimated | Source policy, taxonomy, run lifecycle; the approved world |
+| 4 | Skills, protected gates and evidence-based outcomes | 5–6 | H-07 in session 2 | Profile, targets and source claims; the approved world |
+| 5 | Reviewed options and correct monthly finances | 5–7 | About 2 (session 2, after the Sprint 5 backend) | Capability model and offerings; the approved world |
+| W | The world: the experience of section 4, with the shell and the You chapter rebuilt in it (v1.4) | 7–10 | About 2 (session W1, about 1, after the spike; session W2, about 1, at the end) | Session 2's design record |
 | 6a | Verified enumeration and three Pareto layers on instances that complete | 5–7 for 6a and 6b together | None | Frozen planning input, financial checker and reviewed option pack |
 | 6b | Durable, bounded search at full scale | (within 6a's range) | None | Sprint 6a |
-| 7 | Exceptional coordinated route comparison | 4–6 | About 1 (session 3, before Sprint 7 closes) | Real solver output, design system and session 2's findings |
-| 8 | Chosen plan, progress, revision and exports | 3–4 | Not estimated: Safari print (H-04) | Stable comparison and immutable snapshots |
-| 9 | Local release qualification and handover | 4–6 | Not estimated: design review, VoiceOver, Safari, five task sessions (H-01, H-03–H-05) | Complete product journey |
+| 7 | Exceptional coordinated route comparison | 5–7 | About 1 (session 3, before Sprint 7 closes) | Real solver output, the approved world and session 2's findings |
+| 8 | Chosen plan, progress, revision and exports | 4–5 | Not estimated: Safari print (H-04) | Stable comparison and immutable snapshots |
+| 9 | Local release qualification and handover | 5–7 | Not estimated: design review, VoiceOver, Safari, five task sessions (H-01, H-03–H-05) | Complete product journey |
 | 10 | Operator's manual, with the friction it finds smoothed | 2–3 | Not estimated: a person follows the manual (H-14); decisions on any larger proposal | The qualified release candidate |
-| Total | Local release candidate | 37–51 | About 5 scheduled, plus Sprints 8–9 | Re-estimate after Sprints 0 and 3 |
+| Total | Local release candidate | 52–70 | About 7½ scheduled, plus Sprints 8–9 | Re-estimate after Sprints 0 and 3, and after the spike |
+
+From v1.4, every interface deliverable in Sprints 3, 4, 5, 7 and 8 is built as its chapter's place in the world, with its moment (section 4), on the design references Sprint W produces. Each of those sprints, and Sprint 9's qualification of motion and frame budgets, is one engineering day larger.
 
 ## Responsibility and sequencing
 
@@ -224,9 +298,20 @@ The critical chain is validated inputs → evidence and outcomes → monthly fea
 7. Sprint 3 Roles chapter (S3.5), job scoring and review, after review session 1.
 8. Sprints 6a, 6b, 7 (closing after review session 3), 8, 9 and 10.
 
+**Order from here (v1.4).** Steps 1–5 are done, through review session 2. Step 6's design findings now belong to Sprint W, which comes before any more chapter interface:
+
+1. Sprint W's spike, then session W1, where the product owner chooses a direction.
+2. The reviewed option pack published from session 2's record (it may run while session W1 is awaited).
+3. The rest of Sprint W, then session W2, the product owner's review of the world.
+4. Sprint 4 Skills chapter and review, then Sprint 5 Options chapter and review, built in the world.
+5. Sprint 3 Roles chapter (S3.5), job scoring and review, after review session 1.
+6. Sprints 6a, 6b, 7 (closing after review session 3), 8, 9 and 10.
+
+Backend work (the option pack, Sprints 6a and 6b) may fill any wait for a session. Interface work waits for session W2.
+
 Review session 1 can be held at any point before the Roles chapter; held before the option pack is curated, it lets the pack's pages be classified against its rights policy rather than left pending human review. Each sprint's review is written when its last slice finishes, so the Sprint 3 review follows those of Sprints 4 and 5. With one implementer at a time, slices without a dependency on each other run one after the other, in either order.
 
-**Human review sessions.** Human review is a scheduled resource, not an event between sprints. Three fixed sessions, named in section 10 with the gates each closes, are dispatch preconditions for the work after them: no dependent slice starts until its session has happened. They total about five and a half hours. The other human checks (the Sprint 3 and Sprint 9 design reviews, VoiceOver, Safari, the five Sprint 9 task sessions and the privacy decision) keep their positions in the sprint cards; none of them is a dispatch precondition.
+**Human review sessions.** Human review is a scheduled resource, not an event between sprints. Five fixed sessions (three from v1.1, and W1 and W2 from v1.4), named in section 10 with the gates each closes, are dispatch preconditions for the work after them: no dependent slice starts until its session has happened. They total about seven and a half hours. The other human checks (the Sprint 3 and Sprint 9 design reviews, VoiceOver, Safari, the five Sprint 9 task sessions and the privacy decision) keep their positions in the sprint cards; none of them is a dispatch precondition.
 
 # Sprint 0 Resolve the expensive uncertainties
 
@@ -424,6 +509,38 @@ After the Sprint 5 backend, the product owner runs the formative comprehension s
 
 Read one route as both a user story and a ledger. Every payment, receipt, time commitment and outcome must have one source and one place in the model. Confirm that conservative model rejection is not described as real-world impossibility.
 
+# Sprint W Build the world (v1.4)
+
+7–10 engineering days • Entry: review session 2's design record (H-01 for Sprint 2, and H-13) • Human: session W1 after the spike, session W2 at the end • Requirements: section 4; spec sections 3, 7, 13, 14 and 15 as section 4 overrides them; ADR 0014
+
+## Demonstrable outcome
+
+Someone opens Careerwright for the first time. Within ten seconds they have changed something and the world has answered. As they share their experience, it shows them something true about themselves, an overlooked strength or an unexpected connection, with the reason one step away. With motion off, a still world tells the same story. All six chapters already live in the world; nothing looks like the old shell.
+
+## Deliverables
+
+SW.1 The spike, throwaway: section 4's three directions (Growth, Horizon and Circuit), each with the same first ten seconds and one revelation on synthetic data, each with its still version and its measured frame times on the target Mac in Chrome. It starts with one command, makes no external request and is labelled as a spike. It settles the WebGL library and the display face. The product owner plays all three at session W1 and chooses one, or a mix, in their own words.
+
+SW.2 Design references for the chosen direction in `docs/design`, replacing the Sprint 0 compositions: tokens with measured contrast (including panels over the brightest light in the world), type, the motion vocabulary and its timings, the six places at 1440 × 900, 768 × 1024 and 390 × 844, and every honest state drawn in the world. The fixture values stay checked by `check-data`.
+
+SW.3 The world layer in the app: one persistent world behind all six chapters, travel between places, the exact DOM and SVG layer on top, the still world, the pause control, calm mode and frame-time instrumentation. A chapter not yet built shows its place in the world with an honest "not built yet" state.
+
+SW.4 The You chapter rebuilt in the world, applying session 2's design findings: chat first and immediate; the tone setting moved to preferences; one idea per view; suggestions in their own view; a bright primary action; accept and undo colour coded; and the limits ("total spending limit", "monthly payment limit") explained in plain words.
+
+SW.5 The first moments: the first answer ignites the origin and grows the first trails through deterministic code over the pinned ESCO release, within one second and without a model call; then the unexpected-connection revelation from the slate, and the overlooked strength (section 4): one bounded, model-backed proposal per conversation turn that has new answers, added as a new run kind (ADR 0006: a task, never a second call path), with its quotation verified as a span and the skill checked as essential before the person is asked to confirm it. It runs only with the person's key and within their spend limit; the demo shows a scripted example, labelled. If the run kind changes the workflow's step sequence, change the DBOS `application_version`. Destinations and connections are joined by shared essential skills, never by shared words in a title. At session 2 the product owner judged the slate for "data analyst" as "arbitrary matching on keywords": check that case and the five personas, and fix the slate where it matches on words (amending ADR 0007).
+
+SW.6 The world's requirements enter the register as a new family, with their tests tagged, and ADR 0014 records the spike's choices.
+
+## Acceptance and tests
+
+The existing journeys pass in the world. Browser tests prove that a first answer changes the world within ten seconds and that every revelation's sentence and evidence are in the DOM. The same journeys pass under reduced motion and calm mode with identical text. axe, overflow and contrast checks are clean at the three viewports; keyboard-only completion and focus return work. Frame times are measured against section 4's budgets and reported with device, browser and scene. Demo mode makes no external request. A risk word stills the world and holds back revelations.
+
+Session W1's choice and session W2's review are the product owner's own records (R2). At session W2 every rubric category, including the three added in v1.4 (section 5), must reach at least 4 before the Skills chapter starts; a lower score gets a fix round first. Safari and VoiceOver stay Sprint 9's human checks.
+
+## Coherence review
+
+Pick one revelation and trace it from the screen to its source records and versions; any glow, gate or shadow without a computed state behind it is a defect. Then ask the question the sprint exists for: would a first-time visitor feel, within ten seconds, "My future is larger than I realised"? If the honest answer is no, the sprint is not done.
+
 # Sprint 6a Prove the optimiser and layers on instances that complete
 
 5–7 engineering days for 6a and 6b together • Entry: frozen input compiler, tested feasibility rules and the option pack reviewed at review session 2 • Requirements: OPT-1, ROU-1, FIN-1, RDY-1, TEST-1
@@ -482,7 +599,7 @@ At two starts per concept, the selection bound alone permits 10,161,633 combinat
 
 # Sprint 7 Make route comparison the signature experience
 
-4–6 engineering days • Entry: real solver output, approved design compositions and the findings of review session 2; closes only after review session 3 • Requirements: VIS-2, ROU-1, AIR-1, sections 13–14
+5–7 engineering days • Entry: real solver output, the world approved at session W2 and the findings of review session 2; closes only after review session 3 • Requirements: VIS-2, ROU-1, AIR-1, sections 13–14
 
 ## Demonstrable outcome
 
@@ -498,7 +615,7 @@ S7.3 Implement exact numeric inputs and keyboard sliders for time/cost. View fil
 
 S7.4 Connect selection to a static Gantt, step cards, monthly financial table and evidence drawer. Use overlapping bands for parallel work/study, clear waits and conditional gates, and actual dates alongside model months.
 
-S7.5 Add the agreed purposeful transitions, reduced-motion/calm mode, persistent target-specific controls and pinned out-of-range states. Preserve the inspected route while recalculating.
+S7.5 Build Routes as its place in the world, with its moment, the credible route (section 4), and its still version; add persistent target-specific controls and pinned out-of-range states. Preserve the inspected route while recalculating.
 
 S7.6 Use paginated archive queries and a bounded projection for large results. Disclose shown/total counts, preserve extremes and selected points, and provide access to every retained schedule. Do not relabel a sampled plot as the full frontier.
 
@@ -745,13 +862,15 @@ Store a short record in docs/reviews/sprint-N.md: demonstrated journey, current 
 
 ## Human review sessions (v1.1)
 
-Human review is scheduled as three fixed sessions, about five and a half hours in all. Each is a dispatch precondition for the work after it: an agent prepares the session's package (checklists, captures, the records to review), a person holds the session, and dependent work starts only after it has happened. If it has not, the work is recorded as “blocked: awaiting session N”, never started or self-certified. The product owner confirmed D1–D3 on 28 October 2026, so no session needs time for them.
+Human review is scheduled as fixed sessions: three from v1.1, about five and a half hours, and two from v1.4 for the world, about two more. Each is a dispatch precondition for the work after it: an agent prepares the session's package (checklists, captures, the records to review), a person holds the session, and dependent work starts only after it has happened. If it has not, the work is recorded as “blocked: awaiting session N”, never started or self-certified. The product owner confirmed D1–D3 on 28 October 2026, so no session needs time for them.
 
 | Session | When | Gates it closes | Precondition for |
 |---|---|---|---|
 | 1, about 2 hours | Before the Sprint 3 Roles chapter (S3.5) and before any page body is retained beyond the source classes it permits | H-06 as a rights policy for the permitted source classes of the corpus and the option pack, so agents can then classify pages themselves (a page outside those classes stays with a person); the H-12 checklist in ADR 0007 | The Roles chapter and job corpus; retaining or committing page bodies beyond ruling R3 |
 | 2, about 2½ hours | After the Sprint 5 backend | H-07 for Sprints 4 and 5, on the option pack and the TRACE-01 checker run on P01's real option set; the formative comprehension session (section 5, H-13); H-01 for Sprint 2, the design review of the You chapter and the slate at desktop and 390 px, testing scanning, understanding and choosing (v1.2) | Publishing the reviewed option pack, and through it Sprint 6a and the Skills, Options and Roles chapters' scoring against reviewed values; more interface detail in those chapters, which first applies the Sprint 2 design findings; the start of Sprint 7 |
 | 3, about 1 hour | Before Sprint 7 closes | H-01 for Sprint 7, the design review, against what session 2 showed | Closing Sprint 7, and so Sprint 8 |
+| W1, about 1 hour (v1.4) | After Sprint W's spike | The product owner plays the three directions of section 4 and chooses one, or a mix, in their own words; also whether sound is wanted | The rest of Sprint W |
+| W2, about 1 hour (v1.4) | At the end of Sprint W | H-01 for Sprint W: the design review of the world and the You chapter, every rubric category at least 4 (section 5) | Every later chapter interface: Skills, Options, Roles, Routes and Plan |
 
 ## Use the supplied Claude Code starter kit
 
@@ -779,7 +898,7 @@ Link this living checklist to code, tests, demonstrations or scope exclusions. P
 | MAP-1, OUT-1 and RDY-1 | 4, 5 | Provisional matrix, inspectable spans, protected gates and apply-now |
 | TIME-1 and FIN-1 | 5, 6a, 8 | Independent ledger checks, conservative timing, export agreement |
 | OPT-1 and ROU-1 | 6a, 6b, 7 | Oracle agreement, full encountered archive, exact/truncated labels, measured complete-coverage sizes, truncation shown as the expected case |
-| VIS-1 and VIS-2 | 1, 3, 7, 9 | Approved compositions, coordinated state, keyboard and performance |
+| VIS-1 and VIS-2 | 1, W, 3, 7, 9 | The world approved at session W2, coordinated state, keyboard and performance |
 | Evidence lifecycle and chosen plan | 3, 8, 9 | Invalidation, immutable snapshots, replan and offline export |
 | ARC-1 and secret/privacy controls | 0, 1, 9 | Ownership, journals, spend, revocation, recovery, deletion and restore |
 | TEST-1 | All, final gate 9 | Five browser personas, two numeric fixtures and real Meta smoke |
@@ -823,7 +942,9 @@ References checked on 27 October 2026. These narrow checks support the integrati
 | Monthly bounds reject viable real routes | Preserve exact dates and explain coarse-model limitations. Offer explicit reviewed changes within scope, not an infeasibility claim about life. |
 | Search does not finish within limits | Keep every encountered route and disclose truncation. Use tiny complete cases for proof; qualify the full-size workload empirically. |
 | Attractive UI hides uncertainty | Make conditional/unknown states part of initial compositions and formative comprehension tests. Block misleading presentation. |
-| Design quality arrives too late | Approve signature compositions in Sprint 0, shell in 1, map in 3 and route view in 7. Fix interaction debt before final integration. |
+| Design quality arrives too late | Choose the world from a working spike (session W1) and approve it (session W2) before more chapters are built in it; then the map in 3 and the route view in 7. Fix interaction debt before final integration. |
+| The product owner's ambition is diluted again in planning or building (v1.4) | Their words lead section 4 and `CLAUDE.md`. Session W1 chooses from something they can play, not from a description. Session W2 is a gate with three rubric questions about the ambition itself. A screen that works but is bland fails review. |
+| The spectacle costs speed, access or truth (v1.4) | An exact DOM and SVG layer over the WebGL world, which holds nothing unique; a still version that carries every state and word; frame budgets measured on the target Mac; and the rule that everything that varies has a computed meaning. |
 | Scope expands into public launch | Maintain the explicit L0 checklist. Schedule hosted/private-beta and M1 work as later milestones with their own acceptance evidence. |
 | Human review becomes the bottleneck | Sprints 0–2 took 16 hours of wall-clock time, so review points that assumed weeks between them now set elapsed time. Hold three fixed review sessions as dispatch preconditions (section 10) and size the remaining work in human review hours (section 6). |
 | Language-rule refinement becomes open-ended (support screen, explanation validation, redaction, value readers) | Grow a rule only for a reproduced defect or an evaluation failure. Prefer a fail-safe outcome (unknown, unclear, not kept) to a new pattern. Record a hypothetical form as a known limit. Keep the safeguards and accepted limitations as recorded (v1.2; ruling R11 in the task file). |

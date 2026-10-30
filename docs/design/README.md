@@ -1,5 +1,10 @@
 # Careerwright design references (Sprint 0)
 
+**Superseded direction (2026-10-30).** The "calm observatory" below is replaced by the living
+world: the plan's section 4 (v1.4) and ADR 0014. These references stay as the record of
+Sprint 0, and their fixture checks keep running, until Sprint W's references replace them.
+Do not polish them or build new work on their look.
+
 Versioned visual reference for L0: semantic tokens with measured contrast, two licensed
 fonts, and three signature compositions built as static HTML, CSS and SVG. Each
 composition has a desktop and mobile layout, an unknown-data state and a failure state.

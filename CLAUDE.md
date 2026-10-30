@@ -2,8 +2,9 @@
 
 Careerwright L0: a local career-planning app (FastAPI, Pydantic AI, DBOS and PostgreSQL 16
 backend; Next.js web app in `apps/web`). Authority order: `Careerwright_Product_Specification.md`
-(v1.2), then `docs/plan/development-plan.md` (v1.0), then `docs/plan/l0-sprint-tasks.md`.
-Decisions live in `docs/adr/`; the latest sprint review is in `docs/reviews/`.
+(v1.3), then `docs/plan/development-plan.md` (v1.4), then `docs/plan/l0-sprint-tasks.md`. For the
+experience and the interface, the plan's section 4 (ADR 0014) overrides the specification's art
+direction. Decisions live in `docs/adr/`; the latest sprint review is in `docs/reviews/`.
 
 ## Talking to the user
 Anything the user reads must be easy: chat replies, review packages, questions, decision
@@ -18,6 +19,32 @@ sheets and reports. Keep their effort as low as you can.
 - Show money in pounds (£2,995), never minor units or JSON.
 - Before sending, reread it as someone who has never seen the code. If a sentence needs
   our context to make sense, rewrite it.
+
+## The experience: a world, not a tool
+The product owner's ambition governs every interface change. In their words, Careerwright
+must be "revolutionary, not the current bland corporate borefest". It should "verge on
+computer game rather than typical tool, conveying a sense of travelling through a brave new
+world, and progression towards your destiny", "feel organic and cybernetic", "thrum with
+power and possibility" and "leave users astonished and breathless and excite them with
+revealed insight". The feeling to leave: "My future is larger than I realised—and I can start
+moving towards it." The contract is the plan's section 4 (ADR 0014).
+- One living world, not pages. The person is the light at its origin, destinations are warm
+  lights ahead, and trails of light grow between them. Each chapter is a place in that world
+  with its own moment.
+- Within ten seconds the person has changed something and the world has answered.
+- Progress visibly transforms the world. Evidence unlocks understanding. Decisions show
+  their consequences before they are confirmed.
+- Revelations (an overlooked strength, an unexpected connection, a credible route) are
+  earned: built from deterministic results and verified spans, each with its reason one step
+  away. The model never decides one; it may only propose a strength as a quotation of the
+  person's words, which code verifies and the person confirms (ADR 0014).
+- The world never shows more than the evidence. Everything that varies has a computed
+  meaning; unknown is shadow, never zero; a condition is a gate in plain words; nothing
+  implies a job offer. Distress stills the world and shows the calm support panel.
+- Plain words carry the wonder. Reduced motion and calm mode draw a still world with the
+  same states and words.
+- A bland, form-like or corporate screen fails review even if it works. Ask of every
+  interface change: does this feel like a world answering the person?
 
 ## Commands
 Run from the repository root (details: `docs/runbook.md`).
