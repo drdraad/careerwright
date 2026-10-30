@@ -235,6 +235,7 @@ def test_the_lockfile_holds_none_of_the_excluded_technologies() -> None:
 # The same exclusions for JavaScript (spec ARC-1, GC2): no other renderer (PixiJS, three.js),
 # workflow engine, Redis, vector database, embedding model, agent platform or scraping
 # browser. Playwright stays allowed: it is the plan's browser-test tool, never product code.
+# ADMITTED_JS_PACKAGES below names the one ADR-admitted exception.
 EXCLUDED_JS_PACKAGES = frozenset(
     {
         "pixi.js",
@@ -264,6 +265,9 @@ EXCLUDED_JS_SCOPES = (
     "@huggingface/",
 )
 PNPM_LOCKS = ("apps/web/pnpm-lock.yaml", "docs/design/pnpm-lock.yaml", "docker/auth/pnpm-lock.yaml")
+# The one renderer an ADR admits, and only where it admits it: three.js for the web app's world
+# layer, one WebGL2 canvas behind the exact DOM and SVG layer (ADR 0014 decision 2, Task W2).
+ADMITTED_JS_PACKAGES = {"apps/web/pnpm-lock.yaml": frozenset({"three"})}
 
 
 def pnpm_locked_names(path: Path) -> set[str]:
@@ -302,7 +306,7 @@ def test_the_javascript_lockfiles_hold_none_of_the_excluded_technologies(lock: s
     excluded = {n for n in names if n in EXCLUDED_JS_PACKAGES or n.startswith(EXCLUDED_JS_SCOPES)}
 
     assert len(names) > 0, f"{lock} has no packages: the reader is broken"
-    assert excluded == set()
+    assert excluded - ADMITTED_JS_PACKAGES.get(lock, frozenset()) == set()
 
 
 def import_closure(root: str) -> tuple[set[str], set[str]]:

@@ -98,6 +98,8 @@ export function EvidenceDrawer() {
       {evidence !== null && (
         <Dialog.Content
           className="drawer on-reading"
+          data-covers-world
+          data-world-panel
           data-expanded={expanded}
           aria-describedby={undefined}
           onOpenAutoFocus={(event) => {

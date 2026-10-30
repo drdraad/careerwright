@@ -62,6 +62,19 @@ describe("[STATE-01][UI-04] a planned chapter treats every chosen state as an an
     expect(screen.getByText(/Not asked yet: target roles/)).toBeInTheDocument();
   });
 
+  it.each([
+    ["roles", "Roles", "The horizon: places you could head for."],
+    ["skills", "Skills", "The ground between you and a destination."],
+    ["options", "Options", /^Bridges across the dark stretches/],
+    ["plan", "Plan", /^The path you choose, made solid/],
+  ] as const)("shows %s as its place in the world, honestly not built yet", (id, title, where) => {
+    render(<PlannedChapter id={id} profile={profile({})} workspaceId="w1" />);
+
+    expect(screen.getByText("Not built yet")).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: title })).toBeVisible();
+    expect(screen.getByText(where)).toBeVisible();
+  });
+
   it("says plan selection isn't built, and what its one action is for (V-06)", () => {
     render(<PlannedChapter id="plan" profile={profile({})} workspaceId="w1" />);
 

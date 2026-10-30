@@ -72,8 +72,6 @@ function Strip({
         onReconnect={() => {}}
         refreshFailed={refreshFailed}
         email="ada@careerwright.test"
-        calm={false}
-        onCalmChange={() => {}}
         onSignOut={() => {}}
       />
     </div>

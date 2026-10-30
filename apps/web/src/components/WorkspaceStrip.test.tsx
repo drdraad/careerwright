@@ -38,8 +38,6 @@ function strip(overrides: Overrides = {}) {
       onReconnect={overrides.onReconnect ?? (() => {})}
       refreshFailed={overrides.refreshFailed ?? false}
       email="ada@careerwright.test"
-      calm={false}
-      onCalmChange={() => {}}
       onSignOut={() => {}}
     />,
   );

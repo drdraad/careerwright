@@ -21,6 +21,7 @@
     "storybook": "STORYBOOK_DISABLE_TELEMETRY=1 storybook dev --host 127.0.0.1 --port 6006 --no-open",
     "build-storybook": "STORYBOOK_DISABLE_TELEMETRY=1 storybook build --quiet",
     "e2e": "NEXT_TELEMETRY_DISABLED=1 playwright test",
+    "measure-world": "node scripts/measure-world.mjs ../../docs/evidence/world-frames.json",
     "review-screenshots": "NEXT_TELEMETRY_DISABLED=1 CAREERWRIGHT_REVIEW_DIR=../../docs/reviews/sprint-2/screenshots playwright test e2e/visual.spec.ts"
   },
   "dependencies": {
@@ -31,7 +32,8 @@
     "@tanstack/react-query": "5.104.2",
     "next": "16.4.1",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
@@ -47,6 +49,7 @@
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@types/three": "0.186.0",
     "axe-core": "4.14.0",
     "jsdom": "30.1.2",
     "storybook": "10.6.2",

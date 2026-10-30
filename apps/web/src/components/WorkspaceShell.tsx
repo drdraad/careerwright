@@ -1,14 +1,15 @@
 "use client";
-// The six-chapter shell around one workspace (spec section 3, UI-09): chapter rail or menu,
-// workspace strip, the chapter's work area and the evidence drawer. It owns the session
+// The six-chapter shell around one workspace (spec section 3, UI-09): one persistent world
+// behind everything (plan section 4), with the chapter rail or menu, the workspace strip and
+// its world controls, the chapter's place and the evidence drawer over it. It owns the session
 // checks (signed in, invited, workspace visible) and the workspace's live status events;
 // chapters read the same server state through `useWorkspaceData`.
 import { usePathname, useRouter, useSelectedLayoutSegment } from "next/navigation";
-import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import type { ProfileOut, WorkspaceOut } from "@/generated/api";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { CHAPTERS, type ChapterId, type ChapterProgress, isChapter } from "@/lib/chapters";
+import { type ChapterId, type ChapterProgress, isChapter } from "@/lib/chapters";
 import type { StreamStatus } from "@/lib/events";
 import {
   firstLoadFailed,
@@ -19,11 +20,15 @@ import {
   useWorkspaceEvents,
   useWorkspaces,
 } from "@/lib/queries";
+import { worldFromProfile } from "@/lib/world/model";
+import { useWorldSettings } from "@/lib/world/settings";
 import { ChapterMenu, ChapterRail } from "./ChapterNav";
 import { EvidenceDrawer, useEvidence } from "./EvidenceDrawer";
 import { NotInvited, PageFrame, PageLoading, RequestFailure } from "./PageState";
 import { SyntheticLabel } from "./Status";
 import { WorkspaceStrip } from "./WorkspaceStrip";
+import { World } from "./World";
+import { WorldControls } from "./WorldControls";
 
 type WorkspaceData = {
   workspace: WorkspaceOut;
@@ -40,32 +45,6 @@ export function useWorkspaceData(): WorkspaceData {
   const value = useContext(WorkspaceContext);
   if (value === null) throw new Error("useWorkspaceData outside WorkspaceShell");
   return value;
-}
-
-const CALM_KEY = "careerwright.calm";
-
-/** Calm mode is a per-viewer convenience; storage may be unavailable, which only loses it. */
-function useCalmMode(): [boolean, (calm: boolean) => void] {
-  const [calm, setCalm] = useState(false);
-  useEffect(() => {
-    try {
-      setCalm(window.localStorage.getItem(CALM_KEY) === "true");
-    } catch {
-      // Private mode or blocked storage: calm mode simply starts off.
-    }
-  }, []);
-  useEffect(() => {
-    document.documentElement.dataset.calm = String(calm);
-  }, [calm]);
-  const update = (next: boolean) => {
-    setCalm(next);
-    try {
-      window.localStorage.setItem(CALM_KEY, String(next));
-    } catch {
-      // As above: the choice holds for this page only.
-    }
-  };
-  return [calm, update];
 }
 
 /**
@@ -118,7 +97,7 @@ export function WorkspaceShell({
   const router = useRouter();
   const pathname = usePathname();
   const { evidence, close } = useEvidence();
-  const [calm, setCalm] = useCalmMode();
+  const world = useWorldSettings();
   const signedIn = auth.state.status === "signed_in";
 
   useEffect(() => {
@@ -146,6 +125,10 @@ export function WorkspaceShell({
     session: auth.state.status === "signed_in" ? auth.state.uid : "",
   });
   const visited = useVisited(workspaceId, chapter);
+  const worldInput = useMemo(
+    () => (profile.data === undefined ? null : worldFromProfile(profile.data)),
+    [profile.data],
+  );
 
   if (auth.state.status !== "signed_in") return <PageLoading stage="Checking your sign-in" />;
   // Only a first load that fails replaces the shell. A failed refresh (Careerwright restarting) keeps
@@ -183,7 +166,6 @@ export function WorkspaceShell({
   }
   if (workspace.data === undefined) return <PageLoading stage="Opening your workspace" />;
 
-  const surface = CHAPTERS.find((item) => item.id === chapter)?.surface ?? "reading";
   const progress = progressOf(visited, profile.data);
   const data: WorkspaceData = {
     workspace: workspace.data,
@@ -203,7 +185,7 @@ export function WorkspaceShell({
       </a>
       <div className="app" data-drawer={evidence === null ? "closed" : "open"}>
         <ChapterRail workspaceId={workspaceId} current={chapter} progress={progress} />
-        <div className="topbar on-space">
+        <div className="topbar on-space" data-covers-world>
           <ChapterMenu workspaceId={workspaceId} current={chapter} progress={progress} />
           {workspace.data.synthetic && <SyntheticLabel />}
         </div>
@@ -217,15 +199,21 @@ export function WorkspaceShell({
           onReconnect={events.restart}
           refreshFailed={refreshFailed(me, workspace, profile)}
           email={auth.state.email}
-          calm={calm}
-          onCalmChange={setCalm}
+          controls={<WorldControls settings={world} />}
           onSignOut={() => void auth.signOut()}
         />
-        <main id="main" tabIndex={-1} className={`workarea on-${surface}`}>
+        <main id="main" tabIndex={-1} className="workarea">
           {children}
         </main>
         <EvidenceDrawer />
       </div>
+      <World
+        place={chapter}
+        input={worldInput}
+        calm={world.calm}
+        paused={world.paused}
+        sound={world.sound}
+      />
     </WorkspaceContext.Provider>
   );
 }

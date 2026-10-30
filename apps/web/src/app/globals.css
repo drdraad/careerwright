@@ -3,8 +3,9 @@
  * tokens (src/design/tokens/tokens.css, a byte-identical mirror of docs/design/tokens,
  * imported beside this file so its font URLs resolve from its own folder). The Tailwind
  * theme is reset and rebuilt from those semantic tokens, so no default palette, spacing or
- * radius exists to drift from the design system. Component classes port the reviewed
- * Sprint 0 shell (docs/design/compositions/shell.css).
+ * radius exists to drift from the design system. The shell is the living world's (plan
+ * section 4, docs/design/compositions/world.css): the world behind everything, words on dark
+ * glass over it, sea-glass only for selection and the one primary action.
  */
 @import "tailwindcss";
 
@@ -36,6 +37,7 @@
   --color-space-raised: var(--surface-space-raised);
   --color-space-raised-2: var(--surface-space-raised-2);
   --color-reading: var(--surface-reading);
+  --color-glass: var(--surface-glass);
   --color-card: var(--surface-card);
   --color-band: var(--surface-band);
 
@@ -74,19 +76,28 @@
     line-height: var(--leading-body);
     font-optical-sizing: auto;
     -webkit-text-size-adjust: 100%;
+    color-scheme: dark;
   }
 
+  /* Outside a workspace (sign-in, the workspace list) the world's ground and horizon are
+     still there, drawn still; inside one, the world itself is drawn behind (World.tsx). */
   body {
     min-height: 100dvh;
-    background: var(--surface-space);
+    background:
+      radial-gradient(120% 38% at 50% 64%, rgb(28 37 82 / 0.85), transparent 70%),
+      linear-gradient(180deg, #010309 0%, #050a1a 52%, var(--world-horizon) 64%, #050916 76%, var(--surface-space) 100%);
+    background-attachment: fixed;
     color: var(--text-on-space);
     font-size: var(--type-16);
   }
 
+  /* Focus is white, never sea-glass (which means selection). Its dark halo keeps it visible
+     over any light in the world. */
   :focus-visible {
     outline: 2px solid var(--focus, var(--focus-ring-space));
     outline-offset: 2px;
     border-radius: 4px;
+    box-shadow: 0 0 0 6px var(--surface-space);
   }
 
   [hidden] {
@@ -101,16 +112,17 @@
 
   .display {
     font-family: var(--font-display);
-    font-weight: 340;
+    font-weight: var(--weight-display);
     line-height: var(--leading-display);
-    letter-spacing: -0.005em;
+    letter-spacing: var(--tracking-display);
   }
 
   .page-title {
     font-family: var(--font-display);
-    font-weight: 340;
-    font-size: var(--type-31);
+    font-weight: var(--weight-display);
+    font-size: var(--type-39);
     line-height: var(--leading-display);
+    letter-spacing: var(--tracking-display);
   }
 
   .measure {
@@ -123,16 +135,150 @@
     flex: none;
   }
 
-  /* ---------- App frame ---------- */
+  /* ---------- The world, behind everything ---------- */
+
+  .world {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    background: var(--world-ground);
+  }
+
+  .world-layer {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .world-layer svg,
+  .world-layer canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .world-words {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* Each light's name sits beside it on a small dark label (measured over the brightest
+     light). A name that cannot be placed clear of the panels is hidden from sight only: it
+     stays in the list for assistive tech. */
+  .world-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px var(--space-12);
+    border-radius: 999px;
+    background: var(--surface-label);
+    color: var(--text-on-space);
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: var(--type-14);
+    line-height: 1.5;
+    white-space: nowrap;
+    transition: opacity var(--motion-panel) var(--ease-settle);
+  }
+
+  .world-label[data-shown="false"] {
+    opacity: 0;
+  }
+
+  .world-label[data-kind="origin"] {
+    font-weight: 700;
+  }
+
+  .world-label[data-leader="above"]::after,
+  .world-label[data-leader="below"]::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    width: 1px;
+    height: var(--leader, 0);
+    background: rgb(242 246 255 / 0.45);
+  }
+
+  .world-label[data-leader="above"]::after {
+    top: 100%;
+  }
+
+  .world-label[data-leader="below"]::after {
+    bottom: 100%;
+  }
+
+  /* Orange means a destination: its glyph is a small warm diamond, its name stays white. */
+  .world-label[data-kind="destination"]::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    background: var(--light-destination);
+    transform: rotate(45deg);
+  }
+
+  .world-legend {
+    position: absolute;
+    right: var(--space-24);
+    bottom: var(--space-24);
+    display: grid;
+    gap: var(--space-4);
+    padding: var(--space-8) var(--space-12);
+    border-radius: var(--radius-control);
+    background: var(--surface-label);
+    color: var(--text-on-space-muted);
+    font-size: var(--type-14);
+  }
+
+  .world-legend[data-shown="false"] {
+    opacity: 0;
+  }
+
+  .world-legend li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+  }
+
+  .world-key {
+    display: inline-block;
+    flex: none;
+  }
+
+  .world-key[data-key="destination"] {
+    width: 9px;
+    height: 9px;
+    background: var(--light-destination);
+    transform: rotate(45deg);
+  }
+
+  .world-key[data-key="shadow"] {
+    width: 18px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--trail-shadow);
+  }
+
+  /* ---------- App frame: over the world ---------- */
 
   .app {
+    position: relative;
+    z-index: 1;
     display: grid;
     grid-template-columns: 88px minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
     min-height: 100dvh;
   }
 
+  /* The rail is the journey through the six places: a fine trail of light joins them. */
   .rail {
+    position: relative;
     grid-row: 1 / span 2;
     grid-column: 1;
     display: flex;
@@ -140,8 +286,7 @@
     align-items: center;
     gap: var(--space-24);
     padding: var(--space-24) 0;
-    background: var(--surface-space);
-    border-right: 1px solid var(--line-space-hairline);
+    background-image: linear-gradient(90deg, rgb(3 5 11 / 0.94) 55%, rgb(3 5 11 / 0.6));
   }
 
   .rail-mark {
@@ -150,21 +295,36 @@
     gap: var(--space-4);
     color: var(--text-on-space);
     text-decoration: none;
-    font-size: var(--type-14);
+    font-family: var(--font-display);
+    font-size: var(--type-12);
     font-weight: 600;
+    letter-spacing: 0.01em;
   }
 
   .rail-mark .glyph {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
   }
 
   .rail-chapters {
+    position: relative;
     display: grid;
     gap: var(--space-8);
   }
 
+  .rail-chapters::before {
+    content: "";
+    position: absolute;
+    top: 22px;
+    bottom: 40px;
+    left: 50%;
+    width: 1px;
+    background: linear-gradient(180deg, var(--trail-near), var(--trail-far));
+    opacity: 0.55;
+  }
+
   .rail-chapter {
+    position: relative;
     display: grid;
     justify-items: center;
     gap: var(--space-4);
@@ -173,6 +333,7 @@
     border-radius: var(--radius-control);
     color: var(--text-on-space-muted);
     text-decoration: none;
+    font-family: var(--font-display);
     font-size: var(--type-14);
     transition: color var(--motion-control) var(--ease-settle);
   }
@@ -186,7 +347,8 @@
     height: 14px;
     border-radius: 50%;
     border: 1.5px solid var(--line-space-control);
-    background: var(--surface-space);
+    background: transparent;
+    box-shadow: 0 0 0 3px var(--surface-space);
   }
 
   /* V-09: a visited chapter has a brighter ring, never a fill. A filled landmark is kept for a
@@ -202,12 +364,14 @@
     font-weight: 600;
   }
 
+  /* Where you are: the lock-on ring, in sea-glass (selection). */
   .rail-chapter[aria-current="page"] .landmark,
   .menu-chapter[aria-current="page"] .landmark {
     border: 2px solid var(--selection-space);
     box-shadow:
       0 0 0 4px var(--surface-space),
-      0 0 0 5px var(--selection-space);
+      0 0 0 5px var(--selection-space),
+      0 0 14px 4px rgb(69 247 212 / 0.35);
   }
 
   .strip {
@@ -218,7 +382,8 @@
     gap: var(--space-12) var(--space-24);
     min-height: 60px;
     padding: var(--space-12) var(--space-32);
-    background: var(--surface-space-raised);
+    background: var(--surface-glass);
+    backdrop-filter: blur(var(--glass-blur));
     border-bottom: 1px solid var(--line-space-hairline);
     font-size: var(--type-14);
   }
@@ -243,21 +408,60 @@
   .workarea {
     grid-column: 2;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
   }
 
-  .workarea.on-reading {
-    background: var(--surface-reading);
-  }
-
-  .workarea.on-space {
-    background: var(--surface-space);
-  }
-
+  /* A built chapter reads on a dark glass panel over the world, leaving the world in view
+     beside it; a place not built yet is a small card low in the world. */
   .chapter {
     display: grid;
     gap: var(--space-24);
     max-width: 1080px;
+    margin: var(--space-24) var(--space-32) var(--space-32);
     padding: var(--space-32);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-card);
+    background: var(--surface-reading);
+    backdrop-filter: blur(var(--glass-blur));
+    box-shadow: var(--shadow-card-on-space);
+  }
+
+  .chapter-place {
+    max-width: 520px;
+    margin-top: auto;
+    gap: var(--space-16);
+    padding: var(--space-24);
+  }
+
+  .chapter-place .page-title {
+    font-size: var(--type-31);
+  }
+
+  .chapter-place .empty {
+    padding: var(--space-16) 0 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .place-kicker {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--status-unknown);
+    font-size: var(--type-14);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .place-where {
+    font-family: var(--font-display);
+    font-size: var(--type-20);
+    font-weight: 400;
+    line-height: 1.3;
+    color: var(--fg);
   }
 
   /* ---------- Evidence drawer: a column on wide screens, an overlay on tablets, a bottom
@@ -268,7 +472,8 @@
     flex-direction: column;
     gap: var(--space-16);
     padding: var(--space-24);
-    background: var(--surface-card);
+    background: var(--surface-glass-strong);
+    backdrop-filter: blur(var(--glass-blur));
     color: var(--text-on-reading);
     border-left: 1px solid var(--line-reading-hairline);
     border-top-left-radius: var(--radius-sheet);
@@ -292,7 +497,7 @@
   .drawer-title {
     margin-right: auto;
     font-family: var(--font-display);
-    font-weight: 400;
+    font-weight: var(--weight-display);
     font-size: var(--type-25);
     line-height: var(--leading-display);
   }
@@ -332,9 +537,11 @@
     height: 18px;
   }
 
+  /* The one primary action: bright and unmistakable ("Needs to be a bright colour"). */
   .btn-primary {
     background: var(--action);
     color: var(--on-action);
+    box-shadow: 0 0 22px -6px rgb(69 247 212 / 0.7);
   }
 
   .btn-secondary {
@@ -703,7 +910,8 @@
     gap: var(--space-12);
     grid-column: 1;
     padding: var(--space-12) var(--space-16);
-    background: var(--surface-space);
+    background: var(--surface-glass);
+    backdrop-filter: blur(var(--glass-blur));
     border-bottom: 1px solid var(--line-space-hairline);
   }
 
@@ -722,8 +930,17 @@
     grid-column: 1;
   }
 
+  /* On a phone the world is the backdrop: the chapter is a sheet over it, edge to edge. */
   .chapter {
+    margin: var(--space-12) 0 0;
     padding: var(--space-24) var(--space-16);
+    border-width: 1px 0 0;
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  }
+
+  .chapter-place {
+    max-width: none;
+    margin-top: auto;
   }
 
   .app[data-drawer="open"] .chapter {
@@ -788,8 +1005,18 @@
     font-size: var(--type-20);
   }
 
-  .page-title {
-    font-size: var(--type-25);
+  .page-title,
+  .chapter-place .page-title {
+    font-size: var(--type-31);
+  }
+
+  .world-toggle-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
@@ -813,6 +1040,73 @@
 
 .strip-switch:hover {
   border-color: var(--line-space-control);
+}
+
+/* The world's controls: pause motion, calm mode and sound, each a switch with its words. */
+.world-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.world-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 40px;
+  padding: 0 var(--space-8);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-on-space-muted);
+  font-size: var(--type-14);
+  cursor: pointer;
+}
+
+.world-toggle:hover:not([aria-disabled="true"]) {
+  border-color: var(--line-space-control);
+  color: var(--text-on-space);
+}
+
+.world-toggle[aria-pressed="true"] {
+  color: var(--text-on-space);
+}
+
+/* Disabled keeps readable words and says why to assistive tech; the switch shows it is set. */
+.world-toggle[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.world-switch {
+  position: relative;
+  width: 26px;
+  height: 14px;
+  flex: none;
+  border: 1.5px solid var(--line-space-control);
+  border-radius: 999px;
+}
+
+.world-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-on-space-muted);
+  transition: transform var(--motion-control) var(--ease-settle);
+}
+
+.world-toggle[aria-pressed="true"] .world-switch::after {
+  transform: translateX(12px);
+  background: var(--text-on-space);
+  border-color: var(--text-on-space);
 }
 
 .chapter-menu-button {
@@ -860,14 +1154,16 @@
   font-weight: 600;
 }
 
-/* ---------- You: the conversation beside "What we know" (docs/design/compositions/
-   conversation.css, the reviewed Sprint 0 reference). The conversation stays on the light
-   reading surface: quiet and human. A dashed edge means provisional only (a proposal not yet
-   a fact, a reply not yet checked, the early sketch). ---------- */
+/* ---------- You: the conversation beside "What we know", on its glass panel at the person's
+   light (the You chapter is rebuilt in the world in Sprint W's next slice). A dashed edge
+   means provisional only (a proposal not yet a fact, a reply not yet checked, the early
+   sketch). ---------- */
 
 @layer components {
+  /* Wide enough for the conversation and "What we know", narrow enough to leave the person's
+     light in view beside it. */
   .chapter-you {
-    max-width: 1240px;
+    max-width: 1040px;
   }
 
   /* Wide: the conversation and directions on the left, "What we know" beside both. Stacked:
@@ -1143,7 +1439,7 @@
 
   .suggestion h4 {
     font-family: var(--font-display);
-    font-weight: 400;
+    font-weight: 600;
     font-size: var(--type-25);
   }
 

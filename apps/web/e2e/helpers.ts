@@ -36,9 +36,25 @@ export function externalRequests(urls: string[]): string[] {
 
 export type AxeViolation = { id: string; impact: string | null; nodes: number; target: string };
 
-/** axe-core with the WCAG 2.0/2.1/2.2 A and AA rule tags (the same set as docs/design). */
+/**
+ * axe-core with the WCAG 2.0/2.1/2.2 A and AA rule tags (the same set as docs/design). In
+ * Storybook the a11y addon runs its own scan after each story renders; a scan already in
+ * progress is waited for, never skipped.
+ */
 export async function axe(page: Page): Promise<AxeViolation[]> {
   await page.addScriptTag({ content: axeSource });
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await scan(page);
+    } catch (error) {
+      const busy = error instanceof Error && error.message.includes("Axe is already running");
+      if (!busy || attempt >= 40) throw error;
+      await page.waitForTimeout(250);
+    }
+  }
+}
+
+function scan(page: Page): Promise<AxeViolation[]> {
   return page.evaluate(async () => {
     const engine = (
       window as unknown as {

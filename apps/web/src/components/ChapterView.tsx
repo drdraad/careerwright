@@ -1,17 +1,21 @@
 "use client";
-// What each chapter shows in this build. You holds the conversation, what we know and the
-// directions to explore; Routes shows the labelled fixture preview in the fixture workspace;
-// the other chapters say what they will hold, which answers they depend on, and what to do
-// next (spec section 3: useful, honest empty states).
+// What each chapter shows in this build, as its place in the world (plan section 4). You holds
+// the conversation, what we know and the directions to explore; Routes shows the labelled
+// fixture preview in the fixture workspace; the other chapters are places not built yet, and
+// say so plainly: what the place is, what it will hold, which answers it depends on and what
+// to do next (spec section 3: useful, honest empty states).
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { ProfileOut } from "@/generated/api";
 import { CHAPTERS, type ChapterId, chapterHref } from "@/lib/chapters";
 import type { RoutePreview as Preview } from "@/lib/fixtures/trace";
 import { describeField } from "@/lib/profile";
 import { type ChapterNeeds, chapterNeeds } from "@/lib/readiness";
 import { PROFILE_FIELDS, type ProfileFieldName } from "@/lib/vocabulary";
+import { PLACES } from "@/lib/world/places";
 import { Button } from "./Button";
 import { EmptyState } from "./EmptyState";
+import { Glyph } from "./Glyph";
 import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
 import { RoutePreview } from "./RoutePreview";
@@ -90,6 +94,20 @@ function Needs({ profile, needs }: { profile: ProfileOut; needs: ChapterNeeds })
   );
 }
 
+/** The head of a place not built yet: the honest state first, then where it is in the world. */
+function NotBuiltYet({ id, title }: { id: ChapterId; title: string }) {
+  return (
+    <>
+      <p className="place-kicker">
+        <Glyph name="blocked" />
+        Not built yet
+      </p>
+      <h1 className="page-title">{title}</h1>
+      <p className="place-where">{PLACES[id].where}</p>
+    </>
+  );
+}
+
 /** A chapter whose feature belongs to a later sprint: its purpose and the answers it uses. */
 export function PlannedChapter({
   id,
@@ -109,8 +127,8 @@ export function PlannedChapter({
   );
   return (
     <>
-      <h1 className="page-title">{planned.title}</h1>
-      <p className="measure">{planned.purpose}</p>
+      <NotBuiltYet id={id} title={planned.title} />
+      <p className="measure small muted">{planned.purpose}</p>
       {needs.notAsked.length > 0 ? (
         <EmptyState
           state="blocked_missing_information"
@@ -147,14 +165,15 @@ export function ChapterView({
   routePreview: Preview | null;
 }) {
   const { workspace, profile, profileError, retryProfile } = useWorkspaceData();
-  const surface = chapter === "roles" || chapter === "routes" ? "on-space" : "on-reading";
 
   // While loading or after a failed load the page still says which chapter it is.
-  const title = (
-    <h1 className="page-title">{CHAPTERS.find((item) => item.id === chapter)?.label}</h1>
-  );
-  let body: React.ReactNode;
+  const label = CHAPTERS.find((item) => item.id === chapter)?.label ?? "";
+  const title = <h1 className="page-title">{label}</h1>;
+  // A built chapter reads on a glass panel; a place not built yet is a small card in the world.
+  let shape: "panel" | "place" = "panel";
+  let body: ReactNode;
   if (profile === undefined && profileError) {
+    shape = "place";
     body = (
       <>
         {title}
@@ -169,6 +188,7 @@ export function ChapterView({
       </>
     );
   } else if (profile === undefined) {
+    shape = "place";
     body = (
       <>
         {title}
@@ -177,35 +197,46 @@ export function ChapterView({
     );
   } else if (chapter === "you") {
     body = <YouChapter workspace={workspace} profile={profile} />;
-  } else if (chapter === "routes") {
+  } else if (chapter === "routes" && workspace.fixture && routePreview !== null) {
     body = (
       <>
         <h1 className="page-title">Routes</h1>
-        {workspace.fixture && routePreview !== null ? (
-          <RoutePreview preview={routePreview} />
-        ) : (
-          <EmptyState
-            state="notStarted"
-            title="No routes yet"
-            next={
-              <Link className="btn btn-secondary" href={chapterHref(workspace.workspace_id, "you")}>
-                Review what we know
-              </Link>
-            }
-          >
-            <p>
-              Routes are compared once your options are reviewed. Careerwright's route search isn't
-              part of this build yet, so no route has been computed for this workspace.
-            </p>
-          </EmptyState>
-        )}
+        <RoutePreview preview={routePreview} />
+      </>
+    );
+  } else if (chapter === "routes") {
+    shape = "place";
+    body = (
+      <>
+        <NotBuiltYet id="routes" title="Routes" />
+        <EmptyState
+          state="notStarted"
+          title="No routes yet"
+          next={
+            <Link className="btn btn-secondary" href={chapterHref(workspace.workspace_id, "you")}>
+              Review what we know
+            </Link>
+          }
+        >
+          <p>
+            Routes are compared once your options are reviewed. Careerwright's route search isn't
+            part of this build yet, so no route has been computed for this workspace.
+          </p>
+        </EmptyState>
       </>
     );
   } else {
+    shape = "place";
     body = <PlannedChapter id={chapter} profile={profile} workspaceId={workspace.workspace_id} />;
   }
 
   return (
-    <div className={`chapter ${surface}${chapter === "you" ? " chapter-you" : ""}`}>{body}</div>
+    <div
+      className={`chapter on-reading chapter-${shape}${chapter === "you" ? " chapter-you" : ""}`}
+      data-covers-world
+      data-world-panel
+    >
+      {body}
+    </div>
   );
 }

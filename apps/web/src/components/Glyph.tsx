@@ -146,6 +146,25 @@ const PATHS = {
       <path d="M8.3 16.3c4-1.6 3.4-5.7 7.4-8.6" {...stroke} />
     </>
   ),
+  // The world's controls (Sprint W), same construction.
+  pause: (
+    <>
+      <circle cx="12" cy="12" r="9" {...stroke} />
+      <path d="M10 8.5v7M14 8.5v7" {...stroke} />
+    </>
+  ),
+  calm: (
+    <>
+      <path d="M3.5 9.5c2.8-2 5.7-2 8.5 0s5.7 2 8.5 0" {...stroke} />
+      <path d="M3.5 15.5h17" {...stroke} />
+    </>
+  ),
+  sound: (
+    <>
+      <path d="M4.5 9.5h3.2L12 5.5v13l-4.3-4H4.5z" {...stroke} />
+      <path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11" {...stroke} />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type GlyphName = keyof typeof PATHS;

@@ -1,13 +1,13 @@
 // The six persistent chapters (spec section 3). They are navigable states, not a wizard, so
-// none is numbered and none is locked.
+// none is numbered and none is locked. Each is a place in the one world (plan section 4).
 
 export const CHAPTERS = [
-  { id: "you", label: "You", surface: "reading" },
-  { id: "roles", label: "Roles", surface: "space" },
-  { id: "skills", label: "Skills", surface: "reading" },
-  { id: "options", label: "Options", surface: "reading" },
-  { id: "routes", label: "Routes", surface: "space" },
-  { id: "plan", label: "Plan", surface: "reading" },
+  { id: "you", label: "You" },
+  { id: "roles", label: "Roles" },
+  { id: "skills", label: "Skills" },
+  { id: "options", label: "Options" },
+  { id: "routes", label: "Routes" },
+  { id: "plan", label: "Plan" },
 ] as const;
 
 export type ChapterId = (typeof CHAPTERS)[number]["id"];

@@ -1,9 +1,10 @@
 "use client";
 // The compact strip (spec section 3): active targets, work areas, the current budget and the
-// saved state, plus the synthetic label, live-update state and account. Each value is the
-// API's own; an unanswered one reads as its state (STATE-08), never as zero.
+// saved state, plus the synthetic label, live-update state, the world's controls and account.
+// Each value is the API's own; an unanswered one reads as its state (STATE-08), never as zero.
 import * as Popover from "@radix-ui/react-popover";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { ProfileOut, WorkspaceOut } from "@/generated/api";
 import type { StreamStatus } from "@/lib/events";
 import { describeField } from "@/lib/profile";
@@ -23,8 +24,8 @@ type Props = {
   /** A refresh failed after a successful load: what is shown is what was last loaded. */
   refreshFailed: boolean;
   email: string | null;
-  calm: boolean;
-  onCalmChange(calm: boolean): void;
+  /** The world's visible controls: pause motion, calm mode and sound. */
+  controls?: ReactNode;
   onSignOut(): void;
 };
 
@@ -92,12 +93,11 @@ export function WorkspaceStrip({
   onReconnect,
   refreshFailed,
   email,
-  calm,
-  onCalmChange,
+  controls,
   onSignOut,
 }: Props) {
   return (
-    <header className="strip on-space">
+    <header className="strip on-space" data-covers-world>
       {workspace.synthetic && (
         <span className="strip-optional">
           <SyntheticLabel />
@@ -176,6 +176,7 @@ export function WorkspaceStrip({
         <span className="strip-item">
           <LiveUpdates status={events} onReconnect={onReconnect} />
         </span>
+        {controls}
         <Popover.Root>
           <Popover.Trigger className="strip-switch" aria-label="Account and settings">
             <Glyph name="menu" />
@@ -185,14 +186,6 @@ export function WorkspaceStrip({
               Signed in as <strong>{email ?? "an emulator account"}</strong>
             </p>
             <p className="small muted">{DATA_MODE[workspace.data_mode]} workspace</p>
-            <label className="flex items-center gap-8 small">
-              <input
-                type="checkbox"
-                checked={calm}
-                onChange={(event) => onCalmChange(event.target.checked)}
-              />
-              Calm mode: no motion
-            </label>
             <button type="button" className="btn btn-secondary" onClick={onSignOut}>
               <Glyph name="signOut" />
               Sign out

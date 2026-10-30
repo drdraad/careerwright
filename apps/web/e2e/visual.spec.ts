@@ -129,12 +129,11 @@ async function talkedWorkspace(token: string): Promise<string> {
 
 /** Opens the phone and tablet sheet to its full height; on a wide screen it is a column. */
 async function expandSheet(page: Page, title = "Where this came from") {
-  const more = page.getByRole("dialog", { name: title }).getByRole("button", {
-    name: "More",
-  });
+  const sheet = page.getByRole("dialog", { name: title });
+  const more = sheet.getByRole("button", { name: "More" });
   if (await more.isVisible()) {
     await more.click();
-    await expect(page.getByRole("button", { name: "Less" })).toBeVisible();
+    await expect(sheet.getByRole("button", { name: "Less" })).toBeVisible();
   }
 }
 
@@ -687,7 +686,7 @@ function clippedSelects(page: Page): Promise<string[]> {
 async function measure(page: Page, path: string): Promise<Omit<Result, "file" | "errors">> {
   await page.evaluate(() => document.fonts.ready);
   const fonts = await page.evaluate(
-    () => document.fonts.check('16px "Source Sans 3"') && document.fonts.check('31px "Newsreader"'),
+    () => document.fonts.check('16px "Source Sans 3"') && document.fonts.check('600 39px "Outfit"'),
   );
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - window.innerWidth,

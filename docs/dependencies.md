@@ -101,7 +101,7 @@ the application and ships nothing.
 
 | Package | Version | Why | arm64 evidence |
 |---|---|---|---|
-| `playwright` | 1.64.1 (published 2026-10-14), Chromium build 1248 (Chrome for Testing 156.0.8078.4) | screenshots at 1440×900 and 390×844 | Verified: 18 captures (`docs/design/screenshots/checks.md`) |
+| `playwright` | 1.64.1 (published 2026-10-14), Chromium build 1248 (Chrome for Testing 156.0.8078.4) | screenshots at 1440×900, 768×1024 and 390×844 | Verified: 28 captures of the world's references (Task W2, `docs/design/screenshots/checks.md`) |
 | `axe-core` | 4.14.0 (published 2026-10-05), MPL-2.0 | automated WCAG A/AA checks on each capture | Verified: same run |
 
 The web app (Task 4) pins its own copies in `apps/web`: axe-core 4.14.0 (the same) and
@@ -123,6 +123,7 @@ registry, checked 2026-10-28.
 | `@tanstack/react-query` | 5.104.2 | 2026-10-11 | MIT | server state (spec ARC-1) |
 | `@radix-ui/react-dialog`, `@radix-ui/react-popover` | 1.3.1 | 2026-10-12 | MIT | the evidence drawer, chapter menu and account menu (spec: Radix controls). Single primitives rather than the 55-package `radix-ui` bundle |
 | `@firebase/app`, `@firebase/auth` | 0.16.3, 1.13.7 | 2026-10-07 | Apache-2.0 | emulator sign-in. These are the versions `firebase` 13.0.0 uses; the umbrella package is not used because it also installs Firestore's gRPC stack |
+| `three` | 0.186.1 | 2026-09-24 | MIT | the world layer: one WebGL2 canvas behind every chapter (Task W2; ADR 0014 decision 2, chosen by the world spike's library comparison). No dependencies of its own |
 | dev: `typescript` | 6.0.3 | 2026-04-16 | Apache-2.0 | strict type checking. Not 7.0.2: TypeScript 7 has no JavaScript compiler API, which the client generator needs |
 | dev: `@biomejs/biome` | 2.5.15 | 2026-09-30 | MIT OR Apache-2.0 | the one lint and format toolchain (ADR 0005) |
 | dev: `@hey-api/openapi-ts` | 0.99.0 | 2026-06-22 | MIT | generates the TypeScript client from the OpenAPI document (ADR 0005) |
@@ -135,8 +136,15 @@ registry, checked 2026-10-28.
 | dev: `@playwright/test` | 1.64.0 | 2026-10-07 | Apache-2.0 | browser journeys and visual checks (Chromium 1248) |
 | dev: `axe-core` | 4.14.0 | 2026-10-05 | MPL-2.0 | automated WCAG checks, as in the design tooling |
 | dev: `@types/node`, `@types/react`, `@types/react-dom` | 24.19.2, 19.3.0, 19.3.0 | 2026-10-09, 09-09, 09-09 | MIT | types (Node 24 runtime) |
+| dev: `@types/three` | 0.186.0 | 2026-09-11 | MIT | three.js's types (Task W2). It brings six type-only or unused transitive packages: `@types/webxr` 0.5.24 (2025-09-29, MIT), `@types/stats.js` 0.17.4 (2025-05-05, MIT), `@tweenjs/tween.js` 23.1.3 (2024-07-25, MIT), `fflate` 0.8.3 (2026-05-16, MIT), `meshoptimizer` 1.1.1 (2026-04-15, MIT) and `@dimforge/rapier3d-compat` 0.12.0 (2024-01-28, Apache-2.0); none is imported by the app or shipped |
 
-Lockfile: 438 packages. Licences across the whole tree (`pnpm licenses list`, 2026-10-28):
+Task W2 (2026-10-30) added `three` and `@types/three` with its six transitive packages, each
+published more than 14 days before (pnpm's `minimumReleaseAge` enforced it on install). The
+display face Outfit 1.100 (OFL-1.1) is a font file, not a package: it is pinned to a
+`google/fonts` commit and hashed in `docs/design/fonts/README.md`, and mirrored byte for byte
+in `apps/web/src/design/fonts/`.
+
+Lockfile: 438 packages before Task W2. Licences across the whole tree (`pnpm licenses list`, 2026-10-28):
 MIT (271), Apache-2.0 (16), ISC (11), BlueOak-1.0.0 (6), BSD-2-Clause (5), BSD-3-Clause
 (3), MPL-2.0 (3: `axe-core`, `lightningcss` and its arm64 binary, both build or test tools,
 used unmodified), MIT OR Apache-2.0 (2), MIT-0 (2), CC-BY-4.0 (1: `caniuse-lite`, browser

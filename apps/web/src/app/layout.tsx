@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export const viewport: Viewport = { themeColor: "#09121F", colorScheme: "dark light" };
+export const viewport: Viewport = { themeColor: "#03050B", colorScheme: "dark" };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   // Runtime configuration (one image, any local ports): read per request, never at build.

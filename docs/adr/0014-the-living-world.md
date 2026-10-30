@@ -1,7 +1,8 @@
 # ADR 0014: The living world, Careerwright's experience direction
 
-- Status: Proposed, 2026-10-30. Accepted when the product owner approves plan v1.4. Sprint W
-  adds the spike's choices (decisions 2 and 6) when session W1 has made them.
+- Status: Proposed, 2026-10-30. Accepted when the product owner approves plan v1.4. Session
+  W1 (2026-10-30, `docs/reviews/session-w1-answers.md`) made the spike's choices, recorded in
+  decisions 2, 6 and 8 by Task W2.
 - Date: 2026-10-30
 - Supersedes, for L0: the "calm observatory" art direction (spec section 14), the visual scope
   and renderer limits of plan v1.3 (sections 1, 4 and 5) and the visual direction in
@@ -35,6 +36,16 @@ process." Their reference image is "Careerwright's luminous path forward".
    other renderer" and the specification's "No alternative GPU renderer is selected". Sprint
    W's spike chooses the library against section 4's frame budgets; it is pinned at least 14
    days old and recorded in `docs/dependencies.md` and here.
+   **Chosen: three.js 0.186.1** (MIT, published 2026-09-24), the spike's recommendation, not
+   contested at session W1. The spike drew the same workload with three.js, PixiJS 8.22.0 and
+   OGL 1.0.11 at the same frame cost (the shaders do the work); three.js runs raw GLSL 3
+   shaders as written (`RawShaderMaterial`), has a real camera for travel, is by far the most
+   used and steadily maintained, and needs no `unsafe-eval` under the app's content security
+   policy (PixiJS did). The app draws one canvas (`apps/web/src/lib/world/gl.ts`); its types
+   are `@types/three` 0.186.0 (dev only).
+   **Direction: Horizon, made livelier** (the product owner's choice at session W1): Horizon's
+   calm, lined-up layout, with animation as alive as Growth and Circuit and quiet solid trails
+   in place of the dashed ones. "Not known yet" is a solid slate trail, never dashed.
 3. **Revelations come from deterministic sources** (the slate, readiness and gaps, the route
    checker, reviewed options) and from verified spans. The one exception, by the product
    owner's answer of 2026-10-30, is an overlooked strength: the model may propose one as a
@@ -54,10 +65,22 @@ process." Their reference image is "Careerwright's luminous path forward".
    replacing spec VIS-1's industry colours.
 6. **Type.** A bold geometric sans display face and a readable sans body face, licensed and
    self-hosted; Newsreader retires. The spike chooses the faces.
+   **Chosen: Outfit** for display (the product owner at session W1: "Keep Outfit"), the OFL
+   variable font from `google/fonts`, pinned and unmodified (`docs/design/fonts/README.md`).
+   **Body: Source Sans 3 stays** (Task W2's ruling): session W1 chose only the heading
+   lettering; Source Sans 3 is already licensed, self-hosted and measured, and its default
+   figures are tabular, which money and months need. The spike's Atkinson Hyperlegible Next
+   stood in for body text in a throwaway preview and is not adopted.
 7. **Stillness is a first-class version.** Reduced motion, calm mode and a browser without
    WebGL2 draw the same states and words without motion. A visible control pauses ambient
    motion.
 8. **Sound is not in L0** unless the product owner asks for it at session W1.
+   **The product owner asked for it** at session W1: "YEs, all three, but I want them subtle
+   and evocative, not cheesy!" So L0 has three short cues, synthesised in the browser (no
+   audio files, no requests): a low swell when the person's light comes on, a soft two-note
+   chime when a connection lights up and a small glass tick when a skill is picked
+   (`apps/web/src/lib/world/sound.ts`). Sound is off until the person turns it on with a
+   visible control, every visit.
 9. **Sequencing.** Sprint W (spike, session W1, references, the world in the app with the You
    chapter, session W2) runs before any more chapter interface. Session W2 is a gate: every
    rubric category, including the three v1.4 questions, at least 4.
@@ -67,11 +90,12 @@ process." Their reference image is "Careerwright's luminous path forward".
 - The estimate grows by 13–16 engineering days and about two hours of the product owner's
   time (plan section 6).
 - The Sprint 0 compositions and the current shell are retired, not polished. Their fixture
-  checks stay until Sprint W's references replace them.
+  checks stay until Sprint W's references replace them. (Done in Task W2: `docs/design` now
+  holds the world's references, and `check-data` checks the fixture values they use.)
 - The slate must join destinations by shared skills, not shared words in a title (session
   2's "data analyst" finding), because a revelation is only as good as its source. That is an
   amendment to ADR 0007, made in Sprint W.
-- One new web dependency, the WebGL library.
+- One new web dependency, the WebGL library (three.js 0.186.1), and its types for development.
 - Risks: frame rate on the target Mac, motion sensitivity, and a world that implies more
   certainty than the evidence. The budgets, the still version and decision 4 answer them
   (plan section 12).
