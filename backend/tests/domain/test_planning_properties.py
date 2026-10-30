@@ -9,8 +9,8 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from nessa.planning.checker import FindingKind, RouteCheck, check_route
-from nessa.planning.compiler import PlanningInputs, ReceiptTiming, compile_input
+from careerwright.planning.checker import FindingKind, RouteCheck, check_route
+from careerwright.planning.compiler import PlanningInputs, ReceiptTiming, compile_input
 from tests.support.planning import START, catalogue_of, option, person
 
 AMOUNTS = st.integers(min_value=0, max_value=300_000)

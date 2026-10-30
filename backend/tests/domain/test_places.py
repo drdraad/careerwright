@@ -4,8 +4,13 @@ import uuid
 
 import pytest
 
-from nessa.catalogue.places import ENGLISH_CITIES, resolve_city
-from nessa.profile.document import FIELD_NAMES, ProfileInput, apply_profile_input, empty_profile
+from careerwright.catalogue.places import ENGLISH_CITIES, resolve_city
+from careerwright.profile.document import (
+    FIELD_NAMES,
+    ProfileInput,
+    apply_profile_input,
+    empty_profile,
+)
 
 _SOURCE = uuid.UUID("00000000-0000-4000-8000-0000000000aa")
 

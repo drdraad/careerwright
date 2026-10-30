@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from pydantic import SecretStr
 
-from nessa.identity.model_choice import ModelChoice
+from careerwright.identity.model_choice import ModelChoice
 from tests.integration.test_live_smoke_ledger import IntegrationTarget
 from tests.support.client import ApiClient
 from tests.support.infra import Infra
@@ -29,7 +29,7 @@ def test_every_case_attempt_is_ledgered_and_the_results_are_written(
 ) -> None:
     ledger = Ledger(tmp_path / "live-usage.jsonl")
     results = tmp_path / "live-eval.md"
-    private = tmp_path / "nessa-home" / "evidence" / "live-eval.jsonl"
+    private = tmp_path / "careerwright-home" / "evidence" / "live-eval.jsonl"
     models = ModelChoice.configure(TEST_MODEL, "muse-spark-1.3", "test")
     cases = select(load_cases(), ["INT-01", "DSC-01", "EXP-01"])
     plan = authorise_eval(

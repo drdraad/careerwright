@@ -7,8 +7,8 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from nessa.capability.evidence import Answer, Holding, SkillEvidence, row_evidence
-from nessa.capability.matrix import (
+from careerwright.capability.evidence import Answer, Holding, SkillEvidence, row_evidence
+from careerwright.capability.matrix import (
     EscoSeed,
     EscoSkillRelation,
     Importance,
@@ -23,7 +23,7 @@ from nessa.capability.matrix import (
     find_pack_target,
     pick_occupation,
 )
-from nessa.capability.outcomes import (
+from careerwright.capability.outcomes import (
     Confidence,
     EvidenceKind,
     OutcomeReview,
@@ -34,8 +34,8 @@ from nessa.capability.outcomes import (
     pack_outcomes,
     user_override,
 )
-from nessa.capability.questions import QuestionReason, question_graph
-from nessa.capability.readiness import (
+from careerwright.capability.questions import QuestionReason, question_graph
+from careerwright.capability.readiness import (
     Assessment,
     GapKind,
     PrimaryAction,
@@ -45,11 +45,11 @@ from nessa.capability.readiness import (
     assess,
     ensure_current,
 )
-from nessa.capability.reference import GateKind, load_reference
-from nessa.catalogue.esco import concept_id
-from nessa.catalogue.option_pack import load_pack
-from nessa.catalogue.records import LabelMatch
-from nessa.errors import ErrorCode, NessaError
+from careerwright.capability.reference import GateKind, load_reference
+from careerwright.catalogue.esco import concept_id
+from careerwright.catalogue.option_pack import load_pack
+from careerwright.catalogue.records import LabelMatch
+from careerwright.errors import CareerwrightError, ErrorCode
 from tests.support.capability import (
     ADA,
     assessed,
@@ -266,7 +266,7 @@ def test_p04_cannot_become_ready_by_demoting_registration() -> None:
     matrix = synthetic_matrix("Registered nurse", [gate])
     edit = p04["requested_edit"]
 
-    with pytest.raises(NessaError) as refused:
+    with pytest.raises(CareerwrightError) as refused:
         check_edit(
             matrix,
             edit["gate_id"],
@@ -723,7 +723,7 @@ def test_results_carry_their_versions_and_an_essential_edit_makes_them_stale() -
         "0.1.0",
     )
     ensure_current(result, matrix)
-    with pytest.raises(NessaError) as stale:
+    with pytest.raises(CareerwrightError) as stale:
         ensure_current(result, edited)
     assert stale.value.code is ErrorCode.STALE_INPUT_VERSION
     relaxed = assess(edited, evidence=[], statements=[], outcomes=[], evidence_version=5)
@@ -770,7 +770,7 @@ def test_a_regulated_occupation_with_no_typed_gate_has_an_unresolved_protected_g
     assert status(result, gate.row_id) is RowStatus.UNRESOLVED
     assert (gate.row_id, RowStatus.UNRESOLVED) in [(b.row_id, b.kind) for b in result.blockers]
     assert result.state is ReadinessState.INSUFFICIENT_COVERAGE
-    with pytest.raises(NessaError) as refused:
+    with pytest.raises(CareerwrightError) as refused:
         check_edit(matrix, gate.row_id, Importance.PREFERRED, warning_acknowledged=True)
     assert refused.value.code is ErrorCode.PROTECTED_GATE
 

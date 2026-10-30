@@ -10,7 +10,7 @@ items.
 3 funding pages; Task 7b, 2026-10-29).**
 
 - **Labels:** the labels live in the England option pack 0.1.0
-  (`backend/src/nessa/catalogue/packs/england_option_pack/`, ADR 0011). Each slot's
+  (`backend/src/careerwright/catalogue/packs/england_option_pack/`, ADR 0011). Each slot's
   `labels.claims` names its claims there.
 - **Reviews:** label review (H-07, session 2: `docs/reviews/session-2-option-pack-questions.md`)
   and the rights review of the one page pending (C08) are **not run - requires human**. The
@@ -71,7 +71,7 @@ and the short quoted spans that prove each extracted value.
    structured data never decides its class: an unlisted employer careers or ATS page is
    `other` until you classify it. It applies the URL and
    address checks, the source permission manifest
-   (`backend/src/nessa/evidence/sources.json`, OI-11), robots.txt and the fetch bounds, keeps
+   (`backend/src/careerwright/evidence/sources.json`, OI-11), robots.txt and the fetch bounds, keeps
    the body under `var/evidence/corpus/<slot>/` only where the class permits, and prints the
    record: `retrieved_at`, `http_status`, `content_type`, `sha256` of the exact bytes and each
    claim's offsets and excerpt. It never edits this manifest.

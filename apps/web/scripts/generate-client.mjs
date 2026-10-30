@@ -56,7 +56,7 @@ if (!check) {
   await generateInto(generated, join(generated, "openapi.json"));
   console.log(`generated ${relative(app, generated)}/ from the backend's OpenAPI document`);
 } else {
-  const scratch = mkdtempSync(join(tmpdir(), "nessa-client-"));
+  const scratch = mkdtempSync(join(tmpdir(), "careerwright-client-"));
   try {
     writeFileSync(join(scratch, "openapi.json"), document);
     await generateInto(scratch, join(scratch, "openapi.json"));

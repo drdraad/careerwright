@@ -8,7 +8,7 @@ from datetime import date, time
 import pytest
 from pydantic import ValidationError
 
-from nessa.capability.outcomes import (
+from careerwright.capability.outcomes import (
     Confidence,
     EvidenceKind,
     OutcomeReview,
@@ -17,9 +17,9 @@ from nessa.capability.outcomes import (
     PlannedOutcome,
     Provenance,
 )
-from nessa.capability.readiness import Qualification
-from nessa.errors import ErrorCode, NessaError
-from nessa.planning.catalogue import (
+from careerwright.capability.readiness import Qualification
+from careerwright.errors import CareerwrightError, ErrorCode
+from careerwright.planning.catalogue import (
     ActionKind,
     AwardState,
     EligibilityStatus,
@@ -30,7 +30,7 @@ from nessa.planning.catalogue import (
     Session,
     WorkPatternKind,
 )
-from nessa.planning.checker import (
+from careerwright.planning.checker import (
     Feasibility,
     FindingCode,
     FindingKind,
@@ -41,7 +41,7 @@ from nessa.planning.checker import (
     check_route,
     evaluate_route,
 )
-from nessa.planning.compiler import (
+from careerwright.planning.compiler import (
     Commitment,
     ExistingDebt,
     PlanningInputs,
@@ -698,7 +698,7 @@ def test_one_concept_per_exclusive_group_and_at_most_six_actions() -> None:
     monthly = compile_input(person(), catalogue_of(*seven))
 
     assert codes(grouped) == {"exclusive_group"}
-    with pytest.raises(NessaError) as refused:
+    with pytest.raises(CareerwrightError) as refused:
         check_route(monthly, [v.variant_id for _, _, v in seven])
     assert refused.value.code is ErrorCode.MODEL_SCOPE_EXCEEDED
 

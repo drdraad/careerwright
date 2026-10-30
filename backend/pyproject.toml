@@ -1,7 +1,7 @@
 [project]
-name = "nessa"
+name = "careerwright"
 version = "0.0.0"
-description = "Nessa local career planner backend (L0)."
+description = "Careerwright local career planner backend (L0)."
 requires-python = ">=3.12,<3.13"
 # Exact pins. The DBOS/Pydantic AI pair was qualified in Sprint 0 (docs/adr/0002-durable-execution.md):
 # change those only by re-running `make acceptance`. The rest were added in Task 3
@@ -20,7 +20,7 @@ dependencies = [
     "uvicorn==0.54.0",
     "firebase-admin==7.7.0",
     # Parser only (spec section 6): its HTTP fetcher imports Playwright, which the backend
-    # excludes, so retrieval is Nessa's own guarded client (ADR 0009).
+    # excludes, so retrieval is Careerwright's own guarded client (ADR 0009).
     "scrapling==0.4.15",
 ]
 
@@ -37,7 +37,7 @@ requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/nessa"]
+packages = ["src/careerwright"]
 
 [tool.ruff]
 line-length = 100
@@ -52,7 +52,7 @@ ignore = []
 # Tests assert with plain `assert` and use throwaway secret-shaped literals by design.
 "tests/**" = ["S101", "S105", "S106"]
 # SQL adapters splice only constant column lists and fixed clauses; every value is bound.
-"src/nessa/*/*store.py" = ["S608"]
+"src/careerwright/*/*store.py" = ["S608"]
 
 [tool.mypy]
 python_version = "3.12"

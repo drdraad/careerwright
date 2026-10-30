@@ -6,11 +6,11 @@ import uuid
 
 import pytest
 
-from nessa.capability.evidence import Holding
-from nessa.capability.matrix import EscoSeed, Importance, Matrix, build_matrix
-from nessa.capability.questions import QuestionReason, question_graph
-from nessa.capability.reference import load_reference
-from nessa.catalogue.option_pack import load_pack
+from careerwright.capability.evidence import Holding
+from careerwright.capability.matrix import EscoSeed, Importance, Matrix, build_matrix
+from careerwright.capability.questions import QuestionReason, question_graph
+from careerwright.capability.reference import load_reference
+from careerwright.catalogue.option_pack import load_pack
 from tests.support.capability import (
     gate_row,
     self_report,

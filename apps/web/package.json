@@ -1,8 +1,8 @@
 {
-  "name": "nessa-web",
+  "name": "careerwright-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Nessa L0 web app: the six-chapter shell on the local API (Next.js, TypeScript strict).",
+  "description": "Careerwright L0 web app: the six-chapter shell on the local API (Next.js, TypeScript strict).",
   "type": "module",
   "packageManager": "pnpm@10.33.2",
   "engines": {
@@ -21,7 +21,7 @@
     "storybook": "STORYBOOK_DISABLE_TELEMETRY=1 storybook dev --host 127.0.0.1 --port 6006 --no-open",
     "build-storybook": "STORYBOOK_DISABLE_TELEMETRY=1 storybook build --quiet",
     "e2e": "NEXT_TELEMETRY_DISABLED=1 playwright test",
-    "review-screenshots": "NEXT_TELEMETRY_DISABLED=1 NESSA_REVIEW_DIR=../../docs/reviews/sprint-2/screenshots playwright test e2e/visual.spec.ts"
+    "review-screenshots": "NEXT_TELEMETRY_DISABLED=1 CAREERWRIGHT_REVIEW_DIR=../../docs/reviews/sprint-2/screenshots playwright test e2e/visual.spec.ts"
   },
   "dependencies": {
     "@firebase/app": "0.16.3",

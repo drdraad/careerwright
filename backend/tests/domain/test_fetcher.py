@@ -13,8 +13,8 @@ from collections.abc import Callable, Iterator
 
 import pytest
 
-from nessa.evidence.addresses import ALLOWED_PORTS, CheckedUrl, IPAddress, check_url
-from nessa.evidence.fetcher import (
+from careerwright.evidence.addresses import ALLOWED_PORTS, CheckedUrl, IPAddress, check_url
+from careerwright.evidence.fetcher import (
     DEFAULT_LIMITS,
     HTML_TYPES,
     ROBOTS_TOKEN,
@@ -27,7 +27,7 @@ from nessa.evidence.fetcher import (
     parse_robots,
     redirect_target,
 )
-from nessa.evidence.records import AttemptStatus
+from careerwright.evidence.records import AttemptStatus
 from tests.support.source_server import Scripted, SourceServer, html, source_server
 
 LOOPBACK = ipaddress.ip_address("127.0.0.1")
@@ -58,7 +58,7 @@ def fetcher(
     return Fetcher(
         resolve=resolver({"page.test.example": [LOOPBACK], **(names or {})}),
         limits=limits,
-        user_agent="NessaL0/test",
+        user_agent="CareerwrightL0/test",
         extra_allowed=frozenset({("127.0.0.1", server.port)}),
     )
 
@@ -84,7 +84,7 @@ def test_a_permitted_page_is_fetched_from_the_checked_address_under_its_own_name
     assert result.address == "127.0.0.1"
     assert result.final_url == url(server, "/job")
     assert server.seen[0].host == f"page.test.example:{server.port}"
-    assert server.seen[0].user_agent == "NessaL0/test"
+    assert server.seen[0].user_agent == "CareerwrightL0/test"
 
 
 @pytest.mark.req("ACQ-01")
@@ -365,7 +365,7 @@ def test_the_time_limit_holds_while_a_name_is_looked_up() -> None:
         f = Fetcher(
             resolve=slow_resolve,
             limits=FetchLimits(total_s=1.0, connect_s=1.0),
-            user_agent="NessaL0/test",
+            user_agent="CareerwrightL0/test",
             extra_allowed=frozenset({("127.0.0.1", server.port)}),
         )
         started = time.monotonic()
@@ -415,7 +415,7 @@ def test_connection_failures_and_unknown_hosts_are_typed_failures() -> None:
     f = Fetcher(
         resolve=resolver({"down.test.example": [LOOPBACK]}),
         limits=FetchLimits(),
-        user_agent="NessaL0/test",
+        user_agent="CareerwrightL0/test",
         extra_allowed=frozenset({("127.0.0.1", port)}),
     )
 
@@ -440,7 +440,7 @@ def test_connection_failures_and_unknown_hosts_are_typed_failures() -> None:
         ),
         (
             Scripted(
-                body=b"User-agent: NessaL0\nDisallow: /\n",
+                body=b"User-agent: CareerwrightL0\nDisallow: /\n",
                 headers=(("Content-Type", "text/plain"),),
             ),
             AttemptStatus.BLOCKED,
@@ -448,7 +448,7 @@ def test_connection_failures_and_unknown_hosts_are_typed_failures() -> None:
         ),
         (Scripted(503, body=b"down"), AttemptStatus.FAILED, "robots_unreachable"),
     ],
-    ids=["path disallowed for every agent", "disallowed for Nessa", "robots unreachable"],
+    ids=["path disallowed for every agent", "disallowed for Careerwright", "robots unreachable"],
 )
 def test_robots_txt_is_read_first_and_a_refusal_means_no_request_for_the_page(
     robots: Scripted, outcome: AttemptStatus, reason: str
@@ -525,15 +525,19 @@ def test_an_allow_rule_wins_over_a_disallow_rule_of_equal_length() -> None:
 @pytest.mark.parametrize(
     ("robots", "allowed"),
     [
-        ("User-agent: *\nDisallow: /\n\nUser-agent: NessaL0\nAllow: /\n", True),
-        ("User-agent: *\nAllow: /\n\nUser-agent: nessal0\nDisallow: /jobs\n", False),
+        ("User-agent: *\nDisallow: /\n\nUser-agent: CareerwrightL0\nAllow: /\n", True),
+        ("User-agent: *\nAllow: /\n\nUser-agent: careerwrightl0\nDisallow: /jobs\n", False),
         ("User-agent: OtherBot\nDisallow: /\n", True),
-        ("User-agent: OtherBot\nUser-agent: NessaL0/1.0\nDisallow: /jobs\n", False),
-        ("User-agent: NessaL0\nSitemap: https://x.example/s.xml\nDisallow: /jobs\n", False),
-        ("User-agent: NessaL0\nDisallow: /a\n\nUser-agent: NessaL0\nDisallow: /jobs\n", False),
+        ("User-agent: OtherBot\nUser-agent: CareerwrightL0/1.0\nDisallow: /jobs\n", False),
+        ("User-agent: CareerwrightL0\nSitemap: https://x.example/s.xml\nDisallow: /jobs\n", False),
+        (
+            "User-agent: CareerwrightL0\nDisallow: /a\n\nUser-agent: CareerwrightL0\nDisallow: "
+            "/jobs\n",
+            False,
+        ),
         ("Disallow: /jobs\nUser-agent: *\nDisallow: /other\n", True),
         ("﻿User-agent: * # every agent\nDisallow: /jobs # private\n", False),
-        ("User-agent: NessaL0\nDisallow:\n\nUser-agent: *\nDisallow: /\n", True),
+        ("User-agent: CareerwrightL0\nDisallow:\n\nUser-agent: *\nDisallow: /\n", True),
     ],
     ids=[
         "its own group beats the wildcard group",
@@ -547,7 +551,9 @@ def test_an_allow_rule_wins_over_a_disallow_rule_of_equal_length() -> None:
         "its own group's empty Disallow allows all, whatever the wildcard group says",
     ],
 )
-def test_the_group_for_nessa_is_selected_by_its_product_token(robots: str, allowed: bool) -> None:
+def test_the_group_for_careerwright_is_selected_by_its_product_token(
+    robots: str, allowed: bool
+) -> None:
     assert _robots(robots).allows("/jobs/1") is allowed
 
 

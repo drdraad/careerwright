@@ -15,13 +15,13 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from nessa.api.app import create_app
-from nessa.api.deps import ApiDependencies
-from nessa.catalogue.esco import concept_id
-from nessa.catalogue.pay import MappingReview, MappingReviewPack
-from nessa.catalogue.taxonomy import held_release
-from nessa.config import RuntimeMode
-from nessa.db import system_transaction
+from careerwright.api.app import create_app
+from careerwright.api.deps import ApiDependencies
+from careerwright.catalogue.esco import concept_id
+from careerwright.catalogue.pay import MappingReview, MappingReviewPack
+from careerwright.catalogue.taxonomy import held_release
+from careerwright.config import RuntimeMode
+from careerwright.db import system_transaction
 from tests.integration.durable import Scenario, make_scenario
 from tests.support import reference_data as samples
 from tests.support.client import ApiClient, profile_with
@@ -436,7 +436,7 @@ def test_a_demo_workspace_discovers_offline_with_the_labelled_fixture_proposer(
         )
     assert submitted.status_code == 202, submitted.text
     run = submitted.json()["run"]
-    assert (run["model_id"], run["model_mode"]) == ("nessa-fixture-discovery-1", "fixture")
+    assert (run["model_id"], run["model_mode"]) == ("careerwright-fixture-discovery-1", "fixture")
     scenario = make_scenario(infra, api, ada, tmp_path)
     worker = scenario.worker("worker")
     scenario.wait_terminal(run["run_id"])
@@ -502,7 +502,7 @@ def test_the_sketch_uses_the_occupation_the_person_chose_even_when_its_title_is_
     mechanic, restorer = holder("bicycle mechanic"), holder("furniture restorer")
     workspace = api.create_workspace(ada, "Shared title (synthetic)")["workspace_id"]
     infra.query(
-        "INSERT INTO nessa.occupation_labels (concept_id, label, normalised, kind) "
+        "INSERT INTO careerwright.occupation_labels (concept_id, label, normalised, kind) "
         "VALUES (%s, 'bicycle mechanic', 'bicycle mechanic', 'alternative')",
         (restorer,),
     )
@@ -516,7 +516,7 @@ def test_the_sketch_uses_the_occupation_the_person_chose_even_when_its_title_is_
         sketch = api.get(f"/v1/workspaces/{workspace}/sketch", ada).json()
     finally:
         infra.query(
-            "DELETE FROM nessa.occupation_labels WHERE concept_id = %s AND label = %s",
+            "DELETE FROM careerwright.occupation_labels WHERE concept_id = %s AND label = %s",
             (restorer, "bicycle mechanic"),
         )
 

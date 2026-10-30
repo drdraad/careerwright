@@ -4,7 +4,7 @@
 !.env.example
 *.key
 /var/
-/.nessa/
+/.careerwright/
 
 # Agent workspaces
 .superpowers/

@@ -1,4 +1,4 @@
-# Nessa L0 command contract (development plan section 2). Run from the repository root.
+# Careerwright L0 command contract (development plan section 2). Run from the repository root.
 #   make setup              check prerequisites, install locked dependencies, create local config,
 #                           fetch and verify the pinned ESCO release, build images
 #   make dev                start the live stack (the worker may reach Meta), migrate, seed, print URLs
@@ -21,7 +21,7 @@
 #   make reset-demo         recreate the named fixture workspace only
 #   make rotate-master-key  add a master key version, reload it, reseal every sealed record
 #   make reseal             reseal every sealed record under the current master key
-# Local secrets and master keys live in NESSA_HOME (default ~/.nessa/l0), never in the repository.
+# Local secrets and master keys live in CAREERWRIGHT_HOME (default ~/.careerwright/l0), never in the repository.
 
 UV := uv run --locked
 BACKEND := cd backend &&

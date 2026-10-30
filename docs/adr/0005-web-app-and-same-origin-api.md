@@ -58,7 +58,7 @@ loopback boundary the web service must join without weakening.
    checks stay meaningful and its allowlists are unchanged:
    - **Origin:** the browser's Origin header is forwarded unchanged and never added, so the
      API still refuses a foreign origin and a state-changing request without one.
-   - **Host:** the web server checks the browser's Host against `NESSA_WEB_ALLOWED_HOSTS`
+   - **Host:** the web server checks the browser's Host against `CAREERWRIGHT_WEB_ALLOWED_HOSTS`
      (`src/proxy.ts`), so DNS rebinding is refused at the web origin. The proxied Host is
      `api:8000`, which the API already allowed.
    - **Client address:** the web container is on the internal subnet, which the API already
@@ -139,7 +139,7 @@ loopback boundary the web service must join without weakening.
 
 - `make check` now runs the web checks (client drift, Biome, `tsc`, Vitest). `make
   acceptance` adds the Storybook build and the Playwright suite, which runs on its own stack
-  (`nessa-l0-webtest`, ports 576xx-578xx).
+  (`careerwright-l0-webtest`, ports 576xx-578xx).
 - The web image is part of every stack, so the stack tests build it too.
 - Dev-only advisory accepted: `undici` 8.11.2 through `jsdom`, the unit-test DOM, which makes
   no network request. The fix (8.12.2) was under 14 days old when this was written. Recheck

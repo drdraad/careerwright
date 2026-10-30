@@ -9,7 +9,7 @@ again, so quoting and line endings may differ). The output is deterministic (sor
 timestamps), so rebuilding gives the same SHA-256.
 
 The sample is a modified (reduced) version of ESCO and says so (ESCO's reuse condition 2).
-It is for tests only: the product imports the full release (`nessa.catalogue.esco`).
+It is for tests only: the product imports the full release (`careerwright.catalogue.esco`).
 
 Run from `backend/` after `make setup` fetched the release:
 `uv run --locked python -m tools.esco_sample`.
@@ -22,8 +22,8 @@ import io
 import zipfile
 from pathlib import Path
 
-from nessa.catalogue.esco import ESCO_RELEASE
-from nessa.catalogue.releases import read_verified
+from careerwright.catalogue.esco import ESCO_RELEASE
+from careerwright.catalogue.releases import read_verified
 from tools.datasets import DATASETS_DIR
 from tools.localenv import REPO_ROOT
 

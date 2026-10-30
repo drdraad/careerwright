@@ -27,32 +27,37 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from nessa.api.discovery_schemas import SlateOut, WrittenExplanationOut
-from nessa.catalogue import taxonomy_store
-from nessa.catalogue.ai_resilience import committed_packs
-from nessa.catalogue.pay import committed_reviews
-from nessa.db import Tx
-from nessa.identity.model_registry import FIXTURE_DISCOVERY_MODEL_ID
-from nessa.identity.records import Run, RunKind
-from nessa.profile.discovery import (
+from careerwright.api.discovery_schemas import SlateOut, WrittenExplanationOut
+from careerwright.catalogue import taxonomy_store
+from careerwright.catalogue.ai_resilience import committed_packs
+from careerwright.catalogue.pay import committed_reviews
+from careerwright.db import Tx
+from careerwright.identity.model_registry import FIXTURE_DISCOVERY_MODEL_ID
+from careerwright.identity.records import Run, RunKind
+from careerwright.profile.discovery import (
     DiscoveryInput,
     DiscoveryOutput,
     check_discovery,
     evidence_of,
 )
-from nessa.profile.discovery import render_prompt as render_discovery_prompt
-from nessa.profile.document import (
+from careerwright.profile.discovery import render_prompt as render_discovery_prompt
+from careerwright.profile.document import (
     FIELD_NAMES,
     ProfileDocument,
     ProfileInput,
     apply_profile_input,
     empty_profile,
 )
-from nessa.profile.exploration import DiscoveryView, HardFilterInput, SlateView, compute_slate
-from nessa.profile.fixture_discovery import fixture_queries, prompt_context
-from nessa.profile.fixture_explainer import fixture_explanation
-from nessa.profile.fixture_explainer import prompt_context as explainer_context
-from nessa.profile.interview import (
+from careerwright.profile.exploration import (
+    DiscoveryView,
+    HardFilterInput,
+    SlateView,
+    compute_slate,
+)
+from careerwright.profile.fixture_discovery import fixture_queries, prompt_context
+from careerwright.profile.fixture_explainer import fixture_explanation
+from careerwright.profile.fixture_explainer import prompt_context as explainer_context
+from careerwright.profile.interview import (
     ContextMessage,
     InterviewTurnOutput,
     ProposalOrigin,
@@ -60,11 +65,11 @@ from nessa.profile.interview import (
     check_turn,
     context_profile,
 )
-from nessa.profile.safety import has_risk_stem
-from nessa.profile.slate import Emphasis, SlateControls
-from nessa.profile.slate_explanation import RECORD_STEPS, build_input, check_explanation
-from nessa.profile.slate_explanation import render_prompt as render_explanation_prompt
-from nessa.vocabulary import DataMode, WorkState
+from careerwright.profile.safety import has_risk_stem
+from careerwright.profile.slate import Emphasis, SlateControls
+from careerwright.profile.slate_explanation import RECORD_STEPS, build_input, check_explanation
+from careerwright.profile.slate_explanation import render_prompt as render_explanation_prompt
+from careerwright.vocabulary import DataMode, WorkState
 
 CASES_PATH = Path(__file__).with_name("evaluation_cases.json")
 Json = dict[str, Any]

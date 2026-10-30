@@ -5,18 +5,18 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from nessa.config import ApiSettings, RuntimeMode, is_local_host
+from careerwright.config import ApiSettings, RuntimeMode, is_local_host
 
 BASE = {
-    "NESSA_ENVIRONMENT": "local",
-    "NESSA_RUNTIME_MODE": "live",
-    "NESSA_ALLOWED_HOSTS": "127.0.0.1:58000,localhost:58000,api:8000",
-    "NESSA_ALLOWED_ORIGINS": "http://127.0.0.1:53000,http://localhost:53000",
-    "NESSA_FIREBASE_PROJECT_ID": "demo-nessa",
+    "CAREERWRIGHT_ENVIRONMENT": "local",
+    "CAREERWRIGHT_RUNTIME_MODE": "live",
+    "CAREERWRIGHT_ALLOWED_HOSTS": "127.0.0.1:58000,localhost:58000,api:8000",
+    "CAREERWRIGHT_ALLOWED_ORIGINS": "http://127.0.0.1:53000,http://localhost:53000",
+    "CAREERWRIGHT_FIREBASE_PROJECT_ID": "demo-careerwright",
     "FIREBASE_AUTH_EMULATOR_HOST": "auth:9099",
-    "NESSA_APP_DATABASE_URL": "postgresql+psycopg://nessa_api@postgres:5432/nessa_app",
-    "NESSA_APP_DATABASE_PASSWORD_FILE": "/run/secrets/pg_api",
-    "NESSA_MASTER_KEY_DIR": "/run/nessa/keys",
+    "CAREERWRIGHT_APP_DATABASE_URL": "postgresql+psycopg://careerwright_api@postgres:5432/careerwright_app",
+    "CAREERWRIGHT_APP_DATABASE_PASSWORD_FILE": "/run/secrets/pg_api",
+    "CAREERWRIGHT_MASTER_KEY_DIR": "/run/careerwright/keys",
 }
 
 
@@ -34,14 +34,16 @@ def test_valid_local_configuration_loads(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert loaded.runtime_mode is RuntimeMode.LIVE
     assert loaded.allowed_hosts == frozenset({"127.0.0.1:58000", "localhost:58000", "api:8000"})
-    assert loaded.master_key_dir == Path("/run/nessa/keys")
+    assert loaded.master_key_dir == Path("/run/careerwright/keys")
     assert loaded.internal_network_clients is False  # loopback-only unless configured
 
 
 def test_a_container_opts_in_to_its_internal_network_clients(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    assert settings(monkeypatch, NESSA_API_INTERNAL_NETWORK_CLIENTS="true").internal_network_clients
+    assert settings(
+        monkeypatch, CAREERWRIGHT_API_INTERNAL_NETWORK_CLIENTS="true"
+    ).internal_network_clients
 
 
 @pytest.mark.req("SEC-03")
@@ -50,16 +52,16 @@ def test_anything_but_an_explicit_local_environment_is_refused(
     monkeypatch: pytest.MonkeyPatch, environment: str | None
 ) -> None:
     with pytest.raises(ValidationError):
-        settings(monkeypatch, NESSA_ENVIRONMENT=environment)
+        settings(monkeypatch, CAREERWRIGHT_ENVIRONMENT=environment)
 
 
 @pytest.mark.req("SEC-03")
-@pytest.mark.parametrize("project", ["nessa-prod", "my-project", "demo"])
+@pytest.mark.parametrize("project", ["careerwright-prod", "my-project", "demo"])
 def test_a_firebase_project_that_could_be_real_is_refused(
     monkeypatch: pytest.MonkeyPatch, project: str
 ) -> None:
     with pytest.raises(ValidationError, match="demo-"):
-        settings(monkeypatch, NESSA_FIREBASE_PROJECT_ID=project)
+        settings(monkeypatch, CAREERWRIGHT_FIREBASE_PROJECT_ID=project)
 
 
 @pytest.mark.req("SEC-03")
@@ -81,20 +83,20 @@ def test_a_non_local_emulator_host_is_refused(monkeypatch: pytest.MonkeyPatch, h
 
 @pytest.mark.req("BND1-13")
 @pytest.mark.parametrize(
-    "hosts", ["0.0.0.0:58000", "nessa.example.com:58000", "192.168.0.4:58000", "127.0.0.1"]
+    "hosts", ["0.0.0.0:58000", "careerwright.example.com:58000", "192.168.0.4:58000", "127.0.0.1"]
 )
 def test_allowed_hosts_must_be_loopback_or_internal_service_names_with_ports(
     monkeypatch: pytest.MonkeyPatch, hosts: str
 ) -> None:
     with pytest.raises(ValidationError, match="local"):
-        settings(monkeypatch, NESSA_ALLOWED_HOSTS=hosts)
+        settings(monkeypatch, CAREERWRIGHT_ALLOWED_HOSTS=hosts)
 
 
 @pytest.mark.req("BND1-13")
 @pytest.mark.parametrize(
     "origin",
     [
-        "https://nessa.example.com",
+        "https://careerwright.example.com",
         "http://192.168.0.4:53000",
         "http://web:3000",
         "http://127.0.0.1:53000/",
@@ -106,7 +108,7 @@ def test_allowed_origins_must_be_exact_loopback_http_origins(
     monkeypatch: pytest.MonkeyPatch, origin: str
 ) -> None:
     with pytest.raises(ValidationError, match="loopback"):
-        settings(monkeypatch, NESSA_ALLOWED_ORIGINS=origin)
+        settings(monkeypatch, CAREERWRIGHT_ALLOWED_ORIGINS=origin)
 
 
 @pytest.mark.parametrize(
@@ -133,7 +135,7 @@ def test_database_password_is_read_from_its_file_and_hidden_from_repr(
     password_file = tmp_path / "pg_api"
     password_file.write_text("s3cret-password\n")
 
-    loaded = settings(monkeypatch, NESSA_APP_DATABASE_PASSWORD_FILE=str(password_file))
+    loaded = settings(monkeypatch, CAREERWRIGHT_APP_DATABASE_PASSWORD_FILE=str(password_file))
 
     password = loaded.app_database.password()
     assert password.get_secret_value() == "s3cret-password"
@@ -145,5 +147,5 @@ def test_a_database_url_that_embeds_a_password_is_refused(monkeypatch: pytest.Mo
     with pytest.raises(ValidationError, match="password file"):
         settings(
             monkeypatch,
-            NESSA_APP_DATABASE_URL="postgresql+psycopg://nessa_api:inline@postgres:5432/nessa_app",
+            CAREERWRIGHT_APP_DATABASE_URL="postgresql+psycopg://careerwright_api:inline@postgres:5432/careerwright_app",
         )

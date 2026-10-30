@@ -8,9 +8,9 @@ import psycopg
 import pytest
 from cryptography.exceptions import InvalidTag
 
-from nessa.identity.credentials import credential_context
-from nessa.identity.keyring import SealedValue, load_keyring
-from nessa.seed import FIXTURE_WORKSPACE_ID, INVITED_ACTORS
+from careerwright.identity.credentials import credential_context
+from careerwright.identity.keyring import SealedValue, load_keyring
+from careerwright.seed import FIXTURE_WORKSPACE_ID, INVITED_ACTORS
 from tests.support.client import ApiClient
 from tests.support.infra import Infra
 from tools.leak_scan import Needle, scan
@@ -59,7 +59,7 @@ def test_a_stored_key_is_sealed_bound_to_its_record_and_never_returned(
     assert key not in stored.text + listed.text
     [row] = infra.query(
         "SELECT credential_id::text, workspace_id::text, key_version, nonce, ciphertext "
-        "FROM nessa.credentials WHERE workspace_id = %s",
+        "FROM careerwright.credentials WHERE workspace_id = %s",
         (workspace_id,),
     )
     keyring = load_keyring(infra.home / "keys")
@@ -80,9 +80,9 @@ def test_the_api_role_cannot_read_sealed_key_material(
     store_key(api, ada, workspace_id, new_key())
 
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
-        infra.as_role("pg_api", "SELECT ciphertext FROM nessa.credentials", actor=ADA)
+        infra.as_role("pg_api", "SELECT ciphertext FROM careerwright.credentials", actor=ADA)
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
-        infra.as_role("pg_api", "SELECT nonce FROM nessa.credentials", actor=ADA)
+        infra.as_role("pg_api", "SELECT nonce FROM careerwright.credentials", actor=ADA)
 
 
 def test_a_second_key_must_rotate_the_first(api: ApiClient, ada: str) -> None:
@@ -136,18 +136,18 @@ def test_the_database_keeps_a_revocation_final_even_for_the_api_role(
     ).json()
 
     for statement in (
-        "UPDATE nessa.credentials SET revoked_at = NULL, revoked_by = NULL "
+        "UPDATE careerwright.credentials SET revoked_at = NULL, revoked_by = NULL "
         "WHERE credential_id = %s",
-        "UPDATE nessa.credentials SET revoked_at = now() - interval '1 day' "
+        "UPDATE careerwright.credentials SET revoked_at = now() - interval '1 day' "
         "WHERE credential_id = %s",
-        "UPDATE nessa.credentials SET replaced_by = credential_id WHERE credential_id = %s",
+        "UPDATE careerwright.credentials SET replaced_by = credential_id WHERE credential_id = %s",
     ):
         with pytest.raises(psycopg.errors.CheckViolation, match="final"):
             infra.as_role("pg_api", statement, (first["credential_id"],), actor=ADA)
     with pytest.raises(psycopg.errors.CheckViolation, match="replacements_are_revoked"):
         infra.as_role(
             "pg_api",
-            "UPDATE nessa.credentials SET replaced_by = %s WHERE credential_id = %s",
+            "UPDATE careerwright.credentials SET replaced_by = %s WHERE credential_id = %s",
             (first["credential_id"], rotated["credential_id"]),
             actor=ADA,
         )
@@ -211,7 +211,7 @@ def test_a_key_is_never_echoed_by_errors_receipts_or_exports(
     ]
 
     texts = [("response", r.text) for r in responses]
-    cells = infra.database_cells("nessa_app")
+    cells = infra.database_cells("careerwright_app")
     findings = scan([*texts, *cells], [Needle("key", key, fragment_length=12)])
     assert findings == []
     assert responses[1].json()["error"]["code"] == "VALIDATION_FAILED"

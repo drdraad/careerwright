@@ -7,7 +7,7 @@
 //
 // "Why this could suit you" may also carry a written note (S2.7, ADR 0007 decision 12): one
 // model run per slate, asked for once when the slate first shows, whose every quotation the
-// API checked against the person's answers or ESCO's record. It is shown above how Nessa
+// API checked against the person's answers or ESCO's record. It is shown above how Careerwright
 // found the suggestion, never instead of it; pending, failed and not-covered states say so.
 import { useEffect, useRef, useState } from "react";
 import type {
@@ -131,7 +131,7 @@ type Refusal = {
 // Only the quoted words are checked against a source; the sentences are the writer's own.
 const WRITTEN_BY: Record<ProposalOrigin, string> = {
   model:
-    "Written by Nessa from your answers and ESCO's record. Only the quoted words were checked against them; the sentences are Nessa's own.",
+    "Written by Careerwright from your answers and ESCO's record. Only the quoted words were checked against them; the sentences are Careerwright's own.",
   fixture:
     "Written by the demo explainer (synthetic). Only the quoted words were checked against your answers and ESCO's record; the sentences are the explainer's own.",
 };
@@ -204,8 +204,8 @@ function WrittenNote({ state }: { state: WrittenState }) {
   if (state.kind === "not_covered") {
     return (
       <p className="small muted">
-        Nessa wrote notes for your first set of suggestions; this one appeared when you changed the
-        view, so it has none. How Nessa found it is below.
+        Careerwright wrote notes for your first set of suggestions; this one appeared when you
+        changed the view, so it has none. How Careerwright found it is below.
       </p>
     );
   }
@@ -268,7 +268,7 @@ function SuggestionCard({
         <p className="section-title">Why this could suit you</p>
         <WrittenNote state={written} />
         <div className="grid gap-4">
-          {written.kind !== "none" && <p className="small muted">How Nessa found it</p>}
+          {written.kind !== "none" && <p className="small muted">How Careerwright found it</p>}
           <ul className="plain-list">
             {suggestion.why_it_could_suit.map((line) => (
               <li key={line}>{line}</li>
@@ -364,7 +364,7 @@ function refusal(error: unknown): Refusal | null {
     return { title: words.title, action: words.action, code };
   }
   return {
-    title: "Nessa's service isn't reachable",
+    title: "Careerwright's service isn't reachable",
     action: "Nothing you saved is lost. Try again in a moment.",
     code: null,
   };
@@ -418,10 +418,11 @@ function NoteRecovery({
 
 const NOTE_ANNOUNCEMENT: Record<WrittenState["kind"], string> = {
   none: "",
-  pending: "Nessa is writing a note on why each suggestion could suit you.",
-  written: "Nessa's written notes are shown beside the suggestions.",
-  not_covered: "Nessa's written notes are shown beside the suggestions.",
-  unavailable: "Nessa's written notes aren't available. How each suggestion was found is shown.",
+  pending: "Careerwright is writing a note on why each suggestion could suit you.",
+  written: "Careerwright's written notes are shown beside the suggestions.",
+  not_covered: "Careerwright's written notes are shown beside the suggestions.",
+  unavailable:
+    "Careerwright's written notes aren't available. How each suggestion was found is shown.",
 };
 
 function Slate({
@@ -557,8 +558,8 @@ function Slate({
       )}
       {!familiarityKnown && (
         <p className="small muted">
-          Nessa doesn't know your current work yet, so it can't say which directions are close to
-          it.
+          Careerwright doesn't know your current work yet, so it can't say which directions are
+          close to it.
         </p>
       )}
       {ORDER.map((direction) => {
@@ -606,7 +607,7 @@ function Slate({
       {choose.error !== null && <RequestFailure error={choose.error} />}
       {data.unsupported_hypotheses.length > 0 && (
         <p className="small muted">
-          Titles Nessa thought of that ESCO doesn't list, so not suggested:{" "}
+          Titles Careerwright thought of that ESCO doesn't list, so not suggested:{" "}
           {data.unsupported_hypotheses.join(", ")}.
         </p>
       )}
@@ -634,7 +635,7 @@ export function Directions({
   const blocked =
     unavailable ??
     (!hasEvidence
-      ? "Tell Nessa what you do now, what you enjoy or what you can do first."
+      ? "Tell Careerwright what you do now, what you enjoy or what you can do first."
       : submit.isPending
         ? "Starting…"
         : undefined);

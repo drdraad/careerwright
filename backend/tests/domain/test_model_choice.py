@@ -5,13 +5,17 @@ from datetime import UTC, datetime
 
 import pytest
 
-from nessa.errors import ErrorCode, NessaError
-from nessa.identity.activity import model_refusal
-from nessa.identity.failures import FailureClass
-from nessa.identity.model_choice import ModelChoice, ModelConfigurationError, assert_model_permitted
-from nessa.identity.model_registry import ModelMode, model_entry
-from nessa.identity.records import Run, RunKind
-from nessa.vocabulary import DataMode, WorkState
+from careerwright.errors import CareerwrightError, ErrorCode
+from careerwright.identity.activity import model_refusal
+from careerwright.identity.failures import FailureClass
+from careerwright.identity.model_choice import (
+    ModelChoice,
+    ModelConfigurationError,
+    assert_model_permitted,
+)
+from careerwright.identity.model_registry import ModelMode, model_entry
+from careerwright.identity.records import Run, RunKind
+from careerwright.vocabulary import DataMode, WorkState
 
 CONTRIBUTOR = "muse-spark-1.3-contributor"
 STANDARD = "muse-spark-1.3"
@@ -46,7 +50,7 @@ def test_synthetic_workspaces_use_the_configured_role() -> None:
 
 @pytest.mark.req("MODEL-02")
 def test_the_contributor_model_is_refused_for_a_non_synthetic_workspace() -> None:
-    with pytest.raises(NessaError) as raised:
+    with pytest.raises(CareerwrightError) as raised:
         assert_model_permitted(model_entry(CONTRIBUTOR), synthetic=False)
 
     assert raised.value.code is ErrorCode.MODEL_UNAVAILABLE

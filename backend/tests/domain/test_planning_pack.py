@@ -8,8 +8,8 @@ from datetime import date
 
 import pytest
 
-from nessa.catalogue.option_pack import load_pack
-from nessa.planning.catalogue import (
+from careerwright.catalogue.option_pack import load_pack
+from careerwright.planning.catalogue import (
     ActionConcept,
     ActionKind,
     Catalogue,
@@ -21,7 +21,7 @@ from nessa.planning.catalogue import (
     RecordState,
     Variant,
 )
-from nessa.planning.pack import pack_catalogue
+from careerwright.planning.pack import pack_catalogue
 
 PACK = load_pack("0.1.0")
 TARGETS = [t.target_id for t in PACK.targets]

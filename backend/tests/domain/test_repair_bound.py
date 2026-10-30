@@ -23,12 +23,12 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, Text
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import UsageLimits
 
-from nessa.identity.activity import PartialSink, RepairBound
-from nessa.identity.model_registry import ModelMode
-from nessa.profile import discovery, interview, slate_explanation
-from nessa.profile.discovery_agent import run_discovery
-from nessa.profile.interview_agent import run_interview_turn
-from nessa.profile.slate_explanation_agent import run_explanation
+from careerwright.identity.activity import PartialSink, RepairBound
+from careerwright.identity.model_registry import ModelMode
+from careerwright.profile import discovery, interview, slate_explanation
+from careerwright.profile.discovery_agent import run_discovery
+from careerwright.profile.interview_agent import run_interview_turn
+from careerwright.profile.slate_explanation_agent import run_explanation
 from tests.domain import test_discovery_contract, test_interview_agent, test_slate_explanation
 
 

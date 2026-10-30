@@ -7,7 +7,7 @@ from typing import Any
 import psycopg
 import pytest
 
-from nessa.seed import FIXTURE_SOURCE_ID, FIXTURE_WORKSPACE_ID, INVITED_ACTORS
+from careerwright.seed import FIXTURE_SOURCE_ID, FIXTURE_WORKSPACE_ID, INVITED_ACTORS
 from tests.support.client import ApiClient, profile_with, unasked_profile
 from tests.support.infra import Infra, create_emulator_user, sign_in
 
@@ -40,7 +40,7 @@ def test_workspace_records_its_data_mode_and_permanent_synthetic_label(
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         infra.as_role(
             "pg_api",
-            "UPDATE nessa.workspaces SET synthetic = false WHERE workspace_id = %s",
+            "UPDATE careerwright.workspaces SET synthetic = false WHERE workspace_id = %s",
             (workspace["workspace_id"],),
             actor=str(INVITED_ACTORS[0].actor_id),
         )
@@ -88,9 +88,9 @@ def test_a_retried_command_returns_the_first_result_and_acts_once(
     assert (first.status_code, second.status_code) == (201, 201)
     assert first.json() == second.json()
     assert (
-        infra.query("SELECT count(*) AS n FROM nessa.workspaces WHERE name = %s", (body["name"],))[
-            0
-        ]["n"]
+        infra.query(
+            "SELECT count(*) AS n FROM careerwright.workspaces WHERE name = %s", (body["name"],)
+        )[0]["n"]
         == 1
     )
     assert (different.status_code, different.json()["error"]["code"]) == (
@@ -118,9 +118,9 @@ def test_concurrent_duplicates_of_one_command_create_one_workspace(
     assert {r.status_code for r in results} == {201}
     assert len({r.json()["workspace_id"] for r in results}) == 1
     assert (
-        infra.query("SELECT count(*) AS n FROM nessa.workspaces WHERE name = %s", (body["name"],))[
-            0
-        ]["n"]
+        infra.query(
+            "SELECT count(*) AS n FROM careerwright.workspaces WHERE name = %s", (body["name"],)
+        )[0]["n"]
         == 1
     )
 
@@ -276,10 +276,10 @@ def test_the_fixture_workspace_cites_the_pinned_fixture_file(api: ApiClient, ada
 @pytest.mark.req("API-01")
 def test_workspace_list_paginates_with_an_opaque_cursor(api: ApiClient, infra: Infra) -> None:
     uid = f"pager-{uuid.uuid4().hex[:8]}"
-    email = f"{uid}@nessa.test"
+    email = f"{uid}@careerwright.test"
     create_emulator_user(uid, email, "password-123456")
     infra.query(
-        "INSERT INTO nessa.actors (actor_id, email, display_name, access) "
+        "INSERT INTO careerwright.actors (actor_id, email, display_name, access) "
         "VALUES (%s, %s, 'P', 'active')",
         (uuid.uuid4(), email),
     )

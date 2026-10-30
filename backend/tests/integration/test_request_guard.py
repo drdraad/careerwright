@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 
-from nessa.seed import FIXTURE_WORKSPACE_ID
+from careerwright.seed import FIXTURE_WORKSPACE_ID
 from tests.support.client import ApiClient, profile_with
 from tests.support.infra import Infra
 
@@ -29,7 +29,7 @@ def test_an_unauthorised_local_origin_cannot_change_anything(
     api: ApiClient, ada: str, infra: Infra, origin: str
 ) -> None:
     before = infra.query(
-        "SELECT count(*) AS n FROM nessa.profile_versions WHERE workspace_id = %s",
+        "SELECT count(*) AS n FROM careerwright.profile_versions WHERE workspace_id = %s",
         (FIXTURE_WORKSPACE_ID,),
     )
     response = api.write(
@@ -43,7 +43,7 @@ def test_an_unauthorised_local_origin_cannot_change_anything(
     assert (response.status_code, response.json()["error"]["code"]) == (403, "ORIGIN_NOT_ALLOWED")
     assert (
         infra.query(
-            "SELECT count(*) AS n FROM nessa.profile_versions WHERE workspace_id = %s",
+            "SELECT count(*) AS n FROM careerwright.profile_versions WHERE workspace_id = %s",
             (FIXTURE_WORKSPACE_ID,),
         )
         == before

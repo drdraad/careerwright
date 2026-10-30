@@ -13,17 +13,17 @@ from typing import Any
 import pytest
 from psycopg import errors
 
-from nessa.catalogue.esco import ESCO_RELEASE, concept_id, parse_release
-from nessa.catalogue.releases import read_verified
-from nessa.catalogue.taxonomy import (
+from careerwright.catalogue.esco import ESCO_RELEASE, concept_id, parse_release
+from careerwright.catalogue.releases import read_verified
+from careerwright.catalogue.taxonomy import (
     TaxonomyMismatchError,
     import_release,
     occupation_detail,
     search_occupations,
 )
-from nessa.cli import import_taxonomy, migrate_app
-from nessa.db import create_engine, system_transaction
-from nessa.errors import ErrorCode, NessaError
+from careerwright.cli import import_taxonomy, migrate_app
+from careerwright.db import create_engine, system_transaction
+from careerwright.errors import CareerwrightError, ErrorCode
 from tests.support.client import ApiClient
 from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
 from tests.support.infra import Infra, migrator_engine
@@ -51,7 +51,7 @@ def test_the_manifest_records_release_hash_licence_attribution_and_versions(
     assert release["sample"] is True  # the test copy says so, everywhere it is shown
     assert release["sha256"] == SAMPLE_RELEASE.sha256
     assert release["version"] == "v1.2.1"
-    assert release["transformation_version"] == "nessa-esco-import-1"
+    assert release["transformation_version"] == "careerwright-esco-import-1"
     assert "ISCO-08" in release["native_code_version"]
     assert "2011/833/EU" in release["licence"]
     assert release["attribution"] == (
@@ -60,7 +60,7 @@ def test_the_manifest_records_release_hash_licence_attribution_and_versions(
     # The import is itself a reduced, transformed version: marked as adapted (reuse
     # condition 2), naming what it leaves out and the transformation.
     assert release["adaptation"].startswith("Adapted from ESCO")
-    assert "nessa-esco-import-1" in release["adaptation"]
+    assert "careerwright-esco-import-1" in release["adaptation"]
     assert "skill hierarchy" in release["adaptation"]
     assert (release["occupation_count"], release["isco_group_count"]) == (30, 70)
 
@@ -89,14 +89,14 @@ def test_a_label_match_with_no_searchable_words_reports_full_text_as_not_run(
     # A hidden label of stop words only: it matches as a label, but full-text search has
     # no word to look for. (The sample has none, so the test adds one and removes it.)
     infra.query(
-        "INSERT INTO nessa.occupation_labels (concept_id, label, normalised, kind) "
+        "INSERT INTO careerwright.occupation_labels (concept_id, label, normalised, kind) "
         "VALUES (%s, 'Of The', 'of the', 'hidden')",
         (holder,),
     )
     try:
         found = search(api, ada, "of the")
     finally:
-        infra.query("DELETE FROM nessa.occupation_labels WHERE label = 'Of The'")
+        infra.query("DELETE FROM careerwright.occupation_labels WHERE label = 'Of The'")
 
     assert [m["concept_id"] for m in found["label_matches"]] == [holder]
     assert (found["full_text"], found["full_text_total"]) == ([], None)  # not run, not zero
@@ -212,12 +212,12 @@ def test_the_english_city_list_is_served_with_its_source(api: ApiClient, ada: st
 
 def test_the_api_role_reads_but_cannot_change_the_taxonomy(infra: Infra) -> None:
     with pytest.raises(errors.InsufficientPrivilege):
-        infra.as_role("pg_api", "DELETE FROM nessa.occupation_labels")
+        infra.as_role("pg_api", "DELETE FROM careerwright.occupation_labels")
     with pytest.raises(errors.InsufficientPrivilege):
-        infra.as_role("pg_api", "UPDATE nessa.taxonomy_releases SET sample = false")
-    assert infra.as_role("pg_api", "SELECT count(*) AS n FROM nessa.occupation_concepts") == [
-        {"n": 30}
-    ]
+        infra.as_role("pg_api", "UPDATE careerwright.taxonomy_releases SET sample = false")
+    assert infra.as_role(
+        "pg_api", "SELECT count(*) AS n FROM careerwright.occupation_concepts"
+    ) == [{"n": 30}]
 
 
 def test_importing_again_changes_nothing_and_another_release_is_refused(infra: Infra) -> None:
@@ -235,7 +235,7 @@ def test_importing_again_changes_nothing_and_another_release_is_refused(infra: I
             import_release(tx, other)
     finally:
         engine.dispose()
-    assert infra.query("SELECT count(*) AS n FROM nessa.taxonomy_releases") == [{"n": 1}]
+    assert infra.query("SELECT count(*) AS n FROM careerwright.taxonomy_releases") == [{"n": 1}]
 
 
 TAXONOMY_TABLES = (
@@ -252,7 +252,7 @@ TAXONOMY_TABLES = (
 
 
 def migrated_database(infra: Infra, prefix: str) -> str:
-    database = f"nessa_{prefix}_{uuid.uuid4().hex[:8]}"
+    database = f"careerwright_{prefix}_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     owner = migrator_engine(infra, database)
     try:
@@ -270,7 +270,8 @@ def test_a_release_imported_by_another_transformation_is_refused_not_kept(infra:
         assert import_taxonomy(owner, SAMPLE_PATH, SAMPLE_RELEASE) == "imported"
         with owner.begin() as tx:  # as if an earlier transformation had built it
             tx.exec_driver_sql(
-                "UPDATE nessa.taxonomy_releases SET transformation_version = 'nessa-esco-import-0'"
+                "UPDATE careerwright.taxonomy_releases SET transformation_version = "
+                "'careerwright-esco-import-0'"
             )
 
         # The same release bytes are not enough: its stored labels and vectors are stale.
@@ -301,13 +302,13 @@ def test_an_import_that_fails_part_way_leaves_no_taxonomy_rows(infra: Infra) -> 
 
     for table in TAXONOMY_TABLES:
         assert infra.query(
-            f"SELECT count(*) AS n FROM nessa.{table}",  # noqa: S608 - fixed names
+            f"SELECT count(*) AS n FROM careerwright.{table}",  # noqa: S608 - fixed names
             database=database,
         ) == [{"n": 0}], table
 
 
 def test_a_database_without_the_taxonomy_refuses_searches(infra: Infra) -> None:
-    database = f"nessa_empty_{uuid.uuid4().hex[:8]}"
+    database = f"careerwright_empty_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     owner = migrator_engine(infra, database)
     try:
@@ -316,7 +317,7 @@ def test_a_database_without_the_taxonomy_refuses_searches(infra: Infra) -> None:
         owner.dispose()
     engine = create_engine(infra.api_settings(database).app_database, application_name="t")
     try:
-        with system_transaction(engine) as tx, pytest.raises(NessaError) as raised:
+        with system_transaction(engine) as tx, pytest.raises(CareerwrightError) as raised:
             search_occupations(tx, "data analyst", 5)
     finally:
         engine.dispose()
@@ -328,7 +329,7 @@ def test_a_database_without_the_taxonomy_refuses_searches(infra: Infra) -> None:
 def test_the_full_pinned_release_imports_and_is_searchable(infra: Infra) -> None:
     release = Path(DATASETS_DIR) / ESCO_RELEASE.file_name
     assert release.is_file(), f"run `make setup` first: {release} is missing"
-    database = f"nessa_esco_{uuid.uuid4().hex[:8]}"
+    database = f"careerwright_esco_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     owner = migrator_engine(infra, database)
     try:
@@ -339,15 +340,16 @@ def test_the_full_pinned_release_imports_and_is_searchable(infra: Infra) -> None
         owner.dispose()
 
     counts = infra.query(
-        "SELECT (SELECT count(*) FROM nessa.occupation_concepts) AS occupations, "
-        "(SELECT count(*) FROM nessa.occupation_labels) AS labels, "
-        "(SELECT count(*) FROM nessa.skills) AS skills, "
-        "(SELECT count(*) FROM nessa.skill_labels) AS skill_labels, "
-        "(SELECT count(*) FROM nessa.occupation_skills) AS occupation_skills, "
-        "(SELECT count(*) FROM nessa.skill_relations) AS skill_relations, "
-        "(SELECT count(*) FROM nessa.isco_groups) AS isco, "
-        "(SELECT count(*) FROM nessa.occupation_broader) AS broader, "
-        "(SELECT count(*) FROM nessa.occupation_concepts WHERE search_vector IS NULL) AS unindexed",
+        "SELECT (SELECT count(*) FROM careerwright.occupation_concepts) AS occupations, "
+        "(SELECT count(*) FROM careerwright.occupation_labels) AS labels, "
+        "(SELECT count(*) FROM careerwright.skills) AS skills, "
+        "(SELECT count(*) FROM careerwright.skill_labels) AS skill_labels, "
+        "(SELECT count(*) FROM careerwright.occupation_skills) AS occupation_skills, "
+        "(SELECT count(*) FROM careerwright.skill_relations) AS skill_relations, "
+        "(SELECT count(*) FROM careerwright.isco_groups) AS isco, "
+        "(SELECT count(*) FROM careerwright.occupation_broader) AS broader, "
+        "(SELECT count(*) FROM careerwright.occupation_concepts WHERE search_vector IS NULL) AS "
+        "unindexed",
         database=database,
     )
     # 3,043 occupation rows and 13,960 skill rows, of which 4 and 21 repeat a concept with
@@ -366,7 +368,8 @@ def test_the_full_pinned_release_imports_and_is_searchable(infra: Infra) -> None
         }
     ]
     [manifest] = infra.query(
-        "SELECT dataset_id, sha256, sample, repeated_rows_collapsed FROM nessa.taxonomy_releases",
+        "SELECT dataset_id, sha256, sample, repeated_rows_collapsed FROM "
+        "careerwright.taxonomy_releases",
         database=database,
     )
     assert manifest == {

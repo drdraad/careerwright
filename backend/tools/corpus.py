@@ -41,13 +41,13 @@ from typing import Any
 
 from pydantic import SecretStr, TypeAdapter
 
-from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_adzuna, acquire_page
-from nessa.evidence.addresses import CheckedUrl, UrlRefusal
-from nessa.evidence.adzuna import AdzunaQuery
-from nessa.evidence.fetcher import Admit, Fetched, Fetcher, FetchFailure
-from nessa.evidence.pages import redact_page
-from nessa.evidence.records import ClaimValue, Retention, RightsClass
-from nessa.evidence.sources import (
+from careerwright.evidence.acquire import AcquisitionResult, Pacer, acquire_adzuna, acquire_page
+from careerwright.evidence.addresses import CheckedUrl, UrlRefusal
+from careerwright.evidence.adzuna import AdzunaQuery
+from careerwright.evidence.fetcher import Admit, Fetched, Fetcher, FetchFailure
+from careerwright.evidence.pages import redact_page
+from careerwright.evidence.records import ClaimValue, Retention, RightsClass
+from careerwright.evidence.sources import (
     PENDING_REVIEW,
     PageRights,
     classify_page,

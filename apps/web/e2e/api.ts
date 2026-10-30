@@ -38,8 +38,8 @@ export async function emulatorToken(handle: string): Promise<string> {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        email: `${handle}@nessa.test`,
-        password: `nessa-demo-${handle}`,
+        email: `${handle}@careerwright.test`,
+        password: `careerwright-demo-${handle}`,
         returnSecureToken: true,
       }),
     },

@@ -10,10 +10,10 @@ from decimal import Decimal
 
 import pytest
 
-from nessa.catalogue import ai_evidence, ashe, soc, xlsx
-from nessa.catalogue.ai_evidence import ExposureGradient, MatchType
-from nessa.catalogue.ashe import AshePeriod, Reliability
-from nessa.catalogue.releases import ReleaseIntegrityError
+from careerwright.catalogue import ai_evidence, ashe, soc, xlsx
+from careerwright.catalogue.ai_evidence import ExposureGradient, MatchType
+from careerwright.catalogue.ashe import AshePeriod, Reliability
+from careerwright.catalogue.releases import ReleaseIntegrityError
 from tests.support import reference_data as samples
 
 

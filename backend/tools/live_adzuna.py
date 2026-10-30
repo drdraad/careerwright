@@ -8,7 +8,7 @@ argument. If either name is absent (or empty) the command reports "blocked: Adzu
 credentials not found", which of the two is missing, and the names, never the values, of
 the variables `.env` does set whose name holds "ADZUNA" (fix round 5, item 4), and makes no
 request. Each request goes through the product's own path in the restricted acquisition
-worker's code (`nessa.evidence.acquire.acquire_adzuna`: the guarded fetcher, the response
+worker's code (`careerwright.evidence.acquire.acquire_adzuna`: the guarded fetcher, the response
 contract, the credential-free recorded URL) and is appended to
 `docs/evidence/live-usage.jsonl` and `.md` with its request count, the endpoint as recorded
 (no credentials), the result class and a cost of $0 (free tier). Nothing an advert says is
@@ -35,13 +35,13 @@ from pathlib import Path
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_adzuna
-from nessa.evidence.adzuna import AdzunaQuery
-from nessa.evidence.fetcher import Fetcher
-from nessa.evidence.jobs import group_copies
-from nessa.evidence.records import AttemptStatus
-from nessa.evidence.sources import load_manifest
-from nessa.logs import register_secret
+from careerwright.evidence.acquire import AcquisitionResult, Pacer, acquire_adzuna
+from careerwright.evidence.adzuna import AdzunaQuery
+from careerwright.evidence.fetcher import Fetcher
+from careerwright.evidence.jobs import group_copies
+from careerwright.evidence.records import AttemptStatus
+from careerwright.evidence.sources import load_manifest
+from careerwright.logs import register_secret
 from tools.leak_scan import Needle, scan
 from tools.localenv import ADZUNA_ENV, ENV_FILE, env_names_containing
 from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry, LiveCallRecord

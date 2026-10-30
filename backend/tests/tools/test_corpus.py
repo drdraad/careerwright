@@ -11,10 +11,10 @@ from typing import Any
 import pytest
 from pydantic import SecretStr
 
-from nessa.evidence.adzuna import AdzunaQuery, recorded_url
-from nessa.evidence.fetcher import Fetcher
-from nessa.evidence.records import Retention, RightsClass
-from nessa.evidence.sources import PageRights
+from careerwright.evidence.adzuna import AdzunaQuery, recorded_url
+from careerwright.evidence.fetcher import Fetcher
+from careerwright.evidence.records import Retention, RightsClass
+from careerwright.evidence.sources import PageRights
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
 from tests.support.source_server import Scripted, SourceServer, source_server
@@ -35,7 +35,7 @@ def fetcher(server: SourceServer) -> Fetcher:
                 "www.gov.uk": [LOOPBACK],
             }
         ),
-        user_agent="NessaL0/test",
+        user_agent="CareerwrightL0/test",
         extra_allowed=frozenset({("127.0.0.1", server.port)}),
     )
 

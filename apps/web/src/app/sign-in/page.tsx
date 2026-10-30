@@ -3,7 +3,7 @@ import { PageFrame } from "@/components/PageState";
 import { SignInForm } from "@/components/SignInForm";
 import { safeNext } from "@/lib/navigation";
 
-export const metadata: Metadata = { title: "Sign in · Nessa" };
+export const metadata: Metadata = { title: "Sign in · Careerwright" };
 
 export default async function SignInPage({
   searchParams,

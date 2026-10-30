@@ -37,7 +37,7 @@ function strip(overrides: Overrides = {}) {
       events={overrides.events ?? { state: "live" }}
       onReconnect={overrides.onReconnect ?? (() => {})}
       refreshFailed={overrides.refreshFailed ?? false}
-      email="ada@nessa.test"
+      email="ada@careerwright.test"
       calm={false}
       onCalmChange={() => {}}
       onSignOut={() => {}}

@@ -20,9 +20,14 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-from nessa.catalogue.ai_resilience import FIXTURE_PACK, AssessmentPacks, check_pack, load_pack
-from nessa.catalogue.reference import DATASETS, Dataset
-from nessa.catalogue.releases import ReleasePin
+from careerwright.catalogue.ai_resilience import (
+    FIXTURE_PACK,
+    AssessmentPacks,
+    check_pack,
+    load_pack,
+)
+from careerwright.catalogue.reference import DATASETS, Dataset
+from careerwright.catalogue.releases import ReleasePin
 
 DATA_ANALYST = "http://data.europa.eu/esco/occupation/d3edb8f8-3a06-47a0-8fb9-9b212c006aa2"
 ICT_SYSTEM_ANALYST = "http://data.europa.eu/esco/occupation/a6a0b60f-08da-4faa-bf54-942987efb471"

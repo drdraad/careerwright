@@ -31,8 +31,8 @@ export const Empty: Story = {
         next={<Button>Review what we know</Button>}
       >
         <p>
-          Routes are compared once your options are reviewed. Nessa's route search isn't part of
-          this build yet, so no route has been computed for this workspace.
+          Routes are compared once your options are reviewed. Careerwright's route search isn't part
+          of this build yet, so no route has been computed for this workspace.
         </p>
       </EmptyState>
     </div>
@@ -83,7 +83,7 @@ export const ErrorState: Story = {
   name: "Error",
   render: () => (
     <div className="grid max-w-[640px] gap-16">
-      <Alert tone="error" title="Nessa's database isn't reachable">
+      <Alert tone="error" title="Careerwright's database isn't reachable">
         <p>Nothing was lost. Try again in a moment.</p>
         <p className="muted">Reference 3f2a9c1e0b7d4a5e8c6f1a2b3c4d5e6f</p>
       </Alert>

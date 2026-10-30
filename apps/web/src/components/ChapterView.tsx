@@ -59,7 +59,7 @@ const PLANNED: Record<Exclude<ChapterId, "you" | "routes">, Planned> = {
       "The route you choose, as a dated plan with its conditions, costs and one next action.",
     // V-06: the limitation in words, and never a hint that a fixture preview becomes a plan.
     notYet:
-      "Plan selection isn't part of this build yet, so no plan has been made. When it is, a plan will start from a route Nessa computes from your answers, never from a fixture preview.",
+      "Plan selection isn't part of this build yet, so no plan has been made. When it is, a plan will start from a route Careerwright computes from your answers, never from a fixture preview.",
     next: "Review your answers in You",
   },
 };
@@ -194,8 +194,8 @@ export function ChapterView({
             }
           >
             <p>
-              Routes are compared once your options are reviewed. Nessa's route search isn't part of
-              this build yet, so no route has been computed for this workspace.
+              Routes are compared once your options are reviewed. Careerwright's route search isn't
+              part of this build yet, so no route has been computed for this workspace.
             </p>
           </EmptyState>
         )}

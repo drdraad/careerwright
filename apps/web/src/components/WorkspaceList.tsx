@@ -122,7 +122,7 @@ export function WorkspaceList() {
     }
     return (
       <>
-        <h1 className="page-title">Nessa can't load your account</h1>
+        <h1 className="page-title">Careerwright can't load your account</h1>
         <RequestFailure error={me.error} actions={signOut} />
       </>
     );

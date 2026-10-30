@@ -16,22 +16,22 @@ from typing import Any
 import psycopg
 import pytest
 
-from nessa.db import Engine, Tx, create_engine, run_transaction
-from nessa.evidence import extraction
-from nessa.evidence.acquire import AcquisitionResult
-from nessa.evidence.extraction import DropReason
-from nessa.evidence.extraction_runs import MAX_EXTRACTIONS_PER_ACQUISITION, start_extraction
-from nessa.evidence.records import AttemptStatus, Extraction, InputRoute
-from nessa.identity import run_store
-from nessa.identity import store as identity_store
-from nessa.identity.activity import ACTIVITY_MAX_ATTEMPTS
-from nessa.identity.failures import FailureClass
-from nessa.identity.keyring import Keyring, SealedValue, load_keyring
-from nessa.identity.model_choice import ModelChoice
-from nessa.identity.model_registry import model_entry
-from nessa.identity.records import EventKind, Run
-from nessa.identity.runs import output_context
-from nessa.vocabulary import WorkState
+from careerwright.db import Engine, Tx, create_engine, run_transaction
+from careerwright.evidence import extraction
+from careerwright.evidence.acquire import AcquisitionResult
+from careerwright.evidence.extraction import DropReason
+from careerwright.evidence.extraction_runs import MAX_EXTRACTIONS_PER_ACQUISITION, start_extraction
+from careerwright.evidence.records import AttemptStatus, Extraction, InputRoute
+from careerwright.identity import run_store
+from careerwright.identity import store as identity_store
+from careerwright.identity.activity import ACTIVITY_MAX_ATTEMPTS
+from careerwright.identity.failures import FailureClass
+from careerwright.identity.keyring import Keyring, SealedValue, load_keyring
+from careerwright.identity.model_choice import ModelChoice
+from careerwright.identity.model_registry import model_entry
+from careerwright.identity.records import EventKind, Run
+from careerwright.identity.runs import output_context
+from careerwright.vocabulary import WorkState
 from tests.integration.durable import Scenario, fresh_actor, make_scenario
 from tests.integration.test_acquisition import acquisition, jobs, submit, wait_terminal
 from tests.support.acquisition_service import LOOPBACK, acquisition_service
@@ -111,8 +111,9 @@ def worker(scenario: Scenario, service_url: str, **settings: str) -> Worker:
 
 def extractions(infra: Infra, acquisition_id: str) -> list[dict[str, Any]]:
     return infra.query(
-        "SELECT e.*, r.status, r.kind, r.model_id, r.requested_by FROM nessa.page_extractions e "
-        "LEFT JOIN nessa.runs r ON r.run_id = e.run_id WHERE e.acquisition_run_id = %s "
+        "SELECT e.*, r.status, r.kind, r.model_id, r.requested_by FROM "
+        "careerwright.page_extractions e "
+        "LEFT JOIN careerwright.runs r ON r.run_id = e.run_id WHERE e.acquisition_run_id = %s "
         "ORDER BY e.created_at",
         (acquisition_id,),
     )
@@ -130,7 +131,9 @@ def acquire(scenario: Scenario, *urls: str) -> tuple[str, list[dict[str, Any]]]:
 
 
 def inputs_of(infra: Infra, run_id: object) -> int:
-    rows = infra.query("SELECT count(*) AS n FROM nessa.run_inputs WHERE run_id = %s", (run_id,))
+    rows = infra.query(
+        "SELECT count(*) AS n FROM careerwright.run_inputs WHERE run_id = %s", (run_id,)
+    )
     return int(rows[0]["n"])
 
 
@@ -152,7 +155,7 @@ def test_a_page_with_no_structured_data_is_read_by_the_workspace_s_own_model_run
 
     run_id, [extracted] = acquire(scenario, url(sources, "/labelled"))
 
-    acquisition_run = infra.query("SELECT * FROM nessa.runs WHERE run_id = %s", (run_id,))[0]
+    acquisition_run = infra.query("SELECT * FROM careerwright.runs WHERE run_id = %s", (run_id,))[0]
     assert acquisition_run["model_id"] is None  # the fetch itself calls no model
     assert (extracted["kind"], extracted["status"], extracted["model_id"]) == (
         "page_extraction",
@@ -208,7 +211,7 @@ def test_a_page_with_no_structured_data_is_read_by_the_workspace_s_own_model_run
     # A class that keeps only excerpts: no body, and nothing of its text but the claims'
     # excerpts, anywhere in either database.
     assert page["retention"] == "excerpts"
-    cells = [*infra.database_cells("nessa_app"), *infra.database_cells("nessa_dbos")]
+    cells = [*infra.database_cells("careerwright_app"), *infra.database_cells("careerwright_dbos")]
     assert scan(cells, [Needle("page body", BODY_SENTINEL)]) == []
     assert scenario.leaks() == []
 
@@ -235,12 +238,14 @@ def test_a_page_the_model_reads_and_finds_no_advert_on_is_never_none_found(
     # Beside an API's own empty answer (Adzuna's count of 0), it still never reads as none
     # found (review C M7: through the public listing).
     infra.query(
-        "INSERT INTO nessa.acquisition_targets (run_id, workspace_id, position, route, query, "
+        "INSERT INTO careerwright.acquisition_targets (run_id, workspace_id, position, route, "
+        "query, "
         "status) VALUES (%s, %s, 1, 'adzuna', '{}'::jsonb, 'succeeded')",
         (run_id, scenario.workspace_id),
     )
     infra.query(
-        "INSERT INTO nessa.source_attempts (attempt_id, workspace_id, run_id, position, route, "
+        "INSERT INTO careerwright.source_attempts (attempt_id, workspace_id, run_id, position, "
+        "route, "
         "provider, requested_url, status, content_sha256, extraction, total_matching, "
         "finished_at) VALUES (%s, %s, %s, 1, 'adzuna', 'adzuna', "
         "'https://api.adzuna.com/v1/api/jobs/gb/search/1?what=gardener', 'succeeded', %s, "
@@ -337,20 +342,21 @@ def test_page_text_that_instructs_the_model_changes_nothing_outside_its_run(
         ("title", DropReason.NO_TITLE.value),
     ]
     runs = infra.query(
-        "SELECT kind FROM nessa.runs WHERE workspace_id = %s ORDER BY created_at",
+        "SELECT kind FROM careerwright.runs WHERE workspace_id = %s ORDER BY created_at",
         (scenario.workspace_id,),
     )
     assert [r["kind"] for r in runs] == ["acquisition", "page_extraction"]  # no other run
     assert scenario.profile()["version"] == profile_before  # no profile write
     assert "/collect" not in sources.paths()  # no URL fetched
     attempts = infra.query(
-        "SELECT count(*) AS n FROM nessa.source_attempts WHERE workspace_id = %s",
+        "SELECT count(*) AS n FROM careerwright.source_attempts WHERE workspace_id = %s",
         (scenario.workspace_id,),
     )
     assert attempts[0]["n"] == 1
     assert (
         infra.query(
-            "SELECT 1 FROM nessa.job_copies WHERE workspace_id = %s", (scenario.workspace_id,)
+            "SELECT 1 FROM careerwright.job_copies WHERE workspace_id = %s",
+            (scenario.workspace_id,),
         )
         == []
     )
@@ -362,7 +368,8 @@ def test_page_text_that_instructs_the_model_changes_nothing_outside_its_run(
 def _attempt(infra: Infra, run_id: str, workspace: str, extraction: str | None) -> str:
     attempt_id = str(uuid.uuid4())
     infra.query(
-        "INSERT INTO nessa.source_attempts (attempt_id, workspace_id, run_id, position, route, "
+        "INSERT INTO careerwright.source_attempts (attempt_id, workspace_id, run_id, position, "
+        "route, "
         "provider, requested_url, status, content_sha256, extraction, finished_at) VALUES "
         "(%s, %s, %s, 0, 'fetch', 'jobs.example.org', 'https://jobs.example.org/a', "
         "'succeeded', %s, %s, clock_timestamp()) RETURNING attempt_id",
@@ -375,7 +382,7 @@ def _submit_as_worker(infra: Infra, run_id: str, attempt_id: str) -> str:
     extraction_run = str(uuid.uuid4())
     infra.as_role(
         "pg_worker",
-        "SELECT nessa.submit_page_extraction(%s, %s, 'muse-spark-1.3-contributor', "
+        "SELECT careerwright.submit_page_extraction(%s, %s, 'muse-spark-1.3-contributor', "
         "'contributor', 1, %s, %s, %s)",
         (attempt_id, extraction_run, b"\x00" * 12, b"sealed", "1" * 64),
         run=run_id,
@@ -412,31 +419,33 @@ def test_the_worker_starts_an_extraction_only_for_its_own_run_s_unread_page_and_
         _submit_as_worker(infra, run_id, _attempt(infra, run_id, workspace, "no_job_posting"))
     assert len([r for r in extractions(infra, run_id) if r["run_id"]]) == 5
     started_by = infra.query(
-        "SELECT DISTINCT started_by_run FROM nessa.runs WHERE kind = 'page_extraction' "
+        "SELECT DISTINCT started_by_run FROM careerwright.runs WHERE kind = 'page_extraction' "
         "AND workspace_id = %s",
         (workspace,),
     )
     assert started_by == [{"started_by_run": uuid.UUID(run_id)}]
 
-    started = infra.query("SELECT * FROM nessa.runs WHERE run_id = %s", (extraction_run,))[0]
+    started = infra.query("SELECT * FROM careerwright.runs WHERE run_id = %s", (extraction_run,))[0]
     assert (started["kind"], started["status"], started["workspace_id"]) == (
         "page_extraction",
         "queued",
         uuid.UUID(workspace),
     )
-    outbox = infra.query("SELECT * FROM nessa.outbox WHERE run_id = %s", (extraction_run,))[0]
+    outbox = infra.query("SELECT * FROM careerwright.outbox WHERE run_id = %s", (extraction_run,))[
+        0
+    ]
     assert (outbox["workflow_id"], outbox["workflow_name"]) == (
-        f"nessa-run-{extraction_run}",
-        "nessa.model_run",
+        f"careerwright-run-{extraction_run}",
+        "careerwright.model_run",
     )
-    erase = "SELECT nessa.erase_run_input() AS erased"
+    erase = "SELECT careerwright.erase_run_input() AS erased"
     assert infra.as_role("pg_worker", erase, run=extraction_run) == [{"erased": False}]  # queued
     infra.query(
-        "UPDATE nessa.runs SET status = 'failed', failure_class = 'unknown_failure', "
+        "UPDATE careerwright.runs SET status = 'failed', failure_class = 'unknown_failure', "
         "finished_at = clock_timestamp() WHERE run_id = %s",
         (extraction_run,),
     )
-    infra.query("UPDATE nessa.actors SET access = 'revoked' WHERE email = %s", (email,))
+    infra.query("UPDATE careerwright.actors SET access = 'revoked' WHERE email = %s", (email,))
     # Erased once terminal, even when the requester may no longer act.
     assert infra.as_role("pg_worker", erase, run=extraction_run) == [{"erased": True}]
     assert inputs_of(infra, extraction_run) == 0
@@ -457,7 +466,9 @@ def _cancel(api: ApiClient, token: str, workspace: str, run_id: str) -> Any:
 
 def _status(infra: Infra, run_id: str) -> str:
     return str(
-        infra.query("SELECT status FROM nessa.runs WHERE run_id = %s", (run_id,))[0]["status"]
+        infra.query("SELECT status FROM careerwright.runs WHERE run_id = %s", (run_id,))[0][
+            "status"
+        ]
     )
 
 
@@ -478,7 +489,7 @@ def test_cancelling_an_acquisition_cancels_its_queued_extractions_before_any_req
     # Review C-1 N2: the answer names what it asked to cancel: the run and its started runs.
     assert answer.json()["cancellation_requested"] == [run_id, *started]
     requested = infra.query(
-        "SELECT run_id::text AS id FROM nessa.run_cancellations WHERE workspace_id = %s",
+        "SELECT run_id::text AS id FROM careerwright.run_cancellations WHERE workspace_id = %s",
         (workspace,),
     )
     assert sorted(r["id"] for r in requested) == sorted([run_id, *started])
@@ -499,7 +510,9 @@ def test_cancelling_an_acquisition_cancels_its_queued_extractions_before_any_req
 
     assert not calls.exists() or calls.read_text() == ""  # no provider request
     assert (
-        infra.query("SELECT 1 FROM nessa.model_attempts WHERE run_id = ANY(%s::uuid[])", (started,))
+        infra.query(
+            "SELECT 1 FROM careerwright.model_attempts WHERE run_id = ANY(%s::uuid[])", (started,)
+        )
         == []
     )
     assert [inputs_of(infra, r) for r in started] == [0, 0]  # erased once cancelled
@@ -517,7 +530,7 @@ def test_a_finished_acquisition_s_cancel_cancels_only_its_unsettled_extractions(
     ]
     for ended in (run_id, settled):
         infra.query(
-            "UPDATE nessa.runs SET status = 'failed', failure_class = 'unknown_failure', "
+            "UPDATE careerwright.runs SET status = 'failed', failure_class = 'unknown_failure', "
             "finished_at = clock_timestamp() WHERE run_id = %s",
             (ended,),
         )
@@ -528,7 +541,7 @@ def test_a_finished_acquisition_s_cancel_cancels_only_its_unsettled_extractions(
     assert response.json()["status"] == "failed"  # the acquisition itself stays as it ended
     assert response.json()["cancellation_requested"] == [queued]  # its started run alone
     requested = infra.query(
-        "SELECT run_id::text AS id FROM nessa.run_cancellations WHERE workspace_id = %s",
+        "SELECT run_id::text AS id FROM careerwright.run_cancellations WHERE workspace_id = %s",
         (workspace,),
     )
     assert [r["id"] for r in requested] == [queued]
@@ -548,7 +561,8 @@ def test_an_acquisition_cancelled_while_fetching_hands_no_page_to_extraction(
     wait_for(
         lambda: bool(
             infra.query(
-                "SELECT 1 FROM nessa.source_attempts WHERE run_id = %s AND status = 'pending'",
+                "SELECT 1 FROM careerwright.source_attempts WHERE run_id = %s AND status = "
+                "'pending'",
                 (run_id,),
             )
         ),
@@ -563,7 +577,7 @@ def test_an_acquisition_cancelled_while_fetching_hands_no_page_to_extraction(
     [row] = extractions(infra, run_id)  # the page's result is kept; nothing reads it
     assert (row["run_id"], row["not_run"]) == (None, "acquisition_cancelled")
     kinds = infra.query(
-        "SELECT kind FROM nessa.runs WHERE workspace_id = %s", (scenario.workspace_id,)
+        "SELECT kind FROM careerwright.runs WHERE workspace_id = %s", (scenario.workspace_id,)
     )
     assert [k["kind"] for k in kinds] == ["acquisition"]
 
@@ -606,7 +620,8 @@ def test_a_cancel_while_a_kept_page_for_extraction_is_recorded_ends_without_a_st
     wait_for(
         lambda: bool(
             infra.query(
-                "SELECT 1 FROM nessa.source_attempts WHERE run_id = %s AND status = 'pending'",
+                "SELECT 1 FROM careerwright.source_attempts WHERE run_id = %s AND status = "
+                "'pending'",
                 (run_id,),
             )
         ),
@@ -614,9 +629,9 @@ def test_a_cancel_while_a_kept_page_for_extraction_is_recorded_ends_without_a_st
         what="the page's request",
     )
     answers: list[Any] = []
-    with psycopg.connect(infra.url("pg_superuser", "nessa_app")) as blocker:
+    with psycopg.connect(infra.url("pg_superuser", "careerwright_app")) as blocker:
         blocker.execute(
-            "SELECT 1 FROM nessa.workspaces WHERE workspace_id = %s FOR NO KEY UPDATE",
+            "SELECT 1 FROM careerwright.workspaces WHERE workspace_id = %s FOR NO KEY UPDATE",
             (scenario.workspace_id,),
         )
         cancelling = threading.Thread(
@@ -647,7 +662,8 @@ def test_a_cancel_while_a_kept_page_for_extraction_is_recorded_ends_without_a_st
     wait_for(
         lambda: (
             not infra.query(
-                "SELECT 1 FROM nessa.source_attempts WHERE run_id = %s AND status = 'pending'",
+                "SELECT 1 FROM careerwright.source_attempts WHERE run_id = %s AND status = "
+                "'pending'",
                 (run_id,),
             )
         ),
@@ -655,13 +671,13 @@ def test_a_cancel_while_a_kept_page_for_extraction_is_recorded_ends_without_a_st
         what="the page's recording",
     )
     attempts = infra.query(
-        "SELECT status, retention FROM nessa.source_attempts WHERE run_id = %s", (run_id,)
+        "SELECT status, retention FROM careerwright.source_attempts WHERE run_id = %s", (run_id,)
     )
     assert attempts == [{"status": "succeeded", "retention": "body"}]  # recorded at once, kept
     [row] = extractions(infra, run_id)
     assert (row["run_id"], row["not_run"]) == (None, "acquisition_cancelled")
     documents = infra.query(
-        "SELECT count(*) AS n FROM nessa.source_documents WHERE workspace_id = %s",
+        "SELECT count(*) AS n FROM careerwright.source_documents WHERE workspace_id = %s",
         (scenario.workspace_id,),
     )
     assert documents == [{"n": 1}]
@@ -746,14 +762,15 @@ def test_a_cancel_while_the_worker_writes_a_run_s_event_ends_without_a_store_err
     assert answer.status_code == 202, answer.text  # the cancel: never a store error
     assert answer.json()["cancellation_requested"] == asked
     requested = infra.query(
-        "SELECT run_id::text AS id FROM nessa.run_cancellations WHERE workspace_id = %s",
+        "SELECT run_id::text AS id FROM careerwright.run_cancellations WHERE workspace_id = %s",
         (workspace,),
     )
     assert sorted(r["id"] for r in requested) == sorted(asked)
     # The worker's transaction: committed at its first try, with its event.
     assert _status(infra, publishing) == "running"
     events = infra.query(
-        "SELECT state FROM nessa.workspace_events WHERE workspace_id = %s AND subject_id = %s "
+        "SELECT state FROM careerwright.workspace_events WHERE workspace_id = %s AND subject_id = "
+        "%s "
         "AND kind = 'run.state_changed'",
         (workspace, publishing),
     )
@@ -776,7 +793,7 @@ def _publish_failed(tx: Tx, run: Run) -> None:
 
 def _cancel_events(infra: Infra, workspace: str) -> list[str]:
     rows = infra.query(
-        "SELECT subject_id FROM nessa.workspace_events WHERE workspace_id = %s "
+        "SELECT subject_id FROM careerwright.workspace_events WHERE workspace_id = %s "
         "AND kind = 'run.cancel_requested' ORDER BY seq",
         (workspace,),
     )
@@ -797,7 +814,8 @@ def test_a_cancel_whose_runs_all_settle_while_it_waits_is_run_finished(
         cancelled, [settling, settled] = _cascade(infra, scenario)
         for ended in (cancelled, settled):
             infra.query(
-                "UPDATE nessa.runs SET status = 'failed', failure_class = 'unknown_failure', "
+                "UPDATE careerwright.runs SET status = 'failed', failure_class = "
+                "'unknown_failure', "
                 "finished_at = clock_timestamp() WHERE run_id = %s",
                 (ended,),
             )
@@ -810,10 +828,11 @@ def test_a_cancel_whose_runs_all_settle_while_it_waits_is_run_finished(
     assert answer.json()["error"]["code"] == "RUN_FINISHED"
     assert answer.json()["error"]["details"] == {"status": "failed"}
     requests = infra.query(
-        "SELECT 1 FROM nessa.run_cancellations WHERE workspace_id = %s", (workspace,)
+        "SELECT 1 FROM careerwright.run_cancellations WHERE workspace_id = %s", (workspace,)
     )
     receipts = infra.query(
-        "SELECT 1 FROM nessa.command_receipts WHERE workspace_id = %s AND command = 'cancel_run'",
+        "SELECT 1 FROM careerwright.command_receipts WHERE workspace_id = %s AND command = "
+        "'cancel_run'",
         (workspace,),
     )
     assert (requests, receipts, _cancel_events(infra, workspace)) == ([], [], [])
@@ -911,7 +930,7 @@ def _start(
 
 def _not_run_of(infra: Infra, attempt_id: str) -> str | None:
     rows = infra.query(
-        "SELECT not_run FROM nessa.page_extractions WHERE attempt_id = %s", (attempt_id,)
+        "SELECT not_run FROM careerwright.page_extractions WHERE attempt_id = %s", (attempt_id,)
     )
     return None if not rows else rows[0]["not_run"]
 
@@ -928,7 +947,7 @@ def test_the_budget_check_counts_only_started_runs_that_have_not_reserved(
     run_id = _unread_acquisition(scenario.api, infra, scenario.token, workspace)
     pages = [_attempt(infra, run_id, workspace, "no_structured_data") for _ in range(4)]
     infra.query(
-        "UPDATE nessa.spend_limits SET period_limit_nano_usd = %s WHERE workspace_id = %s",
+        "UPDATE careerwright.spend_limits SET period_limit_nano_usd = %s WHERE workspace_id = %s",
         (worst * 5 // 2, workspace),  # room for two and a half reservations
     )
     engine, keyring = _worker_engine(infra)
@@ -937,7 +956,8 @@ def test_the_budget_check_counts_only_started_runs_that_have_not_reserved(
         _start(engine, keyring, models, run_id, pages[1])  # 0 + 1 unreserved + 1 = 2 runs
         [first, _] = [r["run_id"] for r in extractions(infra, run_id)]
         infra.query(  # the first has reserved and settled at a small cost
-            "INSERT INTO nessa.model_attempts (run_id, workspace_id, model_id, period_start, "
+            "INSERT INTO careerwright.model_attempts (run_id, workspace_id, model_id, "
+            "period_start, "
             "spend_state, reserved_nano_usd, cost_nano_usd, finished_at) VALUES (%s, %s, "
             "'muse-spark-1.3-contributor', date_trunc('month', now() AT TIME ZONE 'UTC')::date, "
             "'reconciled', %s, 1000, clock_timestamp())",
@@ -975,7 +995,8 @@ def test_the_job_list_states_what_an_acquisition_may_spend_before_it_starts(
     infra: Infra, api: ApiClient, ada: str, scenario: Scenario
 ) -> None:
     infra.query(
-        "UPDATE nessa.spend_limits SET run_limit_nano_usd = 40000000 WHERE workspace_id = %s",
+        "UPDATE careerwright.spend_limits SET run_limit_nano_usd = 40000000 WHERE workspace_id = "
+        "%s",
         (scenario.workspace_id,),
     )
     keyless = str(api.create_workspace(ada, "No key yet")["workspace_id"])

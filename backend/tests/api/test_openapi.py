@@ -12,12 +12,12 @@ import pytest
 import sqlalchemy as sa
 from fastapi.testclient import TestClient
 
-from nessa.api.app import create_app, openapi_document
-from nessa.api.deps import ApiDependencies
-from nessa.config import ApiSettings
-from nessa.identity.keyring import KEY_BYTES, Keyring
-from nessa.identity.model_choice import ModelChoice
-from nessa.profile.document import FIELD_SPECS, FieldKind
+from careerwright.api.app import create_app, openapi_document
+from careerwright.api.deps import ApiDependencies
+from careerwright.config import ApiSettings
+from careerwright.identity.keyring import KEY_BYTES, Keyring
+from careerwright.identity.model_choice import ModelChoice
+from careerwright.profile.document import FIELD_SPECS, FieldKind
 from tests.api.test_guard_and_envelope import ENV, HOST, RefusingVerifier
 from tools.openapi import render
 
@@ -62,7 +62,7 @@ def test_every_operation_has_a_named_unique_id() -> None:
 
     assert len(ids) == len(set(ids))
     assert all("_v1_" not in operation for operation in ids), ids  # names, not generated paths
-    assert json.loads(render())["info"]["title"] == "Nessa local API"
+    assert json.loads(render())["info"]["title"] == "Careerwright local API"
 
 
 @pytest.mark.req("ARC1-10")

@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from nessa.capability.matrix import (
+from careerwright.capability.matrix import (
     EscoSeed,
     EscoSkillRelation,
     Importance,
@@ -20,11 +20,11 @@ from nessa.capability.matrix import (
     check_edit,
     derived_importance,
 )
-from nessa.capability.readiness import ReadinessState, assess
-from nessa.capability.reference import load_reference
-from nessa.catalogue.esco import concept_id
-from nessa.catalogue.option_pack import load_pack
-from nessa.errors import ErrorCode, NessaError
+from careerwright.capability.readiness import ReadinessState, assess
+from careerwright.capability.reference import load_reference
+from careerwright.catalogue.esco import concept_id
+from careerwright.catalogue.option_pack import load_pack
+from careerwright.errors import CareerwrightError, ErrorCode
 
 PACK = load_pack("0.1.0")
 REFERENCE = load_reference("0.1.0", PACK)
@@ -237,7 +237,7 @@ def test_a_protected_gate_cannot_be_demoted() -> None:
     matrix = matrix_for("registered-nurse-manchester")
 
     for importance in (Importance.PREFERRED, Importance.UNKNOWN, Importance.DISPUTED):
-        with pytest.raises(NessaError) as refused:
+        with pytest.raises(CareerwrightError) as refused:
             check_edit(
                 matrix,
                 "pack:registered-nurse-manchester:nmc-registration",
@@ -252,7 +252,7 @@ def test_relaxing_an_employer_requirement_needs_the_explicit_warning() -> None:
     matrix = matrix_for("data-quality-analyst-manchester")
     validation = "pack:data-quality-analyst-manchester:data-validation"
 
-    with pytest.raises(NessaError) as refused:
+    with pytest.raises(CareerwrightError) as refused:
         check_edit(matrix, validation, Importance.PREFERRED, warning_acknowledged=False)
 
     assert refused.value.code is ErrorCode.CONFIRMATION_REQUIRED

@@ -1,7 +1,7 @@
 # Repository contract
 
-Nessa L0: a local career-planning app (FastAPI, Pydantic AI, DBOS and PostgreSQL 16
-backend; Next.js web app in `apps/web`). Authority order: `Nessa_Product_Specification.md`
+Careerwright L0: a local career-planning app (FastAPI, Pydantic AI, DBOS and PostgreSQL 16
+backend; Next.js web app in `apps/web`). Authority order: `Careerwright_Product_Specification.md`
 (v1.2), then `docs/plan/development-plan.md` (v1.0), then `docs/plan/l0-sprint-tasks.md`.
 Decisions live in `docs/adr/`; the latest sprint review is in `docs/reviews/`.
 
@@ -23,7 +23,7 @@ sheets and reports. Keep their effort as low as you can.
 Run from the repository root (details: `docs/runbook.md`).
 - Setup: `make setup` (prerequisites, `uv sync --locked` on uv-managed Python 3.12, the
   web app and design tooling with Playwright's Chromium, local secrets and master key in
-  `NESSA_HOME`, default `~/.nessa/l0`, the pinned ESCO release and reference datasets (ONS
+  `CAREERWRIGHT_HOME`, default `~/.careerwright/l0`, the pinned ESCO release and reference datasets (ONS
   ASHE and the SOC 2020 coding index, the ILO and Anthropic AI evidence, the ESCO to O*NET
   crosswalk) fetched into the gitignored `var/datasets/` and hash-checked, and the Docker
   images). The host Python is 3.14;
@@ -54,35 +54,41 @@ Run from the repository root (details: `docs/runbook.md`).
   rewrites session 2's T and R question sets.
 
 ## Repository facts
+- The product was called Nessa until 2026-10-30 (the product owner's rename). The old name
+  stays only where changing it would rewrite a record or a pinned file: the supplied pack
+  (`fixtures/m0`, `Nessa_M0_Fixtures.zip`, `Nessa_Local_Development_Plan.docx`), the pinned
+  format names `nessa-england-option-pack` and `nessa-capability-reference`, corpus case
+  X01's fetched address, and past reviews and evidence (`docs/reviews`, `docs/evidence`).
+  Setups made before the rename (`~/.nessa/l0`, the `nessa-l0` Docker volumes) are not used.
 - Requirement IDs and test IDs: `docs/requirements-register.md`. Tag each test with its
   register ID, and update the rows your work closes.
-- Representative implementation: `backend/src/nessa/identity/activity.py` with
+- Representative implementation: `backend/src/careerwright/identity/activity.py` with
   `workflow.py` beside it: the pinned durable-activity pattern (ADR 0002, ADR 0004), one
-  `RunTask` per run kind (composed in `nessa/worker.py`; a new model-backed kind is a task,
+  `RunTask` per run kind (composed in `careerwright/worker.py`; a new model-backed kind is a task,
   never a second call path, ADR 0006). Workflows carry IDs only; one bounded activity
   re-checks access, model, key and budget, opens the sealed input and key just in time and
   stores the output sealed with its usage; failures
   are classified from type and status with the message discarded; each transient failure
   class has one retry owner: the DBOS step for provider failures, the activity's store
-  budget for store failures. `nessa/profile/commands.py` shows an expected-version command.
-- Layout: `nessa/identity` (identity and execution: access, workspaces, keys, runs,
-  spend), `nessa/profile` (profile, interview contract, turns and preferences, the support
+  budget for store failures. `careerwright/profile/commands.py` shows an expected-version command.
+- Layout: `careerwright/identity` (identity and execution: access, workspaces, keys, runs,
+  spend), `careerwright/profile` (profile, interview contract, turns and preferences, the support
   policy, discovery, the slate and the early sketch, provisional concepts),
-  `nessa/catalogue` (the ESCO taxonomy, the English city list, the pinned reference data,
+  `careerwright/catalogue` (the ESCO taxonomy, the English city list, the pinned reference data,
   the UK SOC mapping, modelled pay and the salary floor, and the AI Resilience record model
   with its packs in `catalogue/packs/`, ADR 0010; and the England option pack,
   `option_pack.py` and `packs/england_option_pack/`, ADR 0011, whose version files, schema
-  and session 2 package only `tools.option_pack_files` writes), `nessa/capability`
+  and session 2 package only `tools.option_pack_files` writes), `careerwright/capability`
   (capability assessment: the pinned capability reference with rubrics, ESCO crosswalks and
   gate types; matrices, evidence, protected gates, OUT-1 outcomes, readiness, gaps and the
-  question graph; `capability.store` is its only SQL), `nessa/planning` (the monthly
+  question graph; `capability.store` is its only SQL), `careerwright/planning` (the monthly
   planning model, pure: the planning catalogue and its pack adapter, the immutable monthly
   input, the direct-spend, income-difference, liquidity and debt ledgers, and the route
-  checker), `nessa/evidence`
+  checker), `careerwright/evidence`
   (acquisition: the guarded fetcher, the source manifest `sources.json`, pages, Adzuna,
-  jobs, freshness, claims, model extraction), `nessa/acquisition.py` (the restricted
-  acquisition worker: no database, master key or model key), `nessa/api` (HTTP only),
-  `nessa/migrations` (forward-only SQL), `nessa/worker.py` (worker entry point). Identity
+  jobs, freshness, claims, model extraction), `careerwright/acquisition.py` (the restricted
+  acquisition worker: no database, master key or model key), `careerwright/api` (HTTP only),
+  `careerwright/migrations` (forward-only SQL), `careerwright/worker.py` (worker entry point). Identity
   never imports profile or catalogue. Vendor and SQL imports are allowed only in the
   adapters listed in `backend/tests/architecture/test_boundaries.py`; add new ones there.
 - Web layout (`apps/web`, ADR 0005): `src/app` (routes; `api/[...path]` forwards `/api/v1`
@@ -109,12 +115,12 @@ Run from the repository root (details: `docs/runbook.md`).
     offers a smaller next step, and nothing about the panel is stored or used for
     suitability (one recall-first screen, ADR 0007). Model output may not infer a health
     condition, type, protected characteristic or percentage the person never used
-    (`nessa/profile/safety.py`).
+    (`careerwright/profile/safety.py`).
   - Money is integer minor units (GBP). Use `Money` (≥ 0) for payments and `SignedMoney`
     for economic cost. Unknown money is `null`, never 0.
   - Unknown is never zero or ineligible. Failure is never an empty success. A truncated
     search is never "no route": `NO_ROUTE_IN_BOUNDED_MODEL` needs complete coverage.
-  - Evidence (ADR 0009): every fetch goes through `nessa.evidence.fetcher` (address,
+  - Evidence (ADR 0009): every fetch goes through `careerwright.evidence.fetcher` (address,
     robots.txt, pacing and every redirect checked); a page's class comes from the manifest,
     never from the page; a body is kept only where the session 1 class permits. Third
     parties' emails, phone numbers and contact fields are removed before anything is
@@ -157,8 +163,8 @@ Run from the repository root (details: `docs/runbook.md`).
     "cannot afford". Unknown dates, cost, timetable or a hard limit leave a route
     unresolved, never passed. Every readiness qualification qualifies the route. Only an
     approved award counts unconditionally; a loan is never support. Readiness milestones
-    come from `nessa.capability.readiness.assess`, never from planning code, and Task 13a's
-    oracle shares no code with `nessa.planning.checker`.
+    come from `careerwright.capability.readiness.assess`, never from planning code, and Task 13a's
+    oracle shares no code with `careerwright.planning.checker`.
   - Pareto layers are computed over the full archive, dominated schedules included.
     Equal points do not dominate each other.
   - TRACE-01 (economic cost) and DIRECTAI (direct spending) never share route IDs or
@@ -168,16 +174,16 @@ Run from the repository root (details: `docs/runbook.md`).
     `fixtures/esco-sample` is a labelled test subset, rebuilt only by `tools.esco_sample`.
   - Secrets: `.env` holds `META_API_KEY` for the live commands only, and
     `ADZUNA_APPLICATION_ID` and `ADZUNA_API_KEY` for `make live-adzuna` and for `make
-    setup`, which copies them into `NESSA_HOME/adzuna/` for the restricted acquisition
+    setup`, which copies them into `CAREERWRIGHT_HOME/adzuna/` for the restricted acquisition
     worker alone; the product takes user keys through the API and seals them. Never print a key, pass it as an argument,
-    log it or journal it. Database passwords and master keys live in `NESSA_HOME`, never in
+    log it or journal it. Database passwords and master keys live in `CAREERWRIGHT_HOME`, never in
     the repository. The test model `muse-spark-1.3-contributor` takes synthetic data only,
     enforced in code and by a database CHECK; production is `muse-spark-1.3` (ADR 0003).
     Demo workspaces run only the offline fixture interviewer, never a provider model.
   - Ownership is row-level security: run API SQL inside `actor_transaction` and worker
-    SQL inside `run_transaction` (`nessa/db.py`). Never connect at runtime as an owner role.
+    SQL inside `run_transaction` (`careerwright/db.py`). Never connect at runtime as an owner role.
   - Every consequential write takes an expected version and an `Idempotency-Key` and goes
-    through `run_idempotent`. Errors are `NessaError` codes; never echo request input.
+    through `run_idempotent`. Errors are `CareerwrightError` codes; never echo request input.
     A command's answer is kept as its receipt in plaintext: never put model output in it.
   - Loopback only: services sit on an internal network; only the edge relay publishes
     ports, on 127.0.0.1. The API rejects foreign Host and Origin headers (ADR 0004).
@@ -193,8 +199,8 @@ Run from the repository root (details: `docs/runbook.md`).
   `backend/uv.lock` (bump only by re-running `make acceptance`), the exact pins in
   `apps/web/package.json` and its lockfile (at least 14 days old, enforced by pnpm, with no
   exception; record each in `docs/dependencies.md`), pnpm 10.33.2, Node 24, Python
-  3.12, PostgreSQL 16, and the DBOS `application_version` `nessa-l0-1` (change it when the
-  workflow's step sequence changes). Code goes in `backend/src/nessa/<domain module>` (plan
+  3.12, PostgreSQL 16, and the DBOS `application_version` `careerwright-l0-1` (change it when the
+  workflow's step sequence changes). Code goes in `backend/src/careerwright/<domain module>` (plan
   section 3) and `apps/web`. No empty layer scaffolding.
 
 ## Change scope

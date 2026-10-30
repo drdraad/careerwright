@@ -304,7 +304,7 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     expect(noteRequests(sent)[0]?.body).toEqual({ expected_profile_version: 2 });
   });
 
-  it("shows the note and each checked quotation above how Nessa found it", async () => {
+  it("shows the note and each checked quotation above how Careerwright found it", async () => {
     const sent = fakeApi([slateRoute]);
     renderDirections();
 
@@ -317,11 +317,11 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     // Fix round 1 (I2): it says what was checked, and that the sentence is the model's own.
     expect(
       shown.getByText(
-        /Only the quoted words were checked against them; the sentences are Nessa's own\./,
+        /Only the quoted words were checked against them; the sentences are Careerwright's own\./,
       ),
     ).toBeVisible();
     expect(shown.queryByText(/checked word for word/)).toBeNull();
-    expect(shown.getByText("How Nessa found it")).toBeVisible();
+    expect(shown.getByText("How Careerwright found it")).toBeVisible();
     // The deterministic provenance stays, after the written note.
     expect(note.compareDocumentPosition(found) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(noteRequests(sent)).toHaveLength(0); // already written: nothing asked
@@ -355,7 +355,7 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     const shown = within(await card());
     expect(shown.getByText(/no written note/)).toBeVisible();
     expect(
-      shown.getByText(/The reply didn't pass Nessa's checks twice\. Nothing from it/),
+      shown.getByText(/The reply didn't pass Careerwright's checks twice\. Nothing from it/),
     ).toBeVisible();
     expect(shown.getByText("What you enjoy: “repairing bicycles”.")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent(/aren't available/);
@@ -429,7 +429,7 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     // Fix round 3 (R3-M6): no run existed, so the card says it was refused before one, not
     // that it failed or that something from it was not kept.
     expect(shown.getByText(/Not started/)).toBeVisible();
-    expect(shown.getByText(/Nessa didn't ask the model, so nothing was sent/)).toBeVisible();
+    expect(shown.getByText(/Careerwright didn't ask the model, so nothing was sent/)).toBeVisible();
     expect(shown.queryByText(/Failed/)).toBeNull();
     expect(shown.queryByText(/Nothing from it was kept/)).toBeNull();
     await user.click(screen.getByRole("button", { name: "Try again : the written note" }));
@@ -489,7 +489,7 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
       expect(screen.queryByRole("button", { name: /Try again/ })).toBeNull();
       if (button === null) {
         expect(
-          screen.getByText(/Edit answers directly\. Nessa then offers Suggest again\./),
+          screen.getByText(/Edit answers directly\. Careerwright then offers Suggest again\./),
         ).toBeVisible();
         expect(screen.queryByRole("button", { name: "Suggest again" })).toBeNull();
       } else {
@@ -550,6 +550,6 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(2));
 
     expect(noteRequests(sent)).toHaveLength(0);
-    expect(screen.queryByText("How Nessa found it")).toBeNull(); // nothing to set it apart from
+    expect(screen.queryByText("How Careerwright found it")).toBeNull(); // nothing to set it apart from
   });
 });

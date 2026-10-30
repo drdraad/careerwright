@@ -23,7 +23,7 @@ export const directSource: SourceOut = {
   ...fixtureSource,
   source_ref_id: "5b0c3a7e-1111-4d2c-8e9f-0a1b2c3d4e5f",
   kind: "direct_entry",
-  label: "Entered directly in Nessa",
+  label: "Entered directly in Careerwright",
   locator: null,
   content_sha256: null,
 };

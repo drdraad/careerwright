@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>You: conversation (Nessa design reference)</title>
+  <title>You: conversation (Careerwright design reference)</title>
   <link rel="stylesheet" href="../tokens/tokens.css">
   <link rel="stylesheet" href="shell.css">
   <link rel="stylesheet" href="conversation.css">
@@ -27,7 +27,7 @@
 
   <main class="workarea on-reading">
     <div class="you mobile-pad-for-sheet">
-      <section class="thread" aria-label="Conversation with Nessa">
+      <section class="thread" aria-label="Conversation with Careerwright">
         <div class="thread-meta">
           <span>Mode: keep this practical</span>
           <button class="btn btn-secondary" type="button" data-glyph="pause">Pause</button>
@@ -45,7 +45,7 @@
         <!-- P01: sure entry. The opening question and first reply are collapsed so the
              latest turn and the current question are in view. -->
         <button class="btn btn-quiet earlier" type="button">Show earlier messages</button>
-        <div class="turn-nessa older" data-show="default failure"><svg aria-hidden="true"></svg>
+        <div class="turn-careerwright older" data-show="default failure"><svg aria-hidden="true"></svg>
           <p>You want to move from finance operations into data quality work in Manchester, keeping your income if you can. I've listed what I understood under What we know, for you to check.</p>
         </div>
         <div class="turn-you older" data-show="default">
@@ -58,7 +58,7 @@
         <div class="alert on-reading" role="alert" data-show="failure">
           <span data-glyph="error"></span>
           <div>
-            <p class="alert-title">Nessa couldn't turn your last message into proposed changes</p>
+            <p class="alert-title">Careerwright couldn't turn your last message into proposed changes</p>
             <p class="small">Its reply failed validation twice, so nothing was saved. What we know is unchanged at version 7. Your message is kept below.</p>
             <p class="small muted">Error SCHEMA_INVALID, interview turn, run 4f2c-91</p>
             <div class="alert-actions">
@@ -73,14 +73,14 @@
         </div>
 
         <!-- P02: unsure entry -->
-        <div class="turn-nessa older" data-show="unknown"><svg aria-hidden="true"></svg>
+        <div class="turn-careerwright older" data-show="unknown"><svg aria-hidden="true"></svg>
           <p>What would you most like to be different about your working life?</p>
         </div>
         <div class="turn-you older" data-show="unknown">
           <p>I've been out of work since the summer. At my last job I liked fixing the machines more than the paperwork, and I'd rather be outside than stuck at a desk all day.</p>
           <span class="when">You, 14:05</span>
         </div>
-        <div class="turn-nessa" data-show="unknown"><svg aria-hidden="true"></svg>
+        <div class="turn-careerwright" data-show="unknown"><svg aria-hidden="true"></svg>
           <p>You enjoy repairing physical things and working outdoors. I've noted both as interests to explore, not as limits on what we look at.</p>
         </div>
 
@@ -96,7 +96,7 @@
 
         <div class="question" data-show="unknown">
           <h1 class="display">Do you want to add what you'd otherwise earn over the next few months?</h1>
-          <p>It lets Nessa compare routes by lost earnings. If you'd rather not, Nessa can still suggest directions and compare direct spending on its own.</p>
+          <p>It lets Careerwright compare routes by lost earnings. If you'd rather not, Careerwright can still suggest directions and compare direct spending on its own.</p>
           <div class="choices">
             <button class="btn btn-secondary" type="button">Add what I'd otherwise earn</button>
             <button class="btn btn-secondary" type="button">Compare direct spending only</button>
@@ -105,7 +105,7 @@
         </div>
 
         <form class="composer" aria-label="Reply" onsubmit="return false">
-          <label class="visually-hidden" for="reply">Reply to Nessa</label>
+          <label class="visually-hidden" for="reply">Reply to Careerwright</label>
           <textarea id="reply" rows="1" placeholder="Reply in your own words"></textarea>
           <!-- One primary action per view (S0-V08): the decision in the drawer (Accept, Add an
                amount) or, after a failure, Try again. Send stays secondary beside them. -->
@@ -144,7 +144,7 @@
             </div>
           </div>
           <div class="proposal inference">
-            <span class="proposal-kind">Nessa's reading, not a fact until you accept it</span>
+            <span class="proposal-kind">Careerwright's reading, not a fact until you accept it</span>
             <span class="proposal-value">You'd rather keep working while you study</span>
             <div class="proposal-actions">
               <button class="btn btn-secondary" type="button">Accept</button>
@@ -170,7 +170,7 @@
             </div>
           </div>
           <div class="proposal inference">
-            <span class="proposal-kind">Nessa's reading, not a fact until you accept it</span>
+            <span class="proposal-kind">Careerwright's reading, not a fact until you accept it</span>
             <span class="proposal-value">Prefers <span data-value="p02.preferredEnvironment.0"></span> work in a <span data-value="p02.preferredEnvironment.1"></span></span>
             <div class="proposal-actions">
               <button class="btn btn-secondary" type="button">Accept</button>
@@ -244,7 +244,7 @@
         <figcaption class="small muted">Your message, Monday 14 December 2026, 10:41</figcaption>
       </figure>
       <div class="drawer-section">
-        <h3 class="section-title">How Nessa read it</h3>
+        <h3 class="section-title">How Careerwright read it</h3>
         <p class="small">"About <span data-gbp="p01.currentNetIncomeMinor"></span>" is recorded as exactly <span data-gbp="p01.currentNetIncomeMinor"></span> after tax each month. Edit it if "about" hides a range.</p>
       </div>
       <div class="drawer-section">
@@ -269,8 +269,8 @@
         <button class="btn btn-quiet" type="button" aria-label="Close evidence" data-glyph="close"></button>
       </div>
       <span class="status status-unknown" data-glyph="unknown">Not confirmed</span>
-      <p class="small">Economic cost compares each route with what you'd earn if you didn't take it. Without that baseline, Nessa can't count lost earnings.</p>
-      <p class="small"><strong>We have not recorded £0.</strong> Unknown and zero give different answers, so Nessa keeps this open until you choose.</p>
+      <p class="small">Economic cost compares each route with what you'd earn if you didn't take it. Without that baseline, Careerwright can't count lost earnings.</p>
+      <p class="small"><strong>We have not recorded £0.</strong> Unknown and zero give different answers, so Careerwright keeps this open until you choose.</p>
       <div class="drawer-section">
         <h3 class="section-title">Still available</h3>
         <ul>
@@ -307,7 +307,7 @@
         <dt>Profile version</dt><dd>7, unchanged</dd>
         <dt>Model usage</dt><dd>Recorded in your spend log</dd>
       </dl>
-      <p class="small">Nessa checks every proposed change against the profile's rules before showing it to you. This reply broke them twice, so it was discarded rather than partly saved.</p>
+      <p class="small">Careerwright checks every proposed change against the profile's rules before showing it to you. This reply broke them twice, so it was discarded rather than partly saved.</p>
       <div class="drawer-actions">
         <button class="btn btn-secondary" type="button">Try again</button>
         <button class="btn btn-secondary" type="button">Add the details yourself</button>
@@ -318,7 +318,7 @@
 <script src="data.js"></script>
 <script src="shell.js"></script>
 <script>
-  for (const slot of document.querySelectorAll(".turn-nessa > svg")) slot.outerHTML = NESSA.glyph("mark");
+  for (const slot of document.querySelectorAll(".turn-careerwright > svg")) slot.outerHTML = CAREERWRIGHT.glyph("mark");
 </script>
 </body>
 </html>

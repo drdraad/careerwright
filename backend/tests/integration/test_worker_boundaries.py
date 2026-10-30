@@ -11,7 +11,7 @@ from pathlib import Path
 import psycopg
 import pytest
 
-from nessa.identity import connection_check
+from careerwright.identity import connection_check
 from tests.integration.durable import Scenario, fresh_actor, make_scenario
 from tests.support.client import ApiClient
 from tests.support.infra import Infra
@@ -35,7 +35,7 @@ def test_the_worker_role_sees_only_the_run_it_executes(
     run_id = scenario.submit()
     other = make_scenario(infra, api, ben, scenario.log_dir)
     other_run = other.submit()
-    count = "SELECT count(*) AS n FROM nessa.{} WHERE workspace_id = %s"
+    count = "SELECT count(*) AS n FROM careerwright.{} WHERE workspace_id = %s"
 
     def visible(table: str, workspace: str, run: str | None) -> int:
         rows = infra.as_role("pg_worker", count.format(table), (workspace,), run=run)
@@ -47,7 +47,7 @@ def test_the_worker_role_sees_only_the_run_it_executes(
         assert visible(table, scenario.workspace_id, None) == 0, table  # no run context
     assert visible("credentials", other.workspace_id, other_run) == 1
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
-        infra.as_role("pg_worker", "SELECT * FROM nessa.profile_versions", run=run_id)
+        infra.as_role("pg_worker", "SELECT * FROM careerwright.profile_versions", run=run_id)
 
 
 @pytest.mark.req("SEC-01", "SEC-02")
@@ -57,11 +57,11 @@ def test_revoking_access_while_a_run_is_queued_hides_the_key_from_the_worker(
     email, token = fresh_actor(api, infra)
     scenario = make_scenario(infra, api, token, tmp_path)
     run_id = scenario.submit()
-    infra.query("UPDATE nessa.actors SET access = 'revoked' WHERE email = %s", (email,))
+    infra.query("UPDATE careerwright.actors SET access = 'revoked' WHERE email = %s", (email,))
 
     rows = infra.as_role(
         "pg_worker",
-        "SELECT count(*) AS n FROM nessa.credentials WHERE workspace_id = %s",
+        "SELECT count(*) AS n FROM careerwright.credentials WHERE workspace_id = %s",
         (scenario.workspace_id,),
         run=run_id,
     )
@@ -102,10 +102,10 @@ def test_the_contributor_model_is_refused_for_non_synthetic_data_at_every_layer(
         psycopg.errors.CheckViolation, match="contributor_models_only_for_synthetic_data"
     ):
         infra.query(
-            "INSERT INTO nessa.runs (run_id, workspace_id, data_mode, synthetic, kind, "
+            "INSERT INTO careerwright.runs (run_id, workspace_id, data_mode, synthetic, kind, "
             "requested_by, model_id, model_mode, status) SELECT %s, workspace_id, data_mode, "
             "synthetic, 'connection_check', owner_actor_id, 'muse-spark-1.3-contributor', "
-            "'contributor', 'queued' FROM nessa.workspaces WHERE workspace_id = %s",
+            "'contributor', 'queued' FROM careerwright.workspaces WHERE workspace_id = %s",
             (uuid.uuid4(), real["workspace_id"]),
         )
 
@@ -175,14 +175,15 @@ def test_concurrent_calls_cannot_reserve_past_the_period_limit(scenario: Scenari
 def cut_worker_database_for(infra: Infra, seconds: float) -> threading.Thread:
     """The worker's database role loses its connections for `seconds` (DBOS's own database
     stays up), as in a restart of the application database."""
-    infra.query("ALTER ROLE nessa_worker NOLOGIN")
+    infra.query("ALTER ROLE careerwright_worker NOLOGIN")
     infra.query(
-        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = 'nessa_worker'"
+        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = "
+        "'careerwright_worker'"
     )
 
     def restore() -> None:
         time.sleep(seconds)
-        infra.query("ALTER ROLE nessa_worker LOGIN")
+        infra.query("ALTER ROLE careerwright_worker LOGIN")
 
     restorer = threading.Thread(target=restore)
     restorer.start()
@@ -204,7 +205,7 @@ def test_a_short_app_database_outage_mid_call_keeps_the_paid_result(
         run = scenario.wait_terminal(run_id, timeout_s=120)
     finally:
         restorer.join()
-        infra.query("ALTER ROLE nessa_worker LOGIN")
+        infra.query("ALTER ROLE careerwright_worker LOGIN")
     worker.stop()
 
     assert (run["status"], run["failure_class"]) == ("complete", None)
@@ -228,7 +229,7 @@ def test_an_outage_longer_than_the_store_budget_ends_in_a_typed_terminal_state(
         run = scenario.wait_terminal(run_id, timeout_s=120)
     finally:
         restorer.join()
-        infra.query("ALTER ROLE nessa_worker LOGIN")
+        infra.query("ALTER ROLE careerwright_worker LOGIN")
     worker.stop()
 
     assert (run["status"], run["failure_class"]) == ("failed", "app_store_unavailable")

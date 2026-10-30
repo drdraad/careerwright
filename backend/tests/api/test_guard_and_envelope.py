@@ -14,24 +14,24 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from nessa.api.app import create_app
-from nessa.api.deps import ApiDependencies
-from nessa.config import ApiSettings
-from nessa.identity.access import VerifiedIdentity, unauthenticated
-from nessa.identity.keyring import KEY_BYTES, Keyring
-from nessa.identity.model_choice import ModelChoice
+from careerwright.api.app import create_app
+from careerwright.api.deps import ApiDependencies
+from careerwright.config import ApiSettings
+from careerwright.identity.access import VerifiedIdentity, unauthenticated
+from careerwright.identity.keyring import KEY_BYTES, Keyring
+from careerwright.identity.model_choice import ModelChoice
 
 HOST = "127.0.0.1:57000"
 ENV = {
-    "NESSA_ENVIRONMENT": "local",
-    "NESSA_RUNTIME_MODE": "demo",
-    "NESSA_ALLOWED_HOSTS": HOST,
-    "NESSA_ALLOWED_ORIGINS": "http://127.0.0.1:57300",
-    "NESSA_FIREBASE_PROJECT_ID": "demo-nessa",
+    "CAREERWRIGHT_ENVIRONMENT": "local",
+    "CAREERWRIGHT_RUNTIME_MODE": "demo",
+    "CAREERWRIGHT_ALLOWED_HOSTS": HOST,
+    "CAREERWRIGHT_ALLOWED_ORIGINS": "http://127.0.0.1:57300",
+    "CAREERWRIGHT_FIREBASE_PROJECT_ID": "demo-careerwright",
     "FIREBASE_AUTH_EMULATOR_HOST": "127.0.0.1:57099",
-    "NESSA_APP_DATABASE_URL": "postgresql+psycopg://nessa_api@127.0.0.1:1/nessa_app",
-    "NESSA_APP_DATABASE_PASSWORD_FILE": "/nonexistent",
-    "NESSA_MASTER_KEY_DIR": "/nonexistent",
+    "CAREERWRIGHT_APP_DATABASE_URL": "postgresql+psycopg://careerwright_api@127.0.0.1:1/careerwright_app",
+    "CAREERWRIGHT_APP_DATABASE_PASSWORD_FILE": "/nonexistent",
+    "CAREERWRIGHT_MASTER_KEY_DIR": "/nonexistent",
 }
 
 
@@ -112,12 +112,12 @@ def test_framework_errors_carry_a_code_that_matches_their_status(
 def test_an_unexpected_error_keeps_the_envelope_correlation_id_and_real_status(
     client: TestClient, caplog: pytest.LogCaptureFixture
 ) -> None:
-    with caplog.at_level(logging.INFO, logger="nessa.api.access"):
+    with caplog.at_level(logging.INFO, logger="careerwright.api.access"):
         response = client.get("/boom")
 
     body = response.json()["error"]
     assert (response.status_code, body["code"]) == (500, "INTERNAL_ERROR")
     assert response.headers["x-correlation-id"] == body["correlation_id"]
     assert "sk-secret-material" not in response.text
-    [access] = [r for r in caplog.records if r.name == "nessa.api.access"]
+    [access] = [r for r in caplog.records if r.name == "careerwright.api.access"]
     assert access.status == 500  # type: ignore[attr-defined]

@@ -1,4 +1,4 @@
-"""A thin test client: the real FastAPI app over TestClient, with Nessa's request headers."""
+"""A thin test client: the real FastAPI app over TestClient, with Careerwright's request headers."""
 
 import uuid
 from typing import Any

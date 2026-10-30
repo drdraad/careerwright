@@ -15,19 +15,19 @@ from pydantic_ai.exceptions import ContentFilterError, UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from nessa.identity.activity import PartialWriter
-from nessa.identity.failures import FailureClass, classify_failure
-from nessa.identity.model_registry import ModelMode
-from nessa.money import Money
-from nessa.profile.document import empty_profile
-from nessa.profile.fixture_interviewer import (
+from careerwright.identity.activity import PartialWriter
+from careerwright.identity.failures import FailureClass, classify_failure
+from careerwright.identity.model_registry import ModelMode
+from careerwright.money import Money
+from careerwright.profile.document import empty_profile
+from careerwright.profile.fixture_interviewer import (
     REPLY_PREFIX,
     SMALLER_STEP_REPLY,
     SURE_QUESTION,
     UNSURE_QUESTION,
     fixture_turn,
 )
-from nessa.profile.interview import (
+from careerwright.profile.interview import (
     ContextMessage,
     InterviewProposal,
     ProfileField,
@@ -38,9 +38,9 @@ from nessa.profile.interview import (
     context_profile,
     render_prompt,
 )
-from nessa.profile.interview_agent import fixture_interviewer_model, run_interview_turn
-from nessa.profile.records import EntryMode
-from nessa.profile.safety import SUPPORT_TURN_INSTRUCTION
+from careerwright.profile.interview_agent import fixture_interviewer_model, run_interview_turn
+from careerwright.profile.records import EntryMode
+from careerwright.profile.safety import SUPPORT_TURN_INSTRUCTION
 from tests.support.fake_models import FakeFailure, fake_model_builder
 
 AT = datetime(2027, 1, 1, tzinfo=UTC)

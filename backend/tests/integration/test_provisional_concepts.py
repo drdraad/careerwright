@@ -37,16 +37,17 @@ def test_a_title_esco_lacks_becomes_a_provisional_concept_citing_the_confirmatio
     }
     assert concept["concept_kind"] == "provisional"  # tells it apart from an ESCO concept
     [row] = infra.query(
-        "SELECT * FROM nessa.provisional_concepts WHERE concept_id = %s", (concept["concept_id"],)
+        "SELECT * FROM careerwright.provisional_concepts WHERE concept_id = %s",
+        (concept["concept_id"],),
     )
     assert "esco_uri" not in row  # structurally not an ESCO record
     assert "isco_code" not in row
     assert infra.query(
-        "SELECT count(*) AS n FROM nessa.occupation_concepts WHERE concept_id = %s",
+        "SELECT count(*) AS n FROM careerwright.occupation_concepts WHERE concept_id = %s",
         (concept["concept_id"],),
     ) == [{"n": 0}]
     [source] = infra.query(
-        "SELECT kind, recorded_by FROM nessa.source_references WHERE source_ref_id = %s",
+        "SELECT kind, recorded_by FROM careerwright.source_references WHERE source_ref_id = %s",
         (concept["source_ref_id"],),
     )
     assert source["kind"] == "direct_entry"
@@ -96,7 +97,7 @@ def test_another_account_cannot_see_or_add_to_a_workspace_s_concepts(
     assert api.get(f"/v1/workspaces/{workspace}/occupations/provisional", ben).status_code == 404
     assert register(api, ben, workspace, "Anything")[0] == 404
     # And below the API: the API role's row-level security shows the rows to the owner only.
-    count = "SELECT count(*) AS n FROM nessa.provisional_concepts WHERE workspace_id = %s"
+    count = "SELECT count(*) AS n FROM careerwright.provisional_concepts WHERE workspace_id = %s"
     owner_id = api.get("/v1/me", ada).json()["actor_id"]
     other_id = api.get("/v1/me", ben).json()["actor_id"]
     assert infra.as_role("pg_api", count, (workspace,), actor=owner_id) == [{"n": 1}]
@@ -109,7 +110,8 @@ def test_the_database_refuses_a_provisional_concept_with_an_esco_title(
     workspace = api.create_workspace(ada, "Trigger check")["workspace_id"]
     _, concept = register(api, ada, workspace, "Wind turbine rope access tech")
     [row] = infra.query(
-        "SELECT * FROM nessa.provisional_concepts WHERE concept_id = %s", (concept["concept_id"],)
+        "SELECT * FROM careerwright.provisional_concepts WHERE concept_id = %s",
+        (concept["concept_id"],),
     )
 
     for title, claimed in (("plumber", "plumber"), ("Plumbers!", "anything else")):
@@ -117,7 +119,7 @@ def test_the_database_refuses_a_provisional_concept_with_an_esco_title(
         # normalised form, and folds plurals and punctuation as the API does.
         with pytest.raises(errors.CheckViolation):
             infra.query(
-                "INSERT INTO nessa.provisional_concepts (concept_id, workspace_id, title, "
+                "INSERT INTO careerwright.provisional_concepts (concept_id, workspace_id, title, "
                 "normalised_title, source_ref_id, created_by) VALUES (gen_random_uuid(), %s, "
                 "%s, %s, %s, %s)",
                 (workspace, title, claimed, row["source_ref_id"], row["created_by"]),

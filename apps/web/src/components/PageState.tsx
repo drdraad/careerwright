@@ -49,11 +49,11 @@ export function RequestFailure({
     <Alert
       tone="error"
       glyph="unavailable"
-      title="Nessa's service isn't reachable"
+      title="Careerwright's service isn't reachable"
       actions={actions}
       announce={announce}
     >
-      <p>Nothing you saved is lost. If Nessa is restarting, try again in a moment.</p>
+      <p>Nothing you saved is lost. If Careerwright is restarting, try again in a moment.</p>
     </Alert>
   );
 }

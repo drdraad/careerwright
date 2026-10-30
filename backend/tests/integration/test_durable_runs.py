@@ -12,11 +12,11 @@ import pytest
 from dbos import DBOS
 from pydantic import SecretStr
 
-from nessa.db import create_engine
-from nessa.identity import worker as worker_loop
-from nessa.identity.activity import ACTIVITY_MAX_ATTEMPTS, ActivityRuntime
-from nessa.identity.keyring import load_keyring
-from nessa.worker import TASKS, model_builder
+from careerwright.db import create_engine
+from careerwright.identity import worker as worker_loop
+from careerwright.identity.activity import ACTIVITY_MAX_ATTEMPTS, ActivityRuntime
+from careerwright.identity.keyring import load_keyring
+from careerwright.worker import TASKS, model_builder
 from tests.integration.durable import Scenario, make_scenario
 from tests.support.client import ApiClient
 from tests.support.fake_models import FakeFailure, fake_model_builder, key_fingerprint
@@ -84,7 +84,7 @@ def test_worker_killed_mid_call_recovers_to_one_output_and_keeps_the_ambiguous_c
     wait_for(
         lambda: (
             scenario.infra.query(
-                "SELECT dispatched_at FROM nessa.outbox WHERE run_id = %s", (run_id,)
+                "SELECT dispatched_at FROM careerwright.outbox WHERE run_id = %s", (run_id,)
             )[0]["dispatched_at"]
             is not None
         ),
@@ -207,14 +207,14 @@ def test_the_reconciler_publishes_an_errored_workflow_s_accepted_output(
     done = scenario.wait_terminal(run_id)
     first.stop()
     scenario.infra.query(
-        "UPDATE nessa.runs SET status = 'running', output_id = NULL, finished_at = NULL "
+        "UPDATE careerwright.runs SET status = 'running', output_id = NULL, finished_at = NULL "
         "WHERE run_id = %s",
         (run_id,),
     )
     scenario.infra.query(
         "UPDATE dbos.workflow_status SET status = 'ERROR' WHERE workflow_uuid = %s",
-        (f"nessa-run-{run_id}",),
-        database="nessa_dbos",
+        (f"careerwright-run-{run_id}",),
+        database="careerwright_dbos",
     )
 
     second = scenario.worker("second")  # reconciles on its first pass
@@ -235,7 +235,7 @@ def test_outbox_replay_after_a_dispatch_crash_starts_one_workflow(scenario: Scen
     run_id = scenario.submit()
     first = scenario.worker("first", crash_at="after_dispatch_before_mark", fake_delay_s="1")
     assert first.wait_exit(60) == -signal.SIGKILL
-    outbox = scenario.infra.query("SELECT * FROM nessa.outbox WHERE run_id = %s", (run_id,))
+    outbox = scenario.infra.query("SELECT * FROM careerwright.outbox WHERE run_id = %s", (run_id,))
     assert outbox[0]["dispatched_at"] is None  # the crash lost the dispatch mark
 
     second = scenario.worker("second")
@@ -243,7 +243,7 @@ def test_outbox_replay_after_a_dispatch_crash_starts_one_workflow(scenario: Scen
     wait_for(
         lambda: (
             scenario.infra.query(
-                "SELECT dispatched_at FROM nessa.outbox WHERE run_id = %s", (run_id,)
+                "SELECT dispatched_at FROM careerwright.outbox WHERE run_id = %s", (run_id,)
             )[0]["dispatched_at"]
             is not None
         ),
@@ -267,14 +267,14 @@ def test_replaying_a_completed_outbox_entry_has_no_effect(scenario: Scenario) ->
     first.stop()
     before = scenario.attempts(run_id)
     scenario.infra.query(
-        "UPDATE nessa.outbox SET dispatched_at = NULL WHERE run_id = %s", (run_id,)
+        "UPDATE careerwright.outbox SET dispatched_at = NULL WHERE run_id = %s", (run_id,)
     )
 
     second = scenario.worker("second")
     wait_for(
         lambda: (
             scenario.infra.query(
-                "SELECT dispatched_at FROM nessa.outbox WHERE run_id = %s", (run_id,)
+                "SELECT dispatched_at FROM careerwright.outbox WHERE run_id = %s", (run_id,)
             )[0]["dispatched_at"]
             is not None
         ),
@@ -454,7 +454,7 @@ def test_a_cancellation_that_fails_never_holds_up_the_next(
     # Review B M8. In process, with only DBOS (the system edge) replaced: cancelling the
     # first run's workflow fails; the second is still cancelled and published.
     stuck, second = scenario.submit(), scenario.submit()
-    infra.query("UPDATE nessa.outbox SET dispatched_at = clock_timestamp()")  # both started
+    infra.query("UPDATE careerwright.outbox SET dispatched_at = clock_timestamp()")  # both started
     for run_id in (stuck, second):
         cancel(scenario, run_id)
     tried: list[str] = []
@@ -480,11 +480,11 @@ def test_a_cancellation_that_fails_never_holds_up_the_next(
         engine.dispose()
 
     assert acted == 1
-    assert sorted(tried) == sorted(f"nessa-run-{r}" for r in (stuck, second))
+    assert sorted(tried) == sorted(f"careerwright-run-{r}" for r in (stuck, second))
     assert scenario.api_run(second)["status"] == "cancelled"
     assert scenario.api_run(stuck)["status"] == "queued"  # tried again next pass
     [left] = infra.query(
-        "SELECT run_id::text AS id FROM nessa.run_cancellations "
+        "SELECT run_id::text AS id FROM careerwright.run_cancellations "
         "WHERE signalled_at IS NULL AND run_id = ANY(%s::uuid[])",
         ([stuck, second],),
     )
@@ -514,5 +514,5 @@ def test_a_run_cancelled_mid_call_settles_that_call_and_makes_no_other(
     assert attempt["spend_state"] == "reconciled"  # the sent call is booked at its cost
     assert scenario.run(run_id)["status"] == "cancelled"  # its result never revives the run
     assert journal["status"][0]["status"] == "CANCELLED"
-    assert "nessa.publish_outcome" not in {s["function_name"] for s in journal["steps"]}
+    assert "careerwright.publish_outcome" not in {s["function_name"] for s in journal["steps"]}
     assert scenario.leaks() == []

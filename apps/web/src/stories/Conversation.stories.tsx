@@ -81,7 +81,7 @@ const turn = (status: TurnOut["run"]["status"], proposal: TurnOut["proposal"] = 
     failure_class: status === "failed" ? "invalid_model_output" : null,
     data_mode: "demo",
     synthetic: true,
-    model_id: "nessa-fixture-interviewer-1",
+    model_id: "careerwright-fixture-interviewer-1",
     model_mode: "fixture",
     created_at: "2027-01-01T10:00:00Z",
     started_at: null,
@@ -168,7 +168,7 @@ const suggestion = (
   ],
   workday: `${title} work, as ESCO describes it: a synthetic description for this story.`,
   why_it_could_suit: [
-    "What you enjoy: “repairing physical objects”. Nessa searched for “machinery repair”, and ESCO's record for this occupation matched.",
+    "What you enjoy: “repairing physical objects”. Careerwright searched for “machinery repair”, and ESCO's record for this occupation matched.",
   ],
   what_might_not_suit: [
     "ESCO lists 12 essential skills, not yet compared with your experience, including: use hand tools, read technical drawings, test equipment.",
@@ -198,7 +198,7 @@ const slate = (suggestions: SuggestionOut[]): SlateOut => ({
   fewer_reasons:
     suggestions.length < 6
       ? [
-          "Only 2 occupations matched your answers closely enough to suggest. Nessa doesn't fill the rest with weaker matches.",
+          "Only 2 occupations matched your answers closely enough to suggest. Careerwright doesn't fill the rest with weaker matches.",
         ]
       : [],
   notes: [],

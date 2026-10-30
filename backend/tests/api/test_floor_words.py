@@ -3,8 +3,8 @@ A M7): every count, so the sentence adds up to the occupations the floor conside
 
 import pytest
 
-from nessa.api.discovery_schemas import SalaryFloorOut
-from nessa.catalogue.pay import FloorCounts, FloorUnknown, SalaryFloorRule
+from careerwright.api.discovery_schemas import SalaryFloorOut
+from careerwright.catalogue.pay import FloorCounts, FloorUnknown, SalaryFloorRule
 
 
 @pytest.mark.req("DIV1-07")

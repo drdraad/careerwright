@@ -71,7 +71,7 @@ function Strip({
         events={events}
         onReconnect={() => {}}
         refreshFailed={refreshFailed}
-        email="ada@nessa.test"
+        email="ada@careerwright.test"
         calm={false}
         onCalmChange={() => {}}
         onSignOut={() => {}}

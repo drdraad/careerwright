@@ -1,7 +1,7 @@
 import pytest
 
-from nessa.identity.model_choice import ModelChoice, ModelConfigurationError
-from nessa.identity.model_registry import (
+from careerwright.identity.model_choice import ModelChoice, ModelConfigurationError
+from careerwright.identity.model_registry import (
     FIXTURE_MODEL_ID,
     PRICE_VERSION,
     Capability,

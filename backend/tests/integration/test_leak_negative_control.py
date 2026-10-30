@@ -1,5 +1,5 @@
 """The leak scan detects a real leak (ARC1-06): the naive DBOSDurability composition puts the
-model's output into `dbos.operation_outputs`, and the same scan that passes for Nessa's own
+model's output into `dbos.operation_outputs`, and the same scan that passes for Careerwright's own
 runs finds it there. ADR 0002 decision 10 rests on this."""
 
 import secrets
@@ -30,8 +30,8 @@ def test_the_scan_finds_the_output_the_durability_capability_journals(
             cwd=BACKEND,
             env={
                 **infra.worker_env(),
-                "NESSA_TEST_OUTPUT_SENTINEL": sentinel,
-                "NESSA_TEST_PROBE_KEY": key,
+                "CAREERWRIGHT_TEST_OUTPUT_SENTINEL": sentinel,
+                "CAREERWRIGHT_TEST_PROBE_KEY": key,
                 "PYDANTIC_AI_NO_BANNER": "1",
             },
             stdout=handle,
@@ -40,7 +40,7 @@ def test_the_scan_finds_the_output_the_durability_capability_journals(
             timeout=120,
         )
 
-    findings = scan(infra.database_cells("nessa_dbos"), [Needle("model output", sentinel)])
+    findings = scan(infra.database_cells("careerwright_dbos"), [Needle("model output", sentinel)])
 
     assert ("dbos.operation_outputs", "model output") in {
         (f.location, f.needle_label) for f in findings

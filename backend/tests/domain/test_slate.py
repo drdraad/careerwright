@@ -7,9 +7,9 @@ import uuid
 
 import pytest
 
-from nessa.profile.discovery import EvidenceItem
-from nessa.profile.interview import ProfileField
-from nessa.profile.slate import (
+from careerwright.profile.discovery import EvidenceItem
+from careerwright.profile.interview import ProfileField
+from careerwright.profile.slate import (
     FAMILY_LIMIT,
     SLATE_SIZE,
     Direction,

@@ -1,0 +1,1135 @@
+"""SQL for acquisition targets, source attempts, sealed source documents, jobs, their source
+copies, claims and favourites, and page extractions (adapter).
+
+The API runs these inside `actor_transaction` and the worker inside `run_transaction`;
+row-level security limits each to its workspace, and the worker to the run it executes
+while the run's requester may act (migration 0013).
+"""
+
+import json
+import uuid
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import date, datetime
+from typing import Any
+
+import sqlalchemy as sa
+
+from careerwright.db import Tx
+from careerwright.evidence.acquire import AcquisitionResult
+from careerwright.evidence.addresses import UrlRefusal
+from careerwright.evidence.records import (
+    UNREADABLE,
+    AttemptReason,
+    AttemptStatus,
+    BodyNotKept,
+    Claim,
+    Extraction,
+    ExtractionNotRun,
+    ExtractionOutcome,
+    InputRoute,
+    JobCopy,
+    Salary,
+)
+from careerwright.identity.keyring import SealedValue
+from careerwright.vocabulary import WorkState
+
+_ATTEMPT_COLUMNS = (
+    "attempt_id, run_id, position, retry_of, route, provider, requested_url, final_url, "
+    "redirects, status, reason, transient, http_status, content_type, address, "
+    "content_sha256, byte_count, rights_class, rights_status, retention, http_requests, "
+    "cost_nano_usd, created_by, started_at, finished_at, extraction, total_matching, "
+    "body_not_kept"
+)
+
+
+@dataclass(frozen=True)
+class TargetRow:
+    run_id: uuid.UUID
+    position: int
+    route: InputRoute
+    url: str | None  # a checked URL; None for a query or a refused URL
+    query: dict[str, Any] | None
+    status: str
+    refusal: UrlRefusal | None = None  # why a submitted URL was refused
+    refused_host: str | None = None  # its host as plain text, never a link
+
+
+@dataclass(frozen=True)
+class AttemptRow:
+    attempt_id: uuid.UUID
+    run_id: uuid.UUID | None
+    position: int | None
+    retry_of: uuid.UUID | None
+    route: InputRoute
+    provider: str
+    requested_url: str | None
+    final_url: str | None
+    redirects: list[str]
+    status: AttemptStatus
+    reason: AttemptReason | None
+    transient: bool
+    http_status: int | None
+    content_type: str | None
+    address: str | None
+    content_sha256: str | None
+    byte_count: int | None
+    rights_class: str | None
+    rights_status: str | None
+    retention: str | None
+    http_requests: int
+    cost_nano_usd: int | None
+    created_by: uuid.UUID | None
+    started_at: datetime
+    finished_at: datetime | None
+    extraction: Extraction | None  # why a retrieved source gave no publishable posting
+    total_matching: int | None  # Adzuna's count of matching adverts
+    body_not_kept: BodyNotKept | None  # why a body its class may keep was not kept
+
+    @property
+    def unreadable(self) -> bool:
+        return self.status is AttemptStatus.SUCCEEDED and self.extraction in UNREADABLE
+
+
+@dataclass(frozen=True)
+class CopyRow:
+    copy_id: uuid.UUID
+    job_id: uuid.UUID | None
+    attempt_id: uuid.UUID
+    provider: str
+    copy: JobCopy  # its claims are read separately
+    extraction_error: str | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class JobRow:
+    job_id: uuid.UUID
+    exemplar: bool
+    first_seen_at: datetime
+    last_success_at: datetime | None
+    last_attempt_at: datetime
+    closed_at: datetime | None
+    favourite: bool
+
+
+@dataclass(frozen=True)
+class ClaimRow:
+    claim_id: int
+    attempt_id: uuid.UUID
+    copy_id: uuid.UUID
+    claim: Claim
+    retrieved_at: datetime
+    published_on: date | None
+    valid_until: datetime | None
+
+
+def _attempt(row: sa.RowMapping) -> AttemptRow:
+    values = dict(row)
+    values["route"] = InputRoute(values["route"])
+    values["status"] = AttemptStatus(values["status"])
+    values["extraction"] = Extraction(values["extraction"]) if values["extraction"] else None
+    values["body_not_kept"] = (
+        BodyNotKept(values["body_not_kept"]) if values["body_not_kept"] else None
+    )
+    values["reason"] = AttemptReason(values["reason"]) if values["reason"] else None
+    return AttemptRow(**values)
+
+
+# --- targets ----------------------------------------------------------------------------
+
+
+def insert_target(
+    tx: Tx,
+    *,
+    run_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    position: int,
+    route: InputRoute,
+    url: str | None,
+    query: dict[str, Any] | None,
+    refusal: UrlRefusal | None = None,
+    refused_host: str | None = None,
+) -> None:
+    tx.execute(
+        sa.text(
+            "INSERT INTO careerwright.acquisition_targets (run_id, workspace_id, position, route, "
+            "url, "
+            "query, refusal, refused_host) VALUES (:run, :ws, :position, :route, :url, "
+            "CAST(:query AS jsonb), :refusal, :refused_host)"
+        ),
+        {
+            "run": run_id,
+            "ws": workspace_id,
+            "position": position,
+            "route": route.value,
+            "url": url,
+            "query": None if query is None else json.dumps(query),
+            "refusal": refusal.value if refusal else None,
+            "refused_host": refused_host,
+        },
+    )
+
+
+def targets(tx: Tx, run_id: uuid.UUID) -> list[TargetRow]:
+    rows = tx.execute(
+        sa.text(
+            "SELECT run_id, position, route, url, query, status, refusal, refused_host "
+            "FROM careerwright.acquisition_targets WHERE run_id = :run ORDER BY position"
+        ),
+        {"run": run_id},
+    ).mappings()
+    return [
+        TargetRow(
+            r["run_id"],
+            r["position"],
+            InputRoute(r["route"]),
+            r["url"],
+            r["query"],
+            r["status"],
+            UrlRefusal(r["refusal"]) if r["refusal"] else None,
+            r["refused_host"],
+        )
+        for r in rows
+    ]
+
+
+def set_target_status(tx: Tx, run_id: uuid.UUID, position: int, status: str) -> None:
+    tx.execute(
+        sa.text(
+            "UPDATE careerwright.acquisition_targets SET status = :status "
+            "WHERE run_id = :run AND position = :position"
+        ),
+        {"run": run_id, "position": position, "status": status},
+    )
+
+
+def urls_in_flight(tx: Tx, workspace_id: uuid.UUID, urls: list[str]) -> dict[str, uuid.UUID]:
+    """URL -> the queued or running acquisition run already working on it."""
+    if not urls:
+        return {}
+    rows = tx.execute(
+        sa.text(
+            "SELECT DISTINCT ON (t.url) t.url, t.run_id FROM careerwright.acquisition_targets t "
+            "JOIN careerwright.runs r ON r.run_id = t.run_id "
+            "WHERE t.workspace_id = :ws AND t.url = ANY(:urls) AND t.status = 'queued' "
+            "AND r.status IN ('queued', 'running') "
+            "AND NOT EXISTS (SELECT 1 FROM careerwright.run_cancellations c WHERE c.run_id = "
+            "r.run_id) "
+            "ORDER BY t.url, r.created_at"
+        ),
+        {"ws": workspace_id, "urls": urls},
+    )
+    return {r.url: r.run_id for r in rows}
+
+
+def url_history(tx: Tx, workspace_id: uuid.UUID, url: str) -> tuple[int, datetime | None]:
+    """(consecutive failures since the last success, the last attempt's start) for a URL."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT status, started_at FROM careerwright.source_attempts "
+            "WHERE workspace_id = :ws AND requested_url = :url AND status <> 'pending' "
+            "ORDER BY started_at DESC LIMIT 20"
+        ),
+        {"ws": workspace_id, "url": url},
+    ).all()
+    failures = 0
+    for row in rows:
+        if row.status == AttemptStatus.SUCCEEDED.value:
+            break
+        failures += 1
+    return failures, (rows[0].started_at if rows else None)
+
+
+# --- attempts ---------------------------------------------------------------------------
+
+
+def insert_attempt(
+    tx: Tx,
+    *,
+    attempt_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    run_id: uuid.UUID | None,
+    position: int | None,
+    retry_of: uuid.UUID | None,
+    route: InputRoute,
+    provider: str,
+    requested_url: str | None,
+    created_by: uuid.UUID | None = None,
+) -> None:
+    """Recorded before the request, so a crash leaves a pending attempt to settle."""
+    tx.execute(
+        sa.text(
+            "INSERT INTO careerwright.source_attempts (attempt_id, workspace_id, run_id, position, "
+            "retry_of, route, provider, requested_url, status, created_by) VALUES (:id, :ws, "
+            ":run, :position, :retry_of, :route, :provider, :url, 'pending', :by)"
+        ),
+        {
+            "id": attempt_id,
+            "ws": workspace_id,
+            "run": run_id,
+            "position": position,
+            "retry_of": retry_of,
+            "route": route.value,
+            "provider": provider[:253],
+            "url": requested_url,
+            "by": created_by,
+        },
+    )
+
+
+def insert_pasted_attempt(
+    tx: Tx,
+    *,
+    attempt_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    created_by: uuid.UUID,
+    requested_url: str | None,
+    sha256: str,
+    byte_count: int,
+    rights_status: str,
+) -> None:
+    """API: pasted text is complete when it arrives, so its attempt is recorded finished in
+    one statement (the API may insert attempts, never change them)."""
+    tx.execute(
+        sa.text(
+            "INSERT INTO careerwright.source_attempts (attempt_id, workspace_id, route, provider, "
+            "requested_url, status, content_type, content_sha256, byte_count, rights_status, "
+            "retention, created_by, finished_at) VALUES (:id, :ws, 'pasted_text', "
+            "'pasted_text', :url, 'succeeded', 'text/plain', :sha, :bytes, :rights, 'body', "
+            ":by, clock_timestamp())"
+        ),
+        {
+            "id": attempt_id,
+            "ws": workspace_id,
+            "url": requested_url,
+            "sha": sha256,
+            "bytes": byte_count,
+            "rights": rights_status,
+            "by": created_by,
+        },
+    )
+
+
+def finish_attempt(
+    tx: Tx, attempt_id: uuid.UUID, result: AcquisitionResult, *, http_requests: int
+) -> None:
+    tx.execute(
+        sa.text(
+            "UPDATE careerwright.source_attempts SET final_url = :final, redirects = "
+            "CAST(:redirects AS "
+            "jsonb), status = :status, reason = :reason, transient = :transient, http_status = "
+            ":http, content_type = :ctype, address = :address, content_sha256 = :sha, "
+            "retrieved_sha256 = :retrieved, extraction = :extraction, total_matching = :total, "
+            "body_not_kept = :not_kept, "
+            "byte_count = :bytes, rights_class = :class, rights_status = :rights, retention = "
+            ":retention, http_requests = :requests, cost_nano_usd = 0, "
+            "finished_at = clock_timestamp() WHERE attempt_id = :id"
+        ),
+        {
+            "id": attempt_id,
+            "final": result.final_url,
+            "redirects": json.dumps(result.redirects),
+            "status": result.status.value,
+            "reason": result.reason.value if result.reason else None,
+            "transient": result.transient,
+            "http": result.http_status,
+            "ctype": (result.content_type or None) and result.content_type[:120],
+            "address": result.address,
+            "sha": result.content_sha256,
+            "retrieved": result.retrieved_sha256,
+            "extraction": result.extraction.value if result.extraction else None,
+            "total": result.total,
+            "not_kept": result.body_not_kept.value if result.body_not_kept else None,
+            "bytes": result.byte_count,
+            "class": result.rights_class.value if result.rights_class else None,
+            "rights": result.rights_status,
+            "retention": result.retention.value if result.retention else None,
+            "requests": http_requests,
+        },
+    )
+
+
+def settle_pending_attempts(tx: Tx, run_id: uuid.UUID, position: int) -> int:
+    """A re-executed step finds an attempt its predecessor never finished (a crash during
+    the request): it failed, as far as anyone can tell."""
+    updated = tx.execute(
+        sa.text(
+            "UPDATE careerwright.source_attempts SET status = 'failed', reason = 'interrupted', "
+            "transient = true, finished_at = clock_timestamp() "
+            "WHERE run_id = :run AND position = :position AND status = 'pending'"
+        ),
+        {"run": run_id, "position": position},
+    )
+    return int(updated.rowcount)
+
+
+def settle_revoked_attempt(tx: Tx, attempt_id: uuid.UUID) -> None:
+    """The requester lost access while the attempt's request was out: it fails as
+    `access_revoked` and keeps nothing the request returned (migration 0016's policy lets
+    the worker do only this once access is gone)."""
+    tx.execute(
+        sa.text(
+            "UPDATE careerwright.source_attempts SET status = 'failed', reason = 'access_revoked', "
+            "finished_at = clock_timestamp() WHERE attempt_id = :id AND status = 'pending'"
+        ),
+        {"id": attempt_id},
+    )
+
+
+def last_attempt(tx: Tx, run_id: uuid.UUID, position: int) -> AttemptRow | None:
+    row = (
+        tx.execute(
+            sa.text(
+                f"SELECT {_ATTEMPT_COLUMNS} FROM careerwright.source_attempts "
+                "WHERE run_id = :run AND position = :position ORDER BY started_at DESC LIMIT 1"
+            ),
+            {"run": run_id, "position": position},
+        )
+        .mappings()
+        .one_or_none()
+    )
+    return None if row is None else _attempt(row)
+
+
+def attempts_of_run(tx: Tx, run_id: uuid.UUID) -> list[AttemptRow]:
+    rows = tx.execute(
+        sa.text(
+            f"SELECT {_ATTEMPT_COLUMNS} FROM careerwright.source_attempts WHERE run_id = :run "
+            "ORDER BY position, started_at"
+        ),
+        {"run": run_id},
+    ).mappings()
+    return [_attempt(r) for r in rows]
+
+
+def attempt(tx: Tx, attempt_id: uuid.UUID) -> AttemptRow | None:
+    row = (
+        tx.execute(
+            sa.text(
+                f"SELECT {_ATTEMPT_COLUMNS} FROM careerwright.source_attempts WHERE attempt_id = "
+                ":id"
+            ),
+            {"id": attempt_id},
+        )
+        .mappings()
+        .one_or_none()
+    )
+    return None if row is None else _attempt(row)
+
+
+def attempts_by_id(tx: Tx, attempt_ids: list[uuid.UUID]) -> dict[uuid.UUID, AttemptRow]:
+    if not attempt_ids:
+        return {}
+    rows = tx.execute(
+        sa.text(
+            f"SELECT {_ATTEMPT_COLUMNS} FROM careerwright.source_attempts WHERE attempt_id = "
+            "ANY(:ids)"
+        ),
+        {"ids": attempt_ids},
+    ).mappings()
+    return {r["attempt_id"]: _attempt(r) for r in rows}
+
+
+NO_POSTING_READABLE = "no_posting_readable"
+NO_POSTING_FOUND_BY_MODEL = "no_posting_found_by_model"
+
+
+def coverage(tx: Tx, workspace_id: uuid.UUID) -> dict[str, int]:
+    """The latest attempt's outcome per source the workspace tried, a retrieved source with
+    no readable posting counted apart (spec section 7: "Display result count, deduplication
+    count and coverage status"). Pasted text is the person's own input, not a source tried.
+
+    A page handed to model extraction (fix round 2) reads as what its run recorded,
+    whatever the run's state (a run cancelled while its call was out keeps its result,
+    DUR-05; fix round 3, review C M2): `succeeded` for a published posting, its own
+    `no_posting_found_by_model` when the run read it and found none, `no_posting_readable`
+    for nothing verified or only conflicting postings. With nothing recorded it is `pending`
+    while its run is queued or running, else (not run, failed, cancelled first)
+    `no_posting_readable`.
+
+    An attempt still `pending` counts as pending only while its own run is queued or
+    running; one its run left behind (a recording rolled back, a crash then a cancel) is
+    `failed`, interrupted, never "still checking" (fix round 3, review B M1)."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT CASE "
+            "WHEN latest.status = 'pending' THEN CASE "
+            "  WHEN ar.status IN ('queued', 'running') THEN 'pending' ELSE 'failed' END "
+            "WHEN latest.status = 'succeeded' AND e.attempt_id IS NOT NULL THEN CASE "
+            "  WHEN e.run_id IS NULL THEN :unread "
+            "  WHEN e.outcome = 'no_posting_found' THEN :found_none "
+            "  WHEN e.outcome = 'postings_recorded' AND EXISTS (SELECT 1 FROM "
+            "careerwright.job_copies c "
+            "    WHERE c.attempt_id = latest.attempt_id AND c.job_id IS NOT NULL) "
+            "    THEN 'succeeded' "
+            "  WHEN e.outcome IS NOT NULL THEN :unread "
+            "  WHEN r.status IN ('queued', 'running') THEN 'pending' "
+            "  ELSE :unread END "
+            "WHEN latest.status = 'succeeded' AND latest.extraction = ANY(:unreadable) "
+            "THEN :unread ELSE latest.status END AS outcome, count(*) AS n "
+            "FROM (SELECT DISTINCT ON (coalesce(requested_url, attempt_id::text)) attempt_id, "
+            "run_id, status, extraction FROM careerwright.source_attempts "
+            "WHERE workspace_id = :ws AND route <> 'pasted_text' "
+            "ORDER BY coalesce(requested_url, attempt_id::text), started_at DESC) latest "
+            "LEFT JOIN careerwright.runs ar ON ar.run_id = latest.run_id "
+            "LEFT JOIN careerwright.page_extractions e ON e.attempt_id = latest.attempt_id "
+            "LEFT JOIN careerwright.runs r ON r.run_id = e.run_id "
+            "GROUP BY 1"
+        ),
+        {
+            "ws": workspace_id,
+            "unreadable": sorted(e.value for e in UNREADABLE),
+            "unread": NO_POSTING_READABLE,
+            "found_none": NO_POSTING_FOUND_BY_MODEL,
+        },
+    )
+    return {r.outcome: int(r.n) for r in rows}
+
+
+# --- page extractions (fix round 2) -----------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ExtractionRow:
+    attempt_id: uuid.UUID
+    acquisition_run_id: uuid.UUID
+    run_id: uuid.UUID | None  # None: not started, `not_run` says why
+    not_run: ExtractionNotRun | None
+    text_sha256: str | None
+    outcome: ExtractionOutcome | None  # set when the run's output was accepted
+    run_status: WorkState | None
+    failure_class: str | None
+
+
+_EXTRACTION_COLUMNS = (
+    "e.attempt_id, e.acquisition_run_id, e.run_id, e.not_run, e.text_sha256, e.outcome, "
+    "r.status AS run_status, r.failure_class"
+)
+
+
+def _extraction(row: sa.RowMapping) -> ExtractionRow:
+    values = dict(row)
+    values["not_run"] = ExtractionNotRun(values["not_run"]) if values["not_run"] else None
+    values["outcome"] = ExtractionOutcome(values["outcome"]) if values["outcome"] else None
+    values["run_status"] = WorkState(values["run_status"]) if values["run_status"] else None
+    return ExtractionRow(**values)
+
+
+def extractions_started(tx: Tx, acquisition_run_id: uuid.UUID) -> int:
+    return int(
+        tx.execute(
+            sa.text(
+                "SELECT count(*) FROM careerwright.page_extractions "
+                "WHERE acquisition_run_id = :run AND run_id IS NOT NULL"
+            ),
+            {"run": acquisition_run_id},
+        ).scalar_one()
+    )
+
+
+def extractions_unreserved(tx: Tx, acquisition_run_id: uuid.UUID) -> int:
+    """The acquisition's started extraction runs that have reserved nothing yet: no attempt,
+    and no cancellation request (a run cancelled before dispatch never reserves). One that
+    has an attempt is in the committed spend already (review C M3)."""
+    return int(
+        tx.execute(
+            sa.text(
+                "SELECT count(*) FROM careerwright.page_extractions e "
+                "WHERE e.acquisition_run_id = :run AND e.run_id IS NOT NULL "
+                "AND NOT EXISTS (SELECT 1 FROM careerwright.model_attempts a WHERE a.run_id = "
+                "e.run_id) "
+                "AND NOT EXISTS (SELECT 1 FROM careerwright.run_cancellations c "
+                "WHERE c.run_id = e.run_id)"
+            ),
+            {"run": acquisition_run_id},
+        ).scalar_one()
+    )
+
+
+def insert_extraction_not_run(
+    tx: Tx,
+    *,
+    attempt_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    acquisition_run_id: uuid.UUID,
+    reason: ExtractionNotRun,
+) -> None:
+    tx.execute(
+        sa.text(
+            "INSERT INTO careerwright.page_extractions (attempt_id, workspace_id, "
+            "acquisition_run_id, "
+            "not_run) VALUES (:attempt, :ws, :run, :reason)"
+        ),
+        {
+            "attempt": attempt_id,
+            "ws": workspace_id,
+            "run": acquisition_run_id,
+            "reason": reason.value,
+        },
+    )
+
+
+def submit_extraction(
+    tx: Tx,
+    *,
+    attempt_id: uuid.UUID,
+    run_id: uuid.UUID,
+    model_id: str,
+    model_mode: str,
+    sealed: SealedValue,
+    text_sha256: str,
+) -> None:
+    """Worker, in the acquisition run's transaction: the extraction run, its sealed input,
+    its outbox entry and its link, through `careerwright.submit_page_extraction` (migration 0021),
+    which checks the attempt is its own run's page that extraction may read."""
+    tx.execute(
+        sa.text(
+            "SELECT careerwright.submit_page_extraction(:attempt, :run, :model, :mode, :version, "
+            ":nonce, :ciphertext, :sha)"
+        ),
+        {
+            "attempt": attempt_id,
+            "run": run_id,
+            "model": model_id,
+            "mode": model_mode,
+            "version": sealed.key_version,
+            "nonce": sealed.nonce,
+            "ciphertext": sealed.ciphertext,
+            "sha": text_sha256,
+        },
+    )
+
+
+def extraction_of_run(tx: Tx, run_id: uuid.UUID) -> ExtractionRow | None:
+    row = (
+        tx.execute(
+            sa.text(
+                f"SELECT {_EXTRACTION_COLUMNS} FROM careerwright.page_extractions e "
+                "LEFT JOIN careerwright.runs r ON r.run_id = e.run_id WHERE e.run_id = :run"
+            ),
+            {"run": run_id},
+        )
+        .mappings()
+        .one_or_none()
+    )
+    return None if row is None else _extraction(row)
+
+
+def set_extraction_outcome(tx: Tx, run_id: uuid.UUID, outcome: ExtractionOutcome) -> None:
+    tx.execute(
+        sa.text("UPDATE careerwright.page_extractions SET outcome = :outcome WHERE run_id = :run"),
+        {"run": run_id, "outcome": outcome.value},
+    )
+
+
+def extractions_of_attempts(tx: Tx, attempt_ids: list[uuid.UUID]) -> dict[uuid.UUID, ExtractionRow]:
+    if not attempt_ids:
+        return {}
+    rows = tx.execute(
+        sa.text(
+            f"SELECT {_EXTRACTION_COLUMNS} FROM careerwright.page_extractions e "
+            "LEFT JOIN careerwright.runs r ON r.run_id = e.run_id WHERE e.attempt_id = ANY(:ids)"
+        ),
+        {"ids": attempt_ids},
+    ).mappings()
+    return {r["attempt_id"]: _extraction(r) for r in rows}
+
+
+@dataclass(frozen=True)
+class AdvertCounts:
+    searches: int
+    retrieved: int  # adverts the latest successful searches returned
+    matching: int | None  # adverts they matched, when every one said
+    partial: int  # searches that matched more than they returned, or did not say
+
+
+def advert_counts(tx: Tx, workspace_id: uuid.UUID) -> AdvertCounts | None:
+    """Over each Adzuna search's latest success: retrieved n of the total matching."""
+    row = tx.execute(
+        sa.text(
+            "SELECT count(*) AS searches, coalesce(sum(retrieved), 0) AS retrieved, "
+            "CASE WHEN bool_and(total_matching IS NOT NULL) THEN sum(total_matching) END "
+            "AS matching, count(*) FILTER (WHERE total_matching IS NULL "
+            "OR total_matching > retrieved) AS partial FROM (SELECT DISTINCT ON "
+            "(a.requested_url) a.total_matching, (SELECT count(*) FROM careerwright.job_copies c "
+            "WHERE c.attempt_id = a.attempt_id) AS retrieved FROM careerwright.source_attempts a "
+            "WHERE a.workspace_id = :ws AND a.route = 'adzuna' AND a.status = 'succeeded' "
+            "ORDER BY a.requested_url, a.started_at DESC) latest"
+        ),
+        {"ws": workspace_id},
+    ).one()
+    if not row.searches:
+        return None
+    return AdvertCounts(
+        int(row.searches),
+        int(row.retrieved),
+        None if row.matching is None else int(row.matching),
+        int(row.partial),
+    )
+
+
+# --- documents --------------------------------------------------------------------------
+
+
+def insert_document(
+    tx: Tx, *, attempt_id: uuid.UUID, workspace_id: uuid.UUID, sha256: str, sealed: SealedValue
+) -> None:
+    tx.execute(
+        sa.text(
+            "INSERT INTO careerwright.source_documents (attempt_id, workspace_id, content_sha256, "
+            "key_version, nonce, ciphertext) VALUES (:id, :ws, :sha, :version, :nonce, "
+            ":ciphertext)"
+        ),
+        {
+            "id": attempt_id,
+            "ws": workspace_id,
+            "sha": sha256,
+            "version": sealed.key_version,
+            "nonce": sealed.nonce,
+            "ciphertext": sealed.ciphertext,
+        },
+    )
+
+
+def all_sealed_documents(tx: Tx) -> list[tuple[uuid.UUID, uuid.UUID, SealedValue]]:
+    """Setup only (master-key rotation): every sealed source document, locked."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT attempt_id, workspace_id, key_version, nonce, ciphertext "
+            "FROM careerwright.source_documents ORDER BY attempt_id FOR UPDATE"
+        )
+    )
+    return [
+        (
+            r.attempt_id,
+            r.workspace_id,
+            SealedValue(r.key_version, bytes(r.nonce), bytes(r.ciphertext)),
+        )
+        for r in rows
+    ]
+
+
+def replace_sealed_document(tx: Tx, attempt_id: uuid.UUID, sealed: SealedValue) -> None:
+    tx.execute(
+        sa.text(
+            "UPDATE careerwright.source_documents SET key_version = :version, nonce = :nonce, "
+            "ciphertext = :ciphertext WHERE attempt_id = :id"
+        ),
+        {
+            "id": attempt_id,
+            "version": sealed.key_version,
+            "nonce": sealed.nonce,
+            "ciphertext": sealed.ciphertext,
+        },
+    )
+
+
+# --- jobs, copies and claims ------------------------------------------------------------
+
+
+def candidate_copies(
+    tx: Tx, workspace_id: uuid.UUID, *, provider: str, source_job_id: str | None, title_key: str
+) -> list[tuple[uuid.UUID, dict[str, Any]]]:
+    """(job, facts) of published copies that could be the same vacancy: the same source ID
+    from the same provider, or the same title key (`jobs.same_job` decides). Exemplars are
+    never candidates. Oldest job first."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT c.job_id, c.facts FROM careerwright.job_copies c JOIN careerwright.jobs j "
+            "ON j.job_id = c.job_id WHERE c.workspace_id = :ws AND NOT j.exemplar AND "
+            "((c.provider = :provider AND c.source_job_id = :source_id) "
+            "OR c.facts ->> 'title_key' = :title) ORDER BY j.first_seen_at, c.created_at"
+        ),
+        {"ws": workspace_id, "provider": provider, "source_id": source_job_id, "title": title_key},
+    )
+    return [(r.job_id, r.facts) for r in rows]
+
+
+def lock_workspace_records(tx: Tx, workspace_id: uuid.UUID) -> None:
+    """Hold the workspace's recording lock until the transaction ends: every transaction
+    that reads candidate jobs and records or merges onto them takes it first."""
+    tx.execute(
+        sa.text("SELECT pg_advisory_xact_lock(hashtextextended(CAST(:ws AS text), 7681))"),
+        {"ws": workspace_id},
+    )
+
+
+def merge_jobs(
+    tx: Tx, workspace_id: uuid.UUID, *, keep: uuid.UUID, merged: list[uuid.UUID]
+) -> None:
+    """A new copy showed these jobs are one: their copies (with their claims) and
+    favourites move to `keep`, the oldest (first seen first), and the others are removed."""
+    if not merged:
+        return
+    params = {"ws": workspace_id, "keep": keep, "merged": merged}
+    tx.execute(
+        sa.text(
+            "UPDATE careerwright.job_copies SET job_id = :keep "
+            "WHERE workspace_id = :ws AND job_id = ANY(:merged)"
+        ),
+        params,
+    )
+    tx.execute(
+        sa.text(
+            "INSERT INTO careerwright.job_favourites (workspace_id, job_id, created_by, "
+            "created_at) "
+            "SELECT workspace_id, :keep, created_by, min(created_at) FROM "
+            "careerwright.job_favourites "
+            "WHERE workspace_id = :ws AND job_id = ANY(:merged) GROUP BY workspace_id, created_by "
+            "ON CONFLICT DO NOTHING"
+        ),
+        params,
+    )
+    tx.execute(
+        sa.text(
+            # `keep` is the oldest (first seen first): its first sighting stands.
+            "UPDATE careerwright.jobs k SET "
+            "last_success_at = greatest(k.last_success_at, m.last_success_at), "
+            "last_attempt_at = greatest(k.last_attempt_at, m.last_attempt_at) FROM (SELECT "
+            "max(last_success_at) AS last_success_at, max(last_attempt_at) AS last_attempt_at "
+            "FROM careerwright.jobs WHERE workspace_id = :ws AND job_id = ANY(:merged)) m "
+            "WHERE k.job_id = :keep"
+        ),
+        params,
+    )
+    tx.execute(
+        sa.text("DELETE FROM careerwright.jobs WHERE workspace_id = :ws AND job_id = ANY(:merged)"),
+        params,
+    )
+
+
+def insert_job(
+    tx: Tx, *, job_id: uuid.UUID, workspace_id: uuid.UUID, exemplar: bool, at: datetime
+) -> None:
+    tx.execute(
+        sa.text(
+            "INSERT INTO careerwright.jobs (job_id, workspace_id, exemplar, first_seen_at, "
+            "last_success_at, last_attempt_at) VALUES (:id, :ws, :exemplar, :at, :success, :at)"
+        ),
+        {
+            "id": job_id,
+            "ws": workspace_id,
+            "exemplar": exemplar,
+            "at": at,
+            "success": None if exemplar else at,
+        },
+    )
+
+
+def job_verified(tx: Tx, job_id: uuid.UUID, at: datetime) -> None:
+    """A successful retrieval: freshness starts again from `at`, and a reopened advert is
+    no longer closed."""
+    tx.execute(
+        sa.text(
+            "UPDATE careerwright.jobs SET last_success_at = greatest(last_success_at, :at), "
+            "last_attempt_at = greatest(last_attempt_at, :at), closed_at = NULL "
+            "WHERE job_id = :id AND NOT exemplar"
+        ),
+        {"id": job_id, "at": at},
+    )
+
+
+def jobs_from_url(tx: Tx, workspace_id: uuid.UUID, url: str) -> list[uuid.UUID]:
+    rows = tx.execute(
+        sa.text(
+            "SELECT DISTINCT c.job_id FROM careerwright.job_copies c JOIN "
+            "careerwright.source_attempts a "
+            "ON a.attempt_id = c.attempt_id WHERE c.workspace_id = :ws AND a.requested_url = :url "
+            "AND c.job_id IS NOT NULL"
+        ),
+        {"ws": workspace_id, "url": url},
+    )
+    return [r.job_id for r in rows]
+
+
+def job_attempted(tx: Tx, job_ids: list[uuid.UUID], at: datetime, *, closed: bool) -> None:
+    """A failed refresh: the attempt time moves, the last success never does (FRESH-03). A
+    source that says the advert is gone (HTTP 410) closes it."""
+    if not job_ids:
+        return
+    tx.execute(
+        sa.text(
+            "UPDATE careerwright.jobs SET last_attempt_at = greatest(last_attempt_at, :at), "
+            "closed_at = CASE WHEN :closed THEN coalesce(closed_at, :at) ELSE closed_at END "
+            "WHERE job_id = ANY(:ids)"
+        ),
+        {"ids": job_ids, "at": at, "closed": closed},
+    )
+
+
+def insert_copy(
+    tx: Tx,
+    *,
+    copy_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    job_id: uuid.UUID | None,
+    attempt_id: uuid.UUID,
+    provider: str,
+    copy: JobCopy,
+    facts: dict[str, Any],
+    extra: dict[str, Any] | None = None,
+) -> None:
+    body = json.loads(copy.model_dump_json(exclude={"claims"}))
+    body.update(extra or {})
+    tx.execute(
+        sa.text(
+            "INSERT INTO careerwright.job_copies (copy_id, workspace_id, job_id, attempt_id, "
+            "provider, "
+            "source_job_id, facts, copy, extraction_error) VALUES (:id, :ws, :job, :attempt, "
+            ":provider, :source_id, CAST(:facts AS jsonb), CAST(:copy AS jsonb), :error)"
+        ),
+        {
+            "id": copy_id,
+            "ws": workspace_id,
+            "job": job_id,
+            "attempt": attempt_id,
+            "provider": provider,
+            "source_id": copy.source_job_id,
+            "facts": json.dumps(facts),
+            "copy": json.dumps(body),
+            "error": copy.extraction_error,
+        },
+    )
+
+
+def insert_claims(
+    tx: Tx,
+    *,
+    workspace_id: uuid.UUID,
+    attempt_id: uuid.UUID,
+    copy_id: uuid.UUID,
+    copy: JobCopy,
+    retrieved_at: datetime,
+) -> None:
+    for claim in copy.claims:
+        data = json.loads(claim.model_dump_json())
+        tx.execute(
+            sa.text(
+                "INSERT INTO careerwright.source_claims (workspace_id, attempt_id, copy_id, field, "
+                "value, validation, issue, span, retrieved_at, published_on, valid_until) "
+                "VALUES (:ws, :attempt, :copy, :field, CAST(:value AS jsonb), :validation, "
+                ":issue, CAST(:span AS jsonb), :retrieved, :published, :until)"
+            ),
+            {
+                "ws": workspace_id,
+                "attempt": attempt_id,
+                "copy": copy_id,
+                "field": claim.field.value,
+                "value": json.dumps(data["value"]),
+                "validation": claim.validation.value,
+                "issue": claim.issue,
+                "span": json.dumps(data["span"]),
+                "retrieved": retrieved_at,
+                "published": copy.date_posted,
+                "until": copy.valid_through,
+            },
+        )
+
+
+def _copy_row(row: sa.Row[Any]) -> CopyRow:
+    return CopyRow(
+        copy_id=row.copy_id,
+        job_id=row.job_id,
+        attempt_id=row.attempt_id,
+        provider=row.provider,
+        copy=JobCopy.model_validate(
+            {k: v for k, v in row.copy.items() if k in JobCopy.model_fields}
+        ),
+        extraction_error=row.extraction_error,
+        created_at=row.created_at,
+    )
+
+
+_COPY_COLUMNS = "copy_id, job_id, attempt_id, provider, copy, extraction_error, created_at"
+
+
+def copies_of_jobs(tx: Tx, job_ids: list[uuid.UUID]) -> list[CopyRow]:
+    if not job_ids:
+        return []
+    rows = tx.execute(
+        sa.text(
+            f"SELECT {_COPY_COLUMNS} FROM careerwright.job_copies WHERE job_id = ANY(:ids) "
+            "ORDER BY created_at"
+        ),
+        {"ids": job_ids},
+    )
+    return [_copy_row(r) for r in rows]
+
+
+def copies_of_attempts(tx: Tx, attempt_ids: list[uuid.UUID]) -> list[CopyRow]:
+    if not attempt_ids:
+        return []
+    rows = tx.execute(
+        sa.text(
+            f"SELECT {_COPY_COLUMNS} FROM careerwright.job_copies WHERE attempt_id = ANY(:ids) "
+            "ORDER BY created_at"
+        ),
+        {"ids": attempt_ids},
+    )
+    return [_copy_row(r) for r in rows]
+
+
+def claims_of_copies(tx: Tx, copy_ids: list[uuid.UUID]) -> list[ClaimRow]:
+    if not copy_ids:
+        return []
+    rows = tx.execute(
+        sa.text(
+            "SELECT claim_id, attempt_id, copy_id, field, value, validation, issue, span, "
+            "retrieved_at, published_on, valid_until FROM careerwright.source_claims "
+            "WHERE copy_id = ANY(:ids) ORDER BY claim_id"
+        ),
+        {"ids": copy_ids},
+    )
+    return [
+        ClaimRow(
+            r.claim_id,
+            r.attempt_id,
+            r.copy_id,
+            Claim.model_validate(
+                {
+                    "field": r.field,
+                    "value": r.value,
+                    "span": r.span,
+                    "validation": r.validation,
+                    "issue": r.issue,
+                }
+            ),
+            r.retrieved_at,
+            r.published_on,
+            r.valid_until,
+        )
+        for r in rows
+    ]
+
+
+_JOB_COLUMNS = (
+    "j.job_id, j.exemplar, j.first_seen_at, j.last_success_at, j.last_attempt_at, j.closed_at, "
+    "(f.job_id IS NOT NULL) AS favourite"
+)
+_JOBS = (
+    "careerwright.jobs j LEFT JOIN careerwright.job_favourites f ON f.workspace_id = "
+    "j.workspace_id "
+    "AND f.job_id = j.job_id"
+)
+
+
+def jobs(
+    tx: Tx,
+    workspace_id: uuid.UUID,
+    *,
+    favourites_only: bool,
+    before: tuple[datetime, uuid.UUID] | None,
+    limit: int,
+    left_out: Sequence[uuid.UUID] = (),
+) -> list[JobRow]:
+    """A page of jobs, newest first, without those a hard filter left out."""
+    cursor = "AND (j.first_seen_at, j.job_id) < (:at, :id) " if before else ""
+    favourite = "AND f.job_id IS NOT NULL " if favourites_only else ""
+    rows = tx.execute(
+        sa.text(
+            f"SELECT {_JOB_COLUMNS} FROM {_JOBS} WHERE j.workspace_id = :ws {cursor}{favourite}"
+            "AND j.job_id <> ALL(CAST(:left_out AS uuid[])) "
+            "ORDER BY j.first_seen_at DESC, j.job_id DESC LIMIT :limit"
+        ),
+        {
+            "ws": workspace_id,
+            "limit": limit,
+            "left_out": [str(job) for job in left_out],
+            **({"at": before[0], "id": before[1]} if before else {}),
+        },
+    ).mappings()
+    return [JobRow(**dict(r)) for r in rows]
+
+
+def vacancy_pay(tx: Tx, workspace_id: uuid.UUID) -> dict[uuid.UUID, list[Salary | None]]:
+    """Each vacancy's copies' pay (an example is never a vacancy), for the salary floor."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT c.job_id, c.copy -> 'salary' AS salary FROM careerwright.job_copies c "
+            "JOIN careerwright.jobs j ON j.job_id = c.job_id "
+            "WHERE c.workspace_id = :ws AND NOT j.exemplar ORDER BY c.job_id, c.created_at"
+        ),
+        {"ws": workspace_id},
+    )
+    pay: dict[uuid.UUID, list[Salary | None]] = {}
+    for row in rows:
+        salary = None if row.salary is None else Salary.model_validate(row.salary)
+        pay.setdefault(row.job_id, []).append(salary)
+    return pay
+
+
+def job(tx: Tx, workspace_id: uuid.UUID, job_id: uuid.UUID) -> JobRow | None:
+    row = (
+        tx.execute(
+            sa.text(
+                f"SELECT {_JOB_COLUMNS} FROM {_JOBS} WHERE j.workspace_id = :ws AND j.job_id = :id"
+            ),
+            {"ws": workspace_id, "id": job_id},
+        )
+        .mappings()
+        .one_or_none()
+    )
+    return None if row is None else JobRow(**dict(row))
+
+
+def job_totals(tx: Tx, workspace_id: uuid.UUID) -> tuple[int, int]:
+    """(vacancies, the person's pasted examples): an example is never a vacancy."""
+    row = tx.execute(
+        sa.text(
+            "SELECT count(*) FILTER (WHERE NOT exemplar) AS jobs, "
+            "count(*) FILTER (WHERE exemplar) AS exemplars FROM careerwright.jobs WHERE "
+            "workspace_id = :ws"
+        ),
+        {"ws": workspace_id},
+    ).one()
+    return int(row.jobs), int(row.exemplars)
+
+
+def city_counts(
+    tx: Tx, workspace_id: uuid.UUID, left_out: Sequence[uuid.UUID] = ()
+) -> dict[str, int]:
+    """City -> the vacancies seen there, without those a hard filter left out; a job in
+    several cities counts in each."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT coalesce(nullif(l ->> 'locality', ''), l ->> 'label') AS city, "
+            "count(DISTINCT c.job_id) AS n FROM careerwright.job_copies c JOIN careerwright.jobs j "
+            "ON j.job_id = c.job_id CROSS JOIN LATERAL jsonb_array_elements(c.copy -> 'locations')"
+            " AS l WHERE c.workspace_id = :ws AND NOT j.exemplar "
+            "AND j.job_id <> ALL(CAST(:left_out AS uuid[])) GROUP BY 1"
+        ),
+        {"ws": workspace_id, "left_out": [str(job) for job in left_out]},
+    )
+    return dict(sorted((r.city, int(r.n)) for r in rows))
+
+
+def set_favourite(tx: Tx, workspace_id: uuid.UUID, job_id: uuid.UUID, actor_id: uuid.UUID) -> None:
+    tx.execute(
+        sa.text(
+            "INSERT INTO careerwright.job_favourites (workspace_id, job_id, created_by) "
+            "VALUES (:ws, :job, :by) ON CONFLICT DO NOTHING"
+        ),
+        {"ws": workspace_id, "job": job_id, "by": actor_id},
+    )
+
+
+def clear_favourite(tx: Tx, workspace_id: uuid.UUID, job_id: uuid.UUID) -> None:
+    tx.execute(
+        sa.text(
+            "DELETE FROM careerwright.job_favourites WHERE workspace_id = :ws AND job_id = :job"
+        ),
+        {"ws": workspace_id, "job": job_id},
+    )
+
+
+def exemplar_count(tx: Tx, workspace_id: uuid.UUID, target_key: str) -> int:
+    return int(
+        tx.execute(
+            sa.text(
+                "SELECT count(*) FROM careerwright.job_copies WHERE workspace_id = :ws "
+                "AND copy ->> 'exemplar_for' = :target"
+            ),
+            {"ws": workspace_id, "target": target_key},
+        ).scalar_one()
+    )

@@ -85,7 +85,7 @@ function turn(status: TurnOut["run"]["status"], proposal: TurnOut["proposal"] = 
       failure_class: status === "failed" ? "invalid_model_output" : null,
       data_mode: "demo",
       synthetic: true,
-      model_id: "nessa-fixture-interviewer-1",
+      model_id: "careerwright-fixture-interviewer-1",
       model_mode: "fixture",
       created_at: "2027-01-01T10:00:00Z",
       started_at: null,
@@ -196,7 +196,7 @@ const unknownHours: TurnOut["proposal"] = {
   ],
 };
 
-/** The API's support panel (`nessa.profile.safety.SUPPORT_NOTE`, one of its resources). */
+/** The API's support panel (`careerwright.profile.safety.SUPPORT_NOTE`, one of its resources). */
 const panel: SupportNoteOut = {
   policy_version: "support-policy-7",
   review_status:
@@ -204,7 +204,7 @@ const panel: SupportNoteOut = {
     "are not yet reviewed as built",
   message:
     "If anything you mentioned is about how you are feeling, support is available any time, " +
-    "from people trained to help. Your message was sent to Nessa as usual.",
+    "from people trained to help. Your message was sent to Careerwright as usual.",
   resources: [
     {
       name: "Samaritans",
@@ -283,7 +283,7 @@ describe("[MODEL-03] the reply streams as provisional and the checked reply repl
 
     expect(await screen.findByText("Writing a reply, not checked yet")).toBeVisible();
     expect(screen.getByText("Thanks, I noted")).toBeVisible();
-    expect(screen.getByText("Nessa is still replying.")).toBeVisible(); // Send says why it waits
+    expect(screen.getByText("Careerwright is still replying.")).toBeVisible(); // Send says why it waits
   });
 
   it("shows only the checked reply once the turn is complete", async () => {
@@ -531,7 +531,9 @@ describe("[UI-06] each new reply is announced once, and focus follows the first 
     };
     state.turns = [{ ...turn("complete", proposal), decision: {} as TurnOut["decision"] }, second];
     await queries.invalidateQueries();
-    await waitFor(() => expect(announcer).toHaveTextContent("Nessa replied: 1 change to review."));
+    await waitFor(() =>
+      expect(announcer).toHaveTextContent("Careerwright replied: 1 change to review."),
+    );
 
     const third = {
       ...turn("complete", { ...proposal, reply: "Good." } as TurnOut["proposal"]),
@@ -543,7 +545,9 @@ describe("[UI-06] each new reply is announced once, and focus follows the first 
       third,
     ];
     await queries.invalidateQueries();
-    await waitFor(() => expect(announcer).toHaveTextContent("Nessa replied: 2 changes to review."));
+    await waitFor(() =>
+      expect(announcer).toHaveTextContent("Careerwright replied: 2 changes to review."),
+    );
   });
 });
 
@@ -614,7 +618,7 @@ describe("[PROF-09] a message with a risk stem is sent as usual, with the suppor
     );
     const user = renderYou();
 
-    const field = await screen.findByLabelText("Reply to Nessa");
+    const field = await screen.findByLabelText("Reply to Careerwright");
     await user.type(field, "I volunteer on a suicide prevention helpline.");
     await user.click(screen.getByRole("button", { name: "Send" }));
 
@@ -627,7 +631,7 @@ describe("[PROF-09] a message with a risk stem is sent as usual, with the suppor
     expect(field).toHaveValue(""); // it was sent
     expect(screen.queryByRole("alert")).toBeNull(); // calm: not an alert
     expect(shown).toHaveTextContent("Samaritans: Call 116 123");
-    expect(shown).toHaveTextContent("sent to Nessa as usual");
+    expect(shown).toHaveTextContent("sent to Careerwright as usual");
     expect(shown).toHaveTextContent("checked on their own websites on 28 October 2026");
     // Session 1 accepted the panel; its review state is not for someone who may be in distress.
     expect(shown).not.toHaveTextContent(/provisional|reviewed/);
@@ -673,7 +677,7 @@ describe("[PROF-09] a message with a risk stem is sent as usual, with the suppor
     );
     const user = renderYou();
 
-    const field = await screen.findByLabelText("Reply to Nessa");
+    const field = await screen.findByLabelText("Reply to Careerwright");
     await user.type(field, "I volunteer on a suicide prevention helpline.");
     await user.click(screen.getByRole("button", { name: "Send" }));
 
@@ -751,7 +755,9 @@ describe("[UI-06][STATE-01] a failed reply says why and keeps one primary action
     );
     renderYou();
 
-    expect(await screen.findByText("The reply didn't pass Nessa's checks twice")).toBeVisible();
+    expect(
+      await screen.findByText("The reply didn't pass Careerwright's checks twice"),
+    ).toBeVisible();
     expect(screen.getByText(/What we know is unchanged at version 1/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Try again" })).toHaveClass("btn-primary");
     expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-secondary");

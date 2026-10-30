@@ -12,8 +12,8 @@ export const chapterUrl = (chapter: string, workspace = FIXTURE_WORKSPACE) =>
 /** Signs in through the page, as a person would, with a seeded emulator identity. */
 export async function signIn(page: Page, handle: "ada" | "ben" | "uninvited", next = "/") {
   await page.goto(`/sign-in?next=${encodeURIComponent(next)}`);
-  await page.getByLabel("Email").fill(`${handle}@nessa.test`);
-  await page.getByLabel("Password").fill(`nessa-demo-${handle}`);
+  await page.getByLabel("Email").fill(`${handle}@careerwright.test`);
+  await page.getByLabel("Password").fill(`careerwright-demo-${handle}`);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"));
 }

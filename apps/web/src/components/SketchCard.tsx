@@ -39,7 +39,7 @@ export function SketchCard({ workspaceId, profile }: { workspaceId: string; prof
       </h3>
       {data.targets.length === 0 ? (
         <p className="small">
-          A sketch needs a target role. Name one, or ask Nessa for directions to explore.
+          A sketch needs a target role. Name one, or ask Careerwright for directions to explore.
         </p>
       ) : (
         data.targets.map((target) => (

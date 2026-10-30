@@ -1,5 +1,5 @@
 """Append-only JSONL ledger of live Meta calls, rendered into docs/evidence/live-usage.md
-(ruling R5; promoted from the Sprint 0 spike). Every HTTP call to Meta made by Nessa tooling
+(ruling R5; promoted from the Sprint 0 spike). Every HTTP call to Meta made by Careerwright tooling
 is recorded, free and failed calls included. A charge that cannot be determined is
 `unknown` (null), never zero, and counts its full reservation in the running total's caveat.
 """
@@ -15,7 +15,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from nessa.identity.model_registry import PRICE_SOURCE, format_usd
+from careerwright.identity.model_registry import PRICE_SOURCE, format_usd
 
 LEDGER_PATH = Path(__file__).resolve().parents[2] / "docs" / "evidence" / "live-usage.jsonl"
 PRICES_CHECKED_ON = "2026-10-27"
@@ -160,7 +160,8 @@ class Ledger:
         """Render next to the ledger (`live-usage.md` for the real one)."""
         self._path.with_suffix(".md").write_text(
             "# Live Meta usage log\n\n"
-            "Every HTTP call to the Meta Model API made by Nessa tooling, including failures and\n"
+            "Every HTTP call to the Meta Model API made by Careerwright tooling, including "
+            "failures and\n"
             "free calls (ruling R5), and every Adzuna API request of `make live-adzuna` (scope\n"
             "`live-adzuna`, free tier, model column `adzuna-jobs-api`). Generated from\n"
             "`live-usage.jsonl` by `backend/tools/usage_ledger.py`; do not edit the table by\n"
@@ -185,11 +186,11 @@ class Ledger:
             "  most one validation repair), none on the production model unless\n"
             "  `PRODUCTION=1`, and a worst-case cost cap; cumulatively at most 9 calls, 3 on the\n"
             "  production model and $0.30 worst case (unknown costs count their full\n"
-            "  reservation; `NESSA_LIVE_SMOKE_*` changes them). Both are enforced in\n"
+            "  reservation; `CAREERWRIGHT_LIVE_SMOKE_*` changes them). Both are enforced in\n"
             "  `backend/tools/live_smoke.py` before the stack starts. `live-eval` (`make\n"
             "  live-eval`): at most 6 evaluation cases per invocation, each one attempt of at\n"
             "  most 2 requests on the test model, never the production model; cumulatively at\n"
-            "  most 24 requests and $0.05 worst case (`NESSA_LIVE_EVAL_*`), enforced in\n"
+            "  most 24 requests and $0.05 worst case (`CAREERWRIGHT_LIVE_EVAL_*`), enforced in\n"
             "  `backend/tools/live_eval.py`. `live-adzuna` (`make live-adzuna`, Task 7A):\n"
             "  Adzuna's free tier, not Meta: at most 2 requests per invocation and 10\n"
             "  cumulatively, each at $0, enforced in `backend/tools/live_adzuna.py`; the\n"

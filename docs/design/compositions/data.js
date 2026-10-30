@@ -7,7 +7,7 @@
 // DESIGN_LISTINGS is invented for the design review only. The fixture pack has no job
 // postings, so every employer, listing and salary below is synthetic and labelled so on
 // the page. None is a real organisation, vacancy or pay figure.
-window.NESSA = {
+window.CAREERWRIGHT = {
   FIXTURES: {
     trace01: {
       id: "TRACE-01",

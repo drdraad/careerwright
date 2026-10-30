@@ -13,7 +13,7 @@ from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RequestUsage
 
-from nessa.identity.model_choice import ModelChoice
+from careerwright.identity.model_choice import ModelChoice
 from tests.support.fake_models import search_parts
 from tools import live_smoke
 from tools.live_smoke import (

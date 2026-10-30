@@ -1,5 +1,5 @@
 """Real PostgreSQL 16 and the Firebase Auth emulator for integration tests, in their own
-Compose project (`nessa-l0-test`) on their own loopback ports. SQLite is not a substitute.
+Compose project (`careerwright-l0-test`) on their own loopback ports. SQLite is not a substitute.
 
 The test process plays the API and the worker (host processes, so failures can be injected);
 `tests/stack` drives the containers themselves.
@@ -20,16 +20,16 @@ import sqlalchemy as sa
 from psycopg import sql
 from psycopg.rows import dict_row
 
-from nessa.config import ApiSettings, OpsSettings, WorkerSettings
+from careerwright.config import ApiSettings, OpsSettings, WorkerSettings
 from tools.localenv import REPO_ROOT, ensure_local_home
 from tools.stack import Ports, Stack
 
-TEST_PROJECT = "nessa-l0-test"
+TEST_PROJECT = "careerwright-l0-test"
 TEST_PORTS = Ports(api=57000, auth=57099, postgres=57432, web=57300)
 HOST = "127.0.0.1"
 WEB_ORIGIN = f"http://{HOST}:{TEST_PORTS.web}"
 API_BASE = f"http://{HOST}:{TEST_PORTS.api}"
-PROJECT_ID = "demo-nessa"
+PROJECT_ID = "demo-careerwright"
 
 
 @dataclass(frozen=True)
@@ -41,28 +41,32 @@ class Infra:
         return (self.home / "secrets" / role).read_text().strip()
 
     def url(self, role: str, database: str) -> str:
-        user = "postgres" if role == "pg_superuser" else f"nessa_{role.removeprefix('pg_')}"
+        user = "postgres" if role == "pg_superuser" else f"careerwright_{role.removeprefix('pg_')}"
         return f"postgresql://{user}:{self.password(role)}@{HOST}:{TEST_PORTS.postgres}/{database}"
 
-    def env(self, database: str = "nessa_app") -> dict[str, str]:
+    def env(self, database: str = "careerwright_app") -> dict[str, str]:
         """Environment for settings objects: the same names the containers use."""
         secrets = self.home / "secrets"
         base = f"postgresql+psycopg://{{user}}@{HOST}:{TEST_PORTS.postgres}/{{db}}"
         return {
-            "NESSA_ENVIRONMENT": "local",
-            "NESSA_RUNTIME_MODE": "live",
-            "NESSA_ALLOWED_HOSTS": f"{HOST}:{TEST_PORTS.api}",
-            "NESSA_ALLOWED_ORIGINS": WEB_ORIGIN,
-            "NESSA_FIREBASE_PROJECT_ID": PROJECT_ID,
+            "CAREERWRIGHT_ENVIRONMENT": "local",
+            "CAREERWRIGHT_RUNTIME_MODE": "live",
+            "CAREERWRIGHT_ALLOWED_HOSTS": f"{HOST}:{TEST_PORTS.api}",
+            "CAREERWRIGHT_ALLOWED_ORIGINS": WEB_ORIGIN,
+            "CAREERWRIGHT_FIREBASE_PROJECT_ID": PROJECT_ID,
             "FIREBASE_AUTH_EMULATOR_HOST": f"{HOST}:{TEST_PORTS.auth}",
-            "NESSA_APP_DATABASE_URL": base.format(user="nessa_api", db=database),
-            "NESSA_APP_DATABASE_PASSWORD_FILE": str(secrets / "pg_api"),
-            "NESSA_MASTER_KEY_DIR": str(self.home / "keys"),
-            "NESSA_MIGRATOR_DATABASE_URL": base.format(user="nessa_migrator", db=database),
-            "NESSA_MIGRATOR_DATABASE_PASSWORD_FILE": str(secrets / "pg_migrator"),
-            "NESSA_DBOS_OWNER_DATABASE_URL": base.format(user="nessa_dbos_owner", db="nessa_dbos"),
-            "NESSA_DBOS_OWNER_DATABASE_PASSWORD_FILE": str(secrets / "pg_dbos_owner"),
-            "NESSA_FIXTURES_DIR": str(REPO_ROOT / "fixtures" / "m0"),
+            "CAREERWRIGHT_APP_DATABASE_URL": base.format(user="careerwright_api", db=database),
+            "CAREERWRIGHT_APP_DATABASE_PASSWORD_FILE": str(secrets / "pg_api"),
+            "CAREERWRIGHT_MASTER_KEY_DIR": str(self.home / "keys"),
+            "CAREERWRIGHT_MIGRATOR_DATABASE_URL": base.format(
+                user="careerwright_migrator", db=database
+            ),
+            "CAREERWRIGHT_MIGRATOR_DATABASE_PASSWORD_FILE": str(secrets / "pg_migrator"),
+            "CAREERWRIGHT_DBOS_OWNER_DATABASE_URL": base.format(
+                user="careerwright_dbos_owner", db="careerwright_dbos"
+            ),
+            "CAREERWRIGHT_DBOS_OWNER_DATABASE_PASSWORD_FILE": str(secrets / "pg_dbos_owner"),
+            "CAREERWRIGHT_FIXTURES_DIR": str(REPO_ROOT / "fixtures" / "m0"),
         }
 
     def worker_env(self) -> dict[str, str]:
@@ -70,10 +74,14 @@ class Infra:
         base = f"postgresql+psycopg://{{user}}@{HOST}:{TEST_PORTS.postgres}/{{db}}"
         return {
             **self.env(),
-            "NESSA_APP_DATABASE_URL": base.format(user="nessa_worker", db="nessa_app"),
-            "NESSA_APP_DATABASE_PASSWORD_FILE": str(secrets / "pg_worker"),
-            "NESSA_DBOS_DATABASE_URL": base.format(user="nessa_dbos_runtime", db="nessa_dbos"),
-            "NESSA_DBOS_DATABASE_PASSWORD_FILE": str(secrets / "pg_dbos_runtime"),
+            "CAREERWRIGHT_APP_DATABASE_URL": base.format(
+                user="careerwright_worker", db="careerwright_app"
+            ),
+            "CAREERWRIGHT_APP_DATABASE_PASSWORD_FILE": str(secrets / "pg_worker"),
+            "CAREERWRIGHT_DBOS_DATABASE_URL": base.format(
+                user="careerwright_dbos_runtime", db="careerwright_dbos"
+            ),
+            "CAREERWRIGHT_DBOS_DATABASE_PASSWORD_FILE": str(secrets / "pg_dbos_runtime"),
         }
 
     @contextmanager
@@ -89,11 +97,11 @@ class Infra:
                 else:
                     os.environ[name] = value
 
-    def api_settings(self, database: str = "nessa_app") -> ApiSettings:
+    def api_settings(self, database: str = "careerwright_app") -> ApiSettings:
         with self.settings_env(self.env(database)):
             return ApiSettings(_env_file=None)
 
-    def ops_settings(self, database: str = "nessa_app") -> OpsSettings:
+    def ops_settings(self, database: str = "careerwright_app") -> OpsSettings:
         with self.settings_env(self.env(database)):
             return OpsSettings(_env_file=None)
 
@@ -102,7 +110,7 @@ class Infra:
             return WorkerSettings(_env_file=None)
 
     def query(
-        self, statement: str, params: tuple[object, ...] = (), *, database: str = "nessa_app"
+        self, statement: str, params: tuple[object, ...] = (), *, database: str = "careerwright_app"
     ) -> list[dict[str, Any]]:
         """Inspect as the superuser (tests only; runtime never connects this way)."""
         with psycopg.connect(self.url("pg_superuser", database), row_factory=dict_row) as conn:
@@ -117,14 +125,14 @@ class Infra:
         *,
         actor: str | None = None,
         run: str | None = None,
-        database: str = "nessa_app",
+        database: str = "careerwright_app",
     ) -> list[dict[str, Any]]:
         """Run one statement as a runtime role with an optional actor/run context."""
         with psycopg.connect(self.url(role, database), row_factory=dict_row) as conn:
             if actor:
-                conn.execute("SELECT set_config('nessa.actor_id', %s, true)", (actor,))
+                conn.execute("SELECT set_config('careerwright.actor_id', %s, true)", (actor,))
             if run:
-                conn.execute("SELECT set_config('nessa.run_id', %s, true)", (run,))
+                conn.execute("SELECT set_config('careerwright.run_id', %s, true)", (run,))
             cur = conn.execute(statement.encode(), params)
             return cur.fetchall() if cur.description else []
 
@@ -134,12 +142,14 @@ class Infra:
                 sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(name))
             )
             conn.execute(
-                sql.SQL("CREATE DATABASE {} OWNER nessa_migrator").format(sql.Identifier(name))
-            )
-            conn.execute(
-                sql.SQL("GRANT CONNECT ON DATABASE {} TO nessa_api, nessa_worker").format(
+                sql.SQL("CREATE DATABASE {} OWNER careerwright_migrator").format(
                     sql.Identifier(name)
                 )
+            )
+            conn.execute(
+                sql.SQL(
+                    "GRANT CONNECT ON DATABASE {} TO careerwright_api, careerwright_worker"
+                ).format(sql.Identifier(name))
             )
         with psycopg.connect(self.url("pg_superuser", name), autocommit=True) as conn:
             conn.execute("REVOKE ALL ON SCHEMA public FROM PUBLIC")
@@ -175,7 +185,7 @@ def start_infra(home: Path) -> Infra:
     return Infra(stack=stack, home=home)
 
 
-def migrator_engine(infra: Infra, database: str = "nessa_app") -> sa.Engine:
+def migrator_engine(infra: Infra, database: str = "careerwright_app") -> sa.Engine:
     return sa.create_engine(
         infra.url("pg_migrator", database).replace("postgresql://", "postgresql+psycopg://")
     )
@@ -206,7 +216,7 @@ def sign_in(email: str, password: str) -> str:
 
 
 def sign_in_seeded(handle: str) -> str:
-    return sign_in(f"{handle}@nessa.test", f"nessa-demo-{handle}")
+    return sign_in(f"{handle}@careerwright.test", f"careerwright-demo-{handle}")
 
 
 def create_emulator_user(uid: str, email: str, password: str, *, verified: bool = True) -> None:

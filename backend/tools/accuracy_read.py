@@ -30,12 +30,12 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 
-from nessa.catalogue.option_pack import Claim, JobPosting, Pack, Split, load_pack
-from nessa.evidence.acquire import Pacer, acquire_page
-from nessa.evidence.fetcher import Fetcher
-from nessa.evidence.pages import parse_page
-from nessa.evidence.records import AdvertiserKind, JobCopy
-from nessa.evidence.sources import load_manifest
+from careerwright.catalogue.option_pack import Claim, JobPosting, Pack, Split, load_pack
+from careerwright.evidence.acquire import Pacer, acquire_page
+from careerwright.evidence.fetcher import Fetcher
+from careerwright.evidence.pages import parse_page
+from careerwright.evidence.records import AdvertiserKind, JobCopy
+from careerwright.evidence.sources import load_manifest
 from tools.localenv import REPO_ROOT
 
 EVIDENCE_DIR = REPO_ROOT / "var" / "evidence" / "corpus"

@@ -24,9 +24,9 @@ export function ChapterRail({ workspaceId, current, progress }: Props) {
   return (
     <div className="rail">
       <Link className="rail-mark" href="/">
-        <span className="sr-only">Nessa: your workspaces</span>
+        <span className="sr-only">Careerwright: your workspaces</span>
         <Glyph name="mark" />
-        <span aria-hidden="true">Nessa</span>
+        <span aria-hidden="true">Careerwright</span>
       </Link>
       <nav aria-label="Chapters">
         <ul className="rail-chapters">

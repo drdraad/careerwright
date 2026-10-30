@@ -9,7 +9,7 @@ used."""
 
 import pytest
 
-from nessa.profile.safety import (
+from careerwright.profile.safety import (
     SUPPORT_RESOURCES,
     has_risk_stem,
     inferred_sensitive_terms,

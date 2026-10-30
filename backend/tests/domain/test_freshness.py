@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from nessa.evidence.freshness import (
+from careerwright.evidence.freshness import (
     MAX_UNVERIFIED_AGE,
     Freshness,
     FreshnessKind,

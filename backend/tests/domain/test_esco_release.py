@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from nessa.catalogue.esco import LabelKind, concept_id, normalise_label, parse_release
-from nessa.catalogue.releases import ReleaseIntegrityError, read_verified
+from careerwright.catalogue.esco import LabelKind, concept_id, normalise_label, parse_release
+from careerwright.catalogue.releases import ReleaseIntegrityError, read_verified
 from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
 
 

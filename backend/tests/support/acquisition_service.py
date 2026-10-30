@@ -11,11 +11,11 @@ from contextlib import contextmanager
 
 from pydantic import SecretStr
 
-from nessa.acquisition import AcquisitionService, make_server
-from nessa.evidence import adzuna
-from nessa.evidence.acquire import Pacer
-from nessa.evidence.addresses import IPAddress
-from nessa.evidence.fetcher import Fetcher, FetchLimits, HostNotFoundError
+from careerwright.acquisition import AcquisitionService, make_server
+from careerwright.evidence import adzuna
+from careerwright.evidence.acquire import Pacer
+from careerwright.evidence.addresses import IPAddress
+from careerwright.evidence.fetcher import Fetcher, FetchLimits, HostNotFoundError
 from tests.support.source_server import SourceServer
 
 LOOPBACK = ipaddress.ip_address("127.0.0.1")
@@ -48,7 +48,7 @@ def acquisition_service(
     fetcher = Fetcher(
         resolve=scripted_resolver(names),
         limits=TEST_LIMITS,
-        user_agent="NessaL0/test",
+        user_agent="CareerwrightL0/test",
         extra_allowed=frozenset({("127.0.0.1", sources.port)}),
     )
     search_url = (

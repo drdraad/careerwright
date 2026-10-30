@@ -14,8 +14,8 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from nessa.identity import connection_check
-from nessa.identity.model_choice import ModelChoice
+from careerwright.identity import connection_check
+from careerwright.identity.model_choice import ModelChoice
 from tests.support.client import ApiClient
 from tests.support.fake_models import FakeFailure
 from tests.support.infra import WEB_ORIGIN, Infra, sign_in_seeded
@@ -72,14 +72,15 @@ def ledger(infra: Infra, tmp_path: Path) -> Iterator[Ledger]:
     yield Ledger(tmp_path / "live-usage.jsonl")
     # Smoke runs are left unfinished on purpose; keep later tests' workers from resuming them.
     for row in infra.query(
-        "SELECT r.run_id FROM nessa.runs r JOIN nessa.workspaces w USING (workspace_id) "
+        "SELECT r.run_id FROM careerwright.runs r JOIN careerwright.workspaces w USING "
+        "(workspace_id) "
         "WHERE w.name = 'Live smoke (synthetic)'"
     ):
         infra.query(
             "UPDATE dbos.workflow_status SET status = 'CANCELLED' "
             "WHERE workflow_uuid = %s AND status = 'PENDING'",
-            (f"nessa-run-{row['run_id']}",),
-            database="nessa_dbos",
+            (f"careerwright-run-{row['run_id']}",),
+            database="careerwright_dbos",
         )
 
 

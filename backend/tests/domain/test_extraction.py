@@ -18,11 +18,11 @@ from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from nessa.config import ApiSettings
-from nessa.evidence import extraction_runs
-from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_page
-from nessa.evidence.acquisition import ModelExtractionState, extraction_state
-from nessa.evidence.extraction import (
+from careerwright.config import ApiSettings
+from careerwright.evidence import extraction_runs
+from careerwright.evidence.acquire import AcquisitionResult, Pacer, acquire_page
+from careerwright.evidence.acquisition import ModelExtractionState, extraction_state
+from careerwright.evidence.extraction import (
     INSTRUCTIONS,
     MAX_POSTINGS,
     MAX_PROMPT_BYTES,
@@ -39,11 +39,11 @@ from nessa.evidence.extraction import (
     work_mode_from,
     worst_case_nano_usd,
 )
-from nessa.evidence.extraction_agent import PAGE_EXTRACTION_TASK, run_extraction
-from nessa.evidence.extraction_runs import acquisition_model_spend
-from nessa.evidence.fetcher import Fetcher
-from nessa.evidence.pages import EXTRACTION_TEXT_BYTES, redact_page, visible_text
-from nessa.evidence.records import (
+from careerwright.evidence.extraction_agent import PAGE_EXTRACTION_TASK, run_extraction
+from careerwright.evidence.extraction_runs import acquisition_model_spend
+from careerwright.evidence.fetcher import Fetcher
+from careerwright.evidence.pages import EXTRACTION_TEXT_BYTES, redact_page, visible_text
+from careerwright.evidence.records import (
     ClaimField,
     Extraction,
     ExtractionNotRun,
@@ -54,18 +54,18 @@ from nessa.evidence.records import (
     ValidationState,
     WorkMode,
 )
-from nessa.evidence.redaction import EMAIL_REMOVED, PHONE_REMOVED
-from nessa.evidence.store import ExtractionRow
-from nessa.identity.activity import ACTIVITY_MAX_ATTEMPTS
-from nessa.identity.failures import FailureClass, OutputTruncatedError, classify_failure
-from nessa.identity.model_choice import ModelChoice
-from nessa.identity.model_registry import ModelMode
-from nessa.identity.records import RunKind
-from nessa.identity.runs import workflow_id
-from nessa.migrations.versions import r0021_page_extraction as r0021
-from nessa.migrations.versions import r0023_cancel_started_runs as r0023
-from nessa.migrations.versions import r0024_postings_conflicting as r0024
-from nessa.vocabulary import DataMode, WorkState
+from careerwright.evidence.redaction import EMAIL_REMOVED, PHONE_REMOVED
+from careerwright.evidence.store import ExtractionRow
+from careerwright.identity.activity import ACTIVITY_MAX_ATTEMPTS
+from careerwright.identity.failures import FailureClass, OutputTruncatedError, classify_failure
+from careerwright.identity.model_choice import ModelChoice
+from careerwright.identity.model_registry import ModelMode
+from careerwright.identity.records import RunKind
+from careerwright.identity.runs import workflow_id
+from careerwright.migrations.versions import r0021_page_extraction as r0021
+from careerwright.migrations.versions import r0023_cancel_started_runs as r0023
+from careerwright.migrations.versions import r0024_postings_conflicting as r0024
+from careerwright.vocabulary import DataMode, WorkState
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
 from tests.support.source_server import SYNTHETIC_MARKER, Scripted, source_server
@@ -192,7 +192,7 @@ def _acquired(body: bytes) -> AcquisitionResult:
     with source_server({"/robots.txt": Scripted(404), "/jobs/1": Scripted(body=body)}) as server:
         fetcher = Fetcher(
             resolve=scripted_resolver({host: [LOOPBACK]}),
-            user_agent="NessaL0/test",
+            user_agent="CareerwrightL0/test",
             extra_allowed=frozenset({("127.0.0.1", server.port)}),
         )
         return acquire_page(
@@ -823,8 +823,8 @@ def test_the_database_holds_extraction_labels_and_the_cap_to_the_code_s() -> Non
     assert cap is not None
     assert int(cap.group(1)) == extraction_runs.MAX_EXTRACTIONS_PER_ACQUISITION
     run_id = uuid.UUID(int=7)
-    assert "'nessa-run-' || p_run::text" in r0023.SCHEMA  # the API's own workflow IDs
-    assert workflow_id(run_id) == f"nessa-run-{run_id}"
+    assert "'careerwright-run-' || p_run::text" in r0023.SCHEMA  # the API's own workflow IDs
+    assert workflow_id(run_id) == f"careerwright-run-{run_id}"
 
 
 def test_the_hash_spans_cite_is_of_the_text_exactly() -> None:

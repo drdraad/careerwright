@@ -18,9 +18,9 @@ import pytest
 from fastapi.testclient import TestClient
 from psycopg import errors
 
-from nessa.api.app import create_app
-from nessa.api.deps import ApiDependencies
-from nessa.config import RuntimeMode
+from careerwright.api.app import create_app
+from careerwright.api.deps import ApiDependencies
+from careerwright.config import RuntimeMode
 from tests.integration.durable import Scenario, fresh_actor, make_scenario
 from tests.support.client import ApiClient, profile_with
 from tests.support.fake_models import interview_answer
@@ -292,7 +292,8 @@ def test_a_message_written_against_an_old_version_is_refused_before_any_run(
     assert response.status_code == 409
     assert response.json()["error"]["details"] == {"current_version": 1}
     assert scenario.infra.query(
-        "SELECT count(*) AS n FROM nessa.runs WHERE workspace_id = %s", (scenario.workspace_id,)
+        "SELECT count(*) AS n FROM careerwright.runs WHERE workspace_id = %s",
+        (scenario.workspace_id,),
     ) == [{"n": 0}]
 
 
@@ -360,7 +361,7 @@ def test_a_turn_streams_its_reply_to_its_owner_and_the_validated_output_supersed
     ]
     assert scenario.api.get(reply_path(scenario, turn_id), ben).status_code == 404
     ben_id = scenario.api.get("/v1/me", ben).json()["actor_id"]
-    count = "SELECT count(*) AS n FROM nessa.run_partials"
+    count = "SELECT count(*) AS n FROM careerwright.run_partials"
     assert scenario.infra.as_role("pg_api", count, actor=ben_id) == [{"n": 0}]
 
     recovered = scenario.worker("recovers")
@@ -373,7 +374,7 @@ def test_a_turn_streams_its_reply_to_its_owner_and_the_validated_output_supersed
     done = scenario.api.get(reply_path(scenario, turn_id), scenario.token).json()
     assert (done["completeness"], done["text"], done["seq"]) == ("superseded", None, None)
     assert scenario.infra.query(
-        "SELECT count(*) AS n FROM nessa.run_partials WHERE run_id = %s", (turn_id,)
+        "SELECT count(*) AS n FROM careerwright.run_partials WHERE run_id = %s", (turn_id,)
     ) == [{"n": 0}]  # deleted with the validated output's arrival
     assert scenario.leaks(secret) == []  # the streamed text is sealed, like the output
 
@@ -413,12 +414,12 @@ def test_a_reply_cut_off_mid_stream_ends_observably_with_the_partial_marked_inco
     assert scenario.output_sentinel in partial["text"]
     assert scenario.leaks() == []
     [row] = scenario.infra.query(
-        "SELECT ciphertext FROM nessa.run_partials WHERE run_id = %s", (turn["turn_id"],)
+        "SELECT ciphertext FROM careerwright.run_partials WHERE run_id = %s", (turn["turn_id"],)
     )
-    unsealed = "UPDATE nessa.run_partials SET ciphertext = %s WHERE run_id = %s"
+    unsealed = "UPDATE careerwright.run_partials SET ciphertext = %s WHERE run_id = %s"
     scenario.infra.query(unsealed, (partial["text"].encode(), turn["turn_id"]))
     try:
-        assert ("nessa.run_partials", "model output") in {
+        assert ("careerwright.run_partials", "model output") in {
             (f.location, f.needle_label) for f in scenario.leaks()
         }
     finally:
@@ -488,7 +489,7 @@ def test_access_revoked_mid_call_still_settles_the_attempt_and_ends_typed(
     wait_for(lambda: revoked.attempts(turn_id) != [], timeout_s=30, what="the first attempt")
 
     # Revoked while the call is in flight: the partial cannot be written, nor marked.
-    infra.query("UPDATE nessa.actors SET access = 'revoked' WHERE email = %s", (email,))
+    infra.query("UPDATE careerwright.actors SET access = 'revoked' WHERE email = %s", (email,))
     run = revoked.wait_terminal(turn_id)
     assert worker.stop() == 0
 
@@ -604,7 +605,7 @@ def test_budget_exhaustion_refuses_a_turn_before_and_after_it_is_queued(
     )
     assert (refused.status_code, refused.json()["error"]["code"]) == (402, "BUDGET_EXCEEDED")
     assert scenario.infra.query(
-        "SELECT count(*) AS n FROM nessa.interview_turns WHERE workspace_id = %s",
+        "SELECT count(*) AS n FROM careerwright.interview_turns WHERE workspace_id = %s",
         (scenario.workspace_id,),
     ) == [{"n": 0}]
     set_limits(scenario, 100_000_000)
@@ -652,11 +653,11 @@ def test_a_non_synthetic_workspace_s_turns_use_the_standard_model_only(
     )
     with pytest.raises(errors.CheckViolation):
         infra.query(
-            "INSERT INTO nessa.runs (run_id, workspace_id, data_mode, synthetic, kind, "
+            "INSERT INTO careerwright.runs (run_id, workspace_id, data_mode, synthetic, kind, "
             "requested_by, model_id, model_mode, status, profile_version) SELECT "
             "gen_random_uuid(), workspace_id, data_mode, synthetic, 'interview_turn', "
             "owner_actor_id, 'muse-spark-1.3-contributor', 'contributor', 'queued', 0 "
-            "FROM nessa.workspaces WHERE workspace_id = %s",
+            "FROM careerwright.workspaces WHERE workspace_id = %s",
             (workspace,),
         )
     scenario = make_scenario(infra, api, ada, tmp_path)  # a worker to finish the queued run
@@ -706,7 +707,7 @@ def test_a_demo_workspace_interviews_offline_with_the_labelled_fixture_interview
     turn_id = submitted.json()["turn_id"]
     run = submitted.json()["run"]
     assert (run["model_id"], run["model_mode"], run["data_mode"]) == (
-        "nessa-fixture-interviewer-1",
+        "careerwright-fixture-interviewer-1",
         "fixture",
         "demo",
     )
@@ -764,7 +765,7 @@ def test_a_demo_workspace_interviews_offline_with_the_labelled_fixture_interview
         # explanations (0011) only.
         (
             "connection_check",
-            "nessa-fixture-interviewer-1",
+            "careerwright-fixture-interviewer-1",
             "fixture",
             "the_fixture_models_only_interview_discover_or_explain",
         ),
@@ -786,11 +787,11 @@ def test_the_database_keeps_the_fixture_interviewer_and_demo_workspaces_together
 
     with pytest.raises(errors.CheckViolation, match=constraint):
         infra.query(
-            "INSERT INTO nessa.runs (run_id, workspace_id, data_mode, synthetic, kind, "
+            "INSERT INTO careerwright.runs (run_id, workspace_id, data_mode, synthetic, kind, "
             "requested_by, model_id, model_mode, status, profile_version) SELECT "
             "gen_random_uuid(), workspace_id, data_mode, synthetic, %s, owner_actor_id, %s, %s, "
             "'queued', CASE WHEN %s = 'interview_turn' THEN 0 END "
-            "FROM nessa.workspaces WHERE workspace_id = %s",
+            "FROM careerwright.workspaces WHERE workspace_id = %s",
             (kind, model_id, model_mode, kind, created.json()["workspace_id"]),
         )
 
@@ -806,13 +807,13 @@ def test_the_worker_never_reads_profile_or_conversation_tables_and_the_api_never
 
     for table in ("interview_turns", "interview_decisions", "profile_versions"):
         with pytest.raises(errors.InsufficientPrivilege):
-            scenario.infra.as_role("pg_worker", f"SELECT * FROM nessa.{table}", run=run_id)  # noqa: S608
+            scenario.infra.as_role("pg_worker", f"SELECT * FROM careerwright.{table}", run=run_id)  # noqa: S608
     with pytest.raises(errors.InsufficientPrivilege):
         scenario.infra.as_role(
-            "pg_api", "SELECT ciphertext FROM nessa.run_inputs", actor=str(uuid.uuid4())
+            "pg_api", "SELECT ciphertext FROM careerwright.run_inputs", actor=str(uuid.uuid4())
         )
     visible = scenario.infra.as_role(
-        "pg_worker", "SELECT run_id::text AS run_id FROM nessa.run_inputs", run=run_id
+        "pg_worker", "SELECT run_id::text AS run_id FROM careerwright.run_inputs", run=run_id
     )
     # Scoped like run outputs and keys: the run's workspace (while its requester may act),
     # so the worker sees that workspace's sealed inputs and no other workspace's.

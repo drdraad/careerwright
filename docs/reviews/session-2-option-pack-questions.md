@@ -10,7 +10,7 @@ it against the tool's output, so its question numbers are stable for Task 7c.
   question number.
 - **What:** 344 yes/no questions. They cover every consequential field of every
   record in
-  `backend/src/nessa/catalogue/packs/england_option_pack/england-option-pack-0.1.0.json`,
+  `backend/src/careerwright/catalogue/packs/england_option_pack/england-option-pack-0.1.0.json`,
   each beside the span it cites. Consequential means pay and its basis, money, dates and
   deadlines, durations and schedules, entry requirements and gates, eligibility rules,
   award status, outcome levels and the conflicts a page leaves open. P02 has no target in

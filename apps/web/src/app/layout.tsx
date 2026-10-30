@@ -7,7 +7,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Nessa",
+  title: "Careerwright",
   description: "Plan a career change you can see and afford. Local L0 build.",
   robots: { index: false, follow: false },
 };

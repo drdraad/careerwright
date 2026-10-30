@@ -23,13 +23,13 @@ decision 7 requires the first run kind that reads the profile to pin the version
 
 1. **One pinned ESCO release, fetched and verified, never committed.** ESCO v1.2.1,
    classification, English, CSV (10,045,670 bytes, SHA-256 `f9761b0b…deb3e`;
-   `nessa.catalogue.esco.ESCO_RELEASE`). `make setup` downloads it from the URL the ESCO
+   `careerwright.catalogue.esco.ESCO_RELEASE`). `make setup` downloads it from the URL the ESCO
    download page links into the gitignored `var/datasets/` and keeps it only if size and
    hash match; the setup container mounts that directory read-only and `setup-database`
    imports the file after checking it again, once (later starts find it imported). The
    database holds one release; importing a different one is refused, so a version bump is
    a reviewed change. The import manifest records dataset, version, URL, hash, size, licence,
-   attribution, native code version, transformation version (`nessa-esco-import-1`), counts
+   attribution, native code version, transformation version (`careerwright-esco-import-1`), counts
    and the repeated rows collapsed (TAX1-04). "Already imported" means the same dataset, the
    same hash **and** the same transformation version; the same release built by another
    transformation is refused like a different release (its stored labels and search vectors
@@ -94,7 +94,7 @@ decision 7 requires the first run kind that reads the profile to pin the version
    `POST /v1/workspaces/{id}/occupations/provisional` records a title the person confirmed as
    an internal concept private to the workspace, citing a direct-entry source. It has no ESCO
    URI or ISCO group by construction; a title that is any ESCO label as a concept is refused
-   with the occupations that hold it. "As a concept" is `nessa.concept_key`, one SQL
+   with the occupations that hold it. "As a concept" is `careerwright.concept_key`, one SQL
    function used by the API and by the database trigger, which derives it from the title
    itself: case, punctuation and hyphens folded, and a simple English plural folded per word
    ("ICT help-desk agent", "Data analyst." and "data analysts" are refused; fix round 1).
@@ -122,7 +122,7 @@ decision 7 requires the first run kind that reads the profile to pin the version
    edit (`PUT /profile`) and a confirmed chat proposal both go through it, with an expected
    version, under the workspace lock, as a new immutable version (PROF-07).
 
-8. **The InterviewTurn contract** (`nessa.profile.interview`). The model receives the
+8. **The InterviewTurn contract** (`careerwright.profile.interview`). The model receives the
    minimum profile subset (every field's state and value, the preferred name's value
    withheld, no IDs or sources), up to the last six messages and its earlier replies, within
    a prompt budget, and must answer a strict JSON schema: reply, proposed updates (field,
@@ -173,13 +173,13 @@ decision 7 requires the first run kind that reads the profile to pin the version
 10. **A new run kind on the same activity.** `interview_turn` runs through the one bounded
     activity and workflow (ADR 0002): no second model-call path. The activity takes a
     `RunTask` per kind (its call, worst case and whether it has an input), composed with the
-    model builder in the new worker entry point `nessa.worker` (`python -m nessa.worker`),
+    model builder in the new worker entry point `careerwright.worker` (`python -m careerwright.worker`),
     because the identity module must not import the profile module. Submission seals the
     turn's context into `run_inputs` (associated data: kind, workspace, run); the worker opens
     it inside the activity, still never reading profile or conversation tables (ADR 0004
     decision 5), and only while the requester may act. The run pins `profile_version`
     (ADR 0004 decision 7; a CHECK requires it for this kind). The step sequence is
-    unchanged, so the DBOS `application_version` stays `nessa-l0-1`. Reseal covers the new
+    unchanged, so the DBOS `application_version` stays `careerwright-l0-1`. Reseal covers the new
     sealed table.
 
 11. **Deciding on a turn.** `POST .../interview/turns/{turn_id}/decision` with an expected
@@ -197,7 +197,7 @@ decision 7 requires the first run kind that reads the profile to pin the version
       the person saw; a stale one is refused before any run exists.
 
 12. **The deterministic fixture interviewer** (plan sections 2-3). Demo workspaces' turns use
-    `nessa-fixture-interviewer-1`, registered with mode `fixture` and zero price: a
+    `careerwright-fixture-interviewer-1`, registered with mode `fixture` and zero price: a
     deterministic answer to the same prompt and schema, from fixed patterns (listed cities,
     hours, pound amounts, "I am a ...", "I enjoy ...", "rather not say"), checked by the same
     `check_turn`, stored with origin `fixture` and a reply that says it is the demo
@@ -282,7 +282,7 @@ decision 7 requires the first run kind that reads the profile to pin the version
   `ALREADY_DECIDED`; new failure classes: `model_refused`, `output_truncated`; new event
   kind `run.partial_updated` and read path `GET .../interview/turns/{id}/reply` (decision
   13); migrations 0006 (a known zero cost for attempts with no call), 0007
-  (`run_partials`), 0008 (the manifest's `adaptation`, `nessa.concept_key` and the trigger
+  (`run_partials`), 0008 (the manifest's `adaptation`, `careerwright.concept_key` and the trigger
   that uses it) and 0009 (a partial records `stopped`, not `incomplete`; untouched $0.10
   run limits move to $0.15).
 - A city outside the list, which Sprint 1 accepted as free text, is now refused on save.

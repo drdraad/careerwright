@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from nessa.identity.model_choice import ModelChoice
+from careerwright.identity.model_choice import ModelChoice
 from tools.evaluation import CaseKind, load_cases
 from tools.live_eval import (
     MAX_LIVE_CASES,

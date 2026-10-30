@@ -18,8 +18,8 @@ import httpx2 as httpx
 import psycopg
 import pytest
 
-from nessa.profile.document import FIELD_NAMES
-from nessa.seed import FIXTURE_WORKSPACE_ID
+from careerwright.profile.document import FIELD_NAMES
+from careerwright.seed import FIXTURE_WORKSPACE_ID
 from tools.localenv import REPO_ROOT as REPO
 from tools.localenv import add_master_key_version
 from tools.stack import CORE_SERVICES, Stack, reseal, rotate_master_key
@@ -34,8 +34,8 @@ def sign_in(stack: Stack, handle: str) -> str:
         f"{stack.auth_url}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword",
         params={"key": "emulator"},
         json={
-            "email": f"{handle}@nessa.test",
-            "password": f"nessa-demo-{handle}",
+            "email": f"{handle}@careerwright.test",
+            "password": f"careerwright-demo-{handle}",
             "returnSecureToken": True,
         },
         timeout=10,
@@ -301,14 +301,16 @@ def test_the_acquisition_worker_holds_no_database_secret_master_key_or_model_key
     worker = _inspect(demo_stack, "worker")
 
     mounts = {m["Destination"] for m in acquisition["Mounts"]}
-    assert mounts == {"/run/nessa/adzuna"}
+    assert mounts == {"/run/careerwright/adzuna"}
     assert all(m["RW"] is False for m in acquisition["Mounts"])
     names = {entry.partition("=")[0] for entry in acquisition["Config"]["Env"]}
     assert not {n for n in names if "DATABASE" in n or "MASTER_KEY" in n or "META" in n}
     assert demo_stack.exec("acquisition", "ls", "/run/secrets").returncode != 0
-    assert "/run/nessa/keys" in {m["Destination"] for m in worker["Mounts"]}  # the contrast
+    assert "/run/careerwright/keys" in {m["Destination"] for m in worker["Mounts"]}  # the contrast
     assert (
-        demo_stack.exec("acquisition", "python", "-m", "nessa.acquisition", "--check").returncode
+        demo_stack.exec(
+            "acquisition", "python", "-m", "careerwright.acquisition", "--check"
+        ).returncode
         == 0
     )
 
@@ -387,7 +389,7 @@ def test_no_database_password_or_master_key_value_is_anywhere_in_the_acquisition
     assert acquisition["files"] > 1_000  # it searched the whole filesystem
     assert acquisition["hits"] == []
     assert not any(n in environment for n in needles)
-    assert {"/run/secrets/pg_worker", "/run/nessa/keys/v1.key"} <= set(worker["hits"])
+    assert {"/run/secrets/pg_worker", "/run/careerwright/keys/v1.key"} <= set(worker["hits"])
 
 
 @pytest.mark.req("ARC1-08")
@@ -399,9 +401,11 @@ def test_the_containerised_worker_runs_dbos_as_the_non_owner_runtime_role(
     password = (demo_stack.home / "secrets" / "pg_dbos_runtime").read_text().strip()
 
     assert '"msg": "worker ready"' in logs
-    assert "nessa_dbos_runtime:[redacted]@postgres:5432/nessa_dbos" in logs
+    assert "careerwright_dbos_runtime:[redacted]@postgres:5432/careerwright_dbos" in logs
     assert password not in logs
-    assert demo_stack.exec("worker", "python", "-m", "nessa.worker", "--check").returncode == 0
+    assert (
+        demo_stack.exec("worker", "python", "-m", "careerwright.worker", "--check").returncode == 0
+    )
 
 
 @pytest.mark.req("BND1-14", "STATE-07")
@@ -490,7 +494,7 @@ def test_a_demo_workspace_interviews_through_the_offline_worker(demo_stack: Stac
 
 def superuser_query(stack: Stack, statement: str) -> list[tuple[Any, ...]]:
     password = (stack.home / "secrets" / "pg_superuser").read_text().strip()
-    url = f"postgresql://postgres:{password}@127.0.0.1:{stack.ports.postgres}/nessa_app"
+    url = f"postgresql://postgres:{password}@127.0.0.1:{stack.ports.postgres}/careerwright_app"
     with psycopg.connect(url) as conn:
         return conn.execute(statement.encode()).fetchall()
 
@@ -513,7 +517,7 @@ def demo_worker_networks(stack: Stack) -> set[str]:
 
 
 NETWORKS_SEEN_BY = (
-    "import json; from nessa.localnet import {name}, ROUTE_TABLE; "
+    "import json; from careerwright.localnet import {name}, ROUTE_TABLE; "
     "print(json.dumps([str(n) for n in {call}]))"
 )
 
@@ -543,8 +547,8 @@ def test_the_edge_relays_only_into_the_internal_network_and_refuses_an_absent_ta
         "api",
         "python",
         "-c",
-        "import json; from nessa.config import ApiSettings; "
-        "from nessa.localnet import client_networks; print(json.dumps([str(n) for n in "
+        "import json; from careerwright.config import ApiSettings; "
+        "from careerwright.localnet import client_networks; print(json.dumps([str(n) for n in "
         "client_networks(internal=ApiSettings().internal_network_clients)]))",
     )
 
@@ -632,14 +636,16 @@ def test_master_key_rotation_reloads_the_running_api_reseals_and_keeps_demo_offl
         {"api_key": "a" * 40, "consent_to_encrypted_storage": True},
     ).json()
     assert {
-        row[0] for row in superuser_query(demo_stack, "SELECT key_version FROM nessa.credentials")
+        row[0]
+        for row in superuser_query(demo_stack, "SELECT key_version FROM careerwright.credentials")
     } == {1}
 
     created = rotate_master_key(demo_stack)
 
     assert created == "keys/v2.key"
     assert {
-        row[0] for row in superuser_query(demo_stack, "SELECT key_version FROM nessa.credentials")
+        row[0]
+        for row in superuser_query(demo_stack, "SELECT key_version FROM careerwright.credentials")
     } == {2}
     # The restarted API seals with the new version: a rotated user key lands on v2 too.
     rotated = call(
@@ -653,7 +659,7 @@ def test_master_key_rotation_reloads_the_running_api_reseals_and_keeps_demo_offl
     new_id = uuid.UUID(rotated.json()["credential_id"])  # parsed, so safe to embed
     versions = superuser_query(
         demo_stack,
-        f"SELECT key_version FROM nessa.credentials WHERE credential_id = '{new_id}'",  # noqa: S608
+        f"SELECT key_version FROM careerwright.credentials WHERE credential_id = '{new_id}'",  # noqa: S608
     )
     assert versions == [(2,)]
     # `restart` kept the demo configuration: the worker still has no route out.
@@ -661,7 +667,9 @@ def test_master_key_rotation_reloads_the_running_api_reseals_and_keeps_demo_offl
 
 
 def key_versions(stack: Stack) -> set[int]:
-    return {row[0] for row in superuser_query(stack, "SELECT key_version FROM nessa.credentials")}
+    return {
+        row[0] for row in superuser_query(stack, "SELECT key_version FROM careerwright.credentials")
+    }
 
 
 @pytest.mark.req("MODEL-05")
@@ -724,7 +732,7 @@ def test_reset_demo_restores_the_fixture_and_touches_nothing_else(demo_stack: St
     )
     events_before = call(demo_stack, "GET", f"{fixture}/events", ada).json()["last_seq"]
 
-    demo_stack.run("migrate", "python", "-m", "nessa.cli", "reset-demo")
+    demo_stack.run("migrate", "python", "-m", "careerwright.cli", "reset-demo")
 
     restored = call(demo_stack, "GET", f"{fixture}/profile", ada).json()
     assert (restored["version"], restored["document"]["cities"]["value"]) == (1, ["Manchester"])
@@ -744,9 +752,9 @@ def test_reset_demo_restores_the_fixture_and_touches_nothing_else(demo_stack: St
 @pytest.mark.parametrize(
     ("variable", "value"),
     [
-        ("NESSA_ENVIRONMENT", "production"),
-        ("NESSA_FIREBASE_PROJECT_ID", "nessa-real-project"),
-        ("NESSA_ALLOWED_HOSTS", "0.0.0.0:8000"),
+        ("CAREERWRIGHT_ENVIRONMENT", "production"),
+        ("CAREERWRIGHT_FIREBASE_PROJECT_ID", "careerwright-real-project"),
+        ("CAREERWRIGHT_ALLOWED_HOSTS", "0.0.0.0:8000"),
         ("FIREBASE_AUTH_EMULATOR_HOST", "auth.example.com:9099"),
     ],
 )
@@ -762,7 +770,7 @@ def test_the_api_refuses_to_start_with_unsafe_configuration(
         "api",
         "python",
         "-c",
-        "from nessa.api.main import build_app; build_app()",
+        "from careerwright.api.main import build_app; build_app()",
         timeout=120,
         check=False,
     )

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from nessa.catalogue.option_pack import PINS, SCHEMA_PATH, load_pack, pack_path
+from careerwright.catalogue.option_pack import PINS, SCHEMA_PATH, load_pack, pack_path
 from tools.option_pack_files import (
     PACKAGE_PATH,
     PACKAGE_VERSION,

@@ -15,6 +15,6 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 COPY src ./src
-RUN uv sync --locked --no-dev && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin nessa
+RUN uv sync --locked --no-dev && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin careerwright
 
-USER nessa
+USER careerwright

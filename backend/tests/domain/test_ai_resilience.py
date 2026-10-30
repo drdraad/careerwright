@@ -9,8 +9,8 @@ from typing import Any
 
 import pytest
 
-from nessa.catalogue import ai_resilience
-from nessa.catalogue.ai_resilience import (
+from careerwright.catalogue import ai_resilience
+from careerwright.catalogue.ai_resilience import (
     MEANING,
     AssessmentOrigin,
     AssessmentPack,
@@ -213,7 +213,7 @@ def test_no_score_is_derived_from_evidence_in_code() -> None:
         for node in ast.walk(ast.parse(source))
         if isinstance(node, ast.ImportFrom) and node.module
     }
-    assert not {m for m in imported if m.startswith("nessa.")}
+    assert not {m for m in imported if m.startswith("careerwright.")}
     assert assessment(check_pack(pack()), DATA_ANALYST).state is AssessmentState.UNSCORED
 
 

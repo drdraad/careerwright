@@ -19,7 +19,7 @@ async function demoWorkspace(name: string): Promise<string> {
 }
 
 async function send(page: Page, message: string) {
-  await page.getByRole("textbox", { name: "Reply to Nessa" }).fill(message);
+  await page.getByRole("textbox", { name: "Reply to Careerwright" }).fill(message);
   await page.getByRole("button", { name: "Send" }).click();
 }
 
@@ -101,12 +101,12 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   await expect(first).toBeVisible({ timeout: 60_000 });
   await expect(first.getByText("Why this could suit you")).toBeVisible();
   // The slate's one written note (S2.7), here the demo explainer's: labelled, its quotations
-  // checked, and above how Nessa found the suggestion, which stays.
+  // checked, and above how Careerwright found the suggestion, which stays.
   await expect(first.getByText(/Written by the demo explainer \(synthetic\)/)).toBeVisible({
     timeout: 60_000,
   });
   await expect(first.getByText("You said:").first()).toBeVisible();
-  await expect(first.getByText("How Nessa found it")).toBeVisible();
+  await expect(first.getByText("How Careerwright found it")).toBeVisible();
   await expect(directions).not.toContainText(/\d\s?%/);
   const title = (await first.getByRole("heading").textContent()) ?? "";
   await first.getByRole("button", { name: /Make this a target/ }).click();
@@ -145,7 +145,7 @@ test("[PROF-09] a message with a risk stem is sent as usual, with the support pa
   ).toBeVisible({ timeout: 60_000 });
   await panel.getByRole("button", { name: "Dismiss the support note" }).click();
   await expect(panel).toHaveCount(0);
-  await expect(page.getByRole("textbox", { name: "Reply to Nessa" })).toBeFocused();
+  await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toBeFocused();
   await expect(opening).toHaveCount(0);
   await expect(page.locator(".question")).toHaveCount(0);
 });
@@ -202,7 +202,7 @@ test.describe("phone", () => {
     const sheet = page.getByRole("dialog", { name: "Where this came from" });
     await expect(sheet).toBeVisible();
     // S0-V02: with the sheet open at its peek, the reply field and Send are not under it.
-    await expectReachable(page, page.getByRole("textbox", { name: "Reply to Nessa" }));
+    await expectReachable(page, page.getByRole("textbox", { name: "Reply to Careerwright" }));
     await expectReachable(page, page.getByRole("button", { name: "Send" }));
 
     // A failed reply: Try again, the recovery action, is reachable beside the sheet too.
@@ -219,7 +219,7 @@ test.describe("phone", () => {
         failure_class: "invalid_model_output",
         data_mode: "demo",
         synthetic: true,
-        model_id: "nessa-fixture-interviewer-1",
+        model_id: "careerwright-fixture-interviewer-1",
         model_mode: "fixture",
         created_at: "2027-01-01T10:00:00Z",
         started_at: null,
@@ -246,7 +246,7 @@ test.describe("phone", () => {
       }),
     );
     await page.reload();
-    await expect(page.getByText("The reply didn't pass Nessa's checks twice")).toBeVisible();
+    await expect(page.getByText("The reply didn't pass Careerwright's checks twice")).toBeVisible();
     // The sticky reply field must not cover Try again either, with the sheet closed.
     const tryAgain = page.getByRole("button", { name: "Try again" });
     const yourself = page.getByRole("button", { name: "Add the details yourself" });
@@ -261,7 +261,7 @@ test.describe("phone", () => {
     await expect(sheet).toBeVisible();
     await expectReachable(page, tryAgain);
     await expectReachable(page, yourself);
-    await expectReachable(page, page.getByRole("textbox", { name: "Reply to Nessa" }));
+    await expectReachable(page, page.getByRole("textbox", { name: "Reply to Careerwright" }));
     await page.evaluate(() => window.scrollTo(0, 0));
     await tryAgain.focus();
     await expectOnTop(page, tryAgain);

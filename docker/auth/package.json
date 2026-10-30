@@ -1,5 +1,5 @@
 {
-  "name": "nessa-auth-emulator",
+  "name": "careerwright-auth-emulator",
   "version": "0.1.0",
   "private": true,
   "description": "The Firebase Auth emulator image's only dependency, installed from pnpm-lock.yaml with --frozen-lockfile.",

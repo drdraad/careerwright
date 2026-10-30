@@ -260,7 +260,7 @@ describe("[DUR-04][API-04] saving the profile is an expected-version, idempotent
     expect(notice).toHaveTextContent("A newer version was saved, and it couldn't be loaded");
     expect(notice).toHaveFocus();
     expect(screen.getAllByRole("alert")).toHaveLength(1);
-    expect(screen.getByText("Nessa's service isn't reachable")).toBeInTheDocument();
+    expect(screen.getByText("Careerwright's service isn't reachable")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Work area 1" })).toHaveValue("Leeds");
   });
 
@@ -272,7 +272,7 @@ describe("[DUR-04][API-04] saving the profile is an expected-version, idempotent
     await user.clear(screen.getByRole("textbox", { name: "Work area 1" }));
     await user.type(screen.getByRole("textbox", { name: "Work area 1" }), "York");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(await screen.findByText("Nessa's service isn't reachable")).toBeInTheDocument();
+    expect(await screen.findByText("Careerwright's service isn't reachable")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     expect(await screen.findByText("Saved as version 2.")).toBeInTheDocument();

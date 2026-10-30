@@ -8,14 +8,14 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
-from nessa.capability.evidence import (
+from careerwright.capability.evidence import (
     Answer,
     Holding,
     Method,
     RequirementStatement,
     SkillEvidence,
 )
-from nessa.capability.matrix import (
+from careerwright.capability.matrix import (
     GateInfo,
     Importance,
     Matrix,
@@ -26,7 +26,7 @@ from nessa.capability.matrix import (
     RubricView,
     apply_edits,
 )
-from nessa.capability.outcomes import (
+from careerwright.capability.outcomes import (
     Confidence,
     EvidenceKind,
     OutcomeReview,
@@ -35,7 +35,7 @@ from nessa.capability.outcomes import (
     PlannedOutcome,
     Provenance,
 )
-from nessa.capability.reference import GateKind
+from careerwright.capability.reference import GateKind
 
 FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "m0"
 ADA = uuid.UUID("00000000-0000-4000-8000-0000000000a1")

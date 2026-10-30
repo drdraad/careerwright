@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from nessa.capability.reference import (
+from careerwright.capability.reference import (
     PINS,
     ReferenceError,
     check_reference,
@@ -15,7 +15,7 @@ from nessa.capability.reference import (
     parse_reference,
     reference_path,
 )
-from nessa.catalogue.option_pack import load_pack, pack_path, parse_pack
+from careerwright.catalogue.option_pack import load_pack, pack_path, parse_pack
 
 PACK = "0.1.0"
 REFERENCE = "0.1.0"

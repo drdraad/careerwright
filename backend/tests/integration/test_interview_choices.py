@@ -13,10 +13,10 @@ from typing import Any
 
 import pytest
 
-from nessa.identity.keyring import SealedValue, load_keyring
-from nessa.identity.receipts import fingerprint
-from nessa.identity.runs import input_context
-from nessa.profile import safety
+from careerwright.identity.keyring import SealedValue, load_keyring
+from careerwright.identity.receipts import fingerprint
+from careerwright.identity.runs import input_context
+from careerwright.profile import safety
 from tests.integration.durable import Scenario, make_scenario
 from tests.support.client import ApiClient, profile_with
 from tests.support.fake_models import SMALLER_STEP_MARK
@@ -75,7 +75,7 @@ def test_the_entry_mode_and_pause_are_saved_with_versions_and_reach_the_intervie
 
     turn = scenario.submit_turn("I want to be a data quality analyst.")
     [row] = infra.query(
-        "SELECT key_version, nonce, ciphertext FROM nessa.run_inputs WHERE run_id = %s",
+        "SELECT key_version, nonce, ciphertext FROM careerwright.run_inputs WHERE run_id = %s",
         (turn["turn_id"],),
     )
     keyring = load_keyring(infra.api_settings().master_key_dir)
@@ -140,7 +140,7 @@ def test_a_message_with_a_risk_stem_is_sent_with_the_support_panel_and_none_of_i
     assert panel["review_status"].startswith("accepted for L0 at session 1")
     assert "not yet reviewed as built" in panel["review_status"]
     assert {r["name"] for r in panel["resources"]} == SERVICES
-    assert panel["message"] == safety.SUPPORT_NOTE  # "...sent to Nessa as usual."
+    assert panel["message"] == safety.SUPPORT_NOTE  # "...sent to Careerwright as usual."
     assert (ordinary.status_code, ordinary.json()["support_note"]) == (202, None)
     assert replayed.json()["turn_id"] == flagged.json()["turn_id"]  # the same turn, replayed
     assert replayed.json()["support_note"] == panel  # recomputed from the request
@@ -158,8 +158,8 @@ def test_a_message_with_a_risk_stem_is_sent_with_the_support_panel_and_none_of_i
     # or log holds the panel's words, its services, the policy or the turn's instruction.
     logs = [(log.name, log.read_text(encoding="utf-8")) for log in scenario.logs if log.exists()]
     cells = [
-        *scenario.infra.database_cells("nessa_app"),
-        *scenario.infra.database_cells("nessa_dbos"),
+        *scenario.infra.database_cells("careerwright_app"),
+        *scenario.infra.database_cells("careerwright_dbos"),
         *logs,
         ("api log", caplog.text),
         ("export", exported),
@@ -172,7 +172,8 @@ def test_a_message_with_a_risk_stem_is_sent_with_the_support_panel_and_none_of_i
     ]
     assert scan(cells, needles) == []
     receipts = scenario.infra.query(
-        "SELECT response::text AS response FROM nessa.command_receipts WHERE workspace_id = %s",
+        "SELECT response::text AS response FROM careerwright.command_receipts WHERE workspace_id = "
+        "%s",
         (scenario.workspace_id,),
     )
     assert receipts
@@ -261,7 +262,7 @@ def test_a_turn_receipt_stored_before_the_redesign_is_refused_never_a_500(
     message = "I volunteer on a suicide prevention helpline and want paid work like it."
     turn = scenario.submit_turn(message)
     [owner] = scenario.infra.query(
-        "SELECT owner_actor_id FROM nessa.workspaces WHERE workspace_id = %s",
+        "SELECT owner_actor_id FROM careerwright.workspaces WHERE workspace_id = %s",
         (scenario.workspace_id,),
     )
     old_request = {
@@ -274,7 +275,7 @@ def test_a_turn_receipt_stored_before_the_redesign_is_refused_never_a_500(
     old_response = {**turn, "support_note": old_note}
     key = uuid.uuid4()
     scenario.infra.query(
-        "INSERT INTO nessa.command_receipts (actor_id, idempotency_key, command, "
+        "INSERT INTO careerwright.command_receipts (actor_id, idempotency_key, command, "
         "request_sha256, status_code, response, workspace_id) "
         "VALUES (%s, %s, 'submit_turn', %s, 202, %s::jsonb, %s)",
         (
@@ -302,7 +303,7 @@ def test_a_turn_receipt_stored_before_the_redesign_is_refused_never_a_500(
         )
     finally:
         scenario.infra.query(
-            "DELETE FROM nessa.command_receipts WHERE idempotency_key = %s", (key,)
+            "DELETE FROM careerwright.command_receipts WHERE idempotency_key = %s", (key,)
         )
 
     assert (replayed.status_code, replayed.json()["error"]["code"]) == (

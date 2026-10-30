@@ -6,9 +6,9 @@ Nothing here enters the product."""
 from datetime import date
 from typing import Literal
 
-from nessa.capability.readiness import ReadinessState
-from nessa.money import Money
-from nessa.planning.catalogue import (
+from careerwright.capability.readiness import ReadinessState
+from careerwright.money import Money
+from careerwright.planning.catalogue import (
     ActionConcept,
     ActionKind,
     AwardState,
@@ -30,7 +30,7 @@ from nessa.planning.catalogue import (
     WorkPattern,
     WorkPatternKind,
 )
-from nessa.planning.compiler import (
+from careerwright.planning.compiler import (
     Baseline,
     Continuation,
     PlanningInputs,

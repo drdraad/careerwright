@@ -9,9 +9,9 @@ import pytest
 from pydantic import SecretStr
 from pydantic_ai.exceptions import ModelHTTPError
 
-from nessa.identity import connection_check
-from nessa.identity.activity import connection_check_agent, run_connection_check
-from nessa.identity.meta import meta_model
+from careerwright.identity import connection_check
+from careerwright.identity.activity import connection_check_agent, run_connection_check
+from careerwright.identity.meta import meta_model
 
 
 def captured_request() -> tuple[str, dict[str, Any], str]:

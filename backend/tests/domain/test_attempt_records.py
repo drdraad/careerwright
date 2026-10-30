@@ -9,10 +9,10 @@ from datetime import UTC, datetime
 
 import pytest
 
-from nessa.evidence.acquire import AcquisitionResult
-from nessa.evidence.acquisition import _kept_body_checked
-from nessa.evidence.addresses import UrlRefusal
-from nessa.evidence.records import (
+from careerwright.evidence.acquire import AcquisitionResult
+from careerwright.evidence.acquisition import _kept_body_checked
+from careerwright.evidence.addresses import UrlRefusal
+from careerwright.evidence.records import (
     AttemptReason,
     AttemptStatus,
     BodyNotKept,
@@ -22,10 +22,10 @@ from nessa.evidence.records import (
     Retention,
     RightsClass,
 )
-from nessa.migrations.versions import r0017_job_merge_and_claim_integrity as r0017
-from nessa.migrations.versions import r0018_internal_error_reason as r0018
-from nessa.migrations.versions import r0019_only_an_api_says_none as r0019
-from nessa.migrations.versions import r0026_link_detail as r0026
+from careerwright.migrations.versions import r0017_job_merge_and_claim_integrity as r0017
+from careerwright.migrations.versions import r0018_internal_error_reason as r0018
+from careerwright.migrations.versions import r0019_only_an_api_says_none as r0019
+from careerwright.migrations.versions import r0026_link_detail as r0026
 
 BODY = b"<html>synthetic</html>"
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from nessa.localnet import LOOPBACK, client_networks, internal_networks, is_permitted
+from careerwright.localnet import LOOPBACK, client_networks, internal_networks, is_permitted
 
 # /proc/net/route of a container on an internal network (eth0, no gateway) and a normal
 # bridge (eth1, which carries the default route). Addresses are little-endian hex.

@@ -3,7 +3,7 @@
 // Layers are recomputed by peeling and checked against the fixture's expected fronts;
 // a mismatch is logged as a console error, which fails tools/screenshots.mjs.
 (function () {
-  const { FIXTURES: F, state, fmt } = window.NESSA;
+  const { FIXTURES: F, state, fmt } = window.CAREERWRIGHT;
   const SVG = "http://www.w3.org/2000/svg";
   const gbp = (minor) => fmt.gbp(minor);
 
@@ -162,7 +162,7 @@
     lines.push(`<span class="route-name"></span>`);
     if (comp) lines.push(`<span class="route-margin"></span>`);
     // S0-V03: every TRACE-01 route is conditional, so its readiness never stands alone.
-    if (economic) lines.push(`<span class="route-condition status">${window.NESSA.glyph("conditional")}<span class="glyph-text"></span></span>`);
+    if (economic) lines.push(`<span class="route-condition status">${window.CAREERWRIGHT.glyph("conditional")}<span class="glyph-text"></span></span>`);
     lines.push(`<span class="route-figures"></span>`);
     if (economic) lines.push(`<span class="route-detail"></span>`);
     if (comp && comp.others.length) lines.push(`<span class="route-detail" data-others></span>`);

@@ -12,12 +12,12 @@ from urllib.parse import quote
 import pytest
 from pydantic import SecretStr
 
-from nessa.evidence import adzuna
-from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_adzuna, acquire_page
-from nessa.evidence.fetcher import Fetcher
-from nessa.evidence.pages import redact_page
-from nessa.evidence.records import AttemptStatus, BodyNotKept, ClaimField, Retention
-from nessa.evidence.redaction import (
+from careerwright.evidence import adzuna
+from careerwright.evidence.acquire import AcquisitionResult, Pacer, acquire_adzuna, acquire_page
+from careerwright.evidence.fetcher import Fetcher
+from careerwright.evidence.pages import redact_page
+from careerwright.evidence.records import AttemptStatus, BodyNotKept, ClaimField, Retention
+from careerwright.evidence.redaction import (
     CONTACT_REMOVED,
     EMAIL_REMOVED,
     PHONE_REMOVED,
@@ -119,7 +119,7 @@ def test_a_kept_body_its_excerpts_and_its_claims_hold_no_personal_details() -> N
     with source_server({"/jobs/1": Scripted(body=raw)}) as server:
         fetcher = Fetcher(
             resolve=scripted_resolver({"www.gov.uk": [LOOPBACK]}),
-            user_agent="NessaL0/test",
+            user_agent="CareerwrightL0/test",
             extra_allowed=frozenset({("127.0.0.1", server.port)}),
         )
         result = acquire_page(
@@ -147,7 +147,7 @@ def _acquire_kept(body: bytes) -> tuple[AcquisitionResult, bytes]:
     with source_server({"/jobs/1": Scripted(body=body)}) as server:
         fetcher = Fetcher(
             resolve=scripted_resolver({"www.gov.uk": [LOOPBACK]}),
-            user_agent="NessaL0/test",
+            user_agent="CareerwrightL0/test",
             extra_allowed=frozenset({("127.0.0.1", server.port)}),
         )
         result = acquire_page(
@@ -576,7 +576,7 @@ def test_an_api_response_s_claims_hold_no_personal_details(description: str) -> 
     with source_server(routes) as server:
         fetcher = Fetcher(
             resolve=scripted_resolver({"api.adzuna.test.example": [LOOPBACK]}),
-            user_agent="NessaL0/test",
+            user_agent="CareerwrightL0/test",
             extra_allowed=frozenset({("127.0.0.1", server.port)}),
         )
         result = acquire_adzuna(

@@ -10,17 +10,19 @@ from collections.abc import Iterator
 
 import pytest
 
-from nessa.acquisition import AcquisitionService, make_server
-from nessa.evidence.acquire import AcquisitionResult, Pacer
-from nessa.evidence.addresses import IPAddress
-from nessa.evidence.fetcher import Fetcher
-from nessa.evidence.records import AttemptReason, AttemptStatus
+from careerwright.acquisition import AcquisitionService, make_server
+from careerwright.evidence.acquire import AcquisitionResult, Pacer
+from careerwright.evidence.addresses import IPAddress
+from careerwright.evidence.fetcher import Fetcher
+from careerwright.evidence.records import AttemptReason, AttemptStatus
 
 
 @pytest.fixture
 def endpoint() -> Iterator[int]:
     service = AcquisitionService(
-        Fetcher(user_agent="NessaL0/test"), credentials=None, pacer=Pacer(sleep=lambda s: None)
+        Fetcher(user_agent="CareerwrightL0/test"),
+        credentials=None,
+        pacer=Pacer(sleep=lambda s: None),
     )
     server = make_server(service, "127.0.0.1", 0)
     thread = threading.Thread(target=server.serve_forever, args=(0.05,), daemon=True)
@@ -79,7 +81,7 @@ def test_a_defect_while_acquiring_is_a_failed_attempt_never_a_malformed_request(
     # Re-review A M-7: an internal error used to be answered 422, which the client takes for
     # the worker being unavailable (a transient retry).
     service = AcquisitionService(
-        Fetcher(user_agent="NessaL0/test", resolve=_defective_resolve),
+        Fetcher(user_agent="CareerwrightL0/test", resolve=_defective_resolve),
         credentials=None,
         pacer=Pacer(sleep=lambda s: None),
     )

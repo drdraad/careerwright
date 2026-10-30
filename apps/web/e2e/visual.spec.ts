@@ -151,7 +151,7 @@ const FAILED_TURN = {
     failure_class: "invalid_model_output",
     data_mode: "demo",
     synthetic: true,
-    model_id: "nessa-fixture-interviewer-1",
+    model_id: "careerwright-fixture-interviewer-1",
     model_mode: "fixture",
     created_at: "2027-01-01T10:00:00Z",
     started_at: null,
@@ -164,7 +164,7 @@ const FAILED_TURN = {
   decision: null,
 };
 
-/** The API's support panel (`nessa.profile.safety.SUPPORT_NOTE` and its resources). */
+/** The API's support panel (`careerwright.profile.safety.SUPPORT_NOTE` and its resources). */
 const SUPPORT_NOTE = {
   policy_version: "support-policy-7",
   review_status:
@@ -172,7 +172,7 @@ const SUPPORT_NOTE = {
     "are not yet reviewed as built",
   message:
     "If anything you mentioned is about how you are feeling, support is available any time, " +
-    "from people trained to help. Your message was sent to Nessa as usual.",
+    "from people trained to help. Your message was sent to Careerwright as usual.",
   resources: [
     {
       name: "Emergency services",
@@ -298,7 +298,7 @@ const shots = (scratch: Scratch): Shot[] => [
     as: null,
     url: "/sign-in",
     ready: async (page) => {
-      await expect(page.getByRole("heading", { name: "Sign in to Nessa" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Sign in to Careerwright" })).toBeVisible();
     },
   },
   {
@@ -400,7 +400,7 @@ const shots = (scratch: Scratch): Shot[] => [
     context: "note-unavailable",
     url: chapterUrl("you", scratch.talked),
     prepare: noteIn("failed"),
-    ready: slateNote(/The reply didn't pass Nessa's checks twice\. Nothing from it/, true),
+    ready: slateNote(/The reply didn't pass Careerwright's checks twice\. Nothing from it/, true),
   },
   {
     name: "you--slate-note-retry",
@@ -420,7 +420,7 @@ const shots = (scratch: Scratch): Shot[] => [
     prepare: noteRefused("INSUFFICIENT_EVIDENCE", "no_quotable_answer"),
     refused: true, // the intercepted 422 is logged as a failed load
     ready: slateNote(
-      /Your answers can't be quoted on their own\. Nessa didn't ask the model/,
+      /Your answers can't be quoted on their own\. Careerwright didn't ask the model/,
       true,
     ),
   },
@@ -441,7 +441,7 @@ const shots = (scratch: Scratch): Shot[] => [
     ready: async (page) => {
       await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
       await page
-        .getByRole("textbox", { name: "Reply to Nessa" })
+        .getByRole("textbox", { name: "Reply to Careerwright" })
         .fill("I volunteer on a suicide prevention helpline and want paid work like it.");
       await page.getByRole("button", { name: "Send" }).click();
       const note = page.getByRole("region", { name: "Support is available" });
@@ -471,7 +471,9 @@ const shots = (scratch: Scratch): Shot[] => [
       );
     },
     ready: async (page) => {
-      await expect(page.getByText("The reply didn't pass Nessa's checks twice")).toBeVisible();
+      await expect(
+        page.getByText("The reply didn't pass Careerwright's checks twice"),
+      ).toBeVisible();
       await page.getByRole("button", { name: "Try again" }).scrollIntoViewIfNeeded();
     },
   },
@@ -481,7 +483,7 @@ const shots = (scratch: Scratch): Shot[] => [
     url: chapterUrl("you", scratch.live),
     ready: async (page) => {
       await expect(
-        page.getByRole("heading", { name: "Connect your Meta API key to talk with Nessa" }),
+        page.getByRole("heading", { name: "Connect your Meta API key to talk with Careerwright" }),
       ).toBeVisible();
     },
   },
@@ -598,7 +600,7 @@ const shots = (scratch: Scratch): Shot[] => [
     ready: async (page) => {
       await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
       await expect(
-        page.getByRole("alert").getByText("Nessa's service isn't reachable"),
+        page.getByRole("alert").getByText("Careerwright's service isn't reachable"),
       ).toBeVisible();
       await expect(page.getByRole("button", { name: "Try again" })).toBeVisible(); // V-02
       await expect(
@@ -649,7 +651,7 @@ type Result = {
   errors: string[];
 };
 
-const target = process.env.NESSA_REVIEW_DIR;
+const target = process.env.CAREERWRIGHT_REVIEW_DIR;
 
 /**
  * The chosen option of each visible select that is wider than the select can show it: a copy

@@ -1,7 +1,7 @@
 # L0 assessment handover: changes to the specification and the development plan
 
 - Date: 2026-10-28. Branch `l0-local-release`, assessed at commit `cfdae68`.
-- For: the planning agent that maintains `Nessa_Product_Specification.md` (v1.2) and
+- For: the planning agent that maintains `Careerwright_Product_Specification.md` (v1.2) and
   `docs/plan/development-plan.md` (v1.0), and the sprint breakdown
   `docs/plan/l0-sprint-tasks.md`.
 - Source: an altitude, lateral and depth assessment of the two documents against the
@@ -37,12 +37,12 @@
 | Fact | Value | Where |
 |---|---|---|
 | Sprints 0–2 elapsed | 16 hours wall clock (plan: 9–12 engineering days) | `git log` 2026-10-27 21:59 to 2026-10-28 14:18 |
-| Code | backend 14,875 lines + 10,995 test lines; web 11,251 + 1,571 e2e | `backend/src/nessa`, `backend/tests`, `apps/web/src`, `apps/web/e2e` |
+| Code | backend 14,875 lines + 10,995 test lines; web 11,251 + 1,571 e2e | `backend/src/careerwright`, `backend/tests`, `apps/web/src`, `apps/web/e2e` |
 | Register | 52 verified, 260 planned, 7 "not run — requires human", 1 open | `docs/requirements-register.md` |
 | Real-source corpus | 0 of 20 jobs, 0 of 10 courses, 0 of 3 funding pages; rights (OI-07) and label review (OI-08) human, undated | `corpus/manifest.json`, `corpus/README.md` |
 | Live model spend | 24 calls, $0.023 total, test model only | `docs/evidence/live-usage.md` |
 | Fast checks on `cfdae68` | `make check` exit 0: 400 backend tests, mypy clean (175 files), 190 web tests, fixture validator passed | run 2026-10-28 |
-| Numerical core | not started: the route preview replays fixture numbers and says so; `SignedMoney` deferred to the monthly compiler; `NO_ROUTE_IN_BOUNDED_MODEL` defined, no raise site | `apps/web/src/lib/fixtures/trace.ts`, `backend/src/nessa/money.py`, `backend/src/nessa/errors.py` |
+| Numerical core | not started: the route preview replays fixture numbers and says so; `SignedMoney` deferred to the monthly compiler; `NO_ROUTE_IN_BOUNDED_MODEL` defined, no raise site | `apps/web/src/lib/fixtures/trace.ts`, `backend/src/careerwright/money.py`, `backend/src/careerwright/errors.py` |
 | OPT-1 bound | 24 concepts × 2 starts, ≤ 6 selected = 10,161,633 selected sets; the 1,000,000-state cap is under 10% of that | computed; plan Sprint 6 coherence review states the same number |
 | Adzuna | no credentials; live vacancy mode ships "unverified" | ruling R4, `docs/dependencies.md` |
 | Fixture arithmetic | TRACE-01 and the A–I fixture re-derived by hand: fronts match the spec | `docs/evidence/fixture-hand-check.md`, re-checked in this assessment |
@@ -137,7 +137,7 @@ local performance"; Sprint 5 card.
   owner (product owner, session 2).
 
 **P6. Adzuna (optional).** Sprint 3 card and ruling R4.
-- Change: if developer credentials are registered and stored under `NESSA_HOME` before
+- Change: if developer credentials are registered and stored under `CAREERWRIGHT_HOME` before
   Task 7, S3.3 qualifies the live integration; otherwise the card is unchanged. External
   data, still a local run.
 
@@ -251,7 +251,7 @@ Listed so they are not re-adopted from the other assessment.
 | Simplify the durable core now (drop streaming partials, reduce permission checks, replace spend accounting) | Each part is an M0 requirement retained locally (section 6). The other assessment itself concluded "do nothing here until the solver lands". |
 | Require the spec's 10–15 person concierge design for any comprehension study | That study is M1. L0's design is the plan's five formative sessions; P5 adds one earlier formative session, not a study. |
 | Remove fixture numbers from the product path entirely | The demo workspace is fixture content by design, labelled. The rule is confinement, not removal. |
-| A "quote pass" on the register, live usage, proxy and CSP | Done in this assessment: every FIN1, TIME1, OPT1 and RDY1 row is `planned`; 24 live entries; the forwarder is a pass-through, Host is checked against `NESSA_WEB_ALLOWED_HOSTS`, the CSP is `connect-src 'self'` plus the Auth emulator with `frame-ancestors 'none'`, tested. Nothing contradicted either assessment. |
+| A "quote pass" on the register, live usage, proxy and CSP | Done in this assessment: every FIN1, TIME1, OPT1 and RDY1 row is `planned`; 24 live entries; the forwarder is a pass-through, Host is checked against `CAREERWRIGHT_WEB_ALLOWED_HOSTS`, the CSP is `connect-src 'self'` plus the Auth emulator with `frame-ancestors 'none'`, tested. Nothing contradicted either assessment. |
 
 ## 8 Evidence pointers
 
@@ -262,8 +262,8 @@ Listed so they are not re-adopted from the other assessment.
 - Spend: `docs/evidence/live-usage.md` rows 1–24, running total $0.023098.
 - Fast checks: `make check` on `cfdae68`, exit 0.
 - Numerical core absent: the module docstrings of `apps/web/src/lib/fixtures/trace.ts` and
-  `backend/src/nessa/money.py`; `NO_ROUTE_IN_BOUNDED_MODEL` referenced only in
-  `backend/src/nessa/errors.py` and `apps/web/src/lib/vocabulary.ts`.
+  `backend/src/careerwright/money.py`; `NO_ROUTE_IN_BOUNDED_MODEL` referenced only in
+  `backend/src/careerwright/errors.py` and `apps/web/src/lib/vocabulary.ts`.
 - OPT-1 bound: Σ_{k=0..6} C(24,k)·2^k = 10,161,633, matching the plan's Sprint 6 coherence
   review.
 - Spec lines relied on: section 4 streaming and validation (line 299); section 16 key
@@ -277,7 +277,7 @@ Listed so they are not re-adopted from the other assessment.
 
 ## 9 Done when
 
-- [ ] `Nessa_Product_Specification.md` is v1.3: S1–S3 applied as section 1 directs;
+- [ ] `Careerwright_Product_Specification.md` is v1.3: S1–S3 applied as section 1 directs;
       section 22 has the v1.3 table; nothing else changed.
 - [ ] `docs/plan/development-plan.md` is v1.1: P1–P8 applied; roadmap has the human review
       hours column; Sprint 3, 4, 5, 6a and 6b cards updated.

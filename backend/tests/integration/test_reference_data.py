@@ -13,15 +13,15 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from nessa.api.app import create_app
-from nessa.api.deps import ApiDependencies
-from nessa.catalogue.esco import ESCO_RELEASE, concept_id
-from nessa.catalogue.pay import MappingReview, MappingReviewPack
-from nessa.catalogue.reference import DATASETS, ReferenceMismatchError
-from nessa.catalogue.releases import ReleaseIntegrityError
-from nessa.cli import import_reference_data, import_taxonomy, migrate_app, seed
-from nessa.db import create_engine
-from nessa.seed import FIXTURE_WORKSPACE_ID
+from careerwright.api.app import create_app
+from careerwright.api.deps import ApiDependencies
+from careerwright.catalogue.esco import ESCO_RELEASE, concept_id
+from careerwright.catalogue.pay import MappingReview, MappingReviewPack
+from careerwright.catalogue.reference import DATASETS, ReferenceMismatchError
+from careerwright.catalogue.releases import ReleaseIntegrityError
+from careerwright.cli import import_reference_data, import_taxonomy, migrate_app, seed
+from careerwright.db import create_engine
+from careerwright.seed import FIXTURE_WORKSPACE_ID
 from tests.support import reference_data as samples
 from tests.support.client import ApiClient, profile_with
 from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
@@ -62,7 +62,7 @@ def test_each_dataset_s_manifest_records_its_release_licence_hash_and_versions(
     rows = infra.query(
         "SELECT dataset, dataset_id, sha256, size_bytes, licence, attribution, sample, "
         "native_code_version, transformation_version, record_count, counts "
-        "FROM nessa.reference_releases ORDER BY dataset"
+        "FROM careerwright.reference_releases ORDER BY dataset"
     )
 
     assert [r["dataset"] for r in rows] == sorted(d.name for d in DATASETS)
@@ -72,7 +72,7 @@ def test_each_dataset_s_manifest_records_its_release_licence_hash_and_versions(
         assert row["licence"]
         assert row["attribution"]
         assert row["native_code_version"].endswith("synthetic test sample")
-        assert row["transformation_version"].startswith("nessa-")
+        assert row["transformation_version"].startswith("careerwright-")
         assert len(row["sha256"]) == 64
     by_name = {r["dataset"]: r for r in rows}
     assert by_name["ashe"]["licence"] == "Open Government Licence v3.0"  # session 1, line A2
@@ -90,7 +90,7 @@ def test_each_dataset_s_manifest_records_its_release_licence_hash_and_versions(
 def test_an_import_is_kept_once_and_another_release_of_a_dataset_is_refused(
     infra: Infra, tmp_path: Path
 ) -> None:
-    database = f"nessa_reference_{uuid.uuid4().hex[:8]}"
+    database = f"careerwright_reference_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     owner = migrator_engine(infra, database)
     try:
@@ -101,7 +101,7 @@ def test_an_import_is_kept_once_and_another_release_of_a_dataset_is_refused(
         altered.write_bytes(files[0][1].read_bytes() + b"x")
         with pytest.raises(ReleaseIntegrityError):  # not the pinned bytes: nothing imported
             import_reference_data(owner, [(files[0][0], altered)])
-        assert infra.query("SELECT * FROM nessa.reference_releases", database=database) == []
+        assert infra.query("SELECT * FROM careerwright.reference_releases", database=database) == []
         assert set(import_reference_data(owner, files).values()) == {"imported"}
         assert set(import_reference_data(owner, files).values()) == {"already imported"}
         other = [
@@ -276,7 +276,7 @@ def test_without_reference_data_the_evidence_is_unavailable_never_empty(
     infra: Infra, api_deps: ApiDependencies, ada: str
 ) -> None:
     # Fix round 1, B-M9 (GC6): a database holding ESCO but none of the reference datasets.
-    database = f"nessa_noref_{uuid.uuid4().hex[:8]}"
+    database = f"careerwright_noref_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     owner = migrator_engine(infra, database)
     try:
@@ -357,7 +357,7 @@ def test_the_pinned_files_import_with_their_documented_counts(infra: Infra) -> N
     missing = [str(path) for _, path in files if not path.is_file()]
     assert not missing, f"run `make setup` first: {missing}"
     esco = Path(DATASETS_DIR) / ESCO_RELEASE.file_name
-    database = f"nessa_pinned_{uuid.uuid4().hex[:8]}"
+    database = f"careerwright_pinned_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     owner = migrator_engine(infra, database)
     try:
@@ -368,7 +368,7 @@ def test_the_pinned_files_import_with_their_documented_counts(infra: Infra) -> N
         owner.dispose()
 
     rows = infra.query(
-        "SELECT dataset, record_count, counts, sample FROM nessa.reference_releases "
+        "SELECT dataset, record_count, counts, sample FROM careerwright.reference_releases "
         "ORDER BY dataset",
         database=database,
     )
@@ -386,7 +386,8 @@ def test_the_pinned_files_import_with_their_documented_counts(infra: Infra) -> N
         "task_usage": (3_364, {}, False),
     }
     [regions] = infra.query(
-        "SELECT count(DISTINCT region_code) AS n FROM nessa.ashe_estimates", database=database
+        "SELECT count(DISTINCT region_code) AS n FROM careerwright.ashe_estimates",
+        database=database,
     )
     assert regions["n"] == 11  # England's nine regions, Wales and Scotland: never a city
     # Fix round 2 (re-review 1-A N1): the 2026 provisional Table 15 (4) publishes no
@@ -397,7 +398,7 @@ def test_the_pinned_files_import_with_their_documented_counts(infra: Infra) -> N
         "SELECT count(*) FILTER (WHERE key LIKE 'p%%') AS percentile_cells, "
         "count(*) FILTER (WHERE value <> 'null'::jsonb AND key LIKE 'p%%') AS percentiles, "
         "count(*) FILTER (WHERE value <> 'null'::jsonb AND key = 'median') AS medians "
-        "FROM nessa.ashe_estimates, jsonb_each(figures)",
+        "FROM careerwright.ashe_estimates, jsonb_each(figures)",
         database=database,
     )
     assert published == {

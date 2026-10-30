@@ -42,7 +42,7 @@ export function useWorkspaceData(): WorkspaceData {
   return value;
 }
 
-const CALM_KEY = "nessa.calm";
+const CALM_KEY = "careerwright.calm";
 
 /** Calm mode is a per-viewer convenience; storage may be unavailable, which only loses it. */
 function useCalmMode(): [boolean, (calm: boolean) => void] {
@@ -73,7 +73,7 @@ function useCalmMode(): [boolean, (calm: boolean) => void] {
  * session storage; unavailable storage only forgets the marks).
  */
 function useVisited(workspaceId: string, chapter: ChapterId): ReadonlySet<ChapterId> {
-  const key = `nessa.visited.${workspaceId}`;
+  const key = `careerwright.visited.${workspaceId}`;
   const [visited, setVisited] = useState<ReadonlySet<ChapterId>>(new Set([chapter]));
   useEffect(() => {
     let stored: ChapterId[] = [];
@@ -148,7 +148,7 @@ export function WorkspaceShell({
   const visited = useVisited(workspaceId, chapter);
 
   if (auth.state.status !== "signed_in") return <PageLoading stage="Checking your sign-in" />;
-  // Only a first load that fails replaces the shell. A failed refresh (Nessa restarting) keeps
+  // Only a first load that fails replaces the shell. A failed refresh (Careerwright restarting) keeps
   // what was last loaded on screen and says so in the strip; the next event refreshes it.
   if (firstLoadFailed(me, workspace)) {
     const error = me.error ?? workspace.error;

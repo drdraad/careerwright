@@ -108,7 +108,7 @@ export function YouChapter({
     ? "Paused: resume to send."
     : (unavailable ??
       (latest !== undefined && turnRunning(latest)
-        ? "Nessa is still replying."
+        ? "Careerwright is still replying."
         : sender.pending
           ? "Sending…"
           : undefined));

@@ -1,8 +1,8 @@
 """Create the local runtime configuration outside the repository, safely (plan: `make setup`).
 
-`NESSA_HOME` (default `~/.nessa/l0`) holds generated database passwords and the versioned
-master keys. Both directories are owner-only (0700) and every file 0600. Existing files are
-never overwritten: replacing a master key would make every stored credential unreadable, and
+`CAREERWRIGHT_HOME` (default `~/.careerwright/l0`) holds generated database passwords and the
+versioned master keys. Both directories are owner-only (0700) and every file 0600. Existing files
+are never overwritten: replacing a master key would make every stored credential unreadable, and
 replacing a password would no longer match the database volume. Nothing here is printed.
 
 Run: `uv run python -m tools.localenv`. Master-key rotation is `make rotate-master-key` only.
@@ -16,9 +16,9 @@ import stat
 import sys
 from pathlib import Path
 
-from nessa.identity.keyring import KEY_BYTES
+from careerwright.identity.keyring import KEY_BYTES
 
-DEFAULT_HOME = Path.home() / ".nessa" / "l0"
+DEFAULT_HOME = Path.home() / ".careerwright" / "l0"
 PASSWORD_NAMES = (
     "pg_superuser",
     "pg_migrator",
@@ -30,8 +30,8 @@ PASSWORD_NAMES = (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def nessa_home() -> Path:
-    return Path(os.environ.get("NESSA_HOME", DEFAULT_HOME)).expanduser().resolve()
+def careerwright_home() -> Path:
+    return Path(os.environ.get("CAREERWRIGHT_HOME", DEFAULT_HOME)).expanduser().resolve()
 
 
 def _private_dir(path: Path) -> None:
@@ -57,7 +57,8 @@ def _key_versions(keys: Path) -> list[int]:
 ADZUNA_DIR = "adzuna"
 # The Adzuna credentials' names in the repository `.env`, as the product owner wrote them
 # (ruling R4; controller ruling, fix round 5), and the files the acquisition worker reads
-# them from (`nessa.acquisition`; `test_the_acquisition_worker_reads_the_files_setup_places`).
+# them from (`careerwright.acquisition`;
+# `test_the_acquisition_worker_reads_the_files_setup_places`).
 ADZUNA_ENV = {
     "ADZUNA_APPLICATION_ID": "adzuna_application_id",
     "ADZUNA_API_KEY": "adzuna_api_key",
@@ -68,7 +69,7 @@ ENV_FILE = REPO_ROOT / ".env"
 def ensure_local_home(home: Path) -> list[str]:
     """Create whatever is missing; return the names of files created (never their contents)."""
     if home.is_relative_to(REPO_ROOT):
-        raise SystemExit(f"NESSA_HOME must be outside the repository ({REPO_ROOT})")
+        raise SystemExit(f"CAREERWRIGHT_HOME must be outside the repository ({REPO_ROOT})")
     created: list[str] = []
     for directory in (home, home / "secrets", home / "keys", home / ADZUNA_DIR):
         _private_dir(directory)
@@ -116,7 +117,7 @@ def env_names_containing(env_file: Path, fragment: str) -> list[str]:
 
 
 def place_adzuna_credentials(home: Path, env_file: Path = ENV_FILE) -> str:
-    """Copy the Adzuna credentials from `.env` into NESSA_HOME (owner-only), where only the
+    """Copy the Adzuna credentials from `.env` into CAREERWRIGHT_HOME (owner-only), where only the
     acquisition worker's container reads them. Returns what happened, never a value: both
     are needed, and a name that is absent is reported as such, never guessed."""
     values = _env_values(env_file, tuple(ADZUNA_ENV))
@@ -132,7 +133,7 @@ def place_adzuna_credentials(home: Path, env_file: Path = ENV_FILE) -> str:
         path.unlink(missing_ok=True)
         _write_new(path, values[name].encode())
     check_permissions(home)
-    return "placed in NESSA_HOME/adzuna"
+    return "placed in CAREERWRIGHT_HOME/adzuna"
 
 
 def adzuna_configured(home: Path) -> bool:
@@ -165,7 +166,7 @@ def check_permissions(home: Path) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     argparse.ArgumentParser(description=__doc__).parse_args(argv)
-    home = nessa_home()
+    home = careerwright_home()
     created = ensure_local_home(home)
     print(f"local configuration: {home} ({', '.join(created) or 'already complete'})")
     sys.stdout.flush()

@@ -9,14 +9,14 @@ from pathlib import Path
 import pytest
 import sqlalchemy as sa
 
-from nessa.cli import ResealIncompleteError, migrate_app, reseal, seed
-from nessa.evidence import store as evidence_store
-from nessa.evidence.acquisition import document_context
-from nessa.identity import credential_store
-from nessa.identity.credentials import credential_context
-from nessa.identity.keyring import Keyring, MasterKeyError, SealedValue, load_keyring
-from nessa.identity.runs import input_context, output_context, partial_context
-from nessa.seed import FIXTURE_OWNER
+from careerwright.cli import ResealIncompleteError, migrate_app, reseal, seed
+from careerwright.evidence import store as evidence_store
+from careerwright.evidence.acquisition import document_context
+from careerwright.identity import credential_store
+from careerwright.identity.credentials import credential_context
+from careerwright.identity.keyring import Keyring, MasterKeyError, SealedValue, load_keyring
+from careerwright.identity.runs import input_context, output_context, partial_context
+from careerwright.seed import FIXTURE_OWNER
 from tests.support.infra import Infra, migrator_engine
 from tools.localenv import add_master_key_version, ensure_local_home
 
@@ -25,7 +25,7 @@ pytestmark = pytest.mark.integration
 
 def add_workspace(tx: sa.Connection) -> uuid.UUID:
     workspace: uuid.UUID = tx.exec_driver_sql(
-        "INSERT INTO nessa.workspaces (workspace_id, owner_actor_id, name, data_mode, "
+        "INSERT INTO careerwright.workspaces (workspace_id, owner_actor_id, name, data_mode, "
         "synthetic) VALUES (gen_random_uuid(), %(owner)s, 'Rotation', 'live_assisted', "
         "true) RETURNING workspace_id",
         {"owner": FIXTURE_OWNER.actor_id},
@@ -38,14 +38,16 @@ def add_sealed_output(
 ) -> uuid.UUID:
     run_id, output_id = uuid.uuid4(), uuid.uuid4()
     tx.exec_driver_sql(
-        "INSERT INTO nessa.runs (run_id, workspace_id, data_mode, synthetic, kind, requested_by, "
+        "INSERT INTO careerwright.runs (run_id, workspace_id, data_mode, synthetic, kind, "
+        "requested_by, "
         "model_id, model_mode, status) VALUES (%(run)s, %(ws)s, 'live_assisted', true, "
         "'connection_check', %(owner)s, 'muse-spark-1.3-contributor', 'contributor', 'running')",
         {"run": run_id, "ws": workspace, "owner": FIXTURE_OWNER.actor_id},
     )
     sealed = keyring.seal(text.encode(), output_context(workspace, output_id))
     tx.exec_driver_sql(
-        "INSERT INTO nessa.run_outputs (output_id, run_id, workspace_id, key_version, nonce, "
+        "INSERT INTO careerwright.run_outputs (output_id, run_id, workspace_id, key_version, "
+        "nonce, "
         "ciphertext, content_sha256) VALUES (%(out)s, %(run)s, %(ws)s, %(v)s, %(n)s, %(c)s, "
         "repeat('0', 64))",
         {
@@ -65,7 +67,8 @@ def add_sealed_input(
 ) -> uuid.UUID:
     run_id = uuid.uuid4()
     tx.exec_driver_sql(
-        "INSERT INTO nessa.runs (run_id, workspace_id, data_mode, synthetic, kind, requested_by, "
+        "INSERT INTO careerwright.runs (run_id, workspace_id, data_mode, synthetic, kind, "
+        "requested_by, "
         "model_id, model_mode, status, profile_version) VALUES (%(run)s, %(ws)s, "
         "'live_assisted', true, 'interview_turn', %(owner)s, 'muse-spark-1.3-contributor', "
         "'contributor', 'queued', 0)",
@@ -73,7 +76,8 @@ def add_sealed_input(
     )
     sealed = keyring.seal(text.encode(), input_context(workspace, run_id))
     tx.exec_driver_sql(
-        "INSERT INTO nessa.run_inputs (run_id, workspace_id, key_version, nonce, ciphertext) "
+        "INSERT INTO careerwright.run_inputs (run_id, workspace_id, key_version, nonce, "
+        "ciphertext) "
         "VALUES (%(run)s, %(ws)s, %(v)s, %(n)s, %(c)s)",
         {
             "run": run_id,
@@ -88,11 +92,12 @@ def add_sealed_input(
 
 def add_sealed_partial(tx: sa.Connection, keyring: Keyring, run_id: uuid.UUID, text: str) -> None:
     workspace = tx.exec_driver_sql(
-        "SELECT workspace_id FROM nessa.runs WHERE run_id = %(run)s", {"run": run_id}
+        "SELECT workspace_id FROM careerwright.runs WHERE run_id = %(run)s", {"run": run_id}
     ).scalar_one()
     sealed = keyring.seal(text.encode(), partial_context(workspace, run_id))
     tx.exec_driver_sql(
-        "INSERT INTO nessa.run_partials (run_id, workspace_id, seq, completeness, key_version, "
+        "INSERT INTO careerwright.run_partials (run_id, workspace_id, seq, completeness, "
+        "key_version, "
         "nonce, ciphertext) VALUES (%(run)s, %(ws)s, 1, 'streaming', %(v)s, %(n)s, %(c)s)",
         {
             "run": run_id,
@@ -110,7 +115,8 @@ def add_sealed_document(
     """A pasted text's sealed body (Task 7A): the attempt and its document."""
     attempt_id = uuid.uuid4()
     tx.exec_driver_sql(
-        "INSERT INTO nessa.source_attempts (attempt_id, workspace_id, route, provider, status, "
+        "INSERT INTO careerwright.source_attempts (attempt_id, workspace_id, route, provider, "
+        "status, "
         "content_sha256, retention, created_by, finished_at) VALUES (%(id)s, %(ws)s, "
         "'pasted_text', 'pasted_text', 'succeeded', repeat('0', 64), 'body', %(owner)s, now())",
         {"id": attempt_id, "ws": workspace, "owner": FIXTURE_OWNER.actor_id},
@@ -127,7 +133,7 @@ def add_sealed_document(
 
 @pytest.fixture
 def rotation(infra: Infra, tmp_path: Path) -> tuple[Infra, str, Path]:
-    database = f"nessa_rotation_{uuid.uuid4().hex[:8]}"
+    database = f"careerwright_rotation_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     home = tmp_path / "home"
     ensure_local_home(home)
@@ -190,7 +196,7 @@ def test_resealing_moves_every_sealed_record_to_the_new_master_key_version(
     assert set(again.values()) == {0}
     for row in infra.query(
         "SELECT attempt_id, workspace_id, key_version, nonce, ciphertext "
-        "FROM nessa.source_documents",
+        "FROM careerwright.source_documents",
         database=database,
     ):
         assert row["key_version"] == 2
@@ -204,7 +210,8 @@ def test_resealing_moves_every_sealed_record_to_the_new_master_key_version(
     (home / "keys" / "v1.key").unlink()
     only_new = load_keyring(home / "keys")
     for row in infra.query(
-        "SELECT credential_id, workspace_id, key_version, nonce, ciphertext FROM nessa.credentials",
+        "SELECT credential_id, workspace_id, key_version, nonce, ciphertext FROM "
+        "careerwright.credentials",
         database=database,
     ):
         assert row["key_version"] == 2
@@ -212,7 +219,8 @@ def test_resealing_moves_every_sealed_record_to_the_new_master_key_version(
         context = credential_context(row["workspace_id"], row["credential_id"])
         assert only_new.open(sealed, context).decode() == keys[row["credential_id"]]
     for row in infra.query(
-        "SELECT output_id, workspace_id, key_version, nonce, ciphertext FROM nessa.run_outputs",
+        "SELECT output_id, workspace_id, key_version, nonce, ciphertext FROM "
+        "careerwright.run_outputs",
         database=database,
     ):
         assert row["key_version"] == 2
@@ -220,7 +228,7 @@ def test_resealing_moves_every_sealed_record_to_the_new_master_key_version(
         context = output_context(row["workspace_id"], row["output_id"])
         assert only_new.open(sealed, context).decode() == outputs[row["output_id"]]
     for row in infra.query(
-        "SELECT run_id, workspace_id, key_version, nonce, ciphertext FROM nessa.run_inputs",
+        "SELECT run_id, workspace_id, key_version, nonce, ciphertext FROM careerwright.run_inputs",
         database=database,
     ):
         assert row["key_version"] == 2
@@ -228,7 +236,8 @@ def test_resealing_moves_every_sealed_record_to_the_new_master_key_version(
         opened = only_new.open(sealed, input_context(row["workspace_id"], row["run_id"]))
         assert opened.decode() == inputs[row["run_id"]]
     for row in infra.query(
-        "SELECT run_id, workspace_id, key_version, nonce, ciphertext FROM nessa.run_partials",
+        "SELECT run_id, workspace_id, key_version, nonce, ciphertext FROM "
+        "careerwright.run_partials",
         database=database,
     ):
         assert row["key_version"] == 2
@@ -249,8 +258,10 @@ def test_reseal_refuses_to_report_success_while_any_sealed_table_holds_an_old_ve
     engine = migrator_engine(infra, database)
     try:
         with engine.begin() as tx:
-            tx.exec_driver_sql("CREATE TABLE nessa.future_sealed (key_version integer NOT NULL)")
-            tx.exec_driver_sql("INSERT INTO nessa.future_sealed VALUES (1)")
+            tx.exec_driver_sql(
+                "CREATE TABLE careerwright.future_sealed (key_version integer NOT NULL)"
+            )
+            tx.exec_driver_sql("INSERT INTO careerwright.future_sealed VALUES (1)")
         add_master_key_version(home)
         with pytest.raises(ResealIncompleteError, match="future_sealed"):
             reseal(engine, load_keyring(home / "keys"))

@@ -20,7 +20,7 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
 
 ## Decisions
 
-1. **A restricted acquisition worker, without a database.** `python -m nessa.acquisition`
+1. **A restricted acquisition worker, without a database.** `python -m careerwright.acquisition`
    is a small standard-library HTTP service on its own internal Compose network,
    `acquisition`, which it shares with the DBOS worker alone: it listens without
    authentication, so no other container (the API, the web app, Auth, the edge, PostgreSQL)
@@ -33,7 +33,7 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    which holds the database role and the master key, calls it and records the result. In
    live mode (`compose.live.yaml`) the acquisition worker and the DBOS worker alone have a
    route out; in demo mode neither does. Proven four ways: the import closure of
-   `nessa.acquisition` reaches no store, keyring, Meta, profile or API module
+   `careerwright.acquisition` reaches no store, keyring, Meta, profile or API module
    (`test_the_acquisition_worker_cannot_reach_a_database_key_model_or_profile`), its
    settings have three fields, on the running container its only mount is the Adzuna
    directory, `/run/secrets` does not exist and no environment name mentions a database,
@@ -45,13 +45,13 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    A new database role was rejected: the init script that creates roles runs only on a new
    volume, so existing installations would not get it.
 
-2. **Scrapling parses; Nessa's own client retrieves.** Scrapling 0.4.15 and
+2. **Scrapling parses; Careerwright's own client retrieves.** Scrapling 0.4.15 and
    0.5 import Playwright, Patchright and browserforge when their HTTP fetcher is imported
    (`scrapling/engines/toolbelt/convertor.py`, `fingerprints.py`), and `make check` excludes
    Playwright from the backend (spec section 6: no browser rendering). So Scrapling 0.4.15's
    parser (`scrapling.parser.Selector`, BSD-3-Clause; lxml, cssselect, orjson, tld, w3lib) is
    the only scraper code used, adaptive relocation off, and retrieval is
-   `nessa.evidence.fetcher` on the HTTP core already in the lock (`httpcore2`). That client
+   `careerwright.evidence.fetcher` on the HTTP core already in the lock (`httpcore2`). That client
    also does what Scrapling's curl-based fetcher does not expose: it connects to the very
    address it checked. Spec section 6 says M0 "calls its HTTP fetch/parse capability"; this
    keeps Scrapling as the one scraper and parser and replaces only the transport. Decided
@@ -96,7 +96,7 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    with what is left of the bound, and if its next slot is further away the hop fails as a
    transient `timeout` at once, with no wait and no slot taken (addendum, re-review A M-2). HTML only for pages, JSON
    for Adzuna. robots.txt is read first for each origin and obeyed for the token
-   `NessaL0` by Nessa's own RFC 9309 matcher (`fetcher.parse_robots`; `urllib.robotparser`
+   `CareerwrightL0` by Careerwright's own RFC 9309 matcher (`fetcher.parse_robots`; `urllib.robotparser`
    was replaced in fix round 1 because it ignores `*` and `$` and takes the first matching
    rule): the groups naming the token without regard to case, else the `*` groups,
    combined; the matching rule with the most octets decides, an allow rule winning a tie;
@@ -108,7 +108,7 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    whose one origin is the fetcher's only extra allowance (`test_fetcher.py`, 36 cases).
 
 4. **The source permission manifest and the rights policy as code (OI-11).**
-   `backend/src/nessa/evidence/sources.json` lists hosts with their session 1 class, access
+   `backend/src/careerwright/evidence/sources.json` lists hosts with their session 1 class, access
    (permitted, API only, denied with the reason), rate limit, retained fields, attribution
    and the terms relied on with the date read (GOV.UK and the National Careers Service:
    the OGL footer; Adzuna: its API terms; LinkedIn and Indeed denied). A page's class comes
@@ -133,7 +133,7 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    Session 1's "always true" clause ("a third party's personal details (recruiter names,
    phone numbers) never kept") binds everything kept: bodies, excerpts and claim values
    (controller ruling, fix round 1, review A M6). So before a page, an API response or a
-   pasted text is hashed for spans, parsed or sealed, `nessa.evidence.redaction` removes,
+   pasted text is hashed for spans, parsed or sealed, `careerwright.evidence.redaction` removes,
    deterministically, email addresses written as plain addresses and telephone numbers in
    UK national (10 or 11 digits from a leading 0) or international (`+`, 8 to 15 digits)
    form, their groups separated by any horizontal space (no-break, narrow and thin spaces
@@ -267,7 +267,7 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    fetching is joined; one that failed recently waits out a back-off of a minute, doubling,
    at most an hour.
 
-8. **The acquisition workflow.** `nessa.acquisition_run` (DBOS): one step per target, then
+8. **The acquisition workflow.** `careerwright.acquisition_run` (DBOS): one step per target, then
    publication. The journal holds the run ID, positions and `{status, attempt_id}`
    outcomes; never a URL, page or credential. The target step owns the bounded retries
    (spec section 6): a transient source failure, the acquisition worker unreachable or the
@@ -320,7 +320,7 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
    status. Every 202 names the runs whose cancellation it asked for
    (`cancellation_requested`, fix round 4). The model workflow's step sequence is
    unchanged and the acquisition workflow is new, so the DBOS `application_version` stays
-   `nessa-l0-1`.
+   `careerwright-l0-1`.
 
     **Writes without an expected version (controller ruling 11; fix round 1, review B
     M10).** Every write here goes through `run_idempotent` with an `Idempotency-Key`, but
@@ -340,7 +340,7 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
     `user_supplied`, its job an `exemplar`: the person's example of a target, at most three
     per target, never a live vacancy (freshness `never_verified`).
 
-11. **Adzuna (R4; controller ruling).** The adapter (`nessa.evidence.adzuna`) records the
+11. **Adzuna (R4; controller ruling).** The adapter (`careerwright.evidence.adzuna`) records the
     request without `app_id` and `app_key` and builds the credentialed URL only for the one
     HTTP call; `redact` strips them from any URL. Adzuna's landing links may carry the app
     id as a parameter's value (`utm_source`), so the acquisition worker, which holds it,
@@ -355,7 +355,7 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
     clearly allow keeping more, so it is class `job-board`: hash and excerpts only. `make
     setup` copies the credentials from `.env`, under the names the product owner used
     (`ADZUNA_APPLICATION_ID`, `ADZUNA_API_KEY`; controller ruling, fix round 5, with no alias
-    for the names Task 7A first read), into `NESSA_HOME/adzuna/` without printing them;
+    for the names Task 7A first read), into `CAREERWRIGHT_HOME/adzuna/` without printing them;
     the acquisition worker is the only container that mounts them (the one credential it may
     hold, GC8); the API knows only whether they are there, to allow live-vacancy workspaces.
 
@@ -410,9 +410,9 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
       (`PAGE_EXTRACTION_TASK`; one `RunTask`, no second call path), started by the
       acquisition in the transaction that records the page, at most
       `MAX_EXTRACTIONS_PER_ACQUISITION` (5) per acquisition, through
-      `nessa.submit_page_extraction` (migration 0021), the worker's only way to start a run:
+      `careerwright.submit_page_extraction` (migration 0021), the worker's only way to start a run:
       it checks that the attempt is its own run's page that extraction may read and holds
-      the same cap. Each is an ordinary model run (its own outbox entry, `nessa.model_run`
+      the same cap. Each is an ordinary model run (its own outbox entry, `careerwright.model_run`
       workflow, reservation, the requester's own model and key, two requests at most with
       `RepairBound`): worst case $0.0034 on the test model and $0.048 on the production
       model, so three attempts fit the default $0.15 run limit. A page not handed over keeps
@@ -497,7 +497,7 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
       again records nothing).
     - *Input and retention.* The sealed input is that text, marked in the prompt as
       untrusted data. It is erased once the run is terminal, whatever its outcome, by
-      `nessa.erase_run_input` (`RunTask.erases_input`), even after the requester's access
+      `careerwright.erase_run_input` (`RunTask.erases_input`), even after the requester's access
       ends; for every class, not only those whose body may not be kept, since a kept class
       keeps its body anyway. What remains is the text's hash (`page_extractions.text_sha256`,
       which every claim's span cites), the verified spans and their excerpts of at most 200
@@ -546,7 +546,7 @@ dates, freshness). Session 1 set the rights policy for what may be kept.
       (`test_page_extraction.py::test_page_text_that_instructs_the_model_changes_nothing_outside_its_run`).
     - *Workflows.* Extraction runs are ordinary model runs and the acquisition step does more
       inside itself, so no workflow's step sequence changes: DBOS `application_version`
-      stays `nessa-l0-1`.
+      stays `careerwright-l0-1`.
 
 ## Evidence
 
@@ -558,7 +558,7 @@ candidate proposed); `make live-extract` once on the test model (ledger row 31: 
 on the synthetic fixture page, 700 input and 460 output tokens, $0.000162; one posting, all
 nine fields approved as `model`, none dropped, the page's own instruction not followed;
 leak scan clean); `make live-adzuna` once on 2026-10-29 (fix round 5), after it had named
-the Adzuna-named variables `.env` sets (names only) and the controller ruled that Nessa reads
+the Adzuna-named variables `.env` sets (names only) and the controller ruled that Careerwright reads
 those names: two free-tier requests through the adapter's own code, both 200 (ledger rows
 32–33, $0); 40 adverts of 68 matching, 39 distinct jobs; pay basis 26 advertised and 14
 predicted, none with a period; snippets only; 4 agency adverts; 357 claims; the scan of the
@@ -588,12 +588,12 @@ results, the ledger rows it wrote and the ledger table found no credential.
   reproduction, the cancel, so the person had to cancel again; an ended worker transaction
   is repeated by its retry owner). The cancel now records its requests before it locks the
   workspace's row, and reads its runs again once it holds it (fix round 1). No workflow's
-  step sequence changed: DBOS `application_version` stays `nessa-l0-1`.
+  step sequence changed: DBOS `application_version` stays `careerwright-l0-1`.
 - The live search proposed no candidate in two tries; candidate quality is unqualified.
 - The Adzuna live integration is qualified on the free tier by `make live-adzuna` (two
   requests, above). A live-vacancy workspace also needs `make setup` to place the
   credentials for the acquisition worker; that path is covered by unit tests (setup's files
-  are the ones the worker loads) and was not run against `NESSA_HOME` in fix round 5.
+  are the ones the worker loads) and was not run against `CAREERWRIGHT_HOME` in fix round 5.
 - A new error code (`RUN_FINISHED`), failure classes (`retrieval_failed`,
   `source_blocked`), event kinds (`run.cancel_requested`, `research.updated`) and run kinds
   (`acquisition`, `source_search`, and in fix round 2 `page_extraction`); migrations 0013

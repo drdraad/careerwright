@@ -61,10 +61,10 @@ def start_worker(
     """`acquisition_url`: a test-started acquisition worker for the DBOS worker to call."""
     env = {
         **infra.worker_env(),
-        "NESSA_WORKER_HEARTBEAT": str(log_path.with_suffix(".heartbeat")),
+        "CAREERWRIGHT_WORKER_HEARTBEAT": str(log_path.with_suffix(".heartbeat")),
         "PYDANTIC_AI_NO_BANNER": "1",
-        **({"NESSA_ACQUISITION_URL": acquisition_url} if acquisition_url else {}),
-        **{f"NESSA_TEST_{name.upper()}": value for name, value in settings.items()},
+        **({"CAREERWRIGHT_ACQUISITION_URL": acquisition_url} if acquisition_url else {}),
+        **{f"CAREERWRIGHT_TEST_{name.upper()}": value for name, value in settings.items()},
     }
     log = log_path.open("ab")
     process = subprocess.Popen(

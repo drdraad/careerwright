@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from nessa.api.app import openapi_document
+from careerwright.api.app import openapi_document
 
 RESPONSE = "OptionsOut"
 

@@ -15,7 +15,7 @@ const sandbox = { window: {} };
 runInNewContext(readFileSync(join(designRoot, "compositions/data.js"), "utf8"), sandbox);
 // Round-trip through JSON: arrays built inside the vm context have another realm's
 // prototype, which deepStrictEqual treats as unequal.
-const f = JSON.parse(JSON.stringify(sandbox.window.NESSA.FIXTURES));
+const f = JSON.parse(JSON.stringify(sandbox.window.CAREERWRIGHT.FIXTURES));
 
 const trace = json("fixtures/m0/worked_trace.json");
 const p01 = json("fixtures/m0/personas/P01.json");

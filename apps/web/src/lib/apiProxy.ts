@@ -58,7 +58,10 @@ export async function forwardToApi(
     });
   } catch {
     // No envelope: the API was not reached, and the browser client reports exactly that.
-    return new Response(null, { status: 502, headers: { "x-nessa-proxy": "api-unreachable" } });
+    return new Response(null, {
+      status: 502,
+      headers: { "x-careerwright-proxy": "api-unreachable" },
+    });
   }
   const out = new Headers();
   for (const name of RESPONSE_HEADERS) {

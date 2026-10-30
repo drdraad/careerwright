@@ -9,8 +9,8 @@ from typing import Any
 
 import pytest
 
-from nessa.money import Money
-from nessa.profile.document import (
+from careerwright.money import Money
+from careerwright.profile.document import (
     FIELD_NAMES,
     HARD_CONSTRAINTS,
     PayPeriod,
@@ -19,7 +19,7 @@ from nessa.profile.document import (
     apply_profile_input,
     empty_profile,
 )
-from nessa.profile.interview import (
+from careerwright.profile.interview import (
     CONTEXT_MARKER,
     INSTRUCTIONS,
     MAX_PROMPT_BYTES,
@@ -36,8 +36,8 @@ from nessa.profile.interview import (
     render_prompt,
     worst_case_nano_usd,
 )
-from nessa.profile.records import Basis, ConversationMode, EntryMode
-from nessa.profile.safety import SUPPORT_TURN_INSTRUCTION, has_risk_stem
+from careerwright.profile.records import Basis, ConversationMode, EntryMode
+from careerwright.profile.safety import SUPPORT_TURN_INSTRUCTION, has_risk_stem
 
 M1 = uuid.UUID("00000000-0000-4000-8000-000000000001")
 M2 = uuid.UUID("00000000-0000-4000-8000-000000000002")
@@ -544,4 +544,4 @@ def test_an_attempt_reserves_both_requests_at_their_bounds() -> None:
     # (That every step retry fits the default run limit: tests/domain/test_spend.py.)
     assert worst_case_nano_usd("muse-spark-1.3-contributor") == 3_500_000
     assert worst_case_nano_usd("muse-spark-1.3") == 49_000_000
-    assert worst_case_nano_usd("nessa-fixture-interviewer-1") == 0
+    assert worst_case_nano_usd("careerwright-fixture-interviewer-1") == 0

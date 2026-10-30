@@ -10,14 +10,14 @@ import sqlalchemy as sa
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
-from nessa.cli import migrate_app, seed
-from nessa.identity import store as identity_store
-from nessa.identity.records import EventKind
-from nessa.profile import store as profile_store
-from nessa.profile.document import ProfileInput, apply_profile_input, empty_profile
-from nessa.profile.records import SourceKind
-from nessa.seed import INVITED_ACTORS
-from nessa.vocabulary import DataMode
+from careerwright.cli import migrate_app, seed
+from careerwright.identity import store as identity_store
+from careerwright.identity.records import EventKind
+from careerwright.profile import store as profile_store
+from careerwright.profile.document import ProfileInput, apply_profile_input, empty_profile
+from careerwright.profile.records import SourceKind
+from careerwright.seed import INVITED_ACTORS
+from careerwright.vocabulary import DataMode
 from tests.support.infra import Infra, migrator_engine
 
 pytestmark = pytest.mark.integration
@@ -25,7 +25,7 @@ pytestmark = pytest.mark.integration
 
 def head() -> str:
     config = Config()
-    config.set_main_option("script_location", "nessa:migrations")
+    config.set_main_option("script_location", "careerwright:migrations")
     revision = ScriptDirectory.from_config(config).get_current_head()
     assert revision is not None
     return revision
@@ -33,7 +33,7 @@ def head() -> str:
 
 @pytest.mark.req("BND1-14")
 def test_a_fresh_database_migrates_to_head_and_seeds(infra: Infra) -> None:
-    database = f"nessa_fresh_{uuid.uuid4().hex[:8]}"
+    database = f"careerwright_fresh_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     engine = migrator_engine(infra, database)
     try:
@@ -46,9 +46,9 @@ def test_a_fresh_database_migrates_to_head_and_seeds(infra: Infra) -> None:
     [version] = infra.query("SELECT version_num FROM alembic_version", database=database)
     assert version["version_num"] == head()
     counts = infra.query(
-        "SELECT (SELECT count(*) FROM nessa.actors) AS actors, "
-        "(SELECT count(*) FROM nessa.workspaces) AS workspaces, "
-        "(SELECT count(*) FROM nessa.profile_versions) AS versions",
+        "SELECT (SELECT count(*) FROM careerwright.actors) AS actors, "
+        "(SELECT count(*) FROM careerwright.workspaces) AS workspaces, "
+        "(SELECT count(*) FROM careerwright.profile_versions) AS versions",
         database=database,
     )
     assert counts == [{"actors": 2, "workspaces": 1, "versions": 1}]
@@ -73,7 +73,7 @@ def snapshot(infra: Infra, database: str) -> dict[str, list[dict[str, object]]]:
     """Every 0001 row with its 0001 columns, exactly."""
     return {
         table: infra.query(
-            f"SELECT (to_jsonb(t) - %s::text[])::text AS row FROM nessa.{table} t "  # noqa: S608
+            f"SELECT (to_jsonb(t) - %s::text[])::text AS row FROM careerwright.{table} t "  # noqa: S608
             "ORDER BY 1",
             (ADDED_SINCE_0001.get(table, []),),
             database=database,
@@ -90,7 +90,7 @@ def add_receipts(tx: sa.Connection, workspace_id: uuid.UUID) -> None:
         (UNATTRIBUTABLE, {"credential_id": str(uuid.uuid4())}),
     ):
         tx.exec_driver_sql(
-            "INSERT INTO nessa.command_receipts (actor_id, idempotency_key, command, "
+            "INSERT INTO careerwright.command_receipts (actor_id, idempotency_key, command, "
             "request_sha256, status_code, response) VALUES (%(actor)s, %(key)s, 'cmd', "
             "repeat('a', 64), 200, %(response)s::jsonb)",
             {"actor": owner, "key": key, "response": json.dumps(response)},
@@ -103,7 +103,7 @@ UNATTRIBUTABLE = uuid.UUID("00000000-0000-4000-8000-0000000000a2")
 
 @pytest.mark.req("BND1-14")
 def test_a_populated_database_upgrades_to_head_without_losing_data(infra: Infra) -> None:
-    database = f"nessa_upgrade_{uuid.uuid4().hex[:8]}"
+    database = f"careerwright_upgrade_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     engine = migrator_engine(infra, database)
     try:
@@ -114,7 +114,7 @@ def test_a_populated_database_upgrades_to_head_without_losing_data(infra: Infra)
             add_receipts(tx, edited)
         before = snapshot(infra, database)
         receipt_before = infra.query(
-            f"SELECT {RECEIPT_COLUMNS_0001} FROM nessa.command_receipts "  # noqa: S608
+            f"SELECT {RECEIPT_COLUMNS_0001} FROM careerwright.command_receipts "  # noqa: S608
             "WHERE idempotency_key = %s",
             (ATTRIBUTABLE,),
             database=database,
@@ -127,21 +127,21 @@ def test_a_populated_database_upgrades_to_head_without_losing_data(infra: Infra)
     assert snapshot(infra, database) == before
     # 0005's source columns are empty for every upgraded source: nothing is invented.
     assert infra.query(
-        "SELECT count(*) AS n FROM nessa.source_references "
+        "SELECT count(*) AS n FROM careerwright.source_references "
         "WHERE run_id IS NOT NULL OR message_ids IS NOT NULL OR basis IS NOT NULL",
         database=database,
     ) == [{"n": 0}]
     # 0003: a receipt is kept and attributed to the workspace its response names; a retry
     # cache that names none is dropped (documented in the migration).
     receipts = infra.query(
-        f"SELECT {RECEIPT_COLUMNS_0001}, workspace_id FROM nessa.command_receipts",  # noqa: S608
+        f"SELECT {RECEIPT_COLUMNS_0001}, workspace_id FROM careerwright.command_receipts",  # noqa: S608
         database=database,
     )
     assert receipts == [{**receipt_before[0], "workspace_id": edited}]
     [version] = infra.query("SELECT version_num FROM alembic_version", database=database)
     assert version["version_num"] == head()
     # The upgraded data is still reachable through row-level security, and only by its owner.
-    count = "SELECT count(*) AS n FROM nessa.profile_versions"
+    count = "SELECT count(*) AS n FROM careerwright.profile_versions"
     owner = infra.as_role("pg_api", count, actor=str(INVITED_ACTORS[0].actor_id), database=database)
     other = infra.as_role("pg_api", count, actor=str(INVITED_ACTORS[1].actor_id), database=database)
     assert (owner, other) == ([{"n": 3}], [{"n": 0}])
@@ -188,7 +188,7 @@ def add_edited_workspace(tx: sa.Connection) -> uuid.UUID:
 
 @pytest.mark.req("MODEL-08", "MODEL-04")
 def test_an_untouched_old_default_run_limit_upgrades_to_the_new_default(infra: Infra) -> None:
-    database = f"nessa_limits_{uuid.uuid4().hex[:8]}"
+    database = f"careerwright_limits_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     engine = migrator_engine(infra, database)
     try:
@@ -203,7 +203,7 @@ def test_an_untouched_old_default_run_limit_upgrades_to_the_new_default(infra: I
             workspaces = {name: add_edited_workspace(tx) for name in rows}
             for name, (run_limit, version) in rows.items():
                 tx.exec_driver_sql(
-                    "INSERT INTO nessa.spend_limits (workspace_id, run_limit_nano_usd, "
+                    "INSERT INTO careerwright.spend_limits (workspace_id, run_limit_nano_usd, "
                     "period_limit_nano_usd, version) VALUES (%(ws)s, %(run)s, 1000000000, %(v)s)",
                     {"ws": workspaces[name], "run": run_limit, "v": version},
                 )
@@ -215,7 +215,7 @@ def test_an_untouched_old_default_run_limit_upgrades_to_the_new_default(infra: I
     limits = {
         name: infra.query(
             "SELECT run_limit_nano_usd AS run, period_limit_nano_usd AS period, version "
-            "FROM nessa.spend_limits WHERE workspace_id = %s",
+            "FROM careerwright.spend_limits WHERE workspace_id = %s",
             (workspace,),
             database=database,
         )[0]
@@ -230,7 +230,7 @@ def test_an_untouched_old_default_run_limit_upgrades_to_the_new_default(infra: I
 
 @pytest.mark.req("MODEL-08")
 def test_attempts_that_made_no_call_upgrade_to_a_known_zero_cost(infra: Infra) -> None:
-    database = f"nessa_zero_cost_{uuid.uuid4().hex[:8]}"
+    database = f"careerwright_zero_cost_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     engine = migrator_engine(infra, database)
     try:
@@ -241,15 +241,16 @@ def test_attempts_that_made_no_call_upgrade_to_a_known_zero_cost(infra: Infra) -
             for state, cost in (("none", None), ("reconciled", 40_000), ("unknown", None)):
                 run = uuid.uuid4()
                 tx.exec_driver_sql(
-                    "INSERT INTO nessa.runs (run_id, workspace_id, data_mode, synthetic, kind, "
+                    "INSERT INTO careerwright.runs (run_id, workspace_id, data_mode, synthetic, "
+                    "kind, "
                     "requested_by, model_id, model_mode, status) SELECT %(run)s, workspace_id, "
                     "data_mode, synthetic, 'connection_check', owner_actor_id, "
                     "'muse-spark-1.3-contributor', 'contributor', 'queued' "
-                    "FROM nessa.workspaces WHERE workspace_id = %(ws)s",
+                    "FROM careerwright.workspaces WHERE workspace_id = %(ws)s",
                     {"run": run, "ws": workspace},
                 )
                 tx.exec_driver_sql(
-                    "INSERT INTO nessa.model_attempts (run_id, workspace_id, model_id, "
+                    "INSERT INTO careerwright.model_attempts (run_id, workspace_id, model_id, "
                     "period_start, spend_state, cost_nano_usd, finished_at, outcome) VALUES "
                     "(%(run)s, %(ws)s, 'muse-spark-1.3-contributor', date '2026-10-01', "
                     "%(state)s, %(cost)s, clock_timestamp(), 'x')",
@@ -261,7 +262,7 @@ def test_attempts_that_made_no_call_upgrade_to_a_known_zero_cost(infra: Infra) -
         engine.dispose()
 
     rows = infra.query(
-        "SELECT spend_state, cost_nano_usd FROM nessa.model_attempts ORDER BY spend_state",
+        "SELECT spend_state, cost_nano_usd FROM careerwright.model_attempts ORDER BY spend_state",
         database=database,
     )
     # No call was made, so the cost is known: zero. Unknown stays unknown.
@@ -274,7 +275,7 @@ def test_attempts_that_made_no_call_upgrade_to_a_known_zero_cost(infra: Infra) -
 
 @pytest.mark.req("ACQ-01")
 def test_0014_leaves_only_http_urls_in_url_fields(infra: Infra) -> None:
-    database = f"nessa_urls_{uuid.uuid4().hex[:8]}"
+    database = f"careerwright_urls_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     engine = migrator_engine(infra, database)
     unsafe = "javascript:alert(1)"
@@ -285,19 +286,21 @@ def test_0014_leaves_only_http_urls_in_url_fields(infra: Infra) -> None:
             workspace = add_edited_workspace(tx)
             run, attempt = uuid.uuid4(), uuid.uuid4()
             tx.exec_driver_sql(
-                "INSERT INTO nessa.runs (run_id, workspace_id, data_mode, synthetic, kind, "
+                "INSERT INTO careerwright.runs (run_id, workspace_id, data_mode, synthetic, kind, "
                 "requested_by, status, failure_class, finished_at) SELECT %(run)s, workspace_id, "
                 "data_mode, synthetic, 'acquisition', owner_actor_id, 'failed', 'source_blocked', "
-                "clock_timestamp() FROM nessa.workspaces WHERE workspace_id = %(ws)s",
+                "clock_timestamp() FROM careerwright.workspaces WHERE workspace_id = %(ws)s",
                 {"run": run, "ws": workspace},
             )
             tx.exec_driver_sql(
-                "INSERT INTO nessa.acquisition_targets (run_id, workspace_id, position, route, "
+                "INSERT INTO careerwright.acquisition_targets (run_id, workspace_id, position, "
+                "route, "
                 "url, status) VALUES (%(run)s, %(ws)s, 0, 'fetch', %(url)s, 'blocked')",
                 {"run": run, "ws": workspace, "url": unsafe},
             )
             tx.exec_driver_sql(
-                "INSERT INTO nessa.source_attempts (attempt_id, workspace_id, run_id, position, "
+                "INSERT INTO careerwright.source_attempts (attempt_id, workspace_id, run_id, "
+                "position, "
                 "route, provider, requested_url, redirects, status, reason, finished_at) VALUES "
                 "(%(id)s, %(ws)s, %(run)s, 0, 'fetch', 'unknown', %(url)s, %(redirects)s::jsonb, "
                 "'blocked', 'scheme_not_allowed', clock_timestamp())",
@@ -314,9 +317,11 @@ def test_0014_leaves_only_http_urls_in_url_fields(infra: Infra) -> None:
     finally:
         engine.dispose()
 
-    [target] = infra.query("SELECT url, refusal FROM nessa.acquisition_targets", database=database)
+    [target] = infra.query(
+        "SELECT url, refusal FROM careerwright.acquisition_targets", database=database
+    )
     [kept] = infra.query(
-        "SELECT requested_url, redirects, status, reason FROM nessa.source_attempts",
+        "SELECT requested_url, redirects, status, reason FROM careerwright.source_attempts",
         database=database,
     )
     assert target == {"url": None, "refusal": "scheme_not_allowed"}

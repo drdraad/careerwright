@@ -148,7 +148,7 @@ ADR 0007 decision 6 chose explanations built from facts only, with no model pros
    (H-05) are unchanged.
 
 7. **Adzuna stays optional (ruling R4).** If developer credentials are registered and stored
-   under `NESSA_HOME` before Task 7 is dispatched, S3.3 qualifies the live integration;
+   under `CAREERWRIGHT_HOME` before Task 7 is dispatched, S3.3 qualifies the live integration;
    otherwise it stays "unverified — no credentials". It is external data, still a local run.
 
 8. **Three tasks added by the controller.** Task 6b implements decision 4. Task 6c is the

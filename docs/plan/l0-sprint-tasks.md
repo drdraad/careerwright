@@ -2,7 +2,7 @@
 
 This file breaks `docs/plan/development-plan.md` (the local development plan, v1.2) into
 implementation tasks for agent execution. Authority order: product specification
-(`Nessa_Product_Specification.md`, v1.3) → development plan local overrides → this file.
+(`Careerwright_Product_Specification.md`, v1.3) → development plan local overrides → this file.
 Tasks 1–6 (Sprints 0–2) are complete. The remaining tasks follow the order, dependency
 rules and dispatch preconditions below (ADR 0008).
 This file adds task slicing, environment facts and standing rulings only; it never
@@ -11,7 +11,7 @@ relaxes the plan or the specification.
 Each task names its sprint card. Read that card in `docs/plan/development-plan.md`
 in full (deliverables, acceptance, coherence review) and the plan's shared sections
 listed under "Always read". Then read the specification sections the card cites
-(`grep -n '^#' Nessa_Product_Specification.md` lists them; read only what you need).
+(`grep -n '^#' Careerwright_Product_Specification.md` lists them; read only what you need).
 
 ## Always read
 
@@ -33,7 +33,7 @@ These bind every task and every review.
    Do not introduce another solver, workflow engine, renderer, scraper vendor, vector
    database or general agent platform. uv + pnpm lockfiles, Ruff, one Python type
    checker, TypeScript strict, one JS lint/format toolchain.
-3. Repository shape: `apps/web` and `backend/src/nessa`, Python organised by domain
+3. Repository shape: `apps/web` and `backend/src/careerwright`, Python organised by domain
    module (profile/exploration, evidence/acquisition, capability/catalogue,
    planning/optimisation, plan/progress, identity/execution). No empty layer
    scaffolding. Narrow ports only at real I/O boundaries. Automated architecture
@@ -108,7 +108,7 @@ These bind every task and every review.
 - R4 Adzuna: no credentials exist (still true on 2026-10-28). Implement the adapter and its
   fixture contract; record the live integration as "unverified — no credentials". Adzuna
   stays optional (plan v1.1, Sprint 3 S3.3): if developer credentials are registered and
-  stored under `NESSA_HOME` before Task 7 is dispatched, Task 7 qualifies the live
+  stored under `CAREERWRIGHT_HOME` before Task 7 is dispatched, Task 7 qualifies the live
   integration instead. It is external data, still a local run; never put the credentials
   in a command argument, log or commit.
 - R5 Live Meta usage (user instruction, 2026-10-27: "keep careful track of meta LLM
@@ -243,7 +243,7 @@ S0.4. Spec sections 1 (BND-1), 16, 17 (ARC-1), 19.
 
 Deliver:
 - Minimal real scaffolding the spike needs (uv project under `backend/` with
-  `backend/src/nessa`, Python 3.12, Ruff, the chosen type checker, pytest) — no feature
+  `backend/src/careerwright`, Python 3.12, Ruff, the chosen type checker, pytest) — no feature
   modules yet. A spike may live in `backend/spikes/` if it is not production code.
 - `docs/adr/0001-l0-scope.md` recording the plan section 1 overrides (L0 vs M0).
 - `docs/dependencies.md`: dependency matrix with exact versions to pin, checked against
@@ -474,7 +474,7 @@ frozen install passes with no lockfile change.
 ## Task 7: Sprint 3 — evidence acquisition backend (S3.1–S3.4, reduced S3.6)
 
 **Preconditions:** Task 6c complete (order). No human session. Adzuna credentials under
-`NESSA_HOME` at dispatch decide S3.3's live qualification (R4).
+`CAREERWRIGHT_HOME` at dispatch decide S3.3's live qualification (R4).
 
 Sprint card: "Sprint 3 Make the evidence and opportunity map real". Slice: S3.1, S3.2,
 S3.3, S3.4, S3.6 and their acceptance items. Spec sections 5, 6, 7, 11 (TAX-1, AIR-1).

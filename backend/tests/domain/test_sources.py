@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from nessa.evidence.acquire import AcquisitionResult, Pacer, acquire_page
-from nessa.evidence.fetcher import DEFAULT_LIMITS, Fetcher, FetchLimits
-from nessa.evidence.records import AttemptStatus, ClaimField, Retention, RightsClass
-from nessa.evidence.sources import (
+from careerwright.evidence.acquire import AcquisitionResult, Pacer, acquire_page
+from careerwright.evidence.fetcher import DEFAULT_LIMITS, Fetcher, FetchLimits
+from careerwright.evidence.records import AttemptStatus, ClaimField, Retention, RightsClass
+from careerwright.evidence.sources import (
     MANIFEST_PATH,
     PENDING_REVIEW,
     Access,
@@ -106,7 +106,7 @@ def _acquired(host: str, body: bytes) -> AcquisitionResult:
     with source_server({"/robots.txt": Scripted(404), "/jobs/1": Scripted(body=body)}) as server:
         fetcher = Fetcher(
             resolve=scripted_resolver({host: [LOOPBACK]}),
-            user_agent="NessaL0/test",
+            user_agent="CareerwrightL0/test",
             extra_allowed=frozenset({("127.0.0.1", server.port)}),
         )
         return acquire_page(
@@ -190,7 +190,7 @@ def _cross_host(
     fetcher = Fetcher(
         resolve=scripted_resolver(CROSS_HOST_NAMES),
         limits=limits,
-        user_agent="NessaL0/test",
+        user_agent="CareerwrightL0/test",
         extra_allowed=frozenset(("127.0.0.1", port) for port in ports),
     )
     return lambda url: acquire_page(

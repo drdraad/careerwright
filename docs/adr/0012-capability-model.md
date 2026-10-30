@@ -36,7 +36,7 @@ deterministic code: a model may later propose mappings and answers, never commit
 
 ## Decisions
 
-1. **Its own module.** `nessa/capability` (dispatch ruling 2; plan section 3, the capability
+1. **Its own module.** `careerwright/capability` (dispatch ruling 2; plan section 3, the capability
    half of "Capability and catalogue"): `reference.py` (the reference data and its loader),
    `matrix.py`, `evidence.py`, `outcomes.py`, `readiness.py`, `questions.py` (all pure),
    `store.py` (the SQL adapter, migration 0029, listed in the architecture test) and

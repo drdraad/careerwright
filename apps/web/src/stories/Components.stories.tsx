@@ -74,8 +74,8 @@ export const Notices: Story = {
       <Alert tone="unknown" title="Total spending limit: Unknown">
         The result is less precise, never filled in with a guess.
       </Alert>
-      <Alert tone="error" title="Nessa's service isn't reachable">
-        Nothing you saved is lost. If Nessa is restarting, try again in a moment.
+      <Alert tone="error" title="Careerwright's service isn't reachable">
+        Nothing you saved is lost. If Careerwright is restarting, try again in a moment.
       </Alert>
     </div>
   ),

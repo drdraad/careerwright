@@ -7,9 +7,9 @@ from ipaddress import ip_network
 
 import pytest
 
-from nessa import edge
-from nessa.edge import Route, parse_routes, serve
-from nessa.localnet import LOOPBACK
+from careerwright import edge
+from careerwright.edge import Route, parse_routes, serve
+from careerwright.localnet import LOOPBACK
 
 ONLY_TEN = (ip_network("10.0.0.0/8"),)
 
@@ -114,7 +114,7 @@ def test_a_target_resolving_outside_the_internal_network_is_never_contacted() ->
 
 @pytest.mark.req("BND1-11")
 def test_an_unresolvable_target_is_refused() -> None:
-    data, reached = relay_attempt("nessa-absent-target.invalid", LOOPBACK)
+    data, reached = relay_attempt("careerwright-absent-target.invalid", LOOPBACK)
 
     assert (data, reached) == (b"", [])
 

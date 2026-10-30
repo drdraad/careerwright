@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from nessa.api import routes_events
+from careerwright.api import routes_events
 from tests.support.client import ApiClient, profile_with
 from tests.support.infra import Infra, create_emulator_user, revoke_tokens, sign_in
 
@@ -95,11 +95,11 @@ def test_the_stream_ends_once_the_firebase_token_is_revoked(
     monkeypatch.setattr(routes_events, "REVERIFY_S", 0.3)
     monkeypatch.setattr(routes_events, "HEARTBEAT_S", 0.2)  # lines keep coming, so no hang
     uid = f"stream-{uuid.uuid4().hex[:8]}"
-    email = f"{uid}@nessa.test"
+    email = f"{uid}@careerwright.test"
     create_emulator_user(uid, email, "password-123456")
     token = sign_in(email, "password-123456")
     infra.query(
-        "INSERT INTO nessa.actors (actor_id, email, display_name, access) "
+        "INSERT INTO careerwright.actors (actor_id, email, display_name, access) "
         "VALUES (%s, %s, 'Streams until revoked', 'active')",
         (uuid.uuid4(), email),
     )

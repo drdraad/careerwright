@@ -73,7 +73,7 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, inspect a fixture rout
   await expect(liveUpdates(page, /^Updates: (Reconnecting|Connecting)$/)).toBeVisible({
     timeout: 60_000,
   });
-  // While Nessa is down the work stays on screen, and the strip's live-update state (checked
+  // While Careerwright is down the work stays on screen, and the strip's live-update state (checked
   // above) is the only marker: nothing refetches, so there is no "Couldn't refresh" notice.
   // Never a blank or an error page in place of the work.
   await expect(page.getByRole("heading", { level: 1, name: "Routes" })).toBeVisible();

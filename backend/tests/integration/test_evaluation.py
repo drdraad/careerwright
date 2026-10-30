@@ -12,10 +12,10 @@ from pathlib import Path
 import pytest
 import sqlalchemy as sa
 
-from nessa.catalogue.esco import ESCO_RELEASE
-from nessa.cli import import_taxonomy, migrate_app
-from nessa.db import system_transaction
-from nessa.profile.slate import POOL_LIMIT
+from careerwright.catalogue.esco import ESCO_RELEASE
+from careerwright.cli import import_taxonomy, migrate_app
+from careerwright.db import system_transaction
+from careerwright.profile.slate import POOL_LIMIT
 from tests.support.infra import Infra, migrator_engine
 from tools.datasets import DATASETS_DIR
 from tools.evaluation import (
@@ -35,7 +35,7 @@ pytestmark = pytest.mark.integration
 def full_release(infra: Infra) -> Iterator[sa.Engine]:
     release = Path(DATASETS_DIR) / ESCO_RELEASE.file_name
     assert release.is_file(), f"run `make setup` first: {release} is missing"
-    database = f"nessa_eval_{uuid.uuid4().hex[:8]}"
+    database = f"careerwright_eval_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     owner = migrator_engine(infra, database)
     migrate_app(owner)

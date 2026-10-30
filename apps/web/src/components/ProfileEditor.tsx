@@ -195,8 +195,8 @@ export function ProfileEditor({
             title="A newer version was saved, and it couldn't be loaded"
           >
             <p>
-              Your edits are kept below. Save again in a moment: Nessa loads the newer version
-              first.
+              Your edits are kept below. Save again in a moment: Careerwright loads the newer
+              version first.
             </p>
           </Alert>
           <RequestFailure error={stale.error} announce={false} />

@@ -7,7 +7,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from nessa.logs import JsonFormatter, register_secret
+from careerwright.logs import JsonFormatter, register_secret
 
 JWT = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJ1aWQtYWRhIn0."
 SECRET = "pg-password-6f0c1a9e"
@@ -18,7 +18,7 @@ def capture() -> Iterator[tuple[logging.Logger, io.StringIO]]:
     stream = io.StringIO()
     handler = logging.StreamHandler(stream)
     handler.setFormatter(JsonFormatter(service="test"))
-    logger = logging.getLogger("nessa.test.redaction")
+    logger = logging.getLogger("careerwright.test.redaction")
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
     logger.propagate = False
@@ -36,13 +36,15 @@ def test_tokens_bearer_headers_and_url_passwords_are_scrubbed(
 ) -> None:
     logger, stream = capture
 
-    logger.info("auth header Bearer %s for postgresql://nessa_api:hunter22@postgres/app", JWT)
+    logger.info(
+        "auth header Bearer %s for postgresql://careerwright_api:hunter22@postgres/app", JWT
+    )
 
     [line] = records(stream)
     assert JWT not in stream.getvalue()
     assert "hunter22" not in stream.getvalue()
     assert "Bearer [redacted]" in str(line["msg"])
-    assert "nessa_api:[redacted]@postgres" in str(line["msg"])
+    assert "careerwright_api:[redacted]@postgres" in str(line["msg"])
 
 
 @pytest.mark.req("SEC-04")

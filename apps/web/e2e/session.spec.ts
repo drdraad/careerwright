@@ -68,7 +68,7 @@ test("[STATE-07][BND1-13] a change saved elsewhere reaches an open page through 
   await expect(watcher.getByRole("banner").getByText("Saved, version 1")).toBeVisible();
   // A reload keeps the address but loses this marker: it proves the page was not reloaded.
   await watcher.evaluate(() => {
-    (window as unknown as { nessaUnreloaded?: boolean }).nessaUnreloaded = true;
+    (window as unknown as { careerwrightUnreloaded?: boolean }).careerwrightUnreloaded = true;
   });
 
   // Another client saves: the event must cross the API, the web server's proxy and the
@@ -89,7 +89,7 @@ test("[STATE-07][BND1-13] a change saved elsewhere reaches an open page through 
   );
   expect(
     await watcher.evaluate(
-      () => (window as unknown as { nessaUnreloaded?: boolean }).nessaUnreloaded,
+      () => (window as unknown as { careerwrightUnreloaded?: boolean }).careerwrightUnreloaded,
     ),
   ).toBe(true);
   await watcher.context().close();

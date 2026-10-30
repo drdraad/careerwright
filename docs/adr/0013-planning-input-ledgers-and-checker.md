@@ -28,12 +28,12 @@ independent oracle must share no code with it. Nothing here is model-backed.
 
 ## Decisions
 
-1. **Its own module, `nessa/planning`, all pure** (Global Constraint 3; plan section 3,
+1. **Its own module, `careerwright/planning`, all pure** (Global Constraint 3; plan section 3,
    "Planning and optimisation"): `months.py` (TIME-1's grid), `catalogue.py` (the records),
    `compiler.py` (the immutable monthly input), `ledgers.py`, `checker.py` and `pack.py` (the
    pack adapter). It reads the capability model (readiness), the catalogue (the pack) and
    money; nothing imports it but the API and tools. No SQL, no run kind, no model call, so
-   DBOS `application_version` stays `nessa-l0-1`. One read endpoint,
+   DBOS `application_version` stays `careerwright-l0-1`. One read endpoint,
    `GET /v1/workspaces/{id}/planning/options`, serves each target's pack options (decision 11).
 
 2. **TIME-1's grid.** A month is a named calendar month. Every month a dated activity touches

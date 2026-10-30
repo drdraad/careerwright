@@ -647,7 +647,7 @@ export const AiResilienceOutSchema = {
         method_version: {
             type: 'string',
             title: 'Method Version',
-            default: 'nessa-air-rubric-m0-1'
+            default: 'careerwright-air-rubric-m0-1'
         }
     },
     additionalProperties: false,
@@ -2855,7 +2855,7 @@ export const ExtractionNotRunSchema = {
         'acquisition_cancelled'
     ],
     title: 'ExtractionNotRun',
-    description: 'Why a page model extraction may read was not handed to it (`nessa.evidence.\nextraction_runs`): the page stays `no_posting_readable`, never "none found".'
+    description: 'Why a page model extraction may read was not handed to it (`careerwright.evidence.\nextraction_runs`): the page stays `no_posting_readable`, never "none found".'
 } as const;
 
 export const FactSchema = {
@@ -3574,7 +3574,7 @@ export const InputRouteSchema = {
         'pasted_text'
     ],
     title: 'InputRoute',
-    description: 'How a source reached Nessa. Pasted text is its own route, never a retrieval.'
+    description: 'How a source reached Careerwright. Pasted text is its own route, never a retrieval.'
 } as const;
 
 export const InstrumentKindSchema = {
@@ -5100,7 +5100,7 @@ export const OccupationOutSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Concept Id',
-            description: 'Nessa\'s internal concept ID (stable per URI).'
+            description: 'Careerwright\'s internal concept ID (stable per URI).'
         },
         concept_kind: {
             type: 'string',
@@ -7011,7 +7011,7 @@ export const ProvisionalConceptOutSchema = {
             type: 'string',
             const: 'provisional',
             title: 'Concept Kind',
-            description: 'provisional: Nessa\'s own concept for a verified title, never an ESCO one.'
+            description: 'provisional: Careerwright\'s own concept for a verified title, never an ESCO one.'
         },
         title: {
             type: 'string',
@@ -7105,7 +7105,7 @@ export const QueryChannelSchema = {
         'less_familiar'
     ],
     title: 'QueryChannel',
-    description: 'The model\'s discovery channels (spec section 4, DIV-1\'s five channels). Nessa adds\nthe person\'s current role and their own target titles itself.'
+    description: 'The model\'s discovery channels (spec section 4, DIV-1\'s five channels). Careerwright adds\nthe person\'s current role and their own target titles itself.'
 } as const;
 
 export const QueryOutSchema = {
@@ -8934,7 +8934,7 @@ export const SearchEmptyReasonSchema = {
         'all_excluded'
     ],
     title: 'SearchEmptyReason',
-    description: 'Why a search proposes no candidate. None of them is evidence that there is no vacancy:\nonly that this search found no page Nessa could check.'
+    description: 'Why a search proposes no candidate. None of them is evidence that there is no vacancy:\nonly that this search found no page Careerwright could check.'
 } as const;
 
 export const SearchExcludedSchema = {
@@ -9381,7 +9381,7 @@ export const SlateChannelSchema = {
         'hypothesis'
     ],
     title: 'SlateChannel',
-    description: 'How a candidate was found: the model\'s channels plus Nessa\'s own.'
+    description: 'How a candidate was found: the model\'s channels plus Careerwright\'s own.'
 } as const;
 
 export const SlateExplanationOutSchema = {
@@ -9545,7 +9545,7 @@ export const SlateOutSchema = {
             },
             type: 'array',
             title: 'Unsupported Hypotheses',
-            description: 'Titles Nessa thought of that ESCO does not list: never suggested.'
+            description: 'Titles Careerwright thought of that ESCO does not list: never suggested.'
         },
         not_included: {
             items: {
@@ -10786,7 +10786,7 @@ export const SupportNoteOutSchema = {
         'resources'
     ],
     title: 'SupportNoteOut',
-    description: 'The support panel, shown beside a message that triggers the support screen\n(`nessa.profile.safety`), whether the send was accepted or refused. Kept apart from\ncareer suitability. Derived from the request on every response, a replay included;\nnever stored, not even in the idempotency receipt.'
+    description: 'The support panel, shown beside a message that triggers the support screen\n(`careerwright.profile.safety`), whether the send was accepted or refused. Kept apart from\ncareer suitability. Derived from the request on every response, a replay included;\nnever stored, not even in the idempotency receipt.'
 } as const;
 
 export const SupportResourceOutSchema = {
@@ -11992,9 +11992,9 @@ export const WorkspaceExportSchema = {
     properties: {
         format: {
             type: 'string',
-            const: 'nessa.workspace-export',
+            const: 'careerwright.workspace-export',
             title: 'Format',
-            default: 'nessa.workspace-export'
+            default: 'careerwright.workspace-export'
         },
         format_version: {
             type: 'integer',

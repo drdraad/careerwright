@@ -65,7 +65,7 @@ function Reply({
   const view = replyView(turn, partial.data);
   if (view.kind === "checked") {
     return (
-      <div className="turn-nessa">
+      <div className="turn-careerwright">
         <Glyph name="mark" />
         <p>{view.text}</p>
       </div>
@@ -74,7 +74,7 @@ function Reply({
   if (view.kind === "failed") {
     if (latest && view.text === null) return null; // the failure notice below says why
     return (
-      <div className="turn-nessa">
+      <div className="turn-careerwright">
         <Glyph name="mark" />
         <div className="reply-provisional grid gap-8">
           <span className="status small" data-tone="error">
@@ -93,7 +93,7 @@ function Reply({
   const words =
     view.kind === "waiting" ? PARTIAL_REPLY.none.label : PARTIAL_REPLY[view.completeness].label;
   return (
-    <div className="turn-nessa">
+    <div className="turn-careerwright">
       <Glyph name="mark" />
       <div className="reply-provisional grid gap-8">
         <span
@@ -110,7 +110,7 @@ function Reply({
 }
 
 /** Beside a sent message that holds a risk stem: calm, not blocking, dismissible. The
- *  message went to Nessa as usual. */
+ *  message went to Careerwright as usual. */
 function SupportNote({ note, onDismiss }: { note: SupportNoteOut; onDismiss(): void }) {
   const titleId = useId();
   const checked = note.resources[0]?.checked_on;
@@ -181,8 +181,8 @@ function EntryChoice({
 
 function repliedWords(turn: TurnOut): string {
   const count = turn.proposal?.changes.length ?? 0;
-  if (count === 0) return "Nessa replied.";
-  return `Nessa replied: ${count} ${count === 1 ? "change" : "changes"} to review.`;
+  if (count === 0) return "Careerwright replied.";
+  return `Careerwright replied: ${count} ${count === 1 ? "change" : "changes"} to review.`;
 }
 
 export function Conversation({
@@ -278,10 +278,10 @@ export function Conversation({
   return (
     <section className="grid gap-24" aria-labelledby="conversation-title">
       <h2 id="conversation-title" className="sr-only">
-        Conversation with Nessa
+        Conversation with Careerwright
       </h2>
       <div className="thread-meta">
-        <label htmlFor={modeId}>How Nessa talks with you</label>
+        <label htmlFor={modeId}>How Careerwright talks with you</label>
         <select
           id={modeId}
           className="select"
@@ -412,7 +412,7 @@ export function Conversation({
           }}
         >
           <label className="sr-only" htmlFor={`${modeId}-reply`}>
-            Reply to Nessa
+            Reply to Careerwright
           </label>
           <textarea
             ref={replyField}

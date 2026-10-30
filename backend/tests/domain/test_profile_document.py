@@ -5,10 +5,10 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pydantic import ValidationError
 
-from nessa.errors import ErrorCode, NessaError
-from nessa.money import Money
-from nessa.profile.commands import restored_answers
-from nessa.profile.document import (
+from careerwright.errors import CareerwrightError, ErrorCode
+from careerwright.money import Money
+from careerwright.profile.commands import restored_answers
+from careerwright.profile.document import (
     FIELD_NAMES,
     HARD_CONSTRAINTS,
     MAX_CITIES,
@@ -97,7 +97,7 @@ def test_money_rejects_fractional_or_negative_amounts() -> None:
 def test_a_fourth_city_is_rejected_with_a_typed_error_not_dropped() -> None:
     new = profile_input(cities=provided(["Leeds", "York", "Hull", "Bradford"]))
 
-    with pytest.raises(NessaError) as raised:
+    with pytest.raises(CareerwrightError) as raised:
         apply_profile_input(empty_profile(), new, SOURCE)
 
     assert raised.value.code is ErrorCode.LIMIT_EXCEEDED
@@ -108,7 +108,7 @@ def test_a_fourth_city_is_rejected_with_a_typed_error_not_dropped() -> None:
 def test_a_fourth_target_is_rejected_with_a_typed_error() -> None:
     new = profile_input(target_titles=provided(["A", "B", "C", "D"]))
 
-    with pytest.raises(NessaError) as raised:
+    with pytest.raises(CareerwrightError) as raised:
         apply_profile_input(empty_profile(), new, SOURCE)
 
     assert raised.value.code is ErrorCode.LIMIT_EXCEEDED
@@ -136,7 +136,7 @@ def test_a_city_is_stored_by_the_list_s_own_name_whatever_the_spelling() -> None
 
 def test_a_place_that_is_not_a_listed_english_city_is_refused_never_guessed() -> None:
     for name in ("Atlantis", "Cardiff", "Shoreditch", "Leeds UK"):
-        with pytest.raises(NessaError) as raised:
+        with pytest.raises(CareerwrightError) as raised:
             apply_profile_input(empty_profile(), profile_input(cities=provided([name])), SOURCE)
 
         assert raised.value.code is ErrorCode.VALIDATION_FAILED
@@ -144,7 +144,7 @@ def test_a_place_that_is_not_a_listed_english_city_is_refused_never_guessed() ->
 
 
 def test_two_spellings_of_one_city_are_a_duplicate() -> None:
-    with pytest.raises(NessaError) as raised:
+    with pytest.raises(CareerwrightError) as raised:
         apply_profile_input(
             empty_profile(), profile_input(cities=provided(["Hull", "Kingston upon Hull"])), SOURCE
         )
@@ -171,7 +171,7 @@ def test_enjoying_believing_and_evidencing_a_task_are_three_separate_fields() ->
 def test_task_lists_are_bounded_with_a_typed_error() -> None:
     tasks = [f"task {n}" for n in range(MAX_TASKS + 1)]
 
-    with pytest.raises(NessaError) as raised:
+    with pytest.raises(CareerwrightError) as raised:
         apply_profile_input(empty_profile(), profile_input(enjoyed_tasks=provided(tasks)), SOURCE)
 
     assert raised.value.details == {"field": "enjoyed_tasks", "limit": MAX_TASKS}
@@ -260,7 +260,7 @@ def test_a_stored_floor_of_nothing_from_before_the_rule_still_reads() -> None:
     assert document.minimum_salary.value is not None
     assert document.minimum_salary.value.amount.minor_units == 0
     # Undoing to that version refuses in words, never a 500 (re-review 2, M-3).
-    with pytest.raises(NessaError) as refused:
+    with pytest.raises(CareerwrightError) as refused:
         restored_answers(document)
     assert refused.value.details == {"field": "minimum_salary", "reason": "no_longer_valid"}
 
@@ -277,7 +277,7 @@ def test_work_style_is_an_optional_described_preference_never_a_limit() -> None:
         empty_profile(), profile_input(work_style={"state": "skipped"}), SOURCE
     )
     assert (skipped.work_style.state, skipped.work_style.value) == (FieldState.SKIPPED, None)
-    with pytest.raises(NessaError) as raised:
+    with pytest.raises(CareerwrightError) as raised:
         apply_profile_input(
             empty_profile(),
             profile_input(work_style=provided([f"style {n}" for n in range(MAX_TASKS + 1)])),
@@ -316,7 +316,7 @@ def test_a_partial_update_changes_only_its_fields_and_cites_only_its_source() ->
 
 
 def test_an_update_naming_something_that_is_not_a_profile_field_is_refused() -> None:
-    with pytest.raises(NessaError) as raised:
+    with pytest.raises(CareerwrightError) as raised:
         apply_updates(
             empty_profile(),
             {"api_key": (TextListInput(state=FieldState.UNKNOWN), SOURCE)},
@@ -341,7 +341,7 @@ def test_limits_targets_work_areas_and_hours_are_the_hard_constraints() -> None:
 def test_duplicate_cities_differing_only_in_case_are_rejected() -> None:
     new = profile_input(cities=provided(["Leeds", " leeds"]))
 
-    with pytest.raises(NessaError) as raised:
+    with pytest.raises(CareerwrightError) as raised:
         apply_profile_input(empty_profile(), new, SOURCE)
 
     assert raised.value.code is ErrorCode.VALIDATION_FAILED
@@ -381,7 +381,7 @@ def test_city_count_property_accepts_at_most_three(cities: list[str]) -> None:
     if len(cities) <= MAX_CITIES:
         assert apply_profile_input(empty_profile(), new, SOURCE).cities.value == cities
     else:
-        with pytest.raises(NessaError):
+        with pytest.raises(CareerwrightError):
             apply_profile_input(empty_profile(), new, SOURCE)
 
 

@@ -22,12 +22,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from nessa.capability.evidence import Answer, SkillEvidence
-from nessa.capability.matrix import build_matrix
-from nessa.capability.outcomes import pack_outcomes
-from nessa.capability.reference import Reference, load_reference
-from nessa.catalogue.option_pack import Pack, load_pack
-from nessa.planning.catalogue import (
+from careerwright.capability.evidence import Answer, SkillEvidence
+from careerwright.capability.matrix import build_matrix
+from careerwright.capability.outcomes import pack_outcomes
+from careerwright.capability.reference import Reference, load_reference
+from careerwright.catalogue.option_pack import Pack, load_pack
+from careerwright.planning.catalogue import (
     AwardState,
     Catalogue,
     Citation,
@@ -38,7 +38,7 @@ from nessa.planning.catalogue import (
     RecordState,
     Support,
 )
-from nessa.planning.checker import (
+from careerwright.planning.checker import (
     FindingCode,
     FindingKind,
     RouteCheck,
@@ -47,7 +47,7 @@ from nessa.planning.checker import (
     Verdict,
     evaluate_route,
 )
-from nessa.planning.compiler import (
+from careerwright.planning.compiler import (
     Baseline,
     Continuation,
     MonthlyInput,
@@ -56,7 +56,7 @@ from nessa.planning.compiler import (
     ReceiptTiming,
     compile_input,
 )
-from nessa.planning.pack import pack_catalogue
+from careerwright.planning.pack import pack_catalogue
 from tools.localenv import REPO_ROOT
 from tools.option_pack_files import DASH, SECONDS_PER_ROW, pounds, show
 from tools.option_pack_files import PACKAGE_VERSION as PACK_VERSION
@@ -204,7 +204,7 @@ def p01_readiness(pack: Pack, reference: Reference) -> ReadinessBasis:
             raise SystemExit(f"the pack target has no rubric row for {skill['skill_id']}")
         evidence.append(
             SkillEvidence(
-                evidence_id=uuid.uuid5(uuid.NAMESPACE_URL, f"nessa:p01:{row.row_id}"),
+                evidence_id=uuid.uuid5(uuid.NAMESPACE_URL, f"careerwright:p01:{row.row_id}"),
                 subject=row.subject,
                 rubric_version=row.rubric.version_id,
                 answer=Answer.DONE_INDEPENDENTLY,

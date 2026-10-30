@@ -53,8 +53,8 @@ The other models the key lists, from the same pricing page and https://dev.meta.
   schema output plus usage reporting. Call 7: streaming, web search and schema output in
   one call. Standard mode excludes model-training use. Contributor mode cannot be configured
   as the production model: the API and worker refuse to start with one (since Task 3,
-  `nessa.identity.model_choice.ModelChoice.configure`, using the mode recorded per model in
-  `nessa.identity.model_registry`).
+  `careerwright.identity.model_choice.ModelChoice.configure`, using the mode recorded per model in
+  `careerwright.identity.model_registry`).
 - **Test model: `muse-spark-1.3-contributor`.** It is the cheapest Meta model (12.5× cheaper
   input and 21× cheaper output than Standard) and the same Spark 1.3 release as production.
   It passed schema output (call 3), streaming schema output (call 4), web search with schema
@@ -120,7 +120,7 @@ The other models the key lists, from the same pricing page and https://dev.meta.
 ## Consequences
 
 - The product owner must confirm, or reject, Contributor mode for synthetic-data testing.
-  If rejected, set `NESSA_META_TEST_MODEL=muse-spark-1.3` (Standard, about 12–21× the cost).
+  If rejected, set `CAREERWRIGHT_META_TEST_MODEL=muse-spark-1.3` (Standard, about 12–21× the cost).
   Every test call then counts against the production-call cap, because the cap follows the
   model ID. Budgets for later tasks must allow for that. Nothing else changes.
 - Qualification covers only the tested versions and scope: Spark 1.3, Pydantic AI 2.62.0,

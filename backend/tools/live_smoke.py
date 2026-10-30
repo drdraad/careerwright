@@ -4,7 +4,7 @@ confirmed into the profile, proving the InterviewTurn schema round-trips.
 
 Ruling R5. The key is read from the repository's gitignored `.env` into a `SecretStr`; it
 is never a command argument and never printed. An isolated stack (its own Compose project,
-ports, NESSA_HOME and volumes, removed afterwards) runs in live mode. The key travels the
+ports, CAREERWRIGHT_HOME and volumes, removed afterwards) runs in live mode. The key travels the
 product path: stored through the API with consent, sealed at once, opened only inside the
 worker's bounded activity, which makes the call. Afterwards the worker is stopped, so no
 further call can start, and then every attempt of the smoke workspace is appended to
@@ -21,7 +21,7 @@ Caps, checked before anything starts:
   worst-case cost cap;
 - per budget scope, cumulative over the ledger: provider requests, production requests and
   worst-case cost (`ScopeBudget`; conservative defaults, configurable through
-  `NESSA_LIVE_SMOKE_*`), checked and spent under an exclusive lock on the ledger, so a
+  `CAREERWRIGHT_LIVE_SMOKE_*`), checked and spent under an exclusive lock on the ledger, so a
   concurrent invocation refuses.
 The test model is a Contributor model, so the workspace is synthetic, and the interview
 message is a fixed synthetic persona.
@@ -69,25 +69,25 @@ from pydantic_ai.messages import (
 from pydantic_ai.models import Model
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from nessa.evidence import extraction, search
-from nessa.evidence.extraction import ExtractionInput, ExtractionProposal
-from nessa.evidence.extraction_agent import run_extraction
-from nessa.evidence.pages import redact_page, visible_text
-from nessa.evidence.records import ValidationState
-from nessa.evidence.search_agent import run_search
-from nessa.identity import connection_check
-from nessa.identity.activity import (
+from careerwright.evidence import extraction, search
+from careerwright.evidence.extraction import ExtractionInput, ExtractionProposal
+from careerwright.evidence.extraction_agent import run_extraction
+from careerwright.evidence.pages import redact_page, visible_text
+from careerwright.evidence.records import ValidationState
+from careerwright.evidence.search_agent import run_search
+from careerwright.identity import connection_check
+from careerwright.identity.activity import (
     ACTIVITY_MAX_ATTEMPTS,
     STORE_RETRY_BUDGET_S,
     PartialWriter,
     measured_usage,
 )
-from nessa.identity.failures import BoundExceededError, classify_failure
-from nessa.identity.meta import REQUEST_TIMEOUT_S, meta_model
-from nessa.identity.model_choice import ModelChoice
-from nessa.identity.model_registry import ModelMode, estimate_cost_nano_usd, format_usd
-from nessa.identity.workflow import ACTIVITY_BACKOFF_RATE, ACTIVITY_INTERVAL_S
-from nessa.profile import interview
+from careerwright.identity.failures import BoundExceededError, classify_failure
+from careerwright.identity.meta import REQUEST_TIMEOUT_S, meta_model
+from careerwright.identity.model_choice import ModelChoice
+from careerwright.identity.model_registry import ModelMode, estimate_cost_nano_usd, format_usd
+from careerwright.identity.workflow import ACTIVITY_BACKOFF_RATE, ACTIVITY_INTERVAL_S
+from careerwright.profile import interview
 from tools.leak_scan import Finding, Needle, scan
 from tools.localenv import REPO_ROOT, ensure_local_home
 from tools.stack import CORE_SERVICES, Ports, Stack
@@ -177,20 +177,24 @@ class SmokeSettings(BaseSettings):
 
     api_key: SecretStr = Field(validation_alias="META_API_KEY")
     meta_test_model: str = Field(
-        default="muse-spark-1.3-contributor", validation_alias="NESSA_META_TEST_MODEL"
+        default="muse-spark-1.3-contributor", validation_alias="CAREERWRIGHT_META_TEST_MODEL"
     )
     meta_production_model: str = Field(
-        default="muse-spark-1.3", validation_alias="NESSA_META_PRODUCTION_MODEL"
+        default="muse-spark-1.3", validation_alias="CAREERWRIGHT_META_PRODUCTION_MODEL"
     )
     # The cumulative budget scope (ruling R5). Defaults: three smoke invocations, one of them
     # on the production model, and $0.30 worst case in all.
-    budget_scope: str = Field(default="live-smoke", validation_alias="NESSA_LIVE_SMOKE_SCOPE")
-    scope_max_calls: int = Field(default=9, ge=0, validation_alias="NESSA_LIVE_SMOKE_MAX_CALLS")
+    budget_scope: str = Field(
+        default="live-smoke", validation_alias="CAREERWRIGHT_LIVE_SMOKE_SCOPE"
+    )
+    scope_max_calls: int = Field(
+        default=9, ge=0, validation_alias="CAREERWRIGHT_LIVE_SMOKE_MAX_CALLS"
+    )
     scope_max_production_calls: int = Field(
-        default=3, ge=0, validation_alias="NESSA_LIVE_SMOKE_MAX_PRODUCTION_CALLS"
+        default=3, ge=0, validation_alias="CAREERWRIGHT_LIVE_SMOKE_MAX_PRODUCTION_CALLS"
     )
     scope_max_cost_nano_usd: int = Field(
-        default=300_000_000, ge=0, validation_alias="NESSA_LIVE_SMOKE_MAX_COST_NANO_USD"
+        default=300_000_000, ge=0, validation_alias="CAREERWRIGHT_LIVE_SMOKE_MAX_COST_NANO_USD"
     )
 
     def budget(self) -> "ScopeBudget":
@@ -278,7 +282,7 @@ def authorise(
 
 
 class SmokeTarget(Protocol):
-    """A running Nessa the smoke drives: the isolated Compose stack (`StackTarget`), or in
+    """A running Careerwright the smoke drives: the isolated Compose stack (`StackTarget`), or in
     tests the integration stack with a fake-model worker."""
 
     @property
@@ -317,9 +321,9 @@ class Api:
 def _workspace_attempts(target: SmokeTarget, workspace_id: str) -> list[dict[str, Any]]:
     """Every attempt of the smoke workspace, whichever run made it, so no call escapes the
     ledger even if the client never learned its run ID."""
-    with psycopg.connect(target.superuser_url("nessa_app"), row_factory=dict_row) as conn:
+    with psycopg.connect(target.superuser_url("careerwright_app"), row_factory=dict_row) as conn:
         return conn.execute(
-            "SELECT * FROM nessa.model_attempts WHERE workspace_id = %s ORDER BY attempt_id",
+            "SELECT * FROM careerwright.model_attempts WHERE workspace_id = %s ORDER BY attempt_id",
             (workspace_id,),
         ).fetchall()
 
@@ -467,7 +471,7 @@ def ledger_workspace_calls(
 
 def leak_findings(target: SmokeTarget, api: Api, key: SecretStr) -> tuple[int, list[Finding]]:
     cells: list[tuple[str, str]] = list(api.responses)
-    for database in ("nessa_app", "nessa_dbos"):
+    for database in ("careerwright_app", "careerwright_dbos"):
         with psycopg.connect(target.superuser_url(database), row_factory=dict_row) as conn:
             tables = conn.execute(
                 "SELECT table_schema, table_name FROM information_schema.tables "
@@ -739,8 +743,8 @@ class StackTarget:
             f"{self.stack.auth_url}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword",
             params={"key": "emulator"},
             json={
-                "email": "ada@nessa.test",
-                "password": "nessa-demo-ada",
+                "email": "ada@careerwright.test",
+                "password": "careerwright-demo-ada",
                 "returnSecureToken": True,
             },
             timeout=20,
@@ -763,15 +767,16 @@ class StackTarget:
 
 @contextmanager
 def smoke_stack(*, production: bool) -> Iterator[StackTarget]:
-    """An isolated live-mode stack (own project, ports, NESSA_HOME, volumes), removed after."""
-    home = Path(tempfile.mkdtemp(prefix="nessa-smoke-"))
+    """An isolated live-mode stack (own project, ports, CAREERWRIGHT_HOME, volumes), removed
+    after."""
+    home = Path(tempfile.mkdtemp(prefix="careerwright-smoke-"))
     ensure_local_home(home)
     stack = Stack(
-        project="nessa-l0-smoke",
+        project="careerwright-l0-smoke",
         home=home,
         ports=SMOKE_PORTS,
         live=True,
-        overrides=(("NESSA_SYNTHETIC_MODEL_ROLE", "production" if production else "test"),),
+        overrides=(("CAREERWRIGHT_SYNTHETIC_MODEL_ROLE", "production" if production else "test"),),
     )
     try:
         stack.down()

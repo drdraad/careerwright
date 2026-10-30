@@ -11,14 +11,19 @@ import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from nessa.catalogue.records import IscoGroupRef, OccupationFacts
-from nessa.errors import ErrorCode, NessaError
-from nessa.profile.discovery import evidence_of
-from nessa.profile.document import FIELD_NAMES, ProfileInput, apply_profile_input, empty_profile
-from nessa.profile.fixture_explainer import fixture_explanation, prompt_context
-from nessa.profile.interview import ProfileField, ProposalOrigin
-from nessa.profile.safety import SUPPORT_TURN_INSTRUCTION, has_risk_stem
-from nessa.profile.slate_explanation import (
+from careerwright.catalogue.records import IscoGroupRef, OccupationFacts
+from careerwright.errors import CareerwrightError, ErrorCode
+from careerwright.profile.discovery import evidence_of
+from careerwright.profile.document import (
+    FIELD_NAMES,
+    ProfileInput,
+    apply_profile_input,
+    empty_profile,
+)
+from careerwright.profile.fixture_explainer import fixture_explanation, prompt_context
+from careerwright.profile.interview import ProfileField, ProposalOrigin
+from careerwright.profile.safety import SUPPORT_TURN_INSTRUCTION, has_risk_stem
+from careerwright.profile.slate_explanation import (
     INSTRUCTIONS,
     MAX_CLAIMS,
     MAX_PROMPT_BYTES,
@@ -626,7 +631,7 @@ def test_answers_too_long_for_the_prompt_in_bytes_are_a_typed_refusal() -> None:
         work_style=wide,
     )
 
-    with pytest.raises(NessaError) as refused:
+    with pytest.raises(CareerwrightError) as refused:
         build_input(
             discovery_id=DISCOVERY,
             profile_version=1,
@@ -901,4 +906,4 @@ def test_an_attempt_reserves_both_requests_at_their_bounds() -> None:
     # Standard: (13,000 x 1,250 + 2,000 x 4,250) x 2 = 49,500,000 nano-USD ($0.0495).
     assert worst_case_nano_usd("muse-spark-1.3-contributor") == 3_400_000
     assert worst_case_nano_usd("muse-spark-1.3") == 49_500_000
-    assert worst_case_nano_usd("nessa-fixture-explainer-1") == 0
+    assert worst_case_nano_usd("careerwright-fixture-explainer-1") == 0

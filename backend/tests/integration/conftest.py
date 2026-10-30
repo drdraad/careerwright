@@ -7,13 +7,13 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from nessa.api.app import create_app
-from nessa.api.deps import ApiDependencies
-from nessa.cli import import_reference_data, import_taxonomy, migrate_app, migrate_dbos, seed
-from nessa.db import create_engine
-from nessa.identity.firebase import FirebaseTokenVerifier
-from nessa.identity.keyring import load_keyring
-from nessa.identity.model_choice import ModelChoice
+from careerwright.api.app import create_app
+from careerwright.api.deps import ApiDependencies
+from careerwright.cli import import_reference_data, import_taxonomy, migrate_app, migrate_dbos, seed
+from careerwright.db import create_engine
+from careerwright.identity.firebase import FirebaseTokenVerifier
+from careerwright.identity.keyring import load_keyring
+from careerwright.identity.model_choice import ModelChoice
 from tests.support.client import ApiClient
 from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
 from tests.support.infra import API_BASE, Infra, sign_in_seeded, start_infra
@@ -24,7 +24,7 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture(scope="session")
 def infra(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Infra]:
-    home = Path(tmp_path_factory.mktemp("nessa-home"))
+    home = Path(tmp_path_factory.mktemp("careerwright-home"))
     started = start_infra(home)
     try:
         settings = started.ops_settings()

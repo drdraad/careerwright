@@ -86,12 +86,12 @@ inference, with at least 30 evaluation cases and a capped live run.
    something the person never said, or that searches by a health condition, personality
    type or protected characteristic the answers do not contain (one bounded repair, as for
    interview turns). Demo workspaces use a deterministic fixture proposer
-   (`nessa-fixture-discovery-1`: each answer as a query, no invented titles); the database
+   (`careerwright-fixture-discovery-1`: each answer as a query, no invented titles); the database
    confines both fixture models to demo workspaces and to these two kinds. A discovery
    pins the profile version it read. Without an answer that describes work it is refused
    (`INSUFFICIENT_EVIDENCE`) before any run exists; without a taxonomy, likewise.
 
-5. **The slate is deterministic code** (`nessa.profile.slate`), recomputed on each read
+5. **The slate is deterministic code** (`careerwright.profile.slate`), recomputed on each read
    (`GET .../discoveries/{id}/slate`) from the stored searches, the pinned answers and the
    held ESCO release, so it is reproducible without storing a second copy. The searches
    record the release they were chosen for; a slate read against another release says so
@@ -99,7 +99,7 @@ inference, with at least 30 evaluation cases and a capped live run.
    - *Retrieval.* Each query runs twice against ESCO's English full-text index: occupations
      matching every word score their rank over the best such rank; those matching only some
      words score at most half that (any-word search ranks a common word in a title highly).
-     Nessa adds the current role (searched) and the person's own target titles (exact label
+     Careerwright adds the current role (searched) and the person's own target titles (exact label
      matches). A model title becomes a candidate only if ESCO holds it as a label (DIV1-04);
      otherwise it is listed as an unsupported hypothesis, never suggested.
    - *Pool.* Hits are pooled by concept (an alias is the same concept). An occupation in the
@@ -110,7 +110,7 @@ inference, with at least 30 evaluation cases and a capped live run.
      distinct occupations a shared label ("geologist", "facility manager"), and chains of
      them once folded quarry engineers with building cleaners. Nor does it cross kinds of
      work: ESCO lists "biochemist" as a chemist, but that is related work, not the same
-     role. By an offline count (Python approximation of `nessa.concept_key` over ESCO
+     role. By an offline count (Python approximation of `careerwright.concept_key` over ESCO
      v1.2.1's preferred and alternative labels), 319 occupation pairs are one alias apart:
      155 across minor groups no longer fold, and 164 within one still do (for example
      physiotherapist and occupational therapist): the product owner confirmed at session 1
@@ -163,7 +163,7 @@ inference, with at least 30 evaluation cases and a capped live run.
    beside these words, never in their place: decision 12 (Task 6b) records how. These words
    remain the deterministic provenance, shown in every case and cited by exports.
 
-7. **The minimal support policy** (`nessa.profile.safety`, `support-policy-7`): one
+7. **The minimal support policy** (`careerwright.profile.safety`, `support-policy-7`): one
    deterministic, recall-first screen over normalised words (controller rulings, Task 6 fix
    rounds 4 and 5; three phrases added after session 1). It is kept apart from career
    suitability: it scores, labels and remembers nothing. The four UK services were checked
@@ -314,11 +314,11 @@ inference, with at least 30 evaluation cases and a capped live run.
    run limit of exactly one attempt, the test model only, a per-scope cumulative cap of the
    controller's 9 requests (R5; no production request, $0.05 worst case), so a scope holds
    one default run and a further authorised run gets its own scope
-   (`NESSA_LIVE_EVAL_SCOPE`). Every attempt is ledgered after the worker stops, the key is
+   (`CAREERWRIGHT_LIVE_EVAL_SCOPE`). Every attempt is ledgered after the worker stops, the key is
    leak-scanned, results with failures by type are appended to
    `docs/evidence/live-eval.md` under a header naming the budget scope (runs from fix round
    2 on), and each case's output is kept in the private evidence
-   directory (`NESSA_HOME/evidence/live-eval.jsonl`, never committed) so a failure can be
+   directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, never committed) so a failure can be
    diagnosed. It is never part of `make check` or `make acceptance`. The counterfactual pair
    (INT-04/05) is not in the default run: one sample per arm cannot separate a demographic
    effect from run-to-run variation, so it compares only the fields the message states
@@ -422,7 +422,7 @@ inference, with at least 30 evaluation cases and a capped live run.
       `output_truncated` at once; nothing is stored as checked.
     - *Models* (MODEL-02, as for every run). The Standard production model for
       non-synthetic workspaces, the test model for synthetic ones; demo workspaces use the
-      deterministic fixture explainer (`nessa-fixture-explainer-1`, each claim labelled
+      deterministic fixture explainer (`careerwright-fixture-explainer-1`, each claim labelled
       "Demo explainer (synthetic)"), which the database confines to demo workspaces and, with
       the other fixture models, to interview turns, discoveries and explanations. It reads
       each quotation back as the check reads it (`accepted_quotation`) before writing it,
@@ -447,7 +447,7 @@ inference, with at least 30 evaluation cases and a capped live run.
     - *UI.* "Why this could suit you" shows the note (each claim, then each quotation after
       "You said" or the part of ESCO's record), says who wrote it and that only the quoted
       words were checked against the answers and ESCO's record, the sentences being the
-      writer's own, and then "How Nessa found it" (decision 6's words), shown in every case.
+      writer's own, and then "How Careerwright found it" (decision 6's words), shown in every case.
       Pending, unavailable and not-covered states say so; a polite status line announces the
       change. An unavailable note shows, once above the cards, words from `vocabulary.ts` and
       the one action that can work: Try again for a run that reached no model or a refusal
@@ -492,7 +492,7 @@ inference, with at least 30 evaluation cases and a capped live run.
   carries the panel too (`TurnRefusedOut`; fix rounds 4 and 5: no 200 response and no
   `send_after_support` any more); a turn decision may carry edits.
 - Task 6b (decision 12): migration 0011; new run kind `slate_explanation` and fixture model
-  `nessa-fixture-explainer-1`; `POST .../discoveries/{id}/explanation`; `DiscoveryOut`
+  `careerwright-fixture-explainer-1`; `POST .../discoveries/{id}/explanation`; `DiscoveryOut`
   gains `explanation`; export format 4. Fix round 1: migration 0012 (a replaced link, one
   current link per discovery), `retry_failed` and `can_retry`, error code
   `SLATE_ALREADY_EXPLAINED` (409).
@@ -552,7 +552,7 @@ cover stays open: not run — requires human.
   job's official record, and a one-word answer such as "art" not quotable on its own
   (answer 2); readiness, pay and hiring claims blocked unless the job's own record uses the
   word, with the known false alarm "employers need" (answer 3); Try again only if no paid
-  call was made, Suggest again otherwise (answer 4); the note above "How Nessa found it",
+  call was made, Suggest again otherwise (answer 4); the note above "How Careerwright found it",
   saying only the quoted words were checked, and evaluation case EXP-01 as written
   (answer 5).
 - [ ] **Not covered by the addendum's answers** (decisions 12 and 7): the full readiness,

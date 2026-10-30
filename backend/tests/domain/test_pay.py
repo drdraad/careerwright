@@ -5,8 +5,8 @@ from datetime import date
 
 import pytest
 
-from nessa.catalogue.ashe import AshePeriod
-from nessa.catalogue.pay import (
+from careerwright.catalogue.ashe import AshePeriod
+from careerwright.catalogue.pay import (
     FloorUnknown,
     FloorVerdict,
     MappingResolution,

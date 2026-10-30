@@ -9,7 +9,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from nessa.planning.months import (
+from careerwright.planning.months import (
     ApplicationTiming,
     Month,
     application_timing,

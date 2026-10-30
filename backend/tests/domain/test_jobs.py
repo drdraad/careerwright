@@ -8,9 +8,9 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from nessa.catalogue.pay import FloorUnknown, FloorVerdict, SalaryFloorRule
-from nessa.evidence.extraction import salary_from
-from nessa.evidence.jobs import (
+from careerwright.catalogue.pay import FloorUnknown, FloorVerdict, SalaryFloorRule
+from careerwright.evidence.extraction import salary_from
+from careerwright.evidence.jobs import (
     CanonicalFacts,
     Grouped,
     advertiser_kind,
@@ -24,7 +24,7 @@ from nessa.evidence.jobs import (
     same_job,
     title_key,
 )
-from nessa.evidence.records import (
+from careerwright.evidence.records import (
     AdvertiserKind,
     DescriptionKind,
     JobCopy,

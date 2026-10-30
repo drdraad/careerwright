@@ -1,5 +1,5 @@
 /*
- * Nessa web styles. Colour, type, space, radius and motion come only from the design
+ * Careerwright web styles. Colour, type, space, radius and motion come only from the design
  * tokens (src/design/tokens/tokens.css, a byte-identical mirror of docs/design/tokens,
  * imported beside this file so its font URLs resolve from its own folder). The Tailwind
  * theme is reset and rebuilt from those semantic tokens, so no default palette, spacing or
@@ -931,13 +931,13 @@
     font-size: var(--type-14);
   }
 
-  .turn-nessa {
+  .turn-careerwright {
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr);
     gap: var(--space-12);
   }
 
-  .turn-nessa > .glyph {
+  .turn-careerwright > .glyph {
     width: 24px;
     height: 24px;
     color: var(--fg-muted);
@@ -1049,7 +1049,7 @@
     border-radius: var(--radius-control);
   }
 
-  /* An inference is drawn with a dashed edge: Nessa's reading, not a fact until accepted. */
+  /* An inference is drawn with a dashed edge: Careerwright's reading, not a fact until accepted. */
   .proposal[data-basis="inferred"] {
     border-style: dashed;
     border-color: var(--line-reading-control);

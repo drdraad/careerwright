@@ -1,4 +1,4 @@
-"""Setup places the Adzuna credentials from `.env` under NESSA_HOME for the acquisition
+"""Setup places the Adzuna credentials from `.env` under CAREERWRIGHT_HOME for the acquisition
 worker only (ruling R4; controller ruling for Task 7A): owner-only files, read in code,
 never echoed; an absent name is reported, never guessed. The names are the product owner's,
 `ADZUNA_APPLICATION_ID` and `ADZUNA_API_KEY` (controller ruling, fix round 5), with no
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from nessa.acquisition import load_adzuna_credentials
+from careerwright.acquisition import load_adzuna_credentials
 from tools.localenv import (
     adzuna_configured,
     ensure_local_home,
@@ -39,7 +39,7 @@ def test_both_credentials_are_placed_owner_only_and_never_returned(
 
     said = place_adzuna_credentials(home, dotenv)
 
-    assert said == "placed in NESSA_HOME/adzuna"
+    assert said == "placed in CAREERWRIGHT_HOME/adzuna"
     assert (home / "adzuna" / "adzuna_application_id").read_text() == APP_ID
     assert (home / "adzuna" / "adzuna_api_key").read_text() == APP_KEY
     for path in (home / "adzuna", *(home / "adzuna").iterdir()):

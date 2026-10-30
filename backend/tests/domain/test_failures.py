@@ -12,8 +12,8 @@ from pydantic_ai.exceptions import (
     UsageLimitExceeded,
 )
 
-from nessa.db import StoreUnavailableError
-from nessa.identity.failures import (
+from careerwright.db import StoreUnavailableError
+from careerwright.identity.failures import (
     Classified,
     FailureClass,
     TransientProviderError,

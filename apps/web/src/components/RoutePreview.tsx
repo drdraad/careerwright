@@ -1,7 +1,7 @@
 "use client";
 // The fixture-driven route preview (S1.5). Every number is the TRACE-01 fixture's own; the
 // layers are the ones the fixture states. Nothing is computed here, and the page says plainly
-// that Nessa's route search does not exist yet: this is not the production solver's output.
+// that Careerwright's route search does not exist yet: this is not the production solver's output.
 //
 // A card or the phone sheet can be read with everything above it scrolled away, so each keeps
 // its own qualification: a conditional route says "Conditional" beside its readiness, with
@@ -70,8 +70,8 @@ function SourceDetails({ preview }: { preview: Complete }) {
         <dd>{longDate.format(new Date(`${preview.source.dataAsOf}T00:00:00Z`))}</dd>
       </dl>
       <p className="small">
-        The layers are the ones this fixture states. Nessa's own route search, which will compute
-        them, is not part of this build.
+        The layers are the ones this fixture states. Careerwright's own route search, which will
+        compute them, is not part of this build.
       </p>
     </>
   );
@@ -163,7 +163,8 @@ function RouteDetails({ route, preview }: { route: PreviewRoute; preview: Comple
         </div>
       )}
       <p className="small muted">
-        From {preview.source.locator}, synthetic test data. Not a route Nessa computed for you.
+        From {preview.source.locator}, synthetic test data. Not a route Careerwright computed for
+        you.
       </p>
     </>
   );
@@ -264,8 +265,8 @@ export function RoutePreview({ preview }: { preview: Preview }) {
         }
       >
         <p>
-          Synthetic {preview.traceId} routes from the supplied fixture pack. Nessa's route search
-          isn't built yet, so none was computed from your profile.
+          Synthetic {preview.traceId} routes from the supplied fixture pack. Careerwright's route
+          search isn't built yet, so none was computed from your profile.
         </p>
       </Alert>
 

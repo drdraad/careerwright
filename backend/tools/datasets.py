@@ -1,12 +1,12 @@
 """`make setup`: fetch the pinned third-party datasets and verify them (ruling R7).
 
 Large datasets are not committed. Each one is pinned by URL, size and SHA-256 (ESCO,
-`nessa.catalogue.esco.ESCO_RELEASE`; the reference datasets, `nessa.catalogue.reference.
-DATASETS`: ONS ASHE and the SOC 2020 coding index, the ILO exposure index, the Anthropic
-Economic Index and the ESCO to O*NET crosswalk) and downloaded once into the gitignored
-`var/datasets/`, which the setup container mounts read-only and imports from. A download is
-written to a temporary file and moved into place only after its size and hash match, so a
-partial or altered file never has the pinned name. A file already present is re-verified,
+`careerwright.catalogue.esco.ESCO_RELEASE`; the reference datasets,
+`careerwright.catalogue.reference.DATASETS`: ONS ASHE and the SOC 2020 coding index, the ILO
+exposure index, the Anthropic Economic Index and the ESCO to O*NET crosswalk) and downloaded once
+into the gitignored `var/datasets/`, which the setup container mounts read-only and imports from. A
+download is written to a temporary file and moved into place only after its size and hash match, so
+a partial or altered file never has the pinned name. A file already present is re-verified,
 never trusted by name. Network access is needed here only. A redirect is followed only to
 https on the pinned URL's own host (Hugging Face serves its files that way); the hash check
 still decides.
@@ -27,9 +27,9 @@ from urllib.parse import urlsplit
 
 import httpx2
 
-from nessa.catalogue.esco import ESCO_RELEASE
-from nessa.catalogue.reference import DATASETS
-from nessa.catalogue.releases import MAX_RELEASE_BYTES, ReleasePin, read_verified
+from careerwright.catalogue.esco import ESCO_RELEASE
+from careerwright.catalogue.reference import DATASETS
+from careerwright.catalogue.releases import MAX_RELEASE_BYTES, ReleasePin, read_verified
 from tools.localenv import REPO_ROOT
 
 DATASETS_DIR = REPO_ROOT / "var" / "datasets"

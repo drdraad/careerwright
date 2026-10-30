@@ -1,18 +1,18 @@
-// The browser tests' own stack: project `nessa-l0-webtest`, its own loopback ports and a
-// temporary NESSA_HOME, driven through the same tool as `make demo` (backend/tools/stack.py).
+// The browser tests' own stack: project `careerwright-l0-webtest`, its own loopback ports and a
+// temporary CAREERWRIGHT_HOME, driven through the same tool as `make demo` (backend/tools/stack.py).
 import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const PROJECT = "nessa-l0-webtest";
+export const PROJECT = "careerwright-l0-webtest";
 export const PORTS = { web: 57600, api: 57700, auth: 57799, postgres: 57832 };
 export const WEB_ORIGIN = `http://127.0.0.1:${PORTS.web}`;
 export const AUTH_ORIGIN = `http://127.0.0.1:${PORTS.auth}`;
 export const FIXTURE_WORKSPACE = "74fa4514-899d-5316-80fd-4161dc0dbda0";
-/** Set by global setup; the restart and the teardown reuse the same NESSA_HOME. */
-export const HOME_VARIABLE = "NESSA_WEBTEST_HOME";
+/** Set by global setup; the restart and the teardown reuse the same CAREERWRIGHT_HOME. */
+export const HOME_VARIABLE = "CAREERWRIGHT_WEBTEST_HOME";
 
 const BACKEND = fileURLToPath(new URL("../../../backend/", import.meta.url));
 
@@ -30,10 +30,10 @@ export function stack(command: string): string {
     cwd: BACKEND,
     env: {
       ...process.env,
-      NESSA_WEB_PORT: String(PORTS.web),
-      NESSA_API_PORT: String(PORTS.api),
-      NESSA_AUTH_PORT: String(PORTS.auth),
-      NESSA_PG_PORT: String(PORTS.postgres),
+      CAREERWRIGHT_WEB_PORT: String(PORTS.web),
+      CAREERWRIGHT_API_PORT: String(PORTS.api),
+      CAREERWRIGHT_AUTH_PORT: String(PORTS.auth),
+      CAREERWRIGHT_PG_PORT: String(PORTS.postgres),
     },
     encoding: "utf8",
     timeout: 1_800_000,

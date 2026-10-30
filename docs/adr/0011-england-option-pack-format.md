@@ -26,8 +26,8 @@ be precise enough for a person to accept or reject each one with a yes or a no.
 ## Decisions
 
 1. **One JSON file per version.** The file is
-   `backend/src/nessa/catalogue/packs/england_option_pack/england-option-pack-<version>.json`.
-   The format is `nessa.catalogue.option_pack`: strict Pydantic models (unknown keys
+   `backend/src/careerwright/catalogue/packs/england_option_pack/england-option-pack-<version>.json`.
+   The format is `careerwright.catalogue.option_pack`: strict Pydantic models (unknown keys
    refused).
    - **Header:** a pack name, `format_version` (1), `pack_version`, `dated`, jurisdiction,
      currency, `synthetic: false` and the label review state.

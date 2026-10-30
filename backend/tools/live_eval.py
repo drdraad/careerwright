@@ -17,11 +17,11 @@ Caps, checked before the stack starts, under the ledger's exclusive lock:
 - per invocation: at most `MAX_LIVE_CASES` cases, no production model, and a worst-case cost
   cap;
 - per budget scope (`live-eval`), cumulatively over the ledger: provider requests,
-  production requests (none by default) and worst-case cost (`NESSA_LIVE_EVAL_*`).
+  production requests (none by default) and worst-case cost (`CAREERWRIGHT_LIVE_EVAL_*`).
 Afterwards the worker is stopped and every attempt of every case workspace is ledgered in
 `docs/evidence/live-usage.*` with its cost; the results, with failures by type, are
 appended to `docs/evidence/live-eval.md`, each case's output to the private evidence
-directory (`NESSA_HOME/evidence/live-eval.jsonl`, never committed); and both databases,
+directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, never committed); and both databases,
 every container log and the API's responses are scanned for the key.
 
 Run from `backend/`: `uv run --locked python -m tools.live_eval [--cases INT-01,DSC-01]`.
@@ -40,9 +40,9 @@ from typing import Any
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from nessa.identity.model_choice import ModelChoice
-from nessa.identity.model_registry import format_usd
-from nessa.profile import discovery, interview, slate_explanation
+from careerwright.identity.model_choice import ModelChoice
+from careerwright.identity.model_registry import format_usd
+from careerwright.profile import discovery, interview, slate_explanation
 from tools.evaluation import (
     Case,
     CaseKind,
@@ -64,14 +64,14 @@ from tools.live_smoke import (
     ledger_workspace_calls,
     smoke_stack,
 )
-from tools.localenv import REPO_ROOT, nessa_home
+from tools.localenv import REPO_ROOT, careerwright_home
 from tools.usage_ledger import Ledger, ScopeSpend
 
 MAX_LIVE_CASES = 6  # the cap for this task's live run (controller, R5)
 MAX_COST_NANO_USD = 50_000_000  # $0.05 worst case per invocation
 # Per budget scope, cumulatively: the controller's per-scope request cap (R5), which holds
 # one default run (four cases, at most eight requests); a further authorised run gets its
-# own scope (`NESSA_LIVE_EVAL_SCOPE`).
+# own scope (`CAREERWRIGHT_LIVE_EVAL_SCOPE`).
 SCOPE_MAX_CALLS = 9
 SCOPE_MAX_COST_NANO_USD = 50_000_000
 RESULTS_PATH = REPO_ROOT / "docs" / "evidence" / "live-eval.md"
@@ -117,17 +117,19 @@ class EvalSettings(BaseSettings):
 
     api_key: SecretStr = Field(validation_alias="META_API_KEY")
     meta_test_model: str = Field(
-        default="muse-spark-1.3-contributor", validation_alias="NESSA_META_TEST_MODEL"
+        default="muse-spark-1.3-contributor", validation_alias="CAREERWRIGHT_META_TEST_MODEL"
     )
     meta_production_model: str = Field(
-        default="muse-spark-1.3", validation_alias="NESSA_META_PRODUCTION_MODEL"
+        default="muse-spark-1.3", validation_alias="CAREERWRIGHT_META_PRODUCTION_MODEL"
     )
-    budget_scope: str = Field(default="live-eval", validation_alias="NESSA_LIVE_EVAL_SCOPE")
+    budget_scope: str = Field(default="live-eval", validation_alias="CAREERWRIGHT_LIVE_EVAL_SCOPE")
     scope_max_calls: int = Field(
-        default=SCOPE_MAX_CALLS, ge=0, validation_alias="NESSA_LIVE_EVAL_MAX_CALLS"
+        default=SCOPE_MAX_CALLS, ge=0, validation_alias="CAREERWRIGHT_LIVE_EVAL_MAX_CALLS"
     )
     scope_max_cost_nano_usd: int = Field(
-        default=SCOPE_MAX_COST_NANO_USD, ge=0, validation_alias="NESSA_LIVE_EVAL_MAX_COST_NANO_USD"
+        default=SCOPE_MAX_COST_NANO_USD,
+        ge=0,
+        validation_alias="CAREERWRIGHT_LIVE_EVAL_MAX_COST_NANO_USD",
     )
 
     def budget(self) -> ScopeBudget:
@@ -340,10 +342,10 @@ def results_of(runs: list[CaseRun]) -> dict[str, list[Failure]]:
 
 
 def _shown(path: Path) -> str:
-    """A private path as the committed results name it: relative to NESSA_HOME, so no
+    """A private path as the committed results name it: relative to CAREERWRIGHT_HOME, so no
     machine's home directory is written into the repository."""
-    home = nessa_home()
-    return f"NESSA_HOME/{path.relative_to(home)}" if path.is_relative_to(home) else str(path)
+    home = careerwright_home()
+    return f"CAREERWRIGHT_HOME/{path.relative_to(home)}" if path.is_relative_to(home) else str(path)
 
 
 def write_results(
@@ -452,7 +454,7 @@ def live_eval(
         if interrupted is not None:
             raise interrupted
     results = results_of(runs)
-    observed_at = observations_path or nessa_home() / "evidence" / "live-eval.jsonl"
+    observed_at = observations_path or careerwright_home() / "evidence" / "live-eval.jsonl"
     write_results(results_path, observed_at, plan, runs, results, seqs, scope)
     print(f"failures by type: {failures_by_type(results)}", flush=True)
     scanned, findings = leak_findings(target, api, key)

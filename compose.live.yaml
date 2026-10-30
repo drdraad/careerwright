@@ -2,7 +2,7 @@
 # activity can reach the Meta Model API, and the restricted acquisition worker gets one so it
 # can fetch permitted pages and query Adzuna (ADR 0009). Nothing else does, and the
 # acquisition worker stays off `internal`: only the DBOS worker can reach it. Demo mode
-# (`make demo`) does not load this file, so no Nessa service can open an outbound connection.
+# (`make demo`) does not load this file, so no Careerwright service can open an outbound connection.
 services:
   worker:
     networks: [internal, acquisition, egress]

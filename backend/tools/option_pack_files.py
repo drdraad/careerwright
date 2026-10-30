@@ -20,7 +20,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from nessa.catalogue.option_pack import (
+from careerwright.catalogue.option_pack import (
     CLAIM_FIELD_SHAPES,
     PACKS_DIR,
     SCHEMA_PATH,
@@ -377,7 +377,8 @@ TABLE = [
     "|---|---|---|---|---|---|",
 ]
 PACK_FILE = (
-    "backend/src/nessa/catalogue/packs/england_option_pack/england-option-pack-{version}.json"
+    "backend/src/careerwright/catalogue/packs/england_option_pack/"
+    "england-option-pack-{version}.json"
 )
 
 

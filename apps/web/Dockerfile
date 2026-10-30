@@ -1,4 +1,4 @@
-# Nessa web app: the Next.js standalone server. Dependencies come from the committed lockfile
+# Careerwright web app: the Next.js standalone server. Dependencies come from the committed lockfile
 # only (GC2); the build is the only step that needs the network. The runtime image holds the
 # traced server files and static assets, runs as the unprivileged `node` user, and has no
 # route out of the machine (it sits on the internal Compose network only).

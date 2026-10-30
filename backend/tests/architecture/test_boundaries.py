@@ -3,7 +3,8 @@
 - No circular imports, between modules or between top-level packages.
 - Vendor and SQL libraries are imported only by the adapter modules listed here. Every other
   module is domain or application code and may use only the standard library, pydantic and
-  other Nessa modules. Adding an adapter means adding it to `ADAPTERS`, which a reviewer sees.
+  other Careerwright modules. Adding an adapter means adding it to `ADAPTERS`, which a reviewer
+  sees.
 - The lockfile contains none of the excluded technologies.
 - Compose publishes ports on 127.0.0.1 only.
 """
@@ -46,37 +47,37 @@ VENDORS = frozenset(
 )
 # Module (or package prefix ending in ".") -> the vendor packages it may import.
 ADAPTERS: dict[str, frozenset[str]] = {
-    "nessa.db": frozenset({"sqlalchemy"}),
-    "nessa.cli": frozenset({"sqlalchemy", "alembic", "dbos"}),
-    "nessa.migrations.": frozenset({"alembic"}),
-    "nessa.identity.store": frozenset({"sqlalchemy"}),
-    "nessa.identity.credential_store": frozenset({"sqlalchemy"}),
-    "nessa.identity.run_store": frozenset({"sqlalchemy"}),
-    "nessa.profile.store": frozenset({"sqlalchemy"}),
-    "nessa.profile.interview_store": frozenset({"sqlalchemy"}),
-    "nessa.profile.explanation_store": frozenset({"sqlalchemy"}),
-    "nessa.catalogue.taxonomy_store": frozenset({"sqlalchemy"}),
-    "nessa.catalogue.reference_store": frozenset({"sqlalchemy"}),  # Task 7 slice B, ADR 0010
-    "nessa.capability.store": frozenset({"sqlalchemy"}),  # Task 9, ADR 0012
-    "nessa.identity.keyring": frozenset({"cryptography"}),
-    "nessa.identity.firebase": frozenset({"firebase_admin"}),
-    "nessa.identity.meta": frozenset({"httpx2", "openai", "pydantic_ai"}),
-    "nessa.identity.failures": frozenset({"pydantic_ai"}),
-    "nessa.identity.activity": frozenset({"pydantic_ai"}),
-    "nessa.identity.workflow": frozenset({"dbos"}),
-    "nessa.identity.worker": frozenset({"dbos"}),
-    "nessa.profile.interview_agent": frozenset({"pydantic_ai"}),
-    "nessa.profile.discovery_agent": frozenset({"pydantic_ai"}),
-    "nessa.profile.slate_explanation_agent": frozenset({"pydantic_ai"}),
-    "nessa.worker": frozenset({"pydantic_ai"}),
+    "careerwright.db": frozenset({"sqlalchemy"}),
+    "careerwright.cli": frozenset({"sqlalchemy", "alembic", "dbos"}),
+    "careerwright.migrations.": frozenset({"alembic"}),
+    "careerwright.identity.store": frozenset({"sqlalchemy"}),
+    "careerwright.identity.credential_store": frozenset({"sqlalchemy"}),
+    "careerwright.identity.run_store": frozenset({"sqlalchemy"}),
+    "careerwright.profile.store": frozenset({"sqlalchemy"}),
+    "careerwright.profile.interview_store": frozenset({"sqlalchemy"}),
+    "careerwright.profile.explanation_store": frozenset({"sqlalchemy"}),
+    "careerwright.catalogue.taxonomy_store": frozenset({"sqlalchemy"}),
+    "careerwright.catalogue.reference_store": frozenset({"sqlalchemy"}),  # Task 7 slice B, ADR 0010
+    "careerwright.capability.store": frozenset({"sqlalchemy"}),  # Task 9, ADR 0012
+    "careerwright.identity.keyring": frozenset({"cryptography"}),
+    "careerwright.identity.firebase": frozenset({"firebase_admin"}),
+    "careerwright.identity.meta": frozenset({"httpx2", "openai", "pydantic_ai"}),
+    "careerwright.identity.failures": frozenset({"pydantic_ai"}),
+    "careerwright.identity.activity": frozenset({"pydantic_ai"}),
+    "careerwright.identity.workflow": frozenset({"dbos"}),
+    "careerwright.identity.worker": frozenset({"dbos"}),
+    "careerwright.profile.interview_agent": frozenset({"pydantic_ai"}),
+    "careerwright.profile.discovery_agent": frozenset({"pydantic_ai"}),
+    "careerwright.profile.slate_explanation_agent": frozenset({"pydantic_ai"}),
+    "careerwright.worker": frozenset({"pydantic_ai"}),
     # Evidence and acquisition (Task 7, ADR 0009): the guarded HTTP client and the parser.
-    "nessa.evidence.fetcher": frozenset({"httpcore2", "certifi"}),
-    "nessa.evidence.pages": frozenset({"scrapling"}),
-    "nessa.evidence.store": frozenset({"sqlalchemy"}),
-    "nessa.evidence.workflow": frozenset({"dbos"}),
-    "nessa.evidence.search_agent": frozenset({"pydantic_ai"}),
-    "nessa.evidence.extraction_agent": frozenset({"pydantic_ai"}),  # fix round 2, ruling 10
-    "nessa.api.": frozenset({"fastapi", "starlette", "anyio"}),
+    "careerwright.evidence.fetcher": frozenset({"httpcore2", "certifi"}),
+    "careerwright.evidence.pages": frozenset({"scrapling"}),
+    "careerwright.evidence.store": frozenset({"sqlalchemy"}),
+    "careerwright.evidence.workflow": frozenset({"dbos"}),
+    "careerwright.evidence.search_agent": frozenset({"pydantic_ai"}),
+    "careerwright.evidence.extraction_agent": frozenset({"pydantic_ai"}),  # fix round 2, ruling 10
+    "careerwright.api.": frozenset({"fastapi", "starlette", "anyio"}),
 }
 EXCLUDED_PACKAGES = frozenset(
     {
@@ -129,7 +130,7 @@ def imports(name: str, path: Path) -> set[str]:
     return names
 
 
-def nessa_graph() -> dict[str, set[str]]:
+def careerwright_graph() -> dict[str, set[str]]:
     known = modules()
     return {
         name: {target for target in imports(name, path) if target in known and target != name}
@@ -184,13 +185,13 @@ def test_the_cycle_detector_finds_direct_and_indirect_cycles() -> None:
 
 @pytest.mark.req("ARC1-09")
 def test_no_module_imports_form_a_cycle() -> None:
-    assert cycles(nessa_graph()) == []
+    assert cycles(careerwright_graph()) == []
 
 
 @pytest.mark.req("ARC1-09")
 def test_no_top_level_packages_import_each_other_in_a_cycle() -> None:
     packages: dict[str, set[str]] = defaultdict(set)
-    for source, targets in nessa_graph().items():
+    for source, targets in careerwright_graph().items():
         packages[package_of(source)].update(
             package_of(t) for t in targets if package_of(t) != package_of(source)
         )
@@ -305,7 +306,7 @@ def test_the_javascript_lockfiles_hold_none_of_the_excluded_technologies(lock: s
 
 
 def import_closure(root: str) -> tuple[set[str], set[str]]:
-    """(Nessa modules, vendor packages) that `root` imports, transitively."""
+    """(Careerwright modules, vendor packages) that `root` imports, transitively."""
     known = modules()
     seen: set[str] = set()
     vendors: set[str] = set()
@@ -325,14 +326,22 @@ def import_closure(root: str) -> tuple[set[str], set[str]]:
 def test_the_acquisition_worker_cannot_reach_a_database_key_model_or_profile() -> None:
     # Global Constraint 8: the restricted acquisition worker holds no user secret, model key,
     # master key or private profile store. Its code cannot even reach one.
-    reached, vendors = import_closure("nessa.acquisition")
+    reached, vendors = import_closure("careerwright.acquisition")
 
     assert vendors <= {"httpcore2", "certifi", "scrapling"}
     forbidden = [
         m
         for m in reached
-        if m in ("nessa.db", "nessa.identity.keyring", "nessa.identity.meta", "nessa.worker")
-        or m.startswith(("nessa.profile", "nessa.identity.credential", "nessa.api"))
+        if m
+        in (
+            "careerwright.db",
+            "careerwright.identity.keyring",
+            "careerwright.identity.meta",
+            "careerwright.worker",
+        )
+        or m.startswith(
+            ("careerwright.profile", "careerwright.identity.credential", "careerwright.api")
+        )
         or m.endswith("store")
     ]
     assert forbidden == []
@@ -340,7 +349,7 @@ def test_the_acquisition_worker_cannot_reach_a_database_key_model_or_profile() -
 
 @pytest.mark.req("ACQ-05")
 def test_the_acquisition_worker_has_no_setting_for_a_database_key_or_model() -> None:
-    from nessa.acquisition import AcquisitionSettings
+    from careerwright.acquisition import AcquisitionSettings
 
     assert set(AcquisitionSettings.model_fields) == {
         "environment",

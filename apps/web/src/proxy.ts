@@ -10,9 +10,9 @@ export function proxy(request: NextRequest): NextResponse {
     config = webConfig();
   } catch (error) {
     console.error(
-      `nessa-web refuses to serve: ${error instanceof Error ? error.message : "invalid configuration"}`,
+      `careerwright-web refuses to serve: ${error instanceof Error ? error.message : "invalid configuration"}`,
     );
-    return new NextResponse("Nessa's web server is not configured safely; see its log.", {
+    return new NextResponse("Careerwright's web server is not configured safely; see its log.", {
       status: 500,
     });
   }

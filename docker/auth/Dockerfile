@@ -21,4 +21,4 @@ COPY --chown=emulator seed ./seed
 EXPOSE 9099
 HEALTHCHECK --interval=2s --timeout=3s --retries=60 \
     CMD ["node", "-e", "fetch('http://127.0.0.1:9099/').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
-CMD ["firebase", "emulators:start", "--only", "auth", "--project", "demo-nessa", "--import", "./seed"]
+CMD ["firebase", "emulators:start", "--only", "auth", "--project", "demo-careerwright", "--import", "./seed"]

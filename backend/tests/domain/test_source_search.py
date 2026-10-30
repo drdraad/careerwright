@@ -13,7 +13,7 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, Text
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RequestUsage
 
-from nessa.evidence.search import (
+from careerwright.evidence.search import (
     INSTRUCTIONS,
     MAX_CANDIDATES,
     MAX_PROMPT_BYTES,
@@ -29,10 +29,10 @@ from nessa.evidence.search import (
     render_prompt,
     worst_case_nano_usd,
 )
-from nessa.evidence.search_agent import SOURCE_SEARCH_TASK, run_search, searched
-from nessa.identity.activity import measured_usage
-from nessa.identity.failures import BoundExceededError, FailureClass, classify_failure
-from nessa.identity.model_registry import ModelMode
+from careerwright.evidence.search_agent import SOURCE_SEARCH_TASK, run_search, searched
+from careerwright.identity.activity import measured_usage
+from careerwright.identity.failures import BoundExceededError, FailureClass, classify_failure
+from careerwright.identity.model_registry import ModelMode
 from tests.support.fake_models import SEARCHED, search_parts
 
 CONTEXT = SearchInput(profile_version=4, target="Data quality analyst", city="Manchester")

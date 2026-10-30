@@ -1,4 +1,4 @@
-# Nessa design references (Sprint 0)
+# Careerwright design references (Sprint 0)
 
 Versioned visual reference for L0: semantic tokens with measured contrast, two licensed
 fonts, and three signature compositions built as static HTML, CSS and SVG. Each
@@ -71,7 +71,7 @@ Rules the compositions follow, which implementations must keep:
   in the unknown colour mark unknown values ("Not confirmed, not £0", "Pay not stated",
   "none found"). A missing value is never a zero, a blank or a lowest rank.
 - **Dashes mean only "provisional" or "reading aid".** A dashed edge marks a proposal or a
-  sketch that is not yet a fact (Nessa's inference, the early sketch). A dashed line in a
+  sketch that is not yet a fact (Careerwright's inference, the early sketch). A dashed line in a
   chart is a reading aid (the comparison boundary). Unknown, stale, remote, estimated and
   synthetic never use dashes:
   - stale map nodes: a solid sand ring;

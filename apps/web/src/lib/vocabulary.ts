@@ -174,7 +174,7 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
   minimum_salary: {
     label: "Lowest pay you'd accept",
     kind: "salary",
-    hint: "Before tax, with its period. A firm limit: vacancies whose advertised pay in that period is below it, and suggestions whose reviewed official pay is, are left out; Nessa says how many, and why the rest were kept.",
+    hint: "Before tax, with its period. A firm limit: vacancies whose advertised pay in that period is below it, and suggestions whose reviewed official pay is, are left out; Careerwright says how many, and why the rest were kept.",
     lessPrecise:
       "No route is checked against pay. Unknown pay is never treated as below your limit.",
   },
@@ -203,7 +203,7 @@ export const ENTRY_MODE: Record<EntryMode, { label: string; detail: string }> = 
   },
   unsure: {
     label: "Help me explore",
-    detail: "Start from what you enjoy. Nessa suggests varied directions to consider.",
+    detail: "Start from what you enjoy. Careerwright suggests varied directions to consider.",
   },
 };
 
@@ -214,7 +214,7 @@ export const CONVERSATION_MODE: Record<ConversationMode, string> = {
   challenge: "Challenge my assumptions",
 };
 
-/** Nessa's first question for each entry, before any reply exists (spec section 4). */
+/** Careerwright's first question for each entry, before any reply exists (spec section 4). */
 export const OPENING_QUESTION: Record<EntryMode, string> = {
   sure: "Which role are you aiming for, and at what level?",
   unsure: "What would you most like to be different about your working life?",
@@ -222,9 +222,9 @@ export const OPENING_QUESTION: Record<EntryMode, string> = {
 
 /** A streamed reply's state in words. Only "incomplete" is final; nothing streamed is saved. */
 export const PARTIAL_REPLY: Record<PartialCompleteness, { label: string }> = {
-  none: { label: "Nessa is reading your message" },
+  none: { label: "Careerwright is reading your message" },
   streaming: { label: "Writing a reply, not checked yet" },
-  stopped: { label: "The reply stopped. Nessa is trying again" },
+  stopped: { label: "The reply stopped. Careerwright is trying again" },
   incomplete: { label: "This reply didn't finish and wasn't checked" },
   // Its text is never served; the checked reply replaces it.
   superseded: { label: "Replaced by the checked reply" },
@@ -235,7 +235,7 @@ export const FAILED_REPLY_LABEL = "Stopped: not checked, nothing saved";
 /** Why a model run ended without a result, in the person's words (failure classes). */
 export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string }> = {
   access_revoked: {
-    title: "Access to this workspace ended while Nessa was working",
+    title: "Access to this workspace ended while Careerwright was working",
     action: "Nothing was saved from it.",
   },
   credential_unavailable: {
@@ -271,7 +271,7 @@ export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string
     action: "Your work is kept. Try again later.",
   },
   invalid_model_output: {
-    title: "The reply didn't pass Nessa's checks twice",
+    title: "The reply didn't pass Careerwright's checks twice",
     action: "Nothing was saved from it. Try again, or add the details yourself.",
   },
   model_refused: {
@@ -283,11 +283,11 @@ export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string
     action: "Nothing was saved from it. Try a shorter message.",
   },
   bound_exceeded: {
-    title: "The model did more work than Nessa allowed for",
+    title: "The model did more work than Careerwright allowed for",
     action: "Its cost was recorded and nothing was saved from it. Try again later.",
   },
   app_store_unavailable: {
-    title: "Nessa couldn't save the result",
+    title: "Careerwright couldn't save the result",
     action: "Try again in a moment.",
   },
   retrieval_failed: {
@@ -299,7 +299,7 @@ export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string
     action: "Nothing was fetched. Choose other sources, or paste the advert.",
   },
   unknown_failure: {
-    title: "Something went wrong while Nessa was working",
+    title: "Something went wrong while Careerwright was working",
     action: "Nothing was saved from it. Try again.",
   },
 };
@@ -313,18 +313,18 @@ export const EMPTY_REASON: Record<EmptyReason, { title: string; detail: string }
   },
   sources_pending: {
     title: "Still checking your sources",
-    detail: "Nessa is fetching or reading them now. The list updates when it's done.",
+    detail: "Careerwright is fetching or reading them now. The list updates when it's done.",
   },
   no_source_retrieved: {
     title: "None of the sources could be fetched",
     detail: "This isn't a sign there are no vacancies. Try again later, or paste the advert.",
   },
   no_posting_readable: {
-    title: "Nessa couldn't read a job advert on these pages",
+    title: "Careerwright couldn't read a job advert on these pages",
     detail: "This isn't a sign there are no vacancies. Paste the advert, or try another page.",
   },
   no_posting_found_by_model: {
-    title: "Nessa read these pages and found no job advert on them",
+    title: "Careerwright read these pages and found no job advert on them",
     detail:
       "This isn't a sign there are no vacancies: only these pages were read. Paste the advert, or try another page.",
   },
@@ -339,41 +339,41 @@ export const EMPTY_REASON: Record<EmptyReason, { title: string; detail: string }
   },
 };
 
-/** How a page went that Nessa's model read for a job advert (fix round 3, review C M5).
+/** How a page went that Careerwright's model read for a job advert (fix round 3, review C M5).
  * None says there are no vacancies. */
 export const MODEL_EXTRACTION_STATE: Record<
   ModelExtractionState,
   { title: string; detail: string }
 > = {
   pending: {
-    title: "Nessa is reading this page",
+    title: "Careerwright is reading this page",
     detail: "Its job advert, if it has one, appears here when the reading is done.",
   },
   postings_read: {
-    title: "Nessa read a job advert on this page",
+    title: "Careerwright read a job advert on this page",
     detail: "Each value was checked against the page's own words.",
   },
   postings_conflicting: {
     title: "The adverts on this page disagree with each other",
     detail:
-      "Nessa can't tell which is right, so none is shown. Paste the advert you mean, or try its own page.",
+      "Careerwright can't tell which is right, so none is shown. Paste the advert you mean, or try its own page.",
   },
   no_posting_found: {
-    title: "Nessa read this page and found no job advert on it",
+    title: "Careerwright read this page and found no job advert on it",
     detail: "This isn't a sign there are no vacancies. Paste the advert, or try another page.",
   },
   not_read: {
-    title: "Nessa couldn't read a job advert on this page",
+    title: "Careerwright couldn't read a job advert on this page",
     detail: "This isn't a sign there are no vacancies. Paste the advert, or try another page.",
   },
   not_run: {
-    title: "Nessa didn't read this page",
+    title: "Careerwright didn't read this page",
     detail: "This isn't a sign there are no vacancies. Paste the advert, or try another page.",
   },
 };
 
 /** Why a source search proposed no page (review B I5). None says there are no vacancies:
- * only that this search found no posting page Nessa could check. */
+ * only that this search found no posting page Careerwright could check. */
 export const SEARCH_EMPTY_REASON: Record<SearchEmptyReason, { title: string; detail: string }> = {
   search_returned_nothing: {
     title: "The search returned no pages",
@@ -386,13 +386,13 @@ export const SEARCH_EMPTY_REASON: Record<SearchEmptyReason, { title: string; det
       "This isn't a sign there are no vacancies. Add a posting you found yourself, or paste the advert.",
   },
   all_excluded: {
-    title: "Every page the search suggested is one Nessa can't use",
+    title: "Every page the search suggested is one Careerwright can't use",
     detail:
       "This isn't a sign there are no vacancies. Look on employers' own careers sites, or paste the advert.",
   },
 };
 
-/** The slate's three directions (relative to what the person has told Nessa). */
+/** The slate's three directions (relative to what the person has told Careerwright). */
 export const DIRECTION: Record<Direction, string> = {
   close_to_current: "Close to what you do now",
   transferable: "Builds on skills you could carry over",
@@ -522,7 +522,7 @@ const ERROR_WORDS: Record<ErrorCode, Omit<ErrorStatement, "tone">> = {
     action: "This feature is planned for later.",
   },
   MODEL_SCOPE_EXCEEDED: {
-    title: "Outside what Nessa can plan",
+    title: "Outside what Careerwright can plan",
     action: "This route needs more than the planning model covers.",
   },
   COARSE_MODEL_UNRESOLVED: {
@@ -545,16 +545,16 @@ const ERROR_WORDS: Record<ErrorCode, Omit<ErrorStatement, "tone">> = {
   METHOD_NOT_ALLOWED: { title: "That action isn't supported", action: "Reload the page." },
   REQUEST_REJECTED: { title: "The request was rejected", action: "Reload the page and try again." },
   CLIENT_NOT_ALLOWED: {
-    title: "Nessa serves this computer only",
-    action: "Open Nessa on the machine it runs on.",
+    title: "Careerwright serves this computer only",
+    action: "Open Careerwright on the machine it runs on.",
   },
   HOST_NOT_ALLOWED: {
-    title: "Nessa answers on its local address only",
-    action: "Open it at the address Nessa printed when it started.",
+    title: "Careerwright answers on its local address only",
+    action: "Open it at the address Careerwright printed when it started.",
   },
   ORIGIN_NOT_ALLOWED: {
     title: "This page isn't allowed to make changes",
-    action: "Open Nessa at its local address.",
+    action: "Open Careerwright at its local address.",
   },
   VALIDATION_FAILED: {
     title: "Some answers aren't valid",
@@ -581,7 +581,7 @@ const ERROR_WORDS: Record<ErrorCode, Omit<ErrorStatement, "tone">> = {
     action: "Use demo or live-assisted mode.",
   },
   STORE_UNAVAILABLE: {
-    title: "Nessa's database isn't reachable",
+    title: "Careerwright's database isn't reachable",
     action: "Nothing was lost. Try again in a moment.",
   },
   AUTH_UNAVAILABLE: {
@@ -594,11 +594,11 @@ const ERROR_WORDS: Record<ErrorCode, Omit<ErrorStatement, "tone">> = {
   },
   TAXONOMY_UNAVAILABLE: {
     title: "The occupation list isn't loaded",
-    action: "Run the setup step again, then restart Nessa. Your work is kept.",
+    action: "Run the setup step again, then restart Careerwright. Your work is kept.",
   },
   REFERENCE_DATA_UNAVAILABLE: {
     title: "Pay and AI evidence aren't loaded",
-    action: "Run the setup step again, then restart Nessa. Your work is kept.",
+    action: "Run the setup step again, then restart Careerwright. Your work is kept.",
   },
   CONFIRMATION_REQUIRED: {
     title: "Confirm each limit or target first",
@@ -630,7 +630,7 @@ const ERROR_WORDS: Record<ErrorCode, Omit<ErrorStatement, "tone">> = {
 /** What the person can do when a slate's written note isn't there (ADR 0007 decision 12). */
 export const NOTE_RECOVERY = {
   /** Its run stopped before any request reached a model, so the one call is unused. */
-  retry: "No request reached the model, so Nessa can try the note again.",
+  retry: "No request reached the model, so Careerwright can try the note again.",
   /** A request was sent: this slate has had its one call. */
   spent: "These suggestions have had their one written note.",
   /** What Suggest again does, wherever it is offered for a note. */
@@ -645,12 +645,12 @@ export const NOTE_RECOVERY = {
 export const NOTE_CARD = {
   failed: {
     detail: "no written note",
-    after: "Nothing from it was kept; how Nessa found this suggestion is below.",
+    after: "Nothing from it was kept; how Careerwright found this suggestion is below.",
   },
   refused: {
     detail: "no written note",
     after:
-      "Nessa didn't ask the model, so nothing was sent; how Nessa found this suggestion is below.",
+      "Careerwright didn't ask the model, so nothing was sent; how Careerwright found this suggestion is below.",
   },
 } as const;
 
@@ -667,18 +667,19 @@ export const NOTE_REFUSAL_REASON = {
   no_quotable_answer: {
     title: "Your answers can't be quoted on their own",
     action:
-      "Add a few words to what you enjoy, can do or have done with Edit answers directly. Nessa then offers Suggest again.",
+      "Add a few words to what you enjoy, can do or have done with Edit answers directly. Careerwright then offers Suggest again.",
     recovery: "edit_answers",
   },
   answers_too_long: {
     title: "Your answers are too long for a written note",
     action:
-      "Shorten or remove some answers with Edit answers directly. Nessa then offers Suggest again.",
+      "Shorten or remove some answers with Edit answers directly. Careerwright then offers Suggest again.",
     recovery: "edit_answers",
   },
   no_suggestions: {
     title: "There are no suggestions here to explain",
-    action: "Add to your answers with Edit answers directly. Nessa then offers Suggest again.",
+    action:
+      "Add to your answers with Edit answers directly. Careerwright then offers Suggest again.",
     recovery: "edit_answers",
   },
 } as const satisfies Record<string, NoteRefusalWords>;
@@ -697,7 +698,7 @@ export const NOTE_REFUSAL_CODE: Partial<Record<ErrorCode, NoteRefusalWords>> = {
   },
   SLATE_ALREADY_EXPLAINED: {
     title: "These suggestions have had their one written note",
-    action: "Nessa doesn't write it again for the same suggestions.",
+    action: "Careerwright doesn't write it again for the same suggestions.",
     recovery: "suggest_again",
   },
 };

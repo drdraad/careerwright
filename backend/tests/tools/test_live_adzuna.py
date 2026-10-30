@@ -10,9 +10,9 @@ from typing import Any
 import pytest
 from pydantic import SecretStr
 
-from nessa.evidence.acquire import AcquisitionResult
-from nessa.evidence.adzuna import AdzunaQuery, parse_search, recorded_url
-from nessa.evidence.records import AttemptStatus, InputRoute
+from careerwright.evidence.acquire import AcquisitionResult
+from careerwright.evidence.adzuna import AdzunaQuery, parse_search, recorded_url
+from careerwright.evidence.records import AttemptStatus, InputRoute
 from tools.live_adzuna import BLOCKED, MAX_SCOPE_REQUESTS, SCOPE, AdzunaSettings, run
 from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry
 

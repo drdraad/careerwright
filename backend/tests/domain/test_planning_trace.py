@@ -6,9 +6,9 @@ dates. Expected values are the fixture's own and the hand check's
 
 import pytest
 
-from nessa.capability.readiness import ReadinessState
-from nessa.planning.checker import Feasibility, Scenario, check_route, evaluate_route
-from nessa.planning.compiler import MonthlyInput, compile_input
+from careerwright.capability.readiness import ReadinessState
+from careerwright.planning.checker import Feasibility, Scenario, check_route, evaluate_route
+from careerwright.planning.compiler import MonthlyInput, compile_input
 from tests.support.capability import fixture
 from tests.support.planning import (
     COURSES,

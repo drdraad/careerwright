@@ -8,9 +8,9 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from nessa.evidence.addresses import MAX_URL_CHARS
-from nessa.evidence.pages import ParsedPage, parse_page
-from nessa.evidence.records import (
+from careerwright.evidence.addresses import MAX_URL_CHARS
+from careerwright.evidence.pages import ParsedPage, parse_page
+from careerwright.evidence.records import (
     UNREADABLE,
     AdvertiserKind,
     ClaimField,

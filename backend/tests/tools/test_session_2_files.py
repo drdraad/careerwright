@@ -7,9 +7,9 @@ import re
 
 import pytest
 
-from nessa.capability.reference import load_reference
-from nessa.catalogue.option_pack import PINS, load_pack, pack_path
-from nessa.planning.checker import (
+from careerwright.capability.reference import load_reference
+from careerwright.catalogue.option_pack import PINS, load_pack, pack_path
+from careerwright.planning.checker import (
     Feasibility,
     FindingCode,
     FindingKind,

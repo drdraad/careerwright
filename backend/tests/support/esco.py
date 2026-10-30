@@ -2,13 +2,13 @@
 
 Tests import this reduced subset of ESCO v1.2.1, so they need no network. It is labelled a
 sample in its pin and in the database (`taxonomy_releases.sample`); the product imports
-only `nessa.catalogue.esco.ESCO_RELEASE`.
+only `careerwright.catalogue.esco.ESCO_RELEASE`.
 """
 
 import dataclasses
 
-from nessa.catalogue.esco import ESCO_RELEASE
-from nessa.catalogue.releases import ReleasePin
+from careerwright.catalogue.esco import ESCO_RELEASE
+from careerwright.catalogue.releases import ReleasePin
 from tools.localenv import REPO_ROOT
 
 SAMPLE_DIR = REPO_ROOT / "fixtures" / "esco-sample"

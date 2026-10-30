@@ -16,7 +16,7 @@ const IDENTITIES = [
 
 const PROBLEM: Record<SignInProblem, string> = {
   wrong_credentials: "That email and password don't match a local identity.",
-  unreachable: "The sign-in service isn't reachable. Is Nessa running (make demo)?",
+  unreachable: "The sign-in service isn't reachable. Is Careerwright running (make demo)?",
   too_many_attempts: "Too many attempts. Wait a moment, then try again.",
   failed: "Sign-in didn't work. Try again.",
 };
@@ -44,11 +44,11 @@ export function SignInForm({ next }: { next: string }) {
     <>
       <div className="flex items-center gap-12">
         <Glyph name="mark" className="h-[32px] w-[32px]" />
-        <h1 className="page-title">Sign in to Nessa</h1>
+        <h1 className="page-title">Sign in to Careerwright</h1>
       </div>
       <p className="small muted">
         Local sign-in through the Firebase Auth emulator on this computer. Being signed in is not
-        enough on its own: Nessa also checks that the account is invited.
+        enough on its own: Careerwright also checks that the account is invited.
       </p>
       <section className="grid gap-8" aria-labelledby={`${id}-identities`}>
         <h2 id={`${id}-identities`} className="section-title">
@@ -61,8 +61,8 @@ export function SignInForm({ next }: { next: string }) {
                 type="button"
                 className="btn btn-secondary w-full flex-wrap justify-start whitespace-normal py-8 text-left"
                 onClick={() => {
-                  setEmail(`${identity.handle}@nessa.test`);
-                  setPassword(`nessa-demo-${identity.handle}`);
+                  setEmail(`${identity.handle}@careerwright.test`);
+                  setPassword(`careerwright-demo-${identity.handle}`);
                   setProblem(null);
                 }}
               >

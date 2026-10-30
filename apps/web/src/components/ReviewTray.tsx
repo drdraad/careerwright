@@ -1,7 +1,7 @@
 "use client";
 // The review tray (spec section 3, STATE-06): the newest reply's proposed changes, each to
 // accept, edit or skip; a limit or target is saved only once confirmed by name (PROF-04).
-// Facts the person stated and Nessa's readings look different (a dashed edge). Edits are
+// Facts the person stated and Careerwright's readings look different (a dashed edge). Edits are
 // checked before anything is sent; then one decision saves the accepted proposals and the
 // person's own answers together, as one version, or nothing at all (the tray and its edits
 // stay, with the reason). Nothing changes until the person saves.
@@ -39,7 +39,9 @@ type Props = {
 
 function kindOf(change: ProposedChangeOut): string {
   const basis =
-    change.basis === "stated" ? "You said" : "Nessa's reading, not a fact until you accept it";
+    change.basis === "stated"
+      ? "You said"
+      : "Careerwright's reading, not a fact until you accept it";
   return change.hard_constraint ? `A limit or target: needs your confirmation. ${basis}` : basis;
 }
 
@@ -133,7 +135,7 @@ export function ReviewTray({
           <span className="status" data-tone="unknown">
             {change.basis === "stated"
               ? "You said this; not verified"
-              : "Nessa's reading of what you said"}
+              : "Careerwright's reading of what you said"}
           </span>
           <figure className="grid gap-4">
             <blockquote className="small">“{turn.message}”</blockquote>

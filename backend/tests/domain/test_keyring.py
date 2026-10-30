@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from cryptography.exceptions import InvalidTag
 
-from nessa.identity.keyring import (
+from careerwright.identity.keyring import (
     KEY_BYTES,
     Keyring,
     MasterKeyError,

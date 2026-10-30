@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from nessa.seed import INVITED_ACTORS
+from careerwright.seed import INVITED_ACTORS
 from tests.support.client import ApiClient
 from tests.support.infra import (
     Infra,
@@ -28,7 +28,7 @@ def test_seeded_invited_identity_signs_in(api: ApiClient, ada: str) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "actor_id": str(INVITED_ACTORS[0].actor_id),
-        "email": "ada@nessa.test",
+        "email": "ada@careerwright.test",
         "display_name": "Ada Demo",
     }
 
@@ -57,12 +57,12 @@ def test_the_seeded_uninvited_identity_is_refused_everywhere(api: ApiClient, ada
 @pytest.mark.req("SEC-01")
 def test_revoked_tokens_are_refused(api: ApiClient, infra: Infra) -> None:
     uid = f"revoke-{uuid.uuid4().hex[:8]}"
-    create_emulator_user(uid, f"{uid}@nessa.test", "password-123456")
-    token = sign_in(f"{uid}@nessa.test", "password-123456")
+    create_emulator_user(uid, f"{uid}@careerwright.test", "password-123456")
+    token = sign_in(f"{uid}@careerwright.test", "password-123456")
     infra.query(
-        "INSERT INTO nessa.actors (actor_id, email, display_name, access) "
+        "INSERT INTO careerwright.actors (actor_id, email, display_name, access) "
         "VALUES (%s, %s, 'Revoked tokens', 'active')",
-        (uuid.uuid4(), f"{uid}@nessa.test"),
+        (uuid.uuid4(), f"{uid}@careerwright.test"),
     )
     assert api.get("/v1/me", token).status_code == 200
 
@@ -75,17 +75,17 @@ def test_revoked_tokens_are_refused(api: ApiClient, infra: Infra) -> None:
 @pytest.mark.req("SEC-01")
 def test_a_revoked_invitation_loses_access_at_once(api: ApiClient, infra: Infra) -> None:
     uid = f"uninvite-{uuid.uuid4().hex[:8]}"
-    email = f"{uid}@nessa.test"
+    email = f"{uid}@careerwright.test"
     create_emulator_user(uid, email, "password-123456")
     token = sign_in(email, "password-123456")
     infra.query(
-        "INSERT INTO nessa.actors (actor_id, email, display_name, access) "
+        "INSERT INTO careerwright.actors (actor_id, email, display_name, access) "
         "VALUES (%s, %s, 'Soon revoked', 'active')",
         (uuid.uuid4(), email),
     )
     workspace = api.create_workspace(token)
 
-    infra.query("UPDATE nessa.actors SET access = 'revoked' WHERE email = %s", (email,))
+    infra.query("UPDATE careerwright.actors SET access = 'revoked' WHERE email = %s", (email,))
 
     for path in ("/v1/me", f"/v1/workspaces/{workspace['workspace_id']}"):
         response = api.get(path, token)
@@ -95,9 +95,9 @@ def test_a_revoked_invitation_loses_access_at_once(api: ApiClient, infra: Infra)
 @pytest.mark.req("SEC-01")
 def test_an_unverified_email_cannot_claim_an_invitation(api: ApiClient, infra: Infra) -> None:
     uid = f"unverified-{uuid.uuid4().hex[:8]}"
-    email = f"{uid}@nessa.test"
+    email = f"{uid}@careerwright.test"
     infra.query(
-        "INSERT INTO nessa.actors (actor_id, email, display_name, access) "
+        "INSERT INTO careerwright.actors (actor_id, email, display_name, access) "
         "VALUES (%s, %s, 'Unverified', 'active')",
         (uuid.uuid4(), email),
     )
@@ -112,9 +112,9 @@ def test_an_unverified_email_cannot_claim_an_invitation(api: ApiClient, infra: I
 def test_an_invitation_binds_to_the_first_account_and_refuses_a_second(
     api: ApiClient, infra: Infra
 ) -> None:
-    email = f"bind-{uuid.uuid4().hex[:8]}@nessa.test"
+    email = f"bind-{uuid.uuid4().hex[:8]}@careerwright.test"
     infra.query(
-        "INSERT INTO nessa.actors (actor_id, email, display_name, access) "
+        "INSERT INTO careerwright.actors (actor_id, email, display_name, access) "
         "VALUES (%s, %s, 'Bound', 'active')",
         (uuid.uuid4(), email),
     )
@@ -128,5 +128,5 @@ def test_an_invitation_binds_to_the_first_account_and_refuses_a_second(
     response = api.get("/v1/me", sign_in(email, "password-123456"))
 
     assert (response.status_code, error_code(response)) == (403, "NOT_INVITED")
-    [row] = infra.query("SELECT firebase_uid FROM nessa.actors WHERE email = %s", (email,))
+    [row] = infra.query("SELECT firebase_uid FROM careerwright.actors WHERE email = %s", (email,))
     assert row["firebase_uid"] == first

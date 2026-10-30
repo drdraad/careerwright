@@ -2,8 +2,8 @@
 // design-only data) for the current state. Layout is deterministic: fixed anchors, fixed
 // company angles, no force simulation (plan section 5: no continuous force motion).
 (function () {
-  const { DESIGN_LISTINGS: L, state, fmt } = window.NESSA;
-  const AI = window.NESSA.FIXTURES.trace01.aiScore;
+  const { DESIGN_LISTINGS: L, state, fmt } = window.CAREERWRIGHT;
+  const AI = window.CAREERWRIGHT.FIXTURES.trace01.aiScore;
 
   const VIEWS = {
     default: { areas: ["manchester", "leeds", "remote"], jobs: null, selected: "j1", stale: [], empty: [] },

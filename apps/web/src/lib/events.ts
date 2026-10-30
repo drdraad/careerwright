@@ -45,7 +45,7 @@ const REAUTH_SETTLE_MS = 10_000;
 const ACCESS_ENDED: ReadonlySet<ErrorCode> = new Set<ErrorCode>(["NOT_INVITED", "NOT_FOUND"]);
 /**
  * The control events the API's stream sends besides plain messages
- * (backend/src/nessa/api/routes_events.py). They are not in the OpenAPI document, which
+ * (backend/src/careerwright/api/routes_events.py). They are not in the OpenAPI document, which
  * describes only the `EventOut` messages, so they are named once here.
  */
 const STREAM_EVENT = {

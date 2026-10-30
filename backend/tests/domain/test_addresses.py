@@ -6,7 +6,7 @@ import ipaddress
 
 import pytest
 
-from nessa.evidence.addresses import CheckedUrl, UrlRefusal, address_refusal, check_url
+from careerwright.evidence.addresses import CheckedUrl, UrlRefusal, address_refusal, check_url
 
 # Full stops IDNA folds to "." (re-review A M-3), written as code points so none is mistaken
 # for an ASCII dot.

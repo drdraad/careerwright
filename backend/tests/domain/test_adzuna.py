@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from pydantic import SecretStr, ValidationError
 
-from nessa.evidence.adzuna import (
+from careerwright.evidence.adzuna import (
     AdzunaQuery,
     parse_search,
     recorded_url,
@@ -16,8 +16,8 @@ from nessa.evidence.adzuna import (
     transport_url,
     without_app_id,
 )
-from nessa.evidence.jobs import group_copies
-from nessa.evidence.records import (
+from careerwright.evidence.jobs import group_copies
+from careerwright.evidence.records import (
     AdvertiserKind,
     ClaimField,
     DescriptionKind,

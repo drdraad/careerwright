@@ -10,10 +10,10 @@ from typing import Any
 import psycopg
 import pytest
 
-from nessa.capability.commands import committed_data
-from nessa.catalogue.esco import ESCO_RELEASE, concept_id, parse_release
-from nessa.catalogue.releases import read_verified
-from nessa.seed import INVITED_ACTORS
+from careerwright.capability.commands import committed_data
+from careerwright.catalogue.esco import ESCO_RELEASE, concept_id, parse_release
+from careerwright.catalogue.releases import read_verified
+from careerwright.seed import INVITED_ACTORS
 from tests.support.client import ApiClient, profile_with
 from tests.support.infra import Infra
 from tools.datasets import DATASETS_DIR
@@ -156,7 +156,8 @@ def test_the_registration_gate_cannot_be_demoted_through_the_api(
     assert refused.status_code == 409
     assert refused.json()["error"]["code"] == "PROTECTED_GATE"
     assert infra.query(
-        "SELECT count(*) AS n FROM nessa.matrix_edits WHERE workspace_id = %s", (workspace_id,)
+        "SELECT count(*) AS n FROM careerwright.matrix_edits WHERE workspace_id = %s",
+        (workspace_id,),
     ) == [{"n": 0}]
     after = matrix(matrices(api, ada, workspace_id), NURSE)
     assert after["definition_version"] == nurse["definition_version"]
@@ -343,7 +344,8 @@ def test_evidence_for_a_subject_no_matrix_holds_is_refused_and_nothing_is_saved(
     assert contradictory.status_code == 422
     assert contradictory.json()["error"]["details"]["reason"] == "inconsistent_evidence"
     assert infra.query(
-        "SELECT count(*) AS n FROM nessa.skill_evidence WHERE workspace_id = %s", (workspace_id,)
+        "SELECT count(*) AS n FROM careerwright.skill_evidence WHERE workspace_id = %s",
+        (workspace_id,),
     ) == [{"n": 0}]
 
 
@@ -388,7 +390,7 @@ def test_relaxing_an_essential_row_needs_the_warning_and_makes_a_new_definition(
     assert applied["reason"] == "None of my target employers asks for it"
     assert row(after, VALIDATION)["source_importance"] == "essential"
     [stored] = infra.query(
-        "SELECT from_matrix_version, to_matrix_version, recorded_by FROM nessa.matrix_edits "
+        "SELECT from_matrix_version, to_matrix_version, recorded_by FROM careerwright.matrix_edits "
         "WHERE workspace_id = %s",
         (workspace_id,),
     )
@@ -463,11 +465,11 @@ def test_a_bookkeeper_chosen_in_the_product_reaches_p05_s_pack_target_despite_a_
     # accountant, so another occupation is given the label for this test (C1(b), round 2).
     bookkeeper = str(concept_id(BOOKKEEPER_URI))
     [other] = infra.query(
-        "SELECT concept_id FROM nessa.occupation_concepts WHERE preferred_label = %s",
+        "SELECT concept_id FROM careerwright.occupation_concepts WHERE preferred_label = %s",
         ("accounting assistant",),
     )
     infra.query(
-        "INSERT INTO nessa.occupation_labels (concept_id, label, normalised, kind) "
+        "INSERT INTO careerwright.occupation_labels (concept_id, label, normalised, kind) "
         "VALUES (%s, 'bookkeeper', 'bookkeeper', 'alternative')",
         (other["concept_id"],),
     )
@@ -481,7 +483,7 @@ def test_a_bookkeeper_chosen_in_the_product_reaches_p05_s_pack_target_despite_a_
         }
     finally:
         infra.query(
-            "DELETE FROM nessa.occupation_labels WHERE concept_id = %s AND normalised = %s",
+            "DELETE FROM careerwright.occupation_labels WHERE concept_id = %s AND normalised = %s",
             (other["concept_id"], "bookkeeper"),
         )
 
@@ -501,7 +503,8 @@ def test_an_unmodelled_target_or_a_regulated_one_without_a_typed_gate_is_never_r
 ) -> None:
     workspace_id = workspace_with_targets(api, ada, "Marine biologist")
     [doctor] = infra.query(
-        "SELECT concept_id FROM nessa.occupation_concepts WHERE preferred_label = %s AND regulated",
+        "SELECT concept_id FROM careerwright.occupation_concepts WHERE preferred_label = %s AND "
+        "regulated",
         ("general practitioner",),
     )
     choose(api, ada, workspace_id, 1, str(doctor["concept_id"]))
@@ -614,18 +617,19 @@ def test_another_person_sees_and_writes_none_of_it(
     )
     assert written.status_code == 404
     for table in ("capability_states", "skill_evidence"):
-        statement = f"SELECT count(*) AS n FROM nessa.{table} WHERE workspace_id = %s"  # noqa: S608
+        statement = f"SELECT count(*) AS n FROM careerwright.{table} WHERE workspace_id = %s"  # noqa: S608
         as_owner = infra.as_role("pg_api", statement, (workspace_id,), actor=ADA_ID)
         as_other = infra.as_role("pg_api", statement, (workspace_id,), actor=BEN_ID)
         assert int(str(as_owner[0]["n"])) == 1
         assert as_other[0]["n"] == 0
     for table in ("requirement_statements", "matrix_edits"):
-        statement = f"SELECT count(*) AS n FROM nessa.{table} WHERE workspace_id = %s"  # noqa: S608
+        statement = f"SELECT count(*) AS n FROM careerwright.{table} WHERE workspace_id = %s"  # noqa: S608
         assert infra.as_role("pg_api", statement, (workspace_id,), actor=BEN_ID)[0]["n"] == 0
     with pytest.raises(psycopg.errors.InsufficientPrivilege, match="row-level security"):
         infra.as_role(
             "pg_api",
-            "INSERT INTO nessa.requirement_statements (statement_id, workspace_id, state_version, "
+            "INSERT INTO careerwright.requirement_statements (statement_id, workspace_id, "
+            "state_version, "
             "subject, holding, verified, recorded_by) VALUES (%s, %s, 9, 'gate:x', 'held', "
             "false, %s)",
             (uuid.uuid4(), workspace_id, BEN_ID),
@@ -642,7 +646,8 @@ def test_the_database_refuses_an_answer_that_contradicts_its_level(
         with pytest.raises(psycopg.errors.CheckViolation):
             infra.as_role(
                 "pg_api",
-                "INSERT INTO nessa.skill_evidence (evidence_id, workspace_id, state_version, "
+                "INSERT INTO careerwright.skill_evidence (evidence_id, workspace_id, "
+                "state_version, "
                 "subject, answer, self_assessed_level, method, recorded_by) VALUES "
                 "(%s, %s, 1, 'esco:x', %s, %s, 'self_report', %s)",
                 (uuid.uuid4(), workspace_id, answer, level, ADA_ID),
@@ -653,13 +658,13 @@ def test_the_database_refuses_an_answer_that_contradicts_its_level(
 @pytest.mark.req("SEC-02")
 def test_capability_history_is_append_only_for_the_api_role(infra: Infra) -> None:
     for statement in (
-        "UPDATE nessa.skill_evidence SET self_assessed_level = 4",
-        "DELETE FROM nessa.skill_evidence",
-        "UPDATE nessa.requirement_statements SET verified = true",
-        "DELETE FROM nessa.requirement_statements",
-        "UPDATE nessa.matrix_edits SET reason = 'x'",
-        "DELETE FROM nessa.matrix_edits",
-        "DELETE FROM nessa.capability_states",
+        "UPDATE careerwright.skill_evidence SET self_assessed_level = 4",
+        "DELETE FROM careerwright.skill_evidence",
+        "UPDATE careerwright.requirement_statements SET verified = true",
+        "DELETE FROM careerwright.requirement_statements",
+        "UPDATE careerwright.matrix_edits SET reason = 'x'",
+        "DELETE FROM careerwright.matrix_edits",
+        "DELETE FROM careerwright.capability_states",
     ):
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             infra.as_role("pg_api", statement, actor=ADA_ID)

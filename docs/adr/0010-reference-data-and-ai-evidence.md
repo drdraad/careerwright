@@ -29,12 +29,12 @@ that is a reviewed range or unscored, never a formula. L0 has no accountable rev
 
 1. **Where it lives.** All of it is market intelligence (spec section 17: "taxonomies,
    regions, role cards, AI resilience methodology/assessments"), so it is in
-   `nessa/catalogue` beside ESCO and the city list: `releases.py` (the generic pin),
+   `careerwright/catalogue` beside ESCO and the city list: `releases.py` (the generic pin),
    `xlsx.py`, `ashe.py`, `soc.py`, `ai_evidence.py` (parsers), `reference_store.py` (the SQL
    adapter, migration 0027), `reference.py` (imports and an occupation's evidence),
    `pay.py` (mapping, modelled pay, the floor) and `ai_resilience.py` (the record model).
    The catalogue imports neither profile nor evidence, so the slate (profile) and the job
-   listing (evidence) both use it without a cycle. `nessa/profile/role_evidence.py` joins
+   listing (evidence) both use it without a cycle. `careerwright/profile/role_evidence.py` joins
    it to a workspace (the person's regions, the pack that applies).
 
 2. **Pinned releases (R7, TAX1-04).** Each file is pinned by URL, size and SHA-256, fetched
@@ -73,7 +73,7 @@ that is a reviewed range or unscored, never a formula. L0 has no accountable rev
    not applicable, `-` negligible) where a value is withheld: null with its marker, never 0.
    Each statistic keeps its own CV from the "b" table and so its own ONS quality band,
    shown beside it, a P90's never the median's (fix round 1, review A M4; migration 0028,
-   transformation `nessa-ashe-import-2`, which removes the held ASHE import so
+   transformation `careerwright-ashe-import-2`, which removes the held ASHE import so
    `setup-database` imports it again). One release is held, so the trend is `unavailable`,
    `single_snapshot`. What this release publishes (fix round 2, re-review 1-A N1, counted on
    the pinned file and pinned in
@@ -195,7 +195,7 @@ that is a reviewed range or unscored, never a formula. L0 has no accountable rev
     `exposure_only_evidence`, `model_proposal`, `bounds_not_decided`,
     `evidence_quality_not_stated` and `widening_not_explained`; the decision's `lower` and
     `upper`. No workflow's step sequence changes: DBOS `application_version` stays
-    `nessa-l0-1`.
+    `careerwright-l0-1`.
 
 ## Evidence
 

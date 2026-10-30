@@ -25,7 +25,7 @@ def test_export_holds_every_version_source_and_event_with_its_synthetic_label(
     # the discoveries and the interview preferences; format 4 (Task 6b) each discovery's
     # written explanation.
     assert (export["format"], export["format_version"], export["synthetic"]) == (
-        "nessa.workspace-export",
+        "careerwright.workspace-export",
         4,
         True,
     )

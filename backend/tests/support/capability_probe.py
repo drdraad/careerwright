@@ -15,12 +15,12 @@ from pydantic import SecretStr
 from pydantic_ai import Agent, NativeOutput
 from pydantic_ai.durable_exec.dbos import DBOSDurability
 
-from nessa.config import WorkerSettings
-from nessa.db import url_with_password
-from nessa.identity.connection_check import ConnectionCheckResult
+from careerwright.config import WorkerSettings
+from careerwright.db import url_with_password
+from careerwright.identity.connection_check import ConnectionCheckResult
 from tests.support.fake_models import fake_model_builder
 
-PROBE_APP_NAME = "nessa-capability-probe"
+PROBE_APP_NAME = "careerwright-capability-probe"
 
 
 def main() -> None:
@@ -32,15 +32,15 @@ def main() -> None:
         "run_migrations": False,
     }
     DBOS(config=config)
-    build = fake_model_builder(output_sentinel=os.environ["NESSA_TEST_OUTPUT_SENTINEL"])
+    build = fake_model_builder(output_sentinel=os.environ["CAREERWRIGHT_TEST_OUTPUT_SENTINEL"])
     agent = Agent(
-        build("muse-spark-1.3-contributor", SecretStr(os.environ["NESSA_TEST_PROBE_KEY"])),
-        name="nessa_probe_agent",
+        build("muse-spark-1.3-contributor", SecretStr(os.environ["CAREERWRIGHT_TEST_PROBE_KEY"])),
+        name="careerwright_probe_agent",
         output_type=NativeOutput(ConnectionCheckResult),
         capabilities=[DBOSDurability()],
     )
 
-    @DBOS.workflow(name="nessa.capability_probe")
+    @DBOS.workflow(name="careerwright.capability_probe")
     async def probe_workflow(prompt: str) -> str:
         # Deliberately naive: the agent runs inside the workflow, so its steps journal.
         result = await agent.run(prompt)

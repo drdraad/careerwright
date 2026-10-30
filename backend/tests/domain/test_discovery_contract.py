@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from nessa.profile.discovery import (
+from careerwright.profile.discovery import (
     INSTRUCTIONS,
     MAX_HYPOTHESES,
     MAX_PROMPT_BYTES,
@@ -24,10 +24,15 @@ from nessa.profile.discovery import (
     render_prompt,
     worst_case_nano_usd,
 )
-from nessa.profile.document import FIELD_NAMES, ProfileInput, apply_profile_input, empty_profile
-from nessa.profile.exploration import release_note, with_article
-from nessa.profile.fixture_discovery import fixture_queries, prompt_context
-from nessa.profile.interview import ProfileField, ProposalOrigin
+from careerwright.profile.document import (
+    FIELD_NAMES,
+    ProfileInput,
+    apply_profile_input,
+    empty_profile,
+)
+from careerwright.profile.exploration import release_note, with_article
+from careerwright.profile.fixture_discovery import fixture_queries, prompt_context
+from careerwright.profile.interview import ProfileField, ProposalOrigin
 
 SOURCE = uuid.UUID("00000000-0000-4000-8000-0000000000aa")
 
@@ -209,7 +214,7 @@ def test_an_attempt_reserves_both_requests_at_their_bounds() -> None:
     # Standard: (12,000 x 1,250 + 1,500 x 4,250) x 2 = 42,750,000 nano-USD ($0.04275).
     assert worst_case_nano_usd("muse-spark-1.3-contributor") == 3_000_000
     assert worst_case_nano_usd("muse-spark-1.3") == 42_750_000
-    assert worst_case_nano_usd("nessa-fixture-discovery-1") == 0
+    assert worst_case_nano_usd("careerwright-fixture-discovery-1") == 0
 
 
 def test_evidence_items_are_plain_answer_texts() -> None:

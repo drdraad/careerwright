@@ -38,8 +38,8 @@ Pin this composition for every workflow that touches private data or a credentia
    roles with only the grants they need, and launch DBOS with `run_migrations=False`. An
    owner bypasses row-level security, so a runtime connection as owner would break Global
    Constraint 7. The spike connected as each database's owner (a spike shortcut). Task 3
-   implemented and tested the role split: `nessa_migrator` and `nessa_dbos_owner` for setup,
-   `nessa_api`, `nessa_worker` and `nessa_dbos_runtime` at runtime (ADR 0004 decision 5).
+   implemented and tested the role split: `careerwright_migrator` and `careerwright_dbos_owner` for setup,
+   `careerwright_api`, `careerwright_worker` and `careerwright_dbos_runtime` at runtime (ADR 0004 decision 5).
 3. **Portable JSON journal.** Configure `DBOSConfig(serializer=DBOSPortableJSONSerializer())`.
    The journal is then plain JSON: inspectable without unpickling database content, and
    unable to hold an object such as a provider client or `SecretStr`.

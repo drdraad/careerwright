@@ -20,11 +20,11 @@ from pydantic_ai.messages import (
 from pydantic_ai.models import Model
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from nessa.identity.failures import FailureClass, classify_failure
-from nessa.identity.model_registry import ModelMode
-from nessa.profile.interview import ProposalOrigin
-from nessa.profile.slate_explanation import REPAIR_ALLOWANCE_TOKENS, SlateExplanation
-from nessa.profile.slate_explanation_agent import fixture_explainer_model, run_explanation
+from careerwright.identity.failures import FailureClass, classify_failure
+from careerwright.identity.model_registry import ModelMode
+from careerwright.profile.interview import ProposalOrigin
+from careerwright.profile.slate_explanation import REPAIR_ALLOWANCE_TOKENS, SlateExplanation
+from careerwright.profile.slate_explanation_agent import fixture_explainer_model, run_explanation
 from tests.domain.test_slate_explanation import GOOD_GARDENER, GOOD_MECHANIC, claim, context, quote
 
 

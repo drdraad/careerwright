@@ -8,10 +8,10 @@ from typing import Any
 
 import pytest
 
-from nessa.catalogue.option_pack import Split, load_pack
-from nessa.evidence.acquire import Pacer
-from nessa.evidence.fetcher import Admit, Fetched, Fetcher, FetchFailure, HostNotFoundError
-from nessa.evidence.records import (
+from careerwright.catalogue.option_pack import Split, load_pack
+from careerwright.evidence.acquire import Pacer
+from careerwright.evidence.fetcher import Admit, Fetched, Fetcher, FetchFailure, HostNotFoundError
+from careerwright.evidence.records import (
     AdvertiserKind,
     DescriptionKind,
     JobCopy,
@@ -159,7 +159,7 @@ def test_one_read_paces_every_page_of_a_host_to_its_rate_limit(tmp_path: Path) -
     of them on one job board: each after that host's first waits its rate limit (spec
     section 6), across the whole read. No request leaves: no name resolves."""
     pacer, waits = _paced()
-    fetcher = Fetcher(user_agent="NessaL0/test", resolve=_no_such_host)
+    fetcher = Fetcher(user_agent="CareerwrightL0/test", resolve=_no_such_host)
 
     read(load_pack(PACK_VERSION), fetcher=fetcher, pacer=pacer, evidence_dir=tmp_path)
 
@@ -170,7 +170,7 @@ class _Recording(Fetcher):
     """The network edge, recording each page asked for; no name resolves."""
 
     def __init__(self) -> None:
-        super().__init__(user_agent="NessaL0/test", resolve=_no_such_host)
+        super().__init__(user_agent="CareerwrightL0/test", resolve=_no_such_host)
         self.asked: list[str] = []
 
     def fetch_page(self, url: str, admit: Admit | None = None) -> Fetched | FetchFailure:

@@ -50,7 +50,7 @@ function emulatorAuth({ emulatorUrl, projectId }: AuthSettings): Auth {
   // The emulator accepts any API key; this value is not a credential.
   const app = initializeApp(
     { apiKey: "local-emulator", projectId, authDomain: new URL(emulatorUrl).host },
-    `nessa-${key}`,
+    `careerwright-${key}`,
   );
   // The session (ID and refresh tokens) lives in IndexedDB, never in localStorage (ADR 0005
   // decision 9; e2e/session.spec.ts checks which store holds it).

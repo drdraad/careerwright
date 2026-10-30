@@ -1,4 +1,4 @@
-# Nessa local development plan
+# Careerwright local development plan
 
 ## From product specification to a beautiful and verifiable local app
 
@@ -110,7 +110,7 @@ Use a modular monolith, explicit use cases and separate workers at trust/executi
 
 ## Repository shape
 
-Use apps/web and backend/src/nessa. Organise Python by domain module with clear services/adapters, without empty layer scaffolding. Separate domain, integration, acceptance, security and evaluation tests. Keep manifests, fixtures, tokens, ADRs and the runbook easy to locate.
+Use apps/web and backend/src/careerwright. Organise Python by domain module with clear services/adapters, without empty layer scaffolding. Separate domain, integration, acceptance, security and evaluation tests. Keep manifests, fixtures, tokens, ADRs and the runbook easy to locate.
 
 Generate the TypeScript client from FastAPI’s OpenAPI contract; do not duplicate money/state/error enums. Pydantic validates external structure; domain functions validate meaning and cross-record rules.
 
@@ -264,7 +264,7 @@ Can one confirmed profile change flow through a typed command, a durable run and
 
 ## Demonstrable outcome
 
-From a fresh checkout, start Nessa, sign in as a seeded local identity, edit a profile, inspect a fixture route and reopen the same work after restarting services. The six-chapter shell already looks like the intended product.
+From a fresh checkout, start Careerwright, sign in as a seeded local identity, edit a profile, inspect a fixture route and reopen the same work after restarting services. The six-chapter shell already looks like the intended product.
 
 ## Deliverables
 
@@ -336,7 +336,7 @@ S3.1 Implement SourceAttempt and SourceClaim records, permitted retention, field
 
 S3.2 Implement bounded Meta search discovery and keyless Scrapling HTTP fetch/parse. Check scheme, resolved IP, redirects, content type, size and time. Parse stable structured fields first and use model extraction only where needed. Manual pasted text is a separately recorded input route.
 
-S3.3 Implement the Adzuna adapter and fixture contract. Qualify actual requests if credentials are available; otherwise record the live integration as unverified. Preserve predicted/advertised/unknown pay and snippets versus full descriptions. Adzuna stays optional: if developer credentials are registered and stored under `NESSA_HOME` before the acquisition backend starts, S3.3 qualifies the live integration; otherwise this deliverable is unchanged. It is external data, still a local run.
+S3.3 Implement the Adzuna adapter and fixture contract. Qualify actual requests if credentials are available; otherwise record the live integration as unverified. Preserve predicted/advertised/unknown pay and snippets versus full descriptions. Adzuna stays optional: if developer credentials are registered and stored under `CAREERWRIGHT_HOME` before the acquisition backend starts, S3.3 qualifies the live integration; otherwise this deliverable is unchanged. It is external data, still a local run.
 
 S3.4 Deduplicate syndicated jobs, retain source copies, distinguish agencies from employers and count multi-city views once. Implement closure/freshness checks, favourites, cancellation and resumable incremental results.
 
@@ -554,7 +554,7 @@ Open the chosen version in all four representations and compare its facts. Confi
 
 ## Demonstrable outcome
 
-A clean machine or equivalent clean user environment can run and test Nessa using the documented commands. Both the offline demo and a budget-capped live Meta journey pass, and the release report states exactly what was verified.
+A clean machine or equivalent clean user environment can run and test Careerwright using the documented commands. Both the offline demo and a budget-capped live Meta journey pass, and the release report states exactly what was verified.
 
 ## Deliverables
 
@@ -584,11 +584,11 @@ A fresh reviewer completes the golden journey from a blank workspace and then de
 
 2–3 engineering days • Entry: the qualified local release candidate (Sprint 9) • Requirements: BND-1 (local operation), section 5 (usability acceptance), ARC-1 (keys, spend, recovery and deletion as the operator meets them)
 
-The operator is the person who runs Nessa on their own computer. They install it, enter their own key, use it, and keep it working. They need not be a developer. The developer runbook (`docs/runbook.md`) stays as it is; the manual is the operator's version.
+The operator is the person who runs Careerwright on their own computer. They install it, enter their own key, use it, and keep it working. They need not be a developer. The developer runbook (`docs/runbook.md`) stays as it is; the manual is the operator's version.
 
 ## Demonstrable outcome
 
-A person who did not build Nessa can install, start, use, maintain and recover it with the manual alone. Every friction point the manual's writing found is fixed, proposed or recorded, with its reason.
+A person who did not build Careerwright can install, start, use, maintain and recover it with the manual alone. Every friction point the manual's writing found is fixed, proposed or recorded, with its reason.
 
 ## Deliverables
 

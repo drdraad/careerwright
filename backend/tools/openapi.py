@@ -8,7 +8,7 @@ The web app generates its TypeScript client from this document and commits both
 import json
 import sys
 
-from nessa.api.app import openapi_document
+from careerwright.api.app import openapi_document
 
 
 def render() -> str:

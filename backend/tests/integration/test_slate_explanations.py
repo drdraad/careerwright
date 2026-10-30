@@ -14,9 +14,9 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from nessa.api.app import create_app
-from nessa.api.deps import ApiDependencies
-from nessa.config import RuntimeMode
+from careerwright.api.app import create_app
+from careerwright.api.deps import ApiDependencies
+from careerwright.config import RuntimeMode
 from tests.integration.durable import Scenario, make_scenario
 from tests.integration.test_discovery import ANSWERS, base, discover, slate
 from tests.support.client import ApiClient, profile_with
@@ -411,7 +411,7 @@ def test_a_demo_workspace_s_slate_is_explained_offline_by_the_labelled_fixture_e
         scenario.wait_terminal(run["run_id"])
         assert worker.stop() == 0
 
-    assert (run["model_id"], run["model_mode"]) == ("nessa-fixture-explainer-1", "fixture")
+    assert (run["model_id"], run["model_mode"]) == ("careerwright-fixture-explainer-1", "fixture")
     shown = api.get(f"/v1/workspaces/{workspace}/discoveries/{found['discovery_id']}", ada).json()
     written = shown["explanation"]["written"]
     assert written["origin"] == "fixture"

@@ -19,7 +19,7 @@ records how they are realised, and the choices a later task must not undo silent
    with `internal: true`. On Docker Desktop that is the only setting that blocks egress
    (a bridge without masquerading still reaches the internet: checked on this machine), and
    it also stops Docker publishing ports. So a small standard-library TCP relay
-   (`nessa.edge`) is the one container also on a normal bridge: it publishes the API, the
+   (`careerwright.edge`) is the one container also on a normal bridge: it publishes the API, the
    emulator, PostgreSQL and the web slot on `127.0.0.1` only, forwarding each port to one
    fixed internal target and opening no other connection. It resolves a target by name but
    connects only to an address inside the internal subnet (read from its route table), so
@@ -31,21 +31,21 @@ records how they are realised, and the choices a later task must not undo silent
    a listener on the host; in live mode the worker reaches it and the API still cannot.
 
 2. **Loopback requests only.** The API serves loopback clients only. Its container's
-   configuration (`NESSA_API_INTERNAL_NETWORK_CLIENTS`, set in `compose.yaml`) adds its own
+   configuration (`CAREERWRIGHT_API_INTERNAL_NETWORK_CLIENTS`, set in `compose.yaml`) adds its own
    internal Compose subnet, where the edge relays from; on a host the API stays
    loopback-only, because docker0, a VPN or a second NIC would look internal by route
    alone. The client address is the socket peer (`--no-proxy-headers`), so no header can
    change it. The emulator's unsigned tokens are therefore unusable from the LAN even if
    the API listens on every interface. It rejects any Host header
    outside a configured list of local `host:port` values (defeats DNS rebinding), any
-   request carrying an Origin other than the Nessa web origin, any state-changing request
+   request carrying an Origin other than the Careerwright web origin, any state-changing request
    without an Origin, and every WebSocket (close code 1008; the API has none). A different
    app on `127.0.0.1` therefore cannot trigger an authenticated change even with a token.
    No CORS headers are ever sent; the web app reaches the API through its own origin. The
    event stream re-verifies its token with the emulator every minute and ends when the
    account is revoked or disabled, or when the token expires.
 
-3. **Fail closed at startup.** Configuration is refused unless `NESSA_ENVIRONMENT=local`,
+3. **Fail closed at startup.** Configuration is refused unless `CAREERWRIGHT_ENVIRONMENT=local`,
    the Firebase project is a `demo-` project, the emulator host and every allowed host are
    loopback or single-label Compose names, origins are exact `http` loopback origins,
    database URLs carry no password (passwords come from files) and the master key directory
@@ -61,15 +61,15 @@ records how they are realised, and the choices a later task must not undo silent
    lookup is one `SECURITY DEFINER` function, so the API role cannot read the allowlist.
 
 5. **Ownership enforced by PostgreSQL row-level security, per role.** Tables are owned by
-   `nessa_migrator`, used only by setup (migrations, seeding, demo reset, master-key reseal).
-   The API connects as `nessa_api` and sets `nessa.actor_id` per transaction
+   `careerwright_migrator`, used only by setup (migrations, seeding, demo reset, master-key reseal).
+   The API connects as `careerwright_api` and sets `careerwright.actor_id` per transaction
    (`set_config(..., is_local => true)`, so a pooled connection never carries it into the
    next request); it sees only workspaces that actor owns while the actor is invited, and
    every workspace-scoped table filters through that policy. The worker connects as
-   `nessa_worker` and sets `nessa.run_id`: it sees the run it executes, and the sealed key
+   `careerwright_worker` and sets `careerwright.run_id`: it sees the run it executes, and the sealed key
    and outputs only while the run's requester still owns the workspace and is invited
-   (`nessa.authorised_run_workspace()`). It has no access to profile tables. DBOS uses
-   `nessa_dbos_runtime`; `nessa_dbos_owner` runs DBOS's migrations. No runtime role is an
+   (`careerwright.authorised_run_workspace()`). It has no access to profile tables. DBOS uses
+   `careerwright_dbos_runtime`; `careerwright_dbos_owner` runs DBOS's migrations. No runtime role is an
    owner, superuser or `BYPASSRLS` (tested). Least-privilege column grants: the API can seal
    and revoke keys but cannot select a nonce or ciphertext; history tables are append-only.
 
@@ -100,7 +100,7 @@ records how they are realised, and the choices a later task must not undo silent
 8. **Keys: consent, sealing, rotation, revocation.** Storing a key needs explicit consent
    to encrypted storage. It is sealed at once with AES-256-GCM under the current master-key
    version, with kind, workspace and credential ID as associated data. Master keys are
-   `v<N>.key` files in `NESSA_HOME/keys` (default `~/.nessa/l0`, outside the repository and
+   `v<N>.key` files in `CAREERWRIGHT_HOME/keys` (default `~/.careerwright/l0`, outside the repository and
    the database), owner-only; the highest version seals. Rotation (`make rotate-master-key`):
    add a version, then reseal (`make reseal`), which first restarts a running API and
    worker so they hold every version, then reseals every sealed record, stored keys and run
@@ -160,6 +160,6 @@ records how they are realised, and the choices a later task must not undo silent
   (Task 4), Linux/amd64 hosts (Compose secrets are bind mounts whose permissions differ on
   Linux; unverified).
 - Changing the activity's step sequence needs a new DBOS `application_version`
-  (`nessa-l0-1`) and a drain of in-flight runs (ADR 0002 decision 9).
+  (`careerwright-l0-1`) and a drain of in-flight runs (ADR 0002 decision 9).
 - A later run kind that handles profile data must keep the minimum-data rule (spec section
   19) and extend the leak scans with that data's sentinels.

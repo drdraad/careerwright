@@ -6,10 +6,10 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from nessa.config import ApiSettings
-from nessa.identity.activity import ACTIVITY_MAX_ATTEMPTS
-from nessa.identity.records import RunKind
-from nessa.identity.spend import (
+from careerwright.config import ApiSettings
+from careerwright.identity.activity import ACTIVITY_MAX_ATTEMPTS
+from careerwright.identity.records import RunKind
+from careerwright.identity.spend import (
     BudgetScope,
     SpendLimits,
     SpendState,
@@ -17,7 +17,7 @@ from nessa.identity.spend import (
     period_start,
     refused_scope,
 )
-from nessa.worker import TASKS
+from careerwright.worker import TASKS
 
 LIMITS = SpendLimits(run_limit_nano_usd=1_000, period_limit_nano_usd=5_000)
 

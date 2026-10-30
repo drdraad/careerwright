@@ -2032,7 +2032,7 @@ export type Extraction = typeof Extraction[keyof typeof Extraction];
 /**
  * ExtractionNotRun
  *
- * Why a page model extraction may read was not handed to it (`nessa.evidence.
+ * Why a page model extraction may read was not handed to it (`careerwright.evidence.
  * extraction_runs`): the page stays `no_posting_readable`, never "none found".
  */
 export const ExtractionNotRun = {
@@ -2048,7 +2048,7 @@ export const ExtractionNotRun = {
 /**
  * ExtractionNotRun
  *
- * Why a page model extraction may read was not handed to it (`nessa.evidence.
+ * Why a page model extraction may read was not handed to it (`careerwright.evidence.
  * extraction_runs`): the page stays `no_posting_readable`, never "none found".
  */
 export type ExtractionNotRun = typeof ExtractionNotRun[keyof typeof ExtractionNotRun];
@@ -2519,7 +2519,7 @@ export type Importance = typeof Importance[keyof typeof Importance];
 /**
  * InputRoute
  *
- * How a source reached Nessa. Pasted text is its own route, never a retrieval.
+ * How a source reached Careerwright. Pasted text is its own route, never a retrieval.
  */
 export const InputRoute = {
     FETCH: 'fetch',
@@ -2530,7 +2530,7 @@ export const InputRoute = {
 /**
  * InputRoute
  *
- * How a source reached Nessa. Pasted text is its own route, never a retrieval.
+ * How a source reached Careerwright. Pasted text is its own route, never a retrieval.
  */
 export type InputRoute = typeof InputRoute[keyof typeof InputRoute];
 
@@ -3455,7 +3455,7 @@ export type OccupationOut = {
     /**
      * Concept Id
      *
-     * Nessa's internal concept ID (stable per URI).
+     * Careerwright's internal concept ID (stable per URI).
      */
     concept_id: string;
     /**
@@ -4592,7 +4592,7 @@ export type ProvisionalConceptOut = {
     /**
      * Concept Kind
      *
-     * provisional: Nessa's own concept for a verified title, never an ESCO one.
+     * provisional: Careerwright's own concept for a verified title, never an ESCO one.
      */
     concept_kind: 'provisional';
     /**
@@ -4655,7 +4655,7 @@ export type Qualification = typeof Qualification[keyof typeof Qualification];
 /**
  * QueryChannel
  *
- * The model's discovery channels (spec section 4, DIV-1's five channels). Nessa adds
+ * The model's discovery channels (spec section 4, DIV-1's five channels). Careerwright adds
  * the person's current role and their own target titles itself.
  */
 export const QueryChannel = {
@@ -4669,7 +4669,7 @@ export const QueryChannel = {
 /**
  * QueryChannel
  *
- * The model's discovery channels (spec section 4, DIV-1's five channels). Nessa adds
+ * The model's discovery channels (spec section 4, DIV-1's five channels). Careerwright adds
  * the person's current role and their own target titles itself.
  */
 export type QueryChannel = typeof QueryChannel[keyof typeof QueryChannel];
@@ -5763,7 +5763,7 @@ export type SearchCandidate = {
  * SearchEmptyReason
  *
  * Why a search proposes no candidate. None of them is evidence that there is no vacancy:
- * only that this search found no page Nessa could check.
+ * only that this search found no page Careerwright could check.
  */
 export const SearchEmptyReason = {
     SEARCH_RETURNED_NOTHING: 'search_returned_nothing',
@@ -5775,7 +5775,7 @@ export const SearchEmptyReason = {
  * SearchEmptyReason
  *
  * Why a search proposes no candidate. None of them is evidence that there is no vacancy:
- * only that this search found no page Nessa could check.
+ * only that this search found no page Careerwright could check.
  */
 export type SearchEmptyReason = typeof SearchEmptyReason[keyof typeof SearchEmptyReason];
 
@@ -6049,7 +6049,7 @@ export type SkippedOut = {
 /**
  * SlateChannel
  *
- * How a candidate was found: the model's channels plus Nessa's own.
+ * How a candidate was found: the model's channels plus Careerwright's own.
  */
 export const SlateChannel = {
     CURRENT: 'current',
@@ -6065,7 +6065,7 @@ export const SlateChannel = {
 /**
  * SlateChannel
  *
- * How a candidate was found: the model's channels plus Nessa's own.
+ * How a candidate was found: the model's channels plus Careerwright's own.
  */
 export type SlateChannel = typeof SlateChannel[keyof typeof SlateChannel];
 
@@ -6180,7 +6180,7 @@ export type SlateOut = {
     /**
      * Unsupported Hypotheses
      *
-     * Titles Nessa thought of that ESCO does not list: never suggested.
+     * Titles Careerwright thought of that ESCO does not list: never suggested.
      */
     unsupported_hypotheses: Array<string>;
     /**
@@ -6866,7 +6866,7 @@ export type Support = {
  * SupportNoteOut
  *
  * The support panel, shown beside a message that triggers the support screen
- * (`nessa.profile.safety`), whether the send was accepted or refused. Kept apart from
+ * (`careerwright.profile.safety`), whether the send was accepted or refused. Kept apart from
  * career suitability. Derived from the request on every response, a replay included;
  * never stored, not even in the idempotency receipt.
  */
@@ -7641,7 +7641,7 @@ export type WorkspaceExport = {
     /**
      * Format
      */
-    format?: 'nessa.workspace-export';
+    format?: 'careerwright.workspace-export';
     /**
      * Format Version
      */

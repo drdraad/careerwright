@@ -52,37 +52,39 @@ function hostPort(name: string, value: string): string {
 }
 
 const VARIABLES = [
-  "NESSA_API_INTERNAL_URL",
-  "NESSA_AUTH_EMULATOR_URL",
-  "NESSA_FIREBASE_PROJECT_ID",
-  "NESSA_WEB_ALLOWED_HOSTS",
-  "NESSA_FIXTURES_DIR",
+  "CAREERWRIGHT_API_INTERNAL_URL",
+  "CAREERWRIGHT_AUTH_EMULATOR_URL",
+  "CAREERWRIGHT_FIREBASE_PROJECT_ID",
+  "CAREERWRIGHT_WEB_ALLOWED_HOSTS",
+  "CAREERWRIGHT_FIXTURES_DIR",
 ] as const;
 
 export function readWebConfig(env: Record<string, string | undefined>): WebConfig {
   const missing = VARIABLES.filter((name) => (env[name] ?? "").trim() === "");
   if (missing.length > 0) throw new ConfigError(`missing configuration: ${missing.join(", ")}`);
-  const projectId = required(env, "NESSA_FIREBASE_PROJECT_ID");
+  const projectId = required(env, "CAREERWRIGHT_FIREBASE_PROJECT_ID");
   if (!projectId.startsWith("demo-")) {
-    throw new ConfigError("NESSA_FIREBASE_PROJECT_ID must be a demo- project (emulator only)");
+    throw new ConfigError(
+      "CAREERWRIGHT_FIREBASE_PROJECT_ID must be a demo- project (emulator only)",
+    );
   }
-  const hosts = required(env, "NESSA_WEB_ALLOWED_HOSTS")
+  const hosts = required(env, "CAREERWRIGHT_WEB_ALLOWED_HOSTS")
     .split(",")
-    .map((entry) => hostPort("NESSA_WEB_ALLOWED_HOSTS", entry));
+    .map((entry) => hostPort("CAREERWRIGHT_WEB_ALLOWED_HOSTS", entry));
   return {
     apiInternalUrl: origin(
-      "NESSA_API_INTERNAL_URL",
-      required(env, "NESSA_API_INTERNAL_URL"),
+      "CAREERWRIGHT_API_INTERNAL_URL",
+      required(env, "CAREERWRIGHT_API_INTERNAL_URL"),
       (host) => LOOPBACK_HOSTS.has(host) || COMPOSE_NAME.test(host),
     ),
     authEmulatorUrl: origin(
-      "NESSA_AUTH_EMULATOR_URL",
-      required(env, "NESSA_AUTH_EMULATOR_URL"),
+      "CAREERWRIGHT_AUTH_EMULATOR_URL",
+      required(env, "CAREERWRIGHT_AUTH_EMULATOR_URL"),
       (host) => LOOPBACK_HOSTS.has(host),
     ),
     firebaseProjectId: projectId,
     allowedHosts: hosts,
-    fixturesDir: required(env, "NESSA_FIXTURES_DIR"),
+    fixturesDir: required(env, "CAREERWRIGHT_FIXTURES_DIR"),
   };
 }
 

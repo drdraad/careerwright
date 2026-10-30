@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 import { WEB_ORIGIN } from "./e2e/stack";
 
 // Browser journeys against the real Compose stack in demo mode, in its own project, ports and
-// NESSA_HOME (e2e/stack.ts). One worker: the journey restarts the shared stack.
+// CAREERWRIGHT_HOME (e2e/stack.ts). One worker: the journey restarts the shared stack.
 export default defineConfig({
   testDir: "e2e",
   globalSetup: "./e2e/global-setup.ts",

@@ -38,8 +38,8 @@ from pydantic_ai.models import Model, StreamedResponse
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RequestUsage
 
-from nessa.evidence.extraction import TEXT_MARKER
-from nessa.profile.safety import SUPPORT_TURN_INSTRUCTION
+from careerwright.evidence.extraction import TEXT_MARKER
+from careerwright.profile.safety import SUPPORT_TURN_INSTRUCTION
 
 FAKE_MODEL_NAME = "fake-function-model"
 CONTEXT_MARKER = "Context (JSON):\n"
@@ -243,7 +243,7 @@ def explanation_answer(
                 "occupation": occupation["ref"],
                 "claims": [
                     {
-                        "text": f"{sentinel} What you told Nessa matches how ESCO describes "
+                        "text": f"{sentinel} What you told Careerwright matches how ESCO describes "
                         "this work.".strip(),
                         "quotes": [
                             {"source": "answer", "text": first if valid else "never said this"},

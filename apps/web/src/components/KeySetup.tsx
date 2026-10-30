@@ -45,7 +45,7 @@ function KeyForm({
     >
       <ul className="plain-list">
         <li>
-          Nessa stores the key encrypted (authenticated encryption) in its database on this
+          Careerwright stores the key encrypted (authenticated encryption) in its database on this
           computer. The master key that unlocks it is kept on this computer too, outside the
           database and the code.
         </li>
@@ -54,14 +54,14 @@ function KeyForm({
           and suggestions, within this workspace's spending limits.
         </li>
         <li>
-          It is not end-to-end encrypted: Nessa's own worker opens it just before each call. It is
-          never shown again and Nessa never keeps it in your browser; if your browser offers to save
-          it, choose not to. It leaves this computer only in those calls to Meta.
+          It is not end-to-end encrypted: Careerwright's own worker opens it just before each call.
+          It is never shown again and Careerwright never keeps it in your browser; if your browser
+          offers to save it, choose not to. It leaves this computer only in those calls to Meta.
         </li>
         {workspace.synthetic && (
           <li>
-            This workspace is labelled synthetic, so Nessa uses Meta's lower-cost test model, which
-            Meta may train on. Enter only made-up details here.
+            This workspace is labelled synthetic, so Careerwright uses Meta's lower-cost test model,
+            which Meta may train on. Enter only made-up details here.
           </li>
         )}
         <li>
@@ -93,7 +93,7 @@ function KeyForm({
           onChange={(event) => setConsent(event.target.checked)}
         />
         <span>
-          I agree to Nessa storing this key, encrypted, on this computer, as described above.
+          I agree to Careerwright storing this key, encrypted, on this computer, as described above.
         </span>
       </label>
       <div>
@@ -150,7 +150,7 @@ export function KeySetup({
     return (
       <section className="card grid gap-12" aria-labelledby="key-title">
         <h2 id="key-title" className="section-title">
-          Connect your Meta API key to talk with Nessa
+          Connect your Meta API key to talk with Careerwright
         </h2>
         {revoked ? (
           <p className="small">That key was already revoked. Store a new key to continue.</p>
@@ -203,8 +203,8 @@ export function KeySetup({
         ) : confirmRevoke ? (
           <div className="grid gap-8">
             <p>
-              Revoke this key? Calls that haven't started will stop, and Nessa can't reply until you
-              store a new key.
+              Revoke this key? Calls that haven't started will stop, and Careerwright can't reply
+              until you store a new key.
             </p>
             <div className="flex flex-wrap gap-8">
               <Button

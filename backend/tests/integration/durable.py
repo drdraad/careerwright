@@ -87,7 +87,7 @@ class Scenario:
         return started
 
     def run(self, run_id: str) -> dict[str, Any]:
-        return self.infra.query("SELECT * FROM nessa.runs WHERE run_id = %s", (run_id,))[0]
+        return self.infra.query("SELECT * FROM careerwright.runs WHERE run_id = %s", (run_id,))[0]
 
     def api_run(self, run_id: str) -> dict[str, Any]:
         response = self.api.get(f"/v1/workspaces/{self.workspace_id}/runs/{run_id}", self.token)
@@ -96,19 +96,22 @@ class Scenario:
 
     def attempts(self, run_id: str) -> list[dict[str, Any]]:
         return self.infra.query(
-            "SELECT * FROM nessa.model_attempts WHERE run_id = %s ORDER BY attempt_id", (run_id,)
+            "SELECT * FROM careerwright.model_attempts WHERE run_id = %s ORDER BY attempt_id",
+            (run_id,),
         )
 
     def outputs(self, run_id: str) -> list[dict[str, Any]]:
-        return self.infra.query("SELECT * FROM nessa.run_outputs WHERE run_id = %s", (run_id,))
+        return self.infra.query(
+            "SELECT * FROM careerwright.run_outputs WHERE run_id = %s", (run_id,)
+        )
 
     def wait_terminal(self, run_id: str, timeout_s: float = RUN_TIMEOUT_S) -> dict[str, Any]:
         wait_for(lambda: self.run(run_id)["status"] in TERMINAL, timeout_s=timeout_s, what="run")
         return self.run(run_id)
 
     def journal(self, run_id: str) -> dict[str, list[dict[str, Any]]]:
-        workflow = f"nessa-run-{run_id}"
-        db = "nessa_dbos"
+        workflow = f"careerwright-run-{run_id}"
+        db = "careerwright_dbos"
         q = self.infra.query
         return {
             "status": q(
@@ -143,8 +146,8 @@ class Scenario:
         output: dict[str, Any] = json.loads(journal["output"][0]["output"])
         assert set(output) in ({"status", "output_id"}, {"status", "failure_class"})
         assert {s["function_name"] for s in journal["steps"]} <= {
-            "nessa.bounded_model_activity",
-            "nessa.publish_outcome",
+            "careerwright.bounded_model_activity",
+            "careerwright.publish_outcome",
         }
         return output
 
@@ -153,8 +156,8 @@ class Scenario:
         as a message) never outside the application tables that own it; the model's output
         only sealed."""
         logs = [(log.name, log.read_text(encoding="utf-8")) for log in self.logs if log.exists()]
-        dbos = self.infra.database_cells("nessa_dbos")
-        app = self.infra.database_cells("nessa_app")
+        dbos = self.infra.database_cells("careerwright_dbos")
+        app = self.infra.database_cells("careerwright_app")
         keys = [
             Needle("credential", key, fragment_length=12)
             for key in (self.api_key, *self.retired_keys)
@@ -170,10 +173,10 @@ class Scenario:
 def fresh_actor(api: ApiClient, infra: Infra) -> tuple[str, str]:
     """A new invited person (email, ID token), whose access a test may revoke."""
     uid = f"actor-{uuid.uuid4().hex[:8]}"
-    email = f"{uid}@nessa.test"
+    email = f"{uid}@careerwright.test"
     create_emulator_user(uid, email, "password-123456")
     infra.query(
-        "INSERT INTO nessa.actors (actor_id, email, display_name, access) "
+        "INSERT INTO careerwright.actors (actor_id, email, display_name, access) "
         "VALUES (%s, %s, 'Fresh', 'active')",
         (uuid.uuid4(), email),
     )

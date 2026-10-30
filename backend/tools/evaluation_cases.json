@@ -1,5 +1,5 @@
 {
-  "format": "nessa.evaluation-cases",
+  "format": "careerwright.evaluation-cases",
   "version": 1,
   "about": "Sprint 2 interview, discovery and slate-explanation evaluation cases. Every case is synthetic: no real person, and no real data. Expectations are semantic (fields, states, word sets, counts), never exact prose. Written and checked against spec section 4 by the implementing agent on 2026-10-28 (EXP-01: Task 6b); a human review of the set is still to do.",
   "cases": [

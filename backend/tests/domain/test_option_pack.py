@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from nessa.catalogue.option_pack import (
+from careerwright.catalogue.option_pack import (
     PINS,
     OptionPackError,
     ReviewState,

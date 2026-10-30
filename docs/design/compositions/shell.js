@@ -58,7 +58,7 @@
       const status = progress === "done" ? '<span class="visually-hidden">, decisions recorded</span>' : "";
       return `<li><a class="rail-chapter" data-progress="${progress}" href="${href || "#"}"${currentAttr}><span class="landmark" aria-hidden="true"></span>${label}${status}</a></li>`;
     }).join("");
-    rail.innerHTML = `<a class="rail-mark" href="index.html">${glyph("mark")}<span>Nessa</span></a><nav aria-label="Chapters"><ul class="rail-chapters">${items}</ul></nav>`;
+    rail.innerHTML = `<a class="rail-mark" href="index.html">${glyph("mark")}<span>Careerwright</span></a><nav aria-label="Chapters"><ul class="rail-chapters">${items}</ul></nav>`;
   }
 
   function renderTopbar() {
@@ -104,7 +104,7 @@
   }
 
   function fixtureValue(path) {
-    const value = path.split(".").reduce((node, key) => (node == null ? undefined : node[key]), window.NESSA.FIXTURES);
+    const value = path.split(".").reduce((node, key) => (node == null ? undefined : node[key]), window.CAREERWRIGHT.FIXTURES);
     if (value === undefined) throw new Error(`no fixture value at ${path}`);
     return value;
   }
@@ -114,8 +114,8 @@
     for (const el of document.querySelectorAll("[data-value]")) el.textContent = String(fixtureValue(el.dataset.value));
   }
 
-  window.NESSA = window.NESSA || {};
-  Object.assign(window.NESSA, { state, glyph, fixtureValue, fmt: { gbp, longDate, monthName } });
+  window.CAREERWRIGHT = window.CAREERWRIGHT || {};
+  Object.assign(window.CAREERWRIGHT, { state, glyph, fixtureValue, fmt: { gbp, longDate, monthName } });
 
   renderRail();
   renderTopbar();
