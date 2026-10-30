@@ -87,15 +87,22 @@ async function firstFrames() {
       await page.goto(`${ORIGIN}/?d=${direction}`);
       await page.waitForFunction(() => window.__spike?.firstFrame !== null, null, { timeout: 10_000 });
       times.push(await page.evaluate(() => window.__spike.firstFrame));
-      await page.locator("#role-input").pressSequentially("care", { delay: 120 });
+      await page.locator("#role-input").pressSequentially("care worker", { delay: 120 });
       await page.waitForTimeout(200);
       keys.push(...(await page.evaluate(() => window.__spike.inputToFrame)));
       await context.close();
     }
+    const sorted = [...keys].sort((a, b) => a - b);
     out[direction] = {
       firstFrameMs: Math.round(median(times)),
       firstFrameRuns: times.map((t) => Math.round(t)),
-      keystrokeToFrameMs: { median: median(keys), max: Math.max(...keys), samples: keys.length },
+      keystrokeToFrameMs: {
+        median: median(keys),
+        p95: sorted[Math.max(0, Math.ceil(sorted.length * 0.95) - 1)],
+        max: Math.max(...keys),
+        count: keys.length,
+        samples: keys,
+      },
     };
     console.log(`first frame ${direction}: ${out[direction].firstFrameMs} ms; keystroke to frame max ${out[direction].keystrokeToFrameMs.max} ms`);
   }
@@ -135,11 +142,14 @@ for (const d of DIRECTIONS) {
     );
   }
 }
-console.log("\n| Direction | First frame, normal entry (median of 3) | First frame, busiest scene | Keystroke to frame, normal entry (max) | Skill picked to frame, busiest scene (max) |");
+console.log(
+  "\n| Direction | First frame, normal entry (median of 3) | First frame, busiest scene | Keystroke to frame, normal entry (median / p95 / max, n) | Skill picked to frame, busiest scene (max of 5) |",
+);
 console.log("|---|---|---|---|---|");
 for (const d of DIRECTIONS) {
   const busy = vsync.results[d];
+  const k = first[d].keystrokeToFrameMs;
   console.log(
-    `| ${d} | ${first[d].firstFrameMs} ms | ${Math.round(busy.firstFrame)} ms | ${first[d].keystrokeToFrameMs.max} ms | ${Math.max(...busy.inputToFrame)} ms |`,
+    `| ${d} | ${first[d].firstFrameMs} ms | ${Math.round(busy.firstFrame)} ms | ${k.median} / ${k.p95} / ${k.max} ms, ${k.count} | ${Math.max(...busy.inputToFrame)} ms |`,
   );
 }

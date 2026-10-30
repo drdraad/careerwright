@@ -22,6 +22,9 @@ function chooser(root: HTMLElement): void {
   // Static markup from the spike's own constants.
   root.innerHTML = `
   <svg class="chooser-world" aria-hidden="true"></svg>
+  <div class="chooser-controls">
+    <button type="button" class="control" data-control="pause" aria-pressed="false">Pause motion</button>
+  </div>
   <main class="chooser">
     <p class="wordmark">Careerwright</p>
     <h1>Three ways the world could feel.</h1>
@@ -101,6 +104,14 @@ function chooser(root: HTMLElement): void {
     ] as const)
       door.addEventListener(type, () => light(door.dataset.door, on));
   }
+  // The trails' flow and the light's breathing are ambient motion: a visible control pauses them
+  // (WCAG 2.2.2); the system's reduced-motion setting stops them altogether.
+  const pause = root.querySelector('[data-control="pause"]') as HTMLButtonElement;
+  pause.addEventListener("click", () => {
+    const paused = pause.getAttribute("aria-pressed") !== "true";
+    pause.setAttribute("aria-pressed", String(paused));
+    document.body.classList.toggle("motion-paused", paused);
+  });
   window.addEventListener("resize", draw);
   void document.fonts.ready.then(draw);
   draw();

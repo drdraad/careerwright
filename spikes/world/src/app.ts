@@ -34,6 +34,10 @@ type SpikeProbe = {
   /** Milliseconds from an input's handler (a keystroke or a skill picked) to the end of the frame that answers it. */
   inputToFrame: number[];
   stats: unknown;
+  /** Where the lights are on screen and which labels have leader lines (for tools/check.mjs). */
+  layout: { lights: { id: string; x: number; y: number }[]; leaders: string[] } | null;
+  /** The destination the person is pointing at or has focused, if any. */
+  pointing: string | null;
 };
 
 declare global {
@@ -218,6 +222,8 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
     firstFrame: null,
     inputToFrame: [],
     stats: null,
+    layout: null,
+    pointing: null,
   };
 
   setFont((params.get("font") as FontId | null) ?? DEFAULT_FONT);
@@ -377,7 +383,8 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
         });
         li.dataset.kind = kind;
         li.dataset.selected = String(node.selected);
-        li.querySelector("button")?.setAttribute("aria-pressed", String(story.focus === key));
+        // Pressed means pinned by a click; pointing and focus only show, they do not press.
+        li.querySelector("button")?.setAttribute("aria-pressed", String(pinned === key));
         li.dataset.voice = kind === "revealed" || story.focus === key ? "speak" : "quiet";
         if (kind === "revealed") li.dataset.caption = "1";
         seen.add(node.id);
@@ -434,10 +441,20 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
       root.style.setProperty("--oy", `${p.y.toFixed(1)}px`);
     }
     for (const [id, li] of labelFor) place(li, nodes.get(id));
+    window.__spike.layout = {
+      lights: scene.nodes
+        .filter((n) => n.kind !== "opening")
+        .map((n) => {
+          const p = direction.project(n.p, cam, vp);
+          return { id: n.id, x: p.x, y: p.y };
+        }),
+      leaders: settle ? [] : (window.__spike.layout?.leaders ?? []),
+    };
     if (settle) settleLabels(cam, nodes);
     else if (leadersShown) {
       leaders.replaceChildren();
       leadersShown = false;
+      window.__spike.layout.leaders = [];
     }
   }
 
@@ -484,16 +501,20 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
         const r = e.getBoundingClientRect();
         return { x0: r.left - 6, y0: r.top - 6, x1: r.right + 6, y1: r.bottom + 6 };
       });
-    const lights: Box[] = [];
+    const lights: { id: string; x: number; y: number; box: Box }[] = [];
     for (const n of scene.nodes) {
       if (n.kind === "opening") continue;
       const p = direction.project(n.p, cam, vp);
       const r = Math.max(3, n.size * p.scale) + 5;
-      lights.push({ x0: p.x - r, y0: p.y - r, x1: p.x + r, y1: p.y + r });
+      lights.push({ id: n.id, x: p.x, y: p.y, box: { x0: p.x - r, y0: p.y - r, x1: p.x + r, y1: p.y + r } });
     }
+    /** Distance from a light's centre to the nearest point of a box (0 inside it). */
+    const reachOf = (box: Box, x: number, y: number) =>
+      Math.hypot(Math.max(box.x0 - x, 0, x - box.x1), Math.max(box.y0 - y, 0, y - box.y1));
     const order = [...labelFor.entries()].sort(([a], [b]) => rank(a) - rank(b));
     const placed: Box[] = [];
     const lines: string[] = [];
+    const led: string[] = [];
     for (const [id, li] of order) {
       const node = nodes.get(id);
       if (!node) continue;
@@ -501,7 +522,7 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
       const gap = Math.max(3, node.size * p.scale) + 8;
       const w = li.offsetWidth;
       const h = li.offsetHeight;
-      let best: { box: Box; score: number; reach: number } | null = null;
+      let best: { box: Box; score: number; mine: number } | null = null;
       for (const reach of REACHES) {
         for (const side of [node.side, ...SIDES.filter((s) => s !== node.side)]) {
           const box = boxFor(side, p.x, p.y, w, h, gap * reach);
@@ -513,27 +534,39 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
           let score = outside * h * 4 + (side === node.side ? 0 : 300) + (reach - 1) * 450;
           for (const b of panels) score += overlap(box, b) * 3;
           for (const b of placed) score += overlap(box, b) * 5;
-          for (const b of lights) score += overlap(box, b);
-          if (!best || score < best.score) best = { box, score, reach };
+          // A word must read as belonging to its own light. Its anchor (the point nearest its
+          // light, where its glyph sits) must never be as near to another light.
+          const mine = reachOf(box, p.x, p.y);
+          const ax = Math.min(Math.max(p.x, box.x0), box.x1);
+          const ay = Math.min(Math.max(p.y, box.y0), box.y1);
+          for (const l of lights) {
+            if (l.id === id) continue;
+            score += overlap(box, l.box);
+            if (Math.hypot(ax - l.x, ay - l.y) <= mine + 6) score += 4000;
+          }
+          if (!best || score < best.score) best = { box, score, mine };
         }
       }
       if (!best) continue;
       const { box } = best;
-      // The label's own offset from its light; its text aligns towards the light.
+      // The label's own offset from its light; its text and glyph turn towards the light.
       li.style.translate = `${(box.x0 - p.x).toFixed(1)}px ${(box.y0 - p.y).toFixed(1)}px`;
       li.dataset.align = box.x1 <= p.x ? "end" : box.x0 >= p.x ? "start" : "centre";
       placed.push(box);
-      if (best.reach > 1 && li.style.visibility !== "hidden") {
+      // Any label not right beside its light gets a fine leader line back to it.
+      if (best.mine > gap + 6 && li.style.visibility !== "hidden") {
         const tx = Math.min(Math.max(p.x, box.x0), box.x1);
         const ty = Math.min(Math.max(p.y, box.y0), box.y1);
         const len = Math.hypot(tx - p.x, ty - p.y) || 1;
         const sx = p.x + ((tx - p.x) / len) * (gap - 4);
         const sy = p.y + ((ty - p.y) / len) * (gap - 4);
         lines.push(`<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${tx.toFixed(1)}" y2="${ty.toFixed(1)}"/>`);
+        led.push(id);
       }
     }
     leaders.innerHTML = lines.join("");
     leadersShown = lines.length > 0;
+    if (window.__spike.layout) window.__spike.layout.leaders = led;
   }
 
   const rank = (id: string): number =>
@@ -711,6 +744,33 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
 
   function point(destination: string | null): void {
     if (story.point(destination ?? pinned)) rebuild(false);
+    window.__spike.pointing = story.focus;
+  }
+
+  /** A click on a destination's light or name pins its shared skills on (touch has no hover). */
+  function pin(destination: string): void {
+    pinned = pinned === destination ? null : destination;
+    story.point(pinned ?? destination);
+    window.__spike.pointing = story.focus;
+    rebuild(false);
+  }
+
+  /** The destination whose light is under the pointer, if any: the lights live in the world layer. */
+  function lightAt(x: number, y: number): { id: string; revealed: boolean } | null {
+    if (story.phase === "ask") return null;
+    const cam = still ? direction.view(vp, story) : tween.current(now());
+    let best: { id: string; revealed: boolean } | null = null;
+    let nearest = Number.POSITIVE_INFINITY;
+    for (const n of scene.nodes) {
+      if (n.kind !== "destination" && n.kind !== "revealed") continue;
+      const p = direction.project(n.p, cam, vp);
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d <= Math.max(22, n.size * p.scale * 3) && d < nearest) {
+        nearest = d;
+        best = { id: n.id.split(":")[1] ?? "", revealed: n.kind === "revealed" };
+      }
+    }
+    return best;
   }
 
   // ---- The question and its type-ahead ---------------------------------------------------
@@ -804,17 +864,30 @@ export function runDirection(root: HTMLElement, direction: Direction, all: reado
       return;
     }
     const place = target.closest<HTMLButtonElement>(".place-toggle");
-    if (place?.dataset.place) {
-      pinned = pinned === place.dataset.place ? null : place.dataset.place;
-      point(pinned);
-    }
+    if (place?.dataset.place) pin(place.dataset.place);
   });
 
-  // Pointing at or focusing a destination shows the skills it shares; leaving it hides them.
+  // Pointing at a destination, its light or its name, or focusing its name, shows the skills it
+  // shares; moving away hides them again (unless a click pinned them).
   const placeOf = (event: Event): string | null =>
     (event.target as HTMLElement).closest<HTMLElement>(".place-toggle")?.dataset.place ?? null;
-  lists.places.addEventListener("pointerover", (event) => point(placeOf(event)));
-  lists.places.addEventListener("pointerleave", () => point(null));
+  const inWorld = (target: EventTarget | null): boolean =>
+    target === canvas || (target instanceof Node && stillHost.contains(target));
+  window.addEventListener("pointermove", (event) => {
+    const name = placeOf(event);
+    const light = !name && inWorld(event.target) ? lightAt(event.clientX, event.clientY) : null;
+    document.body.classList.toggle("over-light", light !== null);
+    point(name ?? light?.id ?? null);
+  });
+  window.addEventListener("click", (event) => {
+    if (!inWorld(event.target)) return;
+    const light = lightAt(event.clientX, event.clientY);
+    if (!light) return;
+    if (light.revealed) {
+      if (card.hidden) showCard();
+      keep.focus();
+    } else pin(light.id);
+  });
   lists.places.addEventListener("focusin", (event) => point(placeOf(event)));
   lists.places.addEventListener("focusout", () => point(null));
 

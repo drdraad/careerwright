@@ -7,6 +7,11 @@
 //   motion setting is turned on and off again;
 // - teal appears only on selection, the kept path and the primary action;
 // - pointing at a destination (keyboard focus) shows what it shares;
+// - after the first answer and after the revelation, at three window sizes, every skill and
+//   destination is inside the window, visible, not covered, focusable, and next to its own light
+//   (or joined to it by a leader line);
+// - pointing at a destination's light itself shows what it shares;
+// - the chooser's motion has a pause control;
 // - picking a skill and keeping the destination in view work from the keyboard;
 // - no request leaves 127.0.0.1.
 // Usage: node tools/check.mjs [--headed]
@@ -134,16 +139,27 @@ for (const direction of DIRECTIONS) {
   if (await wordsShown()) pass("every word stays shown after reduced motion is turned on and off");
   else fail("words vanished after reduced motion was turned off");
 
-  // Pointing at a destination (here by keyboard focus) shows what it shares.
+  // Pointing at a destination (here by keyboard focus) shows what it shares without pressing it;
+  // only a click pins it (aria-pressed).
   const place = page.locator(".places [data-kind='dest'] .place-toggle").first();
   await place.focus();
   await page.waitForTimeout(150);
   const pointed = await place.evaluate((b) => ({
+    id: b.dataset.place,
+    pointing: window.__spike.pointing,
     pressed: b.getAttribute("aria-pressed"),
     caption: getComputedStyle(b.querySelector(".state")).clipPath,
   }));
-  if (pointed.pressed === "true" && pointed.caption === "none") pass("focusing a destination shows how many skills it shares");
-  else fail(`pointing did not show the destination's skills: ${JSON.stringify(pointed)}`);
+  if (pointed.pointing === pointed.id && pointed.pressed === "false" && pointed.caption === "none")
+    pass("focusing a destination shows how many skills it shares, without pressing it");
+  else fail(`focusing did not show the destination's skills: ${JSON.stringify(pointed)}`);
+  await place.click();
+  const pinnedState = await place.getAttribute("aria-pressed");
+  await place.click();
+  const unpinnedState = await place.getAttribute("aria-pressed");
+  if (pinnedState === "true" && unpinnedState === "false") pass("clicking a destination pins it (pressed) and clicking again unpins it");
+  else fail(`pinning: pressed after click ${pinnedState}, after second click ${unpinnedState}`);
+  await place.blur();
 
   // Keyboard: say a skill was done, keep the destination in view, undo.
   const toggle = page.locator('.skill-toggle[data-skill="calm"]');
@@ -176,6 +192,106 @@ for (const direction of DIRECTIONS) {
   }
   if (![moving, still, calm].some((r) => r.foreign.length)) pass("no request left 127.0.0.1");
   for (const run of [moving, still, calm]) await run.context.close();
+}
+
+// Every skill and destination stays reachable and reads as belonging to its own light.
+const VIEWPORTS = [
+  { width: 1440, height: 900 },
+  { width: 1280, height: 800 },
+  { width: 1728, height: 1080 },
+];
+
+function layoutProblems(page) {
+  return page.evaluate(() => {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const layout = window.__spike.layout;
+    const problems = layout ? [] : ["the page does not expose where its lights are"];
+    for (const light of layout?.lights ?? [])
+      if (light.x < 0 || light.x > W || light.y < 0 || light.y > H) problems.push(`${light.id}: light outside the window`);
+    for (const li of document.querySelectorAll(".skills li, .places li")) {
+      const id = li.dataset.node;
+      const r = li.getBoundingClientRect();
+      if (getComputedStyle(li).visibility === "hidden" || r.width === 0) {
+        problems.push(`${id}: hidden`);
+        continue;
+      }
+      if (r.left < 0 || r.top < 0 || r.right > W || r.bottom > H) problems.push(`${id}: outside the window`);
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      if (!hit || !li.contains(hit)) problems.push(`${id}: covered by ${hit?.className || hit?.tagName}`);
+      const button = li.querySelector("button");
+      button?.focus();
+      if (!button || document.activeElement !== button) problems.push(`${id}: not focusable`);
+      button?.blur();
+      if (!layout) continue;
+      const own = layout.lights.find((l) => l.id === id);
+      if (!own) {
+        problems.push(`${id}: no light`);
+        continue;
+      }
+      // The label's anchor is its point nearest its own light (where its glyph sits): it must be
+      // within 30 px of that light and nearer to it than to any other, unless a leader joins them.
+      const ax = Math.min(Math.max(own.x, r.left), r.right);
+      const ay = Math.min(Math.max(own.y, r.top), r.bottom);
+      const mine = Math.hypot(ax - own.x, ay - own.y);
+      const nearest = layout.lights
+        .filter((l) => l.id !== id)
+        .map((l) => ({ id: l.id, d: Math.hypot(ax - l.x, ay - l.y) }))
+        .sort((a, b) => a.d - b.d)[0];
+      if (!layout.leaders.includes(id) && (mine > 30 || (nearest && nearest.d <= mine)))
+        problems.push(`${id}: anchor ${Math.round(mine)} px from its light, ${Math.round(nearest?.d ?? 0)} px from ${nearest?.id}, no leader`);
+    }
+    return problems;
+  });
+}
+
+console.log("\nlayout: every skill and destination reachable and by its own light");
+for (const direction of DIRECTIONS) {
+  for (const viewport of VIEWPORTS) {
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    await page.goto(`${ORIGIN}/?d=${direction}`);
+    await page.locator("#role-input").pressSequentially("chef", { delay: 30 });
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(2000);
+    const grown = await layoutProblems(page);
+    await page.locator(".card").waitFor({ state: "visible", timeout: 10_000 });
+    await page.waitForTimeout(1200);
+    const revealed = await layoutProblems(page);
+    const where = `${direction} at ${viewport.width}x${viewport.height}`;
+    if (grown.length === 0 && revealed.length === 0) pass(`${where}: after the answer and after the revelation`);
+    else fail(`${where}: after the answer [${grown.join("; ")}], after the revelation [${revealed.join("; ")}]`);
+    if (viewport.width === 1440) {
+      // Pointing at a destination's light, not its name, shows what it shares.
+      const light = await page.evaluate(() => window.__spike.layout?.lights.find((l) => l.id.startsWith("dest:")));
+      if (light) {
+        await page.mouse.move(light.x, light.y);
+        await page.waitForTimeout(200);
+        const pointing = await page.evaluate(() => window.__spike.pointing);
+        if (`dest:${pointing}` === light.id) pass(`${direction}: pointing at an orange light shows what it shares`);
+        else fail(`${direction}: pointing at the light of ${light.id} did nothing (pointing: ${pointing})`);
+      } else fail(`${direction}: the page does not expose where its lights are`);
+    }
+    await context.close();
+  }
+}
+
+// The chooser's ambient motion has a visible pause control (reduced motion stops it as well).
+{
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto(`${ORIGIN}/`);
+  await page.waitForTimeout(400);
+  const pause = page.locator('[data-control="pause"]');
+  console.log("\nchooser motion");
+  if ((await pause.count()) === 1 && (await pause.isVisible())) {
+    await pause.click();
+    const states = await page.evaluate(() => document.getAnimations().map((a) => a.playState));
+    if (states.length > 0 && states.every((s) => s === "paused") && (await pause.getAttribute("aria-pressed")) === "true")
+      pass("the chooser's motion pauses from a visible control");
+    else fail(`the chooser's animations after pausing: ${states.join(", ")}`);
+  } else fail("the chooser has no visible pause control");
+  await context.close();
 }
 
 // The chooser and the busiest scene make no foreign request either.

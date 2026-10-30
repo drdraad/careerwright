@@ -82,6 +82,11 @@ input {
   display: block;
 }
 
+/* A destination's light answers the pointer like its name does. */
+.over-light {
+  cursor: pointer;
+}
+
 .leaders {
   position: fixed;
   inset: 0;
@@ -539,6 +544,19 @@ input {
 
 .node-label[data-align="end"] {
   text-align: right;
+}
+
+/* A label left of its light ends with its glyph, so the glyph sits beside its own light. */
+.node-label[data-align="end"] .name {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.node-label[data-align="end"] .name::before {
+  margin-right: 0;
+  margin-left: 7px;
 }
 
 .node-label[data-align="centre"] {
@@ -1098,6 +1116,17 @@ input {
 
 .chooser-world .you-glow {
   animation: chooser-breathe 4s ease-in-out infinite;
+}
+
+.motion-paused .chooser-world * {
+  animation-play-state: paused !important;
+}
+
+.chooser-controls {
+  position: fixed;
+  top: 16px;
+  right: var(--edge);
+  z-index: 5;
 }
 
 @keyframes chooser-flow {

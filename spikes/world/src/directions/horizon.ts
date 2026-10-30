@@ -25,9 +25,10 @@ function geometry(vp: Viewport, story: Story): Geometry {
   const skills: Placed[] = [];
   for (let i = 0; i < skillCount; i++) {
     const slot = slots[i] ?? i;
-    const deg = -62 + (124 * slot) / Math.max(1, skillCount - 1);
+    // An arc of ±50° keeps every skill on screen in every view, the revealed one included.
+    const deg = -50 + (100 * slot) / Math.max(1, skillCount - 1);
     skills.push({
-      p: [origin[0] + Math.sin(deg * DEG) * 2.05 * 1.3 * kx, 0.02, ORIGIN_Z + Math.cos(deg * DEG) * 2.05],
+      p: [origin[0] + Math.sin(deg * DEG) * 2.05 * 1.15 * kx, 0.02, ORIGIN_Z + Math.cos(deg * DEG) * 2.05],
       side: slot % 2 === 0 ? "below" : "above",
     });
   }
@@ -41,7 +42,7 @@ function geometry(vp: Viewport, story: Story): Geometry {
     const k = onLeft ? j : j - leftCount;
     const n = onLeft ? leftCount : destCount - leftCount;
     const t = n > 1 ? k / (n - 1) : 0.5;
-    const x = onLeft ? -15 + 10 * t : 5 + 6 * t;
+    const x = onLeft ? -15 + 10 * t : 5 + 4.5 * t;
     destinations.push({ p: [x * kx, 0.25, HORIZON_Z], side: "above" });
   }
   const revealed: Placed = { p: [0, 0.25, HORIZON_Z], side: "above" };
