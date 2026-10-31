@@ -30,7 +30,7 @@ from tests.support import reference_data as samples
 from tests.support.client import ApiClient, profile_with
 from tests.support.esco import SAMPLE_RELEASE
 from tests.support.infra import API_BASE, Infra, migrator_engine
-from tools.evaluation import load_cases, observe_discovery_offline
+from tools.evaluation import Case, CaseKind, load_cases, observe_discovery_offline
 
 pytestmark = pytest.mark.integration
 
@@ -702,6 +702,44 @@ def test_a_slate_read_against_another_release_than_its_searches_says_so(infra: I
     assert not [note for note in same["notes"] if note["reason"] == "release_changed"]
     [note] = [note for note in other["notes"] if note["reason"] == "release_changed"]
     assert note == {"reason": "release_changed", "searched": "esco-v1.1.1-en-csv", "held": held}
+
+
+@pytest.mark.req("DIV1-04")
+def test_a_title_idea_that_was_never_searched_has_no_count_of_matching_occupations(
+    infra: Infra,
+) -> None:
+    # Task 6d slice A fix round 1 (review M-2): unknown is never zero. An idea resting only on
+    # a one-word answer about how someone likes to work is not searched, so how many
+    # occupations match it isn't known; an idea that was searched has its count, 0 included.
+    case = Case(
+        id="ad hoc",
+        kind=CaseKind.DISCOVERY,
+        title="ad hoc",
+        requirements=[],
+        synthetic=True,
+        profile={"enjoyed_tasks": ["tuning bicycles"], "work_style": ["practical"]},
+        discovery_output={
+            "queries": [
+                {"text": "tune bicycles", "channel": "tasks", "based_on": ["tuning bicycles"]}
+            ],
+            "hypotheses": [
+                {"title": "workshop technician", "based_on": ["practical"]},
+                {"title": "orbital gardener", "based_on": ["tuning bicycles"]},
+            ],
+        },
+        expect=[],
+    )
+    engine = migrator_engine(infra)
+    try:
+        with system_transaction(engine) as tx:
+            observed = observe_discovery_offline(tx, case)
+    finally:
+        engine.dispose()
+
+    assert [(i["title"], i["outcome"], i["occupations"]) for i in observed["title_ideas"]] == [
+        ("workshop technician", "not_searched", None),
+        ("orbital gardener", "not_matched", 0),
+    ]
 
 
 @pytest.mark.req("SEC-02", "API-01")

@@ -13789,9 +13789,16 @@ export const TitleIdeaSchema = {
             title: 'Outcome'
         },
         occupations: {
-            type: 'integer',
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Occupations',
-            description: 'Occupations matching it in ESCO.'
+            description: 'Occupations matching it in ESCO; null when it wasn\'t searched.'
         }
     },
     additionalProperties: false,

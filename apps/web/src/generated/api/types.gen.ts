@@ -8603,9 +8603,9 @@ export type TitleIdea = {
     /**
      * Occupations
      *
-     * Occupations matching it in ESCO.
+     * Occupations matching it in ESCO; null when it wasn't searched.
      */
-    occupations: number;
+    occupations: number | null;
 };
 
 /**

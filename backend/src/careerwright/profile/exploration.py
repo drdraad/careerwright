@@ -818,7 +818,7 @@ def compute_slate(
                     title=hypothesis.title,
                     based_on=based_on,
                     outcome=Outcome.NOT_SEARCHED,
-                    occupations=0,
+                    occupations=None,
                 )
             )
             continue

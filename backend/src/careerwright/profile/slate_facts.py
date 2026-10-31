@@ -274,4 +274,6 @@ class TitleIdea(Fact):
     outcome: Literal[
         Outcome.MATCHED, Outcome.MATCHED_SEVERAL, Outcome.NOT_MATCHED, Outcome.NOT_SEARCHED
     ]
-    occupations: int = Field(description="Occupations matching it in ESCO.")
+    occupations: int | None = Field(
+        description="Occupations matching it in ESCO; null when it wasn't searched."
+    )
