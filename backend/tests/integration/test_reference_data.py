@@ -20,13 +20,15 @@ from careerwright.catalogue.pay import MappingReview, MappingReviewPack
 from careerwright.catalogue.reference import DATASETS, ReferenceMismatchError
 from careerwright.catalogue.releases import ReleaseIntegrityError
 from careerwright.cli import import_reference_data, import_taxonomy, migrate_app, seed_fixture
-from careerwright.db import create_engine
+from careerwright.db import create_engine, system_transaction
+from careerwright.errors import CareerwrightError, ErrorCode
 from careerwright.seed import FIXTURE_WORKSPACE_ID
 from tests.support import reference_data as samples
 from tests.support.client import ApiClient, profile_with
 from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
 from tests.support.infra import API_BASE, Infra, migrator_engine
 from tools.datasets import DATASETS_DIR
+from tools.evaluation import Case, CaseKind, observe_discovery_offline
 
 pytestmark = pytest.mark.integration
 
@@ -272,6 +274,7 @@ def test_an_unknown_occupation_is_not_found(api: ApiClient, ada: str, manchester
     assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
+@pytest.mark.req("TAX1-04", "DIV1-13")
 def test_without_reference_data_the_evidence_is_unavailable_never_empty(
     infra: Infra, api_deps: ApiDependencies, ada: str
 ) -> None:
@@ -302,11 +305,54 @@ def test_without_reference_data_the_evidence_is_unavailable_never_empty(
             response = bare.get(
                 f"/v1/workspaces/{workspace}/occupations/{DATA_ANALYST}/evidence", ada
             )
+            # Task 6d slice B fix round 1, app review M-2: without the UK job-title index the
+            # type-ahead, "Use my own words" and a role typed in What we know refuse; none says
+            # a title is "not listed".
+            typed = bare.get("/v1/taxonomy/titles", ada, q="Registered nurse")
+            own = bare.write(
+                "POST",
+                f"/v1/workspaces/{workspace}/origin/role/title",
+                ada,
+                {"expected_version": 0, "title": "Bookkeeping assistant"},
+            )
+            edited = bare.write(
+                "PUT",
+                f"/v1/workspaces/{workspace}/profile",
+                ada,
+                {"expected_version": 0, "profile": profile_with(current_role="Doula")},
+            )
     finally:
         engine.dispose()
 
-    assert response.status_code == 503
-    assert response.json()["error"]["code"] == "REFERENCE_DATA_UNAVAILABLE"
+    for refused in (response, typed, own, edited):
+        assert refused.status_code == 503, refused.text
+        assert refused.json()["error"]["code"] == "REFERENCE_DATA_UNAVAILABLE"
+    # The slate, which every slate route computes the same way: a title idea can't be said to
+    # be in the index, or not yet found, without it.
+    case = Case(
+        id="ad hoc",
+        kind=CaseKind.DISCOVERY,
+        title="ad hoc",
+        requirements=[],
+        synthetic=True,
+        profile={"enjoyed_tasks": ["writing prompts for AI tools", "analysing data"]},
+        discovery_output={
+            "queries": [
+                {"text": "analyse data", "channel": "tasks", "based_on": ["analysing data"]}
+            ],
+            "hypotheses": [
+                {"title": "Prompt engineer", "based_on": ["writing prompts for AI tools"]}
+            ],
+        },
+        expect=[],
+    )
+    owner = migrator_engine(infra, database)
+    try:
+        with system_transaction(owner) as tx, pytest.raises(CareerwrightError) as slate:
+            observe_discovery_offline(tx, case)
+    finally:
+        owner.dispose()
+    assert slate.value.code is ErrorCode.REFERENCE_DATA_UNAVAILABLE
 
 
 @pytest.fixture

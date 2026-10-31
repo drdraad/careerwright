@@ -229,6 +229,42 @@ def test_the_discovery_checks_name_the_failure_they_find() -> None:
     ]  # fewer than six with no reason given
 
 
+@pytest.mark.req("TEST1-15", "DIV1-04")
+def test_a_title_idea_s_reason_must_be_what_careerwright_did_with_it() -> None:
+    # Task 6d slice B fix round 1, app review M-8: the failure path of `title_idea_reasons`.
+    dsc20 = BY_ID["DSC-20"]
+
+    def idea(title: str, reason: str) -> dict[str, Any]:
+        matched = reason == "in_esco"
+        return {
+            "title": title,
+            "reason": reason,
+            "outcome": "matched" if matched else "not_matched",
+            "occupations": 1 if matched else 0,
+        }
+
+    analyst = suggestion(
+        "data analyst",
+        "251",
+        "close_to_current",
+        linked_evidence=[{"field": "enjoyed_tasks", "text": "analysing data"}],
+    )
+    right = [
+        idea("data analyst", "in_esco"),
+        idea("Prompt engineer", "in_uk_title_index"),
+        idea("Orbital gardener", "not_yet_found"),
+    ]
+    # "Prompt engineer" said to be not yet found, though the UK job-title index lists it.
+    wrong = [*right[:1], idea("Prompt engineer", "not_yet_found"), right[2]]
+    # An idea the case never had is not what Careerwright did with the case's ideas either.
+    extra = [*right, idea("Wind whisperer", "not_yet_found")]
+
+    assert evaluate(dsc20, slate(analyst, title_ideas=right), {}) == []
+    for ideas in (wrong, extra, right[:2]):
+        failed = evaluate(dsc20, slate(analyst, title_ideas=ideas), {})
+        assert [f.type for f in failed] == [FailureType.UNSUPPORTED_TITLE], ideas
+
+
 def searched(query: str, skill: str) -> dict[str, Any]:
     return {
         "reason": "searched_through_skill",

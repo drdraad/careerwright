@@ -266,6 +266,30 @@ def test_none_of_these_at_the_closest_question_is_a_new_version_so_a_stale_tab_c
     assert (role["closest"]["decision"], role["occupation"]) == ("none_of_these", None)
 
 
+@pytest.mark.req("DIV1-13", "DIV1-03")
+def test_own_words_of_only_punctuation_are_kept_as_given(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    # App review M-8: nothing typed is refused, not even a title with no letter or digit (the
+    # type-ahead searches nothing for it; the person's own words are still theirs to keep).
+    workspace = api.create_workspace(ada, "Punctuation (synthetic)")["workspace_id"]
+    searched = api.get("/v1/taxonomy/titles", ada, q="--")
+    kept = name_role(api, ada, workspace, "--", 0)
+    role = origin(api, ada, workspace)["role"]
+
+    assert searched.json()["error"]["details"]["reason"] == "no_search_terms"
+    assert kept.status_code == 201, kept.text
+    assert kept.json()["document"]["current_role"]["value"] == "--"
+    assert (role["text"], role["state"], role["kind"], role["closest"]) == (
+        "--",
+        "not_in_esco",
+        "own_words",
+        None,
+    )
+    stored = record(infra, workspace, "--")  # its concept key is empty, which no CHECK forbids
+    assert (stored["kind"], stored["link"], stored["occupation_uri"]) == ("own_words", "none", None)
+
+
 @pytest.mark.req("DIV1-13", "DIV1-14", "PROF-10")
 def test_a_uk_title_keeps_the_person_s_words_and_asks_which_esco_occupation_is_closest(
     api: ApiClient, ada: str, infra: Infra
