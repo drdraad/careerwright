@@ -4,6 +4,8 @@
   by the product owner on 2026-10-28, so nothing here is provisional (ruling R6 does not
   apply).
 - Date: 2026-10-28
+- Amended: 2026-10-29 (plan v1.2, then v1.3) and 2026-10-31, the product owner's approval
+  of the audit (plan v1.5; the last section).
 - Source: [`docs/plan/l0-assessment-handover.md`](../plan/l0-assessment-handover.md), an
   assessment of the specification and the plan against the repository at `cfdae68`, after
   Sprints 0–2. Applied as product specification v1.3, development plan v1.1, the task file
@@ -226,3 +228,55 @@ it finds are logged:
 The changed candidate is re-qualified, and a new tag needs the product owner's approval. A
 new human gate, H-14 (a person follows the manual), is prepared and is not a dispatch
 precondition. The controller's final whole-branch review moves to after Task 17.
+
+## Amendment, 2026-10-31 (the product owner's approval of the audit)
+
+Source: the whole-solution audit the product owner asked for (`docs/reviews/l0-audit-2026-10-31.md`),
+applied as plan v1.5. Their directions, in their words: "The visuals are important, but they
+must be subservient to having a practical, useful product." "I want to check that the
+development plan is still sensible, and get us back on track with the sprints, even if we
+have to refactor some of them to ensure coherency and pragmatism." They approved it on
+2026-10-31: "Approved - proceed. Where subagent work can be done cleanly in parallel, do so
+but coordinate well to avoid them causing conflicts. Yes, I have 5 people who can try the
+app before release."
+
+1. **The order: the decision path first.** After about 58 hours of build, a person could use
+   only the You chapter, and session W2's gate kept every other chapter waiting for the
+   world's spectacle. From here: finish the You chapter (Task W2E); recognise any UK title
+   and get live sessions ready (Tasks 6d and 3b); research roles no list holds (Task 6e);
+   a short session W2, with the planning inputs (Task 12a) and the search's durable part
+   (Task 13b) meanwhile; then Skills (10), Options (12b), Routes (14) and Plan (15); the
+   end-to-end session; option research for any target (7e); Roles (8); the chapters'
+   moments (M); then 16, 17 and the final review. Task 12 is split into 12a (the stored
+   inputs, backend) and 12b (the Options chapter). Task 13a moved early and runs now. The
+   dependency rules are in the task file.
+2. **Sessions (decision 3, amended).** Sessions 1, 2 and W1 are held. Session W2 becomes a
+   short first look: about 30 minutes, live on Muse Wonder (ADR 0003, amendment), about five
+   questions, and no score threshold. Session 3 merges into one end-to-end session of about
+   an hour after Task 15, which asks session 2's route questions again on the real Routes
+   chapter, records formative scores and orders the moments. "Every rubric category at least
+   4" stays the release bar. The product owner may rule that an AI's check of rote items
+   counts as their own review; an agent never assumes it. Five participants are available
+   for the release task sessions (H-05).
+3. **The context's Adzuna premise is corrected.** The credentials exist, and the free-tier
+   integration was qualified live in Task 7 (ADR 0009 decision 11). Roles still comes after
+   the critical chain, now because routes don't need it. Decision 7 (Adzuna stays optional)
+   stands.
+4. **Scope.** "What does not change" still holds: the dendrite, the three Pareto layers and
+   the sliders stay in L0. New in scope: roles beyond a fixed list (ADR 0015), options and
+   routes for any target as proposed records (ADRs 0011 and 0013, amendments), and the
+   product owner's live sessions on Muse Wonder. The L0 deferrals are listed in plan section
+   1.
+5. **Parallel work replaces decision 2's sequential execution.** Up to two implementers run
+   at once, one in the main tree and one in a git worktree, on disjoint modules (task file
+   ruling R15).
+6. **Review rules.** Small things wait for the final review in every remaining task (ruling
+   R13, which makes R12 permanent); loops are bounded by kind of finding, wording, matching
+   and visual work stop at three rounds, and the product owner judges suggestion quality
+   (ruling R14).
+
+Consequences: plan v1.5 (its version note, sections 1 and 4–6, 9–12, and the Sprint 1, 2, 3,
+4, 5, W, 6b, 7, 8, 9 and new M cards), the task file, the register, ADRs 0003, 0006, 0007 and
+0009–0014, the new ADR 0015, the specification's revision record (section 22) and
+`CLAUDE.md` change together. No code, test, fixture or configuration changes with this
+amendment.

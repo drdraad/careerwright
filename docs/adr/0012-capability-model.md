@@ -20,6 +20,8 @@
     `docs/reviews/session-2-capability-questions.md`), and these provisional decisions on its
     decision sheet (D3-D11).
 - Date: 2026-10-29
+- Amended: 2026-10-31, the product owner's approval of the audit (the last section):
+  decision 10's seed for a role outside ESCO, and Skills for any target.
 - Requirements: MAP1-01–MAP1-08, OUT1-01–OUT1-07, OUT1-11, RDY1-01–RDY1-05, BND1-08,
   ASSESS-01, ASSESS-03–ASSESS-06, READINESS-01–04, TRACE01-06, VERSIONS-04, OPTN-09, PLN-04;
   spec sections 8, 9, 10 and 18; rulings R6, R9, R11, R12; ADR 0011 decisions 2, 10 and 13
@@ -340,3 +342,31 @@ deterministic code: a model may later propose mappings and answers, never commit
   when read back by the domain validator, so every capability read for its workspace
   would answer `INTERNAL_ERROR`, observable, never silent. A populated-upgrade test is left
   for the final review (R12).
+
+## Amendment, 2026-10-31 (the product owner's approval of the audit)
+
+The product owner approved the audit on 2026-10-31: the decision path first, Skills for any
+target, and roles beyond a fixed list (ADR 0015). The capability model changes as follows;
+its rules on protected gates, unknown and readiness (decisions 4, 5 and 7) are unchanged.
+
+- **Decision 10: the ESCO seed for a role outside ESCO.** For a provisional or researched
+  role, the seed is the occupation the person chose as closest ("Which of these is
+  closest?", recorded as an `occupation_choice`). "None of these is my job" means no seed:
+  the target is `insufficient_coverage`, never ready. The seed order otherwise stands.
+- **One stored target record.** Each target's occupation (or none), the source of that link
+  and its coverage are stored once when it is chosen or saved (Task 6d). The capability
+  model reads that record instead of resolving the title again, so You, Skills and the world
+  can't disagree about the same target (the audit's code appendix, finding F5).
+- **Skills for any target** (Task 10): what the seed occupation lists, labelled as ESCO's
+  ("ESCO lists these for this kind of work"); the person's own examples' rows, read by their
+  own selection of spans, with no new run kind (decision 11's open item); and "not assessed
+  yet" with what the target asks, wherever no reviewed rubric exists (decision 7 already
+  makes such a target `insufficient_coverage`).
+- **"Not part of my job"** (the product owner's ESCO research): a skill the person marks so
+  is a display state. It is never evidence, never a level and never a demotion of a
+  protected gate.
+- **Seniority and industry** beside a target are kept for display and search; matching and
+  readiness ignore them.
+- **Decision 11's owners.** Persisting accepted modelling assumptions and outcome overrides
+  is Task 12a's (the stored planning inputs); the checkpoint's interface for them is Task
+  12b's.

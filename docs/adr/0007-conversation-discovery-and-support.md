@@ -31,6 +31,8 @@
   type-ahead's "closest titles" order and its status words, and the prompt's ESCO skill
   wording (`discovery-queries-3`, untested live).
 - Date: 2026-10-28
+- Amended: 2026-10-31, the product owner's approval of the audit (the last section):
+  decisions 4, 5, 13 and 14 for the role space (ADR 0015).
 - Requirements: REC1-01..11, DIV1-02, DIV1-04..12, STATE-05, STATE-06, STATE-08, PROF-04,
   PROF-07..09, MODEL-03, MODEL-07, TEST1-10; spec sections 3, 4 and 16; ADR 0006; ADR 0008
   decision 4
@@ -915,3 +917,44 @@ cover stays open: not run — requires human.
   at the session: about 10 samples per arm, at most 40 requests, its own scope above the
   9-request cap, and INT-04/05's fields as built (`current_role`, `weekly_study_hours`).
   Not run — requires human.
+
+## Amendment, 2026-10-31 (the product owner's approval of the audit)
+
+The product owner, 2026-10-31: "One thing that is really important to me is that we aren't
+limited to a prefilled list of roles - the real world is much more complex than those
+standardised job lists, and I want to avoid the frustration of your ideal job not appearing
+as an option to select." The audit found that keeping roles to ESCO was this ADR's narrowing,
+not the specification's: DIV-1 calls a role library "never the universe of recommendable
+careers" and lets a model's title count once "an authoritative occupational/professional
+source or independent employer evidence" corroborates it. Decision 4 turned that into "only
+if ESCO holds it as a label", and the employer-evidence half was never built. They approved
+the audit's decisions 2 and 3 and the matching `CLAUDE.md` wording. ADR 0015 records the role
+space; this ADR changes as follows.
+
+- **Decision 4: the model proposes searches and title ideas.** A title idea becomes a
+  suggestion only when deterministic code corroborates it: an ESCO label (as before), a title
+  in the pinned ONS coding index (Task 6d), or the title verified as a quoted span on pages
+  from two independent permitted sources, or one official source (Task 6e; ADR 0015
+  decision 2). A corroborated idea outside ESCO is shown in its own short list beside the
+  slate, with the answers it came from. An idea nothing corroborates is shown as not yet
+  found, never as a suggestion. The ideas still never enter the slate's pool, and none
+  becomes a target without the person's choice.
+- **Decisions 5 and 13: the slate stays deterministic code, and its rules don't change
+  here.** They are frozen (task file ruling R11) and judged at session W2 on real examples,
+  not item by item. The provisional items listed in this ADR's status stay provisional until
+  the product owner's answer there says otherwise.
+- **Decision 13: a title of the person's own that ESCO doesn't hold now has a path.** The
+  person's words are kept. "Which of these is closest?" offers the ESCO occupations in the
+  title's ONS group, and "None of these is my job" leaves the role with no ESCO occupation:
+  it joins nothing in the slate, and the slate says what Careerwright did with it (R11). The
+  type-ahead's partial results ("Careerwright couldn't match that title in ESCO. Is it one
+  of these?") gain "None of these is my job", which leads to the person's own words.
+- **Decision 14: the unexpected connection stays a fact about two roles.** The product
+  owner's ESCO research adds a rule: no revelation rests on ESCO's essential skills alone.
+  How the connection meets it is to be settled by Task 6d, asking the product owner before a
+  second round (R14). Until then the connection is shown as it is built, in words, with its
+  shared skills named (Task W2E); its light in the world is Task M's.
+- **Words.** Every line about a title says what Careerwright did or checked, never what a
+  list contains (`CLAUDE.md`; R11). The lines that throw a title idea away ("couldn't match
+  … so not suggested") change in Task 6d.
+- `CLAUDE.md`'s discovery invariant changes to match, in the product owner's approved words.

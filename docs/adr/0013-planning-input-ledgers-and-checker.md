@@ -13,6 +13,8 @@
   - **Not run - requires human:** the review of the checker's run on P01's real option set
     (H-07, TEST1-14) and of the proposed outcome levels, at session 2.
 - Date: 2026-10-29
+- Amended: 2026-10-31, the product owner's approval of the audit (the last section): the
+  stored inputs (Task 12a), and workspace options read beside the pack.
 - Requirements: TIME1-01-TIME1-06, FIN1-01-FIN1-12, OPTN-01, OPTN-02, OPTN-04, OPTN-05,
   OPTN-07, OPTN-09, PLN-01-PLN-09, TEST1-14, and the TRACE01, PREFUND, PAYCAP, TIME, WORKLOAD,
   ECON and FUNDING families; spec sections 10, 11, 12, 18 and 20; rulings R6, R9, R11, R12;
@@ -206,3 +208,28 @@ independent oracle must share no code with it. Nothing here is model-backed.
   stacking, exclusivity and eligible-cost caps (supports on one variant are summed today, and
   the spec says never to assume two schemes stack: carried to Task 12); and S5.3, the
   checkpoint UI.
+
+## Amendment, 2026-10-31 (the product owner's approval of the audit)
+
+The audit found the Options task hid a backend piece (a store for about 15 of the person's
+money and time inputs) and that options existed only for the pack's four targets. The
+product owner approved it on 2026-10-31, with its decision 4: options and routes for any
+job, marked not reviewed.
+
+- **Decision 11's store is Task 12a's.** Task 12 is split: Task 12a stores and confirms
+  every input decision 11 lists, as validated commands (an expected version and an
+  `Idempotency-Key`), with outcome accept and override; Task 12b's checkpoint collects them
+  in one place. Work rights and remote working join the inputs (spec sections 1 and 3);
+  where they live is to be settled by Task 12a. Unknown work rights leave a route
+  unresolved, never ineligible.
+- **Session 2's answers.** The product owner answered yes to D12–D17
+  (`docs/reviews/session-2-answers.md`), so decisions 4, 6, 8 and 9 stand as written; Task
+  12a applies them.
+- **Funding stacking stays unresolved** when a person confirms more than one support on a
+  variant, until stacking is confirmed; exclusivity and eligible-cost caps follow the same
+  rule (Task 12a).
+- **The catalogue reads workspace options beside the pack.** An option the person adds
+  (Task 12b) or that option research finds (Task 7e) is a `proposed` workspace record in the
+  pack's shapes (ADR 0011, amendment). A route built on one is qualified: "affordable and
+  feasible with qualifications" at best (decision 10), never an unqualified "affordable and
+  feasible".

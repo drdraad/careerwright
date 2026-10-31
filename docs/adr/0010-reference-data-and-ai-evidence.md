@@ -11,6 +11,8 @@
   (decision 8; fix round 2). Fix round 1 (2026-10-29) amended decisions 4, 7, 8, 9 and 10 as
   marked; fix round 2 decisions 4 and 8.
 - Date: 2026-10-29
+- Amended: 2026-10-31, the product owner's approval of the audit (the last section): group
+  pay and AI evidence for an ONS-coded title.
 - Requirements: TAX1-02..07, AIR1-02, AIR1-03, AIR1-04, AIR1-05 (backend), AIR1-07,
   AIR1-10, AIR1-11, AIR1-12, JOB-05, DIV1-07, JOB-03 (the floor's part); spec sections 4, 5,
   17 and 18; rulings R2, R6, R7; plan v1.1 S3.1 and S3.6
@@ -223,3 +225,21 @@ evidence endpoint's 503 and 404.
 - One ASHE release and one Economic Index release are held; refreshing either is a reviewed
   migration. Monitoring source releases for corrections is M1; L0 checks the pack's
   recorded corrections at start.
+
+## Amendment, 2026-10-31 (the product owner's approval of the audit)
+
+The product owner approved the audit's decision 2 on 2026-10-31: Careerwright recognises
+any UK job title the ONS coding index lists (ADR 0015). Such a title carries ONS's own SOC
+2020 unit group and ISCO-08 codes, so it can show official figures without a guess:
+
+- **Pay for an ONS-coded title** is the ASHE figures for its own ONS unit group or groups,
+  by region, labelled as the group's, never as the title's or the person's. These are the
+  same candidate-group figures an unreviewed ESCO occupation already shows (decision 5). A
+  title ONS codes to more than one group shows every group, none picked.
+- **AI evidence** for it is its ISCO-08 group's exposure, labelled the group's (decision 6).
+- **Nothing else changes.** Modelled pay still exists only through an accountable
+  reviewer's reviewed mapping (none in L0, H-10). The salary floor's rule (decision 8) is
+  unchanged. ASHE stays regional, never a city's. The AI Resilience Score stays unscored for
+  every real role.
+
+Where it shows: the role card in the Roles chapter (Task 8).

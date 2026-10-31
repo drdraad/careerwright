@@ -4,6 +4,8 @@
   `muse-spark-1.3-contributor` is used for synthetic or public inputs only, and production
   uses `muse-spark-1.3`. The data-use choice for the test model is a product decision.
 - Date: 2026-10-27
+- Amended: 2026-10-31, the product owner's approval of the audit (the last section): Muse
+  Wonder for the product owner's live sessions.
 - Requirements: spec section 16 (Current Meta choices, Privacy mode, Spend controls), ARC-1,
   ruling R5
 
@@ -129,3 +131,45 @@ The other models the key lists, from the same pricing page and https://dev.meta.
 - The model registry in the product (spec section 16) must store per model: exact ID,
   Standard/Contributor mode, price version, capabilities and evaluation status. This table
   is its first entry.
+
+## Amendment, 2026-10-31 (the product owner's approval of the audit)
+
+The product owner, 2026-10-31: "We can also start being a bit more generous with token use
+in human testing - I would like to use muse wonder for this." The audit read "human testing"
+as the product owner using the live app with their own details, in their own sessions
+(`docs/reviews/l0-audit-2026-10-31.md`, section 5). They approved that reading and its
+decision 5 on 2026-10-31.
+
+What changed:
+- **Muse Wonder for the product owner's live sessions only.** `muse-wonder-1.0` (Standard
+  mode, so personal data is allowed; $4.00 / $0.20 / $20.00 per million tokens) becomes the
+  production model for those sessions, started only by the session command (Task 3b). This
+  brings an M1 item forward for these sessions only: it is not an escalation policy, it is
+  never automatic, and it decorates nothing (spec section 16). Its purpose is the quality of
+  the suggestions the product owner judges.
+- **Qualified first.** Two live calls on synthetic input (schema output with usage;
+  streaming, web search and schema output in one call), then at most six evaluation cases,
+  under $0.50 in all. The controller makes these calls. The capabilities they establish go
+  into the model registry; until then Wonder has none, like any model listed but never
+  called.
+- **Capped.** The session command sets about $0.75 a run and about $5 a session. Today's
+  defaults ($0.15 a run, sized for three attempts at a Spark interview turn, and $1.00 a
+  month) would refuse every Wonder interview turn as over budget. The live-smoke production
+  cap, sized for Spark (at most $0.10 an invocation), gets a Wonder-sized bound.
+- **Ledgered.** After each session, each call's model, run kind, tokens and cost, never its
+  content, is copied from the product's run records into `docs/evidence/live-usage.*`
+  (ruling R5). A cost the provider didn't report counts its full reservation.
+
+What does not change:
+- Spark (`muse-spark-1.3`) stays the production default and the release default. Whether
+  the release uses Wonder is the product owner's decision at the end-to-end session.
+- The test model `muse-spark-1.3-contributor` stays for synthetic or public inputs only,
+  with its safeguards in code and in the database CHECK. Automated checks never call a
+  model. A Contributor model still cannot be the production model.
+
+Estimates on Wonder, from Spark's measured token counts (not measured on Wonder): about 2 US
+cents an interview turn, about 4 US cents a written "why" note, 3–6 US cents a web search,
+and about $1.50–2.00 for a two-hour session.
+
+Consequences: Task 3b (S1.6); `CLAUDE.md`'s secrets bullet; the specification's revision
+record (section 22, 2026-10-31); register rows MODEL-08 and MODEL-11.

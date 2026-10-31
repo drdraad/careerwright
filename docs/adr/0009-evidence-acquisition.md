@@ -5,6 +5,8 @@
   owner confirmation (R6)**. Decision 2 was decided by the controller on 2026-10-29 under the
   product owner's delegation ("Do as you think best for these questions").
 - Date: 2026-10-29
+- Amended: 2026-10-31, the product owner's approval of the audit (the last section): role
+  research and option research.
 - Requirements: ACQ-01..10, JOB-01/02/05/06/08, FRESH-01..04, STATE-02, API-06, DUR-05,
   MODEL-08, SEC-05, SEC-08, PROP-02; spec sections 6, 7, 11 and 18; Global Constraint 8;
   rulings R3, R4, R5; the session 1 rights policy (H-06)
@@ -598,3 +600,35 @@ results, the ledger rows it wrote and the ledger table found no credential.
   `source_blocked`), event kinds (`run.cancel_requested`, `research.updated`) and run kinds
   (`acquisition`, `source_search`, and in fix round 2 `page_extraction`); migrations 0013
   and, for extraction, 0021 (also the `model` validation state and `page_extractions`).
+
+## Amendment, 2026-10-31 (the product owner's approval of the audit)
+
+The product owner approved the audit's decision 3 (research roles that no list holds) and
+decision 4 (options and routes for any target, marked not reviewed) on 2026-10-31. The audit
+found that live research of courses and funding, promised by Task 7's card and plan section
+9, was never built: acquisition extracts job postings only. This ADR gains two research
+purposes; decisions 1–4 (the restricted worker, the fetcher, every hop checked, the
+manifest and the rights policy) are unchanged.
+
+- **Decision 12 gains two purposes of the bounded source search.** *Role research* (Task
+  6e): its prompt carries one title and "England", never the person's answers (SEC-05),
+  and asks for pages that describe the role. *Option research* (Task 7e): one target title
+  and one of the person's cities, for course and funding pages. Each keeps decision 12's
+  shape: one request, Meta's own search, no repair, and a worst case that lets three
+  attempts fit the run limit (at most $0.045 on Spark; the session command's run limit fits
+  Wonder, ADR 0003, amendment). Candidates are never claims.
+- **A role-evidence acquisition** (Task 6e): up to five candidate pages for one title,
+  through the guarded fetcher, each page's class from the manifest. Deterministic code then
+  checks the title as a span of each page's visible text, and ADR 0015's corroboration rule
+  decides whether the role is found. Bodies are kept only where the page's class permits,
+  as now; an unlisted host keeps its hash and excerpts, which is enough for the span.
+- **Two extraction schemas under decision 15's pattern** (the model quotes; code approves
+  values read from verified spans; at most five pages an acquisition; the model's input
+  erased when its run ends): a role description (duties and entry requirements; optional,
+  to be settled by Task 6e against its spend bounds) and a course and funding schema (Task
+  7e), writing the pack's record shapes as workspace records, `review_state: proposed`.
+- **Rights.** A page of a source class the session 1 policy doesn't cover stays "pending
+  human rights review" for a person (ruling R10).
+- **Still open:** "The live search proposed no candidate in two tries; candidate quality is
+  unqualified." Task 6e's live test qualifies the role-research purpose once, on the test
+  model with a synthetic title.

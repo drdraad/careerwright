@@ -12,6 +12,8 @@
   - **Amended in Task 7c (2026-10-30):** decision 15 added. The labels' review (H-07) was
     held at session 2 and published as version 0.2.0.
 - Date: 2026-10-29
+- Amended: 2026-10-31, the product owner's approval of the audit (the last section):
+  options outside the pack as proposed workspace records.
 - Requirements: OPTN-08, OPTN-10, TEST1-09, OUT1-10, JOB-01; spec sections 6, 10, 11, 18
   and 20; ADR 0008 decision 1; rulings R2, R3, R6, R7, R9, R10, R11, R12
 
@@ -276,3 +278,23 @@ be precise enough for a person to accept or reject each one with a yes or a no.
   accuracy read found that boards name the advertiser as `hiringOrganization`. So agency
   names reach the employer field unless the agency words catch them. That is a finding
   for Task 8, not a fix here (R11, R12; `docs/evidence/option-pack-accuracy-read.md`).
+
+## Amendment, 2026-10-31 (the product owner's approval of the audit)
+
+The audit found that options, routes and plans existed only for the pack's four targets:
+any other target met a dead end after Skills, and nobody had decided that. The product owner
+approved its decision 4 on 2026-10-31: options and routes work for any job, marked not
+reviewed.
+
+- **Options outside the pack are workspace records, marked proposed.** An option the person
+  adds themselves (Task 12b, "add an option yourself") and one option research finds (Task
+  7e) take the pack's record shapes (LearningOption and Offering, FundingInstrument), with
+  `review_state: proposed`, an `as_of` date and their sources. They live in the person's
+  workspace, never in the pack, and are never shared with another workspace (ADR 0008
+  decision 1: "the same catalogue contract", not the shared pack). A pack version still
+  never changes.
+- **Read beside the pack.** The planning catalogue reads them beside the pack (ADR 0013,
+  amendment). A route built on one is qualified, never an unqualified "affordable and
+  feasible" (ruling R9), and every surface shows it as not reviewed, in plain words.
+- **To be settled:** where the records are stored, by Task 12b; how a pasted page's values
+  are read, by Task 12b; the course and funding extraction schema, by Task 7e.

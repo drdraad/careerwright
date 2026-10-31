@@ -6,6 +6,8 @@
   and were confirmed by the product owner on 2026-10-28 (H-11 below), the hard-constraint
   set with a salary floor added (implemented in Task 6, ADR 0007).
 - Date: 2026-10-28
+- Amended: 2026-10-31, the product owner's approval of the audit (the last section):
+  decision 5's provisional concepts for the role space (ADR 0015).
 - Requirements: TAX1-01, TAX1-04, DIV1-01, DIV1-03, REC1-04, BND1-04, PROF-01..07,
   MODEL-01..04, STATE-08, TEST1-10; spec sections 3-5, 16 and 18; ADR 0002, ADR 0004
   decisions 5, 7 and 9
@@ -314,3 +316,28 @@ change (rulings R2, R6).
 - [x] **Basis of an answer with no value** (decision 8): shown as `inferred`.
 - [x] **Concept-key folding** (decision 5): whether the plural heuristic refuses any title
   a person would expect to be accepted.
+
+## Amendment, 2026-10-31 (the product owner's approval of the audit)
+
+The product owner, 2026-10-31: "One thing that is really important to me is that we aren't
+limited to a prefilled list of roles". They approved the audit's decision 2 (recognise any
+UK job title, and always keep the person's own) and decision 3 (research roles that no list
+holds). ADR 0015 records the role space; this ADR changes as follows.
+
+- **Decision 5: provisional concepts carry their sources.** A provisional concept cites one
+  of: the person's confirmation (as before); a title in the pinned ONS SOC 2020 coding index,
+  with ONS's own unit group and ISCO-08 codes; or the title verified as a span on pages from
+  independent permitted sources (ADR 0015 decision 2). A title a model proposes becomes a
+  provisional concept only once one of those corroborates it; until then it stays a search
+  hypothesis (DIV1-04), shown as not yet found. Why: the specification lets such a title
+  count once "an authoritative occupational/professional source or independent employer
+  evidence" backs it (DIV-1), and the ONS index is already pinned and imported.
+- **The person's own words are always kept.** Nothing typed at the first question is
+  refused (Task 6d). The duplicate check stays: a title that is an ESCO label as a concept
+  becomes that occupation, never a second concept, and the person's words stay its label.
+  How the first question offers that is to be settled by Task 6d.
+- **Optional seniority and industry** beside a role or target title (spec sections 4 and
+  18; the product owner's ESCO research). Matching ignores them; display and search keep
+  them. The profile schema change is Task 6d's.
+- **Open from this ADR's consequences:** residence and work-rights fields (BND1-04) move to
+  Task 12a, with remote working (BND1-05).

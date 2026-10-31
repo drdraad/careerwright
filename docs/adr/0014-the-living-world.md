@@ -2,7 +2,9 @@
 
 - Status: Proposed, 2026-10-30. Accepted when the product owner approves plan v1.4. Session
   W1 (2026-10-30, `docs/reviews/session-w1-answers.md`) made the spike's choices, recorded in
-  decisions 2, 6 and 8 by Task W2.
+  decisions 2, 6 and 8 by Task W2. **Accepted, with the amendment of 2026-10-31** (the last
+  section): the product owner approved the audit, which keeps decisions 1–8 and changes
+  decision 9.
 - Date: 2026-10-30
 - Supersedes, for L0: the "calm observatory" art direction (spec section 14), the visual scope
   and renderer limits of plan v1.3 (sections 1, 4 and 5) and the visual direction in
@@ -161,3 +163,46 @@ process." Their reference image is "Careerwright's luminous path forward".
 - Risks: frame rate on the target Mac, motion sensitivity, and a world that implies more
   certainty than the evidence. The budgets, the still version and decision 4 answer them
   (plan section 12).
+
+## Amendment, 2026-10-31 (the product owner's approval of the audit)
+
+The product owner, 2026-10-31: "The visuals are important, but they must be subservient to
+having a practical, useful product." The audit found that session W2's gate (every rubric
+category at least 4 before any other chapter) kept the whole decision path waiting for the
+world's spectacle in its first chapter, and that on a phone the world pushed the first
+decision out of view. They approved it on 2026-10-31. The truth rules of decisions 1–8 are
+unchanged; what changes:
+
+- **Decision 9, sequencing.** Sprint W closes at the world shell, the You chapter and the
+  deterministic sources (Task W2E). Session W2 is a short first look: about 30 minutes, live,
+  about five questions, and no score threshold. Each later chapter is built in the world to
+  Sprint W's references, its working view (words, choices and numbers) first. The chapters'
+  moments come in a new Sprint M (Task M), after the decision path works, in the order the
+  product owner chooses at the end-to-end session. The threshold, every rubric category at
+  least 4, applies at release (Task 16).
+- **Practical first** (plan section 4; `CLAUDE.md`). Where the world and the decision path
+  compete, the path comes first. On a phone the decision comes first, and the world takes no
+  more room than what it shows.
+- **Decision 3.** Its rules stay provisional until the product owner confirms them at
+  session W2 or, for the strength's interface, in Sprint M. The strength's proposal and
+  confirm step, its holding back on a support turn and its destinations on the horizon ship
+  together in Task M.
+- **Decision 4.** From the product owner's ESCO research: skills a role usually needs are
+  described as what ESCO lists for that kind of work; the person can mark one "not part of
+  my job"; no revelation rests on ESCO's essential skills alone (how the unexpected
+  connection meets it is to be settled by Task 6d). A role the person never named, found in
+  sources, is a revelation with a deterministic source (ADR 0015).
+- **Decisions 5 and 6.** Leaf green for "accept" and Source Sans 3 for body text stay
+  provisional; they are two of session W2's five questions.
+- **Decision 7.** Its frame evidence now reads: Task M and Task 16 measure again, with the
+  product owner warned first, because the measurement opens a window on their screen. Its
+  strip wording is corrected by Task W2E, which moves the motion and sound switches into
+  the account menu below desktop width.
+- **References.** Once a chapter is built, the app's own Storybook stories become its
+  reference, and its place in the hand-drawn design compositions is retired (task file
+  ruling R13).
+- **The spike.** `spikes/world` is deleted after session W2 (Task 10), the audit's ruling;
+  it stays in git history.
+
+Consequences: plan v1.5 (sections 1, 4, 5 and 6, and the Sprint W and new Sprint M cards);
+Global Constraint 11 and rulings R13 and R14 in the task file; Tasks W2E and M.
