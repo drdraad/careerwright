@@ -38,3 +38,5 @@ def test_the_table_names_each_shape_and_the_rank_stage_beside_its_limit() -> Non
     assert "| front | 1,000 |" in printed
     assert "| yes | 1,000, 0, 0 |" in printed
     assert "| 50,000 | 30.0 | 900 | 5 |" in printed
+    # Only the layerings are the best of three: the rank stage at the cap is one run.
+    assert "layerings best of 3; the rank stage at the cap, one run." in printed

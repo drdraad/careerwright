@@ -103,13 +103,25 @@ def _solved(direct_cap: int = 1000, **limits: int) -> SearchResult:
 def test_a_solve_s_code_names_a_stopped_search_or_a_proven_no_route_and_nothing_else() -> None:
     found = _solved()
     stopped = _solved(max_states=1)
+    # Stopped once the £5 course is archived: "Best trade-offs found", and stopped.
+    stopped_with_routes = _solved(max_states=2)
     nothing = _solved(direct_cap=100)  # both above the cap: complete, and nothing unknown
 
-    # Spec section 18's codes, as facts: never an error envelope, never on a result of routes.
+    # Spec section 18's codes, as facts: never an error envelope, never on a complete result
+    # of routes.
     assert (found.coverage, found.outcome) == (SearchCoverage.COMPLETE, Outcome.ROUTES_FOUND)
     assert result_code(found) is None
-    assert stopped.coverage is SearchCoverage.BUDGET_TRUNCATED
+    assert (stopped.coverage, stopped.outcome) == (
+        SearchCoverage.BUDGET_TRUNCATED,
+        Outcome.NONE_FOUND_BEFORE_LIMIT,
+    )
     assert result_code(stopped) == "SOLVE_LIMIT_REACHED"
+    assert (stopped_with_routes.coverage, stopped_with_routes.outcome) == (
+        SearchCoverage.BUDGET_TRUNCATED,
+        Outcome.ROUTES_FOUND,
+    )
+    assert [s.route for s in stopped_with_routes.schedules] == [["cheap"]]
+    assert result_code(stopped_with_routes) == "SOLVE_LIMIT_REACHED"
     assert nothing.outcome is Outcome.NO_ROUTE_IN_BOUNDED_MODEL
     assert result_code(nothing) == "NO_ROUTE_IN_BOUNDED_MODEL"
     assert set(schemas()["SolveOut"]["properties"]["code"]["anyOf"][0]["enum"]) == {

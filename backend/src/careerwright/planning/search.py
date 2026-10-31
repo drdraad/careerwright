@@ -211,11 +211,27 @@ class PruningRule(StrEnum):
 
 
 class Narrowing(StrEnum):
-    """What would make a stopped search smaller (spec section 12)."""
+    """What could help a stopped search (spec section 12): codes the web words as what could
+    help, never as a promise that the narrowed search finishes."""
 
     FEWER_CONCEPTS = "fewer_concepts"
     ONE_START = "one_start"
     SHORTER_HORIZON = "shorter_horizon"
+
+
+# Named from what stopped the search. Fewer concepts or one start shrink the tree of selected
+# sets, which every limit counts. A shorter horizon leaves that tree as it is and only makes
+# each check quicker (Task 13a measured about 13 s at 12 months against 26 s at 24), so it can
+# help only a search the clock stopped.
+_NARROWINGS = {
+    StopReason.STATE_LIMIT: (Narrowing.FEWER_CONCEPTS, Narrowing.ONE_START),
+    StopReason.ARCHIVE_LIMIT: (Narrowing.FEWER_CONCEPTS, Narrowing.ONE_START),
+    StopReason.WALL_TIME_LIMIT: (
+        Narrowing.FEWER_CONCEPTS,
+        Narrowing.ONE_START,
+        Narrowing.SHORTER_HORIZON,
+    ),
+}
 
 
 class InstanceSize(StrictModel):
@@ -287,7 +303,7 @@ class SearchResult(StrictModel):
     elapsed_ms: int  # the search stage, until it ended or stopped: what its 30 s limit reads
     rank_ms: int  # the rank stage, on its own clock
     rank_seconds: int  # the rank stage's own limit
-    narrowings: list[Narrowing]  # when stopped early
+    narrowings: list[Narrowing]  # when stopped: what could help, by what stopped it
     schedules: list[Schedule]  # the whole encountered archive, dominated schedules included
     families: list[Family]
     points: list[EqualPoint]
@@ -746,7 +762,7 @@ class _Search:
             elapsed_ms=self.elapsed_ms,
             rank_ms=rank_ms,
             rank_seconds=rank_seconds,
-            narrowings=[] if complete else _narrowings(size),
+            narrowings=_narrowings(size, self.stop),
             schedules=schedules,
             families=grouped,
             points=points,
@@ -841,15 +857,16 @@ def _selection_space(concepts: list[list[CompiledVariant]], most: int) -> int:
     return sum(ways.values())
 
 
-def _narrowings(size: InstanceSize) -> list[Narrowing]:
-    found = []
-    if size.concepts > 1:
-        found.append(Narrowing.FEWER_CONCEPTS)
-    if size.starts_per_concept > 1:
-        found.append(Narrowing.ONE_START)
-    if size.months > 1:
-        found.append(Narrowing.SHORTER_HORIZON)
-    return found
+def _narrowings(size: InstanceSize, stop: StopReason | None) -> list[Narrowing]:
+    """What could help a search `stop` ended, among the narrowings its size can still take."""
+    if stop is None:
+        return []
+    open_to = {
+        Narrowing.FEWER_CONCEPTS: size.concepts > 1,
+        Narrowing.ONE_START: size.starts_per_concept > 1,
+        Narrowing.SHORTER_HORIZON: size.months > 1,
+    }
+    return [n for n in _NARROWINGS[stop] if open_to[n]]
 
 
 def _codes(check: RouteCheck, kind: FindingKind) -> list[FindingCode]:

@@ -14,9 +14,10 @@ points) on a real archive the search filled to its cap.
   rather than the 30 seconds. The rank stage then runs on its own clock and limit
   (`RANK_SECONDS`). The instance is labelled synthetic and never product data.
 
-Times are the best of three runs, wall clock, on the machine named. Run from `backend/`:
-`uv run --locked python -m tools.rank_benchmark` (the archive takes about half a minute to
-fill; `--points-only` skips it).
+Times are wall clock, on the machine named: each layering's the best of three runs, the rank
+stage at the cap's one run (its archive takes about half a minute to fill). Run from
+`backend/`: `uv run --locked python -m tools.rank_benchmark` (`--points-only` skips the
+archive).
 """
 
 import argparse
@@ -124,7 +125,8 @@ def stage_at_the_cap() -> StageRun:
 def table(runs: Sequence[LayeringRun], stage: StageRun | None) -> str:
     lines = [
         f"Measured {datetime.now(UTC):%Y-%m-%d} on {platform.machine()} "
-        f"({platform.system()}), Python {platform.python_version()}; best of {REPEATS}.",
+        f"({platform.system()}), Python {platform.python_version()}; layerings best of "
+        f"{REPEATS}; the rank stage at the cap, one run.",
         "",
         "| Shape | Points | Efficient layering (s) | Iterative peeling (s) | Equal | F1, F2, F3 |",
         "|---|---:|---:|---:|---|---|",

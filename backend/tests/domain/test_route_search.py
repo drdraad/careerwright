@@ -46,6 +46,7 @@ from careerwright.planning.layers import dominates
 from careerwright.planning.search import (
     RANK_SECONDS,
     M0SearchLimits,
+    Narrowing,
     Outcome,
     PruningRule,
     RankLimitReachedError,
@@ -825,6 +826,72 @@ def test_a_run_stopped_at_its_state_limit_is_budget_truncated_with_its_reason() 
     assert result.narrowings
 
 
+# What could help a stopped search, named from what stopped it (ADR 0016 decision 8, as
+# amended in Task 13b's fix round 1): never a promise that the narrowed search finishes.
+
+
+def two_starts() -> Options:
+    """Three concepts with two starts each, a month apart: every narrowing fits its size."""
+    return [course(f"c{n}{s}", first=s, concept=f"c{n}") for n in range(3) for s in (0, 1)]
+
+
+TWO_STARTS_TEACH = {f"offering:c{n}{s}": (ROW,) for n in range(3) for s in (0, 1)}
+
+
+@pytest.mark.req("OPT1-15", "LIMITS-05")
+@pytest.mark.parametrize(
+    ("limits", "reason"),
+    [
+        ({"max_states": 3}, StopReason.STATE_LIMIT),
+        ({"max_feasible_archive": 2}, StopReason.ARCHIVE_LIMIT),
+    ],
+)
+def test_a_state_or_archive_limit_names_fewer_concepts_or_one_start_never_a_shorter_horizon(
+    limits: dict[str, int], reason: StopReason
+) -> None:
+    # A shorter horizon leaves the tree of selected sets as it is, so it lifts neither count.
+    result = solve(someone(horizon=3), two_starts(), readiness_of(TWO_STARTS_TEACH), **limits)
+
+    assert result.stop_reason is reason
+    assert result.narrowings == [Narrowing.FEWER_CONCEPTS, Narrowing.ONE_START]
+    assert (result.instance.concepts, result.instance.starts_per_concept) == (3, 2)
+    assert result.instance.months == 3
+
+
+@pytest.mark.req("OPT1-15", "LIMITS-05")
+def test_the_time_limit_names_a_shorter_horizon_beside_fewer_concepts_and_one_start() -> None:
+    # Task 13a measured each check's time growing with the months (13 s at 12, 26 s at 24).
+    monthly = compile_input(
+        someone(horizon=3), catalogue_of(*two_starts()), readiness=readiness_of(TWO_STARTS_TEACH)
+    )
+    ticks = iter([0.0, 0.0])  # the start and the first check; then 31 s have passed
+
+    result = search_routes(monthly, clock=lambda: next(ticks, 31.0))
+
+    assert result.stop_reason is StopReason.WALL_TIME_LIMIT
+    assert result.narrowings == [
+        Narrowing.FEWER_CONCEPTS,
+        Narrowing.ONE_START,
+        Narrowing.SHORTER_HORIZON,
+    ]
+
+
+@pytest.mark.req("OPT1-15")
+def test_a_narrowing_the_instance_is_already_at_is_never_named() -> None:
+    # One start each, over one month: only fewer concepts could make it smaller.
+    options = [course(f"c{n}") for n in range(3)]
+    teaches = {f"offering:c{n}": (ROW,) for n in range(3)}
+    monthly = compile_input(
+        someone(horizon=1), catalogue_of(*options), readiness=readiness_of(teaches)
+    )
+    ticks = iter([0.0, 0.0])
+
+    result = search_routes(monthly, clock=lambda: next(ticks, 31.0))
+
+    assert result.stop_reason is StopReason.WALL_TIME_LIMIT
+    assert result.narrowings == [Narrowing.FEWER_CONCEPTS]
+
+
 @pytest.mark.req("OPT1-05", "LIMITS-05")
 def test_a_stopped_run_with_nothing_found_is_none_found_before_the_limit() -> None:
     options = [course("c0"), course("c1")]
@@ -864,16 +931,35 @@ def test_a_full_archive_stops_the_run_before_a_schedule_goes_unrecorded() -> Non
 
 @pytest.mark.req("OPT1-10", "LIMITS-01")
 def test_a_state_limited_run_replays_exactly_and_keeps_every_schedule_it_met() -> None:
-    monthly = directai()
-    limits = M0SearchLimits(max_states=5)
+    # Four free courses, each reaching the target: every one of the 16 sets is a schedule.
+    # Stopped deep in the tree, past the singles, with c0's pairs part-way through.
+    options = [course(f"c{n}") for n in range(4)]
+    teaches = {f"offering:c{n}": (ROW,) for n in range(4)}
+    monthly = compile_input(
+        someone(horizon=2), catalogue_of(*options), readiness=readiness_of(teaches)
+    )
+    limits = M0SearchLimits(max_states=9)
     first, second = search_routes(monthly, limits=limits), search_routes(monthly, limits=limits)
     complete = search_routes(monthly)
 
     assert first.stop_reason is StopReason.STATE_LIMIT
     assert first.model_dump(exclude=TIMES) == second.model_dump(exclude=TIMES)
-    # What it met is the complete run's archive up to where it stopped, in the order met.
+    # The root, the four singles, then c0 with c1 and its subtree, in the order met.
+    assert routes(first) == [
+        ("c0",),
+        ("c1",),
+        ("c2",),
+        ("c3",),
+        ("c0", "c1"),
+        ("c0", "c1", "c2"),
+        ("c0", "c1", "c2", "c3"),
+        ("c0", "c1", "c3"),
+    ]
+    # Left: c0's children c2 and c3, then the singles c1, c2 and c3, each with its subtree.
+    assert first.unexplored_branches == 5
+    # What it met is the complete run's archive up to where it stopped.
+    assert len(complete.schedules) == 15
     assert routes(first) == routes(complete)[: len(first.schedules)]
-    assert first.schedules
 
 
 # The rank stage (S6.8; review 13a, M3): its own time and its own limit, apart from the search.
