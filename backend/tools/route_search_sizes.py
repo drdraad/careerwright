@@ -9,8 +9,12 @@ like TRACE-01's and the pack's:
 
 - course c lasts 1 to 6 months (cycling), takes 4 to 10 hours a week and costs £300 to £1,500,
   paid in full in its first month (even c) or in equal monthly instalments (odd c);
-- its first intake is in month c mod min(months, 6) + 1; a second start, if any, three months
-  later (one that falls after the horizon is still a start the search must consider);
+- its first intake is spread across the horizon, in month 5c mod months + 1 (`spread`, the
+  default: every month of the horizon holds an intake once there are enough courses); a
+  second start, if any, three months later (one that falls after the horizon is still a start
+  the search must consider). The first measurement used `early`, month c mod min(months, 6) +
+  1, which keeps every intake in months 1 to 9 whatever the horizon, so a longer horizon there
+  grows only the cost of each check, never the tree (review 13a, Important 3);
 - every fourth course runs with a reduced-hours work pattern (20 hours at £1,500 a month);
 - the target has three skill rows at level 2, the person is at level 1 in each, and course c
   brings one row (odd c) or two rows (even c) to level 2, so a route needs two or three
@@ -91,6 +95,8 @@ from careerwright.planning.search import M0SearchLimits, search_routes
 
 Family = Literal["p01", "relaxed", "unbounded"]
 FAMILIES: tuple[Family, ...] = ("p01", "relaxed", "unbounded")
+Intakes = Literal["spread", "early"]
+SPREAD_STEP = 5  # months between successive courses' first intakes, wrapping round the horizon
 CONCEPTS = (2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24)
 STARTS = (1, 2)
 HORIZONS = (6, 12, 24)
@@ -113,6 +119,7 @@ class Measurement(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     family: Family
+    intakes: Intakes
     concepts: int
     starts: int
     months: int
@@ -125,9 +132,11 @@ class Measurement(BaseModel):
     total_ms: int  # the whole call: the search, then the layers, families and points
 
 
-def instance(concepts: int, starts: int, months: int, family: Family) -> MonthlyInput:
+def instance(
+    concepts: int, starts: int, months: int, family: Family, intakes: Intakes = "spread"
+) -> MonthlyInput:
     """A synthetic pack-shaped instance (the module docstring describes it)."""
-    options = [_course(c, s, months) for c in range(concepts) for s in range(starts)]
+    options = [_course(c, s, months, intakes) for c in range(concepts) for s in range(starts)]
     catalogue = Catalogue(
         label=CatalogueLabel(name="synthetic pack-shaped instance", dated=START, synthetic=True),
         concepts=[_concept(c) for c in range(concepts)],
@@ -138,13 +147,16 @@ def instance(concepts: int, starts: int, months: int, family: Family) -> Monthly
     return compile_input(_person(months, family), catalogue, readiness=_readiness(teaches))
 
 
-def measure(concepts: int, starts: int, months: int, family: Family) -> Measurement:
-    monthly = instance(concepts, starts, months, family)
+def measure(
+    concepts: int, starts: int, months: int, family: Family, intakes: Intakes = "spread"
+) -> Measurement:
+    monthly = instance(concepts, starts, months, family, intakes)
     began = time.perf_counter()
     result = search_routes(monthly, limits=M0SearchLimits())
     total_ms = round((time.perf_counter() - began) * 1000)
     return Measurement(
         family=family,
+        intakes=intakes,
         concepts=concepts,
         starts=starts,
         months=months,
@@ -163,13 +175,14 @@ def sweep(
     concepts: tuple[int, ...] = CONCEPTS,
     starts: tuple[int, ...] = STARTS,
     horizons: tuple[int, ...] = HORIZONS,
+    intakes: Intakes = "spread",
 ) -> list[Measurement]:
     found = []
     for family in families:
         for start_count in starts:
             for months in horizons:
                 for size in concepts:
-                    run = measure(size, start_count, months, family)
+                    run = measure(size, start_count, months, family, intakes)
                     found.append(run)
                     print(_row(run), file=sys.stderr, flush=True)
                     if not run.complete:
@@ -183,9 +196,9 @@ def table(runs: list[Measurement]) -> str:
         f"({platform.system()}), Python {platform.python_version()}, M0 limits "
         "(1,000,000 states, 30 s, 50,000 schedules).",
         "",
-        "| Family | Concepts | Starts | Months | Selection space | Coverage | Expanded states "
-        "| Archived | Search (s) | Total (s) | ms per state |",
-        "|---|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|",
+        "| Family | Intakes | Concepts | Starts | Months | Selection space | Coverage "
+        "| Expanded states | Archived | Search (s) | Total (s) | ms per state |",
+        "|---|---|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|",
         *(_row(run) for run in runs),
     ]
     return "\n".join(lines)
@@ -195,7 +208,7 @@ def _row(run: Measurement) -> str:
     coverage = "complete" if run.complete else f"not complete at that size ({run.stop_reason})"
     per_state = run.elapsed_ms / run.expanded_states if run.expanded_states else 0
     return (
-        f"| {run.family} | {run.concepts} | {run.starts} | {run.months} | "
+        f"| {run.family} | {run.intakes} | {run.concepts} | {run.starts} | {run.months} | "
         f"{run.selection_space:,} | {coverage} | {run.expanded_states:,} | {run.archived:,} | "
         f"{run.elapsed_ms / 1000:.2f} | {run.total_ms / 1000:.2f} | {per_state:.3f} |"
     )
@@ -213,9 +226,10 @@ def _concept(c: int) -> ActionConcept:
     )
 
 
-def _course(c: int, start: int, months: int) -> tuple[Offering, Variant]:
+def _course(c: int, start: int, months: int, intakes: Intakes) -> tuple[Offering, Variant]:
     length = 1 + c % 6
-    first = c % min(months, 6) + start * SECOND_START_AFTER
+    month = (SPREAD_STEP * c) % months if intakes == "spread" else c % min(months, 6)
+    first = month + start * SECOND_START_AFTER
     begins = _month(START, first)
     fee = 30_000 + 30_000 * (c % 5)
     if c % 2 == 0:
@@ -413,10 +427,11 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("--family", choices=FAMILIES, action="append")
     parser.add_argument("--max-concepts", type=int, default=max(CONCEPTS))
+    parser.add_argument("--intakes", choices=("spread", "early"), default="spread")
     arguments = parser.parse_args(argv)
     families = tuple(arguments.family) if arguments.family else FAMILIES
     sizes = tuple(n for n in CONCEPTS if n <= arguments.max_concepts)
-    print(table(sweep(families, sizes)))
+    print(table(sweep(families, sizes, intakes=arguments.intakes)))
 
 
 if __name__ == "__main__":
