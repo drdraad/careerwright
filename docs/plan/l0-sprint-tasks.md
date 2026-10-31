@@ -188,7 +188,7 @@ These bind every task and every review.
     formative scores for Skills, Options, Routes and Plan (H-01); orders the moments, or
     skips some; asks whether the results for a role outside ESCO are honest and useful,
     whether anything blocks a release, and whether the release uses Muse Wonder. Task 15
-    prepares the package. Precondition for Task M and, in the suggested order, Task 8.
+    prepares the package. Precondition for Tasks 8 and M.
   - **Release checks,** during Task 16; none is a dispatch precondition: every rubric
     category at least 4 (H-01); VoiceOver (H-03); Safari and print (H-04); five task
     sessions with other people (H-05; five participants are available, the product owner,
