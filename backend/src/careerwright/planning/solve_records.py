@@ -34,10 +34,13 @@ class SolveStage(StrEnum):
 
 class AttemptOutcome(StrEnum):
     SUCCEEDED = "succeeded"  # its result is stored
-    # It never finished: the worker stopped (a crash) or its store went away. Never a
-    # truncated result: the solve starts again under a new attempt ID (spec section 22).
+    # It never finished: the worker stopped (a crash), its store went away, or its result
+    # could not be stored before the run ended. Never a truncated result: the solve starts
+    # again under a new attempt ID (spec section 22), or the run has ended without one.
     INTERRUPTED = "interrupted"
-    CANCELLED = "cancelled"  # the person cancelled; the search stopped at its next check
+    # The person cancelled: the search stopped at its next check, or the run's end was
+    # published while its worker was gone.
+    CANCELLED = "cancelled"
     RANK_LIMIT_REACHED = "rank_limit_reached"  # the rank stage's own limit: no result
     FAILED = "failed"  # anything else, named by class only in the logs
 
