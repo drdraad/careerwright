@@ -25,7 +25,8 @@ import hashlib
 import logging
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 from careerwright.db import StoreUnavailableError, run_transaction
@@ -108,23 +109,31 @@ def _prepare(rt: SolveRuntime, run_id: uuid.UUID) -> _Ready | SolveEnd:
     return _Ready(run, attempt_id, sealed)
 
 
-def stop_requested(rt: SolveRuntime, run_id: uuid.UUID) -> Callable[[], bool]:
-    """Whether the person asked to cancel the run, read from the store at most every
-    `CANCEL_POLL_S` on the search's clock, and true for good once it is."""
-    next_read = rt.clock()
+def _cancel_requested(rt: SolveRuntime, run_id: uuid.UUID) -> bool:
+    """Whether the person asked to cancel the run (or it is gone), read from the store."""
+    with run_transaction(rt.activity.engine, run_id) as tx:
+        run = run_store.run(tx, run_id)
+    return run is None or run.cancel_requested_at is not None
+
+
+@contextmanager
+def cancel_watch(
+    read: Callable[[], bool], clock: Callable[[], float] = time.monotonic
+) -> Iterator[Callable[[], bool]]:
+    """The search's cancel check: `read` at most every `CANCEL_POLL_S` on `clock`, and true for
+    good once it is."""
+    next_read = clock()
     requested = False
 
     def check() -> bool:
         nonlocal next_read, requested
-        if requested or rt.clock() < next_read:
+        if requested or clock() < next_read:
             return requested
-        next_read = rt.clock() + CANCEL_POLL_S
-        with run_transaction(rt.activity.engine, run_id) as tx:
-            run = run_store.run(tx, run_id)
-        requested = run is None or run.cancel_requested_at is not None
+        next_read = clock() + CANCEL_POLL_S
+        requested = read()
         return requested
 
-    return check
+    yield check
 
 
 def _finish(rt: SolveRuntime, ready: _Ready, outcome: AttemptOutcome) -> None:
@@ -168,14 +177,14 @@ def _solve(rt: SolveRuntime, ready: _Ready) -> SolveEnd:
         snapshot = SolveSnapshot.model_validate_json(
             rt.activity.keyring.open(ready.sealed, context)
         )
-        stop = stop_requested(rt, run.run_id)
-        archive = search_archive(
-            snapshot.monthly, limits=snapshot.limits, clock=rt.clock, cancelled=stop
-        )
-        _ranking(rt, ready)
-        result = rank_archive(
-            archive, clock=rt.clock, cancelled=stop, limit_seconds=snapshot.rank_seconds
-        )
+        with cancel_watch(lambda: _cancel_requested(rt, run.run_id), rt.clock) as stop:
+            archive = search_archive(
+                snapshot.monthly, limits=snapshot.limits, clock=rt.clock, cancelled=stop
+            )
+            _ranking(rt, ready)
+            result = rank_archive(
+                archive, clock=rt.clock, cancelled=stop, limit_seconds=snapshot.rank_seconds
+            )
     except SearchCancelledError:
         ended = AttemptOutcome.CANCELLED
     except RankLimitReachedError:
