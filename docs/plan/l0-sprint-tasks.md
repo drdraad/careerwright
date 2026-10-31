@@ -585,7 +585,9 @@ Deliver:
   has none).
 - **A session command** (its name is this task's call) that starts the app with
   `muse-wonder-1.0` as the production model and sets the session's workspace caps: about
-  $0.75 a run and about $5 a session. It never runs in `make check` or `make acceptance`.
+  $0.75 a run and about $5 per workspace (the product owner's ruling, 31 October 2026: the cap
+  holds per workspace, and the session prints its total ceiling when it starts). It never
+  runs in `make check` or `make acceptance`.
   Synthetic workspaces keep the test model, and the test model's safeguards (in code and the
   database CHECK) don't change.
 - **Each session's calls in the cost ledger.** After a session, one command copies each
