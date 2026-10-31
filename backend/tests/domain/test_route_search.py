@@ -518,6 +518,9 @@ def test_an_option_without_weekly_hours_is_set_aside_as_unknown_whatever_the_kno
     ]
     assert FindingCode.WORKLOAD_UNKNOWN in result.set_aside[0].codes
     assert result.outcome is Outcome.UNRESOLVED
+    # The breach is the person's own, every month, so it is told once, on the result.
+    assert {f.code for f in result.starting_violations} == {FindingCode.WORKLOAD}
+    assert result.set_aside[0].violations == []
 
 
 @pytest.mark.req("OPT1-07", "LIMITS-05", "OPT1-02")
@@ -532,6 +535,40 @@ def test_an_empty_route_over_its_hours_never_hides_an_undated_option_behind_no_r
         ("reduced-undated", FindingKind.UNRESOLVED)
     ]
     assert result.outcome is Outcome.UNRESOLVED
+
+
+@pytest.mark.req("OPT1-07")
+def test_an_option_is_never_blamed_for_a_breach_the_person_s_starting_position_already_has() -> (
+    None
+):
+    result = search_routes(undated_relief())
+    [undated] = result.set_aside
+
+    # March and April's workload breach is the person's own (37 hours of 25), and the very
+    # breach this option would cure once dated: it is reported once, on the result, never as
+    # what rules the option out (re-review 13a, I2).
+    assert [(f.code, f.month) for f in result.starting_violations] == [
+        (FindingCode.WORKLOAD, "2027-03"),
+        (FindingCode.WORKLOAD, "2027-04"),
+    ]
+    assert undated.unresolved == [FindingCode.DATES_UNKNOWN]
+    assert undated.violations == []
+
+
+@pytest.mark.req("OPT1-07")
+def test_a_course_with_an_unknown_cost_is_not_blamed_for_a_reserve_already_broken() -> None:
+    # £600 opening cash and £1,000 living costs, with pay arriving late: January's lowest
+    # balance is below the £500 reserve before anything is chosen.
+    inputs = person(horizon=3, opening=60_000, living=100_000, reserve=50_000, pay=200_000)
+    options = [course("unpriced", first=1, unknown_cost="not stated")]
+    result = solve(inputs, options, readiness_of({"offering:unpriced": (ROW,)}))
+    [unpriced] = result.set_aside
+
+    assert [(f.code, f.month) for f in result.starting_violations] == [
+        (FindingCode.RESERVE, "2027-01")
+    ]
+    assert unpriced.unresolved == [FindingCode.COST_UNKNOWN]
+    assert unpriced.violations == []
 
 
 @pytest.mark.req("OPT1-07", "LIMITS-05")

@@ -63,7 +63,11 @@ measurements here.
       13a, Important 1: the empty route's workload cut once hid an undated option that could
       have lowered the job's hours). Each set-aside record keeps everything its own check found:
       its unknowns (`unresolved`) apart from the rules it breaks as stated, alone
-      (`violations`);
+      (`violations`). A breach the empty route already has in the same month is the person's
+      starting position, not the option's: it is left out of `violations` and told once, on
+      the result (`starting_violations`), so an option is never blamed for a reserve already
+      short or hours already over, which it might even cure (fix round 2, re-review 13a, I2).
+      `codes` and `kind` stay the proof of why no route can contain the option;
    3. a route's direct cost and each month's payments are sums of each variant's own, never
       below zero, so a child already above the direct-spend or monthly payment cap is never
       checked;
@@ -172,11 +176,13 @@ measurements here.
   completed offerings across candidates; memoising `assess` by its completed set would be the
   cheapest speed-up. Peeling sorts once per layer, so a 50,000-point archive ranks in well under
   a second, but ranking still runs inside the search's call and outside its clock.
-- **For Task 14:** show the outcome's words; for each option set aside, "what to confirm" (its
+- **For Task 14:** show the outcome's words; what the person's starting position already
+  breaks (`starting_violations`), once; for each option set aside, "what to confirm" (its
   `unresolved` list) apart from "what already rules it out as stated" (its `violations`), so
-  the person is never told to confirm something that would still leave the option ruled out
-  (C09: confirm its entry requirements and cost; as stated, nothing grants its admission and
-  its 35 hours a week exceed the 40 available beside P01's job); the narrowings when stopped;
+  the person is never told to confirm something that would still leave the option ruled out,
+  nor that an option is ruled out by their own position (C09: confirm its entry requirements
+  and cost; as stated, nothing grants its admission and its 35 hours a week exceed the 40
+  available beside P01's job); the narrowings when stopped;
   families first with their best layer; and equal points with every route behind them.
 - **For Task 12a:** a new checker finding (stacked funding left unresolved, unknown work
   rights; ADR 0013's 2026-10-31 amendment) must be classed for rule 2 (is it the variant's

@@ -190,7 +190,9 @@ class SetAside(StrictModel):
     codes: list[FindingCode]  # its own findings that set it aside
     kind: Literal[FindingKind.VIOLATION, FindingKind.UNRESOLVED]  # a breach of its own, or not
     unresolved: list[FindingCode]  # every unknown it has: what the person can confirm
-    violations: list[FindingCode]  # every rule it breaks as stated, alone: what rules it out
+    # Every rule it breaks as stated, alone, that the person's starting position does not
+    # already break (those are the result's `starting_violations`): what rules it out.
+    violations: list[FindingCode]
 
 
 class Schedule(StrictModel):
@@ -233,6 +235,9 @@ class SearchResult(StrictModel):
     unresolved: int
     not_feasible: int
     blocking_inputs: list[Finding]  # input-level unknowns: every route has them
+    # What the person's starting position (the empty route) already breaks: told once here,
+    # never blamed on an option.
+    starting_violations: list[Finding]
     set_aside: list[SetAside]
     pruned: dict[PruningRule, int]  # subtrees cut, by rule
     unexplored_branches: int  # pending when the run stopped; 0 when complete
@@ -294,6 +299,7 @@ class _Search:
         self.unresolved = 0
         self.not_feasible = 0
         self.blocking: list[Finding] = []
+        self.starting: list[Finding] = []  # the empty route's violations: the starting position
         self.set_aside: list[SetAside] = []
         self.excluded: set[str] = set()
         self.spend: dict[str, _Spend] = {}
@@ -316,6 +322,7 @@ class _Search:
         check = self._evaluate(())
         root = _Node(route=(), position=-1, check=check, groups=frozenset(), bridge=False)
         self.blocking = [f for f in check.findings if f.kind is FindingKind.UNRESOLVED]
+        self.starting = [f for f in check.findings if f.kind is FindingKind.VIOLATION]
         if self.blocking:
             self.pruned[PruningRule.INPUT_UNRESOLVED] += 1  # rule 1
             return
@@ -359,7 +366,7 @@ class _Search:
                         codes=codes,
                         kind=FindingKind.VIOLATION if violation else FindingKind.UNRESOLVED,
                         unresolved=unresolved,
-                        violations=_codes(check, FindingKind.VIOLATION),
+                        violations=self._own_violations(check),
                     )
                 )
                 self.excluded.add(variant.variant_id)
@@ -443,6 +450,19 @@ class _Search:
             key = family_key(route)
             self.archive.append((_schedule(route, check, key), key))
         return check
+
+    def _own_violations(self, check: RouteCheck) -> list[FindingCode]:
+        """The rules a variant breaks alone that the starting position does not already break
+        in the same month (re-review 13a, I2): the person's own breach, such as a reserve
+        already short or hours already over, is told once on the result, never blamed on the
+        option, which may even be the one that would cure it."""
+        starting = {(f.code, f.month) for f in self.starting}
+        found: list[FindingCode] = []
+        for finding in check.findings:
+            own = (finding.code, finding.month) not in starting
+            if finding.kind is FindingKind.VIOLATION and own and finding.code not in found:
+                found.append(finding.code)
+        return found
 
     # The pruning rules (the module docstring has their proofs).
 
@@ -577,6 +597,7 @@ class _Search:
             unresolved=self.unresolved,
             not_feasible=self.not_feasible,
             blocking_inputs=self.blocking,
+            starting_violations=self.starting,
             set_aside=self.set_aside,
             pruned=dict(self.pruned),
             unexplored_branches=self.unexplored,
