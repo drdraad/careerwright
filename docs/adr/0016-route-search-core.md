@@ -358,9 +358,9 @@ decisions 8, 14, 15, 19 and 20 and added 21 (the narrowings) and 22 (one solve a
     queue registered in DBOS's system database, no change to the outbox's dispatch or to any
     workflow's step sequence (so the DBOS `application_version` stays `careerwright-l0-1`),
     and L0 runs one worker process. Known limits: a second worker process would need a DBOS
-    queue with a concurrency of one; and at shutdown a solve still waiting its turn may start
-    once the running one ends, until Compose's stop period (15 s) ends the worker, after
-    which DBOS recovers both (decision 15).
+    queue with a concurrency of one. At shutdown the worker ends its process as soon as DBOS
+    is destroyed (Task 3b), so a solve still waiting its turn never starts then; DBOS recovers
+    it, and the one that was running, on the next start (decision 15).
 
 ### Consequences (Task 13b)
 
