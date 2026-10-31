@@ -188,9 +188,17 @@ Decision 3's last sentence is built (`careerwright.profile.targets`, migration 0
   target was replaced could not open. Migration 0035 records every target title of every
   version that has no record (once per workspace and title as a concept, spelled as the
   latest version holding it), by the same rules; 0034 is unchanged, as a lasting database
-  may already hold it. A title with no record reads as not resolved (no occupation, no pack
-  target), never as an error. 0035 also decides again each record the restored bracket rule
-  reaches (ADR 0012's line).
+  may already hold it. 0035 also decides again each record the restored bracket rule reaches
+  (ADR 0012's line).
+- **A title with no record (fix round 2)** is decided on read by `resolve_target`, as it
+  would be stored, and nothing is stored on a read: never an error, and never "couldn't
+  match" where no match was tried. Every write path stores its targets' records; an
+  architecture test keeps profile versions written only by the one write path and the
+  fixture seed, and integration tests check their records in the tables themselves.
+- **One record, two spellings.** The concept key reads brackets as word breaks, but the
+  bracket rule reads them as a qualifier. So "Registered nurse adult" and "Registered nurse
+  (adult)" share one record key, though only the second reaches the pack's "Registered nurse"
+  by title. Whichever is saved first stands for both.
 - **Coverage shown where a target is chosen:** one plain line from the record's coverage
   ("Careerwright can check skills, options and routes for this role" for a pack target),
   worded in the web; session W2 judges the words.

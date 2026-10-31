@@ -181,21 +181,24 @@ def record_targets(
         held[record.key] = record
 
 
-def current_targets(tx: Tx, workspace_id: uuid.UUID) -> tuple[int, list[TargetRecord]]:
+def current_targets(
+    tx: Tx, workspace_id: uuid.UUID, pack: PackTargets
+) -> tuple[int, list[TargetRecord]]:
     """The current profile's version and its targets' records (`stored_targets`)."""
     visible_workspace(tx, workspace_id)  # someone else's workspace is not found, never empty
     latest = store.current_profile(tx, workspace_id)
     if latest is None:
         return 0, []
-    return latest.version, stored_targets(tx, workspace_id, latest.document)
+    return latest.version, stored_targets(tx, workspace_id, latest.document, pack)
 
 
 def stored_targets(
-    tx: Tx, workspace_id: uuid.UUID, document: ProfileDocument
+    tx: Tx, workspace_id: uuid.UUID, document: ProfileDocument, pack: PackTargets
 ) -> list[TargetRecord]:
-    """The records of the document's targets, in its order, one per title as a concept. A
-    title with no record (migration 0035 gave every saved title one) is not resolved, never
-    an error: it names no occupation and no pack target covers it."""
+    """The records of the document's targets, in its order, one per title as a concept. Every
+    write path stores its targets' records (`record_targets`; migration 0035 for the past). A
+    title with none is decided here by `resolve_target`, as it would be stored, and nothing
+    is stored on a read."""
     titles = target_titles(document)
     if not titles:
         return []
@@ -203,24 +206,7 @@ def stored_targets(
     held = store.target_records(tx, workspace_id, keys.values())
     records: dict[str, TargetRecord] = {}
     for title in titles:
-        record = held.get(keys[title]) or _not_resolved(title, keys[title])
+        record = held.get(keys[title]) or resolve_target(tx, workspace_id, title, pack)
         # The person's words as the profile holds them; the first of one concept stands.
         records.setdefault(record.key, replace(record, title=title))
     return list(records.values())
-
-
-def _not_resolved(title: str, key: str) -> TargetRecord:
-    """Nothing decided: no occupation, no label match counted and no pack (`pack_version`
-    empty). Never stored."""
-    return TargetRecord(
-        title=title,
-        key=key,
-        kind=TargetKind.OWN_WORDS,
-        occupation_uri=None,
-        link=TargetLink.NONE,
-        label_matches=(),
-        coverage=TargetCoverage.NOT_COVERED,
-        pack_target_id=None,
-        pack_target_basis=None,
-        pack_version="",
-    )

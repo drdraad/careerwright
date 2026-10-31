@@ -7,6 +7,7 @@
   sees.
 - The lockfile contains none of the excluded technologies.
 - Compose publishes ports on 127.0.0.1 only.
+- A profile version is written only where its targets' records are stored.
 """
 
 import ast
@@ -218,6 +219,41 @@ def test_vendor_and_sql_libraries_appear_only_in_listed_adapters() -> None:
             violations.append(f"{name} imports {sorted(extra)}")
 
     assert violations == []
+
+
+# Every function that writes a profile version: the one write path, which stores its targets'
+# records, and the fixture's, whose seed and demo reset store them.
+PROFILE_WRITERS = frozenset(
+    {
+        "careerwright.profile.commands.commit_profile_version",
+        "careerwright.cli._create_fixture_workspace",
+    }
+)
+
+
+def _callee(call: ast.Call) -> str | None:
+    if isinstance(call.func, ast.Attribute):
+        return call.func.attr
+    return call.func.id if isinstance(call.func, ast.Name) else None
+
+
+@pytest.mark.req("PROF-10")
+def test_a_profile_version_is_written_only_where_its_targets_are_recorded() -> None:
+    # Task 6d slice A fix round 2: a read decides a target with no stored record
+    # (`careerwright.profile.targets.stored_targets`), so a writer that skipped
+    # `record_targets` would go unnoticed. A new writer fails here until it stores its
+    # targets' records, is added to `PROFILE_WRITERS` and has its check in
+    # `tests/integration/test_targets.py`.
+    writers = set()
+    for name, path in modules().items():
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and any(
+                isinstance(call, ast.Call) and _callee(call) == "insert_profile_version"
+                for call in ast.walk(node)
+            ):
+                writers.add(f"{name}.{node.name}")
+
+    assert writers == PROFILE_WRITERS
 
 
 def test_the_adapter_list_names_only_modules_that_exist() -> None:

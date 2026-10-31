@@ -34,8 +34,8 @@ from careerwright.profile.document import (
     apply_updates,
     empty_profile,
 )
-from careerwright.profile.records import SourceKind, TargetCoverage, TargetLink
-from careerwright.profile.targets import resolve_target, stored_targets
+from careerwright.profile.records import SourceKind, TargetCoverage, TargetLink, TargetRecord
+from careerwright.profile.targets import resolve_target, target_titles
 from careerwright.seed import FIXTURE_WORKSPACE_ID, INVITED_ACTORS
 from careerwright.vocabulary import DataMode
 from tests.support.client import ApiClient
@@ -359,12 +359,12 @@ def test_0034_gives_each_stored_target_its_record_and_folds_ampersands_and_accen
             after = [taxonomy_store.concept_keys(tx, pair) for pair in pairs]
             latest = profile_store.current_profile(tx, workspace)
             assert latest is not None
-            stored = stored_targets(tx, workspace, latest.document)
+            stored = held_records(tx, workspace, target_titles(latest.document))
             pack = pack_targets(committed_data())
             decided = [resolve_target(tx, workspace, title, pack) for title in titles]
             fixture = profile_store.current_profile(tx, FIXTURE_WORKSPACE_ID)
             assert fixture is not None
-            seeded = stored_targets(tx, FIXTURE_WORKSPACE_ID, fixture.document)
+            seeded = held_records(tx, FIXTURE_WORKSPACE_ID, target_titles(fixture.document))
     finally:
         engine.dispose()
 
@@ -384,6 +384,15 @@ def test_0034_gives_each_stored_target_its_record_and_folds_ampersands_and_accen
 
 
 MECHANIC_URI = "http://data.europa.eu/esco/occupation/336cf331-8082-4a0c-bf5f-e7c54706211c"
+
+
+def held_records(tx: sa.Connection, workspace: uuid.UUID, titles: list[str]) -> list[TargetRecord]:
+    """These titles' stored records, read from the table, as a migration left them: a read
+    through `stored_targets` decides a title with none, so it can't show one is missing."""
+    keys = taxonomy_store.concept_keys(tx, titles)
+    held = profile_store.target_records(tx, workspace, keys.values())
+    assert [title for title in titles if keys[title] not in held] == []
+    return [held[keys[title]] for title in titles]
 
 
 def add_targets(tx: sa.Connection, targets: list[str]) -> uuid.UUID:
@@ -468,7 +477,7 @@ def test_0035_gives_every_version_s_targets_a_record_so_an_older_discovery_still
                         {"ws": workspace},
                     )
                 }
-            # A title with no record is not resolved, never an error.
+            # A title with no record is decided on read, never an error.
             gap = api.get(f"{base}/slate", ada)
 
             migrate_app(engine)
@@ -479,7 +488,7 @@ def test_0035_gives_every_version_s_targets_a_record_so_an_older_discovery_still
                     record
                     for document in documents
                     if document is not None
-                    for record in stored_targets(tx, workspace, document.document)
+                    for record in held_records(tx, workspace, target_titles(document.document))
                 ]
                 decided = [resolve_target(tx, workspace, r.title, pack) for r in stored]
             opened = api.get(f"{base}/slate", ada)
@@ -494,9 +503,14 @@ def test_0035_gives_every_version_s_targets_a_record_so_an_older_discovery_still
         ("Registered nurse (adult)", "none", "not_covered"),
     }
     assert gap.status_code == 200, gap.text
-    assert gap.json()["unmatched_titles"] == OLDER_TARGETS
-    # After 0035 every title of every version has its record, decided as `resolve_target`
-    # decides it, the bracketed qualifiers left out to reach a pack target by its title.
+    # Fix round 2: a title with no record is decided on read as `resolve_target` decides it, so
+    # "Saute cooks" is already ESCO's "sauté cook"; only the titles ESCO doesn't name are
+    # unmatched, and the slate is the one its stored records give after 0035.
+    assert gap.json()["unmatched_titles"] == OLDER_TARGETS[1:]
+    assert gap.json() == opened.json()
+    # After 0035 every title of every version has its stored record, decided as
+    # `resolve_target` decides it, the bracketed qualifiers left out to reach a pack target by
+    # its title.
     assert stored == decided
     assert [(r.title, r.link, r.coverage, r.pack_target_id) for r in stored] == [
         ("Saute cooks", TargetLink.EXACT_LABEL, TargetCoverage.NOT_COVERED, None),

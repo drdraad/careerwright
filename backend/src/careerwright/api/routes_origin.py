@@ -45,7 +45,7 @@ router = APIRouter(
 def get_origin(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> OriginOut:
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
         hard = hard_filters(tx, workspace_id, deps.mapping_reviews, deps.assessment_packs)
-        first = first_slate(tx, workspace_id, hard)
+        first = first_slate(tx, workspace_id, hard, deps.pack_targets)
         evidence = capability_store.evidence(tx, workspace_id)
         found = usual.usual_skills(first.occupation, evidence) if first.occupation else []
         version = capability_store.state(tx, workspace_id).version
@@ -145,6 +145,7 @@ def post_strength(
             defaults=deps.spend_defaults,
             now=deps.clock(),
             hard=hard_filters(tx, workspace_id, deps.mapping_reviews, deps.assessment_packs),
+            pack=deps.pack_targets,
         )
         answer = _run_out(tx, deps.keyring, view)
         return CommandResult(202 if started else 200, answer.model_dump(mode="json"), workspace_id)

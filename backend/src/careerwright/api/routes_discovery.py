@@ -173,7 +173,9 @@ def get_slate(
     chosen = ResilienceFilter(minimum=min_ai_resilience, include_unscored=include_unscored)
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
         hard = hard_filters(tx, workspace_id, deps.mapping_reviews, deps.assessment_packs, chosen)
-        view = discovery_slate(tx, deps.keyring, workspace_id, discovery_id, controls, hard)
+        view = discovery_slate(
+            tx, deps.keyring, workspace_id, discovery_id, controls, hard, deps.pack_targets
+        )
         return SlateOut.of(view, emphasis)
 
 
@@ -217,6 +219,7 @@ def explain(
             defaults=deps.spend_defaults,
             now=deps.clock(),
             hard=hard_filters(tx, workspace_id, deps.mapping_reviews, deps.assessment_packs),
+            pack=deps.pack_targets,
         )
         answer = ExplanationRunOut(
             explanation_id=view.request.explanation_id,
@@ -280,14 +283,14 @@ def choose(
 @router.get("/sketch", response_model=SketchOut, operation_id="get_sketch")
 def get_sketch(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> SketchOut:
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
-        return SketchOut.of(requirement_sketch(tx, workspace_id))
+        return SketchOut.of(requirement_sketch(tx, workspace_id, deps.pack_targets))
 
 
 @router.get("/targets", response_model=TargetRecordsOut, operation_id="list_targets")
 def list_targets(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> TargetRecordsOut:
     """Each target's stored record, which every chapter reads."""
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
-        version, records = current_targets(tx, workspace_id)
+        version, records = current_targets(tx, workspace_id, deps.pack_targets)
         return TargetRecordsOut(
             profile_version=version, targets=[TargetRecordOut.of(r) for r in records]
         )

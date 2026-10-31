@@ -129,7 +129,7 @@ def capability_view(tx: Tx, workspace_id: uuid.UUID, data: CapabilityData) -> Ca
         release = held_release(tx)  # TAXONOMY_UNAVAILABLE without one: never an empty matrix
         matrices = [
             _matrix(tx, workspace_id, record, data, release, synthetic=workspace.synthetic)
-            for record in stored_targets(tx, workspace_id, profile.document)
+            for record in stored_targets(tx, workspace_id, profile.document, pack_targets(data))
         ]
     state = store.state(tx, workspace_id)
     return CapabilityView(

@@ -27,7 +27,7 @@ from careerwright.profile.commands import current_profile
 from careerwright.profile.document import FieldState
 from careerwright.profile.interview import ProfileField
 from careerwright.profile.records import TargetCoverage, TargetRecord
-from careerwright.profile.targets import stored_targets
+from careerwright.profile.targets import PackTargets, stored_targets
 
 REQUIREMENTS_SHOWN = 6
 CLOSE_MATCHES = 3
@@ -151,13 +151,13 @@ def _target(tx: Tx, workspace_id: uuid.UUID, record: TargetRecord) -> TargetSket
     )
 
 
-def requirement_sketch(tx: Tx, workspace_id: uuid.UUID) -> Sketch:
+def requirement_sketch(tx: Tx, workspace_id: uuid.UUID, pack: PackTargets) -> Sketch:
     visible_workspace(tx, workspace_id)  # someone else's workspace is not found, never empty
     profile = current_profile(tx, workspace_id)
     held_release(tx)
     document = profile.document
     inputs = {field: getattr(document, field.value).state for field in MINIMUM_INPUTS}
-    records = stored_targets(tx, workspace_id, document)
+    records = stored_targets(tx, workspace_id, document, pack)
     return Sketch(
         profile_version=profile.version,
         inputs=inputs,

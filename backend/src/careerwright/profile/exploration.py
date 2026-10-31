@@ -712,6 +712,7 @@ def discovery_slate(
     discovery_id: uuid.UUID,
     controls: SlateControls,
     hard: HardFilterInput,
+    pack: PackTargets,
 ) -> SlateView:
     view = visible_discovery(tx, keyring, workspace_id, discovery_id)
     proposal = view.proposal
@@ -726,7 +727,7 @@ def discovery_slate(
             },
         )
     document = _pinned_document(tx, view.run)
-    records = stored_targets(tx, workspace_id, document)
+    records = stored_targets(tx, workspace_id, document, pack)
     return compute_slate(tx, view, proposal, document, controls, hard, records)
 
 
@@ -1093,6 +1094,7 @@ def submit_explanation(
     defaults: SpendLimits,
     now: datetime,
     hard: HardFilterInput,
+    pack: PackTargets,
 ) -> tuple[ExplanationView, bool]:
     """The slate's one written explanation, and whether this request started it. A slate is
     a discovery's first view (balanced, no exclusions, the salary floor applied and the AI
@@ -1163,7 +1165,7 @@ def submit_explanation(
         document,
         SlateControls(),
         replace(hard, ai_filter=ResilienceFilter()),
-        stored_targets(tx, workspace_id, document),
+        stored_targets(tx, workspace_id, document, pack),
     )
     if not shown.suggestions:
         raise CareerwrightError(
@@ -1379,7 +1381,9 @@ class FirstSlate:
     salary_floor: FloorCounts | None = None
 
 
-def first_slate(tx: Tx, workspace_id: uuid.UUID, hard: HardFilterInput) -> FirstSlate:
+def first_slate(
+    tx: Tx, workspace_id: uuid.UUID, hard: HardFilterInput, pack: PackTargets
+) -> FirstSlate:
     """The first scatter of destinations follows from the first answer alone: the role's
     occupation joined to others by shared essential skills (the role itself is the origin,
     never a destination), chosen by the slate's rules and its hard filters (the confirmed
@@ -1413,7 +1417,7 @@ def first_slate(tx: Tx, workspace_id: uuid.UUID, hard: HardFilterInput) -> First
             slate,
             fewer_reasons=[NoSharedOccupation(title=title, min_shared=MIN_SHARED_SKILLS)],
         )
-    named = titles.targets(tx, stored_targets(tx, workspace_id, profile.document))
+    named = titles.targets(tx, stored_targets(tx, workspace_id, profile.document, pack))
     return FirstSlate(
         profile_version=profile.version,
         release=release,

@@ -59,7 +59,7 @@ from careerwright.profile.discovery import EvidenceItem, evidence_of
 from careerwright.profile.exploration import HardFilterInput, first_slate
 from careerwright.profile.safety import has_risk_stem
 from careerwright.profile.store import stale_version
-from careerwright.profile.targets import stored_targets
+from careerwright.profile.targets import PackTargets, stored_targets
 from careerwright.vocabulary import WorkState
 
 
@@ -155,16 +155,16 @@ def _added_answers(tx: Tx, workspace_id: uuid.UUID, version: int) -> list[Eviden
 
 
 def _destinations(
-    tx: Tx, workspace_id: uuid.UUID, hard: HardFilterInput, claimed: set[str]
+    tx: Tx, workspace_id: uuid.UUID, hard: HardFilterInput, pack: PackTargets, claimed: set[str]
 ) -> list[DestinationSkills]:
     """The person's targets that name one ESCO occupation, then the first slate's
     destinations, each with its essential skills not yet claimed (ESCO's order)."""
     profile = current_profile(tx, workspace_id)
     found: dict[uuid.UUID, DestinationKind] = {}
-    for target in titles.targets(tx, stored_targets(tx, workspace_id, profile.document)):
+    for target in titles.targets(tx, stored_targets(tx, workspace_id, profile.document, pack)):
         if len(target.occupations) == 1:
             found.setdefault(target.occupations[0], DestinationKind.TARGET)
-    for suggestion in first_slate(tx, workspace_id, hard).suggestions:
+    for suggestion in first_slate(tx, workspace_id, hard, pack).suggestions:
         found.setdefault(suggestion.candidate.occupation.concept_id, DestinationKind.HORIZON)
     destinations: list[DestinationSkills] = []
     for concept_id, kind in found.items():
@@ -192,6 +192,7 @@ def submit_strength(
     defaults: SpendLimits,
     now: datetime,
     hard: HardFilterInput,
+    pack: PackTargets,
 ) -> tuple[StrengthView, bool]:
     """The turn's one strength run, and whether this request started it: asking again
     answers with the run already asked for, in whatever state. The run reads only the
@@ -239,7 +240,7 @@ def submit_strength(
             "no_quotable_answer",
         )
     claimed = {e.subject for e in store.evidence(tx, workspace_id) if e.answer in usual.SAID_DONE}
-    destinations = _destinations(tx, workspace_id, hard, claimed)
+    destinations = _destinations(tx, workspace_id, hard, pack, claimed)
     if not destinations:
         raise _refusal(
             ErrorCode.INSUFFICIENT_EVIDENCE,
