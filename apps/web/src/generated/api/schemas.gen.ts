@@ -1146,6 +1146,36 @@ export const BandSchema = {
     description: 'The rubric\'s ordinal bands (spec section 5). Never averaged, subtracted or read as\nprobabilities (AIR1-12).'
 } as const;
 
+export const BaselineInputSchema = {
+    properties: {
+        kind: {
+            $ref: '#/components/schemas/BaselineKind'
+        },
+        net_income: {
+            $ref: '#/components/schemas/Money',
+            description: 'Take-home pay a month in the baseline.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'net_income'
+    ],
+    title: 'BaselineInput'
+} as const;
+
+export const BaselineKindSchema = {
+    type: 'string',
+    enum: [
+        'current_role',
+        'job_search',
+        'other'
+    ],
+    title: 'BaselineKind',
+    description: 'The confirmed counterfactual (FIN1-11): never assumed to be staying put.'
+} as const;
+
 export const BasisSchema = {
     type: 'string',
     enum: [
@@ -1800,6 +1830,38 @@ export const ClaimSpanSchema = {
     description: 'A SourceClaim\'s location: offsets into the hashed text, or a JSON pointer.'
 } as const;
 
+export const CommitmentInputSchema = {
+    properties: {
+        kind: {
+            $ref: '#/components/schemas/CommitmentKind'
+        },
+        hours_per_week: {
+            type: 'integer',
+            maximum: 168,
+            minimum: 0,
+            title: 'Hours Per Week'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'hours_per_week'
+    ],
+    title: 'CommitmentInput'
+} as const;
+
+export const CommitmentKindSchema = {
+    type: 'string',
+    enum: [
+        'care',
+        'commute',
+        'second_job',
+        'other'
+    ],
+    title: 'CommitmentKind'
+} as const;
+
 export const ConfidenceSchema = {
     type: 'string',
     enum: [
@@ -1882,6 +1944,29 @@ export const ConnectionOutSchema = {
     ],
     title: 'ConnectionOut',
     description: 'The unexpected connection: one suggestion joined to the person\'s role by the\nessential skills the two share in ESCO, outside the role\'s own kind of work and never a\ntitle the person named; the one sharing the most. Its sentence is a fact about the two\nroles, never about the person, and the shared skills are its evidence, one step away.'
+} as const;
+
+export const ContinuationInputSchema = {
+    properties: {
+        hours_per_week: {
+            type: 'integer',
+            maximum: 168,
+            minimum: 0,
+            title: 'Hours Per Week'
+        },
+        net_income: {
+            $ref: '#/components/schemas/Money',
+            description: 'Take-home pay a month.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'hours_per_week',
+        'net_income'
+    ],
+    title: 'ContinuationInput',
+    description: 'The common work and pay every route returns to (FIN-1): never a target wage.'
 } as const;
 
 export const ConversationModeSchema = {
@@ -2055,6 +2140,45 @@ export const DataModeSchema = {
     ],
     title: 'DataMode',
     description: 'Recorded on every workspace and run (Global Constraint 5, plan section 2).'
+} as const;
+
+export const DebtInputSchema = {
+    properties: {
+        monthly_repayment: {
+            $ref: '#/components/schemas/Money'
+        },
+        balance: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        annual_interest_bps: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 100000,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Annual Interest Bps',
+            description: 'Interest a year in basis points: 1,990 is 19.9%.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'monthly_repayment'
+    ],
+    title: 'DebtInput',
+    description: 'An existing debt: a fixed commitment whose repayments are outflows (spec section 10).'
 } as const;
 
 export const DecideStrengthSchema = {
@@ -2730,7 +2854,8 @@ export const EventKindSchema = {
         'concept.provisional_created',
         'interview.turn_decided',
         'interview.preferences_updated',
-        'capability.updated'
+        'capability.updated',
+        'planning.inputs_updated'
     ],
     title: 'EventKind'
 } as const;
@@ -4951,6 +5076,53 @@ export const MoneyInputSchema = {
     title: 'MoneyInput'
 } as const;
 
+export const NeedSchema = {
+    properties: {
+        input: {
+            $ref: '#/components/schemas/NeededInput'
+        },
+        effect: {
+            $ref: '#/components/schemas/NeedEffect'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'input',
+        'effect'
+    ],
+    title: 'Need'
+} as const;
+
+export const NeedEffectSchema = {
+    type: 'string',
+    enum: [
+        'blocks_a_solve',
+        'leaves_every_route_unresolved'
+    ],
+    title: 'NeedEffect'
+} as const;
+
+export const NeededInputSchema = {
+    type: 'string',
+    enum: [
+        'objective_basis',
+        'continuation',
+        'opening_cash',
+        'living_costs',
+        'commitments',
+        'existing_debts',
+        'scenario_delay_months',
+        'direct_spend_cap',
+        'monthly_payment_cap',
+        'reserve',
+        'weekly_availability',
+        'baseline',
+        'work_rights'
+    ],
+    title: 'NeededInput'
+} as const;
+
 export const NotIncludedSchema = {
     type: 'string',
     enum: [
@@ -5788,6 +5960,170 @@ export const OriginOutSchema = {
     description: 'The world\'s answer to the first question, recomputed on each read with no model call:\nit works before a key is connected and in the demo. `destinations` are the first slate,\njoined to the role only by the essential skills they share in ESCO (never by words in a\ntitle), chosen by the slate\'s rules and the confirmed salary floor; the role itself is\nthe origin, never a destination.'
 } as const;
 
+export const OutcomeDecisionSchema = {
+    properties: {
+        outcome_id: {
+            type: 'string',
+            maxLength: 200,
+            minLength: 1,
+            title: 'Outcome Id'
+        },
+        decision: {
+            type: 'string',
+            enum: [
+                'accept',
+                'override'
+            ],
+            title: 'Decision'
+        },
+        evidence_kind: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/EvidenceKind'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        level_on_completion: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 4,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Level On Completion'
+        },
+        rubric_version: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 200,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rubric Version'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 400,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        },
+        recorded_by: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Recorded By'
+        },
+        recorded_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Recorded At'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'outcome_id',
+        'decision',
+        'recorded_by',
+        'recorded_at'
+    ],
+    title: 'OutcomeDecision',
+    description: 'A stored decision: who made it and when, kept while it is unchanged.'
+} as const;
+
+export const OutcomeDecisionInputSchema = {
+    properties: {
+        outcome_id: {
+            type: 'string',
+            maxLength: 200,
+            minLength: 1,
+            title: 'Outcome Id'
+        },
+        decision: {
+            type: 'string',
+            enum: [
+                'accept',
+                'override'
+            ],
+            title: 'Decision'
+        },
+        evidence_kind: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/EvidenceKind'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        level_on_completion: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 4,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Level On Completion'
+        },
+        rubric_version: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 200,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rubric Version'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 400,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'outcome_id',
+        'decision'
+    ],
+    title: 'OutcomeDecisionInput',
+    description: 'Accept a provisional outcome mapping as a modelling assumption, or override it.'
+} as const;
+
 export const OutcomeReviewSchema = {
     type: 'string',
     enum: [
@@ -6393,6 +6729,483 @@ export const PlaceOutSchema = {
         'timezone'
     ],
     title: 'PlaceOut'
+} as const;
+
+export const PlanningInputsDocumentSchema = {
+    properties: {
+        objective_basis: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: [
+                        'economic',
+                        'direct_spending'
+                    ]
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Objective Basis'
+        },
+        baseline: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/BaselineInput'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        continuation: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ContinuationInput'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        opening_cash: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        living_costs: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Committed outgoings a month.'
+        },
+        reserve: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'The minimum cash to keep.'
+        },
+        monthly_deficit_cap: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Optional: payments less support received plus pay lost, in any month.'
+        },
+        weekly_availability: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 168,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Weekly Availability',
+            description: 'The hours a week the person can give to work, study and commitments.'
+        },
+        commitments: {
+            anyOf: [
+                {
+                    items: {
+                        $ref: '#/components/schemas/CommitmentInput'
+                    },
+                    type: 'array',
+                    maxItems: 50
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Commitments'
+        },
+        existing_debts: {
+            anyOf: [
+                {
+                    items: {
+                        $ref: '#/components/schemas/DebtInput'
+                    },
+                    type: 'array',
+                    maxItems: 50
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Existing Debts'
+        },
+        scenario_delay_months: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 24,
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Scenario Delay Months'
+        },
+        work_rights: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/WorkRights'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        remote_work: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/RemoteWork'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        admissions: {
+            items: {
+                type: 'string',
+                maxLength: 200,
+                minLength: 1
+            },
+            type: 'array',
+            maxItems: 50,
+            title: 'Admissions',
+            description: 'Offerings where the person holds a place or an accepted offer.'
+        },
+        variants: {
+            items: {
+                $ref: '#/components/schemas/VariantInputs'
+            },
+            type: 'array',
+            maxItems: 50,
+            title: 'Variants'
+        },
+        schema_version: {
+            type: 'string',
+            const: '1',
+            title: 'Schema Version',
+            default: '1'
+        },
+        outcome_decisions: {
+            items: {
+                $ref: '#/components/schemas/OutcomeDecision'
+            },
+            type: 'array',
+            maxItems: 50,
+            title: 'Outcome Decisions'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    title: 'PlanningInputsDocument',
+    description: 'A stored version\'s content.'
+} as const;
+
+export const PlanningInputsInSchema = {
+    properties: {
+        objective_basis: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: [
+                        'economic',
+                        'direct_spending'
+                    ]
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Objective Basis'
+        },
+        baseline: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/BaselineInput'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        continuation: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ContinuationInput'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        opening_cash: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        living_costs: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Committed outgoings a month.'
+        },
+        reserve: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'The minimum cash to keep.'
+        },
+        monthly_deficit_cap: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Optional: payments less support received plus pay lost, in any month.'
+        },
+        weekly_availability: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 168,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Weekly Availability',
+            description: 'The hours a week the person can give to work, study and commitments.'
+        },
+        commitments: {
+            anyOf: [
+                {
+                    items: {
+                        $ref: '#/components/schemas/CommitmentInput'
+                    },
+                    type: 'array',
+                    maxItems: 50
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Commitments'
+        },
+        existing_debts: {
+            anyOf: [
+                {
+                    items: {
+                        $ref: '#/components/schemas/DebtInput'
+                    },
+                    type: 'array',
+                    maxItems: 50
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Existing Debts'
+        },
+        scenario_delay_months: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 24,
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Scenario Delay Months'
+        },
+        work_rights: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/WorkRights'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        remote_work: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/RemoteWork'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        admissions: {
+            items: {
+                type: 'string',
+                maxLength: 200,
+                minLength: 1
+            },
+            type: 'array',
+            maxItems: 50,
+            title: 'Admissions',
+            description: 'Offerings where the person holds a place or an accepted offer.'
+        },
+        variants: {
+            items: {
+                $ref: '#/components/schemas/VariantInputs'
+            },
+            type: 'array',
+            maxItems: 50,
+            title: 'Variants'
+        },
+        outcome_decisions: {
+            items: {
+                $ref: '#/components/schemas/OutcomeDecisionInput'
+            },
+            type: 'array',
+            maxItems: 50,
+            title: 'Outcome Decisions'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    title: 'PlanningInputsIn',
+    description: 'What a client submits: the whole document, every input it leaves out unstated.'
+} as const;
+
+export const PlanningInputsOutSchema = {
+    properties: {
+        version: {
+            type: 'integer',
+            title: 'Version'
+        },
+        inputs: {
+            $ref: '#/components/schemas/PlanningInputsDocument'
+        },
+        created_by: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created By'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        profile_version: {
+            type: 'integer',
+            title: 'Profile Version'
+        },
+        direct_spend_cap: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        monthly_payment_cap: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        needs: {
+            items: {
+                $ref: '#/components/schemas/Need'
+            },
+            type: 'array',
+            title: 'Needs'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        },
+        data_mode: {
+            $ref: '#/components/schemas/DataMode'
+        }
+    },
+    type: 'object',
+    required: [
+        'version',
+        'inputs',
+        'created_by',
+        'created_at',
+        'profile_version',
+        'direct_spend_cap',
+        'monthly_payment_cap',
+        'needs',
+        'synthetic',
+        'data_mode'
+    ],
+    title: 'PlanningInputsOut',
+    description: 'The person\'s stored planning inputs, with the profile\'s two spending caps beside them\n(read-only here: they are the profile\'s answers) and what a solve still needs.'
 } as const;
 
 export const PoolQueryOutSchema = {
@@ -8198,6 +9011,46 @@ export const ReliabilitySchema = {
     ],
     title: 'Reliability',
     description: 'ONS\'s quality bands for an estimate\'s coefficient of variation (CV).'
+} as const;
+
+export const RemoteWorkSchema = {
+    properties: {
+        works_remotely: {
+            type: 'boolean',
+            title: 'Works Remotely'
+        },
+        employment_country: {
+            anyOf: [
+                {
+                    type: 'string',
+                    const: 'GB-ENG'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Employment Country'
+        },
+        timezone: {
+            anyOf: [
+                {
+                    type: 'string',
+                    const: 'Europe/London'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Timezone'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'works_remotely'
+    ],
+    title: 'RemoteWork',
+    description: 'Whether the person works remotely, and for an employer in which country and timezone.\nL0 plans England-based work only (spec section 1, BND1-05), so a remote employer is in\nEngland; another country is outside the supported slice and refused. It is never read\nfrom a city and never takes a city slot.'
 } as const;
 
 export const RenameWorkspaceInSchema = {
@@ -11420,6 +12273,84 @@ export const SupportSchema = {
     description: 'One use of a non-repayable instrument on one variant. Paid to the provider, it reduces\nthe fees the person pays and is never also a receipt; paid to the person, it is a receipt\nin its month and reduces direct cost once (FIN1-10).'
 } as const;
 
+export const SupportInputSchema = {
+    properties: {
+        instrument_id: {
+            type: 'string',
+            maxLength: 200,
+            minLength: 1,
+            title: 'Instrument Id'
+        },
+        kind: {
+            $ref: '#/components/schemas/InstrumentKind'
+        },
+        covers_fees_in_full: {
+            type: 'boolean',
+            title: 'Covers Fees In Full',
+            default: false
+        },
+        amount: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        paid_to: {
+            type: 'string',
+            enum: [
+                'provider',
+                'person'
+            ],
+            title: 'Paid To'
+        },
+        paid_month_offset: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 24,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Paid Month Offset'
+        },
+        proven_before_outflows: {
+            type: 'boolean',
+            title: 'Proven Before Outflows',
+            default: false
+        },
+        eligibility: {
+            $ref: '#/components/schemas/EligibilityStatus'
+        },
+        award: {
+            $ref: '#/components/schemas/AwardState'
+        },
+        assumed: {
+            type: 'boolean',
+            title: 'Assumed',
+            description: 'An explicitly conditional award: \'if funding is approved\'.',
+            default: false
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'instrument_id',
+        'kind',
+        'paid_to',
+        'eligibility',
+        'award'
+    ],
+    title: 'SupportInput',
+    description: 'One support the person confirms for an option, with its status: the funding rules of\n`planning.catalogue.Support` (non-repayable only, an approval needs confirmed eligibility).'
+} as const;
+
 export const SupportNoteOutSchema = {
     properties: {
         policy_version: {
@@ -12749,6 +13680,83 @@ export const VariantSchema = {
     description: 'One reviewed start of a concept: an offering with the payment plan, work pattern, wage\nand support the person confirmed for it.'
 } as const;
 
+export const VariantInputsSchema = {
+    properties: {
+        variant_id: {
+            type: 'string',
+            maxLength: 200,
+            minLength: 1,
+            title: 'Variant Id'
+        },
+        work_pattern: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/WorkPatternInput'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        wage: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Take-home wage a month, confirmed.'
+        },
+        supports: {
+            items: {
+                $ref: '#/components/schemas/SupportInput'
+            },
+            type: 'array',
+            maxItems: 4,
+            title: 'Supports'
+        },
+        stacking_confirmed: {
+            type: 'boolean',
+            title: 'Stacking Confirmed',
+            description: 'The supports may be combined: neither excludes the other and together they stay within each one\'s eligible costs.',
+            default: false
+        },
+        entry_requirements_met: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Entry Requirements Met',
+            description: 'Null: not yet answered. False: the person\'s own no.'
+        },
+        condition_statuses: {
+            additionalProperties: {
+                $ref: '#/components/schemas/EligibilityStatus'
+            },
+            propertyNames: {
+                maxLength: 200,
+                minLength: 1
+            },
+            type: 'object',
+            title: 'Condition Statuses',
+            description: 'The person\'s status for each eligibility condition of the stated fee, by the condition\'s field: only `confirmed` meets one.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'variant_id'
+    ],
+    title: 'VariantInputs',
+    description: 'What the person confirmed for one option (a variant of the planning catalogue).'
+} as const;
+
 export const WageSchema = {
     properties: {
         net_income: {
@@ -12808,6 +13816,32 @@ export const WorkPatternSchema = {
     description: 'How the person\'s current job runs while a variant is active, as they confirmed it: its\nweekly hours and the take-home pay they confirmed (no tax or benefit is inferred).'
 } as const;
 
+export const WorkPatternInputSchema = {
+    properties: {
+        kind: {
+            $ref: '#/components/schemas/WorkPatternKind'
+        },
+        hours_per_week: {
+            type: 'integer',
+            maximum: 168,
+            minimum: 0,
+            title: 'Hours Per Week'
+        },
+        net_income: {
+            $ref: '#/components/schemas/Money',
+            description: 'Take-home pay a month while the option is active.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'hours_per_week',
+        'net_income'
+    ],
+    title: 'WorkPatternInput'
+} as const;
+
 export const WorkPatternKindSchema = {
     type: 'string',
     enum: [
@@ -12817,6 +13851,17 @@ export const WorkPatternKindSchema = {
         'leave_current_job'
     ],
     title: 'WorkPatternKind'
+} as const;
+
+export const WorkRightsSchema = {
+    type: 'string',
+    enum: [
+        'held',
+        'not_held',
+        'unknown'
+    ],
+    title: 'WorkRights',
+    description: 'The person\'s right to work in the UK, as they state it (spec sections 1 and 3). Never\ninferred from a city. Only `held` lets a route be feasible: this model checks no visa or\nsponsorship, so `not_held` and `unknown` leave every route unresolved, never ineligible.'
 } as const;
 
 export const WorkStateSchema = {
@@ -13037,6 +14082,27 @@ export const WorkspacePageSchema = {
         'next_cursor'
     ],
     title: 'WorkspacePage'
+} as const;
+
+export const WriteInputsSchema = {
+    properties: {
+        expected_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Version'
+        },
+        inputs: {
+            $ref: '#/components/schemas/PlanningInputsIn'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_version',
+        'inputs'
+    ],
+    title: 'WriteInputs',
+    description: 'Replace the whole document: every input left out is not stated.'
 } as const;
 
 export const WrittenExplanationOutSchema = {

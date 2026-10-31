@@ -42,6 +42,8 @@ class EventKind(StrEnum):
     # Skill evidence, a requirement statement, a matrix edit or the questions' state changed;
     # detail: the capability version only.
     CAPABILITY_UPDATED = "capability.updated"
+    # The person's planning inputs changed; detail: their version only (Task 12a).
+    PLANNING_INPUTS_UPDATED = "planning.inputs_updated"
 
 
 @dataclass(frozen=True)

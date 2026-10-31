@@ -785,6 +785,35 @@ export const Band = {
 export type Band = typeof Band[keyof typeof Band];
 
 /**
+ * BaselineInput
+ */
+export type BaselineInput = {
+    kind: BaselineKind;
+    /**
+     * Take-home pay a month in the baseline.
+     */
+    net_income: Money;
+};
+
+/**
+ * BaselineKind
+ *
+ * The confirmed counterfactual (FIN1-11): never assumed to be staying put.
+ */
+export const BaselineKind = {
+    CURRENT_ROLE: 'current_role',
+    JOB_SEARCH: 'job_search',
+    OTHER: 'other'
+} as const;
+
+/**
+ * BaselineKind
+ *
+ * The confirmed counterfactual (FIN1-11): never assumed to be staying put.
+ */
+export type BaselineKind = typeof BaselineKind[keyof typeof BaselineKind];
+
+/**
  * Basis
  *
  * How an answer relates to what the person said (spec section 3: factual confirmations
@@ -1176,6 +1205,32 @@ export type ClaimSpan = {
 };
 
 /**
+ * CommitmentInput
+ */
+export type CommitmentInput = {
+    kind: CommitmentKind;
+    /**
+     * Hours Per Week
+     */
+    hours_per_week: number;
+};
+
+/**
+ * CommitmentKind
+ */
+export const CommitmentKind = {
+    CARE: 'care',
+    COMMUTE: 'commute',
+    SECOND_JOB: 'second_job',
+    OTHER: 'other'
+} as const;
+
+/**
+ * CommitmentKind
+ */
+export type CommitmentKind = typeof CommitmentKind[keyof typeof CommitmentKind];
+
+/**
  * Confidence
  *
  * Categorical support from the source, never a model-generated probability.
@@ -1253,6 +1308,22 @@ export type ConnectionOut = {
      * Still Uncertain
      */
     still_uncertain: string;
+};
+
+/**
+ * ContinuationInput
+ *
+ * The common work and pay every route returns to (FIN-1): never a target wage.
+ */
+export type ContinuationInput = {
+    /**
+     * Hours Per Week
+     */
+    hours_per_week: number;
+    /**
+     * Take-home pay a month.
+     */
+    net_income: Money;
 };
 
 /**
@@ -1390,6 +1461,22 @@ export const DataMode = {
  * Recorded on every workspace and run (Global Constraint 5, plan section 2).
  */
 export type DataMode = typeof DataMode[keyof typeof DataMode];
+
+/**
+ * DebtInput
+ *
+ * An existing debt: a fixed commitment whose repayments are outflows (spec section 10).
+ */
+export type DebtInput = {
+    monthly_repayment: Money;
+    balance?: Money | null;
+    /**
+     * Annual Interest Bps
+     *
+     * Interest a year in basis points: 1,990 is 19.9%.
+     */
+    annual_interest_bps?: number | null;
+};
 
 /**
  * DecideStrength
@@ -1899,7 +1986,8 @@ export const EventKind = {
     CONCEPT_PROVISIONAL_CREATED: 'concept.provisional_created',
     INTERVIEW_TURN_DECIDED: 'interview.turn_decided',
     INTERVIEW_PREFERENCES_UPDATED: 'interview.preferences_updated',
-    CAPABILITY_UPDATED: 'capability.updated'
+    CAPABILITY_UPDATED: 'capability.updated',
+    PLANNING_INPUTS_UPDATED: 'planning.inputs_updated'
 } as const;
 
 /**
@@ -3383,6 +3471,48 @@ export type MoneyInput = {
 };
 
 /**
+ * Need
+ */
+export type Need = {
+    input: NeededInput;
+    effect: NeedEffect;
+};
+
+/**
+ * NeedEffect
+ */
+export const NeedEffect = { BLOCKS_A_SOLVE: 'blocks_a_solve', LEAVES_EVERY_ROUTE_UNRESOLVED: 'leaves_every_route_unresolved' } as const;
+
+/**
+ * NeedEffect
+ */
+export type NeedEffect = typeof NeedEffect[keyof typeof NeedEffect];
+
+/**
+ * NeededInput
+ */
+export const NeededInput = {
+    OBJECTIVE_BASIS: 'objective_basis',
+    CONTINUATION: 'continuation',
+    OPENING_CASH: 'opening_cash',
+    LIVING_COSTS: 'living_costs',
+    COMMITMENTS: 'commitments',
+    EXISTING_DEBTS: 'existing_debts',
+    SCENARIO_DELAY_MONTHS: 'scenario_delay_months',
+    DIRECT_SPEND_CAP: 'direct_spend_cap',
+    MONTHLY_PAYMENT_CAP: 'monthly_payment_cap',
+    RESERVE: 'reserve',
+    WEEKLY_AVAILABILITY: 'weekly_availability',
+    BASELINE: 'baseline',
+    WORK_RIGHTS: 'work_rights'
+} as const;
+
+/**
+ * NeededInput
+ */
+export type NeededInput = typeof NeededInput[keyof typeof NeededInput];
+
+/**
  * NotIncluded
  *
  * Why a pooled occupation is not on the slate ("show why this wasn't included").
@@ -3851,6 +3981,72 @@ export type OriginOut = {
 };
 
 /**
+ * OutcomeDecision
+ *
+ * A stored decision: who made it and when, kept while it is unchanged.
+ */
+export type OutcomeDecision = {
+    /**
+     * Outcome Id
+     */
+    outcome_id: string;
+    /**
+     * Decision
+     */
+    decision: 'accept' | 'override';
+    evidence_kind?: EvidenceKind | null;
+    /**
+     * Level On Completion
+     */
+    level_on_completion?: number | null;
+    /**
+     * Rubric Version
+     */
+    rubric_version?: string | null;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Recorded By
+     */
+    recorded_by: string;
+    /**
+     * Recorded At
+     */
+    recorded_at: string;
+};
+
+/**
+ * OutcomeDecisionInput
+ *
+ * Accept a provisional outcome mapping as a modelling assumption, or override it.
+ */
+export type OutcomeDecisionInput = {
+    /**
+     * Outcome Id
+     */
+    outcome_id: string;
+    /**
+     * Decision
+     */
+    decision: 'accept' | 'override';
+    evidence_kind?: EvidenceKind | null;
+    /**
+     * Level On Completion
+     */
+    level_on_completion?: number | null;
+    /**
+     * Rubric Version
+     */
+    rubric_version?: string | null;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+};
+
+/**
  * OutcomeReview
  */
 export const OutcomeReview = {
@@ -4266,6 +4462,169 @@ export type PlaceOut = {
      * Timezone
      */
     timezone: string;
+};
+
+/**
+ * PlanningInputsDocument
+ *
+ * A stored version's content.
+ */
+export type PlanningInputsDocument = {
+    /**
+     * Objective Basis
+     */
+    objective_basis?: 'economic' | 'direct_spending' | null;
+    baseline?: BaselineInput | null;
+    continuation?: ContinuationInput | null;
+    opening_cash?: Money | null;
+    /**
+     * Committed outgoings a month.
+     */
+    living_costs?: Money | null;
+    /**
+     * The minimum cash to keep.
+     */
+    reserve?: Money | null;
+    /**
+     * Optional: payments less support received plus pay lost, in any month.
+     */
+    monthly_deficit_cap?: Money | null;
+    /**
+     * Weekly Availability
+     *
+     * The hours a week the person can give to work, study and commitments.
+     */
+    weekly_availability?: number | null;
+    /**
+     * Commitments
+     */
+    commitments?: Array<CommitmentInput> | null;
+    /**
+     * Existing Debts
+     */
+    existing_debts?: Array<DebtInput> | null;
+    /**
+     * Scenario Delay Months
+     */
+    scenario_delay_months?: number | null;
+    work_rights?: WorkRights | null;
+    remote_work?: RemoteWork | null;
+    /**
+     * Admissions
+     *
+     * Offerings where the person holds a place or an accepted offer.
+     */
+    admissions?: Array<string>;
+    /**
+     * Variants
+     */
+    variants?: Array<VariantInputs>;
+    /**
+     * Schema Version
+     */
+    schema_version?: '1';
+    /**
+     * Outcome Decisions
+     */
+    outcome_decisions?: Array<OutcomeDecision>;
+};
+
+/**
+ * PlanningInputsIn
+ *
+ * What a client submits: the whole document, every input it leaves out unstated.
+ */
+export type PlanningInputsIn = {
+    /**
+     * Objective Basis
+     */
+    objective_basis?: 'economic' | 'direct_spending' | null;
+    baseline?: BaselineInput | null;
+    continuation?: ContinuationInput | null;
+    opening_cash?: Money | null;
+    /**
+     * Committed outgoings a month.
+     */
+    living_costs?: Money | null;
+    /**
+     * The minimum cash to keep.
+     */
+    reserve?: Money | null;
+    /**
+     * Optional: payments less support received plus pay lost, in any month.
+     */
+    monthly_deficit_cap?: Money | null;
+    /**
+     * Weekly Availability
+     *
+     * The hours a week the person can give to work, study and commitments.
+     */
+    weekly_availability?: number | null;
+    /**
+     * Commitments
+     */
+    commitments?: Array<CommitmentInput> | null;
+    /**
+     * Existing Debts
+     */
+    existing_debts?: Array<DebtInput> | null;
+    /**
+     * Scenario Delay Months
+     */
+    scenario_delay_months?: number | null;
+    work_rights?: WorkRights | null;
+    remote_work?: RemoteWork | null;
+    /**
+     * Admissions
+     *
+     * Offerings where the person holds a place or an accepted offer.
+     */
+    admissions?: Array<string>;
+    /**
+     * Variants
+     */
+    variants?: Array<VariantInputs>;
+    /**
+     * Outcome Decisions
+     */
+    outcome_decisions?: Array<OutcomeDecisionInput>;
+};
+
+/**
+ * PlanningInputsOut
+ *
+ * The person's stored planning inputs, with the profile's two spending caps beside them
+ * (read-only here: they are the profile's answers) and what a solve still needs.
+ */
+export type PlanningInputsOut = {
+    /**
+     * Version
+     */
+    version: number;
+    inputs: PlanningInputsDocument;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Created At
+     */
+    created_at: string | null;
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    direct_spend_cap: Money | null;
+    monthly_payment_cap: Money | null;
+    /**
+     * Needs
+     */
+    needs: Array<Need>;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    data_mode: DataMode;
 };
 
 /**
@@ -5382,6 +5741,29 @@ export const Reliability = {
  * ONS's quality bands for an estimate's coefficient of variation (CV).
  */
 export type Reliability = typeof Reliability[keyof typeof Reliability];
+
+/**
+ * RemoteWork
+ *
+ * Whether the person works remotely, and for an employer in which country and timezone.
+ * L0 plans England-based work only (spec section 1, BND1-05), so a remote employer is in
+ * England; another country is outside the supported slice and refused. It is never read
+ * from a city and never takes a city slot.
+ */
+export type RemoteWork = {
+    /**
+     * Works Remotely
+     */
+    works_remotely: boolean;
+    /**
+     * Employment Country
+     */
+    employment_country?: 'GB-ENG' | null;
+    /**
+     * Timezone
+     */
+    timezone?: 'Europe/London' | null;
+};
 
 /**
  * RenameWorkspaceIn
@@ -7304,6 +7686,45 @@ export type Support = {
 };
 
 /**
+ * SupportInput
+ *
+ * One support the person confirms for an option, with its status: the funding rules of
+ * `planning.catalogue.Support` (non-repayable only, an approval needs confirmed eligibility).
+ */
+export type SupportInput = {
+    /**
+     * Instrument Id
+     */
+    instrument_id: string;
+    kind: InstrumentKind;
+    /**
+     * Covers Fees In Full
+     */
+    covers_fees_in_full?: boolean;
+    amount?: Money | null;
+    /**
+     * Paid To
+     */
+    paid_to: 'provider' | 'person';
+    /**
+     * Paid Month Offset
+     */
+    paid_month_offset?: number | null;
+    /**
+     * Proven Before Outflows
+     */
+    proven_before_outflows?: boolean;
+    eligibility: EligibilityStatus;
+    award: AwardState;
+    /**
+     * Assumed
+     *
+     * An explicitly conditional award: 'if funding is approved'.
+     */
+    assumed?: boolean;
+};
+
+/**
  * SupportNoteOut
  *
  * The support panel, shown beside a message that triggers the support screen
@@ -8124,6 +8545,47 @@ export type Variant = {
 };
 
 /**
+ * VariantInputs
+ *
+ * What the person confirmed for one option (a variant of the planning catalogue).
+ */
+export type VariantInputs = {
+    /**
+     * Variant Id
+     */
+    variant_id: string;
+    work_pattern?: WorkPatternInput | null;
+    /**
+     * Take-home wage a month, confirmed.
+     */
+    wage?: Money | null;
+    /**
+     * Supports
+     */
+    supports?: Array<SupportInput>;
+    /**
+     * Stacking Confirmed
+     *
+     * The supports may be combined: neither excludes the other and together they stay within each one's eligible costs.
+     */
+    stacking_confirmed?: boolean;
+    /**
+     * Entry Requirements Met
+     *
+     * Null: not yet answered. False: the person's own no.
+     */
+    entry_requirements_met?: boolean | null;
+    /**
+     * Condition Statuses
+     *
+     * The person's status for each eligibility condition of the stated fee, by the condition's field: only `confirmed` meets one.
+     */
+    condition_statuses?: {
+        [key: string]: EligibilityStatus;
+    };
+};
+
+/**
  * Wage
  *
  * A job's or an apprenticeship's take-home pay a month, as the person confirmed it: it
@@ -8165,6 +8627,21 @@ export type WorkPattern = {
 };
 
 /**
+ * WorkPatternInput
+ */
+export type WorkPatternInput = {
+    kind: WorkPatternKind;
+    /**
+     * Hours Per Week
+     */
+    hours_per_week: number;
+    /**
+     * Take-home pay a month while the option is active.
+     */
+    net_income: Money;
+};
+
+/**
  * WorkPatternKind
  */
 export const WorkPatternKind = {
@@ -8178,6 +8655,28 @@ export const WorkPatternKind = {
  * WorkPatternKind
  */
 export type WorkPatternKind = typeof WorkPatternKind[keyof typeof WorkPatternKind];
+
+/**
+ * WorkRights
+ *
+ * The person's right to work in the UK, as they state it (spec sections 1 and 3). Never
+ * inferred from a city. Only `held` lets a route be feasible: this model checks no visa or
+ * sponsorship, so `not_held` and `unknown` leave every route unresolved, never ineligible.
+ */
+export const WorkRights = {
+    HELD: 'held',
+    NOT_HELD: 'not_held',
+    UNKNOWN: 'unknown'
+} as const;
+
+/**
+ * WorkRights
+ *
+ * The person's right to work in the UK, as they state it (spec sections 1 and 3). Never
+ * inferred from a city. Only `held` lets a route be feasible: this model checks no visa or
+ * sponsorship, so `not_held` and `unknown` leave every route unresolved, never ineligible.
+ */
+export type WorkRights = typeof WorkRights[keyof typeof WorkRights];
 
 /**
  * WorkState
@@ -8323,6 +8822,19 @@ export type WorkspacePage = {
      * Next Cursor
      */
     next_cursor: string | null;
+};
+
+/**
+ * WriteInputs
+ *
+ * Replace the whole document: every input left out is not stated.
+ */
+export type WriteInputs = {
+    /**
+     * Expected Version
+     */
+    expected_version: number;
+    inputs: PlanningInputsIn;
 };
 
 /**
@@ -11026,6 +11538,86 @@ export type ListPlanningOptionsResponses = {
 };
 
 export type ListPlanningOptionsResponse = ListPlanningOptionsResponses[keyof ListPlanningOptionsResponses];
+
+export type GetPlanningInputsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/inputs';
+};
+
+export type GetPlanningInputsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetPlanningInputsError = GetPlanningInputsErrors[keyof GetPlanningInputsErrors];
+
+export type GetPlanningInputsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PlanningInputsOut;
+};
+
+export type GetPlanningInputsResponse = GetPlanningInputsResponses[keyof GetPlanningInputsResponses];
+
+export type WritePlanningInputsData = {
+    body: WriteInputs;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/inputs';
+};
+
+export type WritePlanningInputsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type WritePlanningInputsError = WritePlanningInputsErrors[keyof WritePlanningInputsErrors];
+
+export type WritePlanningInputsResponses = {
+    /**
+     * Nothing changed.
+     */
+    200: PlanningInputsOut;
+    /**
+     * Successful Response
+     */
+    201: PlanningInputsOut;
+};
+
+export type WritePlanningInputsResponse = WritePlanningInputsResponses[keyof WritePlanningInputsResponses];
 
 export type GetTaxonomyData = {
     body?: never;

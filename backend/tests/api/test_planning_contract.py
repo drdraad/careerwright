@@ -38,10 +38,12 @@ def reachable(name: str, every: dict[str, Any]) -> set[str]:
     return seen
 
 
-@pytest.mark.req("ARC1-10", "OPTN-01")
-def test_every_amount_the_options_serve_is_money() -> None:
+@pytest.mark.req("ARC1-10", "OPTN-01", "PLN-11")
+# The options, and the person's planning inputs as they are read and written (Task 12a).
+@pytest.mark.parametrize("schema", [RESPONSE, "PlanningInputsOut", "WriteInputs"])
+def test_every_amount_the_options_serve_is_money(schema: str) -> None:
     every = schemas()
-    served = reachable(RESPONSE, every)
+    served = reachable(schema, every)
     bare = sorted(
         f"{name}.{field}"
         for name in served
