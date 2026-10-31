@@ -204,15 +204,31 @@ function renderDirections(shown: DiscoveryOut = discovery, unavailable?: string)
 const slateRoute: Route = { method: "GET", path: /\/slate$/, answer: () => slate([suggestion]) };
 const card = async () => screen.findByRole("article", { name: "Bicycle mechanic" });
 
+/** The slate's notes on how it searched wait in one disclosure, one step away (D-I3). */
+async function openNotes(user: ReturnType<typeof userEvent.setup>, count: number) {
+  const notes = await screen.findByText(
+    `How Careerwright searched (${count} ${count === 1 ? "note" : "notes"})`,
+  );
+  await user.click(notes);
+}
+
 describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls, and choosing", () => {
   it("shows why, what might not suit and a small test, fewer with the reason, and no percentage", async () => {
     fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([suggestion]) }]);
-    renderDirections();
+    const { user } = renderDirections();
 
     expect(await screen.findByRole("heading", { name: "Bicycle mechanic" })).toBeVisible();
     expect(screen.getByText("Why this could suit you")).toBeVisible();
     expect(screen.getByText("Try it before committing")).toBeVisible();
+    // Never overwhelming: the notes are one step away, and each keeps its words there.
+    expect(screen.getByText(/Only 1 occupation matched/)).not.toBeVisible();
+    await openNotes(user, 3);
     expect(screen.getByText(/Only 1 occupation matched/)).toBeVisible();
+    expect(
+      screen.getByText(
+        "Careerwright doesn't know your current work yet, so it can't say which directions are close to it.",
+      ),
+    ).toBeVisible();
     // Never shown as a suggestion, and named for what the match did (W2B re-review 5).
     expect(
       screen.getByText(
@@ -245,8 +261,9 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
         },
       },
     ]);
-    renderDirections();
+    const { user } = renderDirections();
 
+    await openNotes(user, 4);
     expect(await screen.findByText(summary)).toBeVisible();
   });
 
@@ -262,9 +279,10 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
         answer: { ...slate([suggestion]), beyond_pool_limit: 17, notes: [keeps] },
       },
     ]);
-    renderDirections();
+    const { user } = renderDirections();
 
     expect(await screen.findByText(/17 more were found but not kept\./)).toBeVisible();
+    await openNotes(user, 4);
     expect(screen.getByText(keeps)).toBeVisible();
   });
 
@@ -380,12 +398,25 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     expect(document.querySelectorAll(".btn-primary")).toHaveLength(1);
     expect(within(tree).queryByRole("button", { name: /Make this a target/ })).toBeNull();
     expect(within(tree).getByText("Kind of work: Machinery mechanics and repairers")).toBeVisible();
+    // The choice comes right after the title and kind of work, before the details, so the
+    // bright action is in view with a real slate (design review I3).
+    const why = within(mechanic).getByText("Why this could suit you");
+    expect(
+      chooseFirst.compareDocumentPosition(why) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // One is always open: its header says it can't be closed (the ARIA accordion pattern).
+    const mechanicHeader = within(mechanic).getByRole("button", { name: "Bicycle mechanic" });
+    expect(mechanicHeader).toHaveAttribute("aria-expanded", "true");
+    expect(mechanicHeader).toHaveAttribute("aria-disabled", "true");
 
     const open = within(tree).getByRole("button", { name: "Tree surgeon" });
     expect(open).toHaveAttribute("aria-expanded", "false");
+    expect(open).not.toHaveAttribute("aria-disabled");
     await user.click(open);
 
     expect(open).toHaveAttribute("aria-expanded", "true");
+    expect(open).toHaveAttribute("aria-disabled", "true");
+    expect(mechanicHeader).not.toHaveAttribute("aria-disabled");
     expect(within(tree).getByRole("button", { name: /Make this a target/ })).toHaveClass(
       "btn-primary",
     );
@@ -435,6 +466,88 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
 
     expect(noteRequests(sent)).toHaveLength(1);
     expect(noteRequests(sent)[0]?.body).toEqual({ expected_profile_version: 2 });
+  });
+
+  it("asks only once the person can see the slate", async () => {
+    // The You chapter keeps its views mounted (fix round 1, A-I1): a hidden slate asks nothing.
+    const sent = fakeApi([
+      slateRoute,
+      {
+        method: "POST",
+        path: /\/explanation$/,
+        status: 202,
+        answer: { explanation_id: "e1", discovery_id: "d1", run: { status: "queued" } },
+      },
+    ]);
+    const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = (shown: boolean) => (
+      <QueryClientProvider client={queries}>
+        <EvidenceProvider>
+          <Directions
+            workspaceId={WS}
+            profile={profile}
+            discovery={discoveryWith(null)}
+            shown={shown}
+          />
+        </EvidenceProvider>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(view(false));
+
+    await card();
+    await waitFor(() => expect(sent.some((s) => s.path.endsWith("/slate"))).toBe(true));
+    expect(noteRequests(sent)).toHaveLength(0);
+    rerender(view(true));
+    await waitFor(() => expect(noteRequests(sent)).toHaveLength(1));
+  });
+
+  it("[REC1-11] never sends a refused request again when the slate shows again, only by a click", async () => {
+    // App review M2: a refused request (no run) was sent again each time the slate mounted:
+    // on every return to Suggestions, and on every change of chapter.
+    const sent = fakeApi([
+      slateRoute,
+      {
+        method: "POST",
+        path: /\/explanation$/,
+        status: 409,
+        answer: {
+          error: {
+            code: "BUDGET_EXCEEDED",
+            message: "not shown",
+            retryable: false,
+            stage: "execution",
+            correlation_id: "c1",
+            details: {},
+          },
+        },
+      },
+    ]);
+    // One page's query client, as the shell keeps it across chapters.
+    const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const page = () => (
+      <QueryClientProvider client={queries}>
+        <EvidenceProvider>
+          <Directions workspaceId={WS} profile={profile} discovery={discoveryWith(null)} />
+        </EvidenceProvider>
+      </QueryClientProvider>
+    );
+    const first = render(page());
+    expect(
+      await within(await card()).findByText(/The spending limit for model calls is reached\./),
+    ).toBeVisible();
+    expect(noteRequests(sent)).toHaveLength(1);
+
+    first.unmount(); // another chapter
+    render(page()); // and back
+    const again = within(await card());
+    expect(await again.findByText(/The spending limit for model calls is reached\./)).toBeVisible();
+    expect(noteRequests(sent)).toHaveLength(1);
+
+    // Only the person's click sends it again.
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Try again : the written note" }));
+    await waitFor(() => expect(noteRequests(sent)).toHaveLength(2));
   });
 
   it("shows the note and each checked quotation above how Careerwright found it", async () => {

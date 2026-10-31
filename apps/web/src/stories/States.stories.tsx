@@ -68,10 +68,10 @@ export const Conditional: Story = {
 export const Stale: Story = {
   render: () => (
     <div className="grid max-w-[640px] gap-16">
-      <Alert tone="stale" title="Version 3 was saved while you were editing">
+      <Alert tone="stale" title="Your answers changed while you were editing">
         <p>
-          Your edits are kept below, now based on version 3. Version 3 changed: Work areas. Check
-          those answers, then save again.
+          Your edits are kept below, on top of the newer answers. The newer answers changed: Work
+          areas to Leeds. Check them, then save again.
         </p>
       </Alert>
       <StatusBadge state="stale" detail="last checked 2 days ago; may have closed" />

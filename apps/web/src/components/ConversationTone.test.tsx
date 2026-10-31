@@ -35,7 +35,10 @@ describe("[PROF-08][UI-09] the tone is a preference, saved as an expected-versio
     const user = userEvent.setup();
 
     const tone = await screen.findByLabelText("How Careerwright talks with you");
-    expect(tone).toHaveDisplayValue("Choose a tone");
+    // Named in the product owner's word, for this workspace (design review M4).
+    expect(screen.getByRole("heading", { name: "Preferences for this workspace" })).toBeVisible();
+    // Unchosen, the interviewer keeps it practical, so that is what it shows.
+    expect(tone).toHaveDisplayValue("Keep this practical (the default)");
     await user.selectOptions(tone, "Help me explore gently");
 
     await waitFor(() => expect(sent.some((s) => s.method === "PUT")).toBe(true));
@@ -45,5 +48,6 @@ describe("[PROF-08][UI-09] the tone is a preference, saved as an expected-versio
       conversation_mode: "gentle",
       paused: false,
     });
+    expect(await screen.findByRole("status")).toHaveTextContent("Saved.");
   });
 });

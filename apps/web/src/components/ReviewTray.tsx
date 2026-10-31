@@ -1,9 +1,10 @@
 "use client";
 // The review tray (spec section 3, STATE-06): the newest reply's proposed changes, each to
 // accept, edit or skip; a limit or target is saved only once confirmed by name (PROF-04).
-// Accept and Confirm are colour coded as well as worded (session 2, C3: leaf green, filled once
-// chosen), and a limit says what it means in plain words. Facts the person stated and
-// Careerwright's readings look different (a dashed edge). Edits are checked before anything is
+// Accept and Confirm are colour coded as well as worded (session 2, C3: leaf green, on a faint
+// leaf tint once chosen, never a second bright fill beside the one primary action), and a limit
+// says what it means in plain words. Facts the person stated and Careerwright's readings look
+// different (a dashed edge). Edits are checked before anything is
 // sent; then one decision saves the accepted proposals and the person's own answers together,
 // as one version, or nothing at all (the tray and its edits stay, with the reason). Nothing
 // changes until the person saves.
@@ -39,12 +40,12 @@ type Props = {
   onSaved(after: ProfileOut): void;
 };
 
+/** Whether the person said it or Careerwright read it in (a truth the dashed edge also shows).
+ *  A limit or target says nothing more: its Confirm button names it (PROF-04). */
 function kindOf(change: ProposedChangeOut): string {
-  const basis =
-    change.basis === "stated"
-      ? "You said"
-      : "Careerwright's reading, not a fact until you accept it";
-  return change.hard_constraint ? `A limit or target: needs your confirmation. ${basis}` : basis;
+  return change.basis === "stated"
+    ? "You said"
+    : "Careerwright's reading, not a fact until you accept it";
 }
 
 function proposedValue(change: ProposedChangeOut): string {
@@ -144,9 +145,6 @@ export function ReviewTray({
             <figcaption className="small muted">Your message</figcaption>
           </figure>
           <p className="small">Why: {change.reason}</p>
-          <p className="small muted">
-            Saving creates profile version {profile.version + 1}. Nothing changes until you save.
-          </p>
         </div>
       ),
     });
@@ -190,12 +188,7 @@ export function ReviewTray({
         const setDraft = (next: FieldDraft) =>
           setDrafts((current) => ({ ...current, [change.change_id]: next }));
         return (
-          <div
-            key={change.change_id}
-            className="proposal"
-            data-basis={change.basis}
-            data-chosen={choice === "accept" || choice === "confirm" || editing}
-          >
+          <div key={change.change_id} className="proposal" data-basis={change.basis}>
             <span className="proposal-kind">{kindOf(change)}</span>
             <span className="proposal-value">
               {label}: {proposedValue(change)}
@@ -299,10 +292,6 @@ export function ReviewTray({
           Keep none
         </Button>
       </div>
-      <p className="small muted">
-        Skipped changes are not saved. Every saved answer keeps where it came from; an answer you
-        edit is saved as yours.
-      </p>
     </section>
   );
 }

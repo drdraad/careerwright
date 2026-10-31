@@ -146,16 +146,19 @@ beforeEach(() => {
 });
 
 describe("[DUR-04][API-04] saving the profile is an expected-version, idempotent command", () => {
-  it("sends the loaded version with a key, and shows the new version", async () => {
+  it("sends the loaded version with a key, and says it is saved", async () => {
     const current = { profile: profileOut(1, ["Manchester"]) };
     const sent = api(current, [json(201, profileOut(2, ["Leeds"]))]);
     const user = renderEditor(current.profile);
 
     await user.clear(screen.getByRole("textbox", { name: "Work area 1" }));
     await user.type(screen.getByRole("textbox", { name: "Work area 1" }), "Leeds");
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
-    expect(await screen.findByText("Saved as version 2.")).toBeInTheDocument();
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    // Plain words: the person sees their answers saved, never a version number (D-M5).
+    expect(document.body.textContent).not.toMatch(/version/i);
     const put = sent.find((request) => request.method === "PUT");
     expect(put?.url).toBe(`http://localhost:3000/api/v1/workspaces/${WS}/profile`);
     expect(put?.key).toMatch(/^[0-9a-f-]{36}$/);
@@ -182,9 +185,10 @@ describe("[DUR-04][API-04] saving the profile is an expected-version, idempotent
     // The refusal and the answers that changed under the person are announced, and focus
     // moves to the notice, so nothing changes silently for a screen-reader user.
     const notice = await screen.findByRole("alert");
-    expect(notice).toHaveTextContent("Version 2 was saved while you were editing");
-    expect(notice).toHaveTextContent("Version 2 changed: Total spending limit to £900.");
+    expect(notice).toHaveTextContent("Your answers changed while you were editing");
+    expect(notice).toHaveTextContent("The newer answers changed: Total spending limit to £900.");
     expect(notice).toHaveFocus();
+    expect(document.body.textContent).not.toMatch(/version/i);
     expect(screen.getByRole("textbox", { name: "Work area 1" })).toHaveValue("Leeds");
     // The field the person did not touch now shows version 2's answer, not the old one.
     expect(screen.getByRole("textbox", { name: /Total spending limit, in pounds/ })).toHaveValue(
@@ -192,7 +196,7 @@ describe("[DUR-04][API-04] saving the profile is an expected-version, idempotent
     );
 
     await user.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(await screen.findByText("Saved as version 3.")).toBeInTheDocument();
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
     const puts = sent.filter((request) => request.method === "PUT");
     expect(puts.map((put) => (put.body as { expected_version: number }).expected_version)).toEqual([
       1, 2,
@@ -221,11 +225,13 @@ describe("[DUR-04][API-04] saving the profile is an expected-version, idempotent
     expect(amount).toHaveValue("1,200");
     // The conflict is part of the control's description, not only text beside it.
     expect(amount).toHaveAccessibleDescription(
-      "Version 2 has £900 here. Saving keeps your answer instead.",
+      "The newer answers have £900 here. Saving keeps your answer instead.",
     );
     expect(
       screen.getByRole("combobox", { name: "How you answer total spending limit" }),
-    ).toHaveAccessibleDescription("Version 2 has £900 here. Saving keeps your answer instead.");
+    ).toHaveAccessibleDescription(
+      "The newer answers have £900 here. Saving keeps your answer instead.",
+    );
   });
 
   it("names no conflict where the person's edit already matches the newer version", async () => {
@@ -240,7 +246,7 @@ describe("[DUR-04][API-04] saving the profile is an expected-version, idempotent
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Version 2 changed: Total spending limit to £900.",
+      "The newer answers changed: Total spending limit to £900.",
     );
     expect(screen.queryByText(/Saving keeps your answer instead/)).not.toBeInTheDocument();
     expect(amount).not.toHaveAccessibleDescription();
@@ -257,7 +263,9 @@ describe("[DUR-04][API-04] saving the profile is an expected-version, idempotent
 
     // One announcement, on the notice that has focus; the cause follows it in place.
     const notice = await screen.findByRole("alert");
-    expect(notice).toHaveTextContent("A newer version was saved, and it couldn't be loaded");
+    expect(notice).toHaveTextContent(
+      "Your answers changed elsewhere, and the newer ones couldn't be loaded",
+    );
     expect(notice).toHaveFocus();
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     expect(screen.getByText("Careerwright's service isn't reachable")).toBeInTheDocument();
@@ -275,7 +283,7 @@ describe("[DUR-04][API-04] saving the profile is an expected-version, idempotent
     expect(await screen.findByText("Careerwright's service isn't reachable")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(await screen.findByText("Saved as version 2.")).toBeInTheDocument();
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
     const keys = sent.filter((request) => request.method === "PUT").map((put) => put.key);
     expect(keys).toHaveLength(2);
     expect(keys[0]).toBe(keys[1]);

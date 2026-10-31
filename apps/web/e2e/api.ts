@@ -1,6 +1,7 @@
 // Direct calls for test set-up and boundary checks: an emulator ID token, and raw HTTP to the
 // web origin so Host and Origin are exactly what a test says.
 import { request as httpRequest } from "node:http";
+import { expect } from "@playwright/test";
 import { AUTH_ORIGIN, PORTS, WEB_ORIGIN } from "./stack";
 
 export type Raw = { status: number; body: string };
@@ -101,4 +102,56 @@ export async function saveElsewhere(
     profile,
   });
   return saved.version;
+}
+
+/** Answers, a reply to review and a completed discovery, through the API (demo mode). */
+export async function talkedWorkspace(token: string): Promise<string> {
+  const { workspace_id: id } = await asBrowser<{ workspace_id: string }>(
+    "POST",
+    "/v1/workspaces",
+    token,
+    { name: "Conversation (synthetic)", data_mode: "demo", synthetic: true },
+  );
+  const base = `/v1/workspaces/${id}`;
+  const blank = await asBrowser<{ document: Record<string, unknown> }>(
+    "GET",
+    `${base}/profile`,
+    token,
+  );
+  const profile: Record<string, unknown> = Object.fromEntries(
+    Object.keys(blank.document)
+      .filter((field) => field !== "schema_version")
+      .map((field) => [field, { state: "unasked" }]),
+  );
+  profile.current_role = { state: "provided", value: "warehouse supervisor" };
+  profile.enjoyed_tasks = { state: "provided", value: ["fixing bikes", "working outdoors"] };
+  profile.cities = { state: "provided", value: ["Leeds"] };
+  await asBrowser("PUT", `${base}/profile`, token, { expected_version: 0, profile });
+  await asBrowser("PUT", `${base}/interview/preferences`, token, {
+    expected_version: 0,
+    entry_mode: "unsure",
+    conversation_mode: null,
+    paused: false,
+  });
+  const turn = await asBrowser<{ turn_id: string }>("POST", `${base}/interview/turns`, token, {
+    expected_profile_version: 1,
+    message: "Synthetic: I could do 5 hours a week, and spend up to £600.",
+  });
+  const found = await asBrowser<{ discovery_id: string }>("POST", `${base}/discoveries`, token, {
+    expected_profile_version: 1,
+  });
+  for (const path of [
+    `${base}/interview/turns/${turn.turn_id}`,
+    `${base}/discoveries/${found.discovery_id}`,
+  ]) {
+    await expect
+      .poll(
+        async () => (await asBrowser<{ run: { status: string } }>("GET", path, token)).run.status,
+        {
+          timeout: 60_000,
+        },
+      )
+      .toBe("complete");
+  }
+  return id;
 }

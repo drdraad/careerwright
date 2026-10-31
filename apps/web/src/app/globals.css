@@ -642,8 +642,9 @@
   }
 
   /* The two decisions on a proposed change, colour coded as well as worded (session 2, C3):
-     leaf green accepts a change or confirms a limit, filled once chosen; orchid undoes the last
-     save. Neither is ever teal, and neither is the view's primary action. */
+     leaf green accepts a change or confirms a limit; orchid undoes the last save. Neither is
+     ever teal, and neither is the view's primary action: once chosen, Accept sits on a faint
+     leaf tint with a doubled edge, never a second bright fill beside the one primary. */
   .btn-accept {
     background: transparent;
     border-color: var(--decision-accept);
@@ -651,8 +652,8 @@
   }
 
   .btn-accept[aria-pressed="true"] {
-    background: var(--decision-accept);
-    color: var(--text-on-decision);
+    background: var(--surface-decision-chosen);
+    box-shadow: inset 0 0 0 1px var(--decision-accept);
   }
 
   .btn-undo {
@@ -1500,15 +1501,12 @@
     border-radius: var(--radius-control);
   }
 
-  /* An inference is drawn with a dashed edge: Careerwright's reading, not a fact until accepted. */
+  /* An inference is drawn with a dashed edge: Careerwright's reading, not a fact until accepted.
+     A chosen proposal is marked by its Accept or Confirm alone, never also by a teal edge
+     (teal is selection among alternatives and the one primary action). */
   .proposal[data-basis="inferred"] {
     border-style: dashed;
     border-color: var(--line-reading-control);
-  }
-
-  .proposal[data-chosen="true"] {
-    border-color: var(--selection-reading);
-    box-shadow: inset 3px 0 0 var(--selection-reading);
   }
 
   .proposal-kind {
@@ -1672,11 +1670,56 @@
   }
 }
 
-@media (max-width: 760px) {
-  /* On a phone the console is a sheet over the lower part of the world, so the person's light
-     shows above it while there is room (plan section 4: the world is the backdrop). */
+/* Where the console leaves the world too narrow a span beside it (the rail's 96 px, its 32 px
+   margin, the console's 600 px and geometry.ts's MIN_CLEAR of 240 px: below 968 px), the
+   person's light stands in a band above the console in every view, never shorter than
+   geometry.ts's MIN_BAND of 240 px, so the You place never falls back to a backdrop behind
+   it. A short console sits low, under more of the world; a long one starts below the band and
+   scrolls with the page (Task W2C fix round 1). */
+@media (max-width: 967px) {
+  .workarea:has(> .chapter-you) {
+    /* At least MIN_BAND and a margin; on a taller screen, room for the light's arc at full
+       size and the names around it (as docs/design draws it). */
+    padding-top: max(300px, 34vh);
+  }
+
   .chapter-you {
     margin-top: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  /* The top bar already names the chapter "You", so the console's own title is for assistive
+     tech only, and the world above it keeps the room (D-I2). */
+  .chapter-you > .page-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* One row in every update state (A-M1): the state's words take the room left and end in an
+     ellipsis rather than pushing the account menu to a second row; assistive tech reads them
+     all. A failed refresh, rarer, takes a row of its own. */
+  .strip-updates {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .strip-updates > .status {
+    min-width: 0;
+  }
+
+  .strip-updates > .status > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .strip-refresh-failed {
+    flex-basis: 100%;
   }
 
   .question .display {

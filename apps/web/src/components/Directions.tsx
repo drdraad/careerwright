@@ -10,10 +10,14 @@
 // there are any.
 //
 // "Why this could suit you" may also carry a written note (S2.7, ADR 0007 decision 12): one
-// model run per slate, asked for once when the slate first shows, whose every quotation the
+// model run per slate, asked for once when the person first sees the slate (the page keeps
+// every request, so a view or chapter change never asks again), whose every quotation the
 // API checked against the person's answers or ESCO's record. It is shown above how Careerwright
 // found the suggestion, never instead of it; pending, failed and not-covered states say so.
-import { useEffect, useId, useRef, useState } from "react";
+//
+// Never overwhelming (session 2): the slate's notes on how it searched wait in one disclosure
+// under the count line, and the open suggestion's choice comes right after its title.
+import { useEffect, useId, useState } from "react";
 import type {
   Direction,
   DiscoveryOut,
@@ -33,9 +37,9 @@ import { stillRunning } from "@/lib/conversation";
 import {
   type SlateControls,
   useChooseTarget,
+  useNoteRequests,
   useSlate,
   useSubmitDiscovery,
-  useSubmitExplanation,
 } from "@/lib/queries";
 import {
   ADDED_WEIGHT_ONLY,
@@ -288,7 +292,10 @@ function SuggestionCard({
           aria-expanded={open}
           // Only an open suggestion's details are in the page.
           aria-controls={open ? body : undefined}
-          onClick={onOpen}
+          // One is always open, so the open one's header can't close it (the ARIA accordion
+          // pattern): it says so rather than doing nothing.
+          aria-disabled={open || undefined}
+          onClick={open ? undefined : onOpen}
         >
           {title}
           <Glyph name={open ? "expand" : "collapse"} />
@@ -297,36 +304,8 @@ function SuggestionCard({
       <p className="small muted">Kind of work: {suggestion.family.label}</p>
       {open && (
         <div id={body} className="grid gap-12">
-          <p className="small">{suggestion.workday}</p>
-          <div className="grid gap-8">
-            <p className="section-title">Why this could suit you</p>
-            <WrittenNote state={written} />
-            <div className="grid gap-4">
-              {written.kind !== "none" && <p className="small muted">How Careerwright found it</p>}
-              <ul className="plain-list">
-                {suggestion.why_it_could_suit.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          <div className="grid gap-4">
-            <p className="section-title">What might not suit you</p>
-            <ul className="plain-list">
-              {[...suggestion.what_might_not_suit, ...suggestion.entry_gates].map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </div>
-          <div className="grid gap-4">
-            <p className="section-title">Try it before committing</p>
-            <ul className="plain-list">
-              {suggestion.try_it.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </div>
-          <p className="small muted">{suggestion.evidence_gaps.join(" ")}</p>
+          {/* The choice first, so its bright action is in view with a real slate; what the
+              work is and why it could suit you follow (D-I3). */}
           <div className="flex flex-wrap items-center gap-8">
             <Button
               variant={primary ? "primary" : "secondary"}
@@ -361,9 +340,57 @@ function SuggestionCard({
               Source <span className="sr-only">for {title}</span>
             </Button>
           </div>
+          <p className="small">{suggestion.workday}</p>
+          <div className="grid gap-8">
+            <p className="section-title">Why this could suit you</p>
+            <WrittenNote state={written} />
+            <div className="grid gap-4">
+              {written.kind !== "none" && <p className="small muted">How Careerwright found it</p>}
+              <ul className="plain-list">
+                {suggestion.why_it_could_suit.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <div className="grid gap-4">
+            <p className="section-title">What might not suit you</p>
+            <ul className="plain-list">
+              {[...suggestion.what_might_not_suit, ...suggestion.entry_gates].map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="grid gap-4">
+            <p className="section-title">Try it before committing</p>
+            <ul className="plain-list">
+              {suggestion.try_it.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+          <p className="small muted">{suggestion.evidence_gaps.join(" ")}</p>
         </div>
       )}
     </article>
+  );
+}
+
+/** The slate's notes on how it searched, one step away (session 2's "never overwhelming"):
+ *  each keeps its words, none is dropped, and the count says how many wait inside. */
+function SearchNotes({ lines }: { lines: string[] }) {
+  if (lines.length === 0) return null;
+  return (
+    <details className="details">
+      <summary>
+        How Careerwright searched ({lines.length} {lines.length === 1 ? "note" : "notes"})
+      </summary>
+      <ul className="plain-list mt-8">
+        {lines.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -466,6 +493,7 @@ function Slate({
   profile,
   discovery,
   canWrite,
+  shown,
   choosePrimary,
   onSuggestAgain,
   suggestBlocked,
@@ -475,6 +503,8 @@ function Slate({
   discovery: DiscoveryOut;
   /** Whether a written note may be asked for (a key is stored, or the workspace is a demo). */
   canWrite: boolean;
+  /** Whether the person can see the slate (its view is the one open). */
+  shown: boolean;
   /** Whether choosing the open suggestion is the view's one primary action (not while
    *  "Suggest again" is, for changed answers). */
   choosePrimary: boolean;
@@ -487,35 +517,30 @@ function Slate({
   const [opened, setOpened] = useState<string | null>(null);
   const slate = useSlate(workspaceId, discovery.discovery_id, controls);
   const choose = useChooseTarget(workspaceId);
-  const explain = useSubmitExplanation(workspaceId);
+  const notes = useNoteRequests(workspaceId, discovery.discovery_id);
   const explanation = discovery.explanation ?? null;
-  const asked = useRef<string | null>(null);
-  const shown = slate.data !== undefined && slate.data.suggestions.length > 0;
-  // One request per slate, when it first shows for the current answers: a view change or a
-  // refresh never asks again here, and the API answers any repeat with the same run.
+  const suggested = slate.data !== undefined && slate.data.suggestions.length > 0;
+  // One request per slate, when the person first sees it for the current answers: a view
+  // change, a change of chapter or a refresh never asks again here (the page keeps every
+  // request), and the API answers any repeat with the same run.
   const wanted =
-    canWrite && shown && explanation === null && discovery.profile_version === profile.version;
-  const askForNote = explain.mutate;
+    canWrite &&
+    shown &&
+    suggested &&
+    explanation === null &&
+    discovery.profile_version === profile.version;
+  const { askOnce } = notes;
   useEffect(() => {
-    if (!wanted || asked.current === discovery.discovery_id) return;
-    asked.current = discovery.discovery_id;
-    askForNote({
-      discoveryId: discovery.discovery_id,
-      body: { expected_profile_version: profile.version },
-    });
-  }, [wanted, discovery.discovery_id, profile.version, askForNote]);
-  const flags = {
-    asked: asked.current === discovery.discovery_id,
-    sending: explain.isPending,
-    refused: refusal(explain.error),
-  };
+    if (wanted) askOnce({ expected_profile_version: profile.version });
+  }, [wanted, profile.version, askOnce]);
+  const flags = { asked: notes.asked, sending: notes.sending, refused: refusal(notes.error) };
   const noteFor = (suggestion: SuggestionOut) => writtenState(suggestion, explanation, flags);
   // Only ever by the person's click: a retry of a run that reached no model, or a refused
   // request sent again (never automatic).
   const tryAgain = (retry: boolean) =>
-    explain.mutate({
-      discoveryId: discovery.discovery_id,
-      body: { expected_profile_version: profile.version, ...(retry ? { retry_failed: true } : {}) },
+    notes.askAgain({
+      expected_profile_version: profile.version,
+      ...(retry ? { retry_failed: true } : {}),
     });
   const targets =
     profile.document.target_titles.state === "provided"
@@ -574,16 +599,26 @@ function Slate({
         {excluded > 0 &&
           ` Your exclusions removed ${data.excluded.occupations + data.excluded.families}.`}
       </p>
-      {[
-        ...data.fewer_reasons,
-        ...data.notes,
-        ...(data.salary_floor ? [data.salary_floor.summary] : []),
-        ...(data.ai_resilience_filter.summary ? [data.ai_resilience_filter.summary] : []),
-      ].map((line) => (
-        <p key={line} className="small">
-          {line}
-        </p>
-      ))}
+      <SearchNotes
+        lines={[
+          ...data.fewer_reasons,
+          ...data.notes,
+          ...(data.salary_floor ? [data.salary_floor.summary] : []),
+          ...(data.ai_resilience_filter.summary ? [data.ai_resilience_filter.summary] : []),
+          ...(data.unsupported_hypotheses.length > 0
+            ? [
+                "Titles Careerwright thought of but couldn't match to an occupation in ESCO, so " +
+                  `not suggested: ${data.unsupported_hypotheses.join(", ")}.`,
+              ]
+            : []),
+          ...(familiarityKnown
+            ? []
+            : [
+                "Careerwright doesn't know your current work yet, so it can't say which " +
+                  "directions are close to it.",
+              ]),
+        ]}
+      />
       {note.kind === "unavailable" && (
         <NoteRecovery
           state={note}
@@ -604,12 +639,6 @@ function Slate({
             Clear exclusions
           </Button>
         </div>
-      )}
-      {!familiarityKnown && (
-        <p className="small muted">
-          Careerwright doesn't know your current work yet, so it can't say which directions are
-          close to it.
-        </p>
       )}
       {ORDER.map((direction) => {
         const group = data.suggestions.filter((s) => s.direction === direction);
@@ -657,12 +686,6 @@ function Slate({
         );
       })}
       {choose.error !== null && <RequestFailure error={choose.error} />}
-      {data.unsupported_hypotheses.length > 0 && (
-        <p className="small muted">
-          Titles Careerwright thought of but couldn't match to an occupation in ESCO, so not
-          suggested: {data.unsupported_hypotheses.join(", ")}.
-        </p>
-      )}
       <NotShown items={data.not_included} />
       <p className="small muted">{data.release.attribution}</p>
     </div>
@@ -674,12 +697,15 @@ export function Directions({
   profile,
   discovery,
   unavailable,
+  shown = true,
 }: {
   workspaceId: string;
   profile: ProfileOut;
   discovery: DiscoveryOut | null;
   /** Why discovery can't run yet (no key stored), if it can't. */
   unavailable?: string;
+  /** Whether the person can see it: the written note is asked for only once they can. */
+  shown?: boolean;
 }) {
   const submit = useSubmitDiscovery(workspaceId);
   const hasEvidence = EVIDENCE.some((name) => profile.document[name].state === "provided");
@@ -700,16 +726,13 @@ export function Directions({
         Directions to explore
       </h2>
       <p className="small muted measure">
-        Up to six occupations from ESCO, found from your own answers and chosen to differ from each
-        other. They are ideas to test, not a judgement of fit: no score or percentage.
+        Occupations from ESCO, found from your own answers. Ideas to test, not a judgement of fit:
+        no score or percentage.
       </p>
       {discovery === null || (stale && !running) ? (
         <>
           {stale && (
-            <Alert
-              tone="stale"
-              title={`Based on your answers at version ${discovery?.profile_version}`}
-            >
+            <Alert tone="stale" title="Based on your earlier answers">
               <p>Your answers have changed since. Suggest again to use the latest ones.</p>
             </Alert>
           )}
@@ -750,6 +773,7 @@ export function Directions({
           profile={profile}
           discovery={discovery}
           canWrite={unavailable === undefined}
+          shown={shown}
           choosePrimary={!stale}
           onSuggestAgain={start}
           suggestBlocked={blocked}

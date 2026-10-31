@@ -3,8 +3,8 @@
 // the keyboard, its views are tabs, and focus lands on what each decision did. Desktop rail and
 // phone menu.
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { asBrowser, emulatorToken } from "./api";
-import { chapterUrl, signIn } from "./helpers";
+import { asBrowser, emulatorToken, talkedWorkspace } from "./api";
+import { chapterUrl, saved, signIn } from "./helpers";
 
 /** Presses Tab until `target` has focus; failing to get there is a keyboard trap or a gap. */
 async function tabTo(page: Page, target: Locator, limit = 80) {
@@ -121,6 +121,33 @@ test("[UI-06][STATE-06][PROF-04] the You chapter completes from the keyboard, an
   await page.keyboard.press("Home");
   await expect(conversation).toBeFocused();
   await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toBeVisible();
+});
+
+test("[UI-06][REC1-07] a suggestion opens and becomes a target from the keyboard", async ({
+  page,
+}) => {
+  // App review M4: the keyboard journey stopped before the suggestions.
+  test.setTimeout(120_000);
+  const id = await talkedWorkspace(await emulatorToken("ada"));
+  await page.goto(chapterUrl("you", id));
+  await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
+  await page.locator("body").focus();
+  await tabTo(page, page.getByRole("tab", { name: "Conversation" }));
+  await page.keyboard.press("End");
+  await expect(page.getByRole("tab", { name: "Suggestions" })).toBeFocused();
+
+  const directions = page.getByRole("region", { name: "Directions to explore" });
+  await expect(directions.getByRole("article").first()).toBeVisible({ timeout: 60_000 });
+  const second = directions.getByRole("article").last();
+  const title = (await second.getByRole("heading").textContent()) ?? "";
+  const toggle = second.getByRole("button", { name: title.trim() });
+  await tabTo(page, toggle);
+  await page.keyboard.press("Enter");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(toggle).toBeFocused(); // the open card's header keeps focus
+  await tabTo(page, second.getByRole("button", { name: /Make this a target/ }), 5);
+  await page.keyboard.press("Enter");
+  await expect(saved(page, 2)).toBeVisible();
 });
 
 test.describe("phone", () => {

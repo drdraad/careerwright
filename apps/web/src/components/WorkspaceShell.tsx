@@ -207,9 +207,10 @@ export function WorkspaceShell({
             email={auth.state.email}
             controls={<WorldControls settings={world} supportShown={supportShown} />}
             settings={
+              // Calm mode is this viewer's; the tone, under its own heading, this workspace's.
               <>
-                <ConversationTone workspaceId={workspaceId} />
                 <CalmMode settings={world} />
+                <ConversationTone workspaceId={workspaceId} />
               </>
             }
             onSignOut={() => void auth.signOut()}

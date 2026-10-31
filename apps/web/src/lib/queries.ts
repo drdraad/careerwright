@@ -1,8 +1,14 @@
 "use client";
 // Server state (TanStack Query) over the generated client. Every workspace-scoped query shares
 // the `["ws", id]` prefix, so a status event refetches exactly what that workspace shows.
-import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import {
+  type QueryClient,
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type ChooseTarget,
   type CreateWorkspace,
@@ -73,6 +79,9 @@ export const keys = {
   latestDiscovery: (id: string) => ["ws", id, "discoveries", "latest"] as const,
   slate: (id: string, discoveryId: string, controls: SlateControls) =>
     ["ws", id, "discoveries", discoveryId, "slate", controls] as const,
+  /** The requests for a discovery's written note (mutations, kept for the page's life). */
+  noteRequests: (id: string, discoveryId: string) =>
+    ["ws", id, "discoveries", discoveryId, "note-requests"] as const,
   sketch: (id: string) => ["ws", id, "sketch"] as const,
   credentials: (id: string) => ["ws", id, "credentials"] as const,
 };
@@ -228,10 +237,13 @@ export function useCreateWorkspace() {
 function useCommand<Vars, Result>(
   id: string,
   send: (vars: Vars, idempotencyKey: string) => Promise<Result>,
+  /** Kept in the query client under this key for the page's life, never collected. */
+  kept?: readonly unknown[],
 ) {
   const queries = useQueryClient();
   const [changes] = useState(() => new ChangeKeys());
   return useMutation({
+    ...(kept === undefined ? {} : { mutationKey: kept, gcTime: Number.POSITIVE_INFINITY }),
     mutationFn: (vars: Vars) => send(vars, changes.keyFor(vars)),
     onSuccess: () => {
       changes.settled();
@@ -403,10 +415,18 @@ export function useSubmitDiscovery(id: string) {
 
 /** Asks for a slate's one written explanation (ADR 0007 decision 12). Asking again, from any
  *  view, answers with the same run: a slate never has a second call. */
-export function useSubmitExplanation(id: string) {
-  return useCommand(
+/**
+ * Asking for a slate's written note (S2.7, ADR 0007 decision 12). Every request for a
+ * discovery is kept in the query client for the page's life, so whether the note was asked
+ * for, and the last refusal, outlive the slate: changing view or chapter never asks again. A
+ * refused request is sent again only by the person's click (`askAgain`).
+ */
+export function useNoteRequests(id: string, discoveryId: string) {
+  const queries = useQueryClient();
+  const kept = keys.noteRequests(id, discoveryId);
+  const submit = useCommand(
     id,
-    async ({ discoveryId, body }: { discoveryId: string; body: SubmitExplanation }, key: string) =>
+    async (body: SubmitExplanation, key: string) =>
       (
         await submitExplanation({
           path: { workspace_id: id, discovery_id: discoveryId },
@@ -415,7 +435,32 @@ export function useSubmitExplanation(id: string) {
           throwOnError: true,
         })
       ).data as ExplanationRunOut,
+    kept,
   );
+  const last = useMutationState({
+    filters: { mutationKey: kept, exact: true },
+    select: (request) => request.state,
+  }).at(-1);
+  const ask = submit.mutate;
+  // Unless this page already asked for this discovery's note: read from the cache at the
+  // moment of asking, so a slate that shows twice at once still asks once.
+  const askOnce = useCallback(
+    (body: SubmitExplanation) => {
+      const asked = queries.getMutationCache().findAll({
+        mutationKey: keys.noteRequests(id, discoveryId),
+        exact: true,
+      });
+      if (asked.length === 0) ask(body);
+    },
+    [queries, id, discoveryId, ask],
+  );
+  return {
+    askOnce,
+    askAgain: ask,
+    asked: last !== undefined,
+    sending: last?.status === "pending",
+    error: last?.status === "error" ? last.error : null,
+  };
 }
 
 export function useSlate(id: string, discoveryId: string, controls: SlateControls, enabled = true) {

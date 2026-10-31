@@ -8,7 +8,8 @@
 // menu, never on the first screen (plan section 4). The synthetic label shows at every width.
 // A tablet's strip is two rows: the synthetic label and the target, then the states and
 // controls. On a phone the strip keeps the saved state, any update state, the world's
-// controls, the account menu (which also leads to the workspaces) and any failure: the top bar
+// controls, the account menu (which also leads to the workspaces) and any failure, on one row
+// in every update state (the state's words end in an ellipsis if they must): the top bar
 // carries the chapter and the synthetic label, and the world names the target.
 import * as Popover from "@radix-ui/react-popover";
 import Link from "next/link";
@@ -76,7 +77,7 @@ function LiveUpdates({ status, onReconnect }: { status: StreamStatus; onReconnec
   const glyph = status.state === "stopped" ? "error" : "running";
   const tone = status.state === "stopped" && status.reason !== "closed" ? "error" : "neutral";
   return (
-    <span className={live ? "sr-only" : "strip-item flex items-center gap-8"}>
+    <span className={live ? "sr-only" : "strip-item strip-updates flex items-center gap-8"}>
       <span className="status" data-tone={tone} role="status" aria-live="polite">
         {/* Named in words, so it is never read as the state of what the page loaded (V-02). */}
         {!live && (
@@ -194,7 +195,7 @@ export function WorkspaceStrip({
           </span>
         )}
         {refreshFailed && (
-          <span className="status" data-tone="error" role="alert">
+          <span className="status strip-refresh-failed" data-tone="error" role="alert">
             <Glyph name="unavailable" />
             <span>Couldn't refresh: showing what was last loaded</span>
           </span>

@@ -42,7 +42,7 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, inspect a fixture rout
   await page.getByLabel("How you answer weekly study hours").selectOption("provided");
   await page.getByLabel("Weekly study hours, hours a week").fill("6");
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByText(`Saved as version ${version + 1}.`)).toBeVisible();
+  await expect(page.locator("#edit-answers").getByText("Saved.", { exact: true })).toBeVisible();
   await expect(saved(page, version + 1)).toBeVisible();
   await expect(page.getByRole("banner").getByText("Manchester, Leeds")).toBeVisible();
 

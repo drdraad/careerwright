@@ -5,7 +5,9 @@
 // question's two quick answers; how Careerwright talks with you is a preference in the account
 // menu (`ConversationTone`). A streamed reply is marked not checked until the validated turn
 // replaces it; a failed turn says why, keeps what streamed marked as not saved, and saves
-// nothing. What the reply proposes (`review`) is decided right after it. A message with a risk
+// nothing. What the reply proposes (`review`) is decided right after it, and the next question
+// waits until it is decided: one decision at a time (plan section 4). While the interview is
+// paused, Resume is the view's one primary action, where the question was. A message with a risk
 // stem is sent as usual, and the API's calm support panel is shown beside it, or beside its
 // refusal if the send is refused (ADR 0007 decision 7): announced politely, focus left where
 // it is, dismissible, and the question steps aside while it is shown (no career question that
@@ -163,25 +165,19 @@ function EntryChoice({
         How would you like to start?
       </h2>
       <div className="choices">
+        {/* The two choices name themselves; their glosses were helper text that didn't help
+            (session 2: "too much helper text"). */}
         {(Object.keys(ENTRY_MODE) as EntryMode[]).map((entry) => (
           <Button
             key={entry}
             variant="secondary"
-            aria-describedby={`entry-${entry}`}
             aria-pressed={preferences.entry_mode === entry}
             onClick={() => onChoose(entry)}
           >
-            {ENTRY_MODE[entry].label}
+            {ENTRY_MODE[entry]}
           </Button>
         ))}
       </div>
-      <ul className="plain-list mt-12">
-        {(Object.keys(ENTRY_MODE) as EntryMode[]).map((entry) => (
-          <li key={entry} id={`entry-${entry}`}>
-            {ENTRY_MODE[entry].label}: {ENTRY_MODE[entry].detail}
-          </li>
-        ))}
-      </ul>
     </section>
   );
 }
@@ -209,8 +205,9 @@ export function Conversation({
   const setPreferences = useSetPreferences(id);
   const [message, setMessage] = useState("");
   const [showEarlier, setShowEarlier] = useState(false);
-  const [focusQuestion, setFocusQuestion] = useState(false);
+  const [focusTo, setFocusTo] = useState<"question" | "paused" | "resumed" | null>(null);
   const questionTitle = useRef<HTMLHeadingElement>(null);
+  const pausedTitle = useRef<HTMLHeadingElement>(null);
   const replyField = useRef<HTMLTextAreaElement>(null);
   const modeId = useId();
   const demo = workspace.data_mode === "demo";
@@ -253,11 +250,21 @@ export function Conversation({
     }
   }, [support, announce]);
 
-  // After choosing how to start, the first question takes focus (it replaced the choice).
+  // The control just used is replaced, so focus moves to what replaced it once it is there:
+  // after choosing how to start, the first question; after pausing, "Paused"; after resuming,
+  // the question, or the reply field while no question is shown.
   useEffect(() => {
-    if (focusQuestion && questionTitle.current !== null) {
-      questionTitle.current.focus();
-      setFocusQuestion(false);
+    const target =
+      focusTo === "question"
+        ? questionTitle.current
+        : focusTo === "paused"
+          ? pausedTitle.current
+          : focusTo === "resumed" && !preferences.paused
+            ? (questionTitle.current ?? replyField.current)
+            : null;
+    if (target !== null) {
+      target.focus();
+      setFocusTo(null);
     }
   });
 
@@ -294,9 +301,9 @@ export function Conversation({
         <EntryChoice
           preferences={preferences}
           onChoose={(entry) => {
-            setFocusQuestion(true);
+            setFocusTo("question");
             // A failed save leaves the choice on screen; focus must not jump later (N-M6).
-            save({ entry_mode: entry }, () => setFocusQuestion(false));
+            save({ entry_mode: entry }, () => setFocusTo(null));
           }}
         />
       ) : (
@@ -337,7 +344,7 @@ export function Conversation({
             >
               <p>
                 {FAILURE_CLASS[latest.run.failure_class ?? "unknown_failure"].action} What we know
-                is unchanged at version {profile.version}. Your message is kept above.
+                is unchanged. Your message is kept above.
               </p>
             </Alert>
           )}
@@ -346,25 +353,42 @@ export function Conversation({
 
           {preferences.paused ? (
             <section className="question" aria-labelledby="paused-title">
-              <h2 id="paused-title" className="display">
+              <h2 id="paused-title" className="display" tabIndex={-1} ref={pausedTitle}>
                 Paused
               </h2>
               <p className="muted mt-12 measure">
                 Nothing is asked and nothing can be sent until you resume. Everything you have said
                 and saved is kept.
               </p>
+              <div className="mt-16">
+                <Button
+                  variant={primary === "resume" ? "primary" : "secondary"}
+                  onClick={() => {
+                    setFocusTo("resumed");
+                    save({ paused: false }, () => setFocusTo(null));
+                  }}
+                >
+                  Resume the interview
+                </Button>
+              </div>
             </section>
           ) : (
             question !== null &&
             !latestFailed &&
-            note === null && (
+            note === null &&
+            // A reply's proposals are one decision; the next question waits until it is made.
+            primary !== "review" && (
               <section className="question" aria-labelledby="question-title">
                 <h2 id="question-title" className="display" tabIndex={-1} ref={questionTitle}>
                   {question}
                 </h2>
-                <p className="muted mt-12 measure">
-                  Answer in your own words, or say Skip, Unknown or Prefer not to say.
-                </p>
+                {/* Said once, at the start, not under every question (session 2: "too much
+                    helper text"). */}
+                {turns.length === 0 && (
+                  <p className="muted mt-12 measure">
+                    Answer in your own words, or say Skip, Unknown or Prefer not to say.
+                  </p>
+                )}
               </section>
             )
           )}
@@ -417,10 +441,16 @@ export function Conversation({
 
       {(!entryNeeded || demo) && (
         <div className="thread-meta">
-          {!entryNeeded && (
+          {!entryNeeded && !preferences.paused && (
             // Named for what it pauses: the world's "Pause motion" is on the same screen.
-            <Button variant="quiet" onClick={() => save({ paused: !preferences.paused })}>
-              {preferences.paused ? "Resume the interview" : "Pause the interview"}
+            <Button
+              variant="quiet"
+              onClick={() => {
+                setFocusTo("paused");
+                save({ paused: true }, () => setFocusTo(null));
+              }}
+            >
+              Pause the interview
             </Button>
           )}
           {demo && (

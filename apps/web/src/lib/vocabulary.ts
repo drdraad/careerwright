@@ -204,15 +204,9 @@ export const PROFILE_FIELD_ORDER: readonly ProfileFieldName[] = [
 ];
 
 /** The entry choices (spec section 3: "I know my direction" or "Help me explore"). */
-export const ENTRY_MODE: Record<EntryMode, { label: string; detail: string }> = {
-  sure: {
-    label: "I know my direction",
-    detail: "Confirm the role you're aiming for, then the practical limits.",
-  },
-  unsure: {
-    label: "Help me explore",
-    detail: "Start from what you enjoy. Careerwright suggests varied directions to consider.",
-  },
+export const ENTRY_MODE: Record<EntryMode, string> = {
+  sure: "I know my direction",
+  unsure: "Help me explore",
 };
 
 /** The tone the person chooses (spec section 4); practical until they choose another. */

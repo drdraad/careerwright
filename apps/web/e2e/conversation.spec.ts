@@ -8,6 +8,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { asBrowser, emulatorToken } from "./api";
 import {
+  brightFills,
   chapterUrl,
   externalRequests,
   liveUpdates,
@@ -83,16 +84,21 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   });
   await expect(page.getByText(/not checked yet/)).toHaveCount(0);
   const tray = page.getByRole("region", { name: /To review: 4 changes/ });
-  await expect(tray.getByText(/needs your confirmation/).first()).toBeVisible();
+  // One decision at a time (design review I4): the next question waits for the tray.
+  await expect(page.locator(".question")).toHaveCount(0);
   await tray.getByRole("button", { name: "Accept current role" }).click();
   await tray.getByRole("button", { name: "Accept tasks you enjoy" }).click();
   await tray.getByRole("button", { name: "Confirm weekly study hours as a limit" }).click();
   await tray.getByRole("button", { name: "Confirm work areas as a limit" }).click();
+  // Four chosen, and still one bright fill in view: Save (design review M1).
+  expect(await brightFills(page)).toBe(1);
   await tray.getByRole("button", { name: /Save 4 to What we know/ }).click();
   await expect(saved(page, 1)).toHaveText("Answers saved");
   await expect(banner.getByText("Leeds")).toBeVisible();
-  // Right where the decision was made: what it did, focused, with Undo in its own colour.
+  // Right where the decision was made: what it did, focused, with Undo in its own colour; the
+  // next question follows it.
   await expect(page.getByRole("heading", { name: "Saved to What we know" })).toBeFocused();
+  await expect(page.locator(".question")).toHaveCount(1);
 
   // Undo restores the answers from before the save, as a new version.
   await page.getByRole("button", { name: "Undo the last save" }).click();
@@ -131,13 +137,17 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   // One suggestion is open; its "Make this a target" is the view's one bright action.
   const choose = first.getByRole("button", { name: /Make this a target/ });
   await expect(choose).toHaveClass(/btn-primary/);
-  await expect(page.locator("main .btn-primary")).toHaveCount(1);
+  // The other views stay mounted, hidden: only the view shown counts.
+  await expect(page.locator("main .btn-primary:visible")).toHaveCount(1);
+  expect(await brightFills(page)).toBe(1);
   await choose.click();
   await expect(saved(page, 4)).toBeVisible();
   await expect(banner.getByText(title, { exact: false })).toBeVisible();
 
-  // The early sketch: ESCO's requirements for the target, every step not resolved yet.
+  // The early sketch, one step away in What we know (a second idea there, design review M6):
+  // ESCO's requirements for the target, every step not resolved yet.
   await youView(page, "What we know");
+  await page.getByText("The early sketch for your target").click();
   const sketch = page.getByRole("region", { name: "Early sketch, not a checked route" });
   await expect(sketch.getByText("What this work usually asks for, from ESCO:")).toBeVisible();
   await expect(sketch.getByText(/Not resolved yet/).first()).toBeVisible();
@@ -174,26 +184,33 @@ test("[PROF-09] a message with a risk stem is sent as usual, with the support pa
   await expect(page.locator(".question")).toHaveCount(0);
 });
 
-test("[UI-09] V-08: the strip keeps its height when updates are interrupted", async ({
+test("[UI-09] V-08: the strip keeps its height when updates are interrupted, on a phone too", async ({
   browser,
 }) => {
-  const height = async (blocked: boolean) => {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-    const page = await context.newPage();
-    if (blocked) await page.route("**/events/stream*", (route) => route.abort());
-    await signIn(page, "ada", chapterUrl("you"));
-    await expect(saved(page)).toHaveText("Answers saved");
-    await expect(liveUpdates(page, blocked ? "Reconnecting" : "Live")).toBeVisible();
-    const box = await page.getByRole("banner").boundingBox();
-    await context.close();
-    return box?.height ?? 0;
-  };
+  // App review M1: on a phone, "Updates: Reconnecting" pushed the account menu to a second row.
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    const height = async (blocked: boolean) => {
+      const context = await browser.newContext({ viewport });
+      const page = await context.newPage();
+      if (blocked) await page.route("**/events/stream*", (route) => route.abort());
+      await signIn(page, "ada", chapterUrl("you"));
+      await expect(saved(page)).toHaveText("Answers saved");
+      await expect(liveUpdates(page, blocked ? "Reconnecting" : "Live")).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      const box = await page.getByRole("banner").boundingBox();
+      await context.close();
+      return box?.height ?? 0;
+    };
 
-  const live = await height(false);
-  const reconnecting = await height(true);
+    const live = await height(false);
+    const reconnecting = await height(true);
 
-  expect(live).toBeGreaterThan(0);
-  expect(reconnecting).toBe(live);
+    expect(live, `${viewport.width} px`).toBeGreaterThan(0);
+    expect(reconnecting, `${viewport.width} px: one row while reconnecting`).toBe(live);
+  }
 });
 
 test.describe("phone", () => {
@@ -281,12 +298,14 @@ test.describe("phone", () => {
     await page.evaluate(() => window.scrollTo(0, 0));
     await tryAgain.focus();
     await expectOnTop(page, tryAgain);
-    // "Add the details yourself" opens the answer form in What we know.
+    // "Add the details yourself" opens the answer form in What we know, and focus goes with
+    // it (app review I2: it fell to the page).
     await yourself.click();
     await expect(page.getByRole("tab", { name: "What we know" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
+    await expect(page.getByRole("heading", { name: "Edit your answers" })).toBeFocused();
     await page.getByRole("button", { name: "Source for total spending limit" }).click();
     await expect(sheet).toBeVisible();
     await youView(page, "Conversation");

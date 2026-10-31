@@ -2,7 +2,7 @@
 // invitation, another person's workspace, foreign Host and Origin values, and a stale save.
 import { expect, test } from "@playwright/test";
 import { WEB_HOST as HOST, raw, emulatorToken as token } from "./api";
-import { chapterUrl, signIn, youView } from "./helpers";
+import { chapterUrl, saved, signIn, youView } from "./helpers";
 import { FIXTURE_WORKSPACE, PORTS, WEB_ORIGIN } from "./stack";
 
 test("[SEC-01] an uninvited account can sign in but is refused, and says so", async ({ page }) => {
@@ -97,15 +97,18 @@ test("[DUR-04][VERSIONS-01] a save based on an older version is refused and the 
   await second.getByRole("textbox", role).fill("Second tab's answer");
   await first.getByRole("textbox", role).fill("First tab's answer");
   await first.getByRole("button", { name: "Save changes" }).click();
-  await expect(first.getByText("Saved as version 1.")).toBeVisible();
+  await expect(first.locator("#edit-answers").getByText("Saved.", { exact: true })).toBeVisible();
+  await expect(saved(first, 1)).toBeVisible();
 
   await second.getByRole("button", { name: "Save changes" }).click();
-  // Announced and focused, naming what changed and to what.
+  // Announced and focused, naming what changed and to what, in plain words (no version).
   const notice = second.getByRole("alert").filter({
-    hasText: "Version 1 was saved while you were editing",
+    hasText: "Your answers changed while you were editing",
   });
   await expect(notice).toBeFocused();
-  await expect(notice).toContainText("Version 1 changed: Current role to First tab's answer.");
+  await expect(notice).toContainText(
+    "The newer answers changed: Current role to First tab's answer.",
+  );
   await expect(second.getByRole("textbox", role)).toHaveValue("Second tab's answer");
   // Close both tabs: open pages would keep streaming into the next test's restart.
   await first.close();

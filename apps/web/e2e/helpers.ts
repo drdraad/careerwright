@@ -107,6 +107,30 @@ export async function savedVersion(page: Page): Promise<number> {
   return Number(await saved(page).getAttribute("data-version"));
 }
 
+/**
+ * The controls in view in the chapter filled with a bright colour, read from the computed
+ * style, not the class: the one primary action's sea-glass, and the decision colours, so a
+ * chosen Accept drawn as a second bright fill would count (design review M1).
+ */
+export async function brightFills(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const fill = (token: string) => {
+      const probe = document.createElement("span");
+      probe.style.background = `var(${token})`;
+      document.body.append(probe);
+      const colour = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return colour;
+    };
+    const bright = ["--action-reading", "--decision-accept", "--decision-undo"].map(fill);
+    return [...document.querySelectorAll("main button, main a")].filter(
+      (control) =>
+        control.getClientRects().length > 0 &&
+        bright.includes(getComputedStyle(control).backgroundColor),
+    ).length;
+  });
+}
+
 /** Opens one of the You chapter's views (its tabs: Conversation, What we know, Suggestions). */
 export async function youView(page: Page, view: "Conversation" | "What we know" | "Suggestions") {
   await page.getByRole("tab", { name: view }).click();

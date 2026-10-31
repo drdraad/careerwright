@@ -371,6 +371,41 @@ test("[UI-07][UI-05] with no light the key explains, the key is not shown", asyn
   }
 });
 
+/** `geometry.ts`'s MIN_BAND: a band of world shorter than this above the panels is no place to
+ *  stand, and the world falls back to a backdrop behind them. */
+const MIN_BAND = 240;
+
+for (const viewport of VIEWPORTS.filter((v) => v.width < 968)) {
+  test(`[UI-07][UI-05] the person's light stands above the You console in every view (${viewport.width}×${viewport.height})`, async ({
+    browser,
+  }) => {
+    // Design review I2: on a tablet and a phone the You place lost its world in most views.
+    const context = await browser.newContext({ viewport, reducedMotion: "reduce" });
+    const page = await context.newPage();
+    await signIn(page, "ada", chapterUrl("you"));
+    for (const view of ["Conversation", "What we know", "Suggestions"] as const) {
+      await youView(page, view);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(900); // the names settle
+      const band = await page.evaluate(() => {
+        const bars = [...document.querySelectorAll("[data-covers-world]:not([data-world-panel])")]
+          .map((e) => e.getBoundingClientRect())
+          .filter((r) => r.width > 0 && r.height > 0 && r.height < window.innerHeight * 0.9);
+        const top = Math.max(0, ...bars.map((r) => r.bottom));
+        const panel = document.querySelector("[data-world-panel]")?.getBoundingClientRect();
+        return (panel?.top ?? 0) - top;
+      });
+      expect(band, `${view}: the band of world above the console`).toBeGreaterThanOrEqual(MIN_BAND);
+      const { labels } = await layout(page);
+      expect(
+        labels.map((label) => label.name),
+        `${view}: the person's light is named`,
+      ).toContain("You");
+    }
+    await context.close();
+  });
+}
+
 /** The chapter's words as read: the same in every way of drawing the world. */
 const chapterText = (page: Page) => page.locator("main").innerText();
 

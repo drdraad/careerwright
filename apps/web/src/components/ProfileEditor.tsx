@@ -7,8 +7,10 @@
 // their edits stay, and a field both changed shows the newer value beside the edit. Nothing
 // is merged silently, and a newer version that cannot be loaded says so. Either notice is
 // announced and takes focus, and lists each answer the newer version changed (WCAG 4.1.3).
+// The words never say "version" (session 2's plain words, Task W2C fix round 1): the person
+// sees their answers and the newer answers, never a number.
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState } from "react";
+import { type Ref, useEffect, useId, useRef, useState } from "react";
 import type { ProfileDocument, ProfileOut } from "@/generated/api";
 import { ApiError, ChangeKeys } from "@/lib/api";
 import {
@@ -33,7 +35,6 @@ import { RequestFailure } from "./PageState";
 type Stale =
   | {
       kind: "rebased";
-      to: number;
       changed: ProfileFieldName[];
       conflicts: ProfileFieldName[];
       latest: ProfileDocument;
@@ -43,9 +44,12 @@ type Stale =
 export function ProfileEditor({
   workspaceId,
   profile,
+  headingRef,
 }: {
   workspaceId: string;
   profile: ProfileOut;
+  /** Where focus can land when the form is opened from elsewhere, so it is never lost. */
+  headingRef?: Ref<HTMLHeadingElement>;
 }) {
   const queries = useQueryClient();
   const save = useSaveProfile(workspaceId);
@@ -54,7 +58,7 @@ export function ProfileEditor({
   const [draft, setDraft] = useState<ProfileDraft>(() => draftFrom(profile.document));
   const [problems, setProblems] = useState<Partial<Record<ProfileFieldName, FieldProblem>>>({});
   const [stale, setStale] = useState<Stale | null>(null);
-  const [saved, setSaved] = useState<number | null>(null);
+  const [saved, setSaved] = useState(false);
   const [changes] = useState(() => new ChangeKeys());
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftFrom(base.document));
   const idPrefix = useId();
@@ -75,7 +79,7 @@ export function ProfileEditor({
   }, [profile, base.version, dirty]);
 
   const change = (name: ProfileFieldName, next: ProfileDraft[ProfileFieldName]) => {
-    setSaved(null);
+    setSaved(false);
     setDraft((current) => ({ ...current, [name]: next }));
     setProblems((current) => {
       const { [name]: _dropped, ...rest } = current;
@@ -101,7 +105,7 @@ export function ProfileEditor({
       setStale(null);
       setBase(stored);
       setDraft(draftFrom(stored.document));
-      setSaved(stored.version);
+      setSaved(true);
     } catch (error) {
       if (!(error instanceof ApiError && error.code === "STALE_INPUT_VERSION")) return;
       let latest: ProfileOut;
@@ -119,7 +123,6 @@ export function ProfileEditor({
       const rebased = rebaseDraft(draft, base.document, latest.document);
       setStale({
         kind: "rebased",
-        to: latest.version,
         changed: rebased.changedThere,
         conflicts: rebased.conflicts,
         latest: latest.document,
@@ -150,39 +153,34 @@ export function ProfileEditor({
       }}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-12">
-        <h2 id={`${idPrefix}-title`} className="display text-25">
+        <h2 id={`${idPrefix}-title`} className="display text-25" tabIndex={-1} ref={headingRef}>
           Edit your answers
         </h2>
-        <p className="small muted tnum">
-          {base.version === 0 ? "Nothing saved yet" : `Version ${base.version}`}
-          {dirty && ", with unsaved changes"}
-        </p>
+        {dirty && <p className="small muted">Unsaved changes</p>}
       </div>
-      <p className="small muted measure">
-        Saving makes a new version. Unknown, Skipped and Prefer not to say are answers too.
-      </p>
+      <p className="small muted measure">Unknown, Skipped and Prefer not to say are answers too.</p>
 
       {stale?.kind === "rebased" && (
         <Alert
           ref={notice}
           tone="stale"
           announce
-          title={`Version ${stale.to} was saved while you were editing`}
+          title="Your answers changed while you were editing"
         >
           <p>
-            Your edits are kept below, now based on version {stale.to}.{" "}
+            Your edits are kept below, on top of the newer answers.{" "}
             {stale.changed.length > 0
-              ? `Version ${stale.to} changed: ${stale.changed
+              ? `The newer answers changed: ${stale.changed
                   .map(
                     (name) =>
                       `${PROFILE_FIELDS[name].label} to ${describeField(stale.latest[name])}`,
                   )
                   .join("; ")}. ${
                   stale.conflicts.length > 0
-                    ? `Where you had changed an answer too, your answer is kept and version ${stale.to}'s is shown beside it. `
+                    ? "Where you had changed an answer too, your answer is kept and the newer one is shown beside it. "
                     : ""
                 }Check them, then save again.`
-              : "It changed nothing you are editing. Save again to keep your changes."}
+              : "They changed nothing you are editing. Save again to keep your changes."}
           </p>
         </Alert>
       )}
@@ -192,11 +190,11 @@ export function ProfileEditor({
             ref={notice}
             tone="stale"
             announce
-            title="A newer version was saved, and it couldn't be loaded"
+            title="Your answers changed elsewhere, and the newer ones couldn't be loaded"
           >
             <p>
               Your edits are kept below. Save again in a moment: Careerwright loads the newer
-              version first.
+              answers first.
             </p>
           </Alert>
           <RequestFailure error={stale.error} announce={false} />
@@ -204,7 +202,7 @@ export function ProfileEditor({
       )}
       {failure && <RequestFailure error={save.error} />}
       <p role="status" className="small">
-        {saved !== null && `Saved as version ${saved}.`}
+        {saved && "Saved."}
       </p>
 
       <div className="card grid gap-0 py-8">
@@ -262,7 +260,7 @@ export function ProfileEditor({
                 <p id={conflictId} className="status" data-tone="stale">
                   <Glyph name="stale" />
                   <span>
-                    Version {stale.to} has {describeField(stale.latest[name])} here. Saving keeps
+                    The newer answers have {describeField(stale.latest[name])} here. Saving keeps
                     your answer instead.
                   </span>
                 </p>

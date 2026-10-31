@@ -16,7 +16,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { asBrowser, emulatorToken, saveElsewhere } from "./api";
+import { asBrowser, emulatorToken, saveElsewhere, talkedWorkspace } from "./api";
 import { type AxeViolation, axe, chapterUrl, liveUpdates, saved, signIn, youView } from "./helpers";
 import { FIXTURE_WORKSPACE, stack } from "./stack";
 
@@ -74,65 +74,13 @@ async function staleSave(page: Page, workspace: string) {
   // A new value each time, so every call makes a newer version (the same answer would not).
   staleSaves += 1;
   const elsewhere = `Saved in another tab (${staleSaves})`;
-  const made = await saveElsewhere(workspace, "ada", "current_role", elsewhere);
+  await saveElsewhere(workspace, "ada", "current_role", elsewhere);
   await page.getByRole("button", { name: "Save changes" }).click();
-  const notice = page.getByText(`Version ${made} was saved while you were editing`);
+  const notice = page.getByText("Your answers changed while you were editing");
   await expect(notice).toBeVisible();
-  const inline = page.getByText(`Version ${made} has ${elsewhere} here.`);
+  const inline = page.getByText(`The newer answers have ${elsewhere} here.`);
   await expect(inline).toBeVisible();
   return { notice, inline };
-}
-
-/** Answers, a reply to review and a completed discovery, through the API (demo mode). */
-async function talkedWorkspace(token: string): Promise<string> {
-  const { workspace_id: id } = await asBrowser<{ workspace_id: string }>(
-    "POST",
-    "/v1/workspaces",
-    token,
-    { name: "Conversation (synthetic)", data_mode: "demo", synthetic: true },
-  );
-  const base = `/v1/workspaces/${id}`;
-  const blank = await asBrowser<{ document: Record<string, unknown> }>(
-    "GET",
-    `${base}/profile`,
-    token,
-  );
-  const profile: Record<string, unknown> = Object.fromEntries(
-    Object.keys(blank.document)
-      .filter((field) => field !== "schema_version")
-      .map((field) => [field, { state: "unasked" }]),
-  );
-  profile.current_role = { state: "provided", value: "warehouse supervisor" };
-  profile.enjoyed_tasks = { state: "provided", value: ["fixing bikes", "working outdoors"] };
-  profile.cities = { state: "provided", value: ["Leeds"] };
-  await asBrowser("PUT", `${base}/profile`, token, { expected_version: 0, profile });
-  await asBrowser("PUT", `${base}/interview/preferences`, token, {
-    expected_version: 0,
-    entry_mode: "unsure",
-    conversation_mode: null,
-    paused: false,
-  });
-  const turn = await asBrowser<{ turn_id: string }>("POST", `${base}/interview/turns`, token, {
-    expected_profile_version: 1,
-    message: "Synthetic: I could do 5 hours a week, and spend up to £600.",
-  });
-  const found = await asBrowser<{ discovery_id: string }>("POST", `${base}/discoveries`, token, {
-    expected_profile_version: 1,
-  });
-  for (const path of [
-    `${base}/interview/turns/${turn.turn_id}`,
-    `${base}/discoveries/${found.discovery_id}`,
-  ]) {
-    await expect
-      .poll(
-        async () => (await asBrowser<{ run: { status: string } }>("GET", path, token)).run.status,
-        {
-          timeout: 60_000,
-        },
-      )
-      .toBe("complete");
-  }
-  return id;
 }
 
 /** Opens the phone and tablet sheet to its full height; on a wide screen it is a column. */

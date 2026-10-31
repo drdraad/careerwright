@@ -9,15 +9,22 @@
 // a bright colour"); accept and undo are colour coded ("could be easier with colour coded
 // buttons"); the limits say what they mean ("what do these mean??").
 //
-// The conversation's one filled primary action: connecting a key when none is stored, else Try
-// again after a failed reply, else saving the review tray when it has proposals, else Send.
-// What we know has one while its answer form is open (Save changes), and the suggestions while
-// asking for them or choosing one (`Directions`).
+// The conversation's one filled primary action: connecting a key when none is stored, else
+// Resume while the interview is paused, else Try again after a failed reply, else saving the
+// review tray when it has proposals, else Send. What we know has one while its answer form is
+// open (Save changes), and the suggestions while asking for them or choosing one
+// (`Directions`).
+//
+// The three views stay mounted, the inactive ones hidden, so moving between them never loses
+// what the person typed or chose: a reply, the tray's choices, the answer form's edits, the
+// slate's view controls (Task W2C fix round 1).
 //
 // Screen readers hear what changed (UI-06): each new checked reply, a save and an undo, in one
 // live region that stays mounted; after a decision or an undo, focus moves to the notice that
-// says what it did. Moving between views keeps focus on the view's tab.
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+// says what it did, in the view the person is in. "Add the details yourself" opens the answer
+// form in What we know and moves focus to its heading. Moving between views keeps focus on the
+// view's tab.
+import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { ProfileOut, WorkspaceOut } from "@/generated/api";
 import { reviewable, turnFailed, turnRunning } from "@/lib/conversation";
 import {
@@ -88,8 +95,7 @@ function ViewTabs({ view, onChange }: { view: YouView; onChange(next: YouView): 
           role="tab"
           id={`you-tab-${id}`}
           aria-selected={view === id}
-          // Only the view shown is in the page, so only its tab points at it.
-          aria-controls={view === id ? `you-view-${id}` : undefined}
+          aria-controls={`you-view-${id}`}
           tabIndex={view === id ? 0 : -1}
           className="you-tab"
           onClick={() => onChange(id)}
@@ -124,8 +130,13 @@ export function YouChapter({
   // The last decision's outcome, with how many turns there were when it was made.
   const [outcome, setOutcome] = useState<{ value: SaveOutcome; turns: number } | null>(null);
   const [announcement, setAnnouncement] = useState("");
-  const [focusNotice, setFocusNotice] = useState(false);
-  const notice = useRef<HTMLHeadingElement>(null);
+  // Where focus goes once it is in the page: the notice in the view the person is in, or the
+  // answer form's heading.
+  const [focusTo, setFocusTo] = useState<"notice" | "form" | null>(null);
+  // Both views that show the save notice have their own copy, each with its own heading.
+  const conversationNotice = useRef<HTMLHeadingElement>(null);
+  const knownNotice = useRef<HTMLHeadingElement>(null);
+  const formTitle = useRef<HTMLHeadingElement>(null);
 
   // A repeated announcement still changes the region's text, so it is read again.
   const announce = (text: string) =>
@@ -133,14 +144,19 @@ export function YouChapter({
   const decided = (next: SaveOutcome) => {
     setOutcome({ value: next, turns: turns.data?.length ?? 0 });
     announce(ANNOUNCED[next.kind]);
-    setFocusNotice(true);
+    setFocusTo("notice");
   };
 
-  // The notice mounts with the outcome; focus moves to it once it is there.
+  // The notice mounts with the outcome, the form when it opens; focus moves once it is there.
   useEffect(() => {
-    if (focusNotice && notice.current !== null) {
-      notice.current.focus();
-      setFocusNotice(false);
+    if (focusTo === null) return;
+    const target =
+      focusTo === "form"
+        ? formTitle.current
+        : (view === "known" ? knownNotice : conversationNotice).current;
+    if (target !== null) {
+      target.focus();
+      setFocusTo(null);
     }
   });
 
@@ -194,16 +210,19 @@ export function YouChapter({
           : undefined));
   const primary = !keyStored
     ? "key"
-    : latestFailed
-      ? "retry"
-      : pending !== null && !pending.stale
-        ? "review"
-        : "send";
+    : preferences.data.paused
+      ? "resume"
+      : latestFailed
+        ? "retry"
+        : pending !== null && !pending.stale
+          ? "review"
+          : "send";
   const current = preferences.data;
   const sure = current.entry_mode === "sure";
   const edit = () => {
     setView("known");
     setEditing(true);
+    setFocusTo("form");
   };
 
   // A save stays undoable until something newer is saved; "nothing saved" and "undone" are
@@ -212,14 +231,26 @@ export function YouChapter({
     outcome !== null && (outcome.value.kind === "saved" || outcome.turns === turns.data.length)
       ? outcome.value
       : null;
-  const saveNotice = (
+  const saveNotice = (headingRef: typeof conversationNotice) => (
     <SaveNotice
       workspaceId={id}
       profile={profile}
       outcome={shownOutcome}
-      headingRef={notice}
+      headingRef={headingRef}
       onUndone={(restored) => decided({ kind: "undone", version: restored.version })}
     />
+  );
+  // Every view stays mounted; only the one shown is visible.
+  const panel = (of: YouView, body: ReactNode) => (
+    <div
+      className="you-view"
+      role="tabpanel"
+      id={`you-view-${of}`}
+      aria-labelledby={`you-tab-${of}`}
+      hidden={view !== of}
+    >
+      {body}
+    </div>
   );
   const tray = pending !== null && (
     <ReviewTray
@@ -250,101 +281,104 @@ export function YouChapter({
         {announcement}
       </p>
       <ViewTabs view={view} onChange={setView} />
-      <div
-        className="you-view"
-        role="tabpanel"
-        id={`you-view-${view}`}
-        aria-labelledby={`you-tab-${view}`}
-      >
-        {view === "conversation" && (
-          <>
-            {!demo && !keyStored && (
-              <KeySetup
-                workspace={workspace}
-                credentials={credentials.data ?? []}
-                primary={primary === "key"}
-              />
-            )}
-            <Conversation
+      {panel(
+        "conversation",
+        <>
+          {!demo && !keyStored && (
+            <KeySetup
               workspace={workspace}
-              profile={profile}
-              preferences={current}
-              turns={turns.data}
-              sender={sender}
-              sendBlocked={sendBlocked}
-              primary={primary}
-              announce={announce}
-              onEditAnswers={edit}
-              review={
-                <>
-                  {saveNotice}
-                  {tray}
-                </>
-              }
-              after={
-                !demo &&
-                keyStored && (
-                  <KeySetup
-                    workspace={workspace}
-                    credentials={credentials.data ?? []}
-                    primary={false}
-                  />
-                )
-              }
+              credentials={credentials.data ?? []}
+              primary={primary === "key"}
             />
-          </>
-        )}
-        {view === "known" && (
-          <section className="known" aria-labelledby="known-title">
-            <h2 id="known-title" className="display text-25">
-              What we know
-            </h2>
-            {saveNotice}
-            <WhatWeKnow
+          )}
+          <Conversation
+            workspace={workspace}
+            profile={profile}
+            preferences={current}
+            turns={turns.data}
+            sender={sender}
+            sendBlocked={sendBlocked}
+            primary={primary}
+            announce={announce}
+            onEditAnswers={edit}
+            review={
+              <>
+                {saveNotice(conversationNotice)}
+                {tray}
+              </>
+            }
+            after={
+              !demo &&
+              keyStored && (
+                <KeySetup
+                  workspace={workspace}
+                  credentials={credentials.data ?? []}
+                  primary={false}
+                />
+              )
+            }
+          />
+        </>,
+      )}
+      {panel(
+        "known",
+        <section className="known" aria-labelledby="known-title">
+          <h2 id="known-title" className="display text-25">
+            What we know
+          </h2>
+          {saveNotice(knownNotice)}
+          <WhatWeKnow
+            profile={profile}
+            editing={editing}
+            onEdit={() => setEditing((open) => !open)}
+          />
+          {editing && (
+            <div id="edit-answers">
+              <ProfileEditor key={id} workspaceId={id} profile={profile} headingRef={formTitle} />
+            </div>
+          )}
+          {/* A second idea (a route sketch for the target), so one step away (D-M6). */}
+          <details className="details">
+            <summary>The early sketch for your target</summary>
+            <div className="mt-12">
+              <SketchCard workspaceId={id} profile={profile} />
+            </div>
+          </details>
+        </section>,
+      )}
+      {panel(
+        "suggestions",
+        <div className="directions">
+          {sure ? (
+            <p className="small">
+              You know your direction, so suggestions are optional.{" "}
+              <Button
+                variant="quiet"
+                onClick={() =>
+                  setPreferences.mutate({
+                    expected_version: current.version,
+                    entry_mode: "unsure",
+                    conversation_mode: current.conversation_mode,
+                    paused: current.paused,
+                  })
+                }
+                disabledReason={setPreferences.isPending ? "Saving…" : undefined}
+              >
+                Help me explore instead
+              </Button>
+            </p>
+          ) : (
+            <Directions
+              workspaceId={id}
               profile={profile}
-              editing={editing}
-              onEdit={() => setEditing((open) => !open)}
+              discovery={discovery.data}
+              unavailable={unavailable}
+              shown={view === "suggestions"}
             />
-            {editing && (
-              <div id="edit-answers">
-                <ProfileEditor key={id} workspaceId={id} profile={profile} />
-              </div>
-            )}
-            <SketchCard workspaceId={id} profile={profile} />
-          </section>
-        )}
-        {view === "suggestions" && (
-          <div className="directions">
-            {sure ? (
-              <p className="small">
-                You know your direction, so suggestions are optional.{" "}
-                <Button
-                  variant="quiet"
-                  onClick={() =>
-                    setPreferences.mutate({
-                      expected_version: current.version,
-                      entry_mode: "unsure",
-                      conversation_mode: current.conversation_mode,
-                      paused: current.paused,
-                    })
-                  }
-                  disabledReason={setPreferences.isPending ? "Saving…" : undefined}
-                >
-                  Help me explore instead
-                </Button>
-              </p>
-            ) : (
-              <Directions
-                workspaceId={id}
-                profile={profile}
-                discovery={discovery.data}
-                unavailable={unavailable}
-              />
-            )}
-            {setPreferences.error !== null && <RequestFailure error={setPreferences.error} />}
-          </div>
-        )}
-      </div>
+          )}
+          {setPreferences.error !== null && <RequestFailure error={setPreferences.error} />}
+        </div>,
+      )}
     </>
   );
 }
