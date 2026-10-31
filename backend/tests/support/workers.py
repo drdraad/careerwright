@@ -56,14 +56,21 @@ class Worker:
 
 
 def start_worker(
-    infra: Infra, log_path: Path, *, acquisition_url: str | None = None, **settings: str
+    infra: Infra,
+    log_path: Path,
+    *,
+    acquisition_url: str | None = None,
+    production_model: str | None = None,
+    **settings: str,
 ) -> Worker:
-    """`acquisition_url`: a test-started acquisition worker for the DBOS worker to call."""
+    """`acquisition_url`: a test-started acquisition worker for the DBOS worker to call;
+    `production_model`: the configured production model, as `make session` sets it."""
     env = {
         **infra.worker_env(),
         "CAREERWRIGHT_WORKER_HEARTBEAT": str(log_path.with_suffix(".heartbeat")),
         "PYDANTIC_AI_NO_BANNER": "1",
         **({"CAREERWRIGHT_ACQUISITION_URL": acquisition_url} if acquisition_url else {}),
+        **({"CAREERWRIGHT_META_PRODUCTION_MODEL": production_model} if production_model else {}),
         **{f"CAREERWRIGHT_TEST_{name.upper()}": value for name, value in settings.items()},
     }
     log = log_path.open("ab")

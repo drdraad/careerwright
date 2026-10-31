@@ -27,6 +27,7 @@ import { SupportShown, useWorldSettings } from "@/lib/world/settings";
 import { ChapterMenu, ChapterRail } from "./ChapterNav";
 import { ConversationTone } from "./ConversationTone";
 import { EvidenceDrawer, useEvidence } from "./EvidenceDrawer";
+import { ModelSpending } from "./ModelSpending";
 import { NotInvited, PageFrame, PageLoading, RequestFailure } from "./PageState";
 import { SyntheticLabel } from "./Status";
 import { WorkspaceStrip } from "./WorkspaceStrip";
@@ -212,13 +213,18 @@ export function WorkspaceShell({
             status={supportShown && <StillWhileSupport />}
             settings={
               // Calm mode is this viewer's, and below a desktop's width the world's controls
-              // join it; the tone, under its own heading, is this workspace's.
+              // join it; the tone and the model spending, under the preferences heading, are
+              // this workspace's.
               <>
                 <div className="menu-world">
                   <WorldControls settings={world} />
                 </div>
                 <CalmMode settings={world} />
                 <ConversationTone workspaceId={workspaceId} />
+                <ModelSpending
+                  workspaceId={workspaceId}
+                  demo={workspace.data.data_mode === "demo"}
+                />
               </>
             }
             onSignOut={() => void auth.signOut()}

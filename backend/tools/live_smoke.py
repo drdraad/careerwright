@@ -335,15 +335,19 @@ def authorise(
     return model_id, worst_case
 
 
-class SmokeTarget(Protocol):
-    """A running Careerwright the smoke drives: the isolated Compose stack (`StackTarget`), or in
-    tests the integration stack with a fake-model worker."""
+class ApiTarget(Protocol):
+    """Where `Api` sends its requests: the API, and the web origin a write carries."""
 
     @property
     def http(self) -> httpx2.Client: ...  # base URL: the API
 
     @property
     def web_origin(self) -> str: ...
+
+
+class SmokeTarget(ApiTarget, Protocol):
+    """A running Careerwright the smoke drives: the isolated Compose stack (`StackTarget`), or in
+    tests the integration stack with a fake-model worker."""
 
     def sign_in(self) -> str: ...
 
@@ -355,7 +359,7 @@ class SmokeTarget(Protocol):
 
 
 class Api:
-    def __init__(self, target: SmokeTarget, token: str) -> None:
+    def __init__(self, target: ApiTarget, token: str) -> None:
         self._target = target
         self._token = token
         self.responses: list[tuple[str, str]] = []

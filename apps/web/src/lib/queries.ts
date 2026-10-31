@@ -21,11 +21,13 @@ import {
   type Emphasis,
   EventKind,
   type ExplanationRunOut,
+  estimateRun,
   getMe,
   getPreferences,
   getProfile,
   getSketch,
   getSlate,
+  getSpend,
   getTurnReply,
   getWorkspace,
   listCredentials,
@@ -40,14 +42,18 @@ import {
   type ProfileOut,
   putPreferences,
   putProfile,
+  putSpendLimits,
   type RevertProfile,
+  type RunKind,
   revertProfile,
   revokeCredential,
   rotateCredential,
   type SetPreferences,
+  type SetSpendLimits,
   type SketchOut,
   type SlateOut,
   type SourceOut,
+  type SpendOut,
   type StoreKeyWritable,
   type SubmitDiscovery,
   type SubmitExplanation,
@@ -87,6 +93,8 @@ export const keys = {
   sketch: (id: string) => ["ws", id, "sketch"] as const,
   targets: (id: string) => ["ws", id, "targets"] as const,
   credentials: (id: string) => ["ws", id, "credentials"] as const,
+  spend: (id: string) => ["ws", id, "spend"] as const,
+  estimate: (id: string, kind: RunKind) => ["ws", id, "spend", "estimate", kind] as const,
 };
 
 /** The slate's view controls: never stored, never limits (ADR 0007 decision 5). */
@@ -279,6 +287,42 @@ export function useSetPreferences(id: string) {
         })
       ).data as PreferencesOut,
   );
+}
+
+/** This workspace's model spending this month and its limits (MODEL-10). */
+export function useSpend(id: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.spend(id),
+    queryFn: async () => (await getSpend({ path: path(id), throwOnError: true })).data,
+    retry: retryable,
+    enabled,
+  });
+}
+
+export function useSetSpendLimits(id: string) {
+  return useCommand(
+    id,
+    async (body: SetSpendLimits, key: string) =>
+      (
+        await putSpendLimits({
+          path: path(id),
+          body,
+          headers: { "Idempotency-Key": key },
+          throwOnError: true,
+        })
+      ).data as SpendOut,
+  );
+}
+
+/** What one run of `kind` may cost, before the person starts it (spec section 16). */
+export function useRunEstimate(id: string, kind: RunKind, enabled = true) {
+  return useQuery({
+    queryKey: keys.estimate(id, kind),
+    queryFn: async () =>
+      (await estimateRun({ path: path(id), query: { kind }, throwOnError: true })).data,
+    retry: retryable,
+    enabled,
+  });
 }
 
 /** Every turn, oldest first (a conversation is never silently truncated). */

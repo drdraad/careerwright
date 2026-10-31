@@ -92,6 +92,10 @@ services:
       CAREERWRIGHT_MASTER_KEY_DIR: /run/careerwright/keys
       # Whether setup placed Adzuna credentials (live-vacancy workspaces); never the values.
       CAREERWRIGHT_ADZUNA_CONFIGURED: ${CAREERWRIGHT_ADZUNA_CONFIGURED:-false}
+      # The limits a workspace gets when its key is stored: config.py's defaults, or the live
+      # session's caps (`make session`). A fast test keeps these defaults equal to config.py's.
+      CAREERWRIGHT_DEFAULT_RUN_SPEND_LIMIT_NANO_USD: ${CAREERWRIGHT_DEFAULT_RUN_SPEND_LIMIT_NANO_USD:-150000000}
+      CAREERWRIGHT_DEFAULT_PERIOD_SPEND_LIMIT_NANO_USD: ${CAREERWRIGHT_DEFAULT_PERIOD_SPEND_LIMIT_NANO_USD:-1000000000}
     secrets: [pg_api]
     volumes:
       - ${CAREERWRIGHT_HOME:?run make setup}/keys:/run/careerwright/keys:ro

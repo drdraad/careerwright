@@ -1437,6 +1437,74 @@
         }
       }
     },
+    "/v1/workspaces/{workspace_id}/spend/estimate": {
+      "get": {
+        "tags": [
+          "credentials",
+          "spend"
+        ],
+        "summary": "Estimate Run",
+        "description": "What one run of `kind` may spend on this workspace's key, before the person starts it.\nA kind no person starts has no estimate (`422`, reason `no_estimate_for_kind`).",
+        "operationId": "estimate_run",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RunKind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunEstimateOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/workspaces/{workspace_id}/spend/limits": {
       "put": {
         "tags": [
@@ -6841,6 +6909,14 @@
         ],
         "title": "BodyNotKept",
         "description": "Why a body its rights class may keep was not kept: personal details in it could not\nbe removed (`pages.redact_page`), so only its hash and excerpts are. Each applies to any\nscript, JSON-LD or not (fix round 3 corrects 0020's wording, re-review 3 A R3-1)."
+      },
+      "BudgetScope": {
+        "type": "string",
+        "enum": [
+          "run",
+          "period"
+        ],
+        "title": "BudgetScope"
       },
       "CandidateOption": {
         "properties": {
@@ -15562,6 +15638,54 @@
         ],
         "title": "RunCancelOut",
         "description": "A cancel's answer (DUR-05): the run as it stands, and the runs whose cancellation the\nrequest asked for (review C-1 N2)."
+      },
+      "RunEstimateOut": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/RunKind"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id",
+            "description": "The model this workspace's runs of this kind pin."
+          },
+          "model_mode": {
+            "$ref": "#/components/schemas/ModelMode"
+          },
+          "per_run_nano_usd": {
+            "type": "integer",
+            "title": "Per Run Nano Usd",
+            "description": "The most the run spends without a worker crash: every attempt it may make, each at its reservation's bounds, never past the run limit (0 for a fixture)."
+          },
+          "hard_maximum_nano_usd": {
+            "type": "integer",
+            "title": "Hard Maximum Nano Usd",
+            "description": "The most it can ever spend, a worker crash included: the workspace's per-run spend limit, past which a run never reserves (0 for a fixture)."
+          },
+          "refused_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetScope"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The spend limit that would refuse the run if it started now; null when it fits."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "model_id",
+          "model_mode",
+          "per_run_nano_usd",
+          "hard_maximum_nano_usd",
+          "refused_scope"
+        ],
+        "title": "RunEstimateOut",
+        "description": "What one run of a kind may spend on the person's key, shown before it starts (spec\nsection 16; MODEL-08): two maxima in integer nano-USD, never an expected cost."
       },
       "RunKind": {
         "type": "string",

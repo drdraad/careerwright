@@ -19,8 +19,8 @@ from careerwright.identity.records import (
     Workspace,
     WorkspaceEvent,
 )
-from careerwright.identity.spend import SpendState
-from careerwright.identity.spend_limits import SpendSummary
+from careerwright.identity.spend import BudgetScope, SpendState
+from careerwright.identity.spend_limits import RunEstimate, SpendSummary
 from careerwright.identity.workspaces import WorkspaceName
 from careerwright.profile.commands import ProfileView
 from careerwright.profile.document import ProfileDocument, ProfileInput
@@ -250,6 +250,38 @@ class SpendOut(ResponseModel):
             period_start=summary.period_start,
             period_committed_nano_usd=summary.period_committed_nano_usd,
             unknown_cost_attempts=summary.unknown_cost_attempts,
+        )
+
+
+class RunEstimateOut(ResponseModel):
+    """What one run of a kind may spend on the person's key, shown before it starts (spec
+    section 16; MODEL-08): two maxima in integer nano-USD, never an expected cost."""
+
+    kind: RunKind
+    model_id: str = Field(description="The model this workspace's runs of this kind pin.")
+    model_mode: ModelMode
+    per_run_nano_usd: int = Field(
+        description="The most the run spends without a worker crash: every attempt it may "
+        "make, each at its reservation's bounds, never past the run limit (0 for a fixture)."
+    )
+    hard_maximum_nano_usd: int = Field(
+        description="The most it can ever spend, a worker crash included: the workspace's "
+        "per-run spend limit, past which a run never reserves (0 for a fixture)."
+    )
+    refused_scope: BudgetScope | None = Field(
+        description="The spend limit that would refuse the run if it started now; null when "
+        "it fits."
+    )
+
+    @classmethod
+    def of(cls, estimate: RunEstimate) -> "RunEstimateOut":
+        return cls(
+            kind=estimate.kind,
+            model_id=estimate.model.model_id,
+            model_mode=estimate.model.mode,
+            per_run_nano_usd=estimate.per_run_nano_usd,
+            hard_maximum_nano_usd=estimate.hard_maximum_nano_usd,
+            refused_scope=estimate.refused_scope,
         )
 
 

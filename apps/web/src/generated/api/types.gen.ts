@@ -907,6 +907,16 @@ export const BodyNotKept = {
 export type BodyNotKept = typeof BodyNotKept[keyof typeof BodyNotKept];
 
 /**
+ * BudgetScope
+ */
+export const BudgetScope = { RUN: 'run', PERIOD: 'period' } as const;
+
+/**
+ * BudgetScope
+ */
+export type BudgetScope = typeof BudgetScope[keyof typeof BudgetScope];
+
+/**
  * CandidateOption
  *
  * An option whose planned outcome maps to the gap's row: "expected to address", never a
@@ -6488,6 +6498,39 @@ export type RunCancelOut = {
 };
 
 /**
+ * RunEstimateOut
+ *
+ * What one run of a kind may spend on the person's key, shown before it starts (spec
+ * section 16; MODEL-08): two maxima in integer nano-USD, never an expected cost.
+ */
+export type RunEstimateOut = {
+    kind: RunKind;
+    /**
+     * Model Id
+     *
+     * The model this workspace's runs of this kind pin.
+     */
+    model_id: string;
+    model_mode: ModelMode;
+    /**
+     * Per Run Nano Usd
+     *
+     * The most the run spends without a worker crash: every attempt it may make, each at its reservation's bounds, never past the run limit (0 for a fixture).
+     */
+    per_run_nano_usd: number;
+    /**
+     * Hard Maximum Nano Usd
+     *
+     * The most it can ever spend, a worker crash included: the workspace's per-run spend limit, past which a run never reserves (0 for a fixture).
+     */
+    hard_maximum_nano_usd: number;
+    /**
+     * The spend limit that would refuse the run if it started now; null when it fits.
+     */
+    refused_scope: BudgetScope | null;
+};
+
+/**
  * RunKind
  */
 export const RunKind = {
@@ -10448,6 +10491,42 @@ export type GetSpendResponses = {
 };
 
 export type GetSpendResponse = GetSpendResponses[keyof GetSpendResponses];
+
+export type EstimateRunData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query: {
+        kind: RunKind;
+    };
+    url: '/v1/workspaces/{workspace_id}/spend/estimate';
+};
+
+export type EstimateRunErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type EstimateRunError = EstimateRunErrors[keyof EstimateRunErrors];
+
+export type EstimateRunResponses = {
+    /**
+     * Successful Response
+     */
+    200: RunEstimateOut;
+};
+
+export type EstimateRunResponse = EstimateRunResponses[keyof EstimateRunResponses];
 
 export type PutSpendLimitsData = {
     body: SetSpendLimits;

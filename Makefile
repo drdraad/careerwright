@@ -20,6 +20,12 @@
 #                           credentials read from .env in code, each request ledgered at $0
 #   make live-extract       one in-process page extraction of the synthetic fixture page on the
 #                           test model (scope live-extract: at most 3 requests, $0.30), ledgered
+#   make session            the product owner's live session: `make dev`'s stack with Muse Wonder
+#                           as the production model (synthetic workspaces keep the test model),
+#                           and the session's caps on each live workspace not marked synthetic
+#                           ($0.75 a run, $5 a session); nothing is stopped or reset
+#   make session-ledger     copy each model attempt the app made (counts, cost and state, never
+#                           content) into docs/evidence/live-usage.*, scope live-session-<date>
 #   make stop               stop every service, bounded; persisted work is kept
 #   make reset-demo         recreate the named fixture workspace only
 #   make rotate-master-key  add a master key version, reload it, reseal every sealed record
@@ -35,7 +41,7 @@ WEB := cd apps/web &&
 export NEXT_TELEMETRY_DISABLED := 1
 export STORYBOOK_DISABLE_TELEMETRY := 1
 
-.PHONY: setup dev demo check acceptance live-smoke live-eval live-adzuna live-extract stop reset-demo status rotate-master-key reseal spike-world
+.PHONY: setup dev demo check acceptance live-smoke live-eval live-adzuna live-extract session session-ledger stop reset-demo status rotate-master-key reseal spike-world
 
 setup:
 	$(BACKEND) uv python install 3.12 && uv sync --locked
@@ -73,6 +79,12 @@ live-adzuna:
 
 live-extract:
 	$(BACKEND) $(UV) python -m tools.live_smoke --extract
+
+session:
+	$(BACKEND) $(UV) python -m tools.session start
+
+session-ledger:
+	$(BACKEND) $(UV) python -m tools.session ledger
 
 stop:
 	$(BACKEND) $(UV) python -m tools.stack stop

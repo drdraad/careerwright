@@ -5,6 +5,7 @@
 import type { GlyphName } from "@/components/Glyph";
 import type {
   AiResilienceFilterOut,
+  BudgetScope,
   ConversationMode,
   DataMode,
   Direction,
@@ -35,9 +36,53 @@ import type {
 } from "@/generated/api";
 import { listLimit } from "./bounds";
 import { formatMoney } from "./money";
+import type { UsdInputProblem } from "./usd";
 
 /** Only error and stale add a hue; everything else is carried by glyph and words. */
 export type Tone = "neutral" | "unknown" | "stale" | "error";
+
+/** Where a reached spending limit can be raised: the spending line (`ModelSpending`). */
+export const RAISE_THE_LIMIT =
+  "You can raise the limit under Model spending, in the Account and settings menu.";
+
+/** The spending line in the account menu (MODEL-10). Amounts are in US dollars, as Meta bills. */
+export const SPENDING = {
+  heading: "Model spending",
+  spent: (spent: string, limit: string) => `${spent} of ${limit} spent this month`,
+  perRun: (limit: string) => `Each run can use up to ${limit}.`,
+  unknown: (calls: number) =>
+    calls === 1
+      ? "Meta didn't report the cost of 1 call, so Careerwright counts it at its most."
+      : `Meta didn't report the cost of ${calls} calls, so Careerwright counts each at its most.`,
+  demo: "This demo workspace never calls a model, so it spends nothing.",
+  dollars: "Meta bills in US dollars.",
+  change: "Change",
+  monthLabel: "Monthly limit, in US dollars",
+  runLabel: "Most for one run, in US dollars",
+  save: "Save limits",
+  cancel: "Cancel",
+  saved: "Saved.",
+} as const;
+
+/** Why a typed dollar amount can't be used (`parseUsdInput`). */
+export const USD_INPUT_PROBLEM: Record<UsdInputProblem, string> = {
+  empty: "Enter an amount.",
+  negative: "Enter an amount of zero or more.",
+  not_a_number: "Enter an amount in dollars, such as 5 or 0.75.",
+  too_precise: "Use at most two digits after the point.",
+  too_large: "Enter a smaller amount.",
+};
+
+/** What a run may cost before the person starts it (`RunEstimate`; spec section 16). */
+export const RUN_ESTIMATE = {
+  costs: (most: string) => `This can cost up to ${most} on your Meta key.`,
+  restart: (hard: string) => `If it has to restart, never more than ${hard}.`,
+  free: "This uses the demo's stand-in, so it costs nothing.",
+  refused: {
+    run: `It needs more than this workspace's limit for one run. ${RAISE_THE_LIMIT}`,
+    period: `This month's spending limit doesn't leave room for it. ${RAISE_THE_LIMIT}`,
+  } satisfies Record<BudgetScope, string>,
+} as const;
 
 export type StatePresentation = { label: string; glyph: GlyphName; tone: Tone };
 
@@ -318,10 +363,10 @@ export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string
     title: "That model isn't allowed for this workspace's data",
     action: "Nothing was sent. Check the workspace's data label.",
   },
-  // F10: names no control the app doesn't have yet (Task 3b adds the spending line).
+  // F10: points to the spending line (Task 3b).
   budget_exceeded: {
     title: "The spending limit for model calls is reached",
-    action: "Careerwright stopped before spending more. Your work is kept.",
+    action: `Careerwright stopped before spending more. Your work is kept. ${RAISE_THE_LIMIT}`,
   },
   provider_authentication: {
     title: "Meta didn't accept the key",
@@ -879,7 +924,7 @@ const ERROR_WORDS: Record<ErrorCode, Omit<ErrorStatement, "tone">> = {
   },
   BUDGET_EXCEEDED: {
     title: "The spending limit for model calls is reached",
-    action: "Careerwright stopped before spending more. Your work is kept.",
+    action: `Careerwright stopped before spending more. Your work is kept. ${RAISE_THE_LIMIT}`,
   },
   SOLVE_LIMIT_REACHED: {
     title: "The route search stopped at its limit",

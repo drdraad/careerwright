@@ -1281,6 +1281,15 @@ export const BodyNotKeptSchema = {
     description: 'Why a body its rights class may keep was not kept: personal details in it could not\nbe removed (`pages.redact_page`), so only its hash and excerpts are. Each applies to any\nscript, JSON-LD or not (fix round 3 corrects 0020\'s wording, re-review 3 A R3-1).'
 } as const;
 
+export const BudgetScopeSchema = {
+    type: 'string',
+    enum: [
+        'run',
+        'period'
+    ],
+    title: 'BudgetScope'
+} as const;
+
 export const CandidateOptionSchema = {
     properties: {
         outcome_id: {
@@ -10221,6 +10230,55 @@ export const RunCancelOutSchema = {
     ],
     title: 'RunCancelOut',
     description: 'A cancel\'s answer (DUR-05): the run as it stands, and the runs whose cancellation the\nrequest asked for (review C-1 N2).'
+} as const;
+
+export const RunEstimateOutSchema = {
+    properties: {
+        kind: {
+            $ref: '#/components/schemas/RunKind'
+        },
+        model_id: {
+            type: 'string',
+            title: 'Model Id',
+            description: 'The model this workspace\'s runs of this kind pin.'
+        },
+        model_mode: {
+            $ref: '#/components/schemas/ModelMode'
+        },
+        per_run_nano_usd: {
+            type: 'integer',
+            title: 'Per Run Nano Usd',
+            description: 'The most the run spends without a worker crash: every attempt it may make, each at its reservation\'s bounds, never past the run limit (0 for a fixture).'
+        },
+        hard_maximum_nano_usd: {
+            type: 'integer',
+            title: 'Hard Maximum Nano Usd',
+            description: 'The most it can ever spend, a worker crash included: the workspace\'s per-run spend limit, past which a run never reserves (0 for a fixture).'
+        },
+        refused_scope: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/BudgetScope'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'The spend limit that would refuse the run if it started now; null when it fits.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'model_id',
+        'model_mode',
+        'per_run_nano_usd',
+        'hard_maximum_nano_usd',
+        'refused_scope'
+    ],
+    title: 'RunEstimateOut',
+    description: 'What one run of a kind may spend on the person\'s key, shown before it starts (spec\nsection 16; MODEL-08): two maxima in integer nano-USD, never an expected cost.'
 } as const;
 
 export const RunKindSchema = {

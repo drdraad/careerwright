@@ -683,11 +683,12 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
 
     await card();
     expect(screen.getByText(/No request reached the model/)).toBeVisible();
-    // F10: the words name no control the app doesn't have yet.
+    // F10: the words point to the spending line, the control that raises the limit (Task 3b).
     expect(
-      screen.getByText("Careerwright stopped before spending more. Your work is kept."),
+      screen.getByText(
+        "Careerwright stopped before spending more. Your work is kept. You can raise the limit under Model spending, in the Account and settings menu.",
+      ),
     ).toBeVisible();
-    expect(screen.queryByText(/Raise the limit/)).toBeNull();
     expect(noteRequests(sent)).toHaveLength(0); // never automatic
     await user.click(screen.getByRole("button", { name: "Try again : the written note" }));
 
