@@ -391,3 +391,11 @@ its rules on protected gates, unknown and readiness (decisions 4, 5 and 7) are u
   (adult)" is P03's "Registered nurse"); the whole title as a concept comes first, and ESCO's
   labels are still matched by the whole title. Migration 0035 decides again each stored record
   this rule reaches.
+- **Amendment line, Task 6d slice B (2026-10-31): the closest occupation, or none** (ADR 0015,
+  amendment line). Decision 10's seed for a title the person keeps in their own words is the
+  ESCO occupation they chose as closest (its record's `occupation_choice`), or none after
+  "None of these is my job" (`none_of_these`: no ESCO rows; a pack target found by its title
+  keeps its own rows). A qualifier naming another nursing field ("(mental health)",
+  "(children's)", "(learning disabilities)") never reaches P03's adult "Registered nurse" by
+  its title; a neutral qualifier still does. Migration 0036 decides again each stored record
+  the bracket rule had taken there.

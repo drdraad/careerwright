@@ -992,3 +992,15 @@ space; this ADR changes as follows.
   resolver; choosing an occupation for a target whose title is that occupation's own label
   ("bookkeeper" meant as the bookkeeper) is recorded as the choice (before: nothing changed,
   so the sketch kept asking).
+- **Amendment line, Task 6d slice B (2026-10-31): decisions 4 and 13 as amended are built**
+  (ADR 0015, amendment line). A title idea ESCO doesn't hold is a suggestion only where the
+  pinned UK job-title index lists it exactly, in its own list beside the slate, never in the
+  slate's pool; one no list holds is "not yet found" ("Titles Careerwright thought of but
+  hasn't found in ESCO or the UK job-title index yet, so not suggested: …"; before: "…
+  couldn't match to an occupation in ESCO, so not suggested: …"). A role the person chose a
+  closest occupation for joins work through that occupation, its words kept; one they said
+  "None of these is my job" for joins nothing, and the slate says so without asking them to
+  choose (`title_kept_as_own`: "Careerwright keeps “…” in your words and joins no other work
+  to it by shared skills, because you said none of the ESCO occupations it offered is your
+  job."). The slate's rules, ranking and thresholds are unchanged: every evaluation case
+  recorded before Task 6d gives the same slate (DSC-20, new, is compared on its own).

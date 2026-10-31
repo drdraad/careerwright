@@ -202,3 +202,54 @@ Decision 3's last sentence is built (`careerwright.profile.targets`, migration 0
 - **Coverage shown where a target is chosen:** one plain line from the record's coverage
   ("Careerwright can check skills, options and routes for this role" for a pack target),
   worded in the web; session W2 judges the words.
+
+## Amendment line, Task 6d slice B (2026-10-31): your title, recognised
+
+Decisions 1 to 3's first step is built (S2.8; `careerwright.catalogue.uk_titles`, migration
+0036). Words are worded in the web from facts (ruling R11); session W2 judges them.
+- **The first question** leads the You chapter's start: its type-ahead offers ESCO's titles
+  and the UK job-title index's (`GET /v1/taxonomy/titles`: every title holding each typed word
+  as a word beginning, one per title however many entries the index gives it, with every SOC
+  2020 unit group and ISCO-08 group ONS codes it to, none picked), marked "UK job title
+  (ONS)". A title ESCO itself offers (a preferred or alternative label, as a concept) is
+  offered as ESCO's only. Best first: what was typed, then a title beginning with it, then the
+  rest, ESCO first on ties. ESCO's closest titles ("Careerwright couldn't match that title in
+  ESCO. Is it one of these?") only when neither list holds every word, with "None of these is
+  my job", which keeps the person's own words. "Use my own words" is always the last option
+  and keeps the title exactly as typed (`POST .../origin/role/title`); nothing is refused, no
+  model is called, and it works without a key and in the demo. "Skip for now" goes on to how to
+  start, saving nothing. The answer lights the person's light at once; a browser test proves
+  it within ten seconds; on the full release the type-ahead took about 20 ms and the save and
+  the origin read together about 50 ms (`test_first_answer.py`, one run on this machine).
+- **"Which of these is closest?"** is asked for a role whose title the index lists and no ESCO
+  occupation holds as a label (the origin's `role.closest`; `POST .../origin/role/closest`):
+  the ESCO occupations in every ISCO-08 group ONS codes the title to, by group, none picked (a
+  group the held release has no occupation in says so). A choice becomes the role's ESCO
+  occupation with the person's words kept (the role cites it, as `choose_role` does); "None of
+  these is my job" leaves the role with no ESCO occupation, its words say what isn't known yet,
+  and nothing asks for another job. A title the index doesn't list has no groups, so its words
+  say what Careerwright did with it and what isn't known yet, with no closest question.
+- **The record** (decision 3) holds a title's words as `esco`, `ons` (a title the index lists
+  exactly, on its normalised title, with its SOC 2020 and ISCO-08 codes) or `own_words`; the
+  closest occupation the person chose (`occupation_choice`, citing its source) or
+  `none_of_these`. The role named at the first question is recorded in the same table, one
+  record per title as a concept, so a target with the same title reads the same record. The
+  record is the provisional concept this decision describes; the older `provisional_concepts`
+  table keeps its own API (DIV1-03). The CHECKs needed no change: a choice still cites its
+  source, an ONS title's codes are in its row, and "None of these is my job" names no
+  occupation and is recorded with who decided it and when. `resolve_target` refuses to decide
+  without the index (`REFERENCE_DATA_UNAVAILABLE`), never "not listed"; setup imports the
+  reference data before the seed. Migration 0036 makes each stored own-words record whose
+  title the index lists an ONS title with its codes.
+- **Title ideas** (decision 2): each carries what Careerwright did with it (`reason`:
+  `in_esco`, `in_uk_title_index`, `not_yet_found`, `not_searched`). One the index lists and
+  ESCO doesn't is a suggestion in its own list beside the slate ("Title ideas found in the UK
+  job-title index", with the answers it came from), never in the slate's pool; one no list
+  holds is named as not yet found and never suggested. The evaluation case DSC-20 checks it on
+  the full release. Making such an idea a target is not built in this slice (it can be named as
+  a target in What we know).
+- **Another nursing field.** A qualifier in brackets naming another field the Nursing and
+  Midwifery Council registers ("(mental health)", "(children's)", "(learning disabilities)")
+  never takes a title to the pack's "Registered nurse", whose evidence is adult nursing
+  (`careerwright.profile.targets.OTHER_FIELDS`); a neutral one ("(adult)") still does. 0036
+  decides again each stored record the bracket rule had taken there.
