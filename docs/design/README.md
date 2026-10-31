@@ -22,7 +22,7 @@ requires a human** (session W2, ruling R2).
 | `compositions/world.html` | One place in one state: `?place=you\|roles\|skills\|options\|routes\|plan&state=…` |
 | `compositions/world.js`, `world.css` | The still world in Horizon's geometry, and the exact layer over it |
 | `compositions/data.js` | Fixture values (checked) and invented listings (labelled synthetic) |
-| `screenshots/` | 43 PNGs (the six places at 1440×900, 768×1024 and 390×844, each honest state, three long targets at all three sizes, and the You console's review, saved, what-we-know and suggestions views at all three sizes) and `checks.md` |
+| `screenshots/` | 46 PNGs (the six places at 1440×900, 768×1024 and 390×844, each honest state, three long targets at all three sizes, the You console's review, saved, what-we-know and suggestions views at all three sizes, and Routes not built yet at all three sizes, as the app shows it until Routes is built) and `checks.md` |
 | `tools/` | `contrast.mjs`, `check-fixture-data.mjs`, `screenshots.mjs` |
 | `reference/luminous-path-forward.png` | The product owner's image: palette and mood |
 
@@ -46,7 +46,9 @@ view and named, no name, gate or key over a light's centre, every line from a na
 light (as drawn) clear of the other lights, gates and names and of the key, the key clear of
 the panels, shown whenever a light it explains is in view and only while something it explains
 is, the time and cost instrument's labels clear of each other and its marks, no words clipped
-in a panel (a text's box inside every box that clips it, up to its panel), the person's light
+in a panel (a text's box inside every box that clips it, up to its panel; a row that scrolls
+sideways, a phone's view controls, clips nothing for good: its words are reached by
+scrolling), the person's light
 named above the You console in every view at 768 and 390 px with the band above it never under
 MIN_BAND, and at most one action filled with a bright colour in view (by its computed fill: the
 primary's sea-glass or a decision colour). The lights, gates and trails come from the drawing

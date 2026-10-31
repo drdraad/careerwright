@@ -411,6 +411,17 @@ button {
   border: 2px solid var(--text-on-space-muted);
 }
 
+/* A chapter not built yet in the app says so under its name, before it is clicked (Task W2E,
+   the audit's F2). */
+.rail .later {
+  font-family: var(--font-body);
+  font-size: var(--type-12);
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--text-on-space-muted);
+  text-align: center;
+}
+
 .rail a[aria-current="page"] {
   color: var(--text-on-space);
   font-weight: 600;
@@ -1057,7 +1068,9 @@ button {
 
 /* ---------- Tablet and phone ---------- */
 
-@media (max-width: 1100px) {
+/* The work area stays on a tablet (Task W2E, F14: the person's facts come first); a phone's
+   strip has no room for it. */
+@media (max-width: 760px) {
   .strip .optional {
     display: none;
   }
@@ -1065,9 +1078,13 @@ button {
 
 /* Where the console leaves the world too narrow a span beside it (the rail's 96 px, the 32 px
    margin, the console's 600 px and MIN_CLEAR's 240 px: below 968 px), the person's light stands
-   in a band above the console in every view, never shorter than MIN_BAND (240 px), so the You
-   place never falls back to a backdrop behind it; a long console starts below the band and
-   scrolls with the page (design review I2, as the app does). */
+   in a band above the console in every view, never shorter than MIN_BAND, so the You place never
+   falls back to a backdrop behind it; a long console starts below the band and scrolls with the
+   page (design review I2, as the app does). The band takes no more room than what the world
+   shows (Task W2E, the audit's F7; plan section 4: on a phone the decision comes first): the
+   start, whose skills light up as the person picks them, keeps a tall band; a view with a
+   decision waiting (a reply to review, a save, what we know, the suggestions) shows the person
+   and the target in a slim band, MIN_BAND and a margin, as the app does. */
 @media (max-width: 967px) {
   .work:has(> .console) {
     /* At least MIN_BAND and a margin; on a taller screen, room for the light's arc at full size
@@ -1075,8 +1092,20 @@ button {
     padding-top: max(300px, 34vh);
   }
 
+  .work:has(> .console[data-band="slim"]) {
+    padding-top: 144px;
+  }
+
   .console {
     margin-top: auto;
+  }
+}
+
+/* Below a desktop's width the person's facts come first (Task W2E, the audit's F14): the
+   world's controls move into the account menu, beside calm mode (menus are not drawn here). */
+@media (max-width: 1179px) {
+  .strip .toggle:not(.account) {
+    display: none;
   }
 }
 
@@ -1187,6 +1216,25 @@ button {
 
   .question {
     font-size: var(--type-25);
+  }
+
+  /* The slate's view controls on one row, scrolled sideways, so its first choice is in the
+     first screen (Task W2E, F7: on a phone the decision comes first), as the app does. */
+  .segmented {
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .segmented .btn {
+    flex: none;
+  }
+
+  /* The console's headings and the open suggestion's title take less height on a phone, so a
+     long title still leaves its choice in the first screen (F7), as the app does. */
+  .console .sentence,
+  .suggestion h4 {
+    font-size: var(--type-20);
   }
 
   /* A phone names each light by its name alone; what its look means is in the key, and the

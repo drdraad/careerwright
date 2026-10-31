@@ -81,7 +81,10 @@
     }
   }
   const MIN_CLEAR = 240;
-  const MIN_BAND = 240;
+  const MIN_BAND = 128; // the app's geometry.ts: room for the names above and below, and a little plain
+  // A You view with a decision waiting, below 968 px: the slim band (world.css), whose world
+  // shows the person and the target, no more (Task W2E, the audit's F7).
+  const slimBand = place === "you" && ["review", "saved", "known", "suggestions"].includes(state) && vp.w < 968;
   const ROOM_ABOVE = 56;
   const ROOM_BELOW = 48;
   /**
@@ -253,7 +256,7 @@
       world.legend.add(d.kind);
     }
 
-    if (place === "you") {
+    if (place === "you" && !slimBand) {
       SKILLS.forEach((s, i) => {
         const p = skillAt(i, SKILLS.length);
         const a = ORIGIN;
@@ -352,7 +355,9 @@
       }
     }
 
-    if (place === "routes") {
+    // Not built yet (as the app shows Routes in every workspace, Task W2E): no route is drawn,
+    // because none has been worked out.
+    if (place === "routes" && state !== "not-built") {
       // Whole journeys from the person to the destination: TRACE-01's five routes. Where each
       // runs is layout only; the instrument beside it carries time and cost exactly.
       const failed = state === "failed";
@@ -489,14 +494,14 @@
   // strip, or on a phone in the top bar, where it adds no row (the other copy is not displayed).
   const stillStatus = state === "distress" ? `<span class="status world-status" data-tone="neutral" role="status">${glyph("support")}<span>Still while support is shown</span></span>` : "";
   const controls = `
-    <button type="button" class="toggle" aria-pressed="false">${glyph("pause")}<span class="label">Pause motion</span><span class="switch" aria-hidden="true"></span></button>
+    <button type="button" class="toggle" aria-pressed="false">${glyph("pause")}<span class="label">Hold the world still</span><span class="switch" aria-hidden="true"></span></button>
     ${stillStatus}
     <button type="button" class="toggle" aria-pressed="false">${glyph("sound")}<span class="label">Sound</span><span class="switch" aria-hidden="true"></span></button>
     <button type="button" class="toggle account" aria-label="Account and settings">${glyph("menu")}</button>`;
   const rail = `
     <nav class="rail" aria-label="Chapters">
       <a class="wordmark" href="index.html"><svg viewBox="0 0 24 24" aria-hidden="true">${GLYPH.mark}</svg><span>Careerwright</span></a>
-      <ol>${PLACES.map((id) => `<li><a href="world.html?place=${id}" data-progress="${id === "you" ? "visited" : "todo"}"${id === place ? ' aria-current="page"' : ""}><span class="landmark" aria-hidden="true"></span>${LABEL[id]}${id === place ? "" : `<span class="sr-only">, ${id === "you" ? "visited" : "not started"}</span>`}</a></li>`).join("")}</ol>
+      <ol>${PLACES.map((id) => `<li><a href="world.html?place=${id}" data-progress="${id === "you" ? "visited" : "todo"}"${id === place ? ' aria-current="page"' : ""}><span class="landmark" aria-hidden="true"></span>${LABEL[id]}${id === "you" ? "" : `<span class="later"><span class="sr-only">,</span> not built yet</span>`}${id === place ? "" : `<span class="sr-only">, ${id === "you" ? "visited" : "not started"}</span>`}</a></li>`).join("")}</ol>
     </nav>`;
   // The person's targets, as the app's strip names them: P01's, and the two long invented ones.
   const targetTitles = [...F.p01.targetTitles, ...(state === "three-targets" ? LONG.map((d) => d.title) : [])];
@@ -610,7 +615,7 @@
           <p class="answer">Synthetic: I could do 5 hours a week, and spend up to £600.</p>
           <p class="reply">${glyph("mark")}<span>Demo interviewer (synthetic): I noted 2 things for you to review.</span></p>`;
       const atConsole = (body) => `
-        <section class="panel console" aria-labelledby="title">
+        <section class="panel console" aria-labelledby="title"${slimBand ? ' data-band="slim"' : ""}>
           <h1 id="title" class="title">You</h1>${tabs}
           <div class="view" role="tabpanel" id="view" aria-labelledby="tab-${view}">${body}</div>
         </section>`;
