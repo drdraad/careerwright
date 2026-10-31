@@ -111,8 +111,8 @@ measurements here.
 
 8. **What a result says.** Coverage is `complete` only when the declared tree is exhausted
    under these rules, else `budget_truncated` with the exact stop reason (state, wall time or
-   archive limit), the branches left unexplored and the narrowings that would help (fewer
-   concepts, one start, a shorter horizon). The outcome is one of:
+   archive limit), the branches left unexplored and the narrowings that could help (fewer
+   concepts, one start, a shorter horizon; which ones, decision 21). The outcome is one of:
    - `routes_found` (lead with "Best trade-offs found");
    - `none_found_before_limit` (a stopped run with nothing found: never "no route");
    - `unresolved` (complete, nothing proved feasible, and something unknown: a blocking input,
@@ -239,7 +239,8 @@ child process. The caps, their exact stop reasons, the separate rank stage, the 
 wording and the 50,000-point ranking benchmark stay. Requirements: OPT1-03 (as deferred),
 OPT1-04, OPT1-05 (run states), OPT1-06 (stored), OPT1-07 (API), OPT1-09 (as deferred),
 OPT1-10 (limited runs), OPT1-11, OPT1-12 (in flight), OPT1-15, LIMITS-01 to LIMITS-06,
-STATE-03, DUR-05, and API-02's `SOLVE_LIMIT_REACHED`.
+STATE-03, DUR-05, and API-02's `SOLVE_LIMIT_REACHED`. Task 13b's fix round 1 amended
+decisions 8, 14, 15, 19 and 20 and added 21 (the narrowings) and 22 (one solve at a time).
 
 12. **A route solve is a run kind with its own workflow.** `route_solve` calls no model and
     needs no key, so it is no `RunTask` on the model activity (whose every step is a model
@@ -266,8 +267,9 @@ STATE-03, DUR-05, and API-02's `SOLVE_LIMIT_REACHED`.
     or a catalogue beyond the M0 bounds (`MODEL_SCOPE_EXCEEDED`).
 14. **An idempotent solve identity.** `solve_id` hashes the monthly input's version, the
     limits, the rank stage's limit and the algorithm and pruning versions. The same solve
-    asked for while one is queued or running joins it (200, the same run); a replayed
-    Idempotency-Key returns its receipt.
+    asked for while one is queued or running joins it (200, the same run), unless the person
+    has asked to cancel that one: a cancel only records a request until the worker publishes
+    it, so the new request is a new run (202); a replayed Idempotency-Key returns its receipt.
 15. **Attempts, and a crash.** Each execution records an attempt
     (`route_solve_attempts`). An execution finds any attempt its predecessor left unfinished
     and marks it `interrupted`: never a truncated result. With no checkpoint (spec section 22)
@@ -275,6 +277,13 @@ STATE-03, DUR-05, and API-02's `SOLVE_LIMIT_REACHED`.
     then fails `unknown_failure`. The DBOS step is the one retry owner and retries only a store
     outage (a re-run re-solves; the solve is pure and costs nothing); DBOS recovers a crashed
     worker's workflow the same way. A run whose result was stored before a crash returns it.
+    However a run ends, the transaction that publishes its end also settles any attempt still
+    unfinished (`solve_runs.settle_attempts`, which the worker composes into the activity
+    runtime by kind, so identity imports nothing of planning): `cancelled` on a cancelled run
+    (its search stops at its next check, or its worker is gone), else `interrupted` (it never
+    finished: its store went away, its result could not be stored, or its worker stopped). So
+    no attempt reads as running once its run has ended, whichever of the workflow, the worker
+    loop's cancel or the reconciler publishes it.
 16. **The archive** stays in memory under the caps, as decision 5 has it, and is never
     evicted to fit memory. A stopped search keeps everything it met: a state-limited run's
     archive is exactly the complete run's archive up to where it stopped, in the order met,
@@ -302,11 +311,16 @@ STATE-03, DUR-05, and API-02's `SOLVE_LIMIT_REACHED`.
     generated oracle instance (all complete). Peeling was never quadratic either (one sort per
     layer); at 50,000 points both take hundredths of a second.
 19. **Cancellation.** The search takes a cancel check, read before each candidate and before
-    each rank pass. The worker reads the person's request at most every 0.2 s; a cancelled
-    search raises `SearchCancelledError`, the attempt ends `cancelled`, and nothing is stored:
-    a cancel is never a truncated result. The worker loop also cancels the DBOS workflow and
-    publishes the run `cancelled`, as for every run (DUR-05). This replaces the child
-    process's cancellation in L0 (LIMITS-06 as deferred).
+    each rank pass. A daemon thread reads the person's request every 0.2 s and sets an event;
+    the check reads only the event (`solve_runs.cancel_watch`), so the search never waits on
+    the store, and a slow store is never charged to the search's 30 seconds or the rank
+    stage's 5 (decision 1's "no SQL" holds for the whole search, its checks included). A
+    failed read is
+    never a cancel; the thread tries again at its next poll. A cancelled search raises
+    `SearchCancelledError`, the attempt ends `cancelled`, and nothing is stored: a cancel is
+    never a truncated result. The worker loop also cancels the DBOS workflow and publishes the
+    run `cancelled`, as for every run (DUR-05). This replaces the child process's cancellation
+    in L0 (LIMITS-06 as deferred).
 20. **What is stored, and served.** The ranked `SearchResult` is the run's sealed output; its
     facts go beside it once (`route_solve_results`), with CHECKs that repeat the search's rules:
     a stopped search names its limit and is never complete; only a complete one has exact
@@ -318,19 +332,50 @@ STATE-03, DUR-05, and API-02's `SOLVE_LIMIT_REACHED`.
     limit stopped (beside its stop reason, instance size and narrowings; truncation is the
     normal state) and `NO_ROUTE_IN_BOUNDED_MODEL` for a complete search that proves no route;
     otherwise null. "Best trade-offs found" is the web's words for `routes_found`. The Routes
-    chapter (Task 14) words them; pagination of a large archive is Task 14's too.
+    chapter (Task 14) words them; pagination of a large archive is Task 14's too. **No
+    sentence Careerwright composed is sealed or served** (R11, fix round 1): a finding's
+    `reason` (the gate, or why a value is unknown) is the checker's working note, read in
+    memory by the search's prerequisite rule and never serialized. A finding goes out as its
+    code, kind, month, variant, amount, limit and unit, and Task 14 words it from those.
+21. **What could help a stopped search** (OPT1-15; fix round 1). The narrowings are named
+    from the stop reason, among those the instance can still take (a dimension already at one
+    is never named):
+    - the state limit or the archive limit: fewer concepts, or one start. Both shrink the tree
+      of selected sets, which those limits count;
+    - the time limit: those two and a shorter horizon. A shorter horizon leaves the tree as it
+      is and only makes each check quicker (Task 13a measured about 13 s at 12 months against
+      26 s at 24), so it can help only a search the clock stopped.
+    They are codes, beside the instance size, which the Routes chapter words as what could
+    help, never as a promise that the narrowed search finishes.
+22. **One solve at a time** (fix round 1). **Ruling: a process-wide lock in the activity, not
+    a DBOS queue.** The search is CPU-bound pure Python on a wall clock, and DBOS runs each
+    workflow in its own thread of one interpreter, so two solves at once would each get about
+    half of it: a search that completes alone in 26 s (Task 13a's largest realistic one)
+    would stop at 30 s, truncated, with narrowings it did not need. An execution takes the
+    worker's one solve slot before it marks its run running or records an attempt, so its run
+    stays `queued` while it waits and its clocks start only when it runs; it polls the cancel
+    while it waits and leaves at once if the person cancels. Why a lock: it needs no DBOS
+    queue registered in DBOS's system database, no change to the outbox's dispatch or to any
+    workflow's step sequence (so the DBOS `application_version` stays `careerwright-l0-1`),
+    and L0 runs one worker process. Known limits: a second worker process would need a DBOS
+    queue with a concurrency of one; and at shutdown a solve still waiting its turn may start
+    once the running one ends, until Compose's stop period (15 s) ends the worker, after
+    which DBOS recovers both (decision 15).
 
 ### Consequences (Task 13b)
 
 - **The benchmark** (`uv run --locked python -m tools.rank_benchmark`, 2026-10-31, arm64
-  macOS, Python 3.12.12, best of three): at 50,000 points the efficient layering took 0.005 s
-  to 0.039 s and peeling 0.005 s to 0.068 s over the five shapes, always equal; the whole rank
-  stage on a 50,000-schedule archive (the synthetic `unbounded` instance, 20 concepts, one
-  start, 24 months, its search's clock held still so the archive cap stopped it, which took
-  42 s) took 988 ms, inside its 5-second limit (1,115 ms on a second run).
+  macOS, Python 3.12.12): at 50,000 points, each layering timed as the best of three runs,
+  the efficient layering took 0.005 s to 0.039 s and peeling 0.005 s to 0.068 s over the five
+  shapes, always equal; the whole rank stage on a 50,000-schedule archive (the synthetic
+  `unbounded` instance, 20 concepts, one start, 24 months, its search's clock held still so
+  the archive cap stopped it, which took 42 s), timed as one run, took 988 ms, inside its
+  5-second limit (1,115 ms on a second, separate run).
 - **For Task 14:** read a solve through `GET .../planning/solves/{run_id}`; word `code`,
-  `outcome`, `coverage`, `stop_reason`, the instance size and the narrowings; show the stage
-  while it runs; a failed or cancelled solve has no result. A result at the archive cap is
+  `outcome`, `coverage`, `stop_reason`, the instance size and the narrowings (as what could
+  help, decision 21), and each finding from its code and facts (decision 20); show the stage
+  while it runs; a solve waiting its turn is `queued` (decision 22); a failed or cancelled
+  solve has no result. A result at the archive cap is
   large: on the benchmark's instance, 86 MB of JSON (50,000 schedules, 50,000 families, 320
   equal points), read back in 2.4 s, so the chapter should page it (realistic L0 results,
   P01's limits included, hold about a thousand schedules or fewer). A chosen route's full
@@ -340,4 +385,8 @@ STATE-03, DUR-05, and API-02's `SOLVE_LIMIT_REACHED`.
 - **Known limits:** a search stopped by the clock may stop at a different place on another
   machine; a crash loop ends after three attempts as `unknown_failure`, since what killed the
   worker is not known; the rank stage's limit is checked between its passes, so it can run
-  over by at most one pass (under a second at the cap).
+  over by at most one pass (under a second at the cap); solves run one at a time per worker
+  process, and L0 runs one (decision 22). A finding's `reason` also carried a few
+  identifiers (the gate a prerequisite needs, which limit is unknown, a scheme's ID); the
+  served result no longer has them, so if the Routes chapter needs one it becomes a typed
+  field of its own.

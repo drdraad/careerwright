@@ -125,8 +125,10 @@ after it change documents only):
   objective, direct and economic cost, verdict, qualifications and conditions from the very
   `check_route` call that judged it, and its layer from the rank stage over the whole archive;
   the displayed explanation is Task 14's. The measured sizes are in ADR 0016's consequences,
-  and a stopped result names its narrowings (`fewer_concepts`, `one_start`,
-  `shorter_horizon`) and its instance size, which the API serves for Task 14.
+  and a stopped result names the narrowings that could help, chosen from its stop reason
+  (`fewer_concepts` or `one_start` for the state and archive limits, and `shorter_horizon`
+  too for the time limit; ADR 0016 decision 21), beside its instance size, which the API
+  serves for Task 14.
 - **Sprint 6b's card** (at two starts per concept the selection bound alone is 10,161,633
   sets; does a full-scale truncated run report itself as the expected case, with its size and
   narrowing, never as infeasible?): yes. A stopped run is `budget_truncated` with its stop
@@ -147,3 +149,5 @@ after it change documents only):
 - A chosen route's full ledgers need the same snapshot, which only the worker opens today.
 - A solve whose worker keeps crashing ends after three attempts as `unknown_failure`.
 - Wall-time-stopped results can stop at a different place on another machine (as specified).
+- Solves run one at a time per worker process (L0 runs one); a second worker process would
+  need a DBOS queue (ADR 0016 decision 22).
