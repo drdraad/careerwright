@@ -1,10 +1,12 @@
 # ADR 0016: The route search core: the declared tree, sound pruning, the archive, layers and families
 
-- Status: Accepted for Task 13a (Sprint 6a: S6.1, S6.2, S6.5, S6.6, S6.7).
+- Status: Accepted for Task 13a (Sprint 6a: S6.1, S6.2, S6.5, S6.6, S6.7), and amended for
+  Task 13b (Sprint 6b: S6.3, S6.4, S6.8, as the L0 deferrals size them; the amendment at the
+  end).
   - **Rulings (not R6; each costs little if wrong):** decisions 2 (one bridge role means one
     `work` action), 3 (the search reads the base scenario only), 7 (a payment plan is a
     schedule variant, not a family) and 10 (proposed records are searched and qualified, not
-    left out).
+    left out); Task 13b's are listed in its amendment.
 - Date: 2026-10-31
 - Requirements: OPT1-01, OPT1-02, OPT1-05 (coverage), OPT1-06 (the run's record, in memory),
   OPT1-07, OPT1-08, OPT1-09 (evaluation), OPT1-10 (complete runs), OPT1-12 (in part), OPT1-13,
@@ -228,3 +230,114 @@ Fix round 1 (review 12a):
   (existing repayments above the monthly payment cap) says `no_route_in_bounded_model`
   whatever is set aside or unstated; decision 8 is otherwise unchanged. The oracle's property
   test now checks the outcome both ways: the search's equals the oracle's.
+
+## Amendment, 2026-10-31 (Task 13b): the search as a run, bounded and ranked
+
+Sprint 6b, sized by the product owner's yes of 31 October 2026 (the specification's section
+22, "L0 deferrals"): L0 keeps no disk-backed archive, checkpoints or resume, and no separate
+child process. The caps, their exact stop reasons, the separate rank stage, the truncation
+wording and the 50,000-point ranking benchmark stay. Requirements: OPT1-03 (as deferred),
+OPT1-04, OPT1-05 (run states), OPT1-06 (stored), OPT1-07 (API), OPT1-09 (as deferred),
+OPT1-10 (limited runs), OPT1-11, OPT1-12 (in flight), OPT1-15, LIMITS-01 to LIMITS-06,
+STATE-03, DUR-05, and API-02's `SOLVE_LIMIT_REACHED`.
+
+12. **A route solve is a run kind with its own workflow.** `route_solve` calls no model and
+    needs no key, so it is no `RunTask` on the model activity (whose every step is a model
+    call's: its key, spend and attempt rows). Like an acquisition it is a keyless kind
+    (`KEYLESS_KINDS`): the same run record, outbox, status events, cancellation and
+    publication (`careerwright.identity.workflow.publish_outcome`), and one bounded activity
+    (`careerwright.planning.solve_runs`) run by one DBOS step in its own workflow
+    (`careerwright.planning.workflow`, composed in `careerwright.worker`). No second model-call
+    path exists. It needs no route out, so demo workspaces and the offline demo may run it
+    (`OUTBOUND_KINDS` names the keyless kinds that may not). The existing workflows' step
+    sequences are unchanged, so the DBOS `application_version` stays `careerwright-l0-1`.
+13. **The snapshot.** `POST /v1/workspaces/{id}/planning/solves` takes the planning inputs
+    version the person saw (a newer one is `STALE_INPUT_VERSION`), a target title, the
+    comparison's first month (this month or later) and its horizon (1 to 24 months), with an
+    Idempotency-Key through `run_idempotent`, under the workspace's lock. It compiles the
+    person's stored inputs, the profile's two caps, the target's options with the person's
+    answers in them and the target's readiness basis (the matrix, evidence and statements at
+    the capability version, with the person's outcome decisions) into one `MonthlyInput`, and
+    seals it, with every limit, into the run (`SolveSnapshot`). The run pins the profile
+    version it read. A later edit is a new version and never reaches a solve under way
+    (OPT1-12). What a solve cannot start from is refused with its code and never run: a stale
+    version, a target that is not the person's, a target with no options (**ruling**: never an
+    empty catalogue searched into "no route"), a past start, an input a solve needs (named),
+    or a catalogue beyond the M0 bounds (`MODEL_SCOPE_EXCEEDED`).
+14. **An idempotent solve identity.** `solve_id` hashes the monthly input's version, the
+    limits, the rank stage's limit and the algorithm and pruning versions. The same solve
+    asked for while one is queued or running joins it (200, the same run); a replayed
+    Idempotency-Key returns its receipt.
+15. **Attempts, and a crash.** Each execution records an attempt
+    (`route_solve_attempts`). An execution finds any attempt its predecessor left unfinished
+    and marks it `interrupted`: never a truncated result. With no checkpoint (spec section 22)
+    the solve starts again from the start under a new attempt ID; a run makes at most three,
+    then fails `unknown_failure`. The DBOS step is the one retry owner and retries only a store
+    outage (a re-run re-solves; the solve is pure and costs nothing); DBOS recovers a crashed
+    worker's workflow the same way. A run whose result was stored before a crash returns it.
+16. **The archive** stays in memory under the caps, as decision 5 has it, and is never
+    evicted to fit memory. A stopped search keeps everything it met: a state-limited run's
+    archive is exactly the complete run's archive up to where it stopped, in the order met,
+    and replays exactly (OPT1-10); a wall-time-limited one is not promised the same prefix.
+17. **Two stages, each with its own time** (S6.8; review 13a, M3). **Ruling: the rank stage
+    has its own named limit, not time inside the search's budget.** The search stage
+    (`search_archive`) keeps the 30 seconds, 1,000,000 states and 50,000 schedules exactly as
+    Task 13a measured them, read before each candidate on its own clock (`elapsed_ms`). The
+    rank stage (`rank_archive`) then layers the archive, and groups families and equal points,
+    on its own clock (`rank_ms`) under `RANK_SECONDS = 5`, read before each of its four passes;
+    the result records both. Reaching it raises `RankLimitReachedError`: the attempt ends
+    `rank_limit_reached`, the run fails `rank_limit_reached` (a new failure class), and no
+    result claims ranks it lacks. Why a limit of its own: the 30-second limit is the search's
+    as the specification states it and as Task 13a measured it; giving the ranking a slice of
+    it would stop the search earlier than measured. The bound is far from binding: the whole
+    rank stage on an archive the search filled to its 50,000 cap took 0.99 s
+    (`tools.rank_benchmark`, below). The attempt's `stage` says `ranking` once the search
+    stage has ended, so the stage is observable while it runs.
+18. **The efficient two-objective layering** (`layers.rank`): one sort by time then cost, and
+    one pass in which each layer keeps its tail (its cheapest point, taken last); a point's
+    layer is the first whose tail does not dominate it. That is one more than the deepest
+    layer of anything dominating it, which is what peeling gives; Sprint 6a's peeling stays as
+    the reference it is qualified against. It equals peeling on 400 generated point sets with
+    heavy ties (Hypothesis), on 50,000 points of five shapes, and on the archive of every
+    generated oracle instance (all complete). Peeling was never quadratic either (one sort per
+    layer); at 50,000 points both take hundredths of a second.
+19. **Cancellation.** The search takes a cancel check, read before each candidate and before
+    each rank pass. The worker reads the person's request at most every 0.2 s; a cancelled
+    search raises `SearchCancelledError`, the attempt ends `cancelled`, and nothing is stored:
+    a cancel is never a truncated result. The worker loop also cancels the DBOS workflow and
+    publishes the run `cancelled`, as for every run (DUR-05). This replaces the child
+    process's cancellation in L0 (LIMITS-06 as deferred).
+20. **What is stored, and served.** The ranked `SearchResult` is the run's sealed output; its
+    facts go beside it once (`route_solve_results`), with CHECKs that repeat the search's rules:
+    a stopped search names its limit and is never complete; only a complete one has exact
+    layers, proves no route or is unresolved; a stopped one with nothing found found none
+    before its limit; routes are found exactly when something was archived; the caps bound the
+    counts. `GET .../planning/solves/{run_id}` serves the solve, its stage while it runs, and
+    its result once complete. **Ruling (R11):** the result carries spec section 18's codes as
+    facts the web words, never as an error: `code` is `SOLVE_LIMIT_REACHED` for a search a
+    limit stopped (beside its stop reason, instance size and narrowings; truncation is the
+    normal state) and `NO_ROUTE_IN_BOUNDED_MODEL` for a complete search that proves no route;
+    otherwise null. "Best trade-offs found" is the web's words for `routes_found`. The Routes
+    chapter (Task 14) words them; pagination of a large archive is Task 14's too.
+
+### Consequences (Task 13b)
+
+- **The benchmark** (`uv run --locked python -m tools.rank_benchmark`, 2026-10-31, arm64
+  macOS, Python 3.12.12, best of three): at 50,000 points the efficient layering took 0.005 s
+  to 0.039 s and peeling 0.005 s to 0.068 s over the five shapes, always equal; the whole rank
+  stage on a 50,000-schedule archive (the synthetic `unbounded` instance, 20 concepts, one
+  start, 24 months, its search's clock held still so the archive cap stopped it, which took
+  42 s) took 988 ms, inside its 5-second limit (1,115 ms on a second run).
+- **For Task 14:** read a solve through `GET .../planning/solves/{run_id}`; word `code`,
+  `outcome`, `coverage`, `stop_reason`, the instance size and the narrowings; show the stage
+  while it runs; a failed or cancelled solve has no result. A result at the archive cap is
+  large: on the benchmark's instance, 86 MB of JSON (50,000 schedules, 50,000 families, 320
+  equal points), read back in 2.4 s, so the chapter should page it (realistic L0 results,
+  P01's limits included, hold about a thousand schedules or fewer). A chosen route's full
+  ledgers are
+  `check_route` on the same snapshot, which only the worker can open today (the API seals it,
+  never reads it).
+- **Known limits:** a search stopped by the clock may stop at a different place on another
+  machine; a crash loop ends after three attempts as `unknown_failure`, since what killed the
+  worker is not known; the rank stage's limit is checked between its passes, so it can run
+  over by at most one pass (under a second at the cap).
