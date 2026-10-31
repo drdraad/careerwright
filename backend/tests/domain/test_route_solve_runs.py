@@ -38,7 +38,7 @@ def eventually(check: Callable[[], bool]) -> bool:
     return False
 
 
-@pytest.mark.req("LIMITS-05", "DUR-05")
+@pytest.mark.req("OPT1-04", "LIMITS-02")
 def test_a_slow_store_is_never_charged_to_the_search_s_clock() -> None:
     answered = threading.Event()
 

@@ -558,7 +558,7 @@ def test_a_solve_that_finds_routes_stores_and_serves_them_with_their_schedules(
     assert no_reason_anywhere(result)
 
 
-@pytest.mark.req("LIMITS-05", "OPT1-05")
+@pytest.mark.req("OPT1-04", "LIMITS-02")
 def test_two_solves_asked_together_run_one_at_a_time_each_on_its_own_clock(
     person: Person, workers: Any
 ) -> None:
@@ -584,6 +584,29 @@ def test_two_solves_asked_together_run_one_at_a_time_each_on_its_own_clock(
     # Its clock started when it ran: its search took no longer than its own attempt.
     ran_ms = (later["finished_at"] - later["started_at"]).total_seconds() * 1000
     assert later_result["search_ms"] <= ran_ms
+
+
+@pytest.mark.req("DUR-05", "OPT1-05")
+def test_a_solve_cancelled_while_it_waits_its_turn_never_runs(person: Person, workers: Any) -> None:
+    runs = [
+        person.ask().json()["run"]["run_id"],
+        person.ask(horizon_months=23).json()["run"]["run_id"],
+    ]
+    worker = workers("slow", solve_check_delay_s=str(SHORT_CHECK_S))
+    wait_for(lambda: any(person.attempts(r) for r in runs), timeout_s=30, what="a search")
+    [running] = [r for r in runs if person.attempts(r)]
+    [waiting] = [r for r in runs if r != running]
+
+    assert person.cancel(waiting).status_code == 202
+    cancelled = person.wait_terminal(waiting, timeout_s=10)
+    other_then = person.run(running)["status"]
+    finished = person.wait_terminal(running)
+    worker.stop()
+
+    assert cancelled["status"] == "cancelled"
+    assert person.attempts(waiting) == []  # it never ran, and never will
+    assert other_then == "running"  # it ended while the other still searched
+    assert finished["status"] == "complete"
 
 
 @pytest.mark.req("DUR-05", "OPT1-03")
