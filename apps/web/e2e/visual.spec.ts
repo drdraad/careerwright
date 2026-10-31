@@ -171,6 +171,15 @@ const SUPPORT_NOTE = {
   ],
 };
 
+/** The same panel beside a save in What we know (`SUPPORT_NOTE_ENTRY`, support-policy-9). */
+const ENTRY_NOTE = {
+  ...SUPPORT_NOTE,
+  policy_version: "support-policy-9",
+  message:
+    "If anything you typed is about how you are feeling, support is available any time, " +
+    "from people trained to help. Your answers were saved as usual.",
+};
+
 /** The first suggestion's "Why this could suit you", once its written note reads `state`;
  *  a missing note is shown from the notice above the cards, which holds its action. */
 const slateNote =
@@ -319,6 +328,21 @@ const shots = (scratch: Scratch): Shot[] => [
     ready: typeAhead("Bookkeeping assistant", (page) =>
       page.getByText("Careerwright couldn't match that title in ESCO. Is it one of these?"),
     ),
+  },
+  {
+    // The support screen at the first question (fix round 2, design re-review R-I1 and R-M3):
+    // the calm panel above the title field, with the person's choice to keep the words. The
+    // words are this spec's own support input; nothing is saved.
+    name: "you--title-support",
+    as: "ada",
+    url: chapterUrl("you", scratch.empty),
+    ready: async (page) => {
+      await typeAhead(
+        "I volunteer on a suicide prevention helpline and want paid work like it.",
+        (p) => p.getByRole("button", { name: "Keep it as my job title" }),
+      )(page);
+      await expect(page.getByRole("region", { name: "Support is available" })).toBeVisible();
+    },
   },
   {
     // A made-up single word (synthetic) that no list holds.
@@ -526,6 +550,41 @@ const shots = (scratch: Scratch): Shot[] => [
         .getByRole("textbox", { name: "Reply to Careerwright" })
         .fill("I volunteer on a suicide prevention helpline and want paid work like it.");
       await page.getByRole("button", { name: "Send" }).click();
+      const note = page.getByRole("region", { name: "Support is available" });
+      await expect(note).toBeVisible();
+      await note.scrollIntoViewIfNeeded();
+    },
+  },
+  {
+    // A direct entry in What we know that the support screen answers is saved as usual, with
+    // the calm panel above Save changes (fix round 2, the product owner's decision of 31
+    // October 2026). The save is answered here with the profile as it stands, so the scratch
+    // workspace is left as it was.
+    name: "you--what-we-know-support",
+    as: "ada",
+    context: "entry-support",
+    url: chapterUrl("you", scratch.empty),
+    prepare: async (page) => {
+      // The profile as the page last read it answers the save: nothing is stored.
+      let current: object = {};
+      await page.route("**/profile", async (route) => {
+        if (route.request().method() === "PUT") {
+          return route.fulfill({ status: 200, json: { ...current, support_note: ENTRY_NOTE } });
+        }
+        const response = await route.fetch();
+        current = await response.json();
+        return route.fulfill({ response });
+      });
+    },
+    ready: async (page) => {
+      await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
+      await youView(page, "What we know");
+      await page.getByRole("button", { name: "Edit answers directly" }).click();
+      await page.getByLabel("How you answer target roles").selectOption("provided");
+      await page
+        .getByRole("textbox", { name: "Target role 1" })
+        .fill("I volunteer on a suicide prevention helpline and want paid work like it.");
+      await page.getByRole("button", { name: "Save changes" }).click();
       const note = page.getByRole("region", { name: "Support is available" });
       await expect(note).toBeVisible();
       await note.scrollIntoViewIfNeeded();
