@@ -2,7 +2,16 @@
 // edit the profile, inspect the fixture route, restart every service, reopen the same work.
 // Throughout, the browser talks only to the web origin and the local Auth emulator.
 import { expect, test } from "@playwright/test";
-import { chapterUrl, externalRequests, liveUpdates, recordRequests, signIn } from "./helpers";
+import {
+  chapterUrl,
+  externalRequests,
+  liveUpdates,
+  recordRequests,
+  saved,
+  savedVersion,
+  signIn,
+  youView,
+} from "./helpers";
 import { FIXTURE_WORKSPACE, stack } from "./stack";
 
 // Start from the fixture workspace exactly as seeded, so the journey can be repeated.
@@ -19,14 +28,14 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, inspect a fixture rout
   await signIn(page, "ada");
   await page.getByRole("link", { name: /P01 demo \(synthetic\)/ }).click();
   await expect(page).toHaveURL(chapterUrl("you"));
-  const saved = page.getByRole("banner").getByText(/^Saved, version \d+$/);
-  await expect(saved).toBeVisible();
-  const version = Number((await saved.textContent())?.replace(/\D/g, ""));
+  await expect(saved(page)).toHaveText("Answers saved");
+  const version = await savedVersion(page);
   await expect(page.getByRole("banner").getByText("Synthetic demo")).toBeVisible();
   await expect(liveUpdates(page, "Live")).toBeVisible();
 
   // Edit: a second work area and weekly study hours, saved as the next version. The form
-  // opens from "What we know"; the conversation leads the chapter.
+  // opens from "What we know", its own view; the conversation leads the chapter.
+  await youView(page, "What we know");
   await page.getByRole("button", { name: "Edit answers directly" }).click();
   await page.getByRole("button", { name: "Add another work area" }).click();
   await page.getByRole("textbox", { name: "Work area 2" }).fill("Leeds");
@@ -34,7 +43,7 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, inspect a fixture rout
   await page.getByLabel("Weekly study hours, hours a week").fill("6");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText(`Saved as version ${version + 1}.`)).toBeVisible();
-  await expect(page.getByRole("banner").getByText(`Saved, version ${version + 1}`)).toBeVisible();
+  await expect(saved(page, version + 1)).toBeVisible();
   await expect(page.getByRole("banner").getByText("Manchester, Leeds")).toBeVisible();
 
   // Its provenance: a direct entry by the signed-in person, not the fixture.
@@ -87,7 +96,8 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, inspect a fixture rout
 
   // Reopen the same work: a fresh load of the same address shows the saved version.
   await page.goto(chapterUrl("you"));
-  await expect(page.getByRole("banner").getByText(`Saved, version ${version + 1}`)).toBeVisible();
+  await expect(saved(page, version + 1)).toBeVisible();
+  await youView(page, "What we know");
   await page.getByRole("button", { name: "Edit answers directly" }).click();
   await expect(page.getByRole("textbox", { name: "Work area 2" })).toHaveValue("Leeds");
   await expect(page.getByLabel("Weekly study hours, hours a week")).toHaveValue("6");

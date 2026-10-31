@@ -1,11 +1,15 @@
 "use client";
 // The compact strip (spec section 3): active targets, work areas, the current budget and the
-// saved state, plus the synthetic label, live-update state, the world's controls and account.
-// Each value is the API's own; an unanswered one reads as its state (STATE-08), never as zero.
-// Settings such as calm mode live in the account menu, never on the first screen (plan section
-// 4). On a phone the strip keeps the saved state, live updates, the world's controls, the
-// account menu (which also leads to the workspaces) and any failure: the top bar carries the
-// chapter and the synthetic label, and the world names the target.
+// saved state, plus the synthetic label, the world's controls and account. Each value is the
+// API's own; an unanswered one reads as its state (STATE-08), never as zero. In plain words
+// (Task W2C): the saved state says whether answers are saved, never a version number, and live
+// updates say nothing while they work; when they don't, the strip says so (an announced
+// status). Settings such as calm mode and how Careerwright talks with you live in the account
+// menu, never on the first screen (plan section 4). The synthetic label shows at every width.
+// A tablet's strip is two rows: the synthetic label and the target, then the states and
+// controls. On a phone the strip keeps the saved state, any update state, the world's
+// controls, the account menu (which also leads to the workspaces) and any failure: the top bar
+// carries the chapter and the synthetic label, and the world names the target.
 import * as Popover from "@radix-ui/react-popover";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -30,7 +34,7 @@ type Props = {
   email: string | null;
   /** The world's visible controls: pause motion and sound. */
   controls?: ReactNode;
-  /** Settings shown in the account menu (calm mode). */
+  /** Settings shown in the account menu (how Careerwright talks with you, calm mode). */
   settings?: ReactNode;
   onSignOut(): void;
 };
@@ -50,9 +54,8 @@ function budget(profile: ProfileOut): string {
   return `${totalText}, ${monthlyText}`;
 }
 
-const EVENTS_TEXT: Record<StreamStatus["state"], string> = {
+const EVENTS_TEXT: Record<Exclude<StreamStatus["state"], "live">, string> = {
   connecting: "Connecting",
-  live: "Live",
   reconnecting: "Reconnecting",
   stopped: "Stopped",
 };
@@ -64,19 +67,27 @@ const STOP_REASON: Record<Extract<StreamStatus, { state: "stopped" }>["reason"],
   closed: "",
 };
 
-/** Shown on every screen size: on a phone it is the only sign that updates stopped. */
+/**
+ * Shown on every screen size when updates aren't live: on a phone it is the only sign that
+ * they stopped. While they are live it says nothing (the region stays, so a change is heard).
+ */
 function LiveUpdates({ status, onReconnect }: { status: StreamStatus; onReconnect(): void }) {
-  const glyph = status.state === "live" ? "live" : status.state === "stopped" ? "error" : "running";
+  const live = status.state === "live";
+  const glyph = status.state === "stopped" ? "error" : "running";
   const tone = status.state === "stopped" && status.reason !== "closed" ? "error" : "neutral";
   return (
-    <span className="flex items-center gap-8">
+    <span className={live ? "sr-only" : "strip-item flex items-center gap-8"}>
       <span className="status" data-tone={tone} role="status" aria-live="polite">
-        <Glyph name={glyph} />
         {/* Named in words, so it is never read as the state of what the page loaded (V-02). */}
-        <span>
-          Updates: {EVENTS_TEXT[status.state]}
-          {status.state === "stopped" && STOP_REASON[status.reason]}
-        </span>
+        {!live && (
+          <>
+            <Glyph name={glyph} />
+            <span>
+              Updates: {EVENTS_TEXT[status.state]}
+              {status.state === "stopped" && STOP_REASON[status.reason]}
+            </span>
+          </>
+        )}
       </span>
       {/* Only a failed re-authentication can be cured by trying again from here; signed out
           needs sign-in, ended access cannot come back, and closed is a normal restart. */}
@@ -104,14 +115,17 @@ export function WorkspaceStrip({
   onSignOut,
 }: Props) {
   return (
-    <header className="strip on-space" data-covers-world>
+    // `data-events` and `data-version` hold the update state and the saved version for tests;
+    // the words say them plainly.
+    <header className="strip on-space" data-covers-world data-events={events.state}>
       {workspace.synthetic && (
         <span className="strip-optional">
           <SyntheticLabel />
         </span>
       )}
       <Popover.Root>
-        <Popover.Trigger className="strip-switch strip-optional">
+        {/* Wide screens only: the account menu names the workspace and leads to the others. */}
+        <Popover.Trigger className="strip-switch strip-wide">
           <span className="strip-optional">Workspace</span>
           <strong>{workspace.name}</strong>
           <Glyph name="collapse" />
@@ -152,13 +166,13 @@ export function WorkspaceStrip({
       </Popover.Root>
       {profile !== undefined && (
         <>
-          <span className="strip-item strip-optional">
+          <span className="strip-item strip-optional strip-target">
             Target <strong>{describeField(profile.document.target_titles)}</strong>
           </span>
-          <span className="strip-item strip-optional">
+          <span className="strip-item strip-wide">
             Work area <strong>{describeField(profile.document.cities)}</strong>
           </span>
-          <span className="strip-item strip-optional">
+          <span className="strip-item strip-wide">
             Budget <strong className="tnum">{budget(profile)}</strong>
           </span>
         </>
@@ -171,12 +185,12 @@ export function WorkspaceStrip({
             <span>Your answers couldn't be loaded</span>
           </span>
         ) : (
-          <span className="strip-item">
+          <span className="strip-item" data-version={profile?.version}>
             {profile === undefined
               ? "Loading"
               : profile.version === 0
                 ? "Nothing saved yet"
-                : `Saved, version ${profile.version}`}
+                : "Answers saved"}
           </span>
         )}
         {refreshFailed && (
@@ -185,9 +199,7 @@ export function WorkspaceStrip({
             <span>Couldn't refresh: showing what was last loaded</span>
           </span>
         )}
-        <span className="strip-item">
-          <LiveUpdates status={events} onReconnect={onReconnect} />
-        </span>
+        <LiveUpdates status={events} onReconnect={onReconnect} />
         {controls}
         <Popover.Root>
           <Popover.Trigger className="strip-switch" aria-label="Account and settings">

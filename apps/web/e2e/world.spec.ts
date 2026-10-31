@@ -7,7 +7,15 @@
 // machine. On the real stack, demo mode.
 import { type Browser, expect, type Page, test } from "@playwright/test";
 import { asBrowser, emulatorToken } from "./api";
-import { chapterUrl, externalRequests, recordRequests, signIn } from "./helpers";
+import {
+  chapterUrl,
+  externalRequests,
+  liveUpdates,
+  recordRequests,
+  saved,
+  signIn,
+  youView,
+} from "./helpers";
 
 const CHAPTERS = ["You", "Roles", "Skills", "Options", "Routes", "Plan"] as const;
 const VIEWPORTS = [
@@ -92,7 +100,12 @@ function layout(page: Page) {
     };
     const labels = [
       ...document.querySelectorAll<HTMLElement>(".world-label[data-shown='true']"),
-    ].map((e) => ({ name: e.querySelector(".world-label-name")?.textContent ?? "", ...box(e) }));
+    ].map((e) => ({
+      name: e.querySelector(".world-label-name")?.textContent ?? "",
+      // A light the key explains (every light but the person's).
+      keyed: e.dataset.keyed === "true",
+      ...box(e),
+    }));
     const panels = [...document.querySelectorAll("[data-covers-world]")]
       .map(box)
       .filter((b) => b.w > 0 && b.h > 0);
@@ -282,7 +295,9 @@ test.describe("phone", () => {
     );
     await signIn(page, "ada", chapterUrl("you", id));
     const strip = page.getByRole("banner");
-    const before = (await strip.boundingBox())?.height ?? 0;
+    // Measured once the strip has settled: its words loaded, updates live, the fonts in and
+    // the same height two frames running (it measured 105 px, then 57, mid-load).
+    const before = await settledHeight(page);
     await page.getByRole("button", { name: "Help me explore" }).click();
     await page
       .getByRole("textbox", { name: "Reply to Careerwright" })
@@ -296,9 +311,96 @@ test.describe("phone", () => {
         .getByRole("status")
         .filter({ hasText: "Still while support is shown" }),
     ).toBeVisible();
+    expect(await settledHeight(page), "the strip keeps its height").toBe(before);
     expect((await strip.boundingBox())?.height, "the strip keeps its height").toBe(before);
   });
 });
+
+/**
+ * The strip's height once nothing is still arriving: the saved state and live updates in, the
+ * fonts loaded, and the same height on two animation frames in a row.
+ */
+async function settledHeight(page: Page): Promise<number> {
+  await expect(saved(page)).toHaveText(/^(Answers saved|Nothing saved yet)$/);
+  await expect(liveUpdates(page, "Live")).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        const strip = document.querySelector("header.strip");
+        let last = -1;
+        const check = () => {
+          const height = strip?.getBoundingClientRect().height ?? 0;
+          if (height === last) resolve(height);
+          else {
+            last = height;
+            requestAnimationFrame(() => requestAnimationFrame(check));
+          }
+        };
+        check();
+      }),
+  );
+}
+
+test("[UI-07][UI-05] with no light the key explains, the key is not shown", async ({ page }) => {
+  // W2A re-review 2, Minor 3: the empty-key case. A new workspace has no destination, skill or
+  // opening: the person's light is named, and nothing it draws needs a key.
+  const token = await emulatorToken("ada");
+  const { workspace_id: id } = await asBrowser<{ workspace_id: string }>(
+    "POST",
+    "/v1/workspaces",
+    token,
+    { name: "Nothing to explain (synthetic)", data_mode: "demo", synthetic: true },
+  );
+  await signIn(page, "ada", chapterUrl("you", id));
+  for (const chapter of ["you", "roles"]) {
+    await page.goto(chapterUrl(chapter, id));
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.waitForTimeout(900); // travel, then the names settle
+    const { labels, key } = await layout(page);
+    expect(
+      labels.map((label) => label.name),
+      chapter,
+    ).toEqual(["You"]);
+    expect(
+      labels.some((label) => label.keyed),
+      chapter,
+    ).toBe(false);
+    expect(key, `${chapter}: the key`).toBeNull();
+    await expect(page.locator(".world-key")).toHaveCount(0);
+  }
+});
+
+/** The chapter's words as read: the same in every way of drawing the world. */
+const chapterText = (page: Page) => page.locator("main").innerText();
+
+for (const viewport of VIEWPORTS) {
+  test(`[UI-05][UI-07] the You chapter says the same in the moving and the still world, in every view (${viewport.width}×${viewport.height})`, async ({
+    browser,
+  }) => {
+    test.setTimeout(180_000);
+    const seen = new Map<Mode, string[]>();
+    for (const mode of MODES) {
+      const page = await modePage(browser, viewport, mode);
+      await open(page, chapterUrl("you"), "You", mode);
+      const views: string[] = [];
+      for (const view of ["Conversation", "What we know", "Suggestions"] as const) {
+        await youView(page, view);
+        await expect(page.getByRole("tab", { name: view })).toHaveAttribute(
+          "aria-selected",
+          "true",
+        );
+        await expect(page.getByText("Loading the early sketch")).toHaveCount(0);
+        views.push(await chapterText(page));
+      }
+      seen.set(mode, views);
+      await page.context().close();
+    }
+    const moving = seen.get("moving");
+    expect(moving?.[0]).toContain("Reply to Careerwright");
+    for (const mode of MODES) expect(seen.get(mode), `${mode} against moving`).toEqual(moving);
+  });
+}
 
 test("[UI-09] a chapter not built yet shows its place, and says so", async ({ page }) => {
   await signIn(page, "ada", chapterUrl("skills"));
@@ -397,9 +499,10 @@ for (const viewport of VIEWPORTS) {
           if (key !== null) expect(overlap(label, key), `${where} and the key`).toBe(false);
           for (const other of labels.slice(i + 1)) expect(overlap(label, other), where).toBe(false);
         }
-        // Lights are in view whenever a name is: the key to the lights is then shown too.
-        if (labels.length > 0) {
-          expect(key, `${chapter}, ${reducedMotion}: names in view, but no key`).not.toBeNull();
+        // A light the key explains is named in view: the key to the lights is shown too. The
+        // person's own light needs no key (W2A re-review 2, Minor 3: "You" alone is no reason).
+        if (labels.some((label) => label.keyed)) {
+          expect(key, `${chapter}, ${reducedMotion}: lights in view, but no key`).not.toBeNull();
         }
         // The key to the lights, when shown, is not under a panel either.
         if (key !== null) {

@@ -59,6 +59,9 @@ export type Clear = {
   readonly right: number;
   readonly top: number;
   readonly bottom: number;
+  /** No room anywhere: `left` and `right` are the panels' own span, and the world is a
+   *  backdrop standing behind them. */
+  readonly backdrop?: true;
 };
 
 /** A box on screen (CSS pixels). */
@@ -80,8 +83,10 @@ const ROOM_BELOW = 48;
 /**
  * The part of the window the place can stand in. `bars` are the rail down the left edge and the
  * bars along the top; `panels` are where a person reads (the chapter's panel, the drawer). On a
- * wide screen it is the span beside the panels; otherwise the taller band above or below them;
- * undefined when neither leaves room (the world is then a backdrop behind the panels).
+ * wide screen it is the span beside the panels; otherwise the taller band above or below them.
+ * When neither leaves room the world is a backdrop: the panels' span, marked `backdrop`, so the
+ * place stands behind them and no light peeks out beside them where its name has no room
+ * (Task W2C: a tall You console on a tablet).
  */
 export function clearArea(
   vp: Viewport,
@@ -111,18 +116,26 @@ export function clearArea(
     bottom: vp.h,
   };
   const band = above.bottom - above.top >= below.bottom - below.top ? above : below;
-  return band.bottom - band.top >= MIN_BAND ? band : undefined;
+  if (band.bottom - band.top >= MIN_BAND) return band;
+  return {
+    left: Math.min(...panels.map((p) => p.x)),
+    right: Math.max(...panels.map((p) => p.x + p.w)),
+    top,
+    bottom: vp.h,
+    backdrop: true,
+  };
 }
 
 /**
  * Where the view rests at each place, stood in the part of the window the panels leave clear:
  * moved across only where its usual place would be too near the panel beside it, and fitted
- * between the bars above and the panels below, made smaller only if it must be. Without a clear
- * part the view keeps its usual place, behind the panels.
+ * between the bars above and the panels below, made smaller only if it must be. Before the panels
+ * are measured the view keeps its usual place; with no room it stands behind the panels.
  */
 export function placeView(place: ChapterId, vp: Viewport, clear?: Clear): View {
   const view = restingView(place, vp);
   if (clear === undefined) return view;
+  if (clear.backdrop) return { ...view, centre: (clear.left + clear.right) / 2 };
   const near =
     view.centre < clear.left + MIN_CLEAR / 2 || view.centre > clear.right - MIN_CLEAR / 2;
   // From the horizon down to the person's light, on screen.

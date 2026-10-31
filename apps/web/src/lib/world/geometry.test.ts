@@ -182,8 +182,30 @@ describe("[UI-09] each chapter is a place the view travels to", () => {
   it("leaves the world as a backdrop where the panels leave no room to stand", () => {
     // A phone's You chapter fills the screen below the header.
     const clear = clearArea(PHONE, [STRIP(PHONE, 122, 0)], [{ x: 0, y: 134, w: 390, h: 710 }]);
-    expect(clear).toBeUndefined();
+    expect(clear?.backdrop).toBe(true);
     expect(placeView("you", PHONE, clear)).toEqual(placeView("you", PHONE));
+  });
+
+  it("stands the backdrop behind the panels, so nothing peeks out beside them unnamed", () => {
+    // Task W2C: a tablet's You console, taller than the window, left of centre beside the rail.
+    const panel = { x: 128, y: 130, w: 560, h: 1200 };
+    const clear = clearArea(TABLET, [RAIL(TABLET), STRIP(TABLET, 106)], [panel]);
+    expect(clear?.backdrop).toBe(true);
+    const view = placeView("you", TABLET, clear);
+    expect(view.centre).toBe(panel.x + panel.w / 2);
+    const skills = ["records", "deadlines", "spreadsheets", "errors", "findings"].map((id) => ({
+      id,
+      label: id,
+      state: "usual" as const,
+    }));
+    const scene = buildScene(world({ skills }), TABLET, SETTLED);
+    for (const node of scene.nodes) {
+      const p = project(node.p, view);
+      if (p.y > panel.y) {
+        expect(p.x, node.id).toBeGreaterThan(panel.x);
+        expect(p.x, node.id).toBeLessThan(panel.x + panel.w);
+      }
+    }
   });
 
   it("gives every place its own view", () => {

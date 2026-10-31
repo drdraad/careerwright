@@ -131,16 +131,18 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
     hint: "Hours a week you could give to learning.",
     lessPrecise: "Which courses fit your week, and how long a route takes.",
   },
+  // Session 2: "total spending limit and monthly payment limit - what do these mean??" Each
+  // hint says it in plain words, wherever the limit is shown (`EXPLAINED_FIELDS`).
   direct_spend_cap: {
     label: "Total spending limit",
     kind: "money",
-    hint: "The most you would spend on the change in total.",
+    hint: "The most you'd spend on the whole change, all added up: course fees, exams, equipment and the like. Pay you'd give up while you train isn't part of it.",
     lessPrecise: "Which routes are affordable: they are shown without a spending check.",
   },
   monthly_payment_cap: {
     label: "Monthly payment limit",
     kind: "money",
-    hint: "The most you could pay in any one month.",
+    hint: "The most you could pay out in any one month. A route with a bigger payment in some month doesn't fit, even if its total does.",
     lessPrecise: "Whether a route's payments fit any single month.",
   },
   enjoyed_tasks: {
@@ -179,6 +181,12 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
       "No route is checked against pay. Unknown pay is never treated as below your limit.",
   },
 };
+
+/** Answers whose label alone isn't plain enough: their hint is shown beside them everywhere. */
+export const EXPLAINED_FIELDS: ReadonlySet<ProfileFieldName> = new Set([
+  "direct_spend_cap",
+  "monthly_payment_cap",
+]);
 
 export const PROFILE_FIELD_ORDER: readonly ProfileFieldName[] = [
   "target_titles",

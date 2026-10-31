@@ -85,6 +85,48 @@ describe("[UI-07][UI-05] the world behind every chapter", () => {
     expect(legend).toHaveTextContent("Grey trails: not known yet");
   });
 
+  it("names every skill and counts the openings in the DOM, so the canvas holds nothing unique", () => {
+    // W2A app review M3: skills and openings must be named before the world draws them.
+    render(
+      <World
+        place="you"
+        input={{
+          ...input,
+          skills: [
+            { id: "k1", label: "Keep accurate records", state: "usual" },
+            { id: "k2", label: "Check data for errors", state: "said" },
+          ],
+          openings: 7,
+        }}
+        calm={false}
+        paused={false}
+      />,
+    );
+
+    const words = screen.getByRole("complementary", { name: "Your world" });
+    expect(within(words).getByText("Keep accurate records").closest("li")).toHaveTextContent(
+      "Keep accurate records: usual in your role, not confirmed yet",
+    );
+    expect(within(words).getByText("Check data for errors").closest("li")).toHaveTextContent(
+      "Check data for errors: you said you've done it",
+    );
+    // One count line for the openings, never a hundred names.
+    expect(within(words).getByText("7 openings").closest("li")).toHaveTextContent(
+      "7 openings: small lights around the places you chose",
+    );
+    expect(within(words).getAllByRole("listitem")).toHaveLength(1 + 2 + 2 + 1);
+    // The key explains every light but the person's, and lists only the kinds drawn.
+    const keyed = [...words.querySelectorAll<HTMLElement>("[data-keyed='true']")].map(
+      (item) => item.dataset.kind,
+    );
+    expect(keyed.sort()).toEqual(["destination", "destination", "openings", "skill", "skill"]);
+    expect(words.querySelector("[data-kind='origin']")).toHaveAttribute("data-keyed", "false");
+    const legend = screen.getByRole("list", { name: "What the lights mean" });
+    expect(legend).toHaveTextContent("Bright: you said you've done it");
+    expect(legend).toHaveTextContent("Faint ring: usual in your role, not confirmed yet");
+    expect(legend).toHaveTextContent("Small lights: openings");
+  });
+
   it("waits with one light until the first answer, and explains nothing it cannot show", () => {
     render(
       <World

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ProfileOut, WorkspaceOut } from "@/generated/api";
@@ -49,8 +49,8 @@ describe("[STATE-07][UI-09] the strip states what it has, including what failed 
     strip({ profileFailed: true });
 
     expect(screen.getByText("Your answers couldn't be loaded")).toBeInTheDocument();
-    // V-02: the live-update state names itself, so it never reads as the profile's state.
-    expect(screen.getByRole("status")).toHaveTextContent(/^Updates: Live$/);
+    // Live updates that work say nothing (Task W2C, plain words); the region stays to be heard.
+    expect(screen.getByRole("status")).toHaveTextContent(/^$/);
     expect(screen.queryByText("Loading")).not.toBeInTheDocument();
     expect(screen.queryByText(/showing what was last loaded/)).not.toBeInTheDocument();
     // The chapter announces the failure with its cause; the strip does not announce it again.
@@ -80,6 +80,44 @@ describe("[STATE-07][UI-09] the strip states what it has, including what failed 
     expect(status.closest(".strip-optional")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Reconnect live updates" }));
     expect(onReconnect).toHaveBeenCalledOnce();
+  });
+
+  it("[UI-09] says what is saved in plain words, never a version number", () => {
+    // W2A design review M2: "Saved, version 3" and "Updates: Live" were internal-sounding.
+    const unasked = { state: "unasked" as const, value: null, source_ref_id: null };
+    const saved = (version: number): ProfileOut => ({
+      workspace_id: "w1",
+      version,
+      created_by: null,
+      created_at: "2027-01-01T00:00:00Z",
+      document: {
+        schema_version: "3",
+        preferred_name: unasked,
+        current_role: unasked,
+        cities: unasked,
+        target_titles: unasked,
+        weekly_study_hours: unasked,
+        direct_spend_cap: unasked,
+        monthly_payment_cap: unasked,
+        enjoyed_tasks: unasked,
+        confident_tasks: unasked,
+        evidenced_tasks: unasked,
+        work_style: unasked,
+        minimum_salary: unasked,
+      },
+    });
+    strip({ profile: saved(3), events: { state: "reconnecting", attempt: 1, delayMs: 1000 } });
+
+    expect(screen.getByText("Answers saved")).toHaveAttribute("data-version", "3");
+    expect(screen.getByRole("banner")).not.toHaveTextContent(/version/i);
+    // Not live: the state names itself (V-02), as an announced status.
+    expect(screen.getByRole("status")).toHaveTextContent("Updates: Reconnecting");
+    expect(screen.getByRole("banner")).toHaveAttribute("data-events", "reconnecting");
+    expect(screen.getByText("Synthetic demo")).toBeInTheDocument();
+
+    cleanup();
+    strip({ profile: saved(0) });
+    expect(screen.getByText("Nothing saved yet")).toHaveAttribute("data-version", "0");
   });
 
   it("says so when the list of workspaces could not be loaded", async () => {

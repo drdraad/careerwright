@@ -365,6 +365,40 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
       "/v1/workspaces/w-dir/targets",
     ]); // excluding wrote nothing
   });
+
+  it("[UI-04] opens one suggestion at a time, whose Make this a target is the bright action", async () => {
+    // Session 2: "I found the button, but it did not stand out enough. Needs to be a bright
+    // colour"; "need minimum ideas per page". The rest stay a list of titles to scan.
+    const surgeon: SuggestionOut = { ...suggestion, concept_id: "o3", title: "tree surgeon" };
+    fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([suggestion, surgeon]) }]);
+    const { user } = renderDirections();
+
+    const mechanic = await screen.findByRole("article", { name: "Bicycle mechanic" });
+    const tree = screen.getByRole("article", { name: "Tree surgeon" });
+    const chooseFirst = within(mechanic).getByRole("button", { name: /Make this a target/ });
+    expect(chooseFirst).toHaveClass("btn-primary");
+    expect(document.querySelectorAll(".btn-primary")).toHaveLength(1);
+    expect(within(tree).queryByRole("button", { name: /Make this a target/ })).toBeNull();
+    expect(within(tree).getByText("Kind of work: Machinery mechanics and repairers")).toBeVisible();
+
+    const open = within(tree).getByRole("button", { name: "Tree surgeon" });
+    expect(open).toHaveAttribute("aria-expanded", "false");
+    await user.click(open);
+
+    expect(open).toHaveAttribute("aria-expanded", "true");
+    expect(within(tree).getByRole("button", { name: /Make this a target/ })).toHaveClass(
+      "btn-primary",
+    );
+    expect(within(mechanic).queryByRole("button", { name: /Make this a target/ })).toBeNull();
+    expect(document.querySelectorAll(".btn-primary")).toHaveLength(1);
+  });
+
+  it("[UI-04] makes asking for suggestions the bright action before there are any", () => {
+    fakeApi([]);
+    renderDirections(null as unknown as DiscoveryOut);
+
+    expect(screen.getByRole("button", { name: "Suggest directions" })).toHaveClass("btn-primary");
+  });
 });
 
 const NOTE_PATH = "/v1/workspaces/w-dir/discoveries/d1/explanation";

@@ -1,10 +1,12 @@
 "use client";
 // The review tray (spec section 3, STATE-06): the newest reply's proposed changes, each to
 // accept, edit or skip; a limit or target is saved only once confirmed by name (PROF-04).
-// Facts the person stated and Careerwright's readings look different (a dashed edge). Edits are
-// checked before anything is sent; then one decision saves the accepted proposals and the
-// person's own answers together, as one version, or nothing at all (the tray and its edits
-// stay, with the reason). Nothing changes until the person saves.
+// Accept and Confirm are colour coded as well as worded (session 2, C3: leaf green, filled once
+// chosen), and a limit says what it means in plain words. Facts the person stated and
+// Careerwright's readings look different (a dashed edge). Edits are checked before anything is
+// sent; then one decision saves the accepted proposals and the person's own answers together,
+// as one version, or nothing at all (the tray and its edits stay, with the reason). Nothing
+// changes until the person saves.
 import { useState } from "react";
 import type { ProfileDocument, ProfileOut, ProposedChangeOut, TurnOut } from "@/generated/api";
 import { ApiError } from "@/lib/api";
@@ -18,7 +20,7 @@ import {
   readField,
 } from "@/lib/profile";
 import { useDecideTurn } from "@/lib/queries";
-import { PROFILE_FIELDS, type ProfileFieldName } from "@/lib/vocabulary";
+import { EXPLAINED_FIELDS, PROFILE_FIELDS, type ProfileFieldName } from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { useEvidence } from "./EvidenceDrawer";
 import { AnswerControl, FieldError, FieldStateSelect } from "./fields";
@@ -198,6 +200,9 @@ export function ReviewTray({
             <span className="proposal-value">
               {label}: {proposedValue(change)}
             </span>
+            {EXPLAINED_FIELDS.has(field) && (
+              <span className="small muted">{PROFILE_FIELDS[field].hint}</span>
+            )}
             {editing && (
               <div className="grid gap-8">
                 <FieldStateSelect
@@ -221,7 +226,8 @@ export function ReviewTray({
             <div className="proposal-actions">
               {change.hard_constraint ? (
                 <Button
-                  variant="secondary"
+                  variant="accept"
+                  glyph="accept"
                   aria-pressed={choice === "confirm"}
                   onClick={() => choose(change, "confirm")}
                 >
@@ -229,7 +235,8 @@ export function ReviewTray({
                 </Button>
               ) : (
                 <Button
-                  variant="secondary"
+                  variant="accept"
+                  glyph="accept"
                   aria-pressed={choice === "accept"}
                   onClick={() => choose(change, "accept")}
                 >
@@ -285,6 +292,7 @@ export function ReviewTray({
                 turnId: turn.turn_id,
                 body: decisionFor(changes, {}, profile.version),
               })
+              .then((after) => onSaved(after.profile))
               .catch(() => null)
           }
         >

@@ -165,6 +165,10 @@ const PATHS = {
       <path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11" {...stroke} />
     </>
   ),
+  // Deciding on a proposed change: a plain tick (never the circled tick of "complete", which
+  // reads as verified) and a turn back.
+  accept: <path d="M5.5 12.8l4.2 4.2 8.8-9.6" {...stroke} />,
+  undo: <path d="M9 7.5L5 11.5l4 4M5.5 11.5h8.5a4.5 4.5 0 0 1 0 9H11" {...stroke} />,
   // The calm support panel's own glyph, a lifebuoy (docs/design: never "not known yet").
   support: (
     <>

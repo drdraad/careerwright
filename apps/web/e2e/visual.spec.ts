@@ -1,7 +1,8 @@
 // The visual review package (plan section 5, UI-11): every chapter and the shell's default,
-// selected, empty, stale, unavailable and failed states, and Sprint 2's conversation states
-// (the start, a reply to review, the slate with its written note written, pending and
-// unavailable, the support panel, a failed reply, key
+// selected, empty, stale, unavailable and failed states, and the You chapter's states as
+// rebuilt in Sprint W (the start with its reply field, what we know with the limits explained,
+// a reply to review, a decided reply with Undo, the slate in its own view with its written note
+// written, pending and unavailable, the support panel, a failed reply, key
 // consent, Unknown/Skipped/Prefer not to say, the scrolled stale conflict and its Save, and
 // expanded phone sheets), and the route comparison's disclosure and lower layers (Task 6c), at
 // 1440×900, 390×844 and 768×1024, plus the home page at 200 % zoom, each with the automatable
@@ -16,7 +17,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 import { asBrowser, emulatorToken, saveElsewhere } from "./api";
-import { type AxeViolation, axe, chapterUrl, liveUpdates, signIn } from "./helpers";
+import { type AxeViolation, axe, chapterUrl, liveUpdates, saved, signIn, youView } from "./helpers";
 import { FIXTURE_WORKSPACE, stack } from "./stack";
 
 const VIEWPORTS = [
@@ -47,8 +48,14 @@ type Shot = {
 
 const heading = (name: string) => async (page: Page) => {
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
-  await expect(page.getByRole("banner").getByText(/^Saved, version \d+$/)).toBeVisible();
+  await expect(saved(page)).toHaveText("Answers saved");
   await expect(liveUpdates(page, "Live")).toBeVisible();
+};
+
+/** The You chapter, in one of its views. */
+const inYou = (view: "What we know" | "Suggestions") => async (page: Page) => {
+  await heading("You")(page);
+  await youView(page, view);
 };
 
 let staleSaves = 0;
@@ -60,6 +67,7 @@ let staleSaves = 0;
 async function staleSave(page: Page, workspace: string) {
   await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
   await expect(liveUpdates(page, "Live")).toBeVisible();
+  await youView(page, "What we know");
   await page.getByRole("button", { name: "Edit answers directly" }).click();
   await page.getByLabel("How you answer current role").selectOption("provided");
   await page.getByRole("textbox", { name: "Current role", exact: true }).fill("Typed on this page");
@@ -211,6 +219,7 @@ const SUPPORT_NOTE = {
 const slateNote =
   (state: RegExp, notice = false) =>
   async (page: Page) => {
+    await youView(page, "Suggestions");
     const directions = page.getByRole("region", { name: "Directions to explore" });
     const first = directions.getByRole("article").first();
     await expect(first.getByText(state)).toBeVisible({ timeout: 60_000 });
@@ -288,6 +297,9 @@ type Scratch = {
   talked: string;
   /** Live-assisted and synthetic, no key stored: the consent form. */
   live: string;
+  /** As `talked`, for the shot that decides the reply's proposals (its own, so `talked` keeps
+   *  its reply to review and its slate current). */
+  decided: string;
 };
 
 /** `scratch` workspaces are new synthetic workspaces of Ada's (see `Scratch`). */
@@ -309,7 +321,35 @@ const shots = (scratch: Scratch): Shot[] => [
       await expect(
         page.getByRole("heading", { name: "How would you like to start?" }),
       ).toBeVisible();
+      // Chat is immediate (session 2): the reply field is there from the first screen.
+      await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toBeVisible();
+    },
+  },
+  {
+    // What we know, its own view: the answers, the two limits explained in plain words.
+    name: "you--what-we-know",
+    as: "ada",
+    url: chapterUrl("you"),
+    ready: async (page) => {
+      await inYou("What we know")(page);
+      await expect(page.getByText(/^The most you'd spend on the whole change/)).toBeVisible();
       await expect(page.getByText("Loading the early sketch")).toHaveCount(0); // B-M5
+    },
+  },
+  {
+    // The reply's proposals decided: what it saved, with Undo in its own colour.
+    name: "you--saved",
+    as: "ada",
+    url: chapterUrl("you", scratch.decided),
+    ready: async (page) => {
+      const tray = page.getByRole("region", { name: /To review:/ });
+      await expect(tray).toBeVisible();
+      for (const choose of await tray.getByRole("button", { name: /^(Accept|Confirm)/ }).all()) {
+        await choose.click();
+      }
+      await tray.getByRole("button", { name: /^Save \d to What we know/ }).click();
+      await expect(page.getByRole("heading", { name: "Saved to What we know" })).toBeFocused();
+      await expect(page.getByRole("button", { name: "Undo the last save" })).toBeVisible();
     },
   },
   {
@@ -317,7 +357,7 @@ const shots = (scratch: Scratch): Shot[] => [
     as: "ada",
     url: chapterUrl("you"),
     ready: async (page) => {
-      await heading("You")(page);
+      await inYou("What we know")(page);
       await page.getByRole("button", { name: "Edit answers directly" }).click();
       await page.getByRole("button", { name: "Source for total spending limit" }).click();
       await expect(page.getByText("Synthetic fixture", { exact: true })).toBeVisible();
@@ -328,7 +368,7 @@ const shots = (scratch: Scratch): Shot[] => [
     as: "ada",
     url: chapterUrl("you"),
     ready: async (page) => {
-      await heading("You")(page);
+      await inYou("What we know")(page);
       await page.getByRole("button", { name: "Edit answers directly" }).click();
       await page.getByRole("button", { name: "Source for total spending limit" }).click();
       await expect(page.getByText("Synthetic fixture", { exact: true })).toBeVisible();
@@ -340,7 +380,7 @@ const shots = (scratch: Scratch): Shot[] => [
     as: "ada",
     url: chapterUrl("you"),
     ready: async (page) => {
-      await heading("You")(page);
+      await inYou("What we know")(page);
       await page.getByRole("button", { name: "Edit answers directly" }).click();
       // Three neighbouring answers, so all three states are in view at every size (B-M5).
       await page.getByLabel("How you answer total spending limit").selectOption("unknown");
@@ -358,7 +398,7 @@ const shots = (scratch: Scratch): Shot[] => [
     as: "ada",
     url: chapterUrl("you"),
     ready: async (page) => {
-      await heading("You")(page);
+      await inYou("What we know")(page);
       await page.getByRole("button", { name: "Edit answers directly" }).click();
       await page.getByLabel("How you answer lowest pay you'd accept").selectOption("provided");
       await page.getByLabel("Lowest pay you'd accept, in pounds").fill("2,100");
@@ -765,6 +805,7 @@ for (const viewport of VIEWPORTS) {
         empty: await create("New workspace (synthetic)", "demo"),
         talked: await talkedWorkspace(token),
         live: await create("Live, no key yet (synthetic)", "live_assisted"),
+        decided: await talkedWorkspace(token),
       };
       const results: Result[] = [];
       const errors: string[] = [];

@@ -1,13 +1,16 @@
-// The You chapter's states (S2.3-S2.5, S2.7) on a scripted API at the network edge: the
-// start, a reply streaming and to review, a failed reply, paused; the slate full and thin,
-// with its written note written, pending and unavailable, and with a salary floor applied;
-// key consent and a stored key; and the early sketch with a target. Every value is synthetic.
+// The You chapter's states (S2.3-S2.5, S2.7, SW.4) on a scripted API at the network edge: the
+// start, a reply streaming and to review (one with a limit to confirm), a failed reply,
+// paused; its other views, what we know and the suggestions; a save with Undo and an undo; the
+// slate full and thin, with its written note written, pending and unavailable, and with a
+// salary floor applied; key consent and a stored key; and the early sketch with a target.
+// Every value is synthetic.
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 import { Directions } from "@/components/Directions";
 import { KeySetup } from "@/components/KeySetup";
-import { YouChapter } from "@/components/YouChapter";
+import { SaveNotice } from "@/components/WhatWeKnow";
+import { YouChapter, type YouView } from "@/components/YouChapter";
 import type {
   CredentialOut,
   DiscoveryOut,
@@ -370,13 +373,57 @@ const meta: Meta = { title: "You", parameters: { surface: "reading" } };
 export default meta;
 type Story = StoryObj;
 
-const you = (routes: Route[]) => () => (
-  <Api routes={routes}>
-    <div className="chapter chapter-you on-reading">
-      <YouChapter workspace={workspace("demo")} profile={profile} />
-    </div>
-  </Api>
-);
+const you =
+  (routes: Route[], view: YouView = "conversation", shown: ProfileOut = profile) =>
+  () => (
+    <Api routes={routes}>
+      <div className="chapter chapter-you on-reading">
+        <YouChapter workspace={workspace("demo")} profile={shown} initialView={view} />
+      </div>
+    </Api>
+  );
+
+/** P01-like limits, so "What we know" and the tray explain both in plain words. */
+const withLimits: ProfileOut = {
+  ...profile,
+  document: {
+    ...profile.document,
+    target_titles: given(["Data quality analyst"]),
+    direct_spend_cap: given({ minor_units: 150_000, currency: "GBP" as const }),
+    monthly_payment_cap: given({ minor_units: 25_000, currency: "GBP" as const }),
+  },
+};
+const limitProposal: TurnOut["proposal"] = {
+  origin: "fixture",
+  prompt_version: "interview-turn-2",
+  profile_version: 3,
+  reply: "Demo interviewer (synthetic): I noted 2 things for you to review.",
+  changes: [
+    {
+      change_id: "c1",
+      field: "enjoyed_tasks",
+      state: "provided",
+      value: ["repairing physical objects", "working outdoors", "fixing machines"],
+      basis: "stated",
+      message_ids: ["m1"],
+      reason: "You said you liked fixing the machines.",
+      hard_constraint: false,
+    },
+    {
+      change_id: "c3",
+      field: "direct_spend_cap",
+      state: "provided",
+      value: { minor_units: 60_000, currency: "GBP" },
+      basis: "inferred",
+      message_ids: ["m1"],
+      reason: "You said you could spend up to £600.",
+      hard_constraint: true,
+    },
+  ],
+  next_question: "How many hours a week could you give to learning?",
+  missing_critical_fields: ["weekly_study_hours"],
+  ready_for_review: true,
+};
 
 export const Start: Story = { render: you(chapterRoutes(prefs(null), [])) };
 export const ReplyStreaming: Story = {
@@ -396,6 +443,50 @@ export const ReplyToReview: Story = {
 export const ReplyFailed: Story = { render: you(chapterRoutes(prefs("unsure"), [turn("failed")])) };
 export const Paused: Story = {
   render: you(chapterRoutes(prefs("unsure", true), [turn("complete", proposal)])),
+};
+/** A limit to confirm: Accept and Confirm in leaf green, the limit explained in plain words. */
+export const ReplyWithALimit: Story = {
+  render: you(chapterRoutes(prefs("unsure"), [turn("complete", limitProposal)])),
+};
+/** What we know, its own view: the answers, the limits explained, the early sketch. */
+export const WhatWeKnowView: Story = {
+  render: you(chapterRoutes(prefs("unsure"), []), "known", withLimits),
+};
+/** The suggestions, their own view: one open, its "Make this a target" the bright action. */
+export const SuggestionsView: Story = {
+  render: you(
+    [
+      ...chapterRoutes(prefs("unsure"), []).filter((route) => !route.path.test("/discoveries")),
+      {
+        method: "GET",
+        path: /\/discoveries$/,
+        answer: { items: [discoveryWith(note("complete", full, false))], next_cursor: null },
+      },
+      { method: "GET", path: /\/slate$/, answer: slate(full) },
+    ],
+    "suggestions",
+  ),
+};
+/** After a decision on the tray: what it saved, with Undo in orchid; then what undo did. */
+export const SavedWithUndo: Story = {
+  render: () => (
+    <Api routes={[]}>
+      <div className="chapter chapter-you on-reading grid gap-16">
+        <SaveNotice
+          workspaceId={WS}
+          profile={profile}
+          outcome={{ kind: "saved", version: profile.version }}
+          onUndone={() => {}}
+        />
+        <SaveNotice
+          workspaceId={WS}
+          profile={profile}
+          outcome={{ kind: "undone", version: profile.version }}
+          onUndone={() => {}}
+        />
+      </div>
+    </Api>
+  ),
 };
 
 const directions =

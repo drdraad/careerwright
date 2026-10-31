@@ -312,6 +312,29 @@
     background: var(--trail-shadow);
   }
 
+  /* A skill you said you have: a bright disc in its journey glow; usual in your role: a ring. */
+  .world-key-mark[data-key="said"]::after {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--light-person);
+    box-shadow: 0 0 0 2px var(--trail-near);
+  }
+
+  .world-key-mark[data-key="usual"]::after {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 2px solid var(--trail-near);
+  }
+
+  .world-key-mark[data-key="opening"]::after {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--light-person);
+  }
+
   /* ---------- App frame: over the world ---------- */
 
   .app {
@@ -616,6 +639,26 @@
     padding: 0;
     background: transparent;
     color: var(--fg);
+  }
+
+  /* The two decisions on a proposed change, colour coded as well as worded (session 2, C3):
+     leaf green accepts a change or confirms a limit, filled once chosen; orchid undoes the last
+     save. Neither is ever teal, and neither is the view's primary action. */
+  .btn-accept {
+    background: transparent;
+    border-color: var(--decision-accept);
+    color: var(--decision-accept);
+  }
+
+  .btn-accept[aria-pressed="true"] {
+    background: var(--decision-accept);
+    color: var(--text-on-decision);
+  }
+
+  .btn-undo {
+    background: transparent;
+    border-color: var(--decision-undo);
+    color: var(--decision-undo);
   }
 
   /* Disabled keeps full-contrast text and says why beside it; it is never the only cue. */
@@ -1247,60 +1290,51 @@
   font-weight: 600;
 }
 
-/* ---------- You: the conversation beside "What we know", on its glass panel at the person's
-   light (the You chapter is rebuilt in the world in Sprint W's next slice). A dashed edge
-   means provisional only (a proposal not yet a fact, a reply not yet checked, the early
-   sketch). ---------- */
+/* ---------- You: the origin's console, a glass panel beside the person's light (Sprint W,
+   SW.4; docs/design/compositions/world.css's .panel). One view at a time: the conversation,
+   what we know, the suggestions. A dashed edge means provisional only (a proposal not yet a
+   fact, a reply not yet checked, the early sketch). ---------- */
 
 @layer components {
-  /* Wide enough for the conversation and "What we know", narrow enough to leave the person's
-     light in view beside it. */
+  /* Narrow enough to leave the person's light and its world in view beside it. */
   .chapter-you {
-    max-width: 1040px;
+    max-width: 600px;
+    gap: var(--space-16);
   }
 
-  /* Wide: the conversation and directions on the left, "What we know" beside both. Stacked:
-     the conversation, then "What we know", then directions. */
-  .you {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 360px;
-    grid-template-areas:
-      "thread known"
-      "directions known";
-    align-items: start;
-    gap: var(--space-32);
+  /* The views, as tabs. The one you're in is marked in sea-glass: a selection. */
+  .you-views {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4) var(--space-8);
+    border-bottom: 1px solid var(--line-reading-hairline);
   }
 
-  .you > .thread {
-    grid-area: thread;
-  }
-
-  .you > .known {
-    grid-area: known;
-  }
-
-  .you > .directions {
-    grid-area: directions;
-    min-width: 0;
-    max-width: 66ch;
-  }
-
-  .thread-meta .select {
-    width: auto;
-  }
-
-  .known-summary {
-    display: none;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-12);
-    padding: var(--space-12) var(--space-16);
-    background: var(--surface-card);
-    border: 1px solid var(--line-reading-control);
-    border-radius: var(--radius-control);
+  .you-tab {
+    min-height: 40px;
+    padding: 0 var(--space-8);
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    color: var(--fg-muted);
     font-size: var(--type-14);
-    color: var(--text-on-reading);
-    text-decoration: none;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .you-tab:hover {
+    color: var(--fg);
+  }
+
+  .you-tab[aria-selected="true"] {
+    color: var(--fg);
+    border-bottom-color: var(--selection);
+  }
+
+  .you-view {
+    display: grid;
+    gap: var(--space-24);
+    min-width: 0;
   }
 
   .thread {
@@ -1308,7 +1342,35 @@
     flex-direction: column;
     gap: var(--space-24);
     min-width: 0;
-    max-width: 66ch;
+  }
+
+  /* What the last decision on Careerwright's proposals did, with Undo while it can apply. */
+  .save-notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-8) var(--space-16);
+    padding: var(--space-12) var(--space-16);
+    background: var(--surface-card);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-control);
+  }
+
+  .save-notice h3 {
+    font-weight: 600;
+  }
+
+  .save-notice > p,
+  .save-notice > [role="alert"] {
+    flex-basis: 100%;
+  }
+
+  /* A limit's meaning in plain words, under its name. */
+  .fact-explained {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--type-14);
   }
 
   .thread-meta {
@@ -1363,6 +1425,12 @@
   .question {
     padding-top: var(--space-16);
     border-top: 1px solid var(--line-reading-hairline);
+  }
+
+  /* Leading the view, right under the tabs' own rule: no second rule. */
+  .thread > .sr-only:first-child + .question {
+    padding-top: 0;
+    border-top: 0;
   }
 
   .question .display {
@@ -1530,10 +1598,48 @@
     gap: var(--space-12);
   }
 
+  /* One suggestion open at a time; the rest a list of titles to scan. The open one is the
+     selected one, edged in sea-glass, and holds the view's one bright action. */
+  .suggestion[data-open="false"] {
+    gap: var(--space-4);
+    padding: var(--space-12) var(--space-24);
+  }
+
+  .suggestion[data-open="true"] {
+    border-color: var(--selection);
+    box-shadow: inset 4px 0 0 var(--selection);
+  }
+
   .suggestion h4 {
     font-family: var(--font-display);
     font-weight: 600;
     font-size: var(--type-25);
+  }
+
+  .suggestion[data-open="false"] h4 {
+    font-size: var(--type-20);
+  }
+
+  .suggestion-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-12);
+    width: 100%;
+    min-height: 40px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .suggestion-toggle .glyph {
+    width: 20px;
+    height: 20px;
+    color: var(--fg-muted);
   }
 
   /* The written "Why this could suit you": model prose, then its checked quotations. */
@@ -1572,21 +1678,13 @@
   }
 }
 
-@media (max-width: 1280px) {
-  .you {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "thread"
-      "known"
-      "directions";
-  }
-
-  .known-summary {
-    display: flex;
-  }
-}
-
 @media (max-width: 760px) {
+  /* On a phone the console is a sheet over the lower part of the world, so the person's light
+     shows above it while there is room (plan section 4: the world is the backdrop). */
+  .chapter-you {
+    margin-top: auto;
+  }
+
   .question .display {
     font-size: var(--type-25);
   }
@@ -1605,13 +1703,36 @@
   }
 }
 
-/* V-08: on wide screens the strip's states sit on their own row, so a longer state (a
-   failed refresh, reconnecting) never wraps the strip and moves the work below it. */
-@media (min-width: 1180px) {
+/* V-08: above a phone the strip's states sit on their own row, so a longer state (a failed
+   refresh, reconnecting) never wraps the strip and moves the work below it. A tablet's strip
+   is then two rows (Task W2C): the synthetic label and the target, then the states and
+   controls; the workspace switcher, work area and budget wait for a wide screen (the account
+   menu names the workspace, and "What we know" holds the answers). */
+@media (min-width: 761px) {
   .strip-end {
     flex-basis: 100%;
     justify-content: flex-end;
     margin-left: 0;
+  }
+}
+
+@media (max-width: 1179px) {
+  .strip .strip-wide {
+    display: none;
+  }
+
+  /* One line: a long target ends in an ellipsis here; the world and "What we know" name it
+     in full, and assistive tech reads all of it. */
+  .strip .strip-target {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .strip .strip-target strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

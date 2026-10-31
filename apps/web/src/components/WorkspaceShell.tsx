@@ -24,6 +24,7 @@ import {
 import { worldFromProfile } from "@/lib/world/model";
 import { SupportShown, useWorldSettings } from "@/lib/world/settings";
 import { ChapterMenu, ChapterRail } from "./ChapterNav";
+import { ConversationTone } from "./ConversationTone";
 import { EvidenceDrawer, useEvidence } from "./EvidenceDrawer";
 import { NotInvited, PageFrame, PageLoading, RequestFailure } from "./PageState";
 import { SyntheticLabel } from "./Status";
@@ -205,7 +206,12 @@ export function WorkspaceShell({
             refreshFailed={refreshFailed(me, workspace, profile)}
             email={auth.state.email}
             controls={<WorldControls settings={world} supportShown={supportShown} />}
-            settings={<CalmMode settings={world} />}
+            settings={
+              <>
+                <ConversationTone workspaceId={workspaceId} />
+                <CalmMode settings={world} />
+              </>
+            }
             onSignOut={() => void auth.signOut()}
           />
           <main id="main" tabIndex={-1} className="workarea">

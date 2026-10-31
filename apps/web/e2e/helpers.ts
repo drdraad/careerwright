@@ -82,10 +82,32 @@ function scan(page: Page): Promise<AxeViolation[]> {
 }
 
 /**
- * The strip's live-update state, matched exactly: its text is "Updates: <state>", so a loose
- * match on "Live" would also match other states.
+ * The strip's live-update state. Live updates that work say nothing (plain words, Task W2C), so
+ * "Live" is the strip's `data-events`; any other state is its words, matched exactly ("Updates:
+ * <state>"), so a loose match would not also match another state.
  */
 export function liveUpdates(page: Page, state: "Live" | "Connecting" | "Reconnecting" | RegExp) {
+  if (state === "Live") return page.locator(".strip[data-events='live']");
   const pattern = state instanceof RegExp ? state : new RegExp(`^Updates: ${state}$`);
   return page.getByRole("status").filter({ hasText: pattern });
+}
+
+/**
+ * The strip's saved state: "Answers saved" or "Nothing saved yet" in words, with the saved
+ * version in `data-version` (any version, or the one given).
+ */
+export function saved(page: Page, version?: number) {
+  return page
+    .getByRole("banner")
+    .locator(version === undefined ? "[data-version]" : `[data-version="${version}"]`);
+}
+
+/** The saved version the strip holds. */
+export async function savedVersion(page: Page): Promise<number> {
+  return Number(await saved(page).getAttribute("data-version"));
+}
+
+/** Opens one of the You chapter's views (its tabs: Conversation, What we know, Suggestions). */
+export async function youView(page: Page, view: "Conversation" | "What we know" | "Suggestions") {
+  await page.getByRole("tab", { name: view }).click();
 }

@@ -2,7 +2,7 @@
 // (ADR 0005 decisions 5 and 9; MODEL-06, STATE-07, DUR-03).
 import { expect, test } from "@playwright/test";
 import { saveElsewhere } from "./api";
-import { chapterUrl, liveUpdates, signIn } from "./helpers";
+import { chapterUrl, liveUpdates, saved, signIn, youView } from "./helpers";
 import { FIXTURE_WORKSPACE, stack } from "./stack";
 
 test.beforeEach(() => {
@@ -65,7 +65,8 @@ test("[STATE-07][BND1-13] a change saved elsewhere reaches an open page through 
   const watcher = await (await browser.newContext()).newPage();
   await signIn(watcher, "ada", chapterUrl("you"));
   await expect(liveUpdates(watcher, "Live")).toBeVisible();
-  await expect(watcher.getByRole("banner").getByText("Saved, version 1")).toBeVisible();
+  await expect(saved(watcher, 1)).toBeVisible();
+  await youView(watcher, "What we know");
   // A reload keeps the address but loses this marker: it proves the page was not reloaded.
   await watcher.evaluate(() => {
     (window as unknown as { careerwrightUnreloaded?: boolean }).careerwrightUnreloaded = true;
@@ -81,10 +82,8 @@ test("[STATE-07][BND1-13] a change saved elsewhere reaches an open page through 
   );
 
   expect(made).toBe(2);
-  await expect(watcher.getByRole("banner").getByText("Saved, version 2")).toBeVisible({
-    timeout: 5_000,
-  });
-  await expect(watcher.getByRole("complementary", { name: "What we know" })).toContainText(
+  await expect(saved(watcher, 2)).toBeVisible({ timeout: 5_000 });
+  await expect(watcher.getByRole("region", { name: "What we know" })).toContainText(
     "Saved from another tab",
   );
   expect(

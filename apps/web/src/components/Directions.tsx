@@ -3,7 +3,11 @@
 // hypotheses, each an ESCO occupation found from the person's own answers, with why it could
 // suit them, what might not, and a low-cost way to try it. No match percentage, ever. The
 // controls change the view only: they are never saved and never become limits. A suggestion
-// becomes a target only when the person chooses it.
+// becomes a target only when the person chooses it. One suggestion is open at a time (session
+// 2: "minimum ideas per page"), the rest a list of titles to scan, and the open one's "Make
+// this a target" is the view's one bright primary action ("I found the button, but it did
+// not stand out enough. Needs to be a bright colour"), as asking for suggestions is before
+// there are any.
 //
 // "Why this could suit you" may also carry a written note (S2.7, ADR 0007 decision 12): one
 // model run per slate, asked for once when the slate first shows, whose every quotation the
@@ -50,6 +54,7 @@ import {
 import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { useEvidence } from "./EvidenceDrawer";
+import { Glyph } from "./Glyph";
 import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
 import { StatusBadge } from "./Status";
@@ -241,6 +246,9 @@ function SuggestionCard({
   slate,
   targets,
   written,
+  open,
+  primary,
+  onOpen,
   onChoose,
   onExcludeTitle,
   onExcludeFamily,
@@ -250,6 +258,11 @@ function SuggestionCard({
   slate: SlateOut;
   targets: string[];
   written: WrittenState;
+  /** Shown in full, with its actions; the others show their title and kind of work. */
+  open: boolean;
+  /** Whether "Make this a target" is the view's one bright primary action. */
+  primary: boolean;
+  onOpen(): void;
   onChoose(): void;
   onExcludeTitle(): void;
   onExcludeFamily(): void;
@@ -261,74 +274,94 @@ function SuggestionCard({
     (t) => t.toLocaleLowerCase("en-GB") === suggestion.title.toLocaleLowerCase("en-GB"),
   );
   const full = targets.length >= listLimit("target_titles");
+  const body = `s-${suggestion.concept_id}-body`;
   return (
-    <article className="card suggestion" aria-labelledby={`s-${suggestion.concept_id}`}>
-      <h4 id={`s-${suggestion.concept_id}`}>{title}</h4>
+    <article
+      className="card suggestion"
+      data-open={open}
+      aria-labelledby={`s-${suggestion.concept_id}`}
+    >
+      <h4 id={`s-${suggestion.concept_id}`}>
+        <button
+          type="button"
+          className="suggestion-toggle"
+          aria-expanded={open}
+          aria-controls={body}
+          onClick={onOpen}
+        >
+          {title}
+          <Glyph name={open ? "expand" : "collapse"} />
+        </button>
+      </h4>
       <p className="small muted">Kind of work: {suggestion.family.label}</p>
-      <p className="small">{suggestion.workday}</p>
-      <div className="grid gap-8">
-        <p className="section-title">Why this could suit you</p>
-        <WrittenNote state={written} />
-        <div className="grid gap-4">
-          {written.kind !== "none" && <p className="small muted">How Careerwright found it</p>}
-          <ul className="plain-list">
-            {suggestion.why_it_could_suit.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
+      {open && (
+        <div id={body} className="grid gap-12">
+          <p className="small">{suggestion.workday}</p>
+          <div className="grid gap-8">
+            <p className="section-title">Why this could suit you</p>
+            <WrittenNote state={written} />
+            <div className="grid gap-4">
+              {written.kind !== "none" && <p className="small muted">How Careerwright found it</p>}
+              <ul className="plain-list">
+                {suggestion.why_it_could_suit.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <div className="grid gap-4">
+            <p className="section-title">What might not suit you</p>
+            <ul className="plain-list">
+              {[...suggestion.what_might_not_suit, ...suggestion.entry_gates].map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="grid gap-4">
+            <p className="section-title">Try it before committing</p>
+            <ul className="plain-list">
+              {suggestion.try_it.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+          <p className="small muted">{suggestion.evidence_gaps.join(" ")}</p>
+          <div className="flex flex-wrap items-center gap-8">
+            <Button
+              variant={primary ? "primary" : "secondary"}
+              onClick={onChoose}
+              disabledReason={
+                already
+                  ? "Already one of your targets."
+                  : full
+                    ? `You have ${listLimit("target_titles")} targets: remove one first.`
+                    : choosing
+                      ? "Saving…"
+                      : undefined
+              }
+            >
+              Make this a target <span className="sr-only">: {title}</span>
+            </Button>
+            <Button variant="quiet" onClick={onExcludeTitle}>
+              Not for me <span className="sr-only">: {title}</span>
+            </Button>
+            <Button variant="quiet" onClick={onExcludeFamily}>
+              Exclude this kind of work <span className="sr-only">: {suggestion.family.label}</span>
+            </Button>
+            <Button
+              variant="quiet"
+              onClick={() =>
+                evidence.open({
+                  title: "Where this came from",
+                  body: <Source suggestion={suggestion} slate={slate} />,
+                })
+              }
+            >
+              Source <span className="sr-only">for {title}</span>
+            </Button>
+          </div>
         </div>
-      </div>
-      <div className="grid gap-4">
-        <p className="section-title">What might not suit you</p>
-        <ul className="plain-list">
-          {[...suggestion.what_might_not_suit, ...suggestion.entry_gates].map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-      </div>
-      <div className="grid gap-4">
-        <p className="section-title">Try it before committing</p>
-        <ul className="plain-list">
-          {suggestion.try_it.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-      </div>
-      <p className="small muted">{suggestion.evidence_gaps.join(" ")}</p>
-      <div className="flex flex-wrap items-center gap-8">
-        <Button
-          variant="secondary"
-          onClick={onChoose}
-          disabledReason={
-            already
-              ? "Already one of your targets."
-              : full
-                ? `You have ${listLimit("target_titles")} targets: remove one first.`
-                : choosing
-                  ? "Saving…"
-                  : undefined
-          }
-        >
-          Make this a target <span className="sr-only">: {title}</span>
-        </Button>
-        <Button variant="quiet" onClick={onExcludeTitle}>
-          Not for me <span className="sr-only">: {title}</span>
-        </Button>
-        <Button variant="quiet" onClick={onExcludeFamily}>
-          Exclude this kind of work <span className="sr-only">: {suggestion.family.label}</span>
-        </Button>
-        <Button
-          variant="quiet"
-          onClick={() =>
-            evidence.open({
-              title: "Where this came from",
-              body: <Source suggestion={suggestion} slate={slate} />,
-            })
-          }
-        >
-          Source <span className="sr-only">for {title}</span>
-        </Button>
-      </div>
+      )}
     </article>
   );
 }
@@ -432,6 +465,7 @@ function Slate({
   profile,
   discovery,
   canWrite,
+  choosePrimary,
   onSuggestAgain,
   suggestBlocked,
 }: {
@@ -440,11 +474,16 @@ function Slate({
   discovery: DiscoveryOut;
   /** Whether a written note may be asked for (a key is stored, or the workspace is a demo). */
   canWrite: boolean;
+  /** Whether choosing the open suggestion is the view's one primary action (not while
+   *  "Suggest again" is, for changed answers). */
+  choosePrimary: boolean;
   /** A new discovery: a new set of suggestions, with a note of its own. */
   onSuggestAgain(): void;
   suggestBlocked?: string | undefined;
 }) {
   const [controls, setControls] = useState<SlateControls>(NO_CONTROLS);
+  // The suggestion shown in full; by default the first one listed.
+  const [opened, setOpened] = useState<string | null>(null);
   const slate = useSlate(workspaceId, discovery.discovery_id, controls);
   const choose = useChooseTarget(workspaceId);
   const explain = useSubmitExplanation(workspaceId);
@@ -503,6 +542,11 @@ function Slate({
   const finding = data.queries.filter((query) => !query.too_general && query.reach > 0).length;
   const first = data.suggestions[0];
   const note: WrittenState = first === undefined ? { kind: "none" } : noteFor(first);
+  // As listed: grouped by direction. The open one, or the first listed once it is not shown.
+  const listed = ORDER.flatMap((direction) =>
+    data.suggestions.filter((s) => s.direction === direction),
+  );
+  const open = listed.some((s) => s.concept_id === opened) ? opened : listed[0]?.concept_id;
   return (
     <div className="grid gap-16">
       <p className="sr-only" role="status">
@@ -583,6 +627,9 @@ function Slate({
                 slate={data}
                 targets={targets}
                 written={noteFor(suggestion)}
+                open={suggestion.concept_id === open}
+                primary={choosePrimary}
+                onOpen={() => setOpened(suggestion.concept_id)}
                 choosing={choose.isPending}
                 onChoose={() =>
                   choose.mutate({
@@ -666,7 +713,7 @@ export function Directions({
             </Alert>
           )}
           <div>
-            <Button variant="secondary" onClick={start} disabledReason={blocked}>
+            <Button variant="primary" onClick={start} disabledReason={blocked}>
               {discovery === null ? "Suggest directions" : "Suggest again"}
             </Button>
           </div>
@@ -682,7 +729,12 @@ export function Directions({
             tone={discovery.run.status === "provider_unavailable" ? "stale" : "error"}
             title={FAILURE_CLASS[discovery.run.failure_class ?? "unknown_failure"].title}
             actions={
-              <Button variant="secondary" onClick={start} disabledReason={blocked}>
+              // The one action, unless "Suggest again" (for changed answers) is shown above.
+              <Button
+                variant={stale ? "secondary" : "primary"}
+                onClick={start}
+                disabledReason={blocked}
+              >
                 Try again
               </Button>
             }
@@ -697,6 +749,7 @@ export function Directions({
           profile={profile}
           discovery={discovery}
           canWrite={unavailable === undefined}
+          choosePrimary={!stale}
           onSuggestAgain={start}
           suggestBlocked={blocked}
         />

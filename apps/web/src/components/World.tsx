@@ -26,7 +26,7 @@ import {
 } from "@/lib/world/geometry";
 import { type FrameState, GLWorld, webgl2Available } from "@/lib/world/gl";
 import { type Box, inView, LEADER_FROM, layoutLabels } from "@/lib/world/labels";
-import { EMPTY_WORLD, type WorldInput } from "@/lib/world/model";
+import { EMPTY_WORLD, type WorldInput, type WorldSkill } from "@/lib/world/model";
 import { MOTION, now, TYPING_HOLD_SECONDS } from "@/lib/world/motion";
 import type { Scene, Vec3 } from "@/lib/world/scene";
 import { useReducedMotion } from "@/lib/world/settings";
@@ -136,6 +136,7 @@ function useBirths(input: WorldInput | null, onIgnite: () => void): Births {
 
 type Label = {
   id: string;
+  kind: "origin" | "skill" | "destination" | "openings";
   anchor: Vec3;
   side: "above" | "below";
   name: string;
@@ -143,12 +144,22 @@ type Label = {
   caption: string;
 };
 
+const SKILL_CAPTION: Record<WorldSkill["state"], string> = {
+  usual: "usual in your role, not confirmed yet",
+  said: "you said you've done it",
+};
+
+/**
+ * Every light's words, so the canvas holds nothing unique: the person, each skill and each
+ * destination by name, and the openings as one count line (a hundred names would be noise).
+ */
 function labelsFor(scene: Scene, input: WorldInput): Label[] {
   const labels: Label[] = [];
   const origin = scene.nodes.find((n) => n.kind === "origin");
   if (origin) {
     labels.push({
       id: "origin",
+      kind: "origin",
       anchor: origin.p,
       side: "below",
       name: "You",
@@ -157,15 +168,41 @@ function labelsFor(scene: Scene, input: WorldInput): Label[] {
         : "Your light comes on with your first answer",
     });
   }
+  for (const skill of input.skills) {
+    const node = scene.nodes.find((n) => n.id === `skill:${skill.id}`);
+    if (!node) continue;
+    labels.push({
+      id: node.id,
+      kind: "skill",
+      anchor: node.p,
+      side: "above",
+      name: skill.label,
+      caption: SKILL_CAPTION[skill.state],
+    });
+  }
   for (const destination of input.destinations) {
     const node = scene.nodes.find((n) => n.id === `destination:${destination.id}`);
     if (!node) continue;
     labels.push({
       id: node.id,
+      kind: "destination",
       anchor: node.p,
       side: "above",
       name: destination.title,
       caption: "A place you chose to head for. The ground between is not known yet.",
+    });
+  }
+  const openings = scene.nodes.filter((n) => n.kind === "opening");
+  if (openings.length > 0) {
+    const centre = (axis: 0 | 1 | 2) =>
+      openings.reduce((sum, n) => sum + n.p[axis], 0) / openings.length;
+    labels.push({
+      id: "openings",
+      kind: "openings",
+      anchor: [centre(0), centre(1), centre(2)],
+      side: "below",
+      name: `${openings.length} ${openings.length === 1 ? "opening" : "openings"}`,
+      caption: "small lights around the places you chose",
     });
   }
   return labels;
@@ -194,7 +231,11 @@ function measureClear(vp: Viewport): Clear | undefined {
 }
 
 const sameClear = (a: Clear | undefined, b: Clear | undefined) =>
-  a?.left === b?.left && a?.right === b?.right && a?.top === b?.top && a?.bottom === b?.bottom;
+  a?.left === b?.left &&
+  a?.right === b?.right &&
+  a?.top === b?.top &&
+  a?.bottom === b?.bottom &&
+  a?.backdrop === b?.backdrop;
 
 /** A name's line back to its light stops this short of it (CSS pixels). */
 const LEADER_CLEAR = 8;
@@ -204,10 +245,11 @@ const KEY_MARGIN = { wide: 24, narrow: 16, abovePanel: 12, belowBars: 12 };
 const meets = (a: Box, b: Box) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-/** What the key explains, where the world draws it: the destinations' lights and the grey trails. */
+/** What the key explains, where the world draws it: every light but the person's, and the grey
+ *  trails. */
 function keyPoints(scene: Scene): Vec3[] {
   return [
-    ...scene.nodes.filter((node) => node.kind === "destination").map((node) => node.p),
+    ...scene.nodes.filter((node) => node.kind !== "origin").map((node) => node.p),
     ...scene.trails.filter((trail) => trail.state === "shadow").flatMap((trail) => trail.points),
   ];
 }
@@ -653,13 +695,18 @@ export function World({
 
   const legend = {
     destinations: input.destinations.length > 0,
+    said: input.skills.some((skill) => skill.state === "said"),
+    usual: input.skills.some((skill) => skill.state === "usual"),
     shadow: input.destinations.length > 0,
+    openings: scene?.nodes.some((node) => node.kind === "opening") ?? false,
   };
+  const keyed = Object.values(legend).some(Boolean);
   const view = vp === null ? null : placeView(place, vp, clear);
   const keyOpen =
     vp !== null &&
     vp.w > KEY_OPEN_FROM &&
     clear !== undefined &&
+    !clear.backdrop &&
     clear.right - clear.left >= KEY_OPEN_ROOM;
 
   return (
@@ -690,7 +737,10 @@ export function World({
                 className="world-label"
                 data-label={label.id}
                 data-shown="false"
-                data-kind={label.id === "origin" ? "origin" : "destination"}
+                data-kind={label.kind}
+                // The key explains every light but the person's: while one is named in view,
+                // the key is shown too.
+                data-keyed={label.kind !== "origin"}
               >
                 <span className="world-label-name">{label.name}</span>
                 <span className="sr-only">: {label.caption}</span>
@@ -699,7 +749,7 @@ export function World({
           </ul>
         </aside>
       </div>
-      {(legend.destinations || legend.shadow) && (
+      {keyed && (
         <details className="world-key on-reading" ref={keyRef} open={keyOpen} data-placed="false">
           <summary>What the lights mean</summary>
           <ul aria-label="What the lights mean">
@@ -709,10 +759,28 @@ export function World({
                 Warm lights: places you chose to head for
               </li>
             )}
+            {legend.said && (
+              <li>
+                <span className="world-key-mark" data-key="said" aria-hidden="true" />
+                Bright: you said you've done it
+              </li>
+            )}
+            {legend.usual && (
+              <li>
+                <span className="world-key-mark" data-key="usual" aria-hidden="true" />
+                Faint ring: usual in your role, not confirmed yet
+              </li>
+            )}
             {legend.shadow && (
               <li>
                 <span className="world-key-mark" data-key="shadow" aria-hidden="true" />
                 Grey trails: not known yet
+              </li>
+            )}
+            {legend.openings && (
+              <li>
+                <span className="world-key-mark" data-key="opening" aria-hidden="true" />
+                Small lights: openings
               </li>
             )}
           </ul>

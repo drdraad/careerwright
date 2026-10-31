@@ -252,13 +252,114 @@ describe("[PROF-08][REC1-10] the chapter leads with how to start", () => {
       conversation_mode: null,
       paused: false,
     });
-    // A sure person is asked for the target and its level; suggestions stay optional.
+    // A sure person is asked for the target and its level; suggestions stay optional, in their
+    // own view.
     expect(
       await screen.findByRole("heading", {
         name: "Which role are you aiming for, and at what level?",
       }),
     ).toBeVisible();
+    await user.click(screen.getByRole("tab", { name: "Suggestions" }));
     expect(screen.getByRole("button", { name: "Help me explore instead" })).toBeVisible();
+  });
+
+  it("[PROF-08] has the reply field from the first screen, and no tone setting in the chapter", async () => {
+    // Session 2: "Chat should be immediate"; "ditch the tone selection - this should be in
+    // preferences" (it is in the account menu, `ConversationTone`).
+    const state = { preferences: prefs(null), turns: [] as TurnOut[] };
+    const sent = fakeApi(
+      routes(state, [
+        {
+          method: "POST",
+          path: /\/interview\/turns$/,
+          status: 202,
+          answer: { ...turn("queued"), support_note: null },
+        },
+      ]),
+    );
+    const user = renderYou();
+
+    expect(
+      await screen.findByRole("heading", { name: "How would you like to start?" }),
+    ).toBeVisible();
+    expect(screen.queryByLabelText("How Careerwright talks with you")).toBeNull();
+    await user.type(screen.getByLabelText("Reply to Careerwright"), "I fix bikes.");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
+    expect(sent.find((s) => s.method === "POST")?.body).toEqual({
+      expected_profile_version: 1,
+      message: "I fix bikes.",
+    });
+  });
+});
+
+describe("[UI-06][UI-04] one idea per view: the conversation, what we know and the suggestions", () => {
+  it("opens on the conversation, moves between views as tabs, and shows one view at a time", async () => {
+    fakeApi(routes({ preferences: prefs("unsure"), turns: [] }));
+    const user = renderYou();
+
+    const conversation = await screen.findByRole("tab", { name: "Conversation" });
+    expect(conversation).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: "Conversation" })).toContainElement(
+      screen.getByLabelText("Reply to Careerwright"),
+    );
+    expect(screen.queryByRole("heading", { name: "What we know" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Directions to explore" })).toBeNull();
+
+    // Arrow keys move between the tabs (and the view follows); Home and End reach the ends.
+    conversation.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("tab", { name: "What we know" })).toHaveFocus();
+    expect(screen.getByRole("heading", { name: "What we know" })).toBeVisible();
+    expect(screen.queryByLabelText("Reply to Careerwright")).toBeNull();
+    await user.keyboard("{End}");
+    expect(screen.getByRole("tab", { name: "Suggestions" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(await screen.findByRole("heading", { name: "Directions to explore" })).toBeVisible();
+    await user.keyboard("{Home}");
+    expect(conversation).toHaveFocus();
+    expect(screen.getByLabelText("Reply to Careerwright")).toBeVisible();
+  });
+
+  it("explains the two limits in plain words where they are shown", async () => {
+    // Session 2: "total spending limit and monthly payment limit - what do these mean??"
+    const limited: ProfileOut = {
+      ...profile,
+      document: {
+        ...answers,
+        direct_spend_cap: {
+          state: "provided",
+          value: { minor_units: 150_000, currency: "GBP" },
+          source_ref_id: "s1",
+        },
+        monthly_payment_cap: {
+          state: "provided",
+          value: { minor_units: 25_000, currency: "GBP" },
+          source_ref_id: "s1",
+        },
+      },
+    };
+    fakeApi(routes({ preferences: prefs("unsure"), turns: [] }));
+    const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queries}>
+        <EvidenceProvider>
+          <YouChapter workspace={workspace} profile={limited} initialView="known" />
+        </EvidenceProvider>
+      </QueryClientProvider>,
+    );
+
+    const answersShown = await screen.findByRole("region", { name: "Your answers" });
+    expect(within(answersShown).getByText("Total spending limit")).toBeVisible();
+    expect(
+      within(answersShown).getByText(/The most you'd spend on the whole change, all added up/),
+    ).toBeVisible();
+    expect(
+      within(answersShown).getByText(/The most you could pay out in any one month/),
+    ).toBeVisible();
   });
 });
 
@@ -463,15 +564,22 @@ describe("[STATE-06][PROF-01] undo restores the earlier answers with their sourc
     );
     const { user } = renderLive();
     const tray = await screen.findByRole("region", { name: /To review: 2 changes/ });
-    await user.click(within(tray).getByRole("button", { name: "Accept current role" }));
+    const accept = within(tray).getByRole("button", { name: "Accept current role" });
+    // Session 2, C3: accept and undo are colour coded as well as worded; accept fills once chosen.
+    expect(accept).toHaveClass("btn-accept");
+    expect(accept).toHaveAttribute("aria-pressed", "false");
+    await user.click(accept);
+    expect(accept).toHaveAttribute("aria-pressed", "true");
     await user.click(within(tray).getByRole("button", { name: /Save 1 to What we know/ }));
 
-    // B-I4: the save is announced and focus lands on What we know, not on nothing.
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "What we know" })).toHaveFocus(),
-    );
-    expect(screen.getByTestId("you-announcer")).toHaveTextContent("Saved as version 2.");
-    await user.click(await screen.findByRole("button", { name: "Undo the last save" }));
+    // B-I4: the save is announced and focus lands on the notice that says what it did, right
+    // where the decision was made, not on nothing.
+    const saved = await screen.findByRole("heading", { name: "Saved to What we know" });
+    await waitFor(() => expect(saved).toHaveFocus());
+    expect(screen.getByTestId("you-announcer")).toHaveTextContent("Saved to What we know.");
+    const undo = await screen.findByRole("button", { name: "Undo the last save" });
+    expect(undo).toHaveClass("btn-undo");
+    await user.click(undo);
 
     await waitFor(() => expect(sent.some((s) => s.path.endsWith("/profile/revert"))).toBe(true));
     expect(sent.find((s) => s.path.endsWith("/profile/revert"))?.body).toEqual({
@@ -481,10 +589,11 @@ describe("[STATE-06][PROF-01] undo restores the earlier answers with their sourc
     expect(sent.some((s) => s.method === "PUT" && s.path.endsWith("/profile"))).toBe(false);
     await waitFor(() =>
       expect(screen.getByTestId("you-announcer")).toHaveTextContent(
-        "Undone: version 3 has your answers from before the save.",
+        "Save undone: your answers are back as they were before it.",
       ),
     );
-    expect(screen.getByRole("heading", { name: "What we know" })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Save undone" })).toHaveFocus());
+    expect(screen.queryByRole("button", { name: "Undo the last save" })).toBeNull();
   });
 });
 
@@ -771,11 +880,18 @@ describe("[UI-06][STATE-01] a failed reply says why and keeps one primary action
 describe("[UI-04][S0-V08] one filled primary action in each state of the chapter", () => {
   const count = () => document.querySelectorAll(".btn-primary").length;
 
-  it("is Send when nothing waits, the tray's Save while reviewing, and none at the entry", async () => {
+  it("is Send when nothing waits, the tray's Save while reviewing, and Send at the entry", async () => {
     fakeApi(routes({ preferences: prefs(null), turns: [] }));
     renderYou();
     await screen.findByRole("button", { name: "Help me explore" });
-    expect(count()).toBe(0); // two equal choices: neither is pushed
+    // Chat is immediate (session 2): Send is the one action; the two equal choices are quick
+    // answers, neither pushed.
+    expect(screen.getByRole("button", { name: "Help me explore" })).toHaveClass("btn-secondary");
+    expect(screen.getByRole("button", { name: "I know my direction" })).toHaveClass(
+      "btn-secondary",
+    );
+    expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-primary");
+    expect(count()).toBe(1);
 
     cleanup();
     fakeApi(routes({ preferences: prefs("unsure"), turns: [] }));
@@ -790,6 +906,8 @@ describe("[UI-04][S0-V08] one filled primary action in each state of the chapter
     await screen.findByRole("region", { name: /To review/ });
     expect(count()).toBe(1);
 
+    await user.click(screen.getByRole("tab", { name: "What we know" }));
+    expect(count()).toBe(0); // reading what we know: nothing to decide
     await user.click(screen.getByRole("button", { name: "Edit answers directly" }));
     expect(await screen.findByRole("button", { name: "Save changes" })).toBeVisible();
     expect(count()).toBe(1); // the form's Save while it is open

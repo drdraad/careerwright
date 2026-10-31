@@ -1,7 +1,9 @@
 import { type ButtonHTMLAttributes, forwardRef, type ReactNode, useId } from "react";
 import { Glyph, type GlyphName } from "./Glyph";
 
-type Variant = "primary" | "secondary" | "quiet" | "icon";
+/** `accept` and `undo` are the two decisions on a proposed change, colour coded as well as
+ *  worded (session 2, C3); neither is ever the view's primary action. */
+type Variant = "primary" | "secondary" | "quiet" | "icon" | "accept" | "undo";
 
 type Props = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "disabled"> & {
   variant?: Variant;

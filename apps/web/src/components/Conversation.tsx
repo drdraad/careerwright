@@ -1,15 +1,17 @@
 "use client";
 // The conversation (spec section 4, S2.3): one useful question at a time, the person's
-// choice of entry and tone, pause and resume, and the reply as it streams. A streamed reply
-// is marked not checked until the validated turn replaces it; a failed turn says why, keeps
-// what streamed marked as not saved, and saves nothing. A message with a risk stem is sent
-// as usual, and the API's calm support panel is shown beside it, or beside its refusal if
-// the send is refused (ADR 0007 decision 7): announced politely, focus left where it is,
-// dismissible, and the question steps aside while it is shown (no career question that
+// choice of entry, pause and resume, and the reply as it streams. Chat is immediate (session
+// 2): the reply field is there from the first screen, and the entry choice is the first
+// question's two quick answers; how Careerwright talks with you is a preference in the account
+// menu (`ConversationTone`). A streamed reply is marked not checked until the validated turn
+// replaces it; a failed turn says why, keeps what streamed marked as not saved, and saves
+// nothing. What the reply proposes (`review`) is decided right after it. A message with a risk
+// stem is sent as usual, and the API's calm support panel is shown beside it, or beside its
+// refusal if the send is refused (ADR 0007 decision 7): announced politely, focus left where
+// it is, dismissible, and the question steps aside while it is shown (no career question that
 // turn).
-import { useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import type {
-  ConversationMode,
   EntryMode,
   PreferencesOut,
   ProfileOut,
@@ -20,7 +22,6 @@ import type {
 import { replyView, turnFailed, turnRunning } from "@/lib/conversation";
 import { type MessageSender, useSetPreferences, useTurnReply } from "@/lib/queries";
 import {
-  CONVERSATION_MODE,
   ENTRY_MODE,
   FAILED_REPLY_LABEL,
   FAILURE_CLASS,
@@ -49,6 +50,10 @@ type Props = {
   primary: string;
   announce(text: string): void;
   onEditAnswers(): void;
+  /** What the latest reply proposes, or what the last decision on it did: right after it. */
+  review?: ReactNode;
+  /** Quiet things at the end of the view (the stored key's details). */
+  after?: ReactNode;
 };
 
 function Reply({
@@ -157,7 +162,6 @@ function EntryChoice({
       <h2 id="entry-title" className="display">
         How would you like to start?
       </h2>
-      <p className="muted mt-12 measure">Both lead to the same plan chapters.</p>
       <div className="choices">
         {(Object.keys(ENTRY_MODE) as EntryMode[]).map((entry) => (
           <Button
@@ -198,6 +202,8 @@ export function Conversation({
   primary,
   announce,
   onEditAnswers,
+  review,
+  after,
 }: Props) {
   const id = workspace.workspace_id;
   const setPreferences = useSetPreferences(id);
@@ -256,7 +262,7 @@ export function Conversation({
   });
 
   const save = (
-    changes: Partial<Pick<PreferencesOut, "entry_mode" | "conversation_mode" | "paused">>,
+    changes: Partial<Pick<PreferencesOut, "entry_mode" | "paused">>,
     onError?: () => void,
   ) =>
     setPreferences.mutate(
@@ -279,42 +285,10 @@ export function Conversation({
   const hidden = turns.length - shown.length;
 
   return (
-    <section className="grid gap-24" aria-labelledby="conversation-title">
+    <section className="thread" aria-labelledby="conversation-title">
       <h2 id="conversation-title" className="sr-only">
         Conversation with Careerwright
       </h2>
-      <div className="thread-meta">
-        <label htmlFor={modeId}>How Careerwright talks with you</label>
-        <select
-          id={modeId}
-          className="select"
-          value={preferences.conversation_mode ?? ""}
-          onChange={(event) => save({ conversation_mode: event.target.value as ConversationMode })}
-        >
-          {preferences.conversation_mode === null && (
-            <option value="" disabled>
-              Choose a tone
-            </option>
-          )}
-          {(Object.keys(CONVERSATION_MODE) as ConversationMode[]).map((mode) => (
-            <option key={mode} value={mode}>
-              {CONVERSATION_MODE[mode]}
-            </option>
-          ))}
-        </select>
-        {!entryNeeded && (
-          // Named for what it pauses: the world's "Pause motion" is on the same screen.
-          <Button variant="secondary" onClick={() => save({ paused: !preferences.paused })}>
-            {preferences.paused ? "Resume the interview" : "Pause the interview"}
-          </Button>
-        )}
-        {demo && (
-          <span className="small">
-            Demo interviewer: synthetic answers from fixed patterns, not a model.
-          </span>
-        )}
-      </div>
-      {setPreferences.error !== null && <RequestFailure error={setPreferences.error} />}
 
       {entryNeeded ? (
         <EntryChoice
@@ -368,6 +342,8 @@ export function Conversation({
             </Alert>
           )}
 
+          {review}
+
           {preferences.paused ? (
             <section className="question" aria-labelledby="paused-title">
               <h2 id="paused-title" className="display">
@@ -394,6 +370,8 @@ export function Conversation({
           )}
         </>
       )}
+      {/* Saving the entry choice or a pause failed: said where the choice was made. */}
+      {setPreferences.error !== null && <RequestFailure error={setPreferences.error} />}
 
       {note !== null && (
         <SupportNote
@@ -406,38 +384,51 @@ export function Conversation({
       )}
       {sender.error !== null && <RequestFailure error={sender.error} />}
 
-      {!entryNeeded && (
-        <form
-          className="composer"
-          aria-label="Your reply"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (sendBlocked === undefined && message.trim() !== "") void send(message.trim());
-          }}
-        >
-          <label className="sr-only" htmlFor={`${modeId}-reply`}>
-            Reply to Careerwright
-          </label>
-          <textarea
-            ref={replyField}
-            id={`${modeId}-reply`}
-            rows={2}
-            maxLength={2000}
-            placeholder="Reply in your own words"
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-          />
-          <div className="grid justify-items-end gap-4">
-            <Button
-              type="submit"
-              variant={primary === "send" ? "primary" : "secondary"}
-              disabledReason={sendBlocked}
-            >
-              Send
+      <form
+        className="composer"
+        aria-label="Your reply"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (sendBlocked === undefined && message.trim() !== "") void send(message.trim());
+        }}
+      >
+        <label className="sr-only" htmlFor={`${modeId}-reply`}>
+          Reply to Careerwright
+        </label>
+        <textarea
+          ref={replyField}
+          id={`${modeId}-reply`}
+          rows={2}
+          maxLength={2000}
+          placeholder="Reply in your own words"
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+        />
+        <div className="grid justify-items-end gap-4">
+          <Button
+            type="submit"
+            variant={primary === "send" ? "primary" : "secondary"}
+            disabledReason={sendBlocked}
+          >
+            Send
+          </Button>
+        </div>
+      </form>
+
+      {(!entryNeeded || demo) && (
+        <div className="thread-meta">
+          {!entryNeeded && (
+            // Named for what it pauses: the world's "Pause motion" is on the same screen.
+            <Button variant="quiet" onClick={() => save({ paused: !preferences.paused })}>
+              {preferences.paused ? "Resume the interview" : "Pause the interview"}
             </Button>
-          </div>
-        </form>
+          )}
+          {demo && (
+            <span>Demo interviewer: synthetic answers from fixed patterns, not a model.</span>
+          )}
+        </div>
       )}
+      {after}
     </section>
   );
 }
