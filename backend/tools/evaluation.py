@@ -387,7 +387,10 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         # An answer every search resting on it found nothing with is named in the notes, on
         # a full slate too, and one that found work never is (Task W2B re-review 2, N-I1). A
         # one-word work style a model searched beside a task keeps its own note instead
-        # (re-review 3, M2).
+        # (re-review 3, M2), so naming one as "found no work" is wrong (re-review 4, M3).
+        styles = {
+            text for field, text in answers if field == "work_style" and len(text.split()) == 1
+        }
         reached: dict[str, bool] = {}
         for q in observed["queries"]:
             for item in q["based_on"]:
@@ -401,13 +404,15 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
 
         unnamed = [text for text, hit in reached.items() if not hit and not named(text)]
         wrong = [text for text, hit in reached.items() if hit and named(text)]
+        wrong += sorted(text for text in styles if named(text))
         if unnamed or wrong:
             return Failure(FailureType.THIN_EVIDENCE, f"not named {unnamed}, wrongly {wrong}")
         return None
     if e.check == "general_searches_add_only":
-        # A search too general to find work on its own ("writing reports" is part of the
-        # essential skills of 217 occupations) only adds weight to work another search found,
-        # and the slate names it (Task W2B re-review 2, N-I2; provisional thresholds).
+        # A search too general to find work on its own ("writing reports" reaches 217
+        # occupations through the main names of their essential skills) only adds weight to
+        # work another search found, and the slate names it (Task W2B re-review 2, N-I2;
+        # provisional thresholds).
         general = {q["query_id"]: q["text"] for q in observed["queries"] if q["too_general"]}
         alone = [s["title"] for s in suggestions if set(s["matched_queries"]) <= set(general)]
         unnamed = [

@@ -161,28 +161,29 @@ def test_the_working_pool_keeps_its_bound_and_counts_the_work_beyond_it(
 
 @pytest.mark.req("DIV1-06", "DIV1-08")
 @pytest.mark.parametrize(
-    ("answer", "reach"),
+    ("answer", "did"),
     [
-        ("solving problems", "the essential skills of 77 occupations"),
-        ("writing reports", "the essential skills of 217 occupations"),
-        ("working in a team", "the essential skills of 242 occupations"),
-        ("training staff", "10 different essential skills"),
-        ("analysing data", "the essential skills of 92 occupations"),
+        ("solving problems", "reached 77 occupations in ESCO through the main names of their"),
+        ("writing reports", "reached 217 occupations in ESCO through the main names of their"),
+        ("working in a team", "reached 242 occupations in ESCO through the main names of their"),
+        ("training staff", "matched the main names of 10 different essential skills in ESCO"),
+        ("analysing data", "reached 92 occupations in ESCO through the main names of their"),
     ],
 )
 def test_an_answer_too_general_to_find_work_alone_finds_none_and_says_why(
-    full_release: sa.Engine, answer: str, reach: str
+    full_release: sa.Engine, answer: str, did: str
 ) -> None:
     # Task W2B re-review 2, N-I2: each scattered its slate across unrelated work ("writing
     # reports": an ambulance driver, a chiropractor, a city councillor, a lieutenant).
-    # Re-review 3, I1: the note says what was counted, essential skills only.
+    # Re-review 3, I1: the note says what was counted, essential skills only. Re-review 4,
+    # I1: it says what the search did, the main names it read, never what ESCO holds.
     with system_transaction(full_release) as tx:
         slate = observed_for(tx, {"enjoyed_tasks": [answer]})
 
     assert slate["suggestions"] == []
     [query] = slate["queries"]
     assert query["too_general"]
-    assert any(f"“{answer.capitalize()}” is part of {reach}" in note for note in slate["notes"])
+    assert any(f"“{answer.capitalize()}” {did}" in note for note in slate["notes"])
 
 
 @pytest.mark.req("DIV1-06", "DIV1-08")
@@ -198,10 +199,49 @@ def test_an_answer_naming_a_skill_no_occupation_lists_as_essential_is_named_for_
     assert slate["suggestions"] == []
     assert [(q["text"], q["reach"]) for q in slate["queries"]] == [("taking pictures", 0)]
     assert (
-        "“Taking pictures” isn't part of any skill ESCO lists as essential for an occupation, so "
-        "it found no work."
+        "No main name of a skill ESCO lists as essential holds all the words of “taking "
+        "pictures”, so it found no work."
     ) in slate["notes"]
     assert not any("names any skill" in note for note in slate["notes"])
+
+
+@pytest.mark.req("DIV1-06", "DIV1-08")
+def test_an_answer_that_is_another_name_of_an_essential_skill_is_named_for_what_was_read(
+    full_release: sa.Engine,
+) -> None:
+    # Task W2B re-review 4, I1: "operating farm machinery" is ESCO's other name for "operate
+    # agricultural machinery", essential for 8 occupations. A search reads main names only,
+    # so it finds no work, and the slate said it "isn't part of any skill ESCO lists as
+    # essential", which is untrue. It now says what the search read, and that holds.
+    with system_transaction(full_release) as tx:
+        slate = observed_for(tx, {"enjoyed_tasks": ["operating farm machinery"]})
+        other_name = tx.execute(
+            sa.text(
+                "SELECT count(DISTINCT r.concept_id) FROM careerwright.skill_labels l "
+                "JOIN careerwright.occupation_skills r ON r.skill_id = l.skill_id "
+                "AND r.relation = 'essential' "
+                "WHERE l.kind = 'alternative' AND l.normalised = 'operating farm machinery'"
+            )
+        ).scalar_one()
+        # Independent of the search: a word starting as each of its words does, which holds
+        # at least every word the English stems would match.
+        main_names = tx.execute(
+            sa.text(
+                "SELECT count(*) FROM careerwright.skills s WHERE s.preferred_label ~* '\\moper' "
+                "AND s.preferred_label ~* '\\mfarm' AND s.preferred_label ~* '\\mmachin' "
+                "AND EXISTS (SELECT 1 FROM careerwright.occupation_skills r "
+                "WHERE r.skill_id = s.skill_id AND r.relation = 'essential')"
+            )
+        ).scalar_one()
+
+    assert other_name == 8  # the case: ESCO's other name for an essential skill
+    assert main_names == 0  # the note's words hold
+    assert slate["suggestions"] == []
+    assert [(q["text"], q["reach"]) for q in slate["queries"]] == [("operating farm machinery", 0)]
+    assert (
+        "No main name of a skill ESCO lists as essential holds all the words of “operating farm "
+        "machinery”, so it found no work."
+    ) in slate["notes"]
 
 
 @pytest.mark.req("DIV1-06", "DIV1-08")

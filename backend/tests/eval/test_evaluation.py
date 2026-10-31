@@ -292,15 +292,15 @@ def test_an_answer_whose_every_search_found_nothing_must_be_named() -> None:
         # found work, so it is never "found no work".
         {**query("q5", "writing reports", reports, 217), "hits": 0},
     ]
-    nowhere = "isn't part of any skill ESCO lists as essential for an occupation"
-    missed = f"“Repairing physical objects” {nowhere}, so it found no work."
+    nowhere = "No main name of a skill ESCO lists as essential holds all the words of"
+    missed = f"{nowhere} “repairing physical objects”, so it found no work."
     pool = "Careerwright chose these from 12 occupations."
 
     def shown(*notes: str, reach: int = 0, more: tuple[dict[str, Any], ...] = ()) -> dict[str, Any]:
         found = [*queries, query("q4", "fixing machines", repairing, reach), *more]
         return slate(*six, pool_size=12, queries=found, notes=[*notes, pool])
 
-    wrongly = f"“Working outdoors” {nowhere}, so it found no work."
+    wrongly = f"{nowhere} “working outdoors”, so it found no work."
     assert evaluate(p02, shown(missed), {}) == []
     assert [f.type for f in evaluate(p02, shown(), {})] == [FailureType.THIN_EVIDENCE]
     assert [f.type for f in evaluate(p02, shown(missed, wrongly), {})] == [
@@ -317,6 +317,15 @@ def test_an_answer_whose_every_search_found_nothing_must_be_named() -> None:
     beside = {**query("q6", "repair machinery", repairing, 0), "based_on": [repairing, practical]}
     style = "How you like to work (“practical”) isn't searched on its own."
     assert evaluate(p02, shown(missed, style, more=(beside,)), {}) == []
+    # Re-review 4, M3: naming that style as "found no work" is the bug round 4 fixed, so the
+    # check must catch it.
+    named = (
+        "“Practical” found no work: no main name of a skill ESCO lists as essential holds all "
+        "the words of its search “repair machinery”."
+    )
+    assert [f.type for f in evaluate(p02, shown(missed, named, more=(beside,)), {})] == [
+        FailureType.THIN_EVIDENCE
+    ]
 
 
 @pytest.mark.req("DIV1-06", "DIV1-08", "TEST1-10")
@@ -333,8 +342,8 @@ def test_a_search_too_general_to_find_work_alone_may_only_add_weight_and_is_name
          "too_general": True},
     ]  # fmt: skip
     note = (
-        "“Writing reports” is part of the essential skills of 217 occupations in ESCO, too many "
-        "to choose from on its own."
+        "“Writing reports” reached 217 occupations in ESCO through the main names of their "
+        "essential skills, too many to choose from on its own."
     )
     reason = {"pool_size": 16, "fewer_reasons": ["Only 2 occupations matched."]}
 
@@ -360,12 +369,12 @@ def test_a_search_too_general_to_find_work_alone_may_only_add_weight_and_is_name
 def test_a_title_several_occupations_hold_must_wait_for_the_person_s_choice() -> None:
     # Task W2B fix round 2: never joined over the occupations' skills together.
     case = BY_ID["DSC-16"]
-    named = "Your current role: “bus operator”. ESCO lists it as this occupation."
+    named = "Your current role: “bus operator”. Careerwright matched it to this occupation in ESCO."
     joined = (
         "Your current role: “bus operator”. ESCO lists 14 of the same essential skills for "
         "both, so Careerwright joined them by those skills."
     )
-    reason = ["ESCO lists “bus operator” as the title of 2 occupations."]
+    reason = ["Careerwright matched “bus operator” to 2 occupations in ESCO."]
     role = [{"field": "current_role", "text": "bus operator"}]
 
     def found(title: str, family: str, direction: str, why: str) -> dict[str, Any]:

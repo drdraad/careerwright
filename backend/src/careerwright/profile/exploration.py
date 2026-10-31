@@ -649,9 +649,10 @@ def explain(candidate: Candidate, facts: OccupationFacts, familiarity_known: boo
                     "title "
                     "from it, and ESCO lists it."
                 )
-            else:  # the person's own title, resolved to this occupation
+            else:  # the person's own title, resolved to this occupation (folded, so matched)
                 why.append(
-                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. ESCO lists it as this occupation."
+                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. Careerwright matched it to this "
+                    "occupation in ESCO."
                 )
     might_not: list[str] = []
     if facts.essential_skills:
@@ -768,6 +769,7 @@ def compute_slate(
     own = {keys[t.text]: t for t in mine if keys[t.text]}
     queries: list[PoolQuery] = []
     unsearchable: list[DiscoveryQuery] = []
+    joins: set[str] = set()  # the queries a title's skill join answered, never read
     role_joins: set[str] = set()
     styles: list[str] = []  # one-word work-style answers a search or idea rested on: not run
     general: dict[str, SkillSearch] = {}  # each search too general to find work alone
@@ -780,6 +782,7 @@ def compute_slate(
             if _joinable(title):
                 channel = SlateChannel(query.channel.value)
                 queries.append(_joined(tx, query.query_id, title, channel, tuple(query.based_on)))
+                joins.add(query.query_id)
                 if title is role:
                     role_joins.add(query.query_id)
             continue
@@ -799,6 +802,7 @@ def compute_slate(
         )
         if _joinable(role):
             queries.append(_joined(tx, ROLE_JOIN, role, SlateChannel.SHARED_SKILLS, (item,)))
+            joins.add(ROLE_JOIN)
             role_joins.add(ROLE_JOIN)
         familiar.update(role.occupations)
     for index, target in enumerate(named, start=1):
@@ -837,9 +841,9 @@ def compute_slate(
     slate = choose_slate(pool, controls, left_out)
     changed = release_note(proposal.release, release.dataset_id)
     notes = [] if changed is None else [changed]
-    notes += _missed_notes(queries, unsearchable, styles)
+    notes += _missed_notes(queries, unsearchable, styles, frozenset(joins))
     notes += dict.fromkeys(
-        _general_note(query, general[query.query_id].skills)
+        _general_note(query, general[query.query_id].skills, queries)
         for query in queries
         if query.too_general
     )
@@ -900,17 +904,20 @@ def _suggestions(
     ]
 
 
+# The person's titles are matched with case, punctuation, hyphens and simple plurals folded
+# (`careerwright.concept_key`), so these say what Careerwright matched, never what ESCO
+# lists (Task W2B re-review 4, I1's rule).
 def _unmatched(title: str) -> str:
     return (
-        f"“{title}” isn't a title ESCO lists, so Careerwright can't join other work to it by "
-        "shared skills. Choose the ESCO occupation closest to it."
+        f"Careerwright couldn't match “{title}” to an occupation in ESCO, so it can't join other "
+        "work to that title by shared skills. Choose the ESCO occupation closest to it."
     )
 
 
 def _ambiguous(title: ResolvedTitle) -> str:
     return (
-        f"ESCO lists “{title.text}” as the title of {len(title.occupations)} occupations, so "
-        "Careerwright can't join other work to it by shared skills until you choose which one "
+        f"Careerwright matched “{title.text}” to {len(title.occupations)} occupations in ESCO, "
+        "so it can't join other work to that title by shared skills until you choose which one "
         "you mean."
     )
 
@@ -943,31 +950,42 @@ def _in_own_words(searches: list[str], answers: list[str]) -> bool:
     return len(answers) == 1 and [words(s) for s in searches] == [words(answers[0])]
 
 
+@dataclass
+class _Searched:
+    """An answer's searches, by what each did (`_missed`)."""
+
+    read: list[str] = field(default_factory=list)  # read the main names of essential skills
+    common: list[str] = field(default_factory=list)  # only common words: nothing was read
+    joined: list[str] = field(default_factory=list)  # the person's own title, joined by skills
+
+
 def _missed_notes(
-    queries: list[PoolQuery], unsearchable: list[DiscoveryQuery], styles: list[str]
+    queries: list[PoolQuery],
+    unsearchable: list[DiscoveryQuery],
+    styles: list[str],
+    joins: frozenset[str],
 ) -> list[str]:
-    """Each answer whose every search found nothing, named (Task W2B re-review 2, N-I1): an
-    answer several searches rest on is named only when none of them found anything. A
-    one-word work style keeps its own note (`_work_style_note`), beside `styles`, the
-    one-word styles no search was run for (Task W2B re-review 3, M2)."""
-    searches: dict[EvidenceItem, list[str]] = {}
+    """Each answer whose every search found nothing, named with what those searches did
+    (Task W2B re-review 2, N-I1; re-review 4, I1): an answer several searches rest on is
+    named only when none of them found anything. A one-word work style keeps its own note
+    (`_work_style_note`), beside `styles`, the one-word styles no search was run for
+    (re-review 3, M2). `joins`: the queries a title's skill join answered."""
+    searched: dict[EvidenceItem, _Searched] = {}
     found: set[EvidenceItem] = set()
-    ran = [(q.text, q.based_on, q.reach > 0) for q in queries]
-    ran += [(q.text, tuple(q.based_on), False) for q in unsearchable]
-    for text, based_on, hit in ran:
-        for item in based_on:
-            searches.setdefault(item, []).append(text)
-            if hit:
+    for query in queries:
+        for item in query.based_on:
+            did = searched.setdefault(item, _Searched())
+            (did.joined if query.query_id in joins else did.read).append(query.text)
+            if query.reach > 0:
                 found.add(item)
-    missed = {
-        item: list(dict.fromkeys(texts))
-        for item, texts in searches.items()
-        if item not in found and item.field not in _TITLE_FIELDS
-    }
+    for unread in unsearchable:
+        for item in unread.based_on:
+            searched.setdefault(item, _Searched()).common.append(unread.text)
+    missed = [i for i in searched if i not in found and i.field not in _TITLE_FIELDS]
     styles = [*styles, *(item.text for item in missed if _one_word_style([item]))]
     notes = [_work_style_note(list(dict.fromkeys(styles)))] if styles else []
     return notes + [
-        _missed(item.text, texts) for item, texts in missed.items() if not _one_word_style([item])
+        _missed(item.text, searched[item]) for item in missed if not _one_word_style([item])
     ]
 
 
@@ -976,57 +994,81 @@ def _opening(text: str) -> str:
     return f"“{text[:1].upper()}{text[1:]}”"
 
 
-# What a search was checked against: it reaches a skill only through an occupation that
-# lists it as essential, so a skill ESCO lists as essential for none ("take pictures") is
-# never reached (Task W2B re-review 3, I1).
-_ANY_ESSENTIAL_SKILL = "part of any skill ESCO lists as essential for an occupation"
+# What a search reads: the main name (preferred label) of each skill an occupation lists as
+# essential, never its other names ("operating farm machinery" is another name of "operate
+# agricultural machinery"). So a note says what the search did, never what ESCO holds
+# (Task W2B re-review 4, I1).
+_MAIN_NAME = "main name of a skill ESCO lists as essential holds all the words of"
+_COMMON_ONLY = "only common words, which Careerwright doesn't search for"
 
 
-def _missed(answer: str, searches: list[str]) -> str:
-    if _in_own_words(searches, [answer]):
-        return f"{_opening(answer)} isn't {_ANY_ESSENTIAL_SKILL}, so it found no work."
-    searched, isnt = ("searches", "aren't") if len(searches) > 1 else ("search", "isn't")
-    return (
-        f"The {searched} {_quoted(searches)} (from “{answer}”) {isnt} {_ANY_ESSENTIAL_SKILL}, "
-        f"so “{answer}” found no work."
+def _missed(answer: str, searched: _Searched) -> str:
+    read, common, joined = (
+        list(dict.fromkeys(texts)) for texts in (searched.read, searched.common, searched.joined)
     )
+    if not joined and _in_own_words([*read, *common], [answer]):
+        if read:
+            return f"No {_MAIN_NAME} “{answer}”, so it found no work."
+        return f"{_opening(answer)} has {_COMMON_ONLY}, so it found no work."
+
+    def its(texts: list[str], several: str) -> str:
+        return f"its search “{texts[0]}”" if len(texts) == 1 else f"{several} {_quoted(texts)}"
+
+    did: list[str] = []
+    if read:
+        did.append(f"no {_MAIN_NAME} {its(read, 'any of its searches')}")
+    if common:
+        has = "have" if len(common) > 1 else "has"
+        did.append(f"{its(common, 'its searches')} {has} {_COMMON_ONLY}")
+    if joined:
+        own = "your own titles" if len(joined) > 1 else "your own title"
+        did.append(
+            f"Careerwright found no other occupation in ESCO that shares {MIN_SHARED_SKILLS} or "
+            f"more essential skills with {its(joined, 'any of its searches')}, {own}"
+        )
+    return f"{_opening(answer)} found no work: {', and '.join(did)}."
 
 
-def _general_note(query: PoolQuery, skills: int) -> str:
-    """Why a search too general to find work on its own found none (Task W2B re-review 2,
-    N-I2): it may still add weight to work another search found. A model's search is the
-    one too general, so the person is never asked to say more about their answer (re-review
-    3, M1)."""
+def _general_note(query: PoolQuery, skills: int, queries: list[PoolQuery]) -> str:
+    """Why a search too general to find work on its own found none, in what it did (Task
+    W2B re-review 2, N-I2; re-review 4, I1): it may still add weight to work another search
+    found. A model's search is the one too general, so the person is never asked to say more
+    about their answer (re-review 3, M1), and a narrower search is called for only from an
+    answer no other of `queries` found work from (re-review 4, M1)."""
     answers = [item.text for item in query.based_on]
     if query.reach > TOO_GENERAL_OCCUPATIONS:
-        why = (
-            f"is part of the essential skills of {query.reach} occupations in ESCO, too many "
-            "to choose from on its own"
+        did = (
+            f"reached {query.reach} occupations in ESCO through the main names of their "
+            "essential skills, too many to choose from on its own"
         )
     else:
-        why = (
-            f"is part of {skills} different essential skills in ESCO, none of them just that, "
-            "so it's too general to choose work from on its own"
+        did = (
+            f"matched the main names of {skills} different essential skills in ESCO, none of "
+            "them just those words, so it's too general to choose work from on its own"
         )
     if _in_own_words([query.text], answers):
         return (
-            f"{_opening(query.text)} {why}. Say more about it, such as what it's about or who "
+            f"{_opening(query.text)} {did}. Say more about it, such as what it's about or who "
             "it's for."
         )
-    return (
-        f"The search “{query.text}” (from {_quoted(answers)}) {why}. Careerwright would need "
-        f"a narrower search to find work from {_quoted(answers)}."
+    finding = {item for q in queries if not q.too_general and q.reach > 0 for item in q.based_on}
+    waiting = [item.text for item in query.based_on if item not in finding]
+    narrower = (
+        f" Careerwright would need a narrower search to find work from {_quoted(waiting)}."
+        if waiting
+        else ""
     )
+    return f"The search “{query.text}” (from {_quoted(answers)}) {did}.{narrower}"
 
 
 def _join_note(query: PoolQuery) -> str:
     """What a join keeps when it reaches more than its best 30 (Task W2B re-review 2, N-M2):
     those with the largest share of essential skills in common (`skill_join_hits`), not the
-    most shared skills."""
+    most shared skills. It says what Careerwright found (re-review 4, I1's rule)."""
     return (
-        f"{_opening(query.text)} shares {MIN_SHARED_SKILLS} or more essential skills with "
-        f"{query.reach} other occupations in ESCO. Careerwright keeps the {len(query.hits)} "
-        "with the largest share of essential skills in common."
+        f"Careerwright found {query.reach} other occupations in ESCO that share "
+        f"{MIN_SHARED_SKILLS} or more essential skills with “{query.text}”, and keeps the "
+        f"{len(query.hits)} with the largest share of essential skills in common."
     )
 
 
@@ -1364,8 +1406,8 @@ def first_slate(tx: Tx, workspace_id: uuid.UUID, hard: HardFilterInput) -> First
         slate = replace(
             slate,
             fewer_reasons=[
-                f"No other occupation in ESCO shares {MIN_SHARED_SKILLS} or more essential skills "
-                f"with {with_article(facts[concept].preferred_label)}."
+                f"Careerwright found no other occupation in ESCO that shares {MIN_SHARED_SKILLS} "
+                f"or more essential skills with {with_article(facts[concept].preferred_label)}."
             ],
         )
     named = titles.targets(tx, workspace_id, profile.document)

@@ -249,7 +249,7 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     // Task W2B re-review 2, N-M2: a join's best 30 left 17 out, and the slate said nothing.
     // Re-review 3, I2: the join keeps by the share in common, not the most shared skills.
     const keeps =
-      "“Data analyst” shares 3 or more essential skills with 47 other occupations in ESCO. Careerwright keeps the 30 with the largest share of essential skills in common.";
+      "Careerwright found 47 other occupations in ESCO that share 3 or more essential skills with “data analyst”, and keeps the 30 with the largest share of essential skills in common.";
     fakeApi([
       {
         method: "GET",
@@ -295,6 +295,42 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
       "“bicycle repair”, from “repairing bicycles”",
       "“writing reports”, from “writing reports” (too general to find work on its own, so it only added weight to what another search found)",
     ]);
+  });
+
+  // Task W2B re-review 4, M2: a search that reached nothing ("repairing physical objects")
+  // was counted among those that found the occupations.
+  const search = (
+    query_id: string,
+    text: string,
+    reach: number,
+    too_general = false,
+  ): SlateOut["queries"][number] => ({
+    query_id,
+    text,
+    channel: "tasks",
+    based_on: [{ field: "enjoyed_tasks", text }],
+    hits: too_general ? 1 : reach,
+    reach,
+    too_general,
+  });
+  const nothing = search("q2", "repairing physical objects", 0);
+  const general = search("q3", "writing reports", 217, true);
+  it.each([
+    ["1 search", [nothing, general]],
+    ["2 searches", [nothing, general, search("q4", "working outdoors", 12)]],
+  ])("[DIV1-06] counts only the searches that reached work: %s", async (count, more) => {
+    const shown = slate([suggestion]);
+    fakeApi([
+      {
+        method: "GET",
+        path: /\/slate$/,
+        answer: { ...shown, queries: [...shown.queries, ...more] },
+      },
+    ]);
+    renderDirections();
+
+    const line = `from 4 occupations found by ${count} of ESCO.`;
+    expect(await screen.findByText(line, { exact: false })).toBeVisible();
   });
 
   it("excludes a title as a view only, and makes a target only when chosen", async () => {

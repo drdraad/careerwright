@@ -498,8 +498,9 @@ function Slate({
   const data = slate.data;
   const familiarityKnown = profile.document.current_role.state === "provided" || targets.length > 0;
   const excluded = controls.excludeConcepts.length + controls.excludeFamilies.length;
-  // A search too general to find work on its own found none of the pool: it only added weight.
-  const finding = data.queries.filter((query) => !query.too_general).length;
+  // Only a search that reached work found the pool: one too general to find work on its own
+  // only added weight, and one that reached nothing found none.
+  const finding = data.queries.filter((query) => !query.too_general && query.reach > 0).length;
   const first = data.suggestions[0];
   const note: WrittenState = first === undefined ? { kind: "none" } : noteFor(first);
   return (
@@ -610,8 +611,8 @@ function Slate({
       {choose.error !== null && <RequestFailure error={choose.error} />}
       {data.unsupported_hypotheses.length > 0 && (
         <p className="small muted">
-          Titles Careerwright thought of that ESCO doesn't list, so not suggested:{" "}
-          {data.unsupported_hypotheses.join(", ")}.
+          Titles Careerwright thought of but couldn't match to an occupation in ESCO, so not
+          suggested: {data.unsupported_hypotheses.join(", ")}.
         </p>
       )}
       <NotShown items={data.not_included} />

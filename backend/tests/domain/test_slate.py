@@ -8,7 +8,7 @@ import uuid
 import pytest
 
 from careerwright.catalogue.records import IscoGroupRef, OccupationFacts
-from careerwright.profile.discovery import EvidenceItem
+from careerwright.profile.discovery import DiscoveryQuery, EvidenceItem, QueryChannel
 from careerwright.profile.exploration import _general_note, _join_note, _missed_notes, explain
 from careerwright.profile.interview import ProfileField
 from careerwright.profile.slate import (
@@ -526,7 +526,10 @@ def searched(
     return PoolQuery(query_id, text, channel, based_on, (), total=reach, too_general=general)
 
 
-ESSENTIAL_NOWHERE = "isn't part of any skill ESCO lists as essential for an occupation"
+# What a search reads: the main name of each skill ESCO lists as essential, never its other
+# names, so a note says what the search did, never what ESCO holds (Task W2B re-review 4).
+MAIN_NAME = "main name of a skill ESCO lists as essential holds all the words of"
+COMMON_ONLY = "only common words, which Careerwright doesn't search for"
 
 
 @pytest.mark.req("DIV1-06", "DIV1-10")
@@ -535,7 +538,11 @@ def test_the_notes_say_what_a_model_s_searches_checked_and_which_answers_found_n
     # from a task and a one-word work style, and no product test read those notes; I1, "isn't
     # how ESCO names any skill" was untrue where ESCO names the skill but lists it as
     # essential for no occupation ("take pictures"); M1, a model's search too general asked
-    # the person to say more about an answer that was already specific.
+    # the person to say more about an answer that was already specific. Re-review 4: I1,
+    # "isn't part of any skill ESCO lists as essential" was untrue where the words are another
+    # name of an essential skill ("operating farm machinery"), since a search reads main names
+    # only; M1, a model's search too general asked for a narrower search from an answer
+    # another search had already found work from.
     fixing = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="fixing things")
     tidying = EvidenceItem(field=ProfileField.CONFIDENT_TASKS, text="tidying stockrooms")
     practical = EvidenceItem(field=ProfileField.WORK_STYLE, text="practical")
@@ -551,36 +558,95 @@ def test_the_notes_say_what_a_model_s_searches_checked_and_which_answers_found_n
         searched("q4", "taking pictures", pictures),  # the answer's own words
     ]
 
-    assert _missed_notes(model, [], ["structured"]) == [
+    assert _missed_notes(model, [], ["structured"], frozenset()) == [
         "How you like to work (“structured”, “practical”) isn't searched on its own, because a "
         "single word matches too loosely. Careerwright searches a longer answer, such as "
         "“working outdoors”.",
-        "The searches “repair machinery” and “fix equipment” (from “fixing things”) aren't "
-        "part of any skill ESCO lists as essential for an occupation, so “fixing things” found "
-        "no work.",
-        f"The search “organise stock” (from “tidying stockrooms”) {ESSENTIAL_NOWHERE}, so "
-        "“tidying stockrooms” found no work.",
-        f"“Taking pictures” {ESSENTIAL_NOWHERE}, so it found no work.",
+        f"“Fixing things” found no work: no {MAIN_NAME} any of its searches “repair "
+        "machinery” and “fix equipment”.",
+        f"“Tidying stockrooms” found no work: no {MAIN_NAME} its search “organise stock”.",
+        f"No {MAIN_NAME} “taking pictures”, so it found no work.",
     ]
     # Named only when none of the searches citing it found anything.
     one_found = [model[0], searched("q2", "fix equipment", fixing, reach=3)]
-    assert _missed_notes(one_found, [], []) == []
+    assert _missed_notes(one_found, [], [], frozenset()) == []
     # A one-word style a search found work with is named nowhere, like the task beside it.
     stock = searched("q3", "organise stock", tidying, practical, reach=4)
-    assert _missed_notes([stock], [], []) == []
+    assert _missed_notes([stock], [], [], frozenset()) == []
 
     reports = searched("q5", "write reports", bridges, reach=217, general=True)
-    assert _general_note(reports, 17) == (
-        "The search “write reports” (from “writing inspection reports for bridges”) is part of "
-        "the essential skills of 217 occupations in ESCO, too many to choose from on its own. "
-        "Careerwright would need a narrower search to find work from “writing inspection "
-        "reports for bridges”."
+    assert _general_note(reports, 17, [reports]) == (
+        "The search “write reports” (from “writing inspection reports for bridges”) reached "
+        "217 occupations in ESCO through the main names of their essential skills, too many to "
+        "choose from on its own. Careerwright would need a narrower search to find work from "
+        "“writing inspection reports for bridges”."
     )
-    assert _general_note(searched("q6", "training staff", staff, reach=17, general=True), 10) == (
-        "“Training staff” is part of 10 different essential skills in ESCO, none of them just "
-        "that, so it's too general to choose work from on its own. Say more about it, such as "
-        "what it's about or who it's for."
+    # Another search from the same answer found work, so no narrower search is called for.
+    inspection = searched("q7", "write inspection reports", bridges, reach=6)
+    assert _general_note(reports, 17, [reports, inspection]) == (
+        "The search “write reports” (from “writing inspection reports for bridges”) reached "
+        "217 occupations in ESCO through the main names of their essential skills, too many to "
+        "choose from on its own."
     )
+    general = searched("q6", "training staff", staff, reach=17, general=True)
+    assert _general_note(general, 10, [general]) == (
+        "“Training staff” matched the main names of 10 different essential skills in ESCO, none "
+        "of them just those words, so it's too general to choose work from on its own. Say "
+        "more about it, such as what it's about or who it's for."
+    )
+
+
+@pytest.mark.req("DIV1-06")
+def test_an_answer_whose_searches_read_no_skill_name_is_named_for_what_they_did() -> None:
+    # Task W2B re-review 4, I1: a note says what each search did. A search of only common
+    # words reads nothing, and a model's search naming the person's own title is answered by
+    # the title's skill join, so neither may be said to have read a skill's name.
+    everything = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="all of it")
+    fixing = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="fixing things")
+
+    def common(query_id: str, text: str, item: EvidenceItem) -> DiscoveryQuery:
+        return DiscoveryQuery(
+            query_id=query_id, text=text, channel=QueryChannel.TASKS, based_on=[item]
+        )
+
+    assert _missed_notes([], [common("q1", "all of it", everything)], [], frozenset()) == [
+        f"“All of it” has {COMMON_ONLY}, so it found no work."
+    ]
+    role = searched("q3", "warehouse manager", fixing)  # the person's role: joined, never read
+    assert _missed_notes(
+        [searched("q2", "repair machinery", fixing), role],
+        [common("q4", "the other", fixing)],
+        [],
+        frozenset({"q3"}),
+    ) == [
+        f"“Fixing things” found no work: no {MAIN_NAME} its search “repair machinery”, and its "
+        f"search “the other” has {COMMON_ONLY}, and Careerwright found no other occupation in "
+        "ESCO that shares 3 or more essential skills with its search “warehouse manager”, your "
+        "own title."
+    ]
+
+
+@pytest.mark.req("REC1-05", "DIV1-06")
+def test_a_title_of_the_person_s_own_says_careerwright_matched_it() -> None:
+    # Task W2B re-review 4, I1's rule: "ESCO lists it as this occupation" claimed ESCO holds
+    # the person's words, though a title is matched with case, punctuation and plurals folded
+    # ("Warehouse managers"); the line says what Careerwright did.
+    role = EvidenceItem(field=ProfileField.CURRENT_ROLE, text="Warehouse managers")
+    query = PoolQuery(
+        "r1",
+        role.text,
+        SlateChannel.CURRENT,
+        (role,),
+        (Hit(concept("Warehouse manager"), 1.0, label_match=True),),
+    )
+    [candidate] = build_pool([query], OCCUPATIONS, frozenset())
+
+    why = explain(candidate, facts_of(candidate.occupation), familiarity_known=True).why
+
+    assert why == [
+        "Your current role: “Warehouse managers”. Careerwright matched it to this occupation in "
+        "ESCO."
+    ]
 
 
 @pytest.mark.req("DIV1-02")
@@ -619,10 +685,12 @@ def test_the_pool_counts_what_a_join_reached_past_its_cut_and_its_own_bound() ->
     assert build_pool([joined, statistics], found, frozenset()).beyond_limit == 2
     # Task W2B re-review 3, I2: the join keeps the largest share of essential skills in
     # common, not the most shared skills (P03's join keeps a live chat operator sharing 5 and
-    # leaves out a ticket issuing clerk sharing 7).
+    # leaves out a ticket issuing clerk sharing 7). Re-review 4, I1's rule: it says what
+    # Careerwright found, never what ESCO holds.
     assert _join_note(joined) == (
-        "“Data analyst” shares 3 or more essential skills with 5 other occupations in ESCO. "
-        "Careerwright keeps the 2 with the largest share of essential skills in common."
+        "Careerwright found 5 other occupations in ESCO that share 3 or more essential skills "
+        "with “data analyst”, and keeps the 2 with the largest share of essential skills in "
+        "common."
     )
     # A search that can find work reaches at most this many, under the pool's bound, so it
     # keeps everything it reaches and the count needs no "at least".
