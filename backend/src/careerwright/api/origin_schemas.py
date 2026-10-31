@@ -15,6 +15,8 @@ from careerwright.api.discovery_schemas import (
     SalaryFloorOut,
     SuggestionOut,
 )
+from careerwright.api.envelope import ErrorEnvelope
+from careerwright.api.interview_schemas import SupportNoteOut
 from careerwright.api.schemas import ResponseModel, RunOut
 from careerwright.capability.evidence import Answer
 from careerwright.capability.strength import (
@@ -103,6 +105,14 @@ class ClosestOut(ResponseModel):
             ],
             chosen=offer.chosen,
         )
+
+
+class TitleRefusedOut(ErrorEnvelope):
+    """A refused first answer in the person's own words. When the title triggers the support
+    screen (`careerwright.profile.safety`), it is never kept as the role, and the calm support
+    panel comes with the refusal, whatever the refusal is."""
+
+    support_note: SupportNoteOut | None = None
 
 
 class RoleOut(ResponseModel):

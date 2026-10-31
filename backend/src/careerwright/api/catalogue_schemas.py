@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
+from careerwright.api.interview_schemas import SupportNoteOut
 from careerwright.api.schemas import ResponseModel
 from careerwright.catalogue.places import (
     COUNTRY_CODE,
@@ -248,6 +249,11 @@ class TitleMatchesOut(ResponseModel):
         "these is my job\", which keeps the person's own words: the person chooses one or "
         "none, and nothing is joined to the typed words."
     )
+    support_note: SupportNoteOut | None = Field(
+        description="The calm support panel, when what was typed triggers the support screen "
+        "(`careerwright.profile.safety`), as a message does: then nothing is matched, nothing "
+        "is offered in those words, and nothing about it is kept. Null otherwise."
+    )
 
     @classmethod
     def of(cls, found: TitleMatches) -> "TitleMatchesOut":
@@ -262,6 +268,21 @@ class TitleMatchesOut(ResponseModel):
             uk_total=found.uk_total,
             limit=found.limit,
             partial=found.partial,
+            support_note=None,
+        )
+
+    @classmethod
+    def screened(cls, release: TaxonomyRelease, typed: str, limit: int) -> "TitleMatchesOut":
+        """What was typed triggers the support screen: no match, and the panel."""
+        return cls(
+            release=TaxonomyReleaseOut.of(release),
+            query=" ".join(typed.split()),
+            matches=[],
+            total=0,
+            uk_total=0,
+            limit=limit,
+            partial=False,
+            support_note=SupportNoteOut.beside_a_title(),
         )
 
 

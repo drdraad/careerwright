@@ -572,8 +572,8 @@ const searchable = (text: string) => /[\p{L}\p{N}]/u.test(text);
 
 /** The first question's type-ahead (`GET /v1/taxonomy/titles`): ESCO's titles and the UK
  *  job-title index's, deterministic and offline, so it works without a key and in the demo.
- *  The pinned releases never change while the page is open; the last list stays readable while
- *  the next loads. */
+ *  The pinned releases never change while the page is open. An earlier list is never kept
+ *  while the next loads: it would stand for words it wasn't found for (design review I-1). */
 export function useTitleMatches(typed: string, limit: number) {
   const q = typed.trim();
   return useQuery({
@@ -582,7 +582,6 @@ export function useTitleMatches(typed: string, limit: number) {
       (await matchTitles({ query: { q, limit }, signal, throwOnError: true })).data,
     enabled: searchable(q),
     staleTime: Number.POSITIVE_INFINITY,
-    placeholderData: (previous) => previous,
     retry: retryable,
   });
 }

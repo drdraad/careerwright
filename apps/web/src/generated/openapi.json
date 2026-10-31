@@ -3325,7 +3325,7 @@
           "origin"
         ],
         "summary": "Post Role Title",
-        "description": "The first answer in the person's own words: a UK job title picked from the type-ahead,\nor anything typed (\"Use my own words\"), saved exactly as given as their current role\nthrough the one profile write path. Nothing is refused; no model is called.",
+        "description": "The first answer in the person's own words: a UK job title picked from the type-ahead,\nor anything typed (\"Use my own words\"), saved exactly as given as their current role\nthrough the one profile write path; no model is called. Nothing is refused for its words,\nexcept a title the support screen answers (`careerwright.profile.safety`), as it answers a\nmessage: never kept as the role, with the calm support panel beside the refusal.",
         "operationId": "name_role",
         "security": [
           {
@@ -3388,7 +3388,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
+                  "$ref": "#/components/schemas/TitleRefusedOut"
                 }
               }
             }
@@ -3398,7 +3398,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
+                  "$ref": "#/components/schemas/TitleRefusedOut"
                 }
               }
             }
@@ -5629,7 +5629,7 @@
           "taxonomy"
         ],
         "summary": "Titles",
-        "description": "The type-ahead for \"What do you do now, or what did you do last?\": ESCO titles whose\nwords begin with what was typed. Works before a key is connected and in the demo.",
+        "description": "The type-ahead for \"What do you do now, or what did you do last?\": ESCO titles whose\nwords begin with what was typed. Works before a key is connected and in the demo. What is\ntyped goes through the support screen first, as a message does (design review I-3).",
         "operationId": "match_titles",
         "security": [
           {
@@ -20077,7 +20077,7 @@
           "message": {
             "type": "string",
             "title": "Message",
-            "description": "Says whether the message was sent."
+            "description": "Says whether the message was sent, or that a title was not kept as the role."
           },
           "resources": {
             "items": {
@@ -20096,7 +20096,7 @@
           "resources"
         ],
         "title": "SupportNoteOut",
-        "description": "The support panel, shown beside a message that triggers the support screen\n(`careerwright.profile.safety`), whether the send was accepted or refused. Kept apart from\ncareer suitability. Derived from the request on every response, a replay included;\nnever stored, not even in the idempotency receipt."
+        "description": "The support panel, shown beside a message that triggers the support screen\n(`careerwright.profile.safety`), whether the send was accepted or refused, and beside the\nfirst question's title field when what is typed there triggers it. Kept apart from career\nsuitability. Derived from the request on every response, a replay included; never\nstored, not even in the idempotency receipt."
       },
       "SupportResourceOut": {
         "properties": {
@@ -21064,6 +21064,17 @@
             "type": "boolean",
             "title": "Partial",
             "description": "True: neither ESCO nor the UK job-title index lists a title with every word typed, and these ESCO occupations hold the most of them, rarer words first. Ask \"Careerwright couldn't match that title in ESCO. Is it one of these?\", with \"None of these is my job\", which keeps the person's own words: the person chooses one or none, and nothing is joined to the typed words."
+          },
+          "support_note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupportNoteOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The calm support panel, when what was typed triggers the support screen (`careerwright.profile.safety`), as a message does: then nothing is matched, nothing is offered in those words, and nothing about it is kept. Null otherwise."
           }
         },
         "additionalProperties": false,
@@ -21075,7 +21086,8 @@
           "total",
           "uk_total",
           "limit",
-          "partial"
+          "partial",
+          "support_note"
         ],
         "title": "TitleMatchesOut",
         "description": "The first question's type-ahead: occupations whose ESCO titles (preferred and\nalternative labels) have a word beginning with each word typed, one per occupation, and\nthe UK job-title index's titles that do (ONS's SOC 2020 coding index, other than titles\nESCO itself offers), best first: what was typed, then a title beginning with it, then the\nrest, ESCO first on ties. When neither holds a title with every word, the ESCO occupations\nwhose titles hold the most of them, with `partial` true. Deterministic, no model call. No\nmatch is an honest empty list: nothing is invented, and the person's own words are always\ntheirs to keep (`POST .../origin/role/title`). `total` counts every ESCO occupation that\nmatched, `uk_total` every title of the index."
@@ -21108,6 +21120,30 @@
         ],
         "title": "TitleNotMatched",
         "description": "A target title of the person's matched no occupation in ESCO, so nothing is joined to\nit until they choose the one closest to it (the sketch offers it)."
+      },
+      "TitleRefusedOut": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          },
+          "support_note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupportNoteOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "TitleRefusedOut",
+        "description": "A refused first answer in the person's own words. When the title triggers the support\nscreen (`careerwright.profile.safety`), it is never kept as the role, and the calm support\npanel comes with the refusal, whatever the refusal is."
       },
       "TooGeneral": {
         "properties": {

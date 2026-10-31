@@ -12,6 +12,8 @@ import pytest
 import sqlalchemy as sa
 
 from careerwright.db import system_transaction
+from careerwright.profile import safety
+from tests.integration.test_interview_choices import DISTRESS, SERVICES
 from tests.support.client import ApiClient, profile_with
 from tests.support.infra import Infra, migrator_engine
 from tools.evaluation import Case, CaseKind, observe_discovery_offline
@@ -156,6 +158,50 @@ def test_a_title_neither_list_holds_asks_about_esco_s_closest_titles_and_refuses
         422,
         "not_offered",
     )
+
+
+@pytest.mark.req("PROF-09", "DIV1-13")
+def test_the_first_question_goes_through_the_support_screen_and_keeps_nothing_of_it(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    # Design review I-3: a risk phrase typed as the title was offered back as "Use my own
+    # words", saved as the role and echoed as "your role", with no support panel. The title
+    # field now goes through the same screen as a message (`careerwright.profile.safety`).
+    workspace = api.create_workspace(ada, "Support at the start (synthetic)")["workspace_id"]
+    typed = api.get("/v1/taxonomy/titles", ada, q=DISTRESS)
+    named = name_role(api, ada, workspace, DISTRESS, 0)
+    stale = name_role(api, ada, workspace, DISTRESS, 4)
+    declined = name_role(api, ada, workspace, DISTRESS, 0, none_of_these=True)
+    ordinary = titles(api, ada, "Registered nurse")
+
+    # The type-ahead matches nothing on those words and brings the calm panel instead.
+    assert typed.status_code == 200, typed.text
+    body = typed.json()
+    assert (body["matches"], body["partial"], body["total"], body["uk_total"]) == ([], False, 0, 0)
+    panel = body["support_note"]
+    assert panel["message"] == safety.SUPPORT_NOTE_TITLE
+    assert panel["policy_version"] == safety.POLICY_VERSION
+    assert {r["name"] for r in panel["resources"]} == SERVICES
+    assert ordinary["support_note"] is None
+    # Never kept as the role: refused, with the panel beside the refusal, whatever else the
+    # refusal is (a stale version too), so the person can type again or skip.
+    for refused in (named, declined):
+        assert refused.status_code == 422, refused.text
+        assert refused.json()["error"]["details"] == {"field": "title", "reason": "support_screen"}
+        assert refused.json()["support_note"] == panel
+    assert (stale.status_code, stale.json()["support_note"]) == (409, panel)
+    # Nothing about it is stored: no profile version, source, record or receipt.
+    assert api.get(f"/v1/workspaces/{workspace}/profile", ada).json()["version"] == 0
+    stored = infra.query(
+        "SELECT (SELECT count(*) FROM careerwright.profile_versions WHERE workspace_id = %s) "
+        "AS versions, (SELECT count(*) FROM careerwright.source_references WHERE "
+        "workspace_id = %s) AS sources, (SELECT count(*) FROM careerwright.target_records "
+        "WHERE workspace_id = %s) AS records, (SELECT count(*) FROM "
+        "careerwright.command_receipts WHERE workspace_id = %s AND command = 'name_role') "
+        "AS receipts",
+        (workspace,) * 4,
+    )
+    assert stored == [{"versions": 0, "sources": 0, "records": 0, "receipts": 0}]
 
 
 @pytest.mark.req("DIV1-13", "DIV1-03", "VERSIONS-01")

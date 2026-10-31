@@ -9011,9 +9011,10 @@ export type SupportInput = {
  * SupportNoteOut
  *
  * The support panel, shown beside a message that triggers the support screen
- * (`careerwright.profile.safety`), whether the send was accepted or refused. Kept apart from
- * career suitability. Derived from the request on every response, a replay included;
- * never stored, not even in the idempotency receipt.
+ * (`careerwright.profile.safety`), whether the send was accepted or refused, and beside the
+ * first question's title field when what is typed there triggers it. Kept apart from career
+ * suitability. Derived from the request on every response, a replay included; never
+ * stored, not even in the idempotency receipt.
  */
 export type SupportNoteOut = {
     /**
@@ -9029,7 +9030,7 @@ export type SupportNoteOut = {
     /**
      * Message
      *
-     * Says whether the message was sent.
+     * Says whether the message was sent, or that a title was not kept as the role.
      */
     message: string;
     /**
@@ -9684,6 +9685,10 @@ export type TitleMatchesOut = {
      * True: neither ESCO nor the UK job-title index lists a title with every word typed, and these ESCO occupations hold the most of them, rarer words first. Ask "Careerwright couldn't match that title in ESCO. Is it one of these?", with "None of these is my job", which keeps the person's own words: the person chooses one or none, and nothing is joined to the typed words.
      */
     partial: boolean;
+    /**
+     * The calm support panel, when what was typed triggers the support screen (`careerwright.profile.safety`), as a message does: then nothing is matched, nothing is offered in those words, and nothing about it is kept. Null otherwise.
+     */
+    support_note: SupportNoteOut | null;
 };
 
 /**
@@ -9705,6 +9710,18 @@ export type TitleNotMatched = {
      * Title
      */
     title: string;
+};
+
+/**
+ * TitleRefusedOut
+ *
+ * A refused first answer in the person's own words. When the title triggers the support
+ * screen (`careerwright.profile.safety`), it is never kept as the role, and the calm support
+ * panel comes with the refusal, whatever the refusal is.
+ */
+export type TitleRefusedOut = {
+    error: ErrorBody;
+    support_note?: SupportNoteOut | null;
 };
 
 /**
@@ -12457,11 +12474,11 @@ export type NameRoleErrors = {
     /**
      * Typed error envelope
      */
-    '4XX': ErrorEnvelope;
+    '4XX': TitleRefusedOut;
     /**
      * Typed error envelope
      */
-    '5XX': ErrorEnvelope;
+    '5XX': TitleRefusedOut;
 };
 
 export type NameRoleError = NameRoleErrors[keyof NameRoleErrors];

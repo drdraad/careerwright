@@ -115,6 +115,7 @@ from careerwright.profile.records import (
     TargetRecord,
 )
 from careerwright.profile.role_evidence import cities_of, salary_floor
+from careerwright.profile.safety import has_risk_stem
 from careerwright.profile.slate import (
     MIN_SHARED_SKILLS,
     POOL_LIMIT,
@@ -1453,6 +1454,15 @@ def name_role(
     profile = current_profile(tx, workspace_id)
     if command.expected_version != profile.version:
         raise stale_version(profile.version)
+    if has_risk_stem(command.title):
+        # The title goes through the support screen as a message does (design review I-3): it
+        # is never kept as the role. The route shows the calm panel beside the refusal.
+        raise CareerwrightError(
+            ErrorCode.VALIDATION_FAILED,
+            "Careerwright hasn't kept that title as your role.",
+            stage=ErrorStage.PROFILE,
+            details={"field": "title", "reason": "support_screen"},
+        )
     if _role_text(profile.document) == command.title:
         held = role_record(tx, workspace_id, profile.document, pack)
         if not command.none_of_these or (held and held.link is TargetLink.NONE_OF_THESE):

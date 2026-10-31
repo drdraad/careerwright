@@ -15,8 +15,11 @@ person, and nothing it sees reaches the profile, a proposal or a suggestion.
   do not defeat it within that window. The person sees a calm support panel with the UK
   services below, and the interviewer gets `SUPPORT_TURN_INSTRUCTION` for that turn only
   (any next question it still writes is dropped, `interview.check_turn`); the message is
-  sent as usual, and a refused send shows the panel with its refusal. The
-  screen does not try to judge intent, so a stem inside career phrasing ("took my life
+  sent as usual, and a refused send shows the panel with its refusal. The first question's
+  title field goes through the same screen (`support-policy-8`, Task 6d slice B fix round 1):
+  a title that triggers it is matched to nothing and never kept as the role, the panel says
+  so (`SUPPORT_NOTE_TITLE`) without repeating the words, and the person can type again or
+  skip. The screen does not try to judge intent, so a stem inside career phrasing ("took my life
   savings") triggers it too, an accepted false positive; words outside the lists or the
   windows get nothing ("this commute is killing me"). Whether a message triggers it is
   recomputed from the message every time it is needed and never stored. Clinical
@@ -39,11 +42,12 @@ import unicodedata
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-POLICY_VERSION = "support-policy-7"
+POLICY_VERSION = "support-policy-8"
 CHECKED_ON = "2026-10-28"
 REVIEW_STATUS = (
-    "accepted for L0 at session 1 (human gate H-12); the three phrasings added on 2026-10-28 "
-    "are not yet reviewed as built"
+    "accepted for L0 at session 1 (human gate H-12); the three phrasings added on 2026-10-28, "
+    "and the first question's screen and its line added on 2026-10-31, are not yet reviewed "
+    "as built"
 )
 
 # Normalisation: the listed apostrophe variants to `'`, the hyphens U+2010 and U+2011 to `-`,
@@ -311,6 +315,12 @@ SUPPORT_NOTE = (
 SUPPORT_NOTE_NOT_SENT = (
     "If anything you mentioned is about how you are feeling, support is available any time, "
     "from people trained to help. Your message was not sent; the reason is shown below."
+)
+# The same panel beside the first question's title field (Task 6d slice B fix round 1): the
+# title is not kept as the person's role, and the words are not repeated back to them.
+SUPPORT_NOTE_TITLE = (
+    "If anything you typed is about how you are feeling, support is available any time, "
+    "from people trained to help. Careerwright hasn't kept it as your role."
 )
 # Added to the interviewer's instructions for a turn whose message triggers the screen, and
 # for that turn only. It names neither the screen nor anything matched.

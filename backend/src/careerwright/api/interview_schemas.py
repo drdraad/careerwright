@@ -191,21 +191,33 @@ class SupportResourceOut(ResponseModel):
 
 class SupportNoteOut(ResponseModel):
     """The support panel, shown beside a message that triggers the support screen
-    (`careerwright.profile.safety`), whether the send was accepted or refused. Kept apart from
-    career suitability. Derived from the request on every response, a replay included;
-    never stored, not even in the idempotency receipt."""
+    (`careerwright.profile.safety`), whether the send was accepted or refused, and beside the
+    first question's title field when what is typed there triggers it. Kept apart from career
+    suitability. Derived from the request on every response, a replay included; never
+    stored, not even in the idempotency receipt."""
 
     policy_version: str
     review_status: str = Field(description="How far the policy is reviewed (gate H-12).")
-    message: str = Field(description="Says whether the message was sent.")
+    message: str = Field(
+        description="Says whether the message was sent, or that a title was not kept as the role."
+    )
     resources: list[SupportResourceOut]
 
     @classmethod
     def current(cls, *, sent: bool) -> "SupportNoteOut":
+        return cls._saying(safety.SUPPORT_NOTE if sent else safety.SUPPORT_NOTE_NOT_SENT)
+
+    @classmethod
+    def beside_a_title(cls) -> "SupportNoteOut":
+        """Beside the first question's title field: the title is not kept as the role."""
+        return cls._saying(safety.SUPPORT_NOTE_TITLE)
+
+    @classmethod
+    def _saying(cls, message: str) -> "SupportNoteOut":
         return cls(
             policy_version=safety.POLICY_VERSION,
             review_status=safety.REVIEW_STATUS,
-            message=safety.SUPPORT_NOTE if sent else safety.SUPPORT_NOTE_NOT_SENT,
+            message=message,
             resources=[
                 SupportResourceOut(
                     name=r.name,

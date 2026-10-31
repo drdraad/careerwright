@@ -11,10 +11,12 @@ import type {
   ClosestOut,
   ProfileDocument,
   ProfileOut,
+  SupportNoteOut,
   TitleMatchesOut,
   TitleMatchOut,
   UkTitleOut,
 } from "@/generated/api";
+import { SupportShown } from "@/lib/world/settings";
 import { fakeApi, type Sent } from "@/test/fakeApi";
 import { ClosestQuestion, FirstQuestion } from "./FirstQuestion";
 
@@ -71,7 +73,28 @@ const found = (
   uk_total: matches.filter((m) => m.source === "uk_title_index").length,
   limit: 8,
   partial,
+  support_note: null,
 });
+
+/** The API's panel beside the title field (`careerwright.profile.safety.SUPPORT_NOTE_TITLE`). */
+const titlePanel: SupportNoteOut = {
+  policy_version: "support-policy-8",
+  review_status: "accepted for L0 at session 1 (human gate H-12)",
+  message:
+    "If anything you typed is about how you are feeling, support is available any time, " +
+    "from people trained to help. Careerwright hasn't kept it as your role.",
+  resources: [
+    {
+      name: "Samaritans",
+      contact: "Call 116 123",
+      when: "To talk",
+      source_url: "https://www.samaritans.org/",
+      checked_on: "2026-10-28",
+    },
+  ],
+};
+/** An existing risk-stem input of the chapter's support tests (`YouChapter.test.tsx`). */
+const RISK = "I volunteer on a suicide prevention helpline.";
 
 function wrap(children: ReactNode) {
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -138,8 +161,14 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
     await user.type(field(), "IT support");
     const option = await screen.findByRole("option", { name: /IT support technician/ });
     expect(within(option).getByText("In ESCO as ICT help desk agent")).toBeVisible();
-    // The keyboard picks too: down to the first title, then Enter.
-    await user.keyboard("{ArrowDown}{ArrowUp}{Enter}");
+    // The keyboard picks too: none is active until the person moves; up from none is the
+    // last option (their own words), and down again wraps to the first title, then Enter.
+    await user.keyboard("{ArrowUp}");
+    expect(field()).toHaveAttribute(
+      "aria-activedescendant",
+      screen.getByRole("option", { name: "Use my own words: “IT support”" }).id,
+    );
+    await user.keyboard("{ArrowDown}{Enter}");
 
     await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
     expect(sent.find((s) => s.method === "POST")).toMatchObject({
@@ -192,6 +221,95 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
     });
   });
 
+  it("keeps the typed words on Enter: a partial match the person didn't choose is never saved", async () => {
+    // Design review I-1: every keystroke made ESCO's first guess the active option, so Enter
+    // saved "bookkeeper" for "Bookkeeping assistant".
+    const sent = api({
+      "Bookkeeping assistant": found("Bookkeeping assistant", [esco("bookkeeper")], true),
+    });
+    const user = wrap(<FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} />);
+
+    await user.type(field(), "Bookkeeping assistant");
+    await screen.findByRole("option", { name: /^bookkeeper/ });
+    // No option is active until the person moves to one.
+    expect(field()).not.toHaveAttribute("aria-activedescendant");
+    for (const option of screen.getAllByRole("option")) {
+      expect(option).toHaveAttribute("aria-selected", "false");
+    }
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
+    expect(sent.filter((s) => s.method === "POST")).toEqual([
+      expect.objectContaining({
+        path: `/v1/workspaces/${WS}/origin/role/title`,
+        body: { expected_version: 3, title: "Bookkeeping assistant" },
+      }),
+    ]);
+  });
+
+  it("never lets an earlier search's titles stand for new words while the new ones load", async () => {
+    const sent = fakeApi([
+      {
+        method: "GET",
+        path: /\/v1\/taxonomy\/titles$/,
+        answer: (s: Sent) => {
+          const q = new URLSearchParams(s.query).get("q") ?? "";
+          // The new words' titles never arrive in this test: they are still loading.
+          return q === "Nurse" ? found("Nurse", [uk("Nurse", ["2221"])]) : new Promise(() => {});
+        },
+      },
+      { method: "POST", path: /\/origin\/role\/title$/, status: 201, answer: profile },
+    ]);
+    const user = wrap(<FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} />);
+
+    await user.type(field(), "Nurse");
+    await screen.findByRole("option", { name: /^Nurse\s*,\s*UK job title/ });
+    await user.type(field(), " specialist");
+    await waitFor(() => expect(sent.some((s) => s.query.includes("specialist"))).toBe(true));
+    // Only the person's own words are offered for the new words, and the list says it looks.
+    expect(screen.queryByRole("option", { name: /UK job title/ })).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("Looking for job titles…");
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "Use my own words: “Nurse specialist”",
+    ]);
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
+    expect(sent.find((s) => s.method === "POST")?.body).toEqual({
+      expected_version: 3,
+      title: "Nurse specialist",
+    });
+  });
+
+  it("[UI-06] describes the combobox, and says the partial question, none found and the count politely", async () => {
+    // Design review M-1 (WCAG 2.2 4.1.3): the lines were in no live region, and only the
+    // listbox was described, which aria-activedescendant navigation doesn't read.
+    api({
+      "Registered nurse": found("Registered nurse", [uk("Registered nurse", ["2221"])]),
+      "Bookkeeping assistant": found(
+        "Bookkeeping assistant",
+        [esco("bookkeeper"), esco("bookkeeping clerk")],
+        true,
+      ),
+    });
+    const user = wrap(<FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} />);
+    const status = screen.getByRole("status");
+
+    await user.type(field(), "Registered nurse");
+    await waitFor(() => expect(status).toHaveTextContent("1 job title to choose from."));
+    await user.clear(field());
+    await user.type(field(), "Bookkeeping assistant");
+    const question = "Careerwright couldn't match that title in ESCO. Is it one of these?";
+    await waitFor(() => expect(status).toHaveTextContent(question));
+    expect(status).toHaveTextContent("2 job titles to choose from.");
+    expect(field()).toHaveAccessibleDescription(question);
+    expect(screen.getByRole("listbox")).not.toHaveAttribute("aria-describedby");
+    await user.clear(field());
+    await user.type(field(), "Orbital gardener");
+    await waitFor(() =>
+      expect(status).toHaveTextContent("Careerwright found no job title holding those words."),
+    );
+  });
+
   it("goes on without an answer when the person skips, saving nothing", async () => {
     const sent = api({});
     const skipped = vi.fn();
@@ -200,6 +318,74 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
     await user.click(screen.getByRole("button", { name: "Skip for now" }));
     expect(skipped).toHaveBeenCalledOnce();
     expect(sent.filter((s) => s.method !== "GET")).toEqual([]);
+  });
+});
+
+describe("[PROF-09][DIV1-13] the title field goes through the support screen, as a message does", () => {
+  it("shows the calm panel, stills the world, offers nothing in those words, and keeps nothing", async () => {
+    // Design review I-3: the typed words were offered back as "Use my own words" and saved.
+    const sent = api({ [RISK]: { ...found(RISK, []), support_note: titlePanel } });
+    const shown = vi.fn();
+    const user = wrap(
+      <SupportShown.Provider value={shown}>
+        <FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} />
+      </SupportShown.Provider>,
+    );
+
+    await user.type(field(), RISK);
+    const panel = await screen.findByRole("region", { name: "Support is available" });
+    expect(panel).toHaveTextContent("Careerwright hasn't kept it as your role.");
+    expect(panel).toHaveTextContent("Samaritans: Call 116 123");
+    expect(shown).toHaveBeenLastCalledWith(true); // the world is drawn still
+    // Nothing is offered in those words, and they are never repeated back.
+    expect(screen.queryByRole("option")).toBeNull();
+    expect(document.body).not.toHaveTextContent(RISK);
+    expect(screen.getByRole("status")).toHaveTextContent("Support information is shown below.");
+    await user.keyboard("{Enter}");
+    expect(sent.filter((s) => s.method === "POST")).toEqual([]);
+
+    // The person can dismiss it, type again or skip.
+    await user.click(within(panel).getByRole("button", { name: "Dismiss the support note" }));
+    expect(screen.queryByRole("region", { name: "Support is available" })).toBeNull();
+    expect(field()).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Skip for now" })).toBeEnabled();
+  });
+
+  it("shows the panel beside a refused save too, says nothing went wrong, and stays", async () => {
+    // Enter before the type-ahead answers: the API's own screen refuses the title.
+    const sent = fakeApi([
+      { method: "GET", path: /\/v1\/taxonomy\/titles$/, answer: () => new Promise(() => {}) },
+      {
+        method: "POST",
+        path: /\/origin\/role\/title$/,
+        status: 422,
+        answer: {
+          error: {
+            code: "VALIDATION_FAILED",
+            message: "",
+            retryable: false,
+            stage: "profile",
+            correlation_id: "c1",
+            details: { field: "title", reason: "support_screen" },
+          },
+          support_note: titlePanel,
+        },
+      },
+    ]);
+    const failed = vi.fn();
+    const user = wrap(
+      <FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} onFailed={failed} />,
+    );
+
+    await user.type(field(), `${RISK}{Enter}`);
+    const panel = await screen.findByRole("region", { name: "Support is available" });
+    expect(panel).toHaveTextContent("Careerwright hasn't kept it as your role.");
+    expect(sent.filter((s) => s.method === "POST")).toHaveLength(1);
+    expect(screen.queryByRole("alert")).toBeNull(); // calm: no failure notice
+    expect(failed).toHaveBeenCalledOnce(); // the start stays on the question
+    expect(
+      screen.getByRole("heading", { name: "What do you do now, or what did you do last?" }),
+    ).toBeVisible();
   });
 });
 

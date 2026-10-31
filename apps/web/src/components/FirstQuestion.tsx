@@ -22,11 +22,19 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ClosestOut, ProfileOut, TitleMatchOut, UkTitleOut } from "@/generated/api";
+import type {
+  ClosestOut,
+  ProfileOut,
+  SupportNoteOut,
+  TitleMatchOut,
+  UkTitleOut,
+} from "@/generated/api";
+import { ApiError } from "@/lib/api";
 import { useChooseClosest, useChooseRole, useNameRole, useTitleMatches } from "@/lib/queries";
 import { CLOSEST, FIRST_ANSWER, FIRST_QUESTION } from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { RequestFailure } from "./PageState";
+import { SupportNote } from "./SupportNote";
 
 /** The titles offered at once: a short list keeps the decision in the first screen. */
 const OPTIONS_SHOWN = 8;
@@ -64,6 +72,7 @@ export function FirstQuestion({
   headingRef,
   lead,
   onAnswered,
+  onFailed,
   onSkip,
 }: {
   workspaceId: string;
@@ -72,83 +81,101 @@ export function FirstQuestion({
   headingRef?: Ref<HTMLHeadingElement>;
   /** A line above the question (what Careerwright is for). */
   lead?: ReactNode;
-  /** The person answered: the start moves on once the answer is saved (a failure stays here,
-   *  saying why). */
+  /** The person answered: the start moves on once the answer is saved. */
   onAnswered?(): void;
+  /** Saving the answer failed: the question stays, saying why (or with the support panel). */
+  onFailed?(): void;
   /** "Skip for now": the start goes on without an answer (nothing is saved). */
   onSkip(): void;
 }) {
   const id = useId();
+  const field = useRef<HTMLInputElement>(null);
   const [typed, setTyped] = useState("");
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
+  // No option is active until the person moves to one, so Enter keeps their own words: a
+  // partial match they didn't choose is never saved (design review I-1).
+  const [active, setActive] = useState(-1);
+  // The calm panel, from the type-ahead's screen or a refused save; kept until dismissed.
+  const [support, setSupport] = useState<SupportNoteOut | null>(null);
   const settled = useSettled(typed, SETTLE_MS);
   const found = useTitleMatches(settled, OPTIONS_SHOWN);
   const chooseRole = useChooseRole(workspaceId);
   const nameRole = useNameRole(workspaceId);
   const text = typed.trim();
+  // Only the answer for these very words: an earlier search's never stands for new text.
   const body = text !== "" && settled.trim() === text ? found.data : undefined;
+  const screened = body?.support_note ?? null;
+  useEffect(() => {
+    if (screened !== null) setSupport(screened);
+  }, [screened]);
   const partial = body?.partial === true;
+  const titles: Option[] = (body?.matches ?? []).map((m) =>
+    m.source === "esco" ? { kind: "esco", match: m } : { kind: "uk", title: m },
+  );
+  // Words the support screen answered are offered nothing, and never repeated back.
   const options: Option[] =
-    text === ""
-      ? []
-      : [
-          ...(body?.matches ?? []).map(
-            (m): Option =>
-              m.source === "esco" ? { kind: "esco", match: m } : { kind: "uk", title: m },
-          ),
-          { kind: "own", text },
-        ];
+    text === "" || screened !== null ? [] : [...titles, { kind: "own", text }];
   const shown = open && options.length > 0;
-  const at = Math.min(active, Math.max(options.length - 1, 0));
+  const at = active < options.length ? active : -1;
+  const looking =
+    text !== "" && body === undefined && (settled.trim() !== text || found.isFetching);
   const saving = chooseRole.isPending || nameRole.isPending;
   const failure = chooseRole.error ?? nameRole.error;
+  const failed = (error: Error) => {
+    if (error instanceof ApiError && error.supportNote !== null) setSupport(error.supportNote);
+    onFailed?.();
+  };
 
-  const pick = (option: Option) => {
+  const pick = (option: Option, refused: boolean) => {
     if (saving) return;
     setOpen(false);
     onAnswered?.();
     const expected_version = profile.version;
     if (option.kind === "esco") {
-      chooseRole.mutate({
-        expected_version,
-        concept_id: option.match.concept_id,
-        label: option.match.matched_label,
-      });
-    } else if (option.kind === "uk") {
-      nameRole.mutate({ expected_version, title: option.title.title });
-    } else {
-      // Under a partial list the own-words option is "None of these is my job": the person's
-      // refusal of ESCO's closest titles, recorded so nothing later asks for another job.
-      nameRole.mutate({
-        expected_version,
-        title: option.text,
-        ...(partial && { none_of_these: true }),
-      });
+      chooseRole.mutate(
+        {
+          expected_version,
+          concept_id: option.match.concept_id,
+          label: option.match.matched_label,
+        },
+        { onError: failed },
+      );
+      return;
     }
+    const title = option.kind === "uk" ? option.title.title : option.text;
+    // Under a partial list the own-words option is "None of these is my job": the person's
+    // refusal of ESCO's closest titles, recorded so nothing later asks for another job.
+    nameRole.mutate(
+      { expected_version, title, ...(refused && { none_of_these: true }) },
+      { onError: failed },
+    );
   };
+  const chosen = (option: Option) => pick(option, option.kind === "own" && partial);
 
   const keys = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       setOpen(true);
       if (options.length === 0) return;
-      const step = event.key === "ArrowDown" ? 1 : -1;
-      setActive((at + step + options.length) % options.length);
+      const down = event.key === "ArrowDown";
+      const from = at === -1 ? (down ? -1 : 0) : at;
+      setActive((from + (down ? 1 : -1) + options.length) % options.length);
     } else if (event.key === "Enter") {
-      const option = options[at];
-      if (shown && option !== undefined) {
-        event.preventDefault();
-        pick(option);
-      }
+      event.preventDefault();
+      const option = shown && at !== -1 ? options[at] : undefined;
+      if (option !== undefined) chosen(option);
+      // Nothing chosen: Enter keeps the words as typed (never a refusal they didn't make).
+      else if (text !== "" && screened === null) pick({ kind: "own", text }, false);
     } else if (event.key === "Escape") {
       setOpen(false);
+      setActive(-1);
     }
   };
 
   const listId = `${id}-titles`;
   const questionId = `${id}-partial`;
   const optionId = (n: number) => `${id}-option-${n}`;
+  const answered = shown && body !== undefined;
   return (
     <section className="question" aria-labelledby={`${id}-title`}>
       {lead}
@@ -160,20 +187,23 @@ export function FirstQuestion({
           {FIRST_ANSWER.field}
         </label>
         <input
+          ref={field}
           id={`${id}-field`}
           className="input"
           role="combobox"
           aria-expanded={shown}
           aria-controls={listId}
           aria-autocomplete="list"
-          aria-activedescendant={shown ? optionId(at) : undefined}
+          aria-activedescendant={shown && at !== -1 ? optionId(at) : undefined}
+          // The partial question describes the field itself, which is where focus stays.
+          aria-describedby={shown && partial ? questionId : undefined}
           autoComplete="off"
           maxLength={120}
           placeholder={FIRST_ANSWER.placeholder}
           value={typed}
           onChange={(event) => {
             setTyped(event.target.value);
-            setActive(0);
+            setActive(-1);
             setOpen(true);
           }}
           onKeyDown={keys}
@@ -181,25 +211,26 @@ export function FirstQuestion({
           // Leaving the field closes the list; a press on an option keeps focus in the field.
           onBlur={() => setOpen(false)}
         />
-        {shown && partial && (
-          <p id={questionId} className="small">
-            {FIRST_ANSWER.partial}
-          </p>
-        )}
-        {shown && body !== undefined && body.matches.length === 0 && (
-          <p className="small muted">{FIRST_ANSWER.nothing}</p>
-        )}
-        {shown && body === undefined && found.isFetching && (
-          <p className="small muted" role="status">
-            {FIRST_ANSWER.looking}
-          </p>
-        )}
+        {/* One polite status region (WCAG 2.2 4.1.3): the partial question, none found, the
+            count, looking, and that the support panel is shown. */}
+        <div role="status">
+          {shown && partial && (
+            <p id={questionId} className="small">
+              {FIRST_ANSWER.partial}
+            </p>
+          )}
+          {shown && looking && <p className="small muted">{FIRST_ANSWER.looking}</p>}
+          {answered && titles.length === 0 && <p className="small muted">{FIRST_ANSWER.nothing}</p>}
+          {answered && titles.length > 0 && (
+            <p className="sr-only">{FIRST_ANSWER.count(titles.length)}</p>
+          )}
+          {support !== null && <p className="sr-only">{FIRST_ANSWER.supportShown}</p>}
+        </div>
         <div
           id={listId}
           className="title-options"
           role="listbox"
           aria-label={FIRST_ANSWER.field}
-          aria-describedby={partial ? questionId : undefined}
           hidden={!shown}
         >
           {options.map((option, n) => (
@@ -212,11 +243,11 @@ export function FirstQuestion({
               aria-selected={n === at}
               // A press picks before the field's blur can close the list.
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => pick(option)}
+              onClick={() => chosen(option)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  pick(option);
+                  chosen(option);
                 }
               }}
             >
@@ -225,7 +256,16 @@ export function FirstQuestion({
           ))}
         </div>
         {found.error !== null && <RequestFailure error={found.error} />}
-        {failure !== null && <RequestFailure error={failure} />}
+        {failure !== null && support === null && <RequestFailure error={failure} />}
+        {support !== null && (
+          <SupportNote
+            note={support}
+            onDismiss={() => {
+              setSupport(null);
+              field.current?.focus(); // the button goes; focus is never lost
+            }}
+          />
+        )}
       </div>
       <div className="mt-12">
         <Button variant="quiet" onClick={onSkip} disabledReason={saving ? "Saving…" : undefined}>

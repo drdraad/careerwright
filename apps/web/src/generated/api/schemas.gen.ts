@@ -14396,7 +14396,7 @@ export const SupportNoteOutSchema = {
         message: {
             type: 'string',
             title: 'Message',
-            description: 'Says whether the message was sent.'
+            description: 'Says whether the message was sent, or that a title was not kept as the role.'
         },
         resources: {
             items: {
@@ -14415,7 +14415,7 @@ export const SupportNoteOutSchema = {
         'resources'
     ],
     title: 'SupportNoteOut',
-    description: 'The support panel, shown beside a message that triggers the support screen\n(`careerwright.profile.safety`), whether the send was accepted or refused. Kept apart from\ncareer suitability. Derived from the request on every response, a replay included;\nnever stored, not even in the idempotency receipt.'
+    description: 'The support panel, shown beside a message that triggers the support screen\n(`careerwright.profile.safety`), whether the send was accepted or refused, and beside the\nfirst question\'s title field when what is typed there triggers it. Kept apart from career\nsuitability. Derived from the request on every response, a replay included; never\nstored, not even in the idempotency receipt.'
 } as const;
 
 export const SupportResourceOutSchema = {
@@ -15408,6 +15408,17 @@ export const TitleMatchesOutSchema = {
             type: 'boolean',
             title: 'Partial',
             description: 'True: neither ESCO nor the UK job-title index lists a title with every word typed, and these ESCO occupations hold the most of them, rarer words first. Ask "Careerwright couldn\'t match that title in ESCO. Is it one of these?", with "None of these is my job", which keeps the person\'s own words: the person chooses one or none, and nothing is joined to the typed words.'
+        },
+        support_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SupportNoteOut'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'The calm support panel, when what was typed triggers the support screen (`careerwright.profile.safety`), as a message does: then nothing is matched, nothing is offered in those words, and nothing about it is kept. Null otherwise.'
         }
     },
     additionalProperties: false,
@@ -15419,7 +15430,8 @@ export const TitleMatchesOutSchema = {
         'total',
         'uk_total',
         'limit',
-        'partial'
+        'partial',
+        'support_note'
     ],
     title: 'TitleMatchesOut',
     description: 'The first question\'s type-ahead: occupations whose ESCO titles (preferred and\nalternative labels) have a word beginning with each word typed, one per occupation, and\nthe UK job-title index\'s titles that do (ONS\'s SOC 2020 coding index, other than titles\nESCO itself offers), best first: what was typed, then a title beginning with it, then the\nrest, ESCO first on ties. When neither holds a title with every word, the ESCO occupations\nwhose titles hold the most of them, with `partial` true. Deterministic, no model call. No\nmatch is an honest empty list: nothing is invented, and the person\'s own words are always\ntheirs to keep (`POST .../origin/role/title`). `total` counts every ESCO occupation that\nmatched, `uk_total` every title of the index.'
@@ -15453,6 +15465,31 @@ export const TitleNotMatchedSchema = {
     ],
     title: 'TitleNotMatched',
     description: 'A target title of the person\'s matched no occupation in ESCO, so nothing is joined to\nit until they choose the one closest to it (the sketch offers it).'
+} as const;
+
+export const TitleRefusedOutSchema = {
+    properties: {
+        error: {
+            $ref: '#/components/schemas/ErrorBody'
+        },
+        support_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SupportNoteOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'error'
+    ],
+    title: 'TitleRefusedOut',
+    description: 'A refused first answer in the person\'s own words. When the title triggers the support\nscreen (`careerwright.profile.safety`), it is never kept as the role, and the calm support\npanel comes with the refusal, whatever the refusal is.'
 } as const;
 
 export const TooGeneralSchema = {

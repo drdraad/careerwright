@@ -499,7 +499,9 @@ export const chooseRole = <ThrowOnError extends boolean = false>(options: Option
  *
  * The first answer in the person's own words: a UK job title picked from the type-ahead,
  * or anything typed ("Use my own words"), saved exactly as given as their current role
- * through the one profile write path. Nothing is refused; no model is called.
+ * through the one profile write path; no model is called. Nothing is refused for its words,
+ * except a title the support screen answers (`careerwright.profile.safety`), as it answers a
+ * message: never kept as the role, with the calm support panel beside the refusal.
  */
 export const nameRole = <ThrowOnError extends boolean = false>(options: Options<NameRoleData, ThrowOnError>): RequestResult<NameRoleResponses, NameRoleErrors, ThrowOnError> => (options.client ?? client).post<NameRoleResponses, NameRoleErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -871,7 +873,8 @@ export const searchOccupations = <ThrowOnError extends boolean = false>(options:
  * Titles
  *
  * The type-ahead for "What do you do now, or what did you do last?": ESCO titles whose
- * words begin with what was typed. Works before a key is connected and in the demo.
+ * words begin with what was typed. Works before a key is connected and in the demo. What is
+ * typed goes through the support screen first, as a message does (design review I-3).
  */
 export const matchTitles = <ThrowOnError extends boolean = false>(options: Options<MatchTitlesData, ThrowOnError>): RequestResult<MatchTitlesResponses, MatchTitlesErrors, ThrowOnError> => (options.client ?? client).get<MatchTitlesResponses, MatchTitlesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

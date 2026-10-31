@@ -31,6 +31,7 @@ from careerwright.catalogue.taxonomy import (
     search_occupations,
 )
 from careerwright.db import system_transaction
+from careerwright.profile.safety import has_risk_stem
 
 router = APIRouter(prefix="/v1", responses=ERROR_RESPONSES, tags=["taxonomy"])
 DEFAULT_SEARCH_LIMIT = 20
@@ -66,8 +67,11 @@ def titles(
     limit: Annotated[int, Query(ge=1, le=TITLE_LIMIT)] = DEFAULT_TITLE_LIMIT,
 ) -> TitleMatchesOut:
     """The type-ahead for "What do you do now, or what did you do last?": ESCO titles whose
-    words begin with what was typed. Works before a key is connected and in the demo."""
+    words begin with what was typed. Works before a key is connected and in the demo. What is
+    typed goes through the support screen first, as a message does (design review I-3)."""
     with system_transaction(deps.engine) as tx:
+        if has_risk_stem(q):
+            return TitleMatchesOut.screened(held_release(tx), q, limit)
         return TitleMatchesOut.of(match_titles(tx, q, limit))
 
 

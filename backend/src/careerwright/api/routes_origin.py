@@ -6,11 +6,12 @@ write takes an expected version and an Idempotency-Key."""
 
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from careerwright.api.deps import CallerDep, Deps, IdempotencyKey
-from careerwright.api.envelope import ERROR_RESPONSES
+from careerwright.api.envelope import ERROR_RESPONSES, correlation_id, error_body, error_status
+from careerwright.api.interview_schemas import SupportNoteOut
 from careerwright.api.origin_schemas import (
     OriginOut,
     ProposedStrengthOut,
@@ -18,6 +19,7 @@ from careerwright.api.origin_schemas import (
     StrengthDecisionOut,
     StrengthOut,
     StrengthRunOut,
+    TitleRefusedOut,
 )
 from careerwright.api.routes_runs import run_out
 from careerwright.api.schemas import ProfileOut
@@ -32,6 +34,7 @@ from careerwright.capability.strengths import (
     turn_strength,
 )
 from careerwright.db import Tx, actor_transaction
+from careerwright.errors import CareerwrightError
 from careerwright.identity.keyring import Keyring
 from careerwright.identity.receipts import CommandResult, fingerprint, run_idempotent
 from careerwright.profile.exploration import (
@@ -44,6 +47,7 @@ from careerwright.profile.exploration import (
     hard_filters,
     name_role,
 )
+from careerwright.profile.safety import has_risk_stem
 from careerwright.vocabulary import WorkState
 
 router = APIRouter(
@@ -103,7 +107,11 @@ def post_role(
     "/origin/role/title",
     response_model=ProfileOut,
     status_code=201,
-    responses={200: {"model": ProfileOut, "description": "Already the role; nothing changed."}},
+    responses={
+        200: {"model": ProfileOut, "description": "Already the role; nothing changed."},
+        "4XX": {"model": TitleRefusedOut, "description": "Typed error envelope"},
+        "5XX": {"model": TitleRefusedOut, "description": "Typed error envelope"},
+    },
     operation_id="name_role",
 )
 def post_role_title(
@@ -112,10 +120,16 @@ def post_role_title(
     caller: CallerDep,
     deps: Deps,
     key: IdempotencyKey,
+    http: Request,
 ) -> JSONResponse:
     """The first answer in the person's own words: a UK job title picked from the type-ahead,
     or anything typed ("Use my own words"), saved exactly as given as their current role
-    through the one profile write path. Nothing is refused; no model is called."""
+    through the one profile write path; no model is called. Nothing is refused for its words,
+    except a title the support screen answers (`careerwright.profile.safety`), as it answers a
+    message: never kept as the role, with the calm support panel beside the refusal."""
+    # Screened before anything can refuse it, so every refusal shows the panel too; the
+    # panel is derived from the request each time and never stored.
+    support = has_risk_stem(body.title)
 
     def execute(tx: Tx) -> CommandResult:
         view, changed = name_role(
@@ -126,14 +140,23 @@ def post_role_title(
         )
 
     request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
-    status, response = run_idempotent(
-        deps.engine,
-        caller.actor.actor_id,
-        key,
-        "name_role",
-        fingerprint("name_role", request),
-        execute,
-    )
+    try:
+        status, response = run_idempotent(
+            deps.engine,
+            caller.actor.actor_id,
+            key,
+            "name_role",
+            fingerprint("name_role", request),
+            execute,
+        )
+    except CareerwrightError as error:
+        if not support:
+            raise
+        refused = TitleRefusedOut(
+            error=error_body(error, correlation_id(http)),
+            support_note=SupportNoteOut.beside_a_title(),
+        )
+        return JSONResponse(refused.model_dump(mode="json"), status_code=error_status(error))
     return JSONResponse(response, status_code=status)
 
 

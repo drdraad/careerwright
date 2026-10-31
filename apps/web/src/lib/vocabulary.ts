@@ -878,6 +878,10 @@ export const FIRST_ANSWER = {
   noneOfThese: "None of these is my job",
   nothing: "Careerwright found no job title holding those words.",
   looking: "Looking for job titles…",
+  /** Read by a screen reader as the list changes (WCAG 2.2 4.1.3). */
+  count: (titles: number) => `${titles} job ${titles === 1 ? "title" : "titles"} to choose from.`,
+  /** Read when the support panel shows below the question. */
+  supportShown: "Support information is shown below.",
   skip: "Skip for now",
 } as const;
 

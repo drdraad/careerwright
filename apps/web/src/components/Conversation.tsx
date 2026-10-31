@@ -19,14 +19,7 @@
 // Each demo question offers one-tap example replies the demo interviewer reads (STATE-09), and
 // the role-or-explore question offers two ways on that open existing views.
 import { type ReactNode, type Ref, useEffect, useId, useRef, useState } from "react";
-import type {
-  EntryMode,
-  PreferencesOut,
-  ProfileOut,
-  SupportNoteOut,
-  TurnOut,
-  WorkspaceOut,
-} from "@/generated/api";
+import type { EntryMode, PreferencesOut, ProfileOut, TurnOut, WorkspaceOut } from "@/generated/api";
 import {
   asksRoleOrExplore,
   questionAsks,
@@ -47,17 +40,16 @@ import {
   ROLE_KEPT,
   ROLE_OR_EXPLORE,
 } from "@/lib/vocabulary";
-import { useSupportShown } from "@/lib/world/settings";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { ClosestQuestion, FirstQuestion } from "./FirstQuestion";
 import { Glyph } from "./Glyph";
 import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
+import { SupportNote } from "./SupportNote";
 
 const EARLIER_SHOWN = 2;
 const time = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" });
-const day = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
 type Props = {
   workspace: WorkspaceOut;
@@ -137,41 +129,6 @@ function Reply({
         {view.kind === "streaming" && <p aria-hidden="true">{view.text}</p>}
       </div>
     </div>
-  );
-}
-
-/** Beside a sent message that holds a risk stem: calm, not blocking, dismissible. The
- *  message went to Careerwright as usual. */
-function SupportNote({ note, onDismiss }: { note: SupportNoteOut; onDismiss(): void }) {
-  // While it shows, the world is still (plan section 4: distress stills the world).
-  useSupportShown();
-  const titleId = useId();
-  const checked = note.resources[0]?.checked_on;
-  return (
-    <section className="card grid gap-8 small" aria-labelledby={titleId}>
-      <h3 id={titleId} className="font-semibold">
-        Support is available
-      </h3>
-      <p>{note.message}</p>
-      <ul className="plain-list">
-        {note.resources.map((resource) => (
-          <li key={resource.name}>
-            <strong>{resource.name}:</strong> {resource.contact}. {resource.when}.
-          </li>
-        ))}
-      </ul>
-      {checked !== undefined && (
-        <p className="muted">
-          These services were checked on their own websites on{" "}
-          {day.format(new Date(`${checked}T12:00:00Z`))}.
-        </p>
-      )}
-      <div>
-        <Button variant="quiet" onClick={onDismiss}>
-          Dismiss <span className="sr-only">the support note</span>
-        </Button>
-      </div>
-    </section>
   );
 }
 
