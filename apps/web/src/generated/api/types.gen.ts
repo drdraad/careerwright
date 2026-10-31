@@ -9661,8 +9661,10 @@ export type TitleMatchesOut = {
     release: TaxonomyReleaseOut;
     /**
      * Query
+     *
+     * What was searched, its spaces collapsed; null when the support screen answered, since what was typed is never returned.
      */
-    query: string;
+    query: string | null;
     /**
      * Matches
      */

@@ -71,7 +71,7 @@ def titles(
     typed goes through the support screen first, as a message does (design review I-3)."""
     with system_transaction(deps.engine) as tx:
         if has_risk_stem(q):
-            return TitleMatchesOut.screened(held_release(tx), q, limit)
+            return TitleMatchesOut.screened(held_release(tx), limit)
         return TitleMatchesOut.of(match_titles(tx, q, limit))
 
 

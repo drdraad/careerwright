@@ -237,7 +237,10 @@ class TitleMatchesOut(ResponseModel):
     matched, `uk_total` every title of the index."""
 
     release: TaxonomyReleaseOut
-    query: str
+    query: str | None = Field(
+        description="What was searched, its spaces collapsed; null when the support screen "
+        "answered, since what was typed is never returned."
+    )
     matches: list[TitleOption]
     total: int
     uk_total: int
@@ -272,11 +275,12 @@ class TitleMatchesOut(ResponseModel):
         )
 
     @classmethod
-    def screened(cls, release: TaxonomyRelease, typed: str, limit: int) -> "TitleMatchesOut":
-        """What was typed triggers the support screen: no match, and the panel."""
+    def screened(cls, release: TaxonomyRelease, limit: int) -> "TitleMatchesOut":
+        """What was typed triggers the support screen: no match, and the panel. The words are
+        not returned (`CLAUDE.md`: never echo request input); only the fact is."""
         return cls(
             release=TaxonomyReleaseOut.of(release),
-            query=" ".join(typed.split()),
+            query=None,
             matches=[],
             total=0,
             uk_total=0,

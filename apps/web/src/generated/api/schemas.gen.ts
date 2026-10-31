@@ -15368,8 +15368,16 @@ export const TitleMatchesOutSchema = {
             $ref: '#/components/schemas/TaxonomyReleaseOut'
         },
         query: {
-            type: 'string',
-            title: 'Query'
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Query',
+            description: 'What was searched, its spaces collapsed; null when the support screen answered, since what was typed is never returned.'
         },
         matches: {
             items: {

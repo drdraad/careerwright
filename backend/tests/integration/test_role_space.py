@@ -179,6 +179,10 @@ def test_the_first_question_goes_through_the_support_screen_and_keeps_nothing_of
     assert typed.status_code == 200, typed.text
     body = typed.json()
     assert (body["matches"], body["partial"], body["total"], body["uk_total"]) == ([], False, 0, 0)
+    # Never echoed (`CLAUDE.md`: never echo request input): the answer carries the fact only
+    # (fix round 2, app re-review note).
+    assert body["query"] is None
+    assert DISTRESS not in typed.text
     panel = body["support_note"]
     assert panel["message"] == safety.SUPPORT_NOTE_TITLE
     assert panel["policy_version"] == safety.POLICY_VERSION
