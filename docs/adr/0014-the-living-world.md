@@ -97,7 +97,9 @@ process." Their reference image is "Careerwright's luminous path forward".
    **Decisions on a proposed change (Task W2, the You chapter):** session 2's C3 asked for
    accept and undo as "colour coded buttons", and no meaning hue was free for either, so two
    tokens join: leaf green (`--decision-accept`, `#A6E25A`) accepts a change or confirms a
-   limit, filled once chosen; orchid (`--decision-undo`, `#FFAAFF`) undoes the last save. Each
+   limit, on a faint leaf tint once chosen (`--surface-decision-chosen`; at first it filled
+   solid, a second bright fill beside the one primary, so the W2C review changed it);
+   orchid (`--decision-undo`, `#FFAAFF`) undoes the last save. Each
    follows its words and glyph, means nothing else, and is never the primary action; CIE76 ΔE
    from every other hue is at least 56 (leaf) and 44 (orchid, nearest the journey's violet),
    measured by `docs/design/tools/contrast.mjs`. Provisional (R6), for session W2.

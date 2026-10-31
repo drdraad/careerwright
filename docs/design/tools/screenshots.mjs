@@ -8,9 +8,11 @@
 // centre, every line from a name to its light clear of the other lights, gates and names and of
 // the key, the key clear of the panels, shown whenever a light it explains is in view and only
 // while something it explains is, the time and cost instrument's labels clear of each other and
-// its marks, and at most one filled primary action in view. The lights, gates and trails come
-// from the drawing (window.__worldCheck); whether a name, a line or the key is seen comes from
-// the page.
+// its marks, no words clipped in a panel, the person's light named above the You console in
+// every view on a tablet and a phone (the band above it never under MIN_BAND), and at most one
+// action filled with a bright colour in view (by its computed fill: the primary's, or a
+// decision colour's). The lights, gates and trails come from the drawing (window.__worldCheck);
+// whether a name, a line or the key is seen comes from the page.
 // Writes screenshots/*.png and screenshots/checks.md. Exits 1 if any check fails.
 //   pnpm --dir docs/design run screenshots            (all)
 //   pnpm --dir docs/design run screenshots routes     (one place)
@@ -148,6 +150,28 @@ for (const { place, state, query, name, viewports } of CAPTURES.filter((c) => !o
       const explainedInView = [...lights.filter((l) => l.name !== "origin"), ...gates].some(inView);
       if (explainedInView && !keyShown) problems.push("lights are in view but the key to the lights is not");
       if (keyShown && !explainedInView && !window.__worldCheck.trails.some((t) => t.some(inView))) problems.push("the key to the lights shows with nothing it explains in view");
+      // No words clipped in a panel (design review I1: a CSS collision cut What we know's answers
+      // off mid-word, and every check passed): a text's box stays inside every ancestor that
+      // clips it, up to its panel, and a text that clips itself shows all of its words. Text for
+      // assistive tech only (1 px, clipped on purpose) and text not drawn (a closed disclosure)
+      // are not read.
+      const clips = (e) => getComputedStyle(e).overflowX !== "visible" || getComputedStyle(e).overflowY !== "visible";
+      for (const panel of document.querySelectorAll(".panel")) {
+        for (const e of panel.querySelectorAll("*")) {
+          if (![...e.childNodes].some((c) => c.nodeType === Node.TEXT_NODE && c.textContent.trim() !== "")) continue;
+          const r = box(e);
+          if (r.width <= 1 || r.height <= 1) continue;
+          const words = e.textContent.trim().slice(0, 40);
+          if (clips(e) && (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1)) problems.push(`"${words}" is clipped`);
+          for (let a = e.parentElement; a !== null && a !== panel.parentElement; a = a.parentElement) {
+            const c = box(a);
+            if ((a === panel || clips(a)) && (r.left < c.left - 0.5 || r.right > c.right + 0.5)) {
+              problems.push(`"${words}" passes the edge of ${a === panel ? "its panel" : "a box that clips it"}`);
+              break;
+            }
+          }
+        }
+      }
       for (const svg of document.querySelectorAll(".instrument svg")) {
         const texts = [...svg.querySelectorAll("text")];
         const marks = [...svg.querySelectorAll("circle")];
@@ -158,12 +182,39 @@ for (const { place, state, query, name, viewports } of CAPTURES.filter((c) => !o
       }
       return problems;
     });
+    // The You place keeps its world on a tablet and a phone (design review I2): in every view of
+    // the console the band above it is at least MIN_BAND, so the world never stands behind it,
+    // and the person's light is named in view.
+    if (place === "you" && state !== "distress" && viewport.width < 968) {
+      const lost = await page.evaluate(() => {
+        const problems = [];
+        if (window.__worldCheck.backdrop) problems.push("the world stands behind the console: the band above it is under MIN_BAND");
+        const you = document.querySelector('.world-label[data-for="origin"]');
+        if (you === null || you.classList.contains("sr-only")) problems.push(`the person's light ("You") is not named in view`);
+        return problems;
+      });
+      labels.push(...lost);
+    }
     await page.addScriptTag({ content: axeSource });
     const axe = await page.evaluate(async () => {
       const r = await window.axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] } });
       return r.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, target: v.nodes[0]?.target?.join(" ") }));
     });
-    const primaries = await page.evaluate(() => [...document.querySelectorAll(".btn-primary")].filter((b) => b.getClientRects().length).length);
+    // Filled bright actions in view, read from the computed fill rather than the class: the one
+    // primary's sea-glass and the decision colours, so a chosen Accept drawn as a second bright
+    // fill counts (design review M1).
+    const primaries = await page.evaluate(() => {
+      const fill = (token) => {
+        const probe = document.createElement("span");
+        probe.style.background = `var(${token})`;
+        document.body.append(probe);
+        const colour = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return colour;
+      };
+      const bright = ["--action-reading", "--decision-accept", "--decision-undo"].map(fill);
+      return [...document.querySelectorAll("button, a")].filter((b) => b.getClientRects().length && bright.includes(getComputedStyle(b).backgroundColor)).length;
+    });
     const shown = await page.evaluate(() => document.querySelectorAll(".world-label").length);
     const file = `${place}--${name ?? state}--${viewport.name}.png`;
     await page.screenshot({ path: join(out, file) });
@@ -178,11 +229,11 @@ const failed = results.filter((r) => r.axe.length || r.overflow > 0 || r.errors.
 const lines = [
   "# Screenshot checks",
   "",
-  "Generated by `docs/design/tools/screenshots.mjs` (Playwright 1.64.1, its pinned Chromium, reduced motion, device scale 1): the still world, as reduced motion and calm mode draw it. Automated checks only: axe-core 4.14.0 with the WCAG 2.0/2.1/2.2 A and AA rule tags, horizontal overflow, console errors, both fonts loaded, the wordmark inside the rail, a visible \"Synthetic demo\" label, every name in the world inside the window and clear of the panels, the key and each other, every light and gate in view named and no name for a light out of view (the revelation's subject always in view), no name, gate or key over a light's centre, every line from a name to its light clear of the other lights, gates and names and of the key, the key clear of the panels, shown whenever a light it explains is in view and only while something it explains is, the time and cost instrument's labels clear of each other and its marks, and at most one filled primary action in view. The lights, gates and trails are taken from the drawing; whether a name, a line or the key is seen is measured in the page. They are not a design review, a VoiceOver test or a Safari check (ruling R2).",
+  "Generated by `docs/design/tools/screenshots.mjs` (Playwright 1.64.1, its pinned Chromium, reduced motion, device scale 1): the still world, as reduced motion and calm mode draw it. Automated checks only: axe-core 4.14.0 with the WCAG 2.0/2.1/2.2 A and AA rule tags, horizontal overflow, console errors, both fonts loaded, the wordmark inside the rail, a visible \"Synthetic demo\" label, every name in the world inside the window and clear of the panels, the key and each other, every light and gate in view named and no name for a light out of view (the revelation's subject always in view), no name, gate or key over a light's centre, every line from a name to its light clear of the other lights, gates and names and of the key, the key clear of the panels, shown whenever a light it explains is in view and only while something it explains is, the time and cost instrument's labels clear of each other and its marks, no words clipped in a panel (a text's box inside every box that clips it, up to its panel), the person's light named above the You console in every view at 768 and 390 px with the band above it never under MIN_BAND, and at most one action filled with a bright colour in view (by its computed fill: the primary's sea-glass or a decision colour). The lights, gates and trails are taken from the drawing; whether a name, a line or the key is seen is measured in the page. They are not a design review, a VoiceOver test or a Safari check (ruling R2).",
   "",
   `Result: **${results.length - failed.length} of ${results.length} captures pass**.`,
   "",
-  "| Screenshot | Fonts loaded | Horizontal overflow | axe violations | Console errors | Names placed in the world | Label, name and light problems | Filled primaries |",
+  "| Screenshot | Fonts loaded | Horizontal overflow | axe violations | Console errors | Names placed in the world | Label, name, light and clipping problems | Bright fills |",
   "|---|---|---:|---|---|---:|---|---:|",
   ...results.map((r) => `| \`${r.file}\` | ${r.fonts.body && r.fonts.display ? "yes" : "**no**"} | ${r.overflow > 0 ? `**${r.overflow}px**` : "0"} | ${r.axe.length ? r.axe.map((v) => `**${v.id}** (${v.impact}, ${v.nodes}: \`${v.target}\`)`).join("; ") : "none"} | ${r.errors.length ? `**${r.errors.join("; ")}**` : "none"} | ${r.shown} | ${r.labels.length ? `**${r.labels.join("; ")}**` : "none"} | ${r.primaries > 1 ? `**${r.primaries}**` : r.primaries} |`),
   "",

@@ -701,6 +701,61 @@ button {
   gap: var(--space-16);
 }
 
+/* The You console, as wide as the app's. */
+.panel.console {
+  max-width: 600px;
+}
+
+/* The suggestions view: the view controls, the group headings, plain lists. */
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.segmented .btn {
+  min-height: 40px;
+}
+
+.segmented .btn[aria-pressed="true"] {
+  border-color: var(--selection-reading);
+  box-shadow: inset 0 -3px 0 var(--selection-reading);
+}
+
+.group {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.group-title {
+  color: var(--text-on-reading-muted);
+  font-size: var(--type-14);
+  font-weight: 600;
+}
+
+.bullets {
+  display: grid;
+  gap: var(--space-8);
+  padding-left: var(--space-24);
+  list-style: disc;
+  font-size: var(--type-14);
+}
+
+/* The slate's notes on how it searched, one step away. */
+.notes summary {
+  width: max-content;
+  max-width: 100%;
+  font-size: var(--type-14);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.notes ul {
+  margin-top: var(--space-8);
+}
+
 .reply {
   display: flex;
   gap: var(--space-12);
@@ -739,19 +794,16 @@ button {
   background: var(--surface-card);
 }
 
-/* Careerwright's reading, not a fact until accepted: a dashed edge. Chosen: the selection. */
+/* Careerwright's reading, not a fact until accepted: a dashed edge. A chosen proposal is marked
+   by its Confirm alone, never also a teal edge (teal is selection and the one primary). */
 .proposal[data-basis="inferred"] {
   border-style: dashed;
   border-color: var(--line-reading-control);
 }
 
-.proposal[data-chosen="true"] {
-  border-color: var(--selection-reading);
-  box-shadow: inset 3px 0 0 var(--selection-reading);
-}
-
 /* The two decisions on a proposed change, colour coded as well as worded (session 2, C3):
-   leaf green accepts or confirms, filled once chosen; orchid undoes the last save. */
+   leaf green accepts or confirms, on a faint leaf tint with a doubled edge once chosen (never a
+   second bright fill beside the one primary); orchid undoes the last save. */
 .btn-accept {
   background: transparent;
   border-color: var(--decision-accept);
@@ -759,8 +811,8 @@ button {
 }
 
 .btn-accept[aria-pressed="true"] {
-  background: var(--decision-accept);
-  color: var(--text-on-decision);
+  background: var(--surface-decision-chosen);
+  box-shadow: inset 0 0 0 1px var(--decision-accept);
 }
 
 .btn-undo {
@@ -774,7 +826,9 @@ button {
   height: 18px;
 }
 
-.facts {
+/* What we know's answers, one row each (its own name: Routes' and Plan's `.facts` below is a
+   two-column list, and the two must never meet, design review I1). */
+.known-facts {
   display: grid;
   gap: 2px;
   border: 1px solid var(--line-reading-hairline);
@@ -783,7 +837,7 @@ button {
   overflow: hidden;
 }
 
-.facts > div {
+.known-facts > div {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-12);
@@ -792,11 +846,11 @@ button {
   font-size: var(--type-14);
 }
 
-.facts dt {
+.known-facts dt {
   color: var(--text-on-reading-muted);
 }
 
-.facts dd {
+.known-facts dd {
   font-weight: 600;
   text-align: right;
 }
@@ -823,7 +877,7 @@ button {
   box-shadow: inset 4px 0 0 var(--selection-reading);
 }
 
-.suggestion h3 button {
+.suggestion h4 button {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -841,11 +895,11 @@ button {
   cursor: pointer;
 }
 
-.suggestion[data-open="true"] h3 button {
+.suggestion[data-open="true"] h4 button {
   font-size: var(--type-25);
 }
 
-.suggestion h3 .glyph {
+.suggestion h4 .glyph {
   width: 20px;
   height: 20px;
   color: var(--text-on-reading-muted);
@@ -1009,6 +1063,23 @@ button {
   }
 }
 
+/* Where the console leaves the world too narrow a span beside it (the rail's 96 px, the 32 px
+   margin, the console's 600 px and MIN_CLEAR's 240 px: below 968 px), the person's light stands
+   in a band above the console in every view, never shorter than MIN_BAND (240 px), so the You
+   place never falls back to a backdrop behind it; a long console starts below the band and
+   scrolls with the page (design review I2, as the app does). */
+@media (max-width: 967px) {
+  .work:has(> .console) {
+    /* At least MIN_BAND and a margin; on a taller screen, room for the light's arc at full size
+       and the names around it. */
+    padding-top: max(300px, 34vh);
+  }
+
+  .console {
+    margin-top: auto;
+  }
+}
+
 @media (max-width: 760px) {
   .shell {
     grid-template-columns: minmax(0, 1fr);
@@ -1101,6 +1172,17 @@ button {
 
   .title {
     font-size: var(--type-31);
+  }
+
+  /* The top bar already names the chapter "You": the console's own title is for assistive tech
+     only, and the world above it keeps the room (design review I2). */
+  .console > .title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .question {

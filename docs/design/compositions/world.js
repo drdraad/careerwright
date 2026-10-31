@@ -610,24 +610,25 @@
           <p class="answer">Synthetic: I could do 5 hours a week, and spend up to £600.</p>
           <p class="reply">${glyph("mark")}<span>Demo interviewer (synthetic): I noted 2 things for you to review.</span></p>`;
       const atConsole = (body) => `
-        <section class="panel" aria-labelledby="title">
+        <section class="panel console" aria-labelledby="title">
           <h1 id="title" class="title">You</h1>${tabs}
           <div class="view" role="tabpanel" id="view" aria-labelledby="tab-${view}">${body}</div>
         </section>`;
       if (state === "review") {
-        // A reply's proposals: accept and confirm in leaf green (filled once chosen), the one
-        // bright action is saving them, and Send waits.
+        // A reply's proposals: accept and confirm in leaf green (on a faint leaf tint once
+        // chosen), the one bright action is saving them, Send waits, and the next question waits
+        // until they are decided (one decision at a time).
         return atConsole(`
           ${asked}
           <section class="tray" aria-labelledby="tray">
             <h2 id="tray" class="small"><strong>To review: 2 changes from your last message</strong></h2>
             <div class="proposal">
-              <p class="small muted">A limit or target: needs your confirmation. You said</p>
+              <p class="small muted">You said</p>
               <p><strong>Weekly study hours: 5 hours a week</strong></p>
               <div class="row"><button type="button" class="btn btn-accept" aria-pressed="false">${glyph("accept")}Confirm<span class="sr-only"> weekly study hours as a limit</span></button><button type="button" class="btn btn-secondary">Edit</button><button type="button" class="link">Skip</button><button type="button" class="link">Source</button></div>
             </div>
-            <div class="proposal" data-basis="inferred" data-chosen="true">
-              <p class="small muted">A limit or target: needs your confirmation. Careerwright's reading, not a fact until you accept it</p>
+            <div class="proposal" data-basis="inferred">
+              <p class="small muted">Careerwright's reading, not a fact until you accept it</p>
               <p><strong>Total spending limit: £600</strong></p>
               <p class="small muted">${SPEND}</p>
               <div class="row"><button type="button" class="btn btn-accept" aria-pressed="true">${glyph("accept")}Confirm<span class="sr-only"> total spending limit as a limit</span></button><button type="button" class="btn btn-secondary">Edit</button><button type="button" class="link">Skip</button><button type="button" class="link">Source</button></div>
@@ -649,30 +650,57 @@
       if (state === "known") {
         return atConsole(`
           <h2 class="sentence">What we know</h2>
-          <dl class="facts">
+          <dl class="known-facts">
             <div><dt>Target roles</dt><dd>${esc(F.p01.targetTitles.join(", "))}</dd></div>
             <div><dt>Work areas</dt><dd>${esc(F.p01.cities.join(", "))}</dd></div>
             <div><dt>Total spending limit<span class="explained">${SPEND}</span></dt><dd class="tnum">${money(F.p01.directSpendCapMinor)}</dd></div>
             <div><dt>Monthly payment limit<span class="explained">${MONTHLY}</span></dt><dd class="tnum">${money(F.p01.monthlyPaymentCapMinor)}</dd></div>
           </dl>
           <p class="small muted">Not asked yet: current role, weekly study hours, lowest pay you'd accept.</p>
-          <div class="row"><button type="button" class="btn btn-secondary">Edit answers directly</button></div>`);
+          <div class="row"><button type="button" class="btn btn-secondary">Edit answers directly</button></div>
+          <details class="more"><summary>The early sketch for your target</summary><p class="small muted">Early sketch, not a checked route: what data quality analyst work usually asks for, from ESCO, and every step not resolved yet.</p></details>`);
       }
       if (state === "suggestions") {
-        // One suggestion open, edged as the selection; its "Make this a target" is the view's
-        // one bright action (session 2: "Needs to be a bright colour"). The rest are titles to scan.
-        const others = SUGGESTED.filter((s) => s.title !== "Statistician");
+        // A real slate's shape (design review I3: never only the attractive fixture): the slate
+        // for the role "data analyst" (Task W2B's evaluation, case DSC-10: its six titles and its
+        // notes' words; the counts and the lines in the open card are examples). The view's
+        // controls and count line, the notes one step away, one suggestion open with its choice
+        // right after its title, edged as the selection, its "Make this a target" the view's one
+        // bright action; the rest titles to scan.
+        const groups = [
+          ["Close to what you do now", [["Data scientist", "Mathematicians, actuaries and statisticians"], ["Data quality specialist", "Database and network professionals"]]],
+          ["Builds on skills you could carry over", [["Chief data officer", "Information and communications technology service managers"], ["Knowledge engineer", "Software and applications developers and analysts"], ["Big data archive librarian", "Librarians, archivists and curators"]]],
+          ["Something different", [["Data entry clerk", "Keyboard operators"]]],
+        ];
+        const NOTES = [
+          "Careerwright found 47 other occupations in ESCO that share 3 or more essential skills with “data analyst”, and keeps the 30 with the largest share of essential skills in common.",
+          "Careerwright chose these from 31 occupations that match your answers closely. It aims for at least 60, but doesn't add weaker matches to get there.",
+        ];
+        const card = ([title, kind], i) =>
+          i === 0
+            ? `<article class="suggestion" data-open="true" aria-labelledby="s-0">
+                <h4 id="s-0"><button type="button" aria-expanded="true" aria-disabled="true">${esc(title)}${glyph("expand")}</button></h4>
+                <p class="small muted">Kind of work: ${esc(kind)}</p>
+                <div class="row"><button type="button" class="btn btn-primary">Make this a target</button><button type="button" class="link">Not for me</button><button type="button" class="link">Exclude this kind of work</button><button type="button" class="link">Source</button></div>
+                <p class="small">Data scientists find and interpret rich data sources, manage large amounts of data, merge data sources and ensure the consistency of data sets, and create visualisations to help understand data…</p>
+                <p class="small"><strong>Why this could suit you</strong></p>
+                <ul class="bullets"><li>Your current role: “data analyst”. ESCO lists 12 of the same essential skills for both, so Careerwright joined them by those skills.</li></ul>
+                <p class="small"><strong>What might not suit you</strong></p>
+                <ul class="bullets"><li>ESCO lists 24 essential skills, not yet compared with your experience, including: build recommender systems, collect ICT data, deliver visual presentation of data.</li><li>Entry requirements aren't researched yet.</li></ul>
+                <p class="small"><strong>Try it before committing</strong></p>
+                <ul class="bullets"><li>Talk to someone who works as a data scientist about a typical week (an informational interview).</li></ul>
+                <p class="small muted">Pay, demand and listings in your work areas aren't researched yet.</p>
+              </article>`
+            : `<article class="suggestion" data-open="false" aria-labelledby="s-${i}"><h4 id="s-${i}"><button type="button" aria-expanded="false">${esc(title)}${glyph("collapse")}</button></h4><p class="small muted">Kind of work: ${esc(kind)}</p></article>`;
+        let n = 0;
         return atConsole(`
           <h2 class="sentence">Directions to explore</h2>
-          <p class="small muted">Up to six occupations from ESCO, found from your own answers. Ideas to test, not a judgement of fit: no score or percentage.</p>
-          <article class="suggestion" data-open="true" aria-labelledby="s-open">
-            <h3 id="s-open"><button type="button" aria-expanded="true">Statistician${glyph("expand")}</button></h3>
-            <p class="small muted">Kind of work: Mathematicians, actuaries and statisticians</p>
-            <p class="small">Why this could suit you: ESCO lists 7 of the same essential skills for both, so Careerwright joined them by those skills.</p>
-            <div class="row"><button type="button" class="btn btn-primary">Make this a target</button><button type="button" class="link">Not for me</button><button type="button" class="link">Source</button></div>
-          </article>
-          ${others.map((s, i) => `<article class="suggestion" data-open="false" aria-labelledby="s-${i}"><h3 id="s-${i}"><button type="button" aria-expanded="false">${esc(s.title)}${glyph("collapse")}</button></h3></article>`).join("")}
-          <p class="small muted">Invented examples for design review.</p>`);
+          <p class="small muted">Occupations from ESCO, found from your own answers. Ideas to test, not a judgement of fit: no score or percentage.</p>
+          <div class="segmented" role="group" aria-label="Which directions to show">${["Balanced", "Closer to what I do", "Less familiar", "Broader", "More depth"].map((e, i) => `<button type="button" class="btn btn-secondary" aria-pressed="${i === 0}">${e}</button>`).join("")}</div>
+          <p class="small muted">6 of up to 6, from 31 occupations found by 1 search of ESCO. 17 more were found but not kept.</p>
+          <details class="notes"><summary>How Careerwright searched (${NOTES.length} notes)</summary><ul class="bullets">${NOTES.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></details>
+          ${groups.map(([heading, items], g) => `<section class="group" aria-labelledby="g-${g}"><h3 id="g-${g}" class="group-title">${esc(heading)}</h3>${items.map((item) => card(item, n++)).join("")}</section>`).join("")}
+          <p class="small muted">The slate for “data analyst”, from Careerwright's evaluation: its titles and notes; the counts and the open card's lines are examples for design review.</p>`);
       }
       const failed = state === "failed";
       return atConsole(`
@@ -986,6 +1014,8 @@
 
     // For tools/screenshots.mjs: every light, gate and trail as drawn, to check independently.
     window.__worldCheck = {
+      // No room beside or above the panels: the world stands behind them (a band under MIN_BAND).
+      backdrop: Boolean(clear?.backdrop),
       lights: world.lights.map((l) => ({ id: l.id, kind: l.kind, name: l.name, revelation: Boolean(l.revelation), ...project(l.p) })),
       gates: world.gates.map((g) => ({ id: g.id, name: g.name, ...project(g.p), r: 10 })),
       trails: world.trails.map((t) => t.points.map(project)),

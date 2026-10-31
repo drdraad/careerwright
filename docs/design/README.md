@@ -14,9 +14,9 @@ requires a human** (session W2, ruling R2).
 
 | Path | What it is |
 |---|---|
-| `tokens/tokens.css` | Canonical tokens, v0.2.2: primitives, semantic tokens (with the two decision colours, accept and undo), the `.on-space` and `.on-reading` contexts, type, space, radius, each trail's drawn strength and the motion vocabulary |
+| `tokens/tokens.css` | Canonical tokens, v0.2.3: primitives, semantic tokens (with the two decision colours, accept and undo, and a chosen Accept's faint leaf tint), the `.on-space` and `.on-reading` contexts, type, space, radius, each trail's drawn strength and the motion vocabulary |
 | `tokens/contrast-pairs.json` | Every text and meaningful non-text pairing: glass panels measured over the darkest ground and over the brightest light in the world, and each trail measured as drawn, at its strength |
-| `tokens/contrast-report.md` | Generated measurements: **131 of 131 pass** (99 pairs), with the status and decision hues' distance from every meaning hue |
+| `tokens/contrast-report.md` | Generated measurements: **132 of 132 pass** (100 pairs), with the status and decision hues' distance from every meaning hue |
 | `fonts/` | Outfit (display) and Source Sans 3 (body), with licence texts and provenance (`fonts/README.md`) |
 | `compositions/index.html` | Gallery: every place and state |
 | `compositions/world.html` | One place in one state: `?place=you\|roles\|skills\|options\|routes\|plan&state=…` |
@@ -45,8 +45,11 @@ named (and no name left for a light out of view or under a panel), the revelatio
 view and named, no name, gate or key over a light's centre, every line from a name to its
 light (as drawn) clear of the other lights, gates and names and of the key, the key clear of
 the panels, shown whenever a light it explains is in view and only while something it explains
-is, the time and cost instrument's labels clear of each other and its marks, and at most one
-filled primary action in view. The lights, gates and trails come from the drawing
+is, the time and cost instrument's labels clear of each other and its marks, no words clipped
+in a panel (a text's box inside every box that clips it, up to its panel), the person's light
+named above the You console in every view at 768 and 390 px with the band above it never under
+MIN_BAND, and at most one action filled with a bright colour in view (by its computed fill: the
+primary's sea-glass or a decision colour). The lights, gates and trails come from the drawing
 (`window.__worldCheck`); whether a name, a line or the key can be seen is measured in the page,
 so the check can fail. The captures are the
 still world (reduced motion), which is what calm mode and reduced motion draw; the moving world
@@ -87,7 +90,7 @@ others, and its a bit too [noisy] with the dashed lines." So:
 | Grey, the slate (`--trail-shadow` `#6F7EA3`) | Not known yet: shadow, never absence, never zero | Kept or failed results |
 | White | The person's light; focus rings; type; links and quiet actions (underlined) | |
 | Crimson (`--crimson-300`) and sand (`--sand-300`) | Failed and stale, always after a glyph and words; sand also draws what is kept from an earlier search (openings, routes) | Any world meaning (ΔE76 ≥ 53 from every meaning hue) |
-| Leaf green (`--decision-accept` `#A6E25A`) | Accepting a proposed change, or confirming a limit, after its words and a tick; filled once chosen (session 2, C3: "colour coded buttons") | The primary action, selection, success in general (ΔE76 ≥ 56 from every other hue) |
+| Leaf green (`--decision-accept` `#A6E25A`) | Accepting a proposed change, or confirming a limit, after its words and a tick; on a faint leaf tint with a doubled edge once chosen, never a second bright fill beside the one primary (session 2, C3: "colour coded buttons"; W2C fix round 1) | The primary action, selection, success in general (ΔE76 ≥ 56 from every other hue) |
 | Orchid (`--decision-undo` `#FFAAFF`) | Undoing the last save, after its words and a turn-back glyph | Anything else (ΔE76 ≥ 44 from every other hue; nearest the journey's violet) |
 
 The key to the lights lists only the kinds drawn at that place, each mark drawn as the world
@@ -168,7 +171,7 @@ while the tab is hidden.
 
 | Place | Where it is | Its moment | Reference states |
 |---|---|---|---|
-| You | The origin: the person's light, skills around it, and the console: three views as tabs, one idea each (Conversation, What we know, Suggestions; session 2's findings, SW.4) | The first answer lights it and grows the first trails | default; review (a reply's proposals: Confirm in leaf green, filled once chosen; a limit explained in plain words; saving them the one bright action); saved (what the decision did, where it was made, Undo in orchid); known (What we know, both limits explained); suggestions (one open, edged as the selection, its "Make this a target" the bright action; the rest titles to scan); distress (the world stills and dims, the calm support panel); failed (the message kept, the reply missing) |
+| You | The origin: the person's light, skills around it, and the console: three views as tabs, one idea each (Conversation, What we know, Suggestions; session 2's findings, SW.4) | The first answer lights it and grows the first trails | default; review (a reply's proposals: Confirm in leaf green, on a faint tint once chosen; a limit explained in plain words; saving them the one bright action; the next question waits until they are decided); saved (what the decision did, where it was made, Undo in orchid, then the next question); known (What we know, both limits explained, the early sketch one step away); suggestions (a real slate's shape, "data analyst": the view's controls, the count line and the search notes one step away; one open, edged as the selection, its "Make this a target" the bright action right after its title; the rest titles to scan). On a tablet and a phone the person's light stands in a band of world above the console in every view (never under MIN_BAND), and on a phone the top bar names the chapter, so the console's own title is for assistive tech only; distress (the world stills and dims, the calm support panel); failed (the message kept, the reply missing) |
 | Roles | The horizon: suggested and chosen destinations; the chosen one's openings clustered below it by area, each count with its sources and date (on a phone, listed in the sheet) | An unexpected connection, joined by shared essential skills | default; stale (sand, a clock, the age on each count); unknown ("none found in the 4 sources checked", never "no jobs"); three long targets; not built yet (and, in the gallery, the key opened on a narrow screen) |
 | Skills | The ground between the person and a destination, stretch by stretch (the skills around the person belong to You) | An answer lights a stretch already covered | default, with a gate ("Ready if you pass the assessed report"); unknown (all shadow); not built yet |
 | Options | Bridges across the dark stretches | A gap gets its first bridge | default; unknown ("No bridge found yet. That doesn't mean there are none."); not built yet |
