@@ -25,7 +25,8 @@ adds variants of later concepts.
    requirements or weekly hours, a payment due before the planning start, a start before it,
    an application deadline already passed, or, alone, a direct cost or a month's payments
    above its cap. Each is computed from the variant by itself (its dates, its payments and
-   own support, its hours), so every route containing it repeats it.
+   own support, its hours), so every route containing it repeats it, or, for unknown weekly
+   hours, is unknown or over the limit in each month the variant is active.
 3. *Spend caps.* A route's direct cost is the sum of each variant's own net cost, never below
    zero (a variant's support reduces only its own fees), and a month's payments are the sum of
    each variant's own payments in it, beside debt repayments fixed by the inputs. Adding a

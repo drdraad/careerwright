@@ -186,6 +186,23 @@ def test_the_a_to_i_fixture_completes_with_its_three_layers_in_direct_spending_m
     assert all(s.economic_cost is None for s in result.schedules)  # no baseline: direct only
 
 
+@pytest.mark.req("PARETO-03")
+def test_layers_rank_one_target_s_routes_never_another_s() -> None:
+    trace_result, directai_result = search_routes(trace()), search_routes(directai())
+    b = next(s for s in trace_result.schedules if s.route == ["TRACE-01/B"])
+
+    # TRACE-01's B (4 months, £600) is sooner and cheaper than every A-I route, but it is a
+    # route to another target, so it betters none of them: A, B and C stay in F1.
+    assert trace_result.target_title != directai_result.target_title
+    assert all(
+        dominates((b.months_to_readiness, b.objective_cost.minor_units), (time, cost))
+        for time, cost, _ in by_route(directai_result).values()
+    )
+    assert sorted(r for r, (_, _, layer) in by_route(directai_result).items() if layer == 1) == [
+        (f"fixture:directai:route:{x}",) for x in "ABC"
+    ]
+
+
 @pytest.mark.req("DIRECTAI-03")
 def test_the_two_fixtures_share_no_route_or_family_id() -> None:
     trace_result, directai_result = search_routes(trace()), search_routes(directai())
