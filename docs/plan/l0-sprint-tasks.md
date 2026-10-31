@@ -3,8 +3,9 @@
 This file breaks `docs/plan/development-plan.md` (the local development plan, v1.4) into
 implementation tasks for agent execution. Authority order: product specification
 (`Careerwright_Product_Specification.md`, v1.3) → development plan local overrides → this file.
-Tasks 1–6 (Sprints 0–2) are complete. The remaining tasks follow the order, dependency
-rules and dispatch preconditions below (ADR 0008).
+What is done and what comes next is in "Current position and next tasks" below. The
+remaining tasks follow the order, dependency rules and dispatch preconditions below (ADR
+0008), as Task A1 amends them once the product owner approves.
 This file adds task slicing, environment facts and standing rulings only; it never
 relaxes the plan or the specification.
 
@@ -242,6 +243,117 @@ Sprint reviews follow the order: the task that finishes a sprint writes its revi
 `docs/reviews/sprint-3.md` (Task 8) comes after `sprint-4.md` (Task 10) and `sprint-5.md`
 (Task 12), and `sprint-6.md` (Task 13b) covers 6a and 6b. Each review states the order it
 ran in.
+
+## Current position and next tasks (2026-10-31)
+
+**Complete and reviewed:** Tasks 1–6, 6b, 6c, 7, 7d, 7b, 9, 11, 7c and W1; Task W2's slices
+W2A (the world layer and its design references) and W2B (the deterministic sources: the
+type-ahead, usual skills, the skill-joined slate, the unexpected connection, the overlooked
+strength run). **Held:** sessions 1, 2 and W1. The ledger
+(`.superpowers/sdd/l0-sprint-tasks/progress.md`) has every commit range and ruling.
+
+**In progress:** Task W2, slice W2C part 1 (the You chapter in the world): built
+(166e4ef..6af1097), reviewed in two halves (design and experience; app, truth and tests), fix
+round 1 committed (6af1097..f179d0f; `make check` and `make acceptance` pass on f179d0f). Its
+scoped re-review has not run.
+
+**The product owner's direction (2026-10-31), in their words:**
+- "The visuals are important, but they must be subservient to having a practical, useful
+  product."
+- "I want to check that the development plan is still sensible, and get us back on track
+  with the sprints, even if we have to refactor some of them to ensure coherency and
+  pragmatism."
+- "We can also start being a bit more generous with token use in human testing - I would
+  like to use muse wonder for this."
+
+**Next, in order:**
+1. Task A1, the whole-solution audit (card below). No other task is dispatched until the
+   product owner has approved the plan changes it proposes.
+2. Then, unless A1 changes them: the W2C part 1 re-review, W2C part 2, W2D, session W2, and
+   the suggested order above.
+
+**Remaining Task W2 work** (A1 may cut, merge or reshape it):
+- *W2C part 1:* a scoped re-review of fix round 1 against both reviews. Fix round 1's own
+  concerns go with it:
+  - On a phone, the band of world above the console (about 300 px) puts a long view's first
+    decision a scroll away.
+  - "Help me explore instead" still drops keyboard focus. This is older than W2C.
+  - The moving-and-still identical-words test covers only the fixture workspace.
+- *W2C part 2:*
+  - The first answer's ignition, and the type-ahead's closest titles asked as "Careerwright
+    couldn't match that title in ESCO. Is it one of these?"
+  - The unexpected connection lit in the world (light and a joining trail), its shared
+    skills one step away.
+  - The overlooked strength's proposal and confirm step, and "usual in your role, not
+    confirmed yet". A support turn holds back revelations: `held_back` (422
+    `INSUFFICIENT_EVIDENCE`) is never asked for on a support turn, and its words never sit
+    beside the support panel.
+  - The strength's destinations come from the first slate only: align them with the
+    horizon.
+  - The world answers the chapter's decisions: suggestions drawn as rings with the open one
+    singled out, and "Make this a target" previewing its destination before it is saved.
+- *W2D:*
+  - The world's requirement family in the register, and the Sprint W acceptance.
+  - The frame re-measure on the busiest real scene and an unplaceable-name scene. Warn the
+    product owner first: it opens a window.
+  - Plain phrases for the route preview's "Economic cost" and "Direct spending", with the
+    selected route's name placed first.
+  - ADR 0014 decision 7's strip wording.
+  - The phone openings list one per line, with stale and unknown captures.
+  - Session W2's package and sheet, and `docs/reviews/sprint-w.md`.
+- *Session W2's sheet (the product owner's decisions):*
+  - The slate's provisional rules: at least 3 shared essential skills, Jaccard, best 30, the
+    connection rule, the strength gate, the quotable fields and the "used" answer.
+  - Work style: one word is not searched (REC1-03).
+  - The too-general thresholds (more than 50 occupations, or more than 5 skills not named
+    exactly) and the common answers they leave empty ("writing reports", "working in a
+    team").
+  - Searches read only a skill's main name ("operating farm machinery"); hyphens are read as
+    spaces.
+  - The specificity order, and each note's words ("main name", "added weight").
+  - The discovery prompts, untested live.
+  - Typography and colour: the Source Sans 3 body face, and leaf green (accept) beside
+    destination orange under colour-blind simulation.
+  - Layout: the tablet strip without work areas and budget; the helper lines cut or kept;
+    the early sketch behind a disclosure; the tabs; Send as the bright action.
+- *Parked for the final review:* titles that ESCO writes with "&" or accents don't match
+  their plain spelling (`concept_key`, a migration-defined key). This sits with the three
+  chosen-occupation normalisations and the earlier parked items (ledger lines starting
+  "Parked").
+
+## Task A1: whole-solution audit, coherence and pragmatism (the product owner's request, 2026-10-31)
+
+**Preconditions:** none. Read-only on product code. It writes a report and proposes changes
+to the development plan, this file and, where needed, the specification and `CLAUDE.md`. Each
+change waits for the product owner's approval.
+
+Answer four questions, with evidence:
+1. **Intent:** does the solution as built and planned still deliver the original design's
+   intended functionality? Map each specification capability, end to end, to built, planned
+   or drifted, and name each drift.
+2. **Coherence and pragmatism:** is it one clear product? Check that complexity earns its
+   keep, that the honesty invariants are applied in proportion, and that the world serves the
+   work, not the other way round (the product owner's direction above). Use the review
+   history as evidence: where fix rounds went, and what they bought the person.
+3. **The plan:** is the development plan still sensible? Propose re-ordering, merging,
+   cutting or refactoring sprints and tasks so the practical, useful product comes first.
+   Include the Sprint W gate (session W2 before Tasks 10, 12, 8, 14 and 15) and the remaining
+   W2 work above.
+4. **Muse Wonder for human testing:** `muse-wonder-1.0` is in
+   `identity/model_registry.py`, and ADR 0003 left it unselected. Say where it is used, the
+   budget per session, how each call is ledgered (R5), and what ADR 0003, the plan, the
+   register and the test-model safeguards need.
+
+Deliver:
+- `docs/reviews/l0-audit-2026-10-31.md`: findings, each with evidence and a recommendation.
+- The proposed plan changes.
+- A one-page plain-words summary for the product owner. List only the decisions that are
+  theirs, one sentence each, saying what "yes" does.
+
+Nothing in the plan changes until they approve.
+
+Acceptance: every specification capability is mapped. Every recommendation cites evidence.
+The product owner has the summary.
 
 ---
 
