@@ -99,6 +99,7 @@ def stored(
     return decide(
         title,
         title.casefold(),
+        unqualified=title.casefold(),
         choice=Choice(chosen, uuid.uuid4()) if chosen else None,
         labelled=(),
         pack=pack,

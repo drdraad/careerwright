@@ -1,6 +1,7 @@
 """Migrations against real PostgreSQL 16: a fresh database reaches head; a populated database
 at every earlier revision upgrades to head without losing data (plan Sprint 1 acceptance)."""
 
+import dataclasses
 import json
 import uuid
 from datetime import UTC, datetime
@@ -9,22 +10,37 @@ import pytest
 import sqlalchemy as sa
 from alembic.config import Config
 from alembic.script import ScriptDirectory
+from fastapi.testclient import TestClient
 
+from careerwright.api.app import create_app
+from careerwright.api.deps import ApiDependencies
 from careerwright.capability.commands import committed_data, pack_targets
 from careerwright.catalogue import taxonomy_store
 from careerwright.catalogue.taxonomy import search_essential_skills
 from careerwright.cli import import_taxonomy, migrate_app, seed, seed_fixture
-from careerwright.db import system_transaction
+from careerwright.db import create_engine, system_transaction
 from careerwright.identity import store as identity_store
+from careerwright.identity.keyring import Keyring
+from careerwright.identity.model_registry import FIXTURE_DISCOVERY_MODEL_ID
 from careerwright.identity.records import EventKind
+from careerwright.identity.runs import output_context
 from careerwright.profile import store as profile_store
-from careerwright.profile.document import ProfileInput, apply_profile_input, empty_profile
+from careerwright.profile.discovery import PROMPT_VERSION, DiscoveryProposal
+from careerwright.profile.document import (
+    FieldState,
+    ProfileInput,
+    TargetListInput,
+    apply_profile_input,
+    apply_updates,
+    empty_profile,
+)
 from careerwright.profile.records import SourceKind, TargetCoverage, TargetLink
 from careerwright.profile.targets import resolve_target, stored_targets
 from careerwright.seed import FIXTURE_WORKSPACE_ID, INVITED_ACTORS
 from careerwright.vocabulary import DataMode
+from tests.support.client import ApiClient
 from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
-from tests.support.infra import Infra, migrator_engine
+from tests.support.infra import API_BASE, Infra, migrator_engine
 
 pytestmark = pytest.mark.integration
 
@@ -404,6 +420,206 @@ def add_targets(tx: sa.Connection, targets: list[str]) -> uuid.UUID:
     profile_store.insert_profile_version(tx, workspace.workspace_id, 1, document, owner)
     profile_store.link_sources(tx, workspace.workspace_id, 1, [choice])
     return workspace.workspace_id
+
+
+OLDER_TARGETS = ["Saute cooks", "IT support technician [2nd line]", "Registered nurse (adult)"]
+NEWER_TARGETS = ["bicycle mechanic", "Registered nurse (adult)"]
+
+
+@pytest.mark.req("PROF-10", "BND1-14")
+def test_0035_gives_every_version_s_targets_a_record_so_an_older_discovery_still_opens(
+    infra: Infra, api_deps: ApiDependencies, ada: str
+) -> None:
+    # Task 6d slice A fix round 1 (the target records' review, Important 1): 0034 gave a record
+    # only to each workspace's newest targets. A discovery is read from the version it pinned,
+    # so one made before a target was replaced failed to open its slate and its note
+    # (INTERNAL_ERROR). Before 0034: version 1 holds three targets and a discovery pinned to
+    # it; version 2, the bicycle mechanic chosen from that discovery's slate, keeps one of
+    # them, so the discovery is still current.
+    database = f"careerwright_every_version_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    engine = migrator_engine(infra, database)
+    settings = infra.api_settings(database)
+    app_engine = create_engine(settings.app_database, application_name="test-0035")
+    deps = dataclasses.replace(api_deps, settings=settings, engine=app_engine)
+    try:
+        migrate_app(engine, "0033")
+        assert import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE) == "imported"
+        seed_fixture(engine, infra.ops_settings(database))
+        with system_transaction(engine) as tx:
+            workspace, discovery = add_discovery_then_a_choice(tx, deps.keyring)
+        base = f"/v1/workspaces/{workspace}/discoveries/{discovery}"
+        with TestClient(
+            create_app(deps),
+            base_url=API_BASE,
+            raise_server_exceptions=False,
+            client=("127.0.0.1", 57016),
+        ) as client:
+            api = ApiClient(client)
+            migrate_app(engine, "0034")
+            with system_transaction(engine) as tx:
+                after_0034 = {
+                    tuple(row)
+                    for row in tx.execute(
+                        sa.text(
+                            "SELECT title, link, coverage FROM careerwright.target_records "
+                            "WHERE workspace_id = :ws"
+                        ),
+                        {"ws": workspace},
+                    )
+                }
+            # A title with no record is not resolved, never an error.
+            gap = api.get(f"{base}/slate", ada)
+
+            migrate_app(engine)
+            with system_transaction(engine) as tx:
+                pack = pack_targets(committed_data())
+                documents = [profile_store.profile_version(tx, workspace, v) for v in (1, 2)]
+                stored = [
+                    record
+                    for document in documents
+                    if document is not None
+                    for record in stored_targets(tx, workspace, document.document)
+                ]
+                decided = [resolve_target(tx, workspace, r.title, pack) for r in stored]
+            opened = api.get(f"{base}/slate", ada)
+            note = api.write("POST", f"{base}/explanation", ada, {"expected_profile_version": 2})
+    finally:
+        engine.dispose()
+        app_engine.dispose()
+
+    # 0034's gap: the two targets only version 1 holds have no record.
+    assert after_0034 == {
+        ("bicycle mechanic", "occupation_choice", "not_covered"),
+        ("Registered nurse (adult)", "none", "not_covered"),
+    }
+    assert gap.status_code == 200, gap.text
+    assert gap.json()["unmatched_titles"] == OLDER_TARGETS
+    # After 0035 every title of every version has its record, decided as `resolve_target`
+    # decides it, the bracketed qualifiers left out to reach a pack target by its title.
+    assert stored == decided
+    assert [(r.title, r.link, r.coverage, r.pack_target_id) for r in stored] == [
+        ("Saute cooks", TargetLink.EXACT_LABEL, TargetCoverage.NOT_COVERED, None),
+        (
+            "IT support technician [2nd line]",
+            TargetLink.PACK_CROSSWALK,
+            TargetCoverage.PACK_TARGET,
+            "it-support-technician-bristol",
+        ),
+        (
+            "Registered nurse (adult)",
+            TargetLink.PACK_CROSSWALK,
+            TargetCoverage.PACK_TARGET,
+            "registered-nurse-manchester",
+        ),
+        ("bicycle mechanic", TargetLink.OCCUPATION_CHOICE, TargetCoverage.NOT_COVERED, None),
+        (
+            "Registered nurse (adult)",
+            TargetLink.PACK_CROSSWALK,
+            TargetCoverage.PACK_TARGET,
+            "registered-nurse-manchester",
+        ),
+    ]
+    # The older discovery opens its slate, the sauté cook joined to its title, and its note.
+    assert opened.status_code == 200, opened.text
+    assert opened.json()["unmatched_titles"] == OLDER_TARGETS[1:]
+    assert note.status_code == 202, note.text
+
+
+def add_discovery_then_a_choice(tx: sa.Connection, keyring: Keyring) -> tuple[uuid.UUID, uuid.UUID]:
+    """Ada's demo workspace (its note runs offline) before 0034: version 1 with an answer and
+    three targets, a discovery pinned to it, and version 2, the bicycle mechanic chosen from
+    that discovery's slate in place of two of them."""
+    owner = INVITED_ACTORS[0].actor_id
+    workspace = identity_store.insert_workspace(
+        tx,
+        workspace_id=uuid.uuid4(),
+        owner_actor_id=owner,
+        name="An older discovery (synthetic)",
+        data_mode=DataMode.DEMO,
+        synthetic=True,
+    ).workspace_id
+    now = datetime.now(UTC)
+    typed, choice, discovery, output = (uuid.uuid4() for _ in range(4))
+    profile_store.insert_source(
+        tx,
+        source_ref_id=typed,
+        workspace_id=workspace,
+        kind=SourceKind.DIRECT_ENTRY,
+        label="Typed in (synthetic)",
+        recorded_by=owner,
+        observed_at=now,
+    )
+    first = ProfileInput.model_validate(
+        {
+            **{name: {"state": "unasked"} for name in ProfileInput.model_fields},
+            "enjoyed_tasks": {"state": "provided", "value": ["tuning bicycles"]},
+            "target_titles": {"state": "provided", "value": OLDER_TARGETS},
+        }
+    )
+    older = apply_profile_input(empty_profile(), first, typed)
+    profile_store.insert_profile_version(tx, workspace, 1, older, owner)
+    profile_store.link_sources(tx, workspace, 1, [typed])
+    proposal = DiscoveryProposal.model_validate(
+        {
+            "origin": "fixture",
+            "prompt_version": PROMPT_VERSION,
+            "profile_version": 1,
+            "queries": [
+                {
+                    "query_id": "q1",
+                    "text": "tune bicycles",
+                    "channel": "tasks",
+                    "based_on": [{"field": "enjoyed_tasks", "text": "tuning bicycles"}],
+                }
+            ],
+            "hypotheses": [],
+            "release": SAMPLE_RELEASE.dataset_id,
+        }
+    )
+    sealed = keyring.seal(proposal.model_dump_json().encode(), output_context(workspace, output))
+    tx.exec_driver_sql(
+        "INSERT INTO careerwright.runs (run_id, workspace_id, data_mode, synthetic, kind, "
+        "requested_by, model_id, model_mode, status, output_id, started_at, finished_at, "
+        "profile_version) VALUES (%(run)s, %(ws)s, 'demo', true, 'discovery', %(owner)s, "
+        "%(model)s, 'fixture', 'complete', %(out)s, clock_timestamp(), clock_timestamp(), 1)",
+        {
+            "run": discovery,
+            "ws": workspace,
+            "owner": owner,
+            "model": FIXTURE_DISCOVERY_MODEL_ID,
+            "out": output,
+        },
+    )
+    tx.exec_driver_sql(
+        "INSERT INTO careerwright.run_outputs (output_id, run_id, workspace_id, key_version, "
+        "nonce, ciphertext, content_sha256) VALUES (%(out)s, %(run)s, %(ws)s, %(v)s, %(n)s, "
+        "%(c)s, repeat('0', 64))",
+        {
+            "out": output,
+            "run": discovery,
+            "ws": workspace,
+            "v": sealed.key_version,
+            "n": sealed.nonce,
+            "c": sealed.ciphertext,
+        },
+    )
+    profile_store.insert_source(
+        tx,
+        source_ref_id=choice,
+        workspace_id=workspace,
+        kind=SourceKind.OCCUPATION_CHOICE,
+        label="Chosen from Careerwright's suggestions",
+        recorded_by=owner,
+        observed_at=now,
+        locator=MECHANIC_URI,
+        run_id=discovery,
+    )
+    chosen = TargetListInput(state=FieldState.PROVIDED, value=NEWER_TARGETS)
+    newer, _ = apply_updates(older, {"target_titles": (chosen, choice)})
+    profile_store.insert_profile_version(tx, workspace, 2, newer, owner)
+    profile_store.link_sources(tx, workspace, 2, [choice])
+    return workspace, discovery
 
 
 @pytest.mark.req("ACQ-01")

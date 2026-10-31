@@ -386,4 +386,8 @@ its rules on protected gates, unknown and readiness (decisions 4, 5 and 7) are u
   is. A typed "bookkeeper" is now ambiguous in Skills, as in You, until the person chooses which
   they mean (the sketch asks); a chosen one still reaches P05's pack target through the
   crosswalk (`test_capability.py`). The evidence, statements and edits keep their
-  `title_key` (data keying, unchanged).
+  `title_key` (data keying, unchanged). Fix round 1: a qualifier in brackets is left out
+  again to reach a pack target by its title, as `title_key` did before ("Registered nurse
+  (adult)" is P03's "Registered nurse"); the whole title as a concept comes first, and ESCO's
+  labels are still matched by the whole title. Migration 0035 decides again each stored record
+  this rule reaches.

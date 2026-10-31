@@ -167,3 +167,36 @@ def test_a_chosen_occupation_is_stored_with_the_choice_and_the_pack_target_it_co
     # Another person's targets are not found, never an empty list.
     other = api.get(f"/v1/workspaces/{workspace}/targets", ben)
     assert other.status_code == 404
+
+
+@pytest.mark.req("PROF-10", "MAP1-05")
+def test_each_pack_title_esco_doesn_t_name_is_covered_even_with_a_qualifier_in_brackets(
+    api: ApiClient, ada: str
+) -> None:
+    # Task 6d slice A fix round 1: three of the pack's four titles are no ESCO label, so this is
+    # the main path for the roles Careerwright covers (review I-1; the web words it, never "Not
+    # researched"); and "Registered nurse (adult)" reaches the nursing pack target by its title,
+    # as it did before targets were stored once (review Minor 2).
+    workspace = str(api.create_workspace(ada, "Pack titles (synthetic)")["workspace_id"])
+    put_targets(api, ada, workspace, "Registered nurse (adult)", "Data quality analyst",
+                "Bookkeeping assistant")  # fmt: skip
+    covered = {
+        "Registered nurse (adult)": "registered-nurse-manchester",
+        "Data quality analyst": "data-quality-analyst-manchester",
+        "Bookkeeping assistant": "bookkeeping-assistant-leeds",
+    }
+
+    records = get(api, ada, f"/v1/workspaces/{workspace}/targets")["targets"]
+    assert {t["title"]: (t["link"], t["coverage"], t["pack_target_id"]) for t in records} == {
+        title: ("pack_crosswalk", "pack_target", target) for title, target in covered.items()
+    }
+    sketch = get(api, ada, f"/v1/workspaces/{workspace}/sketch")["targets"]
+    assert [(t["title"], t["resolution"], t["coverage"]) for t in sketch] == [
+        (title, "not_found", "pack_target") for title in covered
+    ]
+    matrices = get(api, ada, f"/v1/workspaces/{workspace}/capability/matrices")["matrices"]
+    assert {
+        m["target_title"]: (m["sources"]["pack_target"]["target_id"],
+                            m["sources"]["pack_target"]["basis"])
+        for m in matrices
+    } == {title: (target, "title") for title, target in covered.items()}  # fmt: skip

@@ -9,9 +9,17 @@ import pytest
 
 from careerwright.capability.commands import committed_data, pack_targets
 from careerwright.migrations.versions import r0034_target_records as migration
+from careerwright.migrations.versions import r0035_every_version_s_targets as backfill
 from careerwright.profile.records import TargetCoverage as Coverage
 from careerwright.profile.records import TargetKind, TargetLink, TargetRecord
-from careerwright.profile.targets import Choice, PackTarget, PackTargets, decide
+from careerwright.profile.targets import (
+    QUALIFIER,
+    Choice,
+    PackTarget,
+    PackTargets,
+    decide,
+    without_qualifiers,
+)
 
 NURSE = "http://data.europa.eu/esco/occupation/8d3e8aaa-791b-4c75-a465-f3f827028f50"
 BOOKKEEPER = "http://data.europa.eu/esco/occupation/c3aae59e-1441-4b3e-bdd1-6da50dc7cf42"
@@ -34,7 +42,15 @@ SOURCE = uuid.uuid4()
 def record(
     key: str, *, choice: Choice | None = None, labelled: tuple[str, ...] = ()
 ) -> TargetRecord:
-    return decide(key, key, choice=choice, labelled=labelled, pack=PACK, pack_keys=PACK_KEYS)
+    return decide(
+        key,
+        key,
+        unqualified=key,
+        choice=choice,
+        labelled=labelled,
+        pack=PACK,
+        pack_keys=PACK_KEYS,
+    )
 
 
 @pytest.mark.req("PROF-10")
@@ -94,6 +110,62 @@ def test_a_pack_target_s_title_links_through_its_crosswalk_for_skills_only() -> 
     )
 
 
+@pytest.mark.req("PROF-10", "MAP1-05")
+def test_a_qualifier_in_brackets_is_left_out_only_to_reach_a_pack_target_by_its_title() -> None:
+    # Task 6d slice A fix round 1 (review Minor 2): "Registered nurse (adult)" reached the
+    # nursing pack target before targets were stored once (Skills folded bracketed notes) and
+    # must again, or the person is told Careerwright can't check a role it covers.
+    assert without_qualifiers("Registered nurse (adult)").split() == ["Registered", "nurse"]
+    assert without_qualifiers("IT support technician [2nd line]").split() == [
+        "IT",
+        "support",
+        "technician",
+    ]
+    adult = decide(
+        "Registered nurse (adult)",
+        "registered nurse adult",
+        unqualified="registered nurse",
+        choice=None,
+        labelled=(),
+        pack=PACK,
+        pack_keys=PACK_KEYS,
+    )
+
+    assert (adult.coverage, adult.pack_target_id, adult.pack_target_basis) == (
+        Coverage.PACK_TARGET,
+        "registered-nurse-manchester",
+        "title",
+    )
+    assert (adult.link, adult.occupation_uri, adult.esco_occupation) == (
+        TargetLink.PACK_CROSSWALK,
+        NURSE,
+        None,
+    )
+    # The whole title as a concept still comes first.
+    twins = PackTargets(
+        "0.1.0", (*PACK.targets, PackTarget("adult", "Registered nurse adult", OTHER))
+    )
+    exact = decide(
+        "Registered nurse (adult)",
+        "registered nurse adult",
+        unqualified="registered nurse",
+        choice=None,
+        labelled=(),
+        pack=twins,
+        pack_keys={**PACK_KEYS, "adult": "registered nurse adult"},
+    )
+    assert (exact.pack_target_id, exact.occupation_uri) == ("adult", OTHER)
+
+
+@pytest.mark.req("PROF-10")
+def test_the_backfill_leaves_out_the_qualifiers_the_resolver_leaves_out() -> None:
+    assert backfill.QUALIFIER == QUALIFIER
+    assert (backfill.PACK_VERSION, backfill.PACK_TARGETS) == (
+        migration.PACK_VERSION,
+        migration.PACK_TARGETS,
+    )
+
+
 @pytest.mark.req("PROF-10", "MAP1-05", "READINESS-04")
 def test_a_chosen_occupation_a_crosswalk_names_is_that_pack_target_s() -> None:
     chosen = record("nurse responsible for general care", choice=Choice(NURSE, SOURCE))
@@ -115,6 +187,7 @@ def test_several_pack_targets_crosswalked_to_one_occupation_are_never_guessed_be
     found = decide(
         "bookkeeper",
         "bookkeeper",
+        unqualified="bookkeeper",
         choice=Choice(BOOKKEEPER, SOURCE),
         labelled=(BOOKKEEPER,),
         pack=twins,

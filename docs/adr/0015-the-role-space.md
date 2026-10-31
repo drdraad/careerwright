@@ -183,6 +183,14 @@ Decision 3's last sentence is built (`careerwright.profile.targets`, migration 0
   `resolve_target`). A later pack that drops a target needs a forward migration of the
   records it names; the capability model refuses a record naming a pack target the committed
   pack lacks (`INTERNAL_ERROR`), never silently.
+- **Every version's targets (fix round 1).** 0034 recorded only each workspace's newest
+  targets, but a discovery is read from the profile version it pinned, so one made before a
+  target was replaced could not open. Migration 0035 records every target title of every
+  version that has no record (once per workspace and title as a concept, spelled as the
+  latest version holding it), by the same rules; 0034 is unchanged, as a lasting database
+  may already hold it. A title with no record reads as not resolved (no occupation, no pack
+  target), never as an error. 0035 also decides again each record the restored bracket rule
+  reaches (ADR 0012's line).
 - **Coverage shown where a target is chosen:** one plain line from the record's coverage
   ("Careerwright can check skills, options and routes for this role" for a pack target),
   worded in the web; session W2 judges the words.

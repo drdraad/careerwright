@@ -16,16 +16,20 @@ The rules, in order. A title is compared as a concept (`careerwright.concept_key
    crosswalk names;
 4. otherwise none yet.
 Its coverage is the option pack's target with the same title, or else the one pack target
-whose crosswalk names its occupation; several such targets are never guessed between.
+whose crosswalk names its occupation; several such targets are never guessed between. A title
+is a pack target's when it is that title as a concept, or else when it is without its
+qualifiers in brackets: "Registered nurse (adult)" is the pack's "Registered nurse", as Skills
+matched pack titles before targets were stored once. Only the pack's titles are matched so;
+ESCO's labels are matched by the whole title.
 """
 
+import re
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 
 from careerwright.catalogue import taxonomy_store
 from careerwright.db import Tx
-from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
 from careerwright.identity.workspaces import visible_workspace
 from careerwright.profile import store
 from careerwright.profile.document import FieldState, ProfileDocument
@@ -36,6 +40,15 @@ from careerwright.profile.records import (
     TargetLink,
     TargetRecord,
 )
+
+# A qualifier in brackets, such as "(adult)" or "[2nd line]". Migration 0035 holds the same
+# pattern, and a test keeps the two equal.
+QUALIFIER = r"\([^)]*\)|\[[^\]]*\]"
+_QUALIFIER = re.compile(QUALIFIER)
+
+
+def without_qualifiers(title: str) -> str:
+    return _QUALIFIER.sub(" ", title)
 
 
 @dataclass(frozen=True)
@@ -65,16 +78,20 @@ def decide(
     title: str,
     key: str,
     *,
+    unqualified: str,
     choice: Choice | None,
     labelled: Sequence[str],
     pack: PackTargets,
     pack_keys: Mapping[str, str],
 ) -> TargetRecord:
-    """The record for a title (as a concept, `key`), from what matching it found: the
-    person's choice, the occupations holding it as a label, and the pack's targets (each
-    target's title as a concept, by target ID)."""
+    """The record for a title (as a concept, `key`; without its qualifiers in brackets,
+    `unqualified`), from what matching it found: the person's choice, the occupations holding
+    it as a label, and the pack's targets (each target's title as a concept, by target ID)."""
     matches = tuple(sorted(set(labelled)))
-    titled = next((t for t in pack.targets if pack_keys.get(t.target_id) == key), None)
+    titled = next(
+        (t for k in (key, unqualified) for t in pack.targets if pack_keys.get(t.target_id) == k),
+        None,
+    )
     link, occupation = TargetLink.NONE, None
     if choice is not None:
         link, occupation = TargetLink.OCCUPATION_CHOICE, choice.esco_uri
@@ -113,7 +130,8 @@ def resolve_target(
     """What a target title names, by the module's rules. Without `choice`, an earlier choice
     of the workspace whose ESCO title is the title as a concept is the person's choice (the
     latest such)."""
-    keys = taxonomy_store.concept_keys(tx, [title, *(t.title for t in pack.targets)])
+    unqualified = without_qualifiers(title)
+    keys = taxonomy_store.concept_keys(tx, [title, unqualified, *(t.title for t in pack.targets)])
     key = keys[title]
     if choice is None:
         choices = store.occupation_choices(tx, workspace_id)
@@ -123,6 +141,7 @@ def resolve_target(
     return decide(
         title,
         key,
+        unqualified=keys[unqualified],
         choice=choice,
         labelled=taxonomy_store.label_match_uris(tx, title),
         pack=pack,
@@ -175,7 +194,8 @@ def stored_targets(
     tx: Tx, workspace_id: uuid.UUID, document: ProfileDocument
 ) -> list[TargetRecord]:
     """The records of the document's targets, in its order, one per title as a concept. A
-    target saved without one is an internal error, never a target that names nothing."""
+    title with no record (migration 0035 gave every saved title one) is not resolved, never
+    an error: it names no occupation and no pack target covers it."""
     titles = target_titles(document)
     if not titles:
         return []
@@ -183,13 +203,24 @@ def stored_targets(
     held = store.target_records(tx, workspace_id, keys.values())
     records: dict[str, TargetRecord] = {}
     for title in titles:
-        record = held.get(keys[title])
-        if record is None:
-            raise CareerwrightError(
-                ErrorCode.INTERNAL_ERROR,
-                "A target has no stored record.",
-                stage=ErrorStage.PROFILE,
-            )
+        record = held.get(keys[title]) or _not_resolved(title, keys[title])
         # The person's words as the profile holds them; the first of one concept stands.
         records.setdefault(record.key, replace(record, title=title))
     return list(records.values())
+
+
+def _not_resolved(title: str, key: str) -> TargetRecord:
+    """Nothing decided: no occupation, no label match counted and no pack (`pack_version`
+    empty). Never stored."""
+    return TargetRecord(
+        title=title,
+        key=key,
+        kind=TargetKind.OWN_WORDS,
+        occupation_uri=None,
+        link=TargetLink.NONE,
+        label_matches=(),
+        coverage=TargetCoverage.NOT_COVERED,
+        pack_target_id=None,
+        pack_target_basis=None,
+        pack_version="",
+    )
