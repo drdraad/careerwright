@@ -5331,6 +5331,172 @@
         }
       }
     },
+    "/v1/workspaces/{workspace_id}/planning/solves": {
+      "post": {
+        "tags": [
+          "planning"
+        ],
+        "summary": "Post Solve",
+        "description": "Search one target's routes as a run, from a snapshot of the planning inputs at the\nversion the person saw: 202 with the new solve, or 200 with the same one under way.",
+        "operationId": "request_route_solve",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID chosen by the client per intended change; retries reuse it.",
+              "title": "Idempotency-Key"
+            },
+            "description": "A UUID chosen by the client per intended change; retries reuse it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolveOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "The same solve is under way: joined.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolveOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspace_id}/planning/solves/{run_id}": {
+      "get": {
+        "tags": [
+          "planning"
+        ],
+        "summary": "Get Solve",
+        "description": "A route solve, its stage while it runs, and its result once complete.",
+        "operationId": "get_route_solve",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolveOut"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Typed error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/taxonomy": {
       "get": {
         "tags": [
@@ -7877,6 +8043,53 @@
         ],
         "title": "CommitmentKind"
       },
+      "Condition": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "offer",
+              "award",
+              "application"
+            ],
+            "title": "Kind"
+          },
+          "variant_id": {
+            "type": "string",
+            "title": "Variant Id"
+          },
+          "instrument_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Id"
+          },
+          "verification": {
+            "type": "string",
+            "enum": [
+              "confirm_offer_accepted",
+              "verify_funding_award",
+              "confirm_admission"
+            ],
+            "title": "Verification"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "variant_id",
+          "instrument_id",
+          "verification"
+        ],
+        "title": "Condition",
+        "description": "What the route rests on that has not happened, with its blocking verification: an\noffer to accept, an award to approve, or a place to win by applying in time (an\napplication the route itself does not hold, with no admission recorded)."
+      },
       "Confidence": {
         "type": "string",
         "enum": [
@@ -8637,6 +8850,47 @@
         "title": "EntryMode",
         "description": "How the person chose to start (spec section 3, the You chapter)."
       },
+      "EqualPoint": {
+        "properties": {
+          "months_to_readiness": {
+            "type": "integer",
+            "title": "Months To Readiness"
+          },
+          "objective_cost": {
+            "$ref": "#/components/schemas/SignedMoney"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layer"
+          },
+          "routes": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Routes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "months_to_readiness",
+          "objective_cost",
+          "layer",
+          "routes"
+        ],
+        "title": "EqualPoint"
+      },
       "ErrorBody": {
         "properties": {
           "code": {
@@ -9178,9 +9432,123 @@
           "app_store_unavailable",
           "retrieval_failed",
           "source_blocked",
+          "rank_limit_reached",
           "unknown_failure"
         ],
         "title": "FailureClass"
+      },
+      "Family": {
+        "properties": {
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/FamilyAction"
+            },
+            "type": "array",
+            "title": "Actions"
+          },
+          "precedence": {
+            "items": {
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "title": "Precedence"
+          },
+          "routes": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Routes"
+          },
+          "best_layer": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Layer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "family_id",
+          "actions",
+          "precedence",
+          "routes",
+          "best_layer"
+        ],
+        "title": "Family"
+      },
+      "FamilyAction": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "title": "Concept Id"
+          },
+          "way": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Way"
+          },
+          "work_pattern": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkPatternKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "financing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Financing"
+          },
+          "conditional_offer": {
+            "type": "boolean",
+            "title": "Conditional Offer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "way",
+          "work_pattern",
+          "financing",
+          "conditional_offer"
+        ],
+        "title": "FamilyAction"
       },
       "FewMatched": {
         "properties": {
@@ -9249,6 +9617,138 @@
           "prefer_not_to_say"
         ],
         "title": "FieldState"
+      },
+      "Finding": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/FindingCode"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FindingKind"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "variant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Id"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "minor_units",
+                  "hours_per_week"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "kind"
+        ],
+        "title": "Finding"
+      },
+      "FindingCode": {
+        "type": "string",
+        "enum": [
+          "direct_spend_cap",
+          "monthly_payment_cap",
+          "monthly_deficit_cap",
+          "reserve",
+          "workload",
+          "session_clash",
+          "prerequisite_not_usable",
+          "application_too_late",
+          "starts_before_planning",
+          "one_start_per_concept",
+          "exclusive_group",
+          "conflicting_work_patterns",
+          "coarse_model_unresolved",
+          "dates_unknown",
+          "cost_unknown",
+          "workload_unknown",
+          "entry_requirements_unconfirmed",
+          "baseline_missing",
+          "limit_unknown",
+          "payment_before_start",
+          "economic_cost_cap",
+          "entry_requirements_not_met",
+          "eligibility_unconfirmed",
+          "stacking_unconfirmed",
+          "work_rights_unknown",
+          "work_rights_not_held",
+          "repayments_above_payment_cap",
+          "job_transitions",
+          "scheme_shared_unconfirmed",
+          "exclusive_schemes"
+        ],
+        "title": "FindingCode"
+      },
+      "FindingKind": {
+        "type": "string",
+        "enum": [
+          "violation",
+          "unresolved",
+          "preference"
+        ],
+        "title": "FindingKind"
       },
       "FloorReasonOut": {
         "properties": {
@@ -9834,6 +10334,40 @@
         ],
         "title": "InputRoute",
         "description": "How a source reached Careerwright. Pasted text is its own route, never a retrieval."
+      },
+      "InstanceSize": {
+        "properties": {
+          "concepts": {
+            "type": "integer",
+            "title": "Concepts"
+          },
+          "starts_per_concept": {
+            "type": "integer",
+            "title": "Starts Per Concept"
+          },
+          "months": {
+            "type": "integer",
+            "title": "Months"
+          },
+          "variants": {
+            "type": "integer",
+            "title": "Variants"
+          },
+          "selection_space": {
+            "type": "integer",
+            "title": "Selection Space"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concepts",
+          "starts_per_concept",
+          "months",
+          "variants",
+          "selection_space"
+        ],
+        "title": "InstanceSize"
       },
       "InstrumentKind": {
         "type": "string",
@@ -10450,6 +10984,63 @@
           "label"
         ],
         "title": "Location"
+      },
+      "M0SearchLimits": {
+        "properties": {
+          "max_actions": {
+            "type": "integer",
+            "maximum": 24.0,
+            "minimum": 1.0,
+            "title": "Max Actions",
+            "default": 24
+          },
+          "max_starts_per_action": {
+            "type": "integer",
+            "maximum": 2.0,
+            "minimum": 1.0,
+            "title": "Max Starts Per Action",
+            "default": 2
+          },
+          "max_selected_actions": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Max Selected Actions",
+            "default": 6
+          },
+          "max_months": {
+            "type": "integer",
+            "maximum": 24.0,
+            "minimum": 1.0,
+            "title": "Max Months",
+            "default": 24
+          },
+          "wall_seconds": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Wall Seconds",
+            "default": 30
+          },
+          "max_states": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 1.0,
+            "title": "Max States",
+            "default": 1000000
+          },
+          "max_feasible_archive": {
+            "type": "integer",
+            "maximum": 50000.0,
+            "minimum": 1.0,
+            "title": "Max Feasible Archive",
+            "default": 50000
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "M0SearchLimits",
+        "description": "Spec section 18's `M0SearchLimits`: the declared model's bounds, then the run's caps."
       },
       "MappingResolution": {
         "type": "string",
@@ -11211,6 +11802,16 @@
         ],
         "title": "NameRole",
         "description": "The first answer in the person's own words: a UK job title picked from the type-ahead\n(`GET /v1/taxonomy/titles`, a title of the UK job-title index), or anything typed (\"Use\nmy own words\"). Nothing is refused."
+      },
+      "Narrowing": {
+        "type": "string",
+        "enum": [
+          "fewer_concepts",
+          "one_start",
+          "shorter_horizon"
+        ],
+        "title": "Narrowing",
+        "description": "What would make a stopped search smaller (spec section 12)."
       },
       "Need": {
         "properties": {
@@ -12205,6 +12806,16 @@
         ],
         "title": "OriginOut",
         "description": "The world's answer to the first question, recomputed on each read with no model call:\nit works before a key is connected and in the demo. `destinations` are the first slate,\njoined to the role only by the essential skills they share in ESCO (never by words in a\ntitle), chosen by the slate's rules and the confirmed salary floor; the role itself is\nthe origin, never a destination."
+      },
+      "Outcome": {
+        "type": "string",
+        "enum": [
+          "routes_found",
+          "none_found_before_limit",
+          "unresolved",
+          "no_route_in_bounded_model"
+        ],
+        "title": "Outcome"
       },
       "OutcomeDecision": {
         "properties": {
@@ -14439,6 +15050,21 @@
         ],
         "title": "ProvisionalConceptPage"
       },
+      "PruningRule": {
+        "type": "string",
+        "enum": [
+          "input_unresolved",
+          "direct_spend_cap",
+          "monthly_payment_cap",
+          "conflicting_work_patterns",
+          "session_clash",
+          "job_transitions",
+          "exclusive_schemes",
+          "workload",
+          "prerequisite"
+        ],
+        "title": "PruningRule"
+      },
       "Qualification": {
         "type": "string",
         "enum": [
@@ -15535,6 +16161,19 @@
         "title": "RoleState",
         "description": "What the person's current or last role names in ESCO."
       },
+      "RouteQualification": {
+        "type": "string",
+        "enum": [
+          "proposed_records",
+          "accepted_assumptions",
+          "synthetic",
+          "conditional_offer",
+          "conditional_award",
+          "conditional_application",
+          "readiness_not_assessed"
+        ],
+        "title": "RouteQualification"
+      },
       "RowAssessment": {
         "properties": {
           "row_id": {
@@ -16079,7 +16718,8 @@
           "acquisition",
           "source_search",
           "page_extraction",
-          "strength_proposal"
+          "strength_proposal",
+          "route_solve"
         ],
         "title": "RunKind"
       },
@@ -16457,6 +17097,115 @@
         "title": "SalaryPeriod",
         "description": "The period a source states pay per (the profile's salary floor has its own)."
       },
+      "Scenario": {
+        "type": "string",
+        "enum": [
+          "base",
+          "delay",
+          "no_award",
+          "no_offer"
+        ],
+        "title": "Scenario"
+      },
+      "Schedule": {
+        "properties": {
+          "route": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Route"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "months_to_readiness": {
+            "type": "integer",
+            "title": "Months To Readiness"
+          },
+          "readiness_month": {
+            "type": "string",
+            "title": "Readiness Month"
+          },
+          "objective_cost": {
+            "$ref": "#/components/schemas/SignedMoney"
+          },
+          "direct_cost": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "economic_cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SignedMoney"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          },
+          "qualifications": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RouteQualification"
+                },
+                {
+                  "$ref": "#/components/schemas/Qualification"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Qualifications"
+          },
+          "conditions": {
+            "items": {
+              "$ref": "#/components/schemas/Condition"
+            },
+            "type": "array",
+            "title": "Conditions"
+          },
+          "preferences": {
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "type": "array",
+            "title": "Preferences"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "route",
+          "family_id",
+          "months_to_readiness",
+          "readiness_month",
+          "objective_cost",
+          "direct_cost",
+          "economic_cost",
+          "verdict",
+          "qualifications",
+          "conditions",
+          "preferences",
+          "layer"
+        ],
+        "title": "Schedule",
+        "description": "One feasible schedule reaching the milestone: its identity, objectives and check."
+      },
       "SearchCandidate": {
         "properties": {
           "url": {
@@ -16481,6 +17230,15 @@
           "grounded"
         ],
         "title": "SearchCandidate"
+      },
+      "SearchCoverage": {
+        "type": "string",
+        "enum": [
+          "complete",
+          "budget_truncated"
+        ],
+        "title": "SearchCoverage",
+        "description": "`search_coverage` (spec section 12)."
       },
       "SearchDid": {
         "type": "string",
@@ -16651,6 +17409,214 @@
         "title": "SearchProposal",
         "description": "A source search's validated output: candidates only, never claims."
       },
+      "SearchResult": {
+        "properties": {
+          "input_version": {
+            "type": "string",
+            "title": "Input Version"
+          },
+          "label": {
+            "$ref": "#/components/schemas/CatalogueLabel"
+          },
+          "target_title": {
+            "type": "string",
+            "title": "Target Title"
+          },
+          "matrix_version": {
+            "type": "string",
+            "title": "Matrix Version"
+          },
+          "definition_version": {
+            "type": "string",
+            "title": "Definition Version"
+          },
+          "objective_basis": {
+            "type": "string",
+            "enum": [
+              "economic",
+              "direct_spending"
+            ],
+            "title": "Objective Basis"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/Scenario"
+          },
+          "algorithm_version": {
+            "type": "string",
+            "title": "Algorithm Version"
+          },
+          "pruning_version": {
+            "type": "string",
+            "title": "Pruning Version"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/M0SearchLimits"
+          },
+          "instance": {
+            "$ref": "#/components/schemas/InstanceSize"
+          },
+          "canonical_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Canonical Order"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/SearchCoverage"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StopReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          "layers_exact": {
+            "type": "boolean",
+            "title": "Layers Exact"
+          },
+          "expanded_states": {
+            "type": "integer",
+            "title": "Expanded States"
+          },
+          "feasible_without_milestone": {
+            "type": "integer",
+            "title": "Feasible Without Milestone"
+          },
+          "readiness_unknown": {
+            "type": "integer",
+            "title": "Readiness Unknown"
+          },
+          "unresolved": {
+            "type": "integer",
+            "title": "Unresolved"
+          },
+          "not_feasible": {
+            "type": "integer",
+            "title": "Not Feasible"
+          },
+          "blocking_inputs": {
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "type": "array",
+            "title": "Blocking Inputs"
+          },
+          "starting_violations": {
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "type": "array",
+            "title": "Starting Violations"
+          },
+          "set_aside": {
+            "items": {
+              "$ref": "#/components/schemas/SetAside"
+            },
+            "type": "array",
+            "title": "Set Aside"
+          },
+          "pruned": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/PruningRule"
+            },
+            "type": "object",
+            "title": "Pruned"
+          },
+          "unexplored_branches": {
+            "type": "integer",
+            "title": "Unexplored Branches"
+          },
+          "elapsed_ms": {
+            "type": "integer",
+            "title": "Elapsed Ms"
+          },
+          "rank_ms": {
+            "type": "integer",
+            "title": "Rank Ms"
+          },
+          "rank_seconds": {
+            "type": "integer",
+            "title": "Rank Seconds"
+          },
+          "narrowings": {
+            "items": {
+              "$ref": "#/components/schemas/Narrowing"
+            },
+            "type": "array",
+            "title": "Narrowings"
+          },
+          "schedules": {
+            "items": {
+              "$ref": "#/components/schemas/Schedule"
+            },
+            "type": "array",
+            "title": "Schedules"
+          },
+          "families": {
+            "items": {
+              "$ref": "#/components/schemas/Family"
+            },
+            "type": "array",
+            "title": "Families"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/EqualPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "input_version",
+          "label",
+          "target_title",
+          "matrix_version",
+          "definition_version",
+          "objective_basis",
+          "scenario",
+          "algorithm_version",
+          "pruning_version",
+          "limits",
+          "instance",
+          "canonical_order",
+          "coverage",
+          "stop_reason",
+          "outcome",
+          "layers_exact",
+          "expanded_states",
+          "feasible_without_milestone",
+          "readiness_unknown",
+          "unresolved",
+          "not_feasible",
+          "blocking_inputs",
+          "starting_violations",
+          "set_aside",
+          "pruned",
+          "unexplored_branches",
+          "elapsed_ms",
+          "rank_ms",
+          "rank_seconds",
+          "narrowings",
+          "schedules",
+          "families",
+          "points"
+        ],
+        "title": "SearchResult"
+      },
       "SearchedThroughSkill": {
         "properties": {
           "reason": {
@@ -16722,6 +17688,54 @@
         ],
         "title": "Session",
         "description": "A fixed timetable session, for clashes (TIME1-04): a weekday (0 is Monday) and times."
+      },
+      "SetAside": {
+        "properties": {
+          "variant_id": {
+            "type": "string",
+            "title": "Variant Id"
+          },
+          "codes": {
+            "items": {
+              "$ref": "#/components/schemas/FindingCode"
+            },
+            "type": "array",
+            "title": "Codes"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "violation",
+              "unresolved"
+            ],
+            "title": "Kind"
+          },
+          "unresolved": {
+            "items": {
+              "$ref": "#/components/schemas/FindingCode"
+            },
+            "type": "array",
+            "title": "Unresolved"
+          },
+          "violations": {
+            "items": {
+              "$ref": "#/components/schemas/FindingCode"
+            },
+            "type": "array",
+            "title": "Violations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "variant_id",
+          "codes",
+          "kind",
+          "unresolved",
+          "violations"
+        ],
+        "title": "SetAside",
+        "description": "A variant no route can contain (rule 2), with everything its own check found."
       },
       "SetPreferences": {
         "properties": {
@@ -16848,6 +17862,27 @@
           "skill_type"
         ],
         "title": "SharedSkillOut"
+      },
+      "SignedMoney": {
+        "properties": {
+          "minor_units": {
+            "type": "integer",
+            "title": "Minor Units"
+          },
+          "currency": {
+            "type": "string",
+            "const": "GBP",
+            "title": "Currency"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "minor_units",
+          "currency"
+        ],
+        "title": "SignedMoney",
+        "description": "An economic cost or an income change: negative is a gain against the baseline."
       },
       "SketchOut": {
         "properties": {
@@ -17381,6 +18416,181 @@
           "benchmarks"
         ],
         "title": "SocCandidateOut"
+      },
+      "SolveOut": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/RunOut"
+          },
+          "solve_id": {
+            "type": "string",
+            "title": "Solve Id",
+            "description": "The same snapshot under the same limits: one solve."
+          },
+          "target_title": {
+            "type": "string",
+            "title": "Target Title"
+          },
+          "inputs_version": {
+            "type": "integer",
+            "title": "Inputs Version",
+            "description": "The planning inputs version the snapshot read."
+          },
+          "capability_version": {
+            "type": "integer",
+            "title": "Capability Version",
+            "description": "The evidence version the snapshot read."
+          },
+          "input_version": {
+            "type": "string",
+            "title": "Input Version",
+            "description": "The monthly input's own version."
+          },
+          "planning_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Planning Start"
+          },
+          "horizon_months": {
+            "type": "integer",
+            "title": "Horizon Months"
+          },
+          "objective_basis": {
+            "type": "string",
+            "enum": [
+              "economic",
+              "direct_spending"
+            ],
+            "title": "Objective Basis"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/M0SearchLimits"
+          },
+          "rank_seconds": {
+            "type": "integer",
+            "title": "Rank Seconds",
+            "description": "The rank stage's own limit."
+          },
+          "algorithm_version": {
+            "type": "string",
+            "title": "Algorithm Version"
+          },
+          "pruning_version": {
+            "type": "string",
+            "title": "Pruning Version"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SolveStage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where a running solve is: its search, then its rank stage. Null before it starts and once it has ended."
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts",
+            "description": "Its executions: more than one, it started again after a crash."
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "SOLVE_LIMIT_REACHED",
+                  "NO_ROUTE_IN_BOUNDED_MODEL"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SearchResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "run",
+          "solve_id",
+          "target_title",
+          "inputs_version",
+          "capability_version",
+          "input_version",
+          "planning_start",
+          "horizon_months",
+          "objective_basis",
+          "limits",
+          "rank_seconds",
+          "algorithm_version",
+          "pruning_version",
+          "stage",
+          "attempts",
+          "code",
+          "result"
+        ],
+        "title": "SolveOut",
+        "description": "A route solve: its run, what it was asked for and read, where it is, and once its run\nis complete its result. A queued, running, failed or cancelled solve has no result."
+      },
+      "SolveRequest": {
+        "properties": {
+          "expected_inputs_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Inputs Version",
+            "description": "The planning inputs version the person saw."
+          },
+          "target": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Target",
+            "description": "One of the profile's target titles."
+          },
+          "planning_start": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+            "title": "Planning Start",
+            "description": "The comparison's first month, as YYYY-MM: this month or later."
+          },
+          "horizon_months": {
+            "type": "integer",
+            "maximum": 24.0,
+            "minimum": 1.0,
+            "title": "Horizon Months"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_inputs_version",
+          "target",
+          "planning_start",
+          "horizon_months"
+        ],
+        "title": "SolveRequest",
+        "description": "Search one target's routes over a comparison's start and horizon."
+      },
+      "SolveStage": {
+        "type": "string",
+        "enum": [
+          "searching",
+          "ranking"
+        ],
+        "title": "SolveStage",
+        "description": "Where a running attempt is: the search stage, then the rank stage (S6.8)."
       },
       "SourceAttemptOut": {
         "properties": {
@@ -18100,6 +19310,15 @@
           "state"
         ],
         "title": "StepOut"
+      },
+      "StopReason": {
+        "type": "string",
+        "enum": [
+          "state_limit",
+          "wall_time_limit",
+          "archive_limit"
+        ],
+        "title": "StopReason"
       },
       "StoreKey": {
         "properties": {
@@ -20664,6 +21883,17 @@
         ],
         "title": "VariantInputs",
         "description": "What the person confirmed for one option (a variant of the planning catalogue)."
+      },
+      "Verdict": {
+        "type": "string",
+        "enum": [
+          "affordable_and_feasible",
+          "affordable_and_feasible_with_qualifications",
+          "readiness_not_reached_in_this_model",
+          "unresolved",
+          "not_feasible_in_this_model"
+        ],
+        "title": "Verdict"
       },
       "Wage": {
         "properties": {

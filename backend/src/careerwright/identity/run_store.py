@@ -26,6 +26,7 @@ _RUN_COLUMNS = (
 _RUNS = "careerwright.runs r LEFT JOIN careerwright.run_cancellations c ON c.run_id = r.run_id"
 MODEL_RUN_WORKFLOW = "careerwright.model_run"
 ACQUISITION_WORKFLOW = "careerwright.acquisition_run"
+ROUTE_SOLVE_WORKFLOW = "careerwright.route_solve"
 _ATTEMPT_COLUMNS = (
     "attempt_id, model_id, started_at, finished_at, outcome, spend_state, reserved_nano_usd, "
     "cost_nano_usd, input_tokens, cached_input_tokens, output_tokens, reasoning_tokens, "

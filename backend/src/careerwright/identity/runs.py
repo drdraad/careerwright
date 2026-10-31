@@ -30,6 +30,7 @@ from careerwright.identity.model_choice import ModelChoice, assert_model_permitt
 from careerwright.identity.model_registry import ModelEntry
 from careerwright.identity.records import (
     KEYLESS_KINDS,
+    OUTBOUND_KINDS,
     EventKind,
     PartialCompleteness,
     PartialReply,
@@ -261,14 +262,18 @@ def submit_keyless_run(
     runtime_mode: RuntimeMode,
     workflow_name: str,
     now: datetime,
+    profile_version: int | None = None,
+    sealed_input: tuple[Keyring, bytes] | None = None,
 ) -> Run:
     """A run that calls no model (`KEYLESS_KINDS`): no key, model or spend, but the same
-    run record, outbox, events and cancellation as every other run. It needs a route out of
-    the machine, so the demo runtime and demo workspaces refuse it."""
+    run record, outbox, events and cancellation as every other run, with the profile version
+    it read pinned and its input sealed, as a model run's are. A kind that needs a route out
+    of the machine (`OUTBOUND_KINDS`) is refused by the demo runtime and demo workspaces."""
     if kind not in KEYLESS_KINDS:
         raise ValueError(f"{kind} calls a model")
     workspace = visible_workspace(tx, workspace_id, lock=True)
-    if runtime_mode is RuntimeMode.DEMO or workspace.data_mode is DataMode.DEMO:
+    offline = runtime_mode is RuntimeMode.DEMO or workspace.data_mode is DataMode.DEMO
+    if kind in OUTBOUND_KINDS and offline:
         raise CareerwrightError(
             ErrorCode.MODE_NOT_SUPPORTED,
             "Demo workspaces and the offline demo never fetch sources.",
@@ -289,8 +294,13 @@ def submit_keyless_run(
         created_at=now,
         started_at=None,
         finished_at=None,
+        profile_version=profile_version,
     )
-    run_store.insert_run(tx, run, workflow_id(run.run_id), None, workflow_name=workflow_name)
+    sealed = None
+    if sealed_input is not None:
+        keyring, plaintext = sealed_input
+        sealed = keyring.seal(plaintext, input_context(workspace_id, run.run_id))
+    run_store.insert_run(tx, run, workflow_id(run.run_id), sealed, workflow_name=workflow_name)
     store.append_event(
         tx,
         workspace_id,

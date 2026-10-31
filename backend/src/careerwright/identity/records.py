@@ -101,9 +101,15 @@ class RunKind(StrEnum):
     # quotation of the person's words against an essential skill of one of their
     # destinations (`careerwright.capability.strength`).
     STRENGTH_PROPOSAL = "strength_proposal"
+    # The route search over one target's options, from a sealed snapshot of the person's
+    # planning inputs (`careerwright.planning.solves`). Calls no model and needs no route out.
+    ROUTE_SOLVE = "route_solve"
 
 
-KEYLESS_KINDS = frozenset({RunKind.ACQUISITION})
+KEYLESS_KINDS = frozenset({RunKind.ACQUISITION, RunKind.ROUTE_SOLVE})
+# Keyless kinds that reach outside the machine, so the demo runtime and demo workspaces refuse
+# them; any other keyless kind is computed in the worker alone.
+OUTBOUND_KINDS = frozenset({RunKind.ACQUISITION})
 
 
 class PartialCompleteness(StrEnum):

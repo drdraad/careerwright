@@ -43,6 +43,8 @@ from careerwright.identity.model_registry import (
 )
 from careerwright.identity.records import RunKind
 from careerwright.logs import configure_logging
+from careerwright.planning import workflow as solve_workflow
+from careerwright.planning.solve_runs import SolveRuntime
 from careerwright.profile.discovery_agent import DISCOVERY_TASK, fixture_discovery_model
 from careerwright.profile.interview_agent import INTERVIEW_TURN_TASK, fixture_interviewer_model
 from careerwright.profile.slate_explanation_agent import (
@@ -59,10 +61,12 @@ TASKS: Mapping[RunKind, RunTask] = {
     RunKind.PAGE_EXTRACTION: PAGE_EXTRACTION_TASK,
     RunKind.STRENGTH_PROPOSAL: STRENGTH_PROPOSAL_TASK,
 }
-# Each run's workflow, by the name its outbox entry carries.
+# Each run's workflow, by the name its outbox entry carries. The keyless kinds (an acquisition,
+# a route solve) call no model, so they are no `RunTask`: each has its own workflow.
 WORKFLOWS: worker.Workflows = {
     run_store.MODEL_RUN_WORKFLOW: workflow.model_run_workflow,
     run_store.ACQUISITION_WORKFLOW: acquisition_workflow.acquisition_workflow,
+    run_store.ROUTE_SOLVE_WORKFLOW: solve_workflow.route_solve_workflow,
 }
 # The deterministic stand-ins for demo workspaces, by model ID.
 FIXTURE_MODELS: Mapping[str, Callable[[], Model]] = {
@@ -128,6 +132,7 @@ def main() -> None:
     acquisition_workflow.configure(
         AcquisitionRuntime(runtime, HttpAcquisitionClient(settings.acquisition_url), models)
     )
+    solve_workflow.configure(SolveRuntime(runtime))
     worker.run(engine, runtime, url_with_password(settings.dbos_database), WORKFLOWS)
 
 

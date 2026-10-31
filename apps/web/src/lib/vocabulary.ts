@@ -425,6 +425,11 @@ export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string
     title: "Every source was refused by its access rules",
     action: "Nothing was fetched. Choose other sources, or paste the advert.",
   },
+  // A route search's ranking ran out of its own time (Task 13b); the Routes chapter is Task 14.
+  rank_limit_reached: {
+    title: "Careerwright couldn't finish putting the routes in order in time",
+    action: "Nothing was saved from this search. Try again.",
+  },
   unknown_failure: {
     title: "Something went wrong while Careerwright was working",
     action: "Nothing was saved from it. Try again.",

@@ -61,6 +61,7 @@ ADAPTERS: dict[str, frozenset[str]] = {
     "careerwright.catalogue.reference_store": frozenset({"sqlalchemy"}),  # Task 7 slice B, ADR 0010
     "careerwright.capability.store": frozenset({"sqlalchemy"}),  # Task 9, ADR 0012
     "careerwright.planning.store": frozenset({"sqlalchemy"}),  # Task 12a, ADR 0013 amendment
+    "careerwright.planning.workflow": frozenset({"dbos"}),  # Task 13b, ADR 0016 amendment
     "careerwright.identity.keyring": frozenset({"cryptography"}),
     "careerwright.identity.firebase": frozenset({"firebase_admin"}),
     "careerwright.identity.meta": frozenset({"httpx2", "openai", "pydantic_ai"}),

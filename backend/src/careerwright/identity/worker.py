@@ -105,7 +105,11 @@ def reconcile_errored_runs(runtime: ActivityRuntime) -> int:
     already terminal cost one lookup each: errored workflows are rare and never re-run."""
     errored = DBOS.list_workflows(
         status="ERROR",
-        name=[run_store.MODEL_RUN_WORKFLOW, run_store.ACQUISITION_WORKFLOW],
+        name=[
+            run_store.MODEL_RUN_WORKFLOW,
+            run_store.ACQUISITION_WORKFLOW,
+            run_store.ROUTE_SOLVE_WORKFLOW,
+        ],
         load_input=False,
         load_output=False,
     )

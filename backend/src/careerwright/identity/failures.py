@@ -49,6 +49,9 @@ class FailureClass(StrEnum):
     # an empty success ("no vacancies"), and the attempts say which and why.
     RETRIEVAL_FAILED = "retrieval_failed"
     SOURCE_BLOCKED = "source_blocked"
+    # A route solve whose rank stage reached its own limit before it finished (Task 13b): no
+    # result claims ranks it lacks, so none is kept.
+    RANK_LIMIT_REACHED = "rank_limit_reached"
     UNKNOWN_FAILURE = "unknown_failure"
 
 

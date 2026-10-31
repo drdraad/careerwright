@@ -1389,6 +1389,32 @@ export const CommitmentKind = {
 export type CommitmentKind = typeof CommitmentKind[keyof typeof CommitmentKind];
 
 /**
+ * Condition
+ *
+ * What the route rests on that has not happened, with its blocking verification: an
+ * offer to accept, an award to approve, or a place to win by applying in time (an
+ * application the route itself does not hold, with no admission recorded).
+ */
+export type Condition = {
+    /**
+     * Kind
+     */
+    kind: 'offer' | 'award' | 'application';
+    /**
+     * Variant Id
+     */
+    variant_id: string;
+    /**
+     * Instrument Id
+     */
+    instrument_id: string | null;
+    /**
+     * Verification
+     */
+    verification: 'confirm_offer_accepted' | 'verify_funding_award' | 'confirm_admission';
+};
+
+/**
  * Confidence
  *
  * Categorical support from the source, never a model-generated probability.
@@ -1986,6 +2012,25 @@ export const EntryMode = { SURE: 'sure', UNSURE: 'unsure' } as const;
 export type EntryMode = typeof EntryMode[keyof typeof EntryMode];
 
 /**
+ * EqualPoint
+ */
+export type EqualPoint = {
+    /**
+     * Months To Readiness
+     */
+    months_to_readiness: number;
+    objective_cost: SignedMoney;
+    /**
+     * Layer
+     */
+    layer: number | null;
+    /**
+     * Routes
+     */
+    routes: Array<Array<string>>;
+};
+
+/**
  * ErrorBody
  */
 export type ErrorBody = {
@@ -2465,6 +2510,7 @@ export const FailureClass = {
     APP_STORE_UNAVAILABLE: 'app_store_unavailable',
     RETRIEVAL_FAILED: 'retrieval_failed',
     SOURCE_BLOCKED: 'source_blocked',
+    RANK_LIMIT_REACHED: 'rank_limit_reached',
     UNKNOWN_FAILURE: 'unknown_failure'
 } as const;
 
@@ -2472,6 +2518,58 @@ export const FailureClass = {
  * FailureClass
  */
 export type FailureClass = typeof FailureClass[keyof typeof FailureClass];
+
+/**
+ * Family
+ */
+export type Family = {
+    /**
+     * Family Id
+     */
+    family_id: string;
+    /**
+     * Actions
+     */
+    actions: Array<FamilyAction>;
+    /**
+     * Precedence
+     */
+    precedence: Array<[
+        number,
+        number
+    ]>;
+    /**
+     * Routes
+     */
+    routes: Array<Array<string>>;
+    /**
+     * Best Layer
+     */
+    best_layer: number | null;
+};
+
+/**
+ * FamilyAction
+ */
+export type FamilyAction = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Way
+     */
+    way: string | null;
+    work_pattern: WorkPatternKind | null;
+    /**
+     * Financing
+     */
+    financing: Array<string>;
+    /**
+     * Conditional Offer
+     */
+    conditional_offer: boolean;
+};
 
 /**
  * FewMatched
@@ -2518,6 +2616,93 @@ export const FieldState = {
  * FieldState
  */
 export type FieldState = typeof FieldState[keyof typeof FieldState];
+
+/**
+ * Finding
+ */
+export type Finding = {
+    code: FindingCode;
+    kind: FindingKind;
+    /**
+     * Month
+     */
+    month?: string | null;
+    /**
+     * Variant Id
+     */
+    variant_id?: string | null;
+    /**
+     * Amount
+     */
+    amount?: number | null;
+    /**
+     * Limit
+     */
+    limit?: number | null;
+    /**
+     * Unit
+     */
+    unit?: 'minor_units' | 'hours_per_week' | null;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+};
+
+/**
+ * FindingCode
+ */
+export const FindingCode = {
+    DIRECT_SPEND_CAP: 'direct_spend_cap',
+    MONTHLY_PAYMENT_CAP: 'monthly_payment_cap',
+    MONTHLY_DEFICIT_CAP: 'monthly_deficit_cap',
+    RESERVE: 'reserve',
+    WORKLOAD: 'workload',
+    SESSION_CLASH: 'session_clash',
+    PREREQUISITE_NOT_USABLE: 'prerequisite_not_usable',
+    APPLICATION_TOO_LATE: 'application_too_late',
+    STARTS_BEFORE_PLANNING: 'starts_before_planning',
+    ONE_START_PER_CONCEPT: 'one_start_per_concept',
+    EXCLUSIVE_GROUP: 'exclusive_group',
+    CONFLICTING_WORK_PATTERNS: 'conflicting_work_patterns',
+    COARSE_MODEL_UNRESOLVED: 'coarse_model_unresolved',
+    DATES_UNKNOWN: 'dates_unknown',
+    COST_UNKNOWN: 'cost_unknown',
+    WORKLOAD_UNKNOWN: 'workload_unknown',
+    ENTRY_REQUIREMENTS_UNCONFIRMED: 'entry_requirements_unconfirmed',
+    BASELINE_MISSING: 'baseline_missing',
+    LIMIT_UNKNOWN: 'limit_unknown',
+    PAYMENT_BEFORE_START: 'payment_before_start',
+    ECONOMIC_COST_CAP: 'economic_cost_cap',
+    ENTRY_REQUIREMENTS_NOT_MET: 'entry_requirements_not_met',
+    ELIGIBILITY_UNCONFIRMED: 'eligibility_unconfirmed',
+    STACKING_UNCONFIRMED: 'stacking_unconfirmed',
+    WORK_RIGHTS_UNKNOWN: 'work_rights_unknown',
+    WORK_RIGHTS_NOT_HELD: 'work_rights_not_held',
+    REPAYMENTS_ABOVE_PAYMENT_CAP: 'repayments_above_payment_cap',
+    JOB_TRANSITIONS: 'job_transitions',
+    SCHEME_SHARED_UNCONFIRMED: 'scheme_shared_unconfirmed',
+    EXCLUSIVE_SCHEMES: 'exclusive_schemes'
+} as const;
+
+/**
+ * FindingCode
+ */
+export type FindingCode = typeof FindingCode[keyof typeof FindingCode];
+
+/**
+ * FindingKind
+ */
+export const FindingKind = {
+    VIOLATION: 'violation',
+    UNRESOLVED: 'unresolved',
+    PREFERENCE: 'preference'
+} as const;
+
+/**
+ * FindingKind
+ */
+export type FindingKind = typeof FindingKind[keyof typeof FindingKind];
 
 /**
  * FloorReasonOut
@@ -2924,6 +3109,32 @@ export const InputRoute = {
 export type InputRoute = typeof InputRoute[keyof typeof InputRoute];
 
 /**
+ * InstanceSize
+ */
+export type InstanceSize = {
+    /**
+     * Concepts
+     */
+    concepts: number;
+    /**
+     * Starts Per Concept
+     */
+    starts_per_concept: number;
+    /**
+     * Months
+     */
+    months: number;
+    /**
+     * Variants
+     */
+    variants: number;
+    /**
+     * Selection Space
+     */
+    selection_space: number;
+};
+
+/**
  * InstrumentKind
  */
 export const InstrumentKind = {
@@ -3271,6 +3482,42 @@ export type Location = {
      * Country
      */
     country?: string | null;
+};
+
+/**
+ * M0SearchLimits
+ *
+ * Spec section 18's `M0SearchLimits`: the declared model's bounds, then the run's caps.
+ */
+export type M0SearchLimits = {
+    /**
+     * Max Actions
+     */
+    max_actions?: number;
+    /**
+     * Max Starts Per Action
+     */
+    max_starts_per_action?: number;
+    /**
+     * Max Selected Actions
+     */
+    max_selected_actions?: number;
+    /**
+     * Max Months
+     */
+    max_months?: number;
+    /**
+     * Wall Seconds
+     */
+    wall_seconds?: number;
+    /**
+     * Max States
+     */
+    max_states?: number;
+    /**
+     * Max Feasible Archive
+     */
+    max_feasible_archive?: number;
 };
 
 /**
@@ -3783,6 +4030,24 @@ export type NameRole = {
      */
     title: string;
 };
+
+/**
+ * Narrowing
+ *
+ * What would make a stopped search smaller (spec section 12).
+ */
+export const Narrowing = {
+    FEWER_CONCEPTS: 'fewer_concepts',
+    ONE_START: 'one_start',
+    SHORTER_HORIZON: 'shorter_horizon'
+} as const;
+
+/**
+ * Narrowing
+ *
+ * What would make a stopped search smaller (spec section 12).
+ */
+export type Narrowing = typeof Narrowing[keyof typeof Narrowing];
 
 /**
  * Need
@@ -4354,6 +4619,21 @@ export type OriginOut = {
     connection: ConnectionOut | null;
     salary_floor: SalaryFloorOut | null;
 };
+
+/**
+ * Outcome
+ */
+export const Outcome = {
+    ROUTES_FOUND: 'routes_found',
+    NONE_FOUND_BEFORE_LIMIT: 'none_found_before_limit',
+    UNRESOLVED: 'unresolved',
+    NO_ROUTE_IN_BOUNDED_MODEL: 'no_route_in_bounded_model'
+} as const;
+
+/**
+ * Outcome
+ */
+export type Outcome = typeof Outcome[keyof typeof Outcome];
 
 /**
  * OutcomeDecision
@@ -5597,6 +5877,26 @@ export type ProvisionalConceptPage = {
 };
 
 /**
+ * PruningRule
+ */
+export const PruningRule = {
+    INPUT_UNRESOLVED: 'input_unresolved',
+    DIRECT_SPEND_CAP: 'direct_spend_cap',
+    MONTHLY_PAYMENT_CAP: 'monthly_payment_cap',
+    CONFLICTING_WORK_PATTERNS: 'conflicting_work_patterns',
+    SESSION_CLASH: 'session_clash',
+    JOB_TRANSITIONS: 'job_transitions',
+    EXCLUSIVE_SCHEMES: 'exclusive_schemes',
+    WORKLOAD: 'workload',
+    PREREQUISITE: 'prerequisite'
+} as const;
+
+/**
+ * PruningRule
+ */
+export type PruningRule = typeof PruningRule[keyof typeof PruningRule];
+
+/**
  * Qualification
  *
  * Why a result is not unqualified. M0 matrices are always provisional.
@@ -6385,6 +6685,24 @@ export const RoleState = {
 export type RoleState = typeof RoleState[keyof typeof RoleState];
 
 /**
+ * RouteQualification
+ */
+export const RouteQualification = {
+    PROPOSED_RECORDS: 'proposed_records',
+    ACCEPTED_ASSUMPTIONS: 'accepted_assumptions',
+    SYNTHETIC: 'synthetic',
+    CONDITIONAL_OFFER: 'conditional_offer',
+    CONDITIONAL_AWARD: 'conditional_award',
+    CONDITIONAL_APPLICATION: 'conditional_application',
+    READINESS_NOT_ASSESSED: 'readiness_not_assessed'
+} as const;
+
+/**
+ * RouteQualification
+ */
+export type RouteQualification = typeof RouteQualification[keyof typeof RouteQualification];
+
+/**
  * RowAssessment
  */
 export type RowAssessment = {
@@ -6671,7 +6989,8 @@ export const RunKind = {
     ACQUISITION: 'acquisition',
     SOURCE_SEARCH: 'source_search',
     PAGE_EXTRACTION: 'page_extraction',
-    STRENGTH_PROPOSAL: 'strength_proposal'
+    STRENGTH_PROPOSAL: 'strength_proposal',
+    ROUTE_SOLVE: 'route_solve'
 } as const;
 
 /**
@@ -6874,6 +7193,65 @@ export const SalaryPeriod = {
 export type SalaryPeriod = typeof SalaryPeriod[keyof typeof SalaryPeriod];
 
 /**
+ * Scenario
+ */
+export const Scenario = {
+    BASE: 'base',
+    DELAY: 'delay',
+    NO_AWARD: 'no_award',
+    NO_OFFER: 'no_offer'
+} as const;
+
+/**
+ * Scenario
+ */
+export type Scenario = typeof Scenario[keyof typeof Scenario];
+
+/**
+ * Schedule
+ *
+ * One feasible schedule reaching the milestone: its identity, objectives and check.
+ */
+export type Schedule = {
+    /**
+     * Route
+     */
+    route: Array<string>;
+    /**
+     * Family Id
+     */
+    family_id: string;
+    /**
+     * Months To Readiness
+     */
+    months_to_readiness: number;
+    /**
+     * Readiness Month
+     */
+    readiness_month: string;
+    objective_cost: SignedMoney;
+    direct_cost: Money;
+    economic_cost: SignedMoney | null;
+    verdict: Verdict;
+    /**
+     * Qualifications
+     */
+    qualifications: Array<RouteQualification | Qualification>;
+    /**
+     * Conditions
+     */
+    conditions: Array<Condition>;
+    /**
+     * Preferences
+     */
+    preferences: Array<Finding>;
+    /**
+     * Layer
+     */
+    layer: number | null;
+};
+
+/**
  * SearchCandidate
  */
 export type SearchCandidate = {
@@ -6892,6 +7270,20 @@ export type SearchCandidate = {
      */
     grounded: boolean;
 };
+
+/**
+ * SearchCoverage
+ *
+ * `search_coverage` (spec section 12).
+ */
+export const SearchCoverage = { COMPLETE: 'complete', BUDGET_TRUNCATED: 'budget_truncated' } as const;
+
+/**
+ * SearchCoverage
+ *
+ * `search_coverage` (spec section 12).
+ */
+export type SearchCoverage = typeof SearchCoverage[keyof typeof SearchCoverage];
 
 /**
  * SearchDid
@@ -7028,6 +7420,125 @@ export type SearchProposal = {
 };
 
 /**
+ * SearchResult
+ */
+export type SearchResult = {
+    /**
+     * Input Version
+     */
+    input_version: string;
+    label: CatalogueLabel;
+    /**
+     * Target Title
+     */
+    target_title: string;
+    /**
+     * Matrix Version
+     */
+    matrix_version: string;
+    /**
+     * Definition Version
+     */
+    definition_version: string;
+    /**
+     * Objective Basis
+     */
+    objective_basis: 'economic' | 'direct_spending';
+    scenario: Scenario;
+    /**
+     * Algorithm Version
+     */
+    algorithm_version: string;
+    /**
+     * Pruning Version
+     */
+    pruning_version: string;
+    limits: M0SearchLimits;
+    instance: InstanceSize;
+    /**
+     * Canonical Order
+     */
+    canonical_order: Array<string>;
+    coverage: SearchCoverage;
+    stop_reason: StopReason | null;
+    outcome: Outcome;
+    /**
+     * Layers Exact
+     */
+    layers_exact: boolean;
+    /**
+     * Expanded States
+     */
+    expanded_states: number;
+    /**
+     * Feasible Without Milestone
+     */
+    feasible_without_milestone: number;
+    /**
+     * Readiness Unknown
+     */
+    readiness_unknown: number;
+    /**
+     * Unresolved
+     */
+    unresolved: number;
+    /**
+     * Not Feasible
+     */
+    not_feasible: number;
+    /**
+     * Blocking Inputs
+     */
+    blocking_inputs: Array<Finding>;
+    /**
+     * Starting Violations
+     */
+    starting_violations: Array<Finding>;
+    /**
+     * Set Aside
+     */
+    set_aside: Array<SetAside>;
+    /**
+     * Pruned
+     */
+    pruned: {
+        [key in PruningRule]?: number;
+    };
+    /**
+     * Unexplored Branches
+     */
+    unexplored_branches: number;
+    /**
+     * Elapsed Ms
+     */
+    elapsed_ms: number;
+    /**
+     * Rank Ms
+     */
+    rank_ms: number;
+    /**
+     * Rank Seconds
+     */
+    rank_seconds: number;
+    /**
+     * Narrowings
+     */
+    narrowings: Array<Narrowing>;
+    /**
+     * Schedules
+     */
+    schedules: Array<Schedule>;
+    /**
+     * Families
+     */
+    families: Array<Family>;
+    /**
+     * Points
+     */
+    points: Array<EqualPoint>;
+};
+
+/**
  * SearchedThroughSkill
  */
 export type SearchedThroughSkill = {
@@ -7074,6 +7585,34 @@ export type Session = {
      * Ends
      */
     ends: string;
+};
+
+/**
+ * SetAside
+ *
+ * A variant no route can contain (rule 2), with everything its own check found.
+ */
+export type SetAside = {
+    /**
+     * Variant Id
+     */
+    variant_id: string;
+    /**
+     * Codes
+     */
+    codes: Array<FindingCode>;
+    /**
+     * Kind
+     */
+    kind: 'violation' | 'unresolved';
+    /**
+     * Unresolved
+     */
+    unresolved: Array<FindingCode>;
+    /**
+     * Violations
+     */
+    violations: Array<FindingCode>;
 };
 
 /**
@@ -7150,6 +7689,22 @@ export type SharedSkillOut = {
      * Skill Type
      */
     skill_type: string | null;
+};
+
+/**
+ * SignedMoney
+ *
+ * An economic cost or an income change: negative is a gain against the baseline.
+ */
+export type SignedMoney = {
+    /**
+     * Minor Units
+     */
+    minor_units: number;
+    /**
+     * Currency
+     */
+    currency: 'GBP';
 };
 
 /**
@@ -7461,6 +8016,130 @@ export type SocCandidateOut = {
      */
     benchmarks: Array<PayBenchmarkOut>;
 };
+
+/**
+ * SolveOut
+ *
+ * A route solve: its run, what it was asked for and read, where it is, and once its run
+ * is complete its result. A queued, running, failed or cancelled solve has no result.
+ */
+export type SolveOut = {
+    run: RunOut;
+    /**
+     * Solve Id
+     *
+     * The same snapshot under the same limits: one solve.
+     */
+    solve_id: string;
+    /**
+     * Target Title
+     */
+    target_title: string;
+    /**
+     * Inputs Version
+     *
+     * The planning inputs version the snapshot read.
+     */
+    inputs_version: number;
+    /**
+     * Capability Version
+     *
+     * The evidence version the snapshot read.
+     */
+    capability_version: number;
+    /**
+     * Input Version
+     *
+     * The monthly input's own version.
+     */
+    input_version: string;
+    /**
+     * Planning Start
+     */
+    planning_start: string;
+    /**
+     * Horizon Months
+     */
+    horizon_months: number;
+    /**
+     * Objective Basis
+     */
+    objective_basis: 'economic' | 'direct_spending';
+    limits: M0SearchLimits;
+    /**
+     * Rank Seconds
+     *
+     * The rank stage's own limit.
+     */
+    rank_seconds: number;
+    /**
+     * Algorithm Version
+     */
+    algorithm_version: string;
+    /**
+     * Pruning Version
+     */
+    pruning_version: string;
+    /**
+     * Where a running solve is: its search, then its rank stage. Null before it starts and once it has ended.
+     */
+    stage: SolveStage | null;
+    /**
+     * Attempts
+     *
+     * Its executions: more than one, it started again after a crash.
+     */
+    attempts: number;
+    /**
+     * Code
+     */
+    code: 'SOLVE_LIMIT_REACHED' | 'NO_ROUTE_IN_BOUNDED_MODEL' | null;
+    result: SearchResult | null;
+};
+
+/**
+ * SolveRequest
+ *
+ * Search one target's routes over a comparison's start and horizon.
+ */
+export type SolveRequest = {
+    /**
+     * Expected Inputs Version
+     *
+     * The planning inputs version the person saw.
+     */
+    expected_inputs_version: number;
+    /**
+     * Target
+     *
+     * One of the profile's target titles.
+     */
+    target: string;
+    /**
+     * Planning Start
+     *
+     * The comparison's first month, as YYYY-MM: this month or later.
+     */
+    planning_start: string;
+    /**
+     * Horizon Months
+     */
+    horizon_months: number;
+};
+
+/**
+ * SolveStage
+ *
+ * Where a running attempt is: the search stage, then the rank stage (S6.8).
+ */
+export const SolveStage = { SEARCHING: 'searching', RANKING: 'ranking' } as const;
+
+/**
+ * SolveStage
+ *
+ * Where a running attempt is: the search stage, then the rank stage (S6.8).
+ */
+export type SolveStage = typeof SolveStage[keyof typeof SolveStage];
 
 /**
  * SourceAttemptOut
@@ -7871,6 +8550,20 @@ export type StepOut = {
      */
     state: 'unresolved';
 };
+
+/**
+ * StopReason
+ */
+export const StopReason = {
+    STATE_LIMIT: 'state_limit',
+    WALL_TIME_LIMIT: 'wall_time_limit',
+    ARCHIVE_LIMIT: 'archive_limit'
+} as const;
+
+/**
+ * StopReason
+ */
+export type StopReason = typeof StopReason[keyof typeof StopReason];
 
 /**
  * StoreKey
@@ -9525,6 +10218,22 @@ export type VariantInputs = {
         [key: string]: EligibilityStatus;
     };
 };
+
+/**
+ * Verdict
+ */
+export const Verdict = {
+    AFFORDABLE_AND_FEASIBLE: 'affordable_and_feasible',
+    AFFORDABLE_AND_FEASIBLE_WITH_QUALIFICATIONS: 'affordable_and_feasible_with_qualifications',
+    READINESS_NOT_REACHED_IN_THIS_MODEL: 'readiness_not_reached_in_this_model',
+    UNRESOLVED: 'unresolved',
+    NOT_FEASIBLE_IN_THIS_MODEL: 'not_feasible_in_this_model'
+} as const;
+
+/**
+ * Verdict
+ */
+export type Verdict = typeof Verdict[keyof typeof Verdict];
 
 /**
  * Wage
@@ -12721,6 +13430,90 @@ export type WritePlanningInputsResponses = {
 };
 
 export type WritePlanningInputsResponse = WritePlanningInputsResponses[keyof WritePlanningInputsResponses];
+
+export type RequestRouteSolveData = {
+    body: SolveRequest;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/solves';
+};
+
+export type RequestRouteSolveErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type RequestRouteSolveError = RequestRouteSolveErrors[keyof RequestRouteSolveErrors];
+
+export type RequestRouteSolveResponses = {
+    /**
+     * The same solve is under way: joined.
+     */
+    200: SolveOut;
+    /**
+     * Successful Response
+     */
+    202: SolveOut;
+};
+
+export type RequestRouteSolveResponse = RequestRouteSolveResponses[keyof RequestRouteSolveResponses];
+
+export type GetRouteSolveData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/solves/{run_id}';
+};
+
+export type GetRouteSolveErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetRouteSolveError = GetRouteSolveErrors[keyof GetRouteSolveErrors];
+
+export type GetRouteSolveResponses = {
+    /**
+     * Successful Response
+     */
+    200: SolveOut;
+};
+
+export type GetRouteSolveResponse = GetRouteSolveResponses[keyof GetRouteSolveResponses];
 
 export type GetTaxonomyData = {
     body?: never;

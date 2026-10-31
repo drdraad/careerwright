@@ -2076,6 +2076,54 @@ export const CommitmentKindSchema = {
     title: 'CommitmentKind'
 } as const;
 
+export const ConditionSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            enum: [
+                'offer',
+                'award',
+                'application'
+            ],
+            title: 'Kind'
+        },
+        variant_id: {
+            type: 'string',
+            title: 'Variant Id'
+        },
+        instrument_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Instrument Id'
+        },
+        verification: {
+            type: 'string',
+            enum: [
+                'confirm_offer_accepted',
+                'verify_funding_award',
+                'confirm_admission'
+            ],
+            title: 'Verification'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'variant_id',
+        'instrument_id',
+        'verification'
+    ],
+    title: 'Condition',
+    description: 'What the route rests on that has not happened, with its blocking verification: an\noffer to accept, an award to approve, or a place to win by applying in time (an\napplication the route itself does not hold, with no admission recorded).'
+} as const;
+
 export const ConfidenceSchema = {
     type: 'string',
     enum: [
@@ -2864,6 +2912,48 @@ export const EntryModeSchema = {
     description: 'How the person chose to start (spec section 3, the You chapter).'
 } as const;
 
+export const EqualPointSchema = {
+    properties: {
+        months_to_readiness: {
+            type: 'integer',
+            title: 'Months To Readiness'
+        },
+        objective_cost: {
+            $ref: '#/components/schemas/SignedMoney'
+        },
+        layer: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Layer'
+        },
+        routes: {
+            items: {
+                items: {
+                    type: 'string'
+                },
+                type: 'array'
+            },
+            type: 'array',
+            title: 'Routes'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'months_to_readiness',
+        'objective_cost',
+        'layer',
+        'routes'
+    ],
+    title: 'EqualPoint'
+} as const;
+
 export const ErrorBodySchema = {
     properties: {
         code: {
@@ -3426,9 +3516,125 @@ export const FailureClassSchema = {
         'app_store_unavailable',
         'retrieval_failed',
         'source_blocked',
+        'rank_limit_reached',
         'unknown_failure'
     ],
     title: 'FailureClass'
+} as const;
+
+export const FamilySchema = {
+    properties: {
+        family_id: {
+            type: 'string',
+            title: 'Family Id'
+        },
+        actions: {
+            items: {
+                $ref: '#/components/schemas/FamilyAction'
+            },
+            type: 'array',
+            title: 'Actions'
+        },
+        precedence: {
+            items: {
+                prefixItems: [
+                    {
+                        type: 'integer'
+                    },
+                    {
+                        type: 'integer'
+                    }
+                ],
+                type: 'array',
+                maxItems: 2,
+                minItems: 2
+            },
+            type: 'array',
+            title: 'Precedence'
+        },
+        routes: {
+            items: {
+                items: {
+                    type: 'string'
+                },
+                type: 'array'
+            },
+            type: 'array',
+            title: 'Routes'
+        },
+        best_layer: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Best Layer'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'family_id',
+        'actions',
+        'precedence',
+        'routes',
+        'best_layer'
+    ],
+    title: 'Family'
+} as const;
+
+export const FamilyActionSchema = {
+    properties: {
+        concept_id: {
+            type: 'string',
+            title: 'Concept Id'
+        },
+        way: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Way'
+        },
+        work_pattern: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/WorkPatternKind'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        financing: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Financing'
+        },
+        conditional_offer: {
+            type: 'boolean',
+            title: 'Conditional Offer'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concept_id',
+        'way',
+        'work_pattern',
+        'financing',
+        'conditional_offer'
+    ],
+    title: 'FamilyAction'
 } as const;
 
 export const FewMatchedSchema = {
@@ -3500,6 +3706,141 @@ export const FieldStateSchema = {
         'prefer_not_to_say'
     ],
     title: 'FieldState'
+} as const;
+
+export const FindingSchema = {
+    properties: {
+        code: {
+            $ref: '#/components/schemas/FindingCode'
+        },
+        kind: {
+            $ref: '#/components/schemas/FindingKind'
+        },
+        month: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Month'
+        },
+        variant_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Variant Id'
+        },
+        amount: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Amount'
+        },
+        limit: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Limit'
+        },
+        unit: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: [
+                        'minor_units',
+                        'hours_per_week'
+                    ]
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Unit'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'code',
+        'kind'
+    ],
+    title: 'Finding'
+} as const;
+
+export const FindingCodeSchema = {
+    type: 'string',
+    enum: [
+        'direct_spend_cap',
+        'monthly_payment_cap',
+        'monthly_deficit_cap',
+        'reserve',
+        'workload',
+        'session_clash',
+        'prerequisite_not_usable',
+        'application_too_late',
+        'starts_before_planning',
+        'one_start_per_concept',
+        'exclusive_group',
+        'conflicting_work_patterns',
+        'coarse_model_unresolved',
+        'dates_unknown',
+        'cost_unknown',
+        'workload_unknown',
+        'entry_requirements_unconfirmed',
+        'baseline_missing',
+        'limit_unknown',
+        'payment_before_start',
+        'economic_cost_cap',
+        'entry_requirements_not_met',
+        'eligibility_unconfirmed',
+        'stacking_unconfirmed',
+        'work_rights_unknown',
+        'work_rights_not_held',
+        'repayments_above_payment_cap',
+        'job_transitions',
+        'scheme_shared_unconfirmed',
+        'exclusive_schemes'
+    ],
+    title: 'FindingCode'
+} as const;
+
+export const FindingKindSchema = {
+    type: 'string',
+    enum: [
+        'violation',
+        'unresolved',
+        'preference'
+    ],
+    title: 'FindingKind'
 } as const;
 
 export const FloorReasonOutSchema = {
@@ -4103,6 +4444,41 @@ export const InputRouteSchema = {
     ],
     title: 'InputRoute',
     description: 'How a source reached Careerwright. Pasted text is its own route, never a retrieval.'
+} as const;
+
+export const InstanceSizeSchema = {
+    properties: {
+        concepts: {
+            type: 'integer',
+            title: 'Concepts'
+        },
+        starts_per_concept: {
+            type: 'integer',
+            title: 'Starts Per Concept'
+        },
+        months: {
+            type: 'integer',
+            title: 'Months'
+        },
+        variants: {
+            type: 'integer',
+            title: 'Variants'
+        },
+        selection_space: {
+            type: 'integer',
+            title: 'Selection Space'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concepts',
+        'starts_per_concept',
+        'months',
+        'variants',
+        'selection_space'
+    ],
+    title: 'InstanceSize'
 } as const;
 
 export const InstrumentKindSchema = {
@@ -4731,6 +5107,64 @@ export const LocationSchema = {
         'label'
     ],
     title: 'Location'
+} as const;
+
+export const M0SearchLimitsSchema = {
+    properties: {
+        max_actions: {
+            type: 'integer',
+            maximum: 24,
+            minimum: 1,
+            title: 'Max Actions',
+            default: 24
+        },
+        max_starts_per_action: {
+            type: 'integer',
+            maximum: 2,
+            minimum: 1,
+            title: 'Max Starts Per Action',
+            default: 2
+        },
+        max_selected_actions: {
+            type: 'integer',
+            maximum: 6,
+            minimum: 0,
+            title: 'Max Selected Actions',
+            default: 6
+        },
+        max_months: {
+            type: 'integer',
+            maximum: 24,
+            minimum: 1,
+            title: 'Max Months',
+            default: 24
+        },
+        wall_seconds: {
+            type: 'integer',
+            maximum: 30,
+            minimum: 1,
+            title: 'Wall Seconds',
+            default: 30
+        },
+        max_states: {
+            type: 'integer',
+            maximum: 1000000,
+            minimum: 1,
+            title: 'Max States',
+            default: 1000000
+        },
+        max_feasible_archive: {
+            type: 'integer',
+            maximum: 50000,
+            minimum: 1,
+            title: 'Max Feasible Archive',
+            default: 50000
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    title: 'M0SearchLimits',
+    description: 'Spec section 18\'s `M0SearchLimits`: the declared model\'s bounds, then the run\'s caps.'
 } as const;
 
 export const MappingResolutionSchema = {
@@ -5512,6 +5946,17 @@ export const NameRoleSchema = {
     ],
     title: 'NameRole',
     description: 'The first answer in the person\'s own words: a UK job title picked from the type-ahead\n(`GET /v1/taxonomy/titles`, a title of the UK job-title index), or anything typed ("Use\nmy own words"). Nothing is refused.'
+} as const;
+
+export const NarrowingSchema = {
+    type: 'string',
+    enum: [
+        'fewer_concepts',
+        'one_start',
+        'shorter_horizon'
+    ],
+    title: 'Narrowing',
+    description: 'What would make a stopped search smaller (spec section 12).'
 } as const;
 
 export const NeedSchema = {
@@ -6527,6 +6972,17 @@ export const OriginOutSchema = {
     ],
     title: 'OriginOut',
     description: 'The world\'s answer to the first question, recomputed on each read with no model call:\nit works before a key is connected and in the demo. `destinations` are the first slate,\njoined to the role only by the essential skills they share in ESCO (never by words in a\ntitle), chosen by the slate\'s rules and the confirmed salary floor; the role itself is\nthe origin, never a destination.'
+} as const;
+
+export const OutcomeSchema = {
+    type: 'string',
+    enum: [
+        'routes_found',
+        'none_found_before_limit',
+        'unresolved',
+        'no_route_in_bounded_model'
+    ],
+    title: 'Outcome'
 } as const;
 
 export const OutcomeDecisionSchema = {
@@ -8804,6 +9260,22 @@ export const ProvisionalConceptPageSchema = {
     title: 'ProvisionalConceptPage'
 } as const;
 
+export const PruningRuleSchema = {
+    type: 'string',
+    enum: [
+        'input_unresolved',
+        'direct_spend_cap',
+        'monthly_payment_cap',
+        'conflicting_work_patterns',
+        'session_clash',
+        'job_transitions',
+        'exclusive_schemes',
+        'workload',
+        'prerequisite'
+    ],
+    title: 'PruningRule'
+} as const;
+
 export const QualificationSchema = {
     type: 'string',
     enum: [
@@ -9933,6 +10405,20 @@ export const RoleStateSchema = {
     description: 'What the person\'s current or last role names in ESCO.'
 } as const;
 
+export const RouteQualificationSchema = {
+    type: 'string',
+    enum: [
+        'proposed_records',
+        'accepted_assumptions',
+        'synthetic',
+        'conditional_offer',
+        'conditional_award',
+        'conditional_application',
+        'readiness_not_assessed'
+    ],
+    title: 'RouteQualification'
+} as const;
+
 export const RowAssessmentSchema = {
     properties: {
         row_id: {
@@ -10485,7 +10971,8 @@ export const RunKindSchema = {
         'acquisition',
         'source_search',
         'page_extraction',
-        'strength_proposal'
+        'strength_proposal',
+        'route_solve'
     ],
     title: 'RunKind'
 } as const;
@@ -10872,6 +11359,117 @@ export const SalaryPeriodSchema = {
     description: 'The period a source states pay per (the profile\'s salary floor has its own).'
 } as const;
 
+export const ScenarioSchema = {
+    type: 'string',
+    enum: [
+        'base',
+        'delay',
+        'no_award',
+        'no_offer'
+    ],
+    title: 'Scenario'
+} as const;
+
+export const ScheduleSchema = {
+    properties: {
+        route: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Route'
+        },
+        family_id: {
+            type: 'string',
+            title: 'Family Id'
+        },
+        months_to_readiness: {
+            type: 'integer',
+            title: 'Months To Readiness'
+        },
+        readiness_month: {
+            type: 'string',
+            title: 'Readiness Month'
+        },
+        objective_cost: {
+            $ref: '#/components/schemas/SignedMoney'
+        },
+        direct_cost: {
+            $ref: '#/components/schemas/Money'
+        },
+        economic_cost: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SignedMoney'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        verdict: {
+            $ref: '#/components/schemas/Verdict'
+        },
+        qualifications: {
+            items: {
+                anyOf: [
+                    {
+                        $ref: '#/components/schemas/RouteQualification'
+                    },
+                    {
+                        $ref: '#/components/schemas/Qualification'
+                    }
+                ]
+            },
+            type: 'array',
+            title: 'Qualifications'
+        },
+        conditions: {
+            items: {
+                $ref: '#/components/schemas/Condition'
+            },
+            type: 'array',
+            title: 'Conditions'
+        },
+        preferences: {
+            items: {
+                $ref: '#/components/schemas/Finding'
+            },
+            type: 'array',
+            title: 'Preferences'
+        },
+        layer: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Layer'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'route',
+        'family_id',
+        'months_to_readiness',
+        'readiness_month',
+        'objective_cost',
+        'direct_cost',
+        'economic_cost',
+        'verdict',
+        'qualifications',
+        'conditions',
+        'preferences',
+        'layer'
+    ],
+    title: 'Schedule',
+    description: 'One feasible schedule reaching the milestone: its identity, objectives and check.'
+} as const;
+
 export const SearchCandidateSchema = {
     properties: {
         url: {
@@ -10896,6 +11494,16 @@ export const SearchCandidateSchema = {
         'grounded'
     ],
     title: 'SearchCandidate'
+} as const;
+
+export const SearchCoverageSchema = {
+    type: 'string',
+    enum: [
+        'complete',
+        'budget_truncated'
+    ],
+    title: 'SearchCoverage',
+    description: '`search_coverage` (spec section 12).'
 } as const;
 
 export const SearchDidSchema = {
@@ -11073,6 +11681,215 @@ export const SearchProposalSchema = {
     description: 'A source search\'s validated output: candidates only, never claims.'
 } as const;
 
+export const SearchResultSchema = {
+    properties: {
+        input_version: {
+            type: 'string',
+            title: 'Input Version'
+        },
+        label: {
+            $ref: '#/components/schemas/CatalogueLabel'
+        },
+        target_title: {
+            type: 'string',
+            title: 'Target Title'
+        },
+        matrix_version: {
+            type: 'string',
+            title: 'Matrix Version'
+        },
+        definition_version: {
+            type: 'string',
+            title: 'Definition Version'
+        },
+        objective_basis: {
+            type: 'string',
+            enum: [
+                'economic',
+                'direct_spending'
+            ],
+            title: 'Objective Basis'
+        },
+        scenario: {
+            $ref: '#/components/schemas/Scenario'
+        },
+        algorithm_version: {
+            type: 'string',
+            title: 'Algorithm Version'
+        },
+        pruning_version: {
+            type: 'string',
+            title: 'Pruning Version'
+        },
+        limits: {
+            $ref: '#/components/schemas/M0SearchLimits'
+        },
+        instance: {
+            $ref: '#/components/schemas/InstanceSize'
+        },
+        canonical_order: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Canonical Order'
+        },
+        coverage: {
+            $ref: '#/components/schemas/SearchCoverage'
+        },
+        stop_reason: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/StopReason'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        outcome: {
+            $ref: '#/components/schemas/Outcome'
+        },
+        layers_exact: {
+            type: 'boolean',
+            title: 'Layers Exact'
+        },
+        expanded_states: {
+            type: 'integer',
+            title: 'Expanded States'
+        },
+        feasible_without_milestone: {
+            type: 'integer',
+            title: 'Feasible Without Milestone'
+        },
+        readiness_unknown: {
+            type: 'integer',
+            title: 'Readiness Unknown'
+        },
+        unresolved: {
+            type: 'integer',
+            title: 'Unresolved'
+        },
+        not_feasible: {
+            type: 'integer',
+            title: 'Not Feasible'
+        },
+        blocking_inputs: {
+            items: {
+                $ref: '#/components/schemas/Finding'
+            },
+            type: 'array',
+            title: 'Blocking Inputs'
+        },
+        starting_violations: {
+            items: {
+                $ref: '#/components/schemas/Finding'
+            },
+            type: 'array',
+            title: 'Starting Violations'
+        },
+        set_aside: {
+            items: {
+                $ref: '#/components/schemas/SetAside'
+            },
+            type: 'array',
+            title: 'Set Aside'
+        },
+        pruned: {
+            additionalProperties: {
+                type: 'integer'
+            },
+            propertyNames: {
+                $ref: '#/components/schemas/PruningRule'
+            },
+            type: 'object',
+            title: 'Pruned'
+        },
+        unexplored_branches: {
+            type: 'integer',
+            title: 'Unexplored Branches'
+        },
+        elapsed_ms: {
+            type: 'integer',
+            title: 'Elapsed Ms'
+        },
+        rank_ms: {
+            type: 'integer',
+            title: 'Rank Ms'
+        },
+        rank_seconds: {
+            type: 'integer',
+            title: 'Rank Seconds'
+        },
+        narrowings: {
+            items: {
+                $ref: '#/components/schemas/Narrowing'
+            },
+            type: 'array',
+            title: 'Narrowings'
+        },
+        schedules: {
+            items: {
+                $ref: '#/components/schemas/Schedule'
+            },
+            type: 'array',
+            title: 'Schedules'
+        },
+        families: {
+            items: {
+                $ref: '#/components/schemas/Family'
+            },
+            type: 'array',
+            title: 'Families'
+        },
+        points: {
+            items: {
+                $ref: '#/components/schemas/EqualPoint'
+            },
+            type: 'array',
+            title: 'Points'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'input_version',
+        'label',
+        'target_title',
+        'matrix_version',
+        'definition_version',
+        'objective_basis',
+        'scenario',
+        'algorithm_version',
+        'pruning_version',
+        'limits',
+        'instance',
+        'canonical_order',
+        'coverage',
+        'stop_reason',
+        'outcome',
+        'layers_exact',
+        'expanded_states',
+        'feasible_without_milestone',
+        'readiness_unknown',
+        'unresolved',
+        'not_feasible',
+        'blocking_inputs',
+        'starting_violations',
+        'set_aside',
+        'pruned',
+        'unexplored_branches',
+        'elapsed_ms',
+        'rank_ms',
+        'rank_seconds',
+        'narrowings',
+        'schedules',
+        'families',
+        'points'
+    ],
+    title: 'SearchResult'
+} as const;
+
 export const SearchedThroughSkillSchema = {
     properties: {
         reason: {
@@ -11145,6 +11962,55 @@ export const SessionSchema = {
     ],
     title: 'Session',
     description: 'A fixed timetable session, for clashes (TIME1-04): a weekday (0 is Monday) and times.'
+} as const;
+
+export const SetAsideSchema = {
+    properties: {
+        variant_id: {
+            type: 'string',
+            title: 'Variant Id'
+        },
+        codes: {
+            items: {
+                $ref: '#/components/schemas/FindingCode'
+            },
+            type: 'array',
+            title: 'Codes'
+        },
+        kind: {
+            type: 'string',
+            enum: [
+                'violation',
+                'unresolved'
+            ],
+            title: 'Kind'
+        },
+        unresolved: {
+            items: {
+                $ref: '#/components/schemas/FindingCode'
+            },
+            type: 'array',
+            title: 'Unresolved'
+        },
+        violations: {
+            items: {
+                $ref: '#/components/schemas/FindingCode'
+            },
+            type: 'array',
+            title: 'Violations'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'variant_id',
+        'codes',
+        'kind',
+        'unresolved',
+        'violations'
+    ],
+    title: 'SetAside',
+    description: 'A variant no route can contain (rule 2), with everything its own check found.'
 } as const;
 
 export const SetPreferencesSchema = {
@@ -11275,6 +12141,28 @@ export const SharedSkillOutSchema = {
         'skill_type'
     ],
     title: 'SharedSkillOut'
+} as const;
+
+export const SignedMoneySchema = {
+    properties: {
+        minor_units: {
+            type: 'integer',
+            title: 'Minor Units'
+        },
+        currency: {
+            type: 'string',
+            const: 'GBP',
+            title: 'Currency'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'minor_units',
+        'currency'
+    ],
+    title: 'SignedMoney',
+    description: 'An economic cost or an income change: negative is a gain against the baseline.'
 } as const;
 
 export const SketchOutSchema = {
@@ -11817,6 +12705,184 @@ export const SocCandidateOutSchema = {
         'benchmarks'
     ],
     title: 'SocCandidateOut'
+} as const;
+
+export const SolveOutSchema = {
+    properties: {
+        run: {
+            $ref: '#/components/schemas/RunOut'
+        },
+        solve_id: {
+            type: 'string',
+            title: 'Solve Id',
+            description: 'The same snapshot under the same limits: one solve.'
+        },
+        target_title: {
+            type: 'string',
+            title: 'Target Title'
+        },
+        inputs_version: {
+            type: 'integer',
+            title: 'Inputs Version',
+            description: 'The planning inputs version the snapshot read.'
+        },
+        capability_version: {
+            type: 'integer',
+            title: 'Capability Version',
+            description: 'The evidence version the snapshot read.'
+        },
+        input_version: {
+            type: 'string',
+            title: 'Input Version',
+            description: 'The monthly input\'s own version.'
+        },
+        planning_start: {
+            type: 'string',
+            format: 'date',
+            title: 'Planning Start'
+        },
+        horizon_months: {
+            type: 'integer',
+            title: 'Horizon Months'
+        },
+        objective_basis: {
+            type: 'string',
+            enum: [
+                'economic',
+                'direct_spending'
+            ],
+            title: 'Objective Basis'
+        },
+        limits: {
+            $ref: '#/components/schemas/M0SearchLimits'
+        },
+        rank_seconds: {
+            type: 'integer',
+            title: 'Rank Seconds',
+            description: 'The rank stage\'s own limit.'
+        },
+        algorithm_version: {
+            type: 'string',
+            title: 'Algorithm Version'
+        },
+        pruning_version: {
+            type: 'string',
+            title: 'Pruning Version'
+        },
+        stage: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SolveStage'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Where a running solve is: its search, then its rank stage. Null before it starts and once it has ended.'
+        },
+        attempts: {
+            type: 'integer',
+            title: 'Attempts',
+            description: 'Its executions: more than one, it started again after a crash.'
+        },
+        code: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: [
+                        'SOLVE_LIMIT_REACHED',
+                        'NO_ROUTE_IN_BOUNDED_MODEL'
+                    ]
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Code'
+        },
+        result: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SearchResult'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: [
+        'run',
+        'solve_id',
+        'target_title',
+        'inputs_version',
+        'capability_version',
+        'input_version',
+        'planning_start',
+        'horizon_months',
+        'objective_basis',
+        'limits',
+        'rank_seconds',
+        'algorithm_version',
+        'pruning_version',
+        'stage',
+        'attempts',
+        'code',
+        'result'
+    ],
+    title: 'SolveOut',
+    description: 'A route solve: its run, what it was asked for and read, where it is, and once its run\nis complete its result. A queued, running, failed or cancelled solve has no result.'
+} as const;
+
+export const SolveRequestSchema = {
+    properties: {
+        expected_inputs_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Inputs Version',
+            description: 'The planning inputs version the person saw.'
+        },
+        target: {
+            type: 'string',
+            maxLength: 120,
+            minLength: 1,
+            title: 'Target',
+            description: 'One of the profile\'s target titles.'
+        },
+        planning_start: {
+            type: 'string',
+            pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$',
+            title: 'Planning Start',
+            description: 'The comparison\'s first month, as YYYY-MM: this month or later.'
+        },
+        horizon_months: {
+            type: 'integer',
+            maximum: 24,
+            minimum: 1,
+            title: 'Horizon Months'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_inputs_version',
+        'target',
+        'planning_start',
+        'horizon_months'
+    ],
+    title: 'SolveRequest',
+    description: 'Search one target\'s routes over a comparison\'s start and horizon.'
+} as const;
+
+export const SolveStageSchema = {
+    type: 'string',
+    enum: [
+        'searching',
+        'ranking'
+    ],
+    title: 'SolveStage',
+    description: 'Where a running attempt is: the search stage, then the rank stage (S6.8).'
 } as const;
 
 export const SourceAttemptOutSchema = {
@@ -12549,6 +13615,16 @@ export const StepOutSchema = {
         'state'
     ],
     title: 'StepOut'
+} as const;
+
+export const StopReasonSchema = {
+    type: 'string',
+    enum: [
+        'state_limit',
+        'wall_time_limit',
+        'archive_limit'
+    ],
+    title: 'StopReason'
 } as const;
 
 export const StoreKeySchema = {
@@ -15173,6 +16249,18 @@ export const VariantInputsSchema = {
     ],
     title: 'VariantInputs',
     description: 'What the person confirmed for one option (a variant of the planning catalogue).'
+} as const;
+
+export const VerdictSchema = {
+    type: 'string',
+    enum: [
+        'affordable_and_feasible',
+        'affordable_and_feasible_with_qualifications',
+        'readiness_not_reached_in_this_model',
+        'unresolved',
+        'not_feasible_in_this_model'
+    ],
+    title: 'Verdict'
 } as const;
 
 export const WageSchema = {
