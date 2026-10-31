@@ -10,9 +10,12 @@
 #                           qualifies the production model; INTERVIEW=1 (exactly) runs one
 #                           interview turn and confirms its proposals instead of a connection check;
 #                           SEARCH=1 runs one source search (Meta web search; scope live-search);
-#                           SEARCH_BOUND=1 asks one in-process search for max_tool_calls 1
+#                           SEARCH_BOUND=1 asks one in-process search for max_tool_calls 1;
+#                           WONDER=1 makes Muse Wonder's two qualification calls in process
+#                           (scope wonder-qualification, $0.50 in all with live-eval WONDER=1)
 #   make live-eval          budget-capped live run of the representative evaluation cases (at most
-#                           6) on the test model; CASES=INT-01,DSC-01 runs a chosen subset
+#                           6) on the test model; CASES=INT-01,DSC-01 runs a chosen subset;
+#                           WONDER=1 runs them on Muse Wonder (scope wonder-qualification)
 #   make live-adzuna        two real Adzuna search requests (free tier; at most 10 in its scope),
 #                           credentials read from .env in code, each request ledgered at $0
 #   make live-extract       one in-process page extraction of the synthetic fixture page on the
@@ -60,10 +63,10 @@ acceptance:
 
 # Only PRODUCTION=1 opts in to the production model; any other value (0, false, no) does not.
 live-smoke:
-	$(BACKEND) $(UV) python -m tools.live_smoke $(if $(filter 1,$(PRODUCTION)),--production-model,) $(if $(filter 1,$(INTERVIEW)),--interview,) $(if $(filter 1,$(SEARCH)),--search,) $(if $(filter 1,$(SEARCH_BOUND)),--search-bound,)
+	$(BACKEND) $(UV) python -m tools.live_smoke $(if $(filter 1,$(PRODUCTION)),--production-model,) $(if $(filter 1,$(INTERVIEW)),--interview,) $(if $(filter 1,$(SEARCH)),--search,) $(if $(filter 1,$(SEARCH_BOUND)),--search-bound,) $(if $(filter 1,$(WONDER)),--wonder,)
 
 live-eval:
-	$(BACKEND) $(UV) python -m tools.live_eval $(if $(CASES),--cases $(CASES),)
+	$(BACKEND) $(UV) python -m tools.live_eval $(if $(CASES),--cases $(CASES),) $(if $(filter 1,$(WONDER)),--wonder,)
 
 live-adzuna:
 	$(BACKEND) $(UV) python -m tools.live_adzuna

@@ -24,7 +24,14 @@ appended to `docs/evidence/live-eval.md`, each case's output to the private evid
 directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, never committed); and both databases,
 every container log and the API's responses are scanned for the key.
 
-Run from `backend/`: `uv run --locked python -m tools.live_eval [--cases INT-01,DSC-01]`.
+`--wonder` (`make live-eval WONDER=1`, Muse Wonder's qualification; ADR 0003, amendment of
+2026-10-31) runs the cases on `muse-wonder-1.0` as the production model, still on synthetic
+workspaces and cases only (Wonder is a Standard-mode model), under its own per-invocation cap
+(`WONDER_MAX_COST_NANO_USD`) and in the scope `wonder-qualification`, which
+`make live-smoke WONDER=1` shares: $0.50 in all, every request a production request.
+
+Run from `backend/`: `uv run --locked python -m tools.live_eval [--cases INT-01,DSC-01]
+[--wonder]`.
 """
 
 import argparse
@@ -41,7 +48,7 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from careerwright.identity.model_choice import ModelChoice
-from careerwright.identity.model_registry import format_usd
+from careerwright.identity.model_registry import WONDER_MODEL_ID, format_usd
 from careerwright.profile import discovery, interview, slate_explanation
 from tools.evaluation import (
     Case,
@@ -54,6 +61,8 @@ from tools.evaluation import (
     profile_input_of,
 )
 from tools.live_smoke import (
+    WONDER_BUDGET,
+    WONDER_SCOPE,
     Api,
     CapExceededError,
     ScopeBudget,
@@ -74,6 +83,10 @@ MAX_COST_NANO_USD = 50_000_000  # $0.05 worst case per invocation
 # own scope (`CAREERWRIGHT_LIVE_EVAL_SCOPE`).
 SCOPE_MAX_CALLS = 9
 SCOPE_MAX_COST_NANO_USD = 50_000_000
+# Per invocation with `--wonder` (Muse Wonder, the production model, in the shared scope
+# `wonder-qualification`): two cases, such as an interview ($0.176 worst case on Wonder) and a
+# discovery ($0.156), or one explanation case ($0.368).
+WONDER_MAX_COST_NANO_USD = 400_000_000
 RESULTS_PATH = REPO_ROOT / "docs" / "evidence" / "live-eval.md"
 EVAL_INTERVIEW = SmokeKind(
     "eval_interview",
@@ -159,30 +172,42 @@ class Plan:
     cases: list[Case]
     calls: int
     worst_case_nano_usd: int
+    production: bool = False  # Muse Wonder's qualification (`--wonder`)
 
 
 def authorise_eval(
-    models: ModelChoice, cases: list[Case], *, budget: ScopeBudget, spent: ScopeSpend
+    models: ModelChoice,
+    cases: list[Case],
+    *,
+    budget: ScopeBudget,
+    spent: ScopeSpend,
+    production: bool = False,
 ) -> Plan:
-    """The test model and the invocation's bounds, or a refusal before any call."""
+    """The model and the invocation's bounds, or a refusal before any call: the test model,
+    or with `production` (Muse Wonder's qualification) the production model, under its own
+    per-invocation cap and the scope's production-request cap."""
     if not 1 <= len(cases) <= MAX_LIVE_CASES:
         raise CapExceededError(f"1-{MAX_LIVE_CASES} live cases per invocation, not {len(cases)}")
-    model_id = models.test.model_id
-    if models.is_production(model_id):
+    model_id = models.production.model_id if production else models.test.model_id
+    if models.is_production(model_id) and not production:
         raise CapExceededError("the test model is the production model: refusing")
     calls = sum(KINDS[case.kind].calls() for case in cases)
     worst = sum(
         KINDS[case.kind].attempts * KINDS[case.kind].per_attempt_nano_usd(model_id)
         for case in cases
     )
-    if worst > MAX_COST_NANO_USD:
-        raise CapExceededError(
-            f"worst case {format_usd(worst)} exceeds the cap {format_usd(MAX_COST_NANO_USD)}"
-        )
+    cap = WONDER_MAX_COST_NANO_USD if production else MAX_COST_NANO_USD
+    if worst > cap:
+        raise CapExceededError(f"worst case {format_usd(worst)} exceeds the cap {format_usd(cap)}")
     if spent.calls + calls > budget.max_calls:
         raise CapExceededError(
             f"scope {budget.scope}: {spent.calls} of {budget.max_calls} calls used, "
             f"{calls} more needed"
+        )
+    if production and spent.production_calls + calls > budget.max_production_calls:
+        raise CapExceededError(
+            f"scope {budget.scope}: {spent.production_calls} of {budget.max_production_calls} "
+            f"production calls used, {calls} more needed"
         )
     if spent.committed_nano_usd + worst > budget.max_cost_nano_usd:
         raise CapExceededError(
@@ -190,7 +215,7 @@ def authorise_eval(
             f"{format_usd(budget.max_cost_nano_usd)} committed, worst case {format_usd(worst)} "
             "more"
         )
-    return Plan(model_id, cases, calls, worst)
+    return Plan(model_id, cases, calls, worst, production)
 
 
 def _wait(api: Api, path: str, run_of: Callable[[dict[str, Any]], dict[str, Any]]) -> Any:
@@ -368,7 +393,8 @@ def write_results(
         f"## Live evaluation, {datetime.now(UTC):%Y-%m-%d %H:%M} UTC",
         "",
         f"Budget scope `{scope}`. "
-        f"Model `{plan.model_id}` (test model, synthetic cases only); {len(runs)} cases; at most "
+        f"Model `{plan.model_id}` ({'production' if plan.production else 'test'} model, "
+        f"synthetic cases only); {len(runs)} cases; at most "
         f"{plan.calls} requests, worst case {format_usd(plan.worst_case_nano_usd)}; ledger rows "
         f"{seqs}. Failures by type: {failures_by_type(results) or 'none'}. Each case's output "
         f"is kept in the private evidence directory (`{_shown(observations_path)}`, not "
@@ -474,25 +500,35 @@ def live_eval(
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cases", help="comma-separated case IDs (default: the live cases)")
+    parser.add_argument(
+        "--wonder",
+        action="store_true",
+        help=f"run the cases on Muse Wonder as the production model, in the scope {WONDER_SCOPE}",
+    )
     args = parser.parse_args(argv)
     settings = EvalSettings()
-    models = ModelChoice.configure(settings.meta_test_model, settings.meta_production_model, "test")
+    production_model = WONDER_MODEL_ID if args.wonder else settings.meta_production_model
+    models = ModelChoice.configure(
+        settings.meta_test_model, production_model, "production" if args.wonder else "test"
+    )
+    budget = WONDER_BUDGET if args.wonder else settings.budget()
     chosen = args.cases.split(",") if args.cases else None
     cases = select(load_cases(), chosen)
     ledger = Ledger()
     with ledger.exclusive():
         plan = authorise_eval(
-            models, cases, budget=settings.budget(), spent=ledger.spent(settings.budget_scope)
+            models, cases, budget=budget, spent=ledger.spent(budget.scope), production=args.wonder
         )
         print(
-            f"live eval: model {plan.model_id} (test); {len(cases)} cases; at most {plan.calls} "
-            f"requests, worst case {format_usd(plan.worst_case_nano_usd)}",
+            f"live eval: model {plan.model_id} ({'production' if args.wonder else 'test'}); "
+            f"{len(cases)} cases; at most {plan.calls} requests, worst case "
+            f"{format_usd(plan.worst_case_nano_usd)}; scope {budget.scope}",
             flush=True,
         )
-        with smoke_stack(production=False) as target:
-            code = live_eval(
-                target, settings.api_key, plan, ledger, models, scope=settings.budget_scope
-            )
+        with smoke_stack(
+            production=args.wonder, production_model=WONDER_MODEL_ID if args.wonder else None
+        ) as target:
+            code = live_eval(target, settings.api_key, plan, ledger, models, scope=budget.scope)
     sys.exit(code)
 
 

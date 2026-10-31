@@ -3,14 +3,15 @@
 
 import json
 import subprocess
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 from pydantic import SecretStr
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
-from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.models import Model
+from pydantic_ai.models.function import AgentInfo, BuiltinToolCallsReturns, FunctionModel
 from pydantic_ai.usage import RequestUsage
 
 from careerwright.identity.model_choice import ModelChoice
@@ -22,6 +23,9 @@ from tools.live_smoke import (
     MAX_CALLS,
     SEARCH_CITY,
     SEARCH_TARGET,
+    WONDER_BUDGET,
+    WONDER_MAX_COST_NANO_USD,
+    WONDER_PAIR,
     CapExceededError,
     ScopeBudget,
     SmokeSettings,
@@ -31,9 +35,10 @@ from tools.live_smoke import (
     ledger_possible_calls,
     qualify_extraction,
     qualify_search_bound,
+    qualify_wonder,
 )
 from tools.localenv import REPO_ROOT
-from tools.usage_ledger import CallOutcome, Ledger, LedgerBusyError, ScopeSpend
+from tools.usage_ledger import CallOutcome, Ledger, LedgerBusyError, LiveCallEntry, ScopeSpend
 
 ROOMY = ScopeBudget("live-smoke", max_calls=99, max_production_calls=99, max_cost_nano_usd=10**12)
 NOTHING_SPENT = ScopeSpend(0, 0, 0)
@@ -357,6 +362,156 @@ def _extraction_meta(*replies: str, sent: list[str]) -> Callable[[str, SecretStr
         return FunctionModel(respond)
 
     return build
+
+
+@pytest.mark.req("MODEL-11")
+@pytest.mark.parametrize("target", ["live-smoke", "live-eval"])
+@pytest.mark.parametrize(("value", "wonder"), [("1", True), ("0", False), ("yes", False)])
+def test_only_wonder_equals_one_puts_muse_wonder_in_a_live_command(
+    target: str, value: str, wonder: bool
+) -> None:
+    dry_run = subprocess.run(  # noqa: S603 - fixed make dry run, nothing executes
+        ["make", "-n", target, f"WONDER={value}"],  # noqa: S607
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+
+    assert ("--wonder" in dry_run.stdout) is wonder
+
+
+@pytest.mark.req("MODEL-11")
+def test_the_wonder_pair_has_its_own_cap_and_its_scope_stops_at_fifty_cents() -> None:
+    models = ModelChoice.configure("muse-spark-1.3-contributor", "muse-wonder-1.0", "production")
+    pair = {"budget": WONDER_BUDGET, "kind": WONDER_PAIR}
+
+    model_id, worst_case = authorise(
+        models,
+        production=True,
+        spent=NOTHING_SPENT,
+        max_cost_nano_usd=WONDER_MAX_COST_NANO_USD,
+        **pair,  # type: ignore[arg-type]
+    )
+
+    # $0.05696 for the schema call (4,000 in x $4/M + 2,048 out x $20/M) and $0.0925 for the
+    # streamed search with one tool call (15,000 in x $4/M + 1,500 out x $20/M + $0.0025).
+    assert (model_id, worst_case) == ("muse-wonder-1.0", 56_960_000 + 92_500_000)
+    assert WONDER_PAIR.calls() == 2
+    assert (WONDER_BUDGET.scope, WONDER_BUDGET.max_cost_nano_usd) == (
+        "wonder-qualification",
+        500_000_000,
+    )
+    with pytest.raises(CapExceededError, match="exceeds the cap"):  # Spark's cap refuses it
+        authorise(models, production=True, spent=NOTHING_SPENT, **pair)  # type: ignore[arg-type]
+    with pytest.raises(CapExceededError, match="committed"):
+        authorise(
+            models,
+            production=True,
+            spent=ScopeSpend(2, 2, 500_000_000 - worst_case + 1),
+            max_cost_nano_usd=WONDER_MAX_COST_NANO_USD,
+            **pair,  # type: ignore[arg-type]
+        )
+
+
+def _wonder_meta(built: list[str], *, piece: int = 40) -> Callable[[str, SecretStr], Model]:
+    """Meta's place, offline: the schema call answers whole; the search streams its tool
+    parts, then its JSON in pieces of `piece` characters."""
+    asked: dict[str, object] = {"role": SEARCH_TARGET, "city": SEARCH_CITY}
+    call, returned, text = search_parts(asked, "")
+
+    def build(model_id: str, api_key: SecretStr) -> FunctionModel:
+        built.append(model_id)
+
+        def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            answer = {"suggested_title": "Training coordinator", "reason": "Synthetic."}
+            usage = RequestUsage(input_tokens=150, output_tokens=60)
+            return ModelResponse(parts=[TextPart(json.dumps(answer))], usage=usage)
+
+        async def stream(
+            messages: list[ModelMessage], info: AgentInfo
+        ) -> AsyncIterator[str | BuiltinToolCallsReturns]:
+            yield {0: call, 1: returned}
+            for start in range(0, len(text.content), piece):
+                yield text.content[start : start + piece]
+
+        return FunctionModel(respond, stream_function=stream)
+
+    return build
+
+
+@pytest.mark.req("MODEL-11", "MODEL-09")
+def test_the_wonder_qualification_makes_both_calls_on_wonder_streams_the_search_and_ledgers_each(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("META_API_KEY", "not-a-real-key-for-this-test")
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+    built: list[str] = []
+
+    code = qualify_wonder(SmokeSettings(_env_file=None), ledger, build=_wonder_meta(built))
+
+    assert code == 0
+    # Wonder whatever is configured (the default production model is Spark).
+    assert built == ["muse-wonder-1.0", "muse-wonder-1.0"]
+    schema, streamed = ledger.records()
+    assert {
+        (r.budget_scope, r.model_id, r.is_production_model, r.http_requests)
+        for r in (
+            schema,
+            streamed,
+        )
+    } == {("wonder-qualification", "muse-wonder-1.0", True, 1)}
+    assert (schema.outcome, streamed.outcome) == (CallOutcome.OK, CallOutcome.OK)
+    assert schema.estimated_cost_nano_usd == 150 * 4_000 + 60 * 20_000
+    assert schema.reserved_nano_usd == 56_960_000
+    assert streamed.reserved_nano_usd == 92_500_000
+    notes = json.loads(streamed.notes)
+    assert notes["streamed_deltas"] >= 2  # the JSON arrived in pieces: the request streamed
+    assert (notes["max_tool_calls"], notes["searches"]) == (1, 1)
+    assert "https://" not in streamed.notes  # hosts only, never a URL
+
+
+@pytest.mark.req("MODEL-11")
+def test_a_search_answered_in_one_piece_does_not_establish_streaming(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("META_API_KEY", "not-a-real-key-for-this-test")
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+
+    code = qualify_wonder(
+        SmokeSettings(_env_file=None), ledger, build=_wonder_meta([], piece=10**6)
+    )
+
+    _, streamed = ledger.records()
+    assert code == 1  # the call is booked at its cost, but streaming was not shown
+    assert streamed.outcome is CallOutcome.OK
+    assert json.loads(streamed.notes)["streamed_deltas"] < 2
+
+
+@pytest.mark.req("MODEL-11")
+def test_the_wonder_qualification_refuses_before_any_request_once_its_scope_is_spent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("META_API_KEY", "not-a-real-key-for-this-test")
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+    ledger.append(
+        LiveCallEntry(
+            budget_scope="wonder-qualification",
+            purpose="an earlier call whose cost Meta never reported",
+            model_id="muse-wonder-1.0",
+            is_production_model=True,
+            endpoint="POST /v1/responses",
+            outcome=CallOutcome.FAILED,
+            reserved_nano_usd=400_000_000,  # unknown: counts its full reservation
+        )
+    )
+    built: list[str] = []
+
+    with pytest.raises(CapExceededError, match=r"wonder-qualification: \$0.400000 of"):
+        qualify_wonder(SmokeSettings(_env_file=None), ledger, build=_wonder_meta(built))
+    assert built == []
+    assert len(ledger.records()) == 1
 
 
 @pytest.mark.req("MODEL-09", "ACQ-03")

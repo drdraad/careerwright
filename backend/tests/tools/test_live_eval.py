@@ -11,12 +11,13 @@ from tools.live_eval import (
     MAX_LIVE_CASES,
     SCOPE_MAX_CALLS,
     SCOPE_MAX_COST_NANO_USD,
+    WONDER_MAX_COST_NANO_USD,
     Plan,
     authorise_eval,
     select,
     write_results,
 )
-from tools.live_smoke import CapExceededError, ScopeBudget
+from tools.live_smoke import WONDER_BUDGET, CapExceededError, ScopeBudget
 from tools.localenv import check_permissions
 from tools.usage_ledger import ScopeSpend
 
@@ -84,6 +85,33 @@ def test_the_explanation_case_runs_only_when_named_within_the_controller_s_cap()
     assert plan.worst_case_nano_usd == 2 * 3_400_000
     with pytest.raises(CapExceededError, match="calls used"):
         authorise_eval(MODELS, cases, budget=cap, spent=ScopeSpend(6, 0, 0))
+
+
+@pytest.mark.req("MODEL-11", "TEST1-10")
+def test_wonder_cases_run_on_the_production_model_within_their_own_caps() -> None:
+    wonder = ModelChoice.configure("muse-spark-1.3-contributor", "muse-wonder-1.0", "production")
+    two = select(load_cases(), ["INT-01", "DSC-01"])
+
+    plan = authorise_eval(wonder, two, budget=WONDER_BUDGET, spent=NOTHING_SPENT, production=True)
+
+    assert (plan.model_id, plan.production, plan.calls) == ("muse-wonder-1.0", True, 4)
+    # An interview attempt ($0.176 on Wonder: two requests) and a discovery ($0.156).
+    assert plan.worst_case_nano_usd == 176_000_000 + 156_000_000 <= WONDER_MAX_COST_NANO_USD
+    four = select(load_cases(), None)
+    with pytest.raises(CapExceededError, match="exceeds the cap"):
+        authorise_eval(wonder, four, budget=WONDER_BUDGET, spent=NOTHING_SPENT, production=True)
+    with pytest.raises(CapExceededError, match="committed"):  # $0.50 in all, the pair included
+        authorise_eval(
+            wonder, two, budget=WONDER_BUDGET, spent=ScopeSpend(2, 2, 200_000_000), production=True
+        )
+    with pytest.raises(CapExceededError, match="production calls used"):
+        authorise_eval(
+            wonder, two, budget=WONDER_BUDGET, spent=ScopeSpend(2, 12, 0), production=True
+        )
+    # Without the flag the same configuration runs the test model, as before.
+    assert authorise_eval(wonder, two, budget=ROOMY, spent=NOTHING_SPENT).model_id == (
+        "muse-spark-1.3-contributor"
+    )
 
 
 @pytest.mark.req("MODEL-09")

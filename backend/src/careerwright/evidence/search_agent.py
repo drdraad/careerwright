@@ -11,10 +11,11 @@ CHECK), so there is no fixture model for this kind.
 """
 
 import asyncio
+from collections.abc import Sequence
 from typing import Any
 
 from pydantic_ai import Agent, NativeOutput, RunContext
-from pydantic_ai.capabilities import NativeTool
+from pydantic_ai.capabilities import AbstractCapability, NativeTool
 from pydantic_ai.messages import (
     ModelMessage,
     ModelResponse,
@@ -71,9 +72,12 @@ def run_search(
     _sink: PartialSink,
     *,
     max_tool_calls: int = MAX_TOOL_CALLS,
+    observe: Sequence[AbstractCapability[Any]] = (),
 ) -> SearchProposal:
     """`max_tool_calls` is the product's two; only the live qualification of the bound
-    (`tools.live_smoke --search-bound`) asks for one."""
+    (`tools.live_smoke --search-bound`) asks for one. `observe` is empty in the product; a
+    model's live qualification (`tools.live_smoke --wonder`) passes a stream probe, which
+    makes the one request stream."""
     if raw_input is None:
         raise ValueError("a source search has a sealed input")
     context = SearchInput.model_validate_json(raw_input)
@@ -90,6 +94,7 @@ def run_search(
                     user_location=WebSearchUserLocation(country="GB"),
                 )
             ),
+            *observe,
         ],
     )
     accepted: list[SearchProposal] = []

@@ -36,8 +36,16 @@ in this process, through the product's task code and check, in its own scope
 (`live-extract`: at most 3 requests and $0.30), ledgering each request with its own tokens
 and cost, then scans the result, the rows and the requests sent for the key (fix round 2).
 
+`--wonder` (`make live-smoke WONDER=1`) qualifies Muse Wonder (ADR 0003, amendment of
+2026-10-31) with two calls in this process on synthetic input, through the product's task
+code: schema output with usage (the connection check), then streaming, web search and schema
+output in one call (the source search, streamed). Wonder is the production model for that
+invocation only, whatever is configured; its own per-invocation cap and the scope
+`wonder-qualification` (shared with `make live-eval WONDER=1`, $0.50 in all) are checked
+before either call. Without the flag, Wonder's worst case is refused by the Spark-sized cap.
+
 Run from `backend/`: `uv run --locked python -m tools.live_smoke [--production-model]
-[--interview | --search | --search-bound | --extract]`.
+[--interview | --search | --search-bound | --extract | --wonder]`.
 """
 
 import argparse
@@ -58,13 +66,17 @@ import httpx2
 import psycopg
 from psycopg import sql
 from psycopg.rows import dict_row
-from pydantic import Field, SecretStr
-from pydantic_ai import capture_run_messages
+from pydantic import BaseModel, Field, SecretStr
+from pydantic_ai import RunContext, capture_run_messages
+from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.messages import (
+    AgentStreamEvent,
     ModelMessage,
     ModelMessagesTypeAdapter,
     ModelRequest,
     ModelResponse,
+    PartDeltaEvent,
+    TextPartDelta,
 )
 from pydantic_ai.models import Model
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -78,6 +90,7 @@ from careerwright.evidence.search_agent import run_search
 from careerwright.identity import connection_check
 from careerwright.identity.activity import (
     ACTIVITY_MAX_ATTEMPTS,
+    CONNECTION_CHECK_TASK,
     STORE_RETRY_BUDGET_S,
     PartialWriter,
     measured_usage,
@@ -85,9 +98,15 @@ from careerwright.identity.activity import (
 from careerwright.identity.failures import BoundExceededError, classify_failure
 from careerwright.identity.meta import REQUEST_TIMEOUT_S, meta_model
 from careerwright.identity.model_choice import ModelChoice
-from careerwright.identity.model_registry import ModelMode, estimate_cost_nano_usd, format_usd
+from careerwright.identity.model_registry import (
+    WONDER_MODEL_ID,
+    ModelMode,
+    estimate_cost_nano_usd,
+    format_usd,
+)
 from careerwright.identity.workflow import ACTIVITY_BACKOFF_RATE, ACTIVITY_INTERVAL_S
 from careerwright.profile import interview
+from careerwright.worker import model_builder
 from tools.leak_scan import Finding, Needle, scan
 from tools.localenv import REPO_ROOT, ensure_local_home
 from tools.stack import CORE_SERVICES, Ports, Stack
@@ -232,6 +251,39 @@ PAGE_EXTRACTION = SmokeKind(
 )
 
 
+# Muse Wonder's qualification (ADR 0003, amendment of 2026-10-31), all in one scope: the two
+# in-process calls (`--wonder`) and at most six evaluation cases (`make live-eval WONDER=1`),
+# under $0.50 in all, every request on the production model. Unknown costs count their full
+# reservation, so the scope refuses any invocation whose worst case would pass $0.50.
+WONDER_SCOPE = "wonder-qualification"
+WONDER_BUDGET = ScopeBudget(
+    WONDER_SCOPE, max_calls=14, max_production_calls=14, max_cost_nano_usd=500_000_000
+)
+# Per invocation of `--wonder` (Spark's production cap, MAX_COST_NANO_USD, is too small):
+# the pair's worst case is $0.149 ($0.057 schema call, $0.0925 streamed search).
+WONDER_MAX_COST_NANO_USD = 200_000_000
+WONDER_PAIR = SmokeKind(
+    "wonder_qualification",
+    1,
+    2,  # one schema-output call and one streamed search, each a single request
+    lambda model_id: (
+        connection_check.worst_case_nano_usd(model_id)
+        + search.worst_case_nano_usd(model_id, max_tool_calls=BOUND_TOOL_CALLS)
+    ),
+    "Muse Wonder qualification, in process",
+)
+WONDER_SCHEMA_PURPOSE = (
+    "Muse Wonder qualification: schema output with usage, in process (the connection check's "
+    "own task code and fixed synthetic prompt)"
+)
+WONDER_STREAM_SEARCH_PURPOSE = (
+    "Muse Wonder qualification: streaming, web search and schema output in one call, in "
+    "process (the source search's own task code and check, streamed, max_tool_calls 1; "
+    "synthetic target and city)"
+)
+MIN_STREAMED_DELTAS = 2  # the output arrived in more than one piece
+
+
 class CapExceededError(SystemExit):
     pass
 
@@ -247,18 +299,20 @@ def authorise(
     budget: ScopeBudget,
     spent: ScopeSpend,
     kind: SmokeKind = CONNECTION_CHECK,
+    max_cost_nano_usd: int = MAX_COST_NANO_USD,
 ) -> tuple[str, int]:
     """The model this invocation may use and its worst case, or refuse before any call:
     both this invocation's caps and what is left of the scope's cumulative budget. Calls are
-    provider requests: every request each allowed attempt may send."""
+    provider requests: every request each allowed attempt may send. `max_cost_nano_usd` is
+    the per-invocation cap: Spark-sized, unless Muse Wonder's flag sets its own."""
     model_id = models.production.model_id if production else models.test.model_id
     if models.is_production(model_id) and not production:
         raise CapExceededError("the test model is the production model: pass --production-model")
     worst_case = kind.attempts * kind.per_attempt_nano_usd(model_id)
     calls = kind.calls()
-    if worst_case > MAX_COST_NANO_USD:
+    if worst_case > max_cost_nano_usd:
         raise CapExceededError(
-            f"worst case {format_usd(worst_case)} exceeds the cap {format_usd(MAX_COST_NANO_USD)}"
+            f"worst case {format_usd(worst_case)} exceeds the cap {format_usd(max_cost_nano_usd)}"
         )
     if spent.calls + calls > budget.max_calls:
         raise CapExceededError(
@@ -766,17 +820,20 @@ class StackTarget:
 
 
 @contextmanager
-def smoke_stack(*, production: bool) -> Iterator[StackTarget]:
+def smoke_stack(*, production: bool, production_model: str | None = None) -> Iterator[StackTarget]:
     """An isolated live-mode stack (own project, ports, CAREERWRIGHT_HOME, volumes), removed
-    after."""
+    after. `production_model` replaces the configured one (Muse Wonder's qualification)."""
     home = Path(tempfile.mkdtemp(prefix="careerwright-smoke-"))
     ensure_local_home(home)
+    overrides = [("CAREERWRIGHT_SYNTHETIC_MODEL_ROLE", "production" if production else "test")]
+    if production_model is not None:
+        overrides.append(("CAREERWRIGHT_META_PRODUCTION_MODEL", production_model))
     stack = Stack(
         project="careerwright-l0-smoke",
         home=home,
         ports=SMOKE_PORTS,
         live=True,
-        overrides=(("CAREERWRIGHT_SYNTHETIC_MODEL_ROLE", "production" if production else "test"),),
+        overrides=tuple(overrides),
     )
     try:
         stack.down()
@@ -1050,6 +1107,183 @@ def _extraction_model(model_id: str, api_key: SecretStr) -> Model:
     )
 
 
+class StreamProbe(AbstractCapability[Any]):
+    """Counts the text deltas of a streamed response. An agent with an event handler streams
+    its requests, so adding the probe is what makes the search's one request stream."""
+
+    def __init__(self) -> None:
+        self.deltas = 0
+
+    async def on_event(self, ctx: RunContext[Any], *, event: AgentStreamEvent) -> None:
+        if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+            self.deltas += 1
+
+
+@dataclass(frozen=True)
+class InProcessCall:
+    output: BaseModel | None
+    outcome: str  # "succeeded", or the failure's label (never its message)
+    messages: list[ModelMessage]
+
+
+def _call_in_process(call: Callable[[], BaseModel]) -> InProcessCall:
+    output = None
+    with capture_run_messages() as messages:
+        try:
+            output = call()
+            outcome = "succeeded"
+        except Exception as error:  # the label only, never the message
+            outcome = classify_failure(error).label
+    return InProcessCall(output, outcome, messages)
+
+
+def _wonder_entry(
+    model_id: str, purpose: str, reserved_nano_usd: int, done: InProcessCall, notes: object
+) -> LiveCallEntry:
+    usage, reasoning, response_id = measured_usage(done.messages)
+    ok = done.outcome == "succeeded"
+    return LiveCallEntry(
+        budget_scope=WONDER_SCOPE,
+        purpose=purpose,
+        http_requests=max(1, sum(isinstance(m, ModelRequest) for m in done.messages)),
+        model_id=model_id,
+        is_production_model=True,
+        endpoint=RESPONSES_ENDPOINT,
+        outcome=CallOutcome.OK if ok else CallOutcome.FAILED,
+        reserved_nano_usd=reserved_nano_usd,
+        estimated_cost_nano_usd=estimate_cost_nano_usd(model_id, usage) if usage else None,
+        error_type=None if ok else done.outcome,
+        input_tokens=usage.input_tokens if usage else None,
+        cached_input_tokens=usage.cached_input_tokens if usage else None,
+        output_tokens=usage.output_tokens if usage else None,
+        reasoning_tokens=reasoning,
+        web_search_queries=usage.web_search_queries if usage else None,
+        provider_response_id=response_id,
+        notes=json.dumps(notes),
+    )
+
+
+def qualify_wonder(
+    settings: SmokeSettings,
+    ledger: Ledger,
+    *,
+    build: Callable[[str, SecretStr], Model] | None = None,
+) -> int:
+    """Muse Wonder's two qualification calls on synthetic input, in this process, through the
+    product's own task code and the model the worker builds (ADR 0003, amendment): schema
+    output with usage (the connection check), then streaming, web search and schema output
+    in one call (the source search, streamed by a probe, asked for one tool call). Both are
+    authorised together before either is sent, against `WONDER_MAX_COST_NANO_USD` and what is
+    left of `WONDER_BUDGET`; each is ledgered whatever happens; then the requests sent, the
+    results and the rows are scanned for the key. `build` replaces Meta in tests only."""
+    models = ModelChoice.configure(settings.meta_test_model, WONDER_MODEL_ID, "production")
+    build = build or _worker_model
+    key = settings.api_key
+    with ledger.exclusive():
+        model_id, worst_case = authorise(
+            models,
+            production=True,
+            budget=WONDER_BUDGET,
+            spent=ledger.spent(WONDER_SCOPE),
+            kind=WONDER_PAIR,
+            max_cost_nano_usd=WONDER_MAX_COST_NANO_USD,
+        )
+        print(
+            f"Muse Wonder qualification: model {model_id} (production); 2 requests, worst case "
+            f"{format_usd(worst_case)}; scope {WONDER_SCOPE}",
+            flush=True,
+        )
+        schema = _call_in_process(
+            lambda: CONNECTION_CHECK_TASK.call(
+                build(model_id, key), ModelMode.STANDARD, None, PartialWriter(lambda text: None)
+            )
+        )
+        probe = StreamProbe()
+        context = search.SearchInput(profile_version=0, target=SEARCH_TARGET, city=SEARCH_CITY)
+        streamed = _call_in_process(
+            lambda: run_search(
+                build(model_id, key),
+                ModelMode.STANDARD,
+                context.model_dump_json().encode(),
+                PartialWriter(lambda text: None),
+                max_tool_calls=BOUND_TOOL_CALLS,
+                observe=[probe],
+            )
+        )
+        search_usage = measured_usage(streamed.messages)[0]
+        bound = search.exceeded_bound(search_usage, BOUND_TOOL_CALLS) if search_usage else None
+        if bound is not None:  # the activity's own check (`SOURCE_SEARCH_TASK.exceeded_bound`)
+            streamed = InProcessCall(
+                streamed.output,
+                classify_failure(BoundExceededError(bound)).label,
+                streamed.messages,
+            )
+        proposal = streamed.output if isinstance(streamed.output, search.SearchProposal) else None
+        search_found = search_notes(proposal.model_dump(mode="json")) if proposal else {}
+        records = [
+            ledger.append(
+                _wonder_entry(
+                    model_id,
+                    WONDER_SCHEMA_PURPOSE,
+                    connection_check.worst_case_nano_usd(model_id),
+                    schema,
+                    {"task": "connection_check"},
+                )
+            ),
+            ledger.append(
+                _wonder_entry(
+                    model_id,
+                    WONDER_STREAM_SEARCH_PURPOSE,
+                    search.worst_case_nano_usd(model_id, max_tool_calls=BOUND_TOOL_CALLS),
+                    streamed,
+                    {
+                        "task": "source_search",
+                        "max_tool_calls": BOUND_TOOL_CALLS,
+                        "streamed_deltas": probe.deltas,
+                        **search_found,
+                    },
+                )
+            ),
+        ]
+        ledger.write_markdown()
+        calls = (("schema", schema), ("search", streamed))
+        cells = [
+            *(
+                (f"requests sent ({name})", ModelMessagesTypeAdapter.dump_json(c.messages).decode())
+                for name, c in calls
+            ),
+            *(
+                (f"result ({name})", c.output.model_dump_json() if c.output else "")
+                for name, c in calls
+            ),
+            *((f"ledger row {r.seq}", r.model_dump_json()) for r in records),
+        ]
+        findings = scan(cells, [Needle("Meta key", key.get_secret_value(), fragment_length=12)])
+    schema_row, search_row = records
+    qualified = {
+        "schema output with usage": schema.outcome == "succeeded"
+        and schema_row.input_tokens is not None,
+        "streaming": streamed.outcome == "succeeded" and probe.deltas >= MIN_STREAMED_DELTAS,
+        "web search": bool(proposal and proposal.queries),
+        "schema output in the streamed search": proposal is not None
+        and search_row.input_tokens is not None,
+    }
+    print(
+        f"schema call {schema.outcome}; streamed search {streamed.outcome} "
+        f"({probe.deltas} deltas, searches {search_found.get('searches')}); established "
+        f"{[name for name, ok in qualified.items() if ok]}; ledger rows "
+        f"{', '.join(str(r.seq) for r in records)}; {len(cells)} cells scanned, "
+        f"{len(findings)} findings",
+        flush=True,
+    )
+    return 0 if all(qualified.values()) and not findings else 1
+
+
+def _worker_model(model_id: str, api_key: SecretStr) -> Model:
+    """The model the worker builds for a run of this model ID."""
+    return model_builder()(model_id, api_key)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -1077,10 +1311,17 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="one in-process page extraction of the synthetic fixture page, in its own scope",
     )
+    parser.add_argument(
+        "--wonder",
+        action="store_true",
+        help=f"Muse Wonder's two qualification calls, in process, in the scope {WONDER_SCOPE}",
+    )
     args = parser.parse_args(argv)
-    alone = [args.search, args.search_bound, args.extract]
+    alone = [args.search, args.search_bound, args.extract, args.wonder]
     if sum(alone) > 1 or (any(alone) and (args.interview or args.production_model)):
-        raise SystemExit("--search, --search-bound and --extract run alone, on the test model")
+        raise SystemExit("--search, --search-bound, --extract and --wonder each run alone")
+    if args.wonder:
+        sys.exit(qualify_wonder(SmokeSettings(), Ledger()))
     if args.search_bound:
         sys.exit(qualify_search_bound(SmokeSettings(), Ledger()))
     if args.extract:

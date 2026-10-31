@@ -55,6 +55,9 @@ class ModelEntry:
 _STANDARD_SPARK = TokenPrice(1_250, 150, 4_250)  # $1.25 / $0.15 cached / $4.25 per M
 _CONTRIBUTOR_SPARK = TokenPrice(100, 2, 200)  # $0.10 / $0.002 cached / $0.20 per M
 _SPARK_1_3 = frozenset(Capability)
+# The product owner's live sessions only (ADR 0003, amendment of 2026-10-31): the session
+# command makes it the production model; Spark stays the default.
+WONDER_MODEL_ID = "muse-wonder-1.0"
 FIXTURE_MODEL_ID = "careerwright-fixture-interviewer-1"
 FIXTURE_DISCOVERY_MODEL_ID = "careerwright-fixture-discovery-1"
 FIXTURE_EXPLAINER_MODEL_ID = "careerwright-fixture-explainer-1"
@@ -80,7 +83,7 @@ _REGISTRY = {
             "test model, synthetic data only: qualified, ADR 0003 (ledger calls 3-5, 8, 10)",
         ),
         ModelEntry("muse-spark-1.2-contributor", ModelMode.CONTRIBUTOR, _CONTRIBUTOR_SPARK),
-        ModelEntry("muse-wonder-1.0", ModelMode.STANDARD, TokenPrice(4_000, 200, 20_000)),
+        ModelEntry(WONDER_MODEL_ID, ModelMode.STANDARD, TokenPrice(4_000, 200, 20_000)),
         ModelEntry(
             FIXTURE_MODEL_ID,
             ModelMode.FIXTURE,
