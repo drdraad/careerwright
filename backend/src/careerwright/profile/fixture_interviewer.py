@@ -15,8 +15,10 @@ It never asks the same question twice in a row once it is answered (Task W2E, th
 the question in front of the person is the opening their entry asked, or the one it asked
 after their last answered message, recomputed from what that message said (its fixed
 patterns) and the answers saved since. A question it couldn't note an answer to is asked
-again, with the way on: an example reply, or Skip. The open question an unsure person starts
-with is only ever the opening: any reply moves on to the first practical question.
+again, with the way on the web shows there: an example reply or Skip, or at the role question
+its two buttons. Once nothing is left to ask, any message gets what to do next. The open
+question an unsure person starts with is only ever the opening: any reply moves on to the
+first practical question.
 """
 
 import re
@@ -54,6 +56,7 @@ QUESTIONS = {
     ),
     ProfileField.TARGET_TITLES: "Do you have a role in mind, or would you like to explore?",
 }
+ROLE_QUESTION = QUESTIONS[ProfileField.TARGET_TITLES]
 SURE_QUESTION = "Which role are you aiming for, and at what level?"
 UNSURE_QUESTION = "What would you most like to be different about your working life?"
 _HOURS = re.compile(r"\b([0-9]{1,3}(?:\.[0-9]{1,2})?)\s*(?:hours?|hrs?)\b", re.IGNORECASE)
@@ -86,7 +89,18 @@ _ANSWER_STATE = {
     "unknown": (AnsweredState.UNKNOWN, "You said you don't know."),
     "prefer not to say": (AnsweredState.PREFER_NOT_TO_SAY, "You said you would rather not say."),
 }
+# The way on names only what the web shows (app review I1): example replies under a demo
+# question; "Show me suggestions" and "Name a role" (`ROLE_OR_EXPLORE` in the web's
+# vocabulary) at the role question of a person who isn't sure; and after the last question,
+# with nothing in front for Skip to answer, the views that are always there.
 COULDNT_NOTE = "Thank you. I couldn't note anything from that. Tap an example reply, or say Skip."
+COULDNT_NOTE_ROLE = (
+    "Thank you. I couldn't note anything from that. Tap Show me suggestions or Name a role."
+)
+NOTHING_LEFT = (
+    "Thank you. I have no more questions. Open Suggestions for work that could suit you, or "
+    "What we know to change an answer."
+)
 
 
 @dataclass(frozen=True)
@@ -302,8 +316,14 @@ def fixture_turn(context: PromptContext, *, smaller_step: bool = False) -> Inter
     question = None if smaller_step or after is None else after.question
     noted = f"I noted {len(updates)} thing{'s' if len(updates) != 1 else ''} for you to review."
     # The question goes only in next_question; the web app shows it once, apart (PROF-08).
-    # Asked again because nothing could be noted: the reply names the way on.
-    said = noted if updates else COULDNT_NOTE if after == in_front else "Thank you."
+    if updates:
+        said = noted
+    elif after is None:  # nothing left to ask: what to do next, never a loop back to Skip
+        said = NOTHING_LEFT
+    elif after == in_front:  # asked again because nothing could be noted: the way on
+        said = COULDNT_NOTE_ROLE if after.question == ROLE_QUESTION else COULDNT_NOTE
+    else:
+        said = "Thank you."
     if smaller_step:
         said = SMALLER_STEP_REPLY + (f" {noted}" if updates else "")
     reply = REPLY_PREFIX + said

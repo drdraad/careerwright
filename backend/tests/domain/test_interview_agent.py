@@ -21,6 +21,7 @@ from careerwright.identity.model_registry import ModelMode
 from careerwright.money import Money
 from careerwright.profile.document import FieldState, empty_profile
 from careerwright.profile.fixture_interviewer import (
+    CRITICAL,
     QUESTIONS,
     REPLY_PREFIX,
     SMALLER_STEP_REPLY,
@@ -477,8 +478,49 @@ def test_an_answer_the_demo_cant_read_says_so_and_names_the_way_on() -> None:
     )
 
 
+EARLY_ANSWERS = {field: FieldState.PROVIDED for field in CRITICAL}
+
+
+@pytest.mark.req("STATE-09")
+def test_at_the_role_question_an_answer_the_demo_cant_read_names_its_two_buttons() -> None:
+    """The web shows "Show me suggestions" and "Name a role" there, never example replies
+    (`asksRoleOrExplore`), so the way on names those two (app review I1, the first probe)."""
+    for reply in ("Explore", "I'd like to explore", "yes"):
+        out = demo(demo_turn("Up to £600", reply, entry=EntryMode.UNSURE, answered=EARLY_ANSWERS))
+
+        assert out.proposed_updates == []
+        assert out.next_question == QUESTIONS[ProfileField.TARGET_TITLES], reply
+        assert out.reply == (
+            REPLY_PREFIX + "Thank you. I couldn't note anything from that. Tap Show me "
+            "suggestions or Name a role."
+        ), reply
+
+
+@pytest.mark.req("STATE-09")
+def test_after_the_last_question_any_message_says_what_to_do_next_and_skip_never_loops() -> None:
+    """Nothing is in front and nothing comes after: no example replies are shown and Skip has
+    nothing to answer, so the reply points to the views that are always there, the same for
+    any message, and never tells the person to say Skip (app review I1, the second probe)."""
+    everything = {**EARLY_ANSWERS, ProfileField.TARGET_TITLES: FieldState.PROVIDED}
+    replies: set[str] = set()
+    for texts in (("Hello.", "What next?"), ("Hello.", "Skip"), ("Hello.", "Skip", "Skip")):
+        out = demo(demo_turn(*texts, entry=EntryMode.UNSURE, answered=everything))
+
+        assert out.proposed_updates == [], texts
+        assert out.next_question is None, texts
+        assert "Skip" not in out.reply, texts
+        assert "example" not in out.reply, texts
+        replies.add(out.reply)
+    assert replies == {
+        REPLY_PREFIX + "Thank you. I have no more questions. Open Suggestions for work that "
+        "could suit you, or What we know to change an answer."
+    }
+
+
 # The web's one-tap example replies for each demo question (`EXAMPLE_REPLIES` in
-# apps/web/src/lib/vocabulary.ts), keyed by what the question asks about.
+# apps/web/src/lib/vocabulary.ts), keyed by what the question asks about. At the role question
+# of a person who isn't sure, the web shows "Show me suggestions" and "Name a role" instead, so
+# there the walk types what the target question's examples say.
 EXAMPLE_REPLIES: dict[ProfileField | None, tuple[str, ...]] = {
     None: ("I enjoy working with people", "Skip"),
     ProfileField.TARGET_TITLES: ("I want to be a nurse", "Skip"),
