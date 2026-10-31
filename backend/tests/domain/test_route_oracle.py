@@ -41,7 +41,8 @@ from careerwright.planning.compiler import (
     WorkRights,
     compile_input,
 )
-from careerwright.planning.search import Coverage, search_routes
+from careerwright.planning.layers import peel
+from careerwright.planning.search import SearchCoverage, search_routes
 from tests.support.planning import (
     CONSTRUCTED,
     START,
@@ -365,7 +366,7 @@ def test_the_search_finds_exactly_the_oracle_s_feasible_schedules_objectives_and
     oracle = Oracle(monthly).solve()
     found = {frozenset(s.route): s for s in result.schedules}
 
-    assert result.coverage is Coverage.COMPLETE
+    assert result.coverage is SearchCoverage.COMPLETE
     assert {r: (s.months_to_readiness, s.objective_cost.minor_units) for r, s in found.items()} == (
         oracle.archive
     )
@@ -378,6 +379,21 @@ def test_the_search_finds_exactly_the_oracle_s_feasible_schedules_objectives_and
     assert result.outcome.value == oracle.outcome
     # Every candidate the search checked is one the oracle's tree holds, once each.
     assert result.expanded_states <= len(oracle.checks)
+
+
+@pytest.mark.req("OPT1-11")
+@SLOW
+@example(monthly=undated_relief())
+@given(monthly=INSTANCES)
+def test_the_rank_stage_s_layers_equal_iterative_peeling_on_every_complete_search(
+    monthly: MonthlyInput,
+) -> None:
+    # S6.8: the efficient layering, qualified against Sprint 6a's peeling on the same archive.
+    result = search_routes(monthly)
+    points = [(s.months_to_readiness, s.objective_cost.minor_units) for s in result.schedules]
+
+    assert result.coverage is SearchCoverage.COMPLETE
+    assert [s.layer for s in result.schedules] == peel(points)
 
 
 @pytest.mark.req("OPT1-08")

@@ -7,7 +7,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from careerwright.planning.layers import dominates, peel
+from careerwright.planning.layers import dominates, peel, rank
 from tests.support.planning import directai_fixture
 
 
@@ -80,3 +80,47 @@ def test_peeling_agrees_with_the_longest_dominance_chain(points: list[tuple[int,
     expected = [d if d <= 3 else None for d in _longest_chain(points)]
 
     assert peel(points) == expected
+
+
+# The efficient layering (S6.8): one sort and one pass, qualified against the peeling above.
+
+
+@pytest.mark.req("OPT1-11", "PARETO-01", "PARETO-02", "DIRECTAI-01")
+def test_the_efficient_layering_gives_the_specification_s_own_layers() -> None:
+    routes = directai_fixture()["routes"]
+    a_to_i = [(r["time_months"], r["direct_spend_minor"]) for r in routes]
+
+    assert rank([(1, 3), (2, 2), (3, 1), (4, 4)]) == [1, 1, 1, 2]  # three dominators
+    assert rank([(4, 600), (4, 600), (5, 600), (4, 700)]) == [1, 1, 2, 2]  # equal points
+    assert rank(a_to_i) == [r["expected_layer"] for r in routes]
+    assert rank([(n, n) for n in range(1, 6)]) == [1, 2, 3, None, None]
+    assert rank([]) == []
+
+
+@pytest.mark.req("OPT1-11", "PARETO-01", "PARETO-02")
+@settings(max_examples=400, deadline=None)
+@given(
+    points=st.lists(
+        # Few coordinates, so ties in time, in cost and in both are common.
+        st.tuples(st.integers(0, 6), st.integers(-4, 6)),
+        max_size=60,
+    )
+)
+def test_the_efficient_layering_equals_iterative_peeling(points: list[tuple[int, int]]) -> None:
+    assert rank(points) == peel(points)
+
+
+@pytest.mark.req("OPT1-11")
+def test_the_efficient_layering_handles_fifty_thousand_points_of_every_shape() -> None:
+    # The archive cap's size: one front (each sooner and dearer than the next), one chain
+    # (each bettered by every earlier one), every point equal, and a grid of ties.
+    size = 50_000
+    front = [(n, size - n) for n in range(size)]
+    chain = [(n, n) for n in range(size)]
+    equal = [(7, 7)] * size
+    grid = [(n % 24, (n * 7919) % 500) for n in range(size)]
+
+    assert rank(front) == [1] * size
+    assert rank(chain) == [1, 2, 3] + [None] * (size - 3)
+    assert rank(equal) == [1] * size
+    assert rank(grid) == peel(grid)

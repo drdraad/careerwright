@@ -15,9 +15,9 @@ from careerwright.planning.checker import FindingCode, FindingKind
 from careerwright.planning.compiler import ReadinessBasis, compile_input
 from careerwright.planning.pack import pack_catalogue
 from careerwright.planning.search import (
-    Coverage,
     M0SearchLimits,
     Outcome,
+    SearchCoverage,
     SearchResult,
     search_routes,
 )
@@ -82,7 +82,7 @@ def test_each_reviewed_pack_target_completes_within_the_m0_limits_and_says_what_
     assert VERSION in PINS
     assert sorted(EXPECTED) == sorted(t.target_id for t in PACK.targets)
     assert result.label.name == f"nessa-england-option-pack {VERSION}"
-    assert result.coverage is Coverage.COMPLETE
+    assert result.coverage is SearchCoverage.COMPLETE
     assert result.expanded_states <= limits.max_states
     assert result.elapsed_ms < limits.wall_seconds * 1000
     assert result.instance.concepts <= 4

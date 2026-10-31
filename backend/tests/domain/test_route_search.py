@@ -5,6 +5,7 @@ layers peeled over that archive, families grouped for presentation only, and cov
 `complete` only when the declared tree is exhausted. Expected values come from the fixtures and
 from hand-worked constructed cases, never from the search itself."""
 
+import itertools
 import subprocess
 import sys
 from typing import Any
@@ -43,12 +44,17 @@ from careerwright.planning.compiler import (
 )
 from careerwright.planning.layers import dominates
 from careerwright.planning.search import (
-    Coverage,
+    RANK_SECONDS,
     M0SearchLimits,
     Outcome,
     PruningRule,
+    RankLimitReachedError,
+    SearchCancelledError,
+    SearchCoverage,
     SearchResult,
     StopReason,
+    rank_archive,
+    search_archive,
     search_routes,
 )
 from tests.support.capability import fixture
@@ -77,6 +83,7 @@ from tests.support.planning import (
 
 # Enough cash that no constructed case below is about the reserve (it has its own tests).
 OPENING = 1_000_000
+TIMES = {"elapsed_ms", "rank_ms"}  # the stages' times: the only fields a replay may change
 Option = tuple[ActionConcept, Offering, Variant]
 Options = list[Option]
 
@@ -146,7 +153,7 @@ def test_trace_01_completes_with_a_b_c_in_f1_d_in_f2_and_e_in_f3() -> None:
     result = search_routes(trace())
     expected = fixture("worked_trace.json")["expected"]
 
-    assert result.coverage is Coverage.COMPLETE
+    assert result.coverage is SearchCoverage.COMPLETE
     assert result.stop_reason is None
     assert result.outcome is Outcome.ROUTES_FOUND
     assert result.layers_exact
@@ -206,7 +213,7 @@ def test_the_a_to_i_fixture_completes_with_its_three_layers_in_direct_spending_m
     result = search_routes(directai())
     stated = directai_fixture()["routes"]
 
-    assert result.coverage is Coverage.COMPLETE
+    assert result.coverage is SearchCoverage.COMPLETE
     assert result.objective_basis == "direct_spending"
     assert by_route(result) == {
         (r["id"],): (r["time_months"], r["direct_spend_minor"], r["expected_layer"]) for r in stated
@@ -407,7 +414,7 @@ def test_a_spend_cap_prunes_only_sets_that_exceed_it() -> None:
     assert sorted(routes(result)) == [("a",), ("a", "b"), ("a", "c"), ("b",), ("b", "c"), ("c",)]
     assert result.pruned == {PruningRule.DIRECT_SPEND_CAP: 1}  # a, b and c together
     assert result.expanded_states == 7  # the triple is never evaluated
-    assert result.coverage is Coverage.COMPLETE
+    assert result.coverage is SearchCoverage.COMPLETE
 
 
 @pytest.mark.req("OPT1-02")
@@ -492,7 +499,7 @@ def test_an_option_no_route_can_contain_is_set_aside_with_its_reason() -> None:
         "undated": ([FindingCode.DATES_UNKNOWN], []),
     }
     assert routes(result) == [("fine",)]
-    assert result.coverage is Coverage.COMPLETE
+    assert result.coverage is SearchCoverage.COMPLETE
 
 
 # What a result says when no route is found: never "no route" unless it is proved.
@@ -504,7 +511,7 @@ def test_a_complete_empty_archive_is_no_route_in_the_bounded_model() -> None:
     inputs = someone(horizon=3, direct_cap=1000)
     result = solve(inputs, options, readiness_of({"offering:dear": (ROW,)}))
 
-    assert result.coverage is Coverage.COMPLETE
+    assert result.coverage is SearchCoverage.COMPLETE
     assert result.schedules == []
     assert result.outcome is Outcome.NO_ROUTE_IN_BOUNDED_MODEL
     assert result.feasible_without_milestone == 2  # the empty route and "unrelated" alone
@@ -515,7 +522,7 @@ def test_an_option_with_unknown_dates_leaves_the_result_unresolved_never_no_rout
     options = [option("undated", start=None, finish=None)]
     result = solve(someone(horizon=3), options, readiness_of({"offering:undated": (ROW,)}))
 
-    assert result.coverage is Coverage.COMPLETE
+    assert result.coverage is SearchCoverage.COMPLETE
     assert result.schedules == []
     assert result.outcome is Outcome.UNRESOLVED
 
@@ -544,7 +551,7 @@ def test_an_empty_route_over_its_hours_never_hides_an_undated_option_behind_no_r
 
     # The empty route breaks the workload limit and no dated option can lower the job's hours,
     # so nothing is feasible as stated; but the undated option might, once its dates are known.
-    assert result.coverage is Coverage.COMPLETE
+    assert result.coverage is SearchCoverage.COMPLETE
     assert result.schedules == []
     assert [(s.variant_id, s.kind) for s in result.set_aside] == [
         ("reduced-undated", FindingKind.UNRESOLVED)
@@ -594,7 +601,7 @@ def test_an_unknown_hard_limit_leaves_every_route_unresolved_and_says_which() ->
     )
 
     assert result.outcome is Outcome.UNRESOLVED
-    assert result.coverage is Coverage.COMPLETE
+    assert result.coverage is SearchCoverage.COMPLETE
     assert [(f.code, f.reason) for f in result.blocking_inputs] == [
         (FindingCode.LIMIT_UNKNOWN, "reserve")
     ]
@@ -695,7 +702,7 @@ def test_repayments_no_option_can_lower_rule_out_every_route_whatever_is_unknown
 
     # Whatever the unpriced course turns out to cost, every route repays £15 a month against a
     # £10 cap: the truth is no route while the repayments exceed it, never "confirm the cost".
-    assert result.coverage is Coverage.COMPLETE
+    assert result.coverage is SearchCoverage.COMPLETE
     assert [s.variant_id for s in result.set_aside] == ["unpriced"]
     assert {f.code for f in result.starting_violations} == {
         FindingCode.REPAYMENTS_ABOVE_PAYMENT_CAP
@@ -808,7 +815,7 @@ def test_a_run_stopped_at_its_state_limit_is_budget_truncated_with_its_reason() 
     teaches = {f"offering:c{n}": (ROW,) for n in range(4)}
     result = solve(someone(horizon=2), options, readiness_of(teaches), max_states=3)
 
-    assert result.coverage is Coverage.BUDGET_TRUNCATED
+    assert result.coverage is SearchCoverage.BUDGET_TRUNCATED
     assert result.stop_reason is StopReason.STATE_LIMIT
     assert result.expanded_states == 3
     assert not result.layers_exact
@@ -823,7 +830,7 @@ def test_a_stopped_run_with_nothing_found_is_none_found_before_the_limit() -> No
     options = [course("c0"), course("c1")]
     result = solve(someone(horizon=2), options, readiness_of({"offering:c1": (ROW,)}), max_states=2)
 
-    assert result.coverage is Coverage.BUDGET_TRUNCATED
+    assert result.coverage is SearchCoverage.BUDGET_TRUNCATED
     assert result.schedules == []
     assert result.outcome is Outcome.NONE_FOUND_BEFORE_LIMIT
 
@@ -839,7 +846,7 @@ def test_a_run_stopped_by_the_clock_says_so() -> None:
 
     result = search_routes(monthly, clock=lambda: next(ticks, 31.0))
 
-    assert result.coverage is Coverage.BUDGET_TRUNCATED
+    assert result.coverage is SearchCoverage.BUDGET_TRUNCATED
     assert result.stop_reason is StopReason.WALL_TIME_LIMIT
     assert result.expanded_states == 2
 
@@ -850,9 +857,74 @@ def test_a_full_archive_stops_the_run_before_a_schedule_goes_unrecorded() -> Non
     teaches = {f"offering:c{n}": (ROW,) for n in range(3)}
     result = solve(someone(horizon=2), options, readiness_of(teaches), max_feasible_archive=2)
 
-    assert result.coverage is Coverage.BUDGET_TRUNCATED
+    assert result.coverage is SearchCoverage.BUDGET_TRUNCATED
     assert result.stop_reason is StopReason.ARCHIVE_LIMIT
     assert routes(result) == [("c0",), ("c1",)]
+
+
+@pytest.mark.req("OPT1-10", "LIMITS-01")
+def test_a_state_limited_run_replays_exactly_and_keeps_every_schedule_it_met() -> None:
+    monthly = directai()
+    limits = M0SearchLimits(max_states=5)
+    first, second = search_routes(monthly, limits=limits), search_routes(monthly, limits=limits)
+    complete = search_routes(monthly)
+
+    assert first.stop_reason is StopReason.STATE_LIMIT
+    assert first.model_dump(exclude=TIMES) == second.model_dump(exclude=TIMES)
+    # What it met is the complete run's archive up to where it stopped, in the order met.
+    assert routes(first) == routes(complete)[: len(first.schedules)]
+    assert first.schedules
+
+
+# The rank stage (S6.8; review 13a, M3): its own time and its own limit, apart from the search.
+
+
+@pytest.mark.req("OPT1-11")
+def test_the_rank_stage_is_timed_apart_from_the_search_and_never_on_its_clock() -> None:
+    monthly = directai()
+    archive = search_archive(monthly, clock=lambda: 0.0)  # the search's clock stands still
+    ticks = itertools.count(1000.0, 0.25)  # the rank stage's: each read a quarter-second on
+
+    result = rank_archive(archive, clock=lambda: next(ticks))
+
+    assert result.elapsed_ms == 0  # the search's own time: ranking never adds to it
+    assert 0 < result.rank_ms < RANK_SECONDS * 1000
+    assert result.rank_seconds == RANK_SECONDS
+    assert result.model_dump(exclude=TIMES) == search_routes(monthly).model_dump(exclude=TIMES)
+
+
+@pytest.mark.req("OPT1-11")
+def test_the_rank_stage_stops_at_its_own_limit_and_never_claims_ranks() -> None:
+    archive = search_archive(directai())
+    ticks = iter([0.0])  # the stage starts; every later read is at its limit
+
+    with pytest.raises(RankLimitReachedError):
+        rank_archive(archive, clock=lambda: next(ticks, float(RANK_SECONDS)))
+
+
+# Cancellation (DUR-05; L0 runs the search in the worker, so a cancel reaches it there).
+
+
+@pytest.mark.req("LIMITS-06", "DUR-05")
+def test_a_cancel_reaches_the_search_at_its_next_check_and_leaves_no_result() -> None:
+    asked: list[int] = []
+
+    def cancelled() -> bool:
+        asked.append(len(asked) + 1)
+        return len(asked) == 3  # the person cancels while the second candidate is checked
+
+    with pytest.raises(SearchCancelledError):
+        search_routes(directai(), cancelled=cancelled)
+    # Asked before each candidate, and nothing checked or asked once it was cancelled.
+    assert asked == [1, 2, 3]
+
+
+@pytest.mark.req("LIMITS-06", "DUR-05")
+def test_a_cancel_during_the_rank_stage_leaves_no_result() -> None:
+    archive = search_archive(directai())
+
+    with pytest.raises(SearchCancelledError):
+        rank_archive(archive, cancelled=lambda: True)
 
 
 @pytest.mark.req("OPT1-10", "OPT1-12")
@@ -860,7 +932,7 @@ def test_a_complete_run_on_the_same_input_reproduces_the_same_result() -> None:
     monthly = directai()
     first, second = search_routes(monthly), search_routes(monthly)
 
-    assert first.model_dump(exclude={"elapsed_ms"}) == second.model_dump(exclude={"elapsed_ms"})
+    assert first.model_dump(exclude=TIMES) == second.model_dump(exclude=TIMES)
     assert first.input_version == monthly.input_version
 
 

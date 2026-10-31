@@ -61,9 +61,21 @@ objectives (no dominance pruning: F2 and F3 need dominated schedules, and econom
 fall as a route grows).
 
 **The archive** (S6.5) keeps every distinct feasible schedule that reaches the readiness
-milestone, dominated ones included; F1 to F3 are peeled over all of it (`layers`), and
-families and equal points group it for presentation only (`families`). A feasible schedule
-without the milestone is counted, never archived: it is not a route to the target.
+milestone, dominated ones included, in memory under the archive cap (L0 keeps no disk archive:
+spec section 22). A feasible schedule without the milestone is counted, never archived: it is
+not a route to the target.
+
+**Two stages** (S6.8; review 13a, M3). The search stage (`search_archive`) walks the tree under
+the M0 limits, read before each candidate on its own clock. The rank stage (`rank_archive`)
+then layers the whole archive (`layers.rank`, qualified against Sprint 6a's peeling) and groups
+families and equal points for presentation only (`families`), on its own clock and under its
+own limit, `RANK_SECONDS`, read before each of its passes: no result claims ranks until it has
+finished, and one that reaches its limit gives none (`RankLimitReachedError`). Each stage
+records its own time (`elapsed_ms`, `rank_ms`). `search_routes` runs both.
+
+**Cancellation** (DUR-05). A cancel check, read with the limits before each candidate and
+before each rank pass, stops the search where it is (`SearchCancelledError`): a cancelled
+search gives no result, never a truncated one.
 
 **Coverage** (S6.7). `complete` only after the whole declared tree is exhausted under these
 rules; a run stopped by a limit is `budget_truncated` with its exact reason, keeps everything
@@ -108,10 +120,13 @@ from careerwright.planning.families import (
     families,
     family_key,
 )
-from careerwright.planning.layers import peel
+from careerwright.planning.layers import rank
 
 ALGORITHM_VERSION = "canonical-dfs-1"
 PRUNING_VERSION = "sound-pruning-4"  # the six rules above: change it with any rule
+# The rank stage's own limit (S6.8). Ranking the archive cap's 50,000 schedules takes about a
+# second (`tools.rank_benchmark`), so it is a bound, never the expected case.
+RANK_SECONDS = 5
 _READINESS_UNKNOWN = frozenset(
     {ReadinessState.NOT_YET_ASSESSED, ReadinessState.INSUFFICIENT_COVERAGE}
 )
@@ -162,7 +177,9 @@ class M0SearchLimits(StrictModel):
     max_feasible_archive: int = Field(default=50_000, ge=1, le=50_000)
 
 
-class Coverage(StrEnum):
+class SearchCoverage(StrEnum):
+    """`search_coverage` (spec section 12)."""
+
     COMPLETE = "complete"
     BUDGET_TRUNCATED = "budget_truncated"
 
@@ -251,7 +268,7 @@ class SearchResult(StrictModel):
     limits: M0SearchLimits
     instance: InstanceSize
     canonical_order: list[str]  # concept IDs
-    coverage: Coverage
+    coverage: SearchCoverage
     stop_reason: StopReason | None
     outcome: Outcome
     layers_exact: bool  # only with complete coverage, and only over the declared model
@@ -267,11 +284,25 @@ class SearchResult(StrictModel):
     set_aside: list[SetAside]
     pruned: dict[PruningRule, int]  # subtrees cut, by rule
     unexplored_branches: int  # pending when the run stopped; 0 when complete
-    elapsed_ms: int  # the search itself, until it ended or stopped
+    elapsed_ms: int  # the search stage, until it ended or stopped: what its 30 s limit reads
+    rank_ms: int  # the rank stage, on its own clock
+    rank_seconds: int  # the rank stage's own limit
     narrowings: list[Narrowing]  # when stopped early
     schedules: list[Schedule]  # the whole encountered archive, dominated schedules included
     families: list[Family]
     points: list[EqualPoint]
+
+
+class SearchCancelledError(Exception):
+    """The person cancelled the run: the search stopped at its next check. Never a result."""
+
+
+class RankLimitReachedError(Exception):
+    """The rank stage reached its own limit before it finished: no result claims ranks."""
+
+
+def _never() -> bool:
+    return False
 
 
 def search_routes(
@@ -279,9 +310,76 @@ def search_routes(
     *,
     limits: M0SearchLimits | None = None,
     clock: Callable[[], float] = time.monotonic,
+    cancelled: Callable[[], bool] = _never,
 ) -> SearchResult:
-    """Every feasible schedule to the target in the declared model, or a truthful stop."""
-    return _Search(monthly, limits or M0SearchLimits(), clock).run()
+    """Every feasible schedule to the target in the declared model, or a truthful stop: the
+    search stage, then the rank stage."""
+    archive = search_archive(monthly, limits=limits, clock=clock, cancelled=cancelled)
+    return rank_archive(archive, clock=clock, cancelled=cancelled)
+
+
+def search_archive(
+    monthly: MonthlyInput,
+    *,
+    limits: M0SearchLimits | None = None,
+    clock: Callable[[], float] = time.monotonic,
+    cancelled: Callable[[], bool] = _never,
+) -> "Archive":
+    """The search stage: every feasible schedule met before the tree ended or a limit stopped
+    it, not yet ranked. Raises `SearchCancelledError` once `cancelled` says so."""
+    search = _Search(monthly, limits or M0SearchLimits(), clock, cancelled)
+    search.run()
+    return Archive(search)
+
+
+def rank_archive(
+    archive: "Archive",
+    *,
+    clock: Callable[[], float] = time.monotonic,
+    cancelled: Callable[[], bool] = _never,
+    limit_seconds: int = RANK_SECONDS,
+) -> SearchResult:
+    """The rank stage: the three layers over the whole archive, then its families and equal
+    points, each pass begun only inside `limit_seconds` on the stage's own clock. Raises
+    `RankLimitReachedError` or `SearchCancelledError`, never a result claiming ranks it lacks."""
+    search = archive.search
+    started = clock()
+
+    def check() -> None:
+        if cancelled():
+            raise SearchCancelledError
+        if clock() - started >= limit_seconds:
+            raise RankLimitReachedError
+
+    check()
+    layers = rank(
+        [(s.months_to_readiness, s.objective_cost.minor_units) for s, _ in search.archive]
+    )
+    check()
+    schedules = [
+        schedule.model_copy(update={"layer": layer})
+        for (schedule, _), layer in zip(search.archive, layers, strict=True)
+    ]
+    check()
+    keys = [key for _, key in search.archive]
+    grouped = families([(s.route, key, s.layer) for s, key in zip(schedules, keys, strict=True)])
+    check()
+    points = equal_points(
+        [(s.route, s.months_to_readiness, s.objective_cost, s.layer) for s in schedules]
+    )
+    rank_ms = round((clock() - started) * 1000)
+    return search.result(schedules, grouped, points, rank_ms=rank_ms, rank_seconds=limit_seconds)
+
+
+class Archive:
+    """The search stage's end: every distinct feasible schedule it met, dominated ones
+    included, in the order met, with what the search found. Only `rank_archive` reads it."""
+
+    def __init__(self, search: "_Search") -> None:
+        self.search = search
+
+    def __len__(self) -> int:
+        return len(self.search.archive)
 
 
 class _LimitError(Exception):
@@ -308,12 +406,17 @@ class _Spend:
 
 class _Search:
     def __init__(
-        self, monthly: MonthlyInput, limits: M0SearchLimits, clock: Callable[[], float]
+        self,
+        monthly: MonthlyInput,
+        limits: M0SearchLimits,
+        clock: Callable[[], float],
+        cancelled: Callable[[], bool],
     ) -> None:
-        _check_scope(monthly, limits)
+        check_scope(monthly, limits)
         self.monthly = monthly
         self.limits = limits
         self.clock = clock
+        self.cancelled = cancelled
         self.started = clock()
         self.concepts = _canonical(monthly.variants)
         self.positions = {c[0].concept_id: n for n, c in enumerate(self.concepts)}
@@ -334,13 +437,12 @@ class _Search:
         self.stop: StopReason | None = None
         self.elapsed_ms = 0  # the search's own time, until it stops: not the result's assembly
 
-    def run(self) -> SearchResult:
+    def run(self) -> None:
         try:
             self._search()
         except _LimitError as stopped:
             self.stop = stopped.reason
         self.elapsed_ms = round((self.clock() - self.started) * 1000)
-        return self._result()
 
     # The tree.
 
@@ -456,6 +558,8 @@ class _Search:
         )
 
     def _evaluate(self, route: tuple[CompiledVariant, ...]) -> RouteCheck:
+        if self.cancelled():
+            raise SearchCancelledError  # never a limit: a cancelled search gives no result
         if self.expanded >= self.limits.max_states:
             raise _LimitError(StopReason.STATE_LIMIT)
         if self.clock() - self.started >= self.limits.wall_seconds:
@@ -596,20 +700,21 @@ class _Search:
 
     # The result.
 
-    def _result(self) -> SearchResult:
+    def result(
+        self,
+        schedules: list[Schedule],
+        grouped: list[Family],
+        points: list[EqualPoint],
+        *,
+        rank_ms: int,
+        rank_seconds: int,
+    ) -> SearchResult:
+        """The result, from the rank stage's layered schedules, families and points."""
         monthly = self.monthly
         readiness = monthly.readiness
-        if readiness is None:  # refused in `_check_scope`
+        if readiness is None:  # refused in `check_scope`
             raise ValueError("a route search needs the readiness basis")
         complete = self.stop is None
-        layers = peel(
-            [(s.months_to_readiness, s.objective_cost.minor_units) for s, _ in self.archive]
-        )
-        schedules = [
-            schedule.model_copy(update={"layer": layer})
-            for (schedule, _), layer in zip(self.archive, layers, strict=True)
-        ]
-        keys = [key for _, key in self.archive]
         size = self._size()
         return SearchResult(
             input_version=monthly.input_version,
@@ -624,7 +729,7 @@ class _Search:
             limits=self.limits,
             instance=size,
             canonical_order=[concept[0].concept_id for concept in self.concepts],
-            coverage=Coverage.COMPLETE if complete else Coverage.BUDGET_TRUNCATED,
+            coverage=SearchCoverage.COMPLETE if complete else SearchCoverage.BUDGET_TRUNCATED,
             stop_reason=self.stop,
             outcome=self._outcome(complete),
             layers_exact=complete,
@@ -639,14 +744,12 @@ class _Search:
             pruned=dict(self.pruned),
             unexplored_branches=self.unexplored,
             elapsed_ms=self.elapsed_ms,
+            rank_ms=rank_ms,
+            rank_seconds=rank_seconds,
             narrowings=[] if complete else _narrowings(size),
             schedules=schedules,
-            families=families(
-                [(s.route, key, s.layer) for s, key in zip(schedules, keys, strict=True)]
-            ),
-            points=equal_points(
-                [(s.route, s.months_to_readiness, s.objective_cost, s.layer) for s in schedules]
-            ),
+            families=grouped,
+            points=points,
         )
 
     def _outcome(self, complete: bool) -> Outcome:
@@ -677,7 +780,9 @@ class _Search:
         )
 
 
-def _check_scope(monthly: MonthlyInput, limits: M0SearchLimits) -> None:
+def check_scope(monthly: MonthlyInput, limits: M0SearchLimits) -> None:
+    """Refuse a search the declared model does not hold, never searching it in part: one
+    without the target's readiness basis, or a catalogue beyond the M0 bounds."""
     if monthly.readiness is None:
         raise CareerwrightError(
             ErrorCode.VALIDATION_FAILED,
