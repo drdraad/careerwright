@@ -185,7 +185,7 @@ def test_a_failed_explanation_is_unavailable_with_its_failure_and_the_provenance
     [attempt] = explaining.attempts(asked["explanation_id"])
     assert attempt["requests_sent"] == requests  # one repair at most, none for a cut-off
     shown = slate(explaining, discovery_id)
-    assert all(s["why_it_could_suit"] and s["linked_evidence"] for s in shown["suggestions"])
+    assert all(s["reasons"] and s["linked_evidence"] for s in shown["suggestions"])
     assert found["can_retry"] is False  # a request was sent: the slate had its one call
     again = ask(explaining, discovery_id)
     assert (again.status_code, again.json()["run"]["status"]) == (200, "failed")  # no 2nd call

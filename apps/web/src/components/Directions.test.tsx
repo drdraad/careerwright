@@ -10,6 +10,7 @@ import type {
   SlateExplanationOut,
   SlateOut,
   SuggestionOut,
+  TargetRecordsOut,
   WorkState,
 } from "@/generated/api";
 import { fakeApi, type Route, type Sent } from "@/test/fakeApi";
@@ -115,11 +116,20 @@ const suggestion: SuggestionOut = {
   matched_queries: ["q1"],
   sources: [{ kind: "esco", uri: "http://data.europa.eu/esco/occupation/o1", release: "esco" }],
   workday: "Bicycle mechanics maintain and repair bicycles.",
-  why_it_could_suit: ["What you enjoy: “repairing bicycles”."],
-  what_might_not_suit: ["ESCO lists 9 essential skills, not yet compared with your experience."],
-  entry_gates: ["Entry requirements aren't researched yet."],
-  evidence_gaps: ["Pay, demand and listings in your work areas aren't researched yet."],
-  try_it: ["Talk to someone who works as a bicycle mechanic about a typical week."],
+  reasons: [
+    {
+      reason: "searched_through_skill",
+      outcome: "found_work",
+      field: "enjoyed_tasks",
+      answer: "repairing bicycles",
+      search: "bicycle repair",
+      skill: "repair bicycles",
+    },
+  ],
+  essential_skill_count: 9,
+  essential_skills: ["repair bicycles", "tune bicycles", "sell bicycles"],
+  regulated: false,
+  different_kind_of_work: false,
   shared_skills: [],
 };
 const slate = (shown: SuggestionOut[]): SlateOut => ({
@@ -136,8 +146,7 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
   target_size: 6,
   family_limit: 2,
   suggestions: shown,
-  fewer_reasons:
-    shown.length < 6 ? ["Only 1 occupation matched your answers closely enough to suggest."] : [],
+  fewer_reasons: shown.length < 6 ? [{ reason: "few_matched", count: 1 }] : [],
   notes: [],
   salary_floor: null,
   ai_resilience_filter: {
@@ -150,7 +159,6 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
     synthetic: false,
     pack_version: "l0-2026-10-29",
     pack_dated: "2026-10-29",
-    summary: null,
   },
   pool_size: 4,
   pool_target: [60, 120],
@@ -168,7 +176,14 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
     },
   ],
   unsearchable_queries: [],
-  unsupported_hypotheses: ["orbital gardener"],
+  title_ideas: [
+    {
+      title: "orbital gardener",
+      based_on: [{ field: "enjoyed_tasks", text: "repairing bicycles" }],
+      outcome: "not_matched",
+      occupations: 0,
+    },
+  ],
   not_included: [
     {
       concept_id: "o2",
@@ -208,6 +223,9 @@ function renderDirections(
 }
 
 const slateRoute: Route = { method: "GET", path: /\/slate$/, answer: () => slate([suggestion]) };
+/** How Careerwright found the suggestion, as the web words its fact. */
+const FOUND_BY =
+  "What you enjoy: “repairing bicycles”. Careerwright searched for “bicycle repair”, and ESCO lists “repair bicycles” as an essential skill for this work.";
 const card = async () => screen.findByRole("article", { name: "Bicycle mechanic" });
 
 /** The slate's notes on how it searched wait in one disclosure, one step away (D-I3). */
@@ -262,7 +280,7 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
             meets: 0,
             kept_pay_unknown: 4,
             kept_by_reason: [{ reason: "no_reviewed_mapping", count: 4 }],
-            summary,
+            basis: "gross",
           },
         },
       },
@@ -282,7 +300,20 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
       {
         method: "GET",
         path: /\/slate$/,
-        answer: { ...slate([suggestion]), beyond_pool_limit: 17, notes: [keeps] },
+        answer: {
+          ...slate([suggestion]),
+          beyond_pool_limit: 17,
+          notes: [
+            {
+              reason: "join_kept_best",
+              outcome: "found_work",
+              title: "data analyst",
+              found: 47,
+              kept: 30,
+              min_shared: 3,
+            },
+          ],
+        },
       },
     ]);
     const { user } = renderDirections();
@@ -375,8 +406,10 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     const { user } = renderDirections();
 
     await user.click(await screen.findByRole("button", { name: /Make this a target/ }));
-    await waitFor(() => expect(sent.some((s) => s.path.endsWith("/targets"))).toBe(true));
-    expect(sent.find((s) => s.path.endsWith("/targets"))?.body).toEqual({
+    // The POST: the card also reads the stored targets (`GET .../targets`).
+    const chose = (s: Sent) => s.method === "POST" && s.path.endsWith("/targets");
+    await waitFor(() => expect(sent.some(chose)).toBe(true));
+    expect(sent.find(chose)?.body).toEqual({
       expected_version: 2,
       concept_id: "o1",
       discovery_id: "d1",
@@ -445,7 +478,16 @@ const other: SuggestionOut = {
   ...suggestion,
   concept_id: "o3",
   title: "tree surgeon",
-  why_it_could_suit: ["What you enjoy: “working outdoors”."],
+  reasons: [
+    {
+      reason: "searched_through_skill",
+      outcome: "found_work",
+      field: "enjoyed_tasks",
+      answer: "working outdoors",
+      search: "working outdoors",
+      skill: "work in outdoor conditions",
+    },
+  ],
 };
 
 describe("[REC1-11] the written why: one request per slate, its states, provenance always", () => {
@@ -562,7 +604,7 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
 
     const shown = within(await card());
     const note = shown.getByText(/mostly maintaining and repairing them/);
-    const found = shown.getByText("What you enjoy: “repairing bicycles”.");
+    const found = shown.getByText(FOUND_BY);
     expect(shown.getByText("You said:")).toBeVisible();
     expect(shown.getByText("ESCO's description:")).toBeVisible();
     expect(shown.getByText(/“maintain and repair bicycles”/)).toBeVisible();
@@ -585,7 +627,7 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     const { rerender } = renderDirections(discoveryWith(explanation("running")));
 
     expect(await within(await card()).findByText(/writing a note/)).toBeVisible();
-    expect(screen.getByText("What you enjoy: “repairing bicycles”.")).toBeVisible();
+    expect(screen.getByText(FOUND_BY)).toBeVisible();
     rerender(
       discoveryWith(explanation("complete", { ...WRITTEN, origin: "fixture" } as typeof WRITTEN)),
     );
@@ -609,7 +651,7 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     expect(
       shown.getByText(/The reply didn't pass Careerwright's checks twice\. Nothing from it/),
     ).toBeVisible();
-    expect(shown.getByText("What you enjoy: “repairing bicycles”.")).toBeVisible();
+    expect(shown.getByText(FOUND_BY)).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent(/aren't available/);
     expect(screen.getByText("These suggestions have had their one written note.")).toBeVisible();
     // It says what Suggest again does.
@@ -680,7 +722,7 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     const shown = within(await card());
     expect(await shown.findByText(/The spending limit for model calls is reached\./)).toBeVisible();
     expect(screen.queryByText("not shown")).toBeNull(); // never the API's own message
-    expect(shown.getByText("What you enjoy: “repairing bicycles”.")).toBeVisible();
+    expect(shown.getByText(FOUND_BY)).toBeVisible();
     expect(screen.getByText("Nothing was sent to the model.")).toBeVisible();
     // Fix round 3 (R3-M6): no run existed, so the card says it was refused before one, not
     // that it failed or that something from it was not kept.
@@ -793,7 +835,11 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
 
     const shown = within(await screen.findByRole("article", { name: "Tree surgeon" }));
     expect(shown.getByText(/appeared when you changed the view/)).toBeVisible();
-    expect(shown.getByText("What you enjoy: “working outdoors”.")).toBeVisible();
+    expect(
+      shown.getByText(
+        "What you enjoy: “working outdoors”. Careerwright searched for “working outdoors”, and ESCO lists “work in outdoor conditions” as an essential skill for this work.",
+      ),
+    ).toBeVisible();
     expect(noteRequests(sent)).toHaveLength(0);
   });
 
@@ -812,12 +858,39 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
 });
 
 const skill = (id: string, label: string) => ({ skill_id: id, label, skill_type: "skill" });
+const GROUP = { code: "7231", label: "Motor vehicle mechanics and repairers" };
+/** The targets as stored once (`GET .../targets`): this one names occupation `conceptId`. */
+const storedAs = (title?: string, conceptId?: string): TargetRecordsOut => ({
+  profile_version: 3,
+  targets:
+    title === undefined
+      ? []
+      : [
+          {
+            key: title,
+            title,
+            kind: "esco",
+            link: "occupation_choice",
+            concept_id: conceptId ?? null,
+            label_matches: 1,
+            coverage: "not_covered",
+            pack_target_id: null,
+          },
+        ],
+});
+const joinedBy = (answer: string): SuggestionOut["reasons"] => [
+  {
+    reason: "joined_by_shared_skills",
+    outcome: "found_work",
+    field: "current_role",
+    answer,
+    shared: 5,
+  },
+];
 const joined: SuggestionOut = {
   ...suggestion,
   channels: ["shared_skills"],
-  why_it_could_suit: [
-    "Your current role: “bicycle courier”. ESCO lists 5 of the same essential skills for both, so Careerwright joined them by those skills.",
-  ],
+  reasons: joinedBy("bicycle courier"),
   shared_skills: [
     skill("k1", "adjust brakes"),
     skill("k2", "fit tyres"),
@@ -828,21 +901,13 @@ const joined: SuggestionOut = {
 };
 /** The slate's unexpected connection: found from the person's role, which they called "cycle
  *  courier" and ESCO titles "bicycle courier" (an alternative title). */
-const connected: SuggestionOut = {
-  ...joined,
-  why_it_could_suit: [
-    "Your current role: “cycle courier”. ESCO lists 5 of the same essential skills for both, so Careerwright joined them by those skills.",
-  ],
-};
+const connected: SuggestionOut = { ...joined, reasons: joinedBy("cycle courier") };
 const connection: SlateOut["connection"] = {
   concept_id: "o1",
   title: "bicycle mechanic",
   role_title: "bicycle courier",
-  sentence: "A bicycle courier and a bicycle mechanic share 5 essential skills.",
   shared_skill_count: 5,
   shared_skills: joined.shared_skills,
-  still_uncertain:
-    "These are the skills ESCO lists for both roles. They aren't compared with your own experience yet.",
 };
 
 describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpected connection and a chosen target", () => {
@@ -913,7 +978,7 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpe
     expect(mechanic).not.toHaveTextContent(/your role/i);
   });
 
-  it("says a chosen target is saved, with what it usually asks for, and keeps the slate current", async () => {
+  it("[PROF-10] says a chosen target is saved, how far it is covered and what it asks for", async () => {
     const chosen: ProfileOut = {
       ...profile,
       version: 3,
@@ -923,7 +988,6 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpe
       },
     };
     const sketch = {
-      label: "Early sketch, not a checked route",
       profile_version: 3,
       inputs: {},
       not_asked: [],
@@ -932,22 +996,32 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpe
         {
           title: "bicycle mechanic",
           resolution: "esco",
-          occupations: [],
+          occupations: [{ concept_id: "o1", title: "bicycle mechanic", isco_group: GROUP }],
           close_matches: [],
           requirements: ["adjust brakes", "fit tyres"],
           requirement_count: 9,
           regulated: false,
-          research_status: "Not researched yet.",
+          coverage: "not_covered",
         },
       ],
     };
-    fakeApi([slateRoute, { method: "GET", path: /\/sketch$/, answer: sketch }]);
+    fakeApi([
+      slateRoute,
+      { method: "GET", path: /\/sketch$/, answer: sketch },
+      { method: "GET", path: /\/targets$/, answer: storedAs("bicycle mechanic", "o1") },
+    ]);
     // Made at version 2; version 3 only added this target, chosen from it: still current.
     renderDirections(discovery, undefined, chosen);
 
     const mechanic = await card();
     expect(
       await within(mechanic).findByRole("heading", { name: "Saved as one of your targets" }),
+    ).toBeVisible();
+    // Coverage, from the target's stored record, in one plain line.
+    expect(
+      within(mechanic).getByText(
+        "Careerwright can show what this work usually asks for. It can't check skills, options or routes for it yet.",
+      ),
     ).toBeVisible();
     expect(within(mechanic).getByText("What this work usually asks for, from ESCO:")).toBeVisible();
     expect(within(mechanic).getByText("Adjust brakes")).toBeVisible();
@@ -959,7 +1033,7 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpe
   });
 
   it("moves focus to the words that say the target is saved, where it was chosen", async () => {
-    const state = { profile };
+    const state = { profile, chosen: false };
     fakeApi([
       slateRoute,
       {
@@ -979,20 +1053,19 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpe
               },
             },
           };
+          state.chosen = true;
           return state.profile;
         },
       },
       {
         method: "GET",
         path: /\/sketch$/,
-        answer: {
-          label: "",
-          profile_version: 3,
-          inputs: {},
-          not_asked: [],
-          steps: [],
-          targets: [],
-        },
+        answer: { profile_version: 3, inputs: {}, not_asked: [], steps: [], targets: [] },
+      },
+      {
+        method: "GET",
+        path: /\/targets$/,
+        answer: () => (state.chosen ? storedAs("bicycle mechanic", "o1") : storedAs()),
       },
     ]);
     const { user, rerenderWith } = renderChoosing();

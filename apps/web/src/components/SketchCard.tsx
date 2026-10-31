@@ -5,7 +5,14 @@
 // the person's choice, never guessed.
 import type { ProfileOut, TargetSketchOut } from "@/generated/api";
 import { useChooseTarget, useSketch } from "@/lib/queries";
-import { PROFILE_FIELDS, RESOLUTION } from "@/lib/vocabulary";
+import {
+  PROFILE_FIELDS,
+  RESEARCH_STATUS,
+  RESOLUTION,
+  SKETCH_LABEL,
+  SKETCH_STEP,
+  TARGET_COVERAGE,
+} from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { Glyph } from "./Glyph";
 import { LoadingState } from "./LoadingState";
@@ -42,6 +49,11 @@ export function TargetRequirements({ target }: { target: TargetSketchOut }) {
   );
 }
 
+/** How far Careerwright can cover a target, from its stored record, in one plain line. */
+export function TargetCoverageLine({ target }: { target: TargetSketchOut }) {
+  return <p className="small">{TARGET_COVERAGE[target.coverage](target.resolution === "esco")}</p>;
+}
+
 export function SketchCard({ workspaceId, profile }: { workspaceId: string; profile: ProfileOut }) {
   const sketch = useSketch(workspaceId);
   const choose = useChooseTarget(workspaceId);
@@ -64,7 +76,7 @@ export function SketchCard({ workspaceId, profile }: { workspaceId: string; prof
     <section className="sketch" aria-labelledby="sketch-title">
       <h3 id="sketch-title" className="status" data-tone="unknown">
         <Glyph name="unknown" />
-        <span>{data.label}</span>
+        <span>{SKETCH_LABEL}</span>
       </h3>
       {data.targets.length === 0 ? (
         <p className="small">
@@ -76,6 +88,7 @@ export function SketchCard({ workspaceId, profile }: { workspaceId: string; prof
             <p className="small">
               <strong>{sentence(target.title)}</strong>: {RESOLUTION[target.resolution]}
             </p>
+            <TargetCoverageLine target={target} />
             <TargetRequirements target={target} />
             {(target.resolution === "ambiguous" || target.resolution === "not_found") &&
               (target.resolution === "ambiguous" ? target.occupations : target.close_matches)
@@ -106,15 +119,18 @@ export function SketchCard({ workspaceId, profile }: { workspaceId: string; prof
                   </div>
                 </div>
               )}
-            <p className="small muted">{target.research_status}</p>
+            <p className="small muted">{RESEARCH_STATUS[target.resolution]}</p>
           </div>
         ))
       )}
       {data.steps.length > 0 && (
         <ol className="plain-list">
-          {data.steps.map((step) => (
-            <li key={step.name}>
-              {step.name}. <span className="muted">Not resolved yet. {step.detail}</span>
+          {data.steps.map(({ step }) => (
+            <li key={step}>
+              {SKETCH_STEP[step].name}.{" "}
+              <span className="muted">
+                Not resolved yet. {SKETCH_STEP[step].detail(data.inputs)}
+              </span>
             </li>
           ))}
         </ol>

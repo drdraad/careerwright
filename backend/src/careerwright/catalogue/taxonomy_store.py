@@ -346,8 +346,8 @@ def essential_skill_reach_among(
 
 
 def concept_keys(tx: Tx, texts: Iterable[str]) -> dict[str, str]:
-    """Each text as a concept (`careerwright.concept_key`: case, punctuation, hyphens and
-    simple plurals folded), by text."""
+    """Each text as a concept (`careerwright.concept_key`: "&" read as "and", accents, case,
+    punctuation, hyphens and simple plurals folded), by text."""
     rows = tx.execute(
         sa.text(
             "SELECT t AS text, careerwright.concept_key(t) AS key "
@@ -375,10 +375,39 @@ def label_matches(tx: Tx, normalised: str) -> list[LabelMatch]:
     return [LabelMatch(**dict(row)) for row in rows]
 
 
+def label_match_uris(tx: Tx, title: str) -> list[str]:
+    """The ESCO URIs of every occupation with a label that is this title as a concept
+    (`concept_key_matches`), hidden labels included, in URI order."""
+    return list(
+        tx.execute(
+            sa.text(
+                "SELECT DISTINCT o.esco_uri FROM careerwright.occupation_labels l "
+                "JOIN careerwright.occupation_concepts o ON o.concept_id = l.concept_id "
+                "WHERE careerwright.concept_key(l.label) = careerwright.concept_key(:title) "
+                "ORDER BY o.esco_uri"
+            ),
+            {"title": title},
+        ).scalars()
+    )
+
+
+def preferred_keys(tx: Tx, uris: Iterable[str]) -> dict[str, str]:
+    """The held release's occupations with these ESCO URIs, each by its preferred label as a
+    concept (unknown URIs are absent)."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT esco_uri, careerwright.concept_key(preferred_label) AS key "
+            "FROM careerwright.occupation_concepts WHERE esco_uri = ANY(CAST(:uris AS text[]))"
+        ),
+        {"uris": sorted(set(uris))},
+    )
+    return {row.esco_uri: row.key for row in rows}
+
+
 def concept_key_matches(tx: Tx, title: str) -> list[LabelMatch]:
     """Every occupation with a label that is this title as a concept (`careerwright.concept_key`:
-    case, punctuation, hyphens and simple plurals folded). Hidden labels match but their
-    text is not returned."""
+    "&" read as "and", accents, case, punctuation, hyphens and simple plurals folded). Hidden
+    labels match but their text is not returned."""
     rows = tx.execute(
         sa.text(
             "SELECT l.concept_id, CASE WHEN l.kind = 'hidden' THEN NULL ELSE l.label END "

@@ -4,6 +4,7 @@
 
 import type { GlyphName } from "@/components/Glyph";
 import type {
+  AiResilienceFilterOut,
   ConversationMode,
   DataMode,
   Direction,
@@ -13,17 +14,27 @@ import type {
   ErrorCode,
   FailureClass,
   FieldState,
+  FloorUnknown,
   ModelExtractionState,
   NotIncluded,
   PartialCompleteness,
   PayPeriod,
+  ProfileField,
   ProfileInput,
   RecordPart,
   Resolution,
+  SalaryFloorOut,
+  SearchDid,
   SearchEmptyReason,
+  SketchOut,
+  SlateOut,
+  Step,
+  SuggestionOut,
+  TargetCoverage,
   WorkState,
 } from "@/generated/api";
 import { listLimit } from "./bounds";
+import { formatMoney } from "./money";
 
 /** Only error and stale add a hue; everything else is carried by glyph and words. */
 export type Tone = "neutral" | "unknown" | "stale" | "error";
@@ -502,6 +513,289 @@ export const RESOLUTION: Record<Resolution, string> = {
   ambiguous: "Matched to several occupations in ESCO",
   provisional: "Your own title: Careerwright couldn't match it in ESCO",
   not_found: "Careerwright couldn't match it in ESCO",
+};
+
+// Discovery's facts in words (Task 6d slice A; ruling R11). The API serves what each search or
+// match did, with a reason code and the values the words need, never a sentence; these maps
+// word each one. Each is keyed by every reason the API can send, so a new reason fails the type
+// check here until it has words. What each says is what the API's sentence said before; only
+// where the words live changed. A title takes no article and no plural rule: the templates
+// need none.
+
+type SlateNote = SlateOut["notes"][number];
+type FewerReason = SlateOut["fewer_reasons"][number];
+type SuggestionReason = SuggestionOut["reasons"][number];
+/** Words for each fact of a union, by its reason, from that fact's own values. */
+type Worded<U extends { reason: string }> = {
+  [R in U["reason"]]: (fact: Extract<U, { reason: R }>) => string;
+};
+
+/** The person's words, quoted. */
+const q = (text: string) => `“${text}”`;
+/** The person's words quoted at the start of a sentence. */
+const opening = (text: string) => q(text.charAt(0).toUpperCase() + text.slice(1));
+/** “a”, “a” and “b”, or “a”, “b” and “c”. */
+const quotedList = (texts: readonly string[]) =>
+  texts.length < 2
+    ? texts.map(q).join("")
+    : `${texts.slice(0, -1).map(q).join(", ")} and ${q(texts.at(-1) ?? "")}`;
+const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** Which of the person's answers found a suggestion, as its line starts. */
+export const ANSWER_SOURCE: Record<ProfileField, string> = {
+  preferred_name: "Your preferred name",
+  current_role: "Your current role",
+  cities: "Your work areas",
+  target_titles: "A role you named",
+  weekly_study_hours: "Your weekly hours",
+  direct_spend_cap: "Your total spending limit",
+  monthly_payment_cap: "Your monthly payment limit",
+  enjoyed_tasks: "What you enjoy",
+  confident_tasks: "What you believe you can do",
+  evidenced_tasks: "What you have done",
+  work_style: "How you like to work",
+  minimum_salary: "The lowest pay you'd accept",
+};
+
+/** What an answer's searches did that found no work: each says what the search did, never
+ *  what ESCO holds (a search reads the main names of essential skills only). */
+function answerFoundNoWork(fact: Extract<SlateNote, { reason: "answer_found_no_work" }>): string {
+  const did = (kind: SearchDid) =>
+    fact.searches.filter((search) => search.did === kind).map((search) => search.text);
+  const read = did("read_main_names");
+  const common = did("only_common_words");
+  const joined = did("no_shared_occupation");
+  const mainName = "main name of a skill ESCO lists as essential holds all the words of";
+  const commonOnly = "only common words, which Careerwright doesn't search for";
+  if (fact.own_words) {
+    return read.length > 0
+      ? `No ${mainName} ${q(fact.answer)}, so it found no work.`
+      : `${opening(fact.answer)} has ${commonOnly}, so it found no work.`;
+  }
+  const its = (texts: string[], several: string) =>
+    texts.length === 1 ? `its search ${q(texts[0] ?? "")}` : `${several} ${quotedList(texts)}`;
+  const parts: string[] = [];
+  if (read.length > 0) parts.push(`no ${mainName} ${its(read, "any of its searches")}`);
+  if (common.length > 0) {
+    parts.push(
+      `${its(common, "its searches")} ${common.length > 1 ? "have" : "has"} ${commonOnly}`,
+    );
+  }
+  if (joined.length > 0) {
+    const own = joined.length > 1 ? "your own titles" : "your own title";
+    parts.push(
+      `Careerwright found no other occupation in ESCO that shares ${fact.min_shared} or more essential skills with ${its(joined, "any of its searches")}, ${own}`,
+    );
+  }
+  return `${opening(fact.answer)} found no work: ${parts.join(", and ")}.`;
+}
+
+/** A search too general to find work on its own: what it did, and what would help. A model's
+ *  search is the one too general, so the person is asked to say more only of their own words. */
+function tooGeneral(fact: Extract<SlateNote, { reason: "too_general" }>): string {
+  const did =
+    fact.by === "occupations"
+      ? `reached ${fact.occupations} occupations in ESCO through the main names of their essential skills, too many to choose from on its own`
+      : `matched the main names of ${fact.skills} different essential skills in ESCO, none of them just those words, so it's too general to choose work from on its own`;
+  if (fact.own_words) {
+    return `${opening(fact.search)} ${did}. Say more about it, such as what it's about or who it's for.`;
+  }
+  const narrower =
+    fact.narrower_for.length > 0
+      ? ` Careerwright would need a narrower search to find work from ${quotedList(fact.narrower_for)}.`
+      : "";
+  return `The search ${q(fact.search)} (from ${quotedList(fact.answers)}) ${did}.${narrower}`;
+}
+
+/** How the slate was made: "How Careerwright searched". */
+export const SLATE_NOTE: Worded<SlateNote> = {
+  release_changed: (fact) =>
+    `These searches were chosen when ESCO ${fact.searched} was held; this slate uses ${fact.held}, so some occupations may have changed.`,
+  one_word_work_style: (fact) =>
+    `How you like to work (${fact.answers.map(q).join(", ")}) isn't searched on its own, because a single word matches too loosely. Careerwright searches a longer answer, such as “working outdoors”.`,
+  answer_found_no_work: answerFoundNoWork,
+  too_general: tooGeneral,
+  join_kept_best: (fact) =>
+    `Careerwright found ${fact.found} other occupations in ESCO that share ${fact.min_shared} or more essential skills with ${q(fact.title)}, and keeps the ${fact.kept} with the largest share of essential skills in common.`,
+  small_pool: (fact) =>
+    `Careerwright chose these from ${fact.pool_size} occupations that match your answers closely. It aims for at least ${fact.pool_target}, but doesn't add weaker matches to get there.`,
+  casting_wider: () =>
+    "Casting wider: a lower bar for relevance and one suggestion per kind of work.",
+  more_depth: (fact) =>
+    `Showing up to ${fact.family_limit} from one kind of work, because you asked for more depth.`,
+};
+
+/** Why there are fewer than six suggestions. */
+export const FEWER_REASON: Worded<FewerReason> = {
+  nothing_found: () => "None of your answers found work to suggest yet.",
+  few_matched: (fact) =>
+    `Only ${count(fact.count, "occupation", "occupations")} matched your answers closely enough to suggest. Careerwright doesn't fill the rest with weaker matches.`,
+  kinds_of_work_shown: (fact) =>
+    `${count(fact.count, "more is", "more are")} in kinds of work already shown ${fact.family_limit} times; ask for more depth to see them.`,
+  exclusions_removed: (fact) =>
+    `Your exclusions removed ${count(fact.count, "occupation", "occupations")}.`,
+  title_not_matched: (fact) =>
+    `Careerwright couldn't match ${q(fact.title)} to an occupation in ESCO, so it can't join other work to that title by shared skills. Choose the ESCO occupation closest to it.`,
+  title_matched_several: (fact) =>
+    `Careerwright matched ${q(fact.title)} to ${fact.occupations} occupations in ESCO, so it can't join other work to that title by shared skills until you choose which one you mean.`,
+  no_shared_occupation: (fact) =>
+    `Careerwright found no other occupation in ESCO that shares ${fact.min_shared} or more essential skills with ${q(fact.title)}.`,
+};
+
+/** Why a suggestion could suit the person: what found it, from one of their answers. */
+export const SUGGESTION_REASON: Worded<SuggestionReason> = {
+  joined_by_shared_skills: (fact) =>
+    `${ANSWER_SOURCE[fact.field]}: ${q(fact.answer)}. ESCO lists ${fact.shared} of the same essential skills for both, so Careerwright joined them by those skills.`,
+  searched_through_skill: (fact) =>
+    `${ANSWER_SOURCE[fact.field]}: ${q(fact.answer)}. Careerwright searched for ${q(fact.search)}, and ESCO lists ${q(fact.skill)} as an essential skill for this work.`,
+  title_idea_matched: (fact) =>
+    `${ANSWER_SOURCE[fact.field]}: ${q(fact.answer)}. Careerwright thought of the title ${q(fact.title)} from it and matched that title to this occupation in ESCO.`,
+  own_title_matched: (fact) =>
+    `${ANSWER_SOURCE[fact.field]}: ${q(fact.answer)}. Careerwright matched it to this occupation in ESCO.`,
+};
+
+// TypeScript can't relate a fact's reason to its own entry, so each lookup says so once here.
+export const slateNote = (fact: SlateNote): string =>
+  (SLATE_NOTE[fact.reason] as (fact: SlateNote) => string)(fact);
+export const fewerReason = (fact: FewerReason): string =>
+  (FEWER_REASON[fact.reason] as (fact: FewerReason) => string)(fact);
+export const suggestionReason = (fact: SuggestionReason): string =>
+  (SUGGESTION_REASON[fact.reason] as (fact: SuggestionReason) => string)(fact);
+
+/** A suggestion's facts beyond what found it, in words: what might not suit, the entry gate,
+ *  how to try it, and what isn't researched yet. */
+export function suggestionWords(suggestion: SuggestionOut): {
+  mightNot: string[];
+  entryGate: string;
+  tryIt: string[];
+  evidenceGap: string;
+} {
+  const mightNot: string[] = [];
+  if (suggestion.essential_skills.length > 0) {
+    mightNot.push(
+      `ESCO lists ${suggestion.essential_skill_count} essential skills, not yet compared with your experience, including: ${suggestion.essential_skills.join(", ")}.`,
+    );
+  }
+  if (suggestion.regulated === true) {
+    mightNot.push(
+      "ESCO marks this as a regulated profession in at least one European country. Whether England requires registration isn't checked yet.",
+    );
+  }
+  if (suggestion.different_kind_of_work) {
+    mightNot.push(
+      "It's a different kind of work from what you've told Careerwright about, so it may need new experience.",
+    );
+  }
+  const first = suggestion.essential_skills[0];
+  return {
+    mightNot,
+    entryGate:
+      suggestion.regulated === true
+        ? "Registration may be required. Not checked yet."
+        : "Entry requirements aren't researched yet.",
+    tryIt: [
+      "Talk to someone who does this work about a typical week (an informational interview).",
+      ...(first === undefined ? [] : [`Try one of its tasks on a small scale: ${first}.`]),
+    ],
+    evidenceGap:
+      "Pay, demand and listings in your work areas aren't researched yet. Finding no listings later would be a demand signal, not proof this work doesn't exist.",
+  };
+}
+
+/** Why the salary floor kept pay it couldn't compare, after "kept because". */
+export const FLOOR_UNKNOWN: Record<FloorUnknown, string> = {
+  no_pay: "Careerwright found no pay in what it read",
+  no_upper_amount: "Careerwright found no top to the pay range",
+  predicted: "the pay Careerwright found is an estimate, not the advertiser's own figure",
+  basis_unknown: "Careerwright couldn't tell whether the pay is advertised or estimated",
+  period_differs: "official pay is not given per your floor's period",
+  period_not_stated: "Careerwright couldn't tell the pay's period",
+  other_currency: "the pay Careerwright found is in another currency",
+  no_reviewed_mapping: "no reviewed UK occupation code links them to pay data",
+  no_work_area: "you have not named a city, so no region's pay applies",
+  not_published: "the official figure is not published for your regions",
+};
+
+/** The salary floor's effect on a slate, every count, so the counts add up. */
+export function floorWords(floor: SalaryFloorOut): string {
+  const parts = [
+    `${floor.left_out} left out because their official pay is below it`,
+    `${floor.meets} meet it`,
+    ...floor.kept_by_reason.map(
+      (kept) => `${kept.count} kept because ${FLOOR_UNKNOWN[kept.reason]}`,
+    ),
+  ];
+  return `Your minimum salary of ${formatMoney(floor.amount)} ${PAY_PERIOD[floor.period]} (gross) is applied: ${parts.join("; ")}. Unknown pay is never treated as below it.`;
+}
+
+/** The AI Resilience filter's effect, when it is not at its default (Any, unscored kept). */
+export function aiFilterWords(filter: AiResilienceFilterOut): string | null {
+  if (filter.minimum === null && filter.include_unscored) return null;
+  const minimum = filter.minimum === null ? "Any" : `${filter.minimum} or more`;
+  const ranges = filter.synthetic
+    ? "each range (a synthetic fixture range here, not a real assessment)"
+    : "each reviewed range";
+  const unscored = filter.include_unscored
+    ? `${filter.unscored} unscored kept`
+    : `${filter.unscored_excluded} unscored left out`;
+  return `AI Resilience Score filter, ${minimum} on the lower end of ${ranges}: ${filter.below_minimum} left out below it; ${unscored}.`;
+}
+
+/** The titles Careerwright thought of but couldn't match, in one line; null with none. */
+export function titleIdeasWords(ideas: SlateOut["title_ideas"]): string | null {
+  const unmatched = ideas
+    .filter((idea) => idea.outcome === "not_matched")
+    .map((idea) => idea.title);
+  return unmatched.length === 0
+    ? null
+    : `Titles Careerwright thought of but couldn't match to an occupation in ESCO, so not suggested: ${unmatched.join(", ")}.`;
+}
+
+/** The early requirement sketch's label: never a checked or best route. */
+export const SKETCH_LABEL = "Early sketch, not a checked route";
+
+/** What a target's resolution means for its requirements, under each sketched target. */
+export const RESEARCH_STATUS: Record<Resolution, string> = {
+  esco: "Requirements from ESCO; not yet compared with your experience.",
+  ambiguous:
+    "Careerwright matched this title to several occupations in ESCO. Choose the one you mean.",
+  provisional:
+    "Careerwright couldn't match this title to an occupation in ESCO, so there's no requirement list yet. Not researched.",
+  not_found:
+    "Careerwright couldn't match this title to an occupation in ESCO, so there's no requirement list yet. Not researched.",
+};
+
+/** The sketch's generic steps, each unresolved, with what each can use so far. */
+export const SKETCH_STEP: Record<
+  Step,
+  { name: string; detail: (inputs: SketchOut["inputs"]) => string }
+> = {
+  compare: {
+    name: "Compare these requirements with what you have done",
+    detail: () => "Not compared yet: nothing is marked missing or met.",
+  },
+  find_options: {
+    name: "Find courses, work routes or funding for any gaps",
+    detail: () => "Not researched yet: no providers, prices or dates.",
+  },
+  check_time_and_cost: {
+    name: "Check the time and cost against your week and budget",
+    detail: (inputs) =>
+      `${inputs.weekly_study_hours === "provided" ? "Uses your weekly hours." : "Your weekly hours aren't known, so timing can't be checked yet."} ${inputs.direct_spend_cap === "provided" ? "Uses your spending limit." : "Your spending limit isn't known, so costs can't be checked yet."}`,
+  },
+};
+
+/** How far Careerwright can cover a target, in one plain line where it is chosen (Task 6d
+ *  slice A; session W2 judges the words). `asks`: whether Careerwright can show what the work
+ *  usually asks for (the target names one ESCO occupation). */
+export const TARGET_COVERAGE: Record<TargetCoverage, (asks: boolean) => string> = {
+  pack_target: () => "Careerwright can check skills, options and routes for this role.",
+  not_covered: (asks) =>
+    asks
+      ? "Careerwright can show what this work usually asks for. It can't check skills, options or routes for it yet."
+      : "Careerwright can't check skills, options or routes for this role yet.",
+  several_pack_targets: () =>
+    "Careerwright can't check skills, options or routes for this role yet.",
 };
 
 /** An error code in the status vocabulary: its words and its tone (STATE-01). */

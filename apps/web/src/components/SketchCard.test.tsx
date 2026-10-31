@@ -1,6 +1,8 @@
 // The early sketch's words for how each target title matched ESCO: what the match did, never
 // what ESCO holds (Task W2B re-review 5: a title ESCO writes another way, or shares only as a
 // hidden label, made "not in ESCO" and "Several ESCO occupations have this title" untrue).
+// Since Task 6d slice A the API sends facts and the web words them: the label, each target's
+// research status and coverage, and each step.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
@@ -31,7 +33,12 @@ const profile: ProfileOut = {
     minimum_salary: unasked,
   },
 };
-const target = (title: string, resolution: SketchOut["targets"][number]["resolution"]) => ({
+type Target = SketchOut["targets"][number];
+const target = (
+  title: string,
+  resolution: Target["resolution"],
+  coverage: Target["coverage"] = "not_covered",
+): Target => ({
   title,
   resolution,
   occupations: [],
@@ -39,34 +46,39 @@ const target = (title: string, resolution: SketchOut["targets"][number]["resolut
   requirements: [],
   requirement_count: null,
   regulated: null,
-  research_status: "Not researched.",
+  coverage,
 });
+
+function renderSketch(sketch: SketchOut) {
+  fakeApi([{ method: "GET", path: /\/sketch$/, answer: sketch }]);
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <SketchCard workspaceId={WS} profile={profile} />
+    </QueryClientProvider>,
+  );
+}
+
+const INPUTS: SketchOut["inputs"] = {
+  target_titles: "provided",
+  current_role: "unasked",
+  weekly_study_hours: "provided",
+  direct_spend_cap: "prefer_not_to_say",
+  cities: "unasked",
+};
 
 describe("[STATE-05][DIV1-03] the sketch says what matching each title did", () => {
   it("names a title matched to several, and the person's own title matched to none", async () => {
-    fakeApi([
-      {
-        method: "GET",
-        path: /\/sketch$/,
-        answer: {
-          label: "Early sketch, not a checked route",
-          profile_version: 1,
-          inputs: {},
-          not_asked: [],
-          targets: [
-            target("bus operator", "ambiguous"),
-            target("facade cleaner", "provisional"),
-            target("orbital gardener", "not_found"),
-          ],
-          steps: [],
-        } satisfies SketchOut,
-      },
-    ]);
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <SketchCard workspaceId={WS} profile={profile} />
-      </QueryClientProvider>,
-    );
+    renderSketch({
+      profile_version: 1,
+      inputs: {},
+      not_asked: [],
+      targets: [
+        target("bus operator", "ambiguous"),
+        target("facade cleaner", "provisional"),
+        target("orbital gardener", "not_found"),
+      ],
+      steps: [],
+    });
 
     expect(
       await screen.findByText(": Matched to several occupations in ESCO", { exact: false }),
@@ -84,5 +96,46 @@ describe("[STATE-05][DIV1-03] the sketch says what matching each title did", () 
     expect(document.body.textContent).not.toMatch(
       /not in ESCO|Not found in ESCO|Several ESCO occupations have/,
     );
+  });
+
+  it("[PROF-10] words its label, each research status, each step and each target's coverage", async () => {
+    renderSketch({
+      profile_version: 2,
+      inputs: INPUTS,
+      not_asked: [],
+      targets: [
+        target("registered nurse", "not_found", "pack_target"),
+        target("bus operator", "ambiguous"),
+      ],
+      steps: [
+        { step: "compare", state: "unresolved" },
+        { step: "find_options", state: "unresolved" },
+        { step: "check_time_and_cost", state: "unresolved" },
+      ],
+    });
+
+    expect(await screen.findByText("Early sketch, not a checked route")).toBeVisible();
+    expect(
+      screen.getByText("Careerwright can check skills, options and routes for this role."),
+    ).toBeVisible();
+    expect(
+      screen.getByText("Careerwright can't check skills, options or routes for this role yet."),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Careerwright couldn't match this title to an occupation in ESCO, so there's no requirement list yet. Not researched.",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Careerwright matched this title to several occupations in ESCO. Choose the one you mean.",
+      ),
+    ).toBeVisible();
+    const steps = screen.getAllByRole("listitem").map((item) => item.textContent);
+    expect(steps).toEqual([
+      "Compare these requirements with what you have done. Not resolved yet. Not compared yet: nothing is marked missing or met.",
+      "Find courses, work routes or funding for any gaps. Not resolved yet. Not researched yet: no providers, prices or dates.",
+      "Check the time and cost against your week and budget. Not resolved yet. Uses your weekly hours. Your spending limit isn't known, so costs can't be checked yet.",
+    ]);
   });
 });

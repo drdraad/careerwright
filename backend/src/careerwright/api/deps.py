@@ -11,7 +11,7 @@ from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import SecretStr
 
-from careerwright.capability.commands import CapabilityData, committed_data
+from careerwright.capability.commands import CapabilityData, committed_data, pack_targets
 from careerwright.catalogue.ai_resilience import AssessmentPacks, committed_packs
 from careerwright.catalogue.pay import MappingReviewPack, committed_reviews
 from careerwright.config import ApiSettings
@@ -23,6 +23,7 @@ from careerwright.identity.keyring import Keyring
 from careerwright.identity.model_choice import ModelChoice
 from careerwright.identity.spend import SpendLimits
 from careerwright.localnet import LOOPBACK
+from careerwright.profile.targets import PackTargets
 
 
 class TokenVerifier(Protocol):
@@ -52,6 +53,11 @@ class ApiDependencies:
     # The option pack and the capability reference, checked against their pins and each
     # other when the API starts (ADR 0011, ADR 0012).
     capability: CapabilityData = field(default_factory=committed_data)
+
+    @property
+    def pack_targets(self) -> PackTargets:
+        """The option pack's targets, which a target's stored record is decided against."""
+        return pack_targets(self.capability)
 
     @property
     def spend_defaults(self) -> SpendLimits:

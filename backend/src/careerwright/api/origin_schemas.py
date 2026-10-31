@@ -27,6 +27,7 @@ from careerwright.capability.usual import UsualSkill, UsualState
 from careerwright.catalogue.records import OccupationDetail, OccupationFacts
 from careerwright.profile.exploration import FirstSlate, RoleState
 from careerwright.profile.interview import ProfileField, ProposalOrigin
+from careerwright.profile.slate_facts import FewerReason
 
 FIXTURE_STRENGTH_LABEL = "Demo example (synthetic)"
 
@@ -110,7 +111,9 @@ class OriginOut(ResponseModel):
     role: RoleOut
     usual_skills: list[UsualSkillOut]
     destinations: list[SuggestionOut]
-    fewer_reasons: list[str] = Field(description="Why there are fewer than six, if there are.")
+    fewer_reasons: list[FewerReason] = Field(
+        description="Why there are fewer than six, if there are, as facts the web words."
+    )
     connection: ConnectionOut | None
     salary_floor: SalaryFloorOut | None
 

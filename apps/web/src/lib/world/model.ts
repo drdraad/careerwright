@@ -1,9 +1,11 @@
 // What the world shows, from what the API computed: nothing here guesses. The person's light is
 // lit once they have given any answer; the destinations are the targets they chose themselves,
-// in title order (position is layout only, never rank). Skills and openings arrive with the
-// chapters that compute them (the You chapter's first moments, Roles); until then the world
-// draws none, and the ground between the person and each destination stays in shadow.
-import type { ProfileOut } from "@/generated/api";
+// each as it is stored once (its record's key is its identity, so two spellings of one title are
+// one destination; Task 6d slice A), in title order (position is layout only, never rank).
+// Skills and openings arrive with the chapters that compute them (the You chapter's first
+// moments, Roles); until then the world draws none, and the ground between the person and each
+// destination stays in shadow.
+import type { ProfileOut, TargetRecordOut } from "@/generated/api";
 import { PROFILE_FIELD_ORDER } from "@/lib/vocabulary";
 
 export type WorldSkill = {
@@ -39,17 +41,15 @@ function hasAnswered(profile: ProfileOut): boolean {
   return PROFILE_FIELD_ORDER.some((name) => profile.document[name].state !== "unasked");
 }
 
-export function worldFromProfile(profile: ProfileOut | undefined): WorldInput {
+/** `targets`: the stored records of the profile's targets (`GET .../targets`); none drawn
+ *  until they are loaded. */
+export function worldFromProfile(
+  profile: ProfileOut | undefined,
+  targets: readonly TargetRecordOut[] = [],
+): WorldInput {
   if (profile === undefined) return EMPTY_WORLD;
-  const targets = profile.document.target_titles;
-  const titles =
-    targets.state === "provided" && Array.isArray(targets.value)
-      ? [...new Set(targets.value.map((title) => title.trim()).filter(Boolean))].sort(byTitle)
-      : [];
-  return {
-    lit: hasAnswered(profile),
-    destinations: titles.map((title) => ({ id: `target:${title}`, title, shared: [] })),
-    skills: [],
-    openings: 0,
-  };
+  const destinations = [...targets]
+    .sort((a, b) => byTitle(a.title, b.title))
+    .map((target) => ({ id: `target:${target.key}`, title: target.title, shared: [] }));
+  return { lit: hasAnswered(profile), destinations, skills: [], openings: 0 };
 }

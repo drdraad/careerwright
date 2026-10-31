@@ -10,16 +10,18 @@ import sqlalchemy as sa
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
+from careerwright.capability.commands import committed_data, pack_targets
 from careerwright.catalogue import taxonomy_store
 from careerwright.catalogue.taxonomy import search_essential_skills
-from careerwright.cli import import_taxonomy, migrate_app, seed
+from careerwright.cli import import_taxonomy, migrate_app, seed, seed_fixture
 from careerwright.db import system_transaction
 from careerwright.identity import store as identity_store
 from careerwright.identity.records import EventKind
 from careerwright.profile import store as profile_store
 from careerwright.profile.document import ProfileInput, apply_profile_input, empty_profile
-from careerwright.profile.records import SourceKind
-from careerwright.seed import INVITED_ACTORS
+from careerwright.profile.records import SourceKind, TargetCoverage, TargetLink
+from careerwright.profile.targets import resolve_target, stored_targets
+from careerwright.seed import FIXTURE_WORKSPACE_ID, INVITED_ACTORS
 from careerwright.vocabulary import DataMode
 from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
 from tests.support.infra import Infra, migrator_engine
@@ -112,7 +114,7 @@ def test_a_populated_database_upgrades_to_head_without_losing_data(infra: Infra)
     engine = migrator_engine(infra, database)
     try:
         migrate_app(engine, "0001")
-        seed(engine, infra.ops_settings(database))  # the fixture workspace with its profile
+        seed_fixture(engine, infra.ops_settings(database))  # the fixture workspace, profile
         with engine.begin() as tx:
             edited = add_edited_workspace(tx)
             add_receipts(tx, edited)
@@ -197,7 +199,7 @@ def test_an_untouched_old_default_run_limit_upgrades_to_the_new_default(infra: I
     engine = migrator_engine(infra, database)
     try:
         migrate_app(engine, "0008")
-        seed(engine, infra.ops_settings(database))
+        seed_fixture(engine, infra.ops_settings(database))
         with engine.begin() as tx:
             rows = {
                 "untouched": (100_000_000, 1),  # the old built-in default, never edited
@@ -239,7 +241,7 @@ def test_attempts_that_made_no_call_upgrade_to_a_known_zero_cost(infra: Infra) -
     engine = migrator_engine(infra, database)
     try:
         migrate_app(engine, "0005")
-        seed(engine, infra.ops_settings(database))
+        seed_fixture(engine, infra.ops_settings(database))
         with engine.begin() as tx:
             workspace = add_edited_workspace(tx)
             for state, cost in (("none", None), ("reconciled", 40_000), ("unknown", None)):
@@ -312,6 +314,98 @@ def test_0032_fills_the_essential_skill_search_for_the_release_already_held(
     }
 
 
+@pytest.mark.req("PROF-10", "BND1-14")
+def test_0034_gives_each_stored_target_its_record_and_folds_ampersands_and_accents(
+    infra: Infra,
+) -> None:
+    # Task 6d slice A: existing profiles migrate forward, each target title gets its record by
+    # the same rules as `resolve_target`; and the concept key, defined only by migrations, is
+    # changed by this one: "&" against "and", and accented titles against their plain
+    # spelling (real ESCO titles of the sample: "distribution & logistics manager", "sauté
+    # cook").
+    database = f"careerwright_targets_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    engine = migrator_engine(infra, database)
+    pairs = [("distribution & logistics manager", "distribution and logistics manager"),
+             ("sauté cook", "saute cook")]  # fmt: skip
+    titles = ["Registered nurse", "Bicycle-mechanics.", "Saute cooks"]  # at most three
+    try:
+        migrate_app(engine, "0033")
+        assert import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE) == "imported"
+        seed_fixture(engine, infra.ops_settings(database))  # as seeded before 0034
+        with system_transaction(engine) as tx:
+            before = [
+                taxonomy_store.concept_keys(tx, pair) for pair in pairs
+            ]  # the key before 0034
+            workspace = add_targets(tx, titles)
+        migrate_app(engine)
+        with system_transaction(engine) as tx:
+            after = [taxonomy_store.concept_keys(tx, pair) for pair in pairs]
+            latest = profile_store.current_profile(tx, workspace)
+            assert latest is not None
+            stored = stored_targets(tx, workspace, latest.document)
+            pack = pack_targets(committed_data())
+            decided = [resolve_target(tx, workspace, title, pack) for title in titles]
+            fixture = profile_store.current_profile(tx, FIXTURE_WORKSPACE_ID)
+            assert fixture is not None
+            seeded = stored_targets(tx, FIXTURE_WORKSPACE_ID, fixture.document)
+    finally:
+        engine.dispose()
+
+    assert [len(set(keys.values())) for keys in before] == [2, 2]  # the defect: two keys
+    assert [len(set(keys.values())) for keys in after] == [1, 1]
+    # The backfill and the resolver agree, title for title.
+    assert stored == decided
+    assert [(r.link, r.coverage) for r in stored] == [
+        (TargetLink.PACK_CROSSWALK, TargetCoverage.PACK_TARGET),
+        (TargetLink.OCCUPATION_CHOICE, TargetCoverage.NOT_COVERED),
+        (TargetLink.EXACT_LABEL, TargetCoverage.NOT_COVERED),
+    ]
+    # The fixture workspace seeded before 0034 has its target's record too.
+    assert [(r.title, r.link, r.pack_target_id) for r in seeded] == [
+        ("Data quality analyst", TargetLink.PACK_CROSSWALK, "data-quality-analyst-manchester")
+    ]
+
+
+MECHANIC_URI = "http://data.europa.eu/esco/occupation/336cf331-8082-4a0c-bf5f-e7c54706211c"
+
+
+def add_targets(tx: sa.Connection, targets: list[str]) -> uuid.UUID:
+    """A workspace whose current profile names these targets, written through the stores
+    before 0034, with the bicycle mechanic chosen from ESCO."""
+    owner = INVITED_ACTORS[0].actor_id
+    workspace = identity_store.insert_workspace(
+        tx,
+        workspace_id=uuid.uuid4(),
+        owner_actor_id=owner,
+        name="Targets before 0034",
+        data_mode=DataMode.LIVE_ASSISTED,
+        synthetic=True,
+    )
+    now = datetime.now(UTC)
+    choice = uuid.uuid4()
+    profile_store.insert_source(
+        tx,
+        source_ref_id=choice,
+        workspace_id=workspace.workspace_id,
+        kind=SourceKind.OCCUPATION_CHOICE,
+        label="Chosen from the ESCO occupations",
+        recorded_by=owner,
+        observed_at=now,
+        locator=MECHANIC_URI,
+    )
+    new = ProfileInput.model_validate(
+        {
+            **{name: {"state": "unasked"} for name in ProfileInput.model_fields},
+            "target_titles": {"state": "provided", "value": targets},
+        }
+    )
+    document = apply_profile_input(empty_profile(), new, choice)
+    profile_store.insert_profile_version(tx, workspace.workspace_id, 1, document, owner)
+    profile_store.link_sources(tx, workspace.workspace_id, 1, [choice])
+    return workspace.workspace_id
+
+
 @pytest.mark.req("ACQ-01")
 def test_0014_leaves_only_http_urls_in_url_fields(infra: Infra) -> None:
     database = f"careerwright_urls_{uuid.uuid4().hex[:8]}"
@@ -320,7 +414,7 @@ def test_0014_leaves_only_http_urls_in_url_fields(infra: Infra) -> None:
     unsafe = "javascript:alert(1)"
     try:
         migrate_app(engine, "0013")
-        seed(engine, infra.ops_settings(database))
+        seed_fixture(engine, infra.ops_settings(database))
         with engine.begin() as tx:
             workspace = add_edited_workspace(tx)
             run, attempt = uuid.uuid4(), uuid.uuid4()

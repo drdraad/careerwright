@@ -32,10 +32,11 @@ def infra(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Infra]:
         try:
             migrate_app(engine)
             migrate_dbos(settings)
-            seed(engine, settings)
             # The committed, labelled sample: the full release is imported in its own
-            # database by `test_taxonomy.py::test_the_full_pinned_release_imports_...`.
+            # database by `test_taxonomy.py::test_the_full_pinned_release_imports_...`. Before
+            # the seed, as setup does: the fixture's target is stored with what it names.
             import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE)
+            seed(engine, settings)
             # Synthetic reference samples (ADR 0010); the pinned files are imported in their
             # own database by `test_reference_data.py`.
             import_reference_data(

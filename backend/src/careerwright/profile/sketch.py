@@ -3,11 +3,13 @@ S2.5; STATE-05).
 
 Once the person has a target, the sketch shows what that occupation usually asks for, from
 ESCO's essential skills, and the generic steps between here and a plan, each explicitly
-unresolved. It is always labelled an early sketch, never a feasible or Pareto-optimal
-route; it names no provider, price or date. A target ESCO does not hold gets no requirement
-list, only its research status. It says which of the minimum inputs (a target and four
-practical answers: current work, weekly hours, budget and work area) are not asked yet,
-because the later chapters need them; Unknown, Skipped and Prefer not to say are answers.
+unresolved. The web labels it an early sketch, never a feasible or Pareto-optimal route; it
+names no provider, price or date. A target ESCO does not name gets no requirement list,
+only its resolution. Each target is read from its stored record
+(`careerwright.profile.targets`), with its coverage. It says which of the minimum inputs (a
+target and four practical answers: current work, weekly hours, budget and work area) are not
+asked yet, because the later chapters need them; Unknown, Skipped and Prefer not to say are
+answers. It carries facts only: the web words them (Task 6d slice A; ruling R11).
 """
 
 import uuid
@@ -15,18 +17,18 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from careerwright.catalogue import taxonomy_store
-from careerwright.catalogue.esco import normalise_label
+from careerwright.catalogue.esco import concept_id, normalise_label
 from careerwright.catalogue.records import IscoGroupRef
 from careerwright.catalogue.taxonomy import held_release, search_occupations
 from careerwright.db import Tx
 from careerwright.errors import CareerwrightError
 from careerwright.identity.workspaces import visible_workspace
-from careerwright.profile import store
 from careerwright.profile.commands import current_profile
 from careerwright.profile.document import FieldState
 from careerwright.profile.interview import ProfileField
+from careerwright.profile.records import TargetCoverage, TargetRecord
+from careerwright.profile.targets import stored_targets
 
-SKETCH_LABEL = "Early sketch, not a checked route"
 REQUIREMENTS_SHOWN = 6
 CLOSE_MATCHES = 3
 MINIMUM_INPUTS = (
@@ -62,20 +64,23 @@ class TargetSketch:
     requirements: list[str]  # ESCO's essential skills, the first few (esco only)
     requirement_count: int | None  # None: no requirement list (not resolved to ESCO)
     regulated: bool | None
-    research_status: str
+    coverage: TargetCoverage  # from its stored record
 
 
-@dataclass(frozen=True)
-class Step:
-    name: str
-    chapter: str
-    detail: str
-    state: str = "unresolved"  # every step is, until later chapters resolve it
+class Step(StrEnum):
+    """The generic steps between here and a plan, each unresolved until a later chapter
+    resolves it."""
+
+    COMPARE = "compare"  # compare the requirements with what the person has done (Skills)
+    FIND_OPTIONS = "find_options"  # courses, work routes or funding for any gaps (Options)
+    CHECK_TIME_AND_COST = "check_time_and_cost"  # against their week and budget (Routes)
+
+
+STEPS = (Step.COMPARE, Step.FIND_OPTIONS, Step.CHECK_TIME_AND_COST)
 
 
 @dataclass(frozen=True)
 class Sketch:
-    label: str
     profile_version: int
     inputs: dict[ProfileField, FieldState]
     not_asked: list[ProfileField]
@@ -83,66 +88,44 @@ class Sketch:
     steps: list[Step]
 
 
-def _ref(tx: Tx, concept_id: uuid.UUID) -> OccupationRef | None:
-    detail = taxonomy_store.occupation(tx, concept_id)
+def _ref(tx: Tx, concept: uuid.UUID) -> OccupationRef | None:
+    detail = taxonomy_store.occupation(tx, concept)
     if detail is None:
         return None
     unit = detail.isco_groups[-1]
     return OccupationRef(detail.concept_id, detail.preferred_label, unit)
 
 
-def _chosen(tx: Tx, workspace_id: uuid.UUID) -> dict[str, OccupationRef]:
-    """The occupations the person chose as targets, by their title (casefolded); a later
-    choice of the same title wins. A choice from another release is simply absent."""
-    uris = store.chosen_occupation_uris(tx, workspace_id)
-    concepts = taxonomy_store.concepts_by_uri(tx, uris)
-    chosen: dict[str, OccupationRef] = {}
-    for uri in uris:
-        ref = _ref(tx, concepts[uri]) if uri in concepts else None
-        if ref is not None:
-            chosen[ref.title.casefold()] = ref
-    return chosen
-
-
-def _esco(tx: Tx, title: str, ref: OccupationRef) -> TargetSketch:
+def _esco(tx: Tx, record: TargetRecord, ref: OccupationRef) -> TargetSketch:
     facts = taxonomy_store.occupation_facts(tx, [ref.concept_id], skills_shown=REQUIREMENTS_SHOWN)[
         ref.concept_id
     ]
     return TargetSketch(
-        title,
+        record.title,
         Resolution.ESCO,
         [ref],
         [],
         list(facts.essential_skills),
         facts.essential_skill_count,
         facts.regulated,
-        "Requirements from ESCO; not yet compared with your experience.",
+        record.coverage,
     )
 
 
-def _target(
-    tx: Tx, workspace_id: uuid.UUID, title: str, chosen: dict[str, OccupationRef]
-) -> TargetSketch:
-    """The occupation the person chose for this title, else the one ESCO occupation that
-    holds it as a label; several is ambiguous, and nothing is guessed."""
-    if title.casefold() in chosen:
-        return _esco(tx, title, chosen[title.casefold()])
-    matched = sorted({m.concept_id for m in taxonomy_store.concept_key_matches(tx, title)})
-    refs = [ref for ref in (_ref(tx, concept_id) for concept_id in matched) if ref is not None]
+def _target(tx: Tx, workspace_id: uuid.UUID, record: TargetRecord) -> TargetSketch:
+    """What the target's record names in ESCO: its occupation (chosen, or the one holding its
+    title as a label); several holding its title is ambiguous, and nothing is guessed. An
+    occupation the held release lacks is simply absent."""
+    named = (record.esco_occupation,) if record.esco_occupation else record.label_matches
+    refs = [ref for ref in (_ref(tx, concept_id(uri)) for uri in named) if ref is not None]
+    if record.esco_occupation is not None and refs:
+        return _esco(tx, record, refs[0])
+    title = record.title
     if len(refs) == 1:
-        return _esco(tx, title, refs[0])
+        return _esco(tx, record, refs[0])
     if refs:
-        return TargetSketch(
-            title,
-            Resolution.AMBIGUOUS,
-            refs,
-            [],
-            [],
-            None,
-            None,
-            "Careerwright matched this title to several occupations in ESCO. Choose the one you "
-            "mean.",
-        )
+        refs.sort(key=lambda ref: ref.concept_id)
+        return TargetSketch(title, Resolution.AMBIGUOUS, refs, [], [], None, None, record.coverage)
     provisional = taxonomy_store.provisional_by_title(tx, workspace_id, normalise_label(title))
     close: list[OccupationRef] = []
     try:
@@ -164,40 +147,8 @@ def _target(
         [],
         None,
         None,
-        "Careerwright couldn't match this title to an occupation in ESCO, so there's no "
-        "requirement list yet. Not researched.",
+        record.coverage,
     )
-
-
-def _steps(inputs: dict[ProfileField, FieldState]) -> list[Step]:
-    def known(field: ProfileField) -> bool:
-        return inputs[field] is FieldState.PROVIDED
-
-    timing = (
-        "Uses your weekly hours."
-        if known(ProfileField.WEEKLY_STUDY_HOURS)
-        else "Your weekly hours aren't known, so timing can't be checked yet."
-    )
-    budget = (
-        "Uses your spending limit."
-        if known(ProfileField.DIRECT_SPEND_CAP)
-        else "Your spending limit isn't known, so costs can't be checked yet."
-    )
-    return [
-        Step(
-            "Compare these requirements with what you have done",
-            "skills",
-            "Not compared yet: nothing is marked missing or met.",
-        ),
-        Step(
-            "Find courses, work routes or funding for any gaps",
-            "options",
-            "Not researched yet: no providers, prices or dates.",
-        ),
-        Step(
-            "Check the time and cost against your week and budget", "routes", f"{timing} {budget}"
-        ),
-    ]
 
 
 def requirement_sketch(tx: Tx, workspace_id: uuid.UUID) -> Sketch:
@@ -206,18 +157,11 @@ def requirement_sketch(tx: Tx, workspace_id: uuid.UUID) -> Sketch:
     held_release(tx)
     document = profile.document
     inputs = {field: getattr(document, field.value).state for field in MINIMUM_INPUTS}
-    targets_field = document.target_titles
-    titles = (
-        [str(t) for t in targets_field.value]
-        if targets_field.state is FieldState.PROVIDED and targets_field.value
-        else []
-    )
-    chosen = _chosen(tx, workspace_id) if titles else {}
+    records = stored_targets(tx, workspace_id, document)
     return Sketch(
-        label=SKETCH_LABEL,
         profile_version=profile.version,
         inputs=inputs,
         not_asked=[field for field, state in inputs.items() if state is FieldState.UNASKED],
-        targets=[_target(tx, workspace_id, title, chosen) for title in titles],
-        steps=_steps(inputs) if titles else [],
+        targets=[_target(tx, workspace_id, record) for record in records],
+        steps=list(STEPS) if records else [],
     )

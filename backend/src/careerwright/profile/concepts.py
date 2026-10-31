@@ -3,8 +3,9 @@
 internal concepts, not fabricated ESCO records"; DIV1-03).
 
 The person's explicit confirmation is the verification, recorded as a direct-entry source.
-A title that is an ESCO label (preferred, alternative or hidden) as a concept, with case,
-punctuation, hyphens and simple plurals folded (`careerwright.concept_key`), is refused with the
+A title that is an ESCO label (preferred, alternative or hidden) as a concept, with "&" read
+as "and" and accents, case, punctuation, hyphens and simple plurals folded
+(`careerwright.concept_key`), is refused with the
 matching occupations; the database trigger applies the same rule to the title itself. A
 title that only resembles an ESCO label ("senior data analyst") is not refused: offering
 the person the full-text matches first is discovery's work (DIV1-05, T6). Model-suggested
@@ -31,8 +32,8 @@ from careerwright.identity.workspaces import visible_workspace
 from careerwright.profile import store
 from careerwright.profile.records import SourceKind
 
-# What the match did, never what ESCO holds: titles are matched with case, punctuation and
-# plurals folded, so "facade cleaner" matches nothing though ESCO writes "façade cleaner".
+# What the match did, never what ESCO holds: titles are matched as concepts ("&", accents,
+# case, punctuation and plurals folded), and the match decides, not how ESCO spells a label.
 SOURCE_LABEL = "A title you confirmed that Careerwright couldn't match in ESCO"
 
 ConceptTitle = Annotated[

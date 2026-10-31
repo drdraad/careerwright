@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 
+from careerwright.capability.commands import CapabilityData, pack_targets
 from careerwright.capability.evidence import Answer, Holding, SkillEvidence, row_evidence
 from careerwright.capability.matrix import (
     EscoSeed,
@@ -20,8 +21,6 @@ from careerwright.capability.matrix import (
     apply_edits,
     build_matrix,
     check_edit,
-    find_pack_target,
-    pick_occupation,
 )
 from careerwright.capability.outcomes import (
     Confidence,
@@ -45,11 +44,12 @@ from careerwright.capability.readiness import (
     assess,
     ensure_current,
 )
-from careerwright.capability.reference import GateKind, load_reference
+from careerwright.capability.reference import GateKind, Reference, load_reference
 from careerwright.catalogue.esco import concept_id
-from careerwright.catalogue.option_pack import load_pack
-from careerwright.catalogue.records import LabelMatch
+from careerwright.catalogue.option_pack import Target, load_pack
 from careerwright.errors import CareerwrightError, ErrorCode
+from careerwright.profile.records import TargetCoverage, TargetRecord
+from careerwright.profile.targets import Choice, decide
 from tests.support.capability import (
     ADA,
     assessed,
@@ -87,6 +87,27 @@ def pack_matrix(target_id: str) -> Matrix:
 
 NURSE_URI = "http://data.europa.eu/esco/occupation/8d3e8aaa-791b-4c75-a465-f3f827028f50"
 NMC = "pack:registered-nurse-manchester:nmc-registration"
+
+
+def stored(
+    title: str, *, chosen: str | None = None, reference: Reference = REFERENCE
+) -> TargetRecord:
+    """A target's stored record, as `careerwright.profile.targets` decides it (no label
+    matches: these titles' occupations come from a choice or a crosswalk). The pack's titles
+    have no punctuation or plurals, so their concept keys are their folded case."""
+    pack = pack_targets(CapabilityData(PACK, reference, tuple(OUTCOMES)))
+    return decide(
+        title,
+        title.casefold(),
+        choice=Choice(chosen, uuid.uuid4()) if chosen else None,
+        labelled=(),
+        pack=pack,
+        pack_keys={t.target_id: t.title.casefold() for t in pack.targets},
+    )
+
+
+def covered(record: TargetRecord) -> Target | None:
+    return next((t for t in PACK.targets if t.target_id == record.pack_target_id), None)
 
 
 def seed(label: str, *, concept: uuid.UUID | None = None, regulated: bool) -> EscoSeed:
@@ -781,7 +802,8 @@ def test_a_slate_chosen_nursing_label_reaches_the_pack_s_registration_gate() -> 
     title = "nurse responsible for general care"
     occupation = seed(title, concept=concept_id(NURSE_URI), regulated=True)
 
-    target, basis, _ = find_pack_target(title, PACK, REFERENCE, occupation)
+    record = stored(title, chosen=NURSE_URI)
+    target, basis = covered(record), record.pack_target_basis
     assert target is not None
     assert basis is not None
     matrix = build_matrix(
@@ -806,13 +828,10 @@ def test_a_slate_chosen_nursing_label_reaches_the_pack_s_registration_gate() -> 
     assert matrix.row("gate:occupation-regulation") is None  # the typed gate models it
     assert result.state is ReadinessState.NOT_YET_ASSESSED
     assert (NMC, RowStatus.UNRESOLVED) in [(b.row_id, b.kind) for b in result.blockers]
-    assert find_pack_target("Registered nurse", PACK, REFERENCE, None)[1] == "title"
-    assert find_pack_target("Marine biologist", PACK, REFERENCE, None) == (None, None, None)
-    assert find_pack_target(title, PACK, REFERENCE, seed(title, regulated=True)) == (
-        None,
-        None,
-        None,
-    )
+    assert stored("Registered nurse").pack_target_basis == "title"
+    assert covered(stored("Marine biologist")) is None
+    other = "http://data.europa.eu/esco/occupation/0000another"
+    assert covered(stored(title, chosen=other)) is None
 
 
 @pytest.mark.req("OUT1-04", "RDY1-02")
@@ -960,62 +979,13 @@ def test_a_synthetic_workspace_s_results_say_so() -> None:
 # Fix round 2 -------------------------------------------------------------------------------
 
 BOOKKEEPER_URI = "http://data.europa.eu/esco/occupation/c3aae59e-1441-4b3e-bdd1-6da50dc7cf42"
-ACCOUNTANT = uuid.uuid4()
-
-
-def label(concept: uuid.UUID, kind: str, preferred: str) -> LabelMatch:
-    return LabelMatch(
-        concept_id=concept,
-        label="bookkeeper" if kind != "hidden" else None,
-        kind=kind,
-        preferred_label=preferred,
-        isco_code="4311",
-        isco_label="Accounting and bookkeeping clerks",
-    )
-
-
-@pytest.mark.req("MAP1-05", "RDY1-03")
-def test_a_chosen_occupation_or_its_own_preferred_label_resolves_a_shared_label() -> None:
-    # C1(b): "bookkeeper" is ESCO's preferred label for bookkeeper and an alternative label
-    # of accountant.
-    bookkeeper = concept_id(BOOKKEEPER_URI)
-    matches = [
-        label(bookkeeper, "preferred", "bookkeeper"),
-        label(ACCOUNTANT, "alternative", "accountant"),
-    ]
-
-    assert pick_occupation("bookkeeper", chosen=None, matches=matches) == (
-        bookkeeper,
-        "esco_label",
-        None,
-    )
-    # The person's own choice is read from its source, never re-derived from the label.
-    assert pick_occupation("bookkeeper", chosen=ACCOUNTANT, matches=matches) == (
-        ACCOUNTANT,
-        "occupation_choice",
-        None,
-    )
-    # Two occupations with that preferred label are equal: ambiguous, never guessed.
-    twins = [
-        label(bookkeeper, "preferred", "bookkeeper"),
-        label(ACCOUNTANT, "preferred", "bookkeeper"),
-    ]
-    assert pick_occupation("bookkeeper", chosen=None, matches=twins) == (
-        None,
-        None,
-        OccupationNote.AMBIGUOUS_LABEL,
-    )
-    assert pick_occupation("bookkeeper", chosen=None, matches=[]) == (
-        None,
-        None,
-        OccupationNote.NO_EXACT_LABEL,
-    )
 
 
 @pytest.mark.req("RDY1-03", "READINESS-03")
 def test_a_bookkeeper_chosen_in_the_product_reaches_p05_s_pack_target_and_can_apply_now() -> None:
     occupation = seed("bookkeeper", concept=concept_id(BOOKKEEPER_URI), regulated=False)
-    target, basis, note = find_pack_target("bookkeeper", PACK, REFERENCE, occupation)
+    record = stored("bookkeeper", chosen=BOOKKEEPER_URI)
+    target, basis = covered(record), record.pack_target_basis
     assert target is not None
     assert basis is not None
     matrix = build_matrix(
@@ -1039,11 +1009,7 @@ def test_a_bookkeeper_chosen_in_the_product_reaches_p05_s_pack_target_and_can_ap
         matrix, evidence=evidence, statements=work, outcomes=OUTCOMES, evidence_version=2
     )
 
-    assert (target.target_id, basis, note) == (
-        "bookkeeping-assistant-leeds",
-        "esco_crosswalk",
-        None,
-    )
+    assert (target.target_id, basis) == ("bookkeeping-assistant-leeds", "esco_crosswalk")
     assert matrix.row("gate:uk-right-to-work") is not None
     assert result.state is ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS
 
@@ -1066,19 +1032,24 @@ def test_two_pack_targets_for_one_occupation_record_why_neither_is_used() -> Non
     title = "nurse responsible for general care"
     occupation = seed(title, concept=concept_id(NURSE_URI), regulated=True)
 
-    target, basis, note = find_pack_target(title, PACK, twinned, occupation)
+    record = stored(title, chosen=NURSE_URI, reference=twinned)
     matrix = build_matrix(
         title,
         pack=PACK,
         reference=twinned,
-        pack_target=None,
-        pack_target_note=note,
+        pack_target=covered(record),
+        pack_target_note=PackTargetNote.AMBIGUOUS_CROSSWALK,
         occupation=occupation,
         exemplars=0,
         synthetic=False,
     )
 
-    assert (target, basis, note) == (None, None, PackTargetNote.AMBIGUOUS_CROSSWALK)
+    assert (record.coverage, record.pack_target_id, record.pack_target_basis) == (
+        TargetCoverage.SEVERAL_PACK_TARGETS,
+        None,
+        None,
+    )
+    assert matrix.sources.pack_target is None
     assert matrix.sources.pack_target_note is PackTargetNote.AMBIGUOUS_CROSSWALK
 
 

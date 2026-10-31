@@ -28,6 +28,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from careerwright.api.discovery_schemas import SlateOut, WrittenExplanationOut
+from careerwright.capability.commands import committed_data, pack_targets
 from careerwright.catalogue import taxonomy_store
 from careerwright.catalogue.ai_resilience import committed_packs
 from careerwright.catalogue.pay import committed_reviews
@@ -65,20 +66,15 @@ from careerwright.profile.interview import (
     check_turn,
     context_profile,
 )
+from careerwright.profile.records import TargetRecord
 from careerwright.profile.safety import has_risk_stem
 from careerwright.profile.slate import MIN_SHARED_SKILLS, Emphasis, SlateControls
 from careerwright.profile.slate_explanation import RECORD_STEPS, build_input, check_explanation
 from careerwright.profile.slate_explanation import render_prompt as render_explanation_prompt
+from careerwright.profile.targets import resolve_target, target_titles
 from careerwright.vocabulary import DataMode, WorkState
 
 CASES_PATH = Path(__file__).with_name("evaluation_cases.json")
-# A suggestion joined to a title by shared essential skills says so in its words; one a
-# search reached names the essential skill that holds the search's words.
-_SHARED = re.compile(r"ESCO lists (\d+) of the same essential skills")
-_SEARCHED = re.compile(
-    r"Careerwright searched for “(?P<query>.+?)”, and ESCO lists “(?P<skill>.+?)” as an "
-    r"essential skill for this work\."
-)
 _LETTERS = re.compile(r"[^\W\d_]+")
 # The answers searched as skills; the person's own titles give their own reasons.
 _SEARCHED_FIELDS = frozenset({"enjoyed_tasks", "confident_tasks", "evidenced_tasks", "work_style"})
@@ -331,7 +327,8 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         return Failure(FailureType.INFERENCE, percent.group(0)) if percent else None
     if e.check == "unsupported_not_suggested":
         shown = {s["title"].casefold() for s in suggestions}
-        leaked = [t for t in observed["unsupported_hypotheses"] if t.casefold() in shown]
+        unmatched = [i["title"] for i in observed["title_ideas"] if i["outcome"] == "not_matched"]
+        leaked = [t for t in unmatched if t.casefold() in shown]
         return Failure(FailureType.UNSUPPORTED_TITLE, f"{leaked}") if leaked else None
     if e.check == "fewer_has_reason":
         short = len(suggestions) < observed["target_size"] and not observed["fewer_reasons"]
@@ -345,9 +342,9 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
             for s in suggestions
             if not {"current", "user_proposed"} & set(s["channels"])
             and not any(
-                int(m.group(1)) >= MIN_SHARED_SKILLS
-                for line in s["why_it_could_suit"]
-                if (m := _SHARED.search(line))
+                reason["shared"] >= MIN_SHARED_SKILLS
+                for reason in s["reasons"]
+                if reason["reason"] == "joined_by_shared_skills"
             )
         ]
         return Failure(FailureType.GROUNDING, f"not joined by skills: {loose}") if loose else None
@@ -358,14 +355,13 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         # 1; never through one shared word such as "people" or "give", fix round 2).
         essential: Mapping[str, list[str]] = observed.get("essential_skills", {})
         loose = [
-            f"{s['title']}: {line}"
+            f"{s['title']}: {reason['search']} -> {reason['skill']}"
             for s in suggestions
-            for line in s["why_it_could_suit"]
-            if "Careerwright searched for" in line
+            for reason in s["reasons"]
+            if reason["reason"] == "searched_through_skill"
             and not (
-                (m := _SEARCHED.search(line)) is not None
-                and m["skill"] in essential.get(s["concept_id"], [])
-                and _every_word_in(m["query"], m["skill"])
+                reason["skill"] in essential.get(s["concept_id"], [])
+                and _every_word_in(reason["search"], reason["skill"])
             )
         ]
         return Failure(FailureType.GROUNDING, f"not through a skill: {loose}") if loose else None
@@ -397,10 +393,14 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
                 style = item["field"] == "work_style" and len(item["text"].split()) == 1
                 if item["field"] in _SEARCHED_FIELDS and not style:
                     reached[item["text"]] = reached.get(item["text"], False) or q["reach"] > 0
-        nothing = [note.casefold() for note in observed["notes"] if "found no work" in note]
+        nothing = {
+            note["answer"].casefold()
+            for note in observed["notes"]
+            if note["reason"] == "answer_found_no_work"
+        }
 
         def named(text: str) -> bool:
-            return any(f"“{text.casefold()}”" in note for note in nothing)
+            return text.casefold() in nothing
 
         unnamed = [text for text, hit in reached.items() if not hit and not named(text)]
         wrong = [text for text, hit in reached.items() if hit and named(text)]
@@ -415,11 +415,12 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         # provisional thresholds).
         general = {q["query_id"]: q["text"] for q in observed["queries"] if q["too_general"]}
         alone = [s["title"] for s in suggestions if set(s["matched_queries"]) <= set(general)]
-        unnamed = [
-            text
-            for text in general.values()
-            if not any(f"“{text.casefold()}”" in note.casefold() for note in observed["notes"])
-        ]
+        named_general = {
+            note["search"].casefold()
+            for note in observed["notes"]
+            if note["reason"] == "too_general"
+        }
+        unnamed = [text for text in general.values() if text.casefold() not in named_general]
         if alone or unnamed:
             return Failure(FailureType.GROUNDING, f"found alone {alone}, not named {unnamed}")
         return None
@@ -430,8 +431,8 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         joined = [
             s["title"]
             for s in suggestions
-            for line in s["why_it_could_suit"]
-            if _SHARED.search(line) and any(f"“{title}”" in line for title in e.words)
+            for reason in s["reasons"]
+            if reason["reason"] == "joined_by_shared_skills" and reason["answer"] in e.words
         ]
         bad = missing or joined
         return Failure(FailureType.GROUNDING, f"{missing} {joined}") if bad else None
@@ -440,7 +441,8 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         # short slate says why it is short and a full one says how many it chose from.
         size, target = observed["pool_size"], observed["pool_target"][0]
         said = bool(observed["fewer_reasons"]) or any(
-            f"from {size} occupations" in note for note in observed["notes"]
+            note["reason"] == "small_pool" and note["pool_size"] == size
+            for note in observed["notes"]
         )
         quiet = size < target and not said
         return Failure(FailureType.THIN_EVIDENCE, f"pool {size}, no reason") if quiet else None
@@ -453,7 +455,6 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         ok = (
             count >= MIN_SHARED_SKILLS
             and len(connection["shared_skills"]) == count
-            and f"share {count} essential skills" in connection["sentence"]
             and connection["concept_id"] in by_id
             and by_id[connection["concept_id"]]["direction"] != "close_to_current"
         )
@@ -490,7 +491,7 @@ def _explanation(observed: Json, e: Expectation, answers: list[str]) -> Failure 
     written = explanation.get("written")
     shown = observed["slate"]["suggestions"]
     if e.check == "provenance_kept":
-        bare = [s["title"] for s in shown if not (s["why_it_could_suit"] and s["linked_evidence"])]
+        bare = [s["title"] for s in shown if not (s["reasons"] and s["linked_evidence"])]
         return Failure(FailureType.GROUNDING, f"no provenance for {bare}") if bare else None
     if written is None:
         status = explanation.get("run", {}).get("status", "never asked")
@@ -741,8 +742,20 @@ def _offline_slate(tx: Tx, case: Case, release: str | None) -> SlateView:
     )
     # The product's committed packs: no reviewed mapping, no published assessment.
     hard = HardFilterInput(committed_reviews(), committed_packs().product)
+    # Each target as its record would be stored, by the one resolver (nothing is written).
+    pack = pack_targets(committed_data())
+    records: dict[str, TargetRecord] = {}
+    for title in target_titles(document):  # one per title as a concept, the first standing
+        record = resolve_target(tx, _SOURCE, title, pack)
+        records.setdefault(record.key, record)
     return compute_slate(
-        tx, DiscoveryView(run, proposal), proposal, document, SlateControls(), hard
+        tx,
+        DiscoveryView(run, proposal),
+        proposal,
+        document,
+        SlateControls(),
+        hard,
+        list(records.values()),
     )
 
 

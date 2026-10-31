@@ -1,4 +1,5 @@
-"""SQL for profile versions and source references (adapter). Both tables are append-only."""
+"""SQL for profile versions and source references, both append-only, and for each target's
+stored record (adapter)."""
 
 import uuid
 from collections.abc import Iterable
@@ -10,7 +11,16 @@ from sqlalchemy import exc
 from careerwright.db import Tx, is_unique_violation
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
 from careerwright.profile.document import ProfileDocument
-from careerwright.profile.records import Basis, ProfileVersion, SourceKind, SourceReference
+from careerwright.profile.records import (
+    Basis,
+    ProfileVersion,
+    SourceKind,
+    SourceReference,
+    TargetCoverage,
+    TargetKind,
+    TargetLink,
+    TargetRecord,
+)
 
 _SOURCE_COLUMNS = (
     "source_ref_id, workspace_id, kind, label, locator, content_sha256, recorded_by, "
@@ -143,17 +153,87 @@ def source(tx: Tx, workspace_id: uuid.UUID, source_ref_id: uuid.UUID) -> SourceR
     return None if row is None else _source(row)
 
 
-def chosen_occupation_uris(tx: Tx, workspace_id: uuid.UUID) -> list[str]:
-    """The ESCO URIs of the occupations the person chose from the taxonomy (as targets, or
-    as their current or last role), oldest first."""
-    return list(
-        tx.execute(
-            sa.text(
-                "SELECT locator FROM careerwright.source_references WHERE workspace_id = :ws "
-                "AND kind = :kind AND locator IS NOT NULL ORDER BY created_at, source_ref_id"
-            ),
-            {"ws": workspace_id, "kind": SourceKind.OCCUPATION_CHOICE.value},
-        ).scalars()
+def occupation_choices(tx: Tx, workspace_id: uuid.UUID) -> list[tuple[str, uuid.UUID]]:
+    """The occupations the person chose from the taxonomy (as targets, or as their current or
+    last role), each by its ESCO URI with the source citing it, oldest first."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT locator, source_ref_id FROM careerwright.source_references "
+            "WHERE workspace_id = :ws AND kind = :kind AND locator IS NOT NULL "
+            "ORDER BY created_at, source_ref_id"
+        ),
+        {"ws": workspace_id, "kind": SourceKind.OCCUPATION_CHOICE.value},
+    )
+    return [(row.locator, row.source_ref_id) for row in rows]
+
+
+_TARGET_COLUMNS = (
+    "title_key, title, kind, occupation_uri, link, label_matches, coverage, pack_target_id, "
+    "pack_target_basis, pack_version, source_ref_id"
+)
+
+
+def _target(row: sa.RowMapping) -> TargetRecord:
+    return TargetRecord(
+        title=row["title"],
+        key=row["title_key"],
+        kind=TargetKind(row["kind"]),
+        occupation_uri=row["occupation_uri"],
+        link=TargetLink(row["link"]),
+        label_matches=tuple(row["label_matches"]),
+        coverage=TargetCoverage(row["coverage"]),
+        pack_target_id=row["pack_target_id"],
+        pack_target_basis=row["pack_target_basis"],
+        pack_version=row["pack_version"],
+        source_ref_id=row["source_ref_id"],
+    )
+
+
+def target_records(tx: Tx, workspace_id: uuid.UUID, keys: Iterable[str]) -> dict[str, TargetRecord]:
+    """The workspace's stored targets with these concept keys, by key."""
+    rows = tx.execute(
+        sa.text(
+            f"SELECT {_TARGET_COLUMNS} FROM careerwright.target_records "
+            "WHERE workspace_id = :ws AND title_key = ANY(CAST(:keys AS text[]))"
+        ),
+        {"ws": workspace_id, "keys": sorted(set(keys))},
+    ).mappings()
+    return {row["title_key"]: _target(row) for row in rows}
+
+
+def upsert_target_record(
+    tx: Tx, workspace_id: uuid.UUID, record: TargetRecord, recorded_by: uuid.UUID | None
+) -> None:
+    """Store a target's record; a later record of the same title (as a concept) replaces it."""
+    tx.execute(
+        sa.text(
+            f"INSERT INTO careerwright.target_records (workspace_id, {_TARGET_COLUMNS}, "
+            "recorded_by) VALUES (:ws, :key, :title, :kind, :occupation, :link, "
+            "CAST(:matches AS text[]), :coverage, :pack_target, :basis, :pack_version, "
+            ":source, :by) "
+            "ON CONFLICT (workspace_id, title_key) DO UPDATE SET title = EXCLUDED.title, "
+            "kind = EXCLUDED.kind, occupation_uri = EXCLUDED.occupation_uri, "
+            "link = EXCLUDED.link, label_matches = EXCLUDED.label_matches, "
+            "coverage = EXCLUDED.coverage, pack_target_id = EXCLUDED.pack_target_id, "
+            "pack_target_basis = EXCLUDED.pack_target_basis, "
+            "pack_version = EXCLUDED.pack_version, source_ref_id = EXCLUDED.source_ref_id, "
+            "recorded_by = EXCLUDED.recorded_by, recorded_at = clock_timestamp()"
+        ),
+        {
+            "ws": workspace_id,
+            "key": record.key,
+            "title": record.title,
+            "kind": record.kind.value,
+            "occupation": record.occupation_uri,
+            "link": record.link.value,
+            "matches": list(record.label_matches),
+            "coverage": record.coverage.value,
+            "pack_target": record.pack_target_id,
+            "basis": record.pack_target_basis,
+            "pack_version": record.pack_version,
+            "source": record.source_ref_id,
+            "by": recorded_by,
+        },
     )
 
 

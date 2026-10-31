@@ -32,9 +32,10 @@ from careerwright.profile.document import (
     empty_profile,
     input_type,
 )
-from careerwright.profile.exploration import changed_only_by_choices, release_note, with_article
+from careerwright.profile.exploration import changed_only_by_choices, release_note
 from careerwright.profile.fixture_discovery import fixture_queries, prompt_context
 from careerwright.profile.interview import ProfileField, ProposalOrigin
+from careerwright.profile.slate_facts import ReleaseChanged
 
 SOURCE = uuid.UUID("00000000-0000-4000-8000-0000000000aa")
 
@@ -139,23 +140,6 @@ def test_a_valid_output_becomes_queries_that_cite_the_answers_they_come_from() -
     assert proposal.profile_version == 3
 
 
-def test_an_occupation_gets_the_article_its_sound_needs() -> None:
-    # Task 6 review A-M14: "a administrative assistant".
-    assert with_article("administrative assistant") == "an administrative assistant"
-    assert with_article("bicycle mechanic") == "a bicycle mechanic"
-    assert with_article("ICT help desk agent") == "an ICT help desk agent"
-    assert with_article("university lecturer") == "a university lecturer"
-    assert with_article("hour-glass maker") == "an hour-glass maker"
-    assert with_article("UX designer") == "a UX designer"  # re-review N-M8
-    # Task W2B re-review 2: ESCO v1.2.1's one plural title takes no article ("a warehouse
-    # operators for clothing"); a singular word ending in s still does.
-    assert with_article("warehouse operators for clothing") == "warehouse operators for clothing"
-    assert with_article("customs and excise officer") == "a customs and excise officer"
-    assert with_article("import export manager in beverages").startswith("an import ")
-    assert with_article("actress") == "an actress"
-    assert with_article("bus driver") == "a bus driver"
-
-
 @pytest.mark.req("REC1-02")
 def test_a_search_may_name_who_the_work_serves_in_a_kindred_word() -> None:
     carer = document(enjoyed_tasks=["helping new mothers"])
@@ -176,9 +160,9 @@ def test_the_searches_record_the_release_they_were_chosen_for_and_a_change_is_sa
     assert proposal.release == "esco-v1.2.1-en-csv"
     assert release_note("esco-v1.2.1-en-csv", "esco-v1.2.1-en-csv") is None
     assert release_note(None, "esco-v1.2.1-en-csv") is None  # chosen before it was recorded
-    note = release_note("esco-v1.2.1-en-csv", "esco-v1.3.0-en-csv")
-    assert note is not None
-    assert "esco-v1.3.0-en-csv" in note
+    assert release_note("esco-v1.2.1-en-csv", "esco-v1.3.0-en-csv") == ReleaseChanged(
+        searched="esco-v1.2.1-en-csv", held="esco-v1.3.0-en-csv"
+    )
 
 
 @pytest.mark.req("REC1-06", "DIV1-04")

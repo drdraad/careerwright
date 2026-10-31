@@ -23,6 +23,7 @@ from alembic import command
 from alembic.config import Config
 from dbos import DBOS
 
+from careerwright.capability.commands import committed_data, pack_targets
 from careerwright.catalogue import reference_store, taxonomy_store
 from careerwright.catalogue.esco import ESCO_RELEASE, parse_release
 from careerwright.catalogue.reference import DATASETS, Dataset, import_dataset
@@ -43,6 +44,7 @@ from careerwright.logs import configure_logging
 from careerwright.profile import store as profile_store
 from careerwright.profile.commands import cited_sources
 from careerwright.profile.records import SourceKind
+from careerwright.profile.targets import record_targets
 from careerwright.seed import (
     FIXTURE_KEY,
     FIXTURE_OWNER,
@@ -191,12 +193,30 @@ def _create_fixture_workspace(tx: Tx, settings: OpsSettings, *, last_event_seq: 
     )
 
 
-def seed(engine: sa.Engine, settings: OpsSettings) -> None:
+def _record_fixture_targets(tx: Tx) -> None:
+    """The fixture workspace's targets, each stored with its record (migration 0034) if it has
+    none yet, decided against the held taxonomy and the committed pack."""
+    latest = profile_store.current_profile(tx, FIXTURE_WORKSPACE_ID)
+    if latest is not None:
+        pack = pack_targets(committed_data())
+        record_targets(tx, None, FIXTURE_WORKSPACE_ID, latest.document, pack)
+
+
+def seed_fixture(engine: sa.Engine, settings: OpsSettings) -> None:
+    """The invited actors and the fixture workspace with its profile: what a seed wrote before
+    targets were stored (migration 0034). Idempotent."""
     with engine.begin() as tx:
         for actor in INVITED_ACTORS:
             identity_store.upsert_actor(tx, actor.actor_id, actor.email, actor.display_name)
         if identity_store.fixture_workspace(tx, FIXTURE_KEY) is None:
             _create_fixture_workspace(tx, settings, last_event_seq=0)
+
+
+def seed(engine: sa.Engine, settings: OpsSettings) -> None:
+    """`seed_fixture`, and the fixture's targets stored with their records. Idempotent."""
+    seed_fixture(engine, settings)
+    with engine.begin() as tx:
+        _record_fixture_targets(tx)
 
 
 def import_taxonomy(engine: sa.Engine, path: Path, pin: ReleasePin = ESCO_RELEASE) -> str:
@@ -237,6 +257,7 @@ def reset_demo(engine: sa.Engine, settings: OpsSettings) -> None:
         last_seq = existing[1] if existing else 0
         identity_store.delete_fixture_workspace(tx, FIXTURE_KEY)
         _create_fixture_workspace(tx, settings, last_event_seq=last_seq)
+        _record_fixture_targets(tx)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -260,13 +281,14 @@ def main(argv: list[str] | None = None) -> None:
             case "setup-database":
                 migrate_app(engine)
                 migrate_dbos(settings)
-                seed(engine, settings)
                 if settings.datasets_dir is None:
                     raise SystemExit("CAREERWRIGHT_DATASETS_DIR is required to import the taxonomy")
                 outcome = import_taxonomy(engine, settings.datasets_dir / ESCO_RELEASE.file_name)
                 _log.info(
                     "taxonomy", extra={"dataset": ESCO_RELEASE.dataset_id, "outcome": outcome}
                 )
+                # After the taxonomy: the fixture's target is stored with what it names in it.
+                seed(engine, settings)
                 directory = settings.datasets_dir
                 imported = import_reference_data(
                     engine, ((d, directory / d.pin.file_name) for d in DATASETS)

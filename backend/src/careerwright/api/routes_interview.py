@@ -202,7 +202,14 @@ def decide(
 ) -> JSONResponse:
     def execute(tx: Tx) -> CommandResult:
         decision, profile = decide_turn(
-            tx, caller.actor, workspace_id, turn_id, body, keyring=deps.keyring, now=deps.clock()
+            tx,
+            caller.actor,
+            workspace_id,
+            turn_id,
+            body,
+            keyring=deps.keyring,
+            now=deps.clock(),
+            pack=deps.pack_targets,
         )
         result = DecisionResult(
             turn_id=turn_id, decision=DecisionOut.of(decision), profile=ProfileOut.of(profile)

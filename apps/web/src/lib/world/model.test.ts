@@ -2,10 +2,29 @@
 // person's light is lit by an answer, destinations are the targets they chose, and nothing is
 // guessed or ranked.
 import { describe, expect, it } from "vitest";
-import type { ProfileDocument, ProfileOut } from "@/generated/api";
+import type { ProfileDocument, ProfileOut, TargetRecordOut } from "@/generated/api";
 import { EMPTY_WORLD, worldFromProfile } from "./model";
 
 const unasked = { state: "unasked", value: null, source_ref_id: null } as const;
+const targets_answered: ProfileDocument["target_titles"] = {
+  state: "provided",
+  value: ["Archivist"],
+  source_ref_id: null,
+};
+
+/** A target's stored record as the API serves it (its key is the API's, here lower case). */
+function record(title: string): TargetRecordOut {
+  return {
+    key: title.toLowerCase(),
+    title,
+    kind: "own_words",
+    link: "none",
+    concept_id: null,
+    label_matches: 0,
+    coverage: "not_covered",
+    pack_target_id: null,
+  };
+}
 
 function profile(changes: Partial<ProfileDocument>, version = 1): ProfileOut {
   return {
@@ -47,23 +66,31 @@ describe("[WLD-04][UI-04] the world draws what the person has said, and nothing 
     expect(worldFromProfile(profile({ current_role: field })).lit).toBe(true);
   });
 
-  it("makes the chosen targets its destinations, in title order, each once", () => {
+  it("[PROF-10] makes the stored targets its destinations, in title order, each by its record", () => {
+    // The API stores each target once, by its title as a concept ("Statisticians." and
+    // "statistician" are one record), so the world never compares titles itself.
+    const targets = ["Statistician", "Data quality analyst", "Archivist"].map((title) =>
+      record(title),
+    );
     const world = worldFromProfile(
       profile({
         target_titles: {
           state: "provided",
-          value: ["Statistician", " Data quality analyst", "Statistician", "Archivist"],
+          value: ["Statistician", "Statisticians.", "Data quality analyst", "Archivist"],
           source_ref_id: null,
         },
       }),
+      targets,
     );
-    expect(world.destinations.map((d) => d.title)).toEqual([
-      "Archivist",
-      "Data quality analyst",
-      "Statistician",
+    expect(world.destinations.map((d) => [d.id, d.title])).toEqual([
+      ["target:archivist", "Archivist"],
+      ["target:data quality analyst", "Data quality analyst"],
+      ["target:statistician", "Statistician"],
     ]);
     // Nothing is known yet about what the person shares with them.
     expect(world.destinations.every((d) => d.shared.length === 0)).toBe(true);
+    // Until the records arrive, no destination is drawn from the titles' words.
+    expect(worldFromProfile(profile({ target_titles: targets_answered })).destinations).toEqual([]);
   });
 
   it.each(["unknown", "skipped", "prefer_not_to_say"] as const)(
@@ -71,6 +98,7 @@ describe("[WLD-04][UI-04] the world draws what the person has said, and nothing 
     (state) => {
       const world = worldFromProfile(
         profile({ target_titles: { state, value: null, source_ref_id: null } }),
+        [],
       );
       expect(world.destinations).toEqual([]);
       expect(world.lit).toBe(true);

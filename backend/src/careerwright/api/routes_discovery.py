@@ -17,6 +17,8 @@ from careerwright.api.discovery_schemas import (
     SketchOut,
     SlateExplanationOut,
     SlateOut,
+    TargetRecordOut,
+    TargetRecordsOut,
     WrittenExplanationOut,
 )
 from careerwright.api.envelope import ERROR_RESPONSES
@@ -43,6 +45,7 @@ from careerwright.profile.exploration import (
 )
 from careerwright.profile.sketch import requirement_sketch
 from careerwright.profile.slate import POOL_LIMIT, Emphasis, SlateControls
+from careerwright.profile.targets import current_targets
 
 router = APIRouter(
     prefix="/v1/workspaces/{workspace_id}", responses=ERROR_RESPONSES, tags=["discovery"]
@@ -255,7 +258,9 @@ def choose(
     key: IdempotencyKey,
 ) -> JSONResponse:
     def execute(tx: Tx) -> CommandResult:
-        view, changed = choose_target(tx, caller.actor, workspace_id, body, deps.clock())
+        view, changed = choose_target(
+            tx, caller.actor, workspace_id, body, deps.clock(), deps.pack_targets
+        )
         return CommandResult(
             201 if changed else 200, ProfileOut.of(view).model_dump(mode="json"), workspace_id
         )
@@ -276,3 +281,13 @@ def choose(
 def get_sketch(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> SketchOut:
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
         return SketchOut.of(requirement_sketch(tx, workspace_id))
+
+
+@router.get("/targets", response_model=TargetRecordsOut, operation_id="list_targets")
+def list_targets(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> TargetRecordsOut:
+    """Each target's stored record, which every chapter reads."""
+    with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
+        version, records = current_targets(tx, workspace_id)
+        return TargetRecordsOut(
+            profile_version=version, targets=[TargetRecordOut.of(r) for r in records]
+        )

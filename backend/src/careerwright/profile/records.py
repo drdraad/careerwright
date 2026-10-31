@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from careerwright.profile.document import ProfileDocument
 
@@ -117,3 +118,59 @@ class TurnDecision:
     rejected_change_ids: tuple[str, ...]
     confirmed_hard_constraints: tuple[str, ...]
     profile_version: int | None  # the version the decision created; None: nothing changed
+
+
+class TargetKind(StrEnum):
+    """What a target's title is (`careerwright.profile.targets`). Slice B of Task 6d adds a UK
+    title from the ONS coding index."""
+
+    ESCO = "esco"  # an ESCO occupation's title, chosen as such
+    OWN_WORDS = "own_words"  # the person's own words
+
+
+class TargetLink(StrEnum):
+    """The source of the link between a target and its ESCO occupation."""
+
+    OCCUPATION_CHOICE = "occupation_choice"  # the person chose the occupation
+    EXACT_LABEL = "exact_label"  # the one occupation holding the title as a label
+    PACK_CROSSWALK = "pack_crosswalk"  # the option pack's crosswalk for its target
+    NONE = "none"  # none yet
+
+
+# The links that are matches in ESCO itself: the slate, the sketch and the strength join work
+# only to these (ADR 0007 decision 13). The pack's crosswalk seeds Skills alone.
+ESCO_LINKS = frozenset({TargetLink.OCCUPATION_CHOICE, TargetLink.EXACT_LABEL})
+
+
+class TargetCoverage(StrEnum):
+    """How far Careerwright can cover a target: one of the option pack's targets, or not."""
+
+    PACK_TARGET = "pack_target"
+    NOT_COVERED = "not_covered"
+    # Several pack targets' crosswalks name its occupation: never guessed between.
+    SEVERAL_PACK_TARGETS = "several_pack_targets"
+
+
+PackTargetBasis = Literal["title", "esco_crosswalk"]
+
+
+@dataclass(frozen=True)
+class TargetRecord:
+    """A target, stored once with what it names (`careerwright.profile.targets`)."""
+
+    title: str
+    key: str  # the title as a concept (`careerwright.concept_key`)
+    kind: TargetKind
+    occupation_uri: str | None
+    link: TargetLink
+    label_matches: tuple[str, ...]  # every occupation holding the title as a label, by URI
+    coverage: TargetCoverage
+    pack_target_id: str | None
+    pack_target_basis: PackTargetBasis | None
+    pack_version: str
+    source_ref_id: uuid.UUID | None = None  # the choice's source
+
+    @property
+    def esco_occupation(self) -> str | None:
+        """The occupation the target names in ESCO itself (chosen, or its one label)."""
+        return self.occupation_uri if self.link in ESCO_LINKS else None

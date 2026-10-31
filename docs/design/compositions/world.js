@@ -695,7 +695,7 @@
                 <p class="small"><strong>What might not suit you</strong></p>
                 <ul class="bullets"><li>ESCO lists 24 essential skills, not yet compared with your experience, including: build recommender systems, collect ICT data, deliver visual presentation of data.</li><li>Entry requirements aren't researched yet.</li></ul>
                 <p class="small"><strong>Try it before committing</strong></p>
-                <ul class="bullets"><li>Talk to someone who works as a data scientist about a typical week (an informational interview).</li></ul>
+                <ul class="bullets"><li>Talk to someone who does this work about a typical week (an informational interview).</li></ul>
                 <p class="small muted">Pay, demand and listings in your work areas aren't researched yet.</p>
               </article>`
             : `<article class="suggestion" data-open="false" aria-labelledby="s-${i}"><h4 id="s-${i}"><button type="button" aria-expanded="false">${esc(title)}${glyph("collapse")}</button></h4><p class="small muted">Kind of work: ${esc(kind)}</p></article>`;

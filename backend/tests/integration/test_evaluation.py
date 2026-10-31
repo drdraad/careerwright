@@ -5,6 +5,7 @@ as a query), English full-text search over all 3,039 occupations, de-duplication
 slate. It certifies the pipeline and its rules, not a model's queries (those are the live
 run's, `tools.live_eval`). Failures are reported by type."""
 
+import json
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -13,12 +14,16 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
+from careerwright.capability.commands import committed_data, pack_targets
 from careerwright.capability.strength import SCRIPTED_STRENGTHS
+from careerwright.catalogue import taxonomy_store
 from careerwright.catalogue.esco import ESCO_RELEASE
 from careerwright.catalogue.taxonomy import MAX_REACH, search_essential_skills
 from careerwright.cli import import_taxonomy, migrate_app
 from careerwright.db import Tx, system_transaction
+from careerwright.profile.records import TargetLink
 from careerwright.profile.slate import POOL_LIMIT, POOL_TARGET
+from careerwright.profile.targets import resolve_target
 from tests.support.infra import Infra, migrator_engine
 from tools.datasets import DATASETS_DIR
 from tools.evaluation import (
@@ -75,8 +80,95 @@ def test_every_discovery_case_passes_on_the_full_release(full_release: sa.Engine
     # `test_the_working_pool_keeps_its_bound_and_counts_the_work_beyond_it`.
     assert p02["pool_size"] <= POOL_LIMIT
     if p02["pool_size"] < POOL_TARGET:
-        assert any(f"from {p02['pool_size']} occupations" in note for note in p02["notes"])
+        assert {
+            "reason": "small_pool",
+            "outcome": "found_work",
+            "pool_size": p02["pool_size"],
+            "pool_target": POOL_TARGET,
+        } in p02["notes"]
     assert p02["release"]["sample"] is False  # the real catalogue, not the test subset
+
+
+def slate_shape(observed: dict[str, Any]) -> dict[str, Any]:
+    """Everything a slate chose and why, without its words."""
+    return {
+        "suggestions": [
+            [s["concept_id"], s["title"], s["direction"], s["matched_queries"]]
+            for s in observed["suggestions"]
+        ],
+        "pool_size": observed["pool_size"],
+        "beyond_pool_limit": observed["beyond_pool_limit"],
+        "not_included": [[n["concept_id"], n["reason"]] for n in observed["not_included"]],
+        "unmatched_titles": observed["unmatched_titles"],
+        "ambiguous_titles": observed["ambiguous_titles"],
+        "connection": observed["connection"]["concept_id"] if observed["connection"] else None,
+        "queries": [
+            [q["query_id"], q["text"], q["hits"], q["reach"], q["too_general"]]
+            for q in observed["queries"]
+        ],
+    }
+
+
+# Every discovery case's slate as the code before Task 6d slice A computed it on the full
+# release (its suggestions in order, pool, what was left out and why, the person's titles that
+# joined nothing, the connection and every search), recorded from commit 86d7ead.
+SLATES_BEFORE = Path(__file__).with_name("slates_before_task_6d.json")
+
+
+@pytest.mark.req("DIV1-06", "DIV1-08", "PROF-10")
+def test_every_evaluation_case_s_slate_is_the_one_before_targets_were_stored_once(
+    full_release: sa.Engine,
+) -> None:
+    # Task 6d slice A: the notes became facts and each target is read from its stored
+    # record; the slate's ranking, rules and thresholds don't change (R11).
+    cases = [case for case in load_cases() if case.kind is CaseKind.DISCOVERY]
+    with system_transaction(full_release) as tx:
+        now = {case.id: slate_shape(observe_discovery_offline(tx, case)) for case in cases}
+
+    assert now == json.loads(SLATES_BEFORE.read_text(encoding="utf-8"))
+
+
+@pytest.mark.req("PROF-10")
+@pytest.mark.parametrize(
+    ("typed", "label", "preferred"),
+    [
+        # "&" in ESCO's title, "and" typed: no other label says it with "and".
+        ("food and beverage supervisors", "food & beverage supervisor", "restaurant manager"),
+        # An accent in ESCO's title, the plain spelling typed.
+        ("facade cleaner", "façade cleaner", "building exterior cleaner"),
+        ("Dance repetiteurs.", "dance répétiteur", "dance répétiteur"),
+    ],
+)
+def test_a_real_esco_title_with_an_ampersand_or_an_accent_resolves_from_its_plain_spelling(
+    full_release: sa.Engine, typed: str, label: str, preferred: str
+) -> None:
+    pack = pack_targets(committed_data())
+    with system_transaction(full_release) as tx:
+        record = resolve_target(tx, uuid.uuid4(), typed, pack)
+        holders = taxonomy_store.label_match_uris(tx, label)
+        found = tx.execute(
+            sa.text(
+                "SELECT preferred_label FROM careerwright.occupation_concepts WHERE esco_uri = :uri"
+            ),
+            {"uri": record.occupation_uri},
+        ).scalar_one()
+
+    assert len(holders) == 1  # ESCO's own title, of one occupation
+    assert (record.link, record.label_matches) == (TargetLink.EXACT_LABEL, tuple(holders))
+    assert found == preferred
+
+
+def found_none_reading(answer: str) -> dict[str, Any]:
+    """An answer searched in its own words that read the main names of essential skills and
+    found none holding all its words: the web says that, never what ESCO holds."""
+    return {
+        "reason": "answer_found_no_work",
+        "outcome": "found_none",
+        "answer": answer,
+        "own_words": True,
+        "searches": [{"text": answer, "did": "read_main_names"}],
+        "min_shared": 3,
+    }
 
 
 def observed_for(tx: Tx, profile: dict[str, Any]) -> dict[str, Any]:
@@ -180,17 +272,17 @@ def test_the_working_pool_keeps_its_bound_and_counts_the_work_beyond_it(
 
 @pytest.mark.req("DIV1-06", "DIV1-08")
 @pytest.mark.parametrize(
-    ("answer", "did"),
+    ("answer", "by", "count"),
     [
-        ("solving problems", "reached 77 occupations in ESCO through the main names of their"),
-        ("writing reports", "reached 217 occupations in ESCO through the main names of their"),
-        ("working in a team", "reached 242 occupations in ESCO through the main names of their"),
-        ("training staff", "matched the main names of 10 different essential skills in ESCO"),
-        ("analysing data", "reached 92 occupations in ESCO through the main names of their"),
+        ("solving problems", "occupations", 77),
+        ("writing reports", "occupations", 217),
+        ("working in a team", "occupations", 242),
+        ("training staff", "skills", 10),
+        ("analysing data", "occupations", 92),
     ],
 )
 def test_an_answer_too_general_to_find_work_alone_finds_none_and_says_why(
-    full_release: sa.Engine, answer: str, did: str
+    full_release: sa.Engine, answer: str, by: str, count: int
 ) -> None:
     # Task W2B re-review 2, N-I2: each scattered its slate across unrelated work ("writing
     # reports": an ambulance driver, a chiropractor, a city councillor, a lieutenant).
@@ -202,7 +294,15 @@ def test_an_answer_too_general_to_find_work_alone_finds_none_and_says_why(
     assert slate["suggestions"] == []
     [query] = slate["queries"]
     assert query["too_general"]
-    assert any(f"“{answer.capitalize()}” {did}" in note for note in slate["notes"])
+    [note] = [note for note in slate["notes"] if note["reason"] == "too_general"]
+    assert (note["search"], note["answers"], note["own_words"], note["by"]) == (
+        answer,
+        [answer],
+        True,
+        by,
+    )
+    assert note[by] == count
+    assert note["narrower_for"] == []  # the answer's own words: say more about it instead
 
 
 @pytest.mark.req("DIV1-06", "DIV1-08")
@@ -217,11 +317,7 @@ def test_an_answer_naming_a_skill_no_occupation_lists_as_essential_is_named_for_
 
     assert slate["suggestions"] == []
     assert [(q["text"], q["reach"]) for q in slate["queries"]] == [("taking pictures", 0)]
-    assert (
-        "No main name of a skill ESCO lists as essential holds all the words of “taking "
-        "pictures”, so it found no work."
-    ) in slate["notes"]
-    assert not any("names any skill" in note for note in slate["notes"])
+    assert found_none_reading("taking pictures") in slate["notes"]
 
 
 @pytest.mark.req("DIV1-06", "DIV1-08")
@@ -257,10 +353,7 @@ def test_an_answer_that_is_another_name_of_an_essential_skill_is_named_for_what_
     assert main_names == 0  # the note's words hold
     assert slate["suggestions"] == []
     assert [(q["text"], q["reach"]) for q in slate["queries"]] == [("operating farm machinery", 0)]
-    assert (
-        "No main name of a skill ESCO lists as essential holds all the words of “operating farm "
-        "machinery”, so it found no work."
-    ) in slate["notes"]
+    assert found_none_reading("operating farm machinery") in slate["notes"]
 
 
 @pytest.mark.req("DIV1-06", "DIV1-08")
@@ -304,11 +397,10 @@ def test_where_someone_likes_to_work_is_searched_and_a_specific_answer_s_work_co
         "working outdoors": 12,
     }
     assert slate["suggestions"][0]["title"] == "bicycle mechanic"
-    assert any("ESCO lists “work in outdoor conditions”" in line
-               for s in slate["suggestions"][1:] for line in s["why_it_could_suit"])  # fmt: skip
-    [style] = [note for note in slate["notes"] if "How you like to work" in note]
-    assert "“structured”" in style
-    assert "“working outdoors”)" not in style
+    assert any(reason.get("skill") == "work in outdoor conditions"
+               for s in slate["suggestions"][1:] for reason in s["reasons"])  # fmt: skip
+    [style] = [note for note in slate["notes"] if note["reason"] == "one_word_work_style"]
+    assert style["answers"] == ["structured"]
 
 
 @pytest.mark.req("BND1-11")

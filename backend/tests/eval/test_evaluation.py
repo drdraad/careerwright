@@ -158,9 +158,22 @@ def slate(*suggestions: dict[str, Any], **extra: Any) -> dict[str, Any]:
         "queries": [],
         "ambiguous_titles": [],
         "salary_floor": None,
-        "unsupported_hypotheses": [],
+        "title_ideas": [],
         **extra,
     }
+
+
+# The slate's facts (Task 6d slice A): what each search or match did, as the API serves them.
+def found_none(answer: str) -> dict[str, Any]:
+    return {"reason": "answer_found_no_work", "outcome": "found_none", "answer": answer}
+
+
+def small_pool(size: int) -> dict[str, Any]:
+    return {"reason": "small_pool", "outcome": "found_work", "pool_size": size, "pool_target": 60}
+
+
+def few_matched(count: int) -> dict[str, Any]:
+    return {"reason": "few_matched", "count": count}
 
 
 def suggestion(title: str, family: str, direction: str, **extra: Any) -> dict[str, Any]:
@@ -172,7 +185,7 @@ def suggestion(title: str, family: str, direction: str, **extra: Any) -> dict[st
         "direction": direction,
         "sources": [{"kind": "esco", "uri": f"http://data.europa.eu/esco/occupation/{title}"}],
         "linked_evidence": [{"field": "enjoyed_tasks", "text": "repairing physical objects"}],
-        "why_it_could_suit": [],
+        "reasons": [],
         **extra,
     }
 
@@ -189,7 +202,7 @@ def test_the_discovery_checks_name_the_failure_they_find() -> None:
         suggestion("bicycle mechanic", "723", "close_to_current"),
         suggestion("bicycle mechanic", "723", "close_to_current"),
         suggestion("motor mechanic", "723", "close_to_current"),
-        unsupported_hypotheses=["Bicycle mechanic"],
+        title_ideas=[{"title": "Bicycle mechanic", "outcome": "not_matched", "occupations": 0}],
     )
     ungrounded = slate(
         suggestion("bicycle mechanic", "723", "less_familiar", linked_evidence=[]),
@@ -209,11 +222,15 @@ def test_the_discovery_checks_name_the_failure_they_find() -> None:
     ]  # fewer than six with no reason given
 
 
-def searched(query: str, skill: str) -> str:
-    return (
-        f"What you enjoy: “repairing physical objects”. Careerwright searched for “{query}”, "
-        f"and ESCO lists “{skill}” as an essential skill for this work."
-    )
+def searched(query: str, skill: str) -> dict[str, Any]:
+    return {
+        "reason": "searched_through_skill",
+        "outcome": "found_work",
+        "field": "enjoyed_tasks",
+        "answer": "repairing physical objects",
+        "search": query,
+        "skill": skill,
+    }
 
 
 @pytest.mark.req("DIV1-08", "TEST1-10")
@@ -226,9 +243,9 @@ def test_a_search_must_reach_work_through_an_essential_skill_that_holds_all_its_
         "bicycle mechanic": ["perform repairs on bicycles", "tune bicycles", "entertain people"]
     }
 
-    def found(*why: str) -> dict[str, Any]:
+    def found(*why: dict[str, Any]) -> dict[str, Any]:
         return slate(
-            suggestion("bicycle mechanic", "723", "less_familiar", why_it_could_suit=list(why)),
+            suggestion("bicycle mechanic", "723", "less_familiar", reasons=list(why)),
             suggestion("tree surgeon", "621", "less_familiar"),
             suggestion("groundsperson", "921", "less_familiar"),
             essential_skills=essential,
@@ -240,10 +257,8 @@ def test_a_search_must_reach_work_through_an_essential_skill_that_holds_all_its_
     one_shared = found(searched("looking after people", "entertain people"))
     other_skill = found(searched("repairing bicycles", "repair engines"))
     other_words = found(searched("repairing physical objects", "tune bicycles"))
-    description = found(
-        "What you enjoy: “repairing physical objects”. Careerwright searched for “repairing "
-        "physical objects”, and ESCO's record for this occupation matched."
-    )
+    # A fact naming no essential skill of the work (its record matched instead).
+    description = found(searched("repairing physical objects", "ESCO's record for this work"))
 
     assert evaluate(p02, through_skill, {}) == []
     assert evaluate(p02, function_words, {}) == []
@@ -263,7 +278,9 @@ def test_no_search_may_rest_on_a_one_word_answer_about_how_the_person_likes_to_w
     def ran(*based_on: dict[str, str]) -> dict[str, Any]:
         query = {"text": "structured", "based_on": list(based_on), "hits": 3}
         return slate(
-            queries=[query], unmatched_titles=["Data quality analyst"], fewer_reasons=["x"]
+            queries=[query],
+            unmatched_titles=["Data quality analyst"],
+            fewer_reasons=[few_matched(0)],
         )
 
     assert evaluate(p01, ran(task, style), {}) == []  # a task with it: the task's search
@@ -292,15 +309,16 @@ def test_an_answer_whose_every_search_found_nothing_must_be_named() -> None:
         # found work, so it is never "found no work".
         {**query("q5", "writing reports", reports, 217), "hits": 0},
     ]
-    nowhere = "No main name of a skill ESCO lists as essential holds all the words of"
-    missed = f"{nowhere} “repairing physical objects”, so it found no work."
-    pool = "Careerwright chose these from 12 occupations."
+    missed = found_none("repairing physical objects")
+    pool = small_pool(12)
 
-    def shown(*notes: str, reach: int = 0, more: tuple[dict[str, Any], ...] = ()) -> dict[str, Any]:
+    def shown(
+        *notes: dict[str, Any], reach: int = 0, more: tuple[dict[str, Any], ...] = ()
+    ) -> dict[str, Any]:
         found = [*queries, query("q4", "fixing machines", repairing, reach), *more]
         return slate(*six, pool_size=12, queries=found, notes=[*notes, pool])
 
-    wrongly = f"{nowhere} “working outdoors”, so it found no work."
+    wrongly = found_none("working outdoors")
     assert evaluate(p02, shown(missed), {}) == []
     assert [f.type for f in evaluate(p02, shown(), {})] == [FailureType.THIN_EVIDENCE]
     assert [f.type for f in evaluate(p02, shown(missed, wrongly), {})] == [
@@ -315,14 +333,11 @@ def test_an_answer_whose_every_search_found_nothing_must_be_named() -> None:
     # its own note, never "found no work".
     practical = {"field": "work_style", "text": "practical"}
     beside = {**query("q6", "repair machinery", repairing, 0), "based_on": [repairing, practical]}
-    style = "How you like to work (“practical”) isn't searched on its own."
+    style = {"reason": "one_word_work_style", "outcome": "not_searched", "answers": ["practical"]}
     assert evaluate(p02, shown(missed, style, more=(beside,)), {}) == []
     # Re-review 4, M3: naming that style as "found no work" is the bug round 4 fixed, so the
     # check must catch it.
-    named = (
-        "“Practical” found no work: no main name of a skill ESCO lists as essential holds all "
-        "the words of its search “repair machinery”."
-    )
+    named = found_none("practical")
     assert [f.type for f in evaluate(p02, shown(missed, named, more=(beside,)), {})] == [
         FailureType.THIN_EVIDENCE
     ]
@@ -341,11 +356,8 @@ def test_a_search_too_general_to_find_work_alone_may_only_add_weight_and_is_name
         {"query_id": "q2", "text": "writing reports", "based_on": [reports], "hits": 120,
          "too_general": True},
     ]  # fmt: skip
-    note = (
-        "“Writing reports” reached 217 occupations in ESCO through the main names of their "
-        "essential skills, too many to choose from on its own."
-    )
-    reason = {"pool_size": 16, "fewer_reasons": ["Only 2 occupations matched."]}
+    note = {"reason": "too_general", "outcome": "found_none", "search": "writing reports"}
+    reason = {"pool_size": 16, "fewer_reasons": [few_matched(2)]}
 
     def found(title: str, *matched: str) -> dict[str, Any]:
         evidence = [children if q == "q1" else reports for q in matched]
@@ -353,7 +365,7 @@ def test_a_search_too_general_to_find_work_alone_may_only_add_weight_and_is_name
             title, "531", "less_familiar", matched_queries=list(matched), linked_evidence=evidence
         )
 
-    def shown(first: dict[str, Any], notes: list[str]) -> dict[str, Any]:
+    def shown(first: dict[str, Any], notes: list[dict[str, Any]]) -> dict[str, Any]:
         return slate(first, found("nanny", "q1"), queries=queries, notes=notes, **reason)
 
     both = shown(found("child care worker", "q1", "q2"), [note])
@@ -369,18 +381,23 @@ def test_a_search_too_general_to_find_work_alone_may_only_add_weight_and_is_name
 def test_a_title_several_occupations_hold_must_wait_for_the_person_s_choice() -> None:
     # Task W2B fix round 2: never joined over the occupations' skills together.
     case = BY_ID["DSC-16"]
-    named = "Your current role: “bus operator”. Careerwright matched it to this occupation in ESCO."
-    joined = (
-        "Your current role: “bus operator”. ESCO lists 14 of the same essential skills for "
-        "both, so Careerwright joined them by those skills."
-    )
-    reason = ["Careerwright matched “bus operator” to 2 occupations in ESCO."]
+    answer = {"field": "current_role", "answer": "bus operator"}
+    named = {"reason": "own_title_matched", "outcome": "matched", **answer}
+    joined = {"reason": "joined_by_shared_skills", "outcome": "found_work", "shared": 14, **answer}
+    reason = [
+        {
+            "reason": "title_matched_several",
+            "outcome": "matched_several",
+            "title": "bus operator",
+            "occupations": 2,
+        }
+    ]
     role = [{"field": "current_role", "text": "bus operator"}]
 
-    def found(title: str, family: str, direction: str, why: str) -> dict[str, Any]:
-        return suggestion(title, family, direction, why_it_could_suit=[why], linked_evidence=role)
+    def found(title: str, family: str, direction: str, why: dict[str, Any]) -> dict[str, Any]:
+        return suggestion(title, family, direction, reasons=[why], linked_evidence=role)
 
-    def shown(why: str, ambiguous: list[str]) -> dict[str, Any]:
+    def shown(why: dict[str, Any], ambiguous: list[str]) -> dict[str, Any]:
         return slate(
             found("bus driver", "833", "close_to_current", named),
             found("taxi driver", "832", "transferable", why),
@@ -407,9 +424,9 @@ def test_a_pool_below_its_soft_target_must_say_why() -> None:
     # from; a short slate's own reasons say why it is short.
     case = BY_ID["DSC-01"]
     six = [suggestion(f"o{n}", f"{n}21", "less_familiar") for n in range(1, 7)]
-    said = slate(*six, pool_size=12, notes=["Careerwright chose these from 12 occupations."])
+    said = slate(*six, pool_size=12, notes=[small_pool(12)])
     silent = slate(*six, pool_size=12)
-    short = slate(*six[:3], pool_size=3, fewer_reasons=["Only 3 occupations matched."])
+    short = slate(*six[:3], pool_size=3, fewer_reasons=[few_matched(3)])
 
     assert evaluate(case, said, {}) == []
     assert evaluate(case, short, {}) == []
@@ -418,7 +435,12 @@ def test_a_pool_below_its_soft_target_must_say_why() -> None:
 
 def explained(*quotations: tuple[str, str], status: str = "complete") -> dict[str, Any]:
     """A slate of one suggestion, its explanation (one claim) and ESCO's record of it."""
-    shown = suggestion("bicycle mechanic", "723", "less_familiar", why_it_could_suit=["Found"])
+    shown = suggestion(
+        "bicycle mechanic",
+        "723",
+        "less_familiar",
+        reasons=[searched("repairing bicycles", "perform repairs on bicycles")],
+    )
     written = {
         "suggestions": [
             {

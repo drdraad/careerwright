@@ -10,11 +10,9 @@ import pytest
 from careerwright.catalogue.records import IscoGroupRef, OccupationFacts
 from careerwright.profile.discovery import DiscoveryQuery, EvidenceItem, QueryChannel
 from careerwright.profile.exploration import (
-    _ambiguous,
     _general_note,
     _join_note,
     _missed_notes,
-    _unmatched,
     explain,
 )
 from careerwright.profile.interview import ProfileField
@@ -38,7 +36,25 @@ from careerwright.profile.slate import (
     choose_slate,
     too_general,
 )
-from careerwright.profile.titles import ResolvedTitle
+from careerwright.profile.slate_facts import (
+    AnswerFoundNoWork,
+    AnswerSearch,
+    CastingWider,
+    ExclusionsRemoved,
+    FewMatched,
+    JoinKeptBest,
+    KindsOfWorkShown,
+    MoreDepth,
+    NothingFound,
+    OneWordWorkStyle,
+    Outcome,
+    OwnTitleMatched,
+    SearchDid,
+    SearchedThroughSkill,
+    TitleIdeaMatched,
+    TooGeneral,
+    TooGeneralBy,
+)
 
 ENJOY = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="repairing physical objects")
 ROLE = EvidenceItem(field=ProfileField.CURRENT_ROLE, text="Warehouse supervisor")
@@ -273,40 +289,15 @@ def test_a_why_line_never_names_a_near_identical_role_s_skill_as_this_one_s() ->
 
     [lead] = [c for c in pool if c.duplicate_of is None]
     assert lead.occupation.title == "sound designer"
-    why = explain(lead, facts_of(lead.occupation), familiarity_known=False).why
-    assert any("ESCO lists “mix multi-track recordings”" in line for line in why)
-    assert not any("attend music recording sessions" in line for line in why)
-
-
-@pytest.mark.req("REC1-05")
-def test_a_small_test_of_work_with_a_plural_title_talks_to_people_who_do_it() -> None:
-    # Task W2B re-review 3: "Talk to someone who works as warehouse operators for clothing"
-    # (ESCO v1.2.1's one plural title), the plural the connection's article already reads.
-    found = {
-        o.concept_id: o
-        for o in (
-            occupation("warehouse operators for clothing", "432"),
-            occupation("bicycle mechanic", "723"),
+    reasons = explain(lead, facts_of(lead.occupation), familiarity_known=False).reasons
+    assert reasons == [
+        SearchedThroughSkill(
+            field=ProfileField.ENJOYED_TASKS,
+            answer="mixing recordings",
+            search="mixing recordings",
+            skill="mix multi-track recordings",
         )
-    }
-    query = pool_query(
-        "q1",
-        SlateChannel.TASKS,
-        ("warehouse operators for clothing", 1.0),
-        ("bicycle mechanic", 1.0),
-    )
-
-    talk = {
-        c.occupation.title: explain(c, facts_of(c.occupation), familiarity_known=False).try_it[0]
-        for c in build_pool([query], found, frozenset())
-    }
-
-    assert talk == {
-        "warehouse operators for clothing": "Talk to people who work as warehouse operators "
-        "for clothing about a typical week (an informational interview).",
-        "bicycle mechanic": "Talk to someone who works as a bicycle mechanic about a typical "
-        "week (an informational interview).",
-    }
+    ]
 
 
 @pytest.mark.req("DIV1-05")
@@ -508,7 +499,7 @@ def test_a_search_too_general_to_find_work_alone_only_adds_weight_to_work_anothe
     assert [m.query.query_id for m in mechanic.matches] == ["q1", "q2"]
     assert mechanic.relevance == 1.0 + FURTHER_QUERY_BONUS
     assert mechanic.reach == 1  # the search that found it, not the general one
-    assert choose_slate(alone).fewer_reasons == ["None of your answers found work to suggest yet."]
+    assert choose_slate(alone).fewer_reasons == [NothingFound()]
     # It adds only that little: its own score never becomes the best, so it never lifts a
     # weak match over the relevance floor.
     weakly = PoolQuery(
@@ -534,10 +525,20 @@ def searched(
     return PoolQuery(query_id, text, channel, based_on, (), total=reach, too_general=general)
 
 
-# What a search reads: the main name of each skill ESCO lists as essential, never its other
-# names, so a note says what the search did, never what ESCO holds (Task W2B re-review 4).
-MAIN_NAME = "main name of a skill ESCO lists as essential holds all the words of"
-COMMON_ONLY = "only common words, which Careerwright doesn't search for"
+# What each of an answer's searches did (`SearchDid`): the web words them, saying what the
+# search did, never what ESCO holds (Task W2B re-review 4; Task 6d slice A).
+READ = SearchDid.READ_MAIN_NAMES
+COMMON = SearchDid.ONLY_COMMON_WORDS
+JOINED = SearchDid.NO_SHARED_OCCUPATION
+
+
+def found_none(answer: str, *searches: tuple[str, SearchDid], own: bool) -> AnswerFoundNoWork:
+    return AnswerFoundNoWork(
+        answer=answer,
+        own_words=own,
+        searches=[AnswerSearch(text=text, did=did) for text, did in searches],
+        min_shared=3,
+    )
 
 
 @pytest.mark.req("DIV1-06", "DIV1-10")
@@ -567,13 +568,10 @@ def test_the_notes_say_what_a_model_s_searches_checked_and_which_answers_found_n
     ]
 
     assert _missed_notes(model, [], ["structured"], frozenset()) == [
-        "How you like to work (“structured”, “practical”) isn't searched on its own, because a "
-        "single word matches too loosely. Careerwright searches a longer answer, such as "
-        "“working outdoors”.",
-        f"“Fixing things” found no work: no {MAIN_NAME} any of its searches “repair "
-        "machinery” and “fix equipment”.",
-        f"“Tidying stockrooms” found no work: no {MAIN_NAME} its search “organise stock”.",
-        f"No {MAIN_NAME} “taking pictures”, so it found no work.",
+        OneWordWorkStyle(answers=["structured", "practical"]),
+        found_none("fixing things", ("repair machinery", READ), ("fix equipment", READ), own=False),
+        found_none("tidying stockrooms", ("organise stock", READ), own=False),
+        found_none("taking pictures", ("taking pictures", READ), own=True),
     ]
     # Named only when none of the searches citing it found anything.
     one_found = [model[0], searched("q2", "fix equipment", fixing, reach=3)]
@@ -583,24 +581,30 @@ def test_the_notes_say_what_a_model_s_searches_checked_and_which_answers_found_n
     assert _missed_notes([stock], [], [], frozenset()) == []
 
     reports = searched("q5", "write reports", bridges, reach=217, general=True)
-    assert _general_note(reports, 17, [reports]) == (
-        "The search “write reports” (from “writing inspection reports for bridges”) reached "
-        "217 occupations in ESCO through the main names of their essential skills, too many to "
-        "choose from on its own. Careerwright would need a narrower search to find work from "
-        "“writing inspection reports for bridges”."
+    bridge_reports = "writing inspection reports for bridges"
+    by_reach = {"search": "write reports", "answers": [bridge_reports], "own_words": False}
+    assert _general_note(reports, 17, [reports]) == TooGeneral(
+        **by_reach,
+        by=TooGeneralBy.OCCUPATIONS,
+        occupations=217,
+        skills=17,
+        narrower_for=[bridge_reports],
     )
     # Another search from the same answer found work, so no narrower search is called for.
     inspection = searched("q7", "write inspection reports", bridges, reach=6)
-    assert _general_note(reports, 17, [reports, inspection]) == (
-        "The search “write reports” (from “writing inspection reports for bridges”) reached "
-        "217 occupations in ESCO through the main names of their essential skills, too many to "
-        "choose from on its own."
+    assert _general_note(reports, 17, [reports, inspection]) == TooGeneral(
+        **by_reach, by=TooGeneralBy.OCCUPATIONS, occupations=217, skills=17, narrower_for=[]
     )
     general = searched("q6", "training staff", staff, reach=17, general=True)
-    assert _general_note(general, 10, [general]) == (
-        "“Training staff” matched the main names of 10 different essential skills in ESCO, none "
-        "of them just those words, so it's too general to choose work from on its own. Say "
-        "more about it, such as what it's about or who it's for."
+    # The answer's own words: the person is asked to say more, never for a narrower search.
+    assert _general_note(general, 10, [general]) == TooGeneral(
+        search="training staff",
+        answers=["training staff"],
+        own_words=True,
+        by=TooGeneralBy.SKILLS,
+        occupations=17,
+        skills=10,
+        narrower_for=[],
     )
 
 
@@ -618,7 +622,7 @@ def test_an_answer_whose_searches_read_no_skill_name_is_named_for_what_they_did(
         )
 
     assert _missed_notes([], [common("q1", "all of it", everything)], [], frozenset()) == [
-        f"“All of it” has {COMMON_ONLY}, so it found no work."
+        found_none("all of it", ("all of it", COMMON), own=True)
     ]
     role = searched("q3", "warehouse manager", fixing)  # the person's role: joined, never read
     assert _missed_notes(
@@ -627,10 +631,13 @@ def test_an_answer_whose_searches_read_no_skill_name_is_named_for_what_they_did(
         [],
         frozenset({"q3"}),
     ) == [
-        f"“Fixing things” found no work: no {MAIN_NAME} its search “repair machinery”, and its "
-        f"search “the other” has {COMMON_ONLY}, and Careerwright found no other occupation in "
-        "ESCO that shares 3 or more essential skills with its search “warehouse manager”, your "
-        "own title."
+        found_none(
+            "fixing things",
+            ("repair machinery", READ),
+            ("the other", COMMON),
+            ("warehouse manager", JOINED),
+            own=False,
+        )
     ]
 
 
@@ -649,35 +656,12 @@ def test_a_title_of_the_person_s_own_says_careerwright_matched_it() -> None:
     )
     [candidate] = build_pool([query], OCCUPATIONS, frozenset())
 
-    why = explain(candidate, facts_of(candidate.occupation), familiarity_known=True).why
+    reasons = explain(candidate, facts_of(candidate.occupation), familiarity_known=True).reasons
 
-    assert why == [
-        "Your current role: “Warehouse managers”. Careerwright matched it to this occupation in "
-        "ESCO."
+    assert reasons == [
+        OwnTitleMatched(field=ProfileField.CURRENT_ROLE, answer="Warehouse managers")
     ]
-
-
-@pytest.mark.req("DIV1-03", "DIV1-04")
-def test_a_title_matched_to_none_or_several_says_what_the_match_did() -> None:
-    # Task W2B re-review 5: these two reworded reasons had no test of their words. A title is
-    # matched with case, punctuation and plurals folded, so each says what Careerwright's match
-    # did, never what ESCO lists.
-    shared = ResolvedTitle(
-        text="bus operator",
-        field=ProfileField.CURRENT_ROLE,
-        occupations=(concept("Bus driver"), concept("Trolley bus driver")),
-        chosen=False,
-    )
-
-    assert _unmatched("Registered nurse") == (
-        "Careerwright couldn't match “Registered nurse” to an occupation in ESCO, so it can't "
-        "join other work to that title by shared skills. Choose the ESCO occupation closest to "
-        "it."
-    )
-    assert _ambiguous(shared) == (
-        "Careerwright matched “bus operator” to 2 occupations in ESCO, so it can't join other "
-        "work to that title by shared skills until you choose which one you mean."
-    )
+    assert reasons[0].outcome is Outcome.MATCHED
 
 
 @pytest.mark.req("REC1-05", "DIV1-06")
@@ -697,11 +681,12 @@ def test_a_title_idea_names_the_idea_and_says_careerwright_matched_it() -> None:
     )
     [candidate] = build_pool([idea], {groomer.concept_id: groomer}, frozenset())
 
-    why = explain(candidate, facts_of(groomer), familiarity_known=False).why
+    reasons = explain(candidate, facts_of(groomer), familiarity_known=False).reasons
 
-    assert why == [
-        "What you enjoy: “looking after dogs”. Careerwright thought of the title “dog groomer” "
-        "from it and matched that title to this occupation in ESCO."
+    assert reasons == [
+        TitleIdeaMatched(
+            field=ProfileField.ENJOYED_TASKS, answer="looking after dogs", title="dog groomer"
+        )
     ]
 
 
@@ -743,11 +728,7 @@ def test_the_pool_counts_what_a_join_reached_past_its_cut_and_its_own_bound() ->
     # common, not the most shared skills (P03's join keeps a live chat operator sharing 5 and
     # leaves out a ticket issuing clerk sharing 7). Re-review 4, I1's rule: it says what
     # Careerwright found, never what ESCO holds.
-    assert _join_note(joined) == (
-        "Careerwright found 5 other occupations in ESCO that share 3 or more essential skills "
-        "with “data analyst”, and keeps the 2 with the largest share of essential skills in "
-        "common."
-    )
+    assert _join_note(joined) == JoinKeptBest(title="data analyst", found=5, kept=2, min_shared=3)
     # A search that can find work reaches at most this many, under the pool's bound, so it
     # keeps everything it reaches and the count needs no "at least".
     assert TOO_GENERAL_OCCUPATIONS < POOL_LIMIT
@@ -762,7 +743,7 @@ def test_a_thin_pool_returns_fewer_with_the_reason_never_filler() -> None:
     chosen = slate(thin)
 
     assert [s.occupation.title for s in chosen.suggestions] == ["Bicycle mechanic"]
-    assert chosen.fewer_reasons  # said why, in words
+    assert chosen.fewer_reasons == [FewMatched(count=1)]  # said why, as a fact
     [below] = [n for n in chosen.not_included if n.reason is NotIncluded.BELOW_RELEVANCE_FLOOR]
     assert below.candidate.occupation.title == "Tree surgeon"
 
@@ -785,7 +766,17 @@ def test_the_family_limit_is_soft_and_relaxed_visibly_when_depth_is_asked_for() 
     assert len(default.suggestions) == FAMILY_LIMIT
     assert any(n.reason is NotIncluded.FAMILY_LIMIT for n in default.not_included)
     assert len(deeper.suggestions) == 3
-    assert deeper.notes  # the relaxation is stated, never silent
+    assert deeper.notes == [MoreDepth(family_limit=4)]  # the relaxation is stated, never silent
+    assert default.fewer_reasons == [
+        FewMatched(count=3),
+        KindsOfWorkShown(count=1, family_limit=FAMILY_LIMIT),
+    ]
+    broad = slate(narrow, SlateControls(emphasis=Emphasis.BROAD))
+    assert broad.notes == [CastingWider()]
+    without = slate(
+        narrow, SlateControls(exclude_concepts=frozenset({concept("Bicycle mechanic")}))
+    )
+    assert without.fewer_reasons == [FewMatched(count=2), ExclusionsRemoved(count=1)]
 
 
 @pytest.mark.req("REC1-08", "DIV1-07")

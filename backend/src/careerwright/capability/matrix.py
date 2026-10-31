@@ -45,7 +45,6 @@ from careerwright.catalogue.option_pack import (
     Source,
     Target,
 )
-from careerwright.catalogue.records import LabelMatch
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
 from careerwright.evidence.jobs import title_key
 
@@ -742,55 +741,6 @@ def _regulation(occupation: EscoSeed | None, rows: list[MatrixRow]) -> list[Matr
             uncertainty=[Uncertainty.REGULATION_NOT_MODELLED],
         )
     ]
-
-
-def find_pack_target(
-    title: str, pack: Pack, reference: Reference, occupation: EscoSeed | None
-) -> tuple[Target | None, Literal["title", "esco_crosswalk"] | None, PackTargetNote | None]:
-    """The pack target with the same title; otherwise the one pack target whose crosswalk
-    names the target's ESCO occupation. Several such targets are never guessed between."""
-    key = title_key(title)
-    by_title = next((t for t in pack.targets if title_key(t.title) == key), None)
-    if by_title is not None:
-        return by_title, "title", None
-    if occupation is None:
-        return None, None, None
-    crosswalked = [
-        t
-        for t in pack.targets
-        if (crosswalk := reference.crosswalk_for(t.target_id)) is not None
-        and concept_id(crosswalk.esco_occupation) == occupation.concept_id
-    ]
-    if len(crosswalked) > 1:
-        return None, None, PackTargetNote.AMBIGUOUS_CROSSWALK
-    if not crosswalked:
-        return None, None, None
-    return crosswalked[0], "esco_crosswalk", None
-
-
-def pick_occupation(
-    title: str, *, chosen: uuid.UUID | None, matches: Sequence[LabelMatch]
-) -> tuple[
-    uuid.UUID | None, Literal["occupation_choice", "esco_label"] | None, OccupationNote | None
-]:
-    """A target's ESCO occupation. The person's own choice, read from its source, wins;
-    otherwise the one occupation ESCO labels with the title; otherwise, where several do,
-    the one whose preferred label is the title (as the product stores a choice). Two equal
-    matches stay ambiguous: never guessed between."""
-    if chosen is not None:
-        return chosen, "occupation_choice", None
-    labelled = {m.concept_id for m in matches if m.kind != "hidden"}
-    if len(labelled) == 1:
-        return next(iter(labelled)), "esco_label", None
-    wanted = " ".join(title.casefold().split())
-    preferred = {
-        m.concept_id
-        for m in matches
-        if m.kind == "preferred" and " ".join(m.preferred_label.casefold().split()) == wanted
-    }
-    if len(preferred) == 1:
-        return next(iter(preferred)), "esco_label", None
-    return None, None, OccupationNote.AMBIGUOUS_LABEL if labelled else OccupationNote.NO_EXACT_LABEL
 
 
 def _digest(prefix: str, payload: object) -> str:

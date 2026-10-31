@@ -53,8 +53,8 @@ def test_a_title_esco_lacks_becomes_a_provisional_concept_citing_the_confirmatio
     )
     assert source["kind"] == "direct_entry"
     # What the match did, never what ESCO holds (Task W2B re-review 5): titles are matched
-    # with case, punctuation and plurals folded, so a title ESCO writes with an accent or "&"
-    # can come here unmatched.
+    # with "&", accents, case, punctuation and plurals folded (Task 6d slice A), so only a
+    # title matching no label as a concept comes here.
     assert source["label"] == "A title you confirmed that Careerwright couldn't match in ESCO"
     again_status, again = register(api, ada, workspace, "  drone   SURVEY pilot ")
     assert (again_status, again["concept_id"]) == (200, concept["concept_id"])

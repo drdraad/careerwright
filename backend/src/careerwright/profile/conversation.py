@@ -56,6 +56,7 @@ from careerwright.profile.records import (
     TurnDecision,
 )
 from careerwright.profile.store import stale_version
+from careerwright.profile.targets import PackTargets
 from careerwright.vocabulary import WorkState
 
 STATED_LABEL = "Your message, confirmed in review"
@@ -300,6 +301,7 @@ def decide_turn(
     *,
     keyring: Keyring,
     now: datetime,
+    pack: PackTargets,
 ) -> tuple[TurnDecision, ProfileView]:
     """Apply the accepted proposals (as one new profile version, if any changes anything)
     and record the decision. Returns the decision and the resulting profile."""
@@ -397,7 +399,7 @@ def decide_turn(
     for field, answer in edited.items():
         updates[field.value] = FieldUpdate(answer, entry)
     result, changed = commit_profile_version(
-        tx, actor, workspace_id, command.expected_version, updates
+        tx, actor, workspace_id, command.expected_version, updates, pack=pack
     )
     decided = TurnDecision(
         turn_id=turn_id,

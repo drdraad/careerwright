@@ -286,7 +286,8 @@ export type AiEvidenceState = typeof AiEvidenceState[keyof typeof AiEvidenceStat
  *
  * The AI Resilience filter's basis and counts (AIR1-05): the minimum applies to the
  * lower end of a reviewed range; unscored occupations are included unless you switch
- * them off, and are never read as 0 or 10.
+ * them off, and are never read as 0 or 10. The web words the counts, when the filter is not
+ * at its default (a minimum, or unscored ones left out).
  */
 export type AiResilienceFilterOut = {
     /**
@@ -333,12 +334,6 @@ export type AiResilienceFilterOut = {
      * Pack Dated
      */
     pack_dated: string;
-    /**
-     * Summary
-     *
-     * In words, when the filter is not at its default.
-     */
-    summary: string | null;
 };
 
 /**
@@ -433,6 +428,53 @@ export const Answer = {
  * and the world's "I've used this" (Sprint W).
  */
 export type Answer = typeof Answer[keyof typeof Answer];
+
+/**
+ * AnswerFoundNoWork
+ *
+ * Every search resting on an answer found nothing.
+ */
+export type AnswerFoundNoWork = {
+    /**
+     * Reason
+     */
+    reason: 'answer_found_no_work';
+    /**
+     * Outcome
+     */
+    outcome: 'found_none';
+    /**
+     * Answer
+     */
+    answer: string;
+    /**
+     * Own Words
+     *
+     * Its searches are the answer itself.
+     */
+    own_words: boolean;
+    /**
+     * Searches
+     */
+    searches: Array<AnswerSearch>;
+    /**
+     * Min Shared
+     *
+     * The essential skills a join needs in common.
+     */
+    min_shared: number;
+};
+
+/**
+ * AnswerSearch
+ */
+export type AnswerSearch = {
+    /**
+     * Text
+     */
+    text: string;
+    did: SearchDid;
+};
 
 /**
  * AnsweredState
@@ -945,6 +987,18 @@ export type CapabilityChangeOut = {
 };
 
 /**
+ * CastingWider
+ *
+ * The broader view: a lower bar for relevance and one suggestion per kind of work.
+ */
+export type CastingWider = {
+    /**
+     * Reason
+     */
+    reason: 'casting_wider';
+};
+
+/**
  * Catalogue
  */
 export type Catalogue = {
@@ -1272,8 +1326,8 @@ export type ConnectionCheckResult = {
  *
  * The unexpected connection: one suggestion joined to the person's role by the
  * essential skills the two share in ESCO, outside the role's own kind of work and never a
- * title the person named; the one sharing the most. Its sentence is a fact about the two
- * roles, never about the person, and the shared skills are its evidence, one step away.
+ * title the person named; the one sharing the most. It is a fact about the two roles,
+ * never about the person, and the shared skills are its evidence, one step away.
  */
 export type ConnectionOut = {
     /**
@@ -1291,10 +1345,6 @@ export type ConnectionOut = {
      */
     role_title: string;
     /**
-     * Sentence
-     */
-    sentence: string;
-    /**
      * Shared Skill Count
      */
     shared_skill_count: number;
@@ -1304,10 +1354,6 @@ export type ConnectionOut = {
      * The essential skills both list.
      */
     shared_skills: Array<SharedSkillOut>;
-    /**
-     * Still Uncertain
-     */
-    still_uncertain: string;
 };
 
 /**
@@ -2060,6 +2106,19 @@ export const EvidenceContext = {
 export type EvidenceContext = typeof EvidenceContext[keyof typeof EvidenceContext];
 
 /**
+ * EvidenceItem
+ *
+ * One confirmed answer text and the field that holds it.
+ */
+export type EvidenceItem = {
+    field: ProfileField;
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
  * EvidenceKind
  */
 export const EvidenceKind = {
@@ -2148,6 +2207,20 @@ export const ExclusionReason = {
  * Why a proposed page is not a candidate: the URL checks' refusals, or these.
  */
 export type ExclusionReason = typeof ExclusionReason[keyof typeof ExclusionReason];
+
+/**
+ * ExclusionsRemoved
+ */
+export type ExclusionsRemoved = {
+    /**
+     * Reason
+     */
+    reason: 'exclusions_removed';
+    /**
+     * Count
+     */
+    count: number;
+};
 
 /**
  * ExplanationRunOut
@@ -2295,6 +2368,22 @@ export const FailureClass = {
  * FailureClass
  */
 export type FailureClass = typeof FailureClass[keyof typeof FailureClass];
+
+/**
+ * FewMatched
+ *
+ * Only these matched closely enough to suggest; weaker matches don't fill the rest.
+ */
+export type FewMatched = {
+    /**
+     * Reason
+     */
+    reason: 'few_matched';
+    /**
+     * Count
+     */
+    count: number;
+};
 
 /**
  * FieldEdit
@@ -2935,7 +3024,88 @@ export type JobPage = {
     acquisition_model_spend: ModelSpendOut | null;
 };
 
+/**
+ * JoinKeptBest
+ *
+ * A title's skill join reached more than it keeps.
+ */
+export type JoinKeptBest = {
+    /**
+     * Reason
+     */
+    reason: 'join_kept_best';
+    /**
+     * Outcome
+     */
+    outcome: 'found_work';
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Found
+     *
+     * Other occupations sharing enough essential skills.
+     */
+    found: number;
+    /**
+     * Kept
+     *
+     * Those kept: the largest share of essential skills in common.
+     */
+    kept: number;
+    /**
+     * Min Shared
+     */
+    min_shared: number;
+};
+
+/**
+ * JoinedBySharedSkills
+ */
+export type JoinedBySharedSkills = {
+    /**
+     * Reason
+     */
+    reason: 'joined_by_shared_skills';
+    /**
+     * Outcome
+     */
+    outcome: 'found_work';
+    field: ProfileField;
+    /**
+     * Answer
+     */
+    answer: string;
+    /**
+     * Shared
+     *
+     * Essential skills ESCO lists for both.
+     */
+    shared: number;
+};
+
 export type JsonValue = unknown;
+
+/**
+ * KindsOfWorkShown
+ *
+ * These are in kinds of work already shown as often as the view allows.
+ */
+export type KindsOfWorkShown = {
+    /**
+     * Reason
+     */
+    reason: 'kinds_of_work_shown';
+    /**
+     * Count
+     */
+    count: number;
+    /**
+     * Family Limit
+     */
+    family_limit: number;
+};
 
 /**
  * LabelMatchOut
@@ -3475,6 +3645,22 @@ export type MoneyInput = {
 };
 
 /**
+ * MoreDepth
+ *
+ * The deeper view: more from one kind of work, because the person asked.
+ */
+export type MoreDepth = {
+    /**
+     * Reason
+     */
+    reason: 'more_depth';
+    /**
+     * Family Limit
+     */
+    family_limit: number;
+};
+
+/**
  * Need
  */
 export type Need = {
@@ -3515,6 +3701,32 @@ export const NeededInput = {
  * NeededInput
  */
 export type NeededInput = typeof NeededInput[keyof typeof NeededInput];
+
+/**
+ * NoSharedOccupation
+ *
+ * The role's join found no other occupation sharing enough essential skills.
+ */
+export type NoSharedOccupation = {
+    /**
+     * Reason
+     */
+    reason: 'no_shared_occupation';
+    /**
+     * Outcome
+     */
+    outcome: 'found_none';
+    /**
+     * Title
+     *
+     * The role, as ESCO titles it.
+     */
+    title: string;
+    /**
+     * Min Shared
+     */
+    min_shared: number;
+};
 
 /**
  * NotIncluded
@@ -3564,6 +3776,20 @@ export type NotIncludedOut = {
      * Duplicate Of Title
      */
     duplicate_of_title: string | null;
+};
+
+/**
+ * NothingFound
+ */
+export type NothingFound = {
+    /**
+     * Reason
+     */
+    reason: 'nothing_found';
+    /**
+     * Outcome
+     */
+    outcome: 'found_none';
 };
 
 /**
@@ -3894,6 +4120,27 @@ export type Offering = {
 };
 
 /**
+ * OneWordWorkStyle
+ *
+ * Searches and title ideas resting only on one-word answers about how the person likes to
+ * work were not run: one word matches too loosely.
+ */
+export type OneWordWorkStyle = {
+    /**
+     * Reason
+     */
+    reason: 'one_word_work_style';
+    /**
+     * Outcome
+     */
+    outcome: 'not_searched';
+    /**
+     * Answers
+     */
+    answers: Array<string>;
+};
+
+/**
  * OnetMatchOut
  */
 export type OnetMatchOut = {
@@ -3977,9 +4224,9 @@ export type OriginOut = {
     /**
      * Fewer Reasons
      *
-     * Why there are fewer than six, if there are.
+     * Why there are fewer than six, if there are, as facts the web words.
      */
-    fewer_reasons: Array<string>;
+    fewer_reasons: Array<NothingFound | FewMatched | KindsOfWorkShown | ExclusionsRemoved | TitleNotMatched | TitleMatchedSeveral | NoSharedOccupation>;
     connection: ConnectionOut | null;
     salary_floor: SalaryFloorOut | null;
 };
@@ -4078,6 +4325,27 @@ export const OutcomeType = {
  * OutcomeType
  */
 export type OutcomeType = typeof OutcomeType[keyof typeof OutcomeType];
+
+/**
+ * OwnTitleMatched
+ *
+ * The person's own title, matched to this occupation.
+ */
+export type OwnTitleMatched = {
+    /**
+     * Reason
+     */
+    reason: 'own_title_matched';
+    /**
+     * Outcome
+     */
+    outcome: 'matched';
+    field: ProfileField;
+    /**
+     * Answer
+     */
+    answer: string;
+};
 
 /**
  * PackLabel
@@ -5711,6 +5979,30 @@ export type RegisterProvisionalConcept = {
 };
 
 /**
+ * ReleaseChanged
+ *
+ * The searches were chosen when another ESCO release was held.
+ */
+export type ReleaseChanged = {
+    /**
+     * Reason
+     */
+    reason: 'release_changed';
+    /**
+     * Searched
+     *
+     * The release the searches were chosen for.
+     */
+    searched: string;
+    /**
+     * Held
+     *
+     * The release this slate uses.
+     */
+    held: string;
+};
+
+/**
  * ReleaseRefOut
  *
  * The ESCO release the slate searched; show the attribution and adaptation with it.
@@ -6345,14 +6637,12 @@ export type SalaryFloor = {
  *
  * Your confirmed salary floor, applied as a hard filter: a suggestion is left out only
  * when official pay for it (ASHE through a reviewed UK SOC mapping, the 90th percentile in
- * every region of your cities) is below it. Unknown pay is never treated as below it.
+ * every region of your cities) is below it. Unknown pay is never treated as below it. The
+ * web words the counts, which add up: left out, meeting it, and kept by reason.
  */
 export type SalaryFloorOut = {
     amount: Money;
-    /**
-     * Period
-     */
-    period: string;
+    period: PayPeriod;
     /**
      * Basis
      */
@@ -6377,12 +6667,6 @@ export type SalaryFloorOut = {
      * Kept By Reason
      */
     kept_by_reason: Array<FloorReasonOut>;
-    /**
-     * Summary
-     *
-     * The counts in words, for display.
-     */
-    summary: string;
 };
 
 /**
@@ -6435,6 +6719,24 @@ export type SearchCandidate = {
      */
     grounded: boolean;
 };
+
+/**
+ * SearchDid
+ *
+ * What one of an answer's searches did that found no work.
+ */
+export const SearchDid = {
+    READ_MAIN_NAMES: 'read_main_names',
+    ONLY_COMMON_WORDS: 'only_common_words',
+    NO_SHARED_OCCUPATION: 'no_shared_occupation'
+} as const;
+
+/**
+ * SearchDid
+ *
+ * What one of an answer's searches did that found no work.
+ */
+export type SearchDid = typeof SearchDid[keyof typeof SearchDid];
 
 /**
  * SearchEmptyReason
@@ -6553,6 +6855,35 @@ export type SearchProposal = {
 };
 
 /**
+ * SearchedThroughSkill
+ */
+export type SearchedThroughSkill = {
+    /**
+     * Reason
+     */
+    reason: 'searched_through_skill';
+    /**
+     * Outcome
+     */
+    outcome: 'found_work';
+    field: ProfileField;
+    /**
+     * Answer
+     */
+    answer: string;
+    /**
+     * Search
+     */
+    search: string;
+    /**
+     * Skill
+     *
+     * The essential skill whose main name holds its words.
+     */
+    skill: string;
+};
+
+/**
  * Session
  *
  * A fixed timetable session, for clashes (TIME1-04): a weekday (0 is Monday) and times.
@@ -6652,13 +6983,10 @@ export type SharedSkillOut = {
  * SketchOut
  *
  * The early requirement sketch: never a feasible or optimal route, never priced or
- * dated. Every step stays unresolved until a later chapter resolves it.
+ * dated. Every step stays unresolved until a later chapter resolves it. Facts only: the web
+ * words them.
  */
 export type SketchOut = {
-    /**
-     * Label
-     */
-    label: string;
     /**
      * Profile Version
      */
@@ -6829,15 +7157,15 @@ export type SlateOut = {
     /**
      * Fewer Reasons
      *
-     * Why there are fewer than six, if there are.
+     * Why there are fewer than six, if there are, as facts the web words.
      */
-    fewer_reasons: Array<string>;
+    fewer_reasons: Array<NothingFound | FewMatched | KindsOfWorkShown | ExclusionsRemoved | TitleNotMatched | TitleMatchedSeveral | NoSharedOccupation>;
     /**
      * Notes
      *
-     * How the slate was made, in words: a control's effect, a changed ESCO release, answers not searched, answers that found no work or were too general to find it alone, what a join keeps, or fewer occupations to choose from than Careerwright aims for.
+     * How the slate was made, as facts the web words: a control's effect, a changed ESCO release, answers not searched, answers that found no work or were too general to find it alone, what a join keeps, or fewer occupations to choose from than Careerwright aims for.
      */
-    notes: Array<string>;
+    notes: Array<ReleaseChanged | OneWordWorkStyle | AnswerFoundNoWork | TooGeneral | JoinKeptBest | SmallPool | CastingWider | MoreDepth>;
     /**
      * Your confirmed salary floor's effect, as a hard filter; null with none.
      */
@@ -6876,11 +7204,11 @@ export type SlateOut = {
      */
     unsearchable_queries: Array<string>;
     /**
-     * Unsupported Hypotheses
+     * Title Ideas
      *
-     * Titles Careerwright thought of but couldn't match to an occupation in ESCO (case, punctuation and plurals folded): never suggested.
+     * Titles Careerwright thought of, each with what matching it in ESCO did (case, punctuation and plurals folded): one it couldn't match is never suggested.
      */
-    unsupported_hypotheses: Array<string>;
+    title_ideas: Array<TitleIdea>;
     /**
      * Not Included
      *
@@ -6903,6 +7231,30 @@ export type SlateOut = {
      * The unexpected connection to the person's role; null without one.
      */
     connection: ConnectionOut | null;
+};
+
+/**
+ * SmallPool
+ *
+ * A full slate chosen from fewer occupations than Careerwright aims for.
+ */
+export type SmallPool = {
+    /**
+     * Reason
+     */
+    reason: 'small_pool';
+    /**
+     * Outcome
+     */
+    outcome: 'found_work';
+    /**
+     * Pool Size
+     */
+    pool_size: number;
+    /**
+     * Pool Target
+     */
+    pool_target: number;
 };
 
 /**
@@ -7317,21 +7669,30 @@ export const Statistic = {
 export type Statistic = typeof Statistic[keyof typeof Statistic];
 
 /**
+ * Step
+ *
+ * The generic steps between here and a plan, each unresolved until a later chapter
+ * resolves it.
+ */
+export const Step = {
+    COMPARE: 'compare',
+    FIND_OPTIONS: 'find_options',
+    CHECK_TIME_AND_COST: 'check_time_and_cost'
+} as const;
+
+/**
+ * Step
+ *
+ * The generic steps between here and a plan, each unresolved until a later chapter
+ * resolves it.
+ */
+export type Step = typeof Step[keyof typeof Step];
+
+/**
  * StepOut
  */
 export type StepOut = {
-    /**
-     * Name
-     */
-    name: string;
-    /**
-     * Chapter
-     */
-    chapter: string;
-    /**
-     * Detail
-     */
-    detail: string;
+    step: Step;
     /**
      * State
      */
@@ -7575,8 +7936,8 @@ export type SubmittedAcquisitionOut = {
  * SuggestionOut
  *
  * A career hypothesis (spec section 4's `CareerSuggestion`): an ESCO occupation, the
- * answers that found it and ESCO's facts about it, in words. Becoming a target needs the
- * person's choice (`POST .../targets`).
+ * answers that found it and ESCO's facts about it, as facts the web words. Becoming a
+ * target needs the person's choice (`POST .../targets`).
  */
 export type SuggestionOut = {
     /**
@@ -7632,27 +7993,35 @@ export type SuggestionOut = {
      */
     workday: string;
     /**
-     * Why It Could Suit
-     */
-    why_it_could_suit: Array<string>;
-    /**
-     * What Might Not Suit
-     */
-    what_might_not_suit: Array<string>;
-    /**
-     * Entry Gates
-     */
-    entry_gates: Array<string>;
-    /**
-     * Evidence Gaps
-     */
-    evidence_gaps: Array<string>;
-    /**
-     * Try It
+     * Reasons
      *
-     * Low-cost ways to test the idea before committing.
+     * Why it could suit the person: what found it, from at most three of their answers.
      */
-    try_it: Array<string>;
+    reasons: Array<JoinedBySharedSkills | SearchedThroughSkill | TitleIdeaMatched | OwnTitleMatched>;
+    /**
+     * Essential Skill Count
+     *
+     * Essential skills ESCO lists for it, not yet compared with experience.
+     */
+    essential_skill_count: number;
+    /**
+     * Essential Skills
+     *
+     * The first few of them, by ESCO's label.
+     */
+    essential_skills: Array<string>;
+    /**
+     * Regulated
+     *
+     * ESCO marks it a regulated profession in at least one European country (whether England requires registration isn't checked); null: ESCO records no note.
+     */
+    regulated: boolean | null;
+    /**
+     * Different Kind Of Work
+     *
+     * Another kind of work than any the person told Careerwright about (false when that isn't known).
+     */
+    different_kind_of_work: boolean;
     /**
      * Shared Skills
      *
@@ -7800,6 +8169,59 @@ export type SupportResourceOut = {
 };
 
 /**
+ * TargetCoverage
+ *
+ * How far Careerwright can cover a target: one of the option pack's targets, or not.
+ */
+export const TargetCoverage = {
+    PACK_TARGET: 'pack_target',
+    NOT_COVERED: 'not_covered',
+    SEVERAL_PACK_TARGETS: 'several_pack_targets'
+} as const;
+
+/**
+ * TargetCoverage
+ *
+ * How far Careerwright can cover a target: one of the option pack's targets, or not.
+ */
+export type TargetCoverage = typeof TargetCoverage[keyof typeof TargetCoverage];
+
+/**
+ * TargetKind
+ *
+ * What a target's title is (`careerwright.profile.targets`). Slice B of Task 6d adds a UK
+ * title from the ONS coding index.
+ */
+export const TargetKind = { ESCO: 'esco', OWN_WORDS: 'own_words' } as const;
+
+/**
+ * TargetKind
+ *
+ * What a target's title is (`careerwright.profile.targets`). Slice B of Task 6d adds a UK
+ * title from the ONS coding index.
+ */
+export type TargetKind = typeof TargetKind[keyof typeof TargetKind];
+
+/**
+ * TargetLink
+ *
+ * The source of the link between a target and its ESCO occupation.
+ */
+export const TargetLink = {
+    OCCUPATION_CHOICE: 'occupation_choice',
+    EXACT_LABEL: 'exact_label',
+    PACK_CROSSWALK: 'pack_crosswalk',
+    NONE: 'none'
+} as const;
+
+/**
+ * TargetLink
+ *
+ * The source of the link between a target and its ESCO occupation.
+ */
+export type TargetLink = typeof TargetLink[keyof typeof TargetLink];
+
+/**
  * TargetListInput
  */
 export type TargetListInput = {
@@ -7873,6 +8295,65 @@ export type TargetOut = {
 };
 
 /**
+ * TargetRecordOut
+ *
+ * A target as it is stored once, when chosen or saved: what it names, the source of that
+ * link and how far Careerwright can cover it. Every chapter reads this record, so a title
+ * resolves the same everywhere.
+ */
+export type TargetRecordOut = {
+    /**
+     * Key
+     *
+     * The title as a concept (case, punctuation, plurals, accents and "&" folded): the target's identity.
+     */
+    key: string;
+    /**
+     * Title
+     *
+     * The person's words, as the profile holds them.
+     */
+    title: string;
+    kind: TargetKind;
+    link: TargetLink;
+    /**
+     * Concept Id
+     *
+     * The ESCO occupation the title names in ESCO itself (the person's choice, or the one occupation holding the title as a label); null otherwise.
+     */
+    concept_id: string | null;
+    /**
+     * Label Matches
+     *
+     * How many ESCO occupations hold the title as a label (several: the person chooses which they mean, none is guessed).
+     */
+    label_matches: number;
+    coverage: TargetCoverage;
+    /**
+     * Pack Target Id
+     *
+     * The option pack's target, when covered.
+     */
+    pack_target_id: string | null;
+};
+
+/**
+ * TargetRecordsOut
+ */
+export type TargetRecordsOut = {
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    /**
+     * Targets
+     *
+     * In the profile's order, one per concept.
+     */
+    targets: Array<TargetRecordOut>;
+};
+
+/**
  * TargetSketchOut
  */
 export type TargetSketchOut = {
@@ -7910,9 +8391,9 @@ export type TargetSketchOut = {
      */
     regulated: boolean | null;
     /**
-     * Research Status
+     * From the target's stored record: one of the option pack's targets, or not (several: the pack targets it could be, none guessed).
      */
-    research_status: string;
+    coverage: TargetCoverage;
 };
 
 /**
@@ -8101,6 +8582,58 @@ export type TextListInput = {
 };
 
 /**
+ * TitleIdea
+ *
+ * A title Careerwright thought of, and what matching it did: only a matched idea is a
+ * suggestion.
+ */
+export type TitleIdea = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Based On
+     */
+    based_on: Array<EvidenceItem>;
+    /**
+     * Outcome
+     */
+    outcome: 'matched' | 'matched_several' | 'not_matched' | 'not_searched';
+    /**
+     * Occupations
+     *
+     * Occupations matching it in ESCO.
+     */
+    occupations: number;
+};
+
+/**
+ * TitleIdeaMatched
+ *
+ * A title Careerwright thought of from the answer, matched to this occupation.
+ */
+export type TitleIdeaMatched = {
+    /**
+     * Reason
+     */
+    reason: 'title_idea_matched';
+    /**
+     * Outcome
+     */
+    outcome: 'matched';
+    field: ProfileField;
+    /**
+     * Answer
+     */
+    answer: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
  * TitleMatchOut
  */
 export type TitleMatchOut = {
@@ -8132,6 +8665,31 @@ export type TitleMatchOut = {
      * Its ISCO-08 unit group.
      */
     isco_group: IscoGroupOut;
+};
+
+/**
+ * TitleMatchedSeveral
+ *
+ * A title of the person's own matched several occupations: nothing is joined to it until
+ * they choose which they mean.
+ */
+export type TitleMatchedSeveral = {
+    /**
+     * Reason
+     */
+    reason: 'title_matched_several';
+    /**
+     * Outcome
+     */
+    outcome: 'matched_several';
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Occupations
+     */
+    occupations: number;
 };
 
 /**
@@ -8168,6 +8726,88 @@ export type TitleMatchesOut = {
      */
     partial: boolean;
 };
+
+/**
+ * TitleNotMatched
+ *
+ * A title of the person's own matched no occupation in ESCO, so nothing is joined to it.
+ */
+export type TitleNotMatched = {
+    /**
+     * Reason
+     */
+    reason: 'title_not_matched';
+    /**
+     * Outcome
+     */
+    outcome: 'not_matched';
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * TooGeneral
+ *
+ * A search too general to find work on its own: it only adds weight to work another
+ * search found.
+ */
+export type TooGeneral = {
+    /**
+     * Reason
+     */
+    reason: 'too_general';
+    /**
+     * Outcome
+     */
+    outcome: 'found_none';
+    /**
+     * Search
+     */
+    search: string;
+    /**
+     * Answers
+     *
+     * The answers it rests on.
+     */
+    answers: Array<string>;
+    /**
+     * Own Words
+     *
+     * The search is its one answer itself.
+     */
+    own_words: boolean;
+    by: TooGeneralBy;
+    /**
+     * Occupations
+     *
+     * Occupations it reached through essential skills.
+     */
+    occupations: number;
+    /**
+     * Skills
+     *
+     * Different essential skills it reached.
+     */
+    skills: number;
+    /**
+     * Narrower For
+     *
+     * Its answers no other search found work from: a narrower search is needed for them (a model's search only).
+     */
+    narrower_for: Array<string>;
+};
+
+/**
+ * TooGeneralBy
+ */
+export const TooGeneralBy = { OCCUPATIONS: 'occupations', SKILLS: 'skills' } as const;
+
+/**
+ * TooGeneralBy
+ */
+export type TooGeneralBy = typeof TooGeneralBy[keyof typeof TooGeneralBy];
 
 /**
  * TrendOut
@@ -10535,6 +11175,40 @@ export type SubmitExplanationResponses = {
 };
 
 export type SubmitExplanationResponse = SubmitExplanationResponses[keyof SubmitExplanationResponses];
+
+export type ListTargetsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/targets';
+};
+
+export type ListTargetsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ListTargetsError = ListTargetsErrors[keyof ListTargetsErrors];
+
+export type ListTargetsResponses = {
+    /**
+     * Successful Response
+     */
+    200: TargetRecordsOut;
+};
+
+export type ListTargetsResponse = ListTargetsResponses[keyof ListTargetsResponses];
 
 export type ChooseTargetData = {
     body: ChooseTarget;

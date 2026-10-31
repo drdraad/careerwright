@@ -66,7 +66,6 @@ const prefs = (entry: PreferencesOut["entry_mode"]): PreferencesOut => ({
   updated_at: null,
 });
 const sketch: SketchOut = {
-  label: "Early sketch, not a checked route",
   profile_version: 1,
   inputs: {},
   not_asked: [],
@@ -259,11 +258,20 @@ const suggestionNamed = (id: string, title: string): SuggestionOut => ({
   matched_queries: ["q1"],
   sources: [{ kind: "esco", uri: `http://data.europa.eu/esco/occupation/${id}`, release: "esco" }],
   workday: `${title} work.`,
-  why_it_could_suit: ["What you enjoy: “repairing bicycles”."],
-  what_might_not_suit: [],
-  entry_gates: [],
-  evidence_gaps: [],
-  try_it: [],
+  reasons: [
+    {
+      reason: "searched_through_skill",
+      outcome: "found_work",
+      field: "enjoyed_tasks",
+      answer: "repairing bicycles",
+      search: "repairing bicycles",
+      skill: "repair bicycles",
+    },
+  ],
+  essential_skill_count: 0,
+  essential_skills: [],
+  regulated: null,
+  different_kind_of_work: false,
   shared_skills: [],
 });
 
@@ -297,7 +305,6 @@ function slateFor(query: string): SlateOut {
       synthetic: false,
       pack_version: "l0-2026-10-29",
       pack_dated: "2026-10-29",
-      summary: null,
     },
     pool_size: 2,
     pool_target: [60, 120],
@@ -305,7 +312,7 @@ function slateFor(query: string): SlateOut {
     excluded: { occupations: 0, families: 0 },
     queries: [],
     unsearchable_queries: [],
-    unsupported_hypotheses: [],
+    title_ideas: [],
     not_included: [],
     unmatched_titles: [],
     ambiguous_titles: [],

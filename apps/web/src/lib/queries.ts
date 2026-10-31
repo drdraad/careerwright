@@ -31,6 +31,7 @@ import {
   listCredentials,
   listDiscoveries,
   listSources,
+  listTargets,
   listTurns,
   listWorkspaces,
   type PartialReplyOut,
@@ -56,6 +57,7 @@ import {
   submitDiscovery,
   submitExplanation,
   submitTurn,
+  type TargetRecordsOut,
   type TurnOut,
   type TurnSubmittedOut,
 } from "@/generated/api";
@@ -83,6 +85,7 @@ export const keys = {
   noteRequests: (id: string, discoveryId: string) =>
     ["ws", id, "discoveries", discoveryId, "note-requests"] as const,
   sketch: (id: string) => ["ws", id, "sketch"] as const,
+  targets: (id: string) => ["ws", id, "targets"] as const,
   credentials: (id: string) => ["ws", id, "credentials"] as const,
 };
 
@@ -504,6 +507,18 @@ export function useSketch(id: string, enabled = true) {
     queryKey: keys.sketch(id),
     queryFn: async (): Promise<SketchOut> =>
       (await getSketch({ path: path(id), throwOnError: true })).data,
+    retry: retryable,
+    enabled,
+  });
+}
+
+/** Each target as it is stored once, with what it names and its coverage: every view that
+ *  asks which occupation a target is reads this, never the title (Task 6d slice A). */
+export function useTargets(id: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.targets(id),
+    queryFn: async (): Promise<TargetRecordsOut> =>
+      (await listTargets({ path: path(id), throwOnError: true })).data,
     retry: retryable,
     enabled,
   });

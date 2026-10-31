@@ -481,15 +481,31 @@ def test_a_bookkeeper_chosen_in_the_product_reaches_p05_s_pack_target_despite_a_
             name: matrices(api, ada, workspace)["matrices"][0]
             for name, workspace in (("chosen", chosen), ("typed", typed))
         }
+        # The person says which they mean, as the sketch asks (`replaces`).
+        meant = api.write(
+            "POST",
+            f"/v1/workspaces/{typed}/targets",
+            ada,
+            {"expected_version": 1, "concept_id": bookkeeper, "replaces": "bookkeeper"},
+        )
+        assert meant.status_code == 201, meant.text
+        found["meant"] = matrices(api, ada, typed)["matrices"][0]
     finally:
         infra.query(
             "DELETE FROM careerwright.occupation_labels WHERE concept_id = %s AND normalised = %s",
             (other["concept_id"], "bookkeeper"),
         )
 
-    # The choice is read from its own source; a typed title prefers ESCO's preferred label.
+    # The choice is read from its own source. Task 6d slice A (one stored target record, one
+    # set of rules): a typed title two occupations hold names neither, here as in the slate
+    # and the sketch, until the person chooses (before: Skills alone picked the occupation
+    # whose preferred label it is).
     assert found["chosen"]["sources"]["occupation"]["basis"] == "occupation_choice"
-    assert found["typed"]["sources"]["occupation"]["basis"] == "esco_label"
+    typed_sources = found.pop("typed")["sources"]
+    assert typed_sources["occupation"] is None
+    assert typed_sources["occupation_note"] == "ambiguous_esco_label"
+    assert typed_sources["pack_target"] is None
+    assert found["meant"]["sources"]["occupation"]["basis"] == "occupation_choice"
     for matrix_out in found.values():
         assert matrix_out["sources"]["occupation"]["concept_id"] == bookkeeper
         assert matrix_out["sources"]["pack_target"]["target_id"] == "bookkeeping-assistant-leeds"

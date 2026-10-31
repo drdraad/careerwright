@@ -1,7 +1,13 @@
 // Story data. Every amount, date and name that stands for a person comes from the supplied
 // synthetic fixture pack (P01 and TRACE-01), never typed into a component; the extra
 // long-label and three-target cases say so where they are built.
-import type { ProfileDocument, ProfileOut, SourceOut, WorkspaceOut } from "@/generated/api";
+import type {
+  ProfileDocument,
+  ProfileOut,
+  SourceOut,
+  TargetRecordOut,
+  WorkspaceOut,
+} from "@/generated/api";
 import { previewFromTrace, type RoutePreview, TRACE_SHA256 } from "@/lib/fixtures/trace";
 import persona from "../../../../fixtures/m0/personas/P01.json";
 import trace from "../../../../fixtures/m0/worked_trace.json";
@@ -81,6 +87,23 @@ export const longDocument: ProfileDocument = {
     source_ref_id: SOURCE_ID,
   },
 };
+
+/** A document's targets as the API stores them, each once (story data: the key the API would
+ *  give these titles, which have no punctuation, plurals or accents, is their lower case). The
+ *  first of P01's is one of the option pack's targets. */
+export function storedTargets(document: ProfileDocument): TargetRecordOut[] {
+  const titles = document.target_titles.value ?? [];
+  return titles.map((title) => ({
+    key: title.toLowerCase(),
+    title,
+    kind: "own_words",
+    link: title === persona.target_titles[0] ? "pack_crosswalk" : "none",
+    concept_id: null,
+    label_matches: 0,
+    coverage: title === persona.target_titles[0] ? "pack_target" : "not_covered",
+    pack_target_id: title === persona.target_titles[0] ? "data-quality-analyst-manchester" : null,
+  }));
+}
 
 export function profile(document: ProfileDocument, version = 1): ProfileOut {
   return {

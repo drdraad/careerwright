@@ -138,7 +138,8 @@ def test_the_origin_shows_usual_skills_and_destinations_joined_by_shared_skills(
     [assistant] = shown["destinations"]
     assert assistant["channels"] == ["shared_skills"]
     assert assistant["direction"] == "close_to_current"  # the same kind of work
-    assert "5 of the same essential skills" in assistant["why_it_could_suit"][0]
+    [reason] = assistant["reasons"]
+    assert (reason["reason"], reason["shared"]) == ("joined_by_shared_skills", 5)
     assert shown["connection"] is None  # nothing outside the bookkeeper's kind of work
     assert shown["release"]["sample"] is True
 
@@ -185,8 +186,8 @@ def test_a_role_no_other_occupation_joins_says_what_careerwright_found(
     api: ApiClient, ada: str
 ) -> None:
     # Task W2B re-review 5: the empty join's words had no test. In the sample no occupation
-    # shares 3 or more essential skills with the cook; the line says what Careerwright found,
-    # never what ESCO holds.
+    # shares 3 or more essential skills with the cook; the fact says what Careerwright found,
+    # never what ESCO holds (the web words it; Task 6d slice A).
     workspace = api.create_workspace(ada, "Empty join (synthetic)")["workspace_id"]
     choose_role(api, ada, workspace, occupation(api, ada, "cook"), 0)
 
@@ -194,8 +195,12 @@ def test_a_role_no_other_occupation_joins_says_what_careerwright_found(
 
     assert shown["destinations"] == []
     assert shown["fewer_reasons"] == [
-        "Careerwright found no other occupation in ESCO that shares 3 or more essential skills "
-        "with a cook."
+        {
+            "reason": "no_shared_occupation",
+            "outcome": "found_none",
+            "title": "cook",
+            "min_shared": 3,
+        }
     ]
 
 

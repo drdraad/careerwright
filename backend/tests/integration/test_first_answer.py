@@ -112,17 +112,15 @@ def test_the_first_answer_changes_the_world_within_one_second_on_the_pinned_rele
         "destinations:",
         [(d["title"], d["family"]["code"], d["direction"]) for d in body["destinations"]],
     )
-    print("connection:", body["connection"]["sentence"] if body["connection"] else None)
+    print("connection:", body["connection"]["title"] if body["connection"] else None)
     assert len(body["usual_skills"]) == 36  # ESCO v1.2.1 lists 36 for the data analyst
     assert {s["state"] for s in body["usual_skills"]} == {"usual_in_role"}
     assert len(body["destinations"]) >= 4
     assert "data analyst" not in [d["title"] for d in body["destinations"]]  # the origin
-    assert all(
-        "of the same essential skills" in d["why_it_could_suit"][0] for d in body["destinations"]
-    )
+    assert all(d["reasons"][0]["reason"] == "joined_by_shared_skills" for d in body["destinations"])
     connection = body["connection"]
     assert connection is not None
-    assert connection["sentence"].startswith("A data analyst and ")
+    assert connection["role_title"] == "data analyst"
     assert connection["shared_skill_count"] >= 3
 
 

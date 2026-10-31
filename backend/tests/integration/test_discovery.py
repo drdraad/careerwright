@@ -129,12 +129,13 @@ def test_a_discovery_runs_durably_and_its_slate_is_grounded_in_esco_and_the_answ
             {"kind": "esco", "uri": detail.json()["esco_uri"], "release": SAMPLE_RELEASE.dataset_id}
         ]
         assert {(e["field"], e["text"]) for e in suggestion["linked_evidence"]} <= answers
-        assert suggestion["why_it_could_suit"]
-        assert suggestion["try_it"]
+        assert suggestion["reasons"]
+        assert all(r["outcome"] in {"found_work", "matched"} for r in suggestion["reasons"])
     # The model's invented title is a hypothesis ESCO does not hold: never a suggestion.
-    [unsupported] = result["unsupported_hypotheses"]
-    assert unsupported.endswith("orbital gardener")
-    assert unsupported not in {s["title"] for s in result["suggestions"]}
+    [unsupported] = [i for i in result["title_ideas"] if i["outcome"] == "not_matched"]
+    assert unsupported["title"].endswith("orbital gardener")
+    assert unsupported["occupations"] == 0
+    assert unsupported["title"] not in {s["title"] for s in result["suggestions"]}
     assert not re.search(r"\d\s?(?:%|per ?cent)", json.dumps(result), re.IGNORECASE)  # none
     families = [s["family"]["code"] for s in result["suggestions"]]
     assert max(families.count(f) for f in families) <= result["family_limit"]
@@ -172,10 +173,10 @@ def test_the_slate_controls_change_the_view_only_and_count_their_effect(
     assert reasons[title["concept_id"]] == "excluded_occupation"  # "show why"
     deeper = slate(scenario, discovery_id, emphasis="deeper")
     assert (deeper["emphasis"], deeper["family_limit"]) == ("deeper", 4)
-    # The relaxation is stated in its own words (Task W2B re-review 2, N-M3: the slate has
+    # The relaxation is stated in its own fact (Task W2B re-review 2, N-M3: the slate has
     # other notes too, so any note at all proved nothing).
-    assert any("because you asked for more depth" in note for note in deeper["notes"])
-    assert not any("more depth" in note for note in first["notes"])
+    assert {"reason": "more_depth", "family_limit": 4} in deeper["notes"]
+    assert not any(note["reason"] == "more_depth" for note in first["notes"])
     assert scenario.profile()["version"] == 2  # a view never changes the profile
 
 
@@ -234,7 +235,7 @@ def test_the_salary_floor_leaves_out_only_what_reviewed_pay_puts_below_it_and_co
         {"reason": "no_reviewed_mapping", "count": floor["kept_pay_unknown"]}
     ]
     assert floor["kept_pay_unknown"] >= 1
-    assert "never treated as below it" in floor["summary"]
+    assert floor["left_out"] + floor["meets"] + floor["kept_pay_unknown"] >= 1  # they add up
     assert BICYCLE_MECHANIC in {s["concept_id"] for s in unreviewed["suggestions"]}
     # A reviewed mapping whose regional 90th percentile (synthetic) is below the floor.
     assert reviewed["salary_floor"]["left_out"] == 1
@@ -263,7 +264,7 @@ def test_the_ai_resilience_filter_keeps_unscored_roles_by_default_and_counts_its
     )
     assert shown["scored"] == 0  # no reviewed record exists: every role is unscored
     assert shown["unscored"] >= len(default["suggestions"]) >= 1
-    assert shown["summary"] is None
+    assert "summary" not in shown  # facts only: the web words a filter that is not at Any
     # A minimum leaves every unscored role in: unknown is never read as 0.
     assert [s["concept_id"] for s in any_minimum["suggestions"]] == [
         s["concept_id"] for s in default["suggestions"]
@@ -272,9 +273,16 @@ def test_the_ai_resilience_filter_keeps_unscored_roles_by_default_and_counts_its
     # Only switching unscored roles off removes them, and it says how many.
     assert hidden["suggestions"] == []
     assert hidden["ai_resilience_filter"]["unscored_excluded"] == shown["unscored"]
-    assert "unscored left out" in hidden["ai_resilience_filter"]["summary"]
+    assert hidden["ai_resilience_filter"]["include_unscored"] is False
     assert {n["reason"] for n in hidden["not_included"]} >= {"ai_resilience_unscored_excluded"}
-    assert hidden["fewer_reasons"]
+    assert hidden["fewer_reasons"] == [
+        {"reason": "few_matched", "count": 0},
+        {
+            "reason": "title_not_matched",
+            "outcome": "not_matched",
+            "title": "Warehouse shift supervisor",
+        },
+    ]
     assert default["salary_floor"] is None  # the person set no floor
 
 
@@ -309,7 +317,7 @@ def test_a_published_range_is_filtered_on_its_lower_end_and_labelled_synthetic(
     kept = at_five["ai_resilience_filter"]
     assert (kept["scored"], kept["below_minimum"], kept["synthetic"]) == (1, 0, True)
     assert BICYCLE_MECHANIC in {s["concept_id"] for s in at_five["suggestions"]}
-    assert "synthetic fixture range" in kept["summary"]
+    assert kept["minimum"] == 5  # the web says the range is a synthetic fixture's
     left = at_six["ai_resilience_filter"]
     assert (left["scored"], left["below_minimum"], left["synthetic"]) == (1, 1, True)
     assert BICYCLE_MECHANIC not in {s["concept_id"] for s in at_six["suggestions"]}
@@ -448,7 +456,13 @@ def test_a_role_esco_lists_joins_other_work_by_shared_essential_skills_only(
     assert (joined["text"], joined["hits"]) == ("bus driver", 1)
     [trolley] = [s for s in result["suggestions"] if s["title"] == "trolley bus driver"]
     assert "shared_skills" in trolley["channels"]
-    assert "ESCO lists 4 of the same essential skills" in " ".join(trolley["why_it_could_suit"])
+    assert {
+        "reason": "joined_by_shared_skills",
+        "outcome": "found_work",
+        "field": "current_role",
+        "answer": "bus driver",
+        "shared": 4,
+    } in trolley["reasons"]
     # The four are named, by label (Task W2E, the audit's F4): never only counted.
     named = [skill["label"] for skill in trolley["shared_skills"]]
     assert len(named) == 4
@@ -585,15 +599,21 @@ def test_the_sketch_lists_esco_requirements_for_a_target_and_every_step_stays_un
     sketch = api.get(f"/v1/workspaces/{workspace}/sketch", ada).json()
 
     assert (before["targets"], before["steps"]) == ([], [])  # no sketch without a target
-    assert sketch["label"] == "Early sketch, not a checked route"
+    assert "label" not in sketch  # facts only: the web labels it an early sketch
     mechanic, invented = sketch["targets"]
     assert mechanic["resolution"] == "esco"
     assert mechanic["requirements"]
     assert mechanic["requirement_count"] >= len(mechanic["requirements"])
     assert invented["resolution"] == "not_found"
     assert (invented["requirements"], invented["requirement_count"]) == ([], None)
-    assert {step["state"] for step in sketch["steps"]} == {"unresolved"}
-    assert "spending limit isn't known" in sketch["steps"][-1]["detail"]
+    assert sketch["steps"] == [
+        {"step": "compare", "state": "unresolved"},
+        {"step": "find_options", "state": "unresolved"},
+        {"step": "check_time_and_cost", "state": "unresolved"},
+    ]
+    # The last step's words say the spending limit isn't known, from this input's state.
+    assert sketch["inputs"]["direct_spend_cap"] != "provided"
+    assert (mechanic["coverage"], invented["coverage"]) == ("not_covered", "not_covered")
     assert set(sketch["not_asked"]) == {"current_role", "weekly_study_hours", "cities"}
     assert sketch["inputs"]["direct_spend_cap"] == "prefer_not_to_say"  # an answer, not zero
     assert not re.search(r"feasible|optimal|£\s?\d", json.dumps(sketch), re.IGNORECASE)
@@ -619,15 +639,11 @@ def test_the_sketch_says_what_matching_each_title_did_never_what_esco_holds(
 
     shared, invented = api.get(f"/v1/workspaces/{workspace}/sketch", ada).json()["targets"]
 
+    # The web words each resolution (`RESEARCH_STATUS`, with a test of each sentence).
     assert shared["resolution"] == "ambiguous"
-    assert shared["research_status"] == (
-        "Careerwright matched this title to several occupations in ESCO. Choose the one you mean."
-    )
+    assert len(shared["occupations"]) == 2
     assert invented["resolution"] == "not_found"
-    assert invented["research_status"] == (
-        "Careerwright couldn't match this title to an occupation in ESCO, so there's no "
-        "requirement list yet. Not researched."
-    )
+    assert "research_status" not in shared
 
 
 @pytest.mark.req("STATE-05", "REC1-07")
@@ -683,10 +699,9 @@ def test_a_slate_read_against_another_release_than_its_searches_says_so(infra: I
     finally:
         engine.dispose()
 
-    assert not [note for note in same["notes"] if "were chosen when" in note]
-    [note] = [note for note in other["notes"] if "were chosen when" in note]
-    assert "esco-v1.1.1-en-csv" in note
-    assert held in note
+    assert not [note for note in same["notes"] if note["reason"] == "release_changed"]
+    [note] = [note for note in other["notes"] if note["reason"] == "release_changed"]
+    assert note == {"reason": "release_changed", "searched": "esco-v1.1.1-en-csv", "held": held}
 
 
 @pytest.mark.req("SEC-02", "API-01")

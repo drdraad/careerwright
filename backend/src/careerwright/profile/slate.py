@@ -51,6 +51,16 @@ from enum import StrEnum
 
 from careerwright.catalogue.records import SkillNeighbour
 from careerwright.profile.discovery import EvidenceItem, QueryChannel
+from careerwright.profile.slate_facts import (
+    CastingWider,
+    ExclusionsRemoved,
+    FewerReason,
+    FewMatched,
+    KindsOfWorkShown,
+    MoreDepth,
+    NothingFound,
+    SlateNote,
+)
 
 SLATE_SIZE = 6
 FAMILY_LIMIT = 2
@@ -321,8 +331,8 @@ class Slate:
     beyond_limit: int
     excluded: dict[str, int]
     family_limit: int
-    fewer_reasons: list[str] = field(default_factory=list)
-    notes: list[str] = field(default_factory=list)
+    fewer_reasons: list[FewerReason] = field(default_factory=list)
+    notes: list[SlateNote] = field(default_factory=list)
 
 
 _CLOSE_CHANNELS = frozenset({SlateChannel.CURRENT, SlateChannel.USER_PROPOSED})
@@ -495,7 +505,7 @@ class _Policy:
     floor: float
     family_limit: int
     quotas: Mapping[Direction, int]
-    note: str | None = None
+    note: SlateNote | None = None
 
 
 _BALANCED = {Direction.CLOSE: 2, Direction.TRANSFERABLE: 2, Direction.LESS_FAMILIAR: 2}
@@ -511,24 +521,14 @@ _POLICIES: Mapping[Emphasis, _Policy] = {
         FAMILY_LIMIT,
         {Direction.CLOSE: 1, Direction.TRANSFERABLE: 1, Direction.LESS_FAMILIAR: 4},
     ),
-    Emphasis.BROAD: _Policy(
-        BROAD_RELEVANCE_FLOOR,
-        1,
-        _BALANCED,
-        "Casting wider: a lower bar for relevance and one suggestion per kind of work.",
-    ),
+    Emphasis.BROAD: _Policy(BROAD_RELEVANCE_FLOOR, 1, _BALANCED, CastingWider()),
     Emphasis.DEEPER: _Policy(
         RELEVANCE_FLOOR,
         DEEPER_FAMILY_LIMIT,
         _BALANCED,
-        f"Showing up to {DEEPER_FAMILY_LIMIT} from one kind of work, because you asked for "
-        "more depth.",
+        MoreDepth(family_limit=DEEPER_FAMILY_LIMIT),
     ),
 }
-
-
-def _plural(count: int, one: str, many: str) -> str:
-    return f"{count} {one if count == 1 else many}"
 
 
 def choose_slate(
@@ -596,26 +596,17 @@ def choose_slate(
         reason = NotIncluded.FAMILY_LIMIT if at_limit else NotIncluded.LESS_RELEVANT
         left.append(Left(candidate, reason))
 
-    fewer: list[str] = []
+    fewer: list[FewerReason] = []
     if len(chosen) < SLATE_SIZE:
         if not pool.candidates:
-            fewer.append("None of your answers found work to suggest yet.")
+            fewer.append(NothingFound())
         elif len(eligible) < SLATE_SIZE:
-            fewer.append(
-                f"Only {_plural(len(eligible), 'occupation', 'occupations')} matched your "
-                "answers closely enough to suggest. Careerwright doesn't fill the rest with weaker "
-                "matches."
-            )
+            fewer.append(FewMatched(count=len(eligible)))
         if blocked:
-            fewer.append(
-                f"{_plural(blocked, 'more is', 'more are')} in kinds of work already shown "
-                f"{policy.family_limit} times; ask for more depth to see them."
-            )
+            fewer.append(KindsOfWorkShown(count=blocked, family_limit=policy.family_limit))
         removed = sum(excluded.values())
         if removed:
-            fewer.append(
-                f"Your exclusions removed {_plural(removed, 'occupation', 'occupations')}."
-            )
+            fewer.append(ExclusionsRemoved(count=removed))
     return Slate(
         suggestions=tuple(chosen),
         not_included=tuple(sorted(left, key=lambda item: _order(item.candidate))),

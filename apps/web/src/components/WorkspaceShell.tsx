@@ -17,6 +17,7 @@ import {
   refreshFailed,
   useMe,
   useProfile,
+  useTargets,
   useWorkspace,
   useWorkspaceEvents,
   useWorkspaces,
@@ -129,9 +130,11 @@ export function WorkspaceShell({
     session: auth.state.status === "signed_in" ? auth.state.uid : "",
   });
   const visited = useVisited(workspaceId, chapter);
+  const targets = useTargets(workspaceId, opened);
   const worldInput = useMemo(
-    () => (profile.data === undefined ? null : worldFromProfile(profile.data)),
-    [profile.data],
+    () =>
+      profile.data === undefined ? null : worldFromProfile(profile.data, targets.data?.targets),
+    [profile.data, targets.data],
   );
 
   if (auth.state.status !== "signed_in") return <PageLoading stage="Checking your sign-in" />;

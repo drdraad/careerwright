@@ -498,18 +498,6 @@ export const AiResilienceFilterOutSchema = {
             type: 'string',
             format: 'date',
             title: 'Pack Dated'
-        },
-        summary: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Summary',
-            description: 'In words, when the filter is not at its default.'
         }
     },
     additionalProperties: false,
@@ -523,11 +511,10 @@ export const AiResilienceFilterOutSchema = {
         'unscored_excluded',
         'synthetic',
         'pack_version',
-        'pack_dated',
-        'summary'
+        'pack_dated'
     ],
     title: 'AiResilienceFilterOut',
-    description: 'The AI Resilience filter\'s basis and counts (AIR1-05): the minimum applies to the\nlower end of a reviewed range; unscored occupations are included unless you switch\nthem off, and are never read as 0 or 10.'
+    description: 'The AI Resilience filter\'s basis and counts (AIR1-05): the minimum applies to the\nlower end of a reviewed range; unscored occupations are included unless you switch\nthem off, and are never read as 0 or 10. The web words the counts, when the filter is not\nat its default (a minimum, or unscored ones left out).'
 } as const;
 
 export const AiResilienceOutSchema = {
@@ -680,6 +667,75 @@ export const AnswerSchema = {
     ],
     title: 'Answer',
     description: 'The five answers the interview pattern distinguishes, each in the same neutral tone,\nand the world\'s "I\'ve used this" (Sprint W).'
+} as const;
+
+export const AnswerFoundNoWorkSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'answer_found_no_work',
+            title: 'Reason',
+            default: 'answer_found_no_work'
+        },
+        outcome: {
+            type: 'string',
+            const: 'found_none',
+            title: 'Outcome',
+            default: 'found_none'
+        },
+        answer: {
+            type: 'string',
+            title: 'Answer'
+        },
+        own_words: {
+            type: 'boolean',
+            title: 'Own Words',
+            description: 'Its searches are the answer itself.'
+        },
+        searches: {
+            items: {
+                $ref: '#/components/schemas/AnswerSearch'
+            },
+            type: 'array',
+            title: 'Searches'
+        },
+        min_shared: {
+            type: 'integer',
+            title: 'Min Shared',
+            description: 'The essential skills a join needs in common.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'answer',
+        'own_words',
+        'searches',
+        'min_shared'
+    ],
+    title: 'AnswerFoundNoWork',
+    description: 'Every search resting on an answer found nothing.'
+} as const;
+
+export const AnswerSearchSchema = {
+    properties: {
+        text: {
+            type: 'string',
+            title: 'Text'
+        },
+        did: {
+            $ref: '#/components/schemas/SearchDid'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'text',
+        'did'
+    ],
+    title: 'AnswerSearch'
 } as const;
 
 export const AnsweredStateSchema = {
@@ -1390,6 +1446,24 @@ export const CapabilityChangeOutSchema = {
     title: 'CapabilityChangeOut'
 } as const;
 
+export const CastingWiderSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'casting_wider',
+            title: 'Reason',
+            default: 'casting_wider'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason'
+    ],
+    title: 'CastingWider',
+    description: 'The broader view: a lower bar for relevance and one suggestion per kind of work.'
+} as const;
+
 export const CatalogueSchema = {
     properties: {
         label: {
@@ -1910,10 +1984,6 @@ export const ConnectionOutSchema = {
             title: 'Role Title',
             description: 'The person\'s role, as ESCO titles it.'
         },
-        sentence: {
-            type: 'string',
-            title: 'Sentence'
-        },
         shared_skill_count: {
             type: 'integer',
             title: 'Shared Skill Count'
@@ -1925,10 +1995,6 @@ export const ConnectionOutSchema = {
             type: 'array',
             title: 'Shared Skills',
             description: 'The essential skills both list.'
-        },
-        still_uncertain: {
-            type: 'string',
-            title: 'Still Uncertain'
         }
     },
     additionalProperties: false,
@@ -1937,13 +2003,11 @@ export const ConnectionOutSchema = {
         'concept_id',
         'title',
         'role_title',
-        'sentence',
         'shared_skill_count',
-        'shared_skills',
-        'still_uncertain'
+        'shared_skills'
     ],
     title: 'ConnectionOut',
-    description: 'The unexpected connection: one suggestion joined to the person\'s role by the\nessential skills the two share in ESCO, outside the role\'s own kind of work and never a\ntitle the person named; the one sharing the most. Its sentence is a fact about the two\nroles, never about the person, and the shared skills are its evidence, one step away.'
+    description: 'The unexpected connection: one suggestion joined to the person\'s role by the\nessential skills the two share in ESCO, outside the role\'s own kind of work and never a\ntitle the person named; the one sharing the most. It is a fact about the two roles,\nnever about the person, and the shared skills are its evidence, one step away.'
 } as const;
 
 export const ContinuationInputSchema = {
@@ -2954,6 +3018,26 @@ export const EvidenceContextSchema = {
     description: 'Where it was done: transferable evidence from any of these counts.'
 } as const;
 
+export const EvidenceItemSchema = {
+    properties: {
+        field: {
+            $ref: '#/components/schemas/ProfileField'
+        },
+        text: {
+            type: 'string',
+            title: 'Text'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'field',
+        'text'
+    ],
+    title: 'EvidenceItem',
+    description: 'One confirmed answer text and the field that holds it.'
+} as const;
+
 export const EvidenceKindSchema = {
     type: 'string',
     enum: [
@@ -3033,6 +3117,28 @@ export const ExclusionReasonSchema = {
     ],
     title: 'ExclusionReason',
     description: 'Why a proposed page is not a candidate: the URL checks\' refusals, or these.'
+} as const;
+
+export const ExclusionsRemovedSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'exclusions_removed',
+            title: 'Reason',
+            default: 'exclusions_removed'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'count'
+    ],
+    title: 'ExclusionsRemoved'
 } as const;
 
 export const ExplanationRunOutSchema = {
@@ -3183,6 +3289,29 @@ export const FailureClassSchema = {
         'unknown_failure'
     ],
     title: 'FailureClass'
+} as const;
+
+export const FewMatchedSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'few_matched',
+            title: 'Reason',
+            default: 'few_matched'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'count'
+    ],
+    title: 'FewMatched',
+    description: 'Only these matched closely enough to suggest; weaker matches don\'t fill the rest.'
 } as const;
 
 export const FieldEditSchema = {
@@ -4228,7 +4357,121 @@ export const JobPageSchema = {
     description: 'A page of jobs, with counts that never double count a multi-city job and coverage\nthat says how many sources were checked. An empty page says why (STATE-02).'
 } as const;
 
+export const JoinKeptBestSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'join_kept_best',
+            title: 'Reason',
+            default: 'join_kept_best'
+        },
+        outcome: {
+            type: 'string',
+            const: 'found_work',
+            title: 'Outcome',
+            default: 'found_work'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        found: {
+            type: 'integer',
+            title: 'Found',
+            description: 'Other occupations sharing enough essential skills.'
+        },
+        kept: {
+            type: 'integer',
+            title: 'Kept',
+            description: 'Those kept: the largest share of essential skills in common.'
+        },
+        min_shared: {
+            type: 'integer',
+            title: 'Min Shared'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'title',
+        'found',
+        'kept',
+        'min_shared'
+    ],
+    title: 'JoinKeptBest',
+    description: 'A title\'s skill join reached more than it keeps.'
+} as const;
+
+export const JoinedBySharedSkillsSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'joined_by_shared_skills',
+            title: 'Reason',
+            default: 'joined_by_shared_skills'
+        },
+        outcome: {
+            type: 'string',
+            const: 'found_work',
+            title: 'Outcome',
+            default: 'found_work'
+        },
+        field: {
+            $ref: '#/components/schemas/ProfileField'
+        },
+        answer: {
+            type: 'string',
+            title: 'Answer'
+        },
+        shared: {
+            type: 'integer',
+            title: 'Shared',
+            description: 'Essential skills ESCO lists for both.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'field',
+        'answer',
+        'shared'
+    ],
+    title: 'JoinedBySharedSkills'
+} as const;
+
 export const JsonValueSchema = {} as const;
+
+export const KindsOfWorkShownSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'kinds_of_work_shown',
+            title: 'Reason',
+            default: 'kinds_of_work_shown'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        },
+        family_limit: {
+            type: 'integer',
+            title: 'Family Limit'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'count',
+        'family_limit'
+    ],
+    title: 'KindsOfWorkShown',
+    description: 'These are in kinds of work already shown as often as the view allows.'
+} as const;
 
 export const LabelMatchOutSchema = {
     properties: {
@@ -5083,6 +5326,29 @@ export const MoneyInputSchema = {
     title: 'MoneyInput'
 } as const;
 
+export const MoreDepthSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'more_depth',
+            title: 'Reason',
+            default: 'more_depth'
+        },
+        family_limit: {
+            type: 'integer',
+            title: 'Family Limit'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'family_limit'
+    ],
+    title: 'MoreDepth',
+    description: 'The deeper view: more from one kind of work, because the person asked.'
+} as const;
+
 export const NeedSchema = {
     properties: {
         input: {
@@ -5128,6 +5394,42 @@ export const NeededInputSchema = {
         'work_rights'
     ],
     title: 'NeededInput'
+} as const;
+
+export const NoSharedOccupationSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'no_shared_occupation',
+            title: 'Reason',
+            default: 'no_shared_occupation'
+        },
+        outcome: {
+            type: 'string',
+            const: 'found_none',
+            title: 'Outcome',
+            default: 'found_none'
+        },
+        title: {
+            type: 'string',
+            title: 'Title',
+            description: 'The role, as ESCO titles it.'
+        },
+        min_shared: {
+            type: 'integer',
+            title: 'Min Shared'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'title',
+        'min_shared'
+    ],
+    title: 'NoSharedOccupation',
+    description: 'The role\'s join found no other occupation sharing enough essential skills.'
 } as const;
 
 export const NotIncludedSchema = {
@@ -5200,6 +5502,30 @@ export const NotIncludedOutSchema = {
     ],
     title: 'NotIncludedOut',
     description: 'A pooled occupation the slate does not show, and why.'
+} as const;
+
+export const NothingFoundSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'nothing_found',
+            title: 'Reason',
+            default: 'nothing_found'
+        },
+        outcome: {
+            type: 'string',
+            const: 'found_none',
+            title: 'Outcome',
+            default: 'found_none'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome'
+    ],
+    title: 'NothingFound'
 } as const;
 
 export const ObservedTaskOutSchema = {
@@ -5794,6 +6120,39 @@ export const OfferingSchema = {
     description: 'One dated intake of a concept (spec section 18, Offering).'
 } as const;
 
+export const OneWordWorkStyleSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'one_word_work_style',
+            title: 'Reason',
+            default: 'one_word_work_style'
+        },
+        outcome: {
+            type: 'string',
+            const: 'not_searched',
+            title: 'Outcome',
+            default: 'not_searched'
+        },
+        answers: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Answers'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'answers'
+    ],
+    title: 'OneWordWorkStyle',
+    description: 'Searches and title ideas resting only on one-word answers about how the person likes to\nwork were not run: one word matches too loosely.'
+} as const;
+
 export const OnetMatchOutSchema = {
     properties: {
         onet_code: {
@@ -5923,11 +6282,45 @@ export const OriginOutSchema = {
         },
         fewer_reasons: {
             items: {
-                type: 'string'
+                oneOf: [
+                    {
+                        $ref: '#/components/schemas/NothingFound'
+                    },
+                    {
+                        $ref: '#/components/schemas/FewMatched'
+                    },
+                    {
+                        $ref: '#/components/schemas/KindsOfWorkShown'
+                    },
+                    {
+                        $ref: '#/components/schemas/ExclusionsRemoved'
+                    },
+                    {
+                        $ref: '#/components/schemas/TitleNotMatched'
+                    },
+                    {
+                        $ref: '#/components/schemas/TitleMatchedSeveral'
+                    },
+                    {
+                        $ref: '#/components/schemas/NoSharedOccupation'
+                    }
+                ],
+                discriminator: {
+                    propertyName: 'reason',
+                    mapping: {
+                        exclusions_removed: '#/components/schemas/ExclusionsRemoved',
+                        few_matched: '#/components/schemas/FewMatched',
+                        kinds_of_work_shown: '#/components/schemas/KindsOfWorkShown',
+                        no_shared_occupation: '#/components/schemas/NoSharedOccupation',
+                        nothing_found: '#/components/schemas/NothingFound',
+                        title_matched_several: '#/components/schemas/TitleMatchedSeveral',
+                        title_not_matched: '#/components/schemas/TitleNotMatched'
+                    }
+                }
             },
             type: 'array',
             title: 'Fewer Reasons',
-            description: 'Why there are fewer than six, if there are.'
+            description: 'Why there are fewer than six, if there are, as facts the web words.'
         },
         connection: {
             anyOf: [
@@ -6150,6 +6543,40 @@ export const OutcomeTypeSchema = {
         'supervised_experience'
     ],
     title: 'OutcomeType'
+} as const;
+
+export const OwnTitleMatchedSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'own_title_matched',
+            title: 'Reason',
+            default: 'own_title_matched'
+        },
+        outcome: {
+            type: 'string',
+            const: 'matched',
+            title: 'Outcome',
+            default: 'matched'
+        },
+        field: {
+            $ref: '#/components/schemas/ProfileField'
+        },
+        answer: {
+            type: 'string',
+            title: 'Answer'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'field',
+        'answer'
+    ],
+    title: 'OwnTitleMatched',
+    description: 'The person\'s own title, matched to this occupation.'
 } as const;
 
 export const PackLabelSchema = {
@@ -8993,6 +9420,36 @@ export const RegisterProvisionalConceptSchema = {
     title: 'RegisterProvisionalConcept'
 } as const;
 
+export const ReleaseChangedSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'release_changed',
+            title: 'Reason',
+            default: 'release_changed'
+        },
+        searched: {
+            type: 'string',
+            title: 'Searched',
+            description: 'The release the searches were chosen for.'
+        },
+        held: {
+            type: 'string',
+            title: 'Held',
+            description: 'The release this slate uses.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'searched',
+        'held'
+    ],
+    title: 'ReleaseChanged',
+    description: 'The searches were chosen when another ESCO release was held.'
+} as const;
+
 export const ReleaseRefOutSchema = {
     properties: {
         dataset_id: {
@@ -10081,8 +10538,7 @@ export const SalaryFloorOutSchema = {
             $ref: '#/components/schemas/Money'
         },
         period: {
-            type: 'string',
-            title: 'Period'
+            $ref: '#/components/schemas/PayPeriod'
         },
         basis: {
             type: 'string',
@@ -10110,11 +10566,6 @@ export const SalaryFloorOutSchema = {
             },
             type: 'array',
             title: 'Kept By Reason'
-        },
-        summary: {
-            type: 'string',
-            title: 'Summary',
-            description: 'The counts in words, for display.'
         }
     },
     additionalProperties: false,
@@ -10125,11 +10576,10 @@ export const SalaryFloorOutSchema = {
         'left_out',
         'meets',
         'kept_pay_unknown',
-        'kept_by_reason',
-        'summary'
+        'kept_by_reason'
     ],
     title: 'SalaryFloorOut',
-    description: 'Your confirmed salary floor, applied as a hard filter: a suggestion is left out only\nwhen official pay for it (ASHE through a reviewed UK SOC mapping, the 90th percentile in\nevery region of your cities) is below it. Unknown pay is never treated as below it.'
+    description: 'Your confirmed salary floor, applied as a hard filter: a suggestion is left out only\nwhen official pay for it (ASHE through a reviewed UK SOC mapping, the 90th percentile in\nevery region of your cities) is below it. Unknown pay is never treated as below it. The\nweb words the counts, which add up: left out, meeting it, and kept by reason.'
 } as const;
 
 export const SalaryInputSchema = {
@@ -10194,6 +10644,17 @@ export const SearchCandidateSchema = {
         'grounded'
     ],
     title: 'SearchCandidate'
+} as const;
+
+export const SearchDidSchema = {
+    type: 'string',
+    enum: [
+        'read_main_names',
+        'only_common_words',
+        'no_shared_occupation'
+    ],
+    title: 'SearchDid',
+    description: 'What one of an answer\'s searches did that found no work.'
 } as const;
 
 export const SearchEmptyReasonSchema = {
@@ -10360,6 +10821,50 @@ export const SearchProposalSchema = {
     description: 'A source search\'s validated output: candidates only, never claims.'
 } as const;
 
+export const SearchedThroughSkillSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'searched_through_skill',
+            title: 'Reason',
+            default: 'searched_through_skill'
+        },
+        outcome: {
+            type: 'string',
+            const: 'found_work',
+            title: 'Outcome',
+            default: 'found_work'
+        },
+        field: {
+            $ref: '#/components/schemas/ProfileField'
+        },
+        answer: {
+            type: 'string',
+            title: 'Answer'
+        },
+        search: {
+            type: 'string',
+            title: 'Search'
+        },
+        skill: {
+            type: 'string',
+            title: 'Skill',
+            description: 'The essential skill whose main name holds its words.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'field',
+        'answer',
+        'search',
+        'skill'
+    ],
+    title: 'SearchedThroughSkill'
+} as const;
+
 export const SessionSchema = {
     properties: {
         weekday: {
@@ -10522,10 +11027,6 @@ export const SharedSkillOutSchema = {
 
 export const SketchOutSchema = {
     properties: {
-        label: {
-            type: 'string',
-            title: 'Label'
-        },
         profile_version: {
             type: 'integer',
             title: 'Profile Version'
@@ -10566,7 +11067,6 @@ export const SketchOutSchema = {
     additionalProperties: false,
     type: 'object',
     required: [
-        'label',
         'profile_version',
         'inputs',
         'not_asked',
@@ -10574,7 +11074,7 @@ export const SketchOutSchema = {
         'steps'
     ],
     title: 'SketchOut',
-    description: 'The early requirement sketch: never a feasible or optimal route, never priced or\ndated. Every step stays unresolved until a later chapter resolves it.'
+    description: 'The early requirement sketch: never a feasible or optimal route, never priced or\ndated. Every step stays unresolved until a later chapter resolves it. Facts only: the web\nwords them.'
 } as const;
 
 export const SkillRefOutSchema = {
@@ -10768,19 +11268,91 @@ export const SlateOutSchema = {
         },
         fewer_reasons: {
             items: {
-                type: 'string'
+                oneOf: [
+                    {
+                        $ref: '#/components/schemas/NothingFound'
+                    },
+                    {
+                        $ref: '#/components/schemas/FewMatched'
+                    },
+                    {
+                        $ref: '#/components/schemas/KindsOfWorkShown'
+                    },
+                    {
+                        $ref: '#/components/schemas/ExclusionsRemoved'
+                    },
+                    {
+                        $ref: '#/components/schemas/TitleNotMatched'
+                    },
+                    {
+                        $ref: '#/components/schemas/TitleMatchedSeveral'
+                    },
+                    {
+                        $ref: '#/components/schemas/NoSharedOccupation'
+                    }
+                ],
+                discriminator: {
+                    propertyName: 'reason',
+                    mapping: {
+                        exclusions_removed: '#/components/schemas/ExclusionsRemoved',
+                        few_matched: '#/components/schemas/FewMatched',
+                        kinds_of_work_shown: '#/components/schemas/KindsOfWorkShown',
+                        no_shared_occupation: '#/components/schemas/NoSharedOccupation',
+                        nothing_found: '#/components/schemas/NothingFound',
+                        title_matched_several: '#/components/schemas/TitleMatchedSeveral',
+                        title_not_matched: '#/components/schemas/TitleNotMatched'
+                    }
+                }
             },
             type: 'array',
             title: 'Fewer Reasons',
-            description: 'Why there are fewer than six, if there are.'
+            description: 'Why there are fewer than six, if there are, as facts the web words.'
         },
         notes: {
             items: {
-                type: 'string'
+                oneOf: [
+                    {
+                        $ref: '#/components/schemas/ReleaseChanged'
+                    },
+                    {
+                        $ref: '#/components/schemas/OneWordWorkStyle'
+                    },
+                    {
+                        $ref: '#/components/schemas/AnswerFoundNoWork'
+                    },
+                    {
+                        $ref: '#/components/schemas/TooGeneral'
+                    },
+                    {
+                        $ref: '#/components/schemas/JoinKeptBest'
+                    },
+                    {
+                        $ref: '#/components/schemas/SmallPool'
+                    },
+                    {
+                        $ref: '#/components/schemas/CastingWider'
+                    },
+                    {
+                        $ref: '#/components/schemas/MoreDepth'
+                    }
+                ],
+                discriminator: {
+                    propertyName: 'reason',
+                    mapping: {
+                        answer_found_no_work: '#/components/schemas/AnswerFoundNoWork',
+                        casting_wider: '#/components/schemas/CastingWider',
+                        join_kept_best: '#/components/schemas/JoinKeptBest',
+                        more_depth: '#/components/schemas/MoreDepth',
+                        one_word_work_style: '#/components/schemas/OneWordWorkStyle',
+                        release_changed: '#/components/schemas/ReleaseChanged',
+                        small_pool: '#/components/schemas/SmallPool',
+                        too_general: '#/components/schemas/TooGeneral'
+                    }
+                }
             },
             type: 'array',
             title: 'Notes',
-            description: 'How the slate was made, in words: a control\'s effect, a changed ESCO release, answers not searched, answers that found no work or were too general to find it alone, what a join keeps, or fewer occupations to choose from than Careerwright aims for.'
+            description: 'How the slate was made, as facts the web words: a control\'s effect, a changed ESCO release, answers not searched, answers that found no work or were too general to find it alone, what a join keeps, or fewer occupations to choose from than Careerwright aims for.'
         },
         salary_floor: {
             anyOf: [
@@ -10843,13 +11415,13 @@ export const SlateOutSchema = {
             title: 'Unsearchable Queries',
             description: 'Queries with no searchable word.'
         },
-        unsupported_hypotheses: {
+        title_ideas: {
             items: {
-                type: 'string'
+                $ref: '#/components/schemas/TitleIdea'
             },
             type: 'array',
-            title: 'Unsupported Hypotheses',
-            description: 'Titles Careerwright thought of but couldn\'t match to an occupation in ESCO (case, punctuation and plurals folded): never suggested.'
+            title: 'Title Ideas',
+            description: 'Titles Careerwright thought of, each with what matching it in ESCO did (case, punctuation and plurals folded): one it couldn\'t match is never suggested.'
         },
         not_included: {
             items: {
@@ -10905,7 +11477,7 @@ export const SlateOutSchema = {
         'excluded',
         'queries',
         'unsearchable_queries',
-        'unsupported_hypotheses',
+        'title_ideas',
         'not_included',
         'unmatched_titles',
         'ambiguous_titles',
@@ -10913,6 +11485,41 @@ export const SlateOutSchema = {
     ],
     title: 'SlateOut',
     description: 'A varied slate of up to six career hypotheses from the discovery\'s searches, computed\ndeterministically each time it is read, with every count that explains it. A title of\nthe person\'s own (their role, a target, or a search naming one) joins other work only by\nshared essential skills, never by its words, and only once it names one occupation.'
+} as const;
+
+export const SmallPoolSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'small_pool',
+            title: 'Reason',
+            default: 'small_pool'
+        },
+        outcome: {
+            type: 'string',
+            const: 'found_work',
+            title: 'Outcome',
+            default: 'found_work'
+        },
+        pool_size: {
+            type: 'integer',
+            title: 'Pool Size'
+        },
+        pool_target: {
+            type: 'integer',
+            title: 'Pool Target'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'pool_size',
+        'pool_target'
+    ],
+    title: 'SmallPool',
+    description: 'A full slate chosen from fewer occupations than Careerwright aims for.'
 } as const;
 
 export const SocCandidateOutSchema = {
@@ -11657,19 +12264,21 @@ export const StatisticSchema = {
     title: 'Statistic'
 } as const;
 
+export const StepSchema = {
+    type: 'string',
+    enum: [
+        'compare',
+        'find_options',
+        'check_time_and_cost'
+    ],
+    title: 'Step',
+    description: 'The generic steps between here and a plan, each unresolved until a later chapter\nresolves it.'
+} as const;
+
 export const StepOutSchema = {
     properties: {
-        name: {
-            type: 'string',
-            title: 'Name'
-        },
-        chapter: {
-            type: 'string',
-            title: 'Chapter'
-        },
-        detail: {
-            type: 'string',
-            title: 'Detail'
+        step: {
+            $ref: '#/components/schemas/Step'
         },
         state: {
             type: 'string',
@@ -11680,9 +12289,7 @@ export const StepOutSchema = {
     additionalProperties: false,
     type: 'object',
     required: [
-        'name',
-        'chapter',
-        'detail',
+        'step',
         'state'
     ],
     title: 'StepOut'
@@ -12149,41 +12756,65 @@ export const SuggestionOutSchema = {
             title: 'Workday',
             description: 'ESCO\'s description of the work, shortened.'
         },
-        why_it_could_suit: {
+        reasons: {
             items: {
-                type: 'string'
+                oneOf: [
+                    {
+                        $ref: '#/components/schemas/JoinedBySharedSkills'
+                    },
+                    {
+                        $ref: '#/components/schemas/SearchedThroughSkill'
+                    },
+                    {
+                        $ref: '#/components/schemas/TitleIdeaMatched'
+                    },
+                    {
+                        $ref: '#/components/schemas/OwnTitleMatched'
+                    }
+                ],
+                discriminator: {
+                    propertyName: 'reason',
+                    mapping: {
+                        joined_by_shared_skills: '#/components/schemas/JoinedBySharedSkills',
+                        own_title_matched: '#/components/schemas/OwnTitleMatched',
+                        searched_through_skill: '#/components/schemas/SearchedThroughSkill',
+                        title_idea_matched: '#/components/schemas/TitleIdeaMatched'
+                    }
+                }
             },
             type: 'array',
-            title: 'Why It Could Suit'
+            title: 'Reasons',
+            description: 'Why it could suit the person: what found it, from at most three of their answers.'
         },
-        what_might_not_suit: {
-            items: {
-                type: 'string'
-            },
-            type: 'array',
-            title: 'What Might Not Suit'
+        essential_skill_count: {
+            type: 'integer',
+            title: 'Essential Skill Count',
+            description: 'Essential skills ESCO lists for it, not yet compared with experience.'
         },
-        entry_gates: {
+        essential_skills: {
             items: {
                 type: 'string'
             },
             type: 'array',
-            title: 'Entry Gates'
+            title: 'Essential Skills',
+            description: 'The first few of them, by ESCO\'s label.'
         },
-        evidence_gaps: {
-            items: {
-                type: 'string'
-            },
-            type: 'array',
-            title: 'Evidence Gaps'
+        regulated: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Regulated',
+            description: 'ESCO marks it a regulated profession in at least one European country (whether England requires registration isn\'t checked); null: ESCO records no note.'
         },
-        try_it: {
-            items: {
-                type: 'string'
-            },
-            type: 'array',
-            title: 'Try It',
-            description: 'Low-cost ways to test the idea before committing.'
+        different_kind_of_work: {
+            type: 'boolean',
+            title: 'Different Kind Of Work',
+            description: 'Another kind of work than any the person told Careerwright about (false when that isn\'t known).'
         },
         shared_skills: {
             items: {
@@ -12209,15 +12840,15 @@ export const SuggestionOutSchema = {
         'matched_queries',
         'sources',
         'workday',
-        'why_it_could_suit',
-        'what_might_not_suit',
-        'entry_gates',
-        'evidence_gaps',
-        'try_it',
+        'reasons',
+        'essential_skill_count',
+        'essential_skills',
+        'regulated',
+        'different_kind_of_work',
         'shared_skills'
     ],
     title: 'SuggestionOut',
-    description: 'A career hypothesis (spec section 4\'s `CareerSuggestion`): an ESCO occupation, the\nanswers that found it and ESCO\'s facts about it, in words. Becoming a target needs the\nperson\'s choice (`POST .../targets`).'
+    description: 'A career hypothesis (spec section 4\'s `CareerSuggestion`): an ESCO occupation, the\nanswers that found it and ESCO\'s facts about it, as facts the web words. Becoming a\ntarget needs the person\'s choice (`POST .../targets`).'
 } as const;
 
 export const SupportSchema = {
@@ -12452,6 +13083,39 @@ export const SupportResourceOutSchema = {
     title: 'SupportResourceOut'
 } as const;
 
+export const TargetCoverageSchema = {
+    type: 'string',
+    enum: [
+        'pack_target',
+        'not_covered',
+        'several_pack_targets'
+    ],
+    title: 'TargetCoverage',
+    description: 'How far Careerwright can cover a target: one of the option pack\'s targets, or not.'
+} as const;
+
+export const TargetKindSchema = {
+    type: 'string',
+    enum: [
+        'esco',
+        'own_words'
+    ],
+    title: 'TargetKind',
+    description: 'What a target\'s title is (`careerwright.profile.targets`). Slice B of Task 6d adds a UK\ntitle from the ONS coding index.'
+} as const;
+
+export const TargetLinkSchema = {
+    type: 'string',
+    enum: [
+        'occupation_choice',
+        'exact_label',
+        'pack_crosswalk',
+        'none'
+    ],
+    title: 'TargetLink',
+    description: 'The source of the link between a target and its ESCO occupation.'
+} as const;
+
 export const TargetListInputSchema = {
     properties: {
         state: {
@@ -12621,6 +13285,98 @@ export const TargetOutSchema = {
     title: 'TargetOut'
 } as const;
 
+export const TargetRecordOutSchema = {
+    properties: {
+        key: {
+            type: 'string',
+            title: 'Key',
+            description: 'The title as a concept (case, punctuation, plurals, accents and "&" folded): the target\'s identity.'
+        },
+        title: {
+            type: 'string',
+            title: 'Title',
+            description: 'The person\'s words, as the profile holds them.'
+        },
+        kind: {
+            $ref: '#/components/schemas/TargetKind'
+        },
+        link: {
+            $ref: '#/components/schemas/TargetLink'
+        },
+        concept_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Concept Id',
+            description: 'The ESCO occupation the title names in ESCO itself (the person\'s choice, or the one occupation holding the title as a label); null otherwise.'
+        },
+        label_matches: {
+            type: 'integer',
+            title: 'Label Matches',
+            description: 'How many ESCO occupations hold the title as a label (several: the person chooses which they mean, none is guessed).'
+        },
+        coverage: {
+            $ref: '#/components/schemas/TargetCoverage'
+        },
+        pack_target_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Pack Target Id',
+            description: 'The option pack\'s target, when covered.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'key',
+        'title',
+        'kind',
+        'link',
+        'concept_id',
+        'label_matches',
+        'coverage',
+        'pack_target_id'
+    ],
+    title: 'TargetRecordOut',
+    description: 'A target as it is stored once, when chosen or saved: what it names, the source of that\nlink and how far Careerwright can cover it. Every chapter reads this record, so a title\nresolves the same everywhere.'
+} as const;
+
+export const TargetRecordsOutSchema = {
+    properties: {
+        profile_version: {
+            type: 'integer',
+            title: 'Profile Version'
+        },
+        targets: {
+            items: {
+                $ref: '#/components/schemas/TargetRecordOut'
+            },
+            type: 'array',
+            title: 'Targets',
+            description: 'In the profile\'s order, one per concept.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'profile_version',
+        'targets'
+    ],
+    title: 'TargetRecordsOut'
+} as const;
+
 export const TargetSketchOutSchema = {
     properties: {
         title: {
@@ -12677,9 +13433,9 @@ export const TargetSketchOutSchema = {
             ],
             title: 'Regulated'
         },
-        research_status: {
-            type: 'string',
-            title: 'Research Status'
+        coverage: {
+            $ref: '#/components/schemas/TargetCoverage',
+            description: 'From the target\'s stored record: one of the option pack\'s targets, or not (several: the pack targets it could be, none guessed).'
         }
     },
     additionalProperties: false,
@@ -12692,7 +13448,7 @@ export const TargetSketchOutSchema = {
         'requirements',
         'requirement_count',
         'regulated',
-        'research_status'
+        'coverage'
     ],
     title: 'TargetSketchOut'
 } as const;
@@ -13009,6 +13765,86 @@ export const TextListInputSchema = {
     title: 'TextListInput'
 } as const;
 
+export const TitleIdeaSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        based_on: {
+            items: {
+                $ref: '#/components/schemas/EvidenceItem'
+            },
+            type: 'array',
+            title: 'Based On'
+        },
+        outcome: {
+            type: 'string',
+            enum: [
+                'matched',
+                'matched_several',
+                'not_matched',
+                'not_searched'
+            ],
+            title: 'Outcome'
+        },
+        occupations: {
+            type: 'integer',
+            title: 'Occupations',
+            description: 'Occupations matching it in ESCO.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title',
+        'based_on',
+        'outcome',
+        'occupations'
+    ],
+    title: 'TitleIdea',
+    description: 'A title Careerwright thought of, and what matching it did: only a matched idea is a\nsuggestion.'
+} as const;
+
+export const TitleIdeaMatchedSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'title_idea_matched',
+            title: 'Reason',
+            default: 'title_idea_matched'
+        },
+        outcome: {
+            type: 'string',
+            const: 'matched',
+            title: 'Outcome',
+            default: 'matched'
+        },
+        field: {
+            $ref: '#/components/schemas/ProfileField'
+        },
+        answer: {
+            type: 'string',
+            title: 'Answer'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'field',
+        'answer',
+        'title'
+    ],
+    title: 'TitleIdeaMatched',
+    description: 'A title Careerwright thought of from the answer, matched to this occupation.'
+} as const;
+
 export const TitleMatchOutSchema = {
     properties: {
         concept_id: {
@@ -13057,6 +13893,41 @@ export const TitleMatchOutSchema = {
     title: 'TitleMatchOut'
 } as const;
 
+export const TitleMatchedSeveralSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'title_matched_several',
+            title: 'Reason',
+            default: 'title_matched_several'
+        },
+        outcome: {
+            type: 'string',
+            const: 'matched_several',
+            title: 'Outcome',
+            default: 'matched_several'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        occupations: {
+            type: 'integer',
+            title: 'Occupations'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'title',
+        'occupations'
+    ],
+    title: 'TitleMatchedSeveral',
+    description: 'A title of the person\'s own matched several occupations: nothing is joined to it until\nthey choose which they mean.'
+} as const;
+
 export const TitleMatchesOutSchema = {
     properties: {
         release: {
@@ -13099,6 +13970,115 @@ export const TitleMatchesOutSchema = {
     ],
     title: 'TitleMatchesOut',
     description: 'The first question\'s type-ahead: occupations whose ESCO titles (preferred and\nalternative labels) have a word beginning with each word typed, best first, one per\noccupation. When no title holds every word, the occupations whose titles hold the most\nof them, with `partial` true. Deterministic, no model call. No match is an honest empty\nlist: nothing is invented. `total` counts every occupation that matched.'
+} as const;
+
+export const TitleNotMatchedSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'title_not_matched',
+            title: 'Reason',
+            default: 'title_not_matched'
+        },
+        outcome: {
+            type: 'string',
+            const: 'not_matched',
+            title: 'Outcome',
+            default: 'not_matched'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'title'
+    ],
+    title: 'TitleNotMatched',
+    description: 'A title of the person\'s own matched no occupation in ESCO, so nothing is joined to it.'
+} as const;
+
+export const TooGeneralSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'too_general',
+            title: 'Reason',
+            default: 'too_general'
+        },
+        outcome: {
+            type: 'string',
+            const: 'found_none',
+            title: 'Outcome',
+            default: 'found_none'
+        },
+        search: {
+            type: 'string',
+            title: 'Search'
+        },
+        answers: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Answers',
+            description: 'The answers it rests on.'
+        },
+        own_words: {
+            type: 'boolean',
+            title: 'Own Words',
+            description: 'The search is its one answer itself.'
+        },
+        by: {
+            $ref: '#/components/schemas/TooGeneralBy'
+        },
+        occupations: {
+            type: 'integer',
+            title: 'Occupations',
+            description: 'Occupations it reached through essential skills.'
+        },
+        skills: {
+            type: 'integer',
+            title: 'Skills',
+            description: 'Different essential skills it reached.'
+        },
+        narrower_for: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Narrower For',
+            description: 'Its answers no other search found work from: a narrower search is needed for them (a model\'s search only).'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'search',
+        'answers',
+        'own_words',
+        'by',
+        'occupations',
+        'skills',
+        'narrower_for'
+    ],
+    title: 'TooGeneral',
+    description: 'A search too general to find work on its own: it only adds weight to work another\nsearch found.'
+} as const;
+
+export const TooGeneralBySchema = {
+    type: 'string',
+    enum: [
+        'occupations',
+        'skills'
+    ],
+    title: 'TooGeneralBy'
 } as const;
 
 export const TrendOutSchema = {

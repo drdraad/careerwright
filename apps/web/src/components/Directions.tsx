@@ -31,6 +31,7 @@ import type {
   SlateExplanationOut,
   SlateOut,
   SuggestionOut,
+  TargetRecordOut,
   WrittenWhyOut,
 } from "@/generated/api";
 import { ApiError } from "@/lib/api";
@@ -43,13 +44,17 @@ import {
   useSketch,
   useSlate,
   useSubmitDiscovery,
+  useTargets,
 } from "@/lib/queries";
 import {
   ADDED_WEIGHT_ONLY,
+  aiFilterWords,
   DIRECTION,
   EMPHASIS,
   ERROR_STATEMENT,
   FAILURE_CLASS,
+  fewerReason,
+  floorWords,
   NOT_INCLUDED,
   NOTE_CARD,
   NOTE_RECOVERY,
@@ -58,6 +63,10 @@ import {
   type NoteRefusalWords,
   RECORD_PART,
   SUGGESTION_WORDS,
+  slateNote,
+  suggestionReason,
+  suggestionWords,
+  titleIdeasWords,
 } from "@/lib/vocabulary";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
@@ -65,7 +74,7 @@ import { useEvidence } from "./EvidenceDrawer";
 import { Glyph } from "./Glyph";
 import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
-import { TargetRequirements } from "./SketchCard";
+import { TargetCoverageLine, TargetRequirements } from "./SketchCard";
 import { StatusBadge } from "./Status";
 
 const EVIDENCE = [
@@ -285,21 +294,21 @@ function JoinedBy({ skills, connection }: { skills: SharedSkillOut[]; connection
   );
 }
 
-/** A suggestion that is one of the person's targets: said where it was chosen, with what it
- *  usually asks for (STATE-10). */
+/** A suggestion that is one of the person's targets: said where it was chosen, with how far
+ *  Careerwright can cover it and what it usually asks for (STATE-10; PROF-10). */
 function TargetSaved({
   workspaceId,
-  title,
+  conceptId,
   headingRef,
 }: {
   workspaceId: string;
-  title: string;
+  conceptId: string;
   headingRef: Ref<HTMLHeadingElement>;
 }) {
   const sketch = useSketch(workspaceId);
   const headingId = useId();
   const target = sketch.data?.targets.find(
-    (t) => t.title.toLocaleLowerCase("en-GB") === title.toLocaleLowerCase("en-GB"),
+    (t) => t.resolution === "esco" && t.occupations[0]?.concept_id === conceptId,
   );
   return (
     <section className="target-saved grid gap-8" aria-labelledby={headingId}>
@@ -321,7 +330,12 @@ function TargetSaved({
           <LoadingState stage="Loading what this work usually asks for" lines={1} />
         )
       ) : (
-        target !== undefined && <TargetRequirements target={target} />
+        target !== undefined && (
+          <>
+            <TargetCoverageLine target={target} />
+            <TargetRequirements target={target} />
+          </>
+        )
       )}
     </section>
   );
@@ -347,7 +361,8 @@ function SuggestionCard({
   workspaceId: string;
   suggestion: SuggestionOut;
   slate: SlateOut;
-  targets: string[];
+  /** The person's targets as stored once, each with the occupation it names. */
+  targets: TargetRecordOut[];
   written: WrittenState;
   /** Shown in full, with its actions; the others show their title and kind of work. */
   open: boolean;
@@ -366,10 +381,10 @@ function SuggestionCard({
 }) {
   const evidence = useEvidence();
   const title = sentence(suggestion.title);
-  const already = targets.some(
-    (t) => t.toLocaleLowerCase("en-GB") === suggestion.title.toLocaleLowerCase("en-GB"),
-  );
+  // A target names this occupation by its stored record, never by comparing titles.
+  const already = targets.some((t) => t.concept_id === suggestion.concept_id);
   const full = targets.length >= listLimit("target_titles");
+  const words = suggestionWords(suggestion);
   const body = useId();
   const saved = useRef<HTMLHeadingElement>(null);
   // The choice is replaced by the words that say it is saved; focus follows once they show.
@@ -409,7 +424,11 @@ function SuggestionCard({
               work is and why it could suit you follow (D-I3). Once chosen, the choice gives
               way to the words that say so, with what the work usually asks for (STATE-10). */}
           {already && (
-            <TargetSaved workspaceId={workspaceId} title={suggestion.title} headingRef={saved} />
+            <TargetSaved
+              workspaceId={workspaceId}
+              conceptId={suggestion.concept_id}
+              headingRef={saved}
+            />
           )}
           <div className="flex flex-wrap items-center gap-8">
             {!already && (
@@ -452,7 +471,7 @@ function SuggestionCard({
             <div className="grid gap-4">
               {written.kind !== "none" && <p className="small muted">How Careerwright found it</p>}
               <ul className="plain-list">
-                {suggestion.why_it_could_suit.map((line) => (
+                {suggestion.reasons.map(suggestionReason).map((line) => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>
@@ -462,7 +481,7 @@ function SuggestionCard({
           <div className="grid gap-4">
             <p className="section-title">What might not suit you</p>
             <ul className="plain-list">
-              {[...suggestion.what_might_not_suit, ...suggestion.entry_gates].map((line) => (
+              {[...words.mightNot, words.entryGate].map((line) => (
                 <li key={line}>{line}</li>
               ))}
             </ul>
@@ -470,12 +489,12 @@ function SuggestionCard({
           <div className="grid gap-4">
             <p className="section-title">Try it before committing</p>
             <ul className="plain-list">
-              {suggestion.try_it.map((line) => (
+              {words.tryIt.map((line) => (
                 <li key={line}>{line}</li>
               ))}
             </ul>
           </div>
-          <p className="small muted">{suggestion.evidence_gaps.join(" ")}</p>
+          <p className="small muted">{words.evidenceGap}</p>
         </div>
       )}
     </article>
@@ -624,6 +643,7 @@ function Slate({
   // The suggestion just made a target: focus goes to the words that say it is saved.
   const [chosen, setChosen] = useState<string | null>(null);
   const slate = useSlate(workspaceId, discovery.discovery_id, controls);
+  const targetRecords = useTargets(workspaceId);
   const choose = useChooseTarget(workspaceId);
   const notes = useNoteRequests(workspaceId, discovery.discovery_id);
   const explanation = discovery.explanation ?? null;
@@ -645,10 +665,7 @@ function Slate({
       expected_profile_version: profile.version,
       ...(retry ? { retry_failed: true } : {}),
     });
-  const targets =
-    profile.document.target_titles.state === "provided"
-      ? (profile.document.target_titles.value ?? [])
-      : [];
+  const targets = targetRecords.data?.targets ?? [];
   if (slate.data === undefined) {
     return slate.error ? (
       <RequestFailure
@@ -664,7 +681,10 @@ function Slate({
     );
   }
   const data = slate.data;
-  const familiarityKnown = profile.document.current_role.state === "provided" || targets.length > 0;
+  const named = profile.document.target_titles;
+  const familiarityKnown =
+    profile.document.current_role.state === "provided" ||
+    (named.state === "provided" && (named.value ?? []).length > 0);
   const excluded = controls.excludeConcepts.length + controls.excludeFamilies.length;
   // Only a search that reached work found the pool: one too general to find work on its own
   // only added weight, and one that reached nothing found none.
@@ -704,16 +724,12 @@ function Slate({
       </p>
       <SearchNotes
         lines={[
-          ...data.fewer_reasons,
-          ...data.notes,
-          ...(data.salary_floor ? [data.salary_floor.summary] : []),
-          ...(data.ai_resilience_filter.summary ? [data.ai_resilience_filter.summary] : []),
-          ...(data.unsupported_hypotheses.length > 0
-            ? [
-                "Titles Careerwright thought of but couldn't match to an occupation in ESCO, so " +
-                  `not suggested: ${data.unsupported_hypotheses.join(", ")}.`,
-              ]
-            : []),
+          ...data.fewer_reasons.map(fewerReason),
+          ...data.notes.map(slateNote),
+          ...(data.salary_floor ? [floorWords(data.salary_floor)] : []),
+          ...[aiFilterWords(data.ai_resilience_filter), titleIdeasWords(data.title_ideas)].filter(
+            (line): line is string => line !== null,
+          ),
           ...(familiarityKnown
             ? []
             : [

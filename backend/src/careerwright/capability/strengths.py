@@ -59,6 +59,7 @@ from careerwright.profile.discovery import EvidenceItem, evidence_of
 from careerwright.profile.exploration import HardFilterInput, first_slate
 from careerwright.profile.safety import has_risk_stem
 from careerwright.profile.store import stale_version
+from careerwright.profile.targets import stored_targets
 from careerwright.vocabulary import WorkState
 
 
@@ -160,7 +161,7 @@ def _destinations(
     destinations, each with its essential skills not yet claimed (ESCO's order)."""
     profile = current_profile(tx, workspace_id)
     found: dict[uuid.UUID, DestinationKind] = {}
-    for target in titles.targets(tx, workspace_id, profile.document):
+    for target in titles.targets(tx, stored_targets(tx, workspace_id, profile.document)):
         if len(target.occupations) == 1:
             found.setdefault(target.occupations[0], DestinationKind.TARGET)
     for suggestion in first_slate(tx, workspace_id, hard).suggestions:

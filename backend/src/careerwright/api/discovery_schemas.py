@@ -1,6 +1,7 @@
 """API contract for career discovery (slates, their written explanation, targets chosen
-from ESCO) and the early requirement sketch. No suggestion carries a percentage, score or
-rank meant as fit."""
+from ESCO and stored once) and the early requirement sketch. No suggestion carries a
+percentage, score or rank meant as fit, and no response carries a sentence the person reads:
+codes, numbers and the person's or ESCO's own words, which the web words (ruling R11)."""
 
 import uuid
 from datetime import date
@@ -10,19 +11,20 @@ from pydantic import Field
 
 from careerwright.api.catalogue_schemas import IscoGroupOut
 from careerwright.api.schemas import ResponseModel, RunOut
+from careerwright.catalogue.esco import concept_id
 from careerwright.catalogue.pay import FloorCounts, FloorUnknown
 from careerwright.catalogue.records import ConceptKind, SkillRef, TaxonomyRelease
 from careerwright.money import Money
 from careerwright.profile.discovery import DiscoveryProposal, EvidenceItem, QueryChannel
-from careerwright.profile.document import FieldState
+from careerwright.profile.document import FieldState, PayPeriod
 from careerwright.profile.exploration import (
-    STILL_UNCERTAIN,
     AiFilterView,
     ConnectionView,
     SlateView,
     Suggestion,
 )
 from careerwright.profile.interview import ProfileField, ProposalOrigin
+from careerwright.profile.records import TargetCoverage, TargetKind, TargetLink, TargetRecord
 from careerwright.profile.sketch import OccupationRef, Resolution, Sketch, Step, TargetSketch
 from careerwright.profile.slate import (
     POOL_LIMIT,
@@ -36,6 +38,7 @@ from careerwright.profile.slate import (
     SlateChannel,
 )
 from careerwright.profile.slate_explanation import QuoteSource, RecordPart, SlateExplanation
+from careerwright.profile.slate_facts import FewerReason, SlateNote, SuggestionReason, TitleIdea
 
 
 class EvidenceOut(ResponseModel):
@@ -242,8 +245,8 @@ class SharedSkillOut(ResponseModel):
 
 class SuggestionOut(ResponseModel):
     """A career hypothesis (spec section 4's `CareerSuggestion`): an ESCO occupation, the
-    answers that found it and ESCO's facts about it, in words. Becoming a target needs the
-    person's choice (`POST .../targets`)."""
+    answers that found it and ESCO's facts about it, as facts the web words. Becoming a
+    target needs the person's choice (`POST .../targets`)."""
 
     concept_id: uuid.UUID
     concept_kind: Literal[ConceptKind.ESCO] = ConceptKind.ESCO
@@ -258,11 +261,22 @@ class SuggestionOut(ResponseModel):
     matched_queries: list[str] = Field(description="The query IDs that found it.")
     sources: list[SourceRefOut]
     workday: str = Field(description="ESCO's description of the work, shortened.")
-    why_it_could_suit: list[str]
-    what_might_not_suit: list[str]
-    entry_gates: list[str]
-    evidence_gaps: list[str]
-    try_it: list[str] = Field(description="Low-cost ways to test the idea before committing.")
+    reasons: list[SuggestionReason] = Field(
+        description="Why it could suit the person: what found it, from at most three of their "
+        "answers."
+    )
+    essential_skill_count: int = Field(
+        description="Essential skills ESCO lists for it, not yet compared with experience."
+    )
+    essential_skills: list[str] = Field(description="The first few of them, by ESCO's label.")
+    regulated: bool | None = Field(
+        description="ESCO marks it a regulated profession in at least one European country "
+        "(whether England requires registration isn't checked); null: ESCO records no note."
+    )
+    different_kind_of_work: bool = Field(
+        description="Another kind of work than any the person told Careerwright about (false "
+        "when that isn't known)."
+    )
     shared_skills: list[SharedSkillOut] = Field(
         description="The essential skills Careerwright joined it to a title of the person's "
         "by (those ESCO lists for both), by label; empty unless it was joined by shared skills."
@@ -287,11 +301,11 @@ class SuggestionOut(ResponseModel):
             matched_queries=list(dict.fromkeys(m.query.query_id for m in candidate.matches)),
             sources=[SourceRefOut(uri=facts.esco_uri, release=release.dataset_id)],
             workday=words.workday,
-            why_it_could_suit=words.why,
-            what_might_not_suit=words.might_not,
-            entry_gates=words.entry_gates,
-            evidence_gaps=words.evidence_gaps,
-            try_it=words.try_it,
+            reasons=words.reasons,
+            essential_skill_count=facts.essential_skill_count,
+            essential_skills=list(facts.essential_skills),
+            regulated=facts.regulated,
+            different_kind_of_work=words.different_kind_of_work,
             shared_skills=[SharedSkillOut.of(skill) for skill in suggestion.shared_skills],
         )
 
@@ -352,15 +366,6 @@ class ExcludedOut(ResponseModel):
     families: int = Field(description="Pooled occupations your excluded kinds of work removed.")
 
 
-_PERIOD_WORDS = {"year": "a year", "month": "a month", "week": "a week", "hour": "an hour"}
-_FLOOR_REASON_WORDS = {
-    FloorUnknown.NO_REVIEWED_MAPPING: "no reviewed UK occupation code links them to pay data",
-    FloorUnknown.NO_WORK_AREA: "you have not named a city, so no region's pay applies",
-    FloorUnknown.NOT_PUBLISHED: "the official figure is not published for your regions",
-    FloorUnknown.PERIOD_DIFFERS: "official pay is not given per your floor's period",
-}
-
-
 class FloorReasonOut(ResponseModel):
     reason: FloorUnknown
     count: int
@@ -369,45 +374,35 @@ class FloorReasonOut(ResponseModel):
 class SalaryFloorOut(ResponseModel):
     """Your confirmed salary floor, applied as a hard filter: a suggestion is left out only
     when official pay for it (ASHE through a reviewed UK SOC mapping, the 90th percentile in
-    every region of your cities) is below it. Unknown pay is never treated as below it."""
+    every region of your cities) is below it. Unknown pay is never treated as below it. The
+    web words the counts, which add up: left out, meeting it, and kept by reason."""
 
     amount: Money
-    period: str
+    period: PayPeriod
     basis: Literal["gross"] = "gross"
     left_out: int = Field(description="Suggestions left out because their pay is below it.")
     meets: int
     kept_pay_unknown: int = Field(description="Kept: their pay could not be compared.")
     kept_by_reason: list[FloorReasonOut]
-    summary: str = Field(description="The counts in words, for display.")
 
     @classmethod
     def of(cls, counts: FloorCounts) -> "SalaryFloorOut":
         floor = counts.floor
-        pounds = f"£{floor.minor_units // 100:,}" + (
-            f".{floor.minor_units % 100:02d}" if floor.minor_units % 100 else ""
-        )
-        words = f"Your minimum salary of {pounds} {_PERIOD_WORDS[floor.period]} (gross) is applied"
-        parts = [
-            f"{counts.left_out} left out because their official pay is below it",
-            f"{counts.meets} meet it",  # so the counts add up (fix round 1, review A M7)
-        ]
-        for reason, n in counts.unknown.items():
-            parts.append(f"{n} kept because {_FLOOR_REASON_WORDS.get(reason, reason.value)}")
         return cls(
             amount=Money(minor_units=floor.minor_units, currency="GBP"),
-            period=floor.period,
+            period=PayPeriod(floor.period),
             left_out=counts.left_out,
             meets=counts.meets,
             kept_pay_unknown=counts.kept_unknown,
             kept_by_reason=[FloorReasonOut(reason=r, count=n) for r, n in counts.unknown.items()],
-            summary=f"{words}: {'; '.join(parts)}. Unknown pay is never treated as below it.",
         )
 
 
 class AiResilienceFilterOut(ResponseModel):
     """The AI Resilience filter's basis and counts (AIR1-05): the minimum applies to the
     lower end of a reviewed range; unscored occupations are included unless you switch
-    them off, and are never read as 0 or 10."""
+    them off, and are never read as 0 or 10. The web words the counts, when the filter is not
+    at its default (a minimum, or unscored ones left out)."""
 
     basis: Literal["lower_bound"] = "lower_bound"
     minimum: int | None = Field(description="Null: Any.")
@@ -421,29 +416,10 @@ class AiResilienceFilterOut(ResponseModel):
     )
     pack_version: str
     pack_dated: date
-    summary: str | None = Field(description="In words, when the filter is not at its default.")
 
     @classmethod
     def of(cls, view: AiFilterView) -> "AiResilienceFilterOut":
         chosen = view.chosen
-        active = chosen.minimum is not None or not chosen.include_unscored
-        summary = None
-        if active:
-            minimum = "Any" if chosen.minimum is None else f"{chosen.minimum} or more"
-            unscored = (
-                f"{view.unscored} unscored kept"
-                if chosen.include_unscored
-                else f"{view.unscored_excluded} unscored left out"
-            )
-            ranges = (
-                "each range (a synthetic fixture range here, not a real assessment)"
-                if view.synthetic
-                else "each reviewed range"
-            )
-            summary = (
-                f"AI Resilience Score filter, {minimum} on the lower end of {ranges}: "
-                f"{view.below_minimum} left out below it; {unscored}."
-            )
         return cls(
             minimum=chosen.minimum,
             include_unscored=chosen.include_unscored,
@@ -454,23 +430,20 @@ class AiResilienceFilterOut(ResponseModel):
             synthetic=view.synthetic,
             pack_version=view.pack_version,
             pack_dated=view.pack_dated,
-            summary=summary,
         )
 
 
 class ConnectionOut(ResponseModel):
     """The unexpected connection: one suggestion joined to the person's role by the
     essential skills the two share in ESCO, outside the role's own kind of work and never a
-    title the person named; the one sharing the most. Its sentence is a fact about the two
-    roles, never about the person, and the shared skills are its evidence, one step away."""
+    title the person named; the one sharing the most. It is a fact about the two roles,
+    never about the person, and the shared skills are its evidence, one step away."""
 
     concept_id: uuid.UUID
     title: str
     role_title: str = Field(description="The person's role, as ESCO titles it.")
-    sentence: str
     shared_skill_count: int
     shared_skills: list[SharedSkillOut] = Field(description="The essential skills both list.")
-    still_uncertain: str
 
     @classmethod
     def of(cls, view: ConnectionView) -> "ConnectionOut":
@@ -478,10 +451,8 @@ class ConnectionOut(ResponseModel):
             concept_id=view.destination.concept_id,
             title=view.destination.preferred_label,
             role_title=view.role_title,
-            sentence=view.sentence,
             shared_skill_count=len(view.shared),
             shared_skills=[SharedSkillOut.of(s) for s in view.shared],
-            still_uncertain=STILL_UNCERTAIN,
         )
 
 
@@ -498,11 +469,13 @@ class SlateOut(ResponseModel):
     target_size: int = SLATE_SIZE
     family_limit: int = Field(description="At most this many from one kind of work.")
     suggestions: list[SuggestionOut]
-    fewer_reasons: list[str] = Field(description="Why there are fewer than six, if there are.")
-    notes: list[str] = Field(
-        description="How the slate was made, in words: a control's effect, a changed ESCO "
-        "release, answers not searched, answers that found no work or were too general to "
-        "find it alone, what a join keeps, or fewer occupations to choose from than "
+    fewer_reasons: list[FewerReason] = Field(
+        description="Why there are fewer than six, if there are, as facts the web words."
+    )
+    notes: list[SlateNote] = Field(
+        description="How the slate was made, as facts the web words: a control's effect, a "
+        "changed ESCO release, answers not searched, answers that found no work or were too "
+        "general to find it alone, what a join keeps, or fewer occupations to choose from than "
         "Careerwright aims for."
     )
     salary_floor: SalaryFloorOut | None = Field(
@@ -517,9 +490,9 @@ class SlateOut(ResponseModel):
     excluded: ExcludedOut
     queries: list[PoolQueryOut] = Field(description="Every search that ran, with its hits.")
     unsearchable_queries: list[str] = Field(description="Queries with no searchable word.")
-    unsupported_hypotheses: list[str] = Field(
-        description="Titles Careerwright thought of but couldn't match to an occupation in "
-        "ESCO (case, punctuation and plurals folded): never suggested."
+    title_ideas: list[TitleIdea] = Field(
+        description="Titles Careerwright thought of, each with what matching it in ESCO did "
+        "(case, punctuation and plurals folded): one it couldn't match is never suggested."
     )
     not_included: list[NotIncludedOut] = Field(description="Show why this wasn't included.")
     unmatched_titles: list[str] = Field(
@@ -555,7 +528,7 @@ class SlateOut(ResponseModel):
             excluded=ExcludedOut(**slate.excluded),
             queries=[PoolQueryOut.of(q) for q in view.queries],
             unsearchable_queries=view.unsearchable_queries,
-            unsupported_hypotheses=view.unsupported_hypotheses,
+            title_ideas=view.title_ideas,
             not_included=[NotIncludedOut.of(left, view.titles) for left in slate.not_included],
             unmatched_titles=view.unmatched_titles,
             ambiguous_titles=view.ambiguous_titles,
@@ -590,7 +563,10 @@ class TargetSketchOut(ResponseModel):
     requirements: list[str] = Field(description="ESCO's essential skills, the first few.")
     requirement_count: int | None = Field(description="null: no requirement list.")
     regulated: bool | None
-    research_status: str
+    coverage: TargetCoverage = Field(
+        description="From the target's stored record: one of the option pack's targets, or "
+        "not (several: the pack targets it could be, none guessed)."
+    )
 
     @classmethod
     def of(cls, target: TargetSketch) -> "TargetSketchOut":
@@ -602,26 +578,63 @@ class TargetSketchOut(ResponseModel):
             requirements=target.requirements,
             requirement_count=target.requirement_count,
             regulated=target.regulated,
-            research_status=target.research_status,
+            coverage=target.coverage,
         )
 
 
-class StepOut(ResponseModel):
-    name: str
-    chapter: str
-    detail: str
-    state: Literal["unresolved"]
+class TargetRecordOut(ResponseModel):
+    """A target as it is stored once, when chosen or saved: what it names, the source of that
+    link and how far Careerwright can cover it. Every chapter reads this record, so a title
+    resolves the same everywhere."""
+
+    key: str = Field(
+        description='The title as a concept (case, punctuation, plurals, accents and "&" '
+        "folded): the target's identity."
+    )
+    title: str = Field(description="The person's words, as the profile holds them.")
+    kind: TargetKind
+    link: TargetLink
+    concept_id: uuid.UUID | None = Field(
+        description="The ESCO occupation the title names in ESCO itself (the person's choice, "
+        "or the one occupation holding the title as a label); null otherwise."
+    )
+    label_matches: int = Field(
+        description="How many ESCO occupations hold the title as a label (several: the person "
+        "chooses which they mean, none is guessed)."
+    )
+    coverage: TargetCoverage
+    pack_target_id: str | None = Field(description="The option pack's target, when covered.")
 
     @classmethod
-    def of(cls, step: Step) -> "StepOut":
-        return cls(name=step.name, chapter=step.chapter, detail=step.detail, state="unresolved")
+    def of(cls, record: TargetRecord) -> "TargetRecordOut":
+        esco = record.esco_occupation
+        return cls(
+            key=record.key,
+            title=record.title,
+            kind=record.kind,
+            link=record.link,
+            concept_id=concept_id(esco) if esco else None,
+            label_matches=len(record.label_matches),
+            coverage=record.coverage,
+            pack_target_id=record.pack_target_id,
+        )
+
+
+class TargetRecordsOut(ResponseModel):
+    profile_version: int
+    targets: list[TargetRecordOut] = Field(description="In the profile's order, one per concept.")
+
+
+class StepOut(ResponseModel):
+    step: Step
+    state: Literal["unresolved"]
 
 
 class SketchOut(ResponseModel):
     """The early requirement sketch: never a feasible or optimal route, never priced or
-    dated. Every step stays unresolved until a later chapter resolves it."""
+    dated. Every step stays unresolved until a later chapter resolves it. Facts only: the web
+    words them."""
 
-    label: str
     profile_version: int
     inputs: dict[ProfileField, FieldState] = Field(
         description="The minimum inputs: a target and four practical answers."
@@ -633,10 +646,9 @@ class SketchOut(ResponseModel):
     @classmethod
     def of(cls, sketch: Sketch) -> "SketchOut":
         return cls(
-            label=sketch.label,
             profile_version=sketch.profile_version,
             inputs=sketch.inputs,
             not_asked=sketch.not_asked,
             targets=[TargetSketchOut.of(t) for t in sketch.targets],
-            steps=[StepOut.of(s) for s in sketch.steps],
+            steps=[StepOut(step=step, state="unresolved") for step in sketch.steps],
         )

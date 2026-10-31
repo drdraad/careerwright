@@ -33,6 +33,7 @@ from careerwright.profile.document import (
 )
 from careerwright.profile.records import Basis, SourceKind
 from careerwright.profile.store import stale_version
+from careerwright.profile.targets import Choice, PackTargets, record_targets
 
 DIRECT_ENTRY_LABEL = "Direct entry"
 
@@ -112,10 +113,15 @@ def commit_profile_version(
     updates: Mapping[str, FieldUpdate],
     *,
     recite: frozenset[str] = frozenset(),
+    pack: PackTargets | None = None,
+    choice: tuple[str, Choice] | None = None,
 ) -> tuple[ProfileView, list[str]]:
     """The one write path. Returns the resulting profile and the fields it changed (none:
     no new version). `recite`: fields whose new source counts as a change by itself
-    (`apply_updates`)."""
+    (`apply_updates`). A version that changes the targets stores each new target's record
+    (`careerwright.profile.targets`), decided against the option pack's targets (`pack`, which
+    every write that can change the targets passes) and the person's `choice` of an
+    occupation for one title, if they made one."""
     visible_workspace(tx, workspace_id, lock=True)
     current = current_profile(tx, workspace_id)
     if expected_version != current.version:
@@ -152,6 +158,14 @@ def commit_profile_version(
         tx, workspace_id, expected_version + 1, document, actor.actor_id
     )
     store.link_sources(tx, workspace_id, created.version, cited)
+    if "target_titles" in changed:
+        if pack is None:  # a programming error: never a target saved without its record
+            raise CareerwrightError(
+                ErrorCode.INTERNAL_ERROR,
+                "Targets can't be saved without the option pack's targets.",
+                stage=ErrorStage.PROFILE,
+            )
+        record_targets(tx, actor.actor_id, workspace_id, created.document, pack, choice)
     identity_store.append_event(
         tx,
         workspace_id,
@@ -172,6 +186,7 @@ def write_profile(
     expected_version: int,
     new: ProfileInput,
     now: datetime,
+    pack: PackTargets,
 ) -> tuple[ProfileView, bool]:
     """A direct edit of the whole profile. Returns the profile and whether a version was
     created; changed answers cite one new direct-entry source."""
@@ -183,12 +198,14 @@ def write_profile(
         recorded_by=actor.actor_id,
     )
     updates = {name: FieldUpdate(getattr(new, name), source) for name in FIELD_NAMES}
-    view, changed = commit_profile_version(tx, actor, workspace_id, expected_version, updates)
+    view, changed = commit_profile_version(
+        tx, actor, workspace_id, expected_version, updates, pack=pack
+    )
     return view, bool(changed)
 
 
 def revert_profile(
-    tx: Tx, actor: Actor, workspace_id: uuid.UUID, command: RevertProfile
+    tx: Tx, actor: Actor, workspace_id: uuid.UUID, command: RevertProfile, pack: PackTargets
 ) -> tuple[ProfileView, bool]:
     """Undo: an earlier version's answers become the newest version, each citing the source
     it had then (a fixture stays a fixture, a confirmed reading keeps its basis and turn),
@@ -207,7 +224,7 @@ def revert_profile(
     earlier = store.profile_version(tx, workspace_id, command.to_version)
     document = empty_profile() if earlier is None else earlier.document
     view, changed = commit_profile_version(
-        tx, actor, workspace_id, command.expected_version, restored_answers(document)
+        tx, actor, workspace_id, command.expected_version, restored_answers(document), pack=pack
     )
     return view, bool(changed)
 

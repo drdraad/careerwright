@@ -11,14 +11,14 @@ import { CHAPTERS, type ChapterId } from "@/lib/chapters";
 import type { WorldMeasurement } from "@/lib/world/frames";
 import { EMPTY_WORLD, type WorldInput, worldFromProfile } from "@/lib/world/model";
 import { CUES, type Cue, Sound } from "@/lib/world/sound";
-import { longDocument, p01Document, profile } from "./data";
+import { longDocument, p01Document, profile, storedTargets } from "./data";
 
 const meta: Meta = { title: "World", parameters: { layout: "fullscreen" } };
 export default meta;
 type Story = StoryObj;
 
-const p01 = worldFromProfile(profile(p01Document));
-const threeTargets = worldFromProfile(profile(longDocument));
+const p01 = worldFromProfile(profile(p01Document), storedTargets(p01Document));
+const threeTargets = worldFromProfile(profile(longDocument), storedTargets(longDocument));
 
 /** A place, with the chapter's name where the chapter's panel would be. */
 function Place({

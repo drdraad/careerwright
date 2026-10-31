@@ -14,10 +14,11 @@ chosen for is recorded, and a slate read against another says so), and Careerwri
 the person's current role and own target titles;
 the hits are pooled, de-duplicated and ranked into a slate by deterministic code
 (`careerwright.profile.slate`). A model's title hypothesis is shown only if ESCO holds it as a
-label; otherwise it is listed as unsupported, never as a suggestion (DIV1-04). Every
-suggestion is an ESCO occupation with its URI as the source, the answers that found it and
-its essential skills; its words are composed from those facts, never from model prose, and
-carry no percentage (REC1-05).
+label; otherwise it is listed as a title idea not matched, never as a suggestion (DIV1-04).
+Every suggestion is an ESCO occupation with its URI as the source, the answers that found it
+and its essential skills; it carries facts the web words (`careerwright.profile.slate_facts`,
+ruling R11), never model prose and never a percentage (REC1-05). The person's targets are
+read from their stored records (`careerwright.profile.targets`).
 
 The slate's controls (emphasis, excluded titles and kinds of work) are view parameters:
 they never change the profile and never become a planning limit. A suggestion becomes a
@@ -32,9 +33,8 @@ a call. The written text is shown beside the words above, never instead of them,
 changes no suggestion.
 """
 
-import re
 import uuid
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from enum import StrEnum
@@ -104,7 +104,7 @@ from careerwright.profile.document import (
     TextValue,
 )
 from careerwright.profile.interview import ProfileField
-from careerwright.profile.records import ExplanationRequest, SourceKind
+from careerwright.profile.records import ExplanationRequest, SourceKind, TargetRecord
 from careerwright.profile.role_evidence import cities_of, salary_floor
 from careerwright.profile.slate import (
     MIN_SHARED_SKILLS,
@@ -134,7 +134,31 @@ from careerwright.profile.slate_explanation import (
     accepted_quotation,
     build_input,
 )
+from careerwright.profile.slate_facts import (
+    AnswerFoundNoWork,
+    AnswerSearch,
+    FewerReason,
+    JoinedBySharedSkills,
+    JoinKeptBest,
+    NoSharedOccupation,
+    OneWordWorkStyle,
+    Outcome,
+    OwnTitleMatched,
+    ReleaseChanged,
+    SearchDid,
+    SearchedThroughSkill,
+    SlateNote,
+    SmallPool,
+    SuggestionReason,
+    TitleIdea,
+    TitleIdeaMatched,
+    TitleMatchedSeveral,
+    TitleNotMatched,
+    TooGeneral,
+    TooGeneralBy,
+)
 from careerwright.profile.store import stale_version
+from careerwright.profile.targets import Choice, PackTargets, stored_targets
 from careerwright.profile.titles import ResolvedTitle
 from careerwright.vocabulary import WorkState
 
@@ -144,14 +168,6 @@ DESCRIPTION_CHARS = 360
 CHOSEN_FROM_SUGGESTIONS = "Chosen from Careerwright's suggestions"
 CHOSEN_FROM_ESCO = "Chosen from the ESCO occupations"
 CHOSEN_AS_ROLE = "Chosen from the ESCO occupations as your current or last role"
-_SOURCE_WORDS = {
-    ProfileField.CURRENT_ROLE: "Your current role",
-    ProfileField.TARGET_TITLES: "A role you named",
-    ProfileField.ENJOYED_TASKS: "What you enjoy",
-    ProfileField.CONFIDENT_TASKS: "What you believe you can do",
-    ProfileField.EVIDENCED_TASKS: "What you have done",
-    ProfileField.WORK_STYLE: "How you like to work",
-}
 
 
 class SubmitDiscovery(BaseModel):
@@ -265,12 +281,12 @@ def answers_current(tx: Tx, run: Run) -> bool:
 
 @dataclass(frozen=True)
 class Explanation:
+    """A suggestion's facts beyond ESCO's record: the web words them (ruling R11)."""
+
     workday: str  # ESCO's description, shortened
-    why: list[str]
-    might_not: list[str]
-    entry_gates: list[str]
-    evidence_gaps: list[str]
-    try_it: list[str]
+    reasons: list[SuggestionReason]  # why it could suit the person: what found it
+    # Another kind of work than any the person told Careerwright about (when that is known).
+    different_kind_of_work: bool
 
 
 @dataclass(frozen=True)
@@ -292,7 +308,7 @@ class SlateView:
     slate: Slate
     suggestions: list[Suggestion]
     queries: list[PoolQuery]
-    unsupported_hypotheses: list[str]  # model titles ESCO does not hold
+    title_ideas: list[TitleIdea]  # the model's titles, each with what matching it did
     unsearchable_queries: list[str]  # queries with no searchable word (none ran)
     titles: dict[uuid.UUID, str]  # every pooled occupation's title
     # The confirmed salary floor's effect on the pool (None when the person set none), and
@@ -307,12 +323,6 @@ class SlateView:
     connection: "ConnectionView | None" = None
 
 
-STILL_UNCERTAIN = (
-    "These are the skills ESCO lists for both roles. They aren't compared with your own "
-    "experience yet."
-)
-
-
 @dataclass(frozen=True)
 class ConnectionView:
     """The unexpected connection (plan section 4; ADR 0007 decision 13): a fact about two
@@ -322,14 +332,6 @@ class ConnectionView:
     candidate: Candidate
     destination: OccupationFacts
     shared: list[SkillRef]  # the essential skills ESCO lists for both, by label
-
-    @property
-    def sentence(self) -> str:
-        first = with_article(self.role_title)
-        return (
-            f"{first[0].upper()}{first[1:]} and {with_article(self.destination.preferred_label)} "
-            f"share {len(self.shared)} essential skills."
-        )
 
 
 @dataclass(frozen=True)
@@ -648,109 +650,44 @@ def _description(text: str) -> str:
     return f"{cut}…"
 
 
-# Spelled with a vowel but said with a consonant ("a university lecturer"), or the reverse:
-# a silent h ("an hour") and capitals read as letters ("an ICT help desk agent").
-_CONSONANT_SOUND = re.compile(r"^(?:uni|use|usu|uti|eu|one\b)", re.IGNORECASE)
-_VOWEL_SOUND = re.compile(r"^(?:hour|honest|honou?r|heir|[AEFHILMNORSX][A-Z])")
-
-
-# What a title's first preposition starts: its head is the last word before it ("operators"
-# in "warehouse operators for clothing", ESCO v1.2.1's one plural title).
-_PREPOSITION = re.compile(r"\s(?:for|in|of|on|with|at|to)\s")
-
-
-def _plural(title: str) -> bool:
-    head = _PREPOSITION.split(title, maxsplit=1)[0].split()
-    return bool(head) and re.search(r"[^su]s$", head[-1]) is not None  # never "actress", "bus"
-
-
-def with_article(title: str) -> str:
-    """The title after "a" or "an", as it is said; a plural title takes none."""
-    if _plural(title):
-        return title
-    said_as_you = _CONSONANT_SOUND.match(title) or re.match(r"U[A-Z]", title)  # "a UX designer"
-    vowel = title[:1].casefold() in "aeiou" and not said_as_you
-    return f"{'an' if vowel or _VOWEL_SOUND.match(title) else 'a'} {title}"
+REASONS_SHOWN = 3  # a suggestion names at most this many of the answers that found it
 
 
 def explain(candidate: Candidate, facts: OccupationFacts, familiarity_known: bool) -> Explanation:
-    """The suggestion's words, from the answers that found it and ESCO's record only. Only
-    what reached this occupation itself is said of it: a near-identical role folded into it
+    """The suggestion's facts, from the answers that found it and ESCO's record only (its
+    essential skills and regulated mark are ESCO's facts, served beside these). Only what
+    reached this occupation itself is said of it: a near-identical role folded into it
     (DIV1-05) adds to its relevance, but its skills are never named as this one's."""
-    title = facts.preferred_label
-    why: list[str] = []
+    reasons: list[SuggestionReason] = []
     seen: set[tuple[str, str]] = set()
     for match in candidate.own_matches:
         for item in match.query.based_on:
             key = (item.field.value, item.text)
-            if key in seen or len(why) == 3:
+            if key in seen or len(reasons) == REASONS_SHOWN:
                 continue
             seen.add(key)
+            field, text = item.field, item.text
             if match.shared_skills is not None:
-                why.append(
-                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. ESCO lists "
-                    f"{match.shared_skills} of the same essential skills for both, so Careerwright "
-                    "joined them by those skills."
+                reasons.append(
+                    JoinedBySharedSkills(field=field, answer=text, shared=match.shared_skills)
                 )
             elif match.skill is not None:
-                why.append(
-                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. Careerwright searched for "
-                    f"“{match.query.text}”, and ESCO lists “{match.skill}” as an essential "
-                    "skill for this work."
+                reasons.append(
+                    SearchedThroughSkill(
+                        field=field, answer=text, search=match.query.text, skill=match.skill
+                    )
                 )
             elif match.query.channel is SlateChannel.HYPOTHESIS:
                 # The idea is matched with case, punctuation and plurals folded, and to any of
                 # the occupation's titles ("dog groomer" is the animal groomer's): named as
                 # the idea, with what the match did.
-                why.append(
-                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. Careerwright thought of the "
-                    f"title “{match.query.text}” from it and matched that title to this "
-                    "occupation in ESCO."
-                )
+                reasons.append(TitleIdeaMatched(field=field, answer=text, title=match.query.text))
             else:  # the person's own title, resolved to this occupation (folded, so matched)
-                why.append(
-                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. Careerwright matched it to this "
-                    "occupation in ESCO."
-                )
-    might_not: list[str] = []
-    if facts.essential_skills:
-        might_not.append(
-            f"ESCO lists {facts.essential_skill_count} essential skills, not yet compared "
-            f"with your experience, including: {', '.join(facts.essential_skills)}."
-        )
-    if facts.regulated:
-        might_not.append(
-            "ESCO marks this as a regulated profession in at least one European country. "
-            "Whether England requires registration isn't checked yet."
-        )
-    if familiarity_known and candidate.direction is Direction.LESS_FAMILIAR:
-        might_not.append(
-            "It's a different kind of work from what you've told Careerwright about, so it may "
-            "need new experience."
-        )
-    gates = (
-        ["Registration may be required. Not checked yet."]
-        if facts.regulated
-        else ["Entry requirements aren't researched yet."]
-    )
-    who = (
-        f"people who work as {title}"
-        if _plural(title)
-        else f"someone who works as {with_article(title)}"
-    )
-    try_it = [f"Talk to {who} about a typical week (an informational interview)."]
-    if facts.essential_skills:
-        try_it.append(f"Try one of its tasks on a small scale: {facts.essential_skills[0]}.")
+                reasons.append(OwnTitleMatched(field=field, answer=text))
     return Explanation(
         workday=_description(facts.description),
-        why=why,
-        might_not=might_not,
-        entry_gates=gates,
-        evidence_gaps=[
-            "Pay, demand and listings in your work areas aren't researched yet. Finding no "
-            "listings later would be a demand signal, not proof this work doesn't exist."
-        ],
-        try_it=try_it,
+        reasons=reasons,
+        different_kind_of_work=familiarity_known and candidate.direction is Direction.LESS_FAMILIAR,
     )
 
 
@@ -788,18 +725,17 @@ def discovery_slate(
                 "failure_class": view.run.failure_class or "",
             },
         )
-    return compute_slate(tx, view, proposal, _pinned_document(tx, view.run), controls, hard)
+    document = _pinned_document(tx, view.run)
+    records = stored_targets(tx, workspace_id, document)
+    return compute_slate(tx, view, proposal, document, controls, hard, records)
 
 
-def release_note(searched: str | None, held: str) -> str | None:
-    """What to say when the searches were chosen for another ESCO release than the one the
-    slate now uses (the slate is recomputed on each read)."""
+def release_note(searched: str | None, held: str) -> ReleaseChanged | None:
+    """The searches were chosen for another ESCO release than the one the slate now uses (the
+    slate is recomputed on each read)."""
     if searched is None or searched == held:
         return None
-    return (
-        f"These searches were chosen when ESCO {searched} was held; this slate uses {held}, "
-        "so some occupations may have changed."
-    )
+    return ReleaseChanged(searched=searched, held=held)
 
 
 def compute_slate(
@@ -809,15 +745,17 @@ def compute_slate(
     document: ProfileDocument,
     controls: SlateControls,
     hard: HardFilterInput,
+    targets: list[TargetRecord],
 ) -> SlateView:
     """The slate for these searches and answers over the held taxonomy, with the person's
     confirmed salary floor and the chosen AI Resilience filter applied as hard filters, each
-    counted. Pay is read only through a reviewed UK SOC mapping, so without one the
-    taxonomy tables are all it reads, and the offline evaluation runs it unchanged against
-    the full release."""
+    counted. `targets`: the records of the answers' target titles, as stored
+    (`careerwright.profile.targets`). Pay is read only through a reviewed UK SOC mapping, so
+    without one the taxonomy tables are all it reads, and the offline evaluation runs it
+    unchanged against the full release."""
     release = held_release(tx)
     role = titles.current_role(tx, view.run.workspace_id, document)
-    named = titles.targets(tx, view.run.workspace_id, document)
+    named = titles.targets(tx, targets)
     mine = ([role] if role else []) + named
     # A search is one of the person's titles when it is that title as a concept
     # (`careerwright.concept_key`): "Data analysts" is their "data analyst".
@@ -870,14 +808,35 @@ def compute_slate(
         queries.append(
             PoolQuery(f"t{index}", target.text, SlateChannel.USER_PROPOSED, (item,), hits)
         )
-    unsupported: list[str] = []
+    ideas: list[TitleIdea] = []
     for index, hypothesis in enumerate(proposal.hypotheses, start=1):
+        based_on = list(hypothesis.based_on)
         if _one_word_style(hypothesis.based_on):
             styles += [item.text for item in hypothesis.based_on]
+            ideas.append(
+                TitleIdea(
+                    title=hypothesis.title,
+                    based_on=based_on,
+                    outcome=Outcome.NOT_SEARCHED,
+                    occupations=0,
+                )
+            )
             continue
         hits = _label_hits(tx, hypothesis.title)
+        matched = len({hit.concept_id for hit in hits})
+        outcome = (
+            Outcome.NOT_MATCHED
+            if matched == 0
+            else Outcome.MATCHED
+            if matched == 1
+            else Outcome.MATCHED_SEVERAL
+        )
+        ideas.append(
+            TitleIdea(
+                title=hypothesis.title, based_on=based_on, outcome=outcome, occupations=matched
+            )
+        )
         if not hits:
-            unsupported.append(hypothesis.title)
             continue
         queries.append(
             PoolQuery(
@@ -898,23 +857,26 @@ def compute_slate(
     left_out, floor, ai_filter = _hard_filters(tx, pool, document, controls, hard, esco_uris)
     slate = choose_slate(pool, controls, left_out)
     changed = release_note(proposal.release, release.dataset_id)
-    notes = [] if changed is None else [changed]
+    notes: list[SlateNote] = [] if changed is None else [changed]
     notes += _missed_notes(queries, unsearchable, styles, frozenset(joins))
-    notes += dict.fromkeys(
+    notes += _distinct(
         _general_note(query, general[query.query_id].skills, queries)
         for query in queries
         if query.too_general
     )
-    notes += dict.fromkeys(_join_note(query) for query in queries if query.unkept)
+    notes += _distinct(_join_note(query) for query in queries if query.unkept)
     # The pool's target is soft: where evidence doesn't permit it, a full slate says so (a
     # short one already says why it is short).
     if slate.pool_size < POOL_TARGET and len(slate.suggestions) == SLATE_SIZE:
-        notes.append(_small_pool_note(slate.pool_size))
+        notes.append(SmallPool(pool_size=slate.pool_size, pool_target=POOL_TARGET))
     slate = replace(slate, notes=[*notes, *slate.notes])
     unmatched = [t.text for t in mine if not t.occupations]
     ambiguous = [t for t in mine if len(t.occupations) > 1]
     if (unmatched or ambiguous) and len(slate.suggestions) < SLATE_SIZE:
-        reasons = [*map(_unmatched, unmatched), *map(_ambiguous, ambiguous)]
+        reasons: list[FewerReason] = [
+            *(TitleNotMatched(title=title) for title in unmatched),
+            *(TitleMatchedSeveral(title=t.text, occupations=len(t.occupations)) for t in ambiguous),
+        ]
         slate = replace(slate, fewer_reasons=[*slate.fewer_reasons, *reasons])
     return SlateView(
         discovery=view,
@@ -922,7 +884,7 @@ def compute_slate(
         slate=slate,
         suggestions=_suggestions(tx, slate, facts, bool(familiar_families)),
         queries=queries,
-        unsupported_hypotheses=unsupported,
+        title_ideas=ideas,
         unsearchable_queries=[query.text for query in unsearchable],
         titles={concept_id: occupation.title for concept_id, occupation in occupations.items()},
         salary_floor=floor,
@@ -976,41 +938,18 @@ def _joined_by(tx: Tx, candidate: Candidate) -> list[SkillRef]:
     return taxonomy_store.essential_skills_by_id(tx, skills)
 
 
-# The person's titles are matched with case, punctuation, hyphens and simple plurals folded
-# (`careerwright.concept_key`), so these say what Careerwright matched, never what ESCO
-# lists (Task W2B re-review 4, I1's rule).
-def _unmatched(title: str) -> str:
-    return (
-        f"Careerwright couldn't match “{title}” to an occupation in ESCO, so it can't join other "
-        "work to that title by shared skills. Choose the ESCO occupation closest to it."
-    )
+def _distinct[T](facts: Iterable[T]) -> list[T]:
+    """Each fact once, in order (equal facts are one note)."""
+    kept: list[T] = []
+    for fact in facts:
+        if fact not in kept:
+            kept.append(fact)
+    return kept
 
 
-def _ambiguous(title: ResolvedTitle) -> str:
-    return (
-        f"Careerwright matched “{title.text}” to {len(title.occupations)} occupations in ESCO, "
-        "so it can't join other work to that title by shared skills until you choose which one "
-        "you mean."
-    )
-
-
-def _work_style_note(styles: list[str]) -> str:
-    quoted = ", ".join(f"“{text}”" for text in styles)
-    return (
-        f"How you like to work ({quoted}) isn't searched on its own, because a single word "
-        "matches too loosely. Careerwright searches a longer answer, such as “working "
-        "outdoors”."
-    )
-
-
-# The person's own titles say why they found nothing in their own words (`_unmatched`,
-# `_ambiguous`).
+# The person's own titles say why they found nothing in their own facts (`TitleNotMatched`,
+# `TitleMatchedSeveral`).
 _TITLE_FIELDS = frozenset({ProfileField.CURRENT_ROLE, ProfileField.TARGET_TITLES})
-
-
-def _quoted(texts: list[str]) -> str:
-    quoted = [f"“{text}”" for text in texts]
-    return quoted[0] if len(quoted) == 1 else f"{', '.join(quoted[:-1])} and {quoted[-1]}"
 
 
 def _in_own_words(searches: list[str], answers: list[str]) -> bool:
@@ -1036,11 +975,11 @@ def _missed_notes(
     unsearchable: list[DiscoveryQuery],
     styles: list[str],
     joins: frozenset[str],
-) -> list[str]:
+) -> list[SlateNote]:
     """Each answer whose every search found nothing, named with what those searches did
     (Task W2B re-review 2, N-I1; re-review 4, I1): an answer several searches rest on is
     named only when none of them found anything. A one-word work style keeps its own note
-    (`_work_style_note`), beside `styles`, the one-word styles no search was run for
+    (`OneWordWorkStyle`), beside `styles`, the one-word styles no search was run for
     (re-review 3, M2). `joins`: the queries a title's skill join answered."""
     searched: dict[EvidenceItem, _Searched] = {}
     found: set[EvidenceItem] = set()
@@ -1055,100 +994,66 @@ def _missed_notes(
             searched.setdefault(item, _Searched()).common.append(unread.text)
     missed = [i for i in searched if i not in found and i.field not in _TITLE_FIELDS]
     styles = [*styles, *(item.text for item in missed if _one_word_style([item]))]
-    notes = [_work_style_note(list(dict.fromkeys(styles)))] if styles else []
+    notes: list[SlateNote] = []
+    if styles:
+        notes.append(OneWordWorkStyle(answers=list(dict.fromkeys(styles))))
     return notes + [
         _missed(item.text, searched[item]) for item in missed if not _one_word_style([item])
     ]
 
 
-def _opening(text: str) -> str:
-    """The person's words quoted at the start of a sentence."""
-    return f"“{text[:1].upper()}{text[1:]}”"
-
-
-# What a search reads: the main name (preferred label) of each skill an occupation lists as
-# essential, never its other names ("operating farm machinery" is another name of "operate
-# agricultural machinery"). So a note says what the search did, never what ESCO holds
-# (Task W2B re-review 4, I1).
-_MAIN_NAME = "main name of a skill ESCO lists as essential holds all the words of"
-_COMMON_ONLY = "only common words, which Careerwright doesn't search for"
-
-
-def _missed(answer: str, searched: _Searched) -> str:
+def _missed(answer: str, searched: _Searched) -> AnswerFoundNoWork:
+    """What each of the answer's searches did. A search reads the main name (preferred
+    label) of each skill an occupation lists as essential, never its other names
+    ("operating farm machinery" is another name of "operate agricultural machinery"), so its
+    words say what the search did, never what ESCO holds (Task W2B re-review 4, I1)."""
     read, common, joined = (
         list(dict.fromkeys(texts)) for texts in (searched.read, searched.common, searched.joined)
     )
-    if not joined and _in_own_words([*read, *common], [answer]):
-        if read:
-            return f"No {_MAIN_NAME} “{answer}”, so it found no work."
-        return f"{_opening(answer)} has {_COMMON_ONLY}, so it found no work."
-
-    def its(texts: list[str], several: str) -> str:
-        return f"its search “{texts[0]}”" if len(texts) == 1 else f"{several} {_quoted(texts)}"
-
-    did: list[str] = []
-    if read:
-        did.append(f"no {_MAIN_NAME} {its(read, 'any of its searches')}")
-    if common:
-        has = "have" if len(common) > 1 else "has"
-        did.append(f"{its(common, 'its searches')} {has} {_COMMON_ONLY}")
-    if joined:
-        own = "your own titles" if len(joined) > 1 else "your own title"
-        did.append(
-            f"Careerwright found no other occupation in ESCO that shares {MIN_SHARED_SKILLS} or "
-            f"more essential skills with {its(joined, 'any of its searches')}, {own}"
-        )
-    return f"{_opening(answer)} found no work: {', and '.join(did)}."
+    return AnswerFoundNoWork(
+        answer=answer,
+        own_words=not joined and _in_own_words([*read, *common], [answer]),
+        searches=[
+            *(AnswerSearch(text=text, did=SearchDid.READ_MAIN_NAMES) for text in read),
+            *(AnswerSearch(text=text, did=SearchDid.ONLY_COMMON_WORDS) for text in common),
+            *(AnswerSearch(text=text, did=SearchDid.NO_SHARED_OCCUPATION) for text in joined),
+        ],
+        min_shared=MIN_SHARED_SKILLS,
+    )
 
 
-def _general_note(query: PoolQuery, skills: int, queries: list[PoolQuery]) -> str:
+def _general_note(query: PoolQuery, skills: int, queries: list[PoolQuery]) -> TooGeneral:
     """Why a search too general to find work on its own found none, in what it did (Task
     W2B re-review 2, N-I2; re-review 4, I1): it may still add weight to work another search
     found. A model's search is the one too general, so the person is never asked to say more
     about their answer (re-review 3, M1), and a narrower search is called for only from an
     answer no other of `queries` found work from (re-review 4, M1)."""
     answers = [item.text for item in query.based_on]
-    if query.reach > TOO_GENERAL_OCCUPATIONS:
-        did = (
-            f"reached {query.reach} occupations in ESCO through the main names of their "
-            "essential skills, too many to choose from on its own"
-        )
-    else:
-        did = (
-            f"matched the main names of {skills} different essential skills in ESCO, none of "
-            "them just those words, so it's too general to choose work from on its own"
-        )
-    if _in_own_words([query.text], answers):
-        return (
-            f"{_opening(query.text)} {did}. Say more about it, such as what it's about or who "
-            "it's for."
-        )
+    own_words = _in_own_words([query.text], answers)
     finding = {item for q in queries if not q.too_general and q.reach > 0 for item in q.based_on}
-    waiting = [item.text for item in query.based_on if item not in finding]
-    narrower = (
-        f" Careerwright would need a narrower search to find work from {_quoted(waiting)}."
-        if waiting
-        else ""
+    return TooGeneral(
+        search=query.text,
+        answers=answers,
+        own_words=own_words,
+        by=(
+            TooGeneralBy.OCCUPATIONS
+            if query.reach > TOO_GENERAL_OCCUPATIONS
+            else TooGeneralBy.SKILLS
+        ),
+        occupations=query.reach,
+        skills=skills,
+        narrower_for=(
+            [] if own_words else [item.text for item in query.based_on if item not in finding]
+        ),
     )
-    return f"The search “{query.text}” (from {_quoted(answers)}) {did}.{narrower}"
 
 
-def _join_note(query: PoolQuery) -> str:
+def _join_note(query: PoolQuery) -> JoinKeptBest:
     """What a join keeps when it reaches more than its best 30 (Task W2B re-review 2, N-M2):
     those with the largest share of essential skills in common (`skill_join_hits`), not the
     most shared skills. It says what Careerwright found (re-review 4, I1's rule)."""
-    return (
-        f"Careerwright found {query.reach} other occupations in ESCO that share "
-        f"{MIN_SHARED_SKILLS} or more essential skills with “{query.text}”, and keeps the "
-        f"{len(query.hits)} with the largest share of essential skills in common."
-    )
-
-
-def _small_pool_note(pool_size: int) -> str:
-    return (
-        f"Careerwright chose these from {pool_size} occupations that match your answers "
-        f"closely. It aims for at least {POOL_TARGET}, but doesn't add weaker matches to get "
-        "there."
+    return JoinKeptBest(
+        title=query.text, found=query.reach, kept=len(query.hits), min_shared=MIN_SHARED_SKILLS
     )
 
 
@@ -1252,7 +1157,13 @@ def submit_explanation(
             details={"reason": "no_quotable_answer"},
         )
     shown = compute_slate(
-        tx, view, proposal, document, SlateControls(), replace(hard, ai_filter=ResilienceFilter())
+        tx,
+        view,
+        proposal,
+        document,
+        SlateControls(),
+        replace(hard, ai_filter=ResilienceFilter()),
+        stored_targets(tx, workspace_id, document),
     )
     if not shown.suggestions:
         raise CareerwrightError(
@@ -1300,10 +1211,17 @@ def submit_explanation(
 
 
 def choose_target(
-    tx: Tx, actor: Actor, workspace_id: uuid.UUID, command: ChooseTarget, now: datetime
+    tx: Tx,
+    actor: Actor,
+    workspace_id: uuid.UUID,
+    command: ChooseTarget,
+    now: datetime,
+    pack: PackTargets,
 ) -> tuple[ProfileView, bool]:
-    """The person's explicit choice is the confirmation a target needs (PROF-04). Returns
-    the profile and whether it changed (the occupation may already be a target)."""
+    """The person's explicit choice is the confirmation a target needs (PROF-04), stored with
+    its record as their choice of that occupation (`careerwright.profile.targets`). A title is
+    compared as a concept (`careerwright.concept_key`). Returns the profile and whether it
+    changed (the occupation may already be a target)."""
     visible_workspace(tx, workspace_id, lock=True)
     held_release(tx)
     occupation = taxonomy_store.occupation(tx, command.concept_id)
@@ -1322,22 +1240,26 @@ def choose_target(
         raise stale_version(profile.version)
     targets = _provided(profile.document, ProfileField.TARGET_TITLES)
     label = occupation.preferred_label
-    folded = [target.casefold() for target in targets]
-    if command.replaces is not None:
-        if command.replaces.casefold() not in folded:
-            raise CareerwrightError(
-                ErrorCode.VALIDATION_FAILED,
-                "That is not one of your target roles.",
-                stage=ErrorStage.PROFILE,
-                details={"field": "replaces", "reason": "not_a_target"},
-            )
-        chosen = [
-            label if target.casefold() == command.replaces.casefold() else target
-            for target in targets
-        ]
+    keys = taxonomy_store.concept_keys(
+        tx, [*targets, label, *([command.replaces] if command.replaces else [])]
+    )
+    replaces = command.replaces
+    if replaces is not None and keys[replaces] not in {keys[target] for target in targets}:
+        raise CareerwrightError(
+            ErrorCode.VALIDATION_FAILED,
+            "That is not one of your target roles.",
+            stage=ErrorStage.PROFILE,
+            details={"field": "replaces", "reason": "not_a_target"},
+        )
+    if replaces is None and keys[label] in {keys[target] for target in targets}:
+        held = profile_store.target_records(tx, workspace_id, [keys[label]]).get(keys[label])
+        if held is not None and held.esco_occupation == occupation.esco_uri:
+            return profile, False  # already a target that names this occupation
+        # The title is a target naming no occupation, or another: the choice says which.
+        replaces = next(target for target in targets if keys[target] == keys[label])
+    if replaces is not None:
+        chosen = [label if keys[target] == keys[replaces] else target for target in targets]
         chosen = list(dict.fromkeys(chosen))  # the occupation may already be a target too
-    elif label.casefold() in folded:
-        return profile, False
     else:
         chosen = [*targets, label]
     source = NewSource(
@@ -1351,7 +1273,16 @@ def choose_target(
     )
     update = FieldUpdate(TextListInput(state=FieldState.PROVIDED, value=chosen), source)
     view, changed = commit_profile_version(
-        tx, actor, workspace_id, command.expected_version, {"target_titles": update}
+        tx,
+        actor,
+        workspace_id,
+        command.expected_version,
+        {"target_titles": update},
+        # The choice is a change by itself: a title already the occupation's own label (an
+        # ambiguous "bookkeeper" meant as the bookkeeper) is recorded as the person's choice.
+        recite=frozenset({"target_titles"}),
+        pack=pack,
+        choice=(label, Choice(occupation.esco_uri, source.source_ref_id)),
     )
     return view, bool(changed)
 
@@ -1477,14 +1408,12 @@ def first_slate(tx: Tx, workspace_id: uuid.UUID, hard: HardFilterInput) -> First
     left_out, floor, _ = _hard_filters(tx, pool, profile.document, controls, hard, esco_uris)
     slate = choose_slate(pool, controls, left_out)
     if not join.hits:
+        title = facts[concept].preferred_label
         slate = replace(
             slate,
-            fewer_reasons=[
-                f"Careerwright found no other occupation in ESCO that shares {MIN_SHARED_SKILLS} "
-                f"or more essential skills with {with_article(facts[concept].preferred_label)}."
-            ],
+            fewer_reasons=[NoSharedOccupation(title=title, min_shared=MIN_SHARED_SKILLS)],
         )
-    named = titles.targets(tx, workspace_id, profile.document)
+    named = titles.targets(tx, stored_targets(tx, workspace_id, profile.document))
     return FirstSlate(
         profile_version=profile.version,
         release=release,

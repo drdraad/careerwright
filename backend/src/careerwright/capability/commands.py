@@ -5,8 +5,10 @@ edits; stop or resume the questions.
 Reads are computed from the current profile's targets, the committed option pack and
 capability reference, the held ESCO release and the workspace's own records, so nothing
 derived is stored and nothing goes stale silently: every result carries the versions it was
-computed from. A target's pack target is the one with the same title; its ESCO seed is the
-occupation ESCO labels with exactly that title, or else the pack target's crosswalk.
+computed from. A target's pack target and its ESCO seed are what its stored record names
+(`careerwright.profile.targets`, decided once when the target was chosen or saved): the
+occupation the person chose, the one occupation holding the title as a label, or else the
+pack target's crosswalk.
 
 Every write is one command (direct edits now, confirmed chat proposals later, through the
 same command): it locks the workspace, checks the expected capability version, records one
@@ -40,19 +42,18 @@ from careerwright.capability.matrix import (
     Matrix,
     OccupationBasis,
     OccupationNote,
+    PackTargetNote,
     RowEdit,
     apply_edits,
     build_matrix,
     check_edit,
-    find_pack_target,
-    pick_occupation,
 )
 from careerwright.capability.outcomes import PlannedOutcome, pack_outcomes
 from careerwright.capability.questions import QuestionGraph, question_graph
 from careerwright.capability.readiness import Assessment, assess
 from careerwright.capability.reference import Reference, load_reference
 from careerwright.catalogue import taxonomy_store
-from careerwright.catalogue.esco import concept_id, normalise_label
+from careerwright.catalogue.esco import concept_id
 from careerwright.catalogue.option_pack import Pack, Target, load_pack
 from careerwright.catalogue.records import TaxonomyRelease
 from careerwright.catalogue.taxonomy import held_release
@@ -64,9 +65,10 @@ from careerwright.identity import store as identity_store
 from careerwright.identity.access import Actor
 from careerwright.identity.records import EventKind
 from careerwright.identity.workspaces import visible_workspace
-from careerwright.profile import store as profile_store
 from careerwright.profile.commands import current_profile
-from careerwright.profile.document import FieldState, TextValue
+from careerwright.profile.document import TextValue
+from careerwright.profile.records import TargetCoverage, TargetLink, TargetRecord
+from careerwright.profile.targets import PackTarget, PackTargets, stored_targets, target_titles
 from careerwright.vocabulary import DataMode
 
 # The versions the capability model reads: Task 7c's reviewed pack is a new version here.
@@ -89,6 +91,24 @@ def committed_data() -> CapabilityData:
     return CapabilityData(pack, reference, tuple(pack_outcomes(pack, reference)))
 
 
+def pack_targets(data: CapabilityData) -> PackTargets:
+    """The pack's targets and the ESCO occupations their crosswalks name, as a target's stored
+    record is decided against them (`careerwright.profile.targets`)."""
+    return PackTargets(
+        data.pack.pack_version,
+        tuple(
+            PackTarget(
+                target.target_id,
+                target.title,
+                crosswalk.esco_occupation
+                if (crosswalk := data.reference.crosswalk_for(target.target_id))
+                else None,
+            )
+            for target in data.pack.targets
+        ),
+    )
+
+
 @dataclass(frozen=True)
 class CapabilityView:
     version: int
@@ -104,23 +124,12 @@ class CapabilityView:
 def capability_view(tx: Tx, workspace_id: uuid.UUID, data: CapabilityData) -> CapabilityView:
     workspace = visible_workspace(tx, workspace_id)
     profile = current_profile(tx, workspace_id)
-    titles = profile.document.target_titles
-    targets = list(titles.value or []) if titles.state is FieldState.PROVIDED else []
     matrices: list[Matrix] = []
-    if targets:
+    if target_titles(profile.document):
         release = held_release(tx)  # TAXONOMY_UNAVAILABLE without one: never an empty matrix
-        chosen = _chosen(tx, workspace_id)
         matrices = [
-            _matrix(
-                tx,
-                workspace_id,
-                title,
-                data,
-                release,
-                chosen=chosen.get(title_key(title)),
-                synthetic=workspace.synthetic,
-            )
-            for title in targets
+            _matrix(tx, workspace_id, record, data, release, synthetic=workspace.synthetic)
+            for record in stored_targets(tx, workspace_id, profile.document)
         ]
     state = store.state(tx, workspace_id)
     return CapabilityView(
@@ -138,26 +147,25 @@ def capability_view(tx: Tx, workspace_id: uuid.UUID, data: CapabilityData) -> Ca
 def _matrix(
     tx: Tx,
     workspace_id: uuid.UUID,
-    title: str,
+    record: TargetRecord,
     data: CapabilityData,
     release: TaxonomyRelease,
     *,
-    chosen: uuid.UUID | None,
     synthetic: bool,
 ) -> Matrix:
-    """A target found by its title, or else through its ESCO occupation, which is how a
-    target chosen in the product is stored (ESCO's preferred label)."""
-    key = title_key(title)
-    by_title, _, _ = find_pack_target(title, data.pack, data.reference, None)
-    seed, note = _seed(tx, title, by_title, data.reference, release, chosen)
-    pack_target, basis, pack_note = find_pack_target(title, data.pack, data.reference, seed)
+    """A target's matrix from its stored record: its pack target and its ESCO seed are what
+    the record names (`careerwright.profile.targets`), never resolved from the title again."""
+    key = title_key(record.title)
+    seed, note = _seed(tx, record, release)
+    pack_target = _pack_target(record, data.pack)
+    several = record.coverage is TargetCoverage.SEVERAL_PACK_TARGETS
     return build_matrix(
-        title,
+        record.title,
         pack=data.pack,
         reference=data.reference,
         pack_target=pack_target,
-        pack_target_basis=basis or "title",
-        pack_target_note=pack_note,
+        pack_target_basis=record.pack_target_basis or "title",
+        pack_target_note=PackTargetNote.AMBIGUOUS_CROSSWALK if several else None,
         occupation=seed,
         exemplars=evidence_store.exemplar_count(tx, workspace_id, key),
         synthetic=synthetic,
@@ -166,42 +174,35 @@ def _matrix(
     )
 
 
-def _chosen(tx: Tx, workspace_id: uuid.UUID) -> dict[str, uuid.UUID]:
-    """The occupations the person chose as targets, read from each choice's own source (its
-    ESCO URI), by their preferred label's title key; a later choice of a title wins. A choice
-    from another release is absent (as in `careerwright.profile.sketch`)."""
-    uris = profile_store.chosen_occupation_uris(tx, workspace_id)
-    concepts = taxonomy_store.concepts_by_uri(tx, uris)
-    chosen: dict[str, uuid.UUID] = {}
-    for uri in uris:
-        detail = taxonomy_store.occupation(tx, concepts[uri]) if uri in concepts else None
-        if detail is not None:
-            chosen[title_key(detail.preferred_label)] = detail.concept_id
-    return chosen
+def _pack_target(record: TargetRecord, pack: Pack) -> Target | None:
+    if record.pack_target_id is None:
+        return None
+    target = next((t for t in pack.targets if t.target_id == record.pack_target_id), None)
+    if target is None:  # a record decided against a pack that held a target this one lacks
+        raise CareerwrightError(
+            ErrorCode.INTERNAL_ERROR,
+            "A target's record names a pack target the committed pack doesn't hold.",
+            stage=ErrorStage.CAPABILITY,
+        )
+    return target
+
+
+_BASIS: dict[TargetLink, OccupationBasis] = {
+    TargetLink.OCCUPATION_CHOICE: "occupation_choice",
+    TargetLink.EXACT_LABEL: "esco_label",
+    TargetLink.PACK_CROSSWALK: "pack_crosswalk",
+}
 
 
 def _seed(
-    tx: Tx,
-    title: str,
-    pack_target: Target | None,
-    reference: Reference,
-    release: TaxonomyRelease,
-    chosen: uuid.UUID | None,
+    tx: Tx, record: TargetRecord, release: TaxonomyRelease
 ) -> tuple[EscoSeed | None, OccupationNote | None]:
-    """The occupation the person chose; else the one ESCO labels with the title (preferring
-    its preferred label where several do); else the pack target's crosswalk."""
-    concept, picked, note = pick_occupation(
-        title, chosen=chosen, matches=taxonomy_store.label_matches(tx, normalise_label(title))
-    )
-    crosswalk = reference.crosswalk_for(pack_target.target_id) if pack_target else None
-    basis: OccupationBasis
-    if concept is not None and picked is not None:
-        basis = picked
-    elif crosswalk is not None:
-        concept, basis = concept_id(crosswalk.esco_occupation), "pack_crosswalk"
-    else:
-        return None, note
-    detail = taxonomy_store.occupation(tx, concept)
+    """The occupation the record names, by any link: the person's choice, the one occupation
+    holding the title as a label, or the pack target's crosswalk."""
+    if record.occupation_uri is None:
+        several = len(record.label_matches) > 1
+        return None, OccupationNote.AMBIGUOUS_LABEL if several else OccupationNote.NO_EXACT_LABEL
+    detail = taxonomy_store.occupation(tx, concept_id(record.occupation_uri))
     if detail is None:
         return None, OccupationNote.NOT_IN_HELD_TAXONOMY
     seed = EscoSeed(
@@ -209,7 +210,7 @@ def _seed(
         concept_id=detail.concept_id,
         label=detail.preferred_label,
         regulated=detail.regulated,
-        basis=basis,
+        basis=_BASIS[record.link],
         skills=[
             EscoSkillRelation(
                 skill_id=s.skill_id,

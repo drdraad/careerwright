@@ -64,7 +64,13 @@ def put_profile(
 ) -> JSONResponse:
     def execute(tx: Tx) -> CommandResult:
         view, created = write_profile(
-            tx, caller.actor, workspace_id, body.expected_version, body.profile, deps.clock()
+            tx,
+            caller.actor,
+            workspace_id,
+            body.expected_version,
+            body.profile,
+            deps.clock(),
+            deps.pack_targets,
         )
         return CommandResult(
             201 if created else 200, ProfileOut.of(view).model_dump(mode="json"), workspace_id
@@ -99,7 +105,7 @@ def revert(
     """Undo: an earlier version's answers, each with the source it had, as a new version."""
 
     def execute(tx: Tx) -> CommandResult:
-        view, created = revert_profile(tx, caller.actor, workspace_id, body)
+        view, created = revert_profile(tx, caller.actor, workspace_id, body, deps.pack_targets)
         return CommandResult(
             201 if created else 200, ProfileOut.of(view).model_dump(mode="json"), workspace_id
         )

@@ -140,7 +140,6 @@ const proposal: TurnOut["proposal"] = {
   ready_for_review: true,
 };
 const sketch: SketchOut = {
-  label: "Early sketch, not a checked route",
   profile_version: 3,
   inputs: {},
   not_asked: ["target_titles"],
@@ -171,19 +170,20 @@ const suggestion = (
     },
   ],
   workday: `${title} work, as ESCO describes it: a synthetic description for this story.`,
-  why_it_could_suit: [
-    "What you enjoy: “repairing physical objects”. Careerwright searched for “repair equipment”, and ESCO lists “repair equipment on site” as an essential skill for this work.",
+  reasons: [
+    {
+      reason: "searched_through_skill",
+      outcome: "found_work",
+      field: "enjoyed_tasks",
+      answer: "repairing physical objects",
+      search: "repair equipment",
+      skill: "repair equipment on site",
+    },
   ],
-  what_might_not_suit: [
-    "ESCO lists 12 essential skills, not yet compared with your experience, including: use hand tools, read technical drawings, test equipment.",
-  ],
-  entry_gates: ["Entry requirements aren't researched yet."],
-  evidence_gaps: [
-    "Pay, demand and listings in your work areas aren't researched yet. Finding no listings later would be a demand signal, not proof this work doesn't exist.",
-  ],
-  try_it: [
-    `Talk to someone who works as a ${title} about a typical week (an informational interview).`,
-  ],
+  essential_skill_count: 12,
+  essential_skills: ["use hand tools", "read technical drawings", "test equipment"],
+  regulated: false,
+  different_kind_of_work: false,
   shared_skills: [],
 });
 const slate = (suggestions: SuggestionOut[]): SlateOut => ({
@@ -200,12 +200,7 @@ const slate = (suggestions: SuggestionOut[]): SlateOut => ({
   target_size: 6,
   family_limit: 2,
   suggestions,
-  fewer_reasons:
-    suggestions.length < 6
-      ? [
-          "Only 2 occupations matched your answers closely enough to suggest. Careerwright doesn't fill the rest with weaker matches.",
-        ]
-      : [],
+  fewer_reasons: suggestions.length < 6 ? [{ reason: "few_matched", count: 2 }] : [],
   notes: [],
   salary_floor: null,
   ai_resilience_filter: {
@@ -218,7 +213,6 @@ const slate = (suggestions: SuggestionOut[]): SlateOut => ({
     synthetic: false,
     pack_version: "l0-2026-10-29",
     pack_dated: "2026-10-29",
-    summary: null,
   },
   pool_size: suggestions.length < 6 ? 2 : 94,
   pool_target: [60, 120],
@@ -236,7 +230,7 @@ const slate = (suggestions: SuggestionOut[]): SlateOut => ({
     },
   ],
   unsearchable_queries: [],
-  unsupported_hypotheses: [],
+  title_ideas: [],
   not_included: [],
   unmatched_titles: [],
   ambiguous_titles: [],
@@ -560,8 +554,14 @@ const joined = full.map((shown, i) =>
     ? {
         ...shown,
         channels: ["shared_skills" as const],
-        why_it_could_suit: [
-          "Your current role: “warehouse supervisor”. ESCO lists 5 of the same essential skills for both, so Careerwright joined them by those skills.",
+        reasons: [
+          {
+            reason: "joined_by_shared_skills" as const,
+            outcome: "found_work" as const,
+            field: "current_role" as const,
+            answer: "warehouse supervisor",
+            shared: 5,
+          },
         ],
         shared_skills: joinedSkills,
       }
@@ -580,12 +580,8 @@ export const SlateJoinedBySkillsWithAConnection: Story = {
               concept_id: joined[0]?.concept_id ?? "",
               title: joined[0]?.title ?? "",
               role_title: "warehouse supervisor",
-              sentence:
-                "A warehouse supervisor and an agricultural machinery technician share 5 essential skills.",
               shared_skill_count: 5,
               shared_skills: joinedSkills,
-              still_uncertain:
-                "These are the skills ESCO lists for both roles. They aren't compared with your own experience yet.",
             },
           },
         },
@@ -616,12 +612,37 @@ export const SlateTargetChosen: Story = {
               {
                 title: "agricultural machinery technician",
                 resolution: "esco",
-                occupations: [],
+                occupations: [
+                  {
+                    concept_id: "agricultural machinery technician",
+                    title: "agricultural machinery technician",
+                    isco_group: { code: "7231", label: "Group 723" },
+                  },
+                ],
                 close_matches: [],
                 requirements: ["repair agricultural machinery", "use hand tools", "test equipment"],
                 requirement_count: 12,
                 regulated: false,
-                research_status: "Not researched yet.",
+                coverage: "not_covered",
+              },
+            ],
+          },
+        },
+        {
+          method: "GET",
+          path: /\/targets$/,
+          answer: {
+            profile_version: 4,
+            targets: [
+              {
+                key: "agricultural machinery technician",
+                title: "agricultural machinery technician",
+                kind: "esco",
+                link: "occupation_choice",
+                concept_id: "agricultural machinery technician",
+                label_matches: 1,
+                coverage: "not_covered",
+                pack_target_id: null,
               },
             ],
           },
@@ -662,8 +683,7 @@ export const SlateWithSalaryFloor: Story = {
               meets: 0,
               kept_pay_unknown: 94,
               kept_by_reason: [{ reason: "no_reviewed_mapping", count: 94 }],
-              summary:
-                "Your minimum salary of £26,000 a year (gross) is applied: 0 left out because their official pay is below it; 0 meet it; 94 kept because no reviewed UK occupation code links them to pay data. Unknown pay is never treated as below it.",
+              basis: "gross",
             },
           },
         },
