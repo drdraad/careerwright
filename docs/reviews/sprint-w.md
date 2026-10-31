@@ -19,9 +19,9 @@
 The card's demonstrable outcome, as plan v1.5 reshapes it, shown from the UI by browser
 journeys on a fresh demo stack:
 
-1. Someone opens Careerwright in a new demo workspace. One plain line says it covers England
-   for now; the entry choice is the bright action. One world stands behind every chapter, with
-   their light at its origin (`e2e/world.spec.ts`).
+1. Someone opens Careerwright in a new demo workspace. One plain line says what Careerwright
+   is for, and one that it covers England for now; the entry choice is the bright action. One
+   world stands behind every chapter, with their light at its origin (`e2e/world.spec.ts`).
 2. They talk with the demo interviewer, by typing or by tapping an example reply under each
    question. It takes a target in their words ("I want to be a nurse") and Skip, Unknown and
    Prefer not to say, and never asks the same question twice
@@ -30,16 +30,17 @@ journeys on a fresh demo stack:
 3. "Do you have a role in mind, or would you like to explore?" offers "Show me suggestions"
    (it opens the suggestions and asks for them) and "Name a role" (it opens the answer form at
    the target roles). Neither commits anything.
-4. The suggestions name the skills each was joined by, and the slate's unexpected connection
-   is shown in words on its suggestion, its skills one step away
-   (`Directions.test.tsx`).
+4. The suggestions name the skills each was joined by, under the reason that says so (the
+   join said once), and the slate's unexpected connection is marked on its suggestion, its
+   skills named the same way (`Directions.test.tsx`).
 5. They make one a target: the choice gives way, in place, to "Saved as one of your targets"
    and what the work usually asks for. The slate is not "out of date": the only change since
    it was made is their choice from it (`e2e/conversation.spec.ts`, `test_discovery.py`).
 6. Every other chapter is marked "not built yet" in the rail before it is clicked, and shows
    its place with an honest card; Routes does in every workspace, the fixture's too.
 7. On a phone each view's first decision is in the first screen; on a tablet the strip keeps
-   the person's facts, and the world's controls are in the account menu.
+   the person's facts whole, and the world's controls are in the account menu. (The first
+   candidate's tests did not establish either: see "Visual findings".)
 
 Not shown, by plan v1.5: the first answer's ignition and the other moments (Sprint M), the
 type-ahead first question (Task 6d), the live interview through the app (Task 3b).
@@ -49,7 +50,7 @@ type-ahead first question (Task 6d), the live interview through the app (Task 3b
 | Item | State | Evidence |
 |---|---|---|
 | SW.1 the spike and session W1's choice | done (Task W1) | `docs/reviews/session-w1-answers.md`; ADR 0014 |
-| SW.2 design references for the chosen direction | done (W2A, W2C part 1; updated by W2E: the phone band, the rail marks, Routes not built yet) | `docs/design/screenshots/checks.md`: 46 of 46 captures pass; contrast 132 of 132 |
+| SW.2 design references for the chosen direction | done (W2A, W2C part 1; updated by W2E: the phone band, the rail marks, Routes not built yet, What we know's action first) | `docs/design/screenshots/checks.md`: 46 of 46 captures pass; contrast 132 of 132 |
 | SW.3 the world layer in the app | done (W2A; N1 fixed by W2E) | `World.test.tsx`, `e2e/world.spec.ts` |
 | SW.4 the You chapter rebuilt, applying session 2's findings | done (W2C part 1, finished by W2E) | `YouChapter.test.tsx`, `Directions.test.tsx`, `e2e/conversation.spec.ts` |
 | SW.5 the deterministic sources and the strength's run | done at its sources (W2B); the connection's sentence and skills shown by W2E; the moments moved to Sprint M | `test_slate.py`, `test_origin.py`, `Directions.test.tsx` |
@@ -71,16 +72,21 @@ On Task W2E's code, commit `c64b636` (the commit after it changes documents only
   mirror in `apps/web/src/design` is byte-identical (`cmp`; tokens unchanged).
 - Live: none (cost $0). Not run: VoiceOver, Safari, the frame re-measure (human or later
   tasks', below).
+- After Task W2E's fix round 1, on `ba0846e`: `make check` exit 0 (1,620 fast backend tests,
+  Vitest 343 tests in 36 files); `make acceptance` exit 0 (333 integration and stack tests,
+  the Storybook build, 56 Playwright tests); design references 132 of 132 contrast
+  measurements and 46 of 46 captures pass.
 
 ## The six questions
 
 1. **Does the journey make sense from entry to the latest outcome?** Yes, from a new demo
    workspace to a saved target and what it usually asks for (Outcome above). Failure paths: a
-   reply the demo can't read says so and names the way on (an example reply, or Skip); a
-   failed reply keeps the message with Try again; a stopped update says why in words read
-   whole on a phone; a slate made from earlier answers says so with Suggest again. Where the
-   path stops: at You, by plan; every later chapter says it is not built yet before it is
-   clicked.
+   reply the demo can't read says so and names the way on that is in sight (an example reply
+   or Skip; at the role question its two buttons); after the last question any message gets
+   what to do next, never a loop back to Skip; a failed reply keeps the message with Try
+   again; a stopped update says why in words read whole on a phone; a slate made from earlier
+   answers says so with Suggest again. Where the path stops: at You, by plan; every later
+   chapter says it is not built yet before it is clicked.
 
 2. **Do shared concepts mean the same everywhere?** Unknown, Skipped and Prefer not to say
    are answers in the demo, the tray, What we know and the form, never zero. "Current" for a
@@ -106,9 +112,10 @@ On Task W2E's code, commit `c64b636` (the commit after it changes documents only
    which only the route preview used, are gone.
 
 5. **Is the interface coherent and polished?** It follows the references, updated where this
-   task changed what a place shows (the phone band, the rail marks, Routes not built yet). One
-   bright action per view: the entry choice at the start, Send only with something to send.
-   The world's control is named apart from the interview's pause. Agent pre-review below.
+   task changed what a place shows (the phone band, the rail marks, Routes not built yet, What
+   we know's action first). One bright action per view: the entry choice at the start, Send
+   only with something to send. The world's control is named apart from the interview's
+   pause. Agent pre-review below.
 
 6. **What evidence establishes completion?** The checks above on the final candidate. They do
    not establish the human gates: session W2's formative scores (H-01), VoiceOver (H-03),
@@ -120,9 +127,9 @@ On Task W2E's code, commit `c64b636` (the commit after it changes documents only
 glow, gate or shadow without a computed state behind it is a defect. Then: would a first-time
 visitor feel, within ten seconds, "My future is larger than I realised"?*
 
-- **The revelation traced:** the unexpected connection on a suggestion ("Careerwright joined
-  this to your role, “…”, by N essential skills ESCO lists for both", the role as ESCO titles
-  it) →
+- **The revelation traced:** the unexpected connection on a suggestion (its mark "An
+  unexpected connection", the reason quoting the person's own role, and the skills named, with
+  "Careerwright hasn't compared them with your own experience yet") →
   `SlateOut.connection`, computed each read by `exploration._connection` over the slate's
   candidates outside the role's own kind of work, never a title the person named → its skills
   from `taxonomy_store.shared_essential_skills` over the held, hash-checked ESCO release → the
@@ -139,10 +146,20 @@ visitor feel, within ten seconds, "My future is larger than I realised"?*
 From the acceptance run's captures (`apps/web/test-results/visual-*/screenshots/`) and the
 design references:
 
+- Corrected after the independent review (Task W2E fix round 1). This review first said each
+  phone view's first decision was in the first screen "(tested)". The test ran What we know
+  only on a workspace with three short answers; in the fixture workspace "Edit answers
+  directly" was below the first screen. It also missed two defects in the captures: on a
+  tablet the strip cut all three facts mid-word, the budget inside its digits, with room to
+  spare; and each skill-joined suggestion stated its join twice in a row. Fix round 1 put What
+  we know's action under its heading (tested on the fixture workspace), gave each strip fact
+  the width its words need (tested at 768: each fact read whole, in the fixture workspace and
+  with three long targets), and states each join once (`Directions.test.tsx`).
 - At 390 × 844 the band is a slim strip with the person's light and the target's name; each
-  view's first decision is in the first screen (tested). In the Suggestions view a two-line
-  title leaves the saved notice or the choice near the fold: a three-line title would push it
-  below (not seen in the examples; a known edge).
+  view's first decision is in the first screen (tested since fix round 1, What we know on the
+  fixture workspace). In the Suggestions view a two-line title leaves the saved notice or the
+  choice near the fold: a three-line title would push it below (not seen in the examples; a
+  known edge).
 - At 1440 the role-or-explore question's two ways on read as one decision, edged in sea-glass,
   with Send quiet beside an empty field; "Hold the world still" is clearly the world's, apart
   from "Pause the interview".
