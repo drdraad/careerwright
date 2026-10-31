@@ -118,9 +118,11 @@ Run from the repository root (details: `docs/runbook.md`).
   question graph; `capability.store` is its only SQL), `careerwright/planning` (the monthly
   planning model: the planning catalogue and its pack adapter, the immutable monthly input
   and its compiler, the direct-spend, income-difference, liquidity and debt ledgers, the
-  route checker and the route search, ADR 0016, all pure; and the person's stored planning
-  inputs, ADR 0013, through `planning.commands`, with `planning.store` its only SQL),
-  `careerwright/evidence`
+  route checker and the route search, ADR 0016, all pure; the person's stored planning
+  inputs, ADR 0013, through `planning.commands`; and the route solve, a keyless run kind
+  with its own DBOS workflow, never a model call (`planning.solves`, `planning.solve_runs`,
+  `planning.workflow`, ADR 0016); `planning.store` is its only SQL and `planning.workflow`
+  its only DBOS import), `careerwright/evidence`
   (acquisition: the guarded fetcher, the source manifest `sources.json`, pages, Adzuna,
   jobs, freshness, claims, model extraction), `careerwright/acquisition.py` (the restricted
   acquisition worker: no database, master key or model key), `careerwright/api` (HTTP only),
