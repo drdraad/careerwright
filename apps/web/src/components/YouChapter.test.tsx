@@ -228,6 +228,16 @@ const panel: SupportNoteOut = {
   ],
 };
 
+/** The API's panel beside the first question's title field (`SUPPORT_NOTE_TITLE`). */
+const titlePanel: SupportNoteOut = {
+  ...panel,
+  policy_version: "support-policy-9",
+  message:
+    "If anything you typed is about how you are feeling, support is available any time, " +
+    "from people trained to help. Careerwright keeps it as your job title only if you choose " +
+    "to. You can also type again or skip this question.",
+};
+
 type Live = { preferences: PreferencesOut; turns: TurnOut[]; profile: ProfileOut };
 
 /** The filled primary actions in the view shown (the other views stay mounted, hidden). */
@@ -1117,6 +1127,148 @@ describe("[DIV1-13][DIV1-14] the start: the first question, which is closest, th
       { expected_version: 1, title: "Registered nurse" },
       { expected_version: 2, title: "Doula" },
     ]);
+  });
+
+  it("while fixing a title, names the way back to which is closest for what it does", async () => {
+    // Design re-review R-M4: after "Change my job title", "Skip for now" went back to the
+    // closest question, skipping nothing.
+    const state: Live = { preferences: prefs(null), turns: [], profile };
+    fakeApi(
+      liveRoutes(state, [
+        {
+          method: "GET",
+          path: /\/taxonomy\/titles$/,
+          answer: titles("Registered nurse", [
+            { source: "uk_title_index", title: "Registered nurse", soc_codes: [], isco_groups: [] },
+          ]),
+        },
+        {
+          method: "POST",
+          path: /\/origin\/role\/title$/,
+          status: 201,
+          answer: () => {
+            state.profile = named("Registered nurse", 2);
+            return state.profile;
+          },
+        },
+        {
+          method: "GET",
+          path: /\/origin$/,
+          answer: () => origin("Registered nurse", "ons", "not_yet"),
+        },
+      ]),
+    );
+    const { user } = renderLive();
+
+    await user.type(
+      await screen.findByRole("combobox", { name: "Your job title" }),
+      "Registered nurse",
+    );
+    await user.click(await screen.findByRole("option", { name: /UK job title \(ONS\)/ }));
+    await user.click(await screen.findByRole("button", { name: "Change my job title" }));
+    await screen.findByRole("heading", { name: "What do you do now, or what did you do last?" });
+
+    expect(screen.queryByRole("button", { name: "Skip for now" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Back to “Which of these is closest?”" }));
+    const closest = await screen.findByRole("heading", { name: "Which of these is closest?" });
+    await waitFor(() => expect(closest).toHaveFocus());
+  });
+
+  it("keeps the first question's support panel until the person dismisses it, after another title or a skip", async () => {
+    // Design re-review R-M2: the panel lived inside the first question, so saving another
+    // title, or "Skip for now", took it away undismissed and the world moved again. The words
+    // are the support tests' own (`FirstQuestion.test.tsx`).
+    const risk = "I volunteer on a suicide prevention helpline.";
+    const state: Live = { preferences: prefs(null), turns: [], profile };
+    fakeApi(
+      liveRoutes(state, [
+        {
+          method: "GET",
+          path: /\/taxonomy\/titles$/,
+          answer: (s: Sent) => {
+            const q = new URLSearchParams(s.query).get("q") ?? "";
+            return q === risk ? { ...titles(q, []), support_note: titlePanel } : titles(q, []);
+          },
+        },
+        {
+          method: "POST",
+          path: /\/origin\/role\/title$/,
+          status: 201,
+          answer: () => {
+            state.profile = named("Bookkeeping assistant", 2);
+            return state.profile;
+          },
+        },
+        {
+          method: "GET",
+          path: /\/origin$/,
+          answer: () => origin("Bookkeeping assistant", "own_words", null),
+        },
+        {
+          method: "PUT",
+          path: /\/interview\/preferences$/,
+          answer: () => {
+            state.preferences = prefs("unsure");
+            return state.preferences;
+          },
+        },
+      ]),
+    );
+    const { user } = renderLive();
+    const panel = () => screen.getByRole("region", { name: "Support is available" });
+
+    const field = await screen.findByRole("combobox", { name: "Your job title" });
+    await user.type(field, risk);
+    await screen.findByRole("region", { name: "Support is available" });
+    await user.clear(field);
+    await user.type(field, "Bookkeeping assistant");
+    await user.click(
+      await screen.findByRole("option", { name: "Use my own words: “Bookkeeping assistant”" }),
+    );
+    const start = await screen.findByRole("heading", { name: "How would you like to start?" });
+    expect(panel()).toBeVisible(); // after another title, still there
+    // Once the start is done, it sits where the message panel does, above the reply field.
+    await user.click(screen.getByRole("button", { name: "Help me explore" }));
+    await screen.findByRole("heading", {
+      name: "What would you most like to be different about your working life?",
+    });
+    expect(panel()).toBeVisible();
+    expect(
+      panel().compareDocumentPosition(
+        screen.getByRole("textbox", { name: "Reply to Careerwright" }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    await user.click(within(panel()).getByRole("button", { name: "Dismiss the support note" }));
+    expect(screen.queryByRole("region", { name: "Support is available" })).toBeNull();
+    expect(screen.getByRole("textbox", { name: "Reply to Careerwright" })).toHaveFocus();
+    expect(start).not.toBeInTheDocument();
+  });
+
+  it("keeps the first question's support panel after Skip for now, until dismissed", async () => {
+    const risk = "I volunteer on a suicide prevention helpline.";
+    const state: Live = { preferences: prefs(null), turns: [], profile };
+    fakeApi(
+      liveRoutes(state, [
+        {
+          method: "GET",
+          path: /\/taxonomy\/titles$/,
+          answer: { ...titles(risk, []), support_note: titlePanel },
+        },
+      ]),
+    );
+    const { user } = renderLive();
+
+    await user.type(await screen.findByRole("combobox", { name: "Your job title" }), risk);
+    await screen.findByRole("region", { name: "Support is available" });
+    await user.click(screen.getByRole("button", { name: "Skip for now" }));
+    const start = await screen.findByRole("heading", { name: "How would you like to start?" });
+    const panel = screen.getByRole("region", { name: "Support is available" });
+    expect(panel).toBeVisible();
+    // No title is in a field any more, so there is nothing to keep: only Dismiss.
+    expect(within(panel).queryByRole("button", { name: "Keep it as my job title" })).toBeNull();
+    await user.click(within(panel).getByRole("button", { name: "Dismiss the support note" }));
+    expect(screen.queryByRole("region", { name: "Support is available" })).toBeNull();
+    expect(start).toHaveFocus();
   });
 
   it("never moves focus later when saving the first answer failed (N-M6)", async () => {

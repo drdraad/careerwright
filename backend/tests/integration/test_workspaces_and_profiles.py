@@ -7,7 +7,9 @@ from typing import Any
 import psycopg
 import pytest
 
+from careerwright.profile import safety
 from careerwright.seed import FIXTURE_SOURCE_ID, FIXTURE_WORKSPACE_ID, INVITED_ACTORS
+from tests.integration.test_interview_choices import DISTRESS, SERVICES
 from tests.support.client import ApiClient, profile_with, unasked_profile
 from tests.support.infra import Infra, create_emulator_user, sign_in
 
@@ -160,6 +162,63 @@ def test_profile_writes_create_versions_and_reject_stale_expected_versions(
     assert current["document"]["cities"]["value"] == ["York"]
     old = api.get(f"{path}/versions/1", ada).json()
     assert old["document"]["cities"]["value"] == ["Leeds"]  # old versions are immutable
+
+
+@pytest.mark.req("PROF-09", "VERSIONS-01")
+def test_a_direct_entry_with_a_risk_word_is_saved_with_the_calm_panel_and_nothing_of_it_kept(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    # The product owner's decision (31 October 2026): What we know's direct entries go through
+    # the support screen (`careerwright.profile.safety`). Like a message, the entry is saved, as
+    # the person's own edit, and the calm panel comes with the answer. The words are the
+    # support tests' own.
+    workspace_id = api.create_workspace(ada, "Support in What we know")["workspace_id"]
+    entered = profile_with(cities=["Leeds"], enjoyed_tasks=["Reconciling ledgers", DISTRESS])
+    key = uuid.uuid4()
+    saved = put_profile(api, ada, workspace_id, 0, entered, key=key)
+    replayed = put_profile(api, ada, workspace_id, 0, entered, key=key)
+    # Saved again beside another change, the same words are no new entry: no panel.
+    later = put_profile(
+        api,
+        ada,
+        workspace_id,
+        1,
+        profile_with(cities=["Leeds", "York"], enjoyed_tasks=["Reconciling ledgers", DISTRESS]),
+    )
+    # A refused save shows the panel too, saying nothing was saved.
+    stale = put_profile(
+        api,
+        ada,
+        workspace_id,
+        1,
+        profile_with(
+            cities=["Leeds"],
+            current_role=DISTRESS,
+            enjoyed_tasks=["Reconciling ledgers", DISTRESS],
+        ),
+    )
+
+    assert saved.status_code == 201, saved.text
+    assert saved.json()["document"]["enjoyed_tasks"]["value"] == ["Reconciling ledgers", DISTRESS]
+    note = saved.json()["support_note"]
+    assert note["message"] == safety.SUPPORT_NOTE_ENTRY
+    assert note["policy_version"] == safety.POLICY_VERSION
+    assert {r["name"] for r in note["resources"]} == SERVICES
+    # Derived from the request every time, a replay included.
+    assert (replayed.status_code, replayed.json()["version"]) == (201, 1)
+    assert replayed.json()["support_note"] == note
+    assert (later.status_code, later.json()["support_note"]) == (201, None)
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["error"]["code"] == "STALE_INPUT_VERSION"
+    assert stale.json()["support_note"]["message"] == safety.SUPPORT_NOTE_ENTRY_NOT_SAVED
+    # Nothing about the panel is stored: each receipt keeps the profile it saved, nothing more.
+    receipts = infra.query(
+        "SELECT response FROM careerwright.command_receipts WHERE workspace_id = %s "
+        "AND command = 'write_profile'",
+        (workspace_id,),
+    )
+    assert len(receipts) == 2
+    assert all("support_note" not in r["response"] for r in receipts)
 
 
 def test_an_unchanged_profile_write_creates_no_version(api: ApiClient, ada: str) -> None:

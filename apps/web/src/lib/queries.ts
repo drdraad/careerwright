@@ -49,6 +49,7 @@ import {
   type PreferencesOut,
   type ProfileInput,
   type ProfileOut,
+  type ProfileSavedOut,
   putPreferences,
   putProfile,
   putSpendLimits,
@@ -224,8 +225,8 @@ export function useSaveProfile(id: string) {
           headers: { "Idempotency-Key": idempotencyKey },
           throwOnError: true,
         })
-      ).data as ProfileOut,
-    onSuccess: (saved) => {
+      ).data as ProfileSavedOut,
+    onSuccess: ({ support_note: _shownBesideTheForm, ...saved }) => {
       queries.setQueryData(keys.profile(id), saved);
       void queries.invalidateQueries({ queryKey: keys.scope(id) });
     },

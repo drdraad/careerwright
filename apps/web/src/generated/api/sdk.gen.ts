@@ -92,6 +92,10 @@ export const getProfile = <ThrowOnError extends boolean = false>(options: Option
 
 /**
  * Put Profile
+ *
+ * A direct edit in What we know. Its new entries go through the support screen
+ * (`careerwright.profile.safety`), as a message does: an edit that triggers it is saved as
+ * usual, with the calm support panel beside the answer, or beside its refusal.
  */
 export const putProfile = <ThrowOnError extends boolean = false>(options: Options<PutProfileData, ThrowOnError>): RequestResult<PutProfileResponses, PutProfileErrors, ThrowOnError> => (options.client ?? client).put<PutProfileResponses, PutProfileErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -501,7 +505,8 @@ export const chooseRole = <ThrowOnError extends boolean = false>(options: Option
  * or anything typed ("Use my own words"), saved exactly as given as their current role
  * through the one profile write path; no model is called. Nothing is refused for its words,
  * except a title the support screen answers (`careerwright.profile.safety`), as it answers a
- * message: never kept as the role, with the calm support panel beside the refusal.
+ * message: not kept as the role by itself, with the calm support panel beside the refusal,
+ * unless the person chose to keep it as typed (`keep_as_typed`).
  */
 export const nameRole = <ThrowOnError extends boolean = false>(options: Options<NameRoleData, ThrowOnError>): RequestResult<NameRoleResponses, NameRoleErrors, ThrowOnError> => (options.client ?? client).post<NameRoleResponses, NameRoleErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

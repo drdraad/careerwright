@@ -1,12 +1,13 @@
 // The profile editor against a scripted API at the network edge (fetch): expected-version
 // saves, the stale-version path, and idempotent retries (GC7, ADR 0004 decisions 6 and 7).
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
-import type { ProfileDocument, ProfileOut, SourceOut } from "@/generated/api";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ProfileDocument, ProfileOut, SourceOut, SupportNoteOut } from "@/generated/api";
 import { client } from "@/generated/api/client.gen";
 import { configureApiClient } from "@/lib/api";
+import { SupportShown } from "@/lib/world/settings";
 import { EvidenceDrawer, EvidenceProvider } from "./EvidenceDrawer";
 import { ProfileEditor } from "./ProfileEditor";
 
@@ -126,18 +127,41 @@ function api(current: { profile: ProfileOut }, puts: Array<Response | Error>, ed
   return sent;
 }
 
-function renderEditor(profile: ProfileOut) {
+function renderEditor(profile: ProfileOut, supportShown: (shown: boolean) => void = () => {}) {
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queries}>
-      <EvidenceProvider>
-        <ProfileEditor workspaceId={WS} profile={profile} />
-        <EvidenceDrawer />
-      </EvidenceProvider>
+      <SupportShown.Provider value={supportShown}>
+        <EvidenceProvider>
+          <ProfileEditor workspaceId={WS} profile={profile} />
+          <EvidenceDrawer />
+        </EvidenceProvider>
+      </SupportShown.Provider>
     </QueryClientProvider>,
   );
   return userEvent.setup();
 }
+
+/** The API's panel beside a direct edit (`careerwright.profile.safety.SUPPORT_NOTE_ENTRY`). */
+const entryPanel = (saved: boolean): SupportNoteOut => ({
+  policy_version: "support-policy-9",
+  review_status: "accepted for L0 at session 1 (human gate H-12)",
+  message:
+    "If anything you typed is about how you are feeling, support is available any time, " +
+    "from people trained to help. " +
+    (saved
+      ? "Your answers were saved as usual."
+      : "Your answers were not saved; the reason is shown with them."),
+  resources: [
+    {
+      name: "Samaritans",
+      contact: "Call 116 123",
+      when: "To talk",
+      source_url: "https://www.samaritans.org/",
+      checked_on: "2026-10-28",
+    },
+  ],
+});
 
 beforeEach(() => {
   configureApiClient(async () => "token");
@@ -302,6 +326,78 @@ describe("[DUR-04][API-04] saving the profile is an expected-version, idempotent
     expect(await screen.findByText("Use at most two decimal places (pence).")).toBeInTheDocument();
     expect(amount).toHaveAttribute("aria-invalid", "true");
     await waitFor(() => expect(sent.filter((r) => r.method === "PUT")).toHaveLength(0));
+  });
+});
+
+describe("[PROF-09] a direct entry with a risk word is saved, with the calm support panel", () => {
+  // The product owner's decision (31 October 2026): What we know's direct entries go through
+  // the support screen, as a message does. The API screens; the form shows its panel. The
+  // words are the support tests' own (`YouChapter.test.tsx`).
+  const RISK = "I volunteer on a suicide prevention helpline.";
+
+  it("shows the panel the API sends with a save, stills the world, and keeps it until dismissed", async () => {
+    const current = { profile: profileOut(1, ["Manchester"]) };
+    const sent = api(current, [
+      json(201, { ...profileOut(2, ["Manchester"]), support_note: entryPanel(true) }),
+    ]);
+    const shown = vi.fn();
+    const user = renderEditor(current.profile, shown);
+
+    const target = screen.getByRole("textbox", { name: "Target role 1" });
+    await user.clear(target);
+    await user.type(target, RISK);
+    const save = screen.getByRole("button", { name: "Save changes" });
+    await user.click(save);
+
+    const panel = await screen.findByRole("region", { name: "Support is available" });
+    expect(panel).toHaveTextContent("Your answers were saved as usual.");
+    expect(panel).toHaveTextContent("Samaritans: Call 116 123");
+    expect(shown).toHaveBeenLastCalledWith(true); // the world is drawn still
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Saved. Support information is shown above Save changes.",
+    );
+    // Beside where the person saved, above the button.
+    expect(panel.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    // Saved as entered: the person's own edit, sent as usual.
+    expect(sent.find((s) => s.method === "PUT")?.body).toMatchObject({
+      profile: { target_titles: { state: "provided", value: [RISK] } },
+    });
+
+    await user.click(within(panel).getByRole("button", { name: "Dismiss the support note" }));
+    expect(screen.queryByRole("region", { name: "Support is available" })).toBeNull();
+    expect(save).toHaveFocus();
+    expect(shown).toHaveBeenLastCalledWith(false);
+  });
+
+  it("shows the panel beside a refused save too, saying the answers were not saved", async () => {
+    const current = { profile: profileOut(1, ["Manchester"]) };
+    api(current, [
+      json(409, {
+        error: {
+          code: "STALE_INPUT_VERSION",
+          message: "ignored by the UI",
+          retryable: false,
+          stage: "profile",
+          correlation_id: "c1",
+          details: { current_version: 2 },
+        },
+        support_note: entryPanel(false),
+      }),
+    ]);
+    current.profile = versionTwoWithCap(90000);
+    const user = renderEditor(profileOut(1, ["Manchester"]));
+
+    const target = screen.getByRole("textbox", { name: "Target role 1" });
+    await user.clear(target);
+    await user.type(target, RISK);
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Your answers changed while you were editing",
+    );
+    expect(screen.getByRole("region", { name: "Support is available" })).toHaveTextContent(
+      "Your answers were not saved; the reason is shown with them.",
+    );
   });
 });
 

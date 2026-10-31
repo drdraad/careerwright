@@ -3,12 +3,13 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Query
+from fastapi import APIRouter, Path, Query, Request
 from fastapi.responses import JSONResponse
 
 from careerwright.api.catalogue_schemas import ProvisionalConceptOut, ProvisionalConceptPage
 from careerwright.api.deps import CallerDep, Deps, IdempotencyKey
-from careerwright.api.envelope import ERROR_RESPONSES
+from careerwright.api.envelope import ERROR_RESPONSES, correlation_id, error_body, error_status
+from careerwright.api.interview_schemas import ProfileRefusedOut, ProfileSavedOut, SupportNoteOut
 from careerwright.api.pagination import (
     DEFAULT_LIMIT,
     MAX_LIMIT,
@@ -32,10 +33,12 @@ from careerwright.profile import store
 from careerwright.profile.commands import (
     RevertProfile,
     current_profile,
+    entered_words,
     revert_profile,
     write_profile,
 )
 from careerwright.profile.concepts import RegisterProvisionalConcept, register_provisional_concept
+from careerwright.profile.safety import has_risk_stem
 
 router = APIRouter(
     prefix="/v1/workspaces/{workspace_id}", responses=ERROR_RESPONSES, tags=["profile"]
@@ -51,9 +54,13 @@ def get_profile(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> Profi
 
 @router.put(
     "/profile",
-    response_model=ProfileOut,
+    response_model=ProfileSavedOut,
     status_code=201,
-    responses={200: {"model": ProfileOut, "description": "No field changed; no new version."}},
+    responses={
+        200: {"model": ProfileSavedOut, "description": "No field changed; no new version."},
+        "4XX": {"model": ProfileRefusedOut, "description": "Typed error envelope"},
+        "5XX": {"model": ProfileRefusedOut, "description": "Typed error envelope"},
+    },
 )
 def put_profile(
     workspace_id: uuid.UUID,
@@ -61,7 +68,17 @@ def put_profile(
     caller: CallerDep,
     deps: Deps,
     key: IdempotencyKey,
+    http: Request,
 ) -> JSONResponse:
+    """A direct edit in What we know. Its new entries go through the support screen
+    (`careerwright.profile.safety`), as a message does: an edit that triggers it is saved as
+    usual, with the calm support panel beside the answer, or beside its refusal."""
+    # Screened before anything can refuse it, so a refusal shows the panel too; derived from
+    # the request every time and never stored, not even in the receipt.
+    with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
+        entered = entered_words(tx, workspace_id, body.expected_version, body.profile)
+    support = any(has_risk_stem(words) for words in entered)
+
     def execute(tx: Tx) -> CommandResult:
         view, created = write_profile(
             tx,
@@ -77,15 +94,25 @@ def put_profile(
         )
 
     request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
-    status, response = run_idempotent(
-        deps.engine,
-        caller.actor.actor_id,
-        key,
-        "write_profile",
-        fingerprint("write_profile", request),
-        execute,
-    )
-    return JSONResponse(response, status_code=status)
+    try:
+        status, response = run_idempotent(
+            deps.engine,
+            caller.actor.actor_id,
+            key,
+            "write_profile",
+            fingerprint("write_profile", request),
+            execute,
+        )
+    except CareerwrightError as error:
+        if not support:
+            raise
+        refused = ProfileRefusedOut(
+            error=error_body(error, correlation_id(http)),
+            support_note=SupportNoteOut.beside_an_entry(saved=False),
+        )
+        return JSONResponse(refused.model_dump(mode="json"), status_code=error_status(error))
+    saved = ProfileSavedOut.saved(ProfileOut.model_validate(response), support=support)
+    return JSONResponse(saved.model_dump(mode="json"), status_code=status)
 
 
 @router.post(

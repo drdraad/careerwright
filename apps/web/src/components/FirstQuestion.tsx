@@ -3,16 +3,22 @@
 // "The first ten seconds"; ADR 0015). As the person types, job titles come from the pinned ESCO
 // release and the pinned UK job-title index (ONS's SOC 2020 coding index), with no model call,
 // so it works without a key and in the demo; a title the index lists is marked "UK job title
-// (ONS)". "Use my own words" is always the last option and keeps the title exactly as typed:
-// nothing typed is refused. Where neither list holds every word typed, the options are ESCO's
-// closest titles, asked as the card's question, and "None of these is my job" keeps the
-// person's own words. The answer lights the person's light in the world at once (any answer
-// does), and a UK title is followed by "Which of these is closest?": the ESCO occupations in
-// every group ONS codes it to, none picked, and "None of these is my job", which leaves the
-// role with no ESCO occupation and never asks for another.
+// (ONS)". "Use my own words" is always the first option, in a phone's first screen however
+// many titles follow, and keeps the title exactly as typed: nothing typed is refused. Where
+// neither list holds every word typed, the options are ESCO's closest titles, asked as the
+// card's question, and "None of these is my job" keeps the person's own words. The answer
+// lights the person's light in the world at once (any answer does), and a UK title is followed
+// by "Which of these is closest?": the ESCO occupations in every group ONS codes it to, none
+// picked, and "None of these is my job", which leaves the role with no ESCO occupation and
+// never asks for another.
+//
+// What is typed goes through the support screen: the calm panel shows above the field, where
+// a phone's keyboard can't cover it, and the words are kept as the job title only by the
+// person's choice in the panel. The start holds the panel until the person dismisses it.
 //
 // The field is an ARIA combobox: the arrow keys move through the options, Enter picks the one
-// in focus, Escape closes the list; each option is also picked by a click or a tap.
+// in focus, Escape closes the list; each option is also picked by a click or a tap. The option
+// in focus is kept by its key, so one that moves as the titles arrive is never Enter's pick.
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -46,14 +52,18 @@ const GROUP_SHOWN = 12;
 type Option =
   | { kind: "esco"; match: TitleMatchOut }
   | { kind: "uk"; title: UkTitleOut }
-  | { kind: "own"; text: string };
+  /** The words as typed; under a partial list, "None of these is my job": a refusal too. */
+  | { kind: "own"; text: string; noneOfThese: boolean };
 
 function optionKey(option: Option): string {
   return option.kind === "esco"
     ? `esco:${option.match.concept_id}`
     : option.kind === "uk"
       ? `uk:${option.title.title}`
-      : "own";
+      : // A refusal is another answer, so the own words arrowed to never become one.
+        option.noneOfThese
+        ? "none-of-these"
+        : "own";
 }
 
 /** Settles `value` once it has stopped changing for `ms`. */
@@ -72,6 +82,10 @@ export function FirstQuestion({
   headingRef,
   lead,
   initial = "",
+  support,
+  onSupport,
+  onDismissSupport,
+  skipLabel = FIRST_ANSWER.skip,
   onAnswered,
   onSaved,
   onFailed,
@@ -85,6 +99,14 @@ export function FirstQuestion({
   lead?: ReactNode;
   /** The words in the field to start with: the title the person came back to fix. */
   initial?: string;
+  /** The calm support panel, held by the start until the person dismisses it, so it stays
+   *  after a skip or another answer, as the message panel does (re-review R-M2). */
+  support: SupportNoteOut | null;
+  /** The support screen answered what was typed (the type-ahead or a refused save). */
+  onSupport(note: SupportNoteOut): void;
+  onDismissSupport(): void;
+  /** The skip button's words: "Skip for now", or what it does while fixing a title. */
+  skipLabel?: string;
   /** The person answered: the start moves on once the answer is saved. */
   onAnswered?(): void;
   /** The answer was saved (it may have changed nothing: the same title again). */
@@ -99,10 +121,9 @@ export function FirstQuestion({
   const [typed, setTyped] = useState(initial);
   const [open, setOpen] = useState(false);
   // No option is active until the person moves to one, so Enter keeps their own words: a
-  // partial match they didn't choose is never saved (design review I-1).
-  const [active, setActive] = useState(-1);
-  // The calm panel, from the type-ahead's screen or a refused save; kept until dismissed.
-  const [support, setSupport] = useState<SupportNoteOut | null>(null);
+  // partial match they didn't choose is never saved (design review I-1). The option is kept
+  // by its key, never its place, so one that moves as titles arrive is not picked (R-M1).
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   const settled = useSettled(typed, SETTLE_MS);
   const found = useTitleMatches(settled, OPTIONS_SHOWN);
   const chooseRole = useChooseRole(workspaceId);
@@ -112,30 +133,44 @@ export function FirstQuestion({
   const body = text !== "" && settled.trim() === text ? found.data : undefined;
   const screened = body?.support_note ?? null;
   useEffect(() => {
-    if (screened !== null) setSupport(screened);
-  }, [screened]);
+    if (screened !== null) onSupport(screened);
+  }, [screened, onSupport]);
   const partial = body?.partial === true;
   const titles: Option[] = (body?.matches ?? []).map((m) =>
     m.source === "esco" ? { kind: "esco", match: m } : { kind: "uk", title: m },
   );
-  // Words the support screen answered are offered nothing, and never repeated back.
+  // Words the support screen answered are offered nothing, and never repeated back. The
+  // person's own words come first, in a phone's first screen (design re-review R-I2).
   const options: Option[] =
-    text === "" || screened !== null ? [] : [...titles, { kind: "own", text }];
+    text === "" || screened !== null
+      ? []
+      : [{ kind: "own", text, noneOfThese: partial }, ...titles];
   const shown = open && options.length > 0;
-  const at = active < options.length ? active : -1;
+  const at = activeKey === null ? -1 : options.findIndex((o) => optionKey(o) === activeKey);
   const looking =
     text !== "" && body === undefined && (settled.trim() !== text || found.isFetching);
   const saving = chooseRole.isPending || nameRole.isPending;
   const failure = chooseRole.error ?? nameRole.error;
+  // The support screen's own refusal is answered by the panel alone; any other says why.
+  const calm =
+    failure instanceof ApiError &&
+    failure.supportNote !== null &&
+    failure.body?.details?.reason === "support_screen";
+  // The words the screen answered, while they are in the field: the person may keep them.
+  const refusedWords =
+    nameRole.error instanceof ApiError && nameRole.error.supportNote !== null
+      ? nameRole.variables?.title
+      : undefined;
+  const keepable = text !== "" && (screened !== null || refusedWords === text);
   const settle = {
     onSuccess: () => onSaved?.(),
     onError: (error: Error) => {
-      if (error instanceof ApiError && error.supportNote !== null) setSupport(error.supportNote);
+      if (error instanceof ApiError && error.supportNote !== null) onSupport(error.supportNote);
       onFailed?.();
     },
   };
 
-  const pick = (option: Option, refused: boolean) => {
+  const pick = (option: Option, keep = false) => {
     if (saving) return;
     setOpen(false);
     onAnswered?.();
@@ -154,9 +189,18 @@ export function FirstQuestion({
     const title = option.kind === "uk" ? option.title.title : option.text;
     // Under a partial list the own-words option is "None of these is my job": the person's
     // refusal of ESCO's closest titles, recorded so nothing later asks for another job.
-    nameRole.mutate({ expected_version, title, ...(refused && { none_of_these: true }) }, settle);
+    // Words the support screen answered are kept only by the person's choice (`keep`).
+    const refused = option.kind === "own" && option.noneOfThese;
+    nameRole.mutate(
+      {
+        expected_version,
+        title,
+        ...(refused && { none_of_these: true }),
+        ...(keep && { keep_as_typed: true }),
+      },
+      settle,
+    );
   };
-  const chosen = (option: Option) => pick(option, option.kind === "own" && partial);
 
   const keys = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -165,16 +209,17 @@ export function FirstQuestion({
       if (options.length === 0) return;
       const down = event.key === "ArrowDown";
       const from = at === -1 ? (down ? -1 : 0) : at;
-      setActive((from + (down ? 1 : -1) + options.length) % options.length);
+      const next = options[(from + (down ? 1 : -1) + options.length) % options.length];
+      if (next !== undefined) setActiveKey(optionKey(next));
     } else if (event.key === "Enter") {
       event.preventDefault();
       const option = shown && at !== -1 ? options[at] : undefined;
-      if (option !== undefined) chosen(option);
+      if (option !== undefined) pick(option);
       // Nothing chosen: Enter keeps the words as typed (never a refusal they didn't make).
-      else if (text !== "" && screened === null) pick({ kind: "own", text }, false);
+      else if (text !== "" && screened === null) pick({ kind: "own", text, noneOfThese: false });
     } else if (event.key === "Escape") {
       setOpen(false);
-      setActive(-1);
+      setActiveKey(null);
     }
   };
 
@@ -182,6 +227,16 @@ export function FirstQuestion({
   const questionId = `${id}-partial`;
   const optionId = (n: number) => `${id}-option-${n}`;
   const answered = shown && body !== undefined;
+  // The person's explicit choice to keep the words the screen answered (re-review R-M3).
+  const keep = keepable && (
+    <Button
+      variant="secondary"
+      onClick={() => pick({ kind: "own", text, noneOfThese: false }, true)}
+      disabledReason={saving ? "Saving…" : undefined}
+    >
+      {FIRST_ANSWER.keep}
+    </Button>
+  );
   return (
     <section className="question" aria-labelledby={`${id}-title`}>
       {lead}
@@ -189,6 +244,18 @@ export function FirstQuestion({
         {FIRST_QUESTION}
       </h2>
       <div className="title-field">
+        {/* Above the field, as the message panel sits above the reply field: below it, a
+            phone's keyboard would cover it while the person types (design re-review R-I1). */}
+        {support !== null && (
+          <SupportNote
+            note={support}
+            onDismiss={() => {
+              onDismissSupport();
+              field.current?.focus(); // the button goes; focus is never lost
+            }}
+            actions={keep}
+          />
+        )}
         <label className="sr-only" htmlFor={`${id}-field`}>
           {FIRST_ANSWER.field}
         </label>
@@ -209,7 +276,7 @@ export function FirstQuestion({
           value={typed}
           onChange={(event) => {
             setTyped(event.target.value);
-            setActive(-1);
+            setActiveKey(null);
             setOpen(true);
           }}
           onKeyDown={keys}
@@ -249,36 +316,27 @@ export function FirstQuestion({
               aria-selected={n === at}
               // A press picks before the field's blur can close the list.
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => chosen(option)}
+              onClick={() => pick(option)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  chosen(option);
+                  pick(option);
                 }
               }}
             >
-              <OptionWords option={option} partial={partial} />
+              <OptionWords option={option} />
             </div>
           ))}
         </div>
+        {/* Dismissed, the panel leaves the choice with the words, under the field. */}
+        {support === null && keep && <div>{keep}</div>}
         {found.error !== null && <RequestFailure error={found.error} />}
-        {/* A refusal the support screen answered shows the panel, never a failure notice. */}
-        {failure !== null && !(failure instanceof ApiError && failure.supportNote !== null) && (
-          <RequestFailure error={failure} />
-        )}
-        {support !== null && (
-          <SupportNote
-            note={support}
-            onDismiss={() => {
-              setSupport(null);
-              field.current?.focus(); // the button goes; focus is never lost
-            }}
-          />
-        )}
+        {/* The support screen's own refusal shows the panel, never a failure notice. */}
+        {failure !== null && !calm && <RequestFailure error={failure} />}
       </div>
       <div className="mt-12">
         <Button variant="quiet" onClick={onSkip} disabledReason={saving ? "Saving…" : undefined}>
-          {FIRST_ANSWER.skip}
+          {skipLabel}
         </Button>
       </div>
     </section>
@@ -295,7 +353,7 @@ function Mark({ children }: { children: ReactNode }) {
   );
 }
 
-function OptionWords({ option, partial }: { option: Option; partial: boolean }) {
+function OptionWords({ option }: { option: Option }) {
   if (option.kind === "esco") {
     const { matched_label, title } = option.match;
     return (
@@ -313,7 +371,7 @@ function OptionWords({ option, partial }: { option: Option; partial: boolean }) 
       </>
     );
   }
-  return partial ? (
+  return option.noneOfThese ? (
     <>
       <span>{FIRST_ANSWER.noneOfThese}</span>
       <Mark>{FIRST_ANSWER.ownWords(option.text)}</Mark>

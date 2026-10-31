@@ -3,7 +3,7 @@
 // convenience), pausing ambient motion and sound (both for this visit only: sound is off until
 // the person turns it on, every visit). The system's reduced-motion setting always wins. And
 // whether the calm support panel is showing, which stills the world while it does.
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Sound } from "./sound";
 
 const CALM_KEY = "careerwright.calm";
@@ -21,6 +21,18 @@ export function useSupportShown(): void {
     report(true);
     return () => report(false);
   }, [report]);
+}
+
+/** For the shell: whether any support panel shows, and the report each panel makes. Panels
+ *  are counted: the first question's stays until dismissed, so it can show beside a message's
+ *  or What we know's, and the world stays still until the last goes. */
+export function useSupportPanels(): [boolean, (shown: boolean) => void] {
+  const [count, setCount] = useState(0);
+  const report = useCallback(
+    (shown: boolean) => setCount((n) => Math.max(0, n + (shown ? 1 : -1))),
+    [],
+  );
+  return [count > 0, report];
 }
 
 export function useReducedMotion(): boolean {

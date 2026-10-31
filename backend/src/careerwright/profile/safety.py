@@ -16,10 +16,15 @@ person, and nothing it sees reaches the profile, a proposal or a suggestion.
   services below, and the interviewer gets `SUPPORT_TURN_INSTRUCTION` for that turn only
   (any next question it still writes is dropped, `interview.check_turn`); the message is
   sent as usual, and a refused send shows the panel with its refusal. The first question's
-  title field goes through the same screen (`support-policy-8`, Task 6d slice B fix round 1):
-  a title that triggers it is matched to nothing and never kept as the role, the panel says
-  so (`SUPPORT_NOTE_TITLE`) without repeating the words, and the person can type again or
-  skip. The screen does not try to judge intent, so a stem inside career phrasing ("took my life
+  title field goes through the same screen (from `support-policy-8`, Task 6d slice B fix round 1):
+  a title that triggers it is matched to nothing and not kept as the role by itself, and the
+  panel says so (`SUPPORT_NOTE_TITLE`) without repeating the words. The person can keep it as
+  typed by their own explicit choice, type again or skip (`support-policy-9`, fix round 2).
+  What we know's direct entries go through it too (`support-policy-9`, the product owner's
+  decision of 2026-10-31): like a message, an entry that triggers it is saved, as the person's
+  own edit, with the panel beside the answer (`SUPPORT_NOTE_ENTRY`, or
+  `SUPPORT_NOTE_ENTRY_NOT_SAVED` beside a refused save). The screen does not try to judge
+  intent, so a stem inside career phrasing ("took my life
   savings") triggers it too, an accepted false positive; words outside the lists or the
   windows get nothing ("this commute is killing me"). Whether a message triggers it is
   recomputed from the message every time it is needed and never stored. Clinical
@@ -42,12 +47,12 @@ import unicodedata
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-POLICY_VERSION = "support-policy-8"
+POLICY_VERSION = "support-policy-9"
 CHECKED_ON = "2026-10-28"
 REVIEW_STATUS = (
     "accepted for L0 at session 1 (human gate H-12); the three phrasings added on 2026-10-28, "
-    "and the first question's screen and its line added on 2026-10-31, are not yet reviewed "
-    "as built"
+    "and the screens of the first question and of What we know with their lines, added on "
+    "2026-10-31, are not yet reviewed as built"
 )
 
 # Normalisation: the listed apostrophe variants to `'`, the hyphens U+2010 and U+2011 to `-`,
@@ -316,11 +321,24 @@ SUPPORT_NOTE_NOT_SENT = (
     "If anything you mentioned is about how you are feeling, support is available any time, "
     "from people trained to help. Your message was not sent; the reason is shown below."
 )
-# The same panel beside the first question's title field (Task 6d slice B fix round 1): the
-# title is not kept as the person's role, and the words are not repeated back to them.
+# The same panel beside the first question's title field (Task 6d slice B fix rounds 1 and
+# 2): the title is not kept as the person's role by itself, the words are not repeated back
+# to them, and the ways on are named: keep it by their choice, type again or skip. It stays
+# true whichever they take, since the panel stays until they dismiss it.
 SUPPORT_NOTE_TITLE = (
     "If anything you typed is about how you are feeling, support is available any time, "
-    "from people trained to help. Careerwright hasn't kept it as your role."
+    "from people trained to help. Careerwright keeps it as your job title only if you choose "
+    "to. You can also type again or skip this question."
+)
+# The same panel beside a direct edit in What we know (the product owner's decision,
+# 2026-10-31): the entry is saved as usual, or, beside a refused save, it was not.
+SUPPORT_NOTE_ENTRY = (
+    "If anything you typed is about how you are feeling, support is available any time, "
+    "from people trained to help. Your answers were saved as usual."
+)
+SUPPORT_NOTE_ENTRY_NOT_SAVED = (
+    "If anything you typed is about how you are feeling, support is available any time, "
+    "from people trained to help. Your answers were not saved; the reason is shown with them."
 )
 # Added to the interviewer's instructions for a turn whose message triggers the screen, and
 # for that turn only. It names neither the screen nor anything matched.

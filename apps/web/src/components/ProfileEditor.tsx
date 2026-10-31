@@ -8,10 +8,13 @@
 // is merged silently, and a newer version that cannot be loaded says so. Either notice is
 // announced and takes focus, and lists each answer the newer version changed (WCAG 4.1.3).
 // The words never say "version" (session 2's plain words, Task W2C fix round 1): the person
-// sees their answers and the newer answers, never a number.
+// sees their answers and the newer answers, never a number. An entry with a listed risk word
+// is saved as usual and the API's calm support panel shows above Save changes, or beside a
+// refused save (the product owner's decision, 2026-10-31); like a message's, it stays until
+// dismissed or the next save.
 import { useQueryClient } from "@tanstack/react-query";
 import { type Ref, useEffect, useId, useRef, useState } from "react";
-import type { ProfileDocument, ProfileOut } from "@/generated/api";
+import type { ProfileDocument, ProfileOut, SupportNoteOut } from "@/generated/api";
 import { ApiError, ChangeKeys } from "@/lib/api";
 import {
   describeField,
@@ -31,6 +34,9 @@ import { FieldSource } from "./FieldSource";
 import { AnswerControl, FieldError, FieldStateSelect } from "./fields";
 import { Glyph } from "./Glyph";
 import { RequestFailure } from "./PageState";
+import { SupportNote } from "./SupportNote";
+
+const SUPPORT_SHOWN = "Support information is shown above Save changes.";
 
 type Stale =
   | {
@@ -66,10 +72,13 @@ export function ProfileEditor({
   const [problems, setProblems] = useState<Partial<Record<ProfileFieldName, FieldProblem>>>({});
   const [stale, setStale] = useState<Stale | null>(null);
   const [saved, setSaved] = useState(false);
+  // The calm panel the API sent with the last save, saved or refused; never stored.
+  const [support, setSupport] = useState<SupportNoteOut | null>(null);
   const [changes] = useState(() => new ChangeKeys());
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftFrom(base.document));
   const idPrefix = useId();
   const notice = useRef<HTMLDivElement>(null);
+  const saveButton = useRef<HTMLButtonElement>(null);
 
   // A refused save moves focus to its notice, which is announced.
   useEffect(() => {
@@ -136,7 +145,9 @@ export function ProfileEditor({
       setBase(stored);
       setDraft(draftFrom(stored.document));
       setSaved(true);
+      setSupport(stored.support_note ?? null);
     } catch (error) {
+      setSupport(error instanceof ApiError ? error.supportNote : null);
       if (!(error instanceof ApiError && error.code === "STALE_INPUT_VERSION")) return;
       let latest: ProfileOut;
       try {
@@ -233,7 +244,7 @@ export function ProfileEditor({
       )}
       {failure && <RequestFailure error={save.error} />}
       <p role="status" className="small">
-        {saved && "Saved."}
+        {[saved && "Saved.", support !== null && SUPPORT_SHOWN].filter(Boolean).join(" ")}
       </p>
 
       <div className="card grid gap-0 py-8">
@@ -303,8 +314,18 @@ export function ProfileEditor({
         })}
       </div>
 
+      {support !== null && (
+        <SupportNote
+          note={support}
+          onDismiss={() => {
+            setSupport(null);
+            saveButton.current?.focus(); // the button goes; focus is never lost
+          }}
+        />
+      )}
       <div className="flex flex-wrap items-center gap-12">
         <Button
+          ref={saveButton}
           type="submit"
           variant="primary"
           disabledReason={save.isPending ? "Saving…" : dirty ? undefined : "No changes to save."}

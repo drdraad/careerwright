@@ -567,7 +567,25 @@ test.describe("phone, first screen", () => {
     const token = await emulatorToken("ada");
     // The start: the first question's field (Task 6d slice B), then the entry choice.
     await signIn(page, "ada", chapterUrl("you", await demoWorkspace("Start (synthetic)")));
-    await firstScreen(page, page.getByRole("combobox", { name: "Your job title" }));
+    const titleField = page.getByRole("combobox", { name: "Your job title" });
+    await firstScreen(page, titleField);
+    // The person's own answer to the type-ahead is in the first screen however many titles it
+    // offers (fix round 2, design re-review R-I2): "Use my own words" over a list of UK job
+    // titles, and "None of these is my job" over a partial list of ESCO's guesses.
+    await titleField.fill("Registered nurse");
+    await expect(
+      page.getByRole("option", { name: /^Registered nurse\s*,\s*UK job title \(ONS\)$/ }),
+    ).toBeVisible();
+    await firstScreen(
+      page,
+      page.getByRole("option", { name: "Use my own words: “Registered nurse”" }),
+    );
+    await titleField.fill("Bookkeeping assistant");
+    await expect(
+      page.getByText("Careerwright couldn't match that title in ESCO. Is it one of these?"),
+    ).toBeVisible();
+    await firstScreen(page, page.getByRole("option", { name: /^None of these is my job/ }));
+    await titleField.fill("");
     await skipFirstQuestion(page);
     await firstScreen(page, page.getByRole("button", { name: "Help me explore" }));
 

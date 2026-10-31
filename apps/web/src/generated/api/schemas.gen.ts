@@ -5931,6 +5931,12 @@ export const NameRoleSchema = {
             title: 'None Of These',
             description: 'True: the person picked "None of these is my job" under the type-ahead\'s partial list, ESCO\'s closest titles: the title names no ESCO occupation, and nothing asks them to pick another.',
             default: false
+        },
+        keep_as_typed: {
+            type: 'boolean',
+            title: 'Keep As Typed',
+            description: 'True: beside the support panel, the person chose to keep what they typed as their job title. A title the support screen answers (`careerwright.profile.safety`) is kept only so, exactly as typed, as any other; nothing about the panel is stored.',
+            default: false
         }
     },
     additionalProperties: false,
@@ -5940,7 +5946,7 @@ export const NameRoleSchema = {
         'title'
     ],
     title: 'NameRole',
-    description: 'The first answer in the person\'s own words: a UK job title picked from the type-ahead\n(`GET /v1/taxonomy/titles`, a title of the UK job-title index), or anything typed ("Use\nmy own words"). Nothing is refused.'
+    description: 'The first answer in the person\'s own words: a UK job title picked from the type-ahead\n(`GET /v1/taxonomy/titles`, a title of the UK job-title index), or anything typed ("Use\nmy own words"). Nothing is refused for its words: a title the support screen answers is\nkept only by the person\'s explicit choice (`keep_as_typed`).'
 } as const;
 
 export const NarrowingSchema = {
@@ -8730,6 +8736,95 @@ export const ProfileOutSchema = {
         'created_at'
     ],
     title: 'ProfileOut'
+} as const;
+
+export const ProfileRefusedOutSchema = {
+    properties: {
+        error: {
+            $ref: '#/components/schemas/ErrorBody'
+        },
+        support_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SupportNoteOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'error'
+    ],
+    title: 'ProfileRefusedOut',
+    description: 'A refused direct edit. When an entry it makes triggers the support screen, the panel\ncomes with the refusal, since the edit was screened before anything could refuse it.'
+} as const;
+
+export const ProfileSavedOutSchema = {
+    properties: {
+        workspace_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Workspace Id'
+        },
+        version: {
+            type: 'integer',
+            title: 'Version',
+            description: '0 means nothing has been saved yet.'
+        },
+        document: {
+            $ref: '#/components/schemas/ProfileDocument'
+        },
+        created_by: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created By'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        support_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SupportNoteOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'workspace_id',
+        'version',
+        'document',
+        'created_by',
+        'created_at',
+        'support_note'
+    ],
+    title: 'ProfileSavedOut',
+    description: 'The profile after a direct edit in What we know, with the support panel when an entry\nthe edit makes triggers the support screen (the product owner\'s decision, 2026-10-31):\nlike a message, the entry is saved as usual.'
 } as const;
 
 export const ProfileVersionPageSchema = {
@@ -14396,7 +14491,7 @@ export const SupportNoteOutSchema = {
         message: {
             type: 'string',
             title: 'Message',
-            description: 'Says whether the message was sent, or that a title was not kept as the role.'
+            description: 'Says whether the message was sent, that a title was not kept as the role by itself (and the ways on), or whether the answers were saved.'
         },
         resources: {
             items: {
@@ -14415,7 +14510,7 @@ export const SupportNoteOutSchema = {
         'resources'
     ],
     title: 'SupportNoteOut',
-    description: 'The support panel, shown beside a message that triggers the support screen\n(`careerwright.profile.safety`), whether the send was accepted or refused, and beside the\nfirst question\'s title field when what is typed there triggers it. Kept apart from career\nsuitability. Derived from the request on every response, a replay included; never\nstored, not even in the idempotency receipt.'
+    description: 'The support panel, shown beside a message that triggers the support screen\n(`careerwright.profile.safety`), whether the send was accepted or refused; beside the\nfirst question\'s title field when what is typed there triggers it; and beside a direct\nedit in What we know whose new entries do, whether it was saved or refused. Kept apart from\ncareer suitability. Derived from the request on every response, a replay included; never\nstored, not even in the idempotency receipt.'
 } as const;
 
 export const SupportResourceOutSchema = {

@@ -453,7 +453,15 @@ describe("[DIV1-13][DIV1-14] the first question's words (Task 6d slice B)", () =
   it("[UI-06] counts the titles to choose from, and says where the support panel is", () => {
     expect(FIRST_ANSWER.count(1)).toBe("1 job title to choose from.");
     expect(FIRST_ANSWER.count(8)).toBe("8 job titles to choose from.");
-    expect(FIRST_ANSWER.supportShown).toBe("Support information is shown below.");
+    // Above the field, where the panel now sits (fix round 2, design re-review R-I1).
+    expect(FIRST_ANSWER.supportShown).toBe(
+      "Support information is shown above the job title field.",
+    );
+  });
+
+  it("names the support panel's way forward, and the way back while fixing a title", () => {
+    expect(FIRST_ANSWER.keep).toBe("Keep it as my job title"); // re-review R-M3
+    expect(FIRST_ANSWER.backToClosest).toBe("Back to “Which of these is closest?”"); // R-M4
   });
 
   it("says what isn't known yet for a title kept in the person's words, and asks for no other", () => {

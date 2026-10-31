@@ -134,10 +134,11 @@ def test_a_message_with_a_risk_stem_is_sent_with_the_support_panel_and_none_of_i
 
     assert flagged.status_code == 202, flagged.text  # sent: no hold, no extra step
     panel = flagged.json()["support_note"]
-    # support-policy-8: the first question's title field is screened too (Task 6d slice B fix
-    # round 1). Accepted at session 1; the three phrasings and the first question's screen
-    # added after it are not yet reviewed.
-    assert panel["policy_version"] == safety.POLICY_VERSION == "support-policy-8"
+    # support-policy-9: the first question's title field (Task 6d slice B fix round 1, kept by
+    # the person's choice in fix round 2) and What we know's direct entries (the product
+    # owner's decision, 2026-10-31) are screened too. Accepted at session 1; the three
+    # phrasings and the screens added after it are not yet reviewed.
+    assert panel["policy_version"] == safety.POLICY_VERSION == "support-policy-9"
     assert panel["review_status"] == safety.REVIEW_STATUS
     assert panel["review_status"].startswith("accepted for L0 at session 1")
     assert "not yet reviewed as built" in panel["review_status"]

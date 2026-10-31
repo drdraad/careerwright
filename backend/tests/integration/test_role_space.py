@@ -209,6 +209,54 @@ def test_the_first_question_goes_through_the_support_screen_and_keeps_nothing_of
     assert stored == [{"versions": 0, "sources": 0, "records": 0, "receipts": 0}]
 
 
+# The support tests' own career phrasing that the screen answers, an accepted false positive
+# (`test_interview_choices.py`'s send-after-support test): no new risk text is written here.
+HELPLINE = "I volunteer on a suicide prevention helpline and want paid work like it."
+
+
+@pytest.mark.req("PROF-09", "DIV1-13", "VERSIONS-01")
+def test_a_title_the_support_screen_answers_is_kept_only_by_the_person_s_explicit_choice(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    # Re-review R-M3 (the controller's ruling): a real title holding a listed word was refused
+    # with no way forward, against "nothing typed is refused". The panel still shows and the
+    # title is still not kept by itself; the person may keep it, as typed, by their choice.
+    workspace = api.create_workspace(ada, "Kept by choice (synthetic)")["workspace_id"]
+    refused = name_role(api, ada, workspace, HELPLINE, 0)
+    stale = name_role(api, ada, workspace, HELPLINE, 3, keep_as_typed=True)
+    kept = name_role(api, ada, workspace, HELPLINE, 0, keep_as_typed=True)
+    again = name_role(api, ada, workspace, HELPLINE, 1, keep_as_typed=True)
+    role = origin(api, ada, workspace)["role"]
+
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["error"]["details"] == {"field": "title", "reason": "support_screen"}
+    panel = refused.json()["support_note"]
+    assert panel["message"] == safety.SUPPORT_NOTE_TITLE
+    assert (stale.status_code, stale.json()["support_note"]) == (409, panel)
+    # Kept exactly as typed, through the same command as "Use my own words".
+    assert kept.status_code == 201, kept.text
+    assert (kept.json()["version"], kept.json()["document"]["current_role"]["value"]) == (
+        1,
+        HELPLINE,
+    )
+    assert (again.status_code, again.json()["version"]) == (200, 1)
+    assert (role["text"], role["state"], role["kind"]) == (HELPLINE, "not_in_esco", "own_words")
+    # Nothing about the panel is stored: the role cites a direct entry like any typed title,
+    # and no answer kept holds a support note.
+    [source] = infra.query(
+        "SELECT kind, label FROM careerwright.source_references WHERE workspace_id = %s",
+        (workspace,),
+    )
+    assert source == {"kind": "direct_entry", "label": "Direct entry"}
+    assert "support_note" not in kept.json()
+    receipts = infra.query(
+        "SELECT response FROM careerwright.command_receipts WHERE workspace_id = %s",
+        (workspace,),
+    )
+    assert receipts
+    assert all("support" not in str(r["response"]) for r in receipts)
+
+
 @pytest.mark.req("DIV1-13", "DIV1-03", "VERSIONS-01")
 def test_none_of_these_in_the_type_ahead_is_the_person_s_refusal_recorded_by_a_versioned_command(
     api: ApiClient, ada: str, infra: Infra

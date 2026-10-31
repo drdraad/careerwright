@@ -209,6 +209,25 @@ def write_profile(
     return view, bool(changed)
 
 
+def entered_words(
+    tx: Tx, workspace_id: uuid.UUID, expected_version: int, new: ProfileInput
+) -> list[str]:
+    """What a direct edit enters in words: each answer given in words, and each item of a list
+    of them, that the version it was made against doesn't hold (every one, when that version
+    can't be read). What the support screen reads for What we know (ADR 0007): a stored version
+    never changes, so a replay of the edit reads the same words."""
+    base = store.profile_version(tx, workspace_id, expected_version)
+    words: list[str] = []
+    for name in FIELD_NAMES:
+        given = getattr(new, name).value
+        held = None if base is None else getattr(base.document, name).value
+        if isinstance(given, str) and given != held:
+            words.append(given)
+        elif isinstance(given, list):
+            words += [item for item in given if not (isinstance(held, list) and item in held)]
+    return words
+
+
 def revert_profile(
     tx: Tx, actor: Actor, workspace_id: uuid.UUID, command: RevertProfile, pack: PackTargets
 ) -> tuple[ProfileView, bool]:

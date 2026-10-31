@@ -3,9 +3,9 @@
 // own words are always offered and kept exactly as typed; the closest step shows every group,
 // none picked, and "None of these is my job" never asks for another job.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
+import { type ComponentProps, type ReactNode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type {
   ClosestOut,
@@ -78,11 +78,12 @@ const found = (
 
 /** The API's panel beside the title field (`careerwright.profile.safety.SUPPORT_NOTE_TITLE`). */
 const titlePanel: SupportNoteOut = {
-  policy_version: "support-policy-8",
+  policy_version: "support-policy-9",
   review_status: "accepted for L0 at session 1 (human gate H-12)",
   message:
     "If anything you typed is about how you are feeling, support is available any time, " +
-    "from people trained to help. Careerwright hasn't kept it as your role.",
+    "from people trained to help. Careerwright keeps it as your job title only if you choose " +
+    "to. You can also type again or skip this question.",
   resources: [
     {
       name: "Samaritans",
@@ -100,6 +101,22 @@ function wrap(children: ReactNode) {
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={queries}>{children}</QueryClientProvider>);
   return userEvent.setup();
+}
+
+/** The first question with its support panel held outside it, as the start holds it until
+ *  the person dismisses it (re-review R-M2). */
+function Held(
+  props: Omit<ComponentProps<typeof FirstQuestion>, "support" | "onSupport" | "onDismissSupport">,
+) {
+  const [support, setSupport] = useState<SupportNoteOut | null>(null);
+  return (
+    <FirstQuestion
+      {...props}
+      support={support}
+      onSupport={setSupport}
+      onDismissSupport={() => setSupport(null)}
+    />
+  );
 }
 
 function api(answers: Record<string, TitleMatchesOut>): Sent[] {
@@ -127,7 +144,7 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
     });
     const answered = vi.fn();
     const user = wrap(
-      <FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} onAnswered={answered} />,
+      <Held workspaceId={WS} profile={profile} onSkip={() => {}} onAnswered={answered} />,
     );
 
     expect(
@@ -139,9 +156,10 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
       name: /^Registered nurse\s*,\s*UK job title \(ONS\)$/,
     });
     expect(within(listed).getByText("UK job title (ONS)")).toBeVisible();
-    // The person's own words are always the last option.
+    // The person's own words are always the first option, right under the field, so they are
+    // in a phone's first screen however many titles follow (re-review R-I2).
     const options = within(list).getAllByRole("option");
-    expect(options.at(-1)).toHaveTextContent("Use my own words: “Registered nurse”");
+    expect(options.at(0)).toHaveTextContent("Use my own words: “Registered nurse”");
 
     await user.click(listed);
     await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
@@ -156,14 +174,14 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
     const sent = api({
       "IT support": found("IT support", [esco("IT support technician", "ICT help desk agent")]),
     });
-    const user = wrap(<FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} />);
+    const user = wrap(<Held workspaceId={WS} profile={profile} onSkip={() => {}} />);
 
     await user.type(field(), "IT support");
     const option = await screen.findByRole("option", { name: /IT support technician/ });
     expect(within(option).getByText("In ESCO as ICT help desk agent")).toBeVisible();
-    // The keyboard picks too: none is active until the person moves; up from none is the
-    // last option (their own words), and down again wraps to the first title, then Enter.
-    await user.keyboard("{ArrowUp}");
+    // The keyboard picks too: none is active until the person moves; down from none is the
+    // first option (their own words), and down again is the first title, then Enter.
+    await user.keyboard("{ArrowDown}");
     expect(field()).toHaveAttribute(
       "aria-activedescendant",
       screen.getByRole("option", { name: "Use my own words: “IT support”" }).id,
@@ -185,7 +203,7 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
     const sent = api({
       "Bookkeeping assistant": found("Bookkeeping assistant", [esco("bookkeeper")], true),
     });
-    const user = wrap(<FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} />);
+    const user = wrap(<Held workspaceId={WS} profile={profile} onSkip={() => {}} />);
 
     await user.type(field(), "Bookkeeping assistant");
     expect(
@@ -195,6 +213,8 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
     ).toBeVisible();
     const own = screen.getByRole("option", { name: /None of these is my job/ });
     expect(own).toHaveTextContent("Use my own words: “Bookkeeping assistant”");
+    // Right under the question, before ESCO's guesses, in a phone's first screen (R-I2).
+    expect(screen.getAllByRole("option")[0]).toBe(own);
 
     await user.click(own);
     await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
@@ -207,7 +227,7 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
 
   it("refuses nothing typed: with no title found, the person's own words are still offered", async () => {
     const sent = api({});
-    const user = wrap(<FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} />);
+    const user = wrap(<Held workspaceId={WS} profile={profile} onSkip={() => {}} />);
 
     await user.type(field(), "Orbital gardener");
     expect(
@@ -227,7 +247,7 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
     const sent = api({
       "Bookkeeping assistant": found("Bookkeeping assistant", [esco("bookkeeper")], true),
     });
-    const user = wrap(<FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} />);
+    const user = wrap(<Held workspaceId={WS} profile={profile} onSkip={() => {}} />);
 
     await user.type(field(), "Bookkeeping assistant");
     await screen.findByRole("option", { name: /^bookkeeper/ });
@@ -260,7 +280,7 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
       },
       { method: "POST", path: /\/origin\/role\/title$/, status: 201, answer: profile },
     ]);
-    const user = wrap(<FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} />);
+    const user = wrap(<Held workspaceId={WS} profile={profile} onSkip={() => {}} />);
 
     await user.type(field(), "Nurse");
     await screen.findByRole("option", { name: /^Nurse\s*,\s*UK job title/ });
@@ -280,6 +300,70 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
     });
   });
 
+  /** A type-ahead held open until the test answers it, as the network may be. */
+  function heldSearch() {
+    let answer: (body: TitleMatchesOut) => void = () => {};
+    const sent = fakeApi([
+      {
+        method: "GET",
+        path: /\/v1\/taxonomy\/titles$/,
+        answer: () =>
+          new Promise<TitleMatchesOut>((resolve) => {
+            answer = resolve;
+          }),
+      },
+      { method: "POST", path: /\/origin\/role\/title$/, status: 201, answer: profile },
+      { method: "POST", path: /\/origin\/role$/, status: 201, answer: profile },
+    ]);
+    return { sent, answer: (body: TitleMatchesOut) => act(() => answer(body)) };
+  }
+
+  it("keeps the option arrowed to by its key, so Enter never picks a title that moved under it", async () => {
+    // Re-review R-M1: the arrowed option was an index. Down while only "Use my own words"
+    // showed (still looking), then the titles arrived, and Enter picked ESCO's first title.
+    const { sent, answer } = heldSearch();
+    const user = wrap(<Held workspaceId={WS} profile={profile} onSkip={() => {}} />);
+
+    await user.type(field(), "IT support");
+    await user.keyboard("{ArrowDown}");
+    const own = screen.getByRole("option", { name: "Use my own words: “IT support”" });
+    expect(field()).toHaveAttribute("aria-activedescendant", own.id);
+    await waitFor(() => expect(sent.some((s) => s.method === "GET")).toBe(true));
+    await answer(found("IT support", [esco("IT support technician", "ICT help desk agent")]));
+    await screen.findByRole("option", { name: /IT support technician/ });
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
+    expect(sent.filter((s) => s.method === "POST")).toEqual([
+      expect.objectContaining({
+        path: `/v1/workspaces/${WS}/origin/role/title`,
+        body: { expected_version: 3, title: "IT support" },
+      }),
+    ]);
+  });
+
+  it("never turns the arrowed own words into a refusal when a partial list arrives", async () => {
+    const { sent, answer } = heldSearch();
+    const user = wrap(<Held workspaceId={WS} profile={profile} onSkip={() => {}} />);
+
+    await user.type(field(), "Bookkeeping assistant");
+    await user.keyboard("{ArrowDown}");
+    await waitFor(() => expect(sent.some((s) => s.method === "GET")).toBe(true));
+    await answer(found("Bookkeeping assistant", [esco("bookkeeper")], true));
+    await screen.findByRole("option", { name: /None of these is my job/ });
+    // "None of these is my job" is another answer: nothing the person arrowed to is active.
+    expect(field()).not.toHaveAttribute("aria-activedescendant");
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
+    expect(sent.filter((s) => s.method === "POST")).toEqual([
+      expect.objectContaining({
+        path: `/v1/workspaces/${WS}/origin/role/title`,
+        body: { expected_version: 3, title: "Bookkeeping assistant" },
+      }),
+    ]);
+  });
+
   it("[UI-06] describes the combobox, and says the partial question, none found and the count politely", async () => {
     // Design review M-1 (WCAG 2.2 4.1.3): the lines were in no live region, and only the
     // listbox was described, which aria-activedescendant navigation doesn't read.
@@ -291,7 +375,7 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
         true,
       ),
     });
-    const user = wrap(<FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} />);
+    const user = wrap(<Held workspaceId={WS} profile={profile} onSkip={() => {}} />);
     const status = screen.getByRole("status");
 
     await user.type(field(), "Registered nurse");
@@ -313,7 +397,7 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
   it("goes on without an answer when the person skips, saving nothing", async () => {
     const sent = api({});
     const skipped = vi.fn();
-    const user = wrap(<FirstQuestion workspaceId={WS} profile={profile} onSkip={skipped} />);
+    const user = wrap(<Held workspaceId={WS} profile={profile} onSkip={skipped} />);
 
     await user.click(screen.getByRole("button", { name: "Skip for now" }));
     expect(skipped).toHaveBeenCalledOnce();
@@ -328,19 +412,20 @@ describe("[PROF-09][DIV1-13] the title field goes through the support screen, as
     const shown = vi.fn();
     const user = wrap(
       <SupportShown.Provider value={shown}>
-        <FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} />
+        <Held workspaceId={WS} profile={profile} onSkip={() => {}} />
       </SupportShown.Provider>,
     );
 
     await user.type(field(), RISK);
     const panel = await screen.findByRole("region", { name: "Support is available" });
-    expect(panel).toHaveTextContent("Careerwright hasn't kept it as your role.");
+    expect(panel).toHaveTextContent(
+      "Careerwright keeps it as your job title only if you choose to. You can also type again or skip this question.",
+    );
     expect(panel).toHaveTextContent("Samaritans: Call 116 123");
     expect(shown).toHaveBeenLastCalledWith(true); // the world is drawn still
     // Nothing is offered in those words, and they are never repeated back.
     expect(screen.queryByRole("option")).toBeNull();
     expect(document.body).not.toHaveTextContent(RISK);
-    expect(screen.getByRole("status")).toHaveTextContent("Support information is shown below.");
     await user.keyboard("{Enter}");
     expect(sent.filter((s) => s.method === "POST")).toEqual([]);
 
@@ -349,6 +434,104 @@ describe("[PROF-09][DIV1-13] the title field goes through the support screen, as
     expect(screen.queryByRole("region", { name: "Support is available" })).toBeNull();
     expect(field()).toHaveFocus();
     expect(screen.getByRole("button", { name: "Skip for now" })).toBeEnabled();
+  });
+
+  it("shows the panel above the title field, where a phone's keyboard can't cover it", async () => {
+    // Design re-review R-I1: the panel came after the field and the list, where a phone's
+    // keyboard sits while the person types. The message panel sits above the reply field.
+    api({ [RISK]: { ...found(RISK, []), support_note: titlePanel } });
+    const user = wrap(<Held workspaceId={WS} profile={profile} onSkip={() => {}} />);
+
+    await user.type(field(), RISK);
+    const panel = await screen.findByRole("region", { name: "Support is available" });
+    expect(panel.compareDocumentPosition(field()) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Support information is shown above the job title field.",
+    );
+  });
+
+  it("keeps the typed words as the job title only when the person chooses to", async () => {
+    // Re-review R-M3 (the controller's ruling): a real title holding a listed word had no way
+    // forward. The panel offers one: the person's own choice, saving the words as typed.
+    const sent = api({ [RISK]: { ...found(RISK, []), support_note: titlePanel } });
+    const answered = vi.fn();
+    const user = wrap(
+      <Held workspaceId={WS} profile={profile} onSkip={() => {}} onAnswered={answered} />,
+    );
+
+    await user.type(field(), RISK);
+    const panel = await screen.findByRole("region", { name: "Support is available" });
+    expect(sent.filter((s) => s.method === "POST")).toEqual([]); // never kept by itself
+    // The choice is for the words the screen answered, only while they are in the field.
+    await user.clear(field());
+    await user.type(field(), "Orbital gardener");
+    await screen.findByRole("option", { name: "Use my own words: “Orbital gardener”" });
+    expect(within(panel).queryByRole("button", { name: "Keep it as my job title" })).toBeNull();
+    await user.clear(field());
+    await user.type(field(), RISK);
+    await user.click(await within(panel).findByRole("button", { name: "Keep it as my job title" }));
+
+    await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
+    expect(sent.filter((s) => s.method === "POST")).toEqual([
+      expect.objectContaining({
+        path: `/v1/workspaces/${WS}/origin/role/title`,
+        body: { expected_version: 3, title: RISK, keep_as_typed: true },
+      }),
+    ]);
+    expect(answered).toHaveBeenCalledOnce();
+  });
+
+  it("still offers the choice under the field once the panel is dismissed", async () => {
+    // Dismissing the panel must not take the way forward with it: the words stay in the field.
+    const sent = api({ [RISK]: { ...found(RISK, []), support_note: titlePanel } });
+    const user = wrap(<Held workspaceId={WS} profile={profile} onSkip={() => {}} />);
+
+    await user.type(field(), RISK);
+    const panel = await screen.findByRole("region", { name: "Support is available" });
+    await user.click(within(panel).getByRole("button", { name: "Dismiss the support note" }));
+    expect(screen.queryByRole("region", { name: "Support is available" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Keep it as my job title" }));
+
+    await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
+    expect(sent.find((s) => s.method === "POST")?.body).toEqual({
+      expected_version: 3,
+      title: RISK,
+      keep_as_typed: true,
+    });
+  });
+
+  it("says why when keeping the words was refused for another reason", async () => {
+    // Only the screen's own refusal is calm and silent; a stale save says so, beside the panel.
+    fakeApi([
+      {
+        method: "GET",
+        path: /\/v1\/taxonomy\/titles$/,
+        answer: { ...found(RISK, []), support_note: titlePanel },
+      },
+      {
+        method: "POST",
+        path: /\/origin\/role\/title$/,
+        status: 409,
+        answer: {
+          error: {
+            code: "STALE_INPUT_VERSION",
+            message: "",
+            retryable: false,
+            stage: "profile",
+            correlation_id: "c1",
+            details: { current_version: 4 },
+          },
+          support_note: titlePanel,
+        },
+      },
+    ]);
+    const user = wrap(<Held workspaceId={WS} profile={profile} onSkip={() => {}} />);
+
+    await user.type(field(), RISK);
+    const panel = await screen.findByRole("region", { name: "Support is available" });
+    await user.click(within(panel).getByRole("button", { name: "Keep it as my job title" }));
+    expect(await screen.findByText("This changed since you loaded it")).toBeVisible();
+    expect(screen.getByRole("region", { name: "Support is available" })).toBeVisible();
   });
 
   it("shows the panel beside a refused save too, says nothing went wrong, and stays", async () => {
@@ -374,18 +557,26 @@ describe("[PROF-09][DIV1-13] the title field goes through the support screen, as
     ]);
     const failed = vi.fn();
     const user = wrap(
-      <FirstQuestion workspaceId={WS} profile={profile} onSkip={() => {}} onFailed={failed} />,
+      <Held workspaceId={WS} profile={profile} onSkip={() => {}} onFailed={failed} />,
     );
 
     await user.type(field(), `${RISK}{Enter}`);
     const panel = await screen.findByRole("region", { name: "Support is available" });
-    expect(panel).toHaveTextContent("Careerwright hasn't kept it as your role.");
+    expect(panel).toHaveTextContent("Careerwright keeps it as your job title only if you choose");
     expect(sent.filter((s) => s.method === "POST")).toHaveLength(1);
     expect(screen.queryByRole("alert")).toBeNull(); // calm: no failure notice
     expect(failed).toHaveBeenCalledOnce(); // the start stays on the question
     expect(
       screen.getByRole("heading", { name: "What do you do now, or what did you do last?" }),
     ).toBeVisible();
+    // The way forward is offered here too: keeping the words the save sent, by choice.
+    await user.click(within(panel).getByRole("button", { name: "Keep it as my job title" }));
+    await waitFor(() => expect(sent.filter((s) => s.method === "POST")).toHaveLength(2));
+    expect(sent.filter((s) => s.method === "POST")[1]?.body).toEqual({
+      expected_version: 3,
+      title: RISK,
+      keep_as_typed: true,
+    });
   });
 });
 

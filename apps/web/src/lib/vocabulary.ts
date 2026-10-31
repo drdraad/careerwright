@@ -880,9 +880,13 @@ export const FIRST_ANSWER = {
   looking: "Looking for job titles…",
   /** Read by a screen reader as the list changes (WCAG 2.2 4.1.3). */
   count: (titles: number) => `${titles} job ${titles === 1 ? "title" : "titles"} to choose from.`,
-  /** Read when the support panel shows below the question. */
-  supportShown: "Support information is shown below.",
+  /** Read when the support panel shows above the field (design re-review R-I1). */
+  supportShown: "Support information is shown above the job title field.",
+  /** In the support panel: the person's own choice to keep what they typed (re-review R-M3). */
+  keep: "Keep it as my job title",
   skip: "Skip for now",
+  /** In place of "Skip for now" while fixing a title: it goes back (re-review R-M4). */
+  backToClosest: "Back to “Which of these is closest?”",
 } as const;
 
 /** "Which of these is closest?", after a UK job title (ADR 0015 decision 3). */

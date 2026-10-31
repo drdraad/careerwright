@@ -191,15 +191,17 @@ class SupportResourceOut(ResponseModel):
 
 class SupportNoteOut(ResponseModel):
     """The support panel, shown beside a message that triggers the support screen
-    (`careerwright.profile.safety`), whether the send was accepted or refused, and beside the
-    first question's title field when what is typed there triggers it. Kept apart from career
-    suitability. Derived from the request on every response, a replay included; never
+    (`careerwright.profile.safety`), whether the send was accepted or refused; beside the
+    first question's title field when what is typed there triggers it; and beside a direct
+    edit in What we know whose new entries do, whether it was saved or refused. Kept apart from
+    career suitability. Derived from the request on every response, a replay included; never
     stored, not even in the idempotency receipt."""
 
     policy_version: str
     review_status: str = Field(description="How far the policy is reviewed (gate H-12).")
     message: str = Field(
-        description="Says whether the message was sent, or that a title was not kept as the role."
+        description="Says whether the message was sent, that a title was not kept as the role "
+        "by itself (and the ways on), or whether the answers were saved."
     )
     resources: list[SupportResourceOut]
 
@@ -209,8 +211,16 @@ class SupportNoteOut(ResponseModel):
 
     @classmethod
     def beside_a_title(cls) -> "SupportNoteOut":
-        """Beside the first question's title field: the title is not kept as the role."""
+        """Beside the first question's title field: the title is not kept as the role by
+        itself; the person can keep it, type again or skip."""
         return cls._saying(safety.SUPPORT_NOTE_TITLE)
+
+    @classmethod
+    def beside_an_entry(cls, *, saved: bool) -> "SupportNoteOut":
+        """Beside a direct edit in What we know: saved as usual, or refused."""
+        return cls._saying(
+            safety.SUPPORT_NOTE_ENTRY if saved else safety.SUPPORT_NOTE_ENTRY_NOT_SAVED
+        )
 
     @classmethod
     def _saying(cls, message: str) -> "SupportNoteOut":
@@ -245,6 +255,26 @@ class TurnSubmittedOut(TurnOut):
 class TurnRefusedOut(ErrorEnvelope):
     """A refused send. When its message triggers the support screen, the panel comes with
     the refusal, since the message was screened before anything could refuse it."""
+
+    support_note: SupportNoteOut | None = None
+
+
+class ProfileSavedOut(ProfileOut):
+    """The profile after a direct edit in What we know, with the support panel when an entry
+    the edit makes triggers the support screen (the product owner's decision, 2026-10-31):
+    like a message, the entry is saved as usual."""
+
+    support_note: SupportNoteOut | None
+
+    @classmethod
+    def saved(cls, profile: ProfileOut, *, support: bool) -> "ProfileSavedOut":
+        note = SupportNoteOut.beside_an_entry(saved=True) if support else None
+        return cls(**profile.model_dump(), support_note=note)
+
+
+class ProfileRefusedOut(ErrorEnvelope):
+    """A refused direct edit. When an entry it makes triggers the support screen, the panel
+    comes with the refusal, since the edit was screened before anything could refuse it."""
 
     support_note: SupportNoteOut | None = None
 

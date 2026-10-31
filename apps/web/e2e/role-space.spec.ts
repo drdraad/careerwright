@@ -164,16 +164,50 @@ test("[PROF-09][DIV1-13][WLD-08] a risk phrase at the first question shows the c
 
   await field(page).fill("Some days I just want to die.");
   const panel = page.getByRole("region", { name: "Support is available" });
-  await expect(panel).toContainText("Careerwright hasn't kept it as your role.");
+  await expect(panel).toContainText(
+    "Careerwright keeps it as your job title only if you choose to. You can also type again or skip this question.",
+  );
   await expect(panel).toContainText("Samaritans: Call 116 123");
   await expect(page.locator(".world")).toHaveAttribute("data-distress", "true");
   await expect(page.getByRole("option")).toHaveCount(0); // nothing offered in those words
   await field(page).press("Enter");
 
-  // Nothing kept: no role; the person can type again or skip.
+  // Nothing kept by itself: no role. The person can keep it by their own choice (offered, not
+  // taken here), type again or skip (fix round 2, re-review R-M3).
   expect((await originOf(workspace)).role).toMatchObject({ text: null, state: "not_answered" });
+  await expect(panel.getByRole("button", { name: "Keep it as my job title" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Skip for now" })).toBeVisible();
   await panel.getByRole("button", { name: "Dismiss the support note" }).click();
   await expect(page.locator(".world")).toHaveAttribute("data-distress", "false");
   await expect(field(page)).toBeFocused();
+});
+
+test.describe("phone", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("[PROF-09][UI-12] at 390 × 844 the title field's support panel is above the field, its heading in view while the field has focus", async ({
+    page,
+  }) => {
+    // Design re-review R-I1: below the field, a phone's keyboard would cover the panel while the
+    // person types; the message panel sits above the reply field. This checks the layout only:
+    // a real phone's keyboard is a human check. The phrase is the support tests' own.
+    test.setTimeout(120_000);
+    const workspace = await demoWorkspace("Support at the start, phone (synthetic)");
+    await signIn(page, "ada", chapterUrl("you", workspace));
+
+    await field(page).fill("Some days I just want to die.");
+    const panel = page.getByRole("region", { name: "Support is available" });
+    await expect(panel).toBeVisible();
+    await expect(field(page)).toBeFocused();
+    const shown = await panel.boundingBox();
+    const heading = await panel
+      .getByRole("heading", { name: "Support is available" })
+      .boundingBox();
+    const typed = await field(page).boundingBox();
+    expect(shown && heading && typed).toBeTruthy();
+    if (shown === null || heading === null || typed === null) return;
+    expect(shown.y + shown.height).toBeLessThanOrEqual(typed.y); // above the field
+    expect(heading.y).toBeGreaterThanOrEqual(0); // in view as it appears, nothing scrolled
+    expect(heading.y + heading.height).toBeLessThanOrEqual(844);
+  });
 });

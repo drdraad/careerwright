@@ -126,7 +126,8 @@ def post_role_title(
     or anything typed ("Use my own words"), saved exactly as given as their current role
     through the one profile write path; no model is called. Nothing is refused for its words,
     except a title the support screen answers (`careerwright.profile.safety`), as it answers a
-    message: never kept as the role, with the calm support panel beside the refusal."""
+    message: not kept as the role by itself, with the calm support panel beside the refusal,
+    unless the person chose to keep it as typed (`keep_as_typed`)."""
     # Screened before anything can refuse it, so every refusal shows the panel too; the
     # panel is derived from the request each time and never stored.
     support = has_risk_stem(body.title)

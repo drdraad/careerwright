@@ -4012,7 +4012,8 @@ export type MoreDepth = {
  *
  * The first answer in the person's own words: a UK job title picked from the type-ahead
  * (`GET /v1/taxonomy/titles`, a title of the UK job-title index), or anything typed ("Use
- * my own words"). Nothing is refused.
+ * my own words"). Nothing is refused for its words: a title the support screen answers is
+ * kept only by the person's explicit choice (`keep_as_typed`).
  */
 export type NameRole = {
     /**
@@ -4031,6 +4032,12 @@ export type NameRole = {
      * True: the person picked "None of these is my job" under the type-ahead's partial list, ESCO's closest titles: the title names no ESCO occupation, and nothing asks them to pick another.
      */
     none_of_these?: boolean;
+    /**
+     * Keep As Typed
+     *
+     * True: beside the support panel, the person chose to keep what they typed as their job title. A title the support screen answers (`careerwright.profile.safety`) is kept only so, exactly as typed, as any other; nothing about the panel is stored.
+     */
+    keep_as_typed?: boolean;
 };
 
 /**
@@ -5568,6 +5575,47 @@ export type ProfileOut = {
      * Created At
      */
     created_at: string | null;
+};
+
+/**
+ * ProfileRefusedOut
+ *
+ * A refused direct edit. When an entry it makes triggers the support screen, the panel
+ * comes with the refusal, since the edit was screened before anything could refuse it.
+ */
+export type ProfileRefusedOut = {
+    error: ErrorBody;
+    support_note?: SupportNoteOut | null;
+};
+
+/**
+ * ProfileSavedOut
+ *
+ * The profile after a direct edit in What we know, with the support panel when an entry
+ * the edit makes triggers the support screen (the product owner's decision, 2026-10-31):
+ * like a message, the entry is saved as usual.
+ */
+export type ProfileSavedOut = {
+    /**
+     * Workspace Id
+     */
+    workspace_id: string;
+    /**
+     * Version
+     *
+     * 0 means nothing has been saved yet.
+     */
+    version: number;
+    document: ProfileDocument;
+    /**
+     * Created By
+     */
+    created_by: string | null;
+    /**
+     * Created At
+     */
+    created_at: string | null;
+    support_note: SupportNoteOut | null;
 };
 
 /**
@@ -9011,9 +9059,10 @@ export type SupportInput = {
  * SupportNoteOut
  *
  * The support panel, shown beside a message that triggers the support screen
- * (`careerwright.profile.safety`), whether the send was accepted or refused, and beside the
- * first question's title field when what is typed there triggers it. Kept apart from career
- * suitability. Derived from the request on every response, a replay included; never
+ * (`careerwright.profile.safety`), whether the send was accepted or refused; beside the
+ * first question's title field when what is typed there triggers it; and beside a direct
+ * edit in What we know whose new entries do, whether it was saved or refused. Kept apart from
+ * career suitability. Derived from the request on every response, a replay included; never
  * stored, not even in the idempotency receipt.
  */
 export type SupportNoteOut = {
@@ -9030,7 +9079,7 @@ export type SupportNoteOut = {
     /**
      * Message
      *
-     * Says whether the message was sent, or that a title was not kept as the role.
+     * Says whether the message was sent, that a title was not kept as the role by itself (and the ways on), or whether the answers were saved.
      */
     message: string;
     /**
@@ -11012,11 +11061,11 @@ export type PutProfileErrors = {
     /**
      * Typed error envelope
      */
-    '4XX': ErrorEnvelope;
+    '4XX': ProfileRefusedOut;
     /**
      * Typed error envelope
      */
-    '5XX': ErrorEnvelope;
+    '5XX': ProfileRefusedOut;
 };
 
 export type PutProfileError = PutProfileErrors[keyof PutProfileErrors];
@@ -11025,11 +11074,11 @@ export type PutProfileResponses = {
     /**
      * No field changed; no new version.
      */
-    200: ProfileOut;
+    200: ProfileSavedOut;
     /**
      * Successful Response
      */
-    201: ProfileOut;
+    201: ProfileSavedOut;
 };
 
 export type PutProfileResponse = PutProfileResponses[keyof PutProfileResponses];

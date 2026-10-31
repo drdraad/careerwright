@@ -1,15 +1,25 @@
 "use client";
 // The calm support panel (ADR 0007 decision 7; `careerwright.profile.safety`): beside a sent
-// message that holds a risk stem, and beside the first question's title field when what is
-// typed there does. Calm, not blocking, dismissible; its words and services are the API's.
-import { useId } from "react";
+// message that holds a risk stem, above the first question's title field when what is typed
+// there does, and beside What we know's answers when an entry saved there does. Calm, not
+// blocking, dismissible; its words and services are the API's.
+import { type ReactNode, useId } from "react";
 import type { SupportNoteOut } from "@/generated/api";
 import { useSupportShown } from "@/lib/world/settings";
 import { Button } from "./Button";
 
 const day = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
-export function SupportNote({ note, onDismiss }: { note: SupportNoteOut; onDismiss(): void }) {
+export function SupportNote({
+  note,
+  onDismiss,
+  actions,
+}: {
+  note: SupportNoteOut;
+  onDismiss(): void;
+  /** The way forward the panel's words name, beside Dismiss (keeping a typed title). */
+  actions?: ReactNode;
+}) {
   // While it shows, the world is still (plan section 4: distress stills the world).
   useSupportShown();
   const titleId = useId();
@@ -33,7 +43,8 @@ export function SupportNote({ note, onDismiss }: { note: SupportNoteOut; onDismi
           {day.format(new Date(`${checked}T12:00:00Z`))}.
         </p>
       )}
-      <div>
+      <div className="flex flex-wrap items-center gap-8">
+        {actions}
         <Button variant="quiet" onClick={onDismiss}>
           Dismiss <span className="sr-only">the support note</span>
         </Button>

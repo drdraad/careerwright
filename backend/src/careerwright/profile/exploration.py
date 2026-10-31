@@ -1414,7 +1414,8 @@ def choose_role(
 class NameRole(BaseModel):
     """The first answer in the person's own words: a UK job title picked from the type-ahead
     (`GET /v1/taxonomy/titles`, a title of the UK job-title index), or anything typed ("Use
-    my own words"). Nothing is refused."""
+    my own words"). Nothing is refused for its words: a title the support screen answers is
+    kept only by the person's explicit choice (`keep_as_typed`)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -1425,6 +1426,12 @@ class NameRole(BaseModel):
         description='True: the person picked "None of these is my job" under the type-ahead\'s '
         "partial list, ESCO's closest titles: the title names no ESCO occupation, and nothing "
         "asks them to pick another.",
+    )
+    keep_as_typed: bool = Field(
+        default=False,
+        description="True: beside the support panel, the person chose to keep what they typed "
+        "as their job title. A title the support screen answers (`careerwright.profile.safety`) "
+        "is kept only so, exactly as typed, as any other; nothing about the panel is stored.",
     )
 
 
@@ -1447,16 +1454,18 @@ def name_role(
     the UK job-title index lists is an ONS title with ONS's groups; anything else is the
     person's own words; a title that already has a record keeps it, with any choice made for
     it). "None of these is my job" (`none_of_these`) is the person's decision, recorded in the
-    record as theirs. The same answer again changes nothing. Returns the profile and whether it
-    changed."""
+    record as theirs. A title the support screen answers is kept only by the person's explicit
+    choice (`keep_as_typed`). The same answer again changes nothing. Returns the profile and
+    whether it changed."""
     visible_workspace(tx, workspace_id, lock=True)
     held_release(tx)
     profile = current_profile(tx, workspace_id)
     if command.expected_version != profile.version:
         raise stale_version(profile.version)
-    if has_risk_stem(command.title):
+    if has_risk_stem(command.title) and not command.keep_as_typed:
         # The title goes through the support screen as a message does (design review I-3): it
-        # is never kept as the role. The route shows the calm panel beside the refusal.
+        # is not kept as the role by itself. The route shows the calm panel beside the refusal,
+        # which offers the person the choice to keep it (re-review R-M3).
         raise CareerwrightError(
             ErrorCode.VALIDATION_FAILED,
             "Careerwright hasn't kept that title as your role.",

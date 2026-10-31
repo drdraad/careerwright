@@ -19,7 +19,14 @@
 // Each demo question offers one-tap example replies the demo interviewer reads (STATE-09), and
 // the role-or-explore question offers two ways on that open existing views.
 import { type ReactNode, type Ref, useEffect, useId, useRef, useState } from "react";
-import type { EntryMode, PreferencesOut, ProfileOut, TurnOut, WorkspaceOut } from "@/generated/api";
+import type {
+  EntryMode,
+  PreferencesOut,
+  ProfileOut,
+  SupportNoteOut,
+  TurnOut,
+  WorkspaceOut,
+} from "@/generated/api";
 import {
   asksRoleOrExplore,
   questionAsks,
@@ -34,6 +41,7 @@ import {
   EXAMPLE_REPLIES,
   FAILED_REPLY_LABEL,
   FAILURE_CLASS,
+  FIRST_ANSWER,
   OPENING_QUESTION,
   PARTIAL_REPLY,
   PURPOSE,
@@ -178,18 +186,26 @@ type StartStep = "first" | "loading" | "closest" | "entry";
  *  B): the first question, then "Which of these is closest?" for a UK job title, then how to
  *  start. The first answer lights the world at once and needs no key; "Skip for now" goes
  *  straight to how to start, saving nothing. "Change my job title" goes back from the closest
- *  question to the first, its title in the field to fix. Focus follows the decision to the next
- *  step, and never moves after a save that failed. */
+ *  question to the first, its title in the field to fix, and the way back to the closest
+ *  question is named for what it does. Focus follows the decision to the next step, and never
+ *  moves after a save that failed. The first question's support panel stays until the person
+ *  dismisses it: above the title field, then after the step the start moves on to. */
 function Start({
   workspace,
   profile,
   preferences,
   onChoose,
+  titleNote,
+  onTitleNote,
+  onDismissTitleNote,
 }: {
   workspace: WorkspaceOut;
   profile: ProfileOut;
   preferences: PreferencesOut;
   onChoose(entry: EntryMode): void;
+  titleNote: SupportNoteOut | null;
+  onTitleNote(note: SupportNoteOut): void;
+  onDismissTitleNote(): void;
 }) {
   const id = workspace.workspace_id;
   const [skipped, setSkipped] = useState(false);
@@ -234,6 +250,11 @@ function Start({
         headingRef={heading}
         lead={<p className="measure mb-12">{PURPOSE}</p>}
         initial={fixing ? backFrom : ""}
+        support={titleNote}
+        onSupport={onTitleNote}
+        onDismissSupport={onDismissTitleNote}
+        // While fixing a title, skipping goes back to its closest question (R-M4).
+        skipLabel={fixing ? FIRST_ANSWER.backToClosest : FIRST_ANSWER.skip}
         onAnswered={() => setLeaving("first")}
         // The same title again changes nothing: back to its closest question.
         onSaved={() => setBackFrom(null)}
@@ -246,23 +267,43 @@ function Start({
       />
     );
   }
-  if (step === "loading") return <LoadingState stage="Looking at your answer" lines={2} />;
+  // The panel stays after the first question, until dismissed (re-review R-M2).
+  const panel = titleNote !== null && (
+    <SupportNote
+      note={titleNote}
+      onDismiss={() => {
+        onDismissTitleNote();
+        heading.current?.focus(); // the button goes: focus moves to the step's question
+      }}
+    />
+  );
+  if (step === "loading") {
+    return (
+      <>
+        <LoadingState stage="Looking at your answer" lines={2} />
+        {panel}
+      </>
+    );
+  }
   if (step === "closest" && current?.closest && current.text !== null) {
     const title = current.text;
     return (
-      <ClosestQuestion
-        workspaceId={id}
-        profile={profile}
-        title={title}
-        closest={current.closest}
-        headingRef={heading}
-        onAnswered={() => setLeaving("closest")}
-        onFailed={failed}
-        onBack={() => {
-          setLeaving("closest");
-          setBackFrom(title);
-        }}
-      />
+      <>
+        <ClosestQuestion
+          workspaceId={id}
+          profile={profile}
+          title={title}
+          closest={current.closest}
+          headingRef={heading}
+          onAnswered={() => setLeaving("closest")}
+          onFailed={failed}
+          onBack={() => {
+            setLeaving("closest");
+            setBackFrom(title);
+          }}
+        />
+        {panel}
+      </>
     );
   }
   const kept =
@@ -291,6 +332,7 @@ function Start({
           }
         />
       )}
+      {panel}
     </>
   );
 }
@@ -349,6 +391,10 @@ export function Conversation({
   const demo = workspace.data_mode === "demo";
   const support = sender.support;
   const note = support?.note ?? null;
+  // The first question's support panel, held here so it stays until the person dismisses it
+  // (re-review R-M2): the start shows it, then, once the start is done, it sits where the
+  // message panel does.
+  const [titleNote, setTitleNote] = useState<SupportNoteOut | null>(null);
 
   const latest = turns.at(-1);
   const latestFailed = latest !== undefined && turnFailed(latest);
@@ -445,6 +491,9 @@ export function Conversation({
             // A failed save leaves the choice on screen; focus must not jump later (N-M6).
             save({ entry_mode: entry }, () => setFocusTo(null));
           }}
+          titleNote={titleNote}
+          onTitleNote={setTitleNote}
+          onDismissTitleNote={() => setTitleNote(null)}
         />
       ) : (
         <>
@@ -570,6 +619,15 @@ export function Conversation({
           onDismiss={() => {
             sender.dismissNote();
             replyField.current?.focus(); // the button goes; focus is never lost (M-1)
+          }}
+        />
+      )}
+      {!entryNeeded && titleNote !== null && (
+        <SupportNote
+          note={titleNote}
+          onDismiss={() => {
+            setTitleNote(null);
+            replyField.current?.focus();
           }}
         />
       )}

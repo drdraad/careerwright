@@ -23,7 +23,7 @@ import {
   useWorkspaces,
 } from "@/lib/queries";
 import { worldFromProfile } from "@/lib/world/model";
-import { SupportShown, useWorldSettings } from "@/lib/world/settings";
+import { SupportShown, useSupportPanels, useWorldSettings } from "@/lib/world/settings";
 import { ChapterMenu, ChapterRail } from "./ChapterNav";
 import { ConversationTone } from "./ConversationTone";
 import { EvidenceDrawer, useEvidence } from "./EvidenceDrawer";
@@ -102,8 +102,8 @@ export function WorkspaceShell({
   const pathname = usePathname();
   const { evidence, close } = useEvidence();
   const world = useWorldSettings();
-  // The calm support panel is showing (the conversation reports it): the world stays still.
-  const [supportShown, setSupportShown] = useState(false);
+  // A calm support panel is showing (each panel reports itself): the world stays still.
+  const [supportShown, reportSupport] = useSupportPanels();
   const signedIn = auth.state.status === "signed_in";
 
   useEffect(() => {
@@ -185,7 +185,7 @@ export function WorkspaceShell({
 
   return (
     <WorkspaceContext.Provider value={data}>
-      <SupportShown.Provider value={setSupportShown}>
+      <SupportShown.Provider value={reportSupport}>
         <a
           className="on-space btn btn-primary sr-only focus:not-sr-only focus:absolute focus:left-16 focus:top-16 focus:z-40"
           href="#main"
