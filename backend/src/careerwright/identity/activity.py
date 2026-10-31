@@ -82,6 +82,9 @@ from careerwright.vocabulary import DataMode, WorkState
 Outcome = dict[str, str]
 # A model for a model ID; the key is None for the fixture interviewer, which needs none.
 ModelBuilder = Callable[[str, SecretStr | None], Model]
+# A keyless kind's own attempts left unfinished, settled in the transaction that ends its run,
+# given the run's terminal state (a route solve's, `careerwright.planning.solve_runs`).
+AttemptSettler = Callable[[Tx, uuid.UUID, WorkState], None]
 
 
 # Where a task sends the natural-language reply so far while the output streams.
@@ -139,7 +142,8 @@ def run_worst_case_nano_usd(attempt_worst_case: Callable[[str], int], model_id: 
 
 @dataclass(frozen=True)
 class ActivityRuntime:
-    """Composition-root dependencies, set once per worker process."""
+    """Composition-root dependencies, set once per worker process. `settle_attempts`: by
+    kind, what `publish` also settles when a run ends (identity imports no other module)."""
 
     engine: Engine
     keyring: Keyring
@@ -147,6 +151,7 @@ class ActivityRuntime:
     clock: Callable[[], datetime]
     tasks: Mapping[RunKind, RunTask]
     store_retry_budget_s: float = STORE_RETRY_BUDGET_S
+    settle_attempts: Mapping[RunKind, AttemptSettler] = dataclasses.field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -669,8 +674,12 @@ def publish(rt: ActivityRuntime, run_id: uuid.UUID, outcome: Outcome) -> None:
         if run is None:
             return
         # A call whose result could not be stored (the database went away) is settled as an
-        # unknown charge, never left looking in flight after the run has ended.
+        # unknown charge, never left looking in flight after the run has ended; so is a
+        # keyless kind's own attempt.
         run_store.interrupt_unfinished_attempts(tx, run_id)
+        settle = rt.settle_attempts.get(run.kind)
+        if settle is not None:
+            settle(tx, run_id, status)
         if status is not WorkState.COMPLETE:  # a crash can leave a partial still streaming
             _end_partial(tx, rt.keyring, run, None)
         output = outcome.get("output_id")

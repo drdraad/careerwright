@@ -185,12 +185,16 @@ def solve(tx: Tx, run_id: uuid.UUID) -> SolveRecord | None:
 
 
 def unsettled_solve(tx: Tx, workspace_id: uuid.UUID, solve_id: str) -> uuid.UUID | None:
-    """API: the run of the same solve still queued or running in this workspace, if any."""
+    """API: the run of the same solve still queued or running in this workspace, if any, that
+    the person has not asked to cancel: a cancelled one ends without a result, however long
+    its worker takes to say so."""
     value = tx.execute(
         sa.text(
             "SELECT s.run_id FROM careerwright.route_solves s JOIN careerwright.runs r "
             "ON r.run_id = s.run_id WHERE s.workspace_id = :ws AND s.solve_id = :solve "
-            "AND r.status IN ('queued', 'running') ORDER BY s.created_at LIMIT 1"
+            "AND r.status IN ('queued', 'running') AND NOT EXISTS (SELECT 1 FROM "
+            "careerwright.run_cancellations c WHERE c.run_id = r.run_id) "
+            "ORDER BY s.created_at LIMIT 1"
         ),
         {"ws": workspace_id, "solve": solve_id},
     ).scalar_one_or_none()
@@ -217,15 +221,16 @@ def solve_attempts(tx: Tx, run_id: uuid.UUID) -> list[SolveAttempt]:
     ]
 
 
-def interrupt_solve_attempts(tx: Tx, run_id: uuid.UUID) -> int:
-    """Worker: an execution finds attempts its predecessor never finished (a crash, or a
-    store that went away): each is `interrupted`, never a result."""
+def end_unfinished_solve_attempts(tx: Tx, run_id: uuid.UUID, outcome: AttemptOutcome) -> int:
+    """Worker: the run's attempts never finished end as `outcome`, never as a result. An
+    execution finds its predecessor's (a crash, or a store that went away) `interrupted`; a
+    run's publication settles any left when the run ends."""
     updated = tx.execute(
         sa.text(
-            "UPDATE careerwright.route_solve_attempts SET outcome = 'interrupted', "
+            "UPDATE careerwright.route_solve_attempts SET outcome = :outcome, "
             "finished_at = clock_timestamp() WHERE run_id = :run AND finished_at IS NULL"
         ),
-        {"run": run_id},
+        {"run": run_id, "outcome": outcome.value},
     )
     return int(updated.rowcount)
 

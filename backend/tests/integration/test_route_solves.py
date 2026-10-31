@@ -21,6 +21,8 @@ import pytest
 
 from careerwright.planning.months import Month
 from careerwright.seed import INVITED_ACTORS
+from tests.integration.durable import fresh_actor
+from tests.integration.test_worker_boundaries import cut_worker_database_for
 from tests.support.client import ApiClient, profile_with
 from tests.support.infra import Infra
 from tests.support.workers import Worker, start_worker, wait_for
@@ -32,6 +34,19 @@ DATA = "Data quality analyst"
 TERMINAL = {"complete", "failed", "provider_unavailable", "cancelled"}
 SOLVE_STEPS = {"careerwright.bounded_route_solve", "careerwright.publish_outcome"}
 CHECK_DELAY_S = 2.0  # each candidate, in the slow worker: the pack target checks about five
+SHORT_CHECK_S = 0.5  # each candidate, where a search need only last a few seconds
+STALLED_CHECK_S = 10.0  # the first candidate outlasts everything the test does meanwhile
+OUTAGE_S = 15.0  # longer than the solve step's three tries (1 s, then 2 s, apart)
+MAX_ATTEMPTS = 3  # executions of one solve (ADR 0016 decision 15)
+
+
+def no_reason_anywhere(served: Any) -> bool:
+    """No finding's `reason` is served: the web words a finding from its facts (R11)."""
+    if isinstance(served, dict):
+        return "reason" not in served and all(no_reason_anywhere(v) for v in served.values())
+    if isinstance(served, list):
+        return all(no_reason_anywhere(v) for v in served)
+    return True
 
 
 def gbp(minor: int) -> dict[str, Any]:
@@ -92,6 +107,32 @@ class Person:
         )
         assert response.status_code == 201, response.text
         self.inputs_version = response.json()["version"]
+
+    def ready_for_the_target(self) -> None:
+        """Synthetic evidence at the required level for each of the target's required rows:
+        ready now for its modelled requirements, so the empty route reaches readiness."""
+        found = self.api.get(f"{self.base}/capability/matrices", self.token).json()
+        matrix = next(m for m in found["matrices"] if m["target_title"] == DATA)
+        required = [r for r in matrix["rows"] if r["required"]]
+        assert required
+        for version, row in enumerate(required):
+            recorded = self.api.write(
+                "POST",
+                f"{self.base}/capability/evidence",
+                self.token,
+                {
+                    "expected_version": version,
+                    "subject": row["subject"],
+                    "rubric_version": row["rubric"]["version_id"],
+                    "answer": "done_independently",
+                    "self_assessed_level": row["required_level"],
+                    "example": "Synthetic: checked a data import and fixed what it broke",
+                    "last_done": "2026-08",
+                    "context": "paid_work",
+                    "independence": "independent",
+                },
+            )
+            assert recorded.status_code == 201, recorded.text
 
     def ask(self, *, key: uuid.UUID | None = None, **changes: Any) -> Any:
         body = {
@@ -413,6 +454,230 @@ def test_a_crashed_solve_starts_again_under_a_new_attempt_never_a_truncated_resu
     assert stored["attempt_id"] == attempts[1]["attempt_id"]  # the new attempt's result only
     assert stored["coverage"] == "complete"
     assert person.solve(run_id).json()["attempts"] == 2
+
+
+@pytest.mark.req("OPT1-03", "DUR-02")
+def test_a_result_stored_before_a_crash_is_published_and_never_solved_again(
+    person: Person, workers: Any
+) -> None:
+    run_id = person.ask().json()["run"]["run_id"]
+    first = workers("first", crash_at="after_solve_stored")
+    assert first.wait_exit(60) == -signal.SIGKILL
+    [stored] = person.stored(run_id)
+    assert person.run(run_id)["status"] == "running"  # stored, never published
+
+    second = workers("second")
+    run = person.wait_terminal(run_id)
+    second.stop()
+    [attempt] = person.attempts(run_id)
+
+    assert (run["status"], run["output_id"]) == ("complete", stored["output_id"])
+    assert attempt["outcome"] == "succeeded"  # one attempt: the stored result is the result
+    assert person.stored(run_id) == [stored]
+    assert person.solve(run_id).json()["attempts"] == 1
+
+
+@pytest.mark.req("OPT1-03", "DUR-02")
+def test_a_solve_whose_worker_keeps_crashing_fails_after_three_attempts(
+    person: Person, workers: Any
+) -> None:
+    run_id = person.ask().json()["run"]["run_id"]
+    for n in range(MAX_ATTEMPTS):
+        crashed = workers(f"crash-{n}", crash_at="mid_solve")
+        assert crashed.wait_exit(60) == -signal.SIGKILL
+
+    last = workers("last")
+    run = person.wait_terminal(run_id)
+    last.stop()
+
+    assert (run["status"], run["failure_class"], run["output_id"]) == (
+        "failed",
+        "unknown_failure",
+        None,
+    )
+    assert [a["outcome"] for a in person.attempts(run_id)] == ["interrupted"] * MAX_ATTEMPTS
+    assert person.stored(run_id) == []
+
+
+@pytest.mark.req("SEC-01", "OPT1-05")
+def test_access_revoked_while_a_solve_runs_fails_it_and_stores_nothing(
+    api: ApiClient, infra: Infra, workers: Any
+) -> None:
+    email, token = fresh_actor(api, infra)
+    someone = Person(api, infra, token)
+    someone.state(stated())
+    run_id = someone.ask().json()["run"]["run_id"]
+    worker = workers("slow", solve_check_delay_s=str(SHORT_CHECK_S))
+    wait_for(lambda: bool(someone.attempts(run_id)), timeout_s=30, what="the search to start")
+
+    infra.query("UPDATE careerwright.actors SET access = 'revoked' WHERE email = %s", (email,))
+    run = someone.wait_terminal(run_id)
+    worker.stop()
+
+    assert (run["status"], run["failure_class"], run["output_id"]) == (
+        "failed",
+        "access_revoked",
+        None,
+    )
+    assert [a["outcome"] for a in someone.attempts(run_id)] == ["failed"]
+    assert someone.stored(run_id) == []
+
+
+@pytest.mark.req("OPT1-06", "OPT1-07", "API-02")
+def test_a_solve_that_finds_routes_stores_and_serves_them_with_their_schedules(
+    person: Person, workers: Any
+) -> None:
+    person.ready_for_the_target()
+    run_id = person.ask().json()["run"]["run_id"]
+    worker = workers("worker")
+    run = person.wait_terminal(run_id)
+    worker.stop()
+    body = person.solve(run_id).json()
+    result = body["result"]
+    [stored] = person.stored(run_id)
+
+    assert run["status"] == "complete"
+    assert (result["coverage"], result["outcome"], result["layers_exact"]) == (
+        "complete",
+        "routes_found",
+        True,
+    )
+    assert body["code"] is None  # complete with routes: "Best trade-offs found" is the web's
+    # Ready now for the modelled requirements: the empty route reaches readiness at once, in
+    # F1. The pack's offerings each still lack a fact the search needs, so are set aside.
+    [schedule] = result["schedules"]
+    assert (schedule["route"], schedule["months_to_readiness"], schedule["layer"]) == ([], 0, 1)
+    assert schedule["family_id"] in {f["family_id"] for f in result["families"]}
+    assert result["set_aside"]
+    # Its facts beside the sealed output repeat it.
+    assert (stored["outcome"], stored["archived"], stored["layers_exact"]) == (
+        "routes_found",
+        1,
+        True,
+    )
+    assert no_reason_anywhere(result)
+
+
+@pytest.mark.req("LIMITS-05", "OPT1-05")
+def test_two_solves_asked_together_run_one_at_a_time_each_on_its_own_clock(
+    person: Person, workers: Any
+) -> None:
+    runs = [
+        person.ask().json()["run"]["run_id"],
+        person.ask(horizon_months=23).json()["run"]["run_id"],  # another solve, not a join
+    ]
+    worker = workers("slow", solve_check_delay_s=str(SHORT_CHECK_S))
+    wait_for(lambda: any(person.attempts(r) for r in runs), timeout_s=30, what="a search")
+    # While one searches, the other waits its turn: still queued, with no attempt.
+    waiting = [person.run(r)["status"] for r in runs if not person.attempts(r)]
+    finished = [person.wait_terminal(r)["status"] for r in runs]
+    worker.stop()
+    attempts = sorted(
+        ((person.attempts(r), person.stored(r)) for r in runs),
+        key=lambda found: found[0][0]["started_at"],
+    )
+    [([earlier], _), ([later], [later_result])] = attempts
+
+    assert finished == ["complete", "complete"]
+    assert waiting == ["queued"]
+    assert later["started_at"] >= earlier["finished_at"]  # one at a time
+    # Its clock started when it ran: its search took no longer than its own attempt.
+    ran_ms = (later["finished_at"] - later["started_at"]).total_seconds() * 1000
+    assert later_result["search_ms"] <= ran_ms
+
+
+@pytest.mark.req("DUR-05", "OPT1-03")
+def test_a_solve_asked_for_again_after_its_cancel_is_a_new_run(person: Person) -> None:
+    first = person.ask().json()["run"]["run_id"]
+    # No worker runs here: the run stays queued with its cancel recorded, never joined.
+    assert person.cancel(first).status_code == 202
+
+    again = person.ask()
+
+    assert again.status_code == 202, again.text
+    assert again.json()["run"]["run_id"] != first
+    assert person.run(first)["status"] == "queued"
+    # Cancelled too, so no later test's worker starts it (solves run one at a time).
+    assert person.cancel(again.json()["run"]["run_id"]).status_code == 202
+
+
+# Every way a run ends settles its attempts: none reads as still running once the run has
+# ended (review 13b, run half Minor 2).
+
+
+@pytest.mark.req("DUR-05")
+def test_a_cancel_published_as_the_worker_dies_leaves_no_attempt_unfinished(
+    person: Person, workers: Any
+) -> None:
+    run_id = person.ask().json()["run"]["run_id"]
+    worker = workers("stalled", solve_check_delay_s=str(STALLED_CHECK_S))
+    wait_for(lambda: bool(person.attempts(run_id)), timeout_s=30, what="the search to start")
+
+    assert person.cancel(run_id).status_code == 202
+    run = person.wait_terminal(run_id, timeout_s=STALLED_CHECK_S / 2)  # the worker loop's
+    worker.kill()  # before the search's next check could end its attempt
+
+    assert run["status"] == "cancelled"
+    [attempt] = person.attempts(run_id)
+    assert attempt["outcome"] == "cancelled"
+    assert attempt["finished_at"] is not None
+
+
+@pytest.mark.req("DUR-05", "DUR-02")
+def test_a_solve_cancelled_after_a_crash_leaves_no_attempt_unfinished(
+    person: Person, workers: Any
+) -> None:
+    run_id = person.ask().json()["run"]["run_id"]
+    first = workers("first", crash_at="mid_solve")
+    assert first.wait_exit(60) == -signal.SIGKILL
+    assert person.cancel(run_id).status_code == 202
+
+    second = workers("second")
+    run = person.wait_terminal(run_id)
+    second.stop()
+
+    assert run["status"] == "cancelled"
+    assert [a["outcome"] for a in person.attempts(run_id)] == ["cancelled"]
+
+
+@pytest.mark.req("DUR-08", "OPT1-05")
+def test_a_solve_whose_store_stays_away_fails_and_leaves_no_attempt_unfinished(
+    person: Person, infra: Infra, workers: Any
+) -> None:
+    run_id = person.ask().json()["run"]["run_id"]
+    worker = workers("slow", solve_check_delay_s=str(SHORT_CHECK_S))
+    wait_for(lambda: bool(person.attempts(run_id)), timeout_s=30, what="the search to start")
+
+    restorer = cut_worker_database_for(infra, OUTAGE_S)
+    try:
+        run = person.wait_terminal(run_id, timeout_s=120)
+    finally:
+        restorer.join()
+        infra.query("ALTER ROLE careerwright_worker LOGIN")
+    worker.stop()
+
+    assert (run["status"], run["failure_class"]) == ("failed", "app_store_unavailable")
+    [attempt] = person.attempts(run_id)
+    assert (attempt["outcome"], attempt["finished_at"] is not None) == ("interrupted", True)
+    assert person.stored(run_id) == []
+
+
+@pytest.mark.req("OPT1-05")
+def test_a_solve_whose_result_cannot_be_stored_fails_and_leaves_no_attempt_unfinished(
+    person: Person, workers: Any
+) -> None:
+    run_id = person.ask().json()["run"]["run_id"]
+    worker = workers("worker", crash_at="solve_store_fails")
+    run = person.wait_terminal(run_id)
+    worker.stop()
+
+    assert (run["status"], run["failure_class"], run["output_id"]) == (
+        "failed",
+        "unknown_failure",
+        None,
+    )
+    assert [a["outcome"] for a in person.attempts(run_id)] == ["interrupted"]
+    assert person.stored(run_id) == []
 
 
 @pytest.mark.req("SEC-02", "ARC1-08")

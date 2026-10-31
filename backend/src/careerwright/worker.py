@@ -27,6 +27,7 @@ from careerwright.identity import connection_check, run_store, worker, workflow
 from careerwright.identity.activity import (
     CONNECTION_CHECK_TASK,
     ActivityRuntime,
+    AttemptSettler,
     ModelBuilder,
     RunTask,
 )
@@ -43,6 +44,7 @@ from careerwright.identity.model_registry import (
 )
 from careerwright.identity.records import RunKind
 from careerwright.logs import configure_logging
+from careerwright.planning import solve_runs
 from careerwright.planning import workflow as solve_workflow
 from careerwright.planning.solve_runs import SolveRuntime
 from careerwright.profile.discovery_agent import DISCOVERY_TASK, fixture_discovery_model
@@ -67,6 +69,10 @@ WORKFLOWS: worker.Workflows = {
     run_store.MODEL_RUN_WORKFLOW: workflow.model_run_workflow,
     run_store.ACQUISITION_WORKFLOW: acquisition_workflow.acquisition_workflow,
     run_store.ROUTE_SOLVE_WORKFLOW: solve_workflow.route_solve_workflow,
+}
+# What publishing a run's end also settles, by kind: a route solve's unfinished attempts.
+SETTLE_ATTEMPTS: Mapping[RunKind, AttemptSettler] = {
+    RunKind.ROUTE_SOLVE: solve_runs.settle_attempts,
 }
 # The deterministic stand-ins for demo workspaces, by model ID.
 FIXTURE_MODELS: Mapping[str, Callable[[], Model]] = {
@@ -128,6 +134,7 @@ def main() -> None:
         build_model=model_builder(),
         clock=_utc_now,
         tasks=TASKS,
+        settle_attempts=SETTLE_ATTEMPTS,
     )
     acquisition_workflow.configure(
         AcquisitionRuntime(runtime, HttpAcquisitionClient(settings.acquisition_url), models)

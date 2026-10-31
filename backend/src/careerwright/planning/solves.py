@@ -10,7 +10,8 @@ refused here with its code, never run and never an empty result: a stale version
 that is not theirs, a target with no options, a planning start already past, an input a solve
 needs (named), or a catalogue beyond the M0 bounds. The snapshot is sealed into the run, so a
 later edit makes a new version and never reaches a solve under way. The same solve asked for
-again while one is queued or running joins it.
+again while one is queued or running joins it, unless the person has asked to cancel that one:
+then it is a new run.
 """
 
 import uuid

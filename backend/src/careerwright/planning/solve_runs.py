@@ -1,6 +1,12 @@
 """Route solves, worker side (Task 13b; ADR 0016's Task 13b amendment): one bounded activity per
 execution, run by the route solve's DBOS step (`careerwright.planning.workflow`).
 
+Solves run one at a time in the worker. The search is CPU-bound Python on a wall clock, so two
+at once would share one interpreter and either could stop at its 30 seconds where it would
+finish alone. An execution waits its turn before it marks its run running or records an
+attempt, so its run stays queued meanwhile and its clocks start only when it runs; it stops
+waiting once the person cancels.
+
 Under the worker role and row-level security scoped to the run, the activity:
 1. ends at once for a run the person cancelled, and returns the stored result of a run that
    stored one before a crash (it is never solved twice into two results);
@@ -20,6 +26,9 @@ nothing. The rank stage reaching its own limit fails the run
 `rank_limit_reached`, never a result without its ranks. A store outage is transient: the DBOS
 step re-runs the activity, which solves again (a solve costs nothing). Everything else fails
 the run `unknown_failure`, named by class only.
+
+However a run ends, its publication settles any attempt still unfinished in the same
+transaction (`settle_attempts`), so no attempt reads as running once its run has ended.
 """
 
 import hashlib
@@ -31,7 +40,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from careerwright.db import StoreUnavailableError, run_transaction
+from careerwright.db import StoreUnavailableError, Tx, run_transaction
 from careerwright.identity import run_store
 from careerwright.identity import store as identity_store
 from careerwright.identity.activity import ActivityRuntime, Outcome, cancelled, failed, succeeded
@@ -53,6 +62,8 @@ from careerwright.vocabulary import WorkState
 SOLVE_MAX_ATTEMPTS = 3  # executions of one solve, its restarts after a crash included
 CANCEL_POLL_S = 0.2  # how often a running search reads whether the person cancelled
 _log = logging.getLogger("careerwright.route_solve")
+# This worker's one solve slot. L0 runs one worker process; a second would need a DBOS queue.
+_ONE_AT_A_TIME = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -99,7 +110,7 @@ def _prepare(rt: SolveRuntime, run_id: uuid.UUID) -> _Ready | SolveEnd:
                 str(run_id),
                 state=WorkState.RUNNING,
             )
-        store.interrupt_solve_attempts(tx, run_id)
+        store.end_unfinished_solve_attempts(tx, run_id, AttemptOutcome.INTERRUPTED)
         if len(store.solve_attempts(tx, run_id)) >= SOLVE_MAX_ATTEMPTS:
             return _failed(FailureClass.UNKNOWN_FAILURE, "attempts_exhausted")
         if run_store.authorised_workspace(tx) != run.workspace_id:
@@ -153,6 +164,18 @@ def cancel_watch(read: Callable[[], bool]) -> Iterator[Callable[[], bool]]:
         ended.set()
 
 
+def settle_attempts(tx: Tx, run_id: uuid.UUID, status: WorkState) -> None:
+    """Publication's part for a route solve (`ActivityRuntime.settle_attempts`), in the
+    transaction that ends its run: an attempt still unfinished is settled, so none reads as
+    running once the run has ended. On a cancelled run it is `cancelled` (its search stops at
+    its next check, or its worker is gone); on any other, `interrupted`: it never finished
+    (its store went away, its result could not be stored, or its worker stopped)."""
+    outcome = (
+        AttemptOutcome.CANCELLED if status is WorkState.CANCELLED else AttemptOutcome.INTERRUPTED
+    )
+    store.end_unfinished_solve_attempts(tx, run_id, outcome)
+
+
 def _finish(rt: SolveRuntime, ready: _Ready, outcome: AttemptOutcome) -> None:
     with run_transaction(rt.activity.engine, ready.run.run_id) as tx:
         store.finish_solve_attempt(tx, ready.attempt_id, outcome)
@@ -185,7 +208,7 @@ def _store(rt: SolveRuntime, ready: _Ready, result: SearchResult) -> SolveEnd:
     return SolveEnd("succeeded" if newly else "reused_result", succeeded(accepted))
 
 
-def _solve(rt: SolveRuntime, ready: _Ready) -> SolveEnd:
+def _solve(rt: SolveRuntime, ready: _Ready, stop: Callable[[], bool]) -> SolveEnd:
     run = ready.run
     ended: AttemptOutcome | None = None
     label = ""
@@ -194,14 +217,13 @@ def _solve(rt: SolveRuntime, ready: _Ready) -> SolveEnd:
         snapshot = SolveSnapshot.model_validate_json(
             rt.activity.keyring.open(ready.sealed, context)
         )
-        with cancel_watch(lambda: _cancel_requested(rt, run.run_id)) as stop:
-            archive = search_archive(
-                snapshot.monthly, limits=snapshot.limits, clock=rt.clock, cancelled=stop
-            )
-            _ranking(rt, ready)
-            result = rank_archive(
-                archive, clock=rt.clock, cancelled=stop, limit_seconds=snapshot.rank_seconds
-            )
+        archive = search_archive(
+            snapshot.monthly, limits=snapshot.limits, clock=rt.clock, cancelled=stop
+        )
+        _ranking(rt, ready)
+        result = rank_archive(
+            archive, clock=rt.clock, cancelled=stop, limit_seconds=snapshot.rank_seconds
+        )
     except SearchCancelledError:
         ended = AttemptOutcome.CANCELLED
     except RankLimitReachedError:
@@ -221,11 +243,26 @@ def _solve(rt: SolveRuntime, ready: _Ready) -> SolveEnd:
     return _failed(FailureClass.UNKNOWN_FAILURE, label)
 
 
+def _take_turn(stop: Callable[[], bool]) -> bool:
+    """This worker's one solve slot, or False once the person cancels while it waits."""
+    while not _ONE_AT_A_TIME.acquire(timeout=CANCEL_POLL_S):
+        if stop():
+            return False
+    return True
+
+
 def execute(rt: SolveRuntime, run_id: uuid.UUID) -> SolveEnd:
     """Never raises: every end is a label and, unless transient, an outcome to publish."""
     try:
-        prepared = _prepare(rt, run_id)
-        end = prepared if isinstance(prepared, SolveEnd) else _solve(rt, prepared)
+        with cancel_watch(lambda: _cancel_requested(rt, run_id)) as stop:
+            if not _take_turn(stop):
+                end = SolveEnd("cancelled", cancelled())
+            else:
+                try:
+                    prepared = _prepare(rt, run_id)
+                    end = prepared if isinstance(prepared, SolveEnd) else _solve(rt, prepared, stop)
+                finally:
+                    _ONE_AT_A_TIME.release()
     except Exception as error:
         classified = classify_failure(error)
         if classified.label == STORE_LABEL:

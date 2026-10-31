@@ -8,8 +8,12 @@ a named moment, so DBOS recovery is exercised rather than simulated:
 - `after_first_partial`: the first piece of a streamed reply is committed, mid-call.
 - `after_acquired_target`: an acquisition target's result is committed, its step is not.
 - `mid_solve`: a route solve's attempt is committed and its search has begun.
-One fault point is not a crash: `recording_fails` makes every target's recording
-transaction fail for good, so it rolls back and leaves the attempt `pending`.
+- `after_solve_stored`: a route solve's result, its facts and its attempt's end are
+  committed, the DBOS step is not.
+Two fault points are not crashes: `recording_fails` makes every target's recording
+transaction fail for good, so it rolls back and leaves the attempt `pending`; and
+`solve_store_fails` makes storing a route solve's result fail for good, so its transaction,
+the attempt's end included, rolls back.
 
 Route solves (Task 13b) take two more settings: `solve_check_delay_s` makes each candidate
 check that long (so a test can cancel a search under way), and `solve_clock_jump` moves the
@@ -41,12 +45,13 @@ from careerwright.identity.records import Run
 from careerwright.logs import configure_logging
 from careerwright.planning import search as route_search
 from careerwright.planning import solve_runs
+from careerwright.planning import store as planning_store
 from careerwright.planning import workflow as solve_workflow
 from careerwright.planning.checker import RouteCheck, Scenario, check_route
 from careerwright.planning.compiler import MonthlyInput
 from careerwright.planning.layers import Point, rank
 from careerwright.planning.solve_runs import SolveRuntime
-from careerwright.worker import TASKS, WORKFLOWS, model_builder
+from careerwright.worker import SETTLE_ATTEMPTS, TASKS, WORKFLOWS, model_builder
 from tests.support.fake_models import FakeFailure, fake_model_builder
 
 PAST_THE_SEARCH_LIMIT_S = 31.0
@@ -136,6 +141,24 @@ def install_crash_point(point: str) -> None:
             raise AssertionError("unreachable")
 
         solve_runs.search_archive = die  # type: ignore[attr-defined]
+    elif point == "after_solve_stored":
+        store_result = solve_runs._store
+
+        def store_then_die(
+            rt: SolveRuntime, ready: solve_runs._Ready, result: route_search.SearchResult
+        ) -> solve_runs.SolveEnd:
+            store_result(rt, ready, result)
+            _kill()
+            raise AssertionError("unreachable")
+
+        solve_runs._store = store_then_die
+    elif point == "solve_store_fails":
+        # Not a crash: the result's facts are refused for good, so the transaction that stores
+        # them and ends the attempt rolls back.
+        def refuse(*args: object) -> None:
+            raise RuntimeError("synthetic store failure")
+
+        planning_store.insert_solve_result = refuse  # type: ignore[assignment]
     elif point:
         raise ValueError(f"unknown crash point {point!r}")
 
@@ -164,6 +187,7 @@ def main() -> None:
         store_retry_budget_s=float(
             os.environ.get("CAREERWRIGHT_TEST_STORE_RETRY_BUDGET_S", activity.STORE_RETRY_BUDGET_S)
         ),
+        settle_attempts=SETTLE_ATTEMPTS,
     )
     install_crash_point(os.environ.get("CAREERWRIGHT_TEST_CRASH_AT", ""))
     models = ModelChoice.configure(
