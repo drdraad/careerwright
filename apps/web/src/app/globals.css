@@ -1264,9 +1264,13 @@
   height: 20px;
 }
 
+/* A menu longer than the room below its button scrolls inside the window, so its last items
+   ("All workspaces" with many workspaces) are never out of reach. */
 .popover {
   z-index: 30;
   min-width: 240px;
+  max-height: var(--radix-popover-content-available-height);
+  overflow-y: auto;
   padding: var(--space-8);
   border: 1px solid var(--line-space-control);
   border-radius: var(--radius-card);

@@ -140,7 +140,7 @@ test("[UI-06][REC1-07] a suggestion opens and becomes a target from the keyboard
   await expect(directions.getByRole("article").first()).toBeVisible({ timeout: 60_000 });
   const second = directions.getByRole("article").last();
   const title = (await second.getByRole("heading").textContent()) ?? "";
-  const toggle = second.getByRole("button", { name: title.trim() });
+  const toggle = second.getByRole("button", { name: title.trim(), exact: true });
   await tabTo(page, toggle);
   await page.keyboard.press("Enter");
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
