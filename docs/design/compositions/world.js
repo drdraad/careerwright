@@ -653,8 +653,11 @@
           ${field(true)}`);
       }
       if (state === "known") {
+        // The view's action first, under its heading, so a phone shows it in the first screen
+        // however many answers there are (Task W2E fix round 1); the answers follow.
         return atConsole(`
           <h2 class="sentence">What we know</h2>
+          <div class="row"><button type="button" class="btn btn-secondary">Edit answers directly</button></div>
           <dl class="known-facts">
             <div><dt>Target roles</dt><dd>${esc(F.p01.targetTitles.join(", "))}</dd></div>
             <div><dt>Work areas</dt><dd>${esc(F.p01.cities.join(", "))}</dd></div>
@@ -662,7 +665,6 @@
             <div><dt>Monthly payment limit<span class="explained">${MONTHLY}</span></dt><dd class="tnum">${money(F.p01.monthlyPaymentCapMinor)}</dd></div>
           </dl>
           <p class="small muted">Not asked yet: current role, weekly study hours, lowest pay you'd accept.</p>
-          <div class="row"><button type="button" class="btn btn-secondary">Edit answers directly</button></div>
           <details class="more"><summary>The early sketch for your target</summary><p class="small muted">Early sketch, not a checked route: what data quality analyst work usually asks for, from ESCO, and every step not resolved yet.</p></details>`);
       }
       if (state === "suggestions") {
