@@ -266,10 +266,13 @@ type Scratch = {
   named: string;
 };
 
-/** The first question's type-ahead open for these words (nothing is saved by typing). */
+/** The first question's type-ahead open for these words, in a new workspace: nothing is saved
+ *  yet, and typing saves nothing. */
 const typeAhead =
   (words: string, shown: (page: Page) => ReturnType<Page["getByText"]>) => async (page: Page) => {
-    await heading("You")(page);
+    await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
+    await expect(saved(page)).toHaveText("Nothing saved yet");
+    await expect(liveUpdates(page, "Live")).toBeVisible();
     await page.getByRole("combobox", { name: "Your job title" }).fill(words);
     await expect(shown(page)).toBeVisible();
   };
