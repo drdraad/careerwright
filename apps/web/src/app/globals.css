@@ -1084,7 +1084,7 @@
   }
 
   /* Whatever is scrolled or tabbed into view stops above the open sheet, never under it
-     (WCAG 2.4.11). You's rule below also clears its sticky reply field. */
+     (WCAG 2.4.11), the You chapter's reply field included. */
   html:has(.app[data-drawer="open"]) {
     scroll-padding-bottom: calc(var(--sheet-peek) + var(--space-16));
   }
@@ -1445,9 +1445,10 @@
     margin-top: var(--space-16);
   }
 
+  /* The reply field sits in the console's flow, right under the question, never floating over
+     what is above it: in the narrow console a floating field covered the tray's Save and the
+     start's choices (axe target-size, Task W2C). */
   .composer {
-    position: sticky;
-    bottom: var(--space-16);
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: end;
@@ -1456,13 +1457,6 @@
     background: var(--surface-card);
     border: 1px solid var(--line-reading-control);
     border-radius: var(--radius-card);
-  }
-
-  /* Whatever is scrolled or tabbed into view stops above the sticky reply field, never under
-     it (WCAG 2.4.11): the field's height (44px, padding, border), its offset and some room. */
-  html:has(.composer) {
-    --composer-reserve: 96px;
-    scroll-padding-bottom: var(--composer-reserve);
   }
 
   .composer textarea {
@@ -1693,14 +1687,8 @@
     max-width: 100%;
   }
 
-  /* S0-V02: the reply field rides above the bottom sheet's peek, never under it. */
-  .app[data-drawer="open"] .composer {
-    bottom: calc(var(--sheet-peek) + var(--space-16));
-  }
-
-  html:has(.app[data-drawer="open"] .composer) {
-    scroll-padding-bottom: calc(var(--sheet-peek) + var(--composer-reserve));
-  }
+  /* S0-V02 holds through the shell's rules: with the sheet open, the chapter keeps room under
+     its end and scrolling stops above the sheet's peek, so the reply field is never under it. */
 }
 
 /* V-08: above a phone the strip's states sit on their own row, so a longer state (a failed

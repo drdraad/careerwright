@@ -13,7 +13,7 @@
 // model run per slate, asked for once when the slate first shows, whose every quotation the
 // API checked against the person's answers or ESCO's record. It is shown above how Careerwright
 // found the suggestion, never instead of it; pending, failed and not-covered states say so.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type {
   Direction,
   DiscoveryOut,
@@ -274,7 +274,7 @@ function SuggestionCard({
     (t) => t.toLocaleLowerCase("en-GB") === suggestion.title.toLocaleLowerCase("en-GB"),
   );
   const full = targets.length >= listLimit("target_titles");
-  const body = `s-${suggestion.concept_id}-body`;
+  const body = useId();
   return (
     <article
       className="card suggestion"
@@ -286,7 +286,8 @@ function SuggestionCard({
           type="button"
           className="suggestion-toggle"
           aria-expanded={open}
-          aria-controls={body}
+          // Only an open suggestion's details are in the page.
+          aria-controls={open ? body : undefined}
           onClick={onOpen}
         >
           {title}

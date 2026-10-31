@@ -2,7 +2,7 @@
 // invitation, another person's workspace, foreign Host and Origin values, and a stale save.
 import { expect, test } from "@playwright/test";
 import { WEB_HOST as HOST, raw, emulatorToken as token } from "./api";
-import { chapterUrl, signIn } from "./helpers";
+import { chapterUrl, signIn, youView } from "./helpers";
 import { FIXTURE_WORKSPACE, PORTS, WEB_ORIGIN } from "./stack";
 
 test("[SEC-01] an uninvited account can sign in but is refused, and says so", async ({ page }) => {
@@ -89,6 +89,7 @@ test("[DUR-04][VERSIONS-01] a save based on an older version is refused and the 
   await signIn(second, "ada", chapterUrl("you", workspace));
   for (const page of [first, second]) {
     await expect(page.getByText("Nothing saved yet").first()).toBeVisible();
+    await youView(page, "What we know");
     await page.getByRole("button", { name: "Edit answers directly" }).click();
     await page.getByLabel("How you answer current role").selectOption("provided");
   }
