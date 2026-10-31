@@ -2643,10 +2643,6 @@ export type Finding = {
      * Unit
      */
     unit?: 'minor_units' | 'hours_per_week' | null;
-    /**
-     * Reason
-     */
-    reason?: string | null;
 };
 
 /**
@@ -4034,7 +4030,8 @@ export type NameRole = {
 /**
  * Narrowing
  *
- * What would make a stopped search smaller (spec section 12).
+ * What could help a stopped search (spec section 12): codes the web words as what could
+ * help, never as a promise that the narrowed search finishes.
  */
 export const Narrowing = {
     FEWER_CONCEPTS: 'fewer_concepts',
@@ -4045,7 +4042,8 @@ export const Narrowing = {
 /**
  * Narrowing
  *
- * What would make a stopped search smaller (spec section 12).
+ * What could help a stopped search (spec section 12): codes the web words as what could
+ * help, never as a promise that the narrowed search finishes.
  */
 export type Narrowing = typeof Narrowing[keyof typeof Narrowing];
 

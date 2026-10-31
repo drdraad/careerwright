@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from careerwright.capability.readiness import Assessment, Qualification, ReadinessState, assess
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
@@ -167,7 +167,10 @@ class Finding(StrictModel):
     amount: int | None = None
     limit: int | None = None
     unit: Literal["minor_units", "hours_per_week"] | None = None
-    reason: str | None = None  # the gate, or why a value is unknown
+    # The gate, or why a value is unknown: the checker's working note, read in memory (the
+    # search's prerequisite rule). Never serialized, so never sealed or served: a finding goes
+    # out as its code and facts, and the web words it (R11, Task 13b's fix round 1).
+    reason: str | None = Field(default=None, exclude=True)
 
 
 class Feasibility(StrEnum):

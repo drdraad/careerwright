@@ -2,6 +2,7 @@
 section 18, "payments/fees use `Money`"): every amount reaches the generated client as
 `Money`, never a bare minor-unit integer, and no planning schema renames an existing one."""
 
+import json
 from typing import Any
 
 import pytest
@@ -84,8 +85,9 @@ def test_no_schema_is_named_by_its_module_path() -> None:
     assert every["Basis"]["enum"] == ["stated", "inferred"]
 
 
-def _solved(direct_cap: int = 1000, **limits: int) -> SearchResult:
-    """A £5 and a £20 course, each reaching the target, under a direct-spend cap."""
+def _solved(direct_cap: int | None = 1000, **limits: int) -> SearchResult:
+    """A £5 and a £20 course, each reaching the target, under a direct-spend cap (None: the
+    cap is not stated)."""
     options = [
         option(name, start=START, finish=month_end(START, 1), hours=0, payments=((0, fee),))
         for name, fee in (("cheap", 500), ("dear", 2000))
@@ -124,6 +126,34 @@ def test_a_solve_s_code_names_a_stopped_search_or_a_proven_no_route_and_nothing_
     assert result_code(stopped_with_routes) == "SOLVE_LIMIT_REACHED"
     assert nothing.outcome is Outcome.NO_ROUTE_IN_BOUNDED_MODEL
     assert result_code(nothing) == "NO_ROUTE_IN_BOUNDED_MODEL"
+
+
+@pytest.mark.req("API-02", "OPT1-07")
+def test_a_served_solve_result_carries_no_sentence_careerwright_composed() -> None:
+    # R11: a finding is sealed and served as its code and facts (month, amount, limit, unit);
+    # the web words it. `Finding.reason` is the checker's working note, held in memory only.
+    every = schemas()
+    [result_ref] = [
+        ref["$ref"] for ref in every["SolveOut"]["properties"]["result"]["anyOf"] if "$ref" in ref
+    ]
+    served = reachable(result_ref.rsplit("/", 1)[-1], every)
+    with_reason = sorted(n for n in served if "reason" in every[n].get("properties", {}))
+    unknown_cap = _solved(direct_cap=None)
+    [blocking] = unknown_cap.blocking_inputs
+    # What the worker seals, and the API reads back and serves.
+    [served_blocking] = json.loads(unknown_cap.model_dump_json())["blocking_inputs"]
+
+    assert with_reason == []
+    assert blocking.reason == "direct_spend_cap"  # the search still reads it in memory
+    assert served_blocking == {
+        "code": "limit_unknown",
+        "kind": "unresolved",
+        "month": None,
+        "variant_id": None,
+        "amount": None,
+        "limit": None,
+        "unit": None,
+    }
     assert set(schemas()["SolveOut"]["properties"]["code"]["anyOf"][0]["enum"]) == {
         ErrorCode.SOLVE_LIMIT_REACHED.value,
         ErrorCode.NO_ROUTE_IN_BOUNDED_MODEL.value,

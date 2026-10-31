@@ -3774,17 +3774,6 @@ export const FindingSchema = {
                 }
             ],
             title: 'Unit'
-        },
-        reason: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Reason'
         }
     },
     additionalProperties: false,
@@ -5956,7 +5945,7 @@ export const NarrowingSchema = {
         'shorter_horizon'
     ],
     title: 'Narrowing',
-    description: 'What would make a stopped search smaller (spec section 12).'
+    description: 'What could help a stopped search (spec section 12): codes the web words as what could\nhelp, never as a promise that the narrowed search finishes.'
 } as const;
 
 export const NeedSchema = {
