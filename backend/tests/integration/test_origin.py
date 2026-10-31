@@ -409,6 +409,53 @@ def test_a_demo_workspace_shows_one_scripted_labelled_strength_and_calls_no_prov
     }
 
 
+@pytest.mark.req("DIV1-14", "PROF-10", "MAP1-09")
+def test_the_conversation_s_change_of_the_role_keeps_the_role_s_record(
+    infra: Infra, api: ApiClient, demo_api: ApiClient, ada: str, tmp_path: Path
+) -> None:
+    # App re-review N-M2 (Task 6d slice B fix round 2): the role's record was tested through
+    # What we know only. A decision on the conversation's proposal of the role goes through the
+    # same write path, so the same title in other capitals keeps the person's closest choice.
+    workspace = demo_api.write(
+        "POST",
+        "/v1/workspaces",
+        ada,
+        {"name": "Role by conversation", "data_mode": "demo", "synthetic": True},
+    ).json()["workspace_id"]
+    path = f"/v1/workspaces/{workspace}/origin/role"
+    named = demo_api.write(
+        "POST", f"{path}/title", ada, {"expected_version": 0, "title": "Registered nurse"}
+    )
+    assert named.status_code == 201, named.text
+    [group] = origin(demo_api, ada, workspace)["role"]["closest"]["groups"]
+    specialist = next(o["concept_id"] for o in group["occupations"] if "specialist" in o["title"])
+    chosen = demo_api.write(
+        "POST", f"{path}/closest", ada, {"expected_version": 1, "concept_id": specialist}
+    )
+    assert chosen.status_code == 201, chosen.text
+    scenario = make_scenario(infra, api, ada, tmp_path)
+
+    # The demo interviewer proposes the role in the message's words; the decision accepts it.
+    decided_turn(demo_api, ada, workspace, scenario, "I am a Registered Nurse.", 2)
+
+    profile = demo_api.get(f"/v1/workspaces/{workspace}/profile", ada).json()
+    assert (profile["version"], profile["document"]["current_role"]["value"]) == (
+        3,
+        "Registered Nurse",
+    )
+    shown = origin(demo_api, ada, workspace)
+    role = shown["role"]
+    assert (role["text"], role["state"], role["chosen"], role["kind"]) == (
+        "Registered Nurse",
+        "esco",
+        True,
+        "ons",
+    )
+    assert role["occupation"]["concept_id"] == specialist
+    assert (role["closest"]["decision"], role["closest"]["chosen"]) == ("chosen", specialist)
+    assert shown["usual_skills"]  # the chosen occupation's skills still seed the role
+
+
 def run_strength(
     api: ApiClient, token: str, workspace: str, scenario: Scenario, turn_id: str, version: int
 ) -> dict[str, Any]:
