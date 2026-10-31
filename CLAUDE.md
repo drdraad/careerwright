@@ -28,6 +28,13 @@ world, and progression towards your destiny", "feel organic and cybernetic", "th
 power and possibility" and "leave users astonished and breathless and excite them with
 revealed insight". The feeling to leave: "My future is larger than I realised—and I can start
 moving towards it." The contract is the plan's section 4 (ADR 0014).
+
+Practical first: "The visuals are important, but they must be subservient to having a
+practical, useful product" (the product owner, 2026-10-31). Where the world and the
+decision path compete, the path comes first: a chapter's working view (its words,
+choices and numbers) ships before its moment, and the world never pushes a decision off
+the first screen.
+
 - One living world, not pages. The person is the light at its origin, destinations are warm
   lights ahead, and trails of light grow between them. Each chapter is a place in that world
   with its own moment.
@@ -130,8 +137,12 @@ Run from the repository root (details: `docs/runbook.md`).
     proposal reaches the profile only through a decision on a complete, validated turn,
     against the version it was made for, with each limit or target confirmed by name, via
     the same command as a direct edit (ADR 0006). In discovery the model proposes searches
-    only; the slate is deterministic code over ESCO, its controls are view parameters and
-    never limits, and a suggestion becomes a target only by the person's choice (ADR 0007).
+    and title ideas. A title idea becomes a suggestion only when deterministic code
+    corroborates it: an ESCO label, a title in the pinned ONS coding index, or the title
+    verified as a quoted span on pages from two independent permitted sources (or one
+    official source). A person's own title is always kept in their words. The slate is
+    deterministic code, its controls are view parameters and never limits, and a suggestion
+    becomes a target only by the person's choice (ADR 0007, ADR 0015).
     A slate's written "Why this could suit you" is one bounded `slate_explanation` call per
     discovery, over its first view; every quotation is verified as a span of the pinned
     answers or that occupation's ESCO record (only the quoted words are checked, and the UI
@@ -206,6 +217,8 @@ Run from the repository root (details: `docs/runbook.md`).
     log it or journal it. Database passwords and master keys live in `CAREERWRIGHT_HOME`, never in
     the repository. The test model `muse-spark-1.3-contributor` takes synthetic data only,
     enforced in code and by a database CHECK; production is `muse-spark-1.3` (ADR 0003).
+    The product owner's live sessions run on `muse-wonder-1.0`, started only by the session
+    command, capped and ledgered (ADR 0003, 2026-10-31 amendment).
     Demo workspaces run only the offline fixture interviewer, never a provider model.
   - Ownership is row-level security: run API SQL inside `actor_transaction` and worker
     SQL inside `run_transaction` (`careerwright/db.py`). Never connect at runtime as an owner role.
@@ -222,6 +235,8 @@ Run from the repository root (details: `docs/runbook.md`).
     rank, layer or affordability. Fixture content is shown only in the fixture workspace,
     labelled. The web server forwards the browser's Origin unchanged and checks Host
     itself; its CSP allows only the web origin and the Auth emulator.
+  - A sentence the person reads says what Careerwright did or checked, never what a source or
+    list contains; when exact and plain conflict, say less.
 - Compatibility boundary: the exact pins in `backend/pyproject.toml` and
   `backend/uv.lock` (bump only by re-running `make acceptance`), the exact pins in
   `apps/web/package.json` and its lockfile (at least 14 days old, enforced by pnpm, with no
