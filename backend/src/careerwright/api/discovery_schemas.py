@@ -574,7 +574,8 @@ class TargetSketchOut(ResponseModel):
         description="The ESCO occupation, or the several that share the title (choose one)."
     )
     close_matches: list[OccupationRefOut] = Field(
-        description="For a title ESCO does not hold: the nearest occupations by full text."
+        description="For a title Careerwright couldn't match to an occupation in ESCO: the "
+        "nearest occupations by full text."
     )
     requirements: list[str] = Field(description="ESCO's essential skills, the first few.")
     requirement_count: int | None = Field(description="null: no requirement list.")

@@ -7308,7 +7308,7 @@ export const ProvisionalConceptOutSchema = {
         'created_at'
     ],
     title: 'ProvisionalConceptOut',
-    description: 'A title the person verified that ESCO does not hold: no ESCO URI, no ISCO group.'
+    description: 'A title the person confirmed that Careerwright couldn\'t match in ESCO: no ESCO URI, no\nISCO group.'
 } as const;
 
 export const ProvisionalConceptPageSchema = {
@@ -8351,7 +8351,7 @@ export const RoleOutSchema = {
         'choices'
     ],
     title: 'RoleOut',
-    description: 'What the person\'s answer to "What do you do now, or what did you do last?" names in\nESCO. Nothing is guessed: an answer ESCO does not hold joins nothing, and one several\noccupations hold asks the person to choose.'
+    description: 'What the person\'s answer to "What do you do now, or what did you do last?" names in\nESCO. Nothing is guessed: an answer Careerwright couldn\'t match in ESCO joins nothing, and\none it matched to several occupations asks the person to choose.'
 } as const;
 
 export const RoleStateSchema = {
@@ -11650,7 +11650,7 @@ export const TargetSketchOutSchema = {
             },
             type: 'array',
             title: 'Close Matches',
-            description: 'For a title ESCO does not hold: the nearest occupations by full text.'
+            description: 'For a title Careerwright couldn\'t match to an occupation in ESCO: the nearest occupations by full text.'
         },
         requirements: {
             items: {

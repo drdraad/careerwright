@@ -447,7 +447,7 @@ export const RESOLUTION: Record<Resolution, string> = {
   esco: "Found in ESCO",
   ambiguous: "Matched to several occupations in ESCO",
   provisional: "Your own title: Careerwright couldn't match it in ESCO",
-  not_found: "Not found in ESCO",
+  not_found: "Careerwright couldn't match it in ESCO",
 };
 
 /** An error code in the status vocabulary: its words and its tone (STATE-01). */

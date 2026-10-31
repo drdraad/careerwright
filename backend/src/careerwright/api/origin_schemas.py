@@ -59,8 +59,8 @@ class RoleOccupationOut(ResponseModel):
 
 class RoleOut(ResponseModel):
     """What the person's answer to "What do you do now, or what did you do last?" names in
-    ESCO. Nothing is guessed: an answer ESCO does not hold joins nothing, and one several
-    occupations hold asks the person to choose."""
+    ESCO. Nothing is guessed: an answer Careerwright couldn't match in ESCO joins nothing, and
+    one it matched to several occupations asks the person to choose."""
 
     text: str | None = Field(description="The person's answer; null before they answer.")
     state: RoleState

@@ -4769,7 +4769,8 @@ export type Provenance = typeof Provenance[keyof typeof Provenance];
 /**
  * ProvisionalConceptOut
  *
- * A title the person verified that ESCO does not hold: no ESCO URI, no ISCO group.
+ * A title the person confirmed that Careerwright couldn't match in ESCO: no ESCO URI, no
+ * ISCO group.
  */
 export type ProvisionalConceptOut = {
     /**
@@ -5491,8 +5492,8 @@ export type RoleOccupationOut = {
  * RoleOut
  *
  * What the person's answer to "What do you do now, or what did you do last?" names in
- * ESCO. Nothing is guessed: an answer ESCO does not hold joins nothing, and one several
- * occupations hold asks the person to choose.
+ * ESCO. Nothing is guessed: an answer Careerwright couldn't match in ESCO joins nothing, and
+ * one it matched to several occupations asks the person to choose.
  */
 export type RoleOut = {
     /**
@@ -7432,7 +7433,7 @@ export type TargetSketchOut = {
     /**
      * Close Matches
      *
-     * For a title ESCO does not hold: the nearest occupations by full text.
+     * For a title Careerwright couldn't match to an occupation in ESCO: the nearest occupations by full text.
      */
     close_matches: Array<OccupationRefOut>;
     /**

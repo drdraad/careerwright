@@ -308,7 +308,8 @@ class PlaceList(ResponseModel):
 
 
 class ProvisionalConceptOut(ResponseModel):
-    """A title the person verified that ESCO does not hold: no ESCO URI, no ISCO group."""
+    """A title the person confirmed that Careerwright couldn't match in ESCO: no ESCO URI, no
+    ISCO group."""
 
     concept_id: uuid.UUID
     concept_kind: Literal[ConceptKind.PROVISIONAL] = Field(

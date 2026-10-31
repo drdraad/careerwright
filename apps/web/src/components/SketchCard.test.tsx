@@ -53,7 +53,11 @@ describe("[STATE-05][DIV1-03] the sketch says what matching each title did", () 
           profile_version: 1,
           inputs: {},
           not_asked: [],
-          targets: [target("bus operator", "ambiguous"), target("facade cleaner", "provisional")],
+          targets: [
+            target("bus operator", "ambiguous"),
+            target("facade cleaner", "provisional"),
+            target("orbital gardener", "not_found"),
+          ],
           steps: [],
         } satisfies SketchOut,
       },
@@ -72,6 +76,13 @@ describe("[STATE-05][DIV1-03] the sketch says what matching each title did", () 
         exact: false,
       }),
     ).toBeVisible();
-    expect(document.body.textContent).not.toMatch(/not in ESCO|Several ESCO occupations have/);
+    // A title matched to none: what the match did, never "Not found in ESCO" (a claim about
+    // ESCO that another spelling or a hidden label can make untrue).
+    expect(screen.getByText("Orbital gardener").closest("p")).toHaveTextContent(
+      "Orbital gardener: Careerwright couldn't match it in ESCO",
+    );
+    expect(document.body.textContent).not.toMatch(
+      /not in ESCO|Not found in ESCO|Several ESCO occupations have/,
+    );
   });
 });

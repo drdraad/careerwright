@@ -243,7 +243,9 @@ def _skill_words(query: str) -> str:
     """A search's words as a skill's name is read: a hyphen is read as a space. The English
     parser keeps "first-aid" whole beside its parts, so its query would also need that whole
     word, which no skill named "provide first aid" holds (Task W2C). A hyphenated name keeps
-    its parts in its vector, so "e learning" still reaches "use e-learning platforms"."""
+    its parts in its vector, so "e learning" still reaches "use e-learning platforms". Ranking
+    is unchanged; but such a name typed with its hyphen no longer counts as named by exactly
+    the search's words, since its vector keeps the whole hyphenated word the search drops."""
     return query.replace("-", " ")
 
 
@@ -256,7 +258,8 @@ def essential_skill_reach(
     skill; how many occupations
     are reached in all; how many different essential skills reach them; and whether one of
     those skills is named by exactly the query's words ("sell products" for "selling
-    products"). Best first: equal ranks go to the occupation whose essential skills the
+    products"; a hyphenated name typed with its hyphen is not, `_skill_words`). Best first:
+    equal ranks go to the occupation whose essential skills the
     query matches the larger share of. The best `limit` and every occupation tied with the
     last of them on both (a cut never falls inside an exact tie), the title ordering only
     what is kept. No title, hidden label, ISCO group or description is searched."""

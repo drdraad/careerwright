@@ -593,7 +593,14 @@ inference, with at least 30 evaluation cases and a capped live run.
          is read as a space (Task W2C): PostgreSQL's English parser kept "first-aid" whole
          beside "first" and "aid" (`'first-aid' & 'first' & 'aid'`), so no skill named with
          "first aid" held it and "first-aid" found no work; a hyphenated skill name keeps its
-         parts too, so nothing it reached is lost. Thresholds and ranking are unchanged. The
+         parts too, so nothing it reached is lost. Thresholds and ranking are unchanged. One
+         precision: a hyphenated skill name typed with its hyphen ("use e-learning
+         platforms") no longer counts as named by exactly the search's words, because its
+         vector keeps the whole hyphenated word the search now drops; that flag only exempts
+         a search from being too general, and the W2C review's rough offline scan of the
+         release's hyphenated essential skill names found no search it turns too general
+         (Task W2C fix round 1).
+         The
          any-word pass and
          decision 5's partial-match weight are gone: one shared word ("people", "give",
          "write") found an animal behaviourist and a secretary for "looking after people",
