@@ -423,7 +423,77 @@ const limitProposal: TurnOut["proposal"] = {
   ready_for_review: true,
 };
 
-export const Start: Story = { render: you(chapterRoutes(prefs(null), [])) };
+// The start (Task 6d slice B): the first question leads; then "Which of these is closest?" for a
+// UK job title; then how to start, with what isn't known yet for a title kept in the person's
+// own words.
+const roleNamed = (title: string): ProfileOut => ({
+  ...profile,
+  document: { ...profile.document, current_role: given(title) },
+});
+const originOf = (title: string, kind: "ons" | "own_words", closest: boolean) => ({
+  method: "GET",
+  path: /\/origin$/,
+  answer: {
+    profile_version: 3,
+    capability_version: 0,
+    release: { dataset_id: "esco-v1.2.1-en-csv", sample: false },
+    role: {
+      text: title,
+      state: "not_in_esco",
+      chosen: false,
+      occupation: null,
+      choices: [],
+      kind,
+      uk_groups: closest ? [{ code: "2221", label: "Nursing professionals" }] : [],
+      closest: closest
+        ? {
+            decision: "not_yet",
+            chosen: null,
+            groups: [
+              {
+                group: { code: "2221", label: "Nursing professionals" },
+                occupations: [
+                  { concept_id: "c1", title: "advanced nurse practitioner", esco_uri: "u1" },
+                  {
+                    concept_id: "c2",
+                    title: "nurse responsible for general care",
+                    esco_uri: "u2",
+                  },
+                  { concept_id: "c3", title: "specialist nurse", esco_uri: "u3" },
+                ],
+              },
+            ],
+          }
+        : null,
+    },
+    usual_skills: [],
+    destinations: [],
+    fewer_reasons: [],
+    connection: null,
+    salary_floor: null,
+  },
+});
+const unanswered: ProfileOut = {
+  ...profile,
+  document: { ...profile.document, current_role: unasked },
+};
+export const Start: Story = {
+  render: you(chapterRoutes(prefs(null), []), "conversation", unanswered),
+};
+export const StartWhichIsClosest: Story = {
+  render: you(
+    [originOf("Registered nurse", "ons", true), ...chapterRoutes(prefs(null), [])],
+    "conversation",
+    roleNamed("Registered nurse"),
+  ),
+};
+export const StartInOwnWords: Story = {
+  render: you(
+    [originOf("Bookkeeping assistant", "own_words", false), ...chapterRoutes(prefs(null), [])],
+    "conversation",
+    roleNamed("Bookkeeping assistant"),
+  ),
+};
 export const ReplyStreaming: Story = {
   render: you(
     chapterRoutes(prefs("unsure"), [turn("running")], {

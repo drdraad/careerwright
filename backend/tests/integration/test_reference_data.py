@@ -19,7 +19,7 @@ from careerwright.catalogue.esco import ESCO_RELEASE, concept_id
 from careerwright.catalogue.pay import MappingReview, MappingReviewPack
 from careerwright.catalogue.reference import DATASETS, ReferenceMismatchError
 from careerwright.catalogue.releases import ReleaseIntegrityError
-from careerwright.cli import import_reference_data, import_taxonomy, migrate_app, seed
+from careerwright.cli import import_reference_data, import_taxonomy, migrate_app, seed_fixture
 from careerwright.db import create_engine
 from careerwright.seed import FIXTURE_WORKSPACE_ID
 from tests.support import reference_data as samples
@@ -281,7 +281,9 @@ def test_without_reference_data_the_evidence_is_unavailable_never_empty(
     owner = migrator_engine(infra, database)
     try:
         migrate_app(owner)
-        seed(owner, infra.ops_settings(database))
+        # The accounts and the fixture workspace only: without the UK job-title index, the
+        # fixture's target can't be decided, so `seed` (which stores its record) refuses.
+        seed_fixture(owner, infra.ops_settings(database))
         import_taxonomy(owner, SAMPLE_PATH, SAMPLE_RELEASE)
     finally:
         owner.dispose()

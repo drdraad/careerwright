@@ -86,6 +86,11 @@ test("[UI-06][STATE-06][PROF-04] the You chapter completes from the keyboard, an
   await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
   await page.locator("body").focus();
 
+  // The first question can be skipped from the keyboard, and focus goes on to how to start
+  // (Task 6d slice B).
+  await tabTo(page, page.getByRole("button", { name: "Skip for now" }));
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "How would you like to start?" })).toBeFocused();
   // Start, then answer: the first question takes focus once the choice is saved.
   await tabTo(page, page.getByRole("button", { name: "Help me explore" }));
   await page.keyboard.press("Enter");

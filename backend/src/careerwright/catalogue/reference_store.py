@@ -26,6 +26,7 @@ from careerwright.catalogue.ai_evidence import (
 )
 from careerwright.catalogue.ashe import AshePeriod, AsheRelease
 from careerwright.catalogue.pay import PayBenchmark, SocLink
+from careerwright.catalogue.records import UkGroup, UkTitle
 from careerwright.catalogue.releases import ReleasePin
 from careerwright.catalogue.soc import SocIndex
 from careerwright.db import Tx
@@ -304,6 +305,83 @@ def soc_links(tx: Tx, isco_code: str) -> list[SocLink]:
         {"isco": isco_code},
     )
     return [SocLink(r.soc_code, r.title, int(r.entries)) for r in rows]
+
+
+# One row per title of the coding index (its normalised form), however many entries give it:
+# every unit group and ISCO-08 group it is coded to, and the held ESCO release's name for each
+# ISCO-08 group.
+_UK_TITLE = (
+    "SELECT h.normalised, h.title, h.soc_codes, h.isco_codes, "
+    "array(SELECT g.label FROM unnest(h.isco_codes) AS c(code) "
+    "LEFT JOIN careerwright.isco_groups g ON g.code = c.code ORDER BY c.code) AS isco_labels"
+)
+
+
+def _uk_title(row: Any) -> UkTitle:
+    return UkTitle(
+        title=row.title,
+        normalised=row.normalised,
+        soc_codes=tuple(row.soc_codes),
+        isco_groups=tuple(
+            UkGroup(code, label)
+            for code, label in zip(row.isco_codes, row.isco_labels, strict=True)
+        ),
+    )
+
+
+def uk_titles(tx: Tx, normalised: Iterable[str]) -> dict[str, UkTitle]:
+    """The coding index's titles that are exactly these normalised titles, by normalised
+    title (absent: the index lists no such title)."""
+    rows = tx.execute(
+        sa.text(
+            "WITH h AS (SELECT normalised, min(title) AS title, "
+            "array_agg(DISTINCT soc_code ORDER BY soc_code) AS soc_codes, "
+            "array_agg(DISTINCT isco_code ORDER BY isco_code) AS isco_codes "
+            "FROM careerwright.soc2020_index_entries "
+            "WHERE normalised = ANY(CAST(:titles AS text[])) GROUP BY normalised) "
+            f"{_UK_TITLE} FROM h"
+        ),
+        {"titles": sorted(set(normalised))},
+    )
+    return {row.normalised: _uk_title(row) for row in rows}
+
+
+def uk_title_matches(
+    tx: Tx, words: Sequence[str], typed: str, limit: int
+) -> tuple[list[UkTitle], int]:
+    """The coding index's titles holding a word that begins with each of `words` (whole words
+    of the title, any order), one per title, that are not a preferred or alternative label of
+    an ESCO occupation as a concept (the type-ahead offers those as ESCO's), and how many there
+    are. Best first: the title is what was typed, then begins with it, then the shorter title,
+    then by title."""
+    prefix = "".join(f"\\{c}" if c in "\\%_" else c for c in typed) + "%"
+    rows = tx.execute(
+        sa.text(
+            "WITH found AS (SELECT normalised, min(title) AS title, "
+            "array_agg(DISTINCT soc_code ORDER BY soc_code) AS soc_codes, "
+            "array_agg(DISTINCT isco_code ORDER BY isco_code) AS isco_codes "
+            "FROM careerwright.soc2020_index_entries "
+            "WHERE to_tsvector('simple', title) @@ to_tsquery('simple', :query) "
+            "GROUP BY normalised), "
+            "h AS (SELECT f.*, count(*) OVER () AS total FROM found f WHERE NOT EXISTS ("
+            "SELECT 1 FROM careerwright.occupation_labels l WHERE l.kind <> 'hidden' "
+            "AND careerwright.concept_key(l.label) = careerwright.concept_key(f.title))) "
+            f"{_UK_TITLE}, h.total FROM h "
+            "ORDER BY h.normalised = :typed DESC, h.normalised LIKE :prefix DESC, "
+            "char_length(h.title), h.title LIMIT :limit"
+        ),
+        {
+            "query": " & ".join(f"'{word}':*" for word in words),
+            "typed": typed,
+            "prefix": prefix,
+            "limit": limit,
+        },
+    )
+    titles, total = [], 0
+    for row in rows:
+        total = int(row.total)
+        titles.append(_uk_title(row))
+    return titles, total
 
 
 def soc_title_matches(tx: Tx, isco_code: str, labels: Iterable[str]) -> set[str]:

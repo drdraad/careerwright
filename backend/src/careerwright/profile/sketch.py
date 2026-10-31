@@ -26,7 +26,7 @@ from careerwright.identity.workspaces import visible_workspace
 from careerwright.profile.commands import current_profile
 from careerwright.profile.document import FieldState
 from careerwright.profile.interview import ProfileField
-from careerwright.profile.records import TargetCoverage, TargetRecord
+from careerwright.profile.records import TargetCoverage, TargetKind, TargetLink, TargetRecord
 from careerwright.profile.targets import PackTargets, stored_targets
 
 REQUIREMENTS_SHOWN = 6
@@ -44,6 +44,7 @@ class Resolution(StrEnum):
     # The title is matched with case, punctuation and plurals folded, hidden labels included.
     ESCO = "esco"  # matched to exactly one ESCO occupation
     AMBIGUOUS = "ambiguous"  # to several: the person chooses, nothing is guessed
+    UK_TITLE = "uk_title"  # to none, and the UK job-title index lists it (its record's kind)
     PROVISIONAL = "provisional"  # to none, and the person confirmed it as their own title
     NOT_FOUND = "not_found"  # to none: no requirement list until it is resolved
 
@@ -129,19 +130,28 @@ def _target(tx: Tx, workspace_id: uuid.UUID, record: TargetRecord) -> TargetSket
     provisional = taxonomy_store.provisional_by_title(tx, workspace_id, normalise_label(title))
     close: list[OccupationRef] = []
     try:
-        found = search_occupations(tx, title, CLOSE_MATCHES, any_word=False)
-        close = [
-            ref
-            for ref in (_ref(tx, hit.concept_id) for hit in found.full_text[:CLOSE_MATCHES])
-            if ref is not None
-        ]
+        # The person said none of the closest is their job: nothing asks them to pick another.
+        if record.link is not TargetLink.NONE_OF_THESE:
+            found = search_occupations(tx, title, CLOSE_MATCHES, any_word=False)
+            close = [
+                ref
+                for ref in (_ref(tx, hit.concept_id) for hit in found.full_text[:CLOSE_MATCHES])
+                if ref is not None
+            ]
     except CareerwrightError as error:
         if error.details.get("reason") != "no_search_terms":
             raise
         close = []  # a title with no searchable word has no close matches to offer
+    resolution = (
+        Resolution.UK_TITLE
+        if record.kind is TargetKind.ONS
+        else Resolution.PROVISIONAL
+        if provisional is not None
+        else Resolution.NOT_FOUND
+    )
     return TargetSketch(
         title,
-        Resolution.PROVISIONAL if provisional is not None else Resolution.NOT_FOUND,
+        resolution,
         [],
         close,
         [],

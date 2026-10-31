@@ -8,11 +8,14 @@ import uuid
 import pytest
 
 from careerwright.capability.commands import committed_data, pack_targets
+from careerwright.catalogue.records import UkGroup, UkTitle
 from careerwright.migrations.versions import r0034_target_records as migration
 from careerwright.migrations.versions import r0035_every_version_s_targets as backfill
+from careerwright.migrations.versions import r0036_uk_titles as uk_migration
 from careerwright.profile.records import TargetCoverage as Coverage
 from careerwright.profile.records import TargetKind, TargetLink, TargetRecord
 from careerwright.profile.targets import (
+    OTHER_FIELDS,
     QUALIFIER,
     Choice,
     PackTarget,
@@ -226,3 +229,138 @@ def test_the_concept_key_folds_every_letter_that_decomposes_to_one_ascii_letter(
 
     assert len(migration.ACCENTED) == len(migration.PLAIN)
     assert dict(zip(migration.ACCENTED, migration.PLAIN, strict=True)) == expected
+
+
+# Task 6d slice B: a UK title from the ONS coding index, the person's own words, the closest
+# occupation they chose and "None of these is my job" (ADR 0015 decision 3).
+
+NURSING = (UkGroup("2221", "Nursing professionals"),)
+LISTED = UkTitle("Registered nurse", "registered nurse", ("2235", "2237"), NURSING)
+SPECIALIST = "http://data.europa.eu/esco/occupation/0000specialist-nurse"
+
+
+@pytest.mark.req("PROF-10", "DIV1-13", "DIV1-03")
+def test_a_title_the_uk_index_lists_is_an_ons_title_with_every_group_ons_codes_it_to() -> None:
+    found = decide(
+        "Doula",
+        "doula",
+        unqualified="doula",
+        choice=None,
+        labelled=(),
+        pack=PACK,
+        pack_keys=PACK_KEYS,
+        listed=UkTitle("Doula", "doula", ("6131",), (UkGroup("5321", None),)),
+    )
+    own = record("bookkeeping clerk assistant")
+
+    assert (found.kind, found.soc_codes, found.isco_codes) == (
+        TargetKind.ONS,
+        ("6131",),
+        ("5321",),
+    )
+    assert (found.link, found.occupation_uri) == (TargetLink.NONE, None)
+    assert (own.kind, own.soc_codes, own.isco_codes) == (TargetKind.OWN_WORDS, (), ())
+
+
+@pytest.mark.req("PROF-10", "DIV1-14")
+def test_the_closest_occupation_the_person_chose_keeps_their_title_s_kind_and_words() -> None:
+    closest = decide(
+        "Registered nurse",
+        "registered nurse",
+        unqualified="registered nurse",
+        choice=Choice(SPECIALIST, SOURCE),
+        closest=True,
+        labelled=(),
+        pack=PACK,
+        pack_keys=PACK_KEYS,
+        listed=LISTED,
+    )
+
+    assert (closest.title, closest.kind, closest.isco_codes) == (
+        "Registered nurse",
+        TargetKind.ONS,
+        ("2221",),
+    )
+    assert (closest.link, closest.occupation_uri, closest.source_ref_id) == (
+        TargetLink.OCCUPATION_CHOICE,
+        SPECIALIST,
+        SOURCE,
+    )
+    assert closest.esco_occupation == SPECIALIST  # the role's ESCO seed: the person's choice
+
+
+@pytest.mark.req("PROF-10", "DIV1-14")
+def test_none_of_these_leaves_the_title_with_no_esco_occupation_and_keeps_its_coverage() -> None:
+    none = decide(
+        "Registered nurse",
+        "registered nurse",
+        unqualified="registered nurse",
+        choice=None,
+        none_of_these=True,
+        labelled=(),
+        pack=PACK,
+        pack_keys=PACK_KEYS,
+        listed=LISTED,
+    )
+
+    assert (none.link, none.occupation_uri, none.esco_occupation) == (
+        TargetLink.NONE_OF_THESE,
+        None,
+        None,
+    )
+    assert (none.kind, none.coverage, none.pack_target_id) == (
+        TargetKind.ONS,
+        Coverage.PACK_TARGET,
+        "registered-nurse-manchester",
+    )
+
+
+@pytest.mark.req("PROF-10", "MAP1-05")
+def test_the_migration_decides_again_with_the_resolver_s_qualifiers_and_other_fields() -> None:
+    assert uk_migration.QUALIFIER == QUALIFIER
+    assert frozenset(uk_migration.OTHER_FIELDS) == OTHER_FIELDS[uk_migration.NURSE_KEY]
+    assert set(OTHER_FIELDS) == {uk_migration.NURSE_KEY}
+    assert (uk_migration.PACK_VERSION, uk_migration.PACK_TARGETS) == (
+        backfill.PACK_VERSION,
+        backfill.PACK_TARGETS,
+    )
+    assert uk_migration.NURSE_TARGET in {target for target, _, _ in uk_migration.PACK_TARGETS}
+
+
+@pytest.mark.req("PROF-10", "MAP1-05")
+@pytest.mark.parametrize(
+    ("title", "qualifier", "reaches"),
+    [
+        ("Registered nurse (mental health)", "mental health", False),
+        ("Registered nurse (children's)", "children s", False),
+        ("Registered nurse (children)", "children", False),
+        ("Registered nurse (learning disabilities)", "learning disability", False),
+        ("Registered nurse (adult)", "adult", True),
+        ("Registered nurse [2nd line]", "2nd line", True),
+    ],
+)
+def test_a_qualifier_naming_another_nursing_field_never_reaches_the_adult_pack_nurse(
+    title: str, qualifier: str, reaches: bool
+) -> None:
+    # The pack's "Registered nurse" rests on adult nursing evidence; the NMC registers nurses
+    # in four fields, so a qualifier naming one of the other three is another registered role.
+    found = decide(
+        title,
+        f"registered nurse {qualifier}",
+        unqualified="registered nurse",
+        qualifiers=(qualifier,),
+        choice=None,
+        labelled=(),
+        pack=PACK,
+        pack_keys=PACK_KEYS,
+    )
+
+    covered = (found.coverage, found.pack_target_id, found.link)
+    if reaches:
+        assert covered == (
+            Coverage.PACK_TARGET,
+            "registered-nurse-manchester",
+            TargetLink.PACK_CROSSWALK,
+        )
+    else:
+        assert covered == (Coverage.NOT_COVERED, None, TargetLink.NONE)

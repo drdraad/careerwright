@@ -48,6 +48,7 @@ import {
 } from "@/lib/queries";
 import {
   ADDED_WEIGHT_ONLY,
+  ANSWER_SOURCE,
   aiFilterWords,
   DIRECTION,
   EMPHASIS,
@@ -66,7 +67,9 @@ import {
   slateNote,
   suggestionReason,
   suggestionWords,
+  titleIdeasListed,
   titleIdeasWords,
+  UK_TITLE_IDEAS,
 } from "@/lib/vocabulary";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
@@ -814,9 +817,37 @@ function Slate({
         );
       })}
       {choose.error !== null && <RequestFailure error={choose.error} />}
+      <UkTitleIdeas ideas={titleIdeasListed(data.title_ideas)} />
       <NotShown items={data.not_included} />
       <p className="small muted">{data.release.attribution}</p>
     </div>
+  );
+}
+
+/** Title ideas the UK job-title index lists (Task 6d slice B; ADR 0015 decision 2): each a
+ *  suggestion in its own short list beside the slate, never in it, with the answers it came
+ *  from. Nothing about it is compared with the person's experience yet. */
+function UkTitleIdeas({ ideas }: { ideas: SlateOut["title_ideas"] }) {
+  if (ideas.length === 0) return null;
+  return (
+    <section className="suggestions" aria-labelledby="uk-title-ideas">
+      <h3 id="uk-title-ideas" className="section-title">
+        {UK_TITLE_IDEAS.heading}
+      </h3>
+      {ideas.map((idea) => (
+        <article key={idea.title} className="suggestion grid gap-8">
+          <h4 className="font-semibold">{idea.title}</h4>
+          <p className="small">{UK_TITLE_IDEAS.found}</p>
+          <ul className="plain-list small">
+            {idea.based_on.map((answer) => (
+              <li key={`${answer.field}:${answer.text}`}>
+                {UK_TITLE_IDEAS.from} {ANSWER_SOURCE[answer.field].toLowerCase()}: “{answer.text}”
+              </li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </section>
   );
 }
 

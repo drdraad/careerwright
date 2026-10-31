@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field
 
@@ -27,6 +27,8 @@ from careerwright.catalogue.records import (
     SkillRef,
     TaxonomyRelease,
     TitleMatch,
+    UkGroup,
+    UkTitle,
 )
 from careerwright.catalogue.taxonomy import OccupationSearch, TitleMatches
 
@@ -166,6 +168,7 @@ class IscoGroupOut(ResponseModel):
 
 
 class TitleMatchOut(ResponseModel):
+    source: Literal["esco"] = Field(description="An occupation of the pinned ESCO release.")
     concept_id: uuid.UUID
     concept_kind: EscoKind
     title: str = Field(description="The occupation's ESCO title (its preferred label).")
@@ -176,6 +179,7 @@ class TitleMatchOut(ResponseModel):
     @classmethod
     def of(cls, match: TitleMatch) -> "TitleMatchOut":
         return cls(
+            source="esco",
             concept_id=match.concept_id,
             concept_kind=ConceptKind.ESCO,
             title=match.preferred_label,
@@ -185,23 +189,64 @@ class TitleMatchOut(ResponseModel):
         )
 
 
+class UkGroupOut(ResponseModel):
+    code: str = Field(description="An ISCO-08 unit group, as the UK job-title index codes it.")
+    label: str | None = Field(
+        description="The held ESCO release's name for the group; null: it names none."
+    )
+
+    @classmethod
+    def of(cls, group: UkGroup) -> "UkGroupOut":
+        return cls(code=group.code, label=group.label)
+
+
+class UkTitleOut(ResponseModel):
+    """A UK job title the pinned ONS SOC 2020 coding index lists (ADR 0015): mark it "UK job
+    title (ONS)". Picked, it stays the person's words (`POST .../origin/role/title`)."""
+
+    source: Literal["uk_title_index"] = Field(description="A title of the UK job-title index.")
+    title: str = Field(description="As the index writes it.")
+    soc_codes: list[str] = Field(description="Every SOC 2020 unit group ONS codes it to.")
+    isco_groups: list[UkGroupOut] = Field(
+        description="Every ISCO-08 unit group ONS codes it to, none picked."
+    )
+
+    @classmethod
+    def of(cls, title: UkTitle) -> "UkTitleOut":
+        return cls(
+            source="uk_title_index",
+            title=title.title,
+            soc_codes=list(title.soc_codes),
+            isco_groups=[UkGroupOut.of(g) for g in title.isco_groups],
+        )
+
+
+TitleOption = Annotated[TitleMatchOut | UkTitleOut, Field(discriminator="source")]
+
+
 class TitleMatchesOut(ResponseModel):
     """The first question's type-ahead: occupations whose ESCO titles (preferred and
-    alternative labels) have a word beginning with each word typed, best first, one per
-    occupation. When no title holds every word, the occupations whose titles hold the most
-    of them, with `partial` true. Deterministic, no model call. No match is an honest empty
-    list: nothing is invented. `total` counts every occupation that matched."""
+    alternative labels) have a word beginning with each word typed, one per occupation, and
+    the UK job-title index's titles that do (ONS's SOC 2020 coding index, other than titles
+    ESCO itself offers), best first: what was typed, then a title beginning with it, then the
+    rest, ESCO first on ties. When neither holds a title with every word, the ESCO occupations
+    whose titles hold the most of them, with `partial` true. Deterministic, no model call. No
+    match is an honest empty list: nothing is invented, and the person's own words are always
+    theirs to keep (`POST .../origin/role/title`). `total` counts every ESCO occupation that
+    matched, `uk_total` every title of the index."""
 
     release: TaxonomyReleaseOut
     query: str
-    matches: list[TitleMatchOut]
+    matches: list[TitleOption]
     total: int
+    uk_total: int
     limit: int
     partial: bool = Field(
-        description="True: ESCO lists no title with every word typed, and these hold the most "
-        "of them, rarer words first. Ask \"Careerwright couldn't match that title in ESCO. Is "
-        'it one of these?": the person chooses one or none, and nothing is joined to the typed '
-        "words."
+        description="True: neither ESCO nor the UK job-title index lists a title with every word "
+        "typed, and these ESCO occupations hold the most of them, rarer words first. Ask "
+        '"Careerwright couldn\'t match that title in ESCO. Is it one of these?", with "None of '
+        "these is my job\", which keeps the person's own words: the person chooses one or "
+        "none, and nothing is joined to the typed words."
     )
 
     @classmethod
@@ -209,8 +254,12 @@ class TitleMatchesOut(ResponseModel):
         return cls(
             release=TaxonomyReleaseOut.of(found.release),
             query=found.query,
-            matches=[TitleMatchOut.of(m) for m in found.matches],
+            matches=[
+                TitleMatchOut.of(o) if isinstance(o, TitleMatch) else UkTitleOut.of(o)
+                for o in found.options
+            ],
             total=found.total,
+            uk_total=found.uk_total,
             limit=found.limit,
             partial=found.partial,
         )

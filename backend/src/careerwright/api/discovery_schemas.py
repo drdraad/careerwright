@@ -491,8 +491,10 @@ class SlateOut(ResponseModel):
     queries: list[PoolQueryOut] = Field(description="Every search that ran, with its hits.")
     unsearchable_queries: list[str] = Field(description="Queries with no searchable word.")
     title_ideas: list[TitleIdea] = Field(
-        description="Titles Careerwright thought of, each with what matching it in ESCO did "
-        "(case, punctuation and plurals folded): one it couldn't match is never suggested."
+        description="Titles Careerwright thought of, each with what it did with it (`reason`): "
+        "one ESCO holds as a label joins the slate's pool; one the UK job-title index lists "
+        "(exactly) is a suggestion in its own list beside the slate, never in it; one no list "
+        "holds is not yet found and never suggested."
     )
     not_included: list[NotIncludedOut] = Field(description="Show why this wasn't included.")
     unmatched_titles: list[str] = Field(

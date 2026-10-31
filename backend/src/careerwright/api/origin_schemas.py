@@ -8,7 +8,7 @@ from datetime import datetime
 
 from pydantic import Field
 
-from careerwright.api.catalogue_schemas import IscoGroupOut
+from careerwright.api.catalogue_schemas import IscoGroupOut, UkGroupOut
 from careerwright.api.discovery_schemas import (
     ConnectionOut,
     ReleaseRefOut,
@@ -24,9 +24,10 @@ from careerwright.capability.strength import (
     StrengthDecision,
 )
 from careerwright.capability.usual import UsualSkill, UsualState
-from careerwright.catalogue.records import OccupationDetail, OccupationFacts
-from careerwright.profile.exploration import FirstSlate, RoleState
+from careerwright.catalogue.records import GroupOccupation, OccupationDetail, OccupationFacts
+from careerwright.profile.exploration import ClosestDecision, ClosestOffer, FirstSlate, RoleState
 from careerwright.profile.interview import ProfileField, ProposalOrigin
+from careerwright.profile.records import TargetKind
 from careerwright.profile.slate_facts import FewerReason
 
 FIXTURE_STRENGTH_LABEL = "Demo example (synthetic)"
@@ -58,16 +59,73 @@ class RoleOccupationOut(ResponseModel):
         )
 
 
+class ClosestOccupationOut(ResponseModel):
+    concept_id: uuid.UUID
+    title: str = Field(description="Its ESCO title.")
+    esco_uri: str
+
+    @classmethod
+    def of(cls, occupation: GroupOccupation) -> "ClosestOccupationOut":
+        return cls(
+            concept_id=occupation.concept_id,
+            title=occupation.preferred_label,
+            esco_uri=occupation.esco_uri,
+        )
+
+
+class ClosestGroupOut(ResponseModel):
+    group: UkGroupOut = Field(description="An ISCO-08 group ONS codes the role's title to.")
+    occupations: list[ClosestOccupationOut] = Field(
+        description="The ESCO occupations in it, by ESCO title; empty where ESCO has none."
+    )
+
+
+class ClosestOut(ResponseModel):
+    """ "Which of these is closest?": asked for a role whose title the UK job-title index lists
+    and no ESCO occupation holds as a label. Answer with `POST .../origin/role/closest`."""
+
+    decision: ClosestDecision
+    groups: list[ClosestGroupOut] = Field(
+        description="Every ISCO-08 group ONS codes the title to, none picked."
+    )
+    chosen: uuid.UUID | None = Field(description="The occupation chosen, when one was.")
+
+    @classmethod
+    def of(cls, offer: ClosestOffer) -> "ClosestOut":
+        return cls(
+            decision=offer.decision,
+            groups=[
+                ClosestGroupOut(
+                    group=UkGroupOut.of(g.group),
+                    occupations=[ClosestOccupationOut.of(o) for o in g.occupations],
+                )
+                for g in offer.groups
+            ],
+            chosen=offer.chosen,
+        )
+
+
 class RoleOut(ResponseModel):
     """What the person's answer to "What do you do now, or what did you do last?" names in
     ESCO. Nothing is guessed: an answer Careerwright couldn't match in ESCO joins nothing, and
-    one it matched to several occupations asks the person to choose."""
+    one it matched to several occupations asks the person to choose. The answer is always kept
+    in the person's words; `kind` says what Careerwright found them to be."""
 
     text: str | None = Field(description="The person's answer; null before they answer.")
     state: RoleState
     chosen: bool = Field(description="The person chose the occupation from ESCO.")
     occupation: RoleOccupationOut | None = Field(description="When it names one occupation.")
     choices: list[RoleOccupationOut] = Field(description="When several hold it as a title.")
+    kind: TargetKind | None = Field(
+        description="esco: an ESCO title chosen as such; ons: a title the UK job-title index "
+        "lists; own_words: neither. Null before they answer."
+    )
+    uk_groups: list[UkGroupOut] = Field(
+        description="Every ISCO-08 group the UK job-title index codes the title to (ons only)."
+    )
+    closest: ClosestOut | None = Field(
+        description='"Which of these is closest?", when it is asked for this role.'
+    )
 
 
 class UsualSkillOut(ResponseModel):
@@ -132,6 +190,9 @@ class OriginOut(ResponseModel):
                 if first.occupation
                 else None,
                 choices=[RoleOccupationOut.of_facts(f) for f in first.choices],
+                kind=first.record.kind if first.record else None,
+                uk_groups=[UkGroupOut.of(g) for g in first.uk_groups],
+                closest=ClosestOut.of(first.closest) if first.closest else None,
             ),
             usual_skills=[UsualSkillOut.of(u) for u in usual],
             destinations=[SuggestionOut.of(s, first.release) for s in first.suggestions],

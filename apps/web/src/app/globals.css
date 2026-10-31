@@ -1443,6 +1443,53 @@
     margin-top: var(--space-16);
   }
 
+  /* The first question's type-ahead (Task 6d slice B): the field, then the titles as a list,
+     the one in focus edged in the selection colour, as a tab is (no new colour pairing). */
+  .title-field {
+    display: grid;
+    gap: var(--space-8);
+    margin-top: var(--space-16);
+  }
+
+  .title-options {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .title-option {
+    display: grid;
+    gap: 2px;
+    min-height: 44px;
+    padding: var(--space-8) var(--space-12);
+    border-left: 3px solid transparent;
+    color: var(--fg);
+    cursor: pointer;
+  }
+
+  .title-option:hover {
+    border-left-color: var(--line-control);
+  }
+
+  .title-option[aria-selected="true"] {
+    border-left-color: var(--selection);
+  }
+
+  .title-option .mark {
+    font-size: var(--type-14);
+    color: var(--fg-muted);
+  }
+
+  /* "Which of these is closest?": each ISCO-08 group ONS codes the title to, with its
+     occupations. */
+  .closest-group {
+    display: grid;
+    gap: var(--space-8);
+    margin-top: var(--space-16);
+  }
+
   /* A demo question's one-tap replies: quiet, and wrapping rather than crowding. */
   .example-replies {
     display: flex;

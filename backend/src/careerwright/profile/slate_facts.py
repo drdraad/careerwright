@@ -189,6 +189,16 @@ class TitleNotMatched(Fact):
     title: str
 
 
+class TitleKeptAsOwn(Fact):
+    """A title of the person's own that they said none of the closest ESCO occupations is
+    ("None of these is my job"): it is kept in their words, names no occupation, and nothing
+    is joined to it; nothing asks them to pick another."""
+
+    reason: Literal["title_kept_as_own"] = "title_kept_as_own"
+    outcome: Literal[Outcome.NOT_MATCHED] = Outcome.NOT_MATCHED
+    title: str
+
+
 class TitleMatchedSeveral(Fact):
     """A title of the person's own matched several occupations: nothing is joined to it until
     they choose which they mean."""
@@ -214,6 +224,7 @@ FewerReason = Annotated[
     | KindsOfWorkShown
     | ExclusionsRemoved
     | TitleNotMatched
+    | TitleKeptAsOwn
     | TitleMatchedSeveral
     | NoSharedOccupation,
     Field(discriminator="reason"),
@@ -265,15 +276,29 @@ SuggestionReason = Annotated[
 ]
 
 
+class TitleIdeaReason(StrEnum):
+    """What Careerwright did with a title it thought of (ADR 0015 decision 2)."""
+
+    # ESCO holds it as a label: its occupation (or each of several) joins the slate's pool.
+    IN_ESCO = "in_esco"
+    # ESCO doesn't, and the UK job-title index lists it exactly: a suggestion in its own short
+    # list beside the slate, never in the slate's pool.
+    IN_UK_TITLE_INDEX = "in_uk_title_index"
+    NOT_YET_FOUND = "not_yet_found"  # neither: shown as not yet found, never a suggestion
+    # It rests only on one-word answers about how the person likes to work: not looked up.
+    NOT_SEARCHED = "not_searched"
+
+
 class TitleIdea(Fact):
-    """A title Careerwright thought of, and what matching it did: only a matched idea is a
-    suggestion."""
+    """A title Careerwright thought of, and what it did with it: only an idea ESCO holds or the
+    UK job-title index lists is a suggestion."""
 
     title: str
     based_on: list[EvidenceItem]
+    reason: TitleIdeaReason
     outcome: Literal[
         Outcome.MATCHED, Outcome.MATCHED_SEVERAL, Outcome.NOT_MATCHED, Outcome.NOT_SEARCHED
-    ]
+    ] = Field(description="What matching it in ESCO did.")
     occupations: int | None = Field(
         description="Occupations matching it in ESCO; null when it wasn't searched."
     )

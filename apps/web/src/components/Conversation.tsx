@@ -18,7 +18,7 @@
 // is the bright action, never Send on an empty field (F17).
 // Each demo question offers one-tap example replies the demo interviewer reads (STATE-09), and
 // the role-or-explore question offers two ways on that open existing views.
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, type Ref, useEffect, useId, useRef, useState } from "react";
 import type {
   EntryMode,
   PreferencesOut,
@@ -34,7 +34,7 @@ import {
   turnFailed,
   turnRunning,
 } from "@/lib/conversation";
-import { type MessageSender, useSetPreferences, useTurnReply } from "@/lib/queries";
+import { type MessageSender, useOrigin, useSetPreferences, useTurnReply } from "@/lib/queries";
 import {
   ENGLAND_ONLY,
   ENTRY_MODE,
@@ -44,12 +44,15 @@ import {
   OPENING_QUESTION,
   PARTIAL_REPLY,
   PURPOSE,
+  ROLE_KEPT,
   ROLE_OR_EXPLORE,
 } from "@/lib/vocabulary";
 import { useSupportShown } from "@/lib/world/settings";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
+import { ClosestQuestion, FirstQuestion } from "./FirstQuestion";
 import { Glyph } from "./Glyph";
+import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
 
 const EARLIER_SHOWN = 2;
@@ -175,16 +178,22 @@ function SupportNote({ note, onDismiss }: { note: SupportNoteOut; onDismiss(): v
 function EntryChoice({
   preferences,
   onChoose,
+  headingRef,
+  lead,
 }: {
   preferences: PreferencesOut;
   onChoose(entry: EntryMode): void;
+  headingRef?: Ref<HTMLHeadingElement>;
+  /** What Careerwright did with the first answer, when there is something to say. */
+  lead?: ReactNode;
 }) {
   return (
     <section className="question" aria-labelledby="entry-title">
       {/* What Careerwright is for, before the choice (session 2: "not sure" what the start
           page was for). One line, and no helper text beyond it. */}
       <p className="measure mb-12">{PURPOSE}</p>
-      <h2 id="entry-title" className="display">
+      {lead}
+      <h2 id="entry-title" className="display" tabIndex={-1} ref={headingRef}>
         How would you like to start?
       </h2>
       <div className="choices">
@@ -203,6 +212,107 @@ function EntryChoice({
         ))}
       </div>
     </section>
+  );
+}
+
+type StartStep = "first" | "loading" | "closest" | "entry";
+
+/** The start, one decision at a time (plan section 4, "The first ten seconds"; Task 6d slice
+ *  B): the first question, then "Which of these is closest?" for a UK job title, then how to
+ *  start. The first answer lights the world at once and needs no key; "Skip for now" goes
+ *  straight to how to start, saving nothing. Focus follows the decision to the next step. */
+function Start({
+  workspace,
+  profile,
+  preferences,
+  onChoose,
+}: {
+  workspace: WorkspaceOut;
+  profile: ProfileOut;
+  preferences: PreferencesOut;
+  onChoose(entry: EntryMode): void;
+}) {
+  const id = workspace.workspace_id;
+  const [skipped, setSkipped] = useState(false);
+  const [leaving, setLeaving] = useState<StartStep | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const role = profile.document.current_role;
+  const answered = role.state === "provided";
+  const origin = useOrigin(id, answered);
+  const shown = origin.data?.role;
+  // The origin answers for the role it was computed from; until it matches, it is loading.
+  const current = shown !== undefined && shown.text === role.value ? shown : undefined;
+  const step: StartStep =
+    role.state === "unasked" && !skipped
+      ? "first"
+      : !answered || origin.error !== null
+        ? "entry"
+        : current === undefined
+          ? "loading"
+          : current.closest?.decision === "not_yet"
+            ? "closest"
+            : "entry";
+  useEffect(() => {
+    if (leaving !== null && step !== leaving && step !== "loading" && heading.current) {
+      heading.current.focus();
+      setLeaving(null);
+    }
+  });
+  if (step === "first") {
+    return (
+      <FirstQuestion
+        workspaceId={id}
+        profile={profile}
+        headingRef={heading}
+        lead={<p className="measure mb-12">{PURPOSE}</p>}
+        onAnswered={() => setLeaving("first")}
+        onSkip={() => {
+          setLeaving("first");
+          setSkipped(true);
+        }}
+      />
+    );
+  }
+  if (step === "loading") return <LoadingState stage="Looking at your answer" lines={2} />;
+  if (step === "closest" && current?.closest && current.text !== null) {
+    return (
+      <ClosestQuestion
+        workspaceId={id}
+        profile={profile}
+        title={current.text}
+        closest={current.closest}
+        headingRef={heading}
+        onAnswered={() => setLeaving("closest")}
+      />
+    );
+  }
+  const kept =
+    current !== undefined &&
+    current.text !== null &&
+    current.kind !== null &&
+    current.state === "not_in_esco" &&
+    (current.closest === null || current.closest.decision === "none_of_these")
+      ? ROLE_KEPT[current.kind](current.text)
+      : null;
+  return (
+    <>
+      <EntryChoice
+        preferences={preferences}
+        onChoose={onChoose}
+        headingRef={heading}
+        lead={kept !== null && <p className="measure mb-12">{kept}</p>}
+      />
+      {origin.error !== null && (
+        <RequestFailure
+          error={origin.error}
+          actions={
+            <Button variant="secondary" onClick={() => void origin.refetch()}>
+              Try again
+            </Button>
+          }
+        />
+      )}
+    </>
   );
 }
 
@@ -347,7 +457,9 @@ export function Conversation({
       </h2>
 
       {entryNeeded ? (
-        <EntryChoice
+        <Start
+          workspace={workspace}
+          profile={profile}
           preferences={preferences}
           onChoose={(entry) => {
             setFocusTo("question");

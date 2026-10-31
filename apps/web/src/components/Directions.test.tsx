@@ -13,6 +13,7 @@ import type {
   TargetRecordsOut,
   WorkState,
 } from "@/generated/api";
+import { UK_TITLE_IDEAS } from "@/lib/vocabulary";
 import { fakeApi, type Route, type Sent } from "@/test/fakeApi";
 import { Directions } from "./Directions";
 import { EvidenceDrawer, EvidenceProvider } from "./EvidenceDrawer";
@@ -180,6 +181,7 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
     {
       title: "orbital gardener",
       based_on: [{ field: "enjoyed_tasks", text: "repairing bicycles" }],
+      reason: "not_yet_found",
       outcome: "not_matched",
       occupations: 0,
     },
@@ -253,15 +255,66 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
         "Careerwright doesn't know your current work yet, so it can't say which directions are close to it.",
       ),
     ).toBeVisible();
-    // Never shown as a suggestion, and named for what the match did (W2B re-review 5).
+    // Never shown as a suggestion, and named for what Careerwright did (W2B re-review 5; Task
+    // 6d slice B: it looked in ESCO and the UK job-title index).
     expect(
       screen.getByText(
-        "Titles Careerwright thought of but couldn't match to an occupation in ESCO, so not suggested: orbital gardener.",
+        "Titles Careerwright thought of but hasn't found in ESCO or the UK job-title index yet, so not suggested: orbital gardener.",
       ),
     ).toBeVisible();
+    expect(screen.queryByRole("heading", { name: UK_TITLE_IDEAS.heading })).toBeNull();
     // Familiarity unknown: the group heading claims no relation to their current work.
     expect(screen.getByRole("heading", { name: "Directions to consider" })).toBeVisible();
     expect(document.body.textContent).not.toMatch(/\d\s?(%|per ?cent)/i); // a number as a percentage
+  });
+
+  it("[DIV1-04][TEST1-15] lists a title idea the UK job-title index lists beside the slate, with its answers", async () => {
+    const ideas: SlateOut["title_ideas"] = [
+      {
+        title: "Prompt engineer",
+        based_on: [{ field: "enjoyed_tasks", text: "writing prompts for AI tools" }],
+        reason: "in_uk_title_index",
+        outcome: "not_matched",
+        occupations: 0,
+      },
+      {
+        title: "orbital gardener",
+        based_on: [{ field: "enjoyed_tasks", text: "repairing bicycles" }],
+        reason: "not_yet_found",
+        outcome: "not_matched",
+        occupations: 0,
+      },
+    ];
+    fakeApi([
+      {
+        method: "GET",
+        path: /\/slate$/,
+        answer: { ...slate([suggestion]), title_ideas: ideas },
+      },
+    ]);
+    const { user } = renderDirections();
+
+    const list = await screen.findByRole("region", { name: UK_TITLE_IDEAS.heading });
+    expect(within(list).getByRole("heading", { name: "Prompt engineer" })).toBeVisible();
+    expect(
+      within(list).getByText(
+        "Found in the UK job-title index (ONS). Not compared with your experience yet.",
+      ),
+    ).toBeVisible();
+    expect(
+      within(list).getByText(
+        "Careerwright thought of it from what you enjoy: “writing prompts for AI tools”",
+      ),
+    ).toBeVisible();
+    // An idea no list holds is never a suggestion: it is named as not yet found, in the notes.
+    expect(within(list).queryByText(/orbital gardener/)).toBeNull();
+    expect(screen.queryByRole("heading", { name: "orbital gardener" })).toBeNull();
+    await openNotes(user, 3);
+    expect(
+      screen.getByText(
+        "Titles Careerwright thought of but hasn't found in ESCO or the UK job-title index yet, so not suggested: orbital gardener.",
+      ),
+    ).toBeVisible();
   });
 
   it("[DIV1-07] says what the salary floor left out and why the rest was kept", async () => {

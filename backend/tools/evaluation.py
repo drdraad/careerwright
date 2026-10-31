@@ -326,10 +326,21 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         percent = re.search(r"\d\s?(?:%|per ?cent)", json.dumps(observed), re.IGNORECASE)
         return Failure(FailureType.INFERENCE, percent.group(0)) if percent else None
     if e.check == "unsupported_not_suggested":
+        # DIV-1 (ADR 0015 decision 2): a title idea is a suggestion only when ESCO holds it or
+        # the UK job-title index lists it, and an indexed one only in its own list, never in
+        # the slate; an idea nothing corroborates is never suggested.
         shown = {s["title"].casefold() for s in suggestions}
-        unmatched = [i["title"] for i in observed["title_ideas"] if i["outcome"] == "not_matched"]
-        leaked = [t for t in unmatched if t.casefold() in shown]
+        outside = [
+            i["title"]
+            for i in observed["title_ideas"]
+            if i["reason"] in ("in_uk_title_index", "not_yet_found")
+        ]
+        leaked = [t for t in outside if t.casefold() in shown]
         return Failure(FailureType.UNSUPPORTED_TITLE, f"{leaked}") if leaked else None
+    if e.check == "title_idea_reasons":
+        reasons = {i["title"]: i["reason"] for i in observed["title_ideas"]}
+        same = reasons == e.value
+        return None if same else Failure(FailureType.UNSUPPORTED_TITLE, f"{reasons}")
     if e.check == "fewer_has_reason":
         short = len(suggestions) < observed["target_size"] and not observed["fewer_reasons"]
         return Failure(FailureType.THIN_EVIDENCE, "fewer, with no reason") if short else None

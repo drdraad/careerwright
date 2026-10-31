@@ -97,7 +97,9 @@ export function SketchCard({ workspaceId, profile }: { workspaceId: string; prof
             </p>
             <TargetCoverageLine target={target} />
             <TargetRequirements target={target} />
-            {(target.resolution === "ambiguous" || target.resolution === "not_found") &&
+            {(target.resolution === "ambiguous" ||
+              target.resolution === "not_found" ||
+              target.resolution === "uk_title") &&
               (target.resolution === "ambiguous" ? target.occupations : target.close_matches)
                 .length > 0 && (
                 <div className="grid gap-4">

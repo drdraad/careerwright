@@ -18,8 +18,9 @@ from careerwright.capability.commands import committed_data, pack_targets
 from careerwright.capability.strength import SCRIPTED_STRENGTHS
 from careerwright.catalogue import taxonomy_store
 from careerwright.catalogue.esco import ESCO_RELEASE
+from careerwright.catalogue.reference import DATASETS
 from careerwright.catalogue.taxonomy import MAX_REACH, search_essential_skills
-from careerwright.cli import import_taxonomy, migrate_app
+from careerwright.cli import import_reference_data, import_taxonomy, migrate_app
 from careerwright.db import Tx, system_transaction
 from careerwright.profile.records import TargetLink
 from careerwright.profile.slate import POOL_LIMIT, POOL_TARGET
@@ -38,6 +39,7 @@ from tools.evaluation import (
 )
 
 pytestmark = pytest.mark.integration
+UK_INDEX = next(dataset for dataset in DATASETS if dataset.name == "soc_index")
 
 
 @pytest.fixture(scope="module")
@@ -49,6 +51,10 @@ def full_release(infra: Infra) -> Iterator[sa.Engine]:
     owner = migrator_engine(infra, database)
     migrate_app(owner)
     assert import_taxonomy(owner, release) == "imported"
+    # The pinned UK job-title index: a title the index lists is a suggestion beside the slate
+    # (ADR 0015 decision 2), and every title's record says whether it lists it.
+    index = Path(DATASETS_DIR) / UK_INDEX.pin.file_name
+    assert import_reference_data(owner, [(UK_INDEX, index)]) == {"soc_index": "imported"}
     yield owner
     owner.dispose()
 
@@ -120,12 +126,19 @@ def test_every_evaluation_case_s_slate_is_the_one_before_targets_were_stored_onc
     full_release: sa.Engine,
 ) -> None:
     # Task 6d slice A: the notes became facts and each target is read from its stored
-    # record; the slate's ranking, rules and thresholds don't change (R11).
+    # record; the slate's ranking, rules and thresholds don't change (R11). Slice B adds a
+    # case (DSC-20, title ideas beside the slate); every case recorded before is compared.
+    before = json.loads(SLATES_BEFORE.read_text(encoding="utf-8"))
     cases = [case for case in load_cases() if case.kind is CaseKind.DISCOVERY]
+    assert set(before) <= {case.id for case in cases}
     with system_transaction(full_release) as tx:
-        now = {case.id: slate_shape(observe_discovery_offline(tx, case)) for case in cases}
+        now = {
+            case.id: slate_shape(observe_discovery_offline(tx, case))
+            for case in cases
+            if case.id in before
+        }
 
-    assert now == json.loads(SLATES_BEFORE.read_text(encoding="utf-8"))
+    assert now == before
 
 
 @pytest.mark.req("PROF-10")

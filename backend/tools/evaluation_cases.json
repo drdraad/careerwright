@@ -657,6 +657,29 @@
       "note": "Task W2 slice W2B fix round 3 (re-review 2, N-I2; provisional thresholds: more than 50 occupations, or more than 5 different skills none named exactly by its words). \"Writing reports\" is part of 217 occupations through 17 skills; alone it offered an emergency ambulance driver, a chiropractor and a city councillor. \"Caring for children\" reaches 16; \"writing reports\" also reaches one of them, the nursery school head teacher, past its own best 127, and only adds weight there, so it comes first with both answers."
     },
     {
+      "id": "DSC-20",
+      "kind": "discovery",
+      "title": "A title idea the UK job-title index lists is a suggestion in its own list; one no list holds is not yet found and never suggested",
+      "requirements": ["DIV1-04", "TEST1-15", "REC1-06"],
+      "synthetic": true,
+      "profile": {"enjoyed_tasks": ["writing prompts for AI tools", "analysing data"]},
+      "discovery_output": {
+        "queries": [{"text": "analyse data", "channel": "tasks", "based_on": ["analysing data"]}],
+        "hypotheses": [
+          {"title": "data analyst", "based_on": ["analysing data"]},
+          {"title": "Prompt engineer", "based_on": ["writing prompts for AI tools"]},
+          {"title": "Orbital gardener", "based_on": ["writing prompts for AI tools"]}
+        ]
+      },
+      "expect": [
+        {"check": "grounded"},
+        {"check": "distinct"},
+        {"check": "unsupported_not_suggested"},
+        {"check": "title_idea_reasons", "value": {"data analyst": "in_esco", "Prompt engineer": "in_uk_title_index", "Orbital gardener": "not_yet_found"}}
+      ],
+      "note": "Task 6d slice B (spec DIV-1; ADR 0015 decision 2): the unsupported-title rejection passes a title the pinned ONS coding index lists. \"Prompt engineer\" is no ESCO title and the index lists it (SOC 2134, ISCO-08 2512), so it is a suggestion in the list beside the slate; \"Orbital gardener\" is in neither, so it is shown as not yet found and never suggested; \"data analyst\" is ESCO's and joins the slate's pool as before."
+    },
+    {
       "id": "EXP-01",
       "kind": "explanation",
       "title": "P02: each suggestion's written why quotes P02's answers and ESCO's record, and nothing else",

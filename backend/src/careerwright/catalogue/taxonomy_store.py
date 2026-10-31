@@ -21,6 +21,7 @@ from careerwright.catalogue.esco import (
 )
 from careerwright.catalogue.esco import label_rows as esco_label_rows
 from careerwright.catalogue.records import (
+    GroupOccupation,
     IscoGroupRef,
     LabelMatch,
     OccupationDetail,
@@ -402,6 +403,32 @@ def preferred_keys(tx: Tx, uris: Iterable[str]) -> dict[str, str]:
         {"uris": sorted(set(uris))},
     )
     return {row.esco_uri: row.key for row in rows}
+
+
+def isco_labels(tx: Tx, codes: Iterable[str]) -> dict[str, str]:
+    """The held release's names for these ISCO-08 groups, by code (unknown codes are absent)."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT code, label FROM careerwright.isco_groups "
+            "WHERE code = ANY(CAST(:codes AS text[]))"
+        ),
+        {"codes": sorted(set(codes))},
+    )
+    return {row.code: row.label for row in rows}
+
+
+def occupations_in_groups(tx: Tx, isco_codes: Iterable[str]) -> list[GroupOccupation]:
+    """Every occupation of the held release in these ISCO-08 unit groups, by group, then by
+    ESCO title."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT concept_id, esco_uri, preferred_label, isco_code "
+            "FROM careerwright.occupation_concepts WHERE isco_code = ANY(CAST(:codes AS text[])) "
+            "ORDER BY isco_code, preferred_label, concept_id"
+        ),
+        {"codes": sorted(set(isco_codes))},
+    ).mappings()
+    return [GroupOccupation(**dict(row)) for row in rows]
 
 
 def concept_key_matches(tx: Tx, title: str) -> list[LabelMatch]:

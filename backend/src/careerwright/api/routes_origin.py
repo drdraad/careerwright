@@ -1,7 +1,8 @@
-"""The world's first moments (plan section 4; Sprint W SW.5): answer the first question with
-an ESCO occupation, read the origin (the role, the skills it usually needs, the first
-destinations and the unexpected connection), and ask for, read and decide a turn's
-overlooked strength. Every write takes an expected version and an Idempotency-Key."""
+"""The world's first moments (plan section 4; Sprint W SW.5; S2.8): answer the first question
+with an ESCO occupation, a UK job title or the person's own words, and "Which of these is
+closest?"; read the origin (the role, the skills it usually needs, the first destinations and
+the unexpected connection); and ask for, read and decide a turn's overlooked strength. Every
+write takes an expected version and an Idempotency-Key."""
 
 import uuid
 
@@ -33,7 +34,16 @@ from careerwright.capability.strengths import (
 from careerwright.db import Tx, actor_transaction
 from careerwright.identity.keyring import Keyring
 from careerwright.identity.receipts import CommandResult, fingerprint, run_idempotent
-from careerwright.profile.exploration import ChooseRole, choose_role, first_slate, hard_filters
+from careerwright.profile.exploration import (
+    ChooseClosest,
+    ChooseRole,
+    NameRole,
+    choose_closest,
+    choose_role,
+    first_slate,
+    hard_filters,
+    name_role,
+)
 from careerwright.vocabulary import WorkState
 
 router = APIRouter(
@@ -82,6 +92,83 @@ def post_role(
         key,
         "choose_role",
         fingerprint("choose_role", request),
+        execute,
+    )
+    return JSONResponse(response, status_code=status)
+
+
+@router.post(
+    "/origin/role/title",
+    response_model=ProfileOut,
+    status_code=201,
+    responses={200: {"model": ProfileOut, "description": "Already the role; nothing changed."}},
+    operation_id="name_role",
+)
+def post_role_title(
+    workspace_id: uuid.UUID,
+    body: NameRole,
+    caller: CallerDep,
+    deps: Deps,
+    key: IdempotencyKey,
+) -> JSONResponse:
+    """The first answer in the person's own words: a UK job title picked from the type-ahead,
+    or anything typed ("Use my own words"), saved exactly as given as their current role
+    through the one profile write path. Nothing is refused; no model is called."""
+
+    def execute(tx: Tx) -> CommandResult:
+        view, changed = name_role(
+            tx, caller.actor, workspace_id, body, deps.clock(), deps.pack_targets
+        )
+        return CommandResult(
+            201 if changed else 200, ProfileOut.of(view).model_dump(mode="json"), workspace_id
+        )
+
+    request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
+    status, response = run_idempotent(
+        deps.engine,
+        caller.actor.actor_id,
+        key,
+        "name_role",
+        fingerprint("name_role", request),
+        execute,
+    )
+    return JSONResponse(response, status_code=status)
+
+
+@router.post(
+    "/origin/role/closest",
+    response_model=ProfileOut,
+    status_code=201,
+    responses={200: {"model": ProfileOut, "description": "Already the answer; nothing changed."}},
+    operation_id="choose_closest",
+)
+def post_role_closest(
+    workspace_id: uuid.UUID,
+    body: ChooseClosest,
+    caller: CallerDep,
+    deps: Deps,
+    key: IdempotencyKey,
+) -> JSONResponse:
+    """The answer to "Which of these is closest?" (the origin's `role.closest`): one of the
+    ESCO occupations offered, which becomes the role's occupation with the person's words
+    kept, or null, "None of these is my job", which leaves the role with no ESCO occupation
+    and asks for no other."""
+
+    def execute(tx: Tx) -> CommandResult:
+        view, changed = choose_closest(
+            tx, caller.actor, workspace_id, body, deps.clock(), deps.pack_targets
+        )
+        return CommandResult(
+            201 if changed else 200, ProfileOut.of(view).model_dump(mode="json"), workspace_id
+        )
+
+    request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
+    status, response = run_idempotent(
+        deps.engine,
+        caller.actor.actor_id,
+        key,
+        "choose_closest",
+        fingerprint("choose_closest", request),
         execute,
     )
     return JSONResponse(response, status_code=status)

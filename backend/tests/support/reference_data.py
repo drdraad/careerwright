@@ -173,10 +173,15 @@ def ashe_package() -> bytes:
 # --- the SOC 2020 coding index -----------------------------------------------------------
 
 UNIT_GROUPS = [
+    ("2134", "Programmers and software development professionals"),
     ("2135", "IT business analysts, architects and systems designers"),
+    ("2235", "Registered mental health nurses"),
+    ("2237", "Other registered nursing professionals"),
+    ("3132", "IT user support technicians"),
     ("3544", "Data analysts"),
     ("4122", "Book-keepers, payroll managers and wages clerks"),
     ("5231", "Vehicle technicians, mechanics and electricians"),
+    ("6131", "Nursing auxiliaries and assistants"),
 ]
 INDEX_ENTRIES = [  # (natural-word-order title, SOC 2020, ISCO-08): synthetic links
     ("Data analyst", "3544", "2511"),
@@ -186,6 +191,20 @@ INDEX_ENTRIES = [  # (natural-word-order title, SOC 2020, ISCO-08): synthetic li
     ("Accounts clerk", "4122", "3313"),
     ("Cycle mechanic", "5231", "7234"),
     ("Data analyst (see notes)", "}}}}", "}}}}"),
+    # The role space's titles (Task 6d slice B), each no ESCO title in the sample. As in the
+    # real index, "Registered nurse" has two entries (two SOC groups, one ISCO group) and
+    # "Nurse" is coded to more than one ISCO group; the links to 5322 (the sample's home care
+    # aide) stand in for the real 5321, which the ESCO sample lacks. "Data quality analyst"
+    # keeps the real 2421, a group the sample holds no occupation in; "IT support technician"
+    # is an ESCO title too (the help desk agent's), so the type-ahead offers it as ESCO's.
+    ("Registered nurse", "2235", "2221"),
+    ("Registered nurse", "2237", "2221"),
+    ("Nurse", "2237", "2221"),
+    ("Nurse", "6131", "5322"),
+    ("Prompt engineer", "2134", "2512"),
+    ("Doula", "6131", "5322"),
+    ("Data quality analyst", "3544", "2421"),
+    ("IT support technician", "3132", "3512"),
 ]
 YORKSHIRE = "E12000003"
 _INDEX_HEADER = [

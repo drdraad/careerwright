@@ -29,6 +29,9 @@ class ResolvedTitle:
     # is ambiguous: each is kept, none is picked); empty when it is not an ESCO title.
     occupations: tuple[uuid.UUID, ...]
     chosen: bool
+    # The person said none of the ESCO occupations offered as closest is their job (its
+    # record's `none_of_these`): it names none, and nothing asks them to pick another.
+    declined: bool = False
 
 
 def _labelled(tx: Tx, text: str) -> tuple[uuid.UUID, ...]:
@@ -38,7 +41,9 @@ def _labelled(tx: Tx, text: str) -> tuple[uuid.UUID, ...]:
 def current_role(
     tx: Tx, workspace_id: uuid.UUID, document: ProfileDocument
 ) -> ResolvedTitle | None:
-    """The role the person gave, or None when they have not given one."""
+    """The role the person gave, or None when they have not given one. "None of these is my
+    job" is read from its title's stored record (`careerwright.profile.targets`); the
+    occupation it names comes from the field's own source, as before."""
     field = document.current_role
     if field.state is not FieldState.PROVIDED or field.value is None:
         return None
@@ -47,8 +52,12 @@ def current_role(
         concept = taxonomy_store.concepts_by_uri(tx, [found.locator]).get(found.locator)
         if concept is not None:
             return ResolvedTitle(field.value, ProfileField.CURRENT_ROLE, (concept,), chosen=True)
+    key = taxonomy_store.concept_keys(tx, [field.value])[field.value]
+    record = store.target_records(tx, workspace_id, [key]).get(key)
+    declined = record is not None and record.link is TargetLink.NONE_OF_THESE
+    occupations = () if declined else _labelled(tx, field.value)
     return ResolvedTitle(
-        field.value, ProfileField.CURRENT_ROLE, _labelled(tx, field.value), chosen=False
+        field.value, ProfileField.CURRENT_ROLE, occupations, chosen=False, declined=declined
     )
 
 
@@ -64,7 +73,14 @@ def targets(tx: Tx, records: list[TargetRecord]) -> list[ResolvedTitle]:
         named = (record.esco_occupation,) if record.esco_occupation else record.label_matches
         occupations = tuple(sorted(held[uri] for uri in named if uri in held))
         chosen = record.link is TargetLink.OCCUPATION_CHOICE
+        declined = record.link is TargetLink.NONE_OF_THESE
         resolved.append(
-            ResolvedTitle(record.title, ProfileField.TARGET_TITLES, occupations, chosen)
+            ResolvedTitle(
+                record.title,
+                ProfileField.TARGET_TITLES,
+                () if declined else occupations,
+                chosen,
+                declined,
+            )
         )
     return resolved

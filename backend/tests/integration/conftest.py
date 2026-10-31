@@ -33,15 +33,16 @@ def infra(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Infra]:
             migrate_app(engine)
             migrate_dbos(settings)
             # The committed, labelled sample: the full release is imported in its own
-            # database by `test_taxonomy.py::test_the_full_pinned_release_imports_...`. Before
-            # the seed, as setup does: the fixture's target is stored with what it names.
+            # database by `test_taxonomy.py::test_the_full_pinned_release_imports_...`.
             import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE)
-            seed(engine, settings)
             # Synthetic reference samples (ADR 0010); the pinned files are imported in their
             # own database by `test_reference_data.py`.
             import_reference_data(
                 engine, sample_files(Path(tmp_path_factory.mktemp("reference-samples")))
             )
+            # After both, as setup does: the fixture's target is stored with what it names in
+            # ESCO and the UK job-title index.
+            seed(engine, settings)
         finally:
             engine.dispose()
         # firebase-admin reads this variable at call time (validated by ApiSettings).

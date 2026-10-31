@@ -5,13 +5,14 @@ sketch, the strength, Skills and the world, and the record says how far Careerwr
 cover the target."""
 
 import uuid
+from pathlib import Path
 from typing import Any
 
 import pytest
 
 from careerwright.capability.commands import committed_data, pack_targets
 from careerwright.catalogue.esco import concept_id
-from careerwright.cli import import_taxonomy, migrate_app, reset_demo, seed
+from careerwright.cli import import_reference_data, import_taxonomy, migrate_app, reset_demo, seed
 from careerwright.db import system_transaction
 from careerwright.profile import store, titles
 from careerwright.profile.targets import stored_targets
@@ -19,6 +20,7 @@ from careerwright.seed import FIXTURE_WORKSPACE_ID
 from tests.support.client import ApiClient, profile_with
 from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
 from tests.support.infra import Infra, migrator_engine
+from tests.support.reference_data import sample_files
 
 pytestmark = pytest.mark.integration
 
@@ -166,8 +168,10 @@ def test_a_chosen_occupation_is_stored_with_the_choice_and_the_pack_target_it_co
         "not_covered",
     )
     sketch = get(api, ada, f"/v1/workspaces/{typed}/sketch")["targets"]
+    # Task 6d slice B: the UK job-title index lists "Registered nurse" (as the synthetic sample
+    # does, like the real index), so the sketch says Careerwright found it there.
     assert [(t["resolution"], t["coverage"]) for t in sketch] == [
-        ("not_found", "pack_target"),
+        ("uk_title", "pack_target"),
         ("not_found", "not_covered"),
     ]
     # Another person's targets are not found, never an empty list.
@@ -197,8 +201,11 @@ def test_each_pack_title_esco_doesn_t_name_is_covered_even_with_a_qualifier_in_b
         title: ("pack_crosswalk", "pack_target", target) for title, target in covered.items()
     }
     sketch = get(api, ada, f"/v1/workspaces/{workspace}/sketch")["targets"]
+    # Task 6d slice B: the UK job-title index lists "Data quality analyst" (as the synthetic
+    # sample does, like the real index); the other two are in neither list.
+    listed = {"Data quality analyst"}
     assert [(t["title"], t["resolution"], t["coverage"]) for t in sketch] == [
-        (title, "not_found", "pack_target") for title in covered
+        (title, "uk_title" if title in listed else "not_found", "pack_target") for title in covered
     ]
     matrices = get(api, ada, f"/v1/workspaces/{workspace}/capability/matrices")["matrices"]
     assert {
@@ -300,7 +307,9 @@ def test_every_write_path_stores_a_record_for_each_target_it_saves(
 
 
 @pytest.mark.req("PROF-10")
-def test_the_seed_and_the_demo_reset_store_the_fixture_s_target_records(infra: Infra) -> None:
+def test_the_seed_and_the_demo_reset_store_the_fixture_s_target_records(
+    infra: Infra, tmp_path: Path
+) -> None:
     database = f"careerwright_seeded_targets_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     engine = migrator_engine(infra, database)
@@ -308,6 +317,7 @@ def test_the_seed_and_the_demo_reset_store_the_fixture_s_target_records(infra: I
     try:
         migrate_app(engine)
         assert import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE) == "imported"
+        import_reference_data(engine, sample_files(tmp_path))  # the UK job-title index
         seed(engine, settings)
         seeded = unrecorded(infra, FIXTURE_WORKSPACE_ID, database)
         reset_demo(engine, settings)

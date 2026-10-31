@@ -14,7 +14,7 @@ import re
 import uuid
 from dataclasses import dataclass
 
-from careerwright.catalogue import taxonomy_store
+from careerwright.catalogue import taxonomy_store, uk_titles
 from careerwright.catalogue.esco import TRANSFORMATION_VERSION, EscoCatalogue, normalise_label
 from careerwright.catalogue.records import (
     LabelMatch,
@@ -23,6 +23,7 @@ from careerwright.catalogue.records import (
     SkillReach,
     TaxonomyRelease,
     TitleMatch,
+    UkTitle,
 )
 from careerwright.catalogue.releases import ReleasePin
 from careerwright.db import Tx
@@ -175,24 +176,45 @@ _WORD = re.compile(r"[^\W_]+")
 class TitleMatches:
     release: TaxonomyRelease
     query: str
-    matches: list[TitleMatch]
-    total: int  # every occupation that matches, of which `matches` are the best
+    # ESCO's occupations (`TitleMatch`) and the UK job-title index's titles (`UkTitle`), best
+    # first: a title that is what was typed, then one beginning with it, then the rest, and
+    # within each, ESCO's before the index's (ESCO first on ties), each list in its own order.
+    options: list[TitleMatch | UkTitle]
+    total: int  # every ESCO occupation that matches
+    uk_total: int  # every title of the UK job-title index that matches
     limit: int
-    # No ESCO title holds every word typed: `matches` hold the most of them, for the person
-    # to choose from ("Careerwright couldn't match that title in ESCO. Is it one of these?":
-    # "and" and accents are typed words too, so ESCO may write the title another way); none is
-    # chosen.
+    # Neither list holds a title with every word typed: `options` are the ESCO occupations
+    # whose titles hold the most of them, for the person to choose from ("Careerwright couldn't
+    # match that title in ESCO. Is it one of these?": "and" and accents are typed words too, so
+    # ESCO may write the title another way); none is chosen.
     partial: bool = False
+
+
+def _tier(normalised: str, typed: str) -> int:
+    return 0 if normalised == typed else 1 if normalised.startswith(typed) else 2
+
+
+def _ordered(
+    esco: list[TitleMatch], uk: list[UkTitle], typed: str, limit: int
+) -> list[TitleMatch | UkTitle]:
+    ranked: list[tuple[int, int, int, TitleMatch | UkTitle]] = [
+        (_tier(normalise_label(m.label), typed), 0, n, m) for n, m in enumerate(esco)
+    ]
+    ranked += [(_tier(t.normalised, typed), 1, n, t) for n, t in enumerate(uk)]
+    return [option for *_, option in sorted(ranked, key=lambda r: r[:3])][:limit]
 
 
 def match_titles(tx: Tx, typed: str, limit: int) -> TitleMatches:
     """The type-ahead for "What do you do now, or what did you do last?": occupations whose
-    preferred or alternative labels have a word beginning with each word typed, best first.
-    When no title holds every word (of two to `PARTIAL_MAX_WORDS`), the occupations whose
-    titles hold the most of them, status words (`STATUS_WORDS`) not counted, marked
-    `partial`: the person may choose one, and nothing is joined by its words. Deterministic
-    and offline (no model, no key). Nothing matching is an honest empty answer, never an
-    invented match; a query with no letter or digit is refused."""
+    preferred or alternative labels have a word beginning with each word typed, and the titles
+    of the UK job-title index that do (ADR 0015: ONS's SOC 2020 coding index, other than the
+    titles ESCO itself offers), best first, ESCO first on ties. When neither holds every word
+    (of two to `PARTIAL_MAX_WORDS`), the occupations whose titles hold the most of them,
+    status words (`STATUS_WORDS`) not counted, marked `partial`: the person may choose one,
+    and nothing is joined by its words. Deterministic and offline (no model, no key). Nothing
+    matching is an honest empty answer, never an invented match; a query with no letter or
+    digit is refused. The person's own words are always theirs to keep: that is the caller's
+    to offer, never this search's to refuse."""
     release = held_release(tx)
     text = " ".join(typed.split())
     words = list(dict.fromkeys(_WORD.findall(text.casefold())))
@@ -210,12 +232,15 @@ def match_titles(tx: Tx, typed: str, limit: int) -> TitleMatches:
             stage=ErrorStage.CATALOGUE,
             details={"field": "q", "reason": "no_search_terms"},
         )
-    matches, total = taxonomy_store.title_matches(tx, words, normalise_label(text), limit)
+    typed_key = normalise_label(text)
+    matches, total = taxonomy_store.title_matches(tx, words, typed_key, limit)
+    uk, uk_total = uk_titles.matching(tx, words, text, limit)
     counted = [word for word in words if word not in STATUS_WORDS]
-    if matches or not 2 <= len(words) <= PARTIAL_MAX_WORDS or not counted:
-        return TitleMatches(release, text, matches, total, limit)
+    if matches or uk or not 2 <= len(words) <= PARTIAL_MAX_WORDS or not counted:
+        options = _ordered(matches, uk, typed_key, limit)
+        return TitleMatches(release, text, options, total, uk_total, limit)
     matches, total = taxonomy_store.partial_title_matches(tx, counted, limit)
-    return TitleMatches(release, text, matches, total, limit, partial=bool(matches))
+    return TitleMatches(release, text, list(matches), total, 0, limit, partial=bool(matches))
 
 
 def occupation_detail(tx: Tx, concept_id: uuid.UUID) -> OccupationDetail:

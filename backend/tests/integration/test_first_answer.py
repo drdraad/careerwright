@@ -19,7 +19,8 @@ from fastapi.testclient import TestClient
 from careerwright.api.app import create_app
 from careerwright.api.deps import ApiDependencies
 from careerwright.catalogue.esco import ESCO_RELEASE
-from careerwright.cli import import_taxonomy, migrate_app, seed
+from careerwright.catalogue.reference import DATASETS
+from careerwright.cli import import_reference_data, import_taxonomy, migrate_app, seed
 from careerwright.db import create_engine
 from careerwright.identity.firebase import FirebaseTokenVerifier
 from careerwright.identity.keyring import load_keyring
@@ -31,6 +32,7 @@ from tools.datasets import DATASETS_DIR
 pytestmark = pytest.mark.integration
 
 BUDGET_S = 1.0  # plan section 4: the first answer changes the world within one second
+UK_INDEX = next(dataset for dataset in DATASETS if dataset.name == "soc_index")
 
 
 @pytest.fixture(scope="module")
@@ -41,8 +43,13 @@ def full_api(infra: Infra) -> Iterator[ApiClient]:
     infra.create_database(database)
     owner = migrator_engine(infra, database)
     migrate_app(owner)
-    seed(owner, infra.ops_settings(database))
     assert import_taxonomy(owner, release) == "imported"
+    # The pinned UK job-title index (ONS's SOC 2020 coding index), then the seed, as setup
+    # does: the type-ahead offers its titles, and every title's record says whether it lists
+    # it.
+    index = Path(DATASETS_DIR) / UK_INDEX.pin.file_name
+    assert import_reference_data(owner, [(UK_INDEX, index)]) == {"soc_index": "imported"}
+    seed(owner, infra.ops_settings(database))
     settings = infra.api_settings(database)
     engine = create_engine(settings.app_database, application_name="test-first-answer")
     deps = ApiDependencies(
@@ -174,24 +181,27 @@ def test_a_title_esco_does_not_list_offers_the_titles_holding_most_of_its_words(
         found = full_api.get("/v1/taxonomy/titles", ada, q=typed, limit=20)
         assert found.status_code == 200, found.text
         body = found.json()
-        assert len(body["matches"]) <= body["total"]
+        assert len(body["matches"]) <= body["total"] + body["uk_total"]
         return body["partial"], [m["title"] for m in body["matches"]]
 
-    p01 = offered("Data quality analyst")
-    p04 = offered("Registered nurse")
     p05 = offered("Bookkeeping assistant")
+    # Neither list holds "NHS" in any title, so only "nurse" is counted, as P04's "Registered
+    # nurse" was before the UK job-title index (Task 6d slice B) listed it.
+    nhs = offered("Registered nurse (NHS)")
     whole, nothing = offered("data analyst"), offered("zqxj wvuy")
     # The widest fallback: nearly every label holds one of these words, none holds them all.
     widest, widest_s = timed(lambda: offered("a b c d e f g h"))
     longer = offered("a b c d e f g h i")  # more words than any fallback compares
 
     print(f"type-ahead with no title holding every word: widest {widest_s:.3f} s")
-    print(f"P01 {p01}\nP04 {p04}\nP05 {p05}")
+    print(f"P05 {p05}\nRegistered nurse (NHS) {nhs}")
     assert widest_s < BUDGET_S
     assert widest[0] is True
     assert longer == (False, [])
-    assert (p01[0], p04[0], p05[0]) == (True, True, True)
-    assert {"data quality specialist", "data analyst"} <= set(p01[1])
+    # Task 6d slice B: P01's and P04's own titles are UK job titles the index lists, so they
+    # are offered as such (`test_the_acceptance_titles_are_uk_job_titles_...`); only a title
+    # neither list holds asks about ESCO's closest titles.
+    assert (p05[0], nhs[0]) == (True, True)
     # Task W2B fix round 2 (re-review M-B): "registered" says a role's standing, not its work,
     # so it isn't counted, and a title holding "nurse" whole comes before one that only
     # begins with it ("nursery"): the five nurses first, never a registered sales assistant.
@@ -202,12 +212,77 @@ def test_a_title_esco_does_not_list_offers_the_titles_holding_most_of_its_words(
         "advanced nurse practitioner",
         "nurse responsible for general care",
     }
-    assert set(p04[1][:5]) == nurses
-    assert "sales support assistant" not in p04[1]
-    p04_labels = full_api.get("/v1/taxonomy/titles", ada, q="Registered nurse", limit=20).json()
-    held = [bool(re.search(r"\bnurse\b", m["matched_label"])) for m in p04_labels["matches"]]
+    assert set(nhs[1][:5]) == nurses
+    assert "sales support assistant" not in nhs[1]
+    labels = full_api.get("/v1/taxonomy/titles", ada, q="Registered nurse (NHS)", limit=20).json()
+    held = [bool(re.search(r"\bnurse\b", m["matched_label"])) for m in labels["matches"]]
     assert held == sorted(held, reverse=True)  # every whole "nurse" before any "nursery"
     assert not all(held)
     assert p05[1][0] == "bookkeeper"  # "bookkeeping" is a rarer word than "assistant"
     assert (whole[0], whole[1][0]) == (False, "data analyst")  # every word: not partial
     assert nothing == (False, [])  # no word of any title: an honest empty answer
+
+
+# The role-space appendix's offline test (Task 6d slice B, acceptance 1 and 2): each title is
+# in the pinned UK job-title index and no ESCO title, with the ISCO-08 groups ONS codes it to.
+UK_TITLES = {
+    "Registered nurse": ["2221"],
+    "Data quality analyst": ["2421"],
+    "Prompt engineer": ["2512"],
+    "Doula": ["5321"],
+}
+
+
+@pytest.mark.req("DIV1-13", "DIV1-14")
+def test_the_acceptance_titles_are_uk_job_titles_and_the_world_answers_within_a_second(
+    full_api: ApiClient, ada: str
+) -> None:
+    for title, groups in UK_TITLES.items():
+        typed, typed_s = timed(
+            lambda title=title: full_api.get("/v1/taxonomy/titles", ada, q=title)
+        )
+        assert typed.status_code == 200, typed.text
+        matches = typed.json()["matches"]
+        # What was typed comes first ("Registered children's nurse" holds the words too).
+        assert (matches[0]["source"], matches[0]["title"]) == ("uk_title_index", title)
+        assert [g["code"] for g in matches[0]["isco_groups"]] == groups
+
+        workspace = full_api.create_workspace(ada, f"{title} (synthetic)")["workspace_id"]
+        named, name_s = timed(
+            lambda workspace=workspace, title=title: full_api.write(
+                "POST",
+                f"/v1/workspaces/{workspace}/origin/role/title",
+                ada,
+                {"expected_version": 0, "title": title},
+            )
+        )
+        shown, origin_s = timed(
+            lambda workspace=workspace: full_api.get(f"/v1/workspaces/{workspace}/origin", ada)
+        )
+        print(f"{title}: type-ahead {typed_s:.3f} s, saved {name_s:.3f} s, origin {origin_s:.3f} s")
+        assert named.status_code == 201, named.text
+        assert shown.status_code == 200, shown.text
+        role = shown.json()["role"]
+        assert (role["text"], role["kind"], role["state"]) == (title, "ons", "not_in_esco")
+        closest = role["closest"]
+        assert closest["decision"] == "not_yet"
+        assert [g["group"]["code"] for g in closest["groups"]] == groups
+        assert all(g["occupations"] and g["group"]["label"] for g in closest["groups"])
+        assert typed_s < BUDGET_S
+        assert name_s + origin_s < BUDGET_S
+
+    # Acceptance 3: a title neither list holds is kept in the person's own words.
+    workspace = full_api.create_workspace(ada, "Own words (synthetic)")["workspace_id"]
+    own = full_api.write(
+        "POST",
+        f"/v1/workspaces/{workspace}/origin/role/title",
+        ada,
+        {"expected_version": 0, "title": "Bookkeeping assistant"},
+    )
+    role = full_api.get(f"/v1/workspaces/{workspace}/origin", ada).json()["role"]
+    assert own.status_code == 201, own.text
+    assert (role["text"], role["kind"], role["closest"]) == (
+        "Bookkeeping assistant",
+        "own_words",
+        None,
+    )

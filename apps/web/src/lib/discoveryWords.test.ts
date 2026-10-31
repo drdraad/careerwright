@@ -8,17 +8,26 @@ import type {
   SalaryFloorOut,
   SlateOut,
   SuggestionOut,
+  TitleIdea,
+  TitleIdeaReason,
 } from "@/generated/api";
 import {
   aiFilterWords,
+  CLOSEST,
+  FIRST_ANSWER,
+  FIRST_QUESTION,
   fewerReason,
   floorWords,
   RESEARCH_STATUS,
+  RESOLUTION,
+  ROLE_KEPT,
   slateNote,
   suggestionReason,
   suggestionWords,
   TARGET_COVERAGE,
+  titleIdeasListed,
   titleIdeasWords,
+  UK_TITLE_IDEAS,
 } from "./vocabulary";
 
 type Note = SlateOut["notes"][number];
@@ -197,6 +206,12 @@ describe("[DIV1-06][DIV1-03] why there are fewer than six, in words", () => {
       { reason: "title_not_matched", outcome: "not_matched", title: "Registered nurse" },
       "Careerwright couldn't match “Registered nurse” to an occupation in ESCO, so it can't join other work to that title by shared skills. Choose the ESCO occupation closest to it.",
     ],
+    // Task 6d slice B: "None of these is my job". What isn't known yet; it asks for no other.
+    [
+      "a title kept in the person's words",
+      { reason: "title_kept_as_own", outcome: "not_matched", title: "Registered nurse" },
+      "Careerwright keeps “Registered nurse” in your words and joins no other work to it by shared skills, because you said none of the ESCO occupations it offered is your job.",
+    ],
     [
       "a title matched to several",
       {
@@ -350,19 +365,93 @@ describe("[DIV1-07][AIR1-05] the hard filters and the title ideas, in words", ()
     );
   });
 
-  it("names the title ideas it couldn't match, and none it matched", () => {
-    const idea = (title: string, outcome: SlateOut["title_ideas"][number]["outcome"]) => ({
-      title,
-      based_on: [],
-      outcome,
-      occupations: outcome === "matched" ? 1 : 0,
-    });
-    expect(titleIdeasWords([idea("dog groomer", "matched")])).toBeNull();
+  // Task 6d slice B: what Careerwright did with each idea, by its reason, never by branching
+  // on what matching in ESCO did. Changed: it now looks in the UK job-title index too, so an
+  // idea no list holds is "not yet found" there as well (the card's last bullet).
+  const idea = (title: string, reason: TitleIdeaReason): TitleIdea => ({
+    title,
+    based_on: [],
+    reason,
+    outcome: reason === "in_esco" ? "matched" : "not_matched",
+    occupations: reason === "in_esco" ? 1 : 0,
+  });
+
+  it("names the title ideas no list holds as not yet found, and none ESCO or the index holds", () => {
     expect(
-      titleIdeasWords([idea("orbital gardener", "not_matched"), idea("dog groomer", "matched")]),
+      titleIdeasWords([
+        idea("dog groomer", "in_esco"),
+        idea("Prompt engineer", "in_uk_title_index"),
+      ]),
+    ).toBeNull();
+    expect(
+      titleIdeasWords([idea("orbital gardener", "not_yet_found"), idea("dog groomer", "in_esco")]),
     ).toBe(
-      "Titles Careerwright thought of but couldn't match to an occupation in ESCO, so not suggested: orbital gardener.",
+      "Titles Careerwright thought of but hasn't found in ESCO or the UK job-title index yet, so not suggested: orbital gardener.",
     );
+  });
+
+  it("lists only the ideas the UK job-title index lists, beside the slate", () => {
+    const ideas = [
+      idea("dog groomer", "in_esco"),
+      idea("Prompt engineer", "in_uk_title_index"),
+      idea("orbital gardener", "not_yet_found"),
+      idea("workshop technician", "not_searched"),
+    ];
+    expect(titleIdeasListed(ideas).map((i) => i.title)).toEqual(["Prompt engineer"]);
+    expect(UK_TITLE_IDEAS).toEqual({
+      heading: "Title ideas found in the UK job-title index",
+      found: "Found in the UK job-title index (ONS). Not compared with your experience yet.",
+      from: "Careerwright thought of it from",
+    });
+  });
+});
+
+describe("[DIV1-13][DIV1-14] the first question's words (Task 6d slice B)", () => {
+  it("asks the plan's question and marks a UK job title", () => {
+    expect(FIRST_QUESTION).toBe("What do you do now, or what did you do last?");
+    expect(FIRST_ANSWER.ukTitle).toBe("UK job title (ONS)");
+    expect(FIRST_ANSWER.escoTitle("ICT help desk agent")).toBe("In ESCO as ICT help desk agent");
+    expect(FIRST_ANSWER.nothing).toBe("Careerwright found no job title holding those words.");
+  });
+
+  it("always offers the person's own words, and asks the card's question when only part matched", () => {
+    expect(FIRST_ANSWER.ownWords("Bookkeeping assistant")).toBe(
+      "Use my own words: “Bookkeeping assistant”",
+    );
+    expect(FIRST_ANSWER.partial).toBe(
+      "Careerwright couldn't match that title in ESCO. Is it one of these?",
+    );
+    expect(FIRST_ANSWER.noneOfThese).toBe("None of these is my job");
+  });
+
+  it("asks which ESCO occupation is closest, and says what it looked up", () => {
+    expect(CLOSEST.question).toBe("Which of these is closest?");
+    expect(CLOSEST.found("Registered nurse", 1)).toBe(
+      "Careerwright found “Registered nurse” in the UK job-title index and looked up the ESCO occupations in the group it's in.",
+    );
+    expect(CLOSEST.found("Nurse", 3)).toBe(
+      "Careerwright found “Nurse” in the UK job-title index and looked up the ESCO occupations in the groups it's in.",
+    );
+    expect(CLOSEST.group({ code: "2221", label: "Nursing professionals" })).toBe(
+      "Nursing professionals (ISCO-08 2221)",
+    );
+    expect(CLOSEST.group({ code: "2421", label: null })).toBe("ISCO-08 group 2421");
+    expect(CLOSEST.empty).toBe("Careerwright found no ESCO occupation in this group.");
+    expect(CLOSEST.more(79)).toBe("Show 79 more");
+    expect(CLOSEST.noneOfThese).toBe("None of these is my job");
+  });
+
+  it("says what isn't known yet for a title kept in the person's words, and asks for no other", () => {
+    expect(ROLE_KEPT.esco("data analyst")).toBeNull();
+    expect(ROLE_KEPT.ons("Registered nurse")).toBe(
+      "Careerwright found “Registered nurse” in the UK job-title index and keeps it as your role, in your words. What this work asks for isn't known yet.",
+    );
+    expect(ROLE_KEPT.own_words("Bookkeeping assistant")).toBe(
+      "Careerwright keeps “Bookkeeping assistant” as your role, in your words. It couldn't match it in ESCO or the UK job-title index, so what this work asks for isn't known yet.",
+    );
+    for (const kind of ["ons", "own_words"] as const) {
+      expect(ROLE_KEPT[kind]("Doula")).not.toMatch(/choose|pick|another/i);
+    }
   });
 });
 
@@ -373,10 +462,16 @@ describe("[STATE-05][PROF-10] the sketch's words and a target's coverage", () =>
     );
   });
 
+  it("words a target the UK job-title index lists but ESCO doesn't (Task 6d slice B)", () => {
+    expect(RESOLUTION.uk_title).toBe(
+      "Found in the UK job-title index; Careerwright couldn't match it in ESCO",
+    );
+  });
+
   it("says a title it couldn't match isn't researched only when no pack target covers it", () => {
     const unmatched =
       "Careerwright couldn't match this title to an occupation in ESCO, so there's no requirement list yet. Not researched.";
-    for (const resolution of ["not_found", "provisional"] as const) {
+    for (const resolution of ["not_found", "provisional", "uk_title"] as const) {
       expect(RESEARCH_STATUS[resolution]("not_covered")).toBe(unmatched);
       // Fix round 1 (review I-1): the option pack researched it; its coverage line says what
       // Careerwright can check, so the sketch says nothing more.

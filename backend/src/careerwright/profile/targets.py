@@ -1,26 +1,33 @@
 """Each target is stored once (Task 6d slice A; ADR 0015 decision 3; ADR 0012 and ADR 0007 as
-amended on 2026-10-31; the audit's code appendix, finding F5).
+amended on 2026-10-31; the audit's code appendix, finding F5), and so is the person's current
+or last role when they name it at the first question (Task 6d slice B).
 
 When a target is chosen or saved, `resolve_target` decides once what it names, by one set of
 rules, and the record is stored with it (`target_records`, migration 0034). The slate, the
 sketch, the strength, Skills and the world read that record instead of resolving the title
-again, so they can't disagree about the same target.
+again, so they can't disagree about the same target. One record serves a title as a concept,
+whether it is a target or the role.
 
 The rules, in order. A title is compared as a concept (`careerwright.concept_key`: "&" read as
 "and", accents, case, punctuation, hyphens and simple plurals folded), and nothing is guessed:
-1. the occupation the person chose for it (an `occupation_choice` source, by its ESCO URI),
-   or an earlier choice of the workspace whose ESCO title is the title as a concept;
-2. otherwise the one occupation holding the title as a label (hidden labels included);
+1. the occupation the person chose for it (an `occupation_choice` source, by its ESCO URI):
+   as the target itself, or as the closest to a title of their own (`closest`); or an
+   earlier choice of the workspace whose ESCO title is the title as a concept;
+2. otherwise, once the person said none of the closest occupations is their job, none;
+3. otherwise the one occupation holding the title as a label (hidden labels included);
    several stay several, each kept, none picked: the person chooses which they mean;
-3. otherwise, for a title that is one of the option pack's targets, the occupation its
+4. otherwise, for a title that is one of the option pack's targets, the occupation its
    crosswalk names;
-4. otherwise none yet.
-Its coverage is the option pack's target with the same title, or else the one pack target
-whose crosswalk names its occupation; several such targets are never guessed between. A title
-is a pack target's when it is that title as a concept, or else when it is without its
-qualifiers in brackets: "Registered nurse (adult)" is the pack's "Registered nurse", as Skills
-matched pack titles before targets were stored once. Only the pack's titles are matched so;
-ESCO's labels are matched by the whole title.
+5. otherwise none yet.
+Its words are an ESCO occupation's title (chosen as such), a title the UK job-title index
+lists (exactly, `catalogue.uk_titles`: with every SOC 2020 and ISCO-08 group ONS codes it to),
+or the person's own. Its coverage is the option pack's target with the same title, or else the
+one pack target whose crosswalk names its occupation; several such targets are never guessed
+between. A title is a pack target's when it is that title as a concept, or else when it is
+without its qualifiers in brackets: "Registered nurse (adult)" is the pack's "Registered
+nurse", as Skills matched pack titles before targets were stored once, unless a qualifier
+names another field of the target's registered work (`OTHER_FIELDS`). Only the pack's titles
+are matched so; ESCO's labels are matched by the whole title.
 """
 
 import re
@@ -28,7 +35,8 @@ import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 
-from careerwright.catalogue import taxonomy_store
+from careerwright.catalogue import taxonomy_store, uk_titles
+from careerwright.catalogue.records import UkTitle
 from careerwright.db import Tx
 from careerwright.identity.workspaces import visible_workspace
 from careerwright.profile import store
@@ -46,9 +54,25 @@ from careerwright.profile.records import (
 QUALIFIER = r"\([^)]*\)|\[[^\]]*\]"
 _QUALIFIER = re.compile(QUALIFIER)
 
+# Qualifiers, as concepts, that name another field of a pack target's registered work, by the
+# target's title as a concept: such a title is another registered role, so the bracket rule
+# never takes it to that target. The pack's "Registered nurse" rests on adult nursing evidence,
+# and the Nursing and Midwifery Council registers nurses in four fields: adult, children's,
+# learning disabilities and mental health. A neutral qualifier ("(adult)") still reaches it.
+OTHER_FIELDS: Mapping[str, frozenset[str]] = {
+    "registered nurse": frozenset(
+        {"mental health", "children s", "children", "learning disability"}
+    ),
+}
+
 
 def without_qualifiers(title: str) -> str:
     return _QUALIFIER.sub(" ", title)
+
+
+def qualifiers(title: str) -> list[str]:
+    """The words inside each pair of brackets in the title."""
+    return [match[1:-1] for match in _QUALIFIER.findall(title)]
 
 
 @dataclass(frozen=True)
@@ -83,18 +107,34 @@ def decide(
     labelled: Sequence[str],
     pack: PackTargets,
     pack_keys: Mapping[str, str],
+    qualifiers: Sequence[str] = (),
+    listed: UkTitle | None = None,
+    closest: bool = False,
+    none_of_these: bool = False,
 ) -> TargetRecord:
     """The record for a title (as a concept, `key`; without its qualifiers in brackets,
-    `unqualified`), from what matching it found: the person's choice, the occupations holding
-    it as a label, and the pack's targets (each target's title as a concept, by target ID)."""
+    `unqualified`; each qualifier as a concept, `qualifiers`), from what matching it found:
+    the person's choice (`closest`: chosen as the closest to a title of their own, not as the
+    title itself), whether they said none of the closest is their job, the occupations
+    holding it as a label, the UK job-title index's entry for it, and the pack's targets
+    (each target's title as a concept, by target ID)."""
     matches = tuple(sorted(set(labelled)))
+
+    def reached(target: PackTarget, by_brackets: bool) -> bool:
+        own = pack_keys.get(target.target_id)
+        if not by_brackets:
+            return own == key
+        return own == unqualified and not OTHER_FIELDS.get(own, frozenset()) & set(qualifiers)
+
     titled = next(
-        (t for k in (key, unqualified) for t in pack.targets if pack_keys.get(t.target_id) == k),
+        (t for by in (False, True) for t in pack.targets if reached(t, by)),
         None,
     )
     link, occupation = TargetLink.NONE, None
     if choice is not None:
         link, occupation = TargetLink.OCCUPATION_CHOICE, choice.esco_uri
+    elif none_of_these:
+        link = TargetLink.NONE_OF_THESE
     elif len(matches) == 1:
         link, occupation = TargetLink.EXACT_LABEL, matches[0]
     elif titled is not None and titled.esco_uri is not None:
@@ -109,10 +149,18 @@ def decide(
         basis = "esco_crosswalk"
     elif crosswalked:
         coverage = TargetCoverage.SEVERAL_PACK_TARGETS
+    kind = (
+        TargetKind.ESCO
+        if choice is not None and not closest
+        else TargetKind.ONS
+        if listed is not None
+        else TargetKind.OWN_WORDS
+    )
+    ons = listed if kind is TargetKind.ONS else None
     return TargetRecord(
         title=title,
         key=key,
-        kind=TargetKind.ESCO if choice is not None else TargetKind.OWN_WORDS,
+        kind=kind,
         occupation_uri=occupation,
         link=link,
         label_matches=matches,
@@ -121,19 +169,32 @@ def decide(
         pack_target_basis=basis,
         pack_version=pack.version,
         source_ref_id=choice.source_ref_id if choice is not None else None,
+        soc_codes=ons.soc_codes if ons else (),
+        isco_codes=tuple(g.code for g in ons.isco_groups) if ons else (),
     )
 
 
 def resolve_target(
-    tx: Tx, workspace_id: uuid.UUID, title: str, pack: PackTargets, choice: Choice | None = None
+    tx: Tx,
+    workspace_id: uuid.UUID,
+    title: str,
+    pack: PackTargets,
+    choice: Choice | None = None,
+    *,
+    closest: bool = False,
+    none_of_these: bool = False,
 ) -> TargetRecord:
-    """What a target title names, by the module's rules. Without `choice`, an earlier choice
-    of the workspace whose ESCO title is the title as a concept is the person's choice (the
-    latest such)."""
+    """What a title names, by the module's rules. Without `choice`, an earlier choice of the
+    workspace whose ESCO title is the title as a concept is the person's choice (the latest
+    such). `closest`: `choice` is the occupation the person chose as closest to their own
+    title; `none_of_these`: they said none of those is their job."""
     unqualified = without_qualifiers(title)
-    keys = taxonomy_store.concept_keys(tx, [title, unqualified, *(t.title for t in pack.targets)])
+    brackets = qualifiers(title)
+    keys = taxonomy_store.concept_keys(
+        tx, [title, unqualified, *brackets, *(t.title for t in pack.targets)]
+    )
     key = keys[title]
-    if choice is None:
+    if choice is None and not none_of_these:
         choices = store.occupation_choices(tx, workspace_id)
         preferred = taxonomy_store.preferred_keys(tx, [uri for uri, _ in choices])
         earlier = [Choice(uri, source) for uri, source in choices if preferred.get(uri) == key]
@@ -142,10 +203,14 @@ def resolve_target(
         title,
         key,
         unqualified=keys[unqualified],
+        qualifiers=[keys[b] for b in brackets],
         choice=choice,
         labelled=taxonomy_store.label_match_uris(tx, title),
         pack=pack,
         pack_keys={t.target_id: keys[t.title] for t in pack.targets},
+        listed=uk_titles.listed(tx, [title]).get(title),
+        closest=closest,
+        none_of_these=none_of_these,
     )
 
 
@@ -179,6 +244,15 @@ def record_targets(
         record = resolve_target(tx, workspace_id, title, pack, chosen)
         store.upsert_target_record(tx, workspace_id, record, recorded_by)
         held[record.key] = record
+
+
+def title_record(tx: Tx, workspace_id: uuid.UUID, title: str, pack: PackTargets) -> TargetRecord:
+    """The stored record of one title (the role's, named at the first question), in the
+    person's spelling, or, with none stored, the record `resolve_target` would store; a read
+    stores nothing."""
+    key = taxonomy_store.concept_keys(tx, [title])[title]
+    held = store.target_records(tx, workspace_id, [key]).get(key)
+    return replace(held, title=title) if held else resolve_target(tx, workspace_id, title, pack)
 
 
 def current_targets(

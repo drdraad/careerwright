@@ -9,7 +9,13 @@ from pathlib import Path
 import pytest
 import sqlalchemy as sa
 
-from careerwright.cli import ResealIncompleteError, migrate_app, reseal, seed
+from careerwright.cli import (
+    ResealIncompleteError,
+    import_reference_data,
+    migrate_app,
+    reseal,
+    seed,
+)
 from careerwright.evidence import store as evidence_store
 from careerwright.evidence.acquisition import document_context
 from careerwright.identity import credential_store
@@ -18,6 +24,7 @@ from careerwright.identity.keyring import Keyring, MasterKeyError, SealedValue, 
 from careerwright.identity.runs import input_context, output_context, partial_context
 from careerwright.seed import FIXTURE_OWNER
 from tests.support.infra import Infra, migrator_engine
+from tests.support.reference_data import sample_files
 from tools.localenv import add_master_key_version, ensure_local_home
 
 pytestmark = pytest.mark.integration
@@ -140,6 +147,10 @@ def rotation(infra: Infra, tmp_path: Path) -> tuple[Infra, str, Path]:
     engine = migrator_engine(infra, database)
     try:
         migrate_app(engine)
+        # As setup does: the UK job-title index before the seed decides the fixture's target.
+        samples = tmp_path / "reference"
+        samples.mkdir()
+        import_reference_data(engine, sample_files(samples))
         seed(engine, infra.ops_settings(database))
     finally:
         engine.dispose()

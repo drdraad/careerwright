@@ -15,6 +15,7 @@ import {
   recordRequests,
   saved,
   signIn,
+  skipFirstQuestion,
   youView,
 } from "./helpers";
 import { FIXTURE_WORKSPACE, stack } from "./stack";
@@ -66,7 +67,9 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   await signIn(page, "ada", chapterUrl("you", workspace));
   const banner = page.getByRole("banner");
 
-  // The first task leads: how to start. Exploring asks the opening question first.
+  // The first task leads: how to start (after the first question, skipped here; Task 6d slice
+  // B). Exploring asks the opening question first.
+  await skipFirstQuestion(page);
   await page.getByRole("button", { name: "Help me explore" }).click();
   await expect(
     page.getByRole("heading", {
@@ -194,6 +197,7 @@ test("[STATE-09][STATE-08][BND1-02] the demo takes a target in the person's word
   ).toBeVisible();
   await expect(page.getByText("Careerwright covers England for now.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Send" })).not.toHaveClass(/btn-primary/);
+  await skipFirstQuestion(page);
   await page.getByRole("button", { name: "I know my direction" }).click();
   const opening = "Which role are you aiming for, and at what level?";
   await expect(page.getByRole("heading", { name: opening })).toBeVisible();
@@ -224,6 +228,7 @@ test("[STATE-09] exploring by example replies reaches the role question, whose S
   test.setTimeout(300_000);
   const workspace = await demoWorkspace("Never loops, explore (synthetic)");
   await signIn(page, "ada", chapterUrl("you", workspace));
+  await skipFirstQuestion(page);
   await page.getByRole("button", { name: "Help me explore" }).click();
   await expect(
     page.getByRole("heading", {
@@ -349,6 +354,7 @@ test("[PROF-09] a message with a risk stem is sent as usual, with the support pa
 }) => {
   const workspace = await demoWorkspace("Support (synthetic)");
   await signIn(page, "ada", chapterUrl("you", workspace));
+  await skipFirstQuestion(page);
   await page.getByRole("button", { name: "Help me explore" }).click();
   const opening = page.getByRole("heading", {
     name: "What would you most like to be different about your working life?",
@@ -559,8 +565,10 @@ test.describe("phone, first screen", () => {
   }) => {
     test.setTimeout(180_000);
     const token = await emulatorToken("ada");
-    // The start: the entry choice.
+    // The start: the first question's field (Task 6d slice B), then the entry choice.
     await signIn(page, "ada", chapterUrl("you", await demoWorkspace("Start (synthetic)")));
+    await firstScreen(page, page.getByRole("combobox", { name: "Your job title" }));
+    await skipFirstQuestion(page);
     await firstScreen(page, page.getByRole("button", { name: "Help me explore" }));
 
     // What we know in the fixture workspace: four answers, two of them limits explained, and a
@@ -592,7 +600,7 @@ test("[UI-12] in a window too short for a band (a phone turned sideways) the con
   const context = await browser.newContext({ viewport: { width: 844, height: 390 } });
   const page = await context.newPage();
   await signIn(page, "ada", chapterUrl("you", await demoWorkspace("Sideways (synthetic)")));
-  const start = page.getByRole("button", { name: "Help me explore" });
+  const start = page.getByRole("combobox", { name: "Your job title" });
   await expect(start).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 0));
   await expectOnTop(page, start);

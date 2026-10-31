@@ -202,7 +202,14 @@ def test_the_discovery_checks_name_the_failure_they_find() -> None:
         suggestion("bicycle mechanic", "723", "close_to_current"),
         suggestion("bicycle mechanic", "723", "close_to_current"),
         suggestion("motor mechanic", "723", "close_to_current"),
-        title_ideas=[{"title": "Bicycle mechanic", "outcome": "not_matched", "occupations": 0}],
+        title_ideas=[
+            {
+                "title": "Bicycle mechanic",
+                "reason": "not_yet_found",
+                "outcome": "not_matched",
+                "occupations": 0,
+            }
+        ],
     )
     ungrounded = slate(
         suggestion("bicycle mechanic", "723", "less_familiar", linked_evidence=[]),

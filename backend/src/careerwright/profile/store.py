@@ -169,7 +169,7 @@ def occupation_choices(tx: Tx, workspace_id: uuid.UUID) -> list[tuple[str, uuid.
 
 _TARGET_COLUMNS = (
     "title_key, title, kind, occupation_uri, link, label_matches, coverage, pack_target_id, "
-    "pack_target_basis, pack_version, source_ref_id"
+    "pack_target_basis, pack_version, source_ref_id, soc_codes, isco_codes"
 )
 
 
@@ -186,6 +186,8 @@ def _target(row: sa.RowMapping) -> TargetRecord:
         pack_target_basis=row["pack_target_basis"],
         pack_version=row["pack_version"],
         source_ref_id=row["source_ref_id"],
+        soc_codes=tuple(row["soc_codes"]),
+        isco_codes=tuple(row["isco_codes"]),
     )
 
 
@@ -204,19 +206,20 @@ def target_records(tx: Tx, workspace_id: uuid.UUID, keys: Iterable[str]) -> dict
 def upsert_target_record(
     tx: Tx, workspace_id: uuid.UUID, record: TargetRecord, recorded_by: uuid.UUID | None
 ) -> None:
-    """Store a target's record; a later record of the same title (as a concept) replaces it."""
+    """Store a title's record; a later record of the same title (as a concept) replaces it."""
     tx.execute(
         sa.text(
             f"INSERT INTO careerwright.target_records (workspace_id, {_TARGET_COLUMNS}, "
             "recorded_by) VALUES (:ws, :key, :title, :kind, :occupation, :link, "
             "CAST(:matches AS text[]), :coverage, :pack_target, :basis, :pack_version, "
-            ":source, :by) "
+            ":source, CAST(:soc AS text[]), CAST(:isco AS text[]), :by) "
             "ON CONFLICT (workspace_id, title_key) DO UPDATE SET title = EXCLUDED.title, "
             "kind = EXCLUDED.kind, occupation_uri = EXCLUDED.occupation_uri, "
             "link = EXCLUDED.link, label_matches = EXCLUDED.label_matches, "
             "coverage = EXCLUDED.coverage, pack_target_id = EXCLUDED.pack_target_id, "
             "pack_target_basis = EXCLUDED.pack_target_basis, "
             "pack_version = EXCLUDED.pack_version, source_ref_id = EXCLUDED.source_ref_id, "
+            "soc_codes = EXCLUDED.soc_codes, isco_codes = EXCLUDED.isco_codes, "
             "recorded_by = EXCLUDED.recorded_by, recorded_at = clock_timestamp()"
         ),
         {
@@ -232,6 +235,8 @@ def upsert_target_record(
             "basis": record.pack_target_basis,
             "pack_version": record.pack_version,
             "source": record.source_ref_id,
+            "soc": list(record.soc_codes),
+            "isco": list(record.isco_codes),
             "by": recorded_by,
         },
     )

@@ -121,20 +121,24 @@ class TurnDecision:
 
 
 class TargetKind(StrEnum):
-    """What a target's title is (`careerwright.profile.targets`). Slice B of Task 6d adds a UK
-    title from the ONS coding index."""
+    """What a title's words are (`careerwright.profile.targets`)."""
 
     ESCO = "esco"  # an ESCO occupation's title, chosen as such
+    ONS = "ons"  # a title the UK job-title index lists (ONS's SOC 2020 coding index)
     OWN_WORDS = "own_words"  # the person's own words
 
 
 class TargetLink(StrEnum):
-    """The source of the link between a target and its ESCO occupation."""
+    """The source of the link between a title and its ESCO occupation."""
 
-    OCCUPATION_CHOICE = "occupation_choice"  # the person chose the occupation
+    # The person chose the occupation: as their target, or as the closest to their title.
+    OCCUPATION_CHOICE = "occupation_choice"
     EXACT_LABEL = "exact_label"  # the one occupation holding the title as a label
     PACK_CROSSWALK = "pack_crosswalk"  # the option pack's crosswalk for its target
     NONE = "none"  # none yet
+    # The person said none of the ESCO occupations offered as closest is their job: none, and
+    # Careerwright doesn't ask again (ADR 0015 decision 3).
+    NONE_OF_THESE = "none_of_these"
 
 
 # The links that are matches in ESCO itself: the slate, the sketch and the strength join work
@@ -156,7 +160,8 @@ PackTargetBasis = Literal["title", "esco_crosswalk"]
 
 @dataclass(frozen=True)
 class TargetRecord:
-    """A target, stored once with what it names (`careerwright.profile.targets`)."""
+    """A title, stored once with what it names (`careerwright.profile.targets`): a target's,
+    or the person's current or last role's."""
 
     title: str
     key: str  # the title as a concept (`careerwright.concept_key`)
@@ -169,6 +174,10 @@ class TargetRecord:
     pack_target_basis: PackTargetBasis | None
     pack_version: str
     source_ref_id: uuid.UUID | None = None  # the choice's source
+    # An ONS title's SOC 2020 unit groups and ISCO-08 groups, as the index codes it; empty
+    # for any other kind.
+    soc_codes: tuple[str, ...] = ()
+    isco_codes: tuple[str, ...] = ()
 
     @property
     def esco_occupation(self) -> str | None:

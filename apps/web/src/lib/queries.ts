@@ -10,8 +10,12 @@ import {
 } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  type ChooseClosest,
+  type ChooseRole,
   type ChooseTarget,
   type CreateWorkspace,
+  chooseClosest,
+  chooseRole,
   chooseTarget,
   createWorkspace,
   type DecideTurn,
@@ -23,6 +27,7 @@ import {
   type ExplanationRunOut,
   estimateRun,
   getMe,
+  getOrigin,
   getPreferences,
   getProfile,
   getSketch,
@@ -36,6 +41,10 @@ import {
   listTargets,
   listTurns,
   listWorkspaces,
+  matchTitles,
+  type NameRole,
+  nameRole,
+  type OriginOut,
   type PartialReplyOut,
   type PreferencesOut,
   type ProfileInput,
@@ -64,6 +73,7 @@ import {
   submitExplanation,
   submitTurn,
   type TargetRecordsOut,
+  type TitleMatchesOut,
   type TurnOut,
   type TurnSubmittedOut,
 } from "@/generated/api";
@@ -92,6 +102,7 @@ export const keys = {
     ["ws", id, "discoveries", discoveryId, "note-requests"] as const,
   sketch: (id: string) => ["ws", id, "sketch"] as const,
   targets: (id: string) => ["ws", id, "targets"] as const,
+  origin: (id: string) => ["ws", id, "origin"] as const,
   credentials: (id: string) => ["ws", id, "credentials"] as const,
   spend: (id: string) => ["ws", id, "spend"] as const,
   estimate: (id: string, kind: RunKind) => ["ws", id, "spend", "estimate", kind] as const,
@@ -554,6 +565,85 @@ export function useSketch(id: string, enabled = true) {
     retry: retryable,
     enabled,
   });
+}
+
+/** Words worth matching: a letter or a digit (the API refuses anything else). */
+const searchable = (text: string) => /[\p{L}\p{N}]/u.test(text);
+
+/** The first question's type-ahead (`GET /v1/taxonomy/titles`): ESCO's titles and the UK
+ *  job-title index's, deterministic and offline, so it works without a key and in the demo.
+ *  The pinned releases never change while the page is open; the last list stays readable while
+ *  the next loads. */
+export function useTitleMatches(typed: string, limit: number) {
+  const q = typed.trim();
+  return useQuery({
+    queryKey: ["titles", q, limit] as const,
+    queryFn: async ({ signal }): Promise<TitleMatchesOut> =>
+      (await matchTitles({ query: { q, limit }, signal, throwOnError: true })).data,
+    enabled: searchable(q),
+    staleTime: Number.POSITIVE_INFINITY,
+    placeholderData: (previous) => previous,
+    retry: retryable,
+  });
+}
+
+/** The world's answer to the first question (`GET .../origin`), computed with no model call. */
+export function useOrigin(id: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.origin(id),
+    queryFn: async (): Promise<OriginOut> =>
+      (await getOrigin({ path: path(id), throwOnError: true })).data,
+    retry: retryable,
+    enabled,
+  });
+}
+
+/** The first answer: an ESCO occupation the person picked from the type-ahead. */
+export function useChooseRole(id: string) {
+  return useCommand(
+    id,
+    async (body: ChooseRole, key: string) =>
+      (
+        await chooseRole({
+          path: path(id),
+          body,
+          headers: { "Idempotency-Key": key },
+          throwOnError: true,
+        })
+      ).data as ProfileOut,
+  );
+}
+
+/** The first answer in the person's own words: a UK job title, or anything typed. */
+export function useNameRole(id: string) {
+  return useCommand(
+    id,
+    async (body: NameRole, key: string) =>
+      (
+        await nameRole({
+          path: path(id),
+          body,
+          headers: { "Idempotency-Key": key },
+          throwOnError: true,
+        })
+      ).data as ProfileOut,
+  );
+}
+
+/** "Which of these is closest?": an occupation offered, or null for "None of these is my job". */
+export function useChooseClosest(id: string) {
+  return useCommand(
+    id,
+    async (body: ChooseClosest, key: string) =>
+      (
+        await chooseClosest({
+          path: path(id),
+          body,
+          headers: { "Idempotency-Key": key },
+          throwOnError: true,
+        })
+      ).data as ProfileOut,
+  );
 }
 
 /** Each target as it is stored once, with what it names and its coverage: every view that

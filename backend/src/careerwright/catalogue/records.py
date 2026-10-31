@@ -83,6 +83,37 @@ class TitleMatch:
 
 
 @dataclass(frozen=True)
+class GroupOccupation:
+    """An ESCO occupation in an ISCO-08 unit group."""
+
+    concept_id: uuid.UUID
+    esco_uri: str
+    preferred_label: str
+    isco_code: str
+
+
+@dataclass(frozen=True)
+class UkGroup:
+    """An ISCO-08 unit group as the ONS coding index codes a title to it, with the held ESCO
+    release's name for it (None: the held release names no such group)."""
+
+    code: str
+    label: str | None
+
+
+@dataclass(frozen=True)
+class UkTitle:
+    """A job title of the pinned ONS SOC 2020 coding index, once however many entries the
+    index gives it: every SOC 2020 unit group and every ISCO-08 group ONS codes it to, none
+    picked (ADR 0015 decisions 1 and 2)."""
+
+    title: str  # as the index writes it
+    normalised: str  # the index's normalised title (`careerwright.catalogue.esco.normalise_label`)
+    soc_codes: tuple[str, ...]
+    isco_groups: tuple[UkGroup, ...]
+
+
+@dataclass(frozen=True)
 class SkillNeighbour:
     """An occupation sharing essential skills with another's (ESCO)."""
 

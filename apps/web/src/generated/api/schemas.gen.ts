@@ -1572,6 +1572,37 @@ export const ChallengeSchema = {
     title: 'Challenge'
 } as const;
 
+export const ChooseClosestSchema = {
+    properties: {
+        expected_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Version'
+        },
+        concept_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Concept Id',
+            description: 'One of the occupations the origin offers as closest (`role.closest`), or null: "None of these is my job".'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_version',
+        'concept_id'
+    ],
+    title: 'ChooseClosest',
+    description: 'The answer to "Which of these is closest?" for the person\'s current or last role.'
+} as const;
+
 export const ChooseRoleSchema = {
     properties: {
         expected_version: {
@@ -1911,6 +1942,106 @@ export const ClaimSpanSchema = {
     ],
     title: 'ClaimSpan',
     description: 'A SourceClaim\'s location: offsets into the hashed text, or a JSON pointer.'
+} as const;
+
+export const ClosestDecisionSchema = {
+    type: 'string',
+    enum: [
+        'not_yet',
+        'chosen',
+        'none_of_these'
+    ],
+    title: 'ClosestDecision',
+    description: 'Where the person is with "Which of these is closest?".'
+} as const;
+
+export const ClosestGroupOutSchema = {
+    properties: {
+        group: {
+            $ref: '#/components/schemas/UkGroupOut',
+            description: 'An ISCO-08 group ONS codes the role\'s title to.'
+        },
+        occupations: {
+            items: {
+                $ref: '#/components/schemas/ClosestOccupationOut'
+            },
+            type: 'array',
+            title: 'Occupations',
+            description: 'The ESCO occupations in it, by ESCO title; empty where ESCO has none.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'group',
+        'occupations'
+    ],
+    title: 'ClosestGroupOut'
+} as const;
+
+export const ClosestOccupationOutSchema = {
+    properties: {
+        concept_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Concept Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title',
+            description: 'Its ESCO title.'
+        },
+        esco_uri: {
+            type: 'string',
+            title: 'Esco Uri'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concept_id',
+        'title',
+        'esco_uri'
+    ],
+    title: 'ClosestOccupationOut'
+} as const;
+
+export const ClosestOutSchema = {
+    properties: {
+        decision: {
+            $ref: '#/components/schemas/ClosestDecision'
+        },
+        groups: {
+            items: {
+                $ref: '#/components/schemas/ClosestGroupOut'
+            },
+            type: 'array',
+            title: 'Groups',
+            description: 'Every ISCO-08 group ONS codes the title to, none picked.'
+        },
+        chosen: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Chosen',
+            description: 'The occupation chosen, when one was.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'decision',
+        'groups',
+        'chosen'
+    ],
+    title: 'ClosestOut',
+    description: '"Which of these is closest?": asked for a role whose title the UK job-title index lists\nand no ESCO occupation holds as a label. Answer with `POST .../origin/role/closest`.'
 } as const;
 
 export const CommitmentInputSchema = {
@@ -5358,6 +5489,31 @@ export const MoreDepthSchema = {
     description: 'The deeper view: more from one kind of work, because the person asked.'
 } as const;
 
+export const NameRoleSchema = {
+    properties: {
+        expected_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Version'
+        },
+        title: {
+            type: 'string',
+            maxLength: 120,
+            minLength: 1,
+            title: 'Title',
+            description: 'The title, kept exactly as given.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_version',
+        'title'
+    ],
+    title: 'NameRole',
+    description: 'The first answer in the person\'s own words: a UK job title picked from the type-ahead\n(`GET /v1/taxonomy/titles`, a title of the UK job-title index), or anything typed ("Use\nmy own words"). Nothing is refused.'
+} as const;
+
 export const NeedSchema = {
     properties: {
         input: {
@@ -6308,6 +6464,9 @@ export const OriginOutSchema = {
                         $ref: '#/components/schemas/TitleNotMatched'
                     },
                     {
+                        $ref: '#/components/schemas/TitleKeptAsOwn'
+                    },
+                    {
                         $ref: '#/components/schemas/TitleMatchedSeveral'
                     },
                     {
@@ -6322,6 +6481,7 @@ export const OriginOutSchema = {
                         kinds_of_work_shown: '#/components/schemas/KindsOfWorkShown',
                         no_shared_occupation: '#/components/schemas/NoSharedOccupation',
                         nothing_found: '#/components/schemas/NothingFound',
+                        title_kept_as_own: '#/components/schemas/TitleKeptAsOwn',
                         title_matched_several: '#/components/schemas/TitleMatchedSeveral',
                         title_not_matched: '#/components/schemas/TitleNotMatched'
                     }
@@ -9576,6 +9736,7 @@ export const ResolutionSchema = {
     enum: [
         'esco',
         'ambiguous',
+        'uk_title',
         'provisional',
         'not_found'
     ],
@@ -9712,6 +9873,36 @@ export const RoleOutSchema = {
             type: 'array',
             title: 'Choices',
             description: 'When several hold it as a title.'
+        },
+        kind: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/TargetKind'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'esco: an ESCO title chosen as such; ons: a title the UK job-title index lists; own_words: neither. Null before they answer.'
+        },
+        uk_groups: {
+            items: {
+                $ref: '#/components/schemas/UkGroupOut'
+            },
+            type: 'array',
+            title: 'Uk Groups',
+            description: 'Every ISCO-08 group the UK job-title index codes the title to (ons only).'
+        },
+        closest: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ClosestOut'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: '"Which of these is closest?", when it is asked for this role.'
         }
     },
     additionalProperties: false,
@@ -9721,10 +9912,13 @@ export const RoleOutSchema = {
         'state',
         'chosen',
         'occupation',
-        'choices'
+        'choices',
+        'kind',
+        'uk_groups',
+        'closest'
     ],
     title: 'RoleOut',
-    description: 'What the person\'s answer to "What do you do now, or what did you do last?" names in\nESCO. Nothing is guessed: an answer Careerwright couldn\'t match in ESCO joins nothing, and\none it matched to several occupations asks the person to choose.'
+    description: 'What the person\'s answer to "What do you do now, or what did you do last?" names in\nESCO. Nothing is guessed: an answer Careerwright couldn\'t match in ESCO joins nothing, and\none it matched to several occupations asks the person to choose. The answer is always kept\nin the person\'s words; `kind` says what Careerwright found them to be.'
 } as const;
 
 export const RoleStateSchema = {
@@ -11343,6 +11537,9 @@ export const SlateOutSchema = {
                         $ref: '#/components/schemas/TitleNotMatched'
                     },
                     {
+                        $ref: '#/components/schemas/TitleKeptAsOwn'
+                    },
+                    {
                         $ref: '#/components/schemas/TitleMatchedSeveral'
                     },
                     {
@@ -11357,6 +11554,7 @@ export const SlateOutSchema = {
                         kinds_of_work_shown: '#/components/schemas/KindsOfWorkShown',
                         no_shared_occupation: '#/components/schemas/NoSharedOccupation',
                         nothing_found: '#/components/schemas/NothingFound',
+                        title_kept_as_own: '#/components/schemas/TitleKeptAsOwn',
                         title_matched_several: '#/components/schemas/TitleMatchedSeveral',
                         title_not_matched: '#/components/schemas/TitleNotMatched'
                     }
@@ -11479,7 +11677,7 @@ export const SlateOutSchema = {
             },
             type: 'array',
             title: 'Title Ideas',
-            description: 'Titles Careerwright thought of, each with what matching it in ESCO did (case, punctuation and plurals folded): one it couldn\'t match is never suggested.'
+            description: 'Titles Careerwright thought of, each with what it did with it (`reason`): one ESCO holds as a label joins the slate\'s pool; one the UK job-title index lists (exactly) is a suggestion in its own list beside the slate, never in it; one no list holds is not yet found and never suggested.'
         },
         not_included: {
             items: {
@@ -13156,10 +13354,11 @@ export const TargetKindSchema = {
     type: 'string',
     enum: [
         'esco',
+        'ons',
         'own_words'
     ],
     title: 'TargetKind',
-    description: 'What a target\'s title is (`careerwright.profile.targets`). Slice B of Task 6d adds a UK\ntitle from the ONS coding index.'
+    description: 'What a title\'s words are (`careerwright.profile.targets`).'
 } as const;
 
 export const TargetLinkSchema = {
@@ -13168,10 +13367,11 @@ export const TargetLinkSchema = {
         'occupation_choice',
         'exact_label',
         'pack_crosswalk',
-        'none'
+        'none',
+        'none_of_these'
     ],
     title: 'TargetLink',
-    description: 'The source of the link between a target and its ESCO occupation.'
+    description: 'The source of the link between a title and its ESCO occupation.'
 } as const;
 
 export const TargetListInputSchema = {
@@ -13836,6 +14036,9 @@ export const TitleIdeaSchema = {
             type: 'array',
             title: 'Based On'
         },
+        reason: {
+            $ref: '#/components/schemas/TitleIdeaReason'
+        },
         outcome: {
             type: 'string',
             enum: [
@@ -13844,7 +14047,8 @@ export const TitleIdeaSchema = {
                 'not_matched',
                 'not_searched'
             ],
-            title: 'Outcome'
+            title: 'Outcome',
+            description: 'What matching it in ESCO did.'
         },
         occupations: {
             anyOf: [
@@ -13864,11 +14068,12 @@ export const TitleIdeaSchema = {
     required: [
         'title',
         'based_on',
+        'reason',
         'outcome',
         'occupations'
     ],
     title: 'TitleIdea',
-    description: 'A title Careerwright thought of, and what matching it did: only a matched idea is a\nsuggestion.'
+    description: 'A title Careerwright thought of, and what it did with it: only an idea ESCO holds or the\nUK job-title index lists is a suggestion.'
 } as const;
 
 export const TitleIdeaMatchedSchema = {
@@ -13910,8 +14115,56 @@ export const TitleIdeaMatchedSchema = {
     description: 'A title Careerwright thought of from the answer, matched to this occupation.'
 } as const;
 
+export const TitleIdeaReasonSchema = {
+    type: 'string',
+    enum: [
+        'in_esco',
+        'in_uk_title_index',
+        'not_yet_found',
+        'not_searched'
+    ],
+    title: 'TitleIdeaReason',
+    description: 'What Careerwright did with a title it thought of (ADR 0015 decision 2).'
+} as const;
+
+export const TitleKeptAsOwnSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'title_kept_as_own',
+            title: 'Reason',
+            default: 'title_kept_as_own'
+        },
+        outcome: {
+            type: 'string',
+            const: 'not_matched',
+            title: 'Outcome',
+            default: 'not_matched'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'title'
+    ],
+    title: 'TitleKeptAsOwn',
+    description: 'A title of the person\'s own that they said none of the closest ESCO occupations is\n("None of these is my job"): it is kept in their words, names no occupation, and nothing\nis joined to it; nothing asks them to pick another.'
+} as const;
+
 export const TitleMatchOutSchema = {
     properties: {
+        source: {
+            type: 'string',
+            const: 'esco',
+            title: 'Source',
+            description: 'An occupation of the pinned ESCO release.'
+        },
         concept_id: {
             type: 'string',
             format: 'uuid',
@@ -13948,6 +14201,7 @@ export const TitleMatchOutSchema = {
     additionalProperties: false,
     type: 'object',
     required: [
+        'source',
         'concept_id',
         'concept_kind',
         'title',
@@ -14004,7 +14258,21 @@ export const TitleMatchesOutSchema = {
         },
         matches: {
             items: {
-                $ref: '#/components/schemas/TitleMatchOut'
+                oneOf: [
+                    {
+                        $ref: '#/components/schemas/TitleMatchOut'
+                    },
+                    {
+                        $ref: '#/components/schemas/UkTitleOut'
+                    }
+                ],
+                discriminator: {
+                    propertyName: 'source',
+                    mapping: {
+                        esco: '#/components/schemas/TitleMatchOut',
+                        uk_title_index: '#/components/schemas/UkTitleOut'
+                    }
+                }
             },
             type: 'array',
             title: 'Matches'
@@ -14013,6 +14281,10 @@ export const TitleMatchesOutSchema = {
             type: 'integer',
             title: 'Total'
         },
+        uk_total: {
+            type: 'integer',
+            title: 'Uk Total'
+        },
         limit: {
             type: 'integer',
             title: 'Limit'
@@ -14020,7 +14292,7 @@ export const TitleMatchesOutSchema = {
         partial: {
             type: 'boolean',
             title: 'Partial',
-            description: 'True: ESCO lists no title with every word typed, and these hold the most of them, rarer words first. Ask "Careerwright couldn\'t match that title in ESCO. Is it one of these?": the person chooses one or none, and nothing is joined to the typed words.'
+            description: 'True: neither ESCO nor the UK job-title index lists a title with every word typed, and these ESCO occupations hold the most of them, rarer words first. Ask "Careerwright couldn\'t match that title in ESCO. Is it one of these?", with "None of these is my job", which keeps the person\'s own words: the person chooses one or none, and nothing is joined to the typed words.'
         }
     },
     additionalProperties: false,
@@ -14030,11 +14302,12 @@ export const TitleMatchesOutSchema = {
         'query',
         'matches',
         'total',
+        'uk_total',
         'limit',
         'partial'
     ],
     title: 'TitleMatchesOut',
-    description: 'The first question\'s type-ahead: occupations whose ESCO titles (preferred and\nalternative labels) have a word beginning with each word typed, best first, one per\noccupation. When no title holds every word, the occupations whose titles hold the most\nof them, with `partial` true. Deterministic, no model call. No match is an honest empty\nlist: nothing is invented. `total` counts every occupation that matched.'
+    description: 'The first question\'s type-ahead: occupations whose ESCO titles (preferred and\nalternative labels) have a word beginning with each word typed, one per occupation, and\nthe UK job-title index\'s titles that do (ONS\'s SOC 2020 coding index, other than titles\nESCO itself offers), best first: what was typed, then a title beginning with it, then the\nrest, ESCO first on ties. When neither holds a title with every word, the ESCO occupations\nwhose titles hold the most of them, with `partial` true. Deterministic, no model call. No\nmatch is an honest empty list: nothing is invented, and the person\'s own words are always\ntheirs to keep (`POST .../origin/role/title`). `total` counts every ESCO occupation that\nmatched, `uk_total` every title of the index.'
 } as const;
 
 export const TitleNotMatchedSchema = {
@@ -14379,6 +14652,35 @@ export const TurnSubmittedOutSchema = {
     description: 'A new turn, with the support panel when its message holds a risk stem.'
 } as const;
 
+export const UkGroupOutSchema = {
+    properties: {
+        code: {
+            type: 'string',
+            title: 'Code',
+            description: 'An ISCO-08 unit group, as the UK job-title index codes it.'
+        },
+        label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label',
+            description: 'The held ESCO release\'s name for the group; null: it names none.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'code',
+        'label'
+    ],
+    title: 'UkGroupOut'
+} as const;
+
 export const UkSocMappingOutSchema = {
     properties: {
         isco_code: {
@@ -14459,6 +14761,48 @@ export const UkSocMappingOutSchema = {
     ],
     title: 'UkSocMappingOut',
     description: 'ESCO occupation to UK SOC 2020, with every candidate kept (TAX1-02).'
+} as const;
+
+export const UkTitleOutSchema = {
+    properties: {
+        source: {
+            type: 'string',
+            const: 'uk_title_index',
+            title: 'Source',
+            description: 'A title of the UK job-title index.'
+        },
+        title: {
+            type: 'string',
+            title: 'Title',
+            description: 'As the index writes it.'
+        },
+        soc_codes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Soc Codes',
+            description: 'Every SOC 2020 unit group ONS codes it to.'
+        },
+        isco_groups: {
+            items: {
+                $ref: '#/components/schemas/UkGroupOut'
+            },
+            type: 'array',
+            title: 'Isco Groups',
+            description: 'Every ISCO-08 unit group ONS codes it to, none picked.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'source',
+        'title',
+        'soc_codes',
+        'isco_groups'
+    ],
+    title: 'UkTitleOut',
+    description: 'A UK job title the pinned ONS SOC 2020 coding index lists (ADR 0015): mark it "UK job\ntitle (ONS)". Picked, it stays the person\'s words (`POST .../origin/role/title`).'
 } as const;
 
 export const UncertaintySchema = {

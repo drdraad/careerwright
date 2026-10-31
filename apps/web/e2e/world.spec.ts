@@ -15,6 +15,7 @@ import {
   recordRequests,
   saved,
   signIn,
+  skipFirstQuestion,
   youView,
 } from "./helpers";
 
@@ -244,6 +245,7 @@ test.describe("moving", () => {
       { name: "Support, moving (synthetic)", data_mode: "demo", synthetic: true },
     );
     await signIn(page, "ada", chapterUrl("you", id));
+    await skipFirstQuestion(page);
     await page.getByRole("button", { name: "Help me explore" }).click();
     await expect(world(page)).toHaveAttribute("data-world-mode", "moving");
     await page
@@ -312,6 +314,7 @@ test.describe("phone", () => {
     // Measured once the strip has settled: its words loaded, updates live, the fonts in and
     // the same height two frames running (it measured 105 px, then 57, mid-load).
     const before = await settledHeight(page);
+    await skipFirstQuestion(page);
     await page.getByRole("button", { name: "Help me explore" }).click();
     await page
       .getByRole("textbox", { name: "Reply to Careerwright" })

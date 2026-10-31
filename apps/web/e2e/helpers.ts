@@ -131,6 +131,12 @@ export async function brightFills(page: Page): Promise<number> {
   });
 }
 
+/** The first question leads a new workspace (Task 6d slice B): "Skip for now" goes on to how
+ *  to start, saving nothing, as a person who'd rather not say would. */
+export async function skipFirstQuestion(page: Page) {
+  await page.getByRole("button", { name: "Skip for now" }).click();
+}
+
 /** Opens one of the You chapter's views (its tabs: Conversation, What we know, Suggestions). */
 export async function youView(page: Page, view: "Conversation" | "What we know" | "Suggestions") {
   await page.getByRole("tab", { name: view }).click();

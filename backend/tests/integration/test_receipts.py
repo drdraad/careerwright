@@ -2,16 +2,18 @@
 removed with it (spec section 19 deletion; reset-demo leaves no copies behind)."""
 
 import uuid
+from pathlib import Path
 
 import psycopg
 import pytest
 
-from careerwright.cli import migrate_app, reset_demo, seed
+from careerwright.cli import import_reference_data, migrate_app, reset_demo, seed
 from careerwright.identity.keyring import load_keyring
 from careerwright.identity.runs import output_context
 from careerwright.seed import FIXTURE_WORKSPACE_ID
 from tests.support.client import ApiClient, profile_with
 from tests.support.infra import Infra, migrator_engine
+from tests.support.reference_data import sample_files
 
 pytestmark = pytest.mark.integration
 
@@ -45,13 +47,15 @@ def test_every_receipt_names_its_workspace_and_goes_when_the_workspace_goes(
     assert receipts_for(infra, workspace_id) == 0
 
 
-def test_reset_demo_removes_the_fixture_workspaces_receipts(infra: Infra) -> None:
+def test_reset_demo_removes_the_fixture_workspaces_receipts(infra: Infra, tmp_path: Path) -> None:
     database = f"careerwright_receipts_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     engine = migrator_engine(infra, database)
     try:
         migrate_app(engine)
         settings = infra.ops_settings(database)
+        # As setup does: the UK job-title index before the seed decides the fixture's target.
+        import_reference_data(engine, sample_files(tmp_path))
         seed(engine, settings)
         with engine.begin() as tx:
             tx.exec_driver_sql(

@@ -279,9 +279,11 @@ const shots = (scratch: Scratch): Shot[] => [
     url: chapterUrl("you"),
     ready: async (page) => {
       await heading("You")(page);
+      // The first question leads (Task 6d slice B), its title field in the first screen.
       await expect(
-        page.getByRole("heading", { name: "How would you like to start?" }),
+        page.getByRole("heading", { name: "What do you do now, or what did you do last?" }),
       ).toBeVisible();
+      await expect(page.getByRole("combobox", { name: "Your job title" })).toBeVisible();
       // Chat is immediate (session 2): the reply field is there from the first screen.
       await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toBeVisible();
     },

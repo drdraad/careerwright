@@ -1070,6 +1070,24 @@ export type Challenge = {
 };
 
 /**
+ * ChooseClosest
+ *
+ * The answer to "Which of these is closest?" for the person's current or last role.
+ */
+export type ChooseClosest = {
+    /**
+     * Expected Version
+     */
+    expected_version: number;
+    /**
+     * Concept Id
+     *
+     * One of the occupations the origin offers as closest (`role.closest`), or null: "None of these is my job".
+     */
+    concept_id: string | null;
+};
+
+/**
  * ChooseRole
  *
  * The first answer: the ESCO occupation the person does now, or did last.
@@ -1266,6 +1284,82 @@ export type ClaimSpan = {
      * Occurrences
      */
     occurrences: number | null;
+};
+
+/**
+ * ClosestDecision
+ *
+ * Where the person is with "Which of these is closest?".
+ */
+export const ClosestDecision = {
+    NOT_YET: 'not_yet',
+    CHOSEN: 'chosen',
+    NONE_OF_THESE: 'none_of_these'
+} as const;
+
+/**
+ * ClosestDecision
+ *
+ * Where the person is with "Which of these is closest?".
+ */
+export type ClosestDecision = typeof ClosestDecision[keyof typeof ClosestDecision];
+
+/**
+ * ClosestGroupOut
+ */
+export type ClosestGroupOut = {
+    /**
+     * An ISCO-08 group ONS codes the role's title to.
+     */
+    group: UkGroupOut;
+    /**
+     * Occupations
+     *
+     * The ESCO occupations in it, by ESCO title; empty where ESCO has none.
+     */
+    occupations: Array<ClosestOccupationOut>;
+};
+
+/**
+ * ClosestOccupationOut
+ */
+export type ClosestOccupationOut = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Title
+     *
+     * Its ESCO title.
+     */
+    title: string;
+    /**
+     * Esco Uri
+     */
+    esco_uri: string;
+};
+
+/**
+ * ClosestOut
+ *
+ * "Which of these is closest?": asked for a role whose title the UK job-title index lists
+ * and no ESCO occupation holds as a label. Answer with `POST .../origin/role/closest`.
+ */
+export type ClosestOut = {
+    decision: ClosestDecision;
+    /**
+     * Groups
+     *
+     * Every ISCO-08 group ONS codes the title to, none picked.
+     */
+    groups: Array<ClosestGroupOut>;
+    /**
+     * Chosen
+     *
+     * The occupation chosen, when one was.
+     */
+    chosen: string | null;
 };
 
 /**
@@ -3671,6 +3765,26 @@ export type MoreDepth = {
 };
 
 /**
+ * NameRole
+ *
+ * The first answer in the person's own words: a UK job title picked from the type-ahead
+ * (`GET /v1/taxonomy/titles`, a title of the UK job-title index), or anything typed ("Use
+ * my own words"). Nothing is refused.
+ */
+export type NameRole = {
+    /**
+     * Expected Version
+     */
+    expected_version: number;
+    /**
+     * Title
+     *
+     * The title, kept exactly as given.
+     */
+    title: string;
+};
+
+/**
  * Need
  */
 export type Need = {
@@ -4236,7 +4350,7 @@ export type OriginOut = {
      *
      * Why there are fewer than six, if there are, as facts the web words.
      */
-    fewer_reasons: Array<NothingFound | FewMatched | KindsOfWorkShown | ExclusionsRemoved | TitleNotMatched | TitleMatchedSeveral | NoSharedOccupation>;
+    fewer_reasons: Array<NothingFound | FewMatched | KindsOfWorkShown | ExclusionsRemoved | TitleNotMatched | TitleKeptAsOwn | TitleMatchedSeveral | NoSharedOccupation>;
     connection: ConnectionOut | null;
     salary_floor: SalaryFloorOut | null;
 };
@@ -6103,6 +6217,7 @@ export type RenameWorkspaceIn = {
 export const Resolution = {
     ESCO: 'esco',
     AMBIGUOUS: 'ambiguous',
+    UK_TITLE: 'uk_title',
     PROVISIONAL: 'provisional',
     NOT_FOUND: 'not_found'
 } as const;
@@ -6207,7 +6322,8 @@ export type RoleOccupationOut = {
  *
  * What the person's answer to "What do you do now, or what did you do last?" names in
  * ESCO. Nothing is guessed: an answer Careerwright couldn't match in ESCO joins nothing, and
- * one it matched to several occupations asks the person to choose.
+ * one it matched to several occupations asks the person to choose. The answer is always kept
+ * in the person's words; `kind` says what Careerwright found them to be.
  */
 export type RoleOut = {
     /**
@@ -6233,6 +6349,20 @@ export type RoleOut = {
      * When several hold it as a title.
      */
     choices: Array<RoleOccupationOut>;
+    /**
+     * esco: an ESCO title chosen as such; ons: a title the UK job-title index lists; own_words: neither. Null before they answer.
+     */
+    kind: TargetKind | null;
+    /**
+     * Uk Groups
+     *
+     * Every ISCO-08 group the UK job-title index codes the title to (ons only).
+     */
+    uk_groups: Array<UkGroupOut>;
+    /**
+     * "Which of these is closest?", when it is asked for this role.
+     */
+    closest: ClosestOut | null;
 };
 
 /**
@@ -7202,7 +7332,7 @@ export type SlateOut = {
      *
      * Why there are fewer than six, if there are, as facts the web words.
      */
-    fewer_reasons: Array<NothingFound | FewMatched | KindsOfWorkShown | ExclusionsRemoved | TitleNotMatched | TitleMatchedSeveral | NoSharedOccupation>;
+    fewer_reasons: Array<NothingFound | FewMatched | KindsOfWorkShown | ExclusionsRemoved | TitleNotMatched | TitleKeptAsOwn | TitleMatchedSeveral | NoSharedOccupation>;
     /**
      * Notes
      *
@@ -7249,7 +7379,7 @@ export type SlateOut = {
     /**
      * Title Ideas
      *
-     * Titles Careerwright thought of, each with what matching it in ESCO did (case, punctuation and plurals folded): one it couldn't match is never suggested.
+     * Titles Careerwright thought of, each with what it did with it (`reason`): one ESCO holds as a label joins the slate's pool; one the UK job-title index lists (exactly) is a suggestion in its own list beside the slate, never in it; one no list holds is not yet found and never suggested.
      */
     title_ideas: Array<TitleIdea>;
     /**
@@ -8232,35 +8362,38 @@ export type TargetCoverage = typeof TargetCoverage[keyof typeof TargetCoverage];
 /**
  * TargetKind
  *
- * What a target's title is (`careerwright.profile.targets`). Slice B of Task 6d adds a UK
- * title from the ONS coding index.
+ * What a title's words are (`careerwright.profile.targets`).
  */
-export const TargetKind = { ESCO: 'esco', OWN_WORDS: 'own_words' } as const;
+export const TargetKind = {
+    ESCO: 'esco',
+    ONS: 'ons',
+    OWN_WORDS: 'own_words'
+} as const;
 
 /**
  * TargetKind
  *
- * What a target's title is (`careerwright.profile.targets`). Slice B of Task 6d adds a UK
- * title from the ONS coding index.
+ * What a title's words are (`careerwright.profile.targets`).
  */
 export type TargetKind = typeof TargetKind[keyof typeof TargetKind];
 
 /**
  * TargetLink
  *
- * The source of the link between a target and its ESCO occupation.
+ * The source of the link between a title and its ESCO occupation.
  */
 export const TargetLink = {
     OCCUPATION_CHOICE: 'occupation_choice',
     EXACT_LABEL: 'exact_label',
     PACK_CROSSWALK: 'pack_crosswalk',
-    NONE: 'none'
+    NONE: 'none',
+    NONE_OF_THESE: 'none_of_these'
 } as const;
 
 /**
  * TargetLink
  *
- * The source of the link between a target and its ESCO occupation.
+ * The source of the link between a title and its ESCO occupation.
  */
 export type TargetLink = typeof TargetLink[keyof typeof TargetLink];
 
@@ -8627,8 +8760,8 @@ export type TextListInput = {
 /**
  * TitleIdea
  *
- * A title Careerwright thought of, and what matching it did: only a matched idea is a
- * suggestion.
+ * A title Careerwright thought of, and what it did with it: only an idea ESCO holds or the
+ * UK job-title index lists is a suggestion.
  */
 export type TitleIdea = {
     /**
@@ -8639,8 +8772,11 @@ export type TitleIdea = {
      * Based On
      */
     based_on: Array<EvidenceItem>;
+    reason: TitleIdeaReason;
     /**
      * Outcome
+     *
+     * What matching it in ESCO did.
      */
     outcome: 'matched' | 'matched_several' | 'not_matched' | 'not_searched';
     /**
@@ -8677,9 +8813,56 @@ export type TitleIdeaMatched = {
 };
 
 /**
+ * TitleIdeaReason
+ *
+ * What Careerwright did with a title it thought of (ADR 0015 decision 2).
+ */
+export const TitleIdeaReason = {
+    IN_ESCO: 'in_esco',
+    IN_UK_TITLE_INDEX: 'in_uk_title_index',
+    NOT_YET_FOUND: 'not_yet_found',
+    NOT_SEARCHED: 'not_searched'
+} as const;
+
+/**
+ * TitleIdeaReason
+ *
+ * What Careerwright did with a title it thought of (ADR 0015 decision 2).
+ */
+export type TitleIdeaReason = typeof TitleIdeaReason[keyof typeof TitleIdeaReason];
+
+/**
+ * TitleKeptAsOwn
+ *
+ * A title of the person's own that they said none of the closest ESCO occupations is
+ * ("None of these is my job"): it is kept in their words, names no occupation, and nothing
+ * is joined to it; nothing asks them to pick another.
+ */
+export type TitleKeptAsOwn = {
+    /**
+     * Reason
+     */
+    reason: 'title_kept_as_own';
+    /**
+     * Outcome
+     */
+    outcome: 'not_matched';
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
  * TitleMatchOut
  */
 export type TitleMatchOut = {
+    /**
+     * Source
+     *
+     * An occupation of the pinned ESCO release.
+     */
+    source: 'esco';
     /**
      * Concept Id
      */
@@ -8739,10 +8922,14 @@ export type TitleMatchedSeveral = {
  * TitleMatchesOut
  *
  * The first question's type-ahead: occupations whose ESCO titles (preferred and
- * alternative labels) have a word beginning with each word typed, best first, one per
- * occupation. When no title holds every word, the occupations whose titles hold the most
- * of them, with `partial` true. Deterministic, no model call. No match is an honest empty
- * list: nothing is invented. `total` counts every occupation that matched.
+ * alternative labels) have a word beginning with each word typed, one per occupation, and
+ * the UK job-title index's titles that do (ONS's SOC 2020 coding index, other than titles
+ * ESCO itself offers), best first: what was typed, then a title beginning with it, then the
+ * rest, ESCO first on ties. When neither holds a title with every word, the ESCO occupations
+ * whose titles hold the most of them, with `partial` true. Deterministic, no model call. No
+ * match is an honest empty list: nothing is invented, and the person's own words are always
+ * theirs to keep (`POST .../origin/role/title`). `total` counts every ESCO occupation that
+ * matched, `uk_total` every title of the index.
  */
 export type TitleMatchesOut = {
     release: TaxonomyReleaseOut;
@@ -8753,11 +8940,15 @@ export type TitleMatchesOut = {
     /**
      * Matches
      */
-    matches: Array<TitleMatchOut>;
+    matches: Array<TitleMatchOut | UkTitleOut>;
     /**
      * Total
      */
     total: number;
+    /**
+     * Uk Total
+     */
+    uk_total: number;
     /**
      * Limit
      */
@@ -8765,7 +8956,7 @@ export type TitleMatchesOut = {
     /**
      * Partial
      *
-     * True: ESCO lists no title with every word typed, and these hold the most of them, rarer words first. Ask "Careerwright couldn't match that title in ESCO. Is it one of these?": the person chooses one or none, and nothing is joined to the typed words.
+     * True: neither ESCO nor the UK job-title index lists a title with every word typed, and these ESCO occupations hold the most of them, rarer words first. Ask "Careerwright couldn't match that title in ESCO. Is it one of these?", with "None of these is my job", which keeps the person's own words: the person chooses one or none, and nothing is joined to the typed words.
      */
     partial: boolean;
 };
@@ -8976,6 +9167,24 @@ export type TurnSubmittedOut = {
 };
 
 /**
+ * UkGroupOut
+ */
+export type UkGroupOut = {
+    /**
+     * Code
+     *
+     * An ISCO-08 unit group, as the UK job-title index codes it.
+     */
+    code: string;
+    /**
+     * Label
+     *
+     * The held ESCO release's name for the group; null: it names none.
+     */
+    label: string | null;
+};
+
+/**
  * UkSocMappingOut
  *
  * ESCO occupation to UK SOC 2020, with every candidate kept (TAX1-02).
@@ -9009,6 +9218,39 @@ export type UkSocMappingOut = {
      * Candidates
      */
     candidates: Array<SocCandidateOut>;
+};
+
+/**
+ * UkTitleOut
+ *
+ * A UK job title the pinned ONS SOC 2020 coding index lists (ADR 0015): mark it "UK job
+ * title (ONS)". Picked, it stays the person's words (`POST .../origin/role/title`).
+ */
+export type UkTitleOut = {
+    /**
+     * Source
+     *
+     * A title of the UK job-title index.
+     */
+    source: 'uk_title_index';
+    /**
+     * Title
+     *
+     * As the index writes it.
+     */
+    title: string;
+    /**
+     * Soc Codes
+     *
+     * Every SOC 2020 unit group ONS codes it to.
+     */
+    soc_codes: Array<string>;
+    /**
+     * Isco Groups
+     *
+     * Every ISCO-08 unit group ONS codes it to, none picked.
+     */
+    isco_groups: Array<UkGroupOut>;
 };
 
 /**
@@ -11448,6 +11690,98 @@ export type ChooseRoleResponses = {
 };
 
 export type ChooseRoleResponse = ChooseRoleResponses[keyof ChooseRoleResponses];
+
+export type NameRoleData = {
+    body: NameRole;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/origin/role/title';
+};
+
+export type NameRoleErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type NameRoleError = NameRoleErrors[keyof NameRoleErrors];
+
+export type NameRoleResponses = {
+    /**
+     * Already the role; nothing changed.
+     */
+    200: ProfileOut;
+    /**
+     * Successful Response
+     */
+    201: ProfileOut;
+};
+
+export type NameRoleResponse = NameRoleResponses[keyof NameRoleResponses];
+
+export type ChooseClosestData = {
+    body: ChooseClosest;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/origin/role/closest';
+};
+
+export type ChooseClosestErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ChooseClosestError = ChooseClosestErrors[keyof ChooseClosestErrors];
+
+export type ChooseClosestResponses = {
+    /**
+     * Already the answer; nothing changed.
+     */
+    200: ProfileOut;
+    /**
+     * Successful Response
+     */
+    201: ProfileOut;
+};
+
+export type ChooseClosestResponse = ChooseClosestResponses[keyof ChooseClosestResponses];
 
 export type GetStrengthData = {
     body?: never;

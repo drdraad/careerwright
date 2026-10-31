@@ -287,13 +287,14 @@ def main(argv: list[str] | None = None) -> None:
                 _log.info(
                     "taxonomy", extra={"dataset": ESCO_RELEASE.dataset_id, "outcome": outcome}
                 )
-                # After the taxonomy: the fixture's target is stored with what it names in it.
-                seed(engine, settings)
                 directory = settings.datasets_dir
                 imported = import_reference_data(
                     engine, ((d, directory / d.pin.file_name) for d in DATASETS)
                 )
                 _log.info("reference data", extra=imported)
+                # After the taxonomy and the UK job-title index: the fixture's target is stored
+                # with what it names in them.
+                seed(engine, settings)
             case "migrate":
                 migrate_app(engine, args.revision)
             case "seed":

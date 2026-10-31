@@ -8,6 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type {
   DiscoveryOut,
+  OriginOut,
   PreferencesOut,
   ProfileDocument,
   ProfileOut,
@@ -15,10 +16,12 @@ import type {
   SlateOut,
   SuggestionOut,
   SupportNoteOut,
+  TitleMatchesOut,
   TurnOut,
   WorkspaceOut,
 } from "@/generated/api";
 import { useProfile } from "@/lib/queries";
+import { FIRST_QUESTION } from "@/lib/vocabulary";
 import { fakeApi, type Route } from "@/test/fakeApi";
 import { EvidenceProvider } from "./EvidenceDrawer";
 import { YouChapter } from "./YouChapter";
@@ -161,6 +164,12 @@ function renderYou(shown: ProfileOut = profile, where: WorkspaceOut = workspace)
     </QueryClientProvider>,
   );
   return userEvent.setup();
+}
+
+/** The first question comes first (Task 6d slice B): "Skip for now" goes on to how to start,
+ *  saving nothing, as a person who'd rather not say would. */
+async function skipFirstQuestion(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: "Skip for now" }));
 }
 
 /** The chapter reading its profile from the (scripted) API, as the workspace shell does. */
@@ -344,6 +353,7 @@ describe("[PROF-08][REC1-10] the chapter leads with how to start", () => {
       ]),
     );
     const user = renderYou();
+    await skipFirstQuestion(user);
 
     await user.click(await screen.findByRole("button", { name: "I know my direction" }));
 
@@ -369,10 +379,15 @@ describe("[PROF-08][REC1-10] the chapter leads with how to start", () => {
     // Session 2, the start page: "It's for inputing information about yourself and your job
     // preferences, not sure".
     fakeApi(routes({ preferences: prefs(null), turns: [] }));
-    renderYou();
-    const purpose = await screen.findByText(
-      "Careerwright helps you find work that could suit you, see what it would take, and plan a route you can afford.",
-    );
+    const user = renderYou();
+    const words =
+      "Careerwright helps you find work that could suit you, see what it would take, and plan a route you can afford.";
+    // Task 6d slice B: the first question now comes first, and the line leads it too.
+    const leading = await screen.findByText(words);
+    const first = screen.getByRole("heading", { name: FIRST_QUESTION });
+    expect(leading.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await skipFirstQuestion(user);
+    const purpose = await screen.findByText(words);
     const choice = screen.getByRole("heading", { name: "How would you like to start?" });
     expect(purpose).toBeVisible();
     expect(purpose.compareDocumentPosition(choice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -399,6 +414,7 @@ describe("[PROF-08][REC1-10] the chapter leads with how to start", () => {
       ]),
     );
     const user = renderYou();
+    await skipFirstQuestion(user);
 
     expect(
       await screen.findByRole("heading", { name: "How would you like to start?" }),
@@ -922,6 +938,165 @@ describe("[STATE-06][PROF-01] undo restores the earlier answers with their sourc
   });
 });
 
+describe("[DIV1-13][DIV1-14] the start: the first question, which is closest, then how to start", () => {
+  const named = (title: string, version: number): ProfileOut => ({
+    ...profile,
+    version,
+    document: {
+      ...answers,
+      current_role: { state: "provided", value: title, source_ref_id: "s-role" },
+    },
+  });
+  const origin = (
+    title: string,
+    kind: "ons" | "own_words",
+    decision: "not_yet" | "none_of_these" | null,
+  ): OriginOut =>
+    ({
+      profile_version: 2,
+      capability_version: 0,
+      role: {
+        text: title,
+        state: "not_in_esco",
+        chosen: false,
+        occupation: null,
+        choices: [],
+        kind,
+        uk_groups: kind === "ons" ? [{ code: "2221", label: "Nursing professionals" }] : [],
+        closest:
+          decision === null
+            ? null
+            : {
+                decision,
+                chosen: null,
+                groups: [
+                  {
+                    group: { code: "2221", label: "Nursing professionals" },
+                    occupations: [{ concept_id: "c2", title: "specialist nurse", esco_uri: "u2" }],
+                  },
+                ],
+              },
+      },
+      usual_skills: [],
+      destinations: [],
+      fewer_reasons: [],
+      connection: null,
+      salary_floor: null,
+    }) as unknown as OriginOut;
+  const titles = (q: string, matches: TitleMatchesOut["matches"], partial = false) =>
+    ({
+      query: q,
+      matches,
+      total: 0,
+      uk_total: matches.length,
+      limit: 8,
+      partial,
+    }) as unknown as TitleMatchesOut;
+
+  it("asks which ESCO occupation is closest after a UK title, and None of these goes on with what isn't known", async () => {
+    let decision: "not_yet" | "none_of_these" = "not_yet";
+    const state: Live = { preferences: prefs(null), turns: [], profile };
+    const sent = fakeApi(
+      liveRoutes(state, [
+        {
+          method: "GET",
+          path: /\/taxonomy\/titles$/,
+          answer: titles("Registered nurse", [
+            { source: "uk_title_index", title: "Registered nurse", soc_codes: [], isco_groups: [] },
+          ]),
+        },
+        {
+          method: "POST",
+          path: /\/origin\/role\/title$/,
+          status: 201,
+          answer: () => {
+            state.profile = named("Registered nurse", 2);
+            return state.profile;
+          },
+        },
+        {
+          method: "GET",
+          path: /\/origin$/,
+          answer: () => origin("Registered nurse", "ons", decision),
+        },
+        {
+          method: "POST",
+          path: /\/origin\/role\/closest$/,
+          status: 201,
+          answer: () => {
+            decision = "none_of_these";
+            return state.profile;
+          },
+        },
+      ]),
+    );
+    const { user } = renderLive();
+
+    await user.type(
+      await screen.findByRole("combobox", { name: "Your job title" }),
+      "Registered nurse",
+    );
+    await user.click(await screen.findByRole("option", { name: /UK job title \(ONS\)/ }));
+    const asked = await screen.findByRole("heading", { name: "Which of these is closest?" });
+    await waitFor(() => expect(asked).toHaveFocus());
+    expect(screen.getByRole("button", { name: "specialist nurse" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "None of these is my job" }));
+    const start = await screen.findByRole("heading", { name: "How would you like to start?" });
+    await waitFor(() => expect(start).toHaveFocus());
+    expect(
+      screen.getByText(
+        "Careerwright found “Registered nurse” in the UK job-title index and keeps it as your role, in your words. What this work asks for isn't known yet.",
+      ),
+    ).toBeVisible();
+    expect(sent.find((s) => s.path.endsWith("/origin/role/closest"))?.body).toEqual({
+      expected_version: 2,
+      concept_id: null,
+    });
+  });
+
+  it("keeps the person's own words and says what isn't known yet, asking for no other job", async () => {
+    const state: Live = { preferences: prefs(null), turns: [], profile };
+    fakeApi(
+      liveRoutes(state, [
+        { method: "GET", path: /\/taxonomy\/titles$/, answer: titles("Bookkeeping assistant", []) },
+        {
+          method: "POST",
+          path: /\/origin\/role\/title$/,
+          status: 201,
+          answer: () => {
+            state.profile = named("Bookkeeping assistant", 2);
+            return state.profile;
+          },
+        },
+        {
+          method: "GET",
+          path: /\/origin$/,
+          answer: () => origin("Bookkeeping assistant", "own_words", null),
+        },
+      ]),
+    );
+    const { user } = renderLive();
+
+    await user.type(
+      await screen.findByRole("combobox", { name: "Your job title" }),
+      "Bookkeeping assistant",
+    );
+    await user.click(
+      await screen.findByRole("option", { name: "Use my own words: “Bookkeeping assistant”" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "How would you like to start?" }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Careerwright keeps “Bookkeeping assistant” as your role, in your words. It couldn't match it in ESCO or the UK job-title index, so what this work asks for isn't known yet.",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Which of these is closest?" })).toBeNull();
+  });
+});
+
 describe("[UI-06] each new reply is announced once, and focus follows the first task", () => {
   it("moves focus to the first question once the person chooses how to start", async () => {
     const state = { preferences: prefs(null), turns: [] as TurnOut[] };
@@ -938,6 +1113,11 @@ describe("[UI-06] each new reply is announced once, and focus follows the first 
       ]),
     );
     const user = renderYou();
+    await skipFirstQuestion(user);
+    // The skip moves focus on to how to start (Task 6d slice B).
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "How would you like to start?" })).toHaveFocus(),
+    );
 
     await user.click(await screen.findByRole("button", { name: "Help me explore" }));
 
@@ -1157,6 +1337,7 @@ describe("[UI-06] focus moves to the question only when the entry choice is save
       </QueryClientProvider>,
     );
     const user = userEvent.setup();
+    await skipFirstQuestion(user);
 
     await user.click(await screen.findByRole("button", { name: "Help me explore" }));
     expect(await screen.findByRole("alert")).toBeVisible();
@@ -1209,6 +1390,10 @@ describe("[UI-04][S0-V08] one filled primary action in each state of the chapter
   it("is the entry choice at the start, Send once there is something to send, and the tray's Save while reviewing", async () => {
     fakeApi(routes({ preferences: prefs(null), turns: [] }));
     const start = renderYou();
+    // The first question has no bright action of its own: its titles are a list to pick from.
+    await screen.findByRole("heading", { name: FIRST_QUESTION });
+    expect(count()).toBe(0);
+    await skipFirstQuestion(start);
     await screen.findByRole("button", { name: "Help me explore" });
     // Until the first answer the bright action is the entry choice, never Send on an empty
     // field (the audit's F17): the two equal choices together, edged in the action colour,

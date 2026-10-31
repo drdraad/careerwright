@@ -42,7 +42,7 @@ from itertools import pairwise
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from careerwright.catalogue import taxonomy_store
+from careerwright.catalogue import taxonomy_store, uk_titles
 from careerwright.catalogue.ai_resilience import (
     AssessmentPacks,
     CheckedPack,
@@ -51,6 +51,7 @@ from careerwright.catalogue.ai_resilience import (
     assessment,
     filter_outcome,
 )
+from careerwright.catalogue.esco import concept_id as concept_id_of
 from careerwright.catalogue.pay import (
     FloorCounts,
     FloorVerdict,
@@ -60,11 +61,13 @@ from careerwright.catalogue.pay import (
     modelled_floor_verdict,
 )
 from careerwright.catalogue.records import (
+    GroupOccupation,
     OccupationDetail,
     OccupationFacts,
     SkillReach,
     SkillRef,
     TaxonomyRelease,
+    UkGroup,
 )
 from careerwright.catalogue.reference import modelled_pay_of, region_codes
 from careerwright.catalogue.taxonomy import SkillSearch, held_release, search_essential_skills
@@ -82,6 +85,7 @@ from careerwright.identity.workspaces import visible_workspace
 from careerwright.profile import discovery, explanation_store, slate_explanation, titles
 from careerwright.profile import store as profile_store
 from careerwright.profile.commands import (
+    DIRECT_ENTRY_LABEL,
     FieldUpdate,
     NewSource,
     ProfileView,
@@ -104,7 +108,12 @@ from careerwright.profile.document import (
     TextValue,
 )
 from careerwright.profile.interview import ProfileField
-from careerwright.profile.records import ExplanationRequest, SourceKind, TargetRecord
+from careerwright.profile.records import (
+    ExplanationRequest,
+    SourceKind,
+    TargetLink,
+    TargetRecord,
+)
 from careerwright.profile.role_evidence import cities_of, salary_floor
 from careerwright.profile.slate import (
     MIN_SHARED_SKILLS,
@@ -152,13 +161,21 @@ from careerwright.profile.slate_facts import (
     SuggestionReason,
     TitleIdea,
     TitleIdeaMatched,
+    TitleIdeaReason,
+    TitleKeptAsOwn,
     TitleMatchedSeveral,
     TitleNotMatched,
     TooGeneral,
     TooGeneralBy,
 )
 from careerwright.profile.store import stale_version
-from careerwright.profile.targets import Choice, PackTargets, stored_targets
+from careerwright.profile.targets import (
+    Choice,
+    PackTargets,
+    resolve_target,
+    stored_targets,
+    title_record,
+)
 from careerwright.profile.titles import ResolvedTitle
 from careerwright.vocabulary import WorkState
 
@@ -810,6 +827,9 @@ def compute_slate(
             PoolQuery(f"t{index}", target.text, SlateChannel.USER_PROPOSED, (item,), hits)
         )
     ideas: list[TitleIdea] = []
+    # A title idea ESCO doesn't hold is a suggestion only where the UK job-title index lists it
+    # (ADR 0015 decision 2), in its own list: never in the slate's pool.
+    listed = uk_titles.listed(tx, [h.title for h in proposal.hypotheses])
     for index, hypothesis in enumerate(proposal.hypotheses, start=1):
         based_on = list(hypothesis.based_on)
         if _one_word_style(hypothesis.based_on):
@@ -818,6 +838,7 @@ def compute_slate(
                 TitleIdea(
                     title=hypothesis.title,
                     based_on=based_on,
+                    reason=TitleIdeaReason.NOT_SEARCHED,
                     outcome=Outcome.NOT_SEARCHED,
                     occupations=None,
                 )
@@ -832,9 +853,20 @@ def compute_slate(
             if matched == 1
             else Outcome.MATCHED_SEVERAL
         )
+        reason = (
+            TitleIdeaReason.IN_ESCO
+            if matched
+            else TitleIdeaReason.IN_UK_TITLE_INDEX
+            if hypothesis.title in listed
+            else TitleIdeaReason.NOT_YET_FOUND
+        )
         ideas.append(
             TitleIdea(
-                title=hypothesis.title, based_on=based_on, outcome=outcome, occupations=matched
+                title=hypothesis.title,
+                based_on=based_on,
+                reason=reason,
+                outcome=outcome,
+                occupations=matched,
             )
         )
         if not hits:
@@ -871,11 +903,14 @@ def compute_slate(
     if slate.pool_size < POOL_TARGET and len(slate.suggestions) == SLATE_SIZE:
         notes.append(SmallPool(pool_size=slate.pool_size, pool_target=POOL_TARGET))
     slate = replace(slate, notes=[*notes, *slate.notes])
-    unmatched = [t.text for t in mine if not t.occupations]
+    unmatched = [t for t in mine if not t.occupations]
     ambiguous = [t for t in mine if len(t.occupations) > 1]
     if (unmatched or ambiguous) and len(slate.suggestions) < SLATE_SIZE:
         reasons: list[FewerReason] = [
-            *(TitleNotMatched(title=title) for title in unmatched),
+            *(
+                TitleKeptAsOwn(title=t.text) if t.declined else TitleNotMatched(title=t.text)
+                for t in unmatched
+            ),
             *(TitleMatchedSeveral(title=t.text, occupations=len(t.occupations)) for t in ambiguous),
         ]
         slate = replace(slate, fewer_reasons=[*slate.fewer_reasons, *reasons])
@@ -890,7 +925,7 @@ def compute_slate(
         titles={concept_id: occupation.title for concept_id, occupation in occupations.items()},
         salary_floor=floor,
         ai_filter=ai_filter,
-        unmatched_titles=unmatched,
+        unmatched_titles=[t.text for t in unmatched],
         ambiguous_titles=[t.text for t in ambiguous],
         connection=_connection(tx, slate, role, named, facts, frozenset(role_joins)),
     )
@@ -1353,6 +1388,202 @@ def choose_role(
     return view, bool(changed)
 
 
+class NameRole(BaseModel):
+    """The first answer in the person's own words: a UK job title picked from the type-ahead
+    (`GET /v1/taxonomy/titles`, a title of the UK job-title index), or anything typed ("Use
+    my own words"). Nothing is refused."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    expected_version: int = Field(ge=0)
+    title: TextValue = Field(description="The title, kept exactly as given.")
+
+
+def _role_text(document: ProfileDocument) -> str | None:
+    field = document.current_role
+    return field.value if field.state is FieldState.PROVIDED else None
+
+
+def name_role(
+    tx: Tx,
+    actor: Actor,
+    workspace_id: uuid.UUID,
+    command: NameRole,
+    now: datetime,
+    pack: PackTargets,
+) -> tuple[ProfileView, bool]:
+    """Answer "What do you do now, or what did you do last?" in the person's own words,
+    through the one profile write path: the current role becomes the title exactly as given,
+    citing their direct entry, and its record is decided afresh (`careerwright.profile.targets`:
+    a title the UK job-title index lists is an ONS title with ONS's groups; anything else is
+    the person's own words), so "Which of these is closest?" is asked for it anew. The same
+    title again changes nothing. Returns the profile and whether it changed."""
+    visible_workspace(tx, workspace_id, lock=True)
+    held_release(tx)
+    profile = current_profile(tx, workspace_id)
+    if command.expected_version != profile.version:
+        raise stale_version(profile.version)
+    if _role_text(profile.document) == command.title:
+        return profile, False  # already the role, in these words
+    source = NewSource(
+        source_ref_id=uuid.uuid4(),
+        kind=SourceKind.DIRECT_ENTRY,
+        label=DIRECT_ENTRY_LABEL,
+        observed_at=now,
+        recorded_by=actor.actor_id,
+    )
+    update = FieldUpdate(TextInput(state=FieldState.PROVIDED, value=command.title), source)
+    view, changed = commit_profile_version(
+        tx,
+        actor,
+        workspace_id,
+        command.expected_version,
+        {"current_role": update},
+        recite=frozenset({"current_role"}),
+    )
+    record = resolve_target(tx, workspace_id, command.title, pack)
+    profile_store.upsert_target_record(tx, workspace_id, record, actor.actor_id)
+    return view, bool(changed)
+
+
+@dataclass(frozen=True)
+class ClosestGroup:
+    """One ISCO-08 group the UK job-title index codes the role's title to, with the ESCO
+    occupations in it (none, where the held release has none)."""
+
+    group: UkGroup
+    occupations: list[GroupOccupation]
+
+
+class ClosestDecision(StrEnum):
+    """Where the person is with "Which of these is closest?"."""
+
+    NOT_YET = "not_yet"
+    CHOSEN = "chosen"  # they chose one: the role's ESCO occupation, their words kept
+    NONE_OF_THESE = "none_of_these"  # "None of these is my job": no ESCO occupation
+
+
+@dataclass(frozen=True)
+class ClosestOffer:
+    """ "Which of these is closest?", for a role whose title the UK job-title index lists and
+    no ESCO occupation holds as a label: the ESCO occupations in every ISCO-08 group ONS codes
+    it to, none picked, and "None of these is my job"."""
+
+    decision: ClosestDecision
+    groups: list[ClosestGroup]
+    chosen: uuid.UUID | None  # the occupation they chose, when they chose one
+
+
+def closest_offer(tx: Tx, record: TargetRecord) -> ClosestOffer | None:
+    """The closest question for a title's record, or None when it isn't asked: the index
+    doesn't list the title, or ESCO holds it as a label (then ESCO names it, or asks which)."""
+    if not record.isco_codes or record.label_matches:
+        return None
+    found = taxonomy_store.occupations_in_groups(tx, record.isco_codes)
+    labels = taxonomy_store.isco_labels(tx, record.isco_codes)
+    groups = [
+        ClosestGroup(UkGroup(code, labels.get(code)), [o for o in found if o.isco_code == code])
+        for code in record.isco_codes
+    ]
+    chosen: uuid.UUID | None = None
+    decision = ClosestDecision.NOT_YET
+    if record.link is TargetLink.NONE_OF_THESE:
+        decision = ClosestDecision.NONE_OF_THESE
+    elif record.link is TargetLink.OCCUPATION_CHOICE and record.occupation_uri is not None:
+        decision = ClosestDecision.CHOSEN
+        chosen = concept_id_of(record.occupation_uri)
+    return ClosestOffer(decision, groups, chosen)
+
+
+class ChooseClosest(BaseModel):
+    """The answer to "Which of these is closest?" for the person's current or last role."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    expected_version: int = Field(ge=0)
+    concept_id: uuid.UUID | None = Field(
+        description="One of the occupations the origin offers as closest (`role.closest`), "
+        'or null: "None of these is my job".'
+    )
+
+
+def choose_closest(
+    tx: Tx,
+    actor: Actor,
+    workspace_id: uuid.UUID,
+    command: ChooseClosest,
+    now: datetime,
+    pack: PackTargets,
+) -> tuple[ProfileView, bool]:
+    """Record the person's answer to "Which of these is closest?". An occupation becomes the
+    role's ESCO occupation, their words kept: the role cites their choice of it (a new profile
+    version, as `choose_role` does), and the title's record names it as the closest they
+    chose. "None of these is my job" records that the title names no ESCO occupation; it never
+    asks for another, and a closest occupation chosen before is let go (the role cites their
+    direct entry again). Returns the profile and whether the decision changed."""
+    visible_workspace(tx, workspace_id, lock=True)
+    held_release(tx)
+    profile = current_profile(tx, workspace_id)
+    if command.expected_version != profile.version:
+        raise stale_version(profile.version)
+    title = _role_text(profile.document)
+    record = title_record(tx, workspace_id, title, pack) if title else None
+    offer = closest_offer(tx, record) if record else None
+    if title is None or offer is None:
+        raise CareerwrightError(
+            ErrorCode.VALIDATION_FAILED,
+            "Your role has no closest occupations to choose from.",
+            stage=ErrorStage.PROFILE,
+            details={"field": "concept_id", "reason": "not_offered"},
+        )
+    offered = {o.concept_id: o for group in offer.groups for o in group.occupations}
+    if command.concept_id is not None and command.concept_id not in offered:
+        raise CareerwrightError(
+            ErrorCode.VALIDATION_FAILED,
+            "Choose one of the occupations offered as closest.",
+            stage=ErrorStage.PROFILE,
+            details={"field": "concept_id", "reason": "not_offered"},
+        )
+    if command.concept_id is None:
+        if offer.decision is ClosestDecision.NONE_OF_THESE:
+            return profile, False
+        source = NewSource(
+            source_ref_id=uuid.uuid4(),
+            kind=SourceKind.DIRECT_ENTRY,
+            label=DIRECT_ENTRY_LABEL,
+            observed_at=now,
+            recorded_by=actor.actor_id,
+        )
+        decided = resolve_target(tx, workspace_id, title, pack, none_of_these=True)
+    else:
+        if offer.chosen == command.concept_id:
+            return profile, False
+        occupation = offered[command.concept_id]
+        source = NewSource(
+            source_ref_id=uuid.uuid4(),
+            kind=SourceKind.OCCUPATION_CHOICE,
+            label=CHOSEN_AS_ROLE,
+            observed_at=now,
+            recorded_by=actor.actor_id,
+            locator=occupation.esco_uri,
+        )
+        choice = Choice(occupation.esco_uri, source.source_ref_id)
+        decided = resolve_target(tx, workspace_id, title, pack, choice, closest=True)
+    view = profile
+    if command.concept_id is not None or offer.decision is ClosestDecision.CHOSEN:
+        update = FieldUpdate(TextInput(state=FieldState.PROVIDED, value=title), source)
+        view, _ = commit_profile_version(
+            tx,
+            actor,
+            workspace_id,
+            command.expected_version,
+            {"current_role": update},
+            recite=frozenset({"current_role"}),
+        )
+    profile_store.upsert_target_record(tx, workspace_id, decided, actor.actor_id)
+    return view, True
+
+
 class RoleState(StrEnum):
     """What the person's current or last role names in ESCO."""
 
@@ -1373,6 +1604,10 @@ class FirstSlate:
     release: TaxonomyRelease
     role: ResolvedTitle | None
     state: RoleState
+    record: TargetRecord | None = None  # the role's title record: its words and its groups
+    # Every ISCO-08 group the UK job-title index codes the role's title to (an ONS title's).
+    uk_groups: list[UkGroup] = field(default_factory=list)
+    closest: ClosestOffer | None = None  # "Which of these is closest?", when it is asked
     occupation: OccupationDetail | None = None  # the role's occupation, when it names one
     choices: list[OccupationFacts] = field(default_factory=list)  # an ambiguous role's
     slate: Slate | None = None  # None until the role names one occupation
@@ -1394,6 +1629,14 @@ def first_slate(
     nothing = FirstSlate(profile.version, release, role, RoleState.NOT_ANSWERED)
     if role is None:
         return nothing
+    record = title_record(tx, workspace_id, role.text, pack)
+    labels = taxonomy_store.isco_labels(tx, record.isco_codes)
+    nothing = replace(
+        nothing,
+        record=record,
+        uk_groups=[UkGroup(code, labels.get(code)) for code in record.isco_codes],
+        closest=closest_offer(tx, record),
+    )
     if len(role.occupations) != 1:
         choices = taxonomy_store.occupation_facts(tx, role.occupations, skills_shown=SKILLS_SHOWN)
         state = RoleState.AMBIGUOUS if role.occupations else RoleState.NOT_IN_ESCO
@@ -1423,6 +1666,9 @@ def first_slate(
         release=release,
         role=role,
         state=RoleState.ESCO,
+        record=nothing.record,
+        uk_groups=nothing.uk_groups,
+        closest=nothing.closest,
         occupation=taxonomy_store.occupation(tx, concept),
         choices=[],
         slate=slate,

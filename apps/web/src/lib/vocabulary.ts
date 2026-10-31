@@ -32,6 +32,10 @@ import type {
   Step,
   SuggestionOut,
   TargetCoverage,
+  TargetKind,
+  TitleIdeaReason,
+  TooGeneralBy,
+  UkGroupOut,
   WorkState,
 } from "@/generated/api";
 import { listLimit } from "./bounds";
@@ -561,6 +565,7 @@ export const RECORD_PART: Record<RecordPart, string> = {
 export const RESOLUTION: Record<Resolution, string> = {
   esco: "Found in ESCO",
   ambiguous: "Matched to several occupations in ESCO",
+  uk_title: "Found in the UK job-title index; Careerwright couldn't match it in ESCO",
   provisional: "Your own title: Careerwright couldn't match it in ESCO",
   not_found: "Careerwright couldn't match it in ESCO",
 };
@@ -607,46 +612,65 @@ export const ANSWER_SOURCE: Record<ProfileField, string> = {
   minimum_salary: "The lowest pay you'd accept",
 };
 
+type FoundNoWork = Extract<SlateNote, { reason: "answer_found_no_work" }>;
+const MAIN_NAME = "main name of a skill ESCO lists as essential holds all the words of";
+const COMMON_ONLY = "only common words, which Careerwright doesn't search for";
+/** "its search “a”", or "any of its searches “a” and “b”". */
+const its = (texts: readonly string[], several: string) =>
+  texts.length === 1 ? `its search ${q(texts[0] ?? "")}` : `${several} ${quotedList(texts)}`;
+
+/** What each way of finding no work says, in a fixed order: for an answer that is its own one
+ *  search (`own`), and as a part of a longer answer's line (`part`). Keyed by every way the API
+ *  can send, so a new one fails the type check until it has words (Task 6d slice B). */
+const FOUND_NO_WORK: Record<
+  SearchDid,
+  { own: (fact: FoundNoWork) => string; part: (texts: string[], fact: FoundNoWork) => string }
+> = {
+  read_main_names: {
+    own: (fact) => `No ${MAIN_NAME} ${q(fact.answer)}, so it found no work.`,
+    part: (texts) => `no ${MAIN_NAME} ${its(texts, "any of its searches")}`,
+  },
+  only_common_words: {
+    own: (fact) => `${opening(fact.answer)} has ${COMMON_ONLY}, so it found no work.`,
+    part: (texts) =>
+      `${its(texts, "its searches")} ${texts.length > 1 ? "have" : "has"} ${COMMON_ONLY}`,
+  },
+  no_shared_occupation: {
+    own: (fact) =>
+      `Careerwright found no other occupation in ESCO that shares ${fact.min_shared} or more essential skills with ${q(fact.answer)}, your own title, so it found no work.`,
+    part: (texts, fact) =>
+      `Careerwright found no other occupation in ESCO that shares ${fact.min_shared} or more essential skills with ${its(texts, "any of its searches")}, ${texts.length > 1 ? "your own titles" : "your own title"}`,
+  },
+};
+const FOUND_NO_WORK_ORDER = Object.keys(FOUND_NO_WORK) as SearchDid[];
+
 /** What an answer's searches did that found no work: each says what the search did, never
  *  what ESCO holds (a search reads the main names of essential skills only). */
-function answerFoundNoWork(fact: Extract<SlateNote, { reason: "answer_found_no_work" }>): string {
+function answerFoundNoWork(fact: FoundNoWork): string {
   const did = (kind: SearchDid) =>
     fact.searches.filter((search) => search.did === kind).map((search) => search.text);
-  const read = did("read_main_names");
-  const common = did("only_common_words");
-  const joined = did("no_shared_occupation");
-  const mainName = "main name of a skill ESCO lists as essential holds all the words of";
-  const commonOnly = "only common words, which Careerwright doesn't search for";
+  const found = FOUND_NO_WORK_ORDER.filter((kind) => did(kind).length > 0);
   if (fact.own_words) {
-    return read.length > 0
-      ? `No ${mainName} ${q(fact.answer)}, so it found no work.`
-      : `${opening(fact.answer)} has ${commonOnly}, so it found no work.`;
+    const first = found[0] ?? "only_common_words";
+    return FOUND_NO_WORK[first].own(fact);
   }
-  const its = (texts: string[], several: string) =>
-    texts.length === 1 ? `its search ${q(texts[0] ?? "")}` : `${several} ${quotedList(texts)}`;
-  const parts: string[] = [];
-  if (read.length > 0) parts.push(`no ${mainName} ${its(read, "any of its searches")}`);
-  if (common.length > 0) {
-    parts.push(
-      `${its(common, "its searches")} ${common.length > 1 ? "have" : "has"} ${commonOnly}`,
-    );
-  }
-  if (joined.length > 0) {
-    const own = joined.length > 1 ? "your own titles" : "your own title";
-    parts.push(
-      `Careerwright found no other occupation in ESCO that shares ${fact.min_shared} or more essential skills with ${its(joined, "any of its searches")}, ${own}`,
-    );
-  }
+  const parts = found.map((kind) => FOUND_NO_WORK[kind].part(did(kind), fact));
   return `${opening(fact.answer)} found no work: ${parts.join(", and ")}.`;
 }
 
+type TooGeneralFact = Extract<SlateNote, { reason: "too_general" }>;
+/** What a search too general to find work on its own did, by what it reached too many of. */
+const TOO_GENERAL_BY: Record<TooGeneralBy, (fact: TooGeneralFact) => string> = {
+  occupations: (fact) =>
+    `reached ${fact.occupations} occupations in ESCO through the main names of their essential skills, too many to choose from on its own`,
+  skills: (fact) =>
+    `matched the main names of ${fact.skills} different essential skills in ESCO, none of them just those words, so it's too general to choose work from on its own`,
+};
+
 /** A search too general to find work on its own: what it did, and what would help. A model's
  *  search is the one too general, so the person is asked to say more only of their own words. */
-function tooGeneral(fact: Extract<SlateNote, { reason: "too_general" }>): string {
-  const did =
-    fact.by === "occupations"
-      ? `reached ${fact.occupations} occupations in ESCO through the main names of their essential skills, too many to choose from on its own`
-      : `matched the main names of ${fact.skills} different essential skills in ESCO, none of them just those words, so it's too general to choose work from on its own`;
+function tooGeneral(fact: TooGeneralFact): string {
+  const did = TOO_GENERAL_BY[fact.by](fact);
   if (fact.own_words) {
     return `${opening(fact.search)} ${did}. Say more about it, such as what it's about or who it's for.`;
   }
@@ -686,6 +710,9 @@ export const FEWER_REASON: Worded<FewerReason> = {
     `Your exclusions removed ${count(fact.count, "occupation", "occupations")}.`,
   title_not_matched: (fact) =>
     `Careerwright couldn't match ${q(fact.title)} to an occupation in ESCO, so it can't join other work to that title by shared skills. Choose the ESCO occupation closest to it.`,
+  // Task 6d slice B: "None of these is my job". What isn't known yet; never asks for another.
+  title_kept_as_own: (fact) =>
+    `Careerwright keeps ${q(fact.title)} in your words and joins no other work to it by shared skills, because you said none of the ESCO occupations it offered is your job.`,
   title_matched_several: (fact) =>
     `Careerwright matched ${q(fact.title)} to ${fact.occupations} occupations in ESCO, so it can't join other work to that title by shared skills until you choose which one you mean.`,
   no_shared_occupation: (fact) =>
@@ -791,15 +818,81 @@ export function aiFilterWords(filter: AiResilienceFilterOut): string | null {
   return `AI Resilience Score filter, ${minimum} on the lower end of ${ranges}: ${filter.below_minimum} left out below it; ${unscored}.`;
 }
 
-/** The titles Careerwright thought of but couldn't match, in one line; null with none. */
+/** Where each title idea is shown, by what Careerwright did with it (Task 6d slice B; ADR 0015
+ *  decision 2): an idea ESCO holds is in the slate itself; one the UK job-title index lists is
+ *  a suggestion in its own list beside the slate; one no list holds is named as not yet found,
+ *  never as a suggestion; one resting only on one-word answers about how the person likes to
+ *  work wasn't looked up, which that note already says. */
+export const TITLE_IDEA_SHOWN: Record<TitleIdeaReason, "uk_title_index" | "not_yet_found" | null> =
+  {
+    in_esco: null,
+    in_uk_title_index: "uk_title_index",
+    not_yet_found: "not_yet_found",
+    not_searched: null,
+  };
+
+/** The title ideas shown in a list of their own: those the UK job-title index lists. */
+export const titleIdeasListed = (ideas: SlateOut["title_ideas"]) =>
+  ideas.filter((idea) => TITLE_IDEA_SHOWN[idea.reason] === "uk_title_index");
+
+/** The heading of the list beside the slate, and what each idea in it says. */
+export const UK_TITLE_IDEAS = {
+  heading: "Title ideas found in the UK job-title index",
+  found: "Found in the UK job-title index (ONS). Not compared with your experience yet.",
+  from: "Careerwright thought of it from",
+} as const;
+
+/** The titles Careerwright thought of but found in no list, in one line; null with none. */
 export function titleIdeasWords(ideas: SlateOut["title_ideas"]): string | null {
-  const unmatched = ideas
-    .filter((idea) => idea.outcome === "not_matched")
+  const unfound = ideas
+    .filter((idea) => TITLE_IDEA_SHOWN[idea.reason] === "not_yet_found")
     .map((idea) => idea.title);
-  return unmatched.length === 0
+  return unfound.length === 0
     ? null
-    : `Titles Careerwright thought of but couldn't match to an occupation in ESCO, so not suggested: ${unmatched.join(", ")}.`;
+    : `Titles Careerwright thought of but hasn't found in ESCO or the UK job-title index yet, so not suggested: ${unfound.join(", ")}.`;
 }
+
+// The first question (Task 6d slice B; plan section 4, "The first ten seconds"; ADR 0015): any
+// UK title, recognised as the person types, and their own words always kept.
+
+/** The first question, in the plan's words. */
+export const FIRST_QUESTION = "What do you do now, or what did you do last?";
+
+/** The first question's words. The type-ahead's partial question is the card's own. */
+export const FIRST_ANSWER = {
+  field: "Your job title",
+  placeholder: "Start typing your job title",
+  ukTitle: "UK job title (ONS)",
+  escoTitle: (title: string) => `In ESCO as ${title}`,
+  partial: "Careerwright couldn't match that title in ESCO. Is it one of these?",
+  ownWords: (typed: string) => `Use my own words: ${q(typed)}`,
+  noneOfThese: "None of these is my job",
+  nothing: "Careerwright found no job title holding those words.",
+  looking: "Looking for job titles…",
+  skip: "Skip for now",
+} as const;
+
+/** "Which of these is closest?", after a UK job title (ADR 0015 decision 3). */
+export const CLOSEST = {
+  question: "Which of these is closest?",
+  found: (title: string, groups: number) =>
+    `Careerwright found ${q(title)} in the UK job-title index and looked up the ESCO occupations in the ${groups === 1 ? "group" : "groups"} it's in.`,
+  group: (group: UkGroupOut) =>
+    group.label === null ? `ISCO-08 group ${group.code}` : `${group.label} (ISCO-08 ${group.code})`,
+  empty: "Careerwright found no ESCO occupation in this group.",
+  more: (count: number) => `Show ${count} more`,
+  noneOfThese: "None of these is my job",
+} as const;
+
+/** What Careerwright did with a first answer it can name no ESCO occupation for: what isn't
+ *  known yet, never a request to pick another job. By the title's kind; null: no line. */
+export const ROLE_KEPT: Record<TargetKind, (title: string) => string | null> = {
+  esco: () => null,
+  ons: (title) =>
+    `Careerwright found ${q(title)} in the UK job-title index and keeps it as your role, in your words. What this work asks for isn't known yet.`,
+  own_words: (title) =>
+    `Careerwright keeps ${q(title)} as your role, in your words. It couldn't match it in ESCO or the UK job-title index, so what this work asks for isn't known yet.`,
+};
 
 /** The early requirement sketch's label: never a checked or best route. */
 export const SKETCH_LABEL = "Early sketch, not a checked route";
@@ -820,6 +913,7 @@ export const RESEARCH_STATUS: Record<Resolution, (coverage: TargetCoverage) => s
   esco: () => "Requirements from ESCO; not yet compared with your experience.",
   ambiguous: () =>
     "Careerwright matched this title to several occupations in ESCO. Choose the one you mean.",
+  uk_title: (coverage) => UNMATCHED_STATUS[coverage],
   provisional: (coverage) => UNMATCHED_STATUS[coverage],
   not_found: (coverage) => UNMATCHED_STATUS[coverage],
 };

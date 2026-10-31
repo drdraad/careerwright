@@ -5,6 +5,7 @@ import dataclasses
 import json
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 import sqlalchemy as sa
@@ -17,7 +18,13 @@ from careerwright.api.deps import ApiDependencies
 from careerwright.capability.commands import committed_data, pack_targets
 from careerwright.catalogue import taxonomy_store
 from careerwright.catalogue.taxonomy import search_essential_skills
-from careerwright.cli import import_taxonomy, migrate_app, seed, seed_fixture
+from careerwright.cli import (
+    import_reference_data,
+    import_taxonomy,
+    migrate_app,
+    seed,
+    seed_fixture,
+)
 from careerwright.db import create_engine, system_transaction
 from careerwright.identity import store as identity_store
 from careerwright.identity.keyring import Keyring
@@ -34,13 +41,20 @@ from careerwright.profile.document import (
     apply_updates,
     empty_profile,
 )
-from careerwright.profile.records import SourceKind, TargetCoverage, TargetLink, TargetRecord
+from careerwright.profile.records import (
+    SourceKind,
+    TargetCoverage,
+    TargetKind,
+    TargetLink,
+    TargetRecord,
+)
 from careerwright.profile.targets import resolve_target, target_titles
 from careerwright.seed import FIXTURE_WORKSPACE_ID, INVITED_ACTORS
 from careerwright.vocabulary import DataMode
 from tests.support.client import ApiClient
 from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
 from tests.support.infra import API_BASE, Infra, migrator_engine
+from tests.support.reference_data import sample_files
 
 pytestmark = pytest.mark.integration
 
@@ -54,12 +68,14 @@ def head() -> str:
 
 
 @pytest.mark.req("BND1-14")
-def test_a_fresh_database_migrates_to_head_and_seeds(infra: Infra) -> None:
+def test_a_fresh_database_migrates_to_head_and_seeds(infra: Infra, tmp_path: Path) -> None:
     database = f"careerwright_fresh_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     engine = migrator_engine(infra, database)
     try:
         migrate_app(engine)
+        # As setup does: the UK job-title index before the seed decides the fixture's target.
+        import_reference_data(engine, sample_files(tmp_path))
         seed(engine, infra.ops_settings(database))
         seed(engine, infra.ops_settings(database))  # seeding twice changes nothing
     finally:
@@ -332,7 +348,7 @@ def test_0032_fills_the_essential_skill_search_for_the_release_already_held(
 
 @pytest.mark.req("PROF-10", "BND1-14")
 def test_0034_gives_each_stored_target_its_record_and_folds_ampersands_and_accents(
-    infra: Infra,
+    infra: Infra, tmp_path: Path
 ) -> None:
     # Task 6d slice A: existing profiles migrate forward, each target title gets its record by
     # the same rules as `resolve_target`; and the concept key, defined only by migrations, is
@@ -348,6 +364,7 @@ def test_0034_gives_each_stored_target_its_record_and_folds_ampersands_and_accen
     try:
         migrate_app(engine, "0033")
         assert import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE) == "imported"
+        import_reference_data(engine, sample_files(tmp_path))  # the UK job-title index
         seed_fixture(engine, infra.ops_settings(database))  # as seeded before 0034
         with system_transaction(engine) as tx:
             before = [
@@ -437,7 +454,7 @@ NEWER_TARGETS = ["bicycle mechanic", "Registered nurse (adult)"]
 
 @pytest.mark.req("PROF-10", "BND1-14")
 def test_0035_gives_every_version_s_targets_a_record_so_an_older_discovery_still_opens(
-    infra: Infra, api_deps: ApiDependencies, ada: str
+    infra: Infra, api_deps: ApiDependencies, ada: str, tmp_path: Path
 ) -> None:
     # Task 6d slice A fix round 1 (the target records' review, Important 1): 0034 gave a record
     # only to each workspace's newest targets. A discovery is read from the version it pinned,
@@ -454,6 +471,7 @@ def test_0035_gives_every_version_s_targets_a_record_so_an_older_discovery_still
     try:
         migrate_app(engine, "0033")
         assert import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE) == "imported"
+        import_reference_data(engine, sample_files(tmp_path))  # the UK job-title index
         seed_fixture(engine, infra.ops_settings(database))
         with system_transaction(engine) as tx:
             workspace, discovery = add_discovery_then_a_choice(tx, deps.keyring)
@@ -538,6 +556,58 @@ def test_0035_gives_every_version_s_targets_a_record_so_an_older_discovery_still
     assert opened.status_code == 200, opened.text
     assert opened.json()["unmatched_titles"] == OLDER_TARGETS[1:]
     assert note.status_code == 202, note.text
+
+
+@pytest.mark.req("PROF-10", "DIV1-13", "MAP1-05", "BND1-14")
+def test_0036_records_uk_titles_and_takes_another_nursing_field_off_the_adult_pack_nurse(
+    infra: Infra, tmp_path: Path
+) -> None:
+    # Task 6d slice B: a stored record whose title the UK job-title index lists becomes an ONS
+    # title with its codes, and one the bracket rule took to the pack's adult nurse though its
+    # qualifier names another nursing field is decided again: neither by any other rule than
+    # `resolve_target`'s.
+    database = f"careerwright_uk_titles_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    engine = migrator_engine(infra, database)
+    titles = ["Prompt engineer", "Registered nurse (mental health)", "Registered nurse (adult)"]
+    try:
+        migrate_app(engine, "0033")
+        assert import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE) == "imported"
+        import_reference_data(engine, sample_files(tmp_path))  # the UK job-title index
+        seed_fixture(engine, infra.ops_settings(database))
+        with system_transaction(engine) as tx:
+            workspace = add_targets(tx, titles)
+        migrate_app(engine, "0035")
+        with system_transaction(engine) as tx:
+            before = held_records(tx, workspace, titles)
+        migrate_app(engine)
+        with system_transaction(engine) as tx:
+            after = held_records(tx, workspace, titles)
+            pack = pack_targets(committed_data())
+            decided = [resolve_target(tx, workspace, title, pack) for title in titles]
+    finally:
+        engine.dispose()
+
+    assert [(r.kind, r.link, r.pack_target_id) for r in before] == [
+        (TargetKind.OWN_WORDS, TargetLink.NONE, None),
+        (TargetKind.OWN_WORDS, TargetLink.PACK_CROSSWALK, "registered-nurse-manchester"),
+        (TargetKind.OWN_WORDS, TargetLink.PACK_CROSSWALK, "registered-nurse-manchester"),
+    ]
+    assert after == decided
+    assert (after[0].kind, after[0].soc_codes, after[0].isco_codes) == (
+        TargetKind.ONS,
+        ("2134",),
+        ("2512",),
+    )
+    assert [(r.link, r.occupation_uri, r.coverage, r.pack_target_id) for r in after[1:]] == [
+        (TargetLink.NONE, None, TargetCoverage.NOT_COVERED, None),
+        (
+            TargetLink.PACK_CROSSWALK,
+            before[2].occupation_uri,
+            TargetCoverage.PACK_TARGET,
+            "registered-nurse-manchester",
+        ),
+    ]
 
 
 def add_discovery_then_a_choice(tx: sa.Connection, keyring: Keyring) -> tuple[uuid.UUID, uuid.UUID]:
