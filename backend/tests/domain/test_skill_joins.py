@@ -11,6 +11,7 @@ from careerwright.catalogue.records import SkillNeighbour
 from careerwright.profile.discovery import EvidenceItem
 from careerwright.profile.interview import ProfileField
 from careerwright.profile.slate import (
+    JOIN_HITS,
     MIN_SHARED_SKILLS,
     Direction,
     Hit,
@@ -19,6 +20,7 @@ from careerwright.profile.slate import (
     SlateChannel,
     build_pool,
     choose_slate,
+    skill_join,
     skill_join_hits,
     unexpected_connection,
 )
@@ -105,6 +107,35 @@ def test_a_join_is_bounded_and_its_order_is_deterministic() -> None:
     assert len(first) == 10
     assert first == again
     assert skill_join_hits(30, []) == ()
+
+
+@pytest.mark.req("DIV1-02", "DIV1-06")
+def test_a_join_never_cuts_inside_a_tie() -> None:
+    # Task W2B re-review 2, N-M1: the warehouse manager's places 23 to 47 tie exactly (equal
+    # share, equal shared count), and the best 30 kept 8 of them by concept ID. The cut now
+    # runs to the end of the tied group.
+    better = [SkillNeighbour(concept(f"better {n}"), 8, 20) for n in range(2)]
+    tied = [SkillNeighbour(concept(f"tied {n}"), 5, 20) for n in range(4)]
+    worse = SkillNeighbour(concept("worse"), 4, 20)
+
+    hits = skill_join_hits(30, [worse, *tied, *better], limit=3)
+
+    assert {h.concept_id for h in hits} == {n.concept_id for n in [*better, *tied]}
+    assert len(skill_join_hits(30, [worse, *tied, *better], limit=2)) == 2  # a cut between ties
+
+
+@pytest.mark.req("DIV1-02")
+def test_a_join_says_how_many_it_reached_and_which_it_did_not_keep() -> None:
+    # Task W2B re-review 2, N-M2: what a join reaches past its best 30 is counted, not lost.
+    reached = [SkillNeighbour(concept(f"o{n}"), MIN_SHARED_SKILLS + n, 40) for n in range(35)]
+    below = SkillNeighbour(concept("one shared skill"), 1, 20)
+
+    query = skill_join(
+        "j1", "data analyst", SlateChannel.SHARED_SKILLS, (ROLE,), 36, [*reached, below]
+    )
+
+    assert (len(query.hits), query.reach) == (JOIN_HITS, 35)
+    assert query.unkept == {concept(f"o{n}") for n in range(5)}  # the five sharing fewest
 
 
 @pytest.mark.req("DIV1-10", "DIV1-12")

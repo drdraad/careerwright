@@ -226,6 +226,8 @@ const slate = (suggestions: SuggestionOut[]): SlateOut => ({
       channel: "tasks",
       based_on: [{ field: "enjoyed_tasks", text: "repairing physical objects" }],
       hits: 30,
+      reach: 30,
+      too_general: false,
     },
   ],
   unsearchable_queries: [],

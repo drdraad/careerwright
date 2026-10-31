@@ -15,6 +15,7 @@ import sqlalchemy as sa
 
 from careerwright.capability.strength import SCRIPTED_STRENGTHS
 from careerwright.catalogue.esco import ESCO_RELEASE
+from careerwright.catalogue.taxonomy import MAX_REACH, search_essential_skills
 from careerwright.cli import import_taxonomy, migrate_app
 from careerwright.db import Tx, system_transaction
 from careerwright.profile.slate import POOL_LIMIT, POOL_TARGET
@@ -96,34 +97,139 @@ def observed_for(tx: Tx, profile: dict[str, Any]) -> dict[str, Any]:
 def test_a_search_keeps_all_the_work_one_skill_reaches_so_no_tie_is_cut_by_title(
     full_release: sa.Engine,
 ) -> None:
-    # Task W2B re-review I-B: "planning shifts" reaches 58 occupations through one essential
-    # skill ("plan shifts of employees"), so all 58 tie. A search kept its first 30 by title
-    # (bricklaying supervisor to laundry and dry cleaning manager), so the warehouse worker,
-    # which "stacking goods" reaches too, never met it, and the slate began alphabetically.
+    # Task W2B re-review I-B: "planning shifts" reached 58 occupations through one essential
+    # skill, so all 58 tied; a search kept its first 30 by title, so the warehouse worker,
+    # which "stacking goods" reaches too, never met it. Since fix round 3 "planning shifts" is
+    # too general to find work on its own (more than 50 occupations), so the same case is
+    # "stocking shelves": 44 occupations through "stock shelves". The ticket issuing clerk,
+    # 42nd by title, is the one "upselling products" reaches too.
     with system_transaction(full_release) as tx:
-        slate = observed_for(tx, {"confident_tasks": ["planning shifts", "stacking goods"]})
+        slate = observed_for(tx, {"confident_tasks": ["stocking shelves", "upselling products"]})
 
     hits = {q["text"]: q["hits"] for q in slate["queries"]}
     first = slate["suggestions"][0]
-    assert hits["planning shifts"] == 58  # every occupation it reaches, within the pool bound
-    assert first["title"] == "warehouse worker"
-    assert {e["text"] for e in first["linked_evidence"]} == {"planning shifts", "stacking goods"}
+    assert hits["stocking shelves"] == 44  # every occupation it reaches, within the pool bound
+    assert first["title"] == "ticket issuing clerk"
+    assert {e["text"] for e in first["linked_evidence"]} == {
+        "stocking shelves",
+        "upselling products",
+    }
+
+
+@pytest.mark.req("DIV1-02", "DIV1-06")
+def test_a_search_never_cuts_inside_a_tie(full_release: sa.Engine) -> None:
+    # Task W2B re-review 2, N-M1: "stocking shelves" reaches 44 occupations, all through
+    # "stock shelves", so they tie on rank and order by the share of their essential skills:
+    # 1 of 8, 1 of 22, then two with 1 of 27 each. A cut after 3 keeps both of those.
+    with system_transaction(full_release) as tx:
+        cut = search_essential_skills(tx, "stocking shelves", 3)
+        whole = search_essential_skills(tx, "stocking shelves", MAX_REACH)
+
+    assert cut.total == whole.total == 44
+    assert [r.concept_id for r in cut.reached] == [r.concept_id for r in whole.reached[:4]]
+    assert (cut.skills, cut.exact) == (1, True)  # one skill, named exactly by its words
 
 
 @pytest.mark.req("DIV1-02")
 def test_the_working_pool_keeps_its_bound_and_counts_the_work_beyond_it(
     full_release: sa.Engine,
 ) -> None:
-    # "Maintaining equipment" alone reaches 242 occupations through 74 essential skills; a
-    # search keeps the pool's bound of them, and two searches together reach more than the
-    # pool holds, so it is cut across families and the rest counted (DIV1-02).
+    # Four specific searches together reach 178 occupations (each 44 to 48, through one
+    # skill), more than the pool holds, so it is cut across families and the rest counted
+    # (DIV1-02). Fix round 3: the two general searches this test used ("maintaining
+    # equipment", 242; "planning shifts", 58) no longer find work on their own.
+    tasks = [
+        "stocking shelves",
+        "processing payments",
+        "interpreting 2D plans",
+        "analysing test data",
+    ]
     with system_transaction(full_release) as tx:
-        slate = observed_for(tx, {"confident_tasks": ["maintaining equipment", "planning shifts"]})
+        slate = observed_for(tx, {"confident_tasks": tasks})
 
-    hits = {q["text"]: q["hits"] for q in slate["queries"]}
-    assert hits["maintaining equipment"] == POOL_LIMIT
+    queries = slate["queries"]
+    assert [(q["hits"], q["too_general"]) for q in queries] == [
+        (44, False),
+        (48, False),
+        (45, False),
+        (44, False),
+    ]
+    assert all(q["hits"] == q["reach"] for q in queries)  # a search that can find work keeps all
     assert slate["pool_size"] == POOL_LIMIT
-    assert slate["beyond_pool_limit"] > 0
+    assert slate["beyond_pool_limit"] == 178 - POOL_LIMIT
+
+
+@pytest.mark.req("DIV1-06", "DIV1-08")
+@pytest.mark.parametrize(
+    ("answer", "reach"),
+    [
+        ("solving problems", "77 occupations"),
+        ("writing reports", "217 occupations"),
+        ("working in a team", "242 occupations"),
+        ("training staff", "10 different ESCO skills"),
+        ("analysing data", "92 occupations"),
+    ],
+)
+def test_an_answer_too_general_to_find_work_alone_finds_none_and_says_why(
+    full_release: sa.Engine, answer: str, reach: str
+) -> None:
+    # Task W2B re-review 2, N-I2: each scattered its slate across unrelated work ("writing
+    # reports": an ambulance driver, a chiropractor, a city councillor, a lieutenant).
+    with system_transaction(full_release) as tx:
+        slate = observed_for(tx, {"enjoyed_tasks": [answer]})
+
+    assert slate["suggestions"] == []
+    [query] = slate["queries"]
+    assert query["too_general"]
+    assert any(f"“{answer.capitalize()}” is part of {reach}" in note for note in slate["notes"])
+
+
+@pytest.mark.req("DIV1-06", "DIV1-08")
+def test_a_general_answer_adds_weight_to_all_the_work_another_answer_found(
+    full_release: sa.Engine,
+) -> None:
+    # Task W2B fix round 3 (found while checking DSC-19): "writing reports" reaches 217
+    # occupations and kept its best 127, which leave out the nursery school head teacher
+    # ("write work-related reports"), so the one occupation both answers reach lost the
+    # general answer's weight. It now adds to every occupation another search found.
+    with system_transaction(full_release) as tx:
+        slate = observed_for(tx, {"enjoyed_tasks": ["caring for children", "writing reports"]})
+
+    first = slate["suggestions"][0]
+    assert first["title"] == "nursery school head teacher"
+    assert {e["text"] for e in first["linked_evidence"]} == {
+        "caring for children",
+        "writing reports",
+    }
+    reports = next(q for q in slate["queries"] if q["text"] == "writing reports")
+    assert (reports["hits"], reports["reach"], reports["too_general"]) == (1, 217, True)
+
+
+@pytest.mark.req("REC1-03", "DIV1-10", "DIV1-12")
+def test_where_someone_likes_to_work_is_searched_and_a_specific_answer_s_work_comes_first(
+    full_release: sa.Engine,
+) -> None:
+    # Task W2B re-review 2: N-I3, "working outdoors" as how someone likes to work reaches
+    # work through "work in outdoor conditions", while the one-word "structured" is not
+    # searched; N-M4, the bicycle mechanic, the only work "repairing bicycles" reaches, comes
+    # before the 12 outdoor occupations.
+    profile = {
+        "enjoyed_tasks": ["repairing bicycles"],
+        "work_style": ["working outdoors", "structured"],
+    }
+    with system_transaction(full_release) as tx:
+        slate = observed_for(tx, profile)
+
+    assert {q["text"]: q["hits"] for q in slate["queries"]} == {
+        "repairing bicycles": 1,
+        "working outdoors": 12,
+    }
+    assert slate["suggestions"][0]["title"] == "bicycle mechanic"
+    assert any("ESCO lists “work in outdoor conditions”" in line
+               for s in slate["suggestions"][1:] for line in s["why_it_could_suit"])  # fmt: skip
+    [style] = [note for note in slate["notes"] if "How you like to work" in note]
+    assert "“structured”" in style
+    assert "“working outdoors”)" not in style
 
 
 @pytest.mark.req("BND1-11")

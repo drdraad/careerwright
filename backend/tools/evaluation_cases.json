@@ -403,9 +403,10 @@
         {"check": "includes_direction", "direction": "less_familiar"},
         {"check": "searched_through_skills"},
         {"check": "work_style_not_searched"},
-        {"check": "small_pool_has_reason"}
+        {"check": "small_pool_has_reason"},
+        {"check": "missed_answers_named"}
       ],
-      "note": "Task W2 slice W2B fix round 2: \"repairing physical objects\" is in no single ESCO skill's label and \"practical\" and \"small team\" are how P02 likes to work, so every suggestion comes through \"working outdoors\" (\"work in outdoor conditions\", 12 occupations). The pool is below the soft 60, and the slate says so."
+      "note": "Task W2 slice W2B fix round 2: \"repairing physical objects\" is in no single ESCO skill's label and \"practical\" and \"small team\" are how P02 likes to work, so every suggestion comes through \"working outdoors\" (\"work in outdoor conditions\", 12 occupations). The pool is below the soft 60, and the slate says so. Fix round 3: the one-word \"practical\" is still not searched, \"small team\" is (and finds nothing), and the slate names \"repairing physical objects\" and \"small team\" as having found no work."
     },
     {
       "id": "DSC-02",
@@ -432,9 +433,10 @@
         {"check": "includes_direction", "direction": "close_to_current"},
         {"check": "includes_direction", "direction": "transferable"},
         {"check": "distinct"},
-        {"check": "searched_through_skills"}
+        {"check": "searched_through_skills"},
+        {"check": "missed_answers_named"}
       ],
-      "note": "Task W2 slice W2B: the role was \"Warehouse shift supervisor\", which ESCO does not list, so it was searched by its words. A title now joins work only by shared essential skills, so the case names an ESCO title (an alternative label of the warehouse manager); a title ESCO does not list is DSC-11's."
+      "note": "Task W2 slice W2B: the role was \"Warehouse shift supervisor\", which ESCO does not list, so it was searched by its words. A title now joins work only by shared essential skills, so the case names an ESCO title (an alternative label of the warehouse manager); a title ESCO does not list is DSC-11's. Fix round 3: \"training new starters\" and \"planning shift rotas\" are in no skill's label, and the slate names both."
     },
     {
       "id": "DSC-04",
@@ -469,9 +471,9 @@
       "title": "A work-style preference removes no work",
       "requirements": ["REC1-03", "DIV1-07"],
       "synthetic": true,
-      "profile": {"enjoyed_tasks": ["looking after people"], "work_style": ["quiet concentration"]},
-      "expect": [{"check": "pool_includes_pool_of", "other": "DSC-08"}, {"check": "grounded"}, {"check": "searched_through_skills"}, {"check": "work_style_not_searched"}, {"check": "fewer_has_reason"}],
-      "note": "Task W2 slice W2B fix round 2: how someone likes to work no longer finds work at all (provisional, for session W2), so it can add none either."
+      "profile": {"enjoyed_tasks": ["caring for animals"], "work_style": ["quiet concentration"]},
+      "expect": [{"check": "pool_includes_pool_of", "other": "DSC-08"}, {"check": "grounded"}, {"check": "searched_through_skills"}, {"check": "missed_answers_named"}, {"check": "fewer_has_reason"}, {"check": "small_pool_has_reason"}],
+      "note": "Task W2 slice W2B fix round 3 (re-review 2, N-M3): the task was \"looking after people\", which no skill's label holds, so both pools were empty and the pair checked nothing. \"Caring for animals\" reaches 13 occupations through 5 skills. \"Quiet concentration\" is longer than one word, so it is searched like any other answer; it finds nothing and the slate says so."
     },
     {
       "id": "DSC-08",
@@ -479,9 +481,9 @@
       "title": "The same answers without the preference",
       "requirements": ["REC1-03"],
       "synthetic": true,
-      "profile": {"enjoyed_tasks": ["looking after people"]},
-      "expect": [{"check": "grounded"}, {"check": "family_limit"}, {"check": "searched_through_skills"}, {"check": "fewer_has_reason"}],
-      "note": "Task W2 slice W2B fix round 2: no ESCO skill's label holds both \"look\" and \"people\", so the slate is empty and says why. Before, one shared word found an animal behaviourist (\"deal with challenging people\"), a secretary and an administrative assistant (\"disseminate messages to people\")."
+      "profile": {"enjoyed_tasks": ["caring for animals"]},
+      "expect": [{"check": "grounded"}, {"check": "family_limit"}, {"check": "searched_through_skills"}, {"check": "fewer_has_reason"}, {"check": "small_pool_has_reason"}],
+      "note": "Task W2 slice W2B fix round 3: the task was \"looking after people\" (see DSC-07). Fix round 2: no ESCO skill's label holds both \"look\" and \"people\". Before that, one shared word found an animal behaviourist (\"deal with challenging people\"), a secretary and an administrative assistant (\"disseminate messages to people\")."
     },
     {
       "id": "DSC-09",
@@ -620,6 +622,39 @@
         {"check": "fewer_has_reason"}
       ],
       "note": "Task W2 slice W2B fix round 2 (re-review I-A). The sound editor lists \"sound designer\" as one of its titles, so the two fold into one suggestion. \"Attend music recording sessions\" is essential to the sound editor only: without the fix, the sound designer's line said ESCO lists it for this work."
+    },
+    {
+      "id": "DSC-18",
+      "kind": "discovery",
+      "title": "An answer that found no work is named, beside the work another answer found",
+      "requirements": ["DIV1-06", "DIV1-08"],
+      "synthetic": true,
+      "profile": {"enjoyed_tasks": ["caring for patients", "giving injections"]},
+      "expect": [
+        {"check": "searched_through_skills"},
+        {"check": "grounded"},
+        {"check": "distinct"},
+        {"check": "fewer_has_reason"},
+        {"check": "missed_answers_named"}
+      ],
+      "note": "Task W2 slice W2B fix round 3 (re-review 2, N-I1). \"Caring for patients\" reaches three nurses through \"provide comprehensive care for patients with surgical conditions\"; no skill's label holds both \"give\" and \"injection\". Before, the slate was silent about \"giving injections\"."
+    },
+    {
+      "id": "DSC-19",
+      "kind": "discovery",
+      "title": "An answer too general to find work on its own finds none, says so, and only adds weight to work another answer found",
+      "requirements": ["DIV1-06", "DIV1-08"],
+      "synthetic": true,
+      "profile": {"enjoyed_tasks": ["caring for children", "writing reports"]},
+      "expect": [
+        {"check": "general_searches_add_only"},
+        {"check": "searched_through_skills"},
+        {"check": "grounded"},
+        {"check": "distinct"},
+        {"check": "fewer_has_reason"},
+        {"check": "small_pool_has_reason"}
+      ],
+      "note": "Task W2 slice W2B fix round 3 (re-review 2, N-I2; provisional thresholds: more than 50 occupations, or more than 5 different skills none named exactly by its words). \"Writing reports\" is part of 217 occupations through 17 skills; alone it offered an emergency ambulance driver, a chiropractor and a city councillor. \"Caring for children\" reaches 16; \"writing reports\" also reaches one of them, the nursery school head teacher, past its own best 127, and only adds weight there, so it comes first with both answers."
     },
     {
       "id": "EXP-01",

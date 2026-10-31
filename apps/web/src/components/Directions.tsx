@@ -519,9 +519,7 @@ function Slate({
       <p className="small muted">
         {data.suggestions.length} of up to {data.target_size}, from {data.pool_size} occupations
         found by {data.queries.length} searches of ESCO{data.release.sample ? " (test sample)" : ""}
-        .
-        {data.beyond_pool_limit > 0 &&
-          ` ${data.beyond_pool_limit} more were found than the pool holds.`}
+        .{data.beyond_pool_limit > 0 && ` ${data.beyond_pool_limit} more were found but not kept.`}
         {excluded > 0 &&
           ` Your exclusions removed ${data.excluded.occupations + data.excluded.families}.`}
       </p>

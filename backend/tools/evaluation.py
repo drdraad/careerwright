@@ -80,6 +80,8 @@ _SEARCHED = re.compile(
     r"essential skill for this work\."
 )
 _LETTERS = re.compile(r"[^\W\d_]+")
+# The answers searched as skills; the person's own titles give their own reasons.
+_SEARCHED_FIELDS = frozenset({"enjoyed_tasks", "confident_tasks", "evidenced_tasks", "work_style"})
 # English function words of three or more letters (the Snowball English stop list): a search
 # may hold them and a skill label need not. Written out here, independent of the product.
 _FUNCTION_WORDS = frozenset(
@@ -368,14 +370,51 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         ]
         return Failure(FailureType.GROUNDING, f"not through a skill: {loose}") if loose else None
     if e.check == "work_style_not_searched":
-        # How someone likes to work says how they work, not a skill: no search resting on it
-        # alone runs (Task W2B fix round 2; provisional, for session W2).
+        # A one-word answer about how someone likes to work ("structured") matches skills too
+        # loosely, so no search resting on such answers alone runs; a longer one ("working
+        # outdoors") is searched like any other (Task W2B fix rounds 2 and 3; provisional).
         ran = [
             q["text"]
             for q in observed["queries"]
-            if q["based_on"] and all(item["field"] == "work_style" for item in q["based_on"])
+            if q["based_on"]
+            and all(
+                item["field"] == "work_style" and len(item["text"].split()) == 1
+                for item in q["based_on"]
+            )
         ]
         return Failure(FailureType.GROUNDING, f"searched: {ran}") if ran else None
+    if e.check == "missed_answers_named":
+        # An answer every search resting on it found nothing with is named in the notes, on
+        # a full slate too, and one that found work never is (Task W2B re-review 2, N-I1).
+        reached: dict[str, bool] = {}
+        for q in observed["queries"]:
+            for item in q["based_on"]:
+                if item["field"] in _SEARCHED_FIELDS:
+                    reached[item["text"]] = reached.get(item["text"], False) or q["reach"] > 0
+        nothing = [note.casefold() for note in observed["notes"] if "found no work" in note]
+
+        def named(text: str) -> bool:
+            return any(f"“{text.casefold()}”" in note for note in nothing)
+
+        unnamed = [text for text, hit in reached.items() if not hit and not named(text)]
+        wrong = [text for text, hit in reached.items() if hit and named(text)]
+        if unnamed or wrong:
+            return Failure(FailureType.THIN_EVIDENCE, f"not named {unnamed}, wrongly {wrong}")
+        return None
+    if e.check == "general_searches_add_only":
+        # A search too general to find work on its own ("writing reports" is part of 217
+        # occupations) only adds weight to work another search found, and the slate names it
+        # (Task W2B re-review 2, N-I2; provisional thresholds).
+        general = {q["query_id"]: q["text"] for q in observed["queries"] if q["too_general"]}
+        alone = [s["title"] for s in suggestions if set(s["matched_queries"]) <= set(general)]
+        unnamed = [
+            text
+            for text in general.values()
+            if not any(f"“{text.casefold()}”" in note.casefold() for note in observed["notes"])
+        ]
+        if alone or unnamed:
+            return Failure(FailureType.GROUNDING, f"found alone {alone}, not named {unnamed}")
+        return None
     if e.check == "titles_ambiguous":
         # A title several occupations hold joins nothing until the person chooses which they
         # mean: never joined over their skills together (Task W2B fix round 2).

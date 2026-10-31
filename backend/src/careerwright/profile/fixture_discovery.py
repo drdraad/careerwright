@@ -4,10 +4,10 @@ fixtures; section 3: a fixture keeps the live adapter's contract, labelled synth
 It reads the same prompt a live model reads and answers the same discovery schema: each
 answer text becomes a query in the channel its field implies (enjoyed tasks: tasks;
 confident and evidenced tasks and the current role: transferable; a target title: the same
-work elsewhere; work style: environment, which the slate does not run, as it would not a
-model's). It proposes no title hypotheses: it never invents a title. Its output passes
-the same check and is stored with origin `fixture`. It exercises the product offline; it
-does not evaluate discovery.
+work elsewhere; work style: environment, which the slate does not run for a one-word
+answer, as it would not a model's). It proposes no title hypotheses: it never invents a
+title. Its output passes the same check and is stored with origin `fixture`. It exercises
+the product offline; it does not evaluate discovery.
 """
 
 from careerwright.profile.discovery import (

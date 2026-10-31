@@ -13,7 +13,11 @@ from careerwright.profile.exploration import explain
 from careerwright.profile.interview import ProfileField
 from careerwright.profile.slate import (
     FAMILY_LIMIT,
+    FURTHER_QUERY_BONUS,
+    POOL_LIMIT,
     SLATE_SIZE,
+    TOO_GENERAL_OCCUPATIONS,
+    TOO_GENERAL_SKILLS,
     Direction,
     Emphasis,
     Hit,
@@ -25,6 +29,7 @@ from careerwright.profile.slate import (
     SlateControls,
     build_pool,
     choose_slate,
+    too_general,
 )
 
 ENJOY = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="repairing physical objects")
@@ -325,46 +330,199 @@ def test_equal_matches_go_to_the_larger_share_of_essential_skills_never_to_the_t
     # Task W2B re-review I-B: every occupation a search reaches through the same skill ties
     # on its rank. The tie goes to the one whose essential skills the person's answers reach
     # the larger share of (the skill is a bigger part of that work), the title only last, in
-    # the pool and on the slate. A skill reached twice counts once.
-    plan = uuid.uuid5(uuid.NAMESPACE_URL, "test:plan shifts of employees")
+    # the pool and on the slate. A skill reached twice counts once. (ESCO v1.2.1's counts for
+    # "stocking shelves", through "stock shelves"; fix round 3 replaced "planning shifts",
+    # now too general to find work on its own.)
+    stock = uuid.uuid5(uuid.NAMESPACE_URL, "test:stock shelves")
     tied = {
         o.concept_id: o
         for o in (
-            occupation("Bricklaying supervisor", "312", essential=24),
-            occupation("Rescue centre manager", "134", essential=73),
-            occupation("Tool pusher", "811", essential=11),
+            occupation("Merchandiser", "524", essential=27),
+            occupation("Ticket issuing clerk", "421", essential=42),
+            occupation("Shelf filler", "933", essential=8),
         )
     }
 
     def reached(*names: str) -> tuple[Hit, ...]:
         return tuple(
-            Hit(
-                concept(name),
-                1.0,
-                False,
-                skill="plan shifts of employees",
-                skills=frozenset({plan}),
-            )
+            Hit(concept(name), 1.0, False, skill="stock shelves", skills=frozenset({stock}))
             for name in names
         )
 
-    shifts = PoolQuery(
+    shelves = PoolQuery(
         "q1",
-        "planning shifts",
+        "stocking shelves",
         SlateChannel.TASKS,
         (ENJOY,),
-        reached("Bricklaying supervisor", "Rescue centre manager", "Tool pusher"),
+        reached("Merchandiser", "Ticket issuing clerk", "Shelf filler"),
     )
-    again = PoolQuery("q2", "plan shifts", SlateChannel.TASKS, (ENJOY,), reached("Tool pusher"))
+    again = PoolQuery("q2", "stock shelves", SlateChannel.TASKS, (ENJOY,), reached("Shelf filler"))
 
-    pool = build_pool([shifts], tied, frozenset())
+    pool = build_pool([shelves], tied, frozenset())
     chosen = choose_slate(pool)
 
-    by_share = ["Tool pusher", "Bricklaying supervisor", "Rescue centre manager"]
-    assert [c.occupation.title for c in pool] == by_share  # 1 of 11, 1 of 24, 1 of 73
+    by_share = ["Shelf filler", "Merchandiser", "Ticket issuing clerk"]
+    assert [c.occupation.title for c in pool] == by_share  # 1 of 8, 1 of 27, 1 of 42
     assert [c.occupation.title for c in chosen.suggestions] == by_share
-    twice = {c.occupation.title: c.share for c in build_pool([shifts, again], tied, frozenset())}
-    assert twice["Tool pusher"] == 1 / 11
+    twice = {c.occupation.title: c.share for c in build_pool([shelves, again], tied, frozenset())}
+    assert twice["Shelf filler"] == 1 / 8
+
+
+OUTDOORS = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="working outdoors")
+BICYCLES = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="repairing bicycles")
+REPORTS = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="writing reports")
+
+
+def through(skill: str, *names: str) -> tuple[Hit, ...]:
+    """Every occupation a search reached through one skill: all tie on its rank."""
+    reached = frozenset({uuid.uuid5(uuid.NAMESPACE_URL, f"test:{skill}")})
+    return tuple(Hit(concept(name), 1.0, False, skill=skill, skills=reached) for name in names)
+
+
+@pytest.mark.req("DIV1-06", "DIV1-12")
+def test_work_a_specific_answer_found_comes_before_work_a_general_one_found() -> None:
+    # Task W2B re-review 2, N-M4: "repairing bicycles" reaches 1 occupation and "working
+    # outdoors" 12, and each search's best scores 1, so the share of essential skills put the
+    # leaflet distributor (6 essential skills) before the bicycle mechanic (30). How specific
+    # the search that reached it was now comes first.
+    found = {
+        o.concept_id: o
+        for o in (
+            occupation("Bicycle mechanic", "723", essential=30),
+            occupation("Leaflet distributor", "962", essential=6),
+            occupation("Fruit picker", "921", essential=7),
+        )
+    }
+    queries = [
+        PoolQuery(
+            "q1",
+            "repairing bicycles",
+            SlateChannel.TASKS,
+            (BICYCLES,),
+            through("perform repairs on bicycles", "Bicycle mechanic"),
+        ),
+        PoolQuery(
+            "q2",
+            "working outdoors",
+            SlateChannel.TASKS,
+            (OUTDOORS,),
+            through("work in outdoor conditions", "Leaflet distributor", "Fruit picker"),
+            total=12,
+        ),
+    ]
+
+    pool = build_pool(queries, found, frozenset())
+
+    assert next(iter(pool)).occupation.title == "Bicycle mechanic"
+    assert {c.occupation.title: c.reach for c in pool} == {
+        "Bicycle mechanic": 1,
+        "Leaflet distributor": 12,
+        "Fruit picker": 12,
+    }
+    assert choose_slate(pool).suggestions[0].occupation.title == "Bicycle mechanic"
+
+
+@pytest.mark.req("DIV1-06", "DIV1-08")
+def test_a_search_too_general_to_find_work_alone_only_adds_weight_to_work_another_found() -> None:
+    # Task W2B re-review 2, N-I2 (provisional thresholds): "writing reports" reaches 217
+    # occupations through 17 skills, so on its own it scattered the slate across ambulance
+    # drivers, chiropractors and city councillors.
+    assert too_general(TOO_GENERAL_OCCUPATIONS + 1, 1, exact=True)  # "writing reports": 217
+    assert too_general(17, TOO_GENERAL_SKILLS + 1, exact=False)  # "training staff": 10 skills
+    assert not too_general(12, 8, exact=True)  # "selling products": "sell products" is exact
+    assert not too_general(TOO_GENERAL_OCCUPATIONS, TOO_GENERAL_SKILLS, exact=False)
+    found = {
+        o.concept_id: o
+        for o in (
+            occupation("Bicycle mechanic", "723"),
+            occupation("Chiropractor", "226"),
+            occupation("City councillor", "111"),
+        )
+    }
+    bicycles = PoolQuery(
+        "q1",
+        "repairing bicycles",
+        SlateChannel.TASKS,
+        (BICYCLES,),
+        through("perform repairs on bicycles", "Bicycle mechanic"),
+    )
+    reports = PoolQuery(
+        "q2",
+        "writing reports",
+        SlateChannel.TASKS,
+        (REPORTS,),
+        (
+            *through("write work-related reports", "Bicycle mechanic", "City councillor"),
+            *through("write reports on neurological tests", "Chiropractor"),
+        ),
+        total=217,
+        too_general=True,
+    )
+
+    alone = build_pool([reports], found, frozenset())
+    both = build_pool([bicycles, reports], found, frozenset())
+
+    assert list(alone) == []
+    assert alone.beyond_limit == 0  # not kept because too general, never past the bound
+    [mechanic] = both
+    assert mechanic.occupation.title == "Bicycle mechanic"
+    assert [m.query.query_id for m in mechanic.matches] == ["q1", "q2"]
+    assert mechanic.relevance == 1.0 + FURTHER_QUERY_BONUS
+    assert mechanic.reach == 1  # the search that found it, not the general one
+    assert choose_slate(alone).fewer_reasons == ["None of your answers found work to suggest yet."]
+    # It adds only that little: its own score never becomes the best, so it never lifts a
+    # weak match over the relevance floor.
+    weakly = PoolQuery(
+        "q3",
+        "adjusting spines",
+        SlateChannel.TASKS,
+        (BICYCLES,),
+        (Hit(concept("Chiropractor"), 0.3, False, skill="adjust spines"),),
+    )
+    lifted = {c.occupation.title: c for c in build_pool([weakly, reports], found, frozenset())}
+    assert lifted["Chiropractor"].relevance == 0.3 + FURTHER_QUERY_BONUS
+    assert lifted["Chiropractor"].best_score == 0.3
+    [left] = choose_slate(build_pool([weakly, reports], found, frozenset())).not_included
+    assert left.reason is NotIncluded.BELOW_RELEVANCE_FLOOR
+
+
+@pytest.mark.req("DIV1-02")
+def test_the_pool_counts_what_a_join_reached_past_its_cut_and_its_own_bound() -> None:
+    # Task W2B re-review 2, N-M2: "data analyst" joins 47 occupations by three or more shared
+    # skills and keeps its best 30, so the slate said it chose from 31 and that nothing more
+    # was found. What a join reached past its cut is now counted, once, unless another
+    # search found it.
+    found = {
+        o.concept_id: o
+        for o in (
+            occupation("Data scientist", "251"),
+            occupation("Chief data officer", "133"),
+            occupation("Statistician", "212"),
+        )
+    }
+    cut = frozenset({concept("Statistician"), concept("Data entry clerk"), concept("Archivist")})
+    joined = PoolQuery(
+        "j1",
+        "data analyst",
+        SlateChannel.SHARED_SKILLS,
+        (ROLE,),
+        hits(("Data scientist", 1.0), ("Chief data officer", 0.5)),
+        total=5,
+        unkept=cut,
+    )
+    statistics = PoolQuery(
+        "q1",
+        "applying statistics",
+        SlateChannel.TASKS,
+        (ENJOY,),
+        through("apply statistical analysis techniques", "Statistician"),
+    )
+
+    assert build_pool([joined], found, frozenset()).beyond_limit == 3
+    assert build_pool([joined, statistics], found, frozenset()).beyond_limit == 2
+    # A search that can find work reaches at most this many, under the pool's bound, so it
+    # keeps everything it reaches and the count needs no "at least".
+    assert TOO_GENERAL_OCCUPATIONS < POOL_LIMIT
 
 
 @pytest.mark.req("DIV1-06")

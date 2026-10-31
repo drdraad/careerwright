@@ -239,13 +239,71 @@ def full_text(
     return hits, total
 
 
-def essential_skill_reach(tx: Tx, query: str, limit: int) -> tuple[list[SkillReach], int]:
+def essential_skill_reach(
+    tx: Tx, query: str, limit: int
+) -> tuple[list[SkillReach], int, int, bool]:
     """The occupations reached through an essential skill whose preferred label holds every
     word of the query (`skills.search_vector`, the label alone; English stems, stop words
-    dropped, no search operators), each by its best-ranked such skill, and how many
-    occupations are reached in all. Best first: equal ranks go to the occupation whose
-    essential skills the query matches the larger share of, its title only last. No title,
-    hidden label, ISCO group or description is searched."""
+    dropped, no search operators), each by its best-ranked such skill; how many occupations
+    are reached in all; how many different essential skills reach them; and whether one of
+    those skills is named by exactly the query's words ("sell products" for "selling
+    products"). Best first: equal ranks go to the occupation whose essential skills the
+    query matches the larger share of. The best `limit` and every occupation tied with the
+    last of them on both (a cut never falls inside an exact tie), the title ordering only
+    what is kept. No title, hidden label, ISCO group or description is searched."""
+    rows = tx.execute(
+        sa.text(
+            "WITH q AS (SELECT plainto_tsquery('english', :q) AS query, "
+            "strip(to_tsvector('english', :q)) AS words), "
+            "matched AS (SELECT s.skill_id, s.preferred_label, "
+            "ts_rank_cd(s.search_vector, q.query, 32) AS text_rank, "
+            "strip(s.search_vector) = q.words AS exact "
+            "FROM careerwright.skills s, q WHERE s.search_vector @@ q.query), "
+            "reached AS (SELECT r.concept_id, m.skill_id, m.preferred_label, m.text_rank, "
+            "m.exact, row_number() OVER (PARTITION BY r.concept_id ORDER BY m.text_rank DESC, "
+            "m.preferred_label, m.skill_id) AS best, "
+            "array_agg(m.skill_id) OVER (PARTITION BY r.concept_id) AS skills "
+            "FROM matched m JOIN careerwright.occupation_skills r ON r.skill_id = m.skill_id "
+            "AND r.relation = 'essential'), "
+            "essential AS (SELECT e.concept_id, count(*) AS skills "
+            "FROM careerwright.occupation_skills e WHERE e.relation = 'essential' "
+            "AND e.concept_id IN (SELECT concept_id FROM reached) GROUP BY e.concept_id), "
+            "spread AS (SELECT count(DISTINCT skill_id) AS skills, "
+            "coalesce(bool_or(exact), false) AS exact FROM reached), "
+            "kept AS (SELECT r.concept_id, r.skill_id, r.preferred_label AS skill_label, "
+            "r.text_rank, r.skills, cardinality(r.skills)::float8 / e.skills AS share, "
+            "count(*) OVER () AS total FROM reached r "
+            "JOIN essential e ON e.concept_id = r.concept_id WHERE r.best = 1 "
+            "ORDER BY r.text_rank DESC, share DESC FETCH FIRST (:limit) ROWS WITH TIES) "
+            "SELECT k.concept_id, k.skill_id, k.skill_label, k.text_rank, k.skills, k.total, "
+            "spread.skills AS reached_skills, spread.exact "
+            "FROM kept k CROSS JOIN spread "
+            "JOIN careerwright.occupation_concepts o ON o.concept_id = k.concept_id "
+            "ORDER BY k.text_rank DESC, k.share DESC, o.preferred_label, k.concept_id"
+        ),
+        {"q": query, "limit": limit},
+    ).mappings()
+    reached, total, skills, exact = [], 0, 0, False
+    for row in rows:
+        total, skills, exact = int(row["total"]), int(row["reached_skills"]), bool(row["exact"])
+        reached.append(
+            SkillReach(
+                concept_id=row["concept_id"],
+                skill_id=row["skill_id"],
+                skill_label=row["skill_label"],
+                text_rank=float(row["text_rank"]),
+                skills=frozenset(row["skills"]),
+            )
+        )
+    return reached, total, skills, exact
+
+
+def essential_skill_reach_among(
+    tx: Tx, query: str, concepts: Iterable[uuid.UUID]
+) -> list[SkillReach]:
+    """Of `concepts`, those the query reaches as `essential_skill_reach` does, each by its
+    best-ranked such skill, with no cut: for a search too general to find work on its own,
+    which only adds weight to occupations another search found."""
     rows = tx.execute(
         sa.text(
             "WITH q AS (SELECT plainto_tsquery('english', :q) AS query), "
@@ -257,33 +315,22 @@ def essential_skill_reach(tx: Tx, query: str, limit: int) -> tuple[list[SkillRea
             "m.preferred_label, m.skill_id) AS best, "
             "array_agg(m.skill_id) OVER (PARTITION BY r.concept_id) AS skills "
             "FROM matched m JOIN careerwright.occupation_skills r ON r.skill_id = m.skill_id "
-            "AND r.relation = 'essential'), "
-            "essential AS (SELECT e.concept_id, count(*) AS skills "
-            "FROM careerwright.occupation_skills e WHERE e.relation = 'essential' "
-            "AND e.concept_id IN (SELECT concept_id FROM reached) GROUP BY e.concept_id) "
-            "SELECT r.concept_id, r.skill_id, r.preferred_label AS skill_label, r.text_rank, "
-            "r.skills, count(*) OVER () AS total FROM reached r "
-            "JOIN essential e ON e.concept_id = r.concept_id "
-            "JOIN careerwright.occupation_concepts o ON o.concept_id = r.concept_id "
-            "WHERE r.best = 1 "
-            "ORDER BY r.text_rank DESC, cardinality(r.skills)::float8 / e.skills DESC, "
-            "o.preferred_label, r.concept_id LIMIT :limit"
+            "AND r.relation = 'essential' AND r.concept_id = ANY(CAST(:concepts AS uuid[]))) "
+            "SELECT concept_id, skill_id, preferred_label AS skill_label, text_rank, skills "
+            "FROM reached WHERE best = 1 ORDER BY concept_id"
         ),
-        {"q": query, "limit": limit},
+        {"q": query, "concepts": [str(c) for c in sorted(set(concepts))]},
     ).mappings()
-    reached, total = [], 0
-    for row in rows:
-        total = int(row["total"])
-        reached.append(
-            SkillReach(
-                concept_id=row["concept_id"],
-                skill_id=row["skill_id"],
-                skill_label=row["skill_label"],
-                text_rank=float(row["text_rank"]),
-                skills=frozenset(row["skills"]),
-            )
+    return [
+        SkillReach(
+            concept_id=row["concept_id"],
+            skill_id=row["skill_id"],
+            skill_label=row["skill_label"],
+            text_rank=float(row["text_rank"]),
+            skills=frozenset(row["skills"]),
         )
-    return reached, total
+        for row in rows
+    ]
 
 
 def concept_keys(tx: Tx, texts: Iterable[str]) -> dict[str, str]:

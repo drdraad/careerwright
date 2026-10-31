@@ -7,9 +7,11 @@ query runs against the held ESCO release (a title of the person's own that names
 occupation is joined by shared essential skills, and one several occupations hold waits for
 the person to choose; any other query reaches work only through an essential skill whose
 label holds every word of it, keeps every occupation it reaches up to the pool's bound, and
-names the skill; a query resting only on how the person likes to work is not run; the
-release the searches were chosen for is recorded, and a slate read against another says
-so), and Careerwright adds the person's current role and own target titles;
+names the skill, and one too general to find work alone only adds weight to work another
+found; a query resting only on one-word answers about how the person likes to work is not
+run; an answer every search found nothing with is named; the release the searches were
+chosen for is recorded, and a slate read against another says so), and Careerwright adds
+the person's current role and own target titles;
 the hits are pooled, de-duplicated and ranked into a slate by deterministic code
 (`careerwright.profile.slate`). A model's title hypothesis is shown only if ESCO holds it as a
 label; otherwise it is listed as unsupported, never as a suggestion (DIV1-04). Every
@@ -58,11 +60,12 @@ from careerwright.catalogue.pay import (
 from careerwright.catalogue.records import (
     OccupationDetail,
     OccupationFacts,
+    SkillReach,
     SkillRef,
     TaxonomyRelease,
 )
 from careerwright.catalogue.reference import modelled_pay_of, region_codes
-from careerwright.catalogue.taxonomy import held_release, search_essential_skills
+from careerwright.catalogue.taxonomy import SkillSearch, held_release, search_essential_skills
 from careerwright.config import RuntimeMode
 from careerwright.db import Tx
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
@@ -86,6 +89,7 @@ from careerwright.profile.commands import (
 from careerwright.profile.discovery import (
     DiscoveryInput,
     DiscoveryProposal,
+    DiscoveryQuery,
     EvidenceItem,
     evidence_of,
 )
@@ -104,6 +108,7 @@ from careerwright.profile.slate import (
     POOL_LIMIT,
     POOL_TARGET,
     SLATE_SIZE,
+    TOO_GENERAL_OCCUPATIONS,
     Candidate,
     Direction,
     Hit,
@@ -116,7 +121,8 @@ from careerwright.profile.slate import (
     SlateControls,
     build_pool,
     choose_slate,
-    skill_join_hits,
+    skill_join,
+    too_general,
     unexpected_connection,
 )
 from careerwright.profile.slate_explanation import (
@@ -470,22 +476,37 @@ def submit_discovery(
     return DiscoveryView(run, None)
 
 
-def _search_hits(tx: Tx, text: str) -> tuple[Hit, ...] | None:
+def _searched(tx: Tx, query: DiscoveryQuery) -> tuple[PoolQuery, SkillSearch] | None:
     """The occupations a search reaches through their essential skills (ADR 0007 decision
     13): one essential skill's label must hold every word of the search (one shared word is
     never enough). Each hit scores its skill's rank over the best such rank and names that
-    skill. Every occupation reached is kept up to the pool's bound, equal ranks ordered by
-    the share of their essential skills the search reaches, never by title. Never an
-    occupation's titles, hidden labels, ISCO group or description: work is never found by a
-    word in a title. None: the query has no searchable word, so nothing ran (never an empty
-    result)."""
+    skill. Every occupation reached is kept up to the pool's bound and any tied with the
+    last, equal ranks ordered by the share of their essential skills the search reaches,
+    never by title. A search reaching too many occupations or skills (`too_general`) only
+    adds weight to work another search found. Never an occupation's titles, hidden labels,
+    ISCO group or description: work is never found by a word in a title. None: the query
+    has no searchable word, so nothing ran (never an empty result)."""
     try:
-        found = search_essential_skills(tx, text, POOL_LIMIT)
+        found = search_essential_skills(tx, query.text, POOL_LIMIT)
     except CareerwrightError as error:
         if error.details.get("reason") == "no_search_terms":
             return None
         raise
-    top = max((reach.text_rank for reach in found.reached), default=0.0)
+    searched = PoolQuery(
+        query.query_id,
+        query.text,
+        SlateChannel(query.channel.value),
+        tuple(query.based_on),
+        _hits(found.reached, found),
+        total=found.total,
+        too_general=too_general(found.total, found.skills, exact=found.exact),
+    )
+    return searched, found
+
+
+def _hits(reached: list[SkillReach], search: SkillSearch) -> tuple[Hit, ...]:
+    """Each scores its skill's rank over the search's best and names that skill."""
+    top = max((reach.text_rank for reach in search.reached), default=0.0)
     return tuple(
         Hit(
             reach.concept_id,
@@ -494,8 +515,15 @@ def _search_hits(tx: Tx, text: str) -> tuple[Hit, ...] | None:
             skill=reach.skill_label,
             skills=reach.skills,
         )
-        for reach in found.reached
+        for reach in reached
     )
+
+
+def _adding(tx: Tx, query: PoolQuery, search: SkillSearch, found: set[uuid.UUID]) -> PoolQuery:
+    """A search too general to find work on its own reaches only what another search or join
+    found, and all of that, past its own cut too: it adds weight there and nowhere else."""
+    among = taxonomy_store.essential_skill_reach_among(tx, query.text, found)
+    return replace(query, hits=_hits(among, search))
 
 
 def _label_hits(tx: Tx, title: str) -> tuple[Hit, ...]:
@@ -515,10 +543,14 @@ def _joinable(title: ResolvedTitle) -> bool:
     return len(title.occupations) == 1
 
 
-def _work_style_only(based_on: list[EvidenceItem]) -> bool:
-    """How someone likes to work says how they work, not a skill, so a search or title idea
-    resting on it alone never retrieves work (provisional, for session W2)."""
-    return bool(based_on) and all(item.field is ProfileField.WORK_STYLE for item in based_on)
+def _one_word_style(based_on: list[EvidenceItem]) -> bool:
+    """A search or title idea resting only on one-word answers about how someone likes to
+    work ("structured", "practical") is never run: one word matches skills too loosely
+    ("structured" found soil structure). A longer one ("working outdoors") is searched like
+    any other answer (provisional, for session W2; Task W2B fix round 3)."""
+    return bool(based_on) and all(
+        item.field is ProfileField.WORK_STYLE and len(item.text.split()) == 1 for item in based_on
+    )
 
 
 def _joined(
@@ -533,9 +565,7 @@ def _joined(
     essential, neighbours = taxonomy_store.skill_neighbours(
         tx, title.occupations, MIN_SHARED_SKILLS
     )
-    return PoolQuery(
-        query_id, title.text, channel, based_on, skill_join_hits(essential, neighbours)
-    )
+    return skill_join(query_id, title.text, channel, based_on, essential, neighbours)
 
 
 def _provided(document: ProfileDocument, field: ProfileField) -> list[str]:
@@ -569,8 +599,16 @@ _CONSONANT_SOUND = re.compile(r"^(?:uni|use|usu|uti|eu|one\b)", re.IGNORECASE)
 _VOWEL_SOUND = re.compile(r"^(?:hour|honest|honou?r|heir|[AEFHILMNORSX][A-Z])")
 
 
+# What a title's first preposition starts: its head is the last word before it ("operators"
+# in "warehouse operators for clothing", ESCO v1.2.1's one plural title).
+_PREPOSITION = re.compile(r"\s(?:for|in|of|on|with|at|to)\s")
+
+
 def with_article(title: str) -> str:
-    """The title after "a" or "an", as it is said."""
+    """The title after "a" or "an", as it is said; a plural title takes none."""
+    head = _PREPOSITION.split(title, maxsplit=1)[0].split()
+    if head and re.search(r"[^su]s$", head[-1]):  # "operators", never "actress" or "bus"
+        return title
     said_as_you = _CONSONANT_SOUND.match(title) or re.match(r"U[A-Z]", title)  # "a UX designer"
     vowel = title[:1].casefold() in "aeiou" and not said_as_you
     return f"{'an' if vowel or _VOWEL_SOUND.match(title) else 'a'} {title}"
@@ -723,11 +761,12 @@ def compute_slate(
     )
     own = {keys[t.text]: t for t in mine if keys[t.text]}
     queries: list[PoolQuery] = []
-    unsearchable: list[str] = []
+    unsearchable: list[DiscoveryQuery] = []
     role_joins: set[str] = set()
-    styles: list[str] = []  # work-style answers a search or title idea rested on alone: not run
+    styles: list[str] = []  # one-word work-style answers a search or idea rested on: not run
+    general: dict[str, SkillSearch] = {}  # each search too general to find work alone
     for query in proposal.queries:
-        if _work_style_only(query.based_on):
+        if _one_word_style(query.based_on):
             styles += [item.text for item in query.based_on]
             continue
         title = own.get(keys[query.text])
@@ -738,19 +777,14 @@ def compute_slate(
                 if title is role:
                     role_joins.add(query.query_id)
             continue
-        hits = _search_hits(tx, query.text)
-        if hits is None:
-            unsearchable.append(query.text)
+        searched = _searched(tx, query)
+        if searched is None:
+            unsearchable.append(query)
             continue
-        queries.append(
-            PoolQuery(
-                query.query_id,
-                query.text,
-                SlateChannel(query.channel.value),
-                tuple(query.based_on),
-                hits,
-            )
-        )
+        pool_query, search = searched
+        queries.append(pool_query)
+        if pool_query.too_general:
+            general[pool_query.query_id] = search
     familiar: set[uuid.UUID] = set()
     if role is not None and role.occupations:
         item = EvidenceItem(field=ProfileField.CURRENT_ROLE, text=role.text)
@@ -770,7 +804,7 @@ def compute_slate(
         )
     unsupported: list[str] = []
     for index, hypothesis in enumerate(proposal.hypotheses, start=1):
-        if _work_style_only(hypothesis.based_on):
+        if _one_word_style(hypothesis.based_on):
             styles += [item.text for item in hypothesis.based_on]
             continue
         hits = _label_hits(tx, hypothesis.title)
@@ -786,7 +820,8 @@ def compute_slate(
                 hits,
             )
         )
-    found = {hit.concept_id for query in queries for hit in query.hits}
+    found = {hit.concept_id for q in queries if not q.too_general for hit in q.hits}
+    queries = [_adding(tx, q, general[q.query_id], found) if q.too_general else q for q in queries]
     facts = taxonomy_store.occupation_facts(tx, found, skills_shown=SKILLS_SHOWN)
     occupations = _occupations(facts)
     familiar_families = frozenset(facts[c].family.code for c in familiar if c in facts)
@@ -798,6 +833,13 @@ def compute_slate(
     notes = [] if changed is None else [changed]
     if styles:
         notes.append(_work_style_note(list(dict.fromkeys(styles))))
+    notes += _missed_notes(queries, unsearchable)
+    notes += dict.fromkeys(
+        _general_note(query, general[query.query_id].skills)
+        for query in queries
+        if query.too_general
+    )
+    notes += dict.fromkeys(_join_note(query) for query in queries if query.unkept)
     # The pool's target is soft: where evidence doesn't permit it, a full slate says so (a
     # short one already says why it is short).
     if slate.pool_size < POOL_TARGET and len(slate.suggestions) == SLATE_SIZE:
@@ -815,7 +857,7 @@ def compute_slate(
         suggestions=_suggestions(slate, facts, bool(familiar_families)),
         queries=queries,
         unsupported_hypotheses=unsupported,
-        unsearchable_queries=unsearchable,
+        unsearchable_queries=[query.text for query in unsearchable],
         titles={concept_id: occupation.title for concept_id, occupation in occupations.items()},
         salary_floor=floor,
         ai_filter=ai_filter,
@@ -872,8 +914,89 @@ def _ambiguous(title: ResolvedTitle) -> str:
 def _work_style_note(styles: list[str]) -> str:
     quoted = ", ".join(f"“{text}”" for text in styles)
     return (
-        f"How you like to work ({quoted}) isn't used to find work: it describes how you work, "
-        "not the work itself."
+        f"How you like to work ({quoted}) isn't searched on its own, because a single word "
+        "matches too loosely. Careerwright searches a longer answer, such as “working "
+        "outdoors”."
+    )
+
+
+# The person's own titles say why they found nothing in their own words (`_unmatched`,
+# `_ambiguous`).
+_TITLE_FIELDS = frozenset({ProfileField.CURRENT_ROLE, ProfileField.TARGET_TITLES})
+
+
+def _quoted(texts: list[str]) -> str:
+    quoted = [f"“{text}”" for text in texts]
+    return quoted[0] if len(quoted) == 1 else f"{', '.join(quoted[:-1])} and {quoted[-1]}"
+
+
+def _in_own_words(searches: list[str], answers: list[str]) -> bool:
+    """The searches are the one answer itself, as the demo's proposer writes them."""
+
+    def words(text: str) -> str:
+        return " ".join(text.split()).casefold()
+
+    return len(answers) == 1 and [words(s) for s in searches] == [words(answers[0])]
+
+
+def _missed_notes(queries: list[PoolQuery], unsearchable: list[DiscoveryQuery]) -> list[str]:
+    """Each answer whose every search found nothing, named (Task W2B re-review 2, N-I1): an
+    answer several searches rest on is named only when none of them found anything."""
+    searches: dict[EvidenceItem, list[str]] = {}
+    found: set[EvidenceItem] = set()
+    ran = [(q.text, q.based_on, q.reach > 0) for q in queries]
+    ran += [(q.text, tuple(q.based_on), False) for q in unsearchable]
+    for text, based_on, hit in ran:
+        for item in based_on:
+            searches.setdefault(item, []).append(text)
+            if hit:
+                found.add(item)
+    return [
+        _missed(item.text, list(dict.fromkeys(texts)))
+        for item, texts in searches.items()
+        if item not in found and item.field not in _TITLE_FIELDS
+    ]
+
+
+def _opening(text: str) -> str:
+    """The person's words quoted at the start of a sentence."""
+    return f"“{text[:1].upper()}{text[1:]}”"
+
+
+def _missed(answer: str, searches: list[str]) -> str:
+    if _in_own_words(searches, [answer]):
+        return f"{_opening(answer)} isn't how ESCO names any skill, so it found no work."
+    searched, isnt = ("searches", "aren't") if len(searches) > 1 else ("search", "isn't")
+    return (
+        f"The {searched} {_quoted(searches)} (from “{answer}”) {isnt} how ESCO names any skill, "
+        f"so “{answer}” found no work."
+    )
+
+
+def _general_note(query: PoolQuery, skills: int) -> str:
+    """Why a search too general to find work on its own found none (Task W2B re-review 2,
+    N-I2): it may still add weight to work another search found."""
+    answers = [item.text for item in query.based_on]
+    if _in_own_words([query.text], answers):
+        subject, about = _opening(query.text), "it"
+    else:
+        subject, about = f"The search “{query.text}” (from {_quoted(answers)})", _quoted(answers)
+    if query.reach > TOO_GENERAL_OCCUPATIONS:
+        why = f"is part of {query.reach} occupations in ESCO, too many to choose from on its own"
+    else:
+        why = (
+            f"is part of {skills} different ESCO skills, none of them just that, so it's too "
+            "general to choose work from on its own"
+        )
+    return f"{subject} {why}. Say more about {about}, such as what it's about or who it's for."
+
+
+def _join_note(query: PoolQuery) -> str:
+    """What a join keeps when it reaches more than its best 30 (Task W2B re-review 2, N-M2)."""
+    return (
+        f"{_opening(query.text)} shares {MIN_SHARED_SKILLS} or more essential skills with "
+        f"{query.reach} other occupations in ESCO. Careerwright keeps the {len(query.hits)} "
+        "that share the most."
     )
 
 

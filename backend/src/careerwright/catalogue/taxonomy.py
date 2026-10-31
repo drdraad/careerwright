@@ -128,13 +128,18 @@ def search_occupations(
 
 @dataclass(frozen=True)
 class SkillSearch:
-    reached: list[SkillReach]  # best first, each through the essential skill it is named by
+    # Best first, each through the essential skill it is named by: the best `limit` and any
+    # tied with the last of them.
+    reached: list[SkillReach]
     total: int  # every occupation the search reached
     limit: int
+    skills: int  # the different essential skills that reached them
+    exact: bool  # one of those skills is named by exactly the search's words
 
 
-# One discovery search keeps every occupation it reaches up to the slate's working-pool bound
-# (`careerwright.profile.slate.POOL_LIMIT`), which its caller passes; never more than this.
+# One discovery search keeps the occupations it reaches up to the slate's working-pool bound
+# (`careerwright.profile.slate.POOL_LIMIT`), which its caller passes, and any tied with the
+# last of them; its limit is never more than this.
 MAX_REACH = 120
 
 
@@ -149,8 +154,8 @@ def search_essential_skills(tx: Tx, query: str, limit: int) -> SkillSearch:
     text = _search_text(query, limit, most=MAX_REACH)
     if taxonomy_store.search_terms(tx, text) == 0:
         raise _no_search_terms()
-    reached, total = taxonomy_store.essential_skill_reach(tx, text, limit)
-    return SkillSearch(reached, total, limit)
+    reached, total, skills, exact = taxonomy_store.essential_skill_reach(tx, text, limit)
+    return SkillSearch(reached, total, limit, skills, exact)
 
 
 TITLE_LIMIT = 20

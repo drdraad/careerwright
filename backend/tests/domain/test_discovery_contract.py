@@ -117,6 +117,13 @@ def test_an_occupation_gets_the_article_its_sound_needs() -> None:
     assert with_article("university lecturer") == "a university lecturer"
     assert with_article("hour-glass maker") == "an hour-glass maker"
     assert with_article("UX designer") == "a UX designer"  # re-review N-M8
+    # Task W2B re-review 2: ESCO v1.2.1's one plural title takes no article ("a warehouse
+    # operators for clothing"); a singular word ending in s still does.
+    assert with_article("warehouse operators for clothing") == "warehouse operators for clothing"
+    assert with_article("customs and excise officer") == "a customs and excise officer"
+    assert with_article("import export manager in beverages").startswith("an import ")
+    assert with_article("actress") == "an actress"
+    assert with_article("bus driver") == "a bus driver"
 
 
 @pytest.mark.req("REC1-02")

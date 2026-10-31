@@ -4278,9 +4278,21 @@ export type PoolQueryOut = {
     /**
      * Hits
      *
-     * Occupations this query found (bounded per query).
+     * Occupations this query found (bounded per query); for one too general to find work on its own, those another search found that it adds weight to.
      */
     hits: number;
+    /**
+     * Reach
+     *
+     * Occupations it reached in all, past its own bound too.
+     */
+    reach: number;
+    /**
+     * Too General
+     *
+     * Too general to find work on its own (it reaches too many occupations, or too many different skills): it only adds weight to work another search found.
+     */
+    too_general: boolean;
 };
 
 /**
@@ -6410,7 +6422,7 @@ export type SlateOut = {
     /**
      * Notes
      *
-     * How the slate was made, in words: a control's effect, a changed ESCO release, answers not used to find work, or fewer occupations to choose from than Careerwright aims for.
+     * How the slate was made, in words: a control's effect, a changed ESCO release, answers not searched, answers that found no work or were too general to find it alone, what a join keeps, or fewer occupations to choose from than Careerwright aims for.
      */
     notes: Array<string>;
     /**
@@ -6434,7 +6446,7 @@ export type SlateOut = {
     /**
      * Beyond Pool Limit
      *
-     * Occupations found past the pool's bound.
+     * Occupations found but not kept: past a join's best 30 or the pool's bound.
      */
     beyond_pool_limit: number;
     excluded: ExcludedOut;

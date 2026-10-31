@@ -161,6 +161,8 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
       channel: "tasks",
       based_on: [{ field: "enjoyed_tasks", text: "repairing bicycles" }],
       hits: 4,
+      reach: 4,
+      too_general: false,
     },
   ],
   unsearchable_queries: [],
@@ -240,6 +242,23 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     renderDirections();
 
     expect(await screen.findByText(summary)).toBeVisible();
+  });
+
+  it("[DIV1-02] counts what was found but not kept, and says what a join keeps", async () => {
+    // Task W2B re-review 2, N-M2: a join's best 30 left 17 out, and the slate said nothing.
+    const keeps =
+      "“Data analyst” shares 3 or more essential skills with 47 other occupations in ESCO. Careerwright keeps the 30 that share the most.";
+    fakeApi([
+      {
+        method: "GET",
+        path: /\/slate$/,
+        answer: { ...slate([suggestion]), beyond_pool_limit: 17, notes: [keeps] },
+      },
+    ]);
+    renderDirections();
+
+    expect(await screen.findByText(/17 more were found but not kept\./)).toBeVisible();
+    expect(screen.getByText(keeps)).toBeVisible();
   });
 
   it("excludes a title as a view only, and makes a target only when chosen", async () => {

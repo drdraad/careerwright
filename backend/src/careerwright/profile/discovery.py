@@ -28,7 +28,10 @@ from careerwright.profile.interview import ProfileField, ProposalOrigin
 from careerwright.profile.safety import inferred_sensitive_terms
 
 # 2 (Task W2B fix round 2): short phrases in ESCO's skill wording, never work style alone.
-PROMPT_VERSION = "discovery-queries-2"
+# 3 (fix round 3): never a phrase too general to find work alone; a one-word work style is
+# never searched alone, a longer one may be; "plan shifts" (now too general) leaves the
+# examples.
+PROMPT_VERSION = "discovery-queries-3"
 INPUT_FORMAT: Literal["careerwright.discovery-input"] = "careerwright.discovery-input"
 MAX_QUERIES = 8
 MAX_HYPOTHESES = 3
@@ -238,9 +241,11 @@ You help Careerwright, a career-planning service for people in England, search t
 classification of occupations. From the person's confirmed answers, write 4-{MAX_QUERIES} search
 queries. Careerwright finds an occupation only through an essential skill ESCO lists for it
 whose name holds every word of a query, so write each query as a short phrase of 2-4 words
-in ESCO's own skill wording: a verb and what it acts on, as ESCO names its skills ("plan
-shifts", "repair bicycles", "care for children", "handle complaints", "perform data
-cleansing"). A paraphrase ESCO does not use ("look after children") finds nothing. Never
+in ESCO's own skill wording: a verb and what it acts on, as ESCO names its skills ("stack
+goods", "repair bicycles", "care for children", "handle complaints", "perform data
+cleansing"). A paraphrase ESCO does not use ("look after children") finds nothing. A phrase
+many kinds of work share ("write reports", "solve problems", "work in a team") is too
+general to find work on its own: say what it is about ("write inspection reports"). Never
 write a sentence or a word on its own. A query may instead be one of the person's own job
 titles exactly as they gave it: Careerwright joins it to other work by the essential skills
 they share.
@@ -249,9 +254,10 @@ Cover different kinds of work, one channel per query: what they enjoy ("tasks"),
 like to work ("environment"), skills they could carry over from what they do or have done
 ("transferable"), the same tasks in other industries ("cross_industry"), and specialist,
 vocational or less familiar work they may not have considered ("less_familiar"). Base each
-query and hypothesis on what they do, enjoy, can do or have done, or a role they named: how
-they like to work describes how they work, not a skill, so Careerwright never searches with
-it alone. Do not favour popular, prestigious or well-paid work.
+query and hypothesis on what they do, enjoy, can do or have done, where they like to work
+("work in outdoor conditions"), or a role they named: a one-word answer about how they like
+to work ("structured") matches too loosely, so Careerwright never searches with it alone. Do
+not favour popular, prestigious or well-paid work.
 
 In based_on, quote exactly the answer texts each query comes from. Also give up to
 {MAX_HYPOTHESES} surprising but plausible occupation titles ("hypotheses"), with the answers they

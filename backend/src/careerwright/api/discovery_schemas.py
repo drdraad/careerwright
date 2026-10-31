@@ -302,7 +302,15 @@ class PoolQueryOut(ResponseModel):
     text: str
     channel: SlateChannel
     based_on: list[EvidenceOut]
-    hits: int = Field(description="Occupations this query found (bounded per query).")
+    hits: int = Field(
+        description="Occupations this query found (bounded per query); for one too general "
+        "to find work on its own, those another search found that it adds weight to."
+    )
+    reach: int = Field(description="Occupations it reached in all, past its own bound too.")
+    too_general: bool = Field(
+        description="Too general to find work on its own (it reaches too many occupations, or "
+        "too many different skills): it only adds weight to work another search found."
+    )
 
     @classmethod
     def of(cls, query: PoolQuery) -> "PoolQueryOut":
@@ -312,6 +320,8 @@ class PoolQueryOut(ResponseModel):
             channel=query.channel,
             based_on=[EvidenceOut.of(e) for e in query.based_on],
             hits=len(query.hits),
+            reach=query.reach,
+            too_general=query.too_general,
         )
 
 
@@ -481,7 +491,8 @@ class SlateOut(ResponseModel):
     fewer_reasons: list[str] = Field(description="Why there are fewer than six, if there are.")
     notes: list[str] = Field(
         description="How the slate was made, in words: a control's effect, a changed ESCO "
-        "release, answers not used to find work, or fewer occupations to choose from than "
+        "release, answers not searched, answers that found no work or were too general to "
+        "find it alone, what a join keeps, or fewer occupations to choose from than "
         "Careerwright aims for."
     )
     salary_floor: SalaryFloorOut | None = Field(
@@ -490,7 +501,9 @@ class SlateOut(ResponseModel):
     ai_resilience_filter: AiResilienceFilterOut
     pool_size: int = Field(description="Distinct occupations after folding near-duplicates.")
     pool_target: tuple[int, int] = (POOL_TARGET, POOL_LIMIT)
-    beyond_pool_limit: int = Field(description="Occupations found past the pool's bound.")
+    beyond_pool_limit: int = Field(
+        description="Occupations found but not kept: past a join's best 30 or the pool's bound."
+    )
     excluded: ExcludedOut
     queries: list[PoolQueryOut] = Field(description="Every search that ran, with its hits.")
     unsearchable_queries: list[str] = Field(description="Queries with no searchable word.")

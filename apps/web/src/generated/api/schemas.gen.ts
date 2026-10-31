@@ -6405,7 +6405,17 @@ export const PoolQueryOutSchema = {
         hits: {
             type: 'integer',
             title: 'Hits',
-            description: 'Occupations this query found (bounded per query).'
+            description: 'Occupations this query found (bounded per query); for one too general to find work on its own, those another search found that it adds weight to.'
+        },
+        reach: {
+            type: 'integer',
+            title: 'Reach',
+            description: 'Occupations it reached in all, past its own bound too.'
+        },
+        too_general: {
+            type: 'boolean',
+            title: 'Too General',
+            description: 'Too general to find work on its own (it reaches too many occupations, or too many different skills): it only adds weight to work another search found.'
         }
     },
     additionalProperties: false,
@@ -6415,7 +6425,9 @@ export const PoolQueryOutSchema = {
         'text',
         'channel',
         'based_on',
-        'hits'
+        'hits',
+        'reach',
+        'too_general'
     ],
     title: 'PoolQueryOut'
 } as const;
@@ -9861,7 +9873,7 @@ export const SlateOutSchema = {
             },
             type: 'array',
             title: 'Notes',
-            description: 'How the slate was made, in words: a control\'s effect, a changed ESCO release, answers not used to find work, or fewer occupations to choose from than Careerwright aims for.'
+            description: 'How the slate was made, in words: a control\'s effect, a changed ESCO release, answers not searched, answers that found no work or were too general to find it alone, what a join keeps, or fewer occupations to choose from than Careerwright aims for.'
         },
         salary_floor: {
             anyOf: [
@@ -9903,7 +9915,7 @@ export const SlateOutSchema = {
         beyond_pool_limit: {
             type: 'integer',
             title: 'Beyond Pool Limit',
-            description: 'Occupations found past the pool\'s bound.'
+            description: 'Occupations found but not kept: past a join\'s best 30 or the pool\'s bound.'
         },
         excluded: {
             $ref: '#/components/schemas/ExcludedOut'

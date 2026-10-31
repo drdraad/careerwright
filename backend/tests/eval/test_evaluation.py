@@ -252,10 +252,12 @@ def test_a_search_must_reach_work_through_an_essential_skill_that_holds_all_its_
 
 
 @pytest.mark.req("REC1-03", "TEST1-10")
-def test_no_search_may_rest_on_how_the_person_likes_to_work_alone() -> None:
+def test_no_search_may_rest_on_a_one_word_answer_about_how_the_person_likes_to_work() -> None:
     # Task W2B fix round 2: "structured" found soil structure and wood elements in structures.
+    # Fix round 3: a longer answer ("working outdoors") is searched like any other.
     p01 = BY_ID["DSC-12"]
     style = {"field": "work_style", "text": "structured"}
+    longer = {"field": "work_style", "text": "working outdoors"}
     task = {"field": "enjoyed_tasks", "text": "finding inconsistencies"}
 
     def ran(*based_on: dict[str, str]) -> dict[str, Any]:
@@ -265,7 +267,83 @@ def test_no_search_may_rest_on_how_the_person_likes_to_work_alone() -> None:
         )
 
     assert evaluate(p01, ran(task, style), {}) == []  # a task with it: the task's search
+    assert evaluate(p01, ran(longer), {}) == []
     assert [f.type for f in evaluate(p01, ran(style), {})] == [FailureType.GROUNDING]
+
+
+@pytest.mark.req("DIV1-06", "TEST1-10")
+def test_an_answer_whose_every_search_found_nothing_must_be_named() -> None:
+    # Task W2B re-review 2, N-I1: P02's slate never said "repairing physical objects" found
+    # nothing. One that found work must never be named as having found none.
+    p02 = BY_ID["DSC-01"]
+    six = [suggestion(f"o{n}", f"{n}21", "less_familiar") for n in range(1, 7)]
+    repairing = {"field": "enjoyed_tasks", "text": "repairing physical objects"}
+    outdoors = {"field": "enjoyed_tasks", "text": "working outdoors"}
+    reports = {"field": "enjoyed_tasks", "text": "writing reports"}
+
+    def query(query_id: str, text: str, answer: dict[str, str], reach: int) -> dict[str, Any]:
+        return {"query_id": query_id, "text": text, "based_on": [answer], "reach": reach}
+
+    queries = [
+        query("q1", "repairing physical objects", repairing, 0),
+        query("q2", "fixing machines", repairing, 0),
+        query("q3", "working outdoors", outdoors, 12),
+        # Too general to find work alone, it added weight nowhere (no hits kept), but it
+        # found work, so it is never "found no work".
+        {**query("q5", "writing reports", reports, 217), "hits": 0},
+    ]
+    missed = "“Repairing physical objects” isn't how ESCO names any skill, so it found no work."
+    pool = "Careerwright chose these from 12 occupations."
+
+    def shown(*notes: str, reach: int = 0) -> dict[str, Any]:
+        found = [*queries, query("q4", "fixing machines", repairing, reach)]
+        return slate(*six, pool_size=12, queries=found, notes=[*notes, pool])
+
+    wrongly = "“Working outdoors” isn't how ESCO names any skill, so it found no work."
+    assert evaluate(p02, shown(missed), {}) == []
+    assert [f.type for f in evaluate(p02, shown(), {})] == [FailureType.THIN_EVIDENCE]
+    assert [f.type for f in evaluate(p02, shown(missed, wrongly), {})] == [
+        FailureType.THIN_EVIDENCE
+    ]
+    # Named only when every search resting on it found nothing.
+    assert [f.type for f in evaluate(p02, shown(missed, reach=2), {})] == [
+        FailureType.THIN_EVIDENCE
+    ]
+    assert evaluate(p02, shown(reach=2), {}) == []
+
+
+@pytest.mark.req("DIV1-06", "DIV1-08", "TEST1-10")
+def test_a_search_too_general_to_find_work_alone_may_only_add_weight_and_is_named() -> None:
+    # Task W2B re-review 2, N-I2: "writing reports" alone offered an ambulance driver, a
+    # chiropractor and a city councillor.
+    case = BY_ID["DSC-19"]
+    children = {"field": "enjoyed_tasks", "text": "caring for children"}
+    reports = {"field": "enjoyed_tasks", "text": "writing reports"}
+    queries = [
+        {"query_id": "q1", "text": "caring for children", "based_on": [children], "hits": 16,
+         "too_general": False},
+        {"query_id": "q2", "text": "writing reports", "based_on": [reports], "hits": 120,
+         "too_general": True},
+    ]  # fmt: skip
+    note = "“Writing reports” is part of 217 occupations in ESCO, too many to choose from."
+    reason = {"pool_size": 16, "fewer_reasons": ["Only 2 occupations matched."]}
+
+    def found(title: str, *matched: str) -> dict[str, Any]:
+        evidence = [children if q == "q1" else reports for q in matched]
+        return suggestion(
+            title, "531", "less_familiar", matched_queries=list(matched), linked_evidence=evidence
+        )
+
+    def shown(first: dict[str, Any], notes: list[str]) -> dict[str, Any]:
+        return slate(first, found("nanny", "q1"), queries=queries, notes=notes, **reason)
+
+    both = shown(found("child care worker", "q1", "q2"), [note])
+    alone = shown(found("chiropractor", "q2"), [note])
+    silent = shown(found("child care worker", "q1", "q2"), [])
+
+    assert evaluate(case, both, {}) == []
+    assert [f.type for f in evaluate(case, alone, {})] == [FailureType.GROUNDING]
+    assert [f.type for f in evaluate(case, silent, {})] == [FailureType.GROUNDING]
 
 
 @pytest.mark.req("DIV1-03", "DIV1-12", "TEST1-10")

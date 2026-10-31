@@ -5,19 +5,22 @@ and an occupation whose preferred label is a label of another (as a concept key)
 near-identical to it, so they count once (DIV1-05); the most relevant represents them and
 the others say which they duplicate. Folding is never transitive. The working pool is
 bounded (`POOL_LIMIT`, the upper end of the soft 60-120 target) and filled round-robin
-across ISCO families before relevance cuts it. A candidate's relevance rests only on how
-well the person's own answers retrieved it: its best normalised rank in any query, plus a
-little for each further query that found it. Equal relevance goes to the larger share of
-its essential skills the answers reach (its own, never a folded role's), and the title is
-only the last tie-break: no cut is decided by the alphabet. No pay, popularity, prestige or
-AI-resilience figure enters (DIV1-07), and no percentage is ever produced (REC1-05).
+across ISCO families before relevance cuts it; what it and a join's own cut leave out is
+counted. A candidate's relevance rests only on how well the person's own answers retrieved
+it: its best normalised rank in any query, plus a little for each further query that found
+it. Equal relevance goes to work a more specific search found (it reached fewer
+occupations), then to the larger share of its essential skills the answers reach (its own,
+never a folded role's), and the title is only the last tie-break: no cut is decided by the
+alphabet. No pay, popularity, prestige or AI-resilience figure enters (DIV1-07), and no
+percentage is ever produced (REC1-05).
 
 **Titles are joined by skills, never by their words** (plan section 4, Sprint W; ADR 0007
 decision 13). The person's role or a title they named is resolved to its ESCO occupation, and
 other occupations join it only by the essential skills the two share (`skill_join_hits`):
 at least `MIN_SHARED_SKILLS`, ranked by their share of both roles' essential skills. Every
 other search reaches an occupation only through one of its essential skills whose label
-holds every word of the search, which its hit names (`Hit.skill`).
+holds every word of the search, which its hit names (`Hit.skill`); a search too general to
+find work on its own (`too_general`) only adds weight to work another search found.
 
 **Direction** is relative to the person (DIV1-12): close to what they do now (its ISCO
 family is one of their current role's or targets', or their role or a target found it),
@@ -42,7 +45,7 @@ fit (spec section 4).
 
 import uuid
 from collections import Counter
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
@@ -69,6 +72,14 @@ SAME_FAMILY_PENALTY = 0.3
 # occupation, 22 on average), and a join keeps its best `JOIN_HITS` like a search.
 MIN_SHARED_SKILLS = 3
 JOIN_HITS = 30
+# A search too general to find work on its own (product policy, provisional for the product
+# owner at session W2; Task W2B fix round 3): it reaches more than this many occupations
+# ("writing reports" reaches 217)...
+TOO_GENERAL_OCCUPATIONS = 50
+# ...or more than this many different essential skills, none named by exactly its words
+# ("training staff": 10, from "train staff in quality procedures" to "train staff to reduce
+# food waste"). It may still add weight to work another search found.
+TOO_GENERAL_SKILLS = 5
 
 
 class SlateChannel(StrEnum):
@@ -88,8 +99,8 @@ class SlateChannel(StrEnum):
 
 # How much a hit counts by the channel that found it. Where someone likes to work is weaker
 # evidence than what they do, enjoy or name (spec section 4: one source of hypotheses among
-# several); it is never a filter (REC1-03), and a search resting on how they like to work
-# alone is not run at all (ADR 0007 decision 13).
+# several); it is never a filter (REC1-03), and a search resting only on one-word answers
+# about how they like to work is not run at all (ADR 0007 decision 13).
 CHANNEL_WEIGHT: Mapping[SlateChannel, float] = {
     SlateChannel.CURRENT: 1.0,
     SlateChannel.USER_PROPOSED: 1.0,
@@ -155,11 +166,19 @@ def skill_join_hits(
     """A title's occupation (with `essential` essential skills) joined to others by the
     essential skills they share: each with at least `MIN_SHARED_SKILLS`, scored by the share
     of both roles' essential skills they have in common (Jaccard) over the best such share,
-    as a search's ranks are over its best. The best `limit`, in a deterministic order."""
+    as a search's ranks are over its best. The best `limit`, in a deterministic order, and
+    every occupation tied with the last of them: a cut never falls inside an exact tie."""
     joined = [n for n in neighbours if n.shared >= MIN_SHARED_SKILLS]
     share = {n.concept_id: n.shared / (essential + n.essential - n.shared) for n in joined}
-    kept = sorted(joined, key=lambda n: (-share[n.concept_id], -n.shared, str(n.concept_id)))
-    kept = kept[:limit]
+
+    def tie(n: SkillNeighbour) -> tuple[float, int]:
+        return (-share[n.concept_id], -n.shared)
+
+    kept = sorted(joined, key=lambda n: (*tie(n), str(n.concept_id)))
+    end = min(limit, len(kept))
+    while 0 < end < len(kept) and tie(kept[end]) == tie(kept[end - 1]):
+        end += 1
+    kept = kept[:end]
     top = max((share[n.concept_id] for n in kept), default=0.0)
     return tuple(
         Hit(
@@ -173,6 +192,13 @@ def skill_join_hits(
     )
 
 
+def too_general(reach: int, skills: int, *, exact: bool) -> bool:
+    """A search too general to find work on its own: it reaches more than
+    `TOO_GENERAL_OCCUPATIONS` occupations, or more than `TOO_GENERAL_SKILLS` different
+    essential skills none of which is named by exactly its words."""
+    return reach > TOO_GENERAL_OCCUPATIONS or (skills > TOO_GENERAL_SKILLS and not exact)
+
+
 @dataclass(frozen=True)
 class PoolQuery:
     query_id: str
@@ -180,6 +206,34 @@ class PoolQuery:
     channel: SlateChannel
     based_on: tuple[EvidenceItem, ...]
     hits: tuple[Hit, ...]
+    # How many occupations it reached in all, past its own cut too; None: its hits are all.
+    # A search that can find work never reaches past its cut (`TOO_GENERAL_OCCUPATIONS` is
+    # below the pool's bound), so only a join's cut leaves occupations out (`unkept`).
+    total: int | None = None
+    unkept: frozenset[uuid.UUID] = frozenset()  # what a join reached past its best 30
+    # Too general to find work on its own (`too_general`): it only adds weight to work
+    # another search found.
+    too_general: bool = False
+
+    @property
+    def reach(self) -> int:
+        return len(self.hits) if self.total is None else self.total
+
+
+def skill_join(
+    query_id: str,
+    title: str,
+    channel: SlateChannel,
+    based_on: tuple[EvidenceItem, ...],
+    essential: int,
+    neighbours: list[SkillNeighbour],
+) -> PoolQuery:
+    """The work joined to a title's occupation by shared essential skills (`skill_join_hits`),
+    with every occupation the join reached, kept or not."""
+    hits = skill_join_hits(essential, neighbours)
+    joined = frozenset(n.concept_id for n in neighbours if n.shared >= MIN_SHARED_SKILLS)
+    unkept = joined - {hit.concept_id for hit in hits}
+    return PoolQuery(query_id, title, channel, based_on, hits, total=len(joined), unkept=unkept)
 
 
 @dataclass(frozen=True)
@@ -216,14 +270,17 @@ class Candidate:
     relevance: float
     direction: Direction
     channels: frozenset[SlateChannel]
-    # The share of its essential skills the person's answers reach (its own matches only):
-    # equal relevance goes to the larger share, never to the title (Task W2B re-review I-B).
+    # How many occupations the most specific search that found it reached: equal relevance
+    # goes to work a specific answer found before work a general one found (Task W2B re-review
+    # 2, N-M4), then to the larger share of its essential skills the person's answers reach
+    # (its own matches only), never to the title (re-review I-B).
+    reach: int
     share: float
     duplicate_of: uuid.UUID | None = None
 
     @property
     def best_score(self) -> float:
-        return max(m.score for m in self.matches)
+        return _found_by(self.matches)
 
     @property
     def own_matches(self) -> tuple[Match, ...]:
@@ -234,7 +291,9 @@ class Candidate:
 @dataclass(frozen=True)
 class Pool:
     candidates: tuple[Candidate, ...]
-    beyond_limit: int  # distinct occupations retrieved past `POOL_LIMIT`, not kept
+    # Occupations a search or join that can find work reached and the pool doesn't keep: past
+    # a join's best 30 or past `POOL_LIMIT`.
+    beyond_limit: int
 
     def __iter__(self) -> Iterator[Candidate]:
         return iter(self.candidates)
@@ -282,12 +341,25 @@ def _direction(
     return Direction.LESS_FAMILIAR
 
 
+def _found_by(matches: Iterable[Match]) -> float:
+    """The best score of a search or join that found it: one too general to find work on its
+    own never counts here."""
+    return max(m.score for m in matches if not m.query.too_general)
+
+
 def _relevance(matches: list[Match]) -> float:
-    best: dict[str, float] = {}
-    for match in matches:
-        best[match.query.query_id] = max(best.get(match.query.query_id, 0.0), match.score)
-    scores = sorted(best.values(), reverse=True)
-    return min(MAX_RELEVANCE, scores[0] + FURTHER_QUERY_BONUS * (len(scores) - 1))
+    """The best score that found it, plus a little for each further query that reached it,
+    a search too general to find work alone included."""
+    further = len({match.query.query_id for match in matches}) - 1
+    return min(MAX_RELEVANCE, _found_by(matches) + FURTHER_QUERY_BONUS * further)
+
+
+def _reach(occupation: Occupation, matches: list[Match]) -> int:
+    return min(
+        m.query.reach
+        for m in matches
+        if m.concept_id == occupation.concept_id and not m.query.too_general
+    )
 
 
 def _share(occupation: Occupation, matches: list[Match]) -> float:
@@ -305,15 +377,18 @@ def _candidate(occupation: Occupation, matches: list[Match], familiar: frozenset
         _relevance(matches),
         _direction(occupation, channels, familiar),
         channels,
+        _reach(occupation, matches),
         _share(occupation, matches),
     )
 
 
-def _order(candidate: Candidate) -> tuple[float, float, str, str]:
-    """Relevance first; equals go to the larger share of essential skills reached, and the
-    title is only the last tie-break (never cut ties alphabetically)."""
+def _order(candidate: Candidate) -> tuple[float, int, float, str, str]:
+    """Relevance first; equals go to work a more specific search found (it reached fewer
+    occupations), then to the larger share of essential skills reached, and the title is
+    only the last tie-break (never cut ties alphabetically)."""
     return (
         -candidate.relevance,
+        candidate.reach,
         -candidate.share,
         candidate.occupation.title,
         str(candidate.occupation.concept_id),
@@ -372,12 +447,16 @@ def build_pool(
     *,
     limit: int = POOL_LIMIT,
 ) -> Pool:
-    """Every hit pooled by concept and near-identical roles folded together, bounded."""
+    """Every hit pooled by concept and near-identical roles folded together, bounded. A
+    search too general to find work on its own only adds to occupations another search or
+    join found. What those reached and the pool doesn't keep is counted: past a join's cut,
+    or past the pool's bound."""
+    finding = [q for q in queries if not q.too_general]
     found: dict[uuid.UUID, list[Match]] = {}
-    for query in queries:
+    for query in [*finding, *(q for q in queries if q.too_general)]:
         weight = CHANNEL_WEIGHT[query.channel]
         for hit in query.hits:
-            if hit.concept_id in occupations:
+            if hit.concept_id in occupations and (not query.too_general or hit.concept_id in found):
                 found.setdefault(hit.concept_id, []).append(
                     Match(
                         query,
@@ -403,14 +482,12 @@ def build_pool(
         pooled += [replace(c, duplicate_of=lead.occupation.concept_id) for c in rest]
     leads = sorted((c for c in pooled if c.duplicate_of is None), key=_order)
     kept = _across_families(leads, limit)
-    return Pool(
-        tuple(
-            c
-            for c in sorted(pooled, key=_order)
-            if (c.duplicate_of or c.occupation.concept_id) in kept
-        ),
-        max(0, len(leads) - limit),
+    pool = tuple(
+        c for c in sorted(pooled, key=_order) if (c.duplicate_of or c.occupation.concept_id) in kept
     )
+    reached = {h.concept_id for q in finding for h in q.hits if h.concept_id in occupations}
+    reached |= {concept for q in finding for concept in q.unkept}
+    return Pool(pool, len(reached - {c.occupation.concept_id for c in pool}))
 
 
 @dataclass(frozen=True)
@@ -522,7 +599,7 @@ def choose_slate(
     fewer: list[str] = []
     if len(chosen) < SLATE_SIZE:
         if not pool.candidates:
-            fewer.append("None of your answers matched an occupation in ESCO yet.")
+            fewer.append("None of your answers found work to suggest yet.")
         elif len(eligible) < SLATE_SIZE:
             fewer.append(
                 f"Only {_plural(len(eligible), 'occupation', 'occupations')} matched your "
