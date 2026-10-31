@@ -8,6 +8,7 @@ each title's stored record. No model is called."""
 import uuid
 from typing import Any
 
+import psycopg
 import pytest
 import sqlalchemy as sa
 
@@ -437,6 +438,32 @@ def test_a_role_chosen_by_one_of_esco_s_other_titles_is_stored_as_an_esco_title(
         "esco",
         "occupation_choice",
         True,
+    )
+
+
+@pytest.mark.req("PROF-10", "DIV1-14")
+def test_the_record_checks_repeat_the_role_space_rules(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    # App review M-4 (migration 0038): kept in code only, an ONS record with no codes would
+    # silently never ask the closest question, and "None of these" could be anyone's.
+    workspace = api.create_workspace(ada, "Record checks (synthetic)")["workspace_id"]
+    assert name_role(api, ada, workspace, "Registered nurse", 0).status_code == 201
+    assert closest(api, ada, workspace, None, 1).status_code == 201
+    row = "WHERE workspace_id = %s AND title_key = 'registered nurse'"
+    refused = [
+        ("an_ons_title_has_its_codes", "soc_codes = '{}'"),
+        ("an_ons_title_has_its_codes", "isco_codes = '{}'"),
+        ("none_of_these_is_the_person_s_own", "recorded_by = NULL"),
+        # An ESCO title has no ONS codes (0034), so only the new rule refuses this one.
+        ("none_of_these_is_the_person_s_own", "kind = 'esco', soc_codes = '{}', isco_codes = '{}'"),
+    ]
+    for constraint, change in refused:
+        with pytest.raises(psycopg.errors.CheckViolation, match=constraint):
+            infra.query(f"UPDATE careerwright.target_records SET {change} {row}", (workspace,))  # noqa: S608
+    # The type-ahead's refusal is on the person's own words, which the rule allows.
+    assert (
+        name_role(api, ada, workspace, "Orbital gardener", 2, none_of_these=True).status_code == 201
     )
 
 
