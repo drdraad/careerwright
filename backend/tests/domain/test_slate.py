@@ -9,7 +9,7 @@ import pytest
 
 from careerwright.catalogue.records import IscoGroupRef, OccupationFacts
 from careerwright.profile.discovery import EvidenceItem
-from careerwright.profile.exploration import explain
+from careerwright.profile.exploration import _general_note, _join_note, _missed_notes, explain
 from careerwright.profile.interview import ProfileField
 from careerwright.profile.slate import (
     FAMILY_LIMIT,
@@ -270,6 +270,37 @@ def test_a_why_line_never_names_a_near_identical_role_s_skill_as_this_one_s() ->
     assert not any("attend music recording sessions" in line for line in why)
 
 
+@pytest.mark.req("REC1-05")
+def test_a_small_test_of_work_with_a_plural_title_talks_to_people_who_do_it() -> None:
+    # Task W2B re-review 3: "Talk to someone who works as warehouse operators for clothing"
+    # (ESCO v1.2.1's one plural title), the plural the connection's article already reads.
+    found = {
+        o.concept_id: o
+        for o in (
+            occupation("warehouse operators for clothing", "432"),
+            occupation("bicycle mechanic", "723"),
+        )
+    }
+    query = pool_query(
+        "q1",
+        SlateChannel.TASKS,
+        ("warehouse operators for clothing", 1.0),
+        ("bicycle mechanic", 1.0),
+    )
+
+    talk = {
+        c.occupation.title: explain(c, facts_of(c.occupation), familiarity_known=False).try_it[0]
+        for c in build_pool([query], found, frozenset())
+    }
+
+    assert talk == {
+        "warehouse operators for clothing": "Talk to people who work as warehouse operators "
+        "for clothing about a typical week (an informational interview).",
+        "bicycle mechanic": "Talk to someone who works as a bicycle mechanic about a typical "
+        "week (an informational interview).",
+    }
+
+
 @pytest.mark.req("DIV1-05")
 def test_an_alias_from_another_kind_of_work_is_not_a_duplicate() -> None:
     # Re-review N-M3: ESCO lists "biochemist" as a label of chemist, but they are
@@ -486,6 +517,72 @@ def test_a_search_too_general_to_find_work_alone_only_adds_weight_to_work_anothe
     assert left.reason is NotIncluded.BELOW_RELEVANCE_FLOOR
 
 
+def searched(
+    query_id: str, text: str, *based_on: EvidenceItem, reach: int = 0, general: bool = False
+) -> PoolQuery:
+    """A search as the notes read it: its words, the answers it cites and how many
+    occupations it reached."""
+    channel = SlateChannel.TASKS
+    return PoolQuery(query_id, text, channel, based_on, (), total=reach, too_general=general)
+
+
+ESSENTIAL_NOWHERE = "isn't part of any skill ESCO lists as essential for an occupation"
+
+
+@pytest.mark.req("DIV1-06", "DIV1-10")
+def test_the_notes_say_what_a_model_s_searches_checked_and_which_answers_found_no_work() -> None:
+    # Task W2B re-review 3: M2, a model may write several searches from one answer, or one
+    # from a task and a one-word work style, and no product test read those notes; I1, "isn't
+    # how ESCO names any skill" was untrue where ESCO names the skill but lists it as
+    # essential for no occupation ("take pictures"); M1, a model's search too general asked
+    # the person to say more about an answer that was already specific.
+    fixing = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="fixing things")
+    tidying = EvidenceItem(field=ProfileField.CONFIDENT_TASKS, text="tidying stockrooms")
+    practical = EvidenceItem(field=ProfileField.WORK_STYLE, text="practical")
+    pictures = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="taking pictures")
+    bridges = EvidenceItem(
+        field=ProfileField.EVIDENCED_TASKS, text="writing inspection reports for bridges"
+    )
+    staff = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="training staff")
+    model = [
+        searched("q1", "repair machinery", fixing),
+        searched("q2", "fix equipment", fixing),
+        searched("q3", "organise stock", tidying, practical),
+        searched("q4", "taking pictures", pictures),  # the answer's own words
+    ]
+
+    assert _missed_notes(model, [], ["structured"]) == [
+        "How you like to work (“structured”, “practical”) isn't searched on its own, because a "
+        "single word matches too loosely. Careerwright searches a longer answer, such as "
+        "“working outdoors”.",
+        "The searches “repair machinery” and “fix equipment” (from “fixing things”) aren't "
+        "part of any skill ESCO lists as essential for an occupation, so “fixing things” found "
+        "no work.",
+        f"The search “organise stock” (from “tidying stockrooms”) {ESSENTIAL_NOWHERE}, so "
+        "“tidying stockrooms” found no work.",
+        f"“Taking pictures” {ESSENTIAL_NOWHERE}, so it found no work.",
+    ]
+    # Named only when none of the searches citing it found anything.
+    one_found = [model[0], searched("q2", "fix equipment", fixing, reach=3)]
+    assert _missed_notes(one_found, [], []) == []
+    # A one-word style a search found work with is named nowhere, like the task beside it.
+    stock = searched("q3", "organise stock", tidying, practical, reach=4)
+    assert _missed_notes([stock], [], []) == []
+
+    reports = searched("q5", "write reports", bridges, reach=217, general=True)
+    assert _general_note(reports, 17) == (
+        "The search “write reports” (from “writing inspection reports for bridges”) is part of "
+        "the essential skills of 217 occupations in ESCO, too many to choose from on its own. "
+        "Careerwright would need a narrower search to find work from “writing inspection "
+        "reports for bridges”."
+    )
+    assert _general_note(searched("q6", "training staff", staff, reach=17, general=True), 10) == (
+        "“Training staff” is part of 10 different essential skills in ESCO, none of them just "
+        "that, so it's too general to choose work from on its own. Say more about it, such as "
+        "what it's about or who it's for."
+    )
+
+
 @pytest.mark.req("DIV1-02")
 def test_the_pool_counts_what_a_join_reached_past_its_cut_and_its_own_bound() -> None:
     # Task W2B re-review 2, N-M2: "data analyst" joins 47 occupations by three or more shared
@@ -520,6 +617,13 @@ def test_the_pool_counts_what_a_join_reached_past_its_cut_and_its_own_bound() ->
 
     assert build_pool([joined], found, frozenset()).beyond_limit == 3
     assert build_pool([joined, statistics], found, frozenset()).beyond_limit == 2
+    # Task W2B re-review 3, I2: the join keeps the largest share of essential skills in
+    # common, not the most shared skills (P03's join keeps a live chat operator sharing 5 and
+    # leaves out a ticket issuing clerk sharing 7).
+    assert _join_note(joined) == (
+        "“Data analyst” shares 3 or more essential skills with 5 other occupations in ESCO. "
+        "Careerwright keeps the 2 with the largest share of essential skills in common."
+    )
     # A search that can find work reaches at most this many, under the pool's bound, so it
     # keeps everything it reaches and the count needs no "at least".
     assert TOO_GENERAL_OCCUPATIONS < POOL_LIMIT

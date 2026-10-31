@@ -34,6 +34,7 @@ import {
   useSubmitExplanation,
 } from "@/lib/queries";
 import {
+  ADDED_WEIGHT_ONLY,
   DIRECTION,
   EMPHASIS,
   ERROR_STATEMENT,
@@ -87,6 +88,7 @@ function Source({ suggestion, slate }: { suggestion: SuggestionOut; slate: Slate
           {queries.map((query) => (
             <li key={query.query_id}>
               “{query.text}”, from {query.based_on.map((item) => `“${item.text}”`).join(", ")}
+              {query.too_general && ` (${ADDED_WEIGHT_ONLY})`}
             </li>
           ))}
         </ul>
@@ -496,6 +498,8 @@ function Slate({
   const data = slate.data;
   const familiarityKnown = profile.document.current_role.state === "provided" || targets.length > 0;
   const excluded = controls.excludeConcepts.length + controls.excludeFamilies.length;
+  // A search too general to find work on its own found none of the pool: it only added weight.
+  const finding = data.queries.filter((query) => !query.too_general).length;
   const first = data.suggestions[0];
   const note: WrittenState = first === undefined ? { kind: "none" } : noteFor(first);
   return (
@@ -518,8 +522,9 @@ function Slate({
       </fieldset>
       <p className="small muted">
         {data.suggestions.length} of up to {data.target_size}, from {data.pool_size} occupations
-        found by {data.queries.length} searches of ESCO{data.release.sample ? " (test sample)" : ""}
-        .{data.beyond_pool_limit > 0 && ` ${data.beyond_pool_limit} more were found but not kept.`}
+        found by {finding} {finding === 1 ? "search" : "searches"} of ESCO
+        {data.release.sample ? " (test sample)" : ""}.
+        {data.beyond_pool_limit > 0 && ` ${data.beyond_pool_limit} more were found but not kept.`}
         {excluded > 0 &&
           ` Your exclusions removed ${data.excluded.occupations + data.excluded.families}.`}
       </p>

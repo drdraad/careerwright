@@ -176,7 +176,8 @@ inference, with at least 30 evaluation cases and a capped live run.
    not suit you" names ESCO's essential skills (not yet compared with experience), a
    regulated-profession mark and, when familiarity is known, a different kind of work;
    "Try it before committing" offers an informational interview and one of its tasks on a
-   small scale. Entry gates and evidence gaps say plainly what is not researched yet; a
+   small scale (with people who do the work for a plural ESCO title, "warehouse operators
+   for clothing", since Task W2B fix round 4). Entry gates and evidence gaps say plainly what is not researched yet; a
    later absence of listings is a demand signal, not proof the work does not exist
    (DIV1-09). Every suggestion carries its ESCO URI as its source, the release's
    attribution and adaptation are shown with the slate, and it becomes a target only when
@@ -558,8 +559,10 @@ inference, with at least 30 evaluation cases and a capped live run.
       every occupation tied with the 30th too (equal share and equal shared count: the
       warehouse manager's places 23 to 47 tie, and the cut kept 8 of them by concept ID). The
       slate says what a join keeps ("“Data analyst” shares 3 or more essential skills with 47
-      other occupations in ESCO. Careerwright keeps the 30 that share the most."), and the
-      ones it leaves out are counted (`beyond_pool_limit`). Careerwright adds the
+      other occupations in ESCO. Careerwright keeps the 30 with the largest share of
+      essential skills in common."; fix round 4: it said "the 30 that share the most", untrue
+      by count, since P03's join keeps a live chat operator sharing 5 and leaves out a ticket
+      issuing clerk sharing 7), and the ones it leaves out are counted (`beyond_pool_limit`). Careerwright adds the
       role's join itself (channel `shared_skills`, query `j1`, a transferable channel); a
       model or fixture search naming the title is answered by the same join under its own
       channel. Direction follows decision 5: close in the role's or a target's kind of work,
@@ -625,9 +628,19 @@ inference, with at least 30 evaluation cases and a capped live run.
          occupation it reaches, past its own cut too (it is searched again among them:
          "writing reports" kept its best 127, which leave out the nursery school head
          teacher that "caring for children" also reaches; DSC-19). The slate says so:
-         "“Writing reports” is part of 217 occupations in ESCO, too many to choose from on
-         its own. Say more about it, such as what it's about or who it's for." The same
-         reasoning as the join's
+         "“Writing reports” is part of the essential skills of 217 occupations in ESCO, too
+         many to choose from on its own. Say more about it, such as what it's about or who
+         it's for." and "“Training staff” is part of 10 different essential skills in ESCO,
+         none of them just that, ..." (fix round 4: both count essential skills only, and now
+         say so; they said "217 occupations" and "10 different ESCO skills"). Where a model wrote
+         the search, it is the search that was too general, so the person is never asked to
+         say more about their answer: "The search “write reports” (from “writing inspection
+         reports for bridges”) is part of the essential skills of 217 occupations in ESCO,
+         too many to choose from on its own. Careerwright would need a narrower search to
+         find work from “writing inspection reports for bridges”." The web marks such a
+         search under "Found by these searches" ("too general to find work on its own, so it
+         only added weight to what another search found") and leaves it out of "found by N
+         searches of ESCO" (fix round 4). The same reasoning as the join's
          three shared skills: one shared skill joins the median occupation to 337 others.
          Both thresholds are provisional, for the product owner at session W2. On the
          release they stop "solving problems" (77), "writing reports" (217), "working in a
@@ -655,17 +668,25 @@ inference, with at least 30 evaluation cases and a capped live run.
       rules 2 and 4, a shared title and the soft pool. The public taxonomy search is
       unchanged. Known limit, for session W2: a one-word task answer reaching few enough
       occupations still matches on its stem (rule 4 stops "driving", 71 occupations).
-    - *Honest emptiness* (fix rounds 2 and 3): an answer whose every search found nothing
-      is named, on full and short slates: "“Repairing physical objects” isn't how ESCO names
-      any skill, so it found no work." Where the searches were not the answer's own words
-      (a model's), the note names them: "The search “repair machinery” (from “fixing
-      things”) isn't how ESCO names any skill, so “fixing things” found no work." An answer
-      several searches rest on is named only when none of them found anything. The
-      person's own titles keep their own reasons, and a one-word work style its own note.
-      With nothing to suggest, the slate says "None of your answers found work to suggest
-      yet." (before: "None of your answers matched an occupation in ESCO yet.", which a too
-      general answer made untrue). Check: `missed_answers_named` (DSC-01, DSC-03, DSC-07,
-      DSC-18).
+    - *Honest emptiness* (fix rounds 2 to 4): an answer whose every search found nothing
+      is named, on full and short slates: "“Repairing physical objects” isn't part of any
+      skill ESCO lists as essential for an occupation, so it found no work." Where the
+      searches were not the answer's own words (a model's), the note names them: "The search
+      “repair machinery” (from “fixing things”) isn't part of any skill ESCO lists as
+      essential for an occupation, so “fixing things” found no work." Fix round 4: the note
+      says what was checked, since a search reaches a skill only through an occupation that
+      lists it as essential; before, it said "isn't how ESCO names any skill", untrue where
+      ESCO names the skill but lists it as essential for no occupation ("taking pictures":
+      "take pictures", optional for two; 2,561 of the 13,939 skills in the release's skills
+      file are essential for none). An
+      answer several searches rest on is named only when none of them found anything. The
+      person's own titles keep their own reasons, and a one-word work style its own note,
+      a model's search resting on it beside a task included (fix round 4; before, such a
+      search that found nothing named "practical" as having found no work). With nothing to
+      suggest, the slate says "None of your answers found work to suggest yet." (before:
+      "None of your answers matched an occupation in ESCO yet.", which a too general answer
+      made untrue). Check: `missed_answers_named` (DSC-01, DSC-03, DSC-07, DSC-18), which
+      leaves one-word work styles to their own note.
     - *The soft pool* (fix round 2): the 60-120 working pool holds only where evidence
       permits (DIV1-02). A full slate chosen from fewer than 60 says so: "Careerwright chose
       these from 12 occupations that match your answers closely. It aims for at least 60,
@@ -755,7 +776,12 @@ inference, with at least 30 evaluation cases and a capped live run.
   `discovery-queries-3`; evaluation cases DSC-18 and DSC-19 and the checks
   `missed_answers_named` and `general_searches_add_only`; `work_style_not_searched` checks
   one-word answers only, and DSC-07 dropped it (its work style is now searched) for
-  `missed_answers_named`; DSC-07 and DSC-08 search "caring for animals". No migration.
+  `missed_answers_named`; DSC-07 and DSC-08 search "caring for animals". No migration. Fix
+  round 4 (words, labels and tests; no API or matching change): the missed, too-general and
+  join notes say what was checked and kept; a model's too-general search points at the
+  search; a one-word work style a model searched beside a task keeps its own note, and
+  `missed_answers_named` leaves it to that note; the web marks a too-general search and
+  doesn't count it as finding work; a plural title's "Try it" talks to people who do it.
 - Migration 0010; new run kind `discovery`; new event kind `interview.preferences_updated`;
   new source kind `occupation_choice`; new endpoints for preferences, discoveries, slates,
   targets, the sketch and the profile revert; `submit_turn` answers 202 with the support

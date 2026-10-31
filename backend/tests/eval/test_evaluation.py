@@ -292,14 +292,15 @@ def test_an_answer_whose_every_search_found_nothing_must_be_named() -> None:
         # found work, so it is never "found no work".
         {**query("q5", "writing reports", reports, 217), "hits": 0},
     ]
-    missed = "“Repairing physical objects” isn't how ESCO names any skill, so it found no work."
+    nowhere = "isn't part of any skill ESCO lists as essential for an occupation"
+    missed = f"“Repairing physical objects” {nowhere}, so it found no work."
     pool = "Careerwright chose these from 12 occupations."
 
-    def shown(*notes: str, reach: int = 0) -> dict[str, Any]:
-        found = [*queries, query("q4", "fixing machines", repairing, reach)]
+    def shown(*notes: str, reach: int = 0, more: tuple[dict[str, Any], ...] = ()) -> dict[str, Any]:
+        found = [*queries, query("q4", "fixing machines", repairing, reach), *more]
         return slate(*six, pool_size=12, queries=found, notes=[*notes, pool])
 
-    wrongly = "“Working outdoors” isn't how ESCO names any skill, so it found no work."
+    wrongly = f"“Working outdoors” {nowhere}, so it found no work."
     assert evaluate(p02, shown(missed), {}) == []
     assert [f.type for f in evaluate(p02, shown(), {})] == [FailureType.THIN_EVIDENCE]
     assert [f.type for f in evaluate(p02, shown(missed, wrongly), {})] == [
@@ -310,6 +311,12 @@ def test_an_answer_whose_every_search_found_nothing_must_be_named() -> None:
         FailureType.THIN_EVIDENCE
     ]
     assert evaluate(p02, shown(reach=2), {}) == []
+    # Task W2B re-review 3, M2: a one-word work style a model searched beside a task keeps
+    # its own note, never "found no work".
+    practical = {"field": "work_style", "text": "practical"}
+    beside = {**query("q6", "repair machinery", repairing, 0), "based_on": [repairing, practical]}
+    style = "How you like to work (“practical”) isn't searched on its own."
+    assert evaluate(p02, shown(missed, style, more=(beside,)), {}) == []
 
 
 @pytest.mark.req("DIV1-06", "DIV1-08", "TEST1-10")
@@ -325,7 +332,10 @@ def test_a_search_too_general_to_find_work_alone_may_only_add_weight_and_is_name
         {"query_id": "q2", "text": "writing reports", "based_on": [reports], "hits": 120,
          "too_general": True},
     ]  # fmt: skip
-    note = "“Writing reports” is part of 217 occupations in ESCO, too many to choose from."
+    note = (
+        "“Writing reports” is part of the essential skills of 217 occupations in ESCO, too many "
+        "to choose from on its own."
+    )
     reason = {"pool_size": 16, "fewer_reasons": ["Only 2 occupations matched."]}
 
     def found(title: str, *matched: str) -> dict[str, Any]:

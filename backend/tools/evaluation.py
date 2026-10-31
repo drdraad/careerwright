@@ -385,11 +385,14 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         return Failure(FailureType.GROUNDING, f"searched: {ran}") if ran else None
     if e.check == "missed_answers_named":
         # An answer every search resting on it found nothing with is named in the notes, on
-        # a full slate too, and one that found work never is (Task W2B re-review 2, N-I1).
+        # a full slate too, and one that found work never is (Task W2B re-review 2, N-I1). A
+        # one-word work style a model searched beside a task keeps its own note instead
+        # (re-review 3, M2).
         reached: dict[str, bool] = {}
         for q in observed["queries"]:
             for item in q["based_on"]:
-                if item["field"] in _SEARCHED_FIELDS:
+                style = item["field"] == "work_style" and len(item["text"].split()) == 1
+                if item["field"] in _SEARCHED_FIELDS and not style:
                     reached[item["text"]] = reached.get(item["text"], False) or q["reach"] > 0
         nothing = [note.casefold() for note in observed["notes"] if "found no work" in note]
 
@@ -402,9 +405,9 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
             return Failure(FailureType.THIN_EVIDENCE, f"not named {unnamed}, wrongly {wrong}")
         return None
     if e.check == "general_searches_add_only":
-        # A search too general to find work on its own ("writing reports" is part of 217
-        # occupations) only adds weight to work another search found, and the slate names it
-        # (Task W2B re-review 2, N-I2; provisional thresholds).
+        # A search too general to find work on its own ("writing reports" is part of the
+        # essential skills of 217 occupations) only adds weight to work another search found,
+        # and the slate names it (Task W2B re-review 2, N-I2; provisional thresholds).
         general = {q["query_id"]: q["text"] for q in observed["queries"] if q["too_general"]}
         alone = [s["title"] for s in suggestions if set(s["matched_queries"]) <= set(general)]
         unnamed = [

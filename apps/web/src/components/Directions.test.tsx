@@ -14,7 +14,7 @@ import type {
 } from "@/generated/api";
 import { fakeApi, type Route, type Sent } from "@/test/fakeApi";
 import { Directions } from "./Directions";
-import { EvidenceProvider } from "./EvidenceDrawer";
+import { EvidenceDrawer, EvidenceProvider } from "./EvidenceDrawer";
 
 const WS = "w-dir";
 const unasked = { state: "unasked" as const, value: null, source_ref_id: null };
@@ -193,6 +193,7 @@ function renderDirections(shown: DiscoveryOut = discovery, unavailable?: string)
           discovery={found}
           {...(unavailable === undefined ? {} : { unavailable })}
         />
+        <EvidenceDrawer />
       </EvidenceProvider>
     </QueryClientProvider>
   );
@@ -246,8 +247,9 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
 
   it("[DIV1-02] counts what was found but not kept, and says what a join keeps", async () => {
     // Task W2B re-review 2, N-M2: a join's best 30 left 17 out, and the slate said nothing.
+    // Re-review 3, I2: the join keeps by the share in common, not the most shared skills.
     const keeps =
-      "“Data analyst” shares 3 or more essential skills with 47 other occupations in ESCO. Careerwright keeps the 30 that share the most.";
+      "“Data analyst” shares 3 or more essential skills with 47 other occupations in ESCO. Careerwright keeps the 30 with the largest share of essential skills in common.";
     fakeApi([
       {
         method: "GET",
@@ -259,6 +261,40 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
 
     expect(await screen.findByText(/17 more were found but not kept\./)).toBeVisible();
     expect(screen.getByText(keeps)).toBeVisible();
+  });
+
+  it("[DIV1-06] marks a search too general to find work alone, and never counts it as finding", async () => {
+    // Task W2B re-review 3, M4: "writing reports" only added weight, yet it was listed and
+    // counted as a search that found the work.
+    const reports: SlateOut["queries"][number] = {
+      query_id: "q2",
+      text: "writing reports",
+      channel: "tasks",
+      based_on: [{ field: "enjoyed_tasks", text: "writing reports" }],
+      hits: 1,
+      reach: 217,
+      too_general: true,
+    };
+    const shown = slate([{ ...suggestion, matched_queries: ["q1", "q2"] }]);
+    fakeApi([
+      {
+        method: "GET",
+        path: /\/slate$/,
+        answer: { ...shown, queries: [...shown.queries, reports] },
+      },
+    ]);
+    const { user } = renderDirections();
+
+    expect(await screen.findByText(/from 4 occupations found by 1 search of ESCO\./)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Source for Bicycle mechanic" }));
+    const sheet = await screen.findByRole("dialog", { name: "Where this came from" });
+    const found = within(sheet)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent);
+    expect(found).toEqual([
+      "“bicycle repair”, from “repairing bicycles”",
+      "“writing reports”, from “writing reports” (too general to find work on its own, so it only added weight to what another search found)",
+    ]);
   });
 
   it("excludes a title as a view only, and makes a target only when chosen", async () => {

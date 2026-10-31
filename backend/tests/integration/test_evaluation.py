@@ -163,11 +163,11 @@ def test_the_working_pool_keeps_its_bound_and_counts_the_work_beyond_it(
 @pytest.mark.parametrize(
     ("answer", "reach"),
     [
-        ("solving problems", "77 occupations"),
-        ("writing reports", "217 occupations"),
-        ("working in a team", "242 occupations"),
-        ("training staff", "10 different ESCO skills"),
-        ("analysing data", "92 occupations"),
+        ("solving problems", "the essential skills of 77 occupations"),
+        ("writing reports", "the essential skills of 217 occupations"),
+        ("working in a team", "the essential skills of 242 occupations"),
+        ("training staff", "10 different essential skills"),
+        ("analysing data", "the essential skills of 92 occupations"),
     ],
 )
 def test_an_answer_too_general_to_find_work_alone_finds_none_and_says_why(
@@ -175,6 +175,7 @@ def test_an_answer_too_general_to_find_work_alone_finds_none_and_says_why(
 ) -> None:
     # Task W2B re-review 2, N-I2: each scattered its slate across unrelated work ("writing
     # reports": an ambulance driver, a chiropractor, a city councillor, a lieutenant).
+    # Re-review 3, I1: the note says what was counted, essential skills only.
     with system_transaction(full_release) as tx:
         slate = observed_for(tx, {"enjoyed_tasks": [answer]})
 
@@ -182,6 +183,25 @@ def test_an_answer_too_general_to_find_work_alone_finds_none_and_says_why(
     [query] = slate["queries"]
     assert query["too_general"]
     assert any(f"“{answer.capitalize()}” is part of {reach}" in note for note in slate["notes"])
+
+
+@pytest.mark.req("DIV1-06", "DIV1-08")
+def test_an_answer_naming_a_skill_no_occupation_lists_as_essential_is_named_for_what_was_checked(
+    full_release: sa.Engine,
+) -> None:
+    # Task W2B re-review 3, I1: ESCO names "take pictures" but lists it as essential for no
+    # occupation (optional for two), so "taking pictures" finds no work, and the slate said
+    # "isn't how ESCO names any skill", which is untrue.
+    with system_transaction(full_release) as tx:
+        slate = observed_for(tx, {"enjoyed_tasks": ["taking pictures"]})
+
+    assert slate["suggestions"] == []
+    assert [(q["text"], q["reach"]) for q in slate["queries"]] == [("taking pictures", 0)]
+    assert (
+        "“Taking pictures” isn't part of any skill ESCO lists as essential for an occupation, so "
+        "it found no work."
+    ) in slate["notes"]
+    assert not any("names any skill" in note for note in slate["notes"])
 
 
 @pytest.mark.req("DIV1-06", "DIV1-08")
@@ -212,11 +232,11 @@ def test_where_someone_likes_to_work_is_searched_and_a_specific_answer_s_work_co
     # Task W2B re-review 2: N-I3, "working outdoors" as how someone likes to work reaches
     # work through "work in outdoor conditions", while the one-word "structured" is not
     # searched; N-M4, the bicycle mechanic, the only work "repairing bicycles" reaches, comes
-    # before the 12 outdoor occupations.
-    profile = {
-        "enjoyed_tasks": ["repairing bicycles"],
-        "work_style": ["working outdoors", "structured"],
-    }
+    # before the 12 outdoor occupations. Re-review 3, M3: both answers are how someone likes
+    # to work, so both search in one channel and score alike; by the share of essential
+    # skills alone the leaflet distributor (1 of 6) would come before the bicycle mechanic
+    # (1 of 13).
+    profile = {"work_style": ["repairing bicycles", "working outdoors", "structured"]}
     with system_transaction(full_release) as tx:
         slate = observed_for(tx, profile)
 

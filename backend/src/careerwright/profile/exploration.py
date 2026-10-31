@@ -604,10 +604,14 @@ _VOWEL_SOUND = re.compile(r"^(?:hour|honest|honou?r|heir|[AEFHILMNORSX][A-Z])")
 _PREPOSITION = re.compile(r"\s(?:for|in|of|on|with|at|to)\s")
 
 
+def _plural(title: str) -> bool:
+    head = _PREPOSITION.split(title, maxsplit=1)[0].split()
+    return bool(head) and re.search(r"[^su]s$", head[-1]) is not None  # never "actress", "bus"
+
+
 def with_article(title: str) -> str:
     """The title after "a" or "an", as it is said; a plural title takes none."""
-    head = _PREPOSITION.split(title, maxsplit=1)[0].split()
-    if head and re.search(r"[^su]s$", head[-1]):  # "operators", never "actress" or "bus"
+    if _plural(title):
         return title
     said_as_you = _CONSONANT_SOUND.match(title) or re.match(r"U[A-Z]", title)  # "a UX designer"
     vowel = title[:1].casefold() in "aeiou" and not said_as_you
@@ -670,10 +674,12 @@ def explain(candidate: Candidate, facts: OccupationFacts, familiarity_known: boo
         if facts.regulated
         else ["Entry requirements aren't researched yet."]
     )
-    try_it = [
-        f"Talk to someone who works as {with_article(title)} about a typical week (an "
-        "informational interview)."
-    ]
+    who = (
+        f"people who work as {title}"
+        if _plural(title)
+        else f"someone who works as {with_article(title)}"
+    )
+    try_it = [f"Talk to {who} about a typical week (an informational interview)."]
     if facts.essential_skills:
         try_it.append(f"Try one of its tasks on a small scale: {facts.essential_skills[0]}.")
     return Explanation(
@@ -831,9 +837,7 @@ def compute_slate(
     slate = choose_slate(pool, controls, left_out)
     changed = release_note(proposal.release, release.dataset_id)
     notes = [] if changed is None else [changed]
-    if styles:
-        notes.append(_work_style_note(list(dict.fromkeys(styles))))
-    notes += _missed_notes(queries, unsearchable)
+    notes += _missed_notes(queries, unsearchable, styles)
     notes += dict.fromkeys(
         _general_note(query, general[query.query_id].skills)
         for query in queries
@@ -939,9 +943,13 @@ def _in_own_words(searches: list[str], answers: list[str]) -> bool:
     return len(answers) == 1 and [words(s) for s in searches] == [words(answers[0])]
 
 
-def _missed_notes(queries: list[PoolQuery], unsearchable: list[DiscoveryQuery]) -> list[str]:
+def _missed_notes(
+    queries: list[PoolQuery], unsearchable: list[DiscoveryQuery], styles: list[str]
+) -> list[str]:
     """Each answer whose every search found nothing, named (Task W2B re-review 2, N-I1): an
-    answer several searches rest on is named only when none of them found anything."""
+    answer several searches rest on is named only when none of them found anything. A
+    one-word work style keeps its own note (`_work_style_note`), beside `styles`, the
+    one-word styles no search was run for (Task W2B re-review 3, M2)."""
     searches: dict[EvidenceItem, list[str]] = {}
     found: set[EvidenceItem] = set()
     ran = [(q.text, q.based_on, q.reach > 0) for q in queries]
@@ -951,10 +959,15 @@ def _missed_notes(queries: list[PoolQuery], unsearchable: list[DiscoveryQuery]) 
             searches.setdefault(item, []).append(text)
             if hit:
                 found.add(item)
-    return [
-        _missed(item.text, list(dict.fromkeys(texts)))
+    missed = {
+        item: list(dict.fromkeys(texts))
         for item, texts in searches.items()
         if item not in found and item.field not in _TITLE_FIELDS
+    }
+    styles = [*styles, *(item.text for item in missed if _one_word_style([item]))]
+    notes = [_work_style_note(list(dict.fromkeys(styles)))] if styles else []
+    return notes + [
+        _missed(item.text, texts) for item, texts in missed.items() if not _one_word_style([item])
     ]
 
 
@@ -963,40 +976,57 @@ def _opening(text: str) -> str:
     return f"“{text[:1].upper()}{text[1:]}”"
 
 
+# What a search was checked against: it reaches a skill only through an occupation that
+# lists it as essential, so a skill ESCO lists as essential for none ("take pictures") is
+# never reached (Task W2B re-review 3, I1).
+_ANY_ESSENTIAL_SKILL = "part of any skill ESCO lists as essential for an occupation"
+
+
 def _missed(answer: str, searches: list[str]) -> str:
     if _in_own_words(searches, [answer]):
-        return f"{_opening(answer)} isn't how ESCO names any skill, so it found no work."
+        return f"{_opening(answer)} isn't {_ANY_ESSENTIAL_SKILL}, so it found no work."
     searched, isnt = ("searches", "aren't") if len(searches) > 1 else ("search", "isn't")
     return (
-        f"The {searched} {_quoted(searches)} (from “{answer}”) {isnt} how ESCO names any skill, "
+        f"The {searched} {_quoted(searches)} (from “{answer}”) {isnt} {_ANY_ESSENTIAL_SKILL}, "
         f"so “{answer}” found no work."
     )
 
 
 def _general_note(query: PoolQuery, skills: int) -> str:
     """Why a search too general to find work on its own found none (Task W2B re-review 2,
-    N-I2): it may still add weight to work another search found."""
+    N-I2): it may still add weight to work another search found. A model's search is the
+    one too general, so the person is never asked to say more about their answer (re-review
+    3, M1)."""
     answers = [item.text for item in query.based_on]
-    if _in_own_words([query.text], answers):
-        subject, about = _opening(query.text), "it"
-    else:
-        subject, about = f"The search “{query.text}” (from {_quoted(answers)})", _quoted(answers)
     if query.reach > TOO_GENERAL_OCCUPATIONS:
-        why = f"is part of {query.reach} occupations in ESCO, too many to choose from on its own"
+        why = (
+            f"is part of the essential skills of {query.reach} occupations in ESCO, too many "
+            "to choose from on its own"
+        )
     else:
         why = (
-            f"is part of {skills} different ESCO skills, none of them just that, so it's too "
-            "general to choose work from on its own"
+            f"is part of {skills} different essential skills in ESCO, none of them just that, "
+            "so it's too general to choose work from on its own"
         )
-    return f"{subject} {why}. Say more about {about}, such as what it's about or who it's for."
+    if _in_own_words([query.text], answers):
+        return (
+            f"{_opening(query.text)} {why}. Say more about it, such as what it's about or who "
+            "it's for."
+        )
+    return (
+        f"The search “{query.text}” (from {_quoted(answers)}) {why}. Careerwright would need "
+        f"a narrower search to find work from {_quoted(answers)}."
+    )
 
 
 def _join_note(query: PoolQuery) -> str:
-    """What a join keeps when it reaches more than its best 30 (Task W2B re-review 2, N-M2)."""
+    """What a join keeps when it reaches more than its best 30 (Task W2B re-review 2, N-M2):
+    those with the largest share of essential skills in common (`skill_join_hits`), not the
+    most shared skills."""
     return (
         f"{_opening(query.text)} shares {MIN_SHARED_SKILLS} or more essential skills with "
         f"{query.reach} other occupations in ESCO. Careerwright keeps the {len(query.hits)} "
-        "that share the most."
+        "with the largest share of essential skills in common."
     )
 
 

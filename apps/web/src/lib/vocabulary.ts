@@ -420,6 +420,11 @@ export const NOT_INCLUDED: Record<NotIncluded, string> = {
   less_relevant: "Matched less closely than the ones shown",
 };
 
+/** Beside a search under "Found by these searches" that was too general to find work on its
+ *  own (the API's `too_general`, ADR 0007 decision 13): it found nothing itself. */
+export const ADDED_WEIGHT_ONLY =
+  "too general to find work on its own, so it only added weight to what another search found";
+
 /** Where a written explanation's quotation of ESCO comes from (a quotation of the person's
  *  own answers reads "You said"). */
 export const RECORD_PART: Record<RecordPart, string> = {
