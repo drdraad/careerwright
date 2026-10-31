@@ -440,6 +440,56 @@ def test_a_strength_reads_only_the_turn_s_new_answers_so_a_declined_one_is_not_o
     )  # "it all" says nothing to quote, and it is all that turn added
 
 
+@pytest.mark.req("ASSESS-01", "BND1-11")
+def test_an_answer_moved_or_added_back_is_not_new_so_a_declined_strength_stays_declined(
+    infra: Infra, api: ApiClient, demo_api: ApiClient, ada: str, tmp_path: Path
+) -> None:
+    # Task W2B re-review M-E: an answer counts as new only if no earlier version held its
+    # words in what the person enjoys, can do or has done, so moving a declined answer to
+    # another of those fields, or removing it and adding it back, does not offer it again.
+    workspace = demo_api.write(
+        "POST",
+        "/v1/workspaces",
+        ada,
+        {"name": "Demo strength moved", "data_mode": "demo", "synthetic": True},
+    ).json()["workspace_id"]
+    choose_role(demo_api, ada, workspace, occupation(api, ada, "bookkeeper"), 0)
+    scenario = make_scenario(infra, api, ada, tmp_path)
+    first = decided_turn(
+        demo_api, ada, workspace, scenario, "I enjoy reconciling accounting entries", 1
+    )
+    proposed = run_strength(demo_api, ada, workspace, scenario, first, 2)
+    declined = demo_api.write(
+        "POST",
+        f"/v1/workspaces/{workspace}/interview/turns/{first}/strength/decision",
+        ada,
+        {"expected_version": 0, "confirm": False},
+    )
+    moved = demo_api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace}/profile",
+        ada,
+        {
+            "expected_version": 2,
+            "profile": profile_with(
+                current_role="bookkeeper", confident_tasks=["Reconciling accounting entries"]
+            ),
+        },
+    )
+    back = decided_turn(
+        demo_api, ada, workspace, scenario, "I enjoy reconciling accounting entries", 3
+    )
+    again = ask_strength(demo_api, ada, workspace, back, 4)
+
+    assert proposed["proposal"]["quotation"] == "reconciling accounting entries"
+    assert (declined.status_code, moved.status_code) == (201, 201), moved.text
+    document = api.get(f"/v1/workspaces/{workspace}/profile", ada).json()["document"]
+    assert document["enjoyed_tasks"]["value"] == ["reconciling accounting entries"]  # back
+    assert document["confident_tasks"]["value"] == ["Reconciling accounting entries"]  # moved
+    assert again.status_code == 422, again.text  # no run: nothing new to offer
+    assert again.json()["error"]["details"]["reason"] == "no_new_answers"
+
+
 @pytest.fixture
 def live(infra: Infra, api: ApiClient, ada: str, tmp_path: Path) -> Iterator[Scenario]:
     started = make_scenario(infra, api, ada, tmp_path)

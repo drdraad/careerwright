@@ -6374,7 +6374,7 @@ export type SlateExplanationOut = {
  * A varied slate of up to six career hypotheses from the discovery's searches, computed
  * deterministically each time it is read, with every count that explains it. A title of
  * the person's own (their role, a target, or a search naming one) joins other work only by
- * shared essential skills, never by its words.
+ * shared essential skills, never by its words, and only once it names one occupation.
  */
 export type SlateOut = {
     /**
@@ -6410,7 +6410,7 @@ export type SlateOut = {
     /**
      * Notes
      *
-     * How a control changed the slate, in words.
+     * How the slate was made, in words: a control's effect, a changed ESCO release, answers not used to find work, or fewer occupations to choose from than Careerwright aims for.
      */
     notes: Array<string>;
     /**
@@ -6468,6 +6468,12 @@ export type SlateOut = {
      * Titles of the person's own that ESCO does not list: nothing is joined to them until the person chooses the ESCO occupation closest to each.
      */
     unmatched_titles: Array<string>;
+    /**
+     * Ambiguous Titles
+     *
+     * Titles of the person's own that ESCO lists for several occupations: nothing is joined to them until the person chooses which one they mean.
+     */
+    ambiguous_titles: Array<string>;
     /**
      * The unexpected connection to the person's role; null without one.
      */

@@ -56,6 +56,7 @@ class SkillReach:
     skill_id: uuid.UUID
     skill_label: str
     text_rank: float  # that label's rank for the search
+    skills: frozenset[uuid.UUID]  # every essential skill of the occupation the search matched
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,7 @@ class SkillNeighbour:
     concept_id: uuid.UUID
     shared: int  # essential skills both have
     essential: int  # its own essential skills
+    skills: frozenset[uuid.UUID] = frozenset()  # the shared skills themselves
 
 
 @dataclass(frozen=True)

@@ -3,11 +3,13 @@ read its slate, and choose an occupation as a target.
 
 The chain is traceable end to end: the person's confirmed answers (a pinned profile
 version) become the model's search queries, each citing the answers it rests on; every
-query runs against the held ESCO release (a title of the person's own is joined by shared
-essential skills; any other query searches the essential skills' labels, every word then
-any word, bounded, and names the skill that reached each occupation; the release the
-searches were chosen for is recorded, and a slate read against another says so), and
-Careerwright adds the person's current role and own target titles;
+query runs against the held ESCO release (a title of the person's own that names one
+occupation is joined by shared essential skills, and one several occupations hold waits for
+the person to choose; any other query reaches work only through an essential skill whose
+label holds every word of it, keeps every occupation it reaches up to the pool's bound, and
+names the skill; a query resting only on how the person likes to work is not run; the
+release the searches were chosen for is recorded, and a slate read against another says
+so), and Careerwright adds the person's current role and own target titles;
 the hits are pooled, de-duplicated and ranked into a slate by deterministic code
 (`careerwright.profile.slate`). A model's title hypothesis is shown only if ESCO holds it as a
 label; otherwise it is listed as unsupported, never as a suggestion (DIV1-04). Every
@@ -99,6 +101,8 @@ from careerwright.profile.records import ExplanationRequest, SourceKind
 from careerwright.profile.role_evidence import cities_of, salary_floor
 from careerwright.profile.slate import (
     MIN_SHARED_SKILLS,
+    POOL_LIMIT,
+    POOL_TARGET,
     SLATE_SIZE,
     Candidate,
     Direction,
@@ -125,11 +129,7 @@ from careerwright.profile.store import stale_version
 from careerwright.profile.titles import ResolvedTitle
 from careerwright.vocabulary import WorkState
 
-QUERY_HITS = 30  # occupations kept per search (the taxonomy search's bound is 50)
 ROLE_JOIN = "j1"  # the query ID of the work joined to the person's role by shared skills
-# An occupation that matches only some of a query's words counts for at most half as much
-# as one that matches them all (product policy, subject to evaluation).
-PARTIAL_MATCH_WEIGHT = 0.5
 SKILLS_SHOWN = 3
 DESCRIPTION_CHARS = 360
 CHOSEN_FROM_SUGGESTIONS = "Chosen from Careerwright's suggestions"
@@ -245,6 +245,9 @@ class SlateView:
     ai_filter: "AiFilterView"
     # The person's titles ESCO does not hold: nothing is joined to them (Sprint W).
     unmatched_titles: list[str] = field(default_factory=list)
+    # The person's titles several ESCO occupations hold: nothing is joined to them until the
+    # person chooses which they mean.
+    ambiguous_titles: list[str] = field(default_factory=list)
     connection: "ConnectionView | None" = None
 
 
@@ -469,29 +472,30 @@ def submit_discovery(
 
 def _search_hits(tx: Tx, text: str) -> tuple[Hit, ...] | None:
     """The occupations a search reaches through their essential skills (ADR 0007 decision
-    13): reached with every word, they score their skill's rank over the best such rank;
-    with only some words, at most `PARTIAL_MATCH_WEIGHT`. Each hit names the essential skill
-    whose words it matched. Never an occupation's titles, hidden labels, ISCO group or
-    description: work is never found by a word in a title. None: the query has no
-    searchable word, so nothing ran (never an empty result)."""
+    13): one essential skill's label must hold every word of the search (one shared word is
+    never enough). Each hit scores its skill's rank over the best such rank and names that
+    skill. Every occupation reached is kept up to the pool's bound, equal ranks ordered by
+    the share of their essential skills the search reaches, never by title. Never an
+    occupation's titles, hidden labels, ISCO group or description: work is never found by a
+    word in a title. None: the query has no searchable word, so nothing ran (never an empty
+    result)."""
     try:
-        every = search_essential_skills(tx, text, QUERY_HITS, any_word=False)
-        some = search_essential_skills(tx, text, QUERY_HITS, any_word=True)
+        found = search_essential_skills(tx, text, POOL_LIMIT)
     except CareerwrightError as error:
         if error.details.get("reason") == "no_search_terms":
             return None
         raise
-    hits: dict[uuid.UUID, Hit] = {}
-    for found, weight in ((every, 1.0), (some, PARTIAL_MATCH_WEIGHT)):
-        top = max((reach.text_rank for reach in found.reached), default=0.0)
-        for reach in found.reached:
-            score = weight * reach.text_rank / top if top > 0 else 0.0
-            held = hits.get(reach.concept_id)
-            if held is None or score > held.score:
-                hits[reach.concept_id] = Hit(
-                    reach.concept_id, score, label_match=False, skill=reach.skill_label
-                )
-    return tuple(hits.values())
+    top = max((reach.text_rank for reach in found.reached), default=0.0)
+    return tuple(
+        Hit(
+            reach.concept_id,
+            reach.text_rank / top if top > 0 else 0.0,
+            label_match=False,
+            skill=reach.skill_label,
+            skills=reach.skills,
+        )
+        for reach in found.reached
+    )
 
 
 def _label_hits(tx: Tx, title: str) -> tuple[Hit, ...]:
@@ -504,6 +508,19 @@ def _named_hits(occupations: tuple[uuid.UUID, ...]) -> tuple[Hit, ...]:
     return tuple(Hit(concept, 1.0, label_match=True) for concept in occupations)
 
 
+def _joinable(title: ResolvedTitle) -> bool:
+    """Work joins a title by shared skills only when the title names one ESCO occupation. A
+    title several occupations hold would be joined over their skills together, so a count it
+    states could be true of neither: the person chooses which they mean first."""
+    return len(title.occupations) == 1
+
+
+def _work_style_only(based_on: list[EvidenceItem]) -> bool:
+    """How someone likes to work says how they work, not a skill, so a search or title idea
+    resting on it alone never retrieves work (provisional, for session W2)."""
+    return bool(based_on) and all(item.field is ProfileField.WORK_STYLE for item in based_on)
+
+
 def _joined(
     tx: Tx,
     query_id: str,
@@ -511,8 +528,8 @@ def _joined(
     channel: SlateChannel,
     based_on: tuple[EvidenceItem, ...],
 ) -> PoolQuery:
-    """The work joined to a title's occupations by shared essential skills: never a search
-    of the title's words."""
+    """The work joined to a title's occupation by shared essential skills: never a search of
+    the title's words. Callers join only a title that names one occupation (`_joinable`)."""
     essential, neighbours = taxonomy_store.skill_neighbours(
         tx, title.occupations, MIN_SHARED_SKILLS
     )
@@ -560,11 +577,13 @@ def with_article(title: str) -> str:
 
 
 def explain(candidate: Candidate, facts: OccupationFacts, familiarity_known: bool) -> Explanation:
-    """The suggestion's words, from the answers that found it and ESCO's record only."""
+    """The suggestion's words, from the answers that found it and ESCO's record only. Only
+    what reached this occupation itself is said of it: a near-identical role folded into it
+    (DIV1-05) adds to its relevance, but its skills are never named as this one's."""
     title = facts.preferred_label
     why: list[str] = []
     seen: set[tuple[str, str]] = set()
-    for match in candidate.matches:
+    for match in candidate.own_matches:
         for item in match.query.based_on:
             key = (item.field.value, item.text)
             if key in seen or len(why) == 3:
@@ -706,10 +725,14 @@ def compute_slate(
     queries: list[PoolQuery] = []
     unsearchable: list[str] = []
     role_joins: set[str] = set()
+    styles: list[str] = []  # work-style answers a search or title idea rested on alone: not run
     for query in proposal.queries:
+        if _work_style_only(query.based_on):
+            styles += [item.text for item in query.based_on]
+            continue
         title = own.get(keys[query.text])
         if title is not None:  # a title of the person's own: joined by skills, never searched
-            if title.occupations:
+            if _joinable(title):
                 channel = SlateChannel(query.channel.value)
                 queries.append(_joined(tx, query.query_id, title, channel, tuple(query.based_on)))
                 if title is role:
@@ -734,8 +757,9 @@ def compute_slate(
         queries.append(
             PoolQuery("r1", role.text, SlateChannel.CURRENT, (item,), _named_hits(role.occupations))
         )
-        queries.append(_joined(tx, ROLE_JOIN, role, SlateChannel.SHARED_SKILLS, (item,)))
-        role_joins.add(ROLE_JOIN)
+        if _joinable(role):
+            queries.append(_joined(tx, ROLE_JOIN, role, SlateChannel.SHARED_SKILLS, (item,)))
+            role_joins.add(ROLE_JOIN)
         familiar.update(role.occupations)
     for index, target in enumerate(named, start=1):
         item = EvidenceItem(field=ProfileField.TARGET_TITLES, text=target.text)
@@ -746,6 +770,9 @@ def compute_slate(
         )
     unsupported: list[str] = []
     for index, hypothesis in enumerate(proposal.hypotheses, start=1):
+        if _work_style_only(hypothesis.based_on):
+            styles += [item.text for item in hypothesis.based_on]
+            continue
         hits = _label_hits(tx, hypothesis.title)
         if not hits:
             unsupported.append(hypothesis.title)
@@ -768,11 +795,19 @@ def compute_slate(
     left_out, floor, ai_filter = _hard_filters(tx, pool, document, controls, hard, esco_uris)
     slate = choose_slate(pool, controls, left_out)
     changed = release_note(proposal.release, release.dataset_id)
-    if changed is not None:
-        slate = replace(slate, notes=[changed, *slate.notes])
-    unmatched = [t.text for t in ([role] if role else []) + named if not t.occupations]
-    if unmatched and len(slate.suggestions) < SLATE_SIZE:
-        slate = replace(slate, fewer_reasons=[*slate.fewer_reasons, *map(_unmatched, unmatched)])
+    notes = [] if changed is None else [changed]
+    if styles:
+        notes.append(_work_style_note(list(dict.fromkeys(styles))))
+    # The pool's target is soft: where evidence doesn't permit it, a full slate says so (a
+    # short one already says why it is short).
+    if slate.pool_size < POOL_TARGET and len(slate.suggestions) == SLATE_SIZE:
+        notes.append(_small_pool_note(slate.pool_size))
+    slate = replace(slate, notes=[*notes, *slate.notes])
+    unmatched = [t.text for t in mine if not t.occupations]
+    ambiguous = [t for t in mine if len(t.occupations) > 1]
+    if (unmatched or ambiguous) and len(slate.suggestions) < SLATE_SIZE:
+        reasons = [*map(_unmatched, unmatched), *map(_ambiguous, ambiguous)]
+        slate = replace(slate, fewer_reasons=[*slate.fewer_reasons, *reasons])
     return SlateView(
         discovery=view,
         release=release,
@@ -785,6 +820,7 @@ def compute_slate(
         salary_floor=floor,
         ai_filter=ai_filter,
         unmatched_titles=unmatched,
+        ambiguous_titles=[t.text for t in ambiguous],
         connection=_connection(tx, slate, role, named, facts, frozenset(role_joins)),
     )
 
@@ -799,6 +835,7 @@ def _occupations(facts: dict[uuid.UUID, OccupationFacts]) -> dict[uuid.UUID, Occ
             sector_code=fact.sector.code,
             preferred_key=fact.preferred_key,
             label_keys=fact.label_keys,
+            essential_skills=fact.essential_skill_count,
         )
         for concept_id, fact in facts.items()
     }
@@ -821,6 +858,30 @@ def _unmatched(title: str) -> str:
     return (
         f"“{title}” isn't a title ESCO lists, so Careerwright can't join other work to it by "
         "shared skills. Choose the ESCO occupation closest to it."
+    )
+
+
+def _ambiguous(title: ResolvedTitle) -> str:
+    return (
+        f"ESCO lists “{title.text}” as the title of {len(title.occupations)} occupations, so "
+        "Careerwright can't join other work to it by shared skills until you choose which one "
+        "you mean."
+    )
+
+
+def _work_style_note(styles: list[str]) -> str:
+    quoted = ", ".join(f"“{text}”" for text in styles)
+    return (
+        f"How you like to work ({quoted}) isn't used to find work: it describes how you work, "
+        "not the work itself."
+    )
+
+
+def _small_pool_note(pool_size: int) -> str:
+    return (
+        f"Careerwright chose these from {pool_size} occupations that match your answers "
+        f"closely. It aims for at least {POOL_TARGET}, but doesn't add weaker matches to get "
+        "there."
     )
 
 

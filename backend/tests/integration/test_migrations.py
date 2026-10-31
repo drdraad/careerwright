@@ -291,7 +291,7 @@ def test_0032_fills_the_essential_skill_search_for_the_release_already_held(
         assert import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE) == "imported"
         migrate_app(engine)
         with system_transaction(engine) as tx:
-            found = search_essential_skills(tx, "accounting entries", 10, any_word=False)
+            found = search_essential_skills(tx, "accounting entries", 10)
             titles = taxonomy_store.occupation_facts(
                 tx, [r.concept_id for r in found.reached], skills_shown=0
             )

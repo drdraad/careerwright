@@ -87,12 +87,12 @@ class OccupationSearch:
     limit: int
 
 
-def _search_text(query: str, limit: int) -> str:
+def _search_text(query: str, limit: int, *, most: int = MAX_LIMIT) -> str:
     text = query.strip()
-    if not text or len(text) > MAX_QUERY or not 1 <= limit <= MAX_LIMIT:
+    if not text or len(text) > MAX_QUERY or not 1 <= limit <= most:
         raise CareerwrightError(
             ErrorCode.VALIDATION_FAILED,
-            f"Search with 1-{MAX_QUERY} characters and a limit of 1-{MAX_LIMIT}.",
+            f"Search with 1-{MAX_QUERY} characters and a limit of 1-{most}.",
             stage=ErrorStage.CATALOGUE,
             details={"field": "q", "reason": "length"},
         )
@@ -128,30 +128,40 @@ def search_occupations(
 
 @dataclass(frozen=True)
 class SkillSearch:
-    any_word: bool
     reached: list[SkillReach]  # best first, each through the essential skill it is named by
     total: int  # every occupation the search reached
     limit: int
 
 
-def search_essential_skills(tx: Tx, query: str, limit: int, *, any_word: bool) -> SkillSearch:
+# One discovery search keeps every occupation it reaches up to the slate's working-pool bound
+# (`careerwright.profile.slate.POOL_LIMIT`), which its caller passes; never more than this.
+MAX_REACH = 120
+
+
+def search_essential_skills(tx: Tx, query: str, limit: int) -> SkillSearch:
     """Discovery's searches that are not the person's own title (ADR 0007 decision 13): the
-    occupations reached through an essential skill whose preferred label holds the search's
-    words (every word, or any word ranked by how many). An occupation's titles, hidden labels,
-    ISCO group and description are never searched, so work is never found by a word in a
-    title, and each occupation comes with the skill that reached it."""
+    occupations reached through an essential skill whose preferred label holds every word of
+    the search (English stems; stop words dropped). One shared word is never enough, and an
+    occupation's titles, hidden labels, ISCO group and description are never searched, so
+    work is never found by a word in a title; each occupation comes with the skill that
+    reached it."""
     held_release(tx)
-    text = _search_text(query, limit)
+    text = _search_text(query, limit, most=MAX_REACH)
     if taxonomy_store.search_terms(tx, text) == 0:
         raise _no_search_terms()
-    reached, total = taxonomy_store.essential_skill_reach(tx, text, limit, any_word=any_word)
-    return SkillSearch(any_word, reached, total, limit)
+    reached, total = taxonomy_store.essential_skill_reach(tx, text, limit)
+    return SkillSearch(reached, total, limit)
 
 
 TITLE_LIMIT = 20
 # The closest-titles fallback compares at most this many typed words: 97% of ESCO v1.2.1's
 # preferred and alternative titles have 8 words or fewer, and its cost grows with each word.
 PARTIAL_MAX_WORDS = 8
+# Words that say a role's standing, not its work: the closest-titles fallback doesn't count
+# them, so "Registered nurse" offers the nurses, not a "registered sales assistant".
+STATUS_WORDS = frozenset(
+    {"registered", "senior", "junior", "trainee", "qualified", "chartered", "certified", "licensed"}
+)
 _WORD = re.compile(r"[^\W_]+")
 
 
@@ -171,10 +181,10 @@ def match_titles(tx: Tx, typed: str, limit: int) -> TitleMatches:
     """The type-ahead for "What do you do now, or what did you do last?": occupations whose
     preferred or alternative labels have a word beginning with each word typed, best first.
     When no title holds every word (of two to `PARTIAL_MAX_WORDS`), the occupations whose
-    titles hold the most of them, marked `partial`: the person may choose one, and nothing
-    is joined by its words. Deterministic and offline (no model, no key). Nothing matching
-    is an honest empty answer, never an invented match; a query with no letter or digit is
-    refused."""
+    titles hold the most of them, status words (`STATUS_WORDS`) not counted, marked
+    `partial`: the person may choose one, and nothing is joined by its words. Deterministic
+    and offline (no model, no key). Nothing matching is an honest empty answer, never an
+    invented match; a query with no letter or digit is refused."""
     release = held_release(tx)
     text = " ".join(typed.split())
     words = list(dict.fromkeys(_WORD.findall(text.casefold())))
@@ -193,9 +203,10 @@ def match_titles(tx: Tx, typed: str, limit: int) -> TitleMatches:
             details={"field": "q", "reason": "no_search_terms"},
         )
     matches, total = taxonomy_store.title_matches(tx, words, normalise_label(text), limit)
-    if matches or not 2 <= len(words) <= PARTIAL_MAX_WORDS:
+    counted = [word for word in words if word not in STATUS_WORDS]
+    if matches or not 2 <= len(words) <= PARTIAL_MAX_WORDS or not counted:
         return TitleMatches(release, text, matches, total, limit)
-    matches, total = taxonomy_store.partial_title_matches(tx, words, limit)
+    matches, total = taxonomy_store.partial_title_matches(tx, counted, limit)
     return TitleMatches(release, text, matches, total, limit, partial=bool(matches))
 
 

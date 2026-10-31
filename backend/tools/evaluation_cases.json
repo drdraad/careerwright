@@ -401,8 +401,11 @@
         {"check": "no_percentage"},
         {"check": "unsupported_not_suggested"},
         {"check": "includes_direction", "direction": "less_familiar"},
-        {"check": "searched_through_skills"}
-      ]
+        {"check": "searched_through_skills"},
+        {"check": "work_style_not_searched"},
+        {"check": "small_pool_has_reason"}
+      ],
+      "note": "Task W2 slice W2B fix round 2: \"repairing physical objects\" is in no single ESCO skill's label and \"practical\" and \"small team\" are how P02 likes to work, so every suggestion comes through \"working outdoors\" (\"work in outdoor conditions\", 12 occupations). The pool is below the soft 60, and the slate says so."
     },
     {
       "id": "DSC-02",
@@ -463,11 +466,12 @@
     {
       "id": "DSC-07",
       "kind": "discovery",
-      "title": "A work-style preference adds candidates and removes none",
+      "title": "A work-style preference removes no work",
       "requirements": ["REC1-03", "DIV1-07"],
       "synthetic": true,
       "profile": {"enjoyed_tasks": ["looking after people"], "work_style": ["quiet concentration"]},
-      "expect": [{"check": "pool_includes_pool_of", "other": "DSC-08"}, {"check": "grounded"}, {"check": "searched_through_skills"}]
+      "expect": [{"check": "pool_includes_pool_of", "other": "DSC-08"}, {"check": "grounded"}, {"check": "searched_through_skills"}, {"check": "work_style_not_searched"}, {"check": "fewer_has_reason"}],
+      "note": "Task W2 slice W2B fix round 2: how someone likes to work no longer finds work at all (provisional, for session W2), so it can add none either."
     },
     {
       "id": "DSC-08",
@@ -476,7 +480,8 @@
       "requirements": ["REC1-03"],
       "synthetic": true,
       "profile": {"enjoyed_tasks": ["looking after people"]},
-      "expect": [{"check": "grounded"}, {"check": "family_limit"}, {"check": "searched_through_skills"}]
+      "expect": [{"check": "grounded"}, {"check": "family_limit"}, {"check": "searched_through_skills"}, {"check": "fewer_has_reason"}],
+      "note": "Task W2 slice W2B fix round 2: no ESCO skill's label holds both \"look\" and \"people\", so the slate is empty and says why. Before, one shared word found an animal behaviourist (\"deal with challenging people\"), a secretary and an administrative assistant (\"disseminate messages to people\")."
     },
     {
       "id": "DSC-09",
@@ -503,7 +508,8 @@
         {"check": "family_limit"},
         {"check": "grounded"},
         {"check": "distinct"},
-        {"check": "no_percentage"}
+        {"check": "no_percentage"},
+        {"check": "small_pool_has_reason"}
       ],
       "note": "Task W2 slice W2B. At session 2 the product owner judged this slate \"arbitrary matching on keywords\" (call centre analyst, data entry clerk, data protection officer, material stress analyst)."
     },
@@ -524,18 +530,19 @@
     {
       "id": "DSC-12",
       "kind": "discovery",
-      "title": "P01: a target ESCO does not list joins nothing; the tasks and work style reach work only through its essential skills",
-      "requirements": ["DIV1-03", "DIV1-10", "REC1-03"],
+      "title": "P01: a target ESCO does not list joins nothing; the tasks reach work only through an essential skill holding all their words, the work style not at all, and an empty slate says why",
+      "requirements": ["DIV1-03", "DIV1-06", "DIV1-10", "REC1-03"],
       "synthetic": true,
       "profile": {"target_titles": ["Data quality analyst"], "enjoyed_tasks": ["finding inconsistencies", "explaining evidence"], "work_style": ["structured", "collaborative"], "cities": ["Manchester"]},
       "expect": [
         {"check": "titles_unmatched", "words": ["Data quality analyst"]},
-        {"check": "size_at_least", "count": 3},
+        {"check": "fewer_has_reason"},
         {"check": "grounded"},
         {"check": "distinct"},
-        {"check": "searched_through_skills"}
+        {"check": "searched_through_skills"},
+        {"check": "work_style_not_searched"}
       ],
-      "note": "Task W2 slice W2B fix round 1: before, \"structured\" found house builder through the word \"structures\" in its description."
+      "note": "Task W2 slice W2B fix round 1: before, \"structured\" found house builder through the word \"structures\" in its description. Fix round 2: \"structured\" still found skills about physical structures (soil, wood, advertising) and \"finding inconsistencies\" found \"interpret findings from medical examinations\", which the product owner would reject. Now no ESCO skill's label holds all the words of either task, and the work style is not searched: the slate is empty and says why. Choosing the closest ESCO title (the data quality specialist) gives DSC-02's slate."
     },
     {
       "id": "DSC-13",
@@ -586,17 +593,33 @@
     {
       "id": "DSC-16",
       "kind": "discovery",
-      "title": "A role several occupations hold as a title is joined by their shared essential skills, but no connection states a fact about it",
+      "title": "A role several occupations hold as a title joins nothing until the person chooses which, and no connection states a fact about it",
       "requirements": ["DIV1-03", "DIV1-12"],
       "synthetic": true,
       "profile": {"current_role": "bus operator"},
       "expect": [
-        {"check": "joined_by_skills"},
+        {"check": "titles_ambiguous", "words": ["bus operator"]},
         {"check": "no_connection"},
+        {"check": "fewer_has_reason"},
         {"check": "grounded"},
         {"check": "distinct"}
       ],
-      "note": "Task W2 slice W2B fix round 1. \"bus operator\" is an alternative title of the bus driver and the trolley bus driver. Before, the connection said \"A bus operator and ... share N essential skills\", a fact about no single occupation."
+      "note": "Task W2 slice W2B fix round 1. \"bus operator\" is an alternative title of the bus driver and the trolley bus driver. Before, the connection said \"A bus operator and ... share N essential skills\", a fact about no single occupation. Fix round 2: before, the two were joined over their skills together, so the taxi driver's line said \"ESCO lists 14 of the same essential skills for both\" (it shares 13 with the bus driver and 9 with the trolley bus driver)."
+    },
+    {
+      "id": "DSC-17",
+      "kind": "discovery",
+      "title": "A near-identical role folded into a suggestion never lends it a skill ESCO lists only for that role",
+      "requirements": ["DIV1-05", "DIV1-08"],
+      "synthetic": true,
+      "profile": {"enjoyed_tasks": ["mixing recordings", "attending recording sessions"]},
+      "expect": [
+        {"check": "searched_through_skills"},
+        {"check": "grounded"},
+        {"check": "distinct"},
+        {"check": "fewer_has_reason"}
+      ],
+      "note": "Task W2 slice W2B fix round 2 (re-review I-A). The sound editor lists \"sound designer\" as one of its titles, so the two fold into one suggestion. \"Attend music recording sessions\" is essential to the sound editor only: without the fix, the sound designer's line said ESCO lists it for this work."
     },
     {
       "id": "EXP-01",

@@ -17,11 +17,14 @@
   salary floor is the product owner's change to the hard-constraint set (H-11, 2026-10-28).
   Decisions 13 and 14 (Task W2 slice W2B, 2026-10-30: the slate joined by shared essential
   skills, and the unexpected connection; fix round 1, 2026-10-31: every other search reaches
-  work only through its essential skills) amend decision 5 and are **provisional, need product
-  owner confirmation at session W2** (R6; its sheet is Task W2D's): the minimum of three
-  shared skills, the share-of-both ranking, the best 30, the connection rule, the
-  essential-skills search and whether work-style words should retrieve at all, and the
-  type-ahead's "closest titles" order.
+  work only through its essential skills; fix round 2, 2026-10-31: a whole phrase in one
+  skill, no search on work style alone, no tie cut by the alphabet, a shared title waits for
+  the person's choice) amend decision 5 and are **provisional, need product owner
+  confirmation at session W2** (R6; its sheet is Task W2D's): the minimum of three shared
+  skills, the share-of-both ranking, the best 30, the connection rule, the essential-skills
+  search with every word of a phrase in one skill, work style finding no work (to confirm or
+  reverse), the share-of-skills tie-break, the type-ahead's "closest titles" order and its
+  status words, and the prompt's ESCO skill wording (`discovery-queries-2`, untested live).
 - Date: 2026-10-28
 - Requirements: REC1-01..11, DIV1-02, DIV1-04..12, STATE-05, STATE-06, STATE-08, PROF-04,
   PROF-07..09, MODEL-03, MODEL-07, TEST1-10; spec sections 3, 4 and 16; ADR 0006; ADR 0008
@@ -55,7 +58,9 @@ inference, with at least 30 evaluation cases and a capped live run.
    - `work_style`: how the person says they like to work, a list of their own phrases. It
      is the spec's optional "work style" layer: never forced, never a personality type, and
      never a limit. Discovery searches with it and weighs it below what the person does or
-     enjoys (decision 5); it can only add candidates (REC1-03).
+     enjoys (decision 5); it can only add candidates (REC1-03). Since Task W2B fix round 2 a
+     search resting on it alone is not run (decision 13, provisional for session W2), so it
+     adds none and still removes none.
    - `minimum_salary`: the lowest gross pay the person will accept, with its period (`year`
      unless they say otherwise; `month`, `week` or `hour` as given; never annualised, spec
      section 5). It is a **hard constraint** (the product owner's change to ADR 0006 decision
@@ -84,7 +89,9 @@ inference, with at least 30 evaluation cases and a capped live run.
    product owner at session 1, H-12). Earlier turns stay one action away.
 
 4. **Discovery is a run kind on the one activity** (`discovery`; ADR 0002, ADR 0006
-   decision 10). The model proposes **searches, never suggestions** (`discovery-queries-1`):
+   decision 10). The model proposes **searches, never suggestions** (`discovery-queries-1`;
+   `discovery-queries-2` since Task W2B fix round 2, decision 13: short phrases in ESCO's
+   skill wording, never work style alone):
    it reads only the confirmed answers that describe work (current role, targets, the three
    task fields, work style; never places, money, hours or a name) and returns up to 8 short
    ESCO queries, each in one of the spec's channels (tasks, environment, transferable,
@@ -108,7 +115,10 @@ inference, with at least 30 evaluation cases and a capped live run.
      words score at most half that (any-word search ranks a common word in a title highly).
      Careerwright adds the current role (searched) and the person's own target titles (exact label
      matches). A model title becomes a candidate only if ESCO holds it as a label (DIV1-04);
-     otherwise it is listed as an unsupported hypothesis, never suggested.
+     otherwise it is listed as an unsupported hypothesis, never suggested. Decision 13
+     (Task W2B) replaces this retrieval: titles join other work by shared essential skills,
+     every other search reaches work only through one essential skill whose label holds all
+     its words, and the any-word search and its half weight are gone.
    - *Pool.* Hits are pooled by concept (an alias is the same concept). An occupation in the
      same ISCO minor group as another, whose preferred label is one of the other's
      non-hidden labels (as a concept key) or that has the same labels, is near-identical to
@@ -507,12 +517,25 @@ inference, with at least 30 evaluation cases and a capped live run.
       label (`careerwright.concept_key`; several is ambiguous and all are kept, none picked).
       A title ESCO does not hold joins nothing: the slate lists it (`unmatched_titles`) and,
       when it is short, says "isn't a title ESCO lists ... Choose the ESCO occupation closest
-      to it". The first question's type-ahead offers those closest titles: when no ESCO title
-      holds every word typed (two to eight words; 97% of ESCO's titles have at most eight),
-      the occupations whose titles hold the most of them, rarer words first ("bookkeeping"
-      before "assistant", so P05 sees the bookkeeper first; P04's "registered" puts two
-      registered titles before the nurses), marked `partial` for "ESCO doesn't list that
-      title. Is it one of these?"; the person chooses, and nothing is joined by the words.
+      to it". A title several occupations hold joins nothing either (fix round 2): joined
+      over their skills together, the count it stated could be true of neither ("bus
+      operator": the taxi driver's "14 of the same essential skills for both", when it shares
+      13 with the bus driver and 9 with the trolley bus driver; ESCO has 1,051 such titles).
+      The slate lists it (`ambiguous_titles`) and, when it is short, says ESCO lists it "as
+      the title of 2 occupations ... until you choose which one you mean", as the first
+      slate already asks (DSC-16). Its occupations are still the person's own close
+      candidates. The first question's type-ahead offers those closest titles: when no ESCO
+      title holds every word typed (two to eight words; 97% of ESCO's titles have at most
+      eight), the occupations whose titles hold the most of them, marked `partial` for
+      "ESCO doesn't list that title. Is it one of these?"; the person chooses, and nothing is
+      joined by the words. Order (fix round 2): titles holding more of the words whole come
+      first ("nurse" before "nursery"), then rarer words ("bookkeeping" before "assistant",
+      so P05 sees the bookkeeper first), and a status word ("registered", "senior",
+      "junior", "trainee", "qualified", "chartered", "certified", "licensed") is not counted,
+      so P04's "Registered nurse" offers the nurse assistant, specialist nurse, veterinary
+      nurse, advanced nurse practitioner and nurse responsible for general care first
+      (before: a registered sales assistant and a dental hygienist, and six "nursery"
+      titles).
       The current role's old fallback (its top full-text hit taken as the person's kind of
       work) is gone: nothing is guessed from a title's words.
     - *The skill join* (`skill_join_hits`): an occupation joins a title only when ESCO lists
@@ -531,42 +554,84 @@ inference, with at least 30 evaluation cases and a capped live run.
       transferable elsewhere. The role's own occupation stays a close candidate of a
       discovery, as before. Its words: "Your current role: “data analyst”. ESCO lists 12 of
       the same essential skills for both, so Careerwright joined them by those skills."
-    - *Every other search reaches work only through its essential skills* (fix round 1):
-      what the person enjoys, can do or has done and how they like to work (the task,
+    - *Every other search reaches work only through one essential skill holding all its
+      words* (fix rounds 1 and 2): what the person enjoys, can do or has done (the task,
       environment, transferable, cross-industry and less-familiar channels) search the
-      preferred labels of ESCO's skills alone (`skills.search_vector`, migration 0032), every
-      word then any word, and reach an occupation only through a skill it lists as essential.
-      No occupation title, hidden label, ISCO group label or description is searched (those
-      were the round's finding: hidden labels and the ISCO group's title still matched title
-      words, and descriptions matched "structured" to "structures"). Each suggestion names
-      the skill: "What you enjoy: “working outdoors”. Careerwright searched for “working
-      outdoors”, and ESCO lists “work in outdoor conditions” as an essential skill for this
-      work." Evaluation check `searched_through_skills` confirms each named skill is one of
-      the suggestion's essential skills and holds the search's words. The public taxonomy
-      search is unchanged. Known limit, for session W2: a skill label still matches on its
-      words, so P01's work style "structured" finds skills about physical structures
-      ("install wood elements in structures"); whether work-style words should retrieve at
-      all is the product owner's question.
-    - *Checked on the full release* (offline evaluation, fixture proposer; DSC-01, DSC-03
-      and DSC-10 to DSC-16, `tests/integration/test_evaluation.py`): "data analyst" gives
-      data scientist (22 shared), chief data officer (7), big data archive librarian (7),
-      data quality specialist (12), data entry clerk (5) and knowledge engineer (7), and the
-      same when a model searches "Data analysts" (DSC-15). P03's "IT support technician" is
-      ESCO's ICT help desk agent and joins after-sales service technician, call centre agent,
-      ICT help desk manager, customer service representative and specialised seller. P04
+      preferred labels of ESCO's skills alone (`skills.search_vector`, migration 0032) and
+      reach an occupation only through a skill it lists as essential. No occupation title,
+      hidden label, ISCO group label or description is searched (fix round 1's finding:
+      hidden labels and the ISCO group's title still matched title words, and descriptions
+      matched "structured" to "structures"). Fix round 2: the product owner had rejected
+      "arbitrary matching on keywords", and the slates still read that way, so three rules
+      make each suggestion defensible to a person, even at the cost of fewer suggestions
+      (each provisional, for session W2):
+      1. *Whole phrase, one skill.* A search reaches a skill only when that one skill's label
+         holds every content word of it (English stems, stop words dropped; no search
+         operator, not even "or", turns it into an any-word search). The any-word pass and
+         decision 5's partial-match weight are gone: one shared word ("people", "give",
+         "write") found an animal behaviourist and a secretary for "looking after people",
+         an aesthetician and an air force officer for "giving injections", and an
+         aquaculture mooring manager for "writing stories".
+      2. *How someone likes to work does not find work.* It says how they work, not a
+         skill: a search or a title idea resting on work-style answers alone is not run, and
+         the slate says so ("How you like to work (“structured”, “collaborative”) isn't used
+         to find work: it describes how you work, not the work itself."). Before, P01's
+         "structured" found soil structure, wood elements in structures and advertising
+         structures. No setting or flag: session W2 confirms or reverses it. A search resting
+         on a task and a work style together still runs.
+      3. *Ties are never cut by the alphabet.* Every occupation reached through the same
+         skill ties on its rank. A search keeps every occupation it reaches up to the pool's
+         bound (120; before, its first 30 by title), and equal scores go to the occupation
+         whose essential skills the person's answers reach the larger share of (the skill is
+         a bigger part of that work), the title only last, in the search, the pool and the
+         slate (`Candidate.share`). "Planning shifts" reaches 58 occupations through "plan
+         shifts of employees"; the first 30 by title were kept, so the warehouse worker,
+         which "stacking goods" also reaches, never met it.
+      Each suggestion names the skill, and only one that reached it itself: a near-identical
+      role folded into it (decision 5) adds to its relevance but never lends it a skill
+      (fix round 2: the sound designer said ESCO lists "attend music recording sessions" for
+      it, which ESCO lists for the sound editor; DSC-17). "What you enjoy: “working
+      outdoors”. Careerwright searched for “working outdoors”, and ESCO lists “work in
+      outdoor conditions” as an essential skill for this work." The discovery prompt
+      (`discovery-queries-2`) asks the model for short phrases in ESCO's skill wording
+      ("plan shifts", "repair bicycles", "care for children"), since a paraphrase ESCO does
+      not use ("look after children") finds nothing; it is untested live (R5). Evaluation:
+      `searched_through_skills` needs every content word of the search in the named skill,
+      one of the suggestion's own essential skills; `work_style_not_searched`,
+      `titles_ambiguous` and `small_pool_has_reason` check rule 2, a shared title and the
+      soft pool. The public taxonomy search is unchanged. Known limit, for session W2: a
+      one-word task answer still matches on its stem ("driving" reaches "comply with
+      policies for trolley bus driving").
+    - *The soft pool* (fix round 2): the 60-120 working pool holds only where evidence
+      permits (DIV1-02). A full slate chosen from fewer than 60 says so: "Careerwright chose
+      these from 12 occupations that match your answers closely. It aims for at least 60,
+      but doesn't add weaker matches to get there." A short slate already says why it is
+      short. Two full-release tests exercise the bound (two searches reaching more than 120)
+      and the ties.
+    - *Checked on the full release* (offline evaluation, fixture proposer; DSC-01 to
+      DSC-17, `tests/integration/test_evaluation.py`): "data analyst" gives data scientist
+      (22 shared), chief data officer (7), big data archive librarian (7), data quality
+      specialist (12), data entry clerk (5) and knowledge engineer (7), and the same when a
+      model searches "Data analysts" (DSC-15). P03's "IT support technician" is ESCO's ICT
+      help desk agent and joins after-sales service technician, call centre agent, ICT help
+      desk manager, customer service representative and specialised seller. P04
       ("Registered nurse"), P05 ("Bookkeeping assistant") and P01's "Data quality analyst"
-      are not ESCO titles: nothing joins them, and the slate says so. P01's tasks and work
-      style now give dental practitioner, ICT information and knowledge manager, advertising
-      installer, agronomic crop production team leader, artistic coach and carpenter, each
-      through a named skill (before: ICT information and knowledge manager, house builder,
-      online community manager, bridge inspector, branch manager, chief operating officer,
-      through descriptions and group titles). P02's give deep-sea fishery worker, fisheries
-      observer, fruit and vegetable picker, pesticides sprayer, landscape gardener and
-      leaflet distributor, all through "work in outdoor conditions" (before: fruit and
-      vegetable picker, vineyard supervisor, fisheries observer, pesticides sprayer,
-      consultant social worker, street sweeper).
-      DSC-03's role became "warehouse supervisor" (an ESCO alternative label): "Warehouse
-      shift supervisor" is not one, so it now joins nothing.
+      are not ESCO titles: nothing joins them, and the slate says so. P01's tasks
+      ("finding inconsistencies", "explaining evidence") are in no single skill's label and
+      its work style is not searched, so its slate is empty with both reasons; choosing the
+      closest ESCO title, the data quality specialist, gives DSC-02's skill-joined slate
+      (fix round 1: dental practitioner, ICT information and knowledge manager, advertising
+      installer, agronomic crop production team leader, artistic coach, carpenter). P02's
+      "repairing physical objects" is in no skill's label and "practical" and "small team"
+      are work style, so all six come through "work in outdoor conditions", from 12
+      occupations: leaflet distributor, deep-sea fishery worker, pesticides sprayer,
+      fisheries observer, fruit and vegetable picker, offshore renewable energy plant
+      operator. "Looking after people" (DSC-07, DSC-08) finds nothing, and says so. "Caring
+      for patients" finds the advanced nurse practitioner, specialist nurse and nurse
+      responsible for general care; "designing websites" the web designer, webmaster and
+      web developer; "teaching children, writing stories" nothing. DSC-03's role became
+      "warehouse supervisor" (an ESCO alternative label) in fix round 1: "Warehouse shift
+      supervisor" is not one, so it joins nothing.
 
 14. **The unexpected connection** (plan section 4, the Roles chapter's moment). A
     deterministic rule over a slate (`unexpected_connection`): of the suggestions the
@@ -575,8 +640,10 @@ inference, with at least 30 evaluation cases and a capped live run.
     essential skills with the role; ties go to the larger share of both roles' skills, then
     to the slate's order. No such suggestion, no connection (a revelation with no source is
     not shown). Only a role that names exactly one ESCO occupation has a connection (fix
-    round 1): a title several occupations hold ("bus operator") is joined over their skills
-    together, which is a fact about no single occupation (DSC-16). Why this rule: "unexpected" is the plan's "a destination the person never
+    round 1): a title several occupations hold ("bus operator") is no single occupation to
+    state a fact about, and since fix round 2 it joins nothing until the person chooses
+    which they mean (decision 13; DSC-16). Only the suggestion's own join counts, never a
+    near-identical role's folded into it. Why this rule: "unexpected" is the plan's "a destination the person never
     named ... joined to their own role": another kind of work, never one they named; and the
     most shared skills makes the revelation the most substantial fact the slate holds, which
     its sentence states. It is a fact about two roles, never about the person: "A data
@@ -601,7 +668,12 @@ inference, with at least 30 evaluation cases and a capped live run.
   (`skills.search_vector`, generated from each skill's preferred label, so the held release
   is filled by the migration and later imports as they write); `TitleMatchesOut.partial`;
   `ChooseRole.label` (the title the person picked); evaluation cases DSC-15 and DSC-16 and
-  the checks `searched_through_skills` and `no_connection`.
+  the checks `searched_through_skills` and `no_connection`. Fix round 2: `SlateOut` gains
+  `ambiguous_titles`, and its `notes` also say when answers were not used to find work or
+  the pool is below its soft target; prompt `discovery-queries-2`; evaluation case DSC-17
+  and the checks `work_style_not_searched`, `titles_ambiguous` and
+  `small_pool_has_reason`; DSC-12's `size_at_least` became `fewer_has_reason`, and DSC-16's
+  `joined_by_skills` became `titles_ambiguous`. No migration.
 - Migration 0010; new run kind `discovery`; new event kind `interview.preferences_updated`;
   new source kind `occupation_choice`; new endpoints for preferences, discoveries, slates,
   targets, the sketch and the profile revert; `submit_turn` answers 202 with the support

@@ -7,7 +7,9 @@ import uuid
 
 import pytest
 
+from careerwright.catalogue.records import IscoGroupRef, OccupationFacts
 from careerwright.profile.discovery import EvidenceItem
+from careerwright.profile.exploration import explain
 from careerwright.profile.interview import ProfileField
 from careerwright.profile.slate import (
     FAMILY_LIMIT,
@@ -33,7 +35,7 @@ def concept(name: str) -> uuid.UUID:
     return uuid.uuid5(uuid.NAMESPACE_URL, f"test:{name}")
 
 
-def occupation(name: str, family: str, *aliases: str) -> Occupation:
+def occupation(name: str, family: str, *aliases: str, essential: int = 20) -> Occupation:
     return Occupation(
         concept_id=concept(name),
         title=name,
@@ -42,6 +44,7 @@ def occupation(name: str, family: str, *aliases: str) -> Occupation:
         sector_code=family[0],
         preferred_key=name.casefold(),
         label_keys=frozenset({name.casefold(), *(a.casefold() for a in aliases)}),
+        essential_skills=essential,
     )
 
 
@@ -202,6 +205,66 @@ def test_folding_never_chains_unrelated_work_through_shared_labels() -> None:
     }
 
 
+def facts_of(o: Occupation) -> OccupationFacts:
+    family = IscoGroupRef(o.family_code, o.family_label)
+    return OccupationFacts(
+        concept_id=o.concept_id,
+        preferred_label=o.title,
+        esco_uri=f"http://data.europa.eu/esco/occupation/{o.concept_id}",
+        esco_code=f"{o.family_code}0.1",
+        description="",
+        regulated=False,
+        unit=family,
+        family=family,
+        sector=IscoGroupRef(o.sector_code, f"Sector {o.sector_code}"),
+        preferred_key=o.preferred_key,
+        label_keys=o.label_keys,
+        essential_skills=(),
+        essential_skill_count=0,
+    )
+
+
+@pytest.mark.req("DIV1-05", "DIV1-08")
+def test_a_why_line_never_names_a_near_identical_role_s_skill_as_this_one_s() -> None:
+    # Task W2B re-review I-A, ESCO v1.2.1's own case: the sound editor lists "sound designer"
+    # as one of its titles, so the two fold into one suggestion. "Attend music recording
+    # sessions" is essential to the sound editor and not to the sound designer, so the sound
+    # designer's words may not say ESCO lists it for this work.
+    mixing = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="mixing recordings")
+    attending = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="attending recording sessions")
+    sound = {
+        o.concept_id: o
+        for o in (
+            occupation("sound designer", "352"),
+            occupation("sound editor", "352", "sound designer"),
+        )
+    }
+    queries = [
+        PoolQuery(
+            "q1",
+            "mixing recordings",
+            SlateChannel.TASKS,
+            (mixing,),
+            (Hit(concept("sound designer"), 1.0, False, skill="mix multi-track recordings"),),
+        ),
+        PoolQuery(
+            "q2",
+            "attending recording sessions",
+            SlateChannel.TASKS,
+            (attending,),
+            (Hit(concept("sound editor"), 0.9, False, skill="attend music recording sessions"),),
+        ),
+    ]
+
+    pool = build_pool(queries, sound, frozenset())
+
+    [lead] = [c for c in pool if c.duplicate_of is None]
+    assert lead.occupation.title == "sound designer"
+    why = explain(lead, facts_of(lead.occupation), familiarity_known=False).why
+    assert any("ESCO lists “mix multi-track recordings”" in line for line in why)
+    assert not any("attend music recording sessions" in line for line in why)
+
+
 @pytest.mark.req("DIV1-05")
 def test_an_alias_from_another_kind_of_work_is_not_a_duplicate() -> None:
     # Re-review N-M3: ESCO lists "biochemist" as a label of chemist, but they are
@@ -255,6 +318,53 @@ def test_the_bounded_pool_samples_across_families_before_relevance_cuts_it() -> 
     kept = {c.occupation.family_code for c in pool}
     assert kept == {"723", "621", "752"}
     assert pool.beyond_limit == 4
+
+
+@pytest.mark.req("DIV1-02", "DIV1-06")
+def test_equal_matches_go_to_the_larger_share_of_essential_skills_never_to_the_title() -> None:
+    # Task W2B re-review I-B: every occupation a search reaches through the same skill ties
+    # on its rank. The tie goes to the one whose essential skills the person's answers reach
+    # the larger share of (the skill is a bigger part of that work), the title only last, in
+    # the pool and on the slate. A skill reached twice counts once.
+    plan = uuid.uuid5(uuid.NAMESPACE_URL, "test:plan shifts of employees")
+    tied = {
+        o.concept_id: o
+        for o in (
+            occupation("Bricklaying supervisor", "312", essential=24),
+            occupation("Rescue centre manager", "134", essential=73),
+            occupation("Tool pusher", "811", essential=11),
+        )
+    }
+
+    def reached(*names: str) -> tuple[Hit, ...]:
+        return tuple(
+            Hit(
+                concept(name),
+                1.0,
+                False,
+                skill="plan shifts of employees",
+                skills=frozenset({plan}),
+            )
+            for name in names
+        )
+
+    shifts = PoolQuery(
+        "q1",
+        "planning shifts",
+        SlateChannel.TASKS,
+        (ENJOY,),
+        reached("Bricklaying supervisor", "Rescue centre manager", "Tool pusher"),
+    )
+    again = PoolQuery("q2", "plan shifts", SlateChannel.TASKS, (ENJOY,), reached("Tool pusher"))
+
+    pool = build_pool([shifts], tied, frozenset())
+    chosen = choose_slate(pool)
+
+    by_share = ["Tool pusher", "Bricklaying supervisor", "Rescue centre manager"]
+    assert [c.occupation.title for c in pool] == by_share  # 1 of 11, 1 of 24, 1 of 73
+    assert [c.occupation.title for c in chosen.suggestions] == by_share
+    twice = {c.occupation.title: c.share for c in build_pool([shifts, again], tied, frozenset())}
+    assert twice["Tool pusher"] == 1 / 11
 
 
 @pytest.mark.req("DIV1-06")

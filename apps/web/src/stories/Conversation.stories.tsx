@@ -168,7 +168,7 @@ const suggestion = (
   ],
   workday: `${title} work, as ESCO describes it: a synthetic description for this story.`,
   why_it_could_suit: [
-    "What you enjoy: “repairing physical objects”. Careerwright searched for “machinery repair”, and ESCO lists “repair equipment on site” as an essential skill for this work.",
+    "What you enjoy: “repairing physical objects”. Careerwright searched for “repair equipment”, and ESCO lists “repair equipment on site” as an essential skill for this work.",
   ],
   what_might_not_suit: [
     "ESCO lists 12 essential skills, not yet compared with your experience, including: use hand tools, read technical drawings, test equipment.",
@@ -232,6 +232,7 @@ const slate = (suggestions: SuggestionOut[]): SlateOut => ({
   unsupported_hypotheses: [],
   not_included: [],
   unmatched_titles: [],
+  ambiguous_titles: [],
   connection: null,
 });
 const full = [

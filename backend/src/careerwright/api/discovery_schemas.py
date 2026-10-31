@@ -469,7 +469,7 @@ class SlateOut(ResponseModel):
     """A varied slate of up to six career hypotheses from the discovery's searches, computed
     deterministically each time it is read, with every count that explains it. A title of
     the person's own (their role, a target, or a search naming one) joins other work only by
-    shared essential skills, never by its words."""
+    shared essential skills, never by its words, and only once it names one occupation."""
 
     discovery_id: uuid.UUID
     profile_version: int
@@ -479,7 +479,11 @@ class SlateOut(ResponseModel):
     family_limit: int = Field(description="At most this many from one kind of work.")
     suggestions: list[SuggestionOut]
     fewer_reasons: list[str] = Field(description="Why there are fewer than six, if there are.")
-    notes: list[str] = Field(description="How a control changed the slate, in words.")
+    notes: list[str] = Field(
+        description="How the slate was made, in words: a control's effect, a changed ESCO "
+        "release, answers not used to find work, or fewer occupations to choose from than "
+        "Careerwright aims for."
+    )
     salary_floor: SalaryFloorOut | None = Field(
         description="Your confirmed salary floor's effect, as a hard filter; null with none."
     )
@@ -497,6 +501,10 @@ class SlateOut(ResponseModel):
     unmatched_titles: list[str] = Field(
         description="Titles of the person's own that ESCO does not list: nothing is joined to "
         "them until the person chooses the ESCO occupation closest to each."
+    )
+    ambiguous_titles: list[str] = Field(
+        description="Titles of the person's own that ESCO lists for several occupations: "
+        "nothing is joined to them until the person chooses which one they mean."
     )
     connection: ConnectionOut | None = Field(
         description="The unexpected connection to the person's role; null without one."
@@ -524,6 +532,7 @@ class SlateOut(ResponseModel):
             unsupported_hypotheses=view.unsupported_hypotheses,
             not_included=[NotIncludedOut.of(left, view.titles) for left in slate.not_included],
             unmatched_titles=view.unmatched_titles,
+            ambiguous_titles=view.ambiguous_titles,
             connection=ConnectionOut.of(view.connection) if view.connection else None,
         )
 

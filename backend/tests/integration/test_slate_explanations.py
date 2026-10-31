@@ -103,9 +103,9 @@ def record_texts(scenario: Scenario, concept_id: str) -> list[str]:
 
 ANSWER_PAIRS = {
     ("current_role", "Warehouse shift supervisor"),
-    ("enjoyed_tasks", "repairing bicycles"),
-    ("enjoyed_tasks", "restoring old furniture"),
-    ("confident_tasks", "looking after gardens"),
+    ("enjoyed_tasks", "tuning bicycles"),
+    ("enjoyed_tasks", "applying restoration techniques"),
+    ("confident_tasks", "maintaining plant growth"),
     ("work_style", "working outdoors"),
 }  # `ANSWERS`, the answers that describe work
 ANSWER_TEXTS = [text for _, text in ANSWER_PAIRS]

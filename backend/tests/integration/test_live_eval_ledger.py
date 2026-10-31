@@ -31,7 +31,23 @@ def test_every_case_attempt_is_ledgered_and_the_results_are_written(
     results = tmp_path / "live-eval.md"
     private = tmp_path / "careerwright-home" / "evidence" / "live-eval.jsonl"
     models = ModelChoice.configure(TEST_MODEL, "muse-spark-1.3", "test")
-    cases = select(load_cases(), ["INT-01", "DSC-01", "EXP-01"])
+    # The ledger is under test, not the slate. On the labelled sample (6 essential skills per
+    # occupation) no skill holds every word of P02's answers since Task W2B fix round 2, so
+    # EXP-01's slate would have nothing to explain; one more answer, which the sample's
+    # bicycle mechanic lists as "tune bicycles", gives it a suggestion.
+    cases = [
+        case.model_copy(
+            update={
+                "profile": {
+                    **case.profile,
+                    "enjoyed_tasks": [*case.profile["enjoyed_tasks"], "tuning bicycles"],
+                }
+            }
+        )
+        if case.id == "EXP-01"
+        else case
+        for case in select(load_cases(), ["INT-01", "DSC-01", "EXP-01"])
+    ]
     plan = authorise_eval(
         models, cases, budget=ScopeBudget("eval-test", 99, 0, 10**9), spent=ScopeSpend(0, 0, 0)
     )

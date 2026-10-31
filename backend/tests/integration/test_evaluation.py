@@ -8,6 +8,7 @@ run's, `tools.live_eval`). Failures are reported by type."""
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -15,11 +16,12 @@ import sqlalchemy as sa
 from careerwright.capability.strength import SCRIPTED_STRENGTHS
 from careerwright.catalogue.esco import ESCO_RELEASE
 from careerwright.cli import import_taxonomy, migrate_app
-from careerwright.db import system_transaction
+from careerwright.db import Tx, system_transaction
 from careerwright.profile.slate import POOL_LIMIT, POOL_TARGET
 from tests.support.infra import Infra, migrator_engine
 from tools.datasets import DATASETS_DIR
 from tools.evaluation import (
+    Case,
     CaseKind,
     Failure,
     evaluate,
@@ -64,12 +66,64 @@ def test_every_discovery_case_passes_on_the_full_release(full_release: sa.Engine
         print(f"{case_id}: pool {observed[case_id]['pool_size']}, slate {shown}")
     assert {case_id: failures for case_id, failures in results.items() if failures} == {}
     p02 = observed["DSC-01"]
-    # P02's four searches fill the working pool within its soft 60-120 (DIV1-02). Each
-    # search reaches work only through essential skills now (fix round 1 of Task W2B), so
-    # four searches of at most 30 each no longer pass the bound; the bound's cut is
-    # `test_slate.py`'s.
-    assert POOL_TARGET <= p02["pool_size"] <= POOL_LIMIT
+    # P02's pool stays within the bound. Its soft 60-120 holds only where evidence permits
+    # (DIV1-02): since Task W2B fix round 2 a search reaches work only through a skill whose
+    # label holds all its words, and work style isn't searched, so only "working outdoors"
+    # reaches work (12 occupations). Below the target, the slate says why (DSC-01's
+    # `small_pool_has_reason`). The bound itself is exercised on the full release by
+    # `test_the_working_pool_keeps_its_bound_and_counts_the_work_beyond_it`.
+    assert p02["pool_size"] <= POOL_LIMIT
+    if p02["pool_size"] < POOL_TARGET:
+        assert any(f"from {p02['pool_size']} occupations" in note for note in p02["notes"])
     assert p02["release"]["sample"] is False  # the real catalogue, not the test subset
+
+
+def observed_for(tx: Tx, profile: dict[str, Any]) -> dict[str, Any]:
+    """The offline slate for a profile that is not one of the reviewed cases."""
+    case = Case(
+        id="ad hoc",
+        kind=CaseKind.DISCOVERY,
+        title="ad hoc",
+        requirements=[],
+        synthetic=True,
+        profile=profile,
+        expect=[],
+    )
+    return observe_discovery_offline(tx, case)
+
+
+@pytest.mark.req("DIV1-02", "DIV1-06")
+def test_a_search_keeps_all_the_work_one_skill_reaches_so_no_tie_is_cut_by_title(
+    full_release: sa.Engine,
+) -> None:
+    # Task W2B re-review I-B: "planning shifts" reaches 58 occupations through one essential
+    # skill ("plan shifts of employees"), so all 58 tie. A search kept its first 30 by title
+    # (bricklaying supervisor to laundry and dry cleaning manager), so the warehouse worker,
+    # which "stacking goods" reaches too, never met it, and the slate began alphabetically.
+    with system_transaction(full_release) as tx:
+        slate = observed_for(tx, {"confident_tasks": ["planning shifts", "stacking goods"]})
+
+    hits = {q["text"]: q["hits"] for q in slate["queries"]}
+    first = slate["suggestions"][0]
+    assert hits["planning shifts"] == 58  # every occupation it reaches, within the pool bound
+    assert first["title"] == "warehouse worker"
+    assert {e["text"] for e in first["linked_evidence"]} == {"planning shifts", "stacking goods"}
+
+
+@pytest.mark.req("DIV1-02")
+def test_the_working_pool_keeps_its_bound_and_counts_the_work_beyond_it(
+    full_release: sa.Engine,
+) -> None:
+    # "Maintaining equipment" alone reaches 242 occupations through 74 essential skills; a
+    # search keeps the pool's bound of them, and two searches together reach more than the
+    # pool holds, so it is cut across families and the rest counted (DIV1-02).
+    with system_transaction(full_release) as tx:
+        slate = observed_for(tx, {"confident_tasks": ["maintaining equipment", "planning shifts"]})
+
+    hits = {q["text"]: q["hits"] for q in slate["queries"]}
+    assert hits["maintaining equipment"] == POOL_LIMIT
+    assert slate["pool_size"] == POOL_LIMIT
+    assert slate["beyond_pool_limit"] > 0
 
 
 @pytest.mark.req("BND1-11")

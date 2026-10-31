@@ -239,31 +239,35 @@ def full_text(
     return hits, total
 
 
-def essential_skill_reach(
-    tx: Tx, query: str, limit: int, *, any_word: bool
-) -> tuple[list[SkillReach], int]:
-    """The occupations reached through an essential skill whose preferred label matches the
-    query (`skills.search_vector`: the label alone), each by its best-ranked such skill, best
-    first, and how many occupations are reached in all. Equal ranks go to the occupation
-    with more of its essential skills matching. No title, hidden label, ISCO group or
-    description is searched."""
+def essential_skill_reach(tx: Tx, query: str, limit: int) -> tuple[list[SkillReach], int]:
+    """The occupations reached through an essential skill whose preferred label holds every
+    word of the query (`skills.search_vector`, the label alone; English stems, stop words
+    dropped, no search operators), each by its best-ranked such skill, and how many
+    occupations are reached in all. Best first: equal ranks go to the occupation whose
+    essential skills the query matches the larger share of, its title only last. No title,
+    hidden label, ISCO group or description is searched."""
     rows = tx.execute(
         sa.text(
-            f"WITH q AS (SELECT {_ANY_WORD if any_word else _ALL_WORDS} AS query), "
+            "WITH q AS (SELECT plainto_tsquery('english', :q) AS query), "
             "matched AS (SELECT s.skill_id, s.preferred_label, "
             "ts_rank_cd(s.search_vector, q.query, 32) AS text_rank "
             "FROM careerwright.skills s, q WHERE s.search_vector @@ q.query), "
             "reached AS (SELECT r.concept_id, m.skill_id, m.preferred_label, m.text_rank, "
             "row_number() OVER (PARTITION BY r.concept_id ORDER BY m.text_rank DESC, "
             "m.preferred_label, m.skill_id) AS best, "
-            "count(*) OVER (PARTITION BY r.concept_id) AS skills "
+            "array_agg(m.skill_id) OVER (PARTITION BY r.concept_id) AS skills "
             "FROM matched m JOIN careerwright.occupation_skills r ON r.skill_id = m.skill_id "
-            "AND r.relation = 'essential') "
+            "AND r.relation = 'essential'), "
+            "essential AS (SELECT e.concept_id, count(*) AS skills "
+            "FROM careerwright.occupation_skills e WHERE e.relation = 'essential' "
+            "AND e.concept_id IN (SELECT concept_id FROM reached) GROUP BY e.concept_id) "
             "SELECT r.concept_id, r.skill_id, r.preferred_label AS skill_label, r.text_rank, "
-            "count(*) OVER () AS total FROM reached r JOIN careerwright.occupation_concepts o "
-            "ON o.concept_id = r.concept_id WHERE r.best = 1 "
-            "ORDER BY r.text_rank DESC, r.skills DESC, o.preferred_label, r.concept_id "
-            "LIMIT :limit"
+            "r.skills, count(*) OVER () AS total FROM reached r "
+            "JOIN essential e ON e.concept_id = r.concept_id "
+            "JOIN careerwright.occupation_concepts o ON o.concept_id = r.concept_id "
+            "WHERE r.best = 1 "
+            "ORDER BY r.text_rank DESC, cardinality(r.skills)::float8 / e.skills DESC, "
+            "o.preferred_label, r.concept_id LIMIT :limit"
         ),
         {"q": query, "limit": limit},
     ).mappings()
@@ -276,6 +280,7 @@ def essential_skill_reach(
                 skill_id=row["skill_id"],
                 skill_label=row["skill_label"],
                 text_rank=float(row["text_rank"]),
+                skills=frozenset(row["skills"]),
             )
         )
     return reached, total
@@ -365,36 +370,39 @@ def title_matches(
 def partial_title_matches(tx: Tx, words: Sequence[str], limit: int) -> tuple[list[TitleMatch], int]:
     """For when no label holds every typed word: the occupations whose preferred or
     alternative labels hold the most of `words` (each beginning a word of the label), one
-    per occupation by its best label, and how many there are. Best first: the label whose
-    words are rarer among ESCO's titles (a word's count is how many of these occupations
-    hold it, so "bookkeeping" outranks "assistant"), then a preferred label, then the shorter
-    label, then by label. None when no label holds any of them. Hidden labels are never
-    offered."""
+    per occupation by its best label, and how many there are. Best first: the label holding
+    more of the words whole (so "nurse" finds the nurses before a "nursery" title), then the
+    label whose words are rarer among ESCO's titles (a word's count is how many of these
+    occupations hold it, so "bookkeeping" outranks "assistant"), then a preferred label, then
+    the shorter label, then by label. None when no label holds any of them. Hidden labels
+    are never offered."""
     rows = tx.execute(
         sa.text(
-            "WITH typed AS (SELECT w, to_tsquery('simple', quote_literal(w) || ':*') AS q "
+            "WITH typed AS (SELECT w, to_tsquery('simple', quote_literal(w) || ':*') AS q, "
+            "to_tsquery('simple', quote_literal(w)) AS whole "
             "FROM unnest(CAST(:words AS text[])) AS w), "
             "labels AS (SELECT l.concept_id, l.label, l.kind, "
             "to_tsvector('simple', l.label) AS v FROM careerwright.occupation_labels l "
             "WHERE l.kind <> 'hidden' AND to_tsvector('simple', l.label) @@ "
             "to_tsquery('simple', :any)), "
-            "held AS (SELECT b.concept_id, b.label, b.kind, t.w FROM labels b "
-            "JOIN typed t ON b.v @@ t.q), "
+            "held AS (SELECT b.concept_id, b.label, b.kind, t.w, b.v @@ t.whole AS whole "
+            "FROM labels b JOIN typed t ON b.v @@ t.q), "
             "reach AS (SELECT w, count(DISTINCT concept_id) AS occupations FROM held "
             "GROUP BY w), "
             "scored AS (SELECT h.concept_id, h.label, h.kind, count(*) AS words, "
+            "count(*) FILTER (WHERE h.whole) AS whole_words, "
             "sum(r.occupations) AS commonness FROM held h JOIN reach r ON r.w = h.w "
             "GROUP BY h.concept_id, h.label, h.kind), "
             "best AS (SELECT s.*, row_number() OVER (PARTITION BY s.concept_id ORDER BY "
-            "s.words DESC, s.commonness, s.kind = 'preferred' DESC, char_length(s.label), "
-            "s.label) AS n, max(s.words) OVER () AS most FROM scored s) "
+            "s.words DESC, s.whole_words DESC, s.commonness, s.kind = 'preferred' DESC, "
+            "char_length(s.label), s.label) AS n, max(s.words) OVER () AS most FROM scored s) "
             "SELECT b.concept_id, b.label, b.kind, o.preferred_label, o.isco_code, "
             "g.label AS isco_label, count(*) OVER () AS total "
             "FROM best b JOIN careerwright.occupation_concepts o ON o.concept_id = b.concept_id "
             "JOIN careerwright.isco_groups g ON g.code = o.isco_code "
             "WHERE b.n = 1 AND b.words = b.most "
-            "ORDER BY b.commonness, b.kind = 'preferred' DESC, char_length(b.label), b.label, "
-            "b.concept_id LIMIT :limit"
+            "ORDER BY b.whole_words DESC, b.commonness, b.kind = 'preferred' DESC, "
+            "char_length(b.label), b.label, b.concept_id LIMIT :limit"
         ),
         {
             "words": list(words),
@@ -417,7 +425,8 @@ def skill_neighbours(
     tx: Tx, anchors: Iterable[uuid.UUID], minimum: int
 ) -> tuple[int, list[SkillNeighbour]]:
     """How many distinct essential skills the anchor occupations have together, and every
-    other occupation sharing at least `minimum` of them, with its own count."""
+    other occupation sharing at least `minimum` of them, with the skills it shares and its
+    own count."""
     ids = [str(i) for i in sorted(set(anchors))]
     mine = int(
         tx.execute(
@@ -432,17 +441,20 @@ def skill_neighbours(
         sa.text(
             "WITH mine AS (SELECT DISTINCT skill_id FROM careerwright.occupation_skills "
             "WHERE concept_id = ANY(CAST(:ids AS uuid[])) AND relation = 'essential'), "
-            "shared AS (SELECT r.concept_id, count(*) AS shared "
+            "shared AS (SELECT r.concept_id, count(*) AS shared, array_agg(r.skill_id) AS skills "
             "FROM careerwright.occupation_skills r JOIN mine m ON m.skill_id = r.skill_id "
             "WHERE r.relation = 'essential' AND r.concept_id <> ALL(CAST(:ids AS uuid[])) "
             "GROUP BY r.concept_id HAVING count(*) >= :minimum) "
-            "SELECT s.concept_id, s.shared, count(*) AS essential FROM shared s "
+            "SELECT s.concept_id, s.shared, s.skills, count(*) AS essential FROM shared s "
             "JOIN careerwright.occupation_skills e ON e.concept_id = s.concept_id "
-            "AND e.relation = 'essential' GROUP BY s.concept_id, s.shared"
+            "AND e.relation = 'essential' GROUP BY s.concept_id, s.shared, s.skills"
         ),
         {"ids": ids, "minimum": minimum},
     )
-    return mine, [SkillNeighbour(r.concept_id, int(r.shared), int(r.essential)) for r in rows]
+    return mine, [
+        SkillNeighbour(r.concept_id, int(r.shared), int(r.essential), frozenset(r.skills))
+        for r in rows
+    ]
 
 
 def shared_essential_skills(

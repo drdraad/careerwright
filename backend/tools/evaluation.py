@@ -80,23 +80,43 @@ _SEARCHED = re.compile(
     r"essential skill for this work\."
 )
 _LETTERS = re.compile(r"[^\W\d_]+")
+# English function words of three or more letters (the Snowball English stop list): a search
+# may hold them and a skill label need not. Written out here, independent of the product.
+_FUNCTION_WORDS = frozenset(
+    {
+        "about", "above", "after", "again", "against", "all", "and", "any", "are", "because",
+        "been", "before", "being", "below", "between", "both", "but", "can", "did", "does",
+        "doing", "don", "down", "during", "each", "few", "for", "from", "further", "had", "has",
+        "have", "having", "her", "here", "hers", "herself", "him", "himself", "his", "how",
+        "into", "its", "itself", "just", "more", "most", "myself", "nor", "not", "now", "off",
+        "once", "only", "other", "our", "ours", "ourselves", "out", "over", "own", "same", "she",
+        "should", "some", "such", "than", "that", "the", "their", "theirs", "them",
+        "themselves", "then", "there", "these", "they", "this", "those", "through", "too",
+        "under", "until", "very", "was", "were", "what", "when", "where", "which", "while",
+        "who", "whom", "why", "will", "with", "you", "your", "yours", "yourself", "yourselves",
+    }
+)  # fmt: skip
 Json = dict[str, Any]
 
 
-def _same_word_in(text: str, label: str) -> bool:
-    """Whether a word of the text appears in the label in some form ("repairing" in "perform
-    repairs"): an independent check of the product's English stemming, so deliberately
-    loose. Two words agree when they begin alike for at least three letters and for all but
-    the last three of the shorter."""
+def _every_word_in(text: str, label: str) -> bool:
+    """Whether every content word of the text (three or more letters, not a function word)
+    appears in the label in some form ("repairing bicycles" in "perform repairs on
+    bicycles"): an independent check of the product's English stemming, so loose about
+    endings, never about a word left out. Two words agree when they begin alike for at least
+    three letters and for all but the last three of the shorter. A text with no such word is
+    not shown to be in the label."""
 
     def agree(a: str, b: str) -> bool:
         shorter = min(len(a), len(b))
         alike = next((i for i in range(shorter) if a[i] != b[i]), shorter)
         return alike >= max(3, shorter - 3)
 
-    words = [w for w in _LETTERS.findall(text.casefold()) if len(w) >= 3]
+    words = [
+        w for w in _LETTERS.findall(text.casefold()) if len(w) >= 3 and w not in _FUNCTION_WORDS
+    ]
     held = _LETTERS.findall(label.casefold())
-    return any(agree(a, b) for a in words for b in held)
+    return bool(words) and all(any(agree(a, b) for b in held) for a in words)
 
 
 class CaseKind(StrEnum):
@@ -330,9 +350,10 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         ]
         return Failure(FailureType.GROUNDING, f"not joined by skills: {loose}") if loose else None
     if e.check == "searched_through_skills":
-        # Every other search reaches work only through one of its essential skills whose
-        # label holds the search's words, and the suggestion's words name that skill (never a
-        # title, hidden label, ISCO group or description; Task W2B fix round 1).
+        # Every other search reaches work only through one of its own essential skills whose
+        # label holds every content word of the search, and the suggestion's words name that
+        # skill (never a title, hidden label, ISCO group or description, Task W2B fix round
+        # 1; never through one shared word such as "people" or "give", fix round 2).
         essential: Mapping[str, list[str]] = observed.get("essential_skills", {})
         loose = [
             f"{s['title']}: {line}"
@@ -342,10 +363,40 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
             and not (
                 (m := _SEARCHED.search(line)) is not None
                 and m["skill"] in essential.get(s["concept_id"], [])
-                and _same_word_in(m["query"], m["skill"])
+                and _every_word_in(m["query"], m["skill"])
             )
         ]
         return Failure(FailureType.GROUNDING, f"not through a skill: {loose}") if loose else None
+    if e.check == "work_style_not_searched":
+        # How someone likes to work says how they work, not a skill: no search resting on it
+        # alone runs (Task W2B fix round 2; provisional, for session W2).
+        ran = [
+            q["text"]
+            for q in observed["queries"]
+            if q["based_on"] and all(item["field"] == "work_style" for item in q["based_on"])
+        ]
+        return Failure(FailureType.GROUNDING, f"searched: {ran}") if ran else None
+    if e.check == "titles_ambiguous":
+        # A title several occupations hold joins nothing until the person chooses which they
+        # mean: never joined over their skills together (Task W2B fix round 2).
+        missing = [title for title in e.words if title not in observed["ambiguous_titles"]]
+        joined = [
+            s["title"]
+            for s in suggestions
+            for line in s["why_it_could_suit"]
+            if _SHARED.search(line) and any(f"“{title}”" in line for title in e.words)
+        ]
+        bad = missing or joined
+        return Failure(FailureType.GROUNDING, f"{missing} {joined}") if bad else None
+    if e.check == "small_pool_has_reason":
+        # The 60-120 working pool is soft, "where evidence permits" (DIV1-02): below it, a
+        # short slate says why it is short and a full one says how many it chose from.
+        size, target = observed["pool_size"], observed["pool_target"][0]
+        said = bool(observed["fewer_reasons"]) or any(
+            f"from {size} occupations" in note for note in observed["notes"]
+        )
+        quiet = size < target and not said
+        return Failure(FailureType.THIN_EVIDENCE, f"pool {size}, no reason") if quiet else None
     if e.check == "connection":
         connection = observed.get("connection")
         if connection is None:

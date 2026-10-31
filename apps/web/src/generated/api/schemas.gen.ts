@@ -9861,7 +9861,7 @@ export const SlateOutSchema = {
             },
             type: 'array',
             title: 'Notes',
-            description: 'How a control changed the slate, in words.'
+            description: 'How the slate was made, in words: a control\'s effect, a changed ESCO release, answers not used to find work, or fewer occupations to choose from than Careerwright aims for.'
         },
         salary_floor: {
             anyOf: [
@@ -9948,6 +9948,14 @@ export const SlateOutSchema = {
             title: 'Unmatched Titles',
             description: 'Titles of the person\'s own that ESCO does not list: nothing is joined to them until the person chooses the ESCO occupation closest to each.'
         },
+        ambiguous_titles: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Ambiguous Titles',
+            description: 'Titles of the person\'s own that ESCO lists for several occupations: nothing is joined to them until the person chooses which one they mean.'
+        },
         connection: {
             anyOf: [
                 {
@@ -9981,10 +9989,11 @@ export const SlateOutSchema = {
         'unsupported_hypotheses',
         'not_included',
         'unmatched_titles',
+        'ambiguous_titles',
         'connection'
     ],
     title: 'SlateOut',
-    description: 'A varied slate of up to six career hypotheses from the discovery\'s searches, computed\ndeterministically each time it is read, with every count that explains it. A title of\nthe person\'s own (their role, a target, or a search naming one) joins other work only by\nshared essential skills, never by its words.'
+    description: 'A varied slate of up to six career hypotheses from the discovery\'s searches, computed\ndeterministically each time it is read, with every count that explains it. A title of\nthe person\'s own (their role, a target, or a search naming one) joins other work only by\nshared essential skills, never by its words, and only once it names one occupation.'
 } as const;
 
 export const SocCandidateOutSchema = {

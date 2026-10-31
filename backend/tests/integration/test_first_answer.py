@@ -6,6 +6,7 @@ one-second budget, for "data analyst" and the heaviest roles ESCO holds; and the
 for titles ESCO does not list. The timings are printed with the run (`-s`); the database
 runs in the test stack's container on this machine."""
 
+import re
 import time
 import uuid
 from collections.abc import Iterator
@@ -169,8 +170,8 @@ def test_a_title_esco_does_not_list_offers_the_titles_holding_most_of_its_words(
     full_api: ApiClient, ada: str
 ) -> None:
     # P01's, P04's and P05's own titles are not ESCO titles (review I5): the type-ahead
-    # offers the occupations whose titles hold the most of their words, rarer words first,
-    # for the person to choose from. Nothing is chosen or joined for them.
+    # offers the occupations whose titles hold the most of their words, whole words then
+    # rarer words first, for the person to choose from. Nothing is chosen or joined for them.
     def offered(typed: str) -> tuple[bool, list[str]]:
         found = full_api.get("/v1/taxonomy/titles", ada, q=typed, limit=20)
         assert found.status_code == 200, found.text
@@ -193,7 +194,22 @@ def test_a_title_esco_does_not_list_offers_the_titles_holding_most_of_its_words(
     assert longer == (False, [])
     assert (p01[0], p04[0], p05[0]) == (True, True, True)
     assert {"data quality specialist", "data analyst"} <= set(p01[1])
-    assert {"specialist nurse", "nurse responsible for general care"} <= set(p04[1])
+    # Task W2B fix round 2 (re-review M-B): "registered" says a role's standing, not its work,
+    # so it isn't counted, and a title holding "nurse" whole comes before one that only
+    # begins with it ("nursery"): the five nurses first, never a registered sales assistant.
+    nurses = {
+        "nurse assistant",
+        "specialist nurse",
+        "veterinary nurse",
+        "advanced nurse practitioner",
+        "nurse responsible for general care",
+    }
+    assert set(p04[1][:5]) == nurses
+    assert "sales support assistant" not in p04[1]
+    p04_labels = full_api.get("/v1/taxonomy/titles", ada, q="Registered nurse", limit=20).json()
+    held = [bool(re.search(r"\bnurse\b", m["matched_label"])) for m in p04_labels["matches"]]
+    assert held == sorted(held, reverse=True)  # every whole "nurse" before any "nursery"
+    assert not all(held)
     assert p05[1][0] == "bookkeeper"  # "bookkeeping" is a rarer word than "assistant"
     assert (whole[0], whole[1][0]) == (False, "data analyst")  # every word: not partial
     assert nothing == (False, [])  # no word of any title: an honest empty answer

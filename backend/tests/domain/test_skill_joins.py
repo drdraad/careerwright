@@ -39,6 +39,7 @@ def occupation(name: str, family: str) -> Occupation:
         sector_code=family[0],
         preferred_key=name.casefold(),
         label_keys=frozenset({name.casefold()}),
+        essential_skills=20,
     )
 
 

@@ -2,8 +2,9 @@
 a turn's one proposal, read it, and confirm or decline it.
 
 A proposal is asked for once per conversation turn whose decision added answers, and reads
-only the answers that decision added (so declining one stores nothing, yet the same words are
-not offered again on a later turn); never for a turn whose message the support screen
+only the answers that decision added, words no earlier version held (so declining one stores
+nothing, yet the same words are not offered again on a later turn, even moved to another
+field or added back); never for a turn whose message the support screen
 (`careerwright.profile.safety`) answered: that turn only acknowledges and offers a smaller
 step. It runs as its own bounded run (`strength_proposal`, one `RunTask` on the one
 activity, so the DBOS step sequence is unchanged): live only with
@@ -55,7 +56,6 @@ from careerwright.profile import titles
 from careerwright.profile.commands import current_profile
 from careerwright.profile.conversation import visible_turn
 from careerwright.profile.discovery import EvidenceItem, evidence_of
-from careerwright.profile.document import empty_profile
 from careerwright.profile.exploration import HardFilterInput, first_slate
 from careerwright.profile.safety import has_risk_stem
 from careerwright.profile.store import stale_version
@@ -125,22 +125,31 @@ def turn_strength(
     return _view(tx, keyring, request)
 
 
+def _words(text: str) -> str:
+    return " ".join(text.casefold().split())
+
+
 def _added_answers(tx: Tx, workspace_id: uuid.UUID, version: int) -> list[EvidenceItem]:
     """The answers about work (what the person enjoys, can do or has done) that the profile
-    version a turn's decision created added: in that version and not in the one before. An
-    answer removed or kept is not added."""
+    version a turn's decision created added: answers whose words no earlier version held in
+    any of those fields (case and spacing aside). An answer kept or removed, moved between
+    those fields, or removed and added back is not added, so a strength declined for it is
+    not offered again."""
     after = profile_store.profile_version(tx, workspace_id, version)
-    before = profile_store.profile_version(tx, workspace_id, version - 1)
     if after is None:
         return []
     earlier = {
-        (item.field, item.text)
-        for item in evidence_of(before.document if before is not None else empty_profile())
+        _words(item.text)
+        for past in profile_store.list_profile_versions(
+            tx, workspace_id, before=version, limit=version
+        )
+        for item in evidence_of(past.document)
+        if item.field in strength.ANSWER_FIELDS
     }
     return [
         item
         for item in evidence_of(after.document)
-        if item.field in strength.ANSWER_FIELDS and (item.field, item.text) not in earlier
+        if item.field in strength.ANSWER_FIELDS and _words(item.text) not in earlier
     ]
 
 

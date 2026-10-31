@@ -176,6 +176,7 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
     },
   ],
   unmatched_titles: [],
+  ambiguous_titles: [],
   connection: null,
 });
 

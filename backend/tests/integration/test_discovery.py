@@ -31,10 +31,14 @@ from tools.evaluation import load_cases, observe_discovery_offline
 
 pytestmark = pytest.mark.integration
 
+# Each task reaches the labelled sample's work through an essential skill holding all its
+# words ("tune bicycles", "apply restoration techniques", "maintain plants' growth"): since
+# Task W2B fix round 2 one shared word is never enough, and how someone likes to work is not
+# searched.
 ANSWERS = profile_with(
     current_role="Warehouse shift supervisor",
-    enjoyed_tasks=["repairing bicycles", "restoring old furniture"],
-    confident_tasks=["looking after gardens"],
+    enjoyed_tasks=["tuning bicycles", "applying restoration techniques"],
+    confident_tasks=["maintaining plant growth"],
     work_style=["working outdoors"],
     cities=["Leeds"],
 )
@@ -98,9 +102,9 @@ def test_a_discovery_runs_durably_and_its_slate_is_grounded_in_esco_and_the_answ
     )
     assert shown["proposal"]["origin"] == "model"
     answers = {
-        ("enjoyed_tasks", "repairing bicycles"),
-        ("enjoyed_tasks", "restoring old furniture"),
-        ("confident_tasks", "looking after gardens"),
+        ("enjoyed_tasks", "tuning bicycles"),
+        ("enjoyed_tasks", "applying restoration techniques"),
+        ("confident_tasks", "maintaining plant growth"),
         ("work_style", "working outdoors"),
         ("current_role", "Warehouse shift supervisor"),
     }

@@ -152,6 +152,11 @@ def slate(*suggestions: dict[str, Any], **extra: Any) -> dict[str, Any]:
         "family_limit": 2,
         "target_size": 6,
         "fewer_reasons": [],
+        "notes": [],
+        "pool_size": 60,
+        "pool_target": [60, 120],
+        "queries": [],
+        "ambiguous_titles": [],
         "salary_floor": None,
         "unsupported_hypotheses": [],
         **extra,
@@ -212,10 +217,14 @@ def searched(query: str, skill: str) -> str:
 
 
 @pytest.mark.req("DIV1-08", "TEST1-10")
-def test_a_search_must_reach_work_through_an_essential_skill_that_holds_its_words() -> None:
-    # Task W2B fix round 1: never a title, hidden label, ISCO group or description.
+def test_a_search_must_reach_work_through_an_essential_skill_that_holds_all_its_words() -> None:
+    # Task W2B fix round 1: never a title, hidden label, ISCO group or description. Fix round
+    # 2: every content word of the search, never one shared word ("people", "give", "write"),
+    # which is the keyword matching the product owner rejected.
     p02 = BY_ID["DSC-01"]
-    essential = {"bicycle mechanic": ["perform repairs on bicycles", "tune bicycles"]}
+    essential = {
+        "bicycle mechanic": ["perform repairs on bicycles", "tune bicycles", "entertain people"]
+    }
 
     def found(*why: str) -> dict[str, Any]:
         return slate(
@@ -225,8 +234,11 @@ def test_a_search_must_reach_work_through_an_essential_skill_that_holds_its_word
             essential_skills=essential,
         )
 
-    through_skill = found(searched("repairing physical objects", "perform repairs on bicycles"))
-    other_skill = found(searched("repairing physical objects", "repair engines"))
+    through_skill = found(searched("repairing bicycles", "perform repairs on bicycles"))
+    function_words = found(searched("repairing the bicycles", "perform repairs on bicycles"))
+    one_word = found(searched("repairing physical objects", "perform repairs on bicycles"))
+    one_shared = found(searched("looking after people", "entertain people"))
+    other_skill = found(searched("repairing bicycles", "repair engines"))
     other_words = found(searched("repairing physical objects", "tune bicycles"))
     description = found(
         "What you enjoy: “repairing physical objects”. Careerwright searched for “repairing "
@@ -234,8 +246,77 @@ def test_a_search_must_reach_work_through_an_essential_skill_that_holds_its_word
     )
 
     assert evaluate(p02, through_skill, {}) == []
-    for loose in (other_skill, other_words, description):
+    assert evaluate(p02, function_words, {}) == []
+    for loose in (one_word, one_shared, other_skill, other_words, description):
         assert [f.type for f in evaluate(p02, loose, {})] == [FailureType.GROUNDING]
+
+
+@pytest.mark.req("REC1-03", "TEST1-10")
+def test_no_search_may_rest_on_how_the_person_likes_to_work_alone() -> None:
+    # Task W2B fix round 2: "structured" found soil structure and wood elements in structures.
+    p01 = BY_ID["DSC-12"]
+    style = {"field": "work_style", "text": "structured"}
+    task = {"field": "enjoyed_tasks", "text": "finding inconsistencies"}
+
+    def ran(*based_on: dict[str, str]) -> dict[str, Any]:
+        query = {"text": "structured", "based_on": list(based_on), "hits": 3}
+        return slate(
+            queries=[query], unmatched_titles=["Data quality analyst"], fewer_reasons=["x"]
+        )
+
+    assert evaluate(p01, ran(task, style), {}) == []  # a task with it: the task's search
+    assert [f.type for f in evaluate(p01, ran(style), {})] == [FailureType.GROUNDING]
+
+
+@pytest.mark.req("DIV1-03", "DIV1-12", "TEST1-10")
+def test_a_title_several_occupations_hold_must_wait_for_the_person_s_choice() -> None:
+    # Task W2B fix round 2: never joined over the occupations' skills together.
+    case = BY_ID["DSC-16"]
+    named = "Your current role: “bus operator”. ESCO lists it as this occupation."
+    joined = (
+        "Your current role: “bus operator”. ESCO lists 14 of the same essential skills for "
+        "both, so Careerwright joined them by those skills."
+    )
+    reason = ["ESCO lists “bus operator” as the title of 2 occupations."]
+    role = [{"field": "current_role", "text": "bus operator"}]
+
+    def found(title: str, family: str, direction: str, why: str) -> dict[str, Any]:
+        return suggestion(title, family, direction, why_it_could_suit=[why], linked_evidence=role)
+
+    def shown(why: str, ambiguous: list[str]) -> dict[str, Any]:
+        return slate(
+            found("bus driver", "833", "close_to_current", named),
+            found("taxi driver", "832", "transferable", why),
+            ambiguous_titles=ambiguous,
+            fewer_reasons=reason,
+        )
+
+    waiting = slate(
+        found("bus driver", "833", "close_to_current", named),
+        ambiguous_titles=["bus operator"],
+        fewer_reasons=reason,
+    )
+
+    assert evaluate(case, waiting, {}) == []
+    assert [f.type for f in evaluate(case, shown(joined, ["bus operator"]), {})] == [
+        FailureType.GROUNDING
+    ]
+    assert [f.type for f in evaluate(case, shown(named, []), {})] == [FailureType.GROUNDING]
+
+
+@pytest.mark.req("DIV1-02", "TEST1-10")
+def test_a_pool_below_its_soft_target_must_say_why() -> None:
+    # DIV1-02: 60-120 "where evidence permits". Below it, a full slate says how many it chose
+    # from; a short slate's own reasons say why it is short.
+    case = BY_ID["DSC-01"]
+    six = [suggestion(f"o{n}", f"{n}21", "less_familiar") for n in range(1, 7)]
+    said = slate(*six, pool_size=12, notes=["Careerwright chose these from 12 occupations."])
+    silent = slate(*six, pool_size=12)
+    short = slate(*six[:3], pool_size=3, fewer_reasons=["Only 3 occupations matched."])
+
+    assert evaluate(case, said, {}) == []
+    assert evaluate(case, short, {}) == []
+    assert [f.type for f in evaluate(case, silent, {})] == [FailureType.THIN_EVIDENCE]
 
 
 def explained(*quotations: tuple[str, str], status: str = "complete") -> dict[str, Any]:

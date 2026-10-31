@@ -7,15 +7,17 @@ the others say which they duplicate. Folding is never transitive. The working po
 bounded (`POOL_LIMIT`, the upper end of the soft 60-120 target) and filled round-robin
 across ISCO families before relevance cuts it. A candidate's relevance rests only on how
 well the person's own answers retrieved it: its best normalised rank in any query, plus a
-little for each further query that found it. No pay, popularity, prestige or AI-resilience
-figure enters (DIV1-07), and no percentage is ever produced (REC1-05).
+little for each further query that found it. Equal relevance goes to the larger share of
+its essential skills the answers reach (its own, never a folded role's), and the title is
+only the last tie-break: no cut is decided by the alphabet. No pay, popularity, prestige or
+AI-resilience figure enters (DIV1-07), and no percentage is ever produced (REC1-05).
 
 **Titles are joined by skills, never by their words** (plan section 4, Sprint W; ADR 0007
 decision 13). The person's role or a title they named is resolved to its ESCO occupation, and
 other occupations join it only by the essential skills the two share (`skill_join_hits`):
 at least `MIN_SHARED_SKILLS`, ranked by their share of both roles' essential skills. Every
-other search reaches an occupation only through one of its essential skills, which its hit
-names (`Hit.skill`).
+other search reaches an occupation only through one of its essential skills whose label
+holds every word of the search, which its hit names (`Hit.skill`).
 
 **Direction** is relative to the person (DIV1-12): close to what they do now (its ISCO
 family is one of their current role's or targets', or their role or a target found it),
@@ -84,9 +86,10 @@ class SlateChannel(StrEnum):
     SHARED_SKILLS = "shared_skills"
 
 
-# How much a hit counts by the channel that found it. How someone likes to work informs the
-# search but is weaker evidence than what they do, enjoy or name (spec section 4: one source
-# of hypotheses among several); it is never a filter (REC1-03).
+# How much a hit counts by the channel that found it. Where someone likes to work is weaker
+# evidence than what they do, enjoy or name (spec section 4: one source of hypotheses among
+# several); it is never a filter (REC1-03), and a search resting on how they like to work
+# alone is not run at all (ADR 0007 decision 13).
 CHANNEL_WEIGHT: Mapping[SlateChannel, float] = {
     SlateChannel.CURRENT: 1.0,
     SlateChannel.USER_PROPOSED: 1.0,
@@ -141,6 +144,9 @@ class Hit:
     shared_skills: int | None = None
     # A search's hit: the essential skill (its ESCO label) whose words the search matched.
     skill: str | None = None
+    # The occupation's essential skills this hit reached: those a search matched, or those a
+    # join shares (none for a title's own occupation).
+    skills: frozenset[uuid.UUID] = frozenset()
 
 
 def skill_join_hits(
@@ -156,7 +162,13 @@ def skill_join_hits(
     kept = kept[:limit]
     top = max((share[n.concept_id] for n in kept), default=0.0)
     return tuple(
-        Hit(n.concept_id, share[n.concept_id] / top, label_match=False, shared_skills=n.shared)
+        Hit(
+            n.concept_id,
+            share[n.concept_id] / top,
+            label_match=False,
+            shared_skills=n.shared,
+            skills=n.skills,
+        )
         for n in kept
     )
 
@@ -181,15 +193,20 @@ class Occupation:
     sector_code: str  # ISCO-08 major group
     preferred_key: str  # its preferred label as a concept key
     label_keys: frozenset[str]  # its non-hidden labels as concept keys
+    essential_skills: int  # how many essential skills ESCO lists for it
 
 
 @dataclass(frozen=True)
 class Match:
     query: PoolQuery
+    # The occupation the hit reached: the candidate's own, or a near-identical role folded
+    # into it (DIV1-05), whose skills are that role's, never the candidate's.
+    concept_id: uuid.UUID
     score: float
     label_match: bool
     shared_skills: int | None = None
     skill: str | None = None
+    skills: frozenset[uuid.UUID] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -199,11 +216,19 @@ class Candidate:
     relevance: float
     direction: Direction
     channels: frozenset[SlateChannel]
+    # The share of its essential skills the person's answers reach (its own matches only):
+    # equal relevance goes to the larger share, never to the title (Task W2B re-review I-B).
+    share: float
     duplicate_of: uuid.UUID | None = None
 
     @property
     def best_score(self) -> float:
         return max(m.score for m in self.matches)
+
+    @property
+    def own_matches(self) -> tuple[Match, ...]:
+        """The matches that reached this occupation itself, not a role folded into it."""
+        return tuple(m for m in self.matches if m.concept_id == self.occupation.concept_id)
 
 
 @dataclass(frozen=True)
@@ -265,6 +290,13 @@ def _relevance(matches: list[Match]) -> float:
     return min(MAX_RELEVANCE, scores[0] + FURTHER_QUERY_BONUS * (len(scores) - 1))
 
 
+def _share(occupation: Occupation, matches: list[Match]) -> float:
+    reached = frozenset().union(
+        *(m.skills for m in matches if m.concept_id == occupation.concept_id)
+    )
+    return len(reached) / occupation.essential_skills if occupation.essential_skills else 0.0
+
+
 def _candidate(occupation: Occupation, matches: list[Match], familiar: frozenset[str]) -> Candidate:
     channels = frozenset(m.query.channel for m in matches)
     return Candidate(
@@ -273,11 +305,19 @@ def _candidate(occupation: Occupation, matches: list[Match], familiar: frozenset
         _relevance(matches),
         _direction(occupation, channels, familiar),
         channels,
+        _share(occupation, matches),
     )
 
 
-def _order(candidate: Candidate) -> tuple[float, str, str]:
-    return (-candidate.relevance, candidate.occupation.title, str(candidate.occupation.concept_id))
+def _order(candidate: Candidate) -> tuple[float, float, str, str]:
+    """Relevance first; equals go to the larger share of essential skills reached, and the
+    title is only the last tie-break (never cut ties alphabetically)."""
+    return (
+        -candidate.relevance,
+        -candidate.share,
+        candidate.occupation.title,
+        str(candidate.occupation.concept_id),
+    )
 
 
 def _aliases(a: Occupation, b: Occupation) -> bool:
@@ -339,7 +379,15 @@ def build_pool(
         for hit in query.hits:
             if hit.concept_id in occupations:
                 found.setdefault(hit.concept_id, []).append(
-                    Match(query, hit.score * weight, hit.label_match, hit.shared_skills, hit.skill)
+                    Match(
+                        query,
+                        hit.concept_id,
+                        hit.score * weight,
+                        hit.label_match,
+                        hit.shared_skills,
+                        hit.skill,
+                        hit.skills,
+                    )
                 )
     candidates = [
         _candidate(occupations[concept_id], matches, familiar_families)
@@ -518,9 +566,10 @@ def unexpected_connection(
     own_families: frozenset[str],
     named: frozenset[uuid.UUID],
 ) -> Connection | None:
-    """Of the slate's suggestions that a join from the person's role found (`role_joins`:
-    those queries' IDs), outside the role's own kinds of work (`own_families`) and not a
-    title the person named: the one sharing the most essential skills with the role, then
+    """Of the slate's suggestions that a join from the person's role found itself (`role_joins`:
+    those queries' IDs; never through a role folded into it), outside the role's own kinds of
+    work (`own_families`) and not a title the person named: the one sharing the most essential
+    skills with the role, then
     the larger share of both roles' skills, then the first in the slate. None when no
     suggestion qualifies: a revelation with no source is never shown."""
     best: tuple[tuple[int, float, int], Connection] | None = None
@@ -529,7 +578,7 @@ def unexpected_connection(
         if occupation.family_code in own_families or occupation.concept_id in named:
             continue
         joined = [
-            m for m in candidate.matches if m.query.query_id in role_joins and m.shared_skills
+            m for m in candidate.own_matches if m.query.query_id in role_joins and m.shared_skills
         ]
         if not joined:
             continue
