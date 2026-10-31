@@ -217,8 +217,11 @@ def main(argv: list[str] | None = None) -> None:
         ),
     )
     # A separate project and CAREERWRIGHT_HOME, for test harnesses (the browser journey); the make
-    # targets always use the defaults.
-    parser.add_argument("--project", default=DEFAULT_PROJECT)
+    # targets use the defaults, unless the acceptance run's own `make demo` sets
+    # CAREERWRIGHT_PROJECT (with CAREERWRIGHT_HOME and the ports) to keep off the real stack.
+    parser.add_argument(
+        "--project", default=os.environ.get("CAREERWRIGHT_PROJECT", DEFAULT_PROJECT)
+    )
     parser.add_argument("--home", type=Path, default=None)
     args = parser.parse_args(argv)
     ports = ports_from_env()

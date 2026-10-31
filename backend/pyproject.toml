@@ -74,6 +74,7 @@ addopts = "-ra --strict-markers -m 'not integration and not stack'"
 markers = [
     "integration: needs PostgreSQL 16 and the Firebase Auth emulator (started by the test harness in Docker)",
     "stack: drives the full Docker Compose stack (make acceptance)",
+    "owner_commands: what the product owner opens or types in a session, offline (make check and make acceptance)",
     "req(id): the requirements-register test ID(s) this test establishes",
 ]
 filterwarnings = [

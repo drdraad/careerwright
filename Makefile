@@ -64,7 +64,7 @@ check:
 	$(WEB) pnpm run check
 
 acceptance:
-	$(BACKEND) $(UV) pytest -m "integration or stack"
+	$(BACKEND) $(UV) pytest -m "integration or stack or owner_commands"
 	$(WEB) pnpm run build-storybook && pnpm run e2e
 
 # Only PRODUCTION=1 opts in to the production model; any other value (0, false, no) does not.
