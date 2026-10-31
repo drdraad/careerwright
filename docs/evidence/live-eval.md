@@ -34,3 +34,29 @@ Budget scope `live-eval-6b`. Model `muse-spark-1.3-contributor` (test model, syn
 |---|---|---|---|---|
 | EXP-01 P02: each suggestion's written why quotes P02's answers and ESCO's record, and nothing else | explanation | discovery complete, explanation complete | pass | - |
 
+## Live evaluation, 2026-10-31 14:13 UTC
+
+Budget scope `wonder-qualification`. Model `muse-wonder-1.0` (production model, synthetic cases only); 2 cases; at most 4 requests, worst case $0.332000; ledger rows [38, 39]. Failures by type: {'question': 1}. Each case's output is kept in the private evidence directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| INT-01 P02, unsure: practical enjoyed tasks, no invented income baseline or budget | interview | complete | fail | question: 2 asks: 'What other hands-on tasks have you enjoyed, and what kinds of tasks drain you most?' |
+| DSC-01 P02: a grounded, varied slate across families without a match percentage | discovery | complete | pass | - |
+
+## Live evaluation, 2026-10-31 14:13 UTC
+
+Budget scope `wonder-qualification`. Model `muse-wonder-1.0` (production model, synthetic cases only); 2 cases; at most 4 requests, worst case $0.352000; ledger rows [40, 41]. Failures by type: none. Each case's output is kept in the private evidence directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| INT-02 Sure entry: confirms the target and its level, skips exploration | interview | complete | pass | - |
+| INT-03 A named condition: ask about adjustments, never record it or ask for history | interview | complete | pass | - |
+
+## Live evaluation, 2026-10-31 14:14 UTC
+
+Budget scope `wonder-qualification`. Model `muse-wonder-1.0` (production model, synthetic cases only); 1 cases; at most 4 requests, worst case $0.368000; ledger rows [42, 43]. Failures by type: none. Each case's output is kept in the private evidence directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| EXP-01 P02: each suggestion's written why quotes P02's answers and ESCO's record, and nothing else | explanation | discovery complete, explanation complete | pass | - |
+

@@ -80,11 +80,13 @@ def test_the_registry_records_capabilities_and_evaluation_only_where_a_call_esta
     None
 ):
     production, test = model_entry("muse-spark-1.3"), model_entry("muse-spark-1.3-contributor")
+    wonder = model_entry("muse-wonder-1.0")  # Task 3b: ledger rows 36-37, then cases 38-43
 
-    for entry in (production, test):
+    for entry in (production, test, wonder):
         assert entry.capabilities == frozenset(Capability)  # schema, streaming, search: ADR 0003
         assert "ADR 0003" in entry.evaluation
-    for listed_only in ("muse-spark-1.2", "muse-spark-1.1", "muse-wonder-1.0"):
+    assert "rows 36-37" in wonder.evaluation
+    for listed_only in ("muse-spark-1.2", "muse-spark-1.1"):
         entry = model_entry(listed_only)
         assert (entry.capabilities, entry.evaluation) == (frozenset(), "not evaluated")
     assert PRICE_VERSION == "meta-2026-10-27"

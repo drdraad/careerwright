@@ -83,7 +83,15 @@ _REGISTRY = {
             "test model, synthetic data only: qualified, ADR 0003 (ledger calls 3-5, 8, 10)",
         ),
         ModelEntry("muse-spark-1.2-contributor", ModelMode.CONTRIBUTOR, _CONTRIBUTOR_SPARK),
-        ModelEntry(WONDER_MODEL_ID, ModelMode.STANDARD, TokenPrice(4_000, 200, 20_000)),
+        ModelEntry(
+            WONDER_MODEL_ID,
+            ModelMode.STANDARD,
+            TokenPrice(4_000, 200, 20_000),
+            frozenset(Capability),  # schema output, streaming, web search: rows 36-37
+            "the product owner's live sessions only: qualified, ADR 0003 amendment (ledger rows "
+            "36-37); evaluation cases 4 of 5 passed (rows 38-43; INT-01 asked two things in "
+            "one question); max_tool_calls 1 not shown to hold (3 queries, 1 billed search)",
+        ),
         ModelEntry(
             FIXTURE_MODEL_ID,
             ModelMode.FIXTURE,

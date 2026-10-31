@@ -173,3 +173,29 @@ and about $1.50–2.00 for a two-hour session.
 
 Consequences: Task 3b (S1.6); `CLAUDE.md`'s secrets bullet; the specification's revision
 record (section 22, 2026-10-31); register rows MODEL-08 and MODEL-11.
+
+### Qualification result (Task 3b, 2026-10-31)
+
+The controller ran the calls on synthetic input, scope `wonder-qualification`: eight ledger
+rows, $0.115534 in all (`docs/evidence/live-usage.md`, rows 36-43).
+- Row 36, schema output with usage (the connection check's task code, in process): ok,
+  62 in, 68 out, $0.001608.
+- Row 37, streaming, web search and schema output in one call (the source search's task
+  code, streamed, asked for one tool call): ok, 3,309 in, 833 out, 12 streamed deltas,
+  12 sources seen, 1 billed search, $0.032396. Its response carried three search queries.
+  The billed 1 is most likely Meta's own `tool_usage` count; if Meta bills each search
+  action, two more cost $0.005. So Wonder keeping to `max_tool_calls` 1 is not shown. The
+  product's search asks for at most two, and the activity's input-token bound still holds
+  each search to its reservation's tokens. All six candidates were excluded for their URL
+  scheme (`scheme_not_allowed`), so the search proposed nothing (`all_excluded`): one
+  synthetic search, recorded as found, for Task 8 to watch on Wonder.
+- Rows 38-43, five evaluation cases through the stack on Wonder: four passed (DSC-01,
+  INT-02, INT-03, EXP-01). INT-01 failed the one-question check: Wonder asked "What other
+  hands-on tasks have you enjoyed, and what kinds of tasks drain you most?", two asks
+  joined in one question. The check counted correctly, so this is a model result for this
+  prompt, not a tool fault. Spark's first run also had one-question failures (rows 15-20,
+  as the check then counted).
+
+The registry records schema output, streaming and web search for `muse-wonder-1.0`, with
+this evaluation. The interview prompt is unchanged: the product owner judges the questions
+in session W2.

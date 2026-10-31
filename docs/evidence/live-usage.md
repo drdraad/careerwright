@@ -1,6 +1,6 @@
 # Live Meta usage log
 
-Every HTTP call to the Meta Model API made by Nessa tooling, including failures and
+Every HTTP call to the Meta Model API made by Careerwright tooling, including failures and
 free calls (ruling R5), and every Adzuna API request of `make live-adzuna` (scope
 `live-adzuna`, free tier, model column `adzuna-jobs-api`). Generated from
 `live-usage.jsonl` by `backend/tools/usage_ledger.py`; do not edit the table by
@@ -17,7 +17,12 @@ hand.
   `find_in_page`) are billed. An upper bound adds $0.0025 per uncounted
   `web_search_call` item (calls 5 and 7: one each; see the JSONL `notes`). Rows 3-5
   predate raw-usage and action-type capture in the tool; their request path was
-  otherwise the same.
+  otherwise the same. Row 37 (Muse Wonder, streamed, asked for one tool call):
+  its notes' `searches` is 3, the queries its response's search actions carried,
+  against 1 billed search here. Three `search` actions would count 3 unless Meta
+  reported its own `tool_usage`, so the 1 is most likely Meta's count; if Meta
+  bills each action, the upper bound adds $0.005 (two at $0.0025), and Wonder
+  keeping to `max_tool_calls` 1 is not shown.
 - Remaining credit: not exposed by any documented Meta API endpoint; check the
   developer dashboard.
 - Budgets: `task-1-sprint-0` (Sprint 0 spike): at most 15 calls, 5 on the production
@@ -26,15 +31,20 @@ hand.
   most one validation repair), none on the production model unless
   `PRODUCTION=1`, and a worst-case cost cap; cumulatively at most 9 calls, 3 on the
   production model and $0.30 worst case (unknown costs count their full
-  reservation; `NESSA_LIVE_SMOKE_*` changes them). Both are enforced in
+  reservation; `CAREERWRIGHT_LIVE_SMOKE_*` changes them). Both are enforced in
   `backend/tools/live_smoke.py` before the stack starts. `live-eval` (`make
   live-eval`): at most 6 evaluation cases per invocation, each one attempt of at
   most 2 requests on the test model, never the production model; cumulatively at
-  most 24 requests and $0.05 worst case (`NESSA_LIVE_EVAL_*`), enforced in
+  most 24 requests and $0.05 worst case (`CAREERWRIGHT_LIVE_EVAL_*`), enforced in
   `backend/tools/live_eval.py`. `live-adzuna` (`make live-adzuna`, Task 7A):
   Adzuna's free tier, not Meta: at most 2 requests per invocation and 10
   cumulatively, each at $0, enforced in `backend/tools/live_adzuna.py`; the
-  endpoint is recorded without the credentials.
+  endpoint is recorded without the credentials. `wonder-qualification` (`make
+  live-smoke WONDER=1` and `make live-eval WONDER=1`, Task 3b): Muse Wonder on
+  synthetic input only, every request a production request: two in-process
+  calls (at most $0.20 an invocation), then at most six evaluation cases (at most
+  $0.40 an invocation); at most 14 requests and $0.50 worst case in all, enforced
+  in `backend/tools/live_smoke.py` and `backend/tools/live_eval.py`.
 - A row for an activity attempt that sent more than one request (the call and its
   validation repair) shows `x N` after the endpoint; its tokens and cost are the
   attempt's total, and the caps count every request.
@@ -76,3 +86,11 @@ hand.
 | 33 | 2026-10-29 06:46:37 | live-adzuna | Adzuna search page 2 through the acquisition adapter (free tier) | `adzuna-jobs-api` | GET https://api.adzuna.com/v1/api/jobs/gb/search/2?what=data+analyst&where=Manchester&results_per_page=20 | ok | - (-) | - (-) | - | $0.000000 | $0.041354 | - |
 | 34 | 2026-10-29 10:40:44 | live-adzuna | corpus J03: Adzuna search page 1 through the acquisition adapter (free tier) | `adzuna-jobs-api` | GET https://api.adzuna.com/v1/api/jobs/gb/search/1?what=bookkeeping+assistant&where=Leeds&results_per_page=50 | ok | - (-) | - (-) | - | $0.000000 | $0.041354 | - |
 | 35 | 2026-10-29 10:41:07 | live-adzuna | corpus J03: Adzuna search page 1 through the acquisition adapter (free tier) | `adzuna-jobs-api` | GET https://api.adzuna.com/v1/api/jobs/gb/search/1?what=IT+support+technician&where=Bristol&results_per_page=50 | ok | - (-) | - (-) | - | $0.000000 | $0.041354 | - |
+| 36 | 2026-10-31 14:10:45 | wonder-qualification | Muse Wonder qualification: schema output with usage, in process (the connection check's own task code and fixed synthetic prompt) | `muse-wonder-1.0` (production) | POST /v1/responses | ok | 62 (0) | 68 (29) | 0 | $0.001608 | $0.042962 | resp_6ae5f6dad9967127c74f4e97 |
+| 37 | 2026-10-31 14:10:45 | wonder-qualification | Muse Wonder qualification: streaming, web search and schema output in one call, in process (the source search's own task code and check, streamed, max_tool_calls 1; synthetic target and city) | `muse-wonder-1.0` (production) | POST /v1/responses | ok | 3,309 (0) | 833 (474) | 1 | $0.032396 | $0.075358 | resp_6ae5f6dcee9329017ad94897 |
+| 38 | 2026-10-31 14:13:06 | wonder-qualification | live evaluation: one interview case via API and DBOS worker (synthetic case; key opened just in time) | `muse-wonder-1.0` (production) | POST /v1/responses | ok | 1,033 (0) | 535 (295) | 0 | $0.014832 | $0.090190 | resp_6ae5f76142b788743f3b4473 |
+| 39 | 2026-10-31 14:13:06 | wonder-qualification | live evaluation: one discovery case via API and DBOS worker (synthetic case; key opened just in time) | `muse-wonder-1.0` (production) | POST /v1/responses | ok | 557 (0) | 502 (287) | 0 | $0.012268 | $0.102458 | resp_6ae5f76a7741851c8af147c2 |
+| 40 | 2026-10-31 14:13:59 | wonder-qualification | live evaluation: one interview case via API and DBOS worker (synthetic case; key opened just in time) | `muse-wonder-1.0` (production) | POST /v1/responses | ok | 1,012 (628) | 418 (224) | 0 | $0.010022 | $0.112480 | resp_6ae5f79bb135ffd534384d77 |
+| 41 | 2026-10-31 14:13:59 | wonder-qualification | live evaluation: one interview case via API and DBOS worker (synthetic case; key opened just in time) | `muse-wonder-1.0` (production) | POST /v1/responses | ok | 1,015 (0) | 435 (252) | 0 | $0.012760 | $0.125240 | resp_6ae5f7a071fae172457b4fe0 |
+| 42 | 2026-10-31 14:14:59 | wonder-qualification | live evaluation: one discovery and its slate's written explanation via API and DBOS worker (synthetic case; key opened just in time) | `muse-wonder-1.0` (production) | POST /v1/responses | ok | 557 (500) | 545 (317) | 0 | $0.011228 | $0.136468 | resp_6ae5f7d8664445ade91a46eb |
+| 43 | 2026-10-31 14:14:59 | wonder-qualification | live evaluation: one discovery and its slate's written explanation via API and DBOS worker (synthetic case; key opened just in time) | `muse-wonder-1.0` (production) | POST /v1/responses | ok | 760 (0) | 869 (296) | 0 | $0.020420 | $0.156888 | resp_6ae5f7deaa0d3c3e09ab41dd |
