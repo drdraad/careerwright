@@ -373,3 +373,17 @@ its rules on protected gates, unknown and readiness (decisions 4, 5 and 7) are u
   override with who made it and when; `planning.inputs.decided_outcomes` applies them through
   this model's own `accept` and `user_override`, and a decision this model refuses is refused
   at the write (ADR 0013, Task 12a's settlement).
+- **Amendment line, Task 6d slice A (2026-10-31): Skills reads the stored target record** (ADR
+  0015, amendment line). A matrix's ESCO seed and pack target are what the target's record
+  names, never the title resolved again: the seed by any link (the person's choice, the one
+  occupation holding the title as a label, or the pack target's crosswalk), the pack target by
+  title or by its crosswalk, and several such pack targets stay `ambiguous_crosswalk`.
+  `find_pack_target` and `pick_occupation` are gone. One set of rules now serves every
+  chapter, so decision 10's seed order changes in two places, both the slate's rules (ADR
+  0007 decision 13): a title is matched as a concept (case, punctuation, plurals, "&" and
+  accents folded) with hidden labels included, and step 3 is dropped: where several
+  occupations hold the title as a label, none is picked, even the one whose preferred label it
+  is. A typed "bookkeeper" is now ambiguous in Skills, as in You, until the person chooses which
+  they mean (the sketch asks); a chosen one still reaches P05's pack target through the
+  crosswalk (`test_capability.py`). The evidence, statements and edits keep their
+  `title_key` (data keying, unchanged).

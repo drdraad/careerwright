@@ -152,3 +152,37 @@ kept.
     group ("Registered nurse"): every group is shown, none picked.
   - A page from a source class the session 1 rights policy doesn't cover stays with a person
     (ruling R10).
+
+## Amendment line, Task 6d slice A (2026-10-31): each target is stored once
+
+Decision 3's last sentence is built (`careerwright.profile.targets`, migration 0034).
+- **The record.** `target_records` holds one row per target title of a workspace, keyed by the
+  title as a concept: its kind (an ESCO title chosen as such, or the person's own words), the
+  ESCO occupation it names or none, the source of that link (`occupation_choice`,
+  `exact_label`, `pack_crosswalk` or `none`), every occupation holding the title as a label,
+  and its coverage (one of the option pack's targets, by title or by the crosswalk of its
+  occupation, or not; several crosswalked pack targets are never guessed between). Its CHECKs
+  already allow slice B's kinds: an ONS title (`kind = 'ons'`, with its SOC 2020 and ISCO-08
+  codes) and "None of these is my job" (`none_of_these`), so slice B needs no second migration.
+- **One resolver, one set of rules.** `resolve_target` decides the record when a target is
+  chosen or saved (the one profile write path stores a record for each new target title, and
+  the person's choice of an occupation replaces its title's record). A title is compared as a
+  concept, hidden labels included; several labels stay several, none picked. It replaces the
+  four resolvers the audit found (the code appendix, F5). The slate, the sketch and the
+  strength join work only to an occupation ESCO itself names (the person's choice or the one
+  label: ADR 0007 decision 13, unchanged); Skills also reads the pack's crosswalk (ADR 0012).
+  The web reads the records (`GET .../targets`): the world's destinations and "already a
+  target" are keyed by them, never by comparing titles.
+- **The concept key** reads "&" as "and" and folds accents (every Latin-1 Supplement and
+  Latin Extended-A letter that decomposes to one ASCII letter), in migration 0034, which
+  rebuilds the label index. So "food and beverage supervisor" is ESCO's "food & beverage
+  supervisor", and "facade cleaner" its "façade cleaner"; a provisional concept with such a
+  title is refused as that occupation, as any ESCO label is.
+- **Existing profiles migrate forward:** 0034 gives each current target its record by the same
+  rules, against the pinned pack 0.1.0 and its crosswalks (a test checks the backfill against
+  `resolve_target`). A later pack that drops a target needs a forward migration of the
+  records it names; the capability model refuses a record naming a pack target the committed
+  pack lacks (`INTERNAL_ERROR`), never silently.
+- **Coverage shown where a target is chosen:** one plain line from the record's coverage
+  ("Careerwright can check skills, options and routes for this role" for a pack target),
+  worded in the web; session W2 judges the words.

@@ -969,3 +969,26 @@ space; this ADR changes as follows.
   `DiscoveryOut.current`; the slate's one written note follows the same rule, since it quotes
   only the pinned answers. The suggestion's choice gives way, in place, to "Saved as one of
   your targets" and what the work usually asks for.
+- **Amendment line, Task 6d slice A (2026-10-31): facts, not sentences (ruling R11; the audit's
+  code appendix, F3 and F7).** The API composes no sentence the person reads in discovery:
+  the slate's notes, its fewer reasons, each suggestion's "Why this could suit you" lines and
+  its other lines, the title ideas, the floor and AI filter counts, the sketch's label, research
+  status and steps, and the origin's fewer reasons are facts (`careerwright.profile.slate_facts`:
+  what the search or match did, a reason code, and the values the words need). The web words
+  them in `src/lib/vocabulary.ts`, one exhaustive map per union, so a new reason fails its
+  type check; one test per fixed sentence checks its words. What each reports is unchanged
+  (decisions 5, 6, 13 and 14 as built, R11), and the slate is the same for every evaluation
+  case (`test_every_evaluation_case_s_slate_is_the_one_before_targets_were_stored_once`,
+  against the slates recorded before the change). Two sentences changed under the sentence
+  rule, to need no article or plural rule for ESCO's titles (the regexes are gone): "Talk to
+  someone who does this work about a typical week (an informational interview)" (before:
+  "someone who works as a bicycle mechanic", "people who work as warehouse operators for
+  clothing"), and the empty join's "… shares 3 or more essential skills with “cook”" (before:
+  "with a cook"). The connection's sentence and "still uncertain" line leave the API: the web
+  never showed them, and words the connection itself (decision 14's fact is unchanged).
+  `unsupported_hypotheses` becomes `title_ideas`, each with what matching it did (matched,
+  matched several, not matched, not searched). A target is read from its stored record (ADR
+  0015, amendment line): decision 13's rule for the person's titles is unchanged, now one
+  resolver; choosing an occupation for a target whose title is that occupation's own label
+  ("bookkeeper" meant as the bookkeeper) is recorded as the choice (before: nothing changed,
+  so the sketch kept asking).
