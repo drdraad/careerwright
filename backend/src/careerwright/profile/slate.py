@@ -13,7 +13,9 @@ figure enters (DIV1-07), and no percentage is ever produced (REC1-05).
 **Titles are joined by skills, never by their words** (plan section 4, Sprint W; ADR 0007
 decision 13). The person's role or a title they named is resolved to its ESCO occupation, and
 other occupations join it only by the essential skills the two share (`skill_join_hits`):
-at least `MIN_SHARED_SKILLS`, ranked by their share of both roles' essential skills.
+at least `MIN_SHARED_SKILLS`, ranked by their share of both roles' essential skills. Every
+other search reaches an occupation only through one of its essential skills, which its hit
+names (`Hit.skill`).
 
 **Direction** is relative to the person (DIV1-12): close to what they do now (its ISCO
 family is one of their current role's or targets', or their role or a target found it),
@@ -137,6 +139,8 @@ class Hit:
     label_match: bool
     # A skill join's hit: how many essential skills it shares with the title joined.
     shared_skills: int | None = None
+    # A search's hit: the essential skill (its ESCO label) whose words the search matched.
+    skill: str | None = None
 
 
 def skill_join_hits(
@@ -185,6 +189,7 @@ class Match:
     score: float
     label_match: bool
     shared_skills: int | None = None
+    skill: str | None = None
 
 
 @dataclass(frozen=True)
@@ -334,7 +339,7 @@ def build_pool(
         for hit in query.hits:
             if hit.concept_id in occupations:
                 found.setdefault(hit.concept_id, []).append(
-                    Match(query, hit.score * weight, hit.label_match, hit.shared_skills)
+                    Match(query, hit.score * weight, hit.label_match, hit.shared_skills, hit.skill)
                 )
     candidates = [
         _candidate(occupations[concept_id], matches, familiar_families)

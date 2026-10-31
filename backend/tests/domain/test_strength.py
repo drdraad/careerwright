@@ -9,6 +9,7 @@ import pytest
 
 from careerwright.capability.strength import (
     MAX_PROMPT_BYTES,
+    SCRIPTED_STRENGTHS,
     DestinationKind,
     DestinationSkills,
     ModelStrength,
@@ -17,6 +18,7 @@ from careerwright.capability.strength import (
     check_strength,
     fixture_strength,
     prompt_context,
+    quotable_answers,
     render_prompt,
 )
 from careerwright.catalogue.records import SkillRef
@@ -172,18 +174,54 @@ def test_the_input_steps_down_skills_to_fit_and_refuses_answers_too_long() -> No
     assert refused.value.details["reason"] == "answers_too_long"
 
 
-def test_the_demo_fixture_proposes_a_shared_word_or_nothing_and_passes_the_check() -> None:
-    built = context()
+BICYCLE_MECHANIC = DestinationSkills(
+    uuid.uuid5(uuid.NAMESPACE_URL, "bicycle mechanic"),
+    "bicycle mechanic",
+    DestinationKind.HORIZON,
+    [skill("tune bicycles"), skill("perform repairs on bicycles")],
+)
+
+
+def scripted(answer: str, destinations: list[DestinationSkills]):  # type: ignore[no-untyped-def]
+    return build_input(
+        turn_id=TURN,
+        profile_version=3,
+        release="esco-v1.2.1-en-csv",
+        answers=[EvidenceItem(field=ProfileField.ENJOYED_TASKS, text=answer)],
+        destinations=destinations,
+    )
+
+
+@pytest.mark.req("BND1-11")
+def test_the_demo_proposes_only_its_scripted_strengths_and_passes_the_same_check() -> None:
+    # Task W2B fix round 1 (review I4): a fixed table of the demo journey's answers, never a
+    # shared word. "Fixing bikes" shares no word with "perform repairs on bicycles".
+    built = scripted("Fixing bikes", [STATISTICIAN, BICYCLE_MECHANIC])
 
     found = fixture_strength(prompt_context(built))
 
-    # "tidying messy data" shares "data" with the data scientist's "... presentation of data".
     checked, problems = check_strength(found, built, ProposalOrigin.FIXTURE)
     assert problems == []
     assert checked is not None
     shown = checked.strength
     assert shown is not None
-    assert shown.quotation.text == "tidying messy data"
-    assert shown.skill.label == "deliver visual presentation of data"
-    none = context([STATISTICIAN])
-    assert fixture_strength(prompt_context(none)) == StrengthOutput(strengths=[])
+    assert (shown.destination.title, shown.skill.label) == (
+        "bicycle mechanic",
+        "perform repairs on bicycles",
+    )
+    assert shown.quotation.text == "Fixing bikes"
+    # No destination lists the script's skill: none. An answer outside the script: none,
+    # even one sharing a word with a skill ("tidying messy data", "... presentation of data").
+    for nothing in (
+        scripted("fixing bikes", [STATISTICIAN, DATA_SCIENTIST]),
+        scripted("repairing bicycles", [BICYCLE_MECHANIC]),
+        context(),
+    ):
+        assert fixture_strength(prompt_context(nothing)) == StrengthOutput(strengths=[])
+
+
+def test_every_scripted_strength_is_a_quotable_answer_and_an_esco_skill() -> None:
+    for script in SCRIPTED_STRENGTHS:
+        answer = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text=script.answer)
+        assert quotable_answers([answer]) == [answer]
+        assert script.skill_uri.startswith("http://data.europa.eu/esco/skill/")

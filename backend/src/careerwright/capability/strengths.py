@@ -1,10 +1,12 @@
 """Overlooked-strength use cases (plan section 4; ADR 0014 decision 3; Sprint W SW.5): ask for
 a turn's one proposal, read it, and confirm or decline it.
 
-A proposal is asked for once per conversation turn whose decision added answers, never for a
-turn whose message the support screen (`careerwright.profile.safety`) answered: that turn only
-acknowledges and offers a smaller step. It runs as its own bounded run (`strength_proposal`,
-one `RunTask` on the one activity, so the DBOS step sequence is unchanged): live only with
+A proposal is asked for once per conversation turn whose decision added answers, and reads
+only the answers that decision added (so declining one stores nothing, yet the same words are
+not offered again on a later turn); never for a turn whose message the support screen
+(`careerwright.profile.safety`) answered: that turn only acknowledges and offers a smaller
+step. It runs as its own bounded run (`strength_proposal`, one `RunTask` on the one
+activity, so the DBOS step sequence is unchanged): live only with
 the person's key and within their spend limit, which the activity checks again before any
 call; a demo workspace uses the deterministic, labelled fixture model and never a provider.
 
@@ -52,8 +54,8 @@ from careerwright.profile import store as profile_store
 from careerwright.profile import titles
 from careerwright.profile.commands import current_profile
 from careerwright.profile.conversation import visible_turn
-from careerwright.profile.discovery import evidence_of
-from careerwright.profile.document import FieldState, empty_profile
+from careerwright.profile.discovery import EvidenceItem, evidence_of
+from careerwright.profile.document import empty_profile
 from careerwright.profile.exploration import HardFilterInput, first_slate
 from careerwright.profile.safety import has_risk_stem
 from careerwright.profile.store import stale_version
@@ -99,7 +101,13 @@ def _view(tx: Tx, keyring: Keyring, request: StrengthRequest) -> StrengthView:
     proposal = None
     if run.kind is RunKind.STRENGTH_PROPOSAL and run.status is WorkState.COMPLETE:
         plaintext = open_output(tx, keyring, run)
-        proposal = None if plaintext is None else OverlookedStrength.model_validate_json(plaintext)
+        if plaintext is None:  # a complete run stored its output; "none found" is an output
+            raise CareerwrightError(
+                ErrorCode.INTERNAL_ERROR,
+                "The strength's run is complete but its output is missing.",
+                stage=ErrorStage.CAPABILITY,
+            )
+        proposal = OverlookedStrength.model_validate_json(plaintext)
     return StrengthView(request, run, proposal, store.strength_decision(tx, request.strength_id))
 
 
@@ -117,19 +125,23 @@ def turn_strength(
     return _view(tx, keyring, request)
 
 
-def _added_answers(tx: Tx, workspace_id: uuid.UUID, version: int) -> bool:
-    """Whether the profile version a turn's decision created changed an answer a strength
-    may quote (what the person enjoys, can do or has done)."""
+def _added_answers(tx: Tx, workspace_id: uuid.UUID, version: int) -> list[EvidenceItem]:
+    """The answers about work (what the person enjoys, can do or has done) that the profile
+    version a turn's decision created added: in that version and not in the one before. An
+    answer removed or kept is not added."""
     after = profile_store.profile_version(tx, workspace_id, version)
     before = profile_store.profile_version(tx, workspace_id, version - 1)
     if after is None:
-        return False
-    earlier = before.document if before is not None else empty_profile()
-    return any(
-        getattr(after.document, field.value).value != getattr(earlier, field.value).value
-        and getattr(after.document, field.value).state is FieldState.PROVIDED
-        for field in strength.ANSWER_FIELDS
-    )
+        return []
+    earlier = {
+        (item.field, item.text)
+        for item in evidence_of(before.document if before is not None else empty_profile())
+    }
+    return [
+        item
+        for item in evidence_of(after.document)
+        if item.field in strength.ANSWER_FIELDS and (item.field, item.text) not in earlier
+    ]
 
 
 def _destinations(
@@ -172,18 +184,21 @@ def submit_strength(
     hard: HardFilterInput,
 ) -> tuple[StrengthView, bool]:
     """The turn's one strength run, and whether this request started it: asking again
-    answers with the run already asked for, in whatever state. Refused before any run
-    exists when the turn's decision added no answers, when the support screen answered its
-    message, when the answers it added are no longer the current ones, when no answer can be
-    quoted, when the person has no destination with an unclaimed essential skill, and for
-    the usual reasons any run is refused (no key, over budget)."""
+    answers with the run already asked for, in whatever state. The run reads only the
+    answers the turn's decision added, so a strength declined on an earlier turn is not
+    proposed again from the same words. Refused before any run exists when the turn's
+    decision added no answers, when the support screen answered its message, when the
+    answers it added are no longer the current ones, when none of them can be quoted, when
+    the person has no destination with an unclaimed essential skill, and for the usual
+    reasons any run is refused (no key, over budget)."""
     visible_workspace(tx, workspace_id, lock=True)
     existing = store.strength_for_turn(tx, workspace_id, turn_id)
     if existing is not None:
         return _view(tx, keyring, existing), False
     turn = visible_turn(tx, keyring, workspace_id, turn_id)
     created = turn.decision.profile_version if turn.decision else None
-    if created is None or not _added_answers(tx, workspace_id, created):
+    added = [] if created is None else _added_answers(tx, workspace_id, created)
+    if created is None or not added:
         raise _refusal(
             ErrorCode.INSUFFICIENT_EVIDENCE,
             "Only a turn that saved something you enjoy, can do or have done can show a strength.",
@@ -205,12 +220,12 @@ def submit_strength(
             stage=ErrorStage.CAPABILITY,
             details={"current_version": profile.version, "turn_version": created},
         )
-    answers = strength.quotable_answers(evidence_of(profile.document))
+    answers = strength.quotable_answers(added)
     if not answers:
         raise _refusal(
             ErrorCode.INSUFFICIENT_EVIDENCE,
-            "Tell Careerwright what you enjoy, can do or have done first: a strength quotes "
-            "your own words about your work.",
+            "What this turn saved has no words a strength could quote: a strength quotes your "
+            "own words about your work.",
             "no_quotable_answer",
         )
     claimed = {e.subject for e in store.evidence(tx, workspace_id) if e.answer in usual.SAID_DONE}

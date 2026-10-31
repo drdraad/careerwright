@@ -1471,6 +1471,18 @@ export const ChooseRoleSchema = {
             format: 'uuid',
             title: 'Concept Id',
             description: 'An occupation from `GET /v1/taxonomy/titles`.'
+        },
+        label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label',
+            description: 'The title the person picked (the type-ahead\'s `matched_label`): ESCO\'s title for the occupation or one of its other titles. It stays their words; the role is resolved by the occupation\'s ESCO URI. Omitted: ESCO\'s title.'
         }
     },
     additionalProperties: false,
@@ -12053,6 +12065,11 @@ export const TitleMatchesOutSchema = {
         limit: {
             type: 'integer',
             title: 'Limit'
+        },
+        partial: {
+            type: 'boolean',
+            title: 'Partial',
+            description: 'True: ESCO lists no title with every word typed, and these hold the most of them, rarer words first. Ask "ESCO doesn\'t list that title. Is it one of these?": the person chooses one or none, and nothing is joined to the typed words.'
         }
     },
     additionalProperties: false,
@@ -12062,10 +12079,11 @@ export const TitleMatchesOutSchema = {
         'query',
         'matches',
         'total',
-        'limit'
+        'limit',
+        'partial'
     ],
     title: 'TitleMatchesOut',
-    description: 'The first question\'s type-ahead: occupations whose ESCO titles (preferred and\nalternative labels) have a word beginning with each word typed, best first, one per\noccupation. Deterministic, no model call. No match is an honest empty list: nothing is\ninvented. `total` counts every occupation that matched.'
+    description: 'The first question\'s type-ahead: occupations whose ESCO titles (preferred and\nalternative labels) have a word beginning with each word typed, best first, one per\noccupation. When no title holds every word, the occupations whose titles hold the most\nof them, with `partial` true. Deterministic, no model call. No match is an honest empty\nlist: nothing is invented. `total` counts every occupation that matched.'
 } as const;
 
 export const TrendOutSchema = {

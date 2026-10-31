@@ -62,8 +62,12 @@ process." Their reference image is "Careerwright's luminous path forward".
    once a turn's decision saved something they enjoy, can do or have done: at most one per
    turn, never on a turn the support screen answered (refused before any run, nothing
    stored), only while those answers are current, with the person's key and within their
-   spend limit (the activity checks again). The model reads those answers (never a title,
-   a name, a place or money) and each destination's essential skills (ESCO), and returns at
+   spend limit (the activity checks again). The model reads only the answers that turn's
+   decision added (fix round 1: never every answer, so a strength declined on one turn is
+   not offered again from the same words on a later one, and nothing about the decline is
+   stored; a turn that added none it could quote is refused `no_quotable_answer`; never a
+   title, a name, a place or money) and each destination's essential skills (ESCO), and
+   returns at
    most one destination, skill and quotation, and no prose; finding none is an answer. Its
    destinations are the person's targets that name one ESCO occupation and the first
    slate's (ADR 0007 decision 14), each with the essential skills not yet claimed. Code
@@ -73,8 +77,13 @@ process." Their reference image is "Careerwright's luminous path forward".
    Idempotency-Key), it is recorded as the person's own claim (ADR 0012's `used` answer, no
    level, the quotation as its example): self-reported, never evidence, so it counts for
    nothing towards readiness. Declined, nothing about the skill is recorded. A demo
-   workspace uses `careerwright-fixture-strength-1` (the first answer sharing a content word
-   with a destination's essential skill, quoted whole; labelled "Demo example (synthetic)").
+   workspace uses `careerwright-fixture-strength-1`, a script (fix round 1): a fixed table
+   of the demo journey's known answers, each with the ESCO skill it shows
+   (`SCRIPTED_STRENGTHS`: "reconciling accounting entries", accounting entries; "fixing
+   bikes", perform repairs on bicycles; "finding inconsistencies", perform data cleansing;
+   "working outdoors", work in outdoor conditions), proposed only when a destination lists
+   that skill as essential, quoted whole, through the same check, labelled "Demo example
+   (synthetic)"; anything else finds none. No word is matched.
    Every rule above is provisional (R6) until the product owner confirms it at session W2.
 4. **The world never shows more than the evidence.** Everything that varies has a computed
    meaning; position is layout only; unknown is shadow, never zero; a condition is a gate in

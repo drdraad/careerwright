@@ -32,12 +32,14 @@ def occupation(api: ApiClient, token: str, title: str) -> str:
     return str(match["concept_id"])
 
 
-def choose_role(api: ApiClient, token: str, workspace: str, concept: str, version: int) -> Any:
+def choose_role(
+    api: ApiClient, token: str, workspace: str, concept: str, version: int, **label: str
+) -> Any:
     return api.write(
         "POST",
         f"/v1/workspaces/{workspace}/origin/role",
         token,
-        {"expected_version": version, "concept_id": concept},
+        {"expected_version": version, "concept_id": concept, **label},
     )
 
 
@@ -206,6 +208,53 @@ def test_a_role_esco_does_not_hold_joins_nothing_and_a_shared_title_asks_which(
     ]
     assert (shared["usual_skills"], shared["destinations"]) == ([], [])  # nothing guessed
 
+    # The person chooses which they meant for the words they already typed: the words stay,
+    # and the role now cites the chosen occupation (review M4: the `recite` path).
+    driver = next(c["concept_id"] for c in shared["role"]["choices"] if c["title"] == "bus driver")
+    chosen = choose_role(api, ada, workspace, driver, 2, label="bus operator")
+    again = choose_role(api, ada, workspace, driver, 3, label="bus operator")
+    resolved = origin(api, ada, workspace)
+
+    assert chosen.status_code == 201, chosen.text
+    assert chosen.json()["version"] == 3  # a new version: the same words, a new source
+    assert (again.status_code, again.json()["version"]) == (200, 3)  # already the role
+    assert (resolved["role"]["text"], resolved["role"]["state"], resolved["role"]["chosen"]) == (
+        "bus operator",
+        "esco",
+        True,
+    )
+    assert resolved["role"]["occupation"]["title"] == "bus driver"
+    assert resolved["usual_skills"]  # one occupation: its essential skills, usual in the role
+
+
+@pytest.mark.req("PROF-07", "PROF-01")
+def test_the_role_keeps_the_title_the_person_picked_and_resolves_by_its_occupation(
+    api: ApiClient, ada: str
+) -> None:
+    # Review M5: picking "IT support technician" (ESCO's other title for the ICT help desk
+    # agent) keeps the person's title; only a title ESCO lists for that occupation is taken.
+    workspace = api.create_workspace(ada, "Picked title (synthetic)")["workspace_id"]
+    [picked] = titles(api, ada, "IT supp").json()["matches"]
+
+    foreign = choose_role(api, ada, workspace, picked["concept_id"], 0, label="bus operator")
+    chosen = choose_role(
+        api, ada, workspace, picked["concept_id"], 0, label=picked["matched_label"]
+    )
+    shown = origin(api, ada, workspace)
+
+    assert (foreign.status_code, foreign.json()["error"]["details"]["reason"]) == (
+        422,
+        "not_its_title",
+    )
+    assert chosen.status_code == 201, chosen.text
+    assert chosen.json()["document"]["current_role"]["value"] == "IT support technician"
+    assert (shown["role"]["text"], shown["role"]["state"], shown["role"]["chosen"]) == (
+        "IT support technician",
+        "esco",
+        True,
+    )
+    assert shown["role"]["occupation"]["title"] == "ICT help desk agent"
+
 
 @pytest.fixture
 def demo_api(api_deps: ApiDependencies) -> Iterator[ApiClient]:
@@ -336,6 +385,61 @@ def test_a_demo_workspace_shows_one_scripted_labelled_strength_and_calls_no_prov
     }
 
 
+def run_strength(
+    api: ApiClient, token: str, workspace: str, scenario: Scenario, turn_id: str, version: int
+) -> dict[str, Any]:
+    """Ask for the turn's strength, run it with a worker and read it."""
+    asked = ask_strength(api, token, workspace, turn_id, version)
+    assert asked.status_code == 202, asked.text
+    worker = scenario.worker(f"strength-{version}")
+    scenario.wait_terminal(asked.json()["run"]["run_id"])
+    assert worker.stop() == 0
+    return strength(api, token, workspace, turn_id)
+
+
+@pytest.mark.req("ASSESS-01", "BND1-11")
+def test_a_strength_reads_only_the_turn_s_new_answers_so_a_declined_one_is_not_offered_again(
+    infra: Infra, api: ApiClient, demo_api: ApiClient, ada: str, tmp_path: Path
+) -> None:
+    # Review I3: the run reads the answers the turn's decision added, never every answer.
+    workspace = demo_api.write(
+        "POST",
+        "/v1/workspaces",
+        ada,
+        {"name": "Demo strength declined", "data_mode": "demo", "synthetic": True},
+    ).json()["workspace_id"]
+    choose_role(demo_api, ada, workspace, occupation(api, ada, "bookkeeper"), 0)
+    scenario = make_scenario(infra, api, ada, tmp_path)
+    first = decided_turn(
+        demo_api, ada, workspace, scenario, "I enjoy reconciling accounting entries", 1
+    )
+    proposed = run_strength(demo_api, ada, workspace, scenario, first, 2)
+    declined = demo_api.write(
+        "POST",
+        f"/v1/workspaces/{workspace}/interview/turns/{first}/strength/decision",
+        ada,
+        {"expected_version": 0, "confirm": False},
+    )
+    later = decided_turn(demo_api, ada, workspace, scenario, "I enjoy planning budgets", 2)
+    after = run_strength(demo_api, ada, workspace, scenario, later, 3)
+    unquotable = decided_turn(demo_api, ada, workspace, scenario, "I enjoy it all", 3)
+    refused = ask_strength(demo_api, ada, workspace, unquotable, 4)
+
+    assert proposed["proposal"]["quotation"] == "reconciling accounting entries"
+    assert declined.status_code == 201, declined.text
+    profile = api.get(f"/v1/workspaces/{workspace}/profile", ada).json()
+    assert profile["document"]["enjoyed_tasks"]["value"] == [
+        "reconciling accounting entries",
+        "planning budgets",
+        "it all",
+    ]  # the earlier answer is still there, but the later turn did not add it
+    assert (after["run"]["status"], after["found"], after["proposal"]) == ("complete", False, None)
+    assert (refused.status_code, refused.json()["error"]["details"]["reason"]) == (
+        422,
+        "no_quotable_answer",
+    )  # "it all" says nothing to quote, and it is all that turn added
+
+
 @pytest.fixture
 def live(infra: Infra, api: ApiClient, ada: str, tmp_path: Path) -> Iterator[Scenario]:
     started = make_scenario(infra, api, ada, tmp_path)
@@ -427,3 +531,77 @@ def test_a_turn_the_support_screen_answered_never_looks_for_a_strength(
         )
         == []
     )  # refused before any run exists, and nothing about the screen is stored
+
+
+def decide(api: ApiClient, token: str, workspace: str, turn_id: str, version: int) -> Any:
+    return api.write(
+        "POST",
+        f"/v1/workspaces/{workspace}/interview/turns/{turn_id}/strength/decision",
+        token,
+        {"expected_version": version, "confirm": True},
+    )
+
+
+@pytest.mark.req("MODEL-02", "ASSESS-01")
+def test_a_strength_invalid_after_its_repair_fails_typed_and_has_nothing_to_decide(
+    live: Scenario,
+) -> None:
+    # Review M4: the strength kind's own failure path, and a decision on a failed run.
+    api, token, workspace = live.api, live.token, live.workspace_id
+    turn_id = decided_turn(api, token, workspace, live, "I enjoy reconciling ledgers", 2)
+    asked = ask_strength(api, token, workspace, turn_id, 3)
+    run_id = asked.json()["run"]["run_id"]
+    worker = live.worker("strength", fake_failure="invalid_always")
+    live.wait_terminal(run_id)
+    assert worker.stop() == 0
+
+    found = strength(api, token, workspace, turn_id)
+    decided = decide(api, token, workspace, turn_id, 0)
+
+    assert (found["run"]["status"], found["run"]["failure_class"]) == (
+        "failed",
+        "invalid_model_output",
+    )
+    assert (found["found"], found["proposal"], found["decision"]) == (None, None, None)
+    [attempt] = live.attempts(run_id)
+    assert attempt["requests_sent"] == 2  # the first request and one repair, never more
+    assert (decided.status_code, decided.json()["error"]["code"]) == (
+        409,
+        "PROPOSAL_NOT_AVAILABLE",
+    )  # a failure is never an empty proposal
+    assert (
+        live.infra.query(
+            "SELECT * FROM careerwright.skill_evidence WHERE workspace_id = %s", (workspace,)
+        )
+        == []
+    )
+    assert live.leaks() == []
+
+
+@pytest.mark.req("MODEL-02", "ASSESS-01")
+def test_a_strength_is_confirmed_against_the_versions_the_person_saw(live: Scenario) -> None:
+    # Review M4: a confirmation against a stale capability version, and a strength asked
+    # for after the turn's answers changed.
+    api, token, workspace = live.api, live.token, live.workspace_id
+    turn_id = decided_turn(api, token, workspace, live, "I enjoy reconciling ledgers", 2)
+    assert run_strength(api, token, workspace, live, turn_id, 3)["found"] is True
+
+    stale = decide(api, token, workspace, turn_id, 1)  # the capability is at version 0
+    confirmed = decide(api, token, workspace, turn_id, 0)
+    later = decided_turn(api, token, workspace, live, "I enjoy planning budgets", 3)
+    assistant = occupation(api, token, "accounting assistant")
+    assert choose_role(api, token, workspace, assistant, 4).status_code == 201
+    too_late = ask_strength(api, token, workspace, later, 5)
+
+    assert stale.json()["error"]["code"] == "STALE_INPUT_VERSION"
+    assert stale.json()["error"]["details"]["current_version"] == 0
+    assert confirmed.status_code == 201, confirmed.text  # nothing was kept from the refusal
+    assert confirmed.json()["capability_version"] == 1
+    assert too_late.json()["error"]["code"] == "STALE_INPUT_VERSION"
+    assert too_late.json()["error"]["details"] == {"current_version": 5, "turn_version": 4}
+    assert (
+        live.infra.query(
+            "SELECT * FROM careerwright.strength_proposals WHERE turn_id = %s", (later,)
+        )
+        == []
+    )  # refused before any run exists

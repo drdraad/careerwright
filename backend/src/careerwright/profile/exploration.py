@@ -3,9 +3,11 @@ read its slate, and choose an occupation as a target.
 
 The chain is traceable end to end: the person's confirmed answers (a pinned profile
 version) become the model's search queries, each citing the answers it rests on; every
-query runs against the held ESCO release (English full-text search, every word then any
-word, bounded; the release the searches were chosen for is recorded, and a slate read
-against another says so), and Careerwright adds the person's current role and own target titles;
+query runs against the held ESCO release (a title of the person's own is joined by shared
+essential skills; any other query searches the essential skills' labels, every word then
+any word, bounded, and names the skill that reached each occupation; the release the
+searches were chosen for is recorded, and a slate read against another says so), and
+Careerwright adds the person's current role and own target titles;
 the hits are pooled, de-duplicated and ranked into a slate by deterministic code
 (`careerwright.profile.slate`). A model's title hypothesis is shown only if ESCO holds it as a
 label; otherwise it is listed as unsupported, never as a suggestion (DIV1-04). Every
@@ -58,7 +60,7 @@ from careerwright.catalogue.records import (
     TaxonomyRelease,
 )
 from careerwright.catalogue.reference import modelled_pay_of, region_codes
-from careerwright.catalogue.taxonomy import held_release, search_occupations
+from careerwright.catalogue.taxonomy import held_release, search_essential_skills
 from careerwright.config import RuntimeMode
 from careerwright.db import Tx
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
@@ -466,28 +468,30 @@ def submit_discovery(
 
 
 def _search_hits(tx: Tx, text: str) -> tuple[Hit, ...] | None:
-    """Exact label matches score 1. Occupations that match every word score their rank over
-    the best such rank; those that match only some words at most `PARTIAL_MATCH_WEIGHT`. A
-    match on the words of an occupation's titles alone is no match (Sprint W: work is never
-    found by a shared word in a title). None: the query has no searchable word, so nothing
-    ran (never an empty result)."""
+    """The occupations a search reaches through their essential skills (ADR 0007 decision
+    13): reached with every word, they score their skill's rank over the best such rank;
+    with only some words, at most `PARTIAL_MATCH_WEIGHT`. Each hit names the essential skill
+    whose words it matched. Never an occupation's titles, hidden labels, ISCO group or
+    description: work is never found by a word in a title. None: the query has no
+    searchable word, so nothing ran (never an empty result)."""
     try:
-        every = search_occupations(tx, text, QUERY_HITS, any_word=False, titles=False)
-        some = search_occupations(tx, text, QUERY_HITS, any_word=True, titles=False)
+        every = search_essential_skills(tx, text, QUERY_HITS, any_word=False)
+        some = search_essential_skills(tx, text, QUERY_HITS, any_word=True)
     except CareerwrightError as error:
         if error.details.get("reason") == "no_search_terms":
             return None
         raise
-    scores: dict[uuid.UUID, float] = {}
+    hits: dict[uuid.UUID, Hit] = {}
     for found, weight in ((every, 1.0), (some, PARTIAL_MATCH_WEIGHT)):
-        top = max((hit.text_rank for hit in found.full_text), default=0.0)
-        for hit in found.full_text:
-            score = weight * hit.text_rank / top if top > 0 else 0.0
-            scores[hit.concept_id] = max(scores.get(hit.concept_id, 0.0), score)
-    labels = {m.concept_id for m in every.label_matches}
-    return tuple(Hit(c, 1.0, label_match=True) for c in sorted(labels)) + tuple(
-        Hit(c, s, label_match=False) for c, s in scores.items() if c not in labels
-    )
+        top = max((reach.text_rank for reach in found.reached), default=0.0)
+        for reach in found.reached:
+            score = weight * reach.text_rank / top if top > 0 else 0.0
+            held = hits.get(reach.concept_id)
+            if held is None or score > held.score:
+                hits[reach.concept_id] = Hit(
+                    reach.concept_id, score, label_match=False, skill=reach.skill_label
+                )
+    return tuple(hits.values())
 
 
 def _label_hits(tx: Tx, title: str) -> tuple[Hit, ...]:
@@ -515,10 +519,6 @@ def _joined(
     return PoolQuery(
         query_id, title.text, channel, based_on, skill_join_hits(essential, neighbours)
     )
-
-
-def _title_key(text: str) -> str:
-    return " ".join(text.casefold().split())
 
 
 def _provided(document: ProfileDocument, field: ProfileField) -> list[str]:
@@ -576,16 +576,21 @@ def explain(candidate: Candidate, facts: OccupationFacts, familiarity_known: boo
                     f"{match.shared_skills} of the same essential skills for both, so Careerwright "
                     "joined them by those skills."
                 )
+            elif match.skill is not None:
+                why.append(
+                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. Careerwright searched for "
+                    f"“{match.query.text}”, and ESCO lists “{match.skill}” as an essential "
+                    "skill for this work."
+                )
             elif match.query.channel is SlateChannel.HYPOTHESIS:
                 why.append(
                     f"{_SOURCE_WORDS[item.field]}: “{item.text}”. Careerwright thought of this "
                     "title "
                     "from it, and ESCO lists it."
                 )
-            else:
+            else:  # the person's own title, resolved to this occupation
                 why.append(
-                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. Careerwright searched for "
-                    f"“{match.query.text}”, and ESCO's record for this occupation matched."
+                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. ESCO lists it as this occupation."
                 )
     might_not: list[str] = []
     if facts.essential_skills:
@@ -691,12 +696,18 @@ def compute_slate(
     release = held_release(tx)
     role = titles.current_role(tx, view.run.workspace_id, document)
     named = titles.targets(tx, view.run.workspace_id, document)
-    own = {_title_key(t.text): t for t in ([role] if role else []) + named}
+    mine = ([role] if role else []) + named
+    # A search is one of the person's titles when it is that title as a concept
+    # (`careerwright.concept_key`): "Data analysts" is their "data analyst".
+    keys = taxonomy_store.concept_keys(
+        tx, [t.text for t in mine] + [q.text for q in proposal.queries]
+    )
+    own = {keys[t.text]: t for t in mine if keys[t.text]}
     queries: list[PoolQuery] = []
     unsearchable: list[str] = []
     role_joins: set[str] = set()
     for query in proposal.queries:
-        title = own.get(_title_key(query.text))
+        title = own.get(keys[query.text])
         if title is not None:  # a title of the person's own: joined by skills, never searched
             if title.occupations:
                 channel = SlateChannel(query.channel.value)
@@ -822,20 +833,18 @@ def _connection(
     role_joins: frozenset[str],
 ) -> ConnectionView | None:
     """The slate's unexpected connection to the person's role, with the skills the two
-    share (ESCO) one step away. None without a role ESCO holds."""
-    if role is None or not role.occupations:
+    share (ESCO) one step away. None unless the role names exactly one ESCO occupation: a
+    role several occupations hold as a title is no one occupation to state a fact about."""
+    if role is None or len(role.occupations) != 1:
         return None
-    families = frozenset(facts[c].family.code for c in role.occupations if c in facts)
+    own = facts[role.occupations[0]]  # the role's own occupation is always pooled
     names = frozenset(c for t in [role, *named] for c in t.occupations)
-    found = unexpected_connection(slate, role_joins, families, names)
+    found = unexpected_connection(slate, role_joins, frozenset({own.family.code}), names)
     if found is None:
         return None
     destination = found.candidate.occupation.concept_id
     shared = taxonomy_store.shared_essential_skills(tx, role.occupations, destination)
-    # One occupation: its ESCO title. Several share the person's title as a label: their words.
-    one = role.occupations[0] if len(role.occupations) == 1 else None
-    role_title = facts[one].preferred_label if one in facts else role.text
-    return ConnectionView(role_title, found.candidate, facts[destination], shared)
+    return ConnectionView(own.preferred_label, found.candidate, facts[destination], shared)
 
 
 def submit_explanation(
@@ -1024,15 +1033,22 @@ class ChooseRole(BaseModel):
 
     expected_version: int = Field(ge=0)
     concept_id: uuid.UUID = Field(description="An occupation from `GET /v1/taxonomy/titles`.")
+    label: str | None = Field(
+        default=None,
+        description="The title the person picked (the type-ahead's `matched_label`): ESCO's "
+        "title for the occupation or one of its other titles. It stays their words; the role "
+        "is resolved by the occupation's ESCO URI. Omitted: ESCO's title.",
+    )
 
 
 def choose_role(
     tx: Tx, actor: Actor, workspace_id: uuid.UUID, command: ChooseRole, now: datetime
 ) -> tuple[ProfileView, bool]:
     """Answer "What do you do now, or what did you do last?" with an ESCO occupation, through
-    the one profile write path: the current role becomes its title, citing an
-    `occupation_choice` source with its ESCO URI. Choosing the occupation the role already
-    names changes nothing. Returns the profile and whether it changed."""
+    the one profile write path: the current role becomes the title the person picked (ESCO's
+    or another it lists for that occupation), citing an `occupation_choice` source with its
+    ESCO URI, which is what the role resolves by. Choosing the occupation and title the role
+    already names changes nothing. Returns the profile and whether it changed."""
     visible_workspace(tx, workspace_id, lock=True)
     held_release(tx)
     occupation = taxonomy_store.occupation(tx, command.concept_id)
@@ -1040,11 +1056,18 @@ def choose_role(
         raise CareerwrightError(
             ErrorCode.NOT_FOUND, "No such ESCO occupation.", stage=ErrorStage.PROFILE
         )
+    label = command.label or occupation.preferred_label
+    if label not in (occupation.preferred_label, *occupation.alternative_labels):
+        raise CareerwrightError(
+            ErrorCode.VALIDATION_FAILED,
+            "Choose one of the titles ESCO lists for this occupation.",
+            stage=ErrorStage.PROFILE,
+            details={"field": "label", "reason": "not_its_title"},
+        )
     profile = current_profile(tx, workspace_id)
     if command.expected_version != profile.version:
         raise stale_version(profile.version)
     role = titles.current_role(tx, workspace_id, profile.document)
-    label = occupation.preferred_label
     if role == ResolvedTitle(label, ProfileField.CURRENT_ROLE, (occupation.concept_id,), True):
         return profile, False  # already the role, chosen from ESCO
     source = NewSource(

@@ -10,7 +10,10 @@ import sqlalchemy as sa
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
-from careerwright.cli import migrate_app, seed
+from careerwright.catalogue import taxonomy_store
+from careerwright.catalogue.taxonomy import search_essential_skills
+from careerwright.cli import import_taxonomy, migrate_app, seed
+from careerwright.db import system_transaction
 from careerwright.identity import store as identity_store
 from careerwright.identity.records import EventKind
 from careerwright.profile import store as profile_store
@@ -18,6 +21,7 @@ from careerwright.profile.document import ProfileInput, apply_profile_input, emp
 from careerwright.profile.records import SourceKind
 from careerwright.seed import INVITED_ACTORS
 from careerwright.vocabulary import DataMode
+from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
 from tests.support.infra import Infra, migrator_engine
 
 pytestmark = pytest.mark.integration
@@ -271,6 +275,41 @@ def test_attempts_that_made_no_call_upgrade_to_a_known_zero_cost(infra: Infra) -
         {"spend_state": "reconciled", "cost_nano_usd": 40_000},
         {"spend_state": "unknown", "cost_nano_usd": None},
     ]
+
+
+@pytest.mark.req("DIV1-01", "BND1-14")
+def test_0032_fills_the_essential_skill_search_for_the_release_already_held(
+    infra: Infra,
+) -> None:
+    # Task W2B fix round 1: a release imported before 0032 is searched through its essential
+    # skills' labels once migrated, with no new import.
+    database = f"careerwright_skill_search_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    engine = migrator_engine(infra, database)
+    try:
+        migrate_app(engine, "0031")
+        assert import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE) == "imported"
+        migrate_app(engine)
+        with system_transaction(engine) as tx:
+            found = search_essential_skills(tx, "accounting entries", 10, any_word=False)
+            titles = taxonomy_store.occupation_facts(
+                tx, [r.concept_id for r in found.reached], skills_shown=0
+            )
+    finally:
+        engine.dispose()
+
+    [counts] = infra.query(
+        "SELECT count(*) AS skills, count(*) FILTER (WHERE search_vector = "
+        "to_tsvector('english', preferred_label)) AS filled FROM careerwright.skills",
+        database=database,
+    )
+    assert counts["skills"] > 0
+    assert counts["filled"] == counts["skills"]
+    reached = {titles[r.concept_id].preferred_label: r.skill_label for r in found.reached}
+    assert reached == {
+        "accounting assistant": "accounting entries",
+        "bookkeeper": "accounting entries",
+    }
 
 
 @pytest.mark.req("ACQ-01")

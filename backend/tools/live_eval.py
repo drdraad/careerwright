@@ -283,7 +283,14 @@ def _drive(api: Api, run: CaseRun, model_id: str) -> None:
         return
     first_view = api.call("GET", f"{base}/discoveries/{submitted['discovery_id']}/slate")
     if run.case.kind is CaseKind.DISCOVERY:
-        run.observed = first_view
+        # Each suggestion's essential skills from the taxonomy, as the offline run keeps them.
+        essential = {}
+        for suggestion in first_view["suggestions"]:
+            detail = api.call("GET", f"/v1/taxonomy/occupations/{suggestion['concept_id']}")
+            essential[suggestion["concept_id"]] = [
+                s["preferred_label"] for s in detail["skills"] if s["relation"] == "essential"
+            ]
+        run.observed = {**first_view, "essential_skills": essential}
         return
     explained = _explain(api, run, version, first_view, model_id)
     run.status = f"discovery complete, explanation {explained}"

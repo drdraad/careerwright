@@ -400,7 +400,8 @@
         {"check": "distinct"},
         {"check": "no_percentage"},
         {"check": "unsupported_not_suggested"},
-        {"check": "includes_direction", "direction": "less_familiar"}
+        {"check": "includes_direction", "direction": "less_familiar"},
+        {"check": "searched_through_skills"}
       ]
     },
     {
@@ -427,7 +428,8 @@
         {"check": "grounded"},
         {"check": "includes_direction", "direction": "close_to_current"},
         {"check": "includes_direction", "direction": "transferable"},
-        {"check": "distinct"}
+        {"check": "distinct"},
+        {"check": "searched_through_skills"}
       ],
       "note": "Task W2 slice W2B: the role was \"Warehouse shift supervisor\", which ESCO does not list, so it was searched by its words. A title now joins work only by shared essential skills, so the case names an ESCO title (an alternative label of the warehouse manager); a title ESCO does not list is DSC-11's."
     },
@@ -438,7 +440,7 @@
       "requirements": ["REC1-09"],
       "synthetic": true,
       "profile": {"preferred_name": "Fatima", "enjoyed_tasks": ["repairing physical objects", "working outdoors"]},
-      "expect": [{"check": "same_slate_as", "other": "DSC-05"}, {"check": "grounded"}]
+      "expect": [{"check": "same_slate_as", "other": "DSC-05"}, {"check": "grounded"}, {"check": "searched_through_skills"}]
     },
     {
       "id": "DSC-05",
@@ -447,7 +449,7 @@
       "requirements": ["REC1-09"],
       "synthetic": true,
       "profile": {"preferred_name": "James", "enjoyed_tasks": ["repairing physical objects", "working outdoors"]},
-      "expect": [{"check": "same_slate_as", "other": "DSC-04"}, {"check": "grounded"}]
+      "expect": [{"check": "same_slate_as", "other": "DSC-04"}, {"check": "grounded"}, {"check": "searched_through_skills"}]
     },
     {
       "id": "DSC-06",
@@ -456,7 +458,7 @@
       "requirements": ["DIV1-06"],
       "synthetic": true,
       "profile": {"enjoyed_tasks": ["origami"]},
-      "expect": [{"check": "fewer_has_reason"}, {"check": "grounded"}]
+      "expect": [{"check": "fewer_has_reason"}, {"check": "grounded"}, {"check": "searched_through_skills"}]
     },
     {
       "id": "DSC-07",
@@ -465,7 +467,7 @@
       "requirements": ["REC1-03", "DIV1-07"],
       "synthetic": true,
       "profile": {"enjoyed_tasks": ["looking after people"], "work_style": ["quiet concentration"]},
-      "expect": [{"check": "pool_includes_pool_of", "other": "DSC-08"}, {"check": "grounded"}]
+      "expect": [{"check": "pool_includes_pool_of", "other": "DSC-08"}, {"check": "grounded"}, {"check": "searched_through_skills"}]
     },
     {
       "id": "DSC-08",
@@ -474,7 +476,7 @@
       "requirements": ["REC1-03"],
       "synthetic": true,
       "profile": {"enjoyed_tasks": ["looking after people"]},
-      "expect": [{"check": "grounded"}, {"check": "family_limit"}]
+      "expect": [{"check": "grounded"}, {"check": "family_limit"}, {"check": "searched_through_skills"}]
     },
     {
       "id": "DSC-09",
@@ -483,7 +485,7 @@
       "requirements": ["PROF-04", "DIV1-07"],
       "synthetic": true,
       "profile": {"enjoyed_tasks": ["repairing bicycles"], "minimum_salary": {"amount": {"minor_units": 2600000, "currency": "GBP"}, "period": "year"}},
-      "expect": [{"check": "limit_reported"}, {"check": "size_at_least", "count": 1}, {"check": "grounded"}]
+      "expect": [{"check": "limit_reported"}, {"check": "size_at_least", "count": 1}, {"check": "grounded"}, {"check": "searched_through_skills"}]
     },
     {
       "id": "DSC-10",
@@ -522,7 +524,7 @@
     {
       "id": "DSC-12",
       "kind": "discovery",
-      "title": "P01: a target ESCO does not list joins nothing; the tasks and work style still search ESCO's skills and descriptions",
+      "title": "P01: a target ESCO does not list joins nothing; the tasks and work style reach work only through its essential skills",
       "requirements": ["DIV1-03", "DIV1-10", "REC1-03"],
       "synthetic": true,
       "profile": {"target_titles": ["Data quality analyst"], "enjoyed_tasks": ["finding inconsistencies", "explaining evidence"], "work_style": ["structured", "collaborative"], "cities": ["Manchester"]},
@@ -530,8 +532,10 @@
         {"check": "titles_unmatched", "words": ["Data quality analyst"]},
         {"check": "size_at_least", "count": 3},
         {"check": "grounded"},
-        {"check": "distinct"}
-      ]
+        {"check": "distinct"},
+        {"check": "searched_through_skills"}
+      ],
+      "note": "Task W2 slice W2B fix round 1: before, \"structured\" found house builder through the word \"structures\" in its description."
     },
     {
       "id": "DSC-13",
@@ -561,6 +565,38 @@
         {"check": "grounded"}
       ],
       "note": "Task W2 slice W2B. Before, the title's words found any \"assistant\" (shop assistant, assistant lecturer, physiotherapy assistant)."
+    },
+    {
+      "id": "DSC-15",
+      "kind": "discovery",
+      "title": "A search that is the person's role in another form (a plural) is their role: joined by shared essential skills, never searched by its words",
+      "requirements": ["DIV1-10", "DIV1-12", "REC1-06"],
+      "synthetic": true,
+      "profile": {"current_role": "data analyst"},
+      "discovery_output": {"queries": [{"text": "Data analysts", "channel": "transferable", "based_on": ["data analyst"]}], "hypotheses": []},
+      "expect": [
+        {"check": "size_at_least", "count": 4},
+        {"check": "joined_by_skills"},
+        {"check": "connection"},
+        {"check": "grounded"},
+        {"check": "distinct"}
+      ],
+      "note": "Task W2 slice W2B fix round 1. The fixture proposer repeats a title as given, so this case gives the searches a model might propose: before, \"Data analysts\" was not recognised as the role and was searched by its words."
+    },
+    {
+      "id": "DSC-16",
+      "kind": "discovery",
+      "title": "A role several occupations hold as a title is joined by their shared essential skills, but no connection states a fact about it",
+      "requirements": ["DIV1-03", "DIV1-12"],
+      "synthetic": true,
+      "profile": {"current_role": "bus operator"},
+      "expect": [
+        {"check": "joined_by_skills"},
+        {"check": "no_connection"},
+        {"check": "grounded"},
+        {"check": "distinct"}
+      ],
+      "note": "Task W2 slice W2B fix round 1. \"bus operator\" is an alternative title of the bus driver and the trolley bus driver. Before, the connection said \"A bus operator and ... share N essential skills\", a fact about no single occupation."
     },
     {
       "id": "EXP-01",

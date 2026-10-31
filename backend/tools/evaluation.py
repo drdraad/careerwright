@@ -72,9 +72,31 @@ from careerwright.profile.slate_explanation import render_prompt as render_expla
 from careerwright.vocabulary import DataMode, WorkState
 
 CASES_PATH = Path(__file__).with_name("evaluation_cases.json")
-# A suggestion joined to a title by shared essential skills says so in its words.
+# A suggestion joined to a title by shared essential skills says so in its words; one a
+# search reached names the essential skill that holds the search's words.
 _SHARED = re.compile(r"ESCO lists (\d+) of the same essential skills")
+_SEARCHED = re.compile(
+    r"Careerwright searched for “(?P<query>.+?)”, and ESCO lists “(?P<skill>.+?)” as an "
+    r"essential skill for this work\."
+)
+_LETTERS = re.compile(r"[^\W\d_]+")
 Json = dict[str, Any]
+
+
+def _same_word_in(text: str, label: str) -> bool:
+    """Whether a word of the text appears in the label in some form ("repairing" in "perform
+    repairs"): an independent check of the product's English stemming, so deliberately
+    loose. Two words agree when they begin alike for at least three letters and for all but
+    the last three of the shorter."""
+
+    def agree(a: str, b: str) -> bool:
+        shorter = min(len(a), len(b))
+        alike = next((i for i in range(shorter) if a[i] != b[i]), shorter)
+        return alike >= max(3, shorter - 3)
+
+    words = [w for w in _LETTERS.findall(text.casefold()) if len(w) >= 3]
+    held = _LETTERS.findall(label.casefold())
+    return any(agree(a, b) for a in words for b in held)
 
 
 class CaseKind(StrEnum):
@@ -135,7 +157,9 @@ class Case(BaseModel):
     profile: Json = Field(default_factory=dict)  # field -> value (provided) or {"state": ...}
     message: str | None = None
     output: Json | None = None  # a guard case's canned model output
-    discovery_output: Json | None = None  # a guard case's canned discovery output
+    # A guard case's canned discovery output; for a discovery case, the searches a model
+    # might propose, used offline in place of the fixture proposer's.
+    discovery_output: Json | None = None
     expect: list[Expectation]
     note: str | None = None
 
@@ -305,6 +329,23 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
             )
         ]
         return Failure(FailureType.GROUNDING, f"not joined by skills: {loose}") if loose else None
+    if e.check == "searched_through_skills":
+        # Every other search reaches work only through one of its essential skills whose
+        # label holds the search's words, and the suggestion's words name that skill (never a
+        # title, hidden label, ISCO group or description; Task W2B fix round 1).
+        essential: Mapping[str, list[str]] = observed.get("essential_skills", {})
+        loose = [
+            f"{s['title']}: {line}"
+            for s in suggestions
+            for line in s["why_it_could_suit"]
+            if "Careerwright searched for" in line
+            and not (
+                (m := _SEARCHED.search(line)) is not None
+                and m["skill"] in essential.get(s["concept_id"], [])
+                and _same_word_in(m["query"], m["skill"])
+            )
+        ]
+        return Failure(FailureType.GROUNDING, f"not through a skill: {loose}") if loose else None
     if e.check == "connection":
         connection = observed.get("connection")
         if connection is None:
@@ -319,6 +360,11 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
             and by_id[connection["concept_id"]]["direction"] != "close_to_current"
         )
         return None if ok else Failure(FailureType.GROUNDING, f"connection {connection}")
+    if e.check == "no_connection":
+        # A role several occupations hold as a title is no one occupation to state a fact
+        # about (Task W2B fix round 1).
+        connection = observed.get("connection")
+        return None if connection is None else Failure(FailureType.GROUNDING, f"{connection}")
     if e.check == "titles_unmatched":
         unmatched = observed["unmatched_titles"]
         missing = [title for title in e.words if title not in unmatched]
@@ -519,11 +565,22 @@ def observe_guard(case: Case) -> Json:
 
 
 def observe_discovery_offline(tx: Tx, case: Case, *, release: str | None = None) -> Json:
-    """The slate the fixture proposer's queries give over the held taxonomy: the pipeline
-    and its rules are under test, not a model. `release`: the release the searches are
-    recorded as chosen for (none: not recorded)."""
+    """The slate the fixture proposer's queries (or the case's own searches) give over the
+    held taxonomy, with each suggestion's essential skills as the taxonomy holds them: the
+    pipeline and its rules are under test, not a model. `release`: the release the
+    searches are recorded as chosen for (none: not recorded)."""
     view = _offline_slate(tx, case, release)
-    return SlateOut.of(view, Emphasis.BALANCED).model_dump(mode="json")
+    observed = SlateOut.of(view, Emphasis.BALANCED).model_dump(mode="json")
+    essential: dict[str, list[str]] = {}
+    for suggestion in view.suggestions:
+        concept = suggestion.candidate.occupation.concept_id
+        detail = taxonomy_store.occupation(tx, concept)
+        if detail is None:
+            raise ValueError(f"{case.id}: a suggestion is not in the held release")
+        essential[str(concept)] = [
+            s.preferred_label for s in detail.skills if s.relation == "essential"
+        ]
+    return {**observed, "essential_skills": essential}
 
 
 def observe_explanation_offline(tx: Tx, case: Case) -> Json:
@@ -559,7 +616,11 @@ def observe_explanation_offline(tx: Tx, case: Case) -> Json:
 def _offline_slate(tx: Tx, case: Case, release: str | None) -> SlateView:
     document = document_of(case)
     context = DiscoveryInput(profile_version=1, evidence=evidence_of(document), release=release)
-    output = fixture_queries(prompt_context(render_discovery_prompt(context)))
+    output = (
+        DiscoveryOutput.model_validate(case.discovery_output)
+        if case.discovery_output is not None
+        else fixture_queries(prompt_context(render_discovery_prompt(context)))
+    )
     proposal, problems = check_discovery(output, context, ProposalOrigin.FIXTURE)
     if proposal is None:
         raise ValueError(f"{case.id}: the fixture proposal failed its check: {problems}")

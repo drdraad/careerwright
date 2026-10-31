@@ -33,7 +33,6 @@ from careerwright.profile.discovery import EvidenceItem
 from careerwright.profile.interview import ProfileField, ProposalOrigin
 from careerwright.profile.slate_explanation import (
     accepted_quotation,
-    content_words,
     quotable,
     quoted_span,
     repair_message,
@@ -335,10 +334,10 @@ def build_input(
     answers: list[EvidenceItem],
     destinations: Sequence[DestinationSkills],
 ) -> StrengthInput:
-    """The run's input: every answer a strength may quote (`quotable_answers`) whole, and as
-    many of each destination's essential skills as fit. A skill several destinations share
-    has one ref. Answers too long for every step are refused (`LIMIT_EXCEEDED`) before any
-    run or reservation exists."""
+    """The run's input: each of `answers` (the ones the turn added) that a strength may quote
+    (`quotable_answers`), whole, and as many of each destination's essential skills as fit.
+    A skill several destinations share has one ref. Answers too long for every step are
+    refused (`LIMIT_EXCEEDED`) before any run or reservation exists."""
     answers = quotable_answers(answers)
     for per_destination in SKILL_STEPS:
         refs: dict[uuid.UUID, SkillRecord] = {}
@@ -394,19 +393,57 @@ def worst_case_nano_usd(model_id: str) -> int:
     return MAX_REQUESTS * per_request
 
 
+@dataclass(frozen=True)
+class ScriptedStrength:
+    """One of the demo's scripted strengths: an answer the demo journey is known to give, and
+    the ESCO skill it shows (by URI, with ESCO's label for it, which is how the prompt names
+    the skill)."""
+
+    answer: str
+    skill_uri: str
+    skill_label: str
+
+
+# The demo journey's known answers (the bookkeeper's demo, the conversation journey, the
+# personas P01 and P02). Nothing else is ever proposed in a demo: no word is matched.
+SCRIPTED_STRENGTHS = (
+    ScriptedStrength(
+        "reconciling accounting entries",
+        "http://data.europa.eu/esco/skill/99b163e8-7815-43e2-83f3-a47f3076354c",
+        "accounting entries",
+    ),
+    ScriptedStrength(
+        "fixing bikes",
+        "http://data.europa.eu/esco/skill/fab8e95a-448d-4784-aa50-9ef10e924829",
+        "perform repairs on bicycles",
+    ),
+    ScriptedStrength(
+        "finding inconsistencies",
+        "http://data.europa.eu/esco/skill/50b100ea-74fd-4706-99db-3e4ca55e51b8",
+        "perform data cleansing",
+    ),
+    ScriptedStrength(
+        "working outdoors",
+        "http://data.europa.eu/esco/skill/0e355580-bd4a-465a-8058-92984623070e",
+        "work in outdoor conditions",
+    ),
+)
+
+
 def fixture_strength(context: PromptStrengthContext) -> StrengthOutput:
     """The demo's scripted strength (`careerwright-fixture-strength-1`; demo workspaces only,
-    labelled synthetic): the first answer, in order, that shares a content word with an
-    essential skill of a destination, quoted whole; none when no answer does. It reads the
-    same prompt a live model reads and passes the same check."""
+    labelled synthetic): the first answer, in order, that is one of `SCRIPTED_STRENGTHS`
+    while a destination lists that script's skill as essential, quoted whole; none
+    otherwise. It reads the same prompt a live model reads and passes the same check."""
+    scripts = {" ".join(s.answer.casefold().split()): s for s in SCRIPTED_STRENGTHS}
     for texts in context.answers.values():
         for text in texts:
-            if not accepted_quotation(text, text):
+            script = scripts.get(" ".join(text.casefold().split()))
+            if script is None:
                 continue
-            words = content_words(text)
             for destination in context.destinations:
                 for ref, label in destination.essential_skills.items():
-                    if words & content_words(label):
+                    if label == script.skill_label:
                         return StrengthOutput(
                             strengths=[
                                 ModelStrength(

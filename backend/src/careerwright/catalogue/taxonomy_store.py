@@ -28,6 +28,7 @@ from careerwright.catalogue.records import (
     OccupationHit,
     ProvisionalConcept,
     SkillNeighbour,
+    SkillReach,
     SkillRef,
     TaxonomyRelease,
     TitleMatch,
@@ -204,45 +205,24 @@ def search_terms(tx: Tx, query: str) -> int:
     return int(tx.execute(sa.text(f"SELECT numnode({_ALL_WORDS})"), {"q": query}).scalar_one())
 
 
-# Rank weights for the vector's {D, C, B, A} parts (PostgreSQL's order): its defaults, and
-# the same with the preferred (A) and alternative (B) labels weighing nothing, so a match on
-# a title's words alone ranks 0 (Sprint W: never joined by shared words in a title).
-_ALL_PARTS = "'{0.1, 0.2, 0.4, 1.0}'"
-_NOT_TITLES = "'{0.1, 0.2, 0, 0}'"
-
-
 def full_text(
-    tx: Tx,
-    query: str,
-    limit: int,
-    *,
-    any_word: bool,
-    exclude: set[uuid.UUID],
-    titles: bool = True,
+    tx: Tx, query: str, limit: int, *, any_word: bool, exclude: set[uuid.UUID]
 ) -> tuple[list[OccupationHit], int]:
     """The best `limit` full-text matches outside `exclude`, ranked, and how many such
-    occupations match in all. `titles=False`: an occupation whose preferred or alternative
-    label is all that matches is no match."""
-    weights = _ALL_PARTS if titles else _NOT_TITLES
+    occupations match in all."""
     rows = tx.execute(
         sa.text(
-            f"WITH q AS (SELECT {_ANY_WORD if any_word else _ALL_WORDS} AS query), "
-            "ranked AS (SELECT o.concept_id, o.preferred_label, o.isco_code, "
-            f"ts_rank_cd({weights}, o.search_vector, q.query, 32) AS text_rank "
-            "FROM careerwright.occupation_concepts o, q WHERE o.search_vector @@ q.query "
-            "AND o.concept_id <> ALL(CAST(:exclude AS uuid[]))) "
-            "SELECT r.concept_id, r.preferred_label, r.isco_code, g.label AS isco_label, "
-            "r.text_rank, count(*) OVER () AS total "
-            "FROM ranked r JOIN careerwright.isco_groups g ON g.code = r.isco_code "
-            "WHERE r.text_rank > 0 OR :titles "
-            "ORDER BY r.text_rank DESC, r.preferred_label, r.concept_id LIMIT :limit"
+            f"WITH q AS (SELECT {_ANY_WORD if any_word else _ALL_WORDS} AS query) "
+            "SELECT o.concept_id, o.preferred_label, o.isco_code, g.label AS isco_label, "
+            "ts_rank_cd(o.search_vector, q.query, 32) AS text_rank, "
+            "count(*) OVER () AS total "
+            "FROM careerwright.occupation_concepts o JOIN careerwright.isco_groups g ON g.code = "
+            "o.isco_code, "
+            "q WHERE o.search_vector @@ q.query "
+            "AND o.concept_id <> ALL(CAST(:exclude AS uuid[])) "
+            "ORDER BY text_rank DESC, o.preferred_label, o.concept_id LIMIT :limit"
         ),
-        {
-            "q": query,
-            "limit": limit,
-            "exclude": [str(i) for i in sorted(exclude)],
-            "titles": titles,
-        },
+        {"q": query, "limit": limit, "exclude": [str(i) for i in sorted(exclude)]},
     ).mappings()
     hits, total = [], 0
     for row in rows:
@@ -257,6 +237,61 @@ def full_text(
             )
         )
     return hits, total
+
+
+def essential_skill_reach(
+    tx: Tx, query: str, limit: int, *, any_word: bool
+) -> tuple[list[SkillReach], int]:
+    """The occupations reached through an essential skill whose preferred label matches the
+    query (`skills.search_vector`: the label alone), each by its best-ranked such skill, best
+    first, and how many occupations are reached in all. Equal ranks go to the occupation
+    with more of its essential skills matching. No title, hidden label, ISCO group or
+    description is searched."""
+    rows = tx.execute(
+        sa.text(
+            f"WITH q AS (SELECT {_ANY_WORD if any_word else _ALL_WORDS} AS query), "
+            "matched AS (SELECT s.skill_id, s.preferred_label, "
+            "ts_rank_cd(s.search_vector, q.query, 32) AS text_rank "
+            "FROM careerwright.skills s, q WHERE s.search_vector @@ q.query), "
+            "reached AS (SELECT r.concept_id, m.skill_id, m.preferred_label, m.text_rank, "
+            "row_number() OVER (PARTITION BY r.concept_id ORDER BY m.text_rank DESC, "
+            "m.preferred_label, m.skill_id) AS best, "
+            "count(*) OVER (PARTITION BY r.concept_id) AS skills "
+            "FROM matched m JOIN careerwright.occupation_skills r ON r.skill_id = m.skill_id "
+            "AND r.relation = 'essential') "
+            "SELECT r.concept_id, r.skill_id, r.preferred_label AS skill_label, r.text_rank, "
+            "count(*) OVER () AS total FROM reached r JOIN careerwright.occupation_concepts o "
+            "ON o.concept_id = r.concept_id WHERE r.best = 1 "
+            "ORDER BY r.text_rank DESC, r.skills DESC, o.preferred_label, r.concept_id "
+            "LIMIT :limit"
+        ),
+        {"q": query, "limit": limit},
+    ).mappings()
+    reached, total = [], 0
+    for row in rows:
+        total = int(row["total"])
+        reached.append(
+            SkillReach(
+                concept_id=row["concept_id"],
+                skill_id=row["skill_id"],
+                skill_label=row["skill_label"],
+                text_rank=float(row["text_rank"]),
+            )
+        )
+    return reached, total
+
+
+def concept_keys(tx: Tx, texts: Iterable[str]) -> dict[str, str]:
+    """Each text as a concept (`careerwright.concept_key`: case, punctuation, hyphens and
+    simple plurals folded), by text."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT t AS text, careerwright.concept_key(t) AS key "
+            "FROM unnest(CAST(:texts AS text[])) AS t"
+        ),
+        {"texts": sorted(set(texts))},
+    )
+    return {row.text: row.key for row in rows}
 
 
 def label_matches(tx: Tx, normalised: str) -> list[LabelMatch]:
@@ -324,6 +359,53 @@ def title_matches(
         ),
         {"typed": typed, "prefix": prefix, "query": query, "limit": limit},
     ).mappings()
+    return _title_matches(rows)
+
+
+def partial_title_matches(tx: Tx, words: Sequence[str], limit: int) -> tuple[list[TitleMatch], int]:
+    """For when no label holds every typed word: the occupations whose preferred or
+    alternative labels hold the most of `words` (each beginning a word of the label), one
+    per occupation by its best label, and how many there are. Best first: the label whose
+    words are rarer among ESCO's titles (a word's count is how many of these occupations
+    hold it, so "bookkeeping" outranks "assistant"), then a preferred label, then the shorter
+    label, then by label. None when no label holds any of them. Hidden labels are never
+    offered."""
+    rows = tx.execute(
+        sa.text(
+            "WITH typed AS (SELECT w, to_tsquery('simple', quote_literal(w) || ':*') AS q "
+            "FROM unnest(CAST(:words AS text[])) AS w), "
+            "labels AS (SELECT l.concept_id, l.label, l.kind, "
+            "to_tsvector('simple', l.label) AS v FROM careerwright.occupation_labels l "
+            "WHERE l.kind <> 'hidden' AND to_tsvector('simple', l.label) @@ "
+            "to_tsquery('simple', :any)), "
+            "held AS (SELECT b.concept_id, b.label, b.kind, t.w FROM labels b "
+            "JOIN typed t ON b.v @@ t.q), "
+            "reach AS (SELECT w, count(DISTINCT concept_id) AS occupations FROM held "
+            "GROUP BY w), "
+            "scored AS (SELECT h.concept_id, h.label, h.kind, count(*) AS words, "
+            "sum(r.occupations) AS commonness FROM held h JOIN reach r ON r.w = h.w "
+            "GROUP BY h.concept_id, h.label, h.kind), "
+            "best AS (SELECT s.*, row_number() OVER (PARTITION BY s.concept_id ORDER BY "
+            "s.words DESC, s.commonness, s.kind = 'preferred' DESC, char_length(s.label), "
+            "s.label) AS n, max(s.words) OVER () AS most FROM scored s) "
+            "SELECT b.concept_id, b.label, b.kind, o.preferred_label, o.isco_code, "
+            "g.label AS isco_label, count(*) OVER () AS total "
+            "FROM best b JOIN careerwright.occupation_concepts o ON o.concept_id = b.concept_id "
+            "JOIN careerwright.isco_groups g ON g.code = o.isco_code "
+            "WHERE b.n = 1 AND b.words = b.most "
+            "ORDER BY b.commonness, b.kind = 'preferred' DESC, char_length(b.label), b.label, "
+            "b.concept_id LIMIT :limit"
+        ),
+        {
+            "words": list(words),
+            "any": " | ".join(f"'{word}':*" for word in words),
+            "limit": limit,
+        },
+    ).mappings()
+    return _title_matches(rows)
+
+
+def _title_matches(rows: Iterable[sa.RowMapping]) -> tuple[list[TitleMatch], int]:
     matches, total = [], 0
     for row in rows:
         total = int(row["total"])

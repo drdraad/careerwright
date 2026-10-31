@@ -2,7 +2,9 @@
 DIV1-01).
 
 Retrieval is PostgreSQL English full-text search plus exact alias lookup over the full
-release; no embedding service or taxonomy API is involved. Alias matches are returned
+release; no embedding service or taxonomy API is involved. Discovery's searches other than
+the person's own titles search the essential skills' labels alone
+(`search_essential_skills`, ADR 0007 decision 13). Alias matches are returned
 before full-text matches, and a label several occupations share returns all of them: the
 ambiguity is the caller's to resolve, never silently decided here. A search without a
 release, or without a searchable term, is an error, never an empty result.
@@ -18,6 +20,7 @@ from careerwright.catalogue.records import (
     LabelMatch,
     OccupationDetail,
     OccupationHit,
+    SkillReach,
     TaxonomyRelease,
     TitleMatch,
 )
@@ -84,15 +87,7 @@ class OccupationSearch:
     limit: int
 
 
-def search_occupations(
-    tx: Tx, query: str, limit: int, *, any_word: bool = False, titles: bool = True
-) -> OccupationSearch:
-    """`any_word=False` needs every word (web-search syntax); `True` ranks occupations by
-    how many of the words they match, for broad task and interest queries. `titles=False`
-    (discovery's task searches): a match on the words of an occupation's preferred or
-    alternative labels alone is no match, so work is never found by a shared word in a
-    title."""
-    release = held_release(tx)
+def _search_text(query: str, limit: int) -> str:
     text = query.strip()
     if not text or len(text) > MAX_QUERY or not 1 <= limit <= MAX_LIMIT:
         raise CareerwrightError(
@@ -101,23 +96,62 @@ def search_occupations(
             stage=ErrorStage.CATALOGUE,
             details={"field": "q", "reason": "length"},
         )
+    return text
+
+
+def _no_search_terms() -> CareerwrightError:
+    return CareerwrightError(
+        ErrorCode.VALIDATION_FAILED,
+        "The search has no searchable words (only common words or punctuation).",
+        stage=ErrorStage.CATALOGUE,
+        details={"field": "q", "reason": "no_search_terms"},
+    )
+
+
+def search_occupations(
+    tx: Tx, query: str, limit: int, *, any_word: bool = False
+) -> OccupationSearch:
+    """`any_word=False` needs every word (web-search syntax); `True` ranks occupations by
+    how many of the words they match, for broad task and interest queries."""
+    release = held_release(tx)
+    text = _search_text(query, limit)
     labels = taxonomy_store.label_matches(tx, normalise_label(text))
     if taxonomy_store.search_terms(tx, text) == 0:
         if labels:
             return OccupationSearch(release, any_word, labels, [], None, limit)
-        raise CareerwrightError(
-            ErrorCode.VALIDATION_FAILED,
-            "The search has no searchable words (only common words or punctuation).",
-            stage=ErrorStage.CATALOGUE,
-            details={"field": "q", "reason": "no_search_terms"},
-        )
+        raise _no_search_terms()
     hits, total = taxonomy_store.full_text(
-        tx, text, limit, any_word=any_word, exclude={m.concept_id for m in labels}, titles=titles
+        tx, text, limit, any_word=any_word, exclude={m.concept_id for m in labels}
     )
     return OccupationSearch(release, any_word, labels, hits, total, limit)
 
 
+@dataclass(frozen=True)
+class SkillSearch:
+    any_word: bool
+    reached: list[SkillReach]  # best first, each through the essential skill it is named by
+    total: int  # every occupation the search reached
+    limit: int
+
+
+def search_essential_skills(tx: Tx, query: str, limit: int, *, any_word: bool) -> SkillSearch:
+    """Discovery's searches that are not the person's own title (ADR 0007 decision 13): the
+    occupations reached through an essential skill whose preferred label holds the search's
+    words (every word, or any word ranked by how many). An occupation's titles, hidden labels,
+    ISCO group and description are never searched, so work is never found by a word in a
+    title, and each occupation comes with the skill that reached it."""
+    held_release(tx)
+    text = _search_text(query, limit)
+    if taxonomy_store.search_terms(tx, text) == 0:
+        raise _no_search_terms()
+    reached, total = taxonomy_store.essential_skill_reach(tx, text, limit, any_word=any_word)
+    return SkillSearch(any_word, reached, total, limit)
+
+
 TITLE_LIMIT = 20
+# The closest-titles fallback compares at most this many typed words: 97% of ESCO v1.2.1's
+# preferred and alternative titles have 8 words or fewer, and its cost grows with each word.
+PARTIAL_MAX_WORDS = 8
 _WORD = re.compile(r"[^\W_]+")
 
 
@@ -128,13 +162,19 @@ class TitleMatches:
     matches: list[TitleMatch]
     total: int  # every occupation that matches, of which `matches` are the best
     limit: int
+    # No ESCO title holds every word typed: `matches` hold the most of them, for the person
+    # to choose from ("ESCO doesn't list that title. Is it one of these?"); none is chosen.
+    partial: bool = False
 
 
 def match_titles(tx: Tx, typed: str, limit: int) -> TitleMatches:
     """The type-ahead for "What do you do now, or what did you do last?": occupations whose
     preferred or alternative labels have a word beginning with each word typed, best first.
-    Deterministic and offline (no model, no key). Nothing matching is an honest empty
-    answer, never an invented match; a query with no letter or digit is refused."""
+    When no title holds every word (of two to `PARTIAL_MAX_WORDS`), the occupations whose
+    titles hold the most of them, marked `partial`: the person may choose one, and nothing
+    is joined by its words. Deterministic and offline (no model, no key). Nothing matching
+    is an honest empty answer, never an invented match; a query with no letter or digit is
+    refused."""
     release = held_release(tx)
     text = " ".join(typed.split())
     words = list(dict.fromkeys(_WORD.findall(text.casefold())))
@@ -153,7 +193,10 @@ def match_titles(tx: Tx, typed: str, limit: int) -> TitleMatches:
             details={"field": "q", "reason": "no_search_terms"},
         )
     matches, total = taxonomy_store.title_matches(tx, words, normalise_label(text), limit)
-    return TitleMatches(release, text, matches, total, limit)
+    if matches or not 2 <= len(words) <= PARTIAL_MAX_WORDS:
+        return TitleMatches(release, text, matches, total, limit)
+    matches, total = taxonomy_store.partial_title_matches(tx, words, limit)
+    return TitleMatches(release, text, matches, total, limit, partial=bool(matches))
 
 
 def occupation_detail(tx: Tx, concept_id: uuid.UUID) -> OccupationDetail:

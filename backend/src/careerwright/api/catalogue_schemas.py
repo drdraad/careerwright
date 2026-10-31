@@ -188,14 +188,20 @@ class TitleMatchOut(ResponseModel):
 class TitleMatchesOut(ResponseModel):
     """The first question's type-ahead: occupations whose ESCO titles (preferred and
     alternative labels) have a word beginning with each word typed, best first, one per
-    occupation. Deterministic, no model call. No match is an honest empty list: nothing is
-    invented. `total` counts every occupation that matched."""
+    occupation. When no title holds every word, the occupations whose titles hold the most
+    of them, with `partial` true. Deterministic, no model call. No match is an honest empty
+    list: nothing is invented. `total` counts every occupation that matched."""
 
     release: TaxonomyReleaseOut
     query: str
     matches: list[TitleMatchOut]
     total: int
     limit: int
+    partial: bool = Field(
+        description="True: ESCO lists no title with every word typed, and these hold the most "
+        'of them, rarer words first. Ask "ESCO doesn\'t list that title. Is it one of these?": '
+        "the person chooses one or none, and nothing is joined to the typed words."
+    )
 
     @classmethod
     def of(cls, found: TitleMatches) -> "TitleMatchesOut":
@@ -205,6 +211,7 @@ class TitleMatchesOut(ResponseModel):
             matches=[TitleMatchOut.of(m) for m in found.matches],
             total=found.total,
             limit=found.limit,
+            partial=found.partial,
         )
 
 

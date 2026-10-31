@@ -992,6 +992,12 @@ export type ChooseRole = {
      * An occupation from `GET /v1/taxonomy/titles`.
      */
     concept_id: string;
+    /**
+     * Label
+     *
+     * The title the person picked (the type-ahead's `matched_label`): ESCO's title for the occupation or one of its other titles. It stays their words; the role is resolved by the occupation's ESCO URI. Omitted: ESCO's title.
+     */
+    label?: string | null;
 };
 
 /**
@@ -7657,8 +7663,9 @@ export type TitleMatchOut = {
  *
  * The first question's type-ahead: occupations whose ESCO titles (preferred and
  * alternative labels) have a word beginning with each word typed, best first, one per
- * occupation. Deterministic, no model call. No match is an honest empty list: nothing is
- * invented. `total` counts every occupation that matched.
+ * occupation. When no title holds every word, the occupations whose titles hold the most
+ * of them, with `partial` true. Deterministic, no model call. No match is an honest empty
+ * list: nothing is invented. `total` counts every occupation that matched.
  */
 export type TitleMatchesOut = {
     release: TaxonomyReleaseOut;
@@ -7678,6 +7685,12 @@ export type TitleMatchesOut = {
      * Limit
      */
     limit: number;
+    /**
+     * Partial
+     *
+     * True: ESCO lists no title with every word typed, and these hold the most of them, rarer words first. Ask "ESCO doesn't list that title. Is it one of these?": the person chooses one or none, and nothing is joined to the typed words.
+     */
+    partial: boolean;
 };
 
 /**

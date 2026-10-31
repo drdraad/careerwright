@@ -48,6 +48,17 @@ class OccupationHit:
 
 
 @dataclass(frozen=True)
+class SkillReach:
+    """An occupation a search reached through one of its essential skills: the one whose
+    preferred label matches the search best."""
+
+    concept_id: uuid.UUID
+    skill_id: uuid.UUID
+    skill_label: str
+    text_rank: float  # that label's rank for the search
+
+
+@dataclass(frozen=True)
 class LabelMatch:
     concept_id: uuid.UUID
     label: str | None  # None for a hidden label: it matched, but is not for display

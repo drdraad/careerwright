@@ -167,6 +167,7 @@ def suggestion(title: str, family: str, direction: str, **extra: Any) -> dict[st
         "direction": direction,
         "sources": [{"kind": "esco", "uri": f"http://data.europa.eu/esco/occupation/{title}"}],
         "linked_evidence": [{"field": "enjoyed_tasks", "text": "repairing physical objects"}],
+        "why_it_could_suit": [],
         **extra,
     }
 
@@ -201,6 +202,40 @@ def test_the_discovery_checks_name_the_failure_they_find() -> None:
     assert [f.type for f in evaluate(BY_ID["DSC-06"], slate(), {})] == [
         FailureType.THIN_EVIDENCE
     ]  # fewer than six with no reason given
+
+
+def searched(query: str, skill: str) -> str:
+    return (
+        f"What you enjoy: “repairing physical objects”. Careerwright searched for “{query}”, "
+        f"and ESCO lists “{skill}” as an essential skill for this work."
+    )
+
+
+@pytest.mark.req("DIV1-08", "TEST1-10")
+def test_a_search_must_reach_work_through_an_essential_skill_that_holds_its_words() -> None:
+    # Task W2B fix round 1: never a title, hidden label, ISCO group or description.
+    p02 = BY_ID["DSC-01"]
+    essential = {"bicycle mechanic": ["perform repairs on bicycles", "tune bicycles"]}
+
+    def found(*why: str) -> dict[str, Any]:
+        return slate(
+            suggestion("bicycle mechanic", "723", "less_familiar", why_it_could_suit=list(why)),
+            suggestion("tree surgeon", "621", "less_familiar"),
+            suggestion("groundsperson", "921", "less_familiar"),
+            essential_skills=essential,
+        )
+
+    through_skill = found(searched("repairing physical objects", "perform repairs on bicycles"))
+    other_skill = found(searched("repairing physical objects", "repair engines"))
+    other_words = found(searched("repairing physical objects", "tune bicycles"))
+    description = found(
+        "What you enjoy: “repairing physical objects”. Careerwright searched for “repairing "
+        "physical objects”, and ESCO's record for this occupation matched."
+    )
+
+    assert evaluate(p02, through_skill, {}) == []
+    for loose in (other_skill, other_words, description):
+        assert [f.type for f in evaluate(p02, loose, {})] == [FailureType.GROUNDING]
 
 
 def explained(*quotations: tuple[str, str], status: str = "complete") -> dict[str, Any]:
