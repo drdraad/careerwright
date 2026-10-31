@@ -142,25 +142,32 @@ measurements here.
 ## Consequences
 
 - **Measured sizes** (`tools.route_search_sizes`, synthetic pack-shaped instances, on the
-  2026-10-31 arm64 machine; the task report has the table). Each check costs about 0.2 to
-  0.7 ms, rising with the horizon, so the 30-second limit binds at about 48,000 to 80,000
-  expanded states; the 1,000,000-state limit never bound. Largest sizes that complete:
+  2026-10-31 arm64 machine; the task report has both tables). These hold for intakes spread
+  across the horizon (`spread`, fix round 1). The first run kept every intake in months 1 to
+  9 (`early`), so its 12- and 24-month rows grew only the cost of each check (review 13a,
+  Important 3). Each check costs about 0.2 to 1.2 ms, rising with the horizon and with the
+  number of completion months readiness is assessed at, so the 30-second limit binds at about
+  26,000 to 110,000 expanded states; the 1,000,000-state limit never bound. Largest sizes that
+  complete, with spread intakes:
   - with P01's limits, the whole M0 bound (24 concepts, two starts, 24 months: 10,161,633
-    selected sets) in 2,487 states and 1.7 seconds: the caps prune almost everything;
-  - with a £5,000 cap and 45 hours, 24 concepts with one start at every horizon (34,956
-    states, 19.5 s at 24 months) and 12 with two starts (29,073 states, 17 s); 14 with two
-    starts stopped at 30 seconds;
-  - with no binding limit (the whole selection space is checked), 18 to 20 concepts with one
-    start and 10 with two (26,025 states, 9 to 14 s); the next size stopped, mostly at the
-    50,000-schedule archive limit before the clock, because almost every set reaches the
-    milestone.
+    selected sets) in 2,233 states and 1.6 seconds: the caps prune almost everything, whatever
+    the dates;
+  - with a £5,000 cap and 45 hours, at 24 months 22 concepts with one start (44,983 states,
+    24 s) and 10 with two (12,451 states, 6.7 s); at 12 months 24 and 12;
+  - with no binding limit (the whole selection space is checked), at 24 months 18 concepts
+    with one start (31,180 states, 23 s) and 10 with two (26,025 states, 26 s); at 12 months
+    20 and 10. The next sizes stopped at the clock or, with one start over 24 months, at the
+    50,000-schedule archive limit.
+  - At 6 months no spread instance reaches the milestone (most courses start too late), so
+    those rows size a tree with nothing to find.
 - **The reviewed pack completes at once:** four targets, at most four concepts each, and
   every offering is set aside until the person confirms a date, a cost, a timetable or an
   entry requirement (Task 12). Two also break a rule as stated: C04 paid in full (£2,995 above
   both of P01's £1,500 caps) and C09 (no admission in the catalogue; its hours beside P01's
   job). No pack instance needs Task 13b's machinery to complete. Even
   a catalogue the size of the whole pack (ten synthetic pack-shaped courses, two starts each:
-  26,025 selected sets) completes in under 15 seconds with no limit binding.
+  26,025 selected sets) completes with no limit binding: in 13 seconds over 12 months and 26
+  over 24 months with spread intakes, close to the 30-second limit.
 - **For Task 13b:** about 40% of a check is the readiness assessment, repeated for the same
   completed offerings across candidates; memoising `assess` by its completed set would be the
   cheapest speed-up. Peeling sorts once per layer, so a 50,000-point archive ranks in well under
