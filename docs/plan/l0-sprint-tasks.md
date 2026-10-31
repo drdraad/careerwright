@@ -211,6 +211,12 @@ These bind every task and every review.
     list contains. When exact and plain conflict, say less: a shorter true sentence, not a
     longer exact one. It covers the slate's notes, the matching lines, "none found", the
     readiness and route verdicts and every new chapter's words.
+  - **Facts, not sentences** (the audit's code appendix B, findings F3 and F7). New or
+    changed API responses carry codes and numbers, never sentences the person reads. The web
+    words them from `src/lib/vocabulary.ts`, with exhaustive maps (`Record<Code, string>`),
+    so a new code fails the type check. Tests check the facts; one test per fixed sentence
+    checks its words. Task 6d's first slice converts discovery's search notes and title-idea
+    lines.
   - A second fix round on the same kind of wording gets a rule, not another rewording (R14).
 - R12 Evidence before polish (plan v1.2). From Task 7b to session 2 (Tasks 7b, 9 and 11)
   the critical chain took priority. A refactor or hardening that no failing check, reproduced
@@ -224,9 +230,12 @@ These bind every task and every review.
   the task, comes from the product owner's own session, or is a failing check. Reviews of
   the path tasks (W2E, 6d, 6e, 10, 12b, 14, 15, 7e and 8) judge correctness, words,
   accessibility and fidelity to Sprint W's references; Global Constraint 11's "bland fails"
-  is judged at Task M and at release. Once a chapter is built, its Storybook stories become
-  its reference, and its place in `docs/design/compositions` is retired (with the mirror in
-  `apps/web/src/design`).
+  is judged at Task M and at release. This is how they meet `CLAUDE.md`'s "A bland,
+  form-like or corporate screen fails review": during a path task, a chapter built to Sprint
+  W's design references, with its words, states and choices exact, meets that bar; its
+  moment, judged at Task M and at release, completes it. Once a chapter is built, its
+  Storybook stories become its reference, and its place in `docs/design/compositions` is
+  retired (with the mirror in `apps/web/src/design`).
 - R14 Review rules (the product owner's approval, 2026-10-31; the audit report, section 6).
   The controller and every reviewer follow them:
   - Keep reviewing hard, and fix within the task: anything that changes a decision (ready
@@ -277,7 +286,7 @@ controller ran one implementer at a time; where the assessment handover
 (`docs/plan/l0-assessment-handover.md`) marked tasks as parallel (∥), they ran one after the
 other.
 
-Dependency rules (rules 1–6 are met; rules 7, 9, 11–13 and 15 are as amended in plan v1.5;
+Dependency rules (rules 1–6 are met; rules 7, 9–13 and 15 are as amended in plan v1.5;
 rules 16–18 are new):
 
 1. Task 6b after Task 6 (it extends Task 6's discovery). By controller ruling, Task 6c
@@ -292,14 +301,17 @@ rules 16–18 are new):
 5. Session 2 after Task 11.
 6. Task 7c after session 2 (it applies the product owner's H-07 record to the pack).
 7. Task 10 after Task 7c, Task 6d and session W2. Task 12 is split in plan v1.5: Task 12a
-   (the stored planning inputs, backend) after Task 7c; Task 12b (the Options chapter)
-   after Tasks 12a and 10 and session W2.
+   (the stored planning inputs, backend) after Task 7c and after Task 13a is integrated
+   (rule 10); Task 12b (the Options chapter) after Tasks 12a and 10 and session W2.
 8. Session 1 before Task 8, and before any page body is retained beyond the classes it
    permits (held 2026-10-28).
 9. Task 8 after Task 7c, session 1, Task 15 and the end-to-end session (plan v1.5: Roles
    comes after the decision path, and the end-to-end session may still reshape L0).
 10. Task 13a after Task 7c (the reviewed pack's instances). Task 13b after Task 13a, its
-    scope sized from Task 13a's measured sizes.
+    scope sized from Task 13a's measured sizes, and after Task 12a is integrated. The
+    worktree track (plan v1.5): Tasks 13a, then 12a, then 13b, one at a time in the
+    worktree, each started after the last is integrated. Task 12a changes the planning
+    rules that 13a's oracle and 13b's solver read, so none of the three overlaps another.
 11. Task 14 after Tasks 13b and 12b and session W2, with session 2's H-13 record as a
     scope input; it closes on its own checks (session 3 is merged into the end-to-end
     session).
@@ -320,9 +332,13 @@ rules 16–18 are new):
 18. The end-to-end session after Task 15. Task M after the end-to-end session and Task 8.
 
 Suggested order (plan v1.5; the plan's section 6 "Order from here (v1.5)" gives each step's
-scope and agent hours): Task A1's documents, with Task 13a in a worktree and the W2C part 1
-re-review → W2E → 6d and 3b → 6e → session W2, with 12a and 13b meanwhile → 10 → 12b → 14
-→ 15 (15A, then 15B) → the end-to-end session → 7e → 8 → M → 16 → 17 → the final review.
+scope and agent hours), in two tracks (R15):
+- The main tree: Task A1's documents and the W2C part 1 re-review → W2E → 6d and 3b → 6e →
+  session W2 → 10 → 12b → 14 → 15 (15A, then 15B) → the end-to-end session → 7e → 8 → M →
+  16 → 17 → the final review.
+- The worktree, beside it: 13a → 12a → 13b, each started after the last is integrated
+  (rule 10). Task 12a may overlap W2E, 6d, 3b and 6e; Task 13b may overlap W2E, 6d, 3b, 6e
+  and 10. Tasks 12b and 14 never overlap 13b: all three change `careerwright/planning`.
 Backend tasks fill any wait for a session.
 
 History: the v1.4 order (after session 2) was W1 → session W1 → 7c → W2 → session W2 → 10
@@ -381,9 +397,9 @@ app before release." Its decisions 1 to 8 are all yes.
 - Task 13a, in the worktree `wt-13a`.
 - The W2C part 1 re-review (read-only); its open findings feed Task W2E.
 
-**Next, in order** (the suggested order above): W2E → 6d and 3b → 6e → session W2, with
-12a and 13b meanwhile → 10 → 12b → 14 → 15 → the end-to-end session → 7e → 8 → M → 16 → 17
-→ the final review.
+**Next, in order** (the suggested order above): in the main tree, W2E → 6d and 3b → 6e →
+session W2 → 10 → 12b → 14 → 15 → the end-to-end session → 7e → 8 → M → 16 → 17 → the final
+review; in the worktree, 13a (running) → 12a → 13b, each after the last is integrated.
 
 **Where the remaining Task W2 work went** (plan v1.5):
 
@@ -765,8 +781,9 @@ frozen install passes with no lockfile change.
 **Preconditions:** Task W2E complete. ADR 0015, the amended ADRs 0006, 0007 and 0012 and the
 `CLAUDE.md` discovery invariant are in place (Task A1, applied). No human session: session
 W2 judges the result.
-**Parallel:** may overlap Task 3b, 13a or 13b. Not 12a (both may change the profile's
-schema) or 6e.
+**Parallel:** may overlap Task 3b, and Task 13a, 12a or 13b in the worktree. Task 12a may
+also change the profile's schema: the one integrated second rebases, renumbers its
+migration and regenerates the client (R15). Not 6e.
 
 Sprint card: "Sprint 2 Deliver conversation and career discovery", S2.8 (plan v1.5). ADR
 0015 (the role space); ADR 0007 decisions 4, 5, 13 and 14, ADR 0006 decision 5 and ADR 0012
@@ -779,6 +796,14 @@ suggestion quality at session W2; at most one matching round. The slate's word r
 change (R11).
 
 Deliver:
+- **First, facts instead of sentences** (R11; the audit's code appendix B, findings F3 and
+  F7), ahead of the role-space work below. Discovery's search notes and its title-idea lines
+  become structured facts in the API: found work, found none or not searched, with the
+  reason code. The web words them from `src/lib/vocabulary.ts`, with exhaustive maps, and
+  the backend composes no sentence the person reads. What each note reports doesn't change
+  (R11 freezes the notes); only where its words live does. Tests check the facts; one test
+  per fixed sentence checks its words. The role space's new notes below (the UK title list,
+  the person's own words, "None of these is my job") are born as facts.
 - **The first question finds any UK title.** As the person types, titles come from the
   pinned ESCO release and the pinned ONS SOC 2020 coding index (already imported for pay
   codes), ESCO first on ties; an ONS title is marked "UK job title (ONS)". "Use my own
@@ -787,12 +812,12 @@ Deliver:
   within a second, with no model call, without a key and in the demo; a browser test
   proves the world answers within ten seconds of the first answer.
 - **"Which of these is closest?"** After an ONS title or the person's own words, the person
-  sees the ESCO occupations in that title's ONS group and "None of these is my job". With
-  none, the role has no ESCO seed, and the words say what isn't known yet without asking
-  anyone to pick another job. A title ONS codes to more than one group shows every group,
-  none picked. The type-ahead's partial results ask "Careerwright couldn't match that
-  title in ESCO. Is it one of these?", and "None of these is my job" leads to the person's
-  own words.
+  sees the ESCO occupations in that title's ISCO-08 group, as the ONS index codes it, and
+  "None of these is my job". With none, the role has no ESCO seed, and the words say what
+  isn't known yet without asking anyone to pick another job. A title the ONS index codes to
+  more than one ISCO-08 group shows every group, none picked. The type-ahead's partial
+  results ask "Careerwright couldn't match that title in ESCO. Is it one of these?", and
+  "None of these is my job" leads to the person's own words.
 - **Title ideas the ONS index lists become suggestions.** A discovery's title idea that the
   ONS index lists is shown in its own short list beside the slate, "found in the UK
   job-title index", with the answers it came from. An idea in no list is shown as not yet
@@ -816,16 +841,17 @@ Deliver:
 - Design inputs: the parked `concept_key` gap ("&" and accented titles don't match their
   plain spelling).
 - The lines that say a title isn't in ESCO change to say what Careerwright did with the
-  person's title (R11). The evaluation cases for unsupported-title rejection change so that
-  a title the ONS index lists passes (spec DIV-1). Regenerate the client after the API
-  changes.
+  person's title (R11), worded in the web from facts like the notes above. The evaluation
+  cases for unsupported-title rejection change so that a title the ONS index lists passes
+  (spec DIV-1). Regenerate the client after the API changes.
 
 Acceptance, in the demo workspace with no key and no network (the role-space appendix's
 test, in plain words):
 1. Type "Registered nurse", "Data quality analyst", "Prompt engineer" and "Doula" at the
    first question. Each appears as a title to pick, marked as a UK job title from ONS.
 2. Picking one keeps the exact words. The world answers within a second and offers the
-   ESCO occupations in the same ONS group and "None of these is my job".
+   ESCO occupations in its ISCO-08 group, as the ONS index codes it, and "None of these is my
+   job".
 3. Type "Bookkeeping assistant", which neither list holds. "Use my own words" is offered and
    kept, and the world still answers. It says what isn't known yet and asks no one to pick a
    different job.
@@ -834,13 +860,17 @@ test, in plain words):
    found, never as a suggestion.
 5. No screen states skills, pay, readiness or openings for these titles beyond what their
    sources hold.
+6. Discovery's search notes and title-idea lines, and the new notes above, arrive as facts
+   with a reason code and carry no sentence; the web words them, and one test per fixed
+   sentence checks its words.
 
 Also: a plural or punctuated title resolves the same in every consumer of the stored target
 record; `make check` and `make acceptance` pass.
 
 Register: closes DIV1-13, DIV1-14, PROF-10, PROF-11 and MAP1-09, and the ONS part of
 DIV1-04; updates DIV1-03, DIV1-10, REC1-06 and PROF-08 (seniority); closes PROF-12 or
-records it as deferred.
+records it as deferred; the Task 6d parts of PROF-07 (pasted CV text through the same
+commands as a direct edit) and TEST1-15 (the unsupported-title evaluation cases).
 
 ## Task 6e: Sprint 2 — research this role (S2.9, the role space's second step, plan v1.5)
 
@@ -889,7 +919,8 @@ something changes nothing. Offline fixtures cover each of those cases; `make che
 `make acceptance` pass.
 
 Register: closes DIV1-15 and the independent-source part of DIV1-04; the Task 6e parts of
-MODEL-08, SEC-05 and TEST1-10.
+DIV1-03 and REC1-06 (a found role as a provisional concept, grounded by its pages), DIV1-10
+(user-proposed titles corroborated outside ESCO), MODEL-08, SEC-05 and TEST1-10.
 
 ## Task 7: Sprint 3 — evidence acquisition backend (S3.1–S3.4, reduced S3.6)
 
@@ -1082,13 +1113,15 @@ Deliver:
   public inputs, capped).
 
 Acceptance: an option found by research round-trips as a not-reviewed record with its
-spans, and a route built on it reads qualified; a page that tells the model to do something
-changes nothing; offline fixtures cover structured data, extraction and a refused page; the
-live scores are reported with their denominators; `make check` and `make acceptance` pass.
+spans, and a route built on it reads qualified in Routes, in plain words; a page that tells
+the model to do something changes nothing; offline fixtures cover structured data,
+extraction and a refused page; the live scores are reported with their denominators; `make
+check` and `make acceptance` pass.
 
 Register: closes OPTN-12; the courses and funding parts of TEST1-13; FRESH-02's course and
 funding ages on workspace records; the Task 7e parts of ACQ-03, ACQ-07, API-06, MODEL-08,
-SEC-05 and TEST1-10.
+OPTN-09 (researched records `proposed`, never in the pack), SEC-05, TEST1-09 (the pack's
+course and funding pages run live) and TEST1-10.
 
 ## Task W1: Sprint W — the spike of three directions (SW.1)
 
@@ -1155,8 +1188,9 @@ design references' contrast and screenshot checks pass.
 **Preconditions:** Task A1 approved (2026-10-31) and its changes applied; the scoped
 re-review of W2C part 1's fix round 1 reported (the controller passes its open findings in
 the dispatch). No human session: session W2 follows Tasks 6d, 3b and 6e.
-**Parallel:** may overlap Task 13a or 13b (in a worktree). Not 6d, 3b or 12a: they change
-the same screens, the account menu or the profile.
+**Parallel:** may overlap Task 13a, 12a or 13b in the worktree (Task 12a under R15's
+rebase rules: it may also change the profile). Not 6d or 3b: they change the same screens
+or the account menu.
 
 Sprint card: "Sprint W Build the world": SW.4 and SW.6, the acceptance as plan v1.5 reshapes
 it, and the coherence review. Plan section 4 ("practical first", and on a phone the decision
@@ -1249,10 +1283,11 @@ From plan v1.5 (the audit's rulings and findings):
 - **Roles outside ESCO** (Tasks 6d and 6e) and titles from live postings appear on the map.
   How they are grouped where no ESCO occupation joins them is to be settled by Task 8.
 - **The role card** (spec section 5): the role, its other names, the workday, pay as its
-  sources hold it (an ONS-coded title's ASHE figures for its ONS group, labelled the
-  group's; ADR 0010, amendment), AI evidence by group, evidence quality and dates, and an
-  outlook of "not enough evidence yet" (trend history isn't available in L0). Job relevance
-  shows its parts, and "matches your preferences" only where they were assessed.
+  sources hold it (an ONS-coded title's ASHE figures for its SOC 2020 unit group, labelled
+  the group's; ADR 0010, amendment), AI evidence by its ISCO-08 group, evidence quality and
+  dates, and an outlook of "not enough evidence yet" (trend history isn't available in L0).
+  Job relevance shows its parts, and "matches your preferences" only where they were
+  assessed.
 - **Live listings** through Adzuna and the source search, in a live workspace. Before a
   research run starts, the person sees its estimated cost (Task 3b's estimate), and a run
   they started can be cancelled.
@@ -1274,6 +1309,12 @@ unsupported, with denominators (TEST1-13; live calls R5). If no earlier task has
 transcribe session 1's outcome from the product owner's own record (R10): H-06 into the
 register and `corpus/README.md`, and H-12 into ADR 0007's checklist and the register.
 Second visual review package (sparse and dense data) per R2. `docs/reviews/sprint-3.md`.
+
+Acceptance (plan v1.5, beside the sprint card's): one plain line stands where the salary and
+AI-range filters were, and the pay lens keeps its lanes; a role card's outlook reads "not
+enough evidence yet"; an ONS-coded title's pay is its SOC 2020 unit group's ASHE figures,
+labelled as the group's, never as the title's or the person's; `make check` and `make
+acceptance` pass.
 
 Register (plan v1.5): the VIS1 rows, AIR1-01, AIR1-08, AIR1-10 and AIR1-13; JOB-01, JOB-04,
 JOB-06 and JOB-07; the Task 8 parts of ACQ-03, ACQ-07, DUR-03, FRESH-02, MODEL-08, UI-09
@@ -1312,7 +1353,8 @@ earlier ranks.
 **Preconditions:** Task 7c complete (the reviewed pack, after session 2's H-07 on its
 course outcomes; Task 11 comes before it); Task 6d complete (the stored target record, plan
 v1.5); session W2 held (R10). No dependency on Task 12b or Task 8.
-**Parallel:** may overlap Task 12a or 13b. Not 12b, which follows it.
+**Parallel:** may overlap Task 13b in the worktree. Not 12a (the worktree track runs it
+beside Tasks W2E, 6d, 3b and 6e only) or 12b, which follows it.
 
 Session 2's Sprint 2 design findings are applied by Task W2 (plan v1.4). Build the Skills
 chapter as its place in the world, to Task W2's design references (plan section 4; R13):
@@ -1354,6 +1396,11 @@ review states wherever its records appear (R9). The live path's scoring on the c
 moves to Task 7e, which builds the course extractor (plan v1.5; TEST1-13). Record H-07's
 Sprint 4 part from the product owner's own session 2 record. `docs/reviews/sprint-4.md`.
 
+Acceptance (plan v1.5, beside the sprint card's): a target outside the option pack, or one
+whose closest occupation is "None of these is my job", shows "not assessed yet, here's what
+it asks" and never a readiness result; a skill the person marked "not part of my job" is
+shown as such and is never evidence; `make check` and `make acceptance` pass.
+
 Register (plan v1.5): MAP1-01, MAP1-06, ASSESS-02, ASSESS-03 and RDY1-03; the Task 10 parts
 of MAP1-09, STATE-08, PROF-07, OPTN-08 and SEC-09.
 
@@ -1393,10 +1440,14 @@ uncertain) and a record sheet. Record each item as "not run — requires human".
 ## Task 12a: Sprint 5 — the person's planning inputs, stored and confirmed (backend; split from Task 12, plan v1.5)
 
 **Preconditions:** Task 7c complete (the reviewed pack 0.2.0, and session 2's answers to
-D12–D17); Task 11 complete. No human session, and it never waits for one: in the suggested
-order it runs while session W2 is awaited.
-**Parallel:** may overlap Task 3b, 6e, 10, 13a or 13b. Not 6d (both may change the
-profile's schema) or 12b.
+D12–D17); Task 11 complete; Task 13a integrated (the worktree track: 13a, then 12a, then
+13b, each after the last is integrated; this task changes the planning rules that 13a's
+oracle and 13b's solver read). No human session, and it never waits for one: in the
+suggested order it runs while session W2 is awaited.
+**Parallel:** in the worktree, it may overlap the main-tree Tasks W2E, 6d, 3b and 6e, under
+R15's rebase rules: it adds API, migrations and the generated client, so it rebases onto
+`l0-local-release`, renumbers a migration whose number another task took and regenerates
+the client. Not 13a or 13b (the same track), 10 or 12b.
 
 Sprint card: "Sprint 5 Compile real options into an honest monthly model": the
 person-supplied inputs of S5.3 and S5.4, stored first as a backend slice (plan v1.5). ADR
@@ -1442,15 +1493,17 @@ null, never a partial figure; unknown work rights never read as ineligible; `mak
 and `make acceptance` pass.
 
 Register: closes PLN-11, BND1-04 and BND1-05; the Task 12a parts of OUT1-03 (overrides
-stored), PLN-06 (stacking) and API-05 (the confirmed inputs a solve needs).
+stored), OPTN-03 (the inputs the checkpoint confirms), PLN-06 (stacking) and API-05 (the
+confirmed inputs a solve needs).
 
 ## Task 12b: Sprint 5 — the Options chapter: review checkpoint, "add an option yourself" and the funding corpus + Sprint 5 review (split from Task 12, plan v1.5)
 
 **Preconditions:** Tasks 12a and 10 complete; Task 7c complete (the reviewed pack; session
 2, with its H-07 and H-13 records, and Task 11 come before it); session W2 held (R10). No
 dependency on Task 8.
-**Parallel:** may overlap Task 13b. Not 10, 14 or 7e: they share the Options chapter or the
-planning catalogue.
+**Parallel:** none. Task 13b changes `careerwright/planning`, as this task's planning
+catalogue does (rule 10); Tasks 10, 14 and 7e share the Options chapter or the planning
+catalogue.
 
 Build the Options chapter as its place in the world, to Task W2's design references (plan
 section 4; R13). Its moment, a gap's first credible bridge, is Task M's (plan v1.5).
@@ -1474,6 +1527,15 @@ From plan v1.5:
   settled way needs one.
 - **A target with no reviewed options** says so in plain words, and offers "add an option
   yourself".
+- **The facts the route search lacks** (Task 13a's measurement, its report's "The answer
+  for Task 13b"). In the reviewed option pack 0.2.0 every offering lacks at least one fact
+  the route search needs (a start date, a cost, weekly hours or an entry confirmation), so
+  today every reviewed target's search says "unresolved", never a route. The checkpoint
+  shows, for each option, which fact is missing, in plain words. The person can supply it as
+  their own figure, labelled as theirs and not reviewed, or choose a stated intake. Entry
+  confirmations come from Skills (Task 10) where they are readiness facts. The search then
+  runs on what they supplied. Where a supplied figure is stored is to be settled by Task
+  12b.
 - The live path's scoring on the funding pages moves to Task 7e, which builds the funding
   extractor (TEST1-13).
 - The controller's carried items for this task come in the dispatch.
@@ -1494,11 +1556,17 @@ register, plan v1.5; its misunderstandings are Task 14's scope inputs.)
 Acceptance (plan v1.5, beside the sprint card's): an added option round-trips as a
 not-reviewed record with its source, and a route resting on it reads qualified; a target
 outside the pack shows the plain line and the add action; the checkpoint never truncates
-silently; `make check` and `make acceptance` pass; the visual review package per R2.
+silently; for each option the checkpoint names the fact the search lacks; P01, with the
+missing facts supplied at the checkpoint, gets computed routes from the route search (shown
+in Routes from Task 14), each qualified where it rests on a figure the person supplied, and
+without them the result names what is missing, never "no route"; `make check` and `make
+acceptance` pass; the visual review package per R2.
 
 Register: closes OPTN-11, OPTN-03, OPTN-06, OUT1-09 and BND1-07; the Task 12b parts of
-OPTN-05, OPTN-07, OPTN-08, OPTN-09, OUT1-04, FUNDING-04, FUNDING-05, FRESH-02, FRESH-06,
-ACQ-07, API-06 and TEST1-14.
+OPTN-05, OPTN-07, OPTN-08, OPTN-09, OPTN-13 (the missing facts at the checkpoint), OUT1-04,
+FUNDING-04, FUNDING-05, FRESH-02, FRESH-06, ACQ-07, API-06, STATE-06 (a changed constraint
+shows the options it affects before invalidating them), TEST1-09 (the pack's funding pages
+consumed) and TEST1-14.
 
 ## Task 13a: Sprint 6a — enumerator, checker, oracle and layers on instances that complete (S6.1, S6.2, S6.5–S6.7)
 
@@ -1506,9 +1574,11 @@ ACQ-07, API-06 and TEST1-14.
 session 2, with the reviewed TRACE-01 checker, come before it; R10).
 **Order (plan v1.5):** dispatched on 2026-10-31 in the worktree `wt-13a`, beside Task A1's
 documents (R15), before the Skills, Options and Routes tasks; its measured sizes decide
-Task 13b's scope. Its scope is unchanged.
+Task 13b's scope. Its scope is unchanged. It is the first of the worktree track (13a, then
+12a, then 13b, each after the last is integrated; dependency rule 10).
 **Parallel:** may overlap any task outside `careerwright/planning` and the optimiser: Task
-A1's documents, W2E, 6d or 3b.
+A1's documents, W2E, 6d or 3b. Not 12a or 13b: they follow it in the worktree track, because
+Task 12a changes the planning rules this task's oracle reads.
 
 Sprint card: "Sprint 6a Prove the optimiser and layers on instances that complete". Whole
 sprint. Spec section 12 (OPT-1, including "Consequence of the M0 limits", ROU-1, FIN-1,
@@ -1535,9 +1605,12 @@ completion is "not complete at that size", never infeasible (OPT1-16).
 
 ## Task 13b: Sprint 6b — durable archive, caps, child process and ranking benchmark (S6.3, S6.4, S6.8) + Sprint 6 review
 
-**Preconditions:** Task 13a complete, with its measured sizes. No human session.
+**Preconditions:** Task 13a complete, with its measured sizes; Task 12a integrated (the
+worktree track: 13a, then 12a, then 13b, each after the last is integrated; Task 12a changes
+the planning rules this task's solver reads). No human session.
 **Parallel:** may overlap any task outside `careerwright/planning` and the optimiser: W2E,
-6d, 3b, 6e, 10 or 12b. Not 12a (planning) or 14.
+6d, 3b, 6e or 10. Not 12a (the same track), 12b or 14: they change `careerwright/planning`
+too (Task 12b's planning catalogue reads the person's own options).
 
 Sprint card: "Sprint 6b Make the search durable and bounded at full scale". Whole sprint.
 Spec section 12 (OPT-1, ROU-1), 17 (the cancellable solver process), 20 (TEST-1).
@@ -1565,6 +1638,10 @@ the narrowing (fewer concepts, one start, a shorter horizon) that Task 13a's mea
 suggest (OPT1-15). Regression family LIMITS (caps, cancellation, truncated empty).
 Benchmark 50,000-point ranking. `docs/reviews/sprint-6.md`, covering 6a and 6b.
 
+Register (plan v1.5): the OPT1 and LIMITS rows it owns, as sized (the archive, the caps and
+their stop reasons, the child process, the rank stage and the benchmark), STATE-03 and
+DUR-05; the Task 13b part of API-02 (`SOLVE_LIMIT_REACHED`).
+
 ## Task 14: Sprint 7 — coordinated route comparison (S7.1–S7.6) + Sprint 7 review
 
 **Preconditions:** Tasks 13b and 12b complete (plan v1.5); session 2's findings exist (the
@@ -1588,6 +1665,14 @@ labels. Also from plan v1.5:
   feasible".
 - The real Routes chapter replaces the demo route preview, which Task W2E took out of the
   person's path.
+- **Routes on the facts the person supplied** (Task 13a's measurement, its report's "The
+  answer for Task 13b"). In the reviewed option pack 0.2.0 every offering lacks at least one
+  fact the route search needs (a start date, a cost, weekly hours or an entry confirmation),
+  so today every reviewed target's search says "unresolved", never a route. Task 12b's
+  checkpoint names each missing fact and lets the person supply it, as their own figure
+  labelled theirs and not reviewed, or choose a stated intake; the search runs on what they
+  supplied. A route resting on a figure the person supplied is qualified, and says so in
+  plain words. Without the facts, Routes names what is missing, never "no route".
 - The solve's stage checks (API-05): a budget-qualified solve needs the person's confirmed
   limits, and an economic solve a horizon and a baseline (Task 12a's inputs).
 - Four planning-model gaps carried from the completed backend tasks: information-gathering
@@ -1615,9 +1700,18 @@ showed; from plan v1.5 its human part is the end-to-end session, formative.
 `docs/reviews/sprint-7.md`, closed on this task's checks; the end-to-end session's outcome
 is added later from the product owner's own record.
 
+Acceptance (plan v1.5, beside the sprint card's): a route built on an option the person
+added (Task 12b) reads qualified on screen, in plain words, never an unqualified
+"affordable and feasible"; P01, with the missing facts supplied at the checkpoint, gets
+computed routes in Routes, each qualified where it rests on a figure the person supplied,
+and without them Routes names what is missing, never "no route"; `make check` and `make
+acceptance` pass.
+
 Register (plan v1.5): the VIS2 rows, ROU1-04, PARETO-04, DIRECTAI-02 and TRACE01-05; the
-Task 14 parts of OUT1-04, RDY1-02, API-04, API-05, DUR-03, UI-09 and FRESH-06; PLN-01,
-PLN-04, OPTN-04 and OUT1-08, as settled.
+Task 14 parts of OUT1-04, OPTN-13 (routes on the supplied facts), RDY1-02, API-02
+(`NO_ROUTE_IN_BOUNDED_MODEL`), API-04, API-05, API-06 (a route locates its supporting
+spans), DUR-03, STATE-06 (a changed constraint shows the routes it affects before
+invalidating them), UI-09 and FRESH-06; PLN-01, PLN-04, OPTN-04 and OUT1-08, as settled.
 
 ## Task 15: Sprint 8 — chosen plan, progress, revision and exports (S8.1–S8.6) + Sprint 8 review
 
@@ -1629,7 +1723,11 @@ run — requires human" with its checklist (R2) and is not a dispatch preconditi
 **Two slices** (plan v1.5): **15A** first: S8.1, S8.2, S8.5 and S8.6 (the snapshot, the
 Plan chapter, print, JSON and calendar), with the workspace's data export, already in the
 API, given its button beside the plan's exports. Then **15B**: S8.3 and S8.4 (revise and
-replan). Both are M0 and both stay in L0. Finish: the end-to-end session's package (R10,
+replan), with the revision history of the person's answers: a small view over the profile's
+saved versions, which the API already lists (`GET .../profile/versions`), and from which undo
+already works. It is an M0 promise (spec section 3: "Undo and revision history are always
+available"; STATE-06), so it is not an L0 deferral (the controller's ruling, 2026-10-31).
+Both slices are M0 and both stay in L0. Finish: the end-to-end session's package (R10,
 R2), in plain words, with its questions and a record sheet, each item "not run — requires
 human".
 
@@ -1654,7 +1752,7 @@ snapshots, exports, cache and workflow references. `docs/reviews/sprint-8.md`.
 
 Register (plan v1.5): the PLAN and EXP rows, AIR1-09, VERSIONS-02, TRACE01-04, FRESH-05 and
 SEC-10; the Task 15 parts of MODEL-04 (a saved plan prints with the key revoked), API-06,
-DUR-06, SEC-06 and OPT1-15.
+DUR-06, SEC-06, OPT1-15 and STATE-06 (the answers' revision history on screen, 15B).
 
 ## Task M: Sprint M — the chapters' moments (plan v1.5)
 
@@ -1708,9 +1806,10 @@ owner, 2026-10-31).
 From plan v1.5: every rubric category must reach at least 4 (H-01, the release bar); the
 world's frame budgets are measured again on the release candidate, with the product owner
 warned first; the live journey includes a persona whose target is outside ESCO (TEST1-15);
-the discovery evaluation adds its relevance-only and common-careers baselines (DIV1-08);
-and the release checks of R10 are prepared, including the name review of committed excerpts
-before any push.
+the discovery evaluation adds its relevance-only and common-careers baselines (DIV1-08),
+and its release report states that L0 measures no language or region disparities because
+it has one language and one region (the plan's own note, plan section 1); and the release
+checks of R10 are prepared, including the name review of committed excerpts before any push.
 
 Sprint card: "Sprint 9 Qualify and hand over the local release". Whole sprint plus the
 plan section 11 final reviewer demonstration (automatable parts).
@@ -1726,6 +1825,13 @@ manifests, licence notices, ADRs, runbook with quickstart/troubleshooting/reset/
 restore, release evidence). Release report `docs/release/L0-release-report.md`
 distinguishing passed / failed / blocked / not run. Tag the tested local release
 (`l0-rc1`); never publish a service. `docs/reviews/sprint-9.md`.
+
+Register (plan v1.5): the Task 16 parts of DIV1-08 (the baselines, exposure concentration and
+long-tail coverage; its language and region part as the plan's note), REC1-09 (the powered
+comparison, its pass rule decided first), TEST1-15 (the live journey), PLN-09, MODEL-03
+(every adapter's contract tests on the final candidate) and API-02 (every error code on the
+final candidate); the frame-budget rows with Task M; the human gates H-01, H-03, H-04, H-05
+and H-08, prepared and recorded "not run — requires human".
 
 ## Task 17: Sprint 10 — operator's manual and friction pass (S10.1–S10.5)
 
