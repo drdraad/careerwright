@@ -26,7 +26,10 @@ adds variants of later concepts.
    an application deadline already passed, or, alone, a direct cost or a month's payments
    above its cap. Each is computed from the variant by itself (its dates, its payments and
    own support, its hours), so every route containing it repeats it, or, for unknown weekly
-   hours, is unknown or over the limit in each month the variant is active.
+   hours, is unknown or over the limit in each month the variant is active. The screen runs
+   before every other cut, the empty route's included, so an option set aside for an unknown
+   always reaches the outcome; its record keeps every unknown and every breach its own check
+   found, apart.
 3. *Spend caps.* A route's direct cost is the sum of each variant's own net cost, never below
    zero (a variant's support reduces only its own fees), and a month's payments are the sum of
    each variant's own payments in it, beside debt repayments fixed by the inputs. Adding a
@@ -97,7 +100,7 @@ from careerwright.planning.families import (
 from careerwright.planning.layers import peel
 
 ALGORITHM_VERSION = "canonical-dfs-1"
-PRUNING_VERSION = "sound-pruning-1"  # the six rules above: change it with any rule
+PRUNING_VERSION = "sound-pruning-2"  # the six rules above: change it with any rule
 _READINESS_UNKNOWN = frozenset(
     {ReadinessState.NOT_YET_ASSESSED, ReadinessState.INSUFFICIENT_COVERAGE}
 )
@@ -181,11 +184,13 @@ class InstanceSize(StrictModel):
 
 
 class SetAside(StrictModel):
-    """A variant no route can contain, with its own findings (rule 2)."""
+    """A variant no route can contain (rule 2), with everything its own check found."""
 
     variant_id: str
-    codes: list[FindingCode]
-    kind: Literal[FindingKind.VIOLATION, FindingKind.UNRESOLVED]
+    codes: list[FindingCode]  # its own findings that set it aside
+    kind: Literal[FindingKind.VIOLATION, FindingKind.UNRESOLVED]  # a breach of its own, or not
+    unresolved: list[FindingCode]  # every unknown it has: what the person can confirm
+    violations: list[FindingCode]  # every rule it breaks as stated, alone: what rules it out
 
 
 class Schedule(StrictModel):
@@ -314,11 +319,14 @@ class _Search:
         if self.blocking:
             self.pruned[PruningRule.INPUT_UNRESOLVED] += 1  # rule 1
             return
-        rule = self._cut(root) if self.concepts else None
+        # The screen comes before any cut, so every option set aside for an unknown reaches
+        # the outcome, however early the search ends (review 13a, Important 1): the cut below
+        # sees an undated option as never active, so it could otherwise hide one.
+        singles = self._screen(root)
+        rule = self._cut(root) if singles else None
         if rule is not None:
             self.pruned[rule] += 1
             return
-        singles = self._screen(root)
         for n, single in enumerate(singles):
             try:
                 self._expand(single)
@@ -343,11 +351,15 @@ class _Search:
                 violation = any(
                     c in _OWN_VIOLATIONS or c is FindingCode.APPLICATION_TOO_LATE for c in codes
                 )
+                unresolved = _codes(check, FindingKind.UNRESOLVED)
+                unresolved += [c for c in codes if c in _OWN_UNRESOLVED and c not in unresolved]
                 self.set_aside.append(
                     SetAside(
                         variant_id=variant.variant_id,
                         codes=codes,
                         kind=FindingKind.VIOLATION if violation else FindingKind.UNRESOLVED,
+                        unresolved=unresolved,
+                        violations=_codes(check, FindingKind.VIOLATION),
                     )
                 )
                 self.excluded.add(variant.variant_id)
@@ -449,6 +461,15 @@ class _Search:
                 finding.code not in codes
             ):
                 codes.append(finding.code)
+        # Its weekly hours are unknown in a month it is active, even where the checker reports
+        # that month as over the limit because the known load already is.
+        untimed = (
+            variant.placed
+            and variant.weekly_hours is None
+            and any(1 <= m <= inputs.horizon_months for m in variant.active)
+        )
+        if untimed and FindingCode.WORKLOAD_UNKNOWN not in codes:
+            codes.append(FindingCode.WORKLOAD_UNKNOWN)
         return codes
 
     def _exceeds(self, node: _Node, variant: CompiledVariant) -> PruningRule | None:
@@ -661,6 +682,15 @@ def _narrowings(size: InstanceSize) -> list[Narrowing]:
         found.append(Narrowing.ONE_START)
     if size.months > 1:
         found.append(Narrowing.SHORTER_HORIZON)
+    return found
+
+
+def _codes(check: RouteCheck, kind: FindingKind) -> list[FindingCode]:
+    """A check's finding codes of one kind, each once, in the order found."""
+    found: list[FindingCode] = []
+    for finding in check.findings:
+        if finding.kind is kind and finding.code not in found:
+            found.append(finding.code)
     return found
 
 

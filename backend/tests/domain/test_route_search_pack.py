@@ -95,6 +95,22 @@ def test_each_reviewed_pack_target_completes_within_the_m0_limits_and_says_what_
     assert result.expanded_states == 1 + result.instance.variants
 
 
+@pytest.mark.req("OPT1-16", "OPT1-07")
+def test_a_set_aside_course_keeps_what_to_confirm_apart_from_what_already_rules_it_out() -> None:
+    result = search("bookkeeping-assistant-leeds")
+    [c09] = [s for s in result.set_aside if s.variant_id == "offering:C09"]
+
+    # To confirm: the person's entry requirements and the cost. Already ruled out as stated:
+    # nothing in the catalogue grants its admission, and its 35 hours a week on top of P01's
+    # 30-hour job exceed the 40 available (review 13a, Important 2).
+    assert c09.kind is FindingKind.UNRESOLVED
+    assert c09.unresolved == [
+        FindingCode.ENTRY_REQUIREMENTS_UNCONFIRMED,
+        FindingCode.COST_UNKNOWN,
+    ]
+    assert c09.violations == [FindingCode.PREREQUISITE_NOT_USABLE, FindingCode.WORKLOAD]
+
+
 @pytest.mark.req("OPT1-16")
 def test_a_dated_free_pack_course_without_weekly_hours_waits_for_a_timetable() -> None:
     result = search("it-support-technician-bristol")

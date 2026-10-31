@@ -35,9 +35,11 @@ from careerwright.planning.catalogue import (
 from careerwright.planning.compiler import (
     Baseline,
     Continuation,
+    MonthlyInput,
     PlanningInputs,
     ReadinessBasis,
     ReceiptTiming,
+    compile_input,
 )
 from tests.support.capability import (
     FIXTURES,
@@ -442,6 +444,23 @@ def directai_instance() -> tuple[PlanningInputs, Catalogue, ReadinessBasis]:
     )
     readiness = readiness_of({f"offering:{r['id']}": (ROW,) for r in routes})
     return inputs, catalogue, readiness
+
+
+def undated_relief() -> MonthlyInput:
+    """Review 13a, Important 1: a person who works 37 hours a week can manage only 25 from the
+    third month, and the one option that would lower the job's hours has no dates."""
+    inputs = person(
+        horizon=4,
+        opening=1_000_000,
+        hours=37,
+        availability=40,
+        pay=200_000,
+        weekly_availability_by_month=[40, 40, 25, 25],
+    )
+    reduced = pattern(WorkPatternKind.REDUCED_HOURS, 20, 120_000)
+    undated = option("reduced-undated", start=None, finish=None, hours=2, pattern=reduced)
+    readiness = readiness_of({"offering:reduced-undated": (ROW,)})
+    return compile_input(inputs, catalogue_of(undated), readiness=readiness)
 
 
 def month_start(first: date, months: int) -> date:

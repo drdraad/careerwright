@@ -54,7 +54,10 @@ class Solved:
     archive: dict[Route, tuple[int, int]]  # feasible and at the milestone: (months, cost)
     layers: dict[Route, int]  # every archived route's layer, however deep
     without_milestone: int
-    something_unknown: bool  # some route is unresolved, or its readiness is not yet known
+    # Some route is unresolved, a feasible route's readiness is not yet known, an input is not
+    # stated, or an option has an unknown of its own and no breach of its own: then "no route"
+    # would be a guess, because knowing the unknown might change the answer.
+    something_unknown: bool
 
 
 class Oracle:
@@ -94,12 +97,62 @@ class Oracle:
             without_milestone=sum(
                 c.status == "feasible" and c.months is None for c in checks.values()
             ),
-            something_unknown=any(
+            something_unknown=self._inputs_unknown()
+            or any(self._unknown_alone(v) for v in self.monthly.variants)
+            or any(
                 c.status == "unresolved"
                 or (c.status == "feasible" and c.months is None and c.readiness in NOT_YET_KNOWN)
                 for c in checks.values()
             ),
         )
+
+    def _inputs_unknown(self) -> bool:
+        """A hard limit, the weekly availability, or a baseline the comparison needs is not
+        stated."""
+        inputs = self.monthly.inputs
+        limits = (inputs.direct_spend_cap_minor, inputs.monthly_payment_cap_minor)
+        needs_baseline = (
+            inputs.objective_basis == "economic" or inputs.monthly_deficit_cap_minor is not None
+        )
+        return (
+            None in limits
+            or inputs.reserve_minor is None
+            or inputs.weekly_availability_by_month is None
+            or (needs_baseline and inputs.baseline is None)
+        )
+
+    def _unknown_alone(self, v: CompiledVariant) -> bool:
+        """The option has an unknown of its own (its dates, cost, weekly hours or entry
+        requirements, or a payment before the start) and breaks nothing that would rule out every
+        route containing it whatever the unknown turns out to be (its own spend above a cap, a
+        start before the planning start, a deadline already passed)."""
+        inputs = self.monthly.inputs
+        alone = _RouteCheck(self, [v])
+        alone._money(v)  # its own payments and support, and any single payment above the cap
+        horizon = alone._each_month()
+        unknown = (
+            not _placed(v)
+            or v.entry_unconfirmed
+            or not alone.costs_known
+            or (v.weekly_hours is None and any(_active(v, m) for m in horizon))
+        )
+        direct_cap, monthly_cap = inputs.direct_spend_cap_minor, inputs.monthly_payment_cap_minor
+        breach = (
+            alone.broken
+            or (_placed(v) and v.start_index is not None and v.start_index < 1)
+            or (
+                v.application_deadline is not None
+                and v.application_gate is not None
+                and v.application_gate not in inputs.initial_gates
+                and v.application_deadline < inputs.planning_start
+            )
+            or (direct_cap is not None and alone.direct > direct_cap)
+            or (
+                monthly_cap is not None
+                and any(alone.payments[m] + alone.debt[m] > monthly_cap for m in horizon)
+            )
+        )
+        return unknown and not breach
 
     def check(self, route: Route) -> Checked:
         return _RouteCheck(self, [self.by_id[v] for v in sorted(route)]).run()

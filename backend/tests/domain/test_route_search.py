@@ -20,8 +20,9 @@ from careerwright.planning.catalogue import (
     Variant,
     WorkPatternKind,
 )
-from careerwright.planning.checker import FindingCode, Scenario, Verdict
+from careerwright.planning.checker import FindingCode, FindingKind, Scenario, Verdict
 from careerwright.planning.compiler import (
+    Commitment,
     MonthlyInput,
     PlanningInputs,
     ReadinessBasis,
@@ -39,6 +40,7 @@ from careerwright.planning.search import (
 )
 from tests.support.capability import fixture
 from tests.support.planning import (
+    CONSTRUCTED,
     COURSES,
     ROW,
     START,
@@ -55,6 +57,7 @@ from tests.support.planning import (
     trace_inputs,
     trace_readiness,
     trace_route,
+    undated_relief,
 )
 
 # Enough cash that no constructed case below is about the reserve (it has its own tests).
@@ -76,8 +79,18 @@ def someone(**changes: Any) -> PlanningInputs:
     return person(opening=OPENING, **changes)
 
 
+def care(hours: int) -> Commitment:
+    return Commitment(label="care", hours_per_week=hours, cited=CONSTRUCTED)
+
+
 def course(
-    name: str, *, first: int = 0, months: int = 1, fee: int = 0, hours: int = 0, **extra: Any
+    name: str,
+    *,
+    first: int = 0,
+    months: int = 1,
+    fee: int = 0,
+    hours: int | None = 0,
+    **extra: Any,
 ) -> Option:
     """A course starting `first` months after the planning start, for `months` calendar
     months, its fee paid in its first month."""
@@ -458,6 +471,11 @@ def test_an_option_no_route_can_contain_is_set_aside_with_its_reason() -> None:
         "dear": [FindingCode.DIRECT_SPEND_CAP],
         "undated": [FindingCode.DATES_UNKNOWN],
     }
+    # Everything each one's own check found, unknowns apart from violations.
+    assert {s.variant_id: (s.unresolved, s.violations) for s in result.set_aside} == {
+        "dear": ([], [FindingCode.DIRECT_SPEND_CAP]),
+        "undated": ([FindingCode.DATES_UNKNOWN], []),
+    }
     assert routes(result) == [("fine",)]
     assert result.coverage is Coverage.COMPLETE
 
@@ -484,6 +502,35 @@ def test_an_option_with_unknown_dates_leaves_the_result_unresolved_never_no_rout
 
     assert result.coverage is Coverage.COMPLETE
     assert result.schedules == []
+    assert result.outcome is Outcome.UNRESOLVED
+
+
+@pytest.mark.req("OPT1-07", "LIMITS-05")
+def test_an_option_without_weekly_hours_is_set_aside_as_unknown_whatever_the_known_load() -> None:
+    # The job and the care already take 38 of 36 hours, so the checker reports this course's
+    # months as over the limit rather than unknown; its own hours are still not stated.
+    inputs = someone(horizon=3, hours=30, availability=36, commitments=[care(8)])
+    options = [course("untimed", months=2, hours=None)]
+    result = solve(inputs, options, readiness_of({"offering:untimed": (ROW,)}))
+
+    assert [(s.variant_id, s.kind) for s in result.set_aside] == [
+        ("untimed", FindingKind.UNRESOLVED)
+    ]
+    assert FindingCode.WORKLOAD_UNKNOWN in result.set_aside[0].codes
+    assert result.outcome is Outcome.UNRESOLVED
+
+
+@pytest.mark.req("OPT1-07", "LIMITS-05", "OPT1-02")
+def test_an_empty_route_over_its_hours_never_hides_an_undated_option_behind_no_route() -> None:
+    result = search_routes(undated_relief())
+
+    # The empty route breaks the workload limit and no dated option can lower the job's hours,
+    # so nothing is feasible as stated; but the undated option might, once its dates are known.
+    assert result.coverage is Coverage.COMPLETE
+    assert result.schedules == []
+    assert [(s.variant_id, s.kind) for s in result.set_aside] == [
+        ("reduced-undated", FindingKind.UNRESOLVED)
+    ]
     assert result.outcome is Outcome.UNRESOLVED
 
 

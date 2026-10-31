@@ -8,7 +8,7 @@ on (the reserve, receipts, support, debt, the deficit cap, applications, economi
 from datetime import date, time
 
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, example, given, settings
 from hypothesis import strategies as st
 
 from careerwright.planning.catalogue import (
@@ -47,6 +47,7 @@ from tests.support.planning import (
     person,
     readiness_of,
     support,
+    undated_relief,
 )
 from tests.support.route_oracle import Oracle
 
@@ -224,8 +225,20 @@ def instances(draw: st.DrawFn, *, unknowns: bool) -> MonthlyInput:
 INSTANCES = st.one_of(instances(unknowns=True), instances(unknowns=False))
 
 
+@pytest.mark.req("OPT1-07")
+def test_the_oracle_counts_an_option_s_own_unknown_as_something_unknown() -> None:
+    oracle = Oracle(undated_relief()).solve()
+
+    # Every route breaks the workload limit as stated, but the undated option's dates might
+    # lower the job's hours once known (review 13a, Important 1).
+    assert not oracle.archive
+    assert all(c.status == "not_feasible" for c in oracle.checks.values())
+    assert oracle.something_unknown
+
+
 @pytest.mark.req("OPT1-08", "OPT1-02", "OPT1-07")
 @SLOW
+@example(monthly=undated_relief())  # review 13a, Important 1
 @given(monthly=INSTANCES)
 def test_the_search_finds_exactly_the_oracle_s_feasible_schedules_objectives_and_layers(
     monthly: MonthlyInput,

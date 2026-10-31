@@ -48,14 +48,22 @@ measurements here.
    (spec section 12, `ω0`), so candidates are checked there. The delay, no-award and no-offer
    stress cases stay `evaluate_route` on a chosen route (ADR 0013 decision 9).
 
-4. **Sound pruning** (`PRUNING_VERSION = "sound-pruning-1"`). A subtree is cut only when no
-   route in it can be feasible. The proofs are in `search.py`'s docstring; in short:
+4. **Sound pruning** (`PRUNING_VERSION = "sound-pruning-2"`; fix round 1 changed rule 2 and
+   the order). A subtree is cut only when no route in it can be feasible. The proofs are in
+   `search.py`'s docstring; in short:
    1. an input-level unknown (an unstated hard limit, availability, or the baseline an
       economic comparison needs) is in every route: nothing further is checked;
    2. a variant whose own finding every route containing it repeats is set aside for the whole
       tree, with its reasons: unknown dates, cost, entry requirements or weekly hours, a
       payment due before the planning start, a start before it, a passed application deadline,
-      or, alone, a cost or a month's payments above a cap;
+      or, alone, a cost or a month's payments above a cap. Unknown weekly hours are read from
+      the variant itself (dated, active in the horizon, no hours stated), even where the checker
+      reports that month as over the limit. This screen runs before any other cut, the empty
+      route's included, so every option set aside for an unknown reaches the outcome (review
+      13a, Important 1: the empty route's workload cut once hid an undated option that could
+      have lowered the job's hours). Each set-aside record keeps everything its own check found:
+      its unknowns (`unresolved`) apart from the rules it breaks as stated, alone
+      (`violations`);
    3. a route's direct cost and each month's payments are sums of each variant's own, never
       below zero, so a child already above the direct-spend or monthly payment cap is never
       checked;
@@ -148,16 +156,21 @@ measurements here.
     milestone.
 - **The reviewed pack completes at once:** four targets, at most four concepts each, and
   every offering is set aside until the person confirms a date, a cost, a timetable or an
-  entry requirement (Task 12). No pack instance needs Task 13b's machinery to complete. Even
+  entry requirement (Task 12). Two also break a rule as stated: C04 paid in full (£2,995 above
+  both of P01's £1,500 caps) and C09 (no admission in the catalogue; its hours beside P01's
+  job). No pack instance needs Task 13b's machinery to complete. Even
   a catalogue the size of the whole pack (ten synthetic pack-shaped courses, two starts each:
   26,025 selected sets) completes in under 15 seconds with no limit binding.
 - **For Task 13b:** about 40% of a check is the readiness assessment, repeated for the same
   completed offerings across candidates; memoising `assess` by its completed set would be the
   cheapest speed-up. Peeling sorts once per layer, so a 50,000-point archive ranks in well under
   a second, but ranking still runs inside the search's call and outside its clock.
-- **For Task 14:** show the outcome's words, the set-aside reasons ("what to confirm"), the
-  narrowings when stopped, families first with their best layer, and equal points with every
-  route behind them.
+- **For Task 14:** show the outcome's words; for each option set aside, "what to confirm" (its
+  `unresolved` list) apart from "what already rules it out as stated" (its `violations`), so
+  the person is never told to confirm something that would still leave the option ruled out
+  (C09: confirm its entry requirements and cost; as stated, nothing grants its admission and
+  its 35 hours a week exceed the 40 available beside P01's job); the narrowings when stopped;
+  families first with their best layer; and equal points with every route behind them.
 - **For Task 12a:** a new checker finding (stacked funding left unresolved, unknown work
   rights; ADR 0013's 2026-10-31 amendment) must be classed for rule 2 (is it the variant's
   own, repeated in every route containing it?) and written into the oracle too, or the oracle
