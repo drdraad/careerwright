@@ -2,7 +2,7 @@
 
 ## From product specification to a beautiful and verifiable local app
 
-30 October 2026 • Plan version 1.4 (1.3 and 1.2: 29 October 2026; 1.1: 28 October 2026; 1.0: 27 October 2026) • Based on product specification 1.3, with the product owner's experience direction of 30 October 2026 (section 4)
+31 October 2026 • Plan version 1.5 (1.4: 30 October 2026; 1.3 and 1.2: 29 October 2026; 1.1: 28 October 2026; 1.0: 27 October 2026) • Based on product specification 1.3, with the product owner's experience direction of 30 October 2026 (section 4) and their direction of 31 October 2026 (a practical, useful product first; roles beyond a fixed list)
 
 Build a complete career-planning experience that runs on a developer’s computer, works without credentials in a labelled synthetic demo, and uses one user-supplied Meta API key for live conversation and research. The endpoint is a tested local release candidate with inspectable evidence, reproducible route comparisons and a printable plan. Public hosting is outside this plan.
 
@@ -18,9 +18,9 @@ Local completion is measurable. A fresh checkout can start the app, exercise all
 
 ## Delivery envelope
 
-Twelve outcome-based sprints: 0–10, with Sprint 6 delivered as 6a and 6b, and Sprint W (the world, added in v1.4). The initial estimate was 39–54 engineering days (Sprint 10, added in v1.3, is 2–3 of them); v1.4 adds 13–16 for the world (Sprint W, and one more day in each later interface sprint and in Sprint 9), making 52–70. For one experienced full-stack engineer using an LLM coding assistant, plan roughly 8–11 working weeks, with regular product and design input. This is a planning range, not a validated productivity forecast. Re-estimate after the technical spike and first real-source extraction work; external access and evidence review can add elapsed time.
+Thirteen outcome-based sprints: 0–10, with Sprint 6 delivered as 6a and 6b, Sprint W (the world, added in v1.4) and Sprint M (the chapters' moments, added in v1.5). The initial estimate was 39–54 engineering days (Sprint 10, added in v1.3, is 2–3 of them); v1.4 adds 13–16 for the world (Sprint W, and one more day in each later interface sprint and in Sprint 9), making 52–70. From v1.5 the remaining work is sized in agent hours instead (section 6). For one experienced full-stack engineer using an LLM coding assistant, plan roughly 8–11 working weeks, with regular product and design input. This is a planning range, not a validated productivity forecast. Re-estimate after the technical spike and first real-source extraction work; external access and evidence review can add elapsed time.
 
-With agent implementers, engineering days are a sizing unit, not a duration: Sprints 0–2, sized at 9–12 engineering days, took 16 hours of wall-clock time. Elapsed time is set by human review hours: the five scheduled review sessions (section 10) and the human checks of Sprints 8–9.
+With agent implementers, engineering days are a sizing unit, not a duration: Sprints 0–2, sized at 9–12 engineering days, took 16 hours of wall-clock time. Elapsed time has been set by build and review loops, not by people: every review session so far was held within hours of its package being ready (v1.5). The audit of 31 October 2026 re-estimated the remaining work from the build's own history: about 80–150 agent hours, review included, plus about 1½ hours of the product owner's sessions and the release checks (section 6). World work has cost about 1.8 times the backend's rate per sized day. History says ±30%.
 
 The earlier ten-day private-beta target is not adopted. The current instruction changes the endpoint to local operation and places a higher bar on UX. A compelling early demonstration should emerge in Sprint 1; a demonstration is not the completed product.
 
@@ -41,6 +41,26 @@ Scope and architecture come first, followed by the design contract, sprint roadm
 
 **Version 1.4 (30 October 2026)** applies the product owner's experience direction, given after review session 2 (ADR 0014). Careerwright becomes one living world in which the six chapters are places, not pages (section 4, rewritten). It replaces the calm observatory of the specification's art direction and lifts the visual scope limits of section 1. A new Sprint W builds the world before more chapter interfaces: a spike of three directions, session W1 to choose one, new design references, the world in the app with the You chapter rebuilt, and session W2 to judge it (sections 6 and 10). The review rubric gains three questions (section 5). The estimate grows by 13–16 engineering days and about two hours of the product owner's time. The domain, the numbers and the integrity rules are unchanged.
 
+**Version 1.5 (31 October 2026)** applies the whole-solution audit the product owner asked for (`docs/reviews/l0-audit-2026-10-31.md`; ADR 0008, amendment of 2026-10-31). They approved it on 31 October 2026: "Approved - proceed. Where subagent work can be done cleanly in parallel, do so but coordinate well to avoid them causing conflicts. Yes, I have 5 people who can try the app before release." Their directions, in their words:
+
+- "The visuals are important, but they must be subservient to having a practical, useful product."
+- "I want to check that the development plan is still sensible, and get us back on track with the sprints, even if we have to refactor some of them to ensure coherency and pragmatism."
+- "One thing that is really important to me is that we aren't limited to a prefilled list of roles - the real world is much more complex than those standardised job lists, and I want to avoid the frustration of your ideal job not appearing as an option to select. This is where deep research and LLMs have a part to play to fill out the "role space" more fully. I want it to feel like you have an omniscient career coach who knows all possible jobs that could fit you."
+- "We can also start being a bit more generous with token use in human testing - I would like to use muse wonder for this."
+
+The changes:
+
+1. **The decision path first.** Skills, Options, Routes and Plan come next, built plainly in the world as it stands, to Sprint W's design references. Each chapter's moment moves to a new Sprint M, after the path works (sections 4 and 6). Sprint W closes at the world shell, the You chapter and the deterministic sources.
+2. **Roles beyond a fixed list** (ADR 0015). Sprint 2 gains S2.8 (your title, recognised: ESCO, the ONS coding index and the person's own words) and S2.9 (research this role), before session W2 and Skills.
+3. **Options for any target.** Sprint 5's stored planning inputs become a backend slice of their own, before the Options chapter, and the chapter gains "add an option yourself" (S5.7). Sprint 3 gains option research for any target (S3.7), after the Plan chapter. Such options are proposed records marked not reviewed, and a route built on one is qualified.
+4. **Live sessions on Muse Wonder** for the product owner (S1.6): qualified first, started by a session command, capped and ledgered, with a spending line in the app. Spark stays the release default.
+5. **Shorter sessions.** Session W2 becomes a short first look (about 30 minutes, live, about five questions, no score threshold). Session 3 merges into one end-to-end session after Sprint 8 (about 1 hour). "Every category at least 4" stays the bar for release (sections 5 and 10).
+6. **A new order** (section 6). Backend work never waits for a session. Sprints 7 and 8 lose the session 3 gate. Roles comes after the end-to-end session.
+7. **Shorter review loops** and up to two implementers at once (task file, rulings R11 to R15).
+8. The remaining work is sized in agent hours (section 6), the L0 deferrals are listed (section 1), and the risk register is corrected (section 12).
+
+The domain, the numbers and the integrity rules are unchanged.
+
 # 1 The local delivery boundary
 
 Call this milestone L0 to distinguish it from the specification’s hosted private beta, M0. Preserve M0’s business semantics and bounded model. The differences below are deliberate local adaptations, not claims that all M0 or M1 gates have been completed.
@@ -48,15 +68,16 @@ Call this milestone L0 to distinguish it from the specification’s hosted priva
 | Area | L0 decision |
 |---|---|
 | Geography | England, en-GB and GBP; up to three cities and three active targets. Keep country-neutral identifiers and explicit unsupported-region states. |
-| Product journey | All six chapters: You, Roles, Skills, Options, Routes, Plan. Include sure and unsure entry, apply-now, conditional and unavailable outcomes. |
+| Product journey | All six chapters: You, Roles, Skills, Options, Routes, Plan. Include sure and unsure entry, apply-now, conditional and unavailable outcomes. Roles are never limited to a fixed list (v1.5, ADR 0015): the first question finds titles in ESCO and the ONS coding index, a person's own title is always kept, and a title no list holds can be researched (S2.8, S2.9). Options and routes exist for any target: an option the person adds or Careerwright researches is a proposed record, marked not reviewed, and a route built on one is qualified (S5.7, S3.7). |
 | Planning model | At most 24 action concepts, two reviewed starts per concept, six selected actions, 24 months and one conditional bridge-role transition. |
 | Hosted infrastructure | Replace Cloud Run, GCE, Cloud SQL and Cloud Storage with local processes, PostgreSQL and private local storage. No deployment, domain, public URL or Terraform work. |
 | Authentication | Firebase Authentication emulator with a demo project and seeded identities. Preserve invitation and ownership checks; real Google OAuth qualification is deferred. |
 | Secrets | Local runtime master key outside the repository and database; authenticated encryption for saved user keys. No GCP Secret Manager or KMS dependency. |
 | Transport | Loopback-only HTTP is an explicit development exception to hosted TLS. Reject non-local host/origin access. No LAN binding or tunnel in the delivered configuration. |
-| Data credentials | A Meta key suffices for the live-assisted journey. Adzuna app ID/key enables a separately qualified live vacancy integration; it is not silently assumed to be part of the Meta key. |
+| Data credentials | A Meta key suffices for the live-assisted journey. Adzuna app ID/key enables a separately qualified live vacancy integration; it is not silently assumed to be part of the Meta key. The Adzuna credentials exist, and the free-tier integration was qualified live in Sprint 3 (v1.5). |
 | Export | Browser print CSS, JSON and ICS from one plan snapshot. No server PDF service, calendar connection or automatic external action. |
-| Visual scope | The living world of section 4 (v1.4; ADR 0014): one persistent world, travel between chapters, staged revelations, consequences shown before a decision is confirmed, ambient motion with a pause control, celebrations of real progress, and a still version of all of it. Semantic zoom, the mini-map and generated illustrations stay deferred; sound is not in L0 unless the product owner asks for it at session W1. |
+| Visual scope | The living world of section 4 (v1.4; ADR 0014): one persistent world, travel between chapters, staged revelations, consequences shown before a decision is confirmed, ambient motion with a pause control, celebrations of real progress, and a still version of all of it. Semantic zoom, the mini-map and generated illustrations stay deferred; sound is not in L0 unless the product owner asks for it at session W1 (they asked for three subtle cues, ADR 0014 decision 8). From v1.5, staged revelations, consequences shown before confirming and celebrations come in Sprint M, after the decision path works. Until then every chapter is built in the world to Sprint W's design references, its states and words exact. |
+| L0 deferrals (v1.5) | Not built in L0, recorded so their absence is visible: one-run deep research of a person's whole role space (M1); pay and AI-range filters on Roles, because L0 holds no reviewed pay mapping or AI score (one plain line says so instead); sessions of different lengths (spec section 4); optional work samples (spec section 9); a what-if copy of a plan (spec section 3); the RegionCapability record (spec section 18); a revision history of answers on screen (spec section 3; every version is kept and undo stays); and language and region disparities in discovery's evaluation, since L0 has one language and one region. Pasting a CV is in S2.8 if it stays small; otherwise it joins this list. |
 
 The selected stack stays React/Next.js, SVG/D3, FastAPI/Pydantic AI, DBOS and PostgreSQL. Do not introduce another solver, workflow engine, scraper vendor, vector database or general agent platform. The one added renderer is section 4's WebGL world layer, chosen by Sprint W's spike; it never holds information the DOM and SVG layer lacks.
 
@@ -134,6 +155,8 @@ Use uv and pnpm lockfiles, Ruff, one Python type checker, TypeScript strict mode
 
 **Version 1.4 (30 October 2026).** This section replaces the calm observatory. It is the product owner's direction, given after review session 2, and for L0 it overrides the specification's art direction (spec section 14) and this plan's earlier visual scope (section 1); ADR 0014 records the decision. The specification's domain rules are unchanged. The Sprint 0 design references and the current shell belong to the old direction: Sprint W replaces them, and they are not polished further.
 
+**Version 1.5 (31 October 2026): practical first.** In the product owner's words: "The visuals are important, but they must be subservient to having a practical, useful product." Where the world and the decision path compete, the path comes first: a chapter's working view (its words, choices and numbers) ships before its moment, and the world never pushes a decision off the first screen. Until the decision path works end to end, every chapter is built in the world to Sprint W's design references, with exact states and words; the chapters' moments follow in Sprint M. The world never blocks a working chapter.
+
 ## The ambition
 
 In the product owner's words, the interface should be "revolutionary, not the current bland corporate borefest". It should "verge on computer game rather than typical tool, conveying a sense of travelling through a brave new world, and progression towards your destiny". It should "feel organic and cybernetic", "thrum with power and possibility" and "leave users astonished and breathless and excite them with revealed insight".
@@ -167,15 +190,15 @@ The world's power comes from being true. The product's integrity rules (CLAUDE.m
 
 - **Everything that varies has a declared meaning.** Brightness, solidity, size and gates come from states the backend computed: evidenced, self-reported, planned, usual in your role (below) and unresolved; ready, ready if, and not feasible in this monthly model. Anything else is atmosphere and looks the same for every item. Position is layout only: where a destination sits never means how likely, how good or how near it is (VIS-1). The interface computes no rank, readiness or affordability.
 - **Unknown is shadow, not absence.** An unknown stretch is drawn in shadow and says "not known yet". It is never empty, never zero and never the dimmest rank.
-- **Usual is not confirmed** (the plan's call, v1.4). The essential skills a person's role usually needs (ESCO) are drawn as a state of their own, "usual in your role, not confirmed yet": brighter than shadow, dimmer than anything the person has said or shown. It is for display only: wherever something is computed, such a skill is still unresolved (ADR 0012). An unexpected connection is worded as a fact about the two roles ("Data analysts and statisticians share 7 essential skills"), never as a claim about the person.
+- **Usual is not confirmed** (the plan's call, v1.4). The essential skills a person's role usually needs (ESCO) are drawn as a state of their own, "usual in your role, not confirmed yet": brighter than shadow, dimmer than anything the person has said or shown. It is for display only: wherever something is computed, such a skill is still unresolved (ADR 0012). An unexpected connection is worded as a fact about the two roles ("Data analysts and statisticians share 7 essential skills"), never as a claim about the person. From v1.5 (the product owner's ESCO research; ADR 0015), such skills are described as what ESCO lists for this kind of work, and the person can mark one "not part of my job".
 - **A condition is a gate on the trail,** with the condition in plain words ("Ready if you pass the assessed report"). A destination is a place the person could reach, never a promise: no revelation, glow or sound suggests a job offer. "Destiny" is the feeling; the words stay plain and honest.
-- **Revelations are earned.** Each comes from a deterministic source: the slate over ESCO (an unexpected connection), readiness and gaps (closer than you thought), the route checker (a credible route) or a reviewed option (a bridge). The one exception is an overlooked strength. By the product owner's answer of 30 October 2026, the model may propose one: a quotation of the person's own words against an essential skill of one of their destinations. Code verifies the quotation as a span of their answers and the skill as essential, and the strength appears only once the person confirms it. A revelation's sentence is built from computed facts, and a quotation appears only when it is verified as a span (ADR 0007). The model never decides a revelation. Each says what changed, why (the evidence is one step away) and what is still uncertain. A kind of revelation with no deterministic source is not shown.
+- **Revelations are earned.** Each comes from a deterministic source: the slate over ESCO (an unexpected connection), readiness and gaps (closer than you thought), the route checker (a credible route) or a reviewed option (a bridge). The one exception is an overlooked strength. By the product owner's answer of 30 October 2026, the model may propose one: a quotation of the person's own words against an essential skill of one of their destinations. Code verifies the quotation as a span of their answers and the skill as essential, and the strength appears only once the person confirms it. A revelation's sentence is built from computed facts, and a quotation appears only when it is verified as a span (ADR 0007). The model never decides a revelation. Each says what changed, why (the evidence is one step away) and what is still uncertain. A kind of revelation with no deterministic source is not shown. From v1.5 a role the person never named, found in sources (S2.9), is a revelation too, from deterministic corroboration; and no revelation rests on ESCO's essential skills alone (ADR 0015; how the unexpected connection meets this is to be settled by Task 6d).
 - **Failure, stale, conditional and synthetic stay distinct,** and synthetic data stays labelled.
 - **The world goes quiet for distress.** Any risk word stills and dims the world, holds back every revelation and celebration, and shows the calm support panel (ADR 0007). Nothing about it glows.
 
 ## The interaction model
 
-**The first ten seconds.** The world is dark, with one light: the person. One plain question invites them in: "What do you do now, or what did you do last?" As they type, matching job titles from the pinned ESCO release appear to pick from (the plan's call, v1.4). Their first answer changes the world at once: the origin ignites, and deterministic code over ESCO grows the first trails, showing the skills that role usually needs ("usual in your role, not confirmed yet") and a first scatter of destinations on the horizon. No model call stands between the first answer and the world's response, so it works before a key is connected and in the demo. The sure or unsure entry (spec section 3) follows this first answer, and the conversation takes it from there. If nothing matches, the world still responds and asks a sharper question; it never invents a match. A returning person sees what changed since their last visit, never a debt of missed tasks.
+**The first ten seconds.** The world is dark, with one light: the person. One plain question invites them in: "What do you do now, or what did you do last?" As they type, matching job titles from the pinned ESCO release appear to pick from (the plan's call, v1.4); from v1.5 they also come from the pinned ONS coding index, and "Use my own words" is always there and always kept (S2.8, ADR 0015). Their first answer changes the world at once: the origin ignites, and deterministic code over ESCO grows the first trails, showing the skills that role usually needs ("usual in your role, not confirmed yet") and a first scatter of destinations on the horizon. No model call stands between the first answer and the world's response, so it works before a key is connected and in the demo. The sure or unsure entry (spec section 3) follows this first answer, and the conversation takes it from there. If nothing matches, the world still responds and asks a sharper question; it never invents a match, and the person's own words are kept, never refused. A returning person sees what changed since their last visit, never a debt of missed tasks.
 
 **Act, see the consequence, then confirm.** Every decision shows its consequence in the world before it is committed. Trails a new limit would cut dim and say why; a chosen target draws its trails forward; an excluded option's bridges wither. The person confirms or backs out (spec section 3: a changed constraint shows affected results before invalidating them). Once confirmed, the change is real and announced in words, and undo stays available.
 
@@ -205,7 +228,7 @@ The rendering split is this plan's call, to be proven by Sprint W's spike:
 - **The exact layer** is everything a person reads or operates: labels, cards, the console, the time and cost instrument and the Gantt, in DOM and SVG, with D3 for layout and geometry. The canvas holds nothing unique. Every place has a DOM list with the same selection, and every action works from the keyboard and that list (spec section 14).
 - **The still world** is drawn without WebGL when motion is reduced, calm mode is on or WebGL2 is unavailable. It shows every state.
 
-Proposed lab budgets in Chrome and Safari, with the world at its busiest (100 job nodes, their trails and ambient particles): 95th-percentile frame time within 16.7 ms on the specification's target Mac (spec section 14: MacBook Air M1, 8 GB) during ambient motion, travel and revelations. The machine available is faster (an M4 MacBook Pro, 16 GB), so measurements on it must leave headroom: within 8 ms there, half the budget. A check on an M1-class Mac is a human check in Sprint 9 if one is available (the plan's call, v1.4). Also: input feedback within 100 ms; the world's first frame within one second of the page appearing; ambient motion stops while the tab is hidden. Report device, browser, scene and percentiles; these are lab targets, not field measurements. On a phone the world is the backdrop behind focused views, with the console and cards in sheets. Phones get their own layout; never shrink the desktop world to phone size and call it responsive.
+Proposed lab budgets in Chrome and Safari, with the world at its busiest (100 job nodes, their trails and ambient particles): 95th-percentile frame time within 16.7 ms on the specification's target Mac (spec section 14: MacBook Air M1, 8 GB) during ambient motion, travel and revelations. The machine available is faster (an M4 MacBook Pro, 16 GB), so measurements on it must leave headroom: within 8 ms there, half the budget. A check on an M1-class Mac is a human check in Sprint 9 if one is available (the plan's call, v1.4). Also: input feedback within 100 ms; the world's first frame within one second of the page appearing; ambient motion stops while the tab is hidden. Report device, browser, scene and percentiles; these are lab targets, not field measurements. On a phone the world is the backdrop behind focused views, with the console and cards in sheets. Phones get their own layout; never shrink the desktop world to phone size and call it responsive. Restated in v1.5: on a phone the decision comes first. In any view with a pending decision, the first decision is in the first screen, and the world takes no more room than what it shows.
 
 ## Type, colour and tokens
 
@@ -220,9 +243,9 @@ Sprint W delivers them (section 6):
 
 1. **A spike of three directions**, each showing the same first ten seconds and one revelation on synthetic data, each with its still version: *Growth* (organic first: a network of roots and nerves grown from the person), *Horizon* (journey first: a horizon plane like the image's, with destinations ahead and travel towards them) and *Circuit* (cybernetic first: a precise luminous circuit with instrument readouts and lock-on). The spike is throwaway. The product owner plays all three and chooses at session W1.
 2. **New design references** for the chosen direction: tokens, type, the motion vocabulary, the six places, phone layouts and every honest state (unknown, conditional, stale, failed, synthetic and distress), with contrast measured. They replace the Sprint 0 compositions.
-3. **The world in the app**: the shell, the world layer and travel, and the You chapter rebuilt in it with its moment, applying session 2's design findings.
+3. **The world in the app**: the shell, the world layer and travel, and the You chapter rebuilt in it with its moment, applying session 2's design findings. From v1.5 the You chapter's moment, the first answer's ignition, comes in Sprint M.
 
-Every later chapter is then built as its place in the world, with its moment, by its own sprint (Sprints 3, 4, 5, 7 and 8).
+Every later chapter is then built as its place in the world by its own sprint (Sprints 3, 4, 5, 7 and 8), to Sprint W's references: its exact layer (states, words and keyboard list) first. From v1.5 its moment is added in Sprint M, after the decision path works. Once a chapter is built, the app's own Storybook stories become its reference, and its place in the hand-drawn design compositions is retired.
 
 # 5 Visual and usability acceptance
 
@@ -230,7 +253,7 @@ Every later chapter is then built as its place in the world, with its moment, by
 
 ## Design review rubric
 
-At Sprints 1, W, 3, 7 and 9, the product owner and a design reviewer assess hierarchy, typography, spacing, visual identity, chart legibility, uncertainty communication, responsive composition and interaction continuity. From v1.4 they also score three questions from section 4: does it feel like a world answering you, not a tool; did it show you something true you did not know, and why; and do decisions show their consequences? Record a 1–5 score with concrete defects; require every category to reach at least 4 at session W2 before more chapters are built in the world, and again before the final local release. This is a proposed internal review convention, not a validated UX measurement.
+At Sprints 1 and W, the end-to-end session and Sprint 9 (v1.5), the product owner and a design reviewer assess hierarchy, typography, spacing, visual identity, chart legibility, uncertainty communication, responsive composition and interaction continuity. From v1.4 they also score three questions from section 4: does it feel like a world answering you, not a tool; did it show you something true you did not know, and why; and do decisions show their consequences? Record a 1–5 score with concrete defects. From v1.5, scores recorded at session W2 and the end-to-end session are formative: they guide the work and gate nothing. Every category must reach at least 4 before the final local release. This is a proposed internal review convention, not a validated UX measurement.
 
 A screenshot approval covers all six chapters at 1440 × 900 and 390 × 844, plus a tablet check at 768 × 1024. Review default, selected, empty, partial, stale, unavailable and failed states for the components that support them. Test long role/provider names, three targets, negative economic cost, zero results and the 100-visible-job limit. Never approve only the attractive fixture.
 
@@ -252,9 +275,9 @@ Target WCAG 2.2 AA. Check keyboard-only completion, visible focus, proper headin
 
 Set measured local budgets: immediate input feedback within 100 ms; p95 linked filtering/selection within 150 ms at 100 visible jobs and a bounded 1,000-mark route projection; no horizontal page overflow at 390 px; and the world's frame and first-frame budgets in section 4. Report device, browser, dataset and measured percentiles. These are proposed lab budgets, not field Web Vitals or a guarantee on every laptop. The complete archive stays accessible through paginated groups; projection counts disclose hidden marks and never change ranks.
 
-Run five short synthetic-data task sessions near Sprint 9, covering sure/unsure entry, evidence inspection, route choice and print. Aim for four of five participants to finish the core task without assistance and correctly explain cost, conditional readiness and uncertainty. Record each person's first two minutes too: what they changed, and what they say they learnt about themselves. Any dangerous misunderstanding is a blocker regardless of the aggregate result; this small study is formative, not statistical validation.
+Run five short synthetic-data task sessions near Sprint 9, covering sure/unsure entry, evidence inspection, route choice and print. Aim for four of five participants to finish the core task without assistance and correctly explain cost, conditional readiness and uncertainty. Record each person's first two minutes too: what they changed, and what they say they learnt about themselves. Any dangerous misunderstanding is a blocker regardless of the aggregate result; this small study is formative, not statistical validation. Five participants are available (the product owner, 31 October 2026).
 
-Hold one earlier formative comprehension session after Sprint 5, so that user contact precedes the two most expensive UI sprints. One person spends 30 minutes with synthetic data on the fixture route comparison and the TRACE-01 ledger; screenshots or Storybook are acceptable surfaces. Ask them to explain the cost shown, what “conditional readiness” means and what is uncertain. Record any dangerous misunderstanding as a Sprint 7 scope input. The product owner runs it at review session 2 (section 10). It is formative, not statistical, and leaves the five Sprint 9 sessions unchanged.
+Hold one earlier formative comprehension session after Sprint 5, so that user contact precedes the two most expensive UI sprints. One person spends 30 minutes with synthetic data on the fixture route comparison and the TRACE-01 ledger; screenshots or Storybook are acceptable surfaces. Ask them to explain the cost shown, what “conditional readiness” means and what is uncertain. Record any dangerous misunderstanding as a Sprint 7 scope input. The product owner runs it at review session 2 (section 10). It is formative, not statistical, and leaves the five Sprint 9 sessions unchanged. It was held at session 2: the route wording was not understood ("Sounds like psychobabble"; "Confusion can make one indecisive and give up"), a Sprint 7 scope input (H-13).
 
 # 6 Sprint roadmap
 
@@ -264,20 +287,21 @@ Sprints are short, outcome-based increments rather than arbitrary two-week conta
 |---|---|---|---|---|
 | 0 | Verify provider, durability and local constraints; freeze contracts | 2–3 | Done: approvals given 2026-10-28, not timed | Supplied specification and access checks |
 | 1 | Beautiful local shell and persisted fixture journey | 3–4 | Done: approval given 2026-10-28, not timed | Sprint 0 decisions |
-| 2 | Live interview and grounded career discovery | 4–5 | H-11 done 2026-10-28, not timed; H-12 in session 1 | Identity, versions, Meta contract, ESCO import |
-| 3 | Reliable evidence acquisition and living opportunity map | 5–6 | About 2 (session 1, before the Roles chapter); the design review is not estimated | Source policy, taxonomy, run lifecycle; the approved world |
-| 4 | Skills, protected gates and evidence-based outcomes | 5–6 | H-07 in session 2 | Profile, targets and source claims; the approved world |
-| 5 | Reviewed options and correct monthly finances | 5–7 | About 2 (session 2, after the Sprint 5 backend) | Capability model and offerings; the approved world |
-| W | The world: the experience of section 4, with the shell and the You chapter rebuilt in it (v1.4) | 7–10 | About 2 (session W1, about 1, after the spike; session W2, about 1, at the end) | Session 2's design record |
+| 2 | Live interview and grounded career discovery; from v1.5 also roles beyond a fixed list (S2.8, S2.9) | 4–5 (S2.8 and S2.9 sized in agent hours below) | H-11 done 2026-10-28, not timed; H-12 in session 1 (held) | Identity, versions, Meta contract, ESCO import; for S2.8 and S2.9, Sprint W closed |
+| 3 | Reliable evidence acquisition and living opportunity map; from v1.5 also option research for any target (S3.7) | 5–6 | Session 1 held 2026-10-28, not timed; the design review is not estimated | Source policy, taxonomy, run lifecycle; Sprint W closed and session W2 held; for S3.5 and S3.7, Sprint 8 and the end-to-end session (v1.5) |
+| 4 | Skills, protected gates and evidence-based outcomes | 5–6 | H-07 at session 2 (held) | Profile, targets and source claims; S2.8; Sprint W closed and session W2 held |
+| 5 | Reviewed options and correct monthly finances; from v1.5 also "add an option yourself" (S5.7) | 5–7 | Session 2 held 2026-10-29 to 30, not timed | Capability model and offerings; the stored planning inputs first (v1.5); Sprint W closed and session W2 held |
+| W | The world: the experience of section 4, with the shell and the You chapter rebuilt in it (v1.4); from v1.5 it closes at the world shell, the You chapter and the deterministic sources | 7–10 | Session W1 held 2026-10-30, not timed; session W2, about ½ h (v1.5) | Session 2's design record |
 | 6a | Verified enumeration and three Pareto layers on instances that complete | 5–7 for 6a and 6b together | None | Frozen planning input, financial checker and reviewed option pack |
-| 6b | Durable, bounded search at full scale | (within 6a's range) | None | Sprint 6a |
-| 7 | Exceptional coordinated route comparison | 5–7 | About 1 (session 3, before Sprint 7 closes) | Real solver output, the approved world and session 2's findings |
-| 8 | Chosen plan, progress, revision and exports | 4–5 | Not estimated: Safari print (H-04) | Stable comparison and immutable snapshots |
-| 9 | Local release qualification and handover | 5–7 | Not estimated: design review, VoiceOver, Safari, five task sessions (H-01, H-03–H-05) | Complete product journey |
+| 6b | Durable, bounded search at full scale; from v1.5 its durable add-ons are sized from 6a's measurements | (within 6a's range) | None | Sprint 6a |
+| 7 | Exceptional coordinated route comparison | 6–8 | None of its own; the end-to-end session, about 1 h, after Sprint 8 (v1.5; replaces session 3) | Real solver output, Sprint 5's options and session 2's findings |
+| 8 | Chosen plan, progress, revision and exports | 4–5 | Not estimated: Safari print (H-04); then the end-to-end session | Stable comparison and immutable snapshots |
+| M | The chapters' moments, in the product owner's order (v1.5) | 3–6 | None of its own; its order comes from the end-to-end session | The end-to-end session and Sprint 3's Roles chapter |
+| 9 | Local release qualification and handover | 5–7 | Not estimated: design review, VoiceOver, Safari, five task sessions (H-01, H-03–H-05; five participants are available) | Complete product journey |
 | 10 | Operator's manual, with the friction it finds smoothed | 2–3 | Not estimated: a person follows the manual (H-14); decisions on any larger proposal | The qualified release candidate |
-| Total | Local release candidate | 52–70 | About 7½ scheduled, plus Sprints 8–9 | Re-estimate after Sprints 0 and 3, and after the spike |
+| Total | Local release candidate | 52–70 by v1.4's sizing, plus Sprint M; the remaining work in agent hours below | Sessions 1, 2 and W1 held; about 1½ h still to hold (session W2 and the end-to-end session), plus the release checks | Re-estimate after Sprints 0 and 3, and after the spike |
 
-From v1.4, every interface deliverable in Sprints 3, 4, 5, 7 and 8 is built as its chapter's place in the world, with its moment (section 4), on the design references Sprint W produces. Each of those sprints, and Sprint 9's qualification of motion and frame budgets, is one engineering day larger.
+From v1.4, every interface deliverable in Sprints 3, 4, 5, 7 and 8 is built as its chapter's place in the world (section 4), on the design references Sprint W produces; from v1.5 it is built to those references first, and its moment comes in Sprint M. Each of those sprints, and Sprint 9's qualification of motion and frame budgets, is one engineering day larger.
 
 ## Responsibility and sequencing
 
@@ -309,9 +333,38 @@ The critical chain is validated inputs → evidence and outcomes → monthly fea
 
 Backend work (the option pack, Sprints 6a and 6b) may fill any wait for a session. Interface work waits for session W2.
 
+**Order from here (v1.5).** The v1.4 list above stays as history. The audit of 31 October 2026 found the decision path waiting behind the world's spectacle, and the product owner approved this order on 31 October 2026. Each step names its task in the task file; agent hours are the audit's estimates, review included.
+
+| # | Work | Sprint | Waits for | Agent hours |
+|---|---|---|---|---|
+| 0 | The approved changes applied to the plan, the task file, the register, the ADRs and `CLAUDE.md` | — | the product owner's yes (given) | 1 |
+| 1 | Finish the You chapter: the pending re-review; the demo interviewer unblocked; a chosen target confirmed, not "out of date"; shared skills named and the unexpected connection shown; on a phone the decision first; the "England only" line; the demo route preview out of the person's path; the Sprint W review | W | — | 5–9 |
+| 2 | Your title, recognised: titles from ESCO and the ONS coding index, the person's own words always kept, each target stored once with its occupation, source and coverage, optional seniority and industry | 2 (S2.8) | 1 | 5–10 |
+| 3 | Live sessions ready: Muse Wonder qualified, a session command with caps, a spending line in the app, each session's calls copied into the cost ledger, the first live run of the real-data path through the app | 1 (S1.6) | — | 3–6 |
+| 4 | Research this role, for a title no list holds | 2 (S2.9) | 2, 3 | 8–15 |
+| 5 | Session W2, short: about 30 minutes, live, on Muse Wonder; the product owner uses the You chapter, roles included, and answers about five questions; no score threshold | W | 1–4 | the product owner's time |
+| 6 | Planning inputs, stored and confirmed (backend): income, cash, living costs, reserve, commitments, debts, availability; work rights and remote working | 5 (S5.3, S5.4 inputs) | — (runs during session W2) | 3–6 |
+| 7 | Route search core: the exact search, the independent check, the three layers, measured sizes; its durable add-ons sized from these measurements | 6a, 6b | — | 5–10 (+2–8) |
+| 8 | Skills, for any target: what the occupation lists, labelled as such; what the person's chosen adverts ask for; evidence questions; readiness where a reviewed rubric exists, and "not assessed yet, here's what it asks" elsewhere | 4 | 5, 2 | 8–14 |
+| 9 | Options: the review checkpoint, collecting step 6's inputs, and "add an option yourself", saved as not reviewed | 5 (S5.3, S5.7) | 6, 8 | 7–12 |
+| 10 | Routes: real computed routes in plain words; routes built on options that aren't reviewed say so | 7 | 7, 9 | 8–14 |
+| 11 | Plan: first the snapshot, the Plan chapter, print, JSON and calendar; then revise and replan | 8 | 10 | 6–10 |
+| 12 | The end-to-end session (about 1 hour; replaces session 3): from You to a printed plan; formative scores; the product owner chooses which moments to build | — | 11 | the product owner's time |
+| 13 | Find options for this role: live research of courses and funding for any target, as records marked not reviewed | 3 (S3.7) | 11 | 8–15 |
+| 14 | Roles: the opportunity map, real listings, role cards with "not enough evidence yet" outlooks; one plain line instead of pay and AI filters | 3 (S3.5) | 11, and 12 in this order | 6–10 |
+| 15 | The moments, in the product owner's order, each on a set budget; the frame re-measure, with the product owner warned before any window opens | M | 12, 14 | 6–12 |
+| 16 | Release qualification, the operator's manual and the final review; every review score at least 4 stays the release bar | 9, 10 | all | 8–16 |
+
+The audit's total is about 80–150 agent hours (its own range, not the sum of the rows), about one to two weeks of continuous build, plus about 1½ hours of the product owner's sessions and the release checks. History says ±30%.
+
+- Backend work never waits for a session: steps 6 and 7, and step 13's research backend, may run while a session is awaited. Chapter interfaces wait for session W2.
+- Up to two implementers run at once, on disjoint modules (the product owner's approval of 31 October 2026; task file ruling R15). Each task card says which tasks it may overlap.
+- Roles stays after the decision path because routes don't need it. The reason v1.1 gave, that the dendrite has no live vacancy data, no longer holds: the Adzuna credentials exist and the free-tier integration was qualified live in Sprint 3.
+- The end-to-end session may offer the product owner a smaller L0 if time matters by then (the audit's shape C: the opportunity map and replanning moved to the next milestone). That would need a specification change, and nothing is cut until they say so.
+
 Review session 1 can be held at any point before the Roles chapter; held before the option pack is curated, it lets the pack's pages be classified against its rights policy rather than left pending human review. Each sprint's review is written when its last slice finishes, so the Sprint 3 review follows those of Sprints 4 and 5. With one implementer at a time, slices without a dependency on each other run one after the other, in either order.
 
-**Human review sessions.** Human review is a scheduled resource, not an event between sprints. Five fixed sessions (three from v1.1, and W1 and W2 from v1.4), named in section 10 with the gates each closes, are dispatch preconditions for the work after them: no dependent slice starts until its session has happened. They total about seven and a half hours. The other human checks (the Sprint 3 and Sprint 9 design reviews, VoiceOver, Safari, the five Sprint 9 task sessions and the privacy decision) keep their positions in the sprint cards; none of them is a dispatch precondition.
+**Human review sessions.** Human review is a scheduled resource, not an event between sprints. From v1.5 the fixed sessions are 1, 2 and W1 (held), session W2 (a short first look) and the end-to-end session, which replaces session 3; section 10 names the gates each closes. Each is a dispatch precondition for the work after it: no dependent slice starts until its session has happened. About 1½ hours of them remain. The other human checks (the Sprint 3 and Sprint 9 design reviews, VoiceOver, Safari, the five Sprint 9 task sessions and the privacy decision) keep their positions in the sprint cards; none of them is a dispatch precondition.
 
 # Sprint 0 Resolve the expensive uncertainties
 
@@ -363,6 +416,8 @@ S1.4 Build the chapter rail, workspace strip, evidence drawer, cards, buttons, f
 
 S1.5 Connect the UI to the real local API/database. A fixture adapter supplies labelled content for the initial end-to-end shell; no component contains bespoke hard-coded financial examples. Add resumable status events and a reconnect path.
 
+S1.6 (added in v1.5, the product owner's request of 31 October 2026) Live sessions for the product owner on Muse Wonder, an M1 item brought forward for those sessions only (ADR 0003, amendment). Qualify `muse-wonder-1.0` first: two live calls on synthetic input, then at most six evaluation cases, under $0.50 in all. A session command starts the app with Wonder as the production model and caps each session (about $5) and each run (about $0.75). After each session, each call's model, kind, tokens and cost, never its content, is copied into the cost ledger. A spending line in the app shows what was spent this month and the limit, and lets the person change it; before any paid research starts, its estimated cost is shown (spec section 16). Spark stays the release default; the end-to-end session decides whether the release uses Wonder. Automated checks keep the test model and never call a model.
+
 ## Acceptance and tests
 
 A fresh database migrates successfully; a populated fixture database upgrades without losing the selected snapshot. Profile updates survive reload and restart. A stale version is rejected. API, stream, cache and worker requests for another workspace fail, as do uninvited requests. Test key redaction across errors, database history and exports. Verify an unauthorised local origin cannot trigger authenticated changes.
@@ -397,11 +452,15 @@ S2.6 Add the minimal reviewed response policy for explicit acute distress and in
 
 S2.7 (added in v1.1, after the Sprint 2 review; D3) Add the model-written “Why this could suit you” that specification section 4 now permits: at most one bounded call per slate, quoting only the person's confirmed answers and the grounded occupation record, each quotation verified server-side, with one repair and then an observable invalid-output failure. The deterministic provenance stays underneath, is shown in every case and is what exports cite. Live checks use the test model on synthetic data within an explicit cap.
 
+S2.8 (added in v1.5; ADR 0015) Your title, recognised. Roles are not limited to ESCO: a model's proposal stays a hypothesis until code corroborates it (spec section 4, DIV-1), and the person confirms. The first question finds titles in the pinned ESCO release and in the pinned ONS SOC 2020 coding index, and "Use my own words" is always offered and kept in the person's words. Next comes "Which of these is closest?" (the ESCO occupations in that title's ONS group) or "None of these is my job". A discovery's title idea that the ONS index lists becomes a suggestion, with the answers it came from; an idea in no list is shown as not yet found, never as a suggestion. Each target is stored once, with its occupation (or none), its source and how far Careerwright can cover it. Optional seniority and industry sit beside a title; matching ignores them. Skills ESCO lists for a role are described as what ESCO lists for that kind of work, the person can mark one "not part of my job", and no revelation rests on ESCO's essential skills alone. Pasted CV text produces proposals through the same review tray if that stays small; otherwise it is an L0 deferral (section 1). No new model call: it works offline and in the demo.
+
+S2.9 (added in v1.5; ADR 0015) Research this role. For a title no list holds, the person can ask Careerwright to research it: one bounded web search that sends only the title and "England", never the person's answers, then the guarded fetcher reads a few of the pages it finds. Code checks the title word for word on each page. The role counts as found once two independent sites name it (distinct hosts or employers; copies of one advert count once) or one official site does, with the quotes and dates one step away. Otherwise it stays "not yet found in independent sources": visible, never a suggestion. Records stay private to the workspace and marked not reviewed. The estimated cost shows before it starts, and every call is ledgered.
+
 ## Acceptance and tests
 
 P02 completes exploration without an invented income baseline or forced personality test. Sure users bypass optional exploration. Test invalid schemas, refusals, truncation, unavailable models, budget exhaustion and stale concurrent profile writes. The old profile survives every failed proposal.
 
-Evaluate grounded occupation IDs, citations, family/task diversity, duplicate aliases, unsupported-title rejection and irrelevant demographic counterfactuals. Use semantic expectations rather than exact prose. Test at least 30 reviewed synthetic interview/discovery cases and record failures by type. Run a budget-capped live version of representative cases; deterministic fixtures do not certify the model’s behaviour.
+Evaluate grounded occupation IDs, citations, family/task diversity, duplicate aliases, unsupported-title rejection and irrelevant demographic counterfactuals. From v1.5 an unsupported title is one that no list or source corroborates: a title the ONS index lists, or that independent sources name, is corroborated and passes (ADR 0015). Use semantic expectations rather than exact prose. Test at least 30 reviewed synthetic interview/discovery cases and record failures by type. Run a budget-capped live version of representative cases; deterministic fixtures do not certify the model’s behaviour.
 
 ## Coherence review
 
@@ -425,9 +484,11 @@ S3.3 Implement the Adzuna adapter and fixture contract. Qualify actual requests 
 
 S3.4 Deduplicate syndicated jobs, retain source copies, distinguish agencies from employers and count multi-city views once. Implement closure/freshness checks, favourites, cancellation and resumable incremental results.
 
-S3.5 Build the SVG dendrite with stable anchors, company expansion, up to 100 visible job nodes and explicit aggregation counts. Add numeric salary and AI-range filters, pay lanes and a mobile-first list. Graph distance never implies commute feasibility. In v1.1, S3.5 runs after the Sprint 5 backend and after review session 1 (section 6, "Order of the remaining work"); its deliverable is unchanged.
+S3.5 Build the SVG dendrite with stable anchors, company expansion, up to 100 visible job nodes and explicit aggregation counts. Add numeric salary and AI-range filters, pay lanes and a mobile-first list. Graph distance never implies commute feasibility. In v1.1, S3.5 runs after the Sprint 5 backend and after review session 1 (section 6, "Order of the remaining work"); its deliverable is unchanged. From v1.5 it runs after Sprint 8 and the end-to-end session. Live listings come from Adzuna, whose credentials now exist. Roles outside ESCO (S2.8, S2.9) and from live postings appear on the map. Each role card says "not enough evidence yet" where its outlook has no evidence. L0 holds no reviewed pay mapping or AI score, so one plain line says so instead of the numeric salary and AI-range filters and the pay lanes, which would filter nothing (section 1, L0 deferrals). Its moment, the unexpected connection, comes in Sprint M.
 
 S3.6 Import the versioned AI evidence/mapping packs and publication-state machinery. Publish only reviewed range records; otherwise show unscored. Implement lower-bound filtering and keep unscored roles visible by default in exploration. In v1.1 S3.6 delivers the assessment record model, its publication-state checks, the lower-bound filter and the unscored state, qualified with one conspicuously labelled fixture record. The pinned evidence and mapping imports stay, so exposure-only evidence can be shown with resilience unscored. The review pipeline is data entry through the record model: a record publishes only when an accountable reviewer's recorded decision passes the publication checks, and no model output can publish one. L0 publishes no reviewed real record unless an accountable reviewer exists, which specification section 5 allows (“the beta can expose unscored roles and the functioning range filter”).
+
+S3.7 (added in v1.5) Find options for this role. For any target, live research finds courses and funding through the guarded fetcher and the extraction pattern (the model quotes; code approves values read from verified spans), and stores them as workspace records marked not reviewed (`proposed`; section 9). They are explorable in Options; a route built on one is qualified, never an unqualified “affordable and feasible”. It runs after Sprint 8. The estimated cost shows before it starts, and every call is ledgered. This restores what plan section 9 and Task 7's card promised and was not built.
 
 ## Acceptance and tests
 
@@ -460,6 +521,8 @@ S4.4 Implement typed, immutable protected gates for legal practice, recognition,
 S4.5 Build OUT-1 row mappings from syllabus and assessment spans to observable tasks. Distinguish topic mentions, practice and assessed demonstration. User acceptance of a provisional mapping creates an assumption, not expert validation.
 
 S4.6 Classify gaps and produce the abstract action graph. Implement the P05 apply-now path ahead of course recommendations. Preserve the target/matrix version on all derived results.
+
+From v1.5 the Skills chapter serves any target, not only the option pack's four: what the target's occupation lists, labelled as ESCO's; what the person's chosen adverts ask for; the evidence questions; readiness where a reviewed rubric exists, and "not assessed yet, here's what it asks" elsewhere. A target outside ESCO uses the person's chosen closest occupation, or none (ADR 0012, amendment). "Usual in your role, not confirmed yet" is shown here, as a display state. The chapter is built to Sprint W's references; its moment, the overlooked strength, comes in Sprint M.
 
 ## Acceptance and tests
 
@@ -495,6 +558,10 @@ S5.5 Implement separate direct-spend, income-difference and liquidity ledgers in
 
 S5.6 Implement fixed base, delay, no-award and no-offer scenario evaluation. An accepted offer gate controls both experience and wages. Do not optimise adaptive policies or invent hiring probabilities.
 
+S5.7 (added in v1.5) Add an option yourself. In Options, the person pastes a course or funding page's text or types its details. It is saved as their own workspace record, marked not reviewed (`proposed`), with its source. The planning catalogue reads it beside the option pack, and a route built on it is qualified (section 9).
+
+From v1.5 the person-supplied inputs of S5.3 and S5.4 are stored and confirmed first, as a backend slice of their own, before the Options chapter: the baseline income, opening cash, living costs, reserve, the limits, availability, commitments, existing debts, work patterns, funding statuses and entry confirmations, and work rights and remote working. The Options chapter then collects and confirms them at the checkpoint. It is built to Sprint W's references; its moment, a gap's first bridge, comes in Sprint M.
+
 ## Acceptance and tests
 
 Reproduce TRACE-01 exactly, including route B’s £600 direct/economic cost, £150 peak payment and £4,850 minimum prefunded lower cash bound. Confirm that the £100 opening balance, £200 day-one fee and £300 late-month pay example fails prefunding despite a positive closing balance.
@@ -511,11 +578,11 @@ Read one route as both a user story and a ledger. Every payment, receipt, time c
 
 # Sprint W Build the world (v1.4)
 
-7–10 engineering days • Entry: review session 2's design record (H-01 for Sprint 2, and H-13) • Human: session W1 after the spike, session W2 at the end • Requirements: section 4; spec sections 3, 7, 13, 14 and 15 as section 4 overrides them; ADR 0014
+7–10 engineering days • Entry: review session 2's design record (H-01 for Sprint 2, and H-13) • Human: session W1 after the spike; session W2, a short first look, after S2.8 and S2.9 (v1.5) • Requirements: section 4; spec sections 3, 7, 13, 14 and 15 as section 4 overrides them; ADR 0014
 
 ## Demonstrable outcome
 
-Someone opens Careerwright for the first time. Within ten seconds they have changed something and the world has answered. As they share their experience, it shows them something true about themselves, an overlooked strength or an unexpected connection, with the reason one step away. With motion off, a still world tells the same story. All six chapters already live in the world; nothing looks like the old shell.
+Someone opens Careerwright for the first time. Within ten seconds they have changed something and the world has answered. As they share their experience, it shows them something true about themselves, an overlooked strength or an unexpected connection, with the reason one step away. With motion off, a still world tells the same story. All six chapters already live in the world; nothing looks like the old shell. From v1.5 Sprint W closes at the world shell, the You chapter and the deterministic sources; the revelations' moments are delivered by Sprint M.
 
 ## Deliverables
 
@@ -529,13 +596,15 @@ SW.4 The You chapter rebuilt in the world, applying session 2's design findings:
 
 SW.5 The first moments: the first answer ignites the origin and grows the first trails through deterministic code over the pinned ESCO release, within one second and without a model call; then the unexpected-connection revelation from the slate, and the overlooked strength (section 4): one bounded, model-backed proposal per conversation turn that has new answers, added as a new run kind (ADR 0006: a task, never a second call path), with its quotation verified as a span and the skill checked as essential before the person is asked to confirm it. It runs only with the person's key and within their spend limit; the demo shows a scripted example, labelled. If the run kind changes the workflow's step sequence, change the DBOS `application_version`. Destinations and connections are joined by shared essential skills, never by shared words in a title. At session 2 the product owner judged the slate for "data analyst" as "arbitrary matching on keywords": check that case and the five personas, and fix the slate where it matches on words (amending ADR 0007).
 
+From v1.5, SW.5 is complete at its deterministic sources and the overlooked strength's run (Task W2's slice W2B). The type-ahead's closest-titles question moves to S2.8; "usual in your role, not confirmed yet" to Sprint 4; the first answer's ignition, the connection lit in the world, decisions previewed in the world and the strength's proposal and confirm step to Sprint M. The unexpected connection's sentence, with its shared skills named, is shown in the You chapter before Sprint W closes.
+
 SW.6 The world's requirements enter the register as a new family, with their tests tagged, and ADR 0014 records the spike's choices.
 
 ## Acceptance and tests
 
-The existing journeys pass in the world. Browser tests prove that a first answer changes the world within ten seconds and that every revelation's sentence and evidence are in the DOM. The same journeys pass under reduced motion and calm mode with identical text. axe, overflow and contrast checks are clean at the three viewports; keyboard-only completion and focus return work. Frame times are measured against section 4's budgets and reported with device, browser and scene. Demo mode makes no external request. A risk word stills the world and holds back revelations.
+The existing journeys pass in the world. Browser tests prove that a first answer changes the world within ten seconds and that every revelation's sentence and evidence are in the DOM. The same journeys pass under reduced motion and calm mode with identical text. axe, overflow and contrast checks are clean at the three viewports; keyboard-only completion and focus return work. Frame times are measured against section 4's budgets and reported with device, browser and scene. Demo mode makes no external request. A risk word stills the world and holds back revelations. From v1.5 the ten-second test belongs with S2.8's first question, the revelation tests with Sprint M, and the frame measurement with Sprints M and 9.
 
-Session W1's choice and session W2's review are the product owner's own records (R2). At session W2 every rubric category, including the three added in v1.4 (section 5), must reach at least 4 before the Skills chapter starts; a lower score gets a fix round first. Safari and VoiceOver stay Sprint 9's human checks.
+Session W1's choice and session W2's record are the product owner's own records (R2). From v1.5, session W2 is a short first look: about 30 minutes in the live app on Muse Wonder, about five questions, and no score threshold. Any scores it records are formative; every category at least 4 is the release bar (section 5). Safari and VoiceOver stay Sprint 9's human checks.
 
 ## Coherence review
 
@@ -589,6 +658,8 @@ S6.4 Enforce 30 seconds, 1,000,000 expanded states and 50,000 feasible schedules
 
 S6.8 Add an efficient two-objective rank algorithm, qualified against Sprint 6a's iterative peeling on the same archives. Rank calculation has its own observable stage and must finish before results claim ranked completion.
 
+From v1.5 (ruling of the audit, 31 October 2026), S6.3's disk-backed archive and the cancellable child process are sized from Sprint 6a's measurements. L0 solves over four targets and ten learning options, and its instances may complete in seconds. The caps, their exact stop reasons and the honest truncation wording of S6.4 stay whatever the measurements show. The disk-backed archive and the child process are specification M0 requirements (OPT-1; ARC-1's stack), so leaving either out of L0 needs the product owner's yes and a note in the specification's revision record; until then they stay in scope, sized to what the measurements show (to be settled by Task 13b).
+
 ## Acceptance and tests
 
 Test archive truncation, each cap's exact stop reason and the retention of every acknowledged feasible record, and resumption or restart after an injected crash. Inject cancellation and child-process failure. A truncated empty archive means none found before the limit. State-limited replay is deterministic; wall-time-limited prefixes need not match. Profile/input changes cannot alter an in-flight snapshot. Benchmark 50,000-point ranking separately; avoid an unqualified quadratic implementation at this limit. On every instance that completes, the disk-backed archive and the efficient ranks equal Sprint 6a's encountered archive and peeled layers.
@@ -599,7 +670,7 @@ At two starts per concept, the selection bound alone permits 10,161,633 combinat
 
 # Sprint 7 Make route comparison the signature experience
 
-5–7 engineering days • Entry: real solver output, the world approved at session W2 and the findings of review session 2; closes only after review session 3 • Requirements: VIS-2, ROU-1, AIR-1, sections 13–14
+6–8 engineering days • Entry: real solver output, Sprint 5's options, Sprint W closed and session W2 held, and the findings of review session 2 (v1.5: it no longer waits for a session to close) • Requirements: VIS-2, ROU-1, AIR-1, sections 13–14
 
 ## Demonstrable outcome
 
@@ -615,7 +686,7 @@ S7.3 Implement exact numeric inputs and keyboard sliders for time/cost. View fil
 
 S7.4 Connect selection to a static Gantt, step cards, monthly financial table and evidence drawer. Use overlapping bands for parallel work/study, clear waits and conditional gates, and actual dates alongside model months.
 
-S7.5 Build Routes as its place in the world, with its moment, the credible route (section 4), and its still version; add persistent target-specific controls and pinned out-of-range states. Preserve the inspected route while recalculating.
+S7.5 Build Routes as its place in the world (section 4), to Sprint W's references, with its still version; its moment, the credible route, comes in Sprint M (v1.5). Add persistent target-specific controls and pinned out-of-range states. Preserve the inspected route while recalculating. Every cost is in plain words (session 2's H-13 record: the product owner could not follow "economic cost", "direct cost" or "conditional"), and a route built on an option that isn't reviewed says so.
 
 S7.6 Use paginated archive queries and a bounded projection for large results. Disclose shown/total counts, preserve extremes and selected points, and provide access to every retained schedule. Do not relabel a sampled plot as the full frontier.
 
@@ -625,7 +696,7 @@ TRACE-01 shows A/B/C in F1, D in F2 and E in F3. The separate A–I fixture uses
 
 Property and browser tests prove selection/filter consistency across charts, cards, list and Gantt. Test keyboard control, focus after filtering, target switching and stale results. Verify no smooth interpolated curve implies attainable intermediate plans. Unknown scenario evidence cannot become zero-width uncertainty.
 
-Run the third visual review and measure the local interaction budgets. Its human part is review session 3, held against what review session 2 showed; Sprint 7 closes only after it. Capture desktop/mobile screenshots with realistic names and actual solver records. A visual regression change requires inspection and an explanation; blanket baseline updates are not acceptance.
+Run the third visual review and measure the local interaction budgets. From v1.5 its human part is the end-to-end session after Sprint 8, formative, where session 2's three route questions are asked again on the real Routes chapter; Sprint 7 closes on its own checks. Capture desktop/mobile screenshots with realistic names and actual solver records. A visual regression change requires inspection and an explanation; blanket baseline updates are not acceptance.
 
 ## Coherence review
 
@@ -653,6 +724,8 @@ S8.5 Generate browser print, JSON and ICS from a shared serialisable snapshot. I
 
 S8.6 Define ICS date/time semantics, stable UID and revision sequence. Conditional events are labelled proposed; downloads never create external calendar entries. Use safe encoding for content and links.
 
+From v1.5 Sprint 8 runs in two slices: first S8.1, S8.2, S8.5 and S8.6 (the snapshot, the Plan chapter, print, JSON and calendar), then S8.3 and S8.4 (revise and replan). Both are M0 and both stay in L0. The workspace's data export, already in the API, gets its button beside the plan's exports. The chapter is built to Sprint W's references; its moment, committing to the chosen path, comes in Sprint M. The end-to-end session follows.
+
 ## Acceptance and tests
 
 Choose TRACE-01 route B and assert that screen, print and JSON agree on the exact numeric fields and snapshot ID. Parse ICS with an independent library to verify dates, timezones, inclusive/exclusive end-date semantics and identity. Check a UK daylight-saving boundary and all-day dates.
@@ -664,6 +737,30 @@ Simulate a closed intake, changed fee and newly demonstrated skill. The old vers
 ## Coherence review
 
 Open the chosen version in all four representations and compare its facts. Confirm that progress, finance and replanning agree about what has already happened, what is still conditional and what money is irrecoverably committed.
+
+# Sprint M Give each chapter its moment (v1.5)
+
+3–6 engineering days • Entry: the end-to-end session, with the product owner's order of the moments, and Sprint 3's Roles chapter • Human: none of its own; the product owner is warned before any measurement opens a window • Requirements: section 4; ADR 0014
+
+## Demonstrable outcome
+
+Each chapter that already works gains its moment, in the order the product owner chose at the end-to-end session. The moments add wonder to chapters that already answer the person's questions. None changes a number, a state or a word in the exact layer, and none pushes a decision off the first screen.
+
+## Deliverables
+
+SM.1 The moments, in the product owner's order, each within a budget stated before it starts; a moment they chose to skip is not built. The candidates: the first answer's ignition; the unexpected connection lit in the world, with its joining trail; decisions previewed in the world (suggestions drawn as rings with the open one singled out, and "Make this a target" previewing its destination before it is saved); the overlooked strength (its proposal and confirm step, held back on a support turn, and its destinations on the horizon); a gap's first bridge; the credible route; committing to a plan; progress landmarks.
+
+SM.2 Sprint W's revelation acceptance: every revelation's sentence and evidence are in the DOM, the still world says the same, and a risk word holds every revelation back.
+
+SM.3 The frame re-measure on the busiest real scene and on a scene with a name that cannot be placed, with the product owner warned first, because the measurement opens a window on their screen. Sprint 9 measures again on the release candidate.
+
+## Acceptance and tests
+
+Every moment keys off a state the backend computed. The still world and the DOM list carry the same states and words. A risk word stills the world and holds every revelation back. Frame times are reported against section 4's budgets with device, browser and scene. The existing journeys pass unchanged, with motion on and off.
+
+## Coherence review
+
+Pick one moment and trace it to the computed state behind it; any glow without one is a defect. Then ask: does each moment make its chapter's answer clearer, and never harder to reach?
 
 # Sprint 9 Qualify and hand over the local release
 
@@ -677,13 +774,13 @@ A clean machine or equivalent clean user environment can run and test Careerwrig
 
 S9.1 Run P01–P05 end to end through the actual browser, API, PostgreSQL, DBOS and solver. Confirm all negative and conditional paths as well as the selected-route print flow.
 
-S9.2 Run a real Meta journey with a synthetic persona and reviewed permitted evidence: interview, grounded discovery, extraction, checkpoint, solve, selection and export. Disconnect/reconnect the browser and restart the worker during the run. An unavailable integration is blocked, not passed by substituting a fixture.
+S9.2 Run a real Meta journey with a synthetic persona and reviewed permitted evidence: interview, grounded discovery, extraction, checkpoint, solve, selection and export. Disconnect/reconnect the browser and restart the worker during the run. An unavailable integration is blocked, not passed by substituting a fixture. From v1.5 the live journey includes a persona whose target is outside ESCO.
 
 S9.3 Exercise invalid/rotated/revoked keys, concurrent spend reservations, provider timeout/rate limit/refusal, cancellation, source drift, stale writes and injected process crashes. Inspect logs and durable storage for leaks. Record ambiguous external-call charges honestly.
 
 S9.4 Test a fresh install and a migration from the last release candidate. Perform a PostgreSQL and permitted-blob backup/restore, with key material handled separately. Demonstrate full workspace deletion and explain that backup copies follow the documented local retention/reset procedure.
 
-S9.5 Finish the visual and accessibility review, real Safari/Chrome checks, VoiceOver walkthrough and five formative task sessions. Fix consequential comprehension, keyboard, contrast, responsive and print defects before sign-off.
+S9.5 Finish the visual and accessibility review, real Safari/Chrome checks, VoiceOver walkthrough and five formative task sessions (five participants are available, the product owner, 31 October 2026). Every rubric category must reach at least 4 (section 5). Measure the world's frame budgets again on the release candidate, with the product owner warned first. Fix consequential comprehension, keyboard, contrast, responsive and print defects before sign-off.
 
 S9.6 Package the repository, lockfiles, source/fixture manifests, licence notices, architecture decisions, test commands, troubleshooting runbook and release evidence. Document optional Adzuna qualification separately. Tag the tested local release; do not publish a service.
 
@@ -820,7 +917,7 @@ The pack is an immutable public evidence pack (specification section 11): fetche
 - A pack record never fills a live field and is never shown as current.
 - Synthetic data stays labelled synthetic and never enters the pack.
 
-Live research (Meta search, Scrapling, Adzuna) writes to the same catalogue contract, inside its own workspace and never into the pack, with `review_state: proposed`. Proposed records are explorable but excluded from an unqualified “affordable and feasible” recommendation until reviewed, which is the option review checkpoint rule (specification section 10). The pack gives the numerical core real, reviewed options to run on before Sprint 9, and gives the live path reviewed values to be scored against.
+Live research (Meta search, Scrapling, Adzuna) writes to the same catalogue contract, inside its own workspace and never into the pack, with `review_state: proposed`. Proposed records are explorable but excluded from an unqualified “affordable and feasible” recommendation until reviewed, which is the option review checkpoint rule (specification section 10). From v1.5 the options a person adds themselves (S5.7) and those option research finds for any target (S3.7) are such workspace records, marked not reviewed in plain words. The planning catalogue reads them beside the pack, and a route built on one is qualified (ADRs 0011 and 0013, amendments). The pack gives the numerical core real, reviewed options to run on before Sprint 9, and gives the live path reviewed values to be scored against.
 
 ## Evaluation outputs
 
@@ -862,15 +959,16 @@ Store a short record in docs/reviews/sprint-N.md: demonstrated journey, current 
 
 ## Human review sessions (v1.1)
 
-Human review is scheduled as fixed sessions: three from v1.1, about five and a half hours, and two from v1.4 for the world, about two more. Each is a dispatch precondition for the work after it: an agent prepares the session's package (checklists, captures, the records to review), a person holds the session, and dependent work starts only after it has happened. If it has not, the work is recorded as “blocked: awaiting session N”, never started or self-certified. The product owner confirmed D1–D3 on 28 October 2026, so no session needs time for them.
+Human review is scheduled as fixed sessions: three from v1.1, about five and a half hours, and two from v1.4 for the world, about two more. From v1.5 (the product owner's approval of 31 October 2026) sessions 1, 2 and W1 are held; session W2 is a short first look, about 30 minutes; and session 3 merges into one end-to-end session of about an hour after Sprint 8. The sessions that worked were short and hands-on, so each asks about five questions, about outcomes rather than settings, each saying what "yes" does. Each is a dispatch precondition for the work after it: an agent prepares the session's package (checklists, captures, the records to review), a person holds the session, and dependent work starts only after it has happened. If it has not, the work is recorded as “blocked: awaiting session N”, never started or self-certified. The product owner confirmed D1–D3 on 28 October 2026, so no session needs time for them.
 
 | Session | When | Gates it closes | Precondition for |
 |---|---|---|---|
-| 1, about 2 hours | Before the Sprint 3 Roles chapter (S3.5) and before any page body is retained beyond the source classes it permits | H-06 as a rights policy for the permitted source classes of the corpus and the option pack, so agents can then classify pages themselves (a page outside those classes stays with a person); the H-12 checklist in ADR 0007 | The Roles chapter and job corpus; retaining or committing page bodies beyond ruling R3 |
-| 2, about 2½ hours | After the Sprint 5 backend | H-07 for Sprints 4 and 5, on the option pack and the TRACE-01 checker run on P01's real option set; the formative comprehension session (section 5, H-13); H-01 for Sprint 2, the design review of the You chapter and the slate at desktop and 390 px, testing scanning, understanding and choosing (v1.2) | Publishing the reviewed option pack, and through it Sprint 6a and the Skills, Options and Roles chapters' scoring against reviewed values; more interface detail in those chapters, which first applies the Sprint 2 design findings; the start of Sprint 7 |
-| 3, about 1 hour | Before Sprint 7 closes | H-01 for Sprint 7, the design review, against what session 2 showed | Closing Sprint 7, and so Sprint 8 |
-| W1, about 1 hour (v1.4) | After Sprint W's spike | The product owner plays the three directions of section 4 and chooses one, or a mix, in their own words; also whether sound is wanted | The rest of Sprint W |
-| W2, about 1 hour (v1.4) | At the end of Sprint W | H-01 for Sprint W: the design review of the world and the You chapter, every rubric category at least 4 (section 5) | Every later chapter interface: Skills, Options, Roles, Routes and Plan |
+| 1, about 2 hours (held 2026-10-28) | Before the Sprint 3 Roles chapter (S3.5) and before any page body is retained beyond the source classes it permits | H-06 as a rights policy for the permitted source classes of the corpus and the option pack, so agents can then classify pages themselves (a page outside those classes stays with a person); the H-12 checklist in ADR 0007 | The Roles chapter and job corpus; retaining or committing page bodies beyond ruling R3 |
+| 2, about 2½ hours (held 2026-10-29 to 30) | After the Sprint 5 backend | H-07 for Sprints 4 and 5, on the option pack and the TRACE-01 checker run on P01's real option set; the formative comprehension session (section 5, H-13); H-01 for Sprint 2, the design review of the You chapter and the slate at desktop and 390 px, testing scanning, understanding and choosing (v1.2) | Publishing the reviewed option pack, and through it Sprint 6a and the Skills, Options and Roles chapters' scoring against reviewed values; more interface detail in those chapters, which first applies the Sprint 2 design findings; the start of Sprint 7 |
+| 3, about 1 hour | Merged into the end-to-end session (v1.5) | — | — |
+| W1, about 1 hour (v1.4; held 2026-10-30) | After Sprint W's spike | The product owner plays the three directions of section 4 and chooses one, or a mix, in their own words; also whether sound is wanted | The rest of Sprint W |
+| W2, about ½ hour (v1.5) | After Sprint W closes and S2.8, S1.6 and S2.9 are built | The product owner uses the You chapter in the live app on Muse Wonder, roles included, and answers about five questions: is it right enough to build the other chapters on; are the suggestions sensible for two or three named people, one with a role on no list; keep Source Sans 3 for body text; keep leaf green for "accept"; any words not understood. Their record of what to change; formative H-01 for Sprint W, no score threshold | Every later chapter interface: Skills, Options, Routes, Plan and Roles (not backend work) |
+| End-to-end, about 1 hour (v1.5; replaces session 3) | After Sprint 8 | The product owner goes from You to a printed plan. Session 2's three route questions asked again on the real Routes chapter (the cost, the condition, what is uncertain); formative H-01 for Sprints 4, 5, 7 and 8; the order of the moments, or which to skip; whether the results for a role outside ESCO are honest and useful; anything that blocks a release; whether the release uses Muse Wonder | Sprint M; Roles (S3.5) in the suggested order |
 
 ## Use the supplied Claude Code starter kit
 
@@ -892,13 +990,16 @@ Link this living checklist to code, tests, demonstrations or scope exclusions. P
 |---|---|---|
 | BND-1 and local overrides | 0, 1, 9 | L0 scope ADR, startup/run modes, no public deployment dependency |
 | REC-1 and DIV-1 | 2 | Sure/unsure flows, grounded slates, diversity/counterfactual eval, span-cited explanations with verified quotations (S2.7) |
+| The role space (v1.5, ADR 0015) | 2 (S2.8, S2.9), 3, 4 | Titles from ESCO and the ONS coding index, the person's own words always kept, title ideas corroborated by code, researched roles with verified quotes from independent sources, each target stored once; S2.8's offline acceptance test in the demo and S2.9's capped live test |
+| Options for any target (v1.5) | 5 (S5.7), 3 (S3.7), 7 | Options the person adds and options research finds, stored as workspace records marked not reviewed; the planning catalogue reading them beside the pack; every route built on one qualified |
+| Live sessions on Muse Wonder (v1.5) | 1 (S1.6) | Wonder qualified (capabilities in the registry), the session command and its caps, the spending line, each session's calls in the cost ledger, the test model unchanged for automated checks |
 | TAX-1 and AIR-1 | 2, 3, 7 | Pinned imports/mappings, reviewed/null range records, filter semantics |
 | Acquisition and source rights | 0, 3–5 | Source manifest, real corpus, hostile-input and access-policy tests |
 | England option pack (D1) | 3–5, 6a | Pack manifest with dates, review states and rights; the session 1 rights policy and the session 2 review (H-06, H-07); live-versus-reviewed field scores; the TRACE-01 checker on P01's real option set; complete coverage on pack-scale instances |
 | MAP-1, OUT-1 and RDY-1 | 4, 5 | Provisional matrix, inspectable spans, protected gates and apply-now |
 | TIME-1 and FIN-1 | 5, 6a, 8 | Independent ledger checks, conservative timing, export agreement |
 | OPT-1 and ROU-1 | 6a, 6b, 7 | Oracle agreement, full encountered archive, exact/truncated labels, measured complete-coverage sizes, truncation shown as the expected case |
-| VIS-1 and VIS-2 | 1, W, 3, 7, 9 | The world approved at session W2, coordinated state, keyboard and performance |
+| VIS-1 and VIS-2 | 1, W, 3, 7, M, 9 | The world reviewed at session W2 and the end-to-end session, and every category at least 4 at release; coordinated state, keyboard and performance; the moments keyed to computed states (Sprint M) |
 | Evidence lifecycle and chosen plan | 3, 8, 9 | Invalidation, immutable snapshots, replan and offline export |
 | ARC-1 and secret/privacy controls | 0, 1, 9 | Ownership, journals, spend, revocation, recovery, deletion and restore |
 | TEST-1 | All, final gate 9 | Five browser personas, two numeric fixtures and real Meta smoke |
@@ -942,11 +1043,13 @@ References checked on 27 October 2026. These narrow checks support the integrati
 | Monthly bounds reject viable real routes | Preserve exact dates and explain coarse-model limitations. Offer explicit reviewed changes within scope, not an infeasibility claim about life. |
 | Search does not finish within limits | Keep every encountered route and disclose truncation. Use tiny complete cases for proof; qualify the full-size workload empirically. |
 | Attractive UI hides uncertainty | Make conditional/unknown states part of initial compositions and formative comprehension tests. Block misleading presentation. |
-| Design quality arrives too late | Choose the world from a working spike (session W1) and approve it (session W2) before more chapters are built in it; then the map in 3 and the route view in 7. Fix interaction debt before final integration. |
-| The product owner's ambition is diluted again in planning or building (v1.4) | Their words lead section 4 and `CLAUDE.md`. Session W1 chooses from something they can play, not from a description. Session W2 is a gate with three rubric questions about the ambition itself. A screen that works but is bland fails review. |
+| Design quality arrives too late | Choose the world from a working spike (session W1). From v1.5: references before chapters, moments after the path. Each chapter is built to Sprint W's references, then gains its moment in Sprint M; session W2 and the end-to-end session score it formatively, and every category must reach at least 4 at release. Fix interaction debt before final integration. |
+| The product owner's ambition is diluted again in planning or building (v1.4) | Their words lead section 4 and `CLAUDE.md`. Session W1 chooses from something they can play, not from a description. From v1.5 the rubric's three questions about the ambition are scored at session W2 and the end-to-end session, Sprint M builds the moments in the order they choose, and the release bar stays every category at least 4. A screen that works but is bland fails the moments review and the release review. |
+| The world displaces the decision path (v1.5) | The path comes first: each chapter's working view ships before its moment, which comes in Sprint M; on a phone the decision comes first; the release gate (every category at least 4) is kept. |
+| Discovery beyond a fixed list loops on wording and matching (v1.5) | The sentence rule from the start: a line says what Careerwright did or checked, never what a source or list contains. The product owner judges suggestion quality on real examples; at most one matching round per task; wording and matching stop at three rounds (task file ruling R14). |
 | The spectacle costs speed, access or truth (v1.4) | An exact DOM and SVG layer over the WebGL world, which holds nothing unique; a still version that carries every state and word; frame budgets measured on the target Mac; and the rule that everything that varies has a computed meaning. |
 | Scope expands into public launch | Maintain the explicit L0 checklist. Schedule hosted/private-beta and M1 work as later milestones with their own acceptance evidence. |
-| Human review becomes the bottleneck | Sprints 0–2 took 16 hours of wall-clock time, so review points that assumed weeks between them now set elapsed time. Hold three fixed review sessions as dispatch preconditions (section 10) and size the remaining work in human review hours (section 6). |
-| Language-rule refinement becomes open-ended (support screen, explanation validation, redaction, value readers) | Grow a rule only for a reproduced defect or an evaluation failure. Prefer a fail-safe outcome (unknown, unclear, not kept) to a new pattern. Record a hypothetical form as a known limit. Keep the safeguards and accepted limitations as recorded (v1.2; ruling R11 in the task file). |
-| Infrastructure polish displaces evidence | From the option pack to review session 2, polish that no failing check or reproduced defect requires goes to the final review list (v1.2; ruling R12 in the task file). |
+| Build and review loops set the pace (corrected in v1.5; it read "Human review becomes the bottleneck") | Human review has not been the bottleneck: every session was held within hours of its package being ready, and build and review loops set the pace. Keep sessions short and hands-on, about five questions on outcomes, never settings (section 10). Bound review loops by kind of finding, and let small things wait for the final review (task file rulings R13 and R14). Size the remaining work in agent hours (section 6). |
+| Language-rule refinement becomes open-ended (support screen, explanation validation, redaction, value readers) | Grow a rule only for a reproduced defect or an evaluation failure. Prefer a fail-safe outcome (unknown, unclear, not kept) to a new pattern. Record a hypothetical form as a known limit. Keep the safeguards and accepted limitations as recorded (v1.2; ruling R11 in the task file, widened in v1.5 to the slate's notes and matching rules). |
+| Infrastructure polish displaces evidence | From the option pack to review session 2, polish that no failing check or reproduced defect requires goes to the final review list (v1.2; ruling R12 in the task file). From v1.5 this holds for every remaining task (ruling R13, "Path before polish"). |
 | The numerical core is unexercised on real, reviewed options before Sprint 9 | Build the England option pack from the required corpus (section 9), run the TRACE-01 checker on P01's real option set and review it at session 2, and hold one formative comprehension session after Sprint 5 (section 5). |
