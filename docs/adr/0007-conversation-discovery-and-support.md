@@ -959,3 +959,13 @@ space; this ADR changes as follows.
   list contains (`CLAUDE.md`; R11). The lines that throw a title idea away ("couldn't match
   … so not suggested") change in Task 6d.
 - `CLAUDE.md`'s discovery invariant changes to match, in the product owner's approved words.
+- **Amendment line, Task W2E (2026-10-31): a target chosen from a slate keeps it current**
+  (STATE-10; the audit's F5). A discovery stays made from the current answers while every
+  profile version after the one it pinned changed only the targets, each time citing the
+  person's choice of an occupation from that discovery's slate
+  (`exploration.changed_only_by_choices`, tested in `test_discovery_contract.py` and
+  `test_discovery.py`). Any other change, a target typed in included, still marks it "based on
+  your earlier answers", with Suggest again as the bright action. The API says it as
+  `DiscoveryOut.current`; the slate's one written note follows the same rule, since it quotes
+  only the pinned answers. The suggestion's choice gives way, in place, to "Saved as one of
+  your targets" and what the work usually asks for.

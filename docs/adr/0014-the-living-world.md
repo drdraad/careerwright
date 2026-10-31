@@ -119,10 +119,15 @@ process." Their reference image is "Careerwright's luminous path forward".
    WebGL2 draw the same states and words without motion. A visible control pauses ambient
    motion.
    **In the app (Task W2):** the still world is also drawn while the calm support panel shows
-   (Pause keeps showing the person's own choice, and the strip says "Still while support is
-   shown"), and for the rest of a visit once the moving world fails (its WebGL context lost,
-   or its renderer unable to start). Calm mode is a setting in the account menu; Pause motion
-   and Sound stay in the strip. **Never overwhelming** (the product owner, shown the busiest
+   (the control that holds it still keeps showing the person's own choice, and the strip, or a
+   phone's top bar, says "Still while support is shown"), and for the rest of a visit once the
+   moving world fails (its WebGL context lost, or its renderer unable to start). Calm mode is a
+   setting in the account menu. **The strip, as corrected by Task W2E:** on a desktop (1180 px
+   and wider) "Hold the world still" and Sound are in the strip, named apart from the
+   conversation's "Pause the interview" (the audit's F17); below that width they are in the
+   account menu, beside calm mode, with their words and switches, so that a tablet's strip
+   keeps the target, the work area and the budget (F14) and a phone's keeps the saved state,
+   any update state and the account menu. **Never overwhelming** (the product owner, shown the busiest
    scene: "too busy … overwhelming"): one idea at a time, and nothing moves without meaning. The
    atmosphere keeps the breathing horizon, the aurora and light flowing along known trails; the
    shimmer that travelled the horizon and the trails' sway are gone, and the motes are cut from
@@ -196,8 +201,14 @@ unchanged; what changes:
   provisional; they are two of session W2's five questions.
 - **Decision 7.** Its frame evidence now reads: Task M and Task 16 measure again, with the
   product owner warned first, because the measurement opens a window on their screen. Its
-  strip wording is corrected by Task W2E, which moves the motion and sound switches into
-  the account menu below desktop width.
+  strip wording is corrected by Task W2E (done: decision 7's "The strip" above), which moves
+  the motion and sound switches into the account menu below desktop width.
+- **On a phone, the band (Task W2E).** Below 968 px the You console's band of world is 144 px
+  (`geometry.ts`'s MIN_BAND of 128 px and a margin): the person's light and the targets' names,
+  no more, so each view's first decision is in the first screen at 390 × 844. A window too
+  short to hold both keeps no band, and the world stands behind the console. The design
+  references keep the tall band only for the start, whose skills light up as the person
+  picks them.
 - **References.** Once a chapter is built, the app's own Storybook stories become its
   reference, and its place in the hand-drawn design compositions is retired (task file
   ruling R13).
