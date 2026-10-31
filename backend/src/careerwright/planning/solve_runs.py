@@ -14,8 +14,9 @@ Under the worker role and row-level security scoped to the run, the activity:
    stores the ranked result sealed, its facts and the attempt's end in one transaction.
 
 The search is pure and reads nothing else: no model, key, network or other table. A cancel
-reaches it at its next check: the person's request is read at most every `CANCEL_POLL_S`, and
-a cancelled search stores nothing. The rank stage reaching its own limit fails the run
+reaches it at its next check: the person's request is read every `CANCEL_POLL_S` on a thread
+of its own (`cancel_watch`), never on the search's clock, and a cancelled search stores
+nothing. The rank stage reaching its own limit fails the run
 `rank_limit_reached`, never a result without its ranks. A store outage is transient: the DBOS
 step re-runs the activity, which solves again (a solve costs nothing). Everything else fails
 the run `unknown_failure`, named by class only.
@@ -23,6 +24,7 @@ the run `unknown_failure`, named by class only.
 
 import hashlib
 import logging
+import threading
 import time
 import uuid
 from collections.abc import Callable, Iterator
@@ -117,23 +119,38 @@ def _cancel_requested(rt: SolveRuntime, run_id: uuid.UUID) -> bool:
 
 
 @contextmanager
-def cancel_watch(
-    read: Callable[[], bool], clock: Callable[[], float] = time.monotonic
-) -> Iterator[Callable[[], bool]]:
-    """The search's cancel check: `read` at most every `CANCEL_POLL_S` on `clock`, and true for
-    good once it is."""
-    next_read = clock()
-    requested = False
+def cancel_watch(read: Callable[[], bool]) -> Iterator[Callable[[], bool]]:
+    """The search's cancel check, true for good once the person has cancelled. A daemon thread
+    calls `read` every `CANCEL_POLL_S` and sets an event; the check reads only the event. So
+    the search never waits on the store, and a slow store is never charged to its clock or the
+    rank stage's. A failed read is never a cancel: it is logged by class, once per run of
+    failures, and tried again at the next poll (the worker loop still publishes a cancelled
+    run `cancelled`)."""
+    requested = threading.Event()
+    ended = threading.Event()
 
-    def check() -> bool:
-        nonlocal next_read, requested
-        if requested or clock() < next_read:
-            return requested
-        next_read = clock() + CANCEL_POLL_S
-        requested = read()
-        return requested
+    def watch() -> None:
+        failing = False
+        while not ended.is_set():
+            try:
+                if read():
+                    requested.set()
+                    return
+                failing = False
+            except Exception as error:
+                if not failing:
+                    _log.warning(
+                        "route solve cancel read failed",
+                        extra={"error_class": type(error).__name__},
+                    )
+                failing = True
+            ended.wait(CANCEL_POLL_S)
 
-    yield check
+    threading.Thread(target=watch, name="route-solve-cancel-watch", daemon=True).start()
+    try:
+        yield requested.is_set
+    finally:
+        ended.set()
 
 
 def _finish(rt: SolveRuntime, ready: _Ready, outcome: AttemptOutcome) -> None:
@@ -177,7 +194,7 @@ def _solve(rt: SolveRuntime, ready: _Ready) -> SolveEnd:
         snapshot = SolveSnapshot.model_validate_json(
             rt.activity.keyring.open(ready.sealed, context)
         )
-        with cancel_watch(lambda: _cancel_requested(rt, run.run_id), rt.clock) as stop:
+        with cancel_watch(lambda: _cancel_requested(rt, run.run_id)) as stop:
             archive = search_archive(
                 snapshot.monthly, limits=snapshot.limits, clock=rt.clock, cancelled=stop
             )
