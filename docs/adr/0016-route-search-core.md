@@ -197,8 +197,8 @@ measurements here.
 ## Amendment, 2026-10-31 (Task 12a): the new findings, classed
 
 Task 12a added checker findings (ADR 0013, Task 12a's settlement). Each is classed for the
-pruning rules, `PRUNING_VERSION` is now `sound-pruning-3`, and the oracle writes each rule again
-from its own reading, its generated cases reaching every one:
+pruning rules, `PRUNING_VERSION` is now `sound-pruning-4` (fix round 1), and the oracle writes
+each rule again from its own reading, its generated cases reaching every one:
 
 - **Rule 1** (input-level, in every route): `work_rights_unknown` and `work_rights_not_held`
   come from the inputs alone.
@@ -210,5 +210,21 @@ from its own reading, its generated cases reaching every one:
 - **Rule 4** (persists): `job_transitions`. Adding a variant never takes away an offer still to
   be accepted, so a node with two is cut (`PruningRule.JOB_TRANSITIONS`). Decision 2's tree
   bound (one `work` action) stands beside it.
-- A month row the checker leaves null never reaches rule 3: a searched route's payments are
-  all known, because rule 2 sets aside an option whose amounts are not.
+- A month row the checker leaves null never reaches rule 3: its sums come from each variant
+  checked alone, whose amounts are all known (rule 2 sets aside an option whose amounts are
+  not), so a node whose own rows are null is summed all the same.
+
+Fix round 1 (review 12a):
+
+- **Rule 2 and rule 4:** `exclusive_schemes` is a variant's own violation where its own
+  supports hold both schemes, and persists across two variants (adding a variant never takes
+  away a counted support), so a node with it is cut (`PruningRule.EXCLUSIVE_SCHEMES`).
+- **Never pruned, never a variant's own:** `scheme_shared_unconfirmed` (one scheme on two
+  options) needs two variants and is unresolved.
+- **A condition, not a finding:** an option behind an application with no admission recorded
+  and no application in the route rests on applying in time (ADR 0013 settlement, item 9), so
+  rule 6 no longer meets it.
+- **The outcome:** a complete run whose starting position breaks a limit no option can lower
+  (existing repayments above the monthly payment cap) says `no_route_in_bounded_model`
+  whatever is set aside or unstated; decision 8 is otherwise unchanged. The oracle's property
+  test now checks the outcome both ways: the search's equals the oracle's.

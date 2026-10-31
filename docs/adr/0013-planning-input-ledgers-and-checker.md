@@ -284,9 +284,7 @@ review 13a (C07, C09 and one job transition) applied.
    counted on one variant without `stacking_confirmed` is `stacking_unconfirmed`, unresolved;
    the one confirmation covers exclusivity and eligible-cost caps between them. The known part
    still counts every support, the least the person could pay, so a limit broken even then is
-   a violation. Known limit: two funded options in one route are not checked against each
-   other; a scheme's exclusivity across courses (C01's "not undertaking any other
-   government-funded training") is one of that option's conditions for the person to confirm.
+   a violation. Across the options of one route, see item 16.
 8. **A fee for eligible learners (C07).** An offering's `eligibility_` funding conditions are
    served as the conditions its stated fee holds under. While one is not `confirmed`, the
    stated fee is not the person's (`eligibility_unconfirmed`, one per condition, unresolved;
@@ -295,9 +293,12 @@ review 13a (C07, C09 and one job transition) applied.
    stated (C01), its cost is the unknown and the conditions add nothing.
 9. **An admission or an offer held (C09).** `admissions` names the offerings where the person
    holds a place or an accepted offer: the application gate joins the initial gates and the
-   offer gate is accepted, so a route can depend on it. Without it, nothing grants the
-   admission: the route stays as stated (`prerequisite_not_usable`) with its offer a
-   condition, never feasible.
+   offer gate is accepted, so a route can depend on it. Without it, and with no application
+   in the route, the route is conditional on the application (fix round 1, the controller's
+   C09 ruling): a `Condition` of kind `application` (`confirm_admission`) and the
+   qualification `conditional_application`, never "not feasible". A deadline already passed
+   is still `application_too_late`, and an application in the route keeps TIME-1's timing
+   rules.
 10. **"Doesn't meet the entry requirements"** is `entry_requirements_not_met`, apart from
     `entry_requirements_unconfirmed`, still unresolved; its next action, worded by the web, is
     to check whether the provider accepts equivalent experience.
@@ -311,13 +312,37 @@ review 13a (C07, C09 and one job transition) applied.
 13. **Month rows** (review M10). A ledger month's figure that rests on an amount not known (a
     payment whose amount or month is not stated, pay from an option with no dates, or an
     earlier month that does) is null; living costs and repayments stay known. The checker
-    still tests its limits on the known part.
+    still tests its limits on the known part. A support paid to the person that may not apply
+    (its stacking, or its scheme paying for two options, not confirmed) leaves every month's
+    receipts null (fix round 1, review 12a, Important 1), while the reserve check still counts
+    it: the most cash the person could have, so a breach there is real.
 14. **Outcome decisions** (ADR 0012 decision 11): accept or override, each kept with who made
     it and when while unchanged; `decided_outcomes` makes an accepted mapping the person's
     assumption and puts an override beside the unchanged provider claim. A decision the
     outcome contract refuses (a level for a topic mention) is refused at the write.
 15. **The oracle and the search.** Each new rule is written again in the oracle and reached by
     its generated cases; the search classes them (ADR 0016's amendment).
+16. **One scheme on several options, and exclusive schemes** (fix round 1, the controller's
+    ruling on review 12a, Important 2):
+    - The same scheme counted on more than one option of a route is
+      `scheme_shared_unconfirmed` (its reason the instrument), unresolved, until the person
+      confirms it pays for each: `shared_schemes`, a planning input naming one of their stated
+      supports. The cost and its month rows are then unknown, the known part the least.
+    - Two schemes a record states may not be combined (`FundingInstrument.exclusive_with`,
+      either naming the other) both counted in one route are `exclusive_schemes`, a violation:
+      not feasible in this monthly model.
+    - **L0 limit:** packs 0.1.0 and 0.2.0 record no exclusivity a model can read (their
+      `exclusions` are words naming no scheme, and none is filled in), so two different
+      schemes in one route are never checked against each other. A scheme's own condition on
+      other funded training (C01's "not undertaking any other government-funded training") is
+      one of that option's eligibility conditions, for the person to confirm. No rule is
+      invented for it.
+17. **"No route" when the person's own repayments rule it out** (fix round 1, review 12a,
+    Important 3). Existing repayments above the monthly payment cap are a starting breach no
+    option, known or unknown, can lower, so a complete search says
+    `no_route_in_bounded_model`, naming them as its starting violations, whatever else is
+    unknown, an unstated input included. Every other starting breach (the reserve, the
+    deficit cap, the workload) some option could relieve, so an unknown still keeps it open.
 
 Not here: storage of an option's own facts the person supplies (a start date, a cost, weekly
 hours) and "add an option yourself" (Task 12b); the planning inputs in the workspace export
