@@ -297,3 +297,18 @@ judges the words.
     stored, so this needs a database made outside setup.
   - 0036's SQL folds case with `lower()` where the index's normalised titles use Python's
     `casefold()`; they differ only for letters such as "ß", which no index title holds.
+
+## Amendment line, Task 6d slice B fix round 2 (2026-10-31): the person's own answer first
+
+The re-reviews' findings, fixed (`task-6dB-fix-round-2.md`). Session W2 still judges the
+words; a real phone's keyboard stays a human check.
+- **"Use my own words" is the type-ahead's first option** (before: the last), and under a
+  partial list "None of these is my job" sits right under the question, so the person's own
+  answer is in a phone's first screen however many titles follow. The option the person
+  arrowed to is kept by its key, so a title that moves as the list arrives is never Enter's
+  pick, and own words arrowed to never become a refusal when a partial list arrives.
+- **The first question's support panel sits above the title field**, as the message panel
+  sits above the reply field, and stays until the person dismisses it, after a skip or
+  another answer too. A title it answers is kept only by the person's choice in the panel
+  (ADR 0007, amendment line, fix round 2). While fixing a title, the way back to the closest
+  question is named for what it does ("Back to “Which of these is closest?”").

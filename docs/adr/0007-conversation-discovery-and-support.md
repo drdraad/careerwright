@@ -1019,3 +1019,25 @@ space; this ADR changes as follows.
   closest occupation after the start, so its fact (`role_not_matched`) asks for none, and a
   direction is "Something different" only where the slate's own fact says the person's kind
   of work is known (`familiarity_known`).
+- **Amendment line, Task 6d slice B fix round 2 (2026-10-31): What we know's direct entries
+  go through decision 7's screen, and a screened title is kept by the person's choice**
+  (`support-policy-9`).
+  - *What we know* (the product owner's decision of 31 October 2026). A direct edit's new
+    entries are screened: each answer given in words, and each item of a list, that the
+    version the edit was made against doesn't hold (so a word saved before doesn't bring the
+    panel back on every save). Like a message, an edit that triggers the screen is saved as
+    usual, as the person's own edit, and the same calm panel comes with the answer
+    (`ProfileSavedOut.support_note`: "… Your answers were saved as usual."), or with its
+    refusal ("… Your answers were not saved; the reason is shown with them."). It is derived
+    from the request every time, a replay included, and never stored, not even in the receipt.
+  - *The first question* (the controller's ruling on re-review R-M3). A title the screen
+    answers is still not kept by itself, but the panel now offers a way forward: the person may
+    keep the words as their job title, exactly as typed, by their explicit choice
+    (`NameRole.keep_as_typed`, the same command as "Use my own words"), type again or skip. Its
+    line changes to stay true whichever they take, since the panel stays until they dismiss it
+    ("… Careerwright keeps it as your job title only if you choose to. You can also type again
+    or skip this question."; before: "… Careerwright hasn't kept it as your role."). The
+    type-ahead's screened answer no longer returns the typed words (`query` is null).
+  - Nothing about the panel is stored or used for suitability. The screen's words and windows
+    are unchanged; both uses and their lines are not yet reviewed as built (`REVIEW_STATUS`;
+    session W2).
