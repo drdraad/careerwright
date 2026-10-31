@@ -669,6 +669,188 @@ button {
   border-color: var(--status-error-on-reading);
 }
 
+/* ---------- You: the console's views (Sprint W, SW.4) ---------- */
+
+/* The three views as tabs; the one you're in is marked in sea-glass (a selection). */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-8);
+  border-bottom: 1px solid var(--line-reading-hairline);
+}
+
+.tabs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-8);
+  border-bottom: 3px solid transparent;
+  color: var(--text-on-reading-muted);
+  font-size: var(--type-14);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tabs a[aria-selected="true"] {
+  color: var(--text-on-reading);
+  border-bottom-color: var(--selection-reading);
+}
+
+.view {
+  display: grid;
+  gap: var(--space-16);
+}
+
+.reply {
+  display: flex;
+  gap: var(--space-12);
+}
+
+.reply .glyph {
+  width: 22px;
+  height: 22px;
+  color: var(--text-on-reading-muted);
+}
+
+.tray {
+  display: grid;
+  gap: var(--space-12);
+}
+
+/* What a decision did, with Undo beside it while it can apply. */
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8) var(--space-16);
+}
+
+.proposal {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.proposal,
+.notice {
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--line-reading-hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface-card);
+}
+
+/* Careerwright's reading, not a fact until accepted: a dashed edge. Chosen: the selection. */
+.proposal[data-basis="inferred"] {
+  border-style: dashed;
+  border-color: var(--line-reading-control);
+}
+
+.proposal[data-chosen="true"] {
+  border-color: var(--selection-reading);
+  box-shadow: inset 3px 0 0 var(--selection-reading);
+}
+
+/* The two decisions on a proposed change, colour coded as well as worded (session 2, C3):
+   leaf green accepts or confirms, filled once chosen; orchid undoes the last save. */
+.btn-accept {
+  background: transparent;
+  border-color: var(--decision-accept);
+  color: var(--decision-accept);
+}
+
+.btn-accept[aria-pressed="true"] {
+  background: var(--decision-accept);
+  color: var(--text-on-decision);
+}
+
+.btn-undo {
+  background: transparent;
+  border-color: var(--decision-undo);
+  color: var(--decision-undo);
+}
+
+.btn .glyph {
+  width: 18px;
+  height: 18px;
+}
+
+.facts {
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--line-reading-hairline);
+  border-radius: var(--radius-control);
+  background: var(--line-reading-hairline);
+  overflow: hidden;
+}
+
+.facts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-12);
+  padding: var(--space-8) var(--space-16);
+  background: var(--surface-card);
+  font-size: var(--type-14);
+}
+
+.facts dt {
+  color: var(--text-on-reading-muted);
+}
+
+.facts dd {
+  font-weight: 600;
+  text-align: right;
+}
+
+/* A limit's meaning in plain words, under its name. */
+.explained {
+  display: block;
+  margin-top: 2px;
+}
+
+.suggestion {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--line-reading-hairline);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+
+/* The open suggestion is the selected one, edged in sea-glass; it holds the bright action. */
+.suggestion[data-open="true"] {
+  padding: var(--space-16) var(--space-24);
+  border-color: var(--selection-reading);
+  box-shadow: inset 4px 0 0 var(--selection-reading);
+}
+
+.suggestion h3 button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  width: 100%;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-on-reading);
+  font-family: var(--font-display);
+  font-size: var(--type-20);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggestion[data-open="true"] h3 button {
+  font-size: var(--type-25);
+}
+
+.suggestion h3 .glyph {
+  width: 20px;
+  height: 20px;
+  color: var(--text-on-reading-muted);
+}
+
 .field {
   display: flex;
   align-items: center;

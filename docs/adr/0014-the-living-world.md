@@ -94,6 +94,13 @@ process." Their reference image is "Careerwright's luminous path forward".
    selection, the chosen path and the primary action only; blue and violet are atmosphere,
    graded the same along every trail. Industry moves from colour to glyph and label,
    replacing spec VIS-1's industry colours.
+   **Decisions on a proposed change (Task W2, the You chapter):** session 2's C3 asked for
+   accept and undo as "colour coded buttons", and no meaning hue was free for either, so two
+   tokens join: leaf green (`--decision-accept`, `#A6E25A`) accepts a change or confirms a
+   limit, filled once chosen; orchid (`--decision-undo`, `#FFAAFF`) undoes the last save. Each
+   follows its words and glyph, means nothing else, and is never the primary action; CIE76 ΔE
+   from every other hue is at least 56 (leaf) and 44 (orchid, nearest the journey's violet),
+   measured by `docs/design/tools/contrast.mjs`. Provisional (R6), for session W2.
 6. **Type.** A bold geometric sans display face and a readable sans body face, licensed and
    self-hosted; Newsreader retires. The spike chooses the faces.
    **Chosen: Outfit** for display (the product owner at session W1: "Keep Outfit"), the OFL

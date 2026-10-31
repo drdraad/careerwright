@@ -133,6 +133,17 @@ for (const status of config.distinctness.status) {
 }
 distinct.sort((a, b) => a.d - b.d);
 
+// The decision hues (accept, undo) against every hue that already says something: the status
+// and meaning hues, and each other.
+const decisions = config.distinctness.decision ?? [];
+const decided = [];
+for (const [i, decision] of decisions.entries()) {
+  for (const other of [...config.distinctness.status, ...config.distinctness.meaning, ...decisions.slice(i + 1)]) {
+    decided.push({ decision, other, d: deltaE76(opaque(decision, declarations), opaque(other, declarations)) });
+  }
+}
+decided.sort((a, b) => a.d - b.d);
+
 const report = [
   "# Contrast report",
   "",
@@ -154,8 +165,20 @@ const report = [
   "|---|---|---:|",
   ...distinct.map((x) => `| \`${x.status}\` | \`${x.meaning}\` | ${x.d.toFixed(1)} |`),
   "",
+  ...(decided.length === 0
+    ? []
+    : [
+        "## Decision hues versus every other hue (informational)",
+        "",
+        "CIE76 ΔE between each decision hue (accepting a proposed change, undoing a save) and each status and meaning hue, and each other, smallest first. Each decision is carried by its words and glyph as well.",
+        "",
+        "| Decision token | Other token | ΔE76 |",
+        "|---|---|---:|",
+        ...decided.map((x) => `| \`${x.decision}\` | \`${x.other}\` | ${x.d.toFixed(1)} |`),
+        "",
+      ]),
 ];
 writeFileSync(join(root, "tokens/contrast-report.md"), report.join("\n"));
-console.log(`${measured - failures}/${measured} measurements pass (${config.pairs.length} pairs); smallest status/meaning ΔE76 ${distinct[0].d.toFixed(1)} (${distinct[0].status} vs ${distinct[0].meaning})`);
+console.log(`${measured - failures}/${measured} measurements pass (${config.pairs.length} pairs); smallest status/meaning ΔE76 ${distinct[0].d.toFixed(1)} (${distinct[0].status} vs ${distinct[0].meaning})${decided.length ? `; smallest decision ΔE76 ${decided[0].d.toFixed(1)} (${decided[0].decision} vs ${decided[0].other})` : ""}`);
 for (const row of rows.filter((r) => r.includes("FAIL"))) console.log(row);
 process.exit(failures ? 1 : 0);

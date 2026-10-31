@@ -50,6 +50,14 @@
     {"fg": "--text-on-reading-muted", "bg": "--surface-card-sunken", "kind": "text", "use": "muted text on a disabled field"},
     {"fg": "--text-on-reading", "bg": "--surface-band", "kind": "text", "use": "text on a neutral Gantt band"},
     {"fg": "--text-on-action-reading", "bg": "--action-reading", "kind": "text", "use": "label on the bright primary action in a panel"},
+    {"fg": "--light-person", "bg": "--surface-reading", "over": ["--world-ground", "--light-brightest"], "kind": "non-text", "use": "the key's said disc and opening dot (the app's key)"},
+    {"fg": "--decision-accept", "bg": "--surface-card", "kind": "text", "use": "Accept or Confirm on a proposed change's card"},
+    {"fg": "--decision-accept", "bg": "--surface-card", "kind": "non-text", "use": "Accept or Confirm's boundary on a proposed change's card"},
+    {"fg": "--text-on-decision", "bg": "--decision-accept", "kind": "text", "use": "Accepted or Confirmed, the button filled once chosen"},
+    {"fg": "--decision-undo", "bg": "--surface-reading", "over": ["--world-ground", "--light-brightest"], "kind": "text", "use": "Undo the last save on a glass panel"},
+    {"fg": "--decision-undo", "bg": "--surface-reading", "over": ["--world-ground", "--light-brightest"], "kind": "non-text", "use": "Undo the last save's boundary on a glass panel"},
+    {"fg": "--decision-undo", "bg": "--surface-card", "kind": "text", "use": "Undo the last save on a card"},
+    {"fg": "--decision-undo", "bg": "--surface-card", "kind": "non-text", "use": "Undo the last save's boundary on a card"},
 
     {"fg": "--line-space-control", "bg": "--surface-space", "kind": "non-text", "use": "control boundary on the ground"},
     {"fg": "--line-space-control", "bg": "--surface-space-raised", "kind": "non-text", "use": "control boundary on a raised panel"},
@@ -99,6 +107,7 @@
   ],
   "distinctness": {
     "status": ["--status-error-on-space", "--status-stale-on-space"],
-    "meaning": ["--light-destination", "--light-chosen", "--trail-near", "--trail-far"]
+    "meaning": ["--light-destination", "--light-chosen", "--trail-near", "--trail-far"],
+    "decision": ["--decision-accept", "--decision-undo"]
   }
 }

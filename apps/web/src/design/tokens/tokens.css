@@ -1,5 +1,5 @@
 /*
- * Careerwright design tokens, v0.2.1: the living world, Horizon made livelier (Sprint W).
+ * Careerwright design tokens, v0.2.2: the living world, Horizon made livelier (Sprint W).
  *
  * Canonical source for colour, type, space, radius and motion. Components use the semantic
  * tokens (the second block) and the context aliases (.on-space / .on-reading), never the
@@ -12,7 +12,8 @@
  * text below WCAG AA. One colour, one meaning (plan section 4, ADR 0014): orange is a
  * destination; sea-glass teal is selection, the chosen path and the primary action; blue to
  * violet is the journey, graded the same along every trail; slate is "not known yet"; crimson
- * is failure and sand is stale, each after a glyph and words. Focus rings are white.
+ * is failure and sand is stale, each after a glyph and words; leaf green accepts a proposed
+ * change and orchid undoes a save, each after its words. Focus rings are white.
  */
 
 @font-face {
@@ -62,6 +63,11 @@
   --slate-200: #AAB6D2;
   --crimson-300: #FF7D90;
   --sand-300: #D6CBAE;
+  /* Deciding on a proposed change (session 2, C3: "colour coded buttons"). The two hues the
+     world leaves free: CIE76 ΔE 56 or more from every other hue here (leaf; nearest sea-glass)
+     and 44 or more (orchid; nearest violet). */
+  --leaf-300: #A6E25A;
+  --orchid-300: #FFAAFF;
   /* Glass: dark panels over the world, with their opacity in the last two digits. */
   --glass-900: #070B17E8;
   --glass-950: #050812F5;
@@ -111,6 +117,13 @@
   --focus-ring-reading: var(--mist-50);
   --glow-selection: var(--seaglass-glow-35);
   --glow-action: var(--seaglass-glow-70);
+
+  /* Decisions on a proposed change, each after its words and glyph: leaf green accepts a
+     change (or confirms a limit) and orchid undoes the last save. They mean nothing else, and
+     never the one primary action. */
+  --decision-accept: var(--leaf-300);
+  --decision-undo: var(--orchid-300);
+  --text-on-decision: var(--void-950);
 
   /* Status: carried by glyph and text first; only error and stale add a hue, and neither is
      a hue the world uses for a meaning. Unknown is slate: shadow, never absence. */

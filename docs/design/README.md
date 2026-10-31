@@ -14,15 +14,15 @@ requires a human** (session W2, ruling R2).
 
 | Path | What it is |
 |---|---|
-| `tokens/tokens.css` | Canonical tokens, v0.2.1: primitives, semantic tokens, the `.on-space` and `.on-reading` contexts, type, space, radius, each trail's drawn strength and the motion vocabulary |
+| `tokens/tokens.css` | Canonical tokens, v0.2.2: primitives, semantic tokens (with the two decision colours, accept and undo), the `.on-space` and `.on-reading` contexts, type, space, radius, each trail's drawn strength and the motion vocabulary |
 | `tokens/contrast-pairs.json` | Every text and meaningful non-text pairing: glass panels measured over the darkest ground and over the brightest light in the world, and each trail measured as drawn, at its strength |
-| `tokens/contrast-report.md` | Generated measurements: **120 of 120 pass** (91 pairs) |
+| `tokens/contrast-report.md` | Generated measurements: **131 of 131 pass** (99 pairs), with the status and decision hues' distance from every meaning hue |
 | `fonts/` | Outfit (display) and Source Sans 3 (body), with licence texts and provenance (`fonts/README.md`) |
 | `compositions/index.html` | Gallery: every place and state |
 | `compositions/world.html` | One place in one state: `?place=you\|roles\|skills\|options\|routes\|plan&state=…` |
 | `compositions/world.js`, `world.css` | The still world in Horizon's geometry, and the exact layer over it |
 | `compositions/data.js` | Fixture values (checked) and invented listings (labelled synthetic) |
-| `screenshots/` | 31 PNGs (the six places at 1440×900, 768×1024 and 390×844, each honest state, and three long targets at all three sizes) and `checks.md` |
+| `screenshots/` | 43 PNGs (the six places at 1440×900, 768×1024 and 390×844, each honest state, three long targets at all three sizes, and the You console's review, saved, what-we-know and suggestions views at all three sizes) and `checks.md` |
 | `tools/` | `contrast.mjs`, `check-fixture-data.mjs`, `screenshots.mjs` |
 | `reference/luminous-path-forward.png` | The product owner's image: palette and mood |
 
@@ -87,6 +87,8 @@ others, and its a bit too [noisy] with the dashed lines." So:
 | Grey, the slate (`--trail-shadow` `#6F7EA3`) | Not known yet: shadow, never absence, never zero | Kept or failed results |
 | White | The person's light; focus rings; type; links and quiet actions (underlined) | |
 | Crimson (`--crimson-300`) and sand (`--sand-300`) | Failed and stale, always after a glyph and words; sand also draws what is kept from an earlier search (openings, routes) | Any world meaning (ΔE76 ≥ 53 from every meaning hue) |
+| Leaf green (`--decision-accept` `#A6E25A`) | Accepting a proposed change, or confirming a limit, after its words and a tick; filled once chosen (session 2, C3: "colour coded buttons") | The primary action, selection, success in general (ΔE76 ≥ 56 from every other hue) |
+| Orchid (`--decision-undo` `#FFAAFF`) | Undoing the last save, after its words and a turn-back glyph | Anything else (ΔE76 ≥ 44 from every other hue; nearest the journey's violet) |
 
 The key to the lights lists only the kinds drawn at that place, each mark drawn as the world
 draws it (a warm disc for a chosen destination, a warm ring for a suggested one, the diamond
@@ -166,7 +168,7 @@ while the tab is hidden.
 
 | Place | Where it is | Its moment | Reference states |
 |---|---|---|---|
-| You | The origin: the person's light, skills around it, and the conversation's console | The first answer lights it and grows the first trails | default; distress (the world stills and dims, the calm support panel); failed (the message kept, the reply missing) |
+| You | The origin: the person's light, skills around it, and the console: three views as tabs, one idea each (Conversation, What we know, Suggestions; session 2's findings, SW.4) | The first answer lights it and grows the first trails | default; review (a reply's proposals: Confirm in leaf green, filled once chosen; a limit explained in plain words; saving them the one bright action); saved (what the decision did, where it was made, Undo in orchid); known (What we know, both limits explained); suggestions (one open, edged as the selection, its "Make this a target" the bright action; the rest titles to scan); distress (the world stills and dims, the calm support panel); failed (the message kept, the reply missing) |
 | Roles | The horizon: suggested and chosen destinations; the chosen one's openings clustered below it by area, each count with its sources and date (on a phone, listed in the sheet) | An unexpected connection, joined by shared essential skills | default; stale (sand, a clock, the age on each count); unknown ("none found in the 4 sources checked", never "no jobs"); three long targets; not built yet (and, in the gallery, the key opened on a narrow screen) |
 | Skills | The ground between the person and a destination, stretch by stretch (the skills around the person belong to You) | An answer lights a stretch already covered | default, with a gate ("Ready if you pass the assessed report"); unknown (all shadow); not built yet |
 | Options | Bridges across the dark stretches | A gap gets its first bridge | default; unknown ("No bridge found yet. That doesn't mean there are none."); not built yet |
@@ -183,13 +185,20 @@ DIRECTAI routes' direct spending keeps its own label.
 
 The view stands the place where the panels leave the world clear: beside the panel on a wide
 screen (moved only where its usual place would be too near the panel), and above (or below) the
-panels on a tablet or a phone, made smaller only if it must be. The app does the same
-(`apps/web/src/lib/world/geometry.ts`). A light that is still under a panel hides its name. On a
-phone the header is two rows (the chapter and the synthetic label; then the saved state, live
-updates, Pause motion and Sound as glyph buttons, ringed in white when on, and the account menu,
-where calm mode keeps its words and its switch); the target is named in the world. While the
-calm support panel shows, "Still while support is shown" sits in the strip, or on a phone in
-the top bar beside the chapter, where it adds no row.
+panels on a tablet or a phone, made smaller only if it must be; where the panels leave no room
+at all (a tall You console on a tablet) the world is a backdrop standing behind them, so no
+light peeks out beside a panel where its name has no room. The app does the same
+(`apps/web/src/lib/world/geometry.ts`). A light that is still under a panel hides its name.
+
+The strip speaks plainly: "Answers saved" (never a version number), and nothing about live
+updates while they work; a state that isn't live names itself ("Updates: Reconnecting"). On a
+tablet it is two rows (the synthetic label and the target; then the states and controls); a wide
+screen adds the work area. On a phone the header is two rows (the chapter and the synthetic
+label; then the saved state, any update state, Pause motion and Sound as glyph buttons, ringed
+in white when on, and the account menu, where calm mode and how Careerwright talks with you keep
+their words); the target is named in the world. While the calm support panel shows, "Still
+while support is shown" sits in the strip, or on a phone in the top bar beside the chapter,
+where it adds no row.
 
 A name sits beside its light; a crowded one steps out a row with a fine line back to its light.
 That line never crosses another light, gate or name, or the key, and no name sits on a line
@@ -232,11 +241,10 @@ never a fill), synthetic data always labelled, and fixture values checked by `ch
 
 - Motion itself: these references are still. The moving world is in the app
   (`apps/web/src/lib/world/`, `src/components/World.tsx`) and its Storybook stories.
-- The You chapter in the world, the first ten seconds and the revelations: Sprint W's next
-  slices. Their words here are illustrative. The unexpected connection is named in the world
-  but not yet singled out by light (W2C).
+- The first ten seconds (the first question's type-ahead and the ignition) and the
+  revelations: the second part of Sprint W's You slice. Their words here are illustrative. The
+  unexpected connection is named in the world but not yet singled out by light.
 - Industry shown by glyph and label: no reference draws an industry yet (Sprint 3, Roles).
-- The strip's words ("Saved, version 3", "Updates: Live") and its reductions: W2C.
 - The map at 100 openings, measured label placement and aggregation: Sprint 3 (Roles).
 - The route instrument's full design (all nine DIRECTAI routes, the Gantt and the ledger):
   Sprint 7.

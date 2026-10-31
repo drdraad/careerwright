@@ -47,6 +47,11 @@
     sound: `<path d="M4.5 9.5h3.2L12 5.5v13l-4.3-4H4.5z" ${S}/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11" ${S}/>`,
     menu: `<path d="M4 7h16M4 12h16M4 17h10" ${S}/>`,
     live: `<circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="12" cy="12" r="7.5" ${S}/>`,
+    // Deciding on a proposed change: a plain tick (never "complete"'s circled one) and a turn back.
+    accept: `<path d="M5.5 12.8l4.2 4.2 8.8-9.6" ${S}/>`,
+    undo: `<path d="M9 7.5L5 11.5l4 4M5.5 11.5h8.5a4.5 4.5 0 0 1 0 9H11" ${S}/>`,
+    expand: `<path d="M7 14.5l5-5 5 5" ${S}/>`,
+    collapse: `<path d="M7 9.5l5 5 5-5" ${S}/>`,
   };
   const glyph = (name) => `<svg viewBox="0 0 24 24" class="glyph" aria-hidden="true" focusable="false">${GLYPH[name]}</svg>`;
 
@@ -87,6 +92,7 @@
   function placeView(id, clear) {
     const view = restingView(id);
     if (clear === undefined) return view;
+    if (clear.backdrop) return { ...view, centre: (clear.left + clear.right) / 2 };
     const near = view.centre < clear.left + MIN_CLEAR / 2 || view.centre > clear.right - MIN_CLEAR / 2;
     const span = ((view.eye - ORIGIN[1]) * view.focal) / (ORIGIN[2] - view.z);
     const room = clear.bottom - clear.top - ROOM_ABOVE - ROOM_BELOW;
@@ -127,7 +133,11 @@
     const above = { left, right, top, bottom: Math.min(vp.h, ...panels.map((p) => p.y)) };
     const below = { left, right, top: Math.max(top, ...panels.map((p) => p.y + p.h)), bottom: vp.h };
     const band = above.bottom - above.top >= below.bottom - below.top ? above : below;
-    return band.bottom - band.top >= MIN_BAND ? band : undefined;
+    if (band.bottom - band.top >= MIN_BAND) return band;
+    // No room anywhere: the world is a backdrop, standing behind the panels (as on a phone), so
+    // no light peeks out beside them where its name has no room (Task W2C, a tall You console
+    // on a tablet).
+    return { left: Math.min(...panels.map((p) => p.x)), right: Math.max(...panels.map((p) => p.x + p.w)), top, bottom: vp.h, backdrop: true };
   }
   function seeded(seed) {
     let h = 2166136261;
@@ -496,8 +506,9 @@
       <span class="optional-phone">Target <strong>${esc(targetTitles.join(", "))}</strong></span>
       <span class="optional">Work area <strong>${esc(F.p01.cities.join(", "))}</strong></span>
       <span class="strip-end">
-        <span>Saved, version 3</span>
-        <span class="status" data-tone="neutral" role="status">${glyph("live")}Updates: Live</span>
+        <span>Answers saved</span>
+        ${/* Live updates that work say nothing; only a state that isn't live is shown. */ ""}
+        <span class="sr-only" role="status"></span>
         ${controls}
       </span>
     </header>`;
@@ -583,16 +594,93 @@
             </section>
           </section>`;
       }
-      const failed = state === "failed";
-      return `
+      // The console's three views, as tabs (SW.4: one idea per view; the suggestions on a tab of
+      // their own). Each tab leads to its view's page here.
+      const view = state === "known" ? "known" : state === "suggestions" ? "suggestions" : "conversation";
+      const VIEWS = [["conversation", "Conversation", "default"], ["known", "What we know", "known"], ["suggestions", "Suggestions", "suggestions"]];
+      const tabs = `
+        <div class="tabs" role="tablist" aria-label="You">${VIEWS.map(([id, label, page]) => `<a role="tab" id="tab-${id}" href="world.html?place=you&amp;state=${page}" aria-selected="${id === view}"${id === view ? ' aria-controls="view"' : ' tabindex="-1"'}>${label}</a>`).join("")}</div>`;
+      const field = (primary) => `
+          <p class="field" aria-hidden="true">Reply in your own words</p>
+          <div class="row"><button type="button" class="btn ${primary ? "btn-primary" : "btn-secondary"}">Send</button></div>`;
+      // A limit says what it means wherever it is shown (session 2: "what do these mean??").
+      const SPEND = "The most you'd spend on the whole change, all added up: course fees, exams, equipment and the like. Pay you'd give up while you train isn't part of it.";
+      const MONTHLY = "The most you could pay out in any one month. A route with a bigger payment in some month doesn't fit, even if its total does.";
+      const asked = `
+          <p class="answer">Synthetic: I could do 5 hours a week, and spend up to £600.</p>
+          <p class="reply">${glyph("mark")}<span>Demo interviewer (synthetic): I noted 2 things for you to review.</span></p>`;
+      const atConsole = (body) => `
         <section class="panel" aria-labelledby="title">
-          <h1 id="title" class="title">You</h1>
+          <h1 id="title" class="title">You</h1>${tabs}
+          <div class="view" role="tabpanel" id="view" aria-labelledby="tab-${view}">${body}</div>
+        </section>`;
+      if (state === "review") {
+        // A reply's proposals: accept and confirm in leaf green (filled once chosen), the one
+        // bright action is saving them, and Send waits.
+        return atConsole(`
+          ${asked}
+          <section class="tray" aria-labelledby="tray">
+            <h2 id="tray" class="small"><strong>To review: 2 changes from your last message</strong></h2>
+            <div class="proposal">
+              <p class="small muted">A limit or target: needs your confirmation. You said</p>
+              <p><strong>Weekly study hours: 5 hours a week</strong></p>
+              <div class="row"><button type="button" class="btn btn-accept" aria-pressed="false">${glyph("accept")}Confirm<span class="sr-only"> weekly study hours as a limit</span></button><button type="button" class="btn btn-secondary">Edit</button><button type="button" class="link">Skip</button><button type="button" class="link">Source</button></div>
+            </div>
+            <div class="proposal" data-basis="inferred" data-chosen="true">
+              <p class="small muted">A limit or target: needs your confirmation. Careerwright's reading, not a fact until you accept it</p>
+              <p><strong>Total spending limit: £600</strong></p>
+              <p class="small muted">${SPEND}</p>
+              <div class="row"><button type="button" class="btn btn-accept" aria-pressed="true">${glyph("accept")}Confirm<span class="sr-only"> total spending limit as a limit</span></button><button type="button" class="btn btn-secondary">Edit</button><button type="button" class="link">Skip</button><button type="button" class="link">Source</button></div>
+            </div>
+            <div class="row"><button type="button" class="btn btn-primary">Save 1 to What we know</button><button type="button" class="link">Keep none</button></div>
+          </section>
+          ${field(false)}`);
+      }
+      if (state === "saved") {
+        // The decision made: what it did, where it was made, with Undo in orchid.
+        return atConsole(`
+          ${asked}
+          <section class="notice" aria-labelledby="saved"><h2 id="saved" class="small"><strong>Saved to What we know</strong></h2>
+            <button type="button" class="btn btn-undo">${glyph("undo")}Undo the last save</button>
+          </section>
+          <p class="question">About how many hours a week could you give to learning?</p>
+          ${field(true)}`);
+      }
+      if (state === "known") {
+        return atConsole(`
+          <h2 class="sentence">What we know</h2>
+          <dl class="facts">
+            <div><dt>Target roles</dt><dd>${esc(F.p01.targetTitles.join(", "))}</dd></div>
+            <div><dt>Work areas</dt><dd>${esc(F.p01.cities.join(", "))}</dd></div>
+            <div><dt>Total spending limit<span class="explained">${SPEND}</span></dt><dd class="tnum">${money(F.p01.directSpendCapMinor)}</dd></div>
+            <div><dt>Monthly payment limit<span class="explained">${MONTHLY}</span></dt><dd class="tnum">${money(F.p01.monthlyPaymentCapMinor)}</dd></div>
+          </dl>
+          <p class="small muted">Not asked yet: current role, weekly study hours, lowest pay you'd accept.</p>
+          <div class="row"><button type="button" class="btn btn-secondary">Edit answers directly</button></div>`);
+      }
+      if (state === "suggestions") {
+        // One suggestion open, edged as the selection; its "Make this a target" is the view's
+        // one bright action (session 2: "Needs to be a bright colour"). The rest are titles to scan.
+        const others = SUGGESTED.filter((s) => s.title !== "Statistician");
+        return atConsole(`
+          <h2 class="sentence">Directions to explore</h2>
+          <p class="small muted">Up to six occupations from ESCO, found from your own answers. Ideas to test, not a judgement of fit: no score or percentage.</p>
+          <article class="suggestion" data-open="true" aria-labelledby="s-open">
+            <h3 id="s-open"><button type="button" aria-expanded="true">Statistician${glyph("expand")}</button></h3>
+            <p class="small muted">Kind of work: Mathematicians, actuaries and statisticians</p>
+            <p class="small">Why this could suit you: ESCO lists 7 of the same essential skills for both, so Careerwright joined them by those skills.</p>
+            <div class="row"><button type="button" class="btn btn-primary">Make this a target</button><button type="button" class="link">Not for me</button><button type="button" class="link">Source</button></div>
+          </article>
+          ${others.map((s, i) => `<article class="suggestion" data-open="false" aria-labelledby="s-${i}"><h3 id="s-${i}"><button type="button" aria-expanded="false">${esc(s.title)}${glyph("collapse")}</button></h3></article>`).join("")}
+          <p class="small muted">Invented examples for design review.</p>`);
+      }
+      const failed = state === "failed";
+      return atConsole(`
           <p class="question">What do you do now, or what did you do last?</p>
           <p class="answer"${failed ? ' data-failed="true"' : ""}>Synthetic: I check customer records for a housing association.${failed ? `<br><span class="status" data-tone="error">${glyph("error")}Not processed</span>` : ""}</p>
           ${failed ? `<div class="alert" data-tone="error" role="alert">${glyph("error")}<div><p><strong>Careerwright's reply didn't arrive</strong></p><p class="small muted">Your message is kept. Nothing about you changed.</p></div></div>` : `<p>Records officers usually need these skills. Pick any you've used, and it lights up.</p>`}
           <p class="field" aria-hidden="true">Tell me more…</p>
-          <div class="row"><button type="button" class="btn btn-primary">${failed ? "Try again" : "Send"}</button></div>
-        </section>`;
+          <div class="row"><button type="button" class="btn btn-primary">${failed ? "Try again" : "Send"}</button></div>`);
     }
     if (place === "roles") {
       const stale = state === "stale";
@@ -728,7 +816,7 @@
 
     const legend = document.querySelector(".legend");
     // Open on a wide screen where the world beside the panels has room for it (as the app).
-    legend.open = vp.w > 1100 && clear !== undefined && clear.right - clear.left >= 360;
+    legend.open = vp.w > 1100 && clear !== undefined && !clear.backdrop && clear.right - clear.left >= 360;
     legend.querySelector("ul").innerHTML = ORDER.filter((k) => world.legend.has(k))
       .map((k) => `<li data-kind="${k}"><span class="key key-${KEY[k][0]}" aria-hidden="true"></span>${KEY[k][1]}</li>`)
       .join("");

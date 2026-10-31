@@ -50,6 +50,9 @@ const CAPTURES = [
   ...["you", "roles", "skills", "options", "routes", "plan"].map((place) => ({ place, state: "default", viewports: ALL })),
   { place: "you", state: "distress", viewports: [DESKTOP, PHONE] },
   { place: "you", state: "failed", viewports: [DESKTOP] },
+  // The You chapter rebuilt (Sprint W, SW.4): a reply to review, the decision saved with Undo,
+  // and its two other views, at the three sizes.
+  ...["review", "saved", "known", "suggestions"].map((state) => ({ place: "you", state, viewports: ALL })),
   { place: "roles", state: "stale", viewports: [DESKTOP] },
   { place: "roles", state: "unknown", viewports: [DESKTOP] },
   { place: "roles", state: "three-targets", viewports: ALL },
