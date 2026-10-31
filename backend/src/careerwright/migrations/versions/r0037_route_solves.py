@@ -26,13 +26,13 @@ The worker writes a solve's attempts and result only for the run it executes (an
 only while the run's requester may act); the API records the solve and reads the rest.
 Forward-only (see `docs/runbook.md`).
 
-Revision ID: 0036
+Revision ID: 0037
 """
 
 from careerwright.migrations.sql import run_script
 
-revision = "0036"
-down_revision = "0035"
+revision = "0037"
+down_revision = "0036"
 branch_labels = None
 depends_on = None
 
