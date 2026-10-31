@@ -155,7 +155,12 @@ describe("[STATE-05][DIV1-03] the sketch says what matching each title did", () 
         target("Data quality analyst", "not_found", "pack_target"),
         target("Bookkeeping assistant", "provisional", "pack_target"),
       ],
-      steps: [],
+      // The three steps the API sends whenever there is a target (fix round 2).
+      steps: [
+        { step: "compare", state: "unresolved" },
+        { step: "find_options", state: "unresolved" },
+        { step: "check_time_and_cost", state: "unresolved" },
+      ],
     });
 
     expect(
@@ -164,10 +169,16 @@ describe("[STATE-05][DIV1-03] the sketch says what matching each title did", () 
       ),
     ).toHaveLength(3);
     for (const title of ["Registered nurse", "Data quality analyst", "Bookkeeping assistant"]) {
-      expect(screen.getByText(title).closest("p")).toHaveTextContent(
+      const line = screen.getByText(title).closest("p");
+      expect(line).toHaveTextContent(
         `${title}: ${title === "Bookkeeping assistant" ? "Your own title: " : ""}Careerwright couldn't match it in ESCO`,
       );
+      // The target's own block; the steps below it are the sketch's, shared by every target.
+      expect(line?.parentElement).not.toHaveTextContent(/Not researched|no requirement list/);
     }
-    expect(document.body.textContent).not.toMatch(/Not researched|no requirement list/);
+    // Step 2 keeps its words; session W2 judges them beside the coverage line.
+    expect(screen.getAllByRole("listitem").map((item) => item.textContent)).toContain(
+      "Find courses, work routes or funding for any gaps. Not resolved yet. Not researched yet: no providers, prices or dates.",
+    );
   });
 });
