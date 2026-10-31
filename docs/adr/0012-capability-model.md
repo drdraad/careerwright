@@ -369,4 +369,7 @@ its rules on protected gates, unknown and readiness (decisions 4, 5 and 7) are u
   readiness ignore them.
 - **Decision 11's owners.** Persisting accepted modelling assumptions and outcome overrides
   is Task 12a's (the stored planning inputs); the checkpoint's interface for them is Task
-  12b's.
+  12b's. Done in Task 12a: the planning inputs' `outcome_decisions` keep each acceptance or
+  override with who made it and when; `planning.inputs.decided_outcomes` applies them through
+  this model's own `accept` and `user_override`, and a decision this model refuses is refused
+  at the write (ADR 0013, Task 12a's settlement).

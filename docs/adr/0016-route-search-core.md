@@ -193,3 +193,22 @@ measurements here.
 - **Not done here:** persistence, API, UI and the child process (Tasks 13b, 14); the stress
   scenarios inside the search (decision 3); the instance from P01's stored inputs, which needs
   Task 12a's store.
+
+## Amendment, 2026-10-31 (Task 12a): the new findings, classed
+
+Task 12a added checker findings (ADR 0013, Task 12a's settlement). Each is classed for the
+pruning rules, `PRUNING_VERSION` is now `sound-pruning-3`, and the oracle writes each rule again
+from its own reading, its generated cases reaching every one:
+
+- **Rule 1** (input-level, in every route): `work_rights_unknown` and `work_rights_not_held`
+  come from the inputs alone.
+- **Rule 2** (a variant's own, set aside): `entry_requirements_not_met`,
+  `eligibility_unconfirmed` and `stacking_unconfirmed` are computed from the variant alone (its
+  answers, its stated fee, its own supports), so every route containing it repeats them.
+- **Rule 3** (spend caps): `repayments_above_payment_cap` comes from repayments the inputs fix;
+  adding a variant never lowers them, so a node with it is cut as the monthly payment cap.
+- **Rule 4** (persists): `job_transitions`. Adding a variant never takes away an offer still to
+  be accepted, so a node with two is cut (`PruningRule.JOB_TRANSITIONS`). Decision 2's tree
+  bound (one `work` action) stands beside it.
+- A month row the checker leaves null never reaches rule 3: a searched route's payments are
+  all known, because rule 2 sets aside an option whose amounts are not.
