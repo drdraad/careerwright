@@ -262,7 +262,10 @@ export function FirstQuestion({
           ))}
         </div>
         {found.error !== null && <RequestFailure error={found.error} />}
-        {failure !== null && support === null && <RequestFailure error={failure} />}
+        {/* A refusal the support screen answered shows the panel, never a failure notice. */}
+        {failure !== null && !(failure instanceof ApiError && failure.supportNote !== null) && (
+          <RequestFailure error={failure} />
+        )}
         {support !== null && (
           <SupportNote
             note={support}
