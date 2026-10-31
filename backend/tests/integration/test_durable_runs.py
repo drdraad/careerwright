@@ -109,6 +109,44 @@ def test_worker_killed_mid_call_recovers_to_one_output_and_keeps_the_ambiguous_c
     assert scenario.leaks() == []
 
 
+@pytest.mark.req("DUR-02", "BND1-14")
+def test_a_worker_stopped_mid_call_exits_within_its_deadline_and_the_run_recovers(
+    scenario: Scenario,
+) -> None:
+    """The recurring shutdown hang (Task 1, W2B): after SIGTERM the loop stopped and DBOS was
+    destroyed, but the process kept running while a DBOS executor thread still held a
+    workflow (the interpreter joins those threads at exit, with no bound). A model call in
+    flight makes it happen every time. DBOS recovers the run on the next start."""
+    run_id = scenario.submit()
+    first = scenario.worker("first", fake_delay_s="30")
+    wait_for(lambda: len(scenario.attempts(run_id)) == 1, timeout_s=30, what="attempt")
+    wait_for(
+        lambda: (
+            scenario.infra.query(
+                "SELECT dispatched_at FROM careerwright.outbox WHERE run_id = %s", (run_id,)
+            )[0]["dispatched_at"]
+            is not None
+        ),
+        timeout_s=10,
+        what="dispatch mark",
+    )
+
+    assert first.stop(timeout_s=worker_loop.SHUTDOWN_DEADLINE_S + 5) == 0
+    assert "worker stopped" in first.log_path.read_text(encoding="utf-8")
+    assert scenario.run(run_id)["status"] == "running"  # left for recovery, not failed
+
+    second = scenario.worker("second")
+    run = scenario.wait_terminal(run_id)
+    assert second.stop() == 0
+    assert run["status"] == "complete"
+    assert len(scenario.outputs(run_id)) == 1
+    assert [(a["outcome"], a["spend_state"]) for a in scenario.attempts(run_id)] == [
+        ("interrupted", "unknown"),  # may have been billed: its reservation stays committed
+        ("succeeded", "reconciled"),
+    ]
+    assert scenario.leaks() == []
+
+
 @pytest.mark.req("DUR-02")
 def test_a_crash_after_acceptance_never_calls_the_model_again_and_keeps_the_usage(
     scenario: Scenario,
@@ -501,8 +539,11 @@ def test_a_run_cancelled_mid_call_settles_that_call_and_makes_no_other(
 
     cancel(scenario, run_id)
     run = scenario.wait_terminal(run_id, timeout_s=10)  # before the call itself ends
+    # Publishing `cancelled` already marks the attempt interrupted (finished, unknown cost);
+    # the call's own settle then books it. Wait for that, not for `finished_at`: the stop
+    # used to wait for the call only because of the shutdown hang (Task 3b).
     wait_for(
-        lambda: scenario.attempts(run_id)[0]["finished_at"] is not None,
+        lambda: scenario.attempts(run_id)[0]["outcome"] not in (None, "interrupted"),
         timeout_s=30,
         what="the call to settle",
     )

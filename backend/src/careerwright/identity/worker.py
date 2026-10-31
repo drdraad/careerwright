@@ -2,10 +2,13 @@
 
 The worker never receives a Meta key from its environment: the activity opens the
 workspace's sealed key just in time. Shutdown is bounded: after SIGTERM the loop stops,
-DBOS is destroyed without waiting for workflows, and a watchdog exits the process if that
-ever hangs (Sprint 0 saw one unexplained hang in 19 runs). DBOS recovers whatever was in
-flight on the next start. The process entry point, which composes the run tasks of every
-module, is `careerwright.worker`.
+DBOS is destroyed without waiting for workflows, and the process then ends at once, so a
+workflow still on a DBOS executor thread (a model call in flight, or its bookkeeping) is
+left as a crash would leave it, and DBOS recovers it on the next start. A normal interpreter
+exit would join those non-daemon threads with no bound: that was the recurring shutdown hang
+(Task 1, W2B; Task 3b's regression test). A watchdog, armed by the signal, ends the process
+if any of this takes longer than `SHUTDOWN_DEADLINE_S`. The process entry point, which
+composes the run tasks of every module, is `careerwright.worker`.
 """
 
 import logging
@@ -17,6 +20,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from types import FrameType
+from typing import NoReturn
 
 from dbos import DBOS, DBOSConfig, DBOSPortableJSONSerializer, SetWorkflowID
 
@@ -150,15 +154,19 @@ def run(
     runtime: ActivityRuntime,
     system_database_url: str,
     workflows: Workflows = MODEL_WORKFLOWS,
-) -> None:
-    """Launch DBOS, loop until SIGTERM/SIGINT, then shut down within the deadline."""
+) -> NoReturn:
+    """Launch DBOS, loop until SIGTERM/SIGINT, then end the process within the deadline."""
     workflow.configure(runtime)
     DBOS(config=dbos_config(system_database_url))
     DBOS.launch()
     stop = threading.Event()
+    watchdog = threading.Timer(SHUTDOWN_DEADLINE_S, os._exit, args=(EXIT_SHUTDOWN_TIMEOUT,))
+    watchdog.daemon = True
 
     def request_stop(signum: int, frame: FrameType | None) -> None:
-        stop.set()
+        if not stop.is_set():
+            stop.set()
+            watchdog.start()  # from the signal: a pass that never returns is bounded too
 
     signal.signal(signal.SIGTERM, request_stop)
     signal.signal(signal.SIGINT, request_stop)
@@ -170,9 +178,8 @@ def run(
         )
         stop.wait(DISPATCH_INTERVAL_S)
     _log.info("worker stopping")
-    watchdog = threading.Timer(SHUTDOWN_DEADLINE_S, os._exit, args=(EXIT_SHUTDOWN_TIMEOUT,))
-    watchdog.daemon = True
-    watchdog.start()
     DBOS.destroy()
-    watchdog.cancel()
     _log.info("worker stopped")
+    # Never the interpreter's exit, which waits for every DBOS executor thread (module doc).
+    logging.shutdown()
+    os._exit(0)
