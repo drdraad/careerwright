@@ -1603,7 +1603,7 @@ implemented sound pruning, with expanded-state counts and times, and the largest
 complete within the M0 limits (1,000,000 states, 30 s). A measurement run stopped before
 completion is "not complete at that size", never infeasible (OPT1-16).
 
-## Task 13b: Sprint 6b — durable archive, caps, child process and ranking benchmark (S6.3, S6.4, S6.8) + Sprint 6 review
+## Task 13b: Sprint 6b — archive, caps, cancellation and ranking benchmark (S6.3, S6.4, S6.8) + Sprint 6 review
 
 **Preconditions:** Task 13a complete, with its measured sizes; Task 12a integrated (the
 worktree track: 13a, then 12a, then 13b, each after the last is integrated; Task 12a changes
@@ -1625,21 +1625,27 @@ process and the 50,000-point ranking benchmark are sized to what the measurement
 are specification M0 requirements (OPT-1; ARC-1's stack), so leaving any of them out of L0
 needs the product owner's yes and a note in the specification's revision record; which of
 them L0 needs is to be settled by Task 13b, put to the product owner as one question (R14).
-Without that yes, the card below stands.
+**Settled, 31 October 2026:** the product owner said yes to leaving out the disk-backed
+archive with its checkpoints and resume, and the separate child process, on Task 13a's
+measurement (the largest realistic L0 search, a pack-sized catalogue at 24 months, takes
+about 26 s). The specification's revision record says so (section 22, "L0 deferrals"). The
+50,000-point ranking benchmark stays.
 
-Deliver the versioned disk-backed archive of every distinct feasible schedule (atomic
-checkpoints, idempotent solve identity, resume-or-restart under a new attempt ID); 30 s /
-1,000,000 states / 50,000 feasible caps with exact stop reasons, archive persistence
-counted in the budget; separate rank stage; an efficient two-objective layering qualified
-against Task 13a's iterative peeling, equal to it on every instance that completes;
-cancellable optimiser child process run durably via DBOS, with cancellation reaching it.
+Deliver the archive of every distinct feasible schedule encountered, dominated ones included,
+kept in memory under the caps (no checkpoints or resume: a crashed solve is a failed run,
+started again under a new attempt ID, never a truncated result), with an idempotent solve
+identity; 30 s / 1,000,000 states / 50,000 feasible caps with exact stop reasons; separate
+rank stage; an efficient two-objective layering qualified against Task 13a's iterative
+peeling, equal to it on every instance that completes; the solve run durably via DBOS in the
+worker, with cancellation reaching the search at its next check.
 A truncated result leads with "Best trade-offs found", states the instance size and names
 the narrowing (fewer concepts, one start, a shorter horizon) that Task 13a's measured sizes
 suggest (OPT1-15). Regression family LIMITS (caps, cancellation, truncated empty).
 Benchmark 50,000-point ranking. `docs/reviews/sprint-6.md`, covering 6a and 6b.
 
 Register (plan v1.5): the OPT1 and LIMITS rows it owns, as sized (the archive, the caps and
-their stop reasons, the child process, the rank stage and the benchmark), STATE-03 and
+their stop reasons, cancellation, the rank stage and the benchmark; OPT1-03's disk archive
+and OPT1-09's child process recorded as L0 deferrals), STATE-03 and
 DUR-05; the Task 13b part of API-02 (`SOLVE_LIMIT_REACHED`).
 
 ## Task 14: Sprint 7 — coordinated route comparison (S7.1–S7.6) + Sprint 7 review

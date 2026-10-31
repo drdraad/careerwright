@@ -116,9 +116,11 @@ Run from the repository root (details: `docs/runbook.md`).
   (capability assessment: the pinned capability reference with rubrics, ESCO crosswalks and
   gate types; matrices, evidence, protected gates, OUT-1 outcomes, readiness, gaps and the
   question graph; `capability.store` is its only SQL), `careerwright/planning` (the monthly
-  planning model, pure: the planning catalogue and its pack adapter, the immutable monthly
-  input, the direct-spend, income-difference, liquidity and debt ledgers, and the route
-  checker), `careerwright/evidence`
+  planning model: the planning catalogue and its pack adapter, the immutable monthly input
+  and its compiler, the direct-spend, income-difference, liquidity and debt ledgers, the
+  route checker and the route search, ADR 0016, all pure; and the person's stored planning
+  inputs, ADR 0013, through `planning.commands`, with `planning.store` its only SQL),
+  `careerwright/evidence`
   (acquisition: the guarded fetcher, the source manifest `sources.json`, pages, Adzuna,
   jobs, freshness, claims, model extraction), `careerwright/acquisition.py` (the restricted
   acquisition worker: no database, master key or model key), `careerwright/api` (HTTP only),
