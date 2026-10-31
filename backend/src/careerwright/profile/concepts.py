@@ -31,7 +31,9 @@ from careerwright.identity.workspaces import visible_workspace
 from careerwright.profile import store
 from careerwright.profile.records import SourceKind
 
-SOURCE_LABEL = "A title you confirmed that ESCO does not list"
+# What the match did, never what ESCO holds: titles are matched with case, punctuation and
+# plurals folded, so "facade cleaner" matches nothing though ESCO writes "façade cleaner".
+SOURCE_LABEL = "A title you confirmed that Careerwright couldn't match in ESCO"
 
 ConceptTitle = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
@@ -54,13 +56,14 @@ def register_provisional_concept(
     """Returns the concept and whether it was created; the same title again returns the
     first one (compared case- and space-insensitively)."""
     visible_workspace(tx, workspace_id, lock=True)
-    held_release(tx)  # without the taxonomy, "not in ESCO" cannot be established
+    held_release(tx)  # without the taxonomy, no match can be tried
     normalised = normalise_label(command.title)
     in_esco = taxonomy_store.concept_key_matches(tx, command.title)
     if in_esco:
         raise CareerwrightError(
             ErrorCode.VALIDATION_FAILED,
-            "ESCO already lists this title: choose its occupation instead.",
+            "Careerwright matched this title to an occupation in ESCO: choose that occupation "
+            "instead.",
             stage=ErrorStage.CATALOGUE,
             details={
                 "field": "title",

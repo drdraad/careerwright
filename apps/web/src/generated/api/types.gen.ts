@@ -6465,7 +6465,7 @@ export type SlateOut = {
     /**
      * Unsupported Hypotheses
      *
-     * Titles Careerwright thought of that ESCO does not list: never suggested.
+     * Titles Careerwright thought of but couldn't match to an occupation in ESCO (case, punctuation and plurals folded): never suggested.
      */
     unsupported_hypotheses: Array<string>;
     /**
@@ -6477,13 +6477,13 @@ export type SlateOut = {
     /**
      * Unmatched Titles
      *
-     * Titles of the person's own that ESCO does not list: nothing is joined to them until the person chooses the ESCO occupation closest to each.
+     * Titles of the person's own that Careerwright couldn't match to an occupation in ESCO (case, punctuation and plurals folded): nothing is joined to them until the person chooses the ESCO occupation closest to each.
      */
     unmatched_titles: Array<string>;
     /**
      * Ambiguous Titles
      *
-     * Titles of the person's own that ESCO lists for several occupations: nothing is joined to them until the person chooses which one they mean.
+     * Titles of the person's own that Careerwright matched to several occupations in ESCO: nothing is joined to them until the person chooses which one they mean.
      */
     ambiguous_titles: Array<string>;
     /**
@@ -7706,7 +7706,7 @@ export type TitleMatchesOut = {
     /**
      * Partial
      *
-     * True: ESCO lists no title with every word typed, and these hold the most of them, rarer words first. Ask "ESCO doesn't list that title. Is it one of these?": the person chooses one or none, and nothing is joined to the typed words.
+     * True: ESCO lists no title with every word typed, and these hold the most of them, rarer words first. Ask "Careerwright couldn't match that title in ESCO. Is it one of these?": the person chooses one or none, and nothing is joined to the typed words.
      */
     partial: boolean;
 };

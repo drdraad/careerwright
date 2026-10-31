@@ -213,7 +213,12 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     expect(screen.getByText("Why this could suit you")).toBeVisible();
     expect(screen.getByText("Try it before committing")).toBeVisible();
     expect(screen.getByText(/Only 1 occupation matched/)).toBeVisible();
-    expect(screen.getByText(/orbital gardener/)).toBeVisible(); // never shown as a suggestion
+    // Never shown as a suggestion, and named for what the match did (W2B re-review 5).
+    expect(
+      screen.getByText(
+        "Titles Careerwright thought of but couldn't match to an occupation in ESCO, so not suggested: orbital gardener.",
+      ),
+    ).toBeVisible();
     // Familiarity unknown: the group heading claims no relation to their current work.
     expect(screen.getByRole("heading", { name: "Directions to consider" })).toBeVisible();
     expect(document.body.textContent).not.toMatch(/\d\s?(%|per ?cent)/i); // a number as a percentage

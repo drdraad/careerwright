@@ -239,12 +239,21 @@ def full_text(
     return hits, total
 
 
+def _skill_words(query: str) -> str:
+    """A search's words as a skill's name is read: a hyphen is read as a space. The English
+    parser keeps "first-aid" whole beside its parts, so its query would also need that whole
+    word, which no skill named "provide first aid" holds (Task W2C). A hyphenated name keeps
+    its parts in its vector, so "e learning" still reaches "use e-learning platforms"."""
+    return query.replace("-", " ")
+
+
 def essential_skill_reach(
     tx: Tx, query: str, limit: int
 ) -> tuple[list[SkillReach], int, int, bool]:
     """The occupations reached through an essential skill whose preferred label holds every
     word of the query (`skills.search_vector`, the label alone; English stems, stop words
-    dropped, no search operators), each by its best-ranked such skill; how many occupations
+    dropped, a hyphen read as a space, no search operators), each by its best-ranked such
+    skill; how many occupations
     are reached in all; how many different essential skills reach them; and whether one of
     those skills is named by exactly the query's words ("sell products" for "selling
     products"). Best first: equal ranks go to the occupation whose essential skills the
@@ -281,7 +290,7 @@ def essential_skill_reach(
             "JOIN careerwright.occupation_concepts o ON o.concept_id = k.concept_id "
             "ORDER BY k.text_rank DESC, k.share DESC, o.preferred_label, k.concept_id"
         ),
-        {"q": query, "limit": limit},
+        {"q": _skill_words(query), "limit": limit},
     ).mappings()
     reached, total, skills, exact = [], 0, 0, False
     for row in rows:
@@ -319,7 +328,7 @@ def essential_skill_reach_among(
             "SELECT concept_id, skill_id, preferred_label AS skill_label, text_rank, skills "
             "FROM reached WHERE best = 1 ORDER BY concept_id"
         ),
-        {"q": query, "concepts": [str(c) for c in sorted(set(concepts))]},
+        {"q": _skill_words(query), "concepts": [str(c) for c in sorted(set(concepts))]},
     ).mappings()
     return [
         SkillReach(

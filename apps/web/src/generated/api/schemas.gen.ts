@@ -9942,7 +9942,7 @@ export const SlateOutSchema = {
             },
             type: 'array',
             title: 'Unsupported Hypotheses',
-            description: 'Titles Careerwright thought of that ESCO does not list: never suggested.'
+            description: 'Titles Careerwright thought of but couldn\'t match to an occupation in ESCO (case, punctuation and plurals folded): never suggested.'
         },
         not_included: {
             items: {
@@ -9958,7 +9958,7 @@ export const SlateOutSchema = {
             },
             type: 'array',
             title: 'Unmatched Titles',
-            description: 'Titles of the person\'s own that ESCO does not list: nothing is joined to them until the person chooses the ESCO occupation closest to each.'
+            description: 'Titles of the person\'s own that Careerwright couldn\'t match to an occupation in ESCO (case, punctuation and plurals folded): nothing is joined to them until the person chooses the ESCO occupation closest to each.'
         },
         ambiguous_titles: {
             items: {
@@ -9966,7 +9966,7 @@ export const SlateOutSchema = {
             },
             type: 'array',
             title: 'Ambiguous Titles',
-            description: 'Titles of the person\'s own that ESCO lists for several occupations: nothing is joined to them until the person chooses which one they mean.'
+            description: 'Titles of the person\'s own that Careerwright matched to several occupations in ESCO: nothing is joined to them until the person chooses which one they mean.'
         },
         connection: {
             anyOf: [
@@ -12090,7 +12090,7 @@ export const TitleMatchesOutSchema = {
         partial: {
             type: 'boolean',
             title: 'Partial',
-            description: 'True: ESCO lists no title with every word typed, and these hold the most of them, rarer words first. Ask "ESCO doesn\'t list that title. Is it one of these?": the person chooses one or none, and nothing is joined to the typed words.'
+            description: 'True: ESCO lists no title with every word typed, and these hold the most of them, rarer words first. Ask "Careerwright couldn\'t match that title in ESCO. Is it one of these?": the person chooses one or none, and nothing is joined to the typed words.'
         }
     },
     additionalProperties: false,

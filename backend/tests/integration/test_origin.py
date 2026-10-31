@@ -180,6 +180,25 @@ def test_the_origin_shows_usual_skills_and_destinations_joined_by_shared_skills(
     assert after["capability_version"] == 1
 
 
+@pytest.mark.req("DIV1-02", "DIV1-04")
+def test_a_role_no_other_occupation_joins_says_what_careerwright_found(
+    api: ApiClient, ada: str
+) -> None:
+    # Task W2B re-review 5: the empty join's words had no test. In the sample no occupation
+    # shares 3 or more essential skills with the cook; the line says what Careerwright found,
+    # never what ESCO holds.
+    workspace = api.create_workspace(ada, "Empty join (synthetic)")["workspace_id"]
+    choose_role(api, ada, workspace, occupation(api, ada, "cook"), 0)
+
+    shown = origin(api, ada, workspace)
+
+    assert shown["destinations"] == []
+    assert shown["fewer_reasons"] == [
+        "Careerwright found no other occupation in ESCO that shares 3 or more essential skills "
+        "with a cook."
+    ]
+
+
 @pytest.mark.req("DIV1-03", "DIV1-04")
 def test_a_role_esco_does_not_hold_joins_nothing_and_a_shared_title_asks_which(
     api: ApiClient, ada: str

@@ -433,10 +433,12 @@ export const RECORD_PART: Record<RecordPart, string> = {
   essential_skill: "An essential skill in ESCO",
 };
 
+/** What matching a target title to ESCO did (case, punctuation and plurals folded): never a
+ *  claim about what ESCO holds, which another spelling or a hidden label can make untrue. */
 export const RESOLUTION: Record<Resolution, string> = {
   esco: "Found in ESCO",
-  ambiguous: "Several ESCO occupations have this title",
-  provisional: "Your own title, not in ESCO",
+  ambiguous: "Matched to several occupations in ESCO",
+  provisional: "Your own title: Careerwright couldn't match it in ESCO",
   not_found: "Not found in ESCO",
 };
 

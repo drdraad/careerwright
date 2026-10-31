@@ -130,6 +130,25 @@ def test_a_search_never_cuts_inside_a_tie(full_release: sa.Engine) -> None:
     assert (cut.skills, cut.exact) == (1, True)  # one skill, named exactly by its words
 
 
+@pytest.mark.req("DIV1-06", "DIV1-08")
+def test_a_hyphen_in_a_search_is_read_as_a_space(full_release: sa.Engine) -> None:
+    # Task W2C (W2B re-review 5's hyphen check): PostgreSQL's English parser keeps
+    # "first-aid" whole beside its parts, so its query also needs the lexeme "first-aid",
+    # which no skill named with "first aid" holds, and "first-aid" found no work. A hyphen
+    # in the search is now read as a space before the search; nothing else changes.
+    with system_transaction(full_release) as tx:
+        parsed = tx.execute(
+            sa.text("SELECT plainto_tsquery('english', 'first-aid')::text")
+        ).scalar_one()
+        hyphen = search_essential_skills(tx, "first-aid", MAX_REACH)
+        space = search_essential_skills(tx, "first aid", MAX_REACH)
+
+    assert parsed == "'first-aid' & 'first' & 'aid'"  # the case, as the database parses it
+    assert "provide first aid" in {r.skill_label for r in hyphen.reached}
+    assert (hyphen.total, hyphen.skills, hyphen.exact) == (space.total, space.skills, space.exact)
+    assert [r.concept_id for r in hyphen.reached] == [r.concept_id for r in space.reached]
+
+
 @pytest.mark.req("DIV1-02")
 def test_the_working_pool_keeps_its_bound_and_counts_the_work_beyond_it(
     full_release: sa.Engine,

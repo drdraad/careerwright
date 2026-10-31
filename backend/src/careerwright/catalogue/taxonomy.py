@@ -146,7 +146,8 @@ MAX_REACH = 120
 def search_essential_skills(tx: Tx, query: str, limit: int) -> SkillSearch:
     """Discovery's searches that are not the person's own title (ADR 0007 decision 13): the
     occupations reached through an essential skill whose preferred label holds every word of
-    the search (English stems; stop words dropped). One shared word is never enough, and an
+    the search (English stems; stop words dropped; a hyphen read as a space, so "first-aid"
+    reaches "provide first aid"). One shared word is never enough, and an
     occupation's titles, hidden labels, ISCO group and description are never searched, so
     work is never found by a word in a title; each occupation comes with the skill that
     reached it."""
@@ -178,7 +179,9 @@ class TitleMatches:
     total: int  # every occupation that matches, of which `matches` are the best
     limit: int
     # No ESCO title holds every word typed: `matches` hold the most of them, for the person
-    # to choose from ("ESCO doesn't list that title. Is it one of these?"); none is chosen.
+    # to choose from ("Careerwright couldn't match that title in ESCO. Is it one of these?":
+    # "and" and accents are typed words too, so ESCO may write the title another way); none is
+    # chosen.
     partial: bool = False
 
 

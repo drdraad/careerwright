@@ -522,6 +522,37 @@ def test_the_sketch_lists_esco_requirements_for_a_target_and_every_step_stays_un
     assert not re.search(r"feasible|optimal|£\s?\d", json.dumps(sketch), re.IGNORECASE)
 
 
+@pytest.mark.req("STATE-05", "DIV1-03")
+def test_the_sketch_says_what_matching_each_title_did_never_what_esco_holds(
+    api: ApiClient, ada: str
+) -> None:
+    # Task W2B re-review 5: "Several ESCO occupations have this title" was untrue where only a
+    # hidden label is shared, and "No ESCO record" where ESCO writes the title another way
+    # ("façade cleaner"): titles are matched with case, punctuation and plurals folded.
+    workspace = api.create_workspace(ada, "Sketch words (synthetic)")["workspace_id"]
+    api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace}/profile",
+        ada,
+        {
+            "expected_version": 0,
+            "profile": profile_with(target_titles=["bus operator", "Tidal lagoon whisperer"]),
+        },
+    )
+
+    shared, invented = api.get(f"/v1/workspaces/{workspace}/sketch", ada).json()["targets"]
+
+    assert shared["resolution"] == "ambiguous"
+    assert shared["research_status"] == (
+        "Careerwright matched this title to several occupations in ESCO. Choose the one you mean."
+    )
+    assert invented["resolution"] == "not_found"
+    assert invented["research_status"] == (
+        "Careerwright couldn't match this title to an occupation in ESCO, so there's no "
+        "requirement list yet. Not researched."
+    )
+
+
 @pytest.mark.req("STATE-05", "REC1-07")
 def test_the_sketch_uses_the_occupation_the_person_chose_even_when_its_title_is_shared(
     api: ApiClient, ada: str, infra: Infra

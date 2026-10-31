@@ -508,16 +508,19 @@ class SlateOut(ResponseModel):
     queries: list[PoolQueryOut] = Field(description="Every search that ran, with its hits.")
     unsearchable_queries: list[str] = Field(description="Queries with no searchable word.")
     unsupported_hypotheses: list[str] = Field(
-        description="Titles Careerwright thought of that ESCO does not list: never suggested."
+        description="Titles Careerwright thought of but couldn't match to an occupation in "
+        "ESCO (case, punctuation and plurals folded): never suggested."
     )
     not_included: list[NotIncludedOut] = Field(description="Show why this wasn't included.")
     unmatched_titles: list[str] = Field(
-        description="Titles of the person's own that ESCO does not list: nothing is joined to "
-        "them until the person chooses the ESCO occupation closest to each."
+        description="Titles of the person's own that Careerwright couldn't match to an "
+        "occupation in ESCO (case, punctuation and plurals folded): nothing is joined to them "
+        "until the person chooses the ESCO occupation closest to each."
     )
     ambiguous_titles: list[str] = Field(
-        description="Titles of the person's own that ESCO lists for several occupations: "
-        "nothing is joined to them until the person chooses which one they mean."
+        description="Titles of the person's own that Careerwright matched to several "
+        "occupations in ESCO: nothing is joined to them until the person chooses which one "
+        "they mean."
     )
     connection: ConnectionOut | None = Field(
         description="The unexpected connection to the person's role; null without one."

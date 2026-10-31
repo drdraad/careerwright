@@ -199,8 +199,9 @@ class TitleMatchesOut(ResponseModel):
     limit: int
     partial: bool = Field(
         description="True: ESCO lists no title with every word typed, and these hold the most "
-        'of them, rarer words first. Ask "ESCO doesn\'t list that title. Is it one of these?": '
-        "the person chooses one or none, and nothing is joined to the typed words."
+        "of them, rarer words first. Ask \"Careerwright couldn't match that title in ESCO. Is "
+        'it one of these?": the person chooses one or none, and nothing is joined to the typed '
+        "words."
     )
 
     @classmethod

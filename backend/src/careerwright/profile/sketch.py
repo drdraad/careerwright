@@ -39,10 +39,11 @@ MINIMUM_INPUTS = (
 
 
 class Resolution(StrEnum):
-    ESCO = "esco"  # exactly one ESCO occupation holds the title
-    AMBIGUOUS = "ambiguous"  # several do: the person chooses, nothing is guessed
-    PROVISIONAL = "provisional"  # a title the person confirmed that ESCO does not list
-    NOT_FOUND = "not_found"  # neither: no requirement list until it is resolved
+    # The title is matched with case, punctuation and plurals folded, hidden labels included.
+    ESCO = "esco"  # matched to exactly one ESCO occupation
+    AMBIGUOUS = "ambiguous"  # to several: the person chooses, nothing is guessed
+    PROVISIONAL = "provisional"  # to none, and the person confirmed it as their own title
+    NOT_FOUND = "not_found"  # to none: no requirement list until it is resolved
 
 
 @dataclass(frozen=True)
@@ -57,7 +58,7 @@ class TargetSketch:
     title: str
     resolution: Resolution
     occupations: list[OccupationRef]  # the one (esco) or the several (ambiguous)
-    close_matches: list[OccupationRef]  # for a title ESCO does not hold
+    close_matches: list[OccupationRef]  # for a title matched to none
     requirements: list[str]  # ESCO's essential skills, the first few (esco only)
     requirement_count: int | None  # None: no requirement list (not resolved to ESCO)
     regulated: bool | None
@@ -139,7 +140,8 @@ def _target(
             [],
             None,
             None,
-            "Several ESCO occupations have this title. Choose the one you mean.",
+            "Careerwright matched this title to several occupations in ESCO. Choose the one you "
+            "mean.",
         )
     provisional = taxonomy_store.provisional_by_title(tx, workspace_id, normalise_label(title))
     close: list[OccupationRef] = []
@@ -162,7 +164,8 @@ def _target(
         [],
         None,
         None,
-        "No ESCO record, so no requirement list yet. Not researched.",
+        "Careerwright couldn't match this title to an occupation in ESCO, so there's no "
+        "requirement list yet. Not researched.",
     )
 
 

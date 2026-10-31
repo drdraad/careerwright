@@ -538,7 +538,9 @@ inference, with at least 30 evaluation cases and a capped live run.
       candidates. The first question's type-ahead offers those closest titles: when no ESCO
       title holds every word typed (two to eight words; 97% of ESCO's titles have at most
       eight), the occupations whose titles hold the most of them, marked `partial` for
-      "ESCO doesn't list that title. Is it one of these?"; the person chooses, and nothing is
+      "Careerwright couldn't match that title in ESCO. Is it one of these?" (Task W2C: it
+      said "ESCO doesn't list that title", untrue for a title typed with "and" that ESCO writes
+      with "&", or without its accent); the person chooses, and nothing is
       joined by the words. Order (fix round 2): titles holding more of the words whole come
       first ("nurse" before "nursery"), then rarer words ("bookkeeping" before "assistant",
       so P05 sees the bookkeeper first), and a status word ("registered", "senior",
@@ -587,7 +589,12 @@ inference, with at least 30 evaluation cases and a capped live run.
       (each provisional, for session W2):
       1. *Whole phrase, one skill.* A search reaches a skill only when that one skill's label
          holds every content word of it (English stems, stop words dropped; no search
-         operator, not even "or", turns it into an any-word search). The any-word pass and
+         operator, not even "or", turns it into an any-word search). A hyphen in the search
+         is read as a space (Task W2C): PostgreSQL's English parser kept "first-aid" whole
+         beside "first" and "aid" (`'first-aid' & 'first' & 'aid'`), so no skill named with
+         "first aid" held it and "first-aid" found no work; a hyphenated skill name keeps its
+         parts too, so nothing it reached is lost. Thresholds and ranking are unchanged. The
+         any-word pass and
          decision 5's partial-match weight are gone: one shared word ("people", "give",
          "write") found an animal behaviourist and a secretary for "looking after people",
          an aesthetician and an air force officer for "giving injections", and an

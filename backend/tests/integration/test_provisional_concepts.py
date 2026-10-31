@@ -47,10 +47,15 @@ def test_a_title_esco_lacks_becomes_a_provisional_concept_citing_the_confirmatio
         (concept["concept_id"],),
     ) == [{"n": 0}]
     [source] = infra.query(
-        "SELECT kind, recorded_by FROM careerwright.source_references WHERE source_ref_id = %s",
+        "SELECT kind, label, recorded_by FROM careerwright.source_references "
+        "WHERE source_ref_id = %s",
         (concept["source_ref_id"],),
     )
     assert source["kind"] == "direct_entry"
+    # What the match did, never what ESCO holds (Task W2B re-review 5): titles are matched
+    # with case, punctuation and plurals folded, so a title ESCO writes with an accent or "&"
+    # can come here unmatched.
+    assert source["label"] == "A title you confirmed that Careerwright couldn't match in ESCO"
     again_status, again = register(api, ada, workspace, "  drone   SURVEY pilot ")
     assert (again_status, again["concept_id"]) == (200, concept["concept_id"])
     listed = api.get(f"/v1/workspaces/{workspace}/occupations/provisional", ada).json()
@@ -69,6 +74,9 @@ def test_an_esco_title_or_alias_is_refused_with_the_occupations_that_hold_it(
     assert status == 422
     assert refused["error"]["details"]["reason"] == "in_taxonomy"
     assert refused["error"]["details"]["concept_ids"] == sorted(h["concept_id"] for h in holders)
+    assert refused["error"]["message"] == (
+        "Careerwright matched this title to an occupation in ESCO: choose that occupation instead."
+    )
     assert api.get(f"/v1/workspaces/{workspace}/occupations/provisional", ada).json()["items"] == []
 
 
@@ -81,7 +89,7 @@ def test_a_near_duplicate_of_an_esco_label_is_refused_too(
 
     status, refused = register(api, ada, workspace, title)
 
-    # Hyphens, punctuation and plurals aside, ESCO already lists it.
+    # Hyphens, punctuation and plurals folded, Careerwright matches it to an ESCO label.
     assert status == 422, refused
     assert refused["error"]["details"]["reason"] == "in_taxonomy"
     assert refused["error"]["details"]["concept_ids"]

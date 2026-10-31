@@ -644,10 +644,13 @@ def explain(candidate: Candidate, facts: OccupationFacts, familiarity_known: boo
                     "skill for this work."
                 )
             elif match.query.channel is SlateChannel.HYPOTHESIS:
+                # The idea is matched with case, punctuation and plurals folded, and to any of
+                # the occupation's titles ("dog groomer" is the animal groomer's): named as
+                # the idea, with what the match did.
                 why.append(
-                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. Careerwright thought of this "
-                    "title "
-                    "from it, and ESCO lists it."
+                    f"{_SOURCE_WORDS[item.field]}: “{item.text}”. Careerwright thought of the "
+                    f"title “{match.query.text}” from it and matched that title to this "
+                    "occupation in ESCO."
                 )
             else:  # the person's own title, resolved to this occupation (folded, so matched)
                 why.append(

@@ -9,7 +9,14 @@ import pytest
 
 from careerwright.catalogue.records import IscoGroupRef, OccupationFacts
 from careerwright.profile.discovery import DiscoveryQuery, EvidenceItem, QueryChannel
-from careerwright.profile.exploration import _general_note, _join_note, _missed_notes, explain
+from careerwright.profile.exploration import (
+    _ambiguous,
+    _general_note,
+    _join_note,
+    _missed_notes,
+    _unmatched,
+    explain,
+)
 from careerwright.profile.interview import ProfileField
 from careerwright.profile.slate import (
     FAMILY_LIMIT,
@@ -31,6 +38,7 @@ from careerwright.profile.slate import (
     choose_slate,
     too_general,
 )
+from careerwright.profile.titles import ResolvedTitle
 
 ENJOY = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="repairing physical objects")
 ROLE = EvidenceItem(field=ProfileField.CURRENT_ROLE, text="Warehouse supervisor")
@@ -646,6 +654,54 @@ def test_a_title_of_the_person_s_own_says_careerwright_matched_it() -> None:
     assert why == [
         "Your current role: “Warehouse managers”. Careerwright matched it to this occupation in "
         "ESCO."
+    ]
+
+
+@pytest.mark.req("DIV1-03", "DIV1-04")
+def test_a_title_matched_to_none_or_several_says_what_the_match_did() -> None:
+    # Task W2B re-review 5: these two reworded reasons had no test of their words. A title is
+    # matched with case, punctuation and plurals folded, so each says what Careerwright's match
+    # did, never what ESCO lists.
+    shared = ResolvedTitle(
+        text="bus operator",
+        field=ProfileField.CURRENT_ROLE,
+        occupations=(concept("Bus driver"), concept("Trolley bus driver")),
+        chosen=False,
+    )
+
+    assert _unmatched("Registered nurse") == (
+        "Careerwright couldn't match “Registered nurse” to an occupation in ESCO, so it can't "
+        "join other work to that title by shared skills. Choose the ESCO occupation closest to "
+        "it."
+    )
+    assert _ambiguous(shared) == (
+        "Careerwright matched “bus operator” to 2 occupations in ESCO, so it can't join other "
+        "work to that title by shared skills until you choose which one you mean."
+    )
+
+
+@pytest.mark.req("REC1-05", "DIV1-06")
+def test_a_title_idea_names_the_idea_and_says_careerwright_matched_it() -> None:
+    # Task W2B re-review 5, I1: "Careerwright thought of this title from it, and ESCO lists
+    # it" was untrue where the idea matched another of the occupation's titles: a model's
+    # "dog groomer" shows as the card "Animal groomer". The line names the idea and says what
+    # the match did.
+    groomer = occupation("Animal groomer", "516", "dog groomer")
+    dogs = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="looking after dogs")
+    idea = PoolQuery(
+        "h1",
+        "dog groomer",
+        SlateChannel.HYPOTHESIS,
+        (dogs,),
+        (Hit(groomer.concept_id, 1.0, label_match=True),),
+    )
+    [candidate] = build_pool([idea], {groomer.concept_id: groomer}, frozenset())
+
+    why = explain(candidate, facts_of(groomer), familiarity_known=False).why
+
+    assert why == [
+        "What you enjoy: “looking after dogs”. Careerwright thought of the title “dog groomer” "
+        "from it and matched that title to this occupation in ESCO."
     ]
 
 
