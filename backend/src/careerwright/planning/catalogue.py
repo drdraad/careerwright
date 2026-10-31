@@ -230,6 +230,10 @@ class FundingInstrument(StrictModel):
     as_of: date | None = None
     rules: list[Fact] = Field(default_factory=list)
     facts: list[Fact] = Field(default_factory=list)
+    # Schemes a record states this one may not be combined with, by instrument ID: a route
+    # counting both is not feasible in this model. Pack 0.1.0 and 0.2.0 record none (their
+    # exclusions are words naming no scheme), so different schemes are then an L0 limit.
+    exclusive_with: list[str] = Field(default_factory=list)
 
 
 class EligibilityStatus(StrEnum):

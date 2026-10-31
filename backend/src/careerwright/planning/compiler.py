@@ -139,6 +139,9 @@ class PlanningInputs(StrictModel):
     # for the comparison, so every route meets the same stress case (PLN-08).
     scenario_delay_months: Annotated[int, Field(ge=1, le=MAX_HORIZON_MONTHS)]
     work_rights: WorkRights  # stated by every caller: never a default
+    # Funding schemes the person confirmed may pay for more than one of their options: any
+    # other scheme counted on two options of one route leaves it unresolved.
+    shared_schemes: list[str] = Field(default_factory=list)
     synthetic: bool
 
     @model_validator(mode="after")
@@ -231,6 +234,9 @@ class MonthlyInput(StrictModel):
     label: CatalogueLabel
     variants: list[CompiledVariant]
     readiness: ReadinessBasis | None
+    # Each scheme's recorded exclusions, as the catalogue states them: a pair is exclusive if
+    # either names the other.
+    scheme_exclusions: dict[str, list[str]] = Field(default_factory=dict)
 
     @property
     def start(self) -> Month:
@@ -357,13 +363,17 @@ def compile_input(
                 and variant.entry_requirements_met is False,
             )
         )
+    exclusions = {
+        i.instrument_id: sorted(i.exclusive_with) for i in catalogue.instruments if i.exclusive_with
+    }
     return MonthlyInput(
-        input_version=_version(inputs, catalogue.label, compiled, readiness),
+        input_version=_version(inputs, catalogue.label, compiled, readiness, exclusions),
         months=months,
         inputs=inputs,
         label=catalogue.label,
         variants=compiled,
         readiness=readiness,
+        scheme_exclusions=exclusions,
     )
 
 
@@ -372,6 +382,7 @@ def _version(
     label: CatalogueLabel,
     variants: list[CompiledVariant],
     readiness: ReadinessBasis | None,
+    exclusions: dict[str, list[str]],
 ) -> str:
     readiness_key = (
         None
@@ -391,6 +402,7 @@ def _version(
         "label": label.model_dump(mode="json"),
         "variants": [v.model_dump(mode="json") for v in variants],
         "readiness": readiness_key,
+        "scheme_exclusions": exclusions,
     }
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
     return f"monthly-input:{digest[:16]}"

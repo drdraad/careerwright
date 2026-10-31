@@ -8,21 +8,22 @@ What it reports, kept apart (Global Constraint 6):
 - **Violations**, each named on its own: the direct-spend cap, the monthly payment cap, the
   monthly deficit cap and the reserve are four different limits, and the workload envelope
   and a session clash are two; existing repayments alone above the payment cap are named as
-  the repayments, and more than one conditional job transition is its own. Every one found is
-  listed, never only the first. A violation is a conservative rejection by this monthly
-  model, never a claim that the person cannot afford a real schedule.
+  the repayments, and more than one conditional job transition and two schemes recorded as
+  exclusive are each their own. Every one found is listed, never only the first. A violation
+  is a conservative rejection by this monthly model, never a claim that the person cannot
+  afford a real schedule.
 - **Unresolved findings:** unknown dates, cost or timetable, a same-month application ("not
   resolved by this monthly model", never "ineligible"), a missing baseline; and what waits on
   the person (Task 12a): work rights not known to be held, an eligibility condition of a stated
-  fee or the stacking of two supports not confirmed, and their own "no" to an entry
-  requirement. Unknown never passes and is never zero.
+  fee, the stacking of two supports or one scheme paying for two options not confirmed, and
+  their own "no" to an entry requirement. Unknown never passes and is never zero.
 - **Ledgers and objectives:** the direct-spend, income-difference, liquidity and debt ledgers;
   months to the modelled application-readiness milestone, which the capability model decides;
   direct and economic cost.
 - **Qualifications and conditions:** proposed records, accepted assumptions, synthetic data,
-  and the conditions a route rests on (an offer to accept, an award to approve), each with a
-  blocking verification. Only a route with none is "affordable and feasible" unqualified
-  (OPTN-09).
+  and the conditions a route rests on (an offer to accept, an award to approve, a place to
+  win by applying in time), each with a blocking verification. Only a route with none is
+  "affordable and feasible" unqualified (OPTN-09).
 
 Scenarios (S5.6): `base` assumes each condition happens as planned; `delay` moves every
 conditional offer and award `scenario_delay_months` later; `no_award` drops every award not
@@ -31,7 +32,7 @@ its wages and its experience go together. No adaptive policy is optimised and no
 probability is invented.
 """
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Literal
@@ -128,6 +129,13 @@ class FindingCode(StrEnum):
     # More than one conditional job transition (a job or apprenticeship behind an offer not yet
     # accepted): spec section 12 allows one.
     JOB_TRANSITIONS = "job_transitions"
+    # Fix round 1 (review 12a, Important 2). One scheme counted on more than one option of the
+    # route before the person confirms it pays for each (the reason names it); its next
+    # action is to confirm the scheme covers both.
+    SCHEME_SHARED_UNCONFIRMED = "scheme_shared_unconfirmed"
+    # Two schemes a record states may not be combined, both counted in the route (the reason
+    # names them).
+    EXCLUSIVE_SCHEMES = "exclusive_schemes"
 
 
 _UNRESOLVED = frozenset(
@@ -145,6 +153,7 @@ _UNRESOLVED = frozenset(
         FindingCode.STACKING_UNCONFIRMED,
         FindingCode.WORK_RIGHTS_UNKNOWN,
         FindingCode.WORK_RIGHTS_NOT_HELD,
+        FindingCode.SCHEME_SHARED_UNCONFIRMED,
     }
 )
 MOST_JOB_TRANSITIONS = 1  # spec section 12: at most one conditional bridge-role transition
@@ -183,16 +192,19 @@ class RouteQualification(StrEnum):
     SYNTHETIC = "synthetic"
     CONDITIONAL_OFFER = "conditional_offer"
     CONDITIONAL_AWARD = "conditional_award"
+    CONDITIONAL_APPLICATION = "conditional_application"
     READINESS_NOT_ASSESSED = "readiness_not_assessed"
 
 
 class Condition(StrictModel):
-    """What the route rests on that has not happened, with its blocking verification."""
+    """What the route rests on that has not happened, with its blocking verification: an
+    offer to accept, an award to approve, or a place to win by applying in time (an
+    application the route itself does not hold, with no admission recorded)."""
 
-    kind: Literal["offer", "award"]
+    kind: Literal["offer", "award", "application"]
     variant_id: str
     instrument_id: str | None
-    verification: Literal["confirm_offer_accepted", "verify_funding_award"]
+    verification: Literal["confirm_offer_accepted", "verify_funding_award", "confirm_admission"]
 
 
 class RouteCheck(StrictModel):
@@ -369,6 +381,10 @@ class _Check:
             )
             for t in self.present
         )
+        # For display only (review 12a, Important 1): a support paid to the person that may not
+        # be combined with another still counts in the checks (the most cash the person could
+        # have, so a reserve breach there is real), but no month shows it as a known receipt.
+        self.receipts_shown = True
         self.conditions: list[Condition] = []
 
     def add(self, code: FindingCode, **values: object) -> None:
@@ -389,6 +405,7 @@ class _Check:
         self._work_rights()
         for timeline in self.present:
             self._costs(timeline)
+        self._schemes()
         self._gates()
         income, hours = self._income_and_hours()
         self._workload(hours)
@@ -418,7 +435,7 @@ class _Check:
             payments=self.months.payments,
             debt_service=self.debt_service,
             payments_known=self.costs_known and self.payments_known,
-            receipts_known=self.receipts_known,
+            receipts_known=self.receipts_known and self.receipts_shown,
             complete=self.costs_known
             and self.receipts_known
             and all(t.placed for t in self.present),
@@ -524,6 +541,19 @@ class _Check:
                 if gate in initial:
                     continue
                 givers = [t for t in self.present if t is not timeline and gate in t.variant.grants]
+                if not givers and gate == variant.application_gate:
+                    # No application in the route and no admission recorded: the route rests
+                    # on applying in time, a condition, never "not feasible" (the controller's
+                    # C09 ruling). A deadline already passed is still a violation.
+                    self.conditions.append(
+                        Condition(
+                            kind="application",
+                            variant_id=variant.variant_id,
+                            instrument_id=None,
+                            verification="confirm_admission",
+                        )
+                    )
+                    continue
                 if any(t.placed and t.usable <= timeline.start for t in givers):
                     continue
                 if any(not t.placed for t in givers):
@@ -633,7 +663,7 @@ class _Check:
         # the known part, the least the person could pay, so a limit broken even with all of
         # them is broken; whether they combine is unresolved until the person confirms it.
         if len(counted) > 1 and not variant.stacking_confirmed:
-            self._unknown_payments()
+            self._unknown_support(counted)
             self.add(FindingCode.STACKING_UNCONFIRMED, variant_id=variant.variant_id)
         fees = 0
         for index, kind, amount, when in sorted(due, key=lambda d: (d[0] is None, d[0] or 0)):
@@ -673,6 +703,38 @@ class _Check:
         """Some payment's amount is not known: neither the total nor any month's row is."""
         self.costs_known = False
         self.payments_known = False
+
+    def _unknown_support(self, supports: Iterable[Support]) -> None:
+        """Supports that may not all apply: what the person pays is not known, and nor is any
+        month's receipts where one of them is paid to the person."""
+        self._unknown_payments()
+        if any(s.paid_to == "person" for s in supports):
+            self.receipts_shown = False
+
+    def _schemes(self) -> None:
+        """One scheme on several options, and schemes recorded as exclusive (review 12a,
+        Important 2): only the supports that count in this scenario."""
+        options: dict[str, list[str]] = {}
+        supports: dict[str, list[Support]] = {}
+        for timeline in self.present:
+            for support in timeline.variant.supports:
+                if not _counts(support, self.scenario):
+                    continue
+                named = options.setdefault(support.instrument_id, [])
+                if timeline.variant.variant_id not in named:
+                    named.append(timeline.variant.variant_id)
+                supports.setdefault(support.instrument_id, []).append(support)
+        shared = set(self.inputs.shared_schemes)
+        for instrument, variants in sorted(options.items()):
+            if len(variants) > 1 and instrument not in shared:
+                self._unknown_support(supports[instrument])
+                self.add(FindingCode.SCHEME_SHARED_UNCONFIRMED, reason=instrument)
+        exclusions = self.monthly.scheme_exclusions
+        counted = sorted(options)
+        for n, first in enumerate(counted):
+            for second in counted[n + 1 :]:
+                if second in exclusions.get(first, []) or first in exclusions.get(second, []):
+                    self.add(FindingCode.EXCLUSIVE_SCHEMES, reason=f"{first}, {second}")
 
     def _award_offset(self, support: Support) -> int:
         """Months after the variant's start at which an award is made."""
@@ -1056,6 +1118,8 @@ class _Check:
             found.append(RouteQualification.CONDITIONAL_OFFER)
         if any(c.kind == "award" for c in self.conditions):
             found.append(RouteQualification.CONDITIONAL_AWARD)
+        if any(c.kind == "application" for c in self.conditions):
+            found.append(RouteQualification.CONDITIONAL_APPLICATION)
         if self.monthly.readiness is None:
             found.append(RouteQualification.READINESS_NOT_ASSESSED)
         # Every qualification readiness carries, by name, the provisional matrix included: in

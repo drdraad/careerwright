@@ -20,8 +20,11 @@ from careerwright.planning.catalogue import (
     AwardState,
     EligibilityStatus,
     Fact,
+    FundingInstrument,
+    InstrumentKind,
     OfferGate,
     Offering,
+    RecordState,
     Recurring,
     Session,
     Support,
@@ -38,7 +41,7 @@ from careerwright.planning.compiler import (
     WorkRights,
     compile_input,
 )
-from careerwright.planning.search import Coverage, Outcome, search_routes
+from careerwright.planning.search import Coverage, search_routes
 from tests.support.planning import (
     CONSTRUCTED,
     START,
@@ -50,6 +53,7 @@ from tests.support.planning import (
     pattern,
     person,
     readiness_of,
+    repayments_beside_an_unknown,
     support,
     undated_relief,
 )
@@ -58,6 +62,7 @@ from tests.support.route_oracle import Oracle
 ROWS = ("fixture:row-one", "fixture:row-two")
 GATES = ("gate:one", "gate:two")
 CONDITIONS = ("eligibility_age", "eligibility_residency")
+SCHEMES = ("funding:one", "funding:two")
 FEE = st.integers(min_value=0, max_value=40_000)
 SLOW = settings(max_examples=150, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 STATUS = {
@@ -84,7 +89,7 @@ def work_pattern(draw: st.DrawFn) -> WorkPattern:
 def funding(draw: st.DrawFn) -> Support:
     to_provider = draw(st.booleans())
     approved = draw(st.booleans())
-    return support(
+    granted = support(
         paid_to="provider" if to_provider else "person",
         amount=None if to_provider and odds(draw, 3) else draw(FEE),
         month=draw(st.integers(min_value=0, max_value=2)),
@@ -97,6 +102,8 @@ def funding(draw: st.DrawFn) -> Support:
         assumed=not approved and draw(st.booleans()),
         early=draw(st.booleans()),
     )
+    # Two schemes, so one scheme now and then pays for two options (review 12a, Important 2).
+    return granted.model_copy(update={"instrument_id": draw(st.sampled_from(SCHEMES))})
 
 
 @st.composite
@@ -236,6 +243,8 @@ def instances(draw: st.DrawFn, *, unknowns: bool) -> MonthlyInput:
         work_rights=draw(st.sampled_from([WorkRights.UNKNOWN, WorkRights.NOT_HELD]))
         if unknown()
         else WorkRights.HELD,
+        # The person sometimes confirms the first scheme may pay for several options.
+        shared_schemes=[SCHEMES[0]] if odds(draw, 3) else [],
     )
     options = []
     for c in range(draw(st.integers(min_value=2, max_value=4))):
@@ -250,7 +259,21 @@ def instances(draw: st.DrawFn, *, unknowns: bool) -> MonthlyInput:
     basis = readiness_of(teaches, rows=rows, current=2 if odds(draw, 8) else 1)
     if unknowns and odds(draw, 12):
         basis = basis.model_copy(update={"evidence": []})  # nothing said yet: not level 0
-    return compile_input(inputs, catalogue_of(*options), readiness=basis)
+    catalogue = catalogue_of(*options)
+    if odds(draw, 3):  # the catalogue records the two schemes as exclusive of each other
+        catalogue = catalogue.model_copy(update={"instruments": [exclusive_schemes()]})
+    return compile_input(inputs, catalogue, readiness=basis)
+
+
+def exclusive_schemes() -> FundingInstrument:
+    return FundingInstrument(
+        instrument_id=SCHEMES[0],
+        programme=None,
+        kind=InstrumentKind.GRANT,
+        jurisdiction="GB-ENG",
+        review_state=RecordState.ACCEPTED_ASSUMPTION,
+        exclusive_with=[SCHEMES[1]],
+    )
 
 
 # Both families in each test: with unknowns (the result must stay unresolved, never "no
@@ -267,11 +290,73 @@ def test_the_oracle_counts_an_option_s_own_unknown_as_something_unknown() -> Non
     assert not oracle.archive
     assert all(c.status == "not_feasible" for c in oracle.checks.values())
     assert oracle.something_unknown
+    assert oracle.outcome == "unresolved"
+
+
+# Task 12a fix round 1, read again by the oracle.
+
+
+@pytest.mark.req("OPT1-08", "OPT1-07", "FIN1-06")
+def test_the_oracle_says_no_route_where_repayments_alone_break_the_cap_whatever_is_unknown() -> (
+    None
+):
+    oracle = Oracle(repayments_beside_an_unknown()).solve()
+
+    # Whatever the unpriced course costs, no option lowers a repayment.
+    assert oracle.repayments_rule_out_every_route
+    assert not oracle.archive
+    assert oracle.outcome == "no_route_in_bounded_model"
+
+
+@pytest.mark.req("OPT1-08", "PLN-06")
+def test_the_oracle_holds_one_scheme_on_two_options_open_and_exclusive_schemes_broken() -> None:
+    waiver = support(paid_to="provider", amount=None).model_copy(
+        update={"instrument_id": SCHEMES[0]}
+    )
+    other = support(paid_to="provider", amount=1000).model_copy(
+        update={"instrument_id": SCHEMES[1]}
+    )
+    options = [
+        option("first", payments=((0, 5000),), supports=(waiver,)),
+        option("second", payments=((0, 5000),), supports=(waiver,)),
+        option("third", payments=((0, 5000),), supports=(other,)),
+    ]
+    teaches = {f"offering:{n}": (ROWS[0],) for n in ("first", "second", "third")}
+    readiness = readiness_of(teaches, rows=ROWS[:1])
+    funds = person(opening=1_000_000)  # the reserve is another rule
+    plain = Oracle(compile_input(funds, catalogue_of(*options), readiness=readiness))
+    exclusive = catalogue_of(*options).model_copy(update={"instruments": [exclusive_schemes()]})
+    recorded = Oracle(compile_input(funds, exclusive, readiness=readiness))
+    confirms = funds.model_copy(update={"shared_schemes": [SCHEMES[0]]})
+    shared = Oracle(compile_input(confirms, catalogue_of(*options), readiness=readiness))
+
+    assert plain.check(frozenset({"first", "second"})).status == "unresolved"
+    assert shared.check(frozenset({"first", "second"})).status == "feasible"
+    assert plain.check(frozenset({"first", "third"})).status == "feasible"
+    assert recorded.check(frozenset({"first", "third"})).status == "not_feasible"
+
+
+@pytest.mark.req("OPT1-08", "TIME1-03")
+def test_the_oracle_reads_a_course_behind_an_application_as_conditional_never_not_feasible() -> (
+    None
+):
+    applied = option(
+        "applied",
+        start=month_start(START, 2),
+        finish=month_end(START, 3),
+        application_deadline=month_end(START, 1),
+        application_gate="admission:offering:applied",
+    )
+    readiness = readiness_of({"offering:applied": (ROWS[0],)}, rows=ROWS[:1])
+    oracle = Oracle(compile_input(person(horizon=4), catalogue_of(applied), readiness=readiness))
+
+    assert oracle.check(frozenset({"applied"})).status == "feasible"
 
 
 @pytest.mark.req("OPT1-08", "OPT1-02", "OPT1-07")
 @SLOW
 @example(monthly=undated_relief())  # review 13a, Important 1
+@example(monthly=repayments_beside_an_unknown())  # review 12a, Important 3
 @given(monthly=INSTANCES)
 def test_the_search_finds_exactly_the_oracle_s_feasible_schedules_objectives_and_layers(
     monthly: MonthlyInput,
@@ -288,12 +373,9 @@ def test_the_search_finds_exactly_the_oracle_s_feasible_schedules_objectives_and
         r: (n if n <= 3 else None) for r, n in oracle.layers.items()
     }
     assert result.feasible_without_milestone == oracle.without_milestone
-    # "No route" is said only when it is true, and never when something is unknown.
-    if result.outcome is Outcome.NO_ROUTE_IN_BOUNDED_MODEL:
-        assert not oracle.archive
-        assert not oracle.something_unknown
-    if oracle.something_unknown and not oracle.archive:
-        assert result.outcome is Outcome.UNRESOLVED
+    # Both directions (review 12a, Important 3): "no route" exactly when the oracle proves it,
+    # "unresolved" exactly when something unknown could still change the answer.
+    assert result.outcome.value == oracle.outcome
     # Every candidate the search checked is one the oracle's tree holds, once each.
     assert result.expanded_states <= len(oracle.checks)
 

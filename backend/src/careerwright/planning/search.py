@@ -26,7 +26,8 @@ adds variants of later concepts.
    requirements or weekly hours, a payment due before the planning start, a start before it,
    an application deadline already passed, the person's "no" to its entry requirements, an
    eligibility condition of its stated fee not confirmed, supports whose stacking is not
-   confirmed, or, alone, a direct cost or a month's payments above its cap. Each is computed
+   confirmed, or, alone, a direct cost or a month's payments above its cap, or two schemes
+   recorded as exclusive among its own supports. Each is computed
    from the variant by itself (its dates, its payments and own support, its hours, the
    person's answers about it), so every route containing it repeats it, or, for unknown weekly
    hours, is unknown or over the limit in each month the variant is active. The screen runs
@@ -38,10 +39,12 @@ adds variants of later concepts.
    each variant's own payments in it, beside debt repayments fixed by the inputs. Adding a
    variant never lowers either, so a child whose sum already exceeds the direct-spend cap or a
    month's payment cap is never checked, nor anything below it; nor is a node whose
-   repayments alone already exceed that cap.
-4. *Conflicting work patterns, session clashes and a second conditional job transition*
-   persist: both variants stay active in that month, with the same patterns and sessions, and
-   adding a variant never takes away an offer still to be accepted.
+   repayments alone already exceed that cap. The sums come from each variant checked alone,
+   so a node whose own rows are null (supports not yet confirmed to combine) is summed alike.
+4. *Conflicting work patterns, session clashes, a second conditional job transition and two
+   schemes recorded as exclusive* persist: both variants stay active in that month, with the
+   same patterns and sessions, and adding a variant never takes away an offer still to be
+   accepted or a support already counted.
 5. *Workload in a month.* The load is the job's hours, the fixed commitments and the active
    variants' weekly hours. The job's hours come from the first variant in route order that is
    active with a work pattern, else from the continuation. Later variants come later in route
@@ -65,7 +68,10 @@ without the milestone is counted, never archived: it is not a route to the targe
 **Coverage** (S6.7). `complete` only after the whole declared tree is exhausted under these
 rules; a run stopped by a limit is `budget_truncated` with its exact reason, keeps everything
 it found, and is never "no route". A complete run with an empty archive is
-`NO_ROUTE_IN_BOUNDED_MODEL` only if nothing it met was unresolved: an unknown is never a no.
+`NO_ROUTE_IN_BOUNDED_MODEL` only if nothing it met was unresolved (an unknown is never a no),
+or if the starting position breaks a limit no option can lower: existing repayments above the
+payment cap rule out every route whatever is unknown. Never pruned on, and never a variant's
+own: one scheme on two options before the person confirms it pays for both (unresolved).
 """
 
 import time
@@ -105,7 +111,7 @@ from careerwright.planning.families import (
 from careerwright.planning.layers import peel
 
 ALGORITHM_VERSION = "canonical-dfs-1"
-PRUNING_VERSION = "sound-pruning-3"  # the six rules above: change it with any rule
+PRUNING_VERSION = "sound-pruning-4"  # the six rules above: change it with any rule
 _READINESS_UNKNOWN = frozenset(
     {ReadinessState.NOT_YET_ASSESSED, ReadinessState.INSUFFICIENT_COVERAGE}
 )
@@ -129,8 +135,15 @@ _OWN_VIOLATIONS = frozenset(
         FindingCode.STARTS_BEFORE_PLANNING,
         FindingCode.DIRECT_SPEND_CAP,
         FindingCode.MONTHLY_PAYMENT_CAP,
+        FindingCode.EXCLUSIVE_SCHEMES,  # two exclusive schemes on the one option
     }
 )
+# A starting breach the inputs alone fix: no option, known or unknown, can lower existing
+# repayments, so every route breaks it and the truth is no route, whatever else is unknown
+# (review 12a, Important 3). Any other starting breach some option could relieve (receipts
+# lift the reserve, pay the deficit, a work pattern the workload), so it keeps the outcome
+# open while something is unknown.
+_FIXED_BY_INPUTS = frozenset({FindingCode.REPAYMENTS_ABOVE_PAYMENT_CAP})
 
 
 class StrictModel(BaseModel):
@@ -164,7 +177,8 @@ class Outcome(StrEnum):
     ROUTES_FOUND = "routes_found"  # lead with "Best trade-offs found"
     NONE_FOUND_BEFORE_LIMIT = "none_found_before_limit"  # stopped early: never "no route"
     UNRESOLVED = "unresolved"  # complete, nothing proved feasible, something unknown
-    NO_ROUTE_IN_BOUNDED_MODEL = "no_route_in_bounded_model"  # complete, and nothing unknown
+    # Complete, and either nothing unknown or a starting breach no option can lower.
+    NO_ROUTE_IN_BOUNDED_MODEL = "no_route_in_bounded_model"
 
 
 class PruningRule(StrEnum):
@@ -174,6 +188,7 @@ class PruningRule(StrEnum):
     CONFLICTING_WORK_PATTERNS = "conflicting_work_patterns"
     SESSION_CLASH = "session_clash"
     JOB_TRANSITIONS = "job_transitions"
+    EXCLUSIVE_SCHEMES = "exclusive_schemes"
     WORKLOAD = "workload"
     PREREQUISITE = "prerequisite"
 
@@ -504,17 +519,24 @@ class _Search:
         return codes
 
     def _exceeds(self, node: _Node, variant: CompiledVariant) -> PruningRule | None:
-        """Rule 3: the child's direct cost or a month's payments already exceed their cap."""
+        """Rule 3: the child's direct cost or a month's payments already exceed their cap. A
+        route's spend is the sum of its variants' own (each checked alone, with every amount
+        known), so a node whose own ledger rows are null (supports not yet confirmed to
+        combine) is summed all the same."""
         inputs = self.monthly.inputs
-        here, own = _spend(node.check), self.spend[variant.variant_id]
+        months = len(self.monthly.months)
+        direct = sum(self.spend[v.variant_id].direct for v in (*node.route, variant))
+        payments = [
+            sum(self.spend[v.variant_id].payments[m] for v in (*node.route, variant))
+            for m in range(months)
+        ]
         cap = inputs.direct_spend_cap_minor
-        if cap is not None and here.direct + own.direct > cap:
+        if cap is not None and direct > cap:
             return PruningRule.DIRECT_SPEND_CAP
         monthly_cap = inputs.monthly_payment_cap_minor
         debt = [m.debt_service_minor for m in node.check.ledgers.liquidity.months]
         if monthly_cap is not None and any(
-            a + b + r > monthly_cap
-            for a, b, r in zip(here.payments, own.payments, debt, strict=True)
+            paid + repaid > monthly_cap for paid, repaid in zip(payments, debt, strict=True)
         ):
             return PruningRule.MONTHLY_PAYMENT_CAP
         return None
@@ -533,6 +555,8 @@ class _Search:
                 return PruningRule.SESSION_CLASH
             if code is FindingCode.JOB_TRANSITIONS:
                 return PruningRule.JOB_TRANSITIONS
+            if code is FindingCode.EXCLUSIVE_SCHEMES:
+                return PruningRule.EXCLUSIVE_SCHEMES
             month = self.month_index.get(finding.month or "")
             if code is FindingCode.WORKLOAD and month is not None and self._load_stays(node, month):
                 return PruningRule.WORKLOAD
@@ -630,6 +654,10 @@ class _Search:
             return Outcome.ROUTES_FOUND
         if not complete:
             return Outcome.NONE_FOUND_BEFORE_LIMIT
+        # A starting breach no option can lower rules out every route: no unknown, an input's
+        # included, could change that (review 12a, Important 3).
+        if any(f.code in _FIXED_BY_INPUTS for f in self.starting):
+            return Outcome.NO_ROUTE_IN_BOUNDED_MODEL
         # Every route carries a blocking input's unknown, even where something else fails too.
         unknown = (
             self.blocking
@@ -735,8 +763,9 @@ def _active(variant: CompiledVariant, month: int) -> bool:
 
 
 def _spend(check: RouteCheck) -> _Spend:
-    """A route's known spend. A searched route's payments are all known (rule 2 sets aside an
-    option whose amounts are not); were one not, 0 could only prune less."""
+    """A variant's own spend, from its check alone. A searched variant's amounts are all known
+    (rule 2 sets aside an option whose amounts are not); were one not, 0 could only prune
+    less."""
     direct = check.direct_cost.minor_units if check.direct_cost is not None else 0
     return _Spend(
         direct=direct,

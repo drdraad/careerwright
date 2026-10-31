@@ -2467,6 +2467,10 @@ export type FundingInstrument = {
      * Facts
      */
     facts?: Array<Fact>;
+    /**
+     * Exclusive With
+     */
+    exclusive_with?: Array<string>;
 };
 
 /**
@@ -4520,6 +4524,12 @@ export type PlanningInputsDocument = {
      */
     variants?: Array<VariantInputs>;
     /**
+     * Shared Schemes
+     *
+     * Schemes the person confirmed may pay for more than one of their options, each one of their stated supports' instrument IDs.
+     */
+    shared_schemes?: Array<string>;
+    /**
      * Schema Version
      */
     schema_version?: '1';
@@ -4584,6 +4594,12 @@ export type PlanningInputsIn = {
      * Variants
      */
     variants?: Array<VariantInputs>;
+    /**
+     * Shared Schemes
+     *
+     * Schemes the person confirmed may pay for more than one of their options, each one of their stated supports' instrument IDs.
+     */
+    shared_schemes?: Array<string>;
     /**
      * Outcome Decisions
      */

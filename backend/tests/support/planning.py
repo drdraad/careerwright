@@ -37,6 +37,7 @@ from careerwright.planning.catalogue import (
 from careerwright.planning.compiler import (
     Baseline,
     Continuation,
+    ExistingDebt,
     MonthlyInput,
     PlanningInputs,
     ReadinessBasis,
@@ -472,6 +473,21 @@ def undated_relief() -> MonthlyInput:
     undated = option("reduced-undated", start=None, finish=None, hours=2, pattern=reduced)
     readiness = readiness_of({"offering:reduced-undated": (ROW,)})
     return compile_input(inputs, catalogue_of(undated), readiness=readiness)
+
+
+def repayments_beside_an_unknown() -> MonthlyInput:
+    """Review 12a, Important 3: £15 of repayments a month against a £10 payment cap, beside one
+    priced course and one whose cost is not stated."""
+    card = ExistingDebt(
+        debt_id="card", monthly_repayment_minor=1500, balance_minor=None, cited=CONSTRUCTED
+    )
+    options = [
+        option("fine", payments=((0, 200),)),
+        option("unpriced", unknown_cost="not stated"),
+    ]
+    inputs = person(horizon=2, opening=1_000_000, monthly_cap=1000, existing_debts=[card])
+    readiness = readiness_of({"offering:fine": (ROW,), "offering:unpriced": (ROW,)})
+    return compile_input(inputs, catalogue_of(*options), readiness=readiness)
 
 
 def month_start(first: date, months: int) -> date:

@@ -101,14 +101,15 @@ def test_a_set_aside_course_keeps_what_to_confirm_apart_from_what_already_rules_
     [c09] = [s for s in result.set_aside if s.variant_id == "offering:C09"]
 
     # To confirm: the person's entry requirements and the cost. Already ruled out as stated:
-    # nothing in the catalogue grants its admission, and its 35 hours a week on top of P01's
-    # 30-hour job exceed the 40 available (review 13a, Important 2).
+    # its 35 hours a week on top of P01's 30-hour job exceed the 40 available (review 13a,
+    # Important 2). Its admission is no longer among them: with none recorded, a route through
+    # it is conditional on the application (Task 12a fix round 1, the C09 ruling).
     assert c09.kind is FindingKind.UNRESOLVED
     assert c09.unresolved == [
         FindingCode.ENTRY_REQUIREMENTS_UNCONFIRMED,
         FindingCode.COST_UNKNOWN,
     ]
-    assert c09.violations == [FindingCode.PREREQUISITE_NOT_USABLE, FindingCode.WORKLOAD]
+    assert c09.violations == [FindingCode.WORKLOAD]
 
 
 @pytest.mark.req("OPT1-16", "OPTN-03")

@@ -245,11 +245,21 @@ class StatedInputs(StrictModel):
         description="Offerings where the person holds a place or an accepted offer.",
     )
     variants: list[VariantInputs] = Field(default_factory=list, max_length=MAX_LISTED)
+    shared_schemes: list[Identifier] = Field(
+        default_factory=list,
+        max_length=MAX_LISTED,
+        description="Schemes the person confirmed may pay for more than one of their options, "
+        "each one of their stated supports' instrument IDs.",
+    )
 
     @model_validator(mode="after")
     def _one_answer_each(self) -> Self:
         _unique(self.admissions, "admission")
         _unique([v.variant_id for v in self.variants], "option")
+        _unique(self.shared_schemes, "shared scheme")
+        stated = {s.instrument_id for v in self.variants for s in v.supports}
+        if set(self.shared_schemes) - stated:
+            raise ValueError("a shared scheme is one of the person's stated supports")
         return self
 
 
@@ -486,6 +496,7 @@ def prepare(
         ),
         scenario_delay_months=delay,
         work_rights=document.work_rights or WorkRights.UNKNOWN,
+        shared_schemes=list(document.shared_schemes),
         synthetic=synthetic,
     )
     return Prepared(inputs=inputs, catalogue=person)

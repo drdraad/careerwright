@@ -66,6 +66,18 @@ class Solved:
     # stated, or an option has an unknown of its own and no breach of its own: then "no route"
     # would be a guess, because knowing the unknown might change the answer.
     something_unknown: bool
+    # The person's existing repayments alone are above the monthly payment cap in some month:
+    # no option changes a repayment, so every route breaks it, whatever is unknown.
+    repayments_rule_out_every_route: bool
+
+    @property
+    def outcome(self) -> str:
+        """What a complete search must say: routes, "no route", or not known yet."""
+        if self.archive:
+            return "routes_found"
+        if self.repayments_rule_out_every_route or not self.something_unknown:
+            return "no_route_in_bounded_model"
+        return "unresolved"
 
 
 class Oracle:
@@ -112,7 +124,18 @@ class Oracle:
                 or (c.status == "feasible" and c.months is None and c.readiness in NOT_YET_KNOWN)
                 for c in checks.values()
             ),
+            repayments_rule_out_every_route=self._repayments_alone_above_the_cap(),
         )
+
+    def _repayments_alone_above_the_cap(self) -> bool:
+        cap = self.monthly.inputs.monthly_payment_cap_minor
+        nothing = _RouteCheck(self, [])
+        return cap is not None and any(nothing.debt[m] > cap for m in nothing._each_month())
+
+    def excluded(self, instruments: set[str]) -> bool:
+        """Two of these schemes are recorded as exclusive: either names the other."""
+        recorded = self.monthly.scheme_exclusions
+        return any(b in recorded.get(a, []) for a in instruments for b in instruments if a != b)
 
     def _inputs_unknown(self) -> bool:
         """A hard limit, the weekly availability, or a baseline the comparison needs is not
@@ -136,7 +159,8 @@ class Oracle:
         requirements, the person's "no" to them, a payment before the start, an unconfirmed
         eligibility condition of its fee, or supports not confirmed to stack) and breaks nothing
         that would rule out every route containing it whatever the unknown turns out to be (its
-        own spend above a cap, a start before the planning start, a deadline already passed)."""
+        own spend above a cap, a start before the planning start, a deadline already passed, two
+        schemes recorded as exclusive among its own supports)."""
         inputs = self.monthly.inputs
         alone = _RouteCheck(self, [v])
         alone._money(v)  # its own payments and support, and any single payment above the cap
@@ -151,6 +175,7 @@ class Oracle:
         direct_cap, monthly_cap = inputs.direct_spend_cap_minor, inputs.monthly_payment_cap_minor
         breach = (
             alone.broken
+            or self.excluded({s.instrument_id for s in v.supports if _counted(s)})
             or (_placed(v) and v.start_index is not None and v.start_index < 1)
             or (
                 v.application_deadline is not None
@@ -254,6 +279,7 @@ class _RouteCheck:
                 self.unknown = True
         for v in self.chosen:
             self._money(v)
+        self._one_scheme_many_options()
         self._prerequisites()
         self._pay_and_hours()
         self._workload()
@@ -389,6 +415,21 @@ class _RouteCheck:
             self.direct -= applied
             fees = max(0, fees - amount)
 
+    def _one_scheme_many_options(self) -> None:
+        """A scheme counted on two options pays for both only if the person said so; two
+        schemes recorded as exclusive are never both used."""
+        holders: dict[str, set[str]] = {}
+        for v in self.chosen:
+            for s in v.supports:
+                if _counted(s):
+                    holders.setdefault(s.instrument_id, set()).add(v.variant_id)
+        for instrument, options in holders.items():
+            if len(options) >= 2 and instrument not in self.inputs.shared_schemes:
+                self.costs_known = False
+                self.unknown = True
+        if self.oracle.excluded(set(holders)):
+            self.broken = True
+
     def _prerequisites(self) -> None:
         start = self.inputs.planning_start
         initial = set(self.inputs.initial_gates)
@@ -399,6 +440,8 @@ class _RouteCheck:
                 if gate in initial:
                     continue
                 givers = [w for w in self.chosen if w is not v and gate in w.grants]
+                if not givers and gate == v.application_gate:
+                    continue  # no application chosen, none recorded: a condition to meet
                 if any(not _placed(w) for w in givers):
                     continue
                 if not any(

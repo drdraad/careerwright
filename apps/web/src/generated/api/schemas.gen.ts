@@ -3434,6 +3434,13 @@ export const FundingInstrumentSchema = {
             },
             type: 'array',
             title: 'Facts'
+        },
+        exclusive_with: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Exclusive With'
         }
     },
     additionalProperties: false,
@@ -6907,6 +6914,17 @@ export const PlanningInputsDocumentSchema = {
             maxItems: 50,
             title: 'Variants'
         },
+        shared_schemes: {
+            items: {
+                type: 'string',
+                maxLength: 200,
+                minLength: 1
+            },
+            type: 'array',
+            maxItems: 50,
+            title: 'Shared Schemes',
+            description: 'Schemes the person confirmed may pay for more than one of their options, each one of their stated supports\' instrument IDs.'
+        },
         schema_version: {
             type: 'string',
             const: '1',
@@ -7103,6 +7121,17 @@ export const PlanningInputsInSchema = {
             type: 'array',
             maxItems: 50,
             title: 'Variants'
+        },
+        shared_schemes: {
+            items: {
+                type: 'string',
+                maxLength: 200,
+                minLength: 1
+            },
+            type: 'array',
+            maxItems: 50,
+            title: 'Shared Schemes',
+            description: 'Schemes the person confirmed may pay for more than one of their options, each one of their stated supports\' instrument IDs.'
         },
         outcome_decisions: {
             items: {

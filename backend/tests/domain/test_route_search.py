@@ -16,12 +16,22 @@ from careerwright.planning.catalogue import (
     ActionConcept,
     ActionKind,
     Fact,
+    FundingInstrument,
+    InstrumentKind,
     OfferGate,
     Offering,
+    RecordState,
+    Support,
     Variant,
     WorkPatternKind,
 )
-from careerwright.planning.checker import FindingCode, FindingKind, Scenario, Verdict
+from careerwright.planning.checker import (
+    FindingCode,
+    FindingKind,
+    RouteQualification,
+    Scenario,
+    Verdict,
+)
 from careerwright.planning.compiler import (
     Commitment,
     ExistingDebt,
@@ -56,6 +66,7 @@ from tests.support.planning import (
     pattern,
     person,
     readiness_of,
+    repayments_beside_an_unknown,
     support,
     trace_catalogue,
     trace_inputs,
@@ -676,6 +687,103 @@ def test_repayments_alone_above_the_payment_cap_are_the_starting_position_never_
     assert result.pruned == {PruningRule.MONTHLY_PAYMENT_CAP: 1}
     assert result.expanded_states == 3  # the empty route and each option alone
     assert result.outcome is Outcome.NO_ROUTE_IN_BOUNDED_MODEL  # nothing here is unknown
+
+
+@pytest.mark.req("OPT1-07", "LIMITS-05", "FIN1-06")
+def test_repayments_no_option_can_lower_rule_out_every_route_whatever_is_unknown() -> None:
+    result = search_routes(repayments_beside_an_unknown())
+
+    # Whatever the unpriced course turns out to cost, every route repays £15 a month against a
+    # £10 cap: the truth is no route while the repayments exceed it, never "confirm the cost".
+    assert result.coverage is Coverage.COMPLETE
+    assert [s.variant_id for s in result.set_aside] == ["unpriced"]
+    assert {f.code for f in result.starting_violations} == {
+        FindingCode.REPAYMENTS_ABOVE_PAYMENT_CAP
+    }
+    assert result.outcome is Outcome.NO_ROUTE_IN_BOUNDED_MODEL
+    # Even beside an input not stated (every route is unresolved), the repayments decide it.
+    unstated = repayments_beside_an_unknown()
+    unstated = unstated.model_copy(
+        update={"inputs": unstated.inputs.model_copy(update={"reserve_minor": None})}
+    )
+    assert search_routes(unstated).outcome is Outcome.NO_ROUTE_IN_BOUNDED_MODEL
+
+
+@pytest.mark.req("OPT1-07", "OPT1-02", "PLN-06")
+def test_one_scheme_on_two_options_is_unresolved_never_pruned_and_exclusive_schemes_are_cut() -> (
+    None
+):
+    waiver = support(paid_to="provider", amount=None, kind=InstrumentKind.FEE_WAIVER)
+    options = [
+        course("first", fee=500, supports=(waiver,)),
+        course("second", fee=500, supports=(waiver,)),
+    ]
+    teaches = {"offering:first": (ROW,), "offering:second": (ROW,)}
+    shared = solve(someone(horizon=2), options, readiness_of(teaches))
+
+    # Each alone uses the waiver once; together they wait on the person's confirmation.
+    assert routes(shared) == [("first",), ("second",)]
+    assert shared.unresolved == 1
+    assert shared.set_aside == []  # it is no one option's own finding
+    confirmed = solve(
+        someone(horizon=2, shared_schemes=["funding:constructed"]), options, readiness_of(teaches)
+    )
+    assert ("first", "second") in routes(confirmed)
+
+    def granted(instrument_id: str) -> Support:
+        return support(paid_to="provider", amount=100).model_copy(
+            update={"instrument_id": instrument_id}
+        )
+
+    exclusive = [
+        course("a", fee=500, supports=(granted("funding:a"),)),
+        course("b", fee=500, supports=(granted("funding:b"),)),
+        course("both", fee=500, supports=(granted("funding:a"), granted("funding:b"))),
+        course("z-later", first=1),
+    ]
+    catalogue = catalogue_of(*exclusive).model_copy(
+        update={
+            "instruments": [
+                FundingInstrument(
+                    instrument_id="funding:a",
+                    programme=None,
+                    kind=InstrumentKind.GRANT,
+                    jurisdiction="GB-ENG",
+                    review_state=RecordState.ACCEPTED_ASSUMPTION,
+                    exclusive_with=["funding:b"],
+                )
+            ]
+        }
+    )
+    teaches = {f"offering:{n}": (ROW,) for n in ("a", "b", "both", "z-later")}
+    monthly = compile_input(someone(horizon=2), catalogue, readiness=readiness_of(teaches))
+    cut = search_routes(monthly)
+
+    # On one option they are its own breach; across two the breach persists, so it is cut.
+    assert [(s.variant_id, s.kind) for s in cut.set_aside] == [("both", FindingKind.VIOLATION)]
+    assert FindingCode.EXCLUSIVE_SCHEMES in cut.set_aside[0].codes
+    assert not any({"a", "b"} <= set(r) for r in routes(cut))
+    assert cut.pruned == {PruningRule.EXCLUSIVE_SCHEMES: 1}
+
+
+@pytest.mark.req("OPT1-07", "TIME1-03", "PLN-05")
+def test_a_course_behind_an_application_is_a_conditional_route_never_set_aside() -> None:
+    # The controller's C09 ruling: no recorded admission is a condition, never "not feasible".
+    applied = course(
+        "applied",
+        first=2,
+        application_deadline=month_end(START, 1),
+        application_gate="admission:offering:applied",
+    )
+    result = solve(someone(horizon=4), [applied], readiness_of({"offering:applied": (ROW,)}))
+
+    assert result.set_aside == []
+    [schedule] = result.schedules
+    assert [(c.kind, c.verification) for c in schedule.conditions] == [
+        ("application", "confirm_admission")
+    ]
+    assert RouteQualification.CONDITIONAL_APPLICATION in schedule.qualifications
+    assert result.outcome is Outcome.ROUTES_FOUND
 
 
 @pytest.mark.req("OPT1-07")

@@ -24,10 +24,12 @@ from careerwright.planning.catalogue import (
     AwardState,
     EligibilityStatus,
     Fact,
+    FundingInstrument,
     InstrumentKind,
     OfferGate,
     RecordState,
     Session,
+    Support,
     WorkPatternKind,
 )
 from careerwright.planning.checker import (
@@ -277,8 +279,15 @@ def test_an_application_in_its_deadline_month_is_unresolved_never_ineligible() -
     assert same.feasibility is Feasibility.UNRESOLVED
     assert FindingCode.APPLICATION_TOO_LATE.value in codes(late)
     assert exempt.feasibility is Feasibility.FEASIBLE  # a completed admission, verified
+    # No application in the route and none recorded: the route rests on applying in time, a
+    # condition, never "not feasible" (Task 12a fix round 1, the controller's C09 ruling).
     unapplied = check(person(horizon=6), course)
-    assert codes(unapplied) == {"prerequisite_not_usable"}  # no application at all
+    assert codes(unapplied) == set()
+    assert [(c.kind, c.verification) for c in unapplied.conditions] == [
+        ("application", "confirm_admission")
+    ]
+    assert unapplied.feasibility is Feasibility.FEASIBLE
+    assert RouteQualification.CONDITIONAL_APPLICATION in unapplied.qualifications
 
 
 @pytest.mark.req("TIME-03", "TIME1-03")
@@ -1087,3 +1096,107 @@ def test_a_month_row_resting_on_an_unknown_amount_is_null_never_a_partial_figure
     assert [(m.route_minor, m.difference_minor) for m in income.months] == [(None, None)] * 2
     assert [m.baseline_minor for m in income.months] == [200000, 200000]
     assert [m.early_receipts_minor for m in undated.ledgers.liquidity.months] == [None, None]
+    # Review 12a, Important 1: two supports paid to the person, their stacking unconfirmed. The
+    # cash may hold one of them or both, so no month's receipts are known; the person's pay is
+    # no support, so the income ledger stays known.
+    grant, bursary = support(amount=30000), support(amount=20000, kind=InstrumentKind.BURSARY)
+    waiting = check(
+        person(horizon=2, opening=100000, pay=200000, baseline=200000),
+        option("course", payments=((0, 60000),), supports=(grant, bursary)),
+    )
+    assert FindingCode.STACKING_UNCONFIRMED.value in codes(waiting)
+    cash_rows = waiting.ledgers.liquidity.months
+    assert [m.later_receipts_minor for m in cash_rows] == [None, None]
+    assert [m.early_receipts_minor for m in cash_rows] == [None, None]
+    assert [m.support_minor for m in waiting.ledgers.direct.months] == [None, None]
+    assert [m.route_minor for m in waiting.ledgers.income.months] == [200000, 200000]
+    # One scheme counted on two options before the person confirms it pays for both: likewise.
+    shared = check(
+        person(horizon=2, opening=100000, pay=200000),
+        option("first", payments=((0, 60000),), supports=(grant,)),
+        option("second", payments=((0, 60000),), supports=(grant,)),
+    )
+    assert FindingCode.SCHEME_SHARED_UNCONFIRMED.value in codes(shared)
+    assert [m.later_receipts_minor for m in shared.ledgers.liquidity.months] == [None, None]
+    assert [m.payments_minor for m in shared.ledgers.direct.months] == [None, None]
+
+
+# Task 12a fix round 1: one scheme on two options, and schemes recorded as exclusive.
+
+
+@pytest.mark.req("PLN-06", "PLN-11", "FUNDING-05")
+def test_one_scheme_on_two_options_waits_until_the_person_confirms_it_pays_for_both() -> None:
+    # Review 12a, Important 2: an approved fee waiver counted on two £500 courses in one route.
+    waiver = support(paid_to="provider", amount=None, kind=InstrumentKind.FEE_WAIVER)
+    courses = (
+        option("first", payments=((0, 50000),), supports=(waiver,)),
+        option("second", payments=((0, 50000),), supports=(waiver,)),
+    )
+    unconfirmed = check(person(opening=100000), *courses)
+    confirmed = check(person(opening=100000, shared_schemes=["funding:constructed"]), *courses)
+    other = support(paid_to="provider", amount=None, kind=InstrumentKind.FEE_WAIVER)
+    distinct = check(
+        person(opening=100000),
+        courses[0],
+        option(
+            "second",
+            payments=((0, 50000),),
+            supports=(other.model_copy(update={"instrument_id": "funding:another"}),),
+        ),
+    )
+
+    [found] = unconfirmed.findings
+    assert (found.code, found.kind, found.reason) == (
+        FindingCode.SCHEME_SHARED_UNCONFIRMED,
+        FindingKind.UNRESOLVED,
+        "funding:constructed",
+    )
+    assert unconfirmed.direct_cost is None  # never one scheme paying twice, shown as known
+    assert unconfirmed.feasibility is Feasibility.UNRESOLVED
+    assert confirmed.feasibility is Feasibility.FEASIBLE
+    assert distinct.feasibility is Feasibility.FEASIBLE  # two schemes: nothing records a limit
+    # Either course alone uses the scheme once.
+    assert check(person(opening=100000), courses[0]).feasibility is Feasibility.FEASIBLE
+
+
+@pytest.mark.req("PLN-06", "FUNDING-05")
+def test_two_schemes_recorded_as_exclusive_are_not_feasible_together() -> None:
+    def scheme(instrument_id: str, *excludes: str) -> FundingInstrument:
+        return FundingInstrument(
+            instrument_id=instrument_id,
+            programme=None,
+            kind=InstrumentKind.GRANT,
+            jurisdiction="GB-ENG",
+            review_state=RecordState.ACCEPTED_ASSUMPTION,
+            exclusive_with=list(excludes),
+        )
+
+    def using(instrument_id: str) -> Support:
+        granted = support(paid_to="provider", amount=10000)
+        return granted.model_copy(update={"instrument_id": instrument_id})
+
+    first = option("first", payments=((0, 50000),), supports=(using("funding:a"),))
+    second = option("second", payments=((0, 50000),), supports=(using("funding:b"),))
+    both = option(
+        "both",
+        payments=((0, 50000),),
+        supports=(using("funding:a"), using("funding:b")),
+        stacking_confirmed=True,
+    )
+    catalogue = catalogue_of(first, second, both).model_copy(
+        update={"instruments": [scheme("funding:a", "funding:b"), scheme("funding:b")]}
+    )
+    monthly = compile_input(person(opening=100000), catalogue)
+
+    together = check_route(monthly, ["first", "second"])
+    one = check_route(monthly, ["both"])
+
+    [found] = together.findings
+    assert (found.code, found.kind, found.reason) == (
+        FindingCode.EXCLUSIVE_SCHEMES,
+        FindingKind.VIOLATION,
+        "funding:a, funding:b",
+    )
+    assert together.feasibility is Feasibility.NOT_FEASIBLE_IN_MODEL
+    assert FindingCode.EXCLUSIVE_SCHEMES.value in codes(one)  # on one option, likewise
+    assert check_route(monthly, ["first"]).feasibility is Feasibility.FEASIBLE

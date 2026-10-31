@@ -74,6 +74,7 @@ def everything() -> dict[str, Any]:
             "timezone": "Europe/London",
         },
         "admissions": [],
+        "shared_schemes": ["funding:employer"],  # fix round 1: it may pay for several options
         "variants": [
             {
                 "variant_id": "offering:C04~pay-in-full",

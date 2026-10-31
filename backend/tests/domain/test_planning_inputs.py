@@ -285,6 +285,29 @@ def test_the_person_s_answers_about_an_option_reach_its_variant_and_two_supports
     assert (untouched.work_pattern, untouched.supports) == (None, [])
 
 
+@pytest.mark.req("PLN-11", "PLN-06", "FUNDING-05")
+def test_a_scheme_the_person_confirms_pays_for_several_options_names_one_of_their_supports() -> (
+    None
+):
+    first = VariantInputs(variant_id="first", supports=[grant()])
+    second = VariantInputs(variant_id="second", supports=[grant()])
+    stated = complete(variants=[first, second], shared_schemes=["funding:employer"])
+    courses = catalogue_of(
+        option("first", payments=((0, 50000),)), option("second", payments=((0, 50000),))
+    )
+
+    assert ready(stated, courses).inputs.shared_schemes == ["funding:employer"]
+    assert checked(ready(stated, courses), ["first", "second"]).feasibility is (
+        Feasibility.FEASIBLE
+    )
+    unconfirmed = checked(ready(complete(variants=[first, second]), courses), ["first", "second"])
+    assert [f.code for f in unconfirmed.findings] == [FindingCode.SCHEME_SHARED_UNCONFIRMED]
+    with pytest.raises(ValidationError):
+        PlanningInputsIn(variants=[first], shared_schemes=["funding:elsewhere"])  # no support
+    with pytest.raises(ValidationError):
+        PlanningInputsIn(variants=[first], shared_schemes=["funding:employer"] * 2)
+
+
 @pytest.mark.req("PLN-11", "FUNDING-04", "FUNDING-05")
 def test_a_support_follows_the_funding_rules_and_a_loan_is_never_one() -> None:
     with pytest.raises(ValidationError):
@@ -317,9 +340,15 @@ def test_a_recorded_admission_or_offer_is_the_starting_position_and_without_it_a
     held = ready(complete(admissions=["offering:apprenticeship"]), catalogue)
 
     assert without.inputs.initial_gates == []
+    # Without a recorded place or offer, the route rests on both, as conditions: never "not
+    # feasible" (fix round 1, the controller's C09 ruling).
     as_stated = checked(without, ["apprenticeship"])
-    assert FindingCode.PREREQUISITE_NOT_USABLE in {f.code for f in as_stated.findings}
-    assert [c.kind for c in as_stated.conditions] == ["offer"]
+    assert as_stated.findings == []
+    assert [(c.kind, c.verification) for c in as_stated.conditions] == [
+        ("offer", "confirm_offer_accepted"),
+        ("application", "confirm_admission"),
+    ]
+    assert as_stated.feasibility is Feasibility.FEASIBLE
     assert held.inputs.initial_gates == ["admission:offering:apprenticeship"]
     [offering] = held.catalogue.offerings
     assert offering.offer_gate == OfferGate(accepted=True)
