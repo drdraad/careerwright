@@ -154,6 +154,7 @@ from careerwright.profile.slate_facts import (
     Outcome,
     OwnTitleMatched,
     ReleaseChanged,
+    RoleNotMatched,
     SearchDid,
     SearchedThroughSkill,
     SlateNote,
@@ -173,8 +174,8 @@ from careerwright.profile.targets import (
     Choice,
     PackTargets,
     resolve_target,
+    role_record,
     stored_targets,
-    title_record,
 )
 from careerwright.profile.titles import ResolvedTitle
 from careerwright.vocabulary import WorkState
@@ -338,6 +339,9 @@ class SlateView:
     # person chooses which they mean.
     ambiguous_titles: list[str] = field(default_factory=list)
     connection: "ConnectionView | None" = None
+    # Whether a title of the person's (their role or a target) names an ESCO occupation, so the
+    # slate's directions say how close each is to their work (design review M-2).
+    familiarity_known: bool = False
 
 
 @dataclass(frozen=True)
@@ -745,7 +749,8 @@ def discovery_slate(
         )
     document = _pinned_document(tx, view.run)
     records = stored_targets(tx, workspace_id, document, pack)
-    return compute_slate(tx, view, proposal, document, controls, hard, records)
+    role = role_record(tx, workspace_id, document, pack)
+    return compute_slate(tx, view, proposal, document, controls, hard, records, role)
 
 
 def release_note(searched: str | None, held: str) -> ReleaseChanged | None:
@@ -764,15 +769,16 @@ def compute_slate(
     controls: SlateControls,
     hard: HardFilterInput,
     targets: list[TargetRecord],
+    role_title: TargetRecord | None,
 ) -> SlateView:
     """The slate for these searches and answers over the held taxonomy, with the person's
     confirmed salary floor and the chosen AI Resilience filter applied as hard filters, each
-    counted. `targets`: the records of the answers' target titles, as stored
-    (`careerwright.profile.targets`). Pay is read only through a reviewed UK SOC mapping, so
-    without one the taxonomy tables are all it reads, and the offline evaluation runs it
-    unchanged against the full release."""
+    counted. `targets` and `role_title`: the records of the answers' target titles and role, as
+    stored (`careerwright.profile.targets`). Pay is read only through a reviewed UK SOC
+    mapping, so without one the taxonomy tables are all it reads, and the offline evaluation
+    runs it unchanged against the full release."""
     release = held_release(tx)
-    role = titles.current_role(tx, view.run.workspace_id, document)
+    role = titles.role(tx, role_title) if role_title is not None else None
     named = titles.targets(tx, targets)
     mine = ([role] if role else []) + named
     # A search is one of the person's titles when it is that title as a concept
@@ -908,7 +914,12 @@ def compute_slate(
     if (unmatched or ambiguous) and len(slate.suggestions) < SLATE_SIZE:
         reasons: list[FewerReason] = [
             *(
-                TitleKeptAsOwn(title=t.text) if t.declined else TitleNotMatched(title=t.text)
+                TitleKeptAsOwn(title=t.text)
+                if t.declined
+                # Nothing offers the role a closest occupation after the start: say less.
+                else RoleNotMatched(title=t.text)
+                if t.field is ProfileField.CURRENT_ROLE
+                else TitleNotMatched(title=t.text)
                 for t in unmatched
             ),
             *(TitleMatchedSeveral(title=t.text, occupations=len(t.occupations)) for t in ambiguous),
@@ -928,6 +939,7 @@ def compute_slate(
         unmatched_titles=[t.text for t in unmatched],
         ambiguous_titles=[t.text for t in ambiguous],
         connection=_connection(tx, slate, role, named, facts, frozenset(role_joins)),
+        familiarity_known=bool(familiar_families),
     )
 
 
@@ -1201,6 +1213,7 @@ def submit_explanation(
         SlateControls(),
         replace(hard, ai_filter=ResilienceFilter()),
         stored_targets(tx, workspace_id, document, pack),
+        role_record(tx, workspace_id, document, pack),
     )
     if not shown.suggestions:
         raise CareerwrightError(
@@ -1340,13 +1353,19 @@ class ChooseRole(BaseModel):
 
 
 def choose_role(
-    tx: Tx, actor: Actor, workspace_id: uuid.UUID, command: ChooseRole, now: datetime
+    tx: Tx,
+    actor: Actor,
+    workspace_id: uuid.UUID,
+    command: ChooseRole,
+    now: datetime,
+    pack: PackTargets,
 ) -> tuple[ProfileView, bool]:
     """Answer "What do you do now, or what did you do last?" with an ESCO occupation, through
     the one profile write path: the current role becomes the title the person picked (ESCO's
     or another it lists for that occupation), citing an `occupation_choice` source with its
-    ESCO URI, which is what the role resolves by. Choosing the occupation and title the role
-    already names changes nothing. Returns the profile and whether it changed."""
+    ESCO URI, and the title's record names that occupation as their choice of it, an ESCO
+    title (`careerwright.profile.targets`). Choosing the occupation and title the role already
+    names changes nothing. Returns the profile and whether it changed."""
     visible_workspace(tx, workspace_id, lock=True)
     held_release(tx)
     occupation = taxonomy_store.occupation(tx, command.concept_id)
@@ -1365,7 +1384,7 @@ def choose_role(
     profile = current_profile(tx, workspace_id)
     if command.expected_version != profile.version:
         raise stale_version(profile.version)
-    role = titles.current_role(tx, workspace_id, profile.document)
+    role = titles.current_role(tx, workspace_id, profile.document, pack)
     if role == ResolvedTitle(label, ProfileField.CURRENT_ROLE, (occupation.concept_id,), True):
         return profile, False  # already the role, chosen from ESCO
     source = NewSource(
@@ -1377,6 +1396,7 @@ def choose_role(
         locator=occupation.esco_uri,
     )
     update = FieldUpdate(TextInput(state=FieldState.PROVIDED, value=label), source)
+    choice = Choice(occupation.esco_uri, source.source_ref_id)
     view, changed = commit_profile_version(
         tx,
         actor,
@@ -1384,6 +1404,8 @@ def choose_role(
         command.expected_version,
         {"current_role": update},
         recite=frozenset({"current_role"}),
+        pack=pack,
+        role=resolve_target(tx, workspace_id, label, pack, choice),
     )
     return view, bool(changed)
 
@@ -1397,6 +1419,12 @@ class NameRole(BaseModel):
 
     expected_version: int = Field(ge=0)
     title: TextValue = Field(description="The title, kept exactly as given.")
+    none_of_these: bool = Field(
+        default=False,
+        description='True: the person picked "None of these is my job" under the type-ahead\'s '
+        "partial list, ESCO's closest titles: the title names no ESCO occupation, and nothing "
+        "asks them to pick another.",
+    )
 
 
 def _role_text(document: ProfileDocument) -> str | None:
@@ -1414,17 +1442,21 @@ def name_role(
 ) -> tuple[ProfileView, bool]:
     """Answer "What do you do now, or what did you do last?" in the person's own words,
     through the one profile write path: the current role becomes the title exactly as given,
-    citing their direct entry, and its record is decided afresh (`careerwright.profile.targets`:
-    a title the UK job-title index lists is an ONS title with ONS's groups; anything else is
-    the person's own words), so "Which of these is closest?" is asked for it anew. The same
-    title again changes nothing. Returns the profile and whether it changed."""
+    citing their direct entry, with its title's record (`careerwright.profile.targets`: a title
+    the UK job-title index lists is an ONS title with ONS's groups; anything else is the
+    person's own words; a title that already has a record keeps it, with any choice made for
+    it). "None of these is my job" (`none_of_these`) is the person's decision, recorded in the
+    record as theirs. The same answer again changes nothing. Returns the profile and whether it
+    changed."""
     visible_workspace(tx, workspace_id, lock=True)
     held_release(tx)
     profile = current_profile(tx, workspace_id)
     if command.expected_version != profile.version:
         raise stale_version(profile.version)
     if _role_text(profile.document) == command.title:
-        return profile, False  # already the role, in these words
+        held = role_record(tx, workspace_id, profile.document, pack)
+        if not command.none_of_these or (held and held.link is TargetLink.NONE_OF_THESE):
+            return profile, False  # already the role, in these words
     source = NewSource(
         source_ref_id=uuid.uuid4(),
         kind=SourceKind.DIRECT_ENTRY,
@@ -1440,9 +1472,11 @@ def name_role(
         command.expected_version,
         {"current_role": update},
         recite=frozenset({"current_role"}),
+        pack=pack,
+        role=resolve_target(tx, workspace_id, command.title, pack, none_of_these=True)
+        if command.none_of_these
+        else None,
     )
-    record = resolve_target(tx, workspace_id, command.title, pack)
-    profile_store.upsert_target_record(tx, workspace_id, record, actor.actor_id)
     return view, bool(changed)
 
 
@@ -1515,19 +1549,21 @@ def choose_closest(
     now: datetime,
     pack: PackTargets,
 ) -> tuple[ProfileView, bool]:
-    """Record the person's answer to "Which of these is closest?". An occupation becomes the
-    role's ESCO occupation, their words kept: the role cites their choice of it (a new profile
-    version, as `choose_role` does), and the title's record names it as the closest they
-    chose. "None of these is my job" records that the title names no ESCO occupation; it never
-    asks for another, and a closest occupation chosen before is let go (the role cites their
-    direct entry again). Returns the profile and whether the decision changed."""
+    """Record the person's answer to "Which of these is closest?", as a new profile version
+    either way, so a tab holding an older version is refused, never silently overruled (app
+    review M-5). An occupation becomes the role's ESCO occupation, their words kept: the role
+    cites their choice of it (as `choose_role` does), and the title's record names it as the
+    closest they chose. "None of these is my job" records that the title names no ESCO
+    occupation; it never asks for another, and a closest occupation chosen before is let go
+    (the role cites their direct entry again). Returns the profile and whether the decision
+    changed."""
     visible_workspace(tx, workspace_id, lock=True)
     held_release(tx)
     profile = current_profile(tx, workspace_id)
     if command.expected_version != profile.version:
         raise stale_version(profile.version)
     title = _role_text(profile.document)
-    record = title_record(tx, workspace_id, title, pack) if title else None
+    record = role_record(tx, workspace_id, profile.document, pack)
     offer = closest_offer(tx, record) if record else None
     if title is None or offer is None:
         raise CareerwrightError(
@@ -1569,18 +1605,17 @@ def choose_closest(
         )
         choice = Choice(occupation.esco_uri, source.source_ref_id)
         decided = resolve_target(tx, workspace_id, title, pack, choice, closest=True)
-    view = profile
-    if command.concept_id is not None or offer.decision is ClosestDecision.CHOSEN:
-        update = FieldUpdate(TextInput(state=FieldState.PROVIDED, value=title), source)
-        view, _ = commit_profile_version(
-            tx,
-            actor,
-            workspace_id,
-            command.expected_version,
-            {"current_role": update},
-            recite=frozenset({"current_role"}),
-        )
-    profile_store.upsert_target_record(tx, workspace_id, decided, actor.actor_id)
+    update = FieldUpdate(TextInput(state=FieldState.PROVIDED, value=title), source)
+    view, _ = commit_profile_version(
+        tx,
+        actor,
+        workspace_id,
+        command.expected_version,
+        {"current_role": update},
+        recite=frozenset({"current_role"}),
+        pack=pack,
+        role=decided,
+    )
     return view, True
 
 
@@ -1625,11 +1660,11 @@ def first_slate(
     salary floor), with the unexpected connection singled out."""
     release = held_release(tx)
     profile = current_profile(tx, workspace_id)
-    role = titles.current_role(tx, workspace_id, profile.document)
+    record = role_record(tx, workspace_id, profile.document, pack)
+    if record is None:
+        return FirstSlate(profile.version, release, None, RoleState.NOT_ANSWERED)
+    role = titles.role(tx, record)
     nothing = FirstSlate(profile.version, release, role, RoleState.NOT_ANSWERED)
-    if role is None:
-        return nothing
-    record = title_record(tx, workspace_id, role.text, pack)
     labels = taxonomy_store.isco_labels(tx, record.isco_codes)
     nothing = replace(
         nothing,

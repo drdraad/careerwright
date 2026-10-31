@@ -31,9 +31,9 @@ from careerwright.profile.document import (
     empty_profile,
     input_type,
 )
-from careerwright.profile.records import Basis, SourceKind
+from careerwright.profile.records import Basis, SourceKind, TargetRecord
 from careerwright.profile.store import stale_version
-from careerwright.profile.targets import Choice, PackTargets, record_targets
+from careerwright.profile.targets import Choice, PackTargets, record_role, record_targets
 
 DIRECT_ENTRY_LABEL = "Direct entry"
 
@@ -115,13 +115,15 @@ def commit_profile_version(
     recite: frozenset[str] = frozenset(),
     pack: PackTargets | None = None,
     choice: tuple[str, Choice] | None = None,
+    role: TargetRecord | None = None,
 ) -> tuple[ProfileView, list[str]]:
     """The one write path. Returns the resulting profile and the fields it changed (none:
     no new version). `recite`: fields whose new source counts as a change by itself
-    (`apply_updates`). A version that changes the targets stores each new target's record
-    (`careerwright.profile.targets`), decided against the option pack's targets (`pack`, which
-    every write that can change the targets passes) and the person's `choice` of an
-    occupation for one title, if they made one."""
+    (`apply_updates`). A version that changes the targets stores each new target's record, and
+    one that changes the role stores the role's (`careerwright.profile.targets`), decided
+    against the option pack's targets (`pack`, which every write that can change a title
+    passes), the person's `choice` of an occupation for one target title, if they made one,
+    and the record the person's decision made for the role (`role`), if they made one."""
     visible_workspace(tx, workspace_id, lock=True)
     current = current_profile(tx, workspace_id)
     if expected_version != current.version:
@@ -158,14 +160,17 @@ def commit_profile_version(
         tx, workspace_id, expected_version + 1, document, actor.actor_id
     )
     store.link_sources(tx, workspace_id, created.version, cited)
-    if "target_titles" in changed:
-        if pack is None:  # a programming error: never a target saved without its record
+    if {"target_titles", "current_role"} & set(changed):
+        if pack is None:  # a programming error: never a title saved without its record
             raise CareerwrightError(
                 ErrorCode.INTERNAL_ERROR,
-                "Targets can't be saved without the option pack's targets.",
+                "Titles can't be saved without the option pack's targets.",
                 stage=ErrorStage.PROFILE,
             )
-        record_targets(tx, actor.actor_id, workspace_id, created.document, pack, choice)
+        if "target_titles" in changed:
+            record_targets(tx, actor.actor_id, workspace_id, created.document, pack, choice)
+        if "current_role" in changed:
+            record_role(tx, actor.actor_id, workspace_id, created.document, pack, role)
     identity_store.append_event(
         tx,
         workspace_id,

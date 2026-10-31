@@ -5925,6 +5925,12 @@ export const NameRoleSchema = {
             minLength: 1,
             title: 'Title',
             description: 'The title, kept exactly as given.'
+        },
+        none_of_these: {
+            type: 'boolean',
+            title: 'None Of These',
+            description: 'True: the person picked "None of these is my job" under the type-ahead\'s partial list, ESCO\'s closest titles: the title names no ESCO occupation, and nothing asks them to pick another.',
+            default: false
         }
     },
     additionalProperties: false,
@@ -6898,6 +6904,9 @@ export const OriginOutSchema = {
                         $ref: '#/components/schemas/TitleNotMatched'
                     },
                     {
+                        $ref: '#/components/schemas/RoleNotMatched'
+                    },
+                    {
                         $ref: '#/components/schemas/TitleKeptAsOwn'
                     },
                     {
@@ -6915,6 +6924,7 @@ export const OriginOutSchema = {
                         kinds_of_work_shown: '#/components/schemas/KindsOfWorkShown',
                         no_shared_occupation: '#/components/schemas/NoSharedOccupation',
                         nothing_found: '#/components/schemas/NothingFound',
+                        role_not_matched: '#/components/schemas/RoleNotMatched',
                         title_kept_as_own: '#/components/schemas/TitleKeptAsOwn',
                         title_matched_several: '#/components/schemas/TitleMatchedSeveral',
                         title_not_matched: '#/components/schemas/TitleNotMatched'
@@ -10263,6 +10273,36 @@ export const RightsClassSchema = {
     description: 'The page classes of the session 1 rights policy (H-06; `corpus/README.md`).'
 } as const;
 
+export const RoleNotMatchedSchema = {
+    properties: {
+        reason: {
+            type: 'string',
+            const: 'role_not_matched',
+            title: 'Reason',
+            default: 'role_not_matched'
+        },
+        outcome: {
+            type: 'string',
+            const: 'not_matched',
+            title: 'Outcome',
+            default: 'not_matched'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'reason',
+        'outcome',
+        'title'
+    ],
+    title: 'RoleNotMatched',
+    description: 'The person\'s current or last role matched no occupation in ESCO: it is kept in their\nwords and nothing is joined to it. Nothing asks them to choose another (Task 6d slice B\nfix round 1, design review I-2).'
+} as const;
+
 export const RoleOccupationOutSchema = {
     properties: {
         concept_id: {
@@ -12414,6 +12454,9 @@ export const SlateOutSchema = {
                         $ref: '#/components/schemas/TitleNotMatched'
                     },
                     {
+                        $ref: '#/components/schemas/RoleNotMatched'
+                    },
+                    {
                         $ref: '#/components/schemas/TitleKeptAsOwn'
                     },
                     {
@@ -12431,6 +12474,7 @@ export const SlateOutSchema = {
                         kinds_of_work_shown: '#/components/schemas/KindsOfWorkShown',
                         no_shared_occupation: '#/components/schemas/NoSharedOccupation',
                         nothing_found: '#/components/schemas/NothingFound',
+                        role_not_matched: '#/components/schemas/RoleNotMatched',
                         title_kept_as_own: '#/components/schemas/TitleKeptAsOwn',
                         title_matched_several: '#/components/schemas/TitleMatchedSeveral',
                         title_not_matched: '#/components/schemas/TitleNotMatched'
@@ -12570,7 +12614,7 @@ export const SlateOutSchema = {
             },
             type: 'array',
             title: 'Unmatched Titles',
-            description: 'Titles of the person\'s own that Careerwright couldn\'t match to an occupation in ESCO (case, punctuation and plurals folded): nothing is joined to them until the person chooses the ESCO occupation closest to each.'
+            description: 'Titles of the person\'s own that Careerwright couldn\'t match to an occupation in ESCO (case, punctuation and plurals folded): nothing is joined to them.'
         },
         ambiguous_titles: {
             items: {
@@ -12590,6 +12634,11 @@ export const SlateOutSchema = {
                 }
             ],
             description: 'The unexpected connection to the person\'s role; null without one.'
+        },
+        familiarity_known: {
+            type: 'boolean',
+            title: 'Familiarity Known',
+            description: 'Whether the person\'s role or a target names an ESCO occupation, so Careerwright knows the kinds of work close to theirs: only then does a direction say it is different from their work (`less_familiar`).'
         }
     },
     additionalProperties: false,
@@ -12614,7 +12663,8 @@ export const SlateOutSchema = {
         'not_included',
         'unmatched_titles',
         'ambiguous_titles',
-        'connection'
+        'connection',
+        'familiarity_known'
     ],
     title: 'SlateOut',
     description: 'A varied slate of up to six career hypotheses from the discovery\'s searches, computed\ndeterministically each time it is read, with every count that explains it. A title of\nthe person\'s own (their role, a target, or a search naming one) joins other work only by\nshared essential skills, never by its words, and only once it names one occupation.'
@@ -15402,7 +15452,7 @@ export const TitleNotMatchedSchema = {
         'title'
     ],
     title: 'TitleNotMatched',
-    description: 'A title of the person\'s own matched no occupation in ESCO, so nothing is joined to it.'
+    description: 'A target title of the person\'s matched no occupation in ESCO, so nothing is joined to\nit until they choose the one closest to it (the sketch offers it).'
 } as const;
 
 export const TooGeneralSchema = {

@@ -1,7 +1,7 @@
 // Directions to explore (REC-1, DIV-1): a grounded slate in words with no percentage; the
 // controls change the view only; a suggestion becomes a target only when chosen.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type {
@@ -199,6 +199,7 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
   unmatched_titles: [],
   ambiguous_titles: [],
   connection: null,
+  familiarity_known: false,
 });
 
 function renderDirections(
@@ -266,6 +267,38 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     // Familiarity unknown: the group heading claims no relation to their current work.
     expect(screen.getByRole("heading", { name: "Directions to consider" })).toBeVisible();
     expect(document.body.textContent).not.toMatch(/\d\s?(%|per ?cent)/i); // a number as a percentage
+  });
+
+  it("[DIV1-03][DIV1-10] says Something different only when the API knows the role's kind of work", async () => {
+    // Design review M-2: a role kept in the person's words (or after "None of these is my
+    // job") names no ESCO occupation, so nothing knows what is different from it: say less.
+    const kept: ProfileOut = {
+      ...profile,
+      document: {
+        ...profile.document,
+        current_role: { state: "provided", value: "Bookkeeping assistant", source_ref_id: "s2" },
+      },
+    };
+    let known = false;
+    fakeApi([
+      {
+        method: "GET",
+        path: /\/slate$/,
+        answer: () => ({ ...slate([suggestion]), familiarity_known: known }),
+      },
+    ]);
+    const { user } = renderDirections(discovery, undefined, kept);
+
+    expect(await screen.findByRole("heading", { name: "Directions to consider" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Something different" })).toBeNull();
+    await openNotes(user, 2);
+    // The role was given, so it never says Careerwright doesn't know the person's work.
+    expect(screen.queryByText(/doesn't know your current work yet/)).toBeNull();
+    cleanup();
+
+    known = true;
+    renderDirections(discovery, undefined, kept);
+    expect(await screen.findByRole("heading", { name: "Something different" })).toBeVisible();
   });
 
   it("[DIV1-04][TEST1-15] lists a title idea the UK job-title index lists beside the slate, with its answers", async () => {

@@ -275,15 +275,48 @@ def test_the_ai_resilience_filter_keeps_unscored_roles_by_default_and_counts_its
     assert hidden["ai_resilience_filter"]["unscored_excluded"] == shown["unscored"]
     assert hidden["ai_resilience_filter"]["include_unscored"] is False
     assert {n["reason"] for n in hidden["not_included"]} >= {"ai_resilience_unscored_excluded"}
+    # The role is kept in the person's words: nothing offers it a closest occupation after the
+    # start, so its fact never asks for one (Task 6d slice B fix round 1, design review I-2).
     assert hidden["fewer_reasons"] == [
         {"reason": "few_matched", "count": 0},
         {
-            "reason": "title_not_matched",
+            "reason": "role_not_matched",
             "outcome": "not_matched",
             "title": "Warehouse shift supervisor",
         },
     ]
     assert default["salary_floor"] is None  # the person set no floor
+
+
+@pytest.mark.req("DIV1-03", "DIV1-13", "DIV1-10")
+def test_after_none_of_these_the_slate_keeps_the_role_in_the_person_s_words_and_says_less(
+    scenario: Scenario,
+) -> None:
+    # Design review I-2 and M-2: after the type-ahead's "None of these is my job" the slate
+    # asked for "the ESCO occupation closest to it" and headed its less familiar directions
+    # "Something different", though nothing knew the person's kind of work.
+    declined = scenario.api.write(
+        "POST",
+        f"{base(scenario)}/origin/role/title",
+        scenario.token,
+        {"expected_version": 2, "title": "Warehouse shift supervisor", "none_of_these": True},
+    )
+    assert declined.status_code == 201, declined.text
+
+    discovery_id = discover(scenario, version=3)["discovery_id"]
+    default = slate(scenario, discovery_id)
+    hidden = slate(scenario, discovery_id, min_ai_resilience="3", include_unscored="false")
+
+    assert hidden["fewer_reasons"] == [
+        {"reason": "few_matched", "count": 0},
+        {
+            "reason": "title_kept_as_own",
+            "outcome": "not_matched",
+            "title": "Warehouse shift supervisor",
+        },
+    ]
+    assert default["familiarity_known"] is False
+    assert not any(s["different_kind_of_work"] for s in default["suggestions"])
 
 
 @pytest.mark.req("AIR1-05")
@@ -489,6 +522,7 @@ def test_a_role_esco_lists_joins_other_work_by_shared_essential_skills_only(
         if "shared_skills" not in s["channels"]
     )
     assert result["unmatched_titles"] == []
+    assert result["familiarity_known"] is True  # the role names an ESCO occupation
 
 
 @pytest.mark.req("PROF-05", "MODEL-02")

@@ -169,9 +169,10 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
 
     await user.click(own);
     await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
+    // Design review I-2: the refusal is recorded, so nothing later asks for another job.
     expect(sent.find((s) => s.method === "POST")).toMatchObject({
       path: `/v1/workspaces/${WS}/origin/role/title`,
-      body: { expected_version: 3, title: "Bookkeeping assistant" },
+      body: { expected_version: 3, title: "Bookkeeping assistant", none_of_these: true },
     });
   });
 

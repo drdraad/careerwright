@@ -499,8 +499,7 @@ class SlateOut(ResponseModel):
     not_included: list[NotIncludedOut] = Field(description="Show why this wasn't included.")
     unmatched_titles: list[str] = Field(
         description="Titles of the person's own that Careerwright couldn't match to an "
-        "occupation in ESCO (case, punctuation and plurals folded): nothing is joined to them "
-        "until the person chooses the ESCO occupation closest to each."
+        "occupation in ESCO (case, punctuation and plurals folded): nothing is joined to them."
     )
     ambiguous_titles: list[str] = Field(
         description="Titles of the person's own that Careerwright matched to several "
@@ -509,6 +508,11 @@ class SlateOut(ResponseModel):
     )
     connection: ConnectionOut | None = Field(
         description="The unexpected connection to the person's role; null without one."
+    )
+    familiarity_known: bool = Field(
+        description="Whether the person's role or a target names an ESCO occupation, so "
+        "Careerwright knows the kinds of work close to theirs: only then does a direction say "
+        "it is different from their work (`less_familiar`)."
     )
 
     @classmethod
@@ -535,6 +539,7 @@ class SlateOut(ResponseModel):
             unmatched_titles=view.unmatched_titles,
             ambiguous_titles=view.ambiguous_titles,
             connection=ConnectionOut.of(view.connection) if view.connection else None,
+            familiarity_known=view.familiarity_known,
         )
 
 

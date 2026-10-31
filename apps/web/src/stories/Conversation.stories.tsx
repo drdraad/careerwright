@@ -235,6 +235,8 @@ const slate = (suggestions: SuggestionOut[]): SlateOut => ({
   unmatched_titles: [],
   ambiguous_titles: [],
   connection: null,
+  // The stories' role joins work by shared skills, so its kind of work is known.
+  familiarity_known: true,
 });
 const full = [
   suggestion("agricultural machinery technician", "723", "close_to_current"),

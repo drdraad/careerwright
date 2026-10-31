@@ -33,12 +33,14 @@ def offered(body: dict[str, Any]) -> list[tuple[str, str]]:
     ]
 
 
-def name_role(api: ApiClient, token: str, workspace: str, title: str, version: int) -> Any:
+def name_role(
+    api: ApiClient, token: str, workspace: str, title: str, version: int, **more: Any
+) -> Any:
     return api.write(
         "POST",
         f"/v1/workspaces/{workspace}/origin/role/title",
         token,
-        {"expected_version": version, "title": title},
+        {"expected_version": version, "title": title, **more},
     )
 
 
@@ -56,6 +58,17 @@ def origin(api: ApiClient, token: str, workspace: str) -> dict[str, Any]:
     assert found.status_code == 200, found.text
     body: dict[str, Any] = found.json()
     return body
+
+
+def edit(api: ApiClient, token: str, workspace: str, version: int, **answers: Any) -> None:
+    """A direct edit in What we know: the whole profile, these answers given."""
+    put = api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace}/profile",
+        token,
+        {"expected_version": version, "profile": profile_with(**answers)},
+    )
+    assert put.status_code == 201, put.text
 
 
 def record(infra: Infra, workspace: str, title: str) -> dict[str, Any]:
@@ -145,6 +158,67 @@ def test_a_title_neither_list_holds_asks_about_esco_s_closest_titles_and_refuses
     )
 
 
+@pytest.mark.req("DIV1-13", "DIV1-03", "VERSIONS-01")
+def test_none_of_these_in_the_type_ahead_is_the_person_s_refusal_recorded_by_a_versioned_command(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    # Design review I-2: the partial list's "None of these is my job" recorded nothing, so the
+    # slate later asked for "the ESCO occupation closest to it". It is now the person's
+    # refusal, recorded like every consequential write: expected version and Idempotency-Key.
+    workspace = api.create_workspace(ada, "None of these, typed (synthetic)")["workspace_id"]
+    stale = name_role(api, ada, workspace, "Bookkeeping assistant", 1, none_of_these=True)
+    declined = name_role(api, ada, workspace, "Bookkeeping assistant", 0, none_of_these=True)
+    again = name_role(api, ada, workspace, "Bookkeeping assistant", 1, none_of_these=True)
+    role = origin(api, ada, workspace)["role"]
+
+    assert (stale.status_code, stale.json()["error"]["code"]) == (409, "STALE_INPUT_VERSION")
+    assert (declined.status_code, declined.json()["version"]) == (201, 1)
+    assert declined.json()["document"]["current_role"]["value"] == "Bookkeeping assistant"
+    assert (again.status_code, again.json()["version"]) == (200, 1)  # already recorded
+    assert (role["state"], role["kind"], role["occupation"], role["closest"]) == (
+        "not_in_esco",
+        "own_words",
+        None,
+        None,
+    )
+    stored = record(infra, workspace, "Bookkeeping assistant")
+    assert (stored["kind"], stored["link"], stored["occupation_uri"]) == (
+        "own_words",
+        "none_of_these",
+        None,
+    )
+
+    # The same words kept without the refusal ("Use my own words", or Enter) record none (the
+    # title is the option pack's target, so it links to the pack's crosswalk, for Skills
+    # alone); the refusal given later for the role's own words is a new version.
+    other = api.create_workspace(ada, "Own words, typed (synthetic)")["workspace_id"]
+    assert name_role(api, ada, other, "Bookkeeping assistant", 0).status_code == 201
+    assert record(infra, other, "Bookkeeping assistant")["link"] == "pack_crosswalk"
+    later = name_role(api, ada, other, "Bookkeeping assistant", 1, none_of_these=True)
+    assert (later.status_code, later.json()["version"]) == (201, 2)
+    assert record(infra, other, "Bookkeeping assistant")["link"] == "none_of_these"
+
+
+@pytest.mark.req("DIV1-14", "VERSIONS-01")
+def test_none_of_these_at_the_closest_question_is_a_new_version_so_a_stale_tab_conflicts(
+    api: ApiClient, ada: str
+) -> None:
+    # App review M-5: "None of these is my job" from not_yet made no profile version, so a
+    # stale tab sending the same expected version could override it without a conflict.
+    workspace = api.create_workspace(ada, "None of these, closest (synthetic)")["workspace_id"]
+    assert name_role(api, ada, workspace, "Registered nurse", 0).status_code == 201
+    [group] = origin(api, ada, workspace)["role"]["closest"]["groups"]
+    specialist = next(o["concept_id"] for o in group["occupations"] if "specialist" in o["title"])
+
+    none = closest(api, ada, workspace, None, 1)
+    stale = closest(api, ada, workspace, specialist, 1)
+    role = origin(api, ada, workspace)["role"]
+
+    assert (none.status_code, none.json()["version"]) == (201, 2)
+    assert (stale.status_code, stale.json()["error"]["code"]) == (409, "STALE_INPUT_VERSION")
+    assert (role["closest"]["decision"], role["occupation"]) == ("none_of_these", None)
+
+
 @pytest.mark.req("DIV1-13", "DIV1-14", "PROF-10")
 def test_a_uk_title_keeps_the_person_s_words_and_asks_which_esco_occupation_is_closest(
     api: ApiClient, ada: str, infra: Infra
@@ -221,6 +295,102 @@ def test_a_uk_title_keeps_the_person_s_words_and_asks_which_esco_occupation_is_c
     assert (outside.status_code, outside.json()["error"]["details"]["reason"]) == (
         422,
         "not_offered",
+    )
+
+
+@pytest.mark.req("DIV1-14", "PROF-10", "MAP1-09")
+def test_the_role_s_record_is_its_one_truth_so_an_edit_of_its_words_keeps_the_closest_choice(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    # App review I-1: the closest choice was kept on the role's source and in its record, and
+    # an edit of the words (even their capitals) lost the first while the second still said
+    # "chosen". The record is now the role's one truth, as it is each target's.
+    workspace = api.create_workspace(ada, "One record (synthetic)")["workspace_id"]
+    assert name_role(api, ada, workspace, "Registered nurse", 0).status_code == 201
+    [group] = origin(api, ada, workspace)["role"]["closest"]["groups"]
+    specialist = next(o["concept_id"] for o in group["occupations"] if "specialist" in o["title"])
+    assert closest(api, ada, workspace, specialist, 1).status_code == 201
+
+    def seeded(text: str) -> None:
+        shown = origin(api, ada, workspace)
+        role = shown["role"]
+        assert (role["text"], role["state"], role["chosen"], role["kind"]) == (
+            text,
+            "esco",
+            True,
+            "ons",
+        )
+        assert role["occupation"]["concept_id"] == specialist
+        assert (role["closest"]["decision"], role["closest"]["chosen"]) == ("chosen", specialist)
+        assert shown["usual_skills"]  # the chosen occupation's skills still seed the role
+
+    # The same title as a concept, in What we know: capitals, then away and back.
+    edit(api, ada, workspace, 2, current_role="Registered Nurse")
+    seeded("Registered Nurse")
+    edit(api, ada, workspace, 3, current_role="Doula")
+    away = origin(api, ada, workspace)["role"]
+    assert (away["state"], away["occupation"], away["closest"]["decision"]) == (
+        "not_in_esco",
+        None,
+        "not_yet",
+    )
+    edit(api, ada, workspace, 4, current_role="Registered nurse")
+    seeded("Registered nurse")
+    stored = record(infra, workspace, "Registered nurse")
+    assert (stored["kind"], stored["link"]) == ("ons", "occupation_choice")
+
+    # App review M-8: a target with the role's title reads the same record, so it names the
+    # occupation the person chose as closest for their role (ruling 1's consequence).
+    edit(
+        api,
+        ada,
+        workspace,
+        5,
+        current_role="Registered nurse",
+        target_titles=["Registered nurse"],
+    )
+    [target] = api.get(f"/v1/workspaces/{workspace}/targets", ada).json()["targets"]
+    assert (target["title"], target["link"], target["concept_id"]) == (
+        "Registered nurse",
+        "occupation_choice",
+        specialist,
+    )
+    seeded("Registered nurse")
+
+
+@pytest.mark.req("PROF-10", "MAP1-09")
+def test_a_role_chosen_by_one_of_esco_s_other_titles_is_stored_as_an_esco_title(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    # App review M-1: "IT support technician" is one of the ICT help desk agent's other titles
+    # in ESCO (and a UK job title too); chosen from ESCO, the role's record says it is ESCO's.
+    [match] = titles(api, ada, "IT support")["matches"]
+    workspace = api.create_workspace(ada, "Other ESCO title (synthetic)")["workspace_id"]
+    chosen = api.write(
+        "POST",
+        f"/v1/workspaces/{workspace}/origin/role",
+        ada,
+        {
+            "expected_version": 0,
+            "concept_id": match["concept_id"],
+            "label": match["matched_label"],
+        },
+    )
+    role = origin(api, ada, workspace)["role"]
+
+    assert chosen.status_code == 201, chosen.text
+    assert (role["text"], role["state"], role["chosen"], role["kind"]) == (
+        "IT support technician",
+        "esco",
+        True,
+        "esco",
+    )
+    assert role["occupation"]["concept_id"] == match["concept_id"]
+    stored = record(infra, workspace, "IT support technician")
+    assert (stored["kind"], stored["link"], stored["source_ref_id"] is not None) == (
+        "esco",
+        "occupation_choice",
+        True,
     )
 
 

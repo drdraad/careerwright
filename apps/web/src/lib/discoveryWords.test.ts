@@ -206,6 +206,13 @@ describe("[DIV1-06][DIV1-03] why there are fewer than six, in words", () => {
       { reason: "title_not_matched", outcome: "not_matched", title: "Registered nurse" },
       "Careerwright couldn't match “Registered nurse” to an occupation in ESCO, so it can't join other work to that title by shared skills. Choose the ESCO occupation closest to it.",
     ],
+    // Task 6d slice B fix round 1 (design review I-2): nothing offers the role a closest
+    // occupation after the start, so its words ask for none.
+    [
+      "a role matched to none",
+      { reason: "role_not_matched", outcome: "not_matched", title: "Bookkeeping assistant" },
+      "Careerwright keeps “Bookkeeping assistant” as your role, in your words. It couldn't match it to an occupation in ESCO, so it joins no other work to it by shared skills.",
+    ],
     // Task 6d slice B: "None of these is my job". What isn't known yet; it asks for no other.
     [
       "a title kept in the person's words",

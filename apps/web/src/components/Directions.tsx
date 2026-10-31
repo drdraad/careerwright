@@ -685,9 +685,12 @@ function Slate({
   }
   const data = slate.data;
   const named = profile.document.target_titles;
-  const familiarityKnown =
+  const titlesGiven =
     profile.document.current_role.state === "provided" ||
     (named.state === "provided" && (named.value ?? []).length > 0);
+  // Only the API's own fact says the person's kind of work is known: a role kept in their own
+  // words names no ESCO occupation, so nothing is "different" from it (design review M-2).
+  const familiarityKnown = data.familiarity_known;
   const excluded = controls.excludeConcepts.length + controls.excludeFamilies.length;
   // Only a search that reached work found the pool: one too general to find work on its own
   // only added weight, and one that reached nothing found none.
@@ -733,7 +736,7 @@ function Slate({
           ...[aiFilterWords(data.ai_resilience_filter), titleIdeasWords(data.title_ideas)].filter(
             (line): line is string => line !== null,
           ),
-          ...(familiarityKnown
+          ...(familiarityKnown || titlesGiven
             ? []
             : [
                 "Careerwright doesn't know your current work yet, so it can't say which " +

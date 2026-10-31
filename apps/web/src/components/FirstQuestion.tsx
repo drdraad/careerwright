@@ -115,10 +115,15 @@ export function FirstQuestion({
         concept_id: option.match.concept_id,
         label: option.match.matched_label,
       });
+    } else if (option.kind === "uk") {
+      nameRole.mutate({ expected_version, title: option.title.title });
     } else {
+      // Under a partial list the own-words option is "None of these is my job": the person's
+      // refusal of ESCO's closest titles, recorded so nothing later asks for another job.
       nameRole.mutate({
         expected_version,
-        title: option.kind === "uk" ? option.title.title : option.text,
+        title: option.text,
+        ...(partial && { none_of_these: true }),
       });
     }
   };

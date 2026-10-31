@@ -182,9 +182,20 @@ class ExclusionsRemoved(Fact):
 
 
 class TitleNotMatched(Fact):
-    """A title of the person's own matched no occupation in ESCO, so nothing is joined to it."""
+    """A target title of the person's matched no occupation in ESCO, so nothing is joined to
+    it until they choose the one closest to it (the sketch offers it)."""
 
     reason: Literal["title_not_matched"] = "title_not_matched"
+    outcome: Literal[Outcome.NOT_MATCHED] = Outcome.NOT_MATCHED
+    title: str
+
+
+class RoleNotMatched(Fact):
+    """The person's current or last role matched no occupation in ESCO: it is kept in their
+    words and nothing is joined to it. Nothing asks them to choose another (Task 6d slice B
+    fix round 1, design review I-2)."""
+
+    reason: Literal["role_not_matched"] = "role_not_matched"
     outcome: Literal[Outcome.NOT_MATCHED] = Outcome.NOT_MATCHED
     title: str
 
@@ -224,6 +235,7 @@ FewerReason = Annotated[
     | KindsOfWorkShown
     | ExclusionsRemoved
     | TitleNotMatched
+    | RoleNotMatched
     | TitleKeptAsOwn
     | TitleMatchedSeveral
     | NoSharedOccupation,

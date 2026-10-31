@@ -80,7 +80,9 @@ def post_role(
     their current role through the one profile write path."""
 
     def execute(tx: Tx) -> CommandResult:
-        view, changed = choose_role(tx, caller.actor, workspace_id, body, deps.clock())
+        view, changed = choose_role(
+            tx, caller.actor, workspace_id, body, deps.clock(), deps.pack_targets
+        )
         return CommandResult(
             201 if changed else 200, ProfileOut.of(view).model_dump(mode="json"), workspace_id
         )

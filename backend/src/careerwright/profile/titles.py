@@ -1,13 +1,13 @@
 """The person's own titles as ESCO occupations (plan section 4, Sprint W SW.5; ADR 0007
 decision 13): their current or last role and their target titles.
 
-A role names the occupation the person chose for it from ESCO (an `occupation_choice`
-source, by its ESCO URI); otherwise every occupation of the held release that holds it as a
-label (`careerwright.concept_key`); otherwise none, and it is not an ESCO title. A target is
-what its stored record names (`careerwright.profile.targets`, decided once by the same rules):
-its occupation in ESCO itself, or else every occupation holding its title as a label. Nothing
-is guessed from the title's words: work joins a title only through the essential skills its
-occupations list (`careerwright.profile.slate.skill_join_hits`).
+Each is what its stored record names (`careerwright.profile.targets`, decided once by one set of
+rules, one record per title as a concept, so a role and a target with the same title name the
+same): its occupation in ESCO itself (the person's choice, as the title itself or as the closest
+to it, or the one occupation holding it as a label), else every occupation holding its title as
+a label (several is ambiguous: each is kept, none is picked), else none, and it is not an ESCO
+title. Nothing is guessed from the title's words: work joins a title only through the essential
+skills its occupations list (`careerwright.profile.slate.skill_join_hits`).
 """
 
 import uuid
@@ -15,10 +15,10 @@ from dataclasses import dataclass
 
 from careerwright.catalogue import taxonomy_store
 from careerwright.db import Tx
-from careerwright.profile import store
-from careerwright.profile.document import FieldState, ProfileDocument
+from careerwright.profile.document import ProfileDocument
 from careerwright.profile.interview import ProfileField
-from careerwright.profile.records import SourceKind, TargetLink, TargetRecord
+from careerwright.profile.records import TargetLink, TargetRecord
+from careerwright.profile.targets import PackTargets, role_record
 
 
 @dataclass(frozen=True)
@@ -34,38 +34,7 @@ class ResolvedTitle:
     declined: bool = False
 
 
-def _labelled(tx: Tx, text: str) -> tuple[uuid.UUID, ...]:
-    return tuple(sorted({m.concept_id for m in taxonomy_store.concept_key_matches(tx, text)}))
-
-
-def current_role(
-    tx: Tx, workspace_id: uuid.UUID, document: ProfileDocument
-) -> ResolvedTitle | None:
-    """The role the person gave, or None when they have not given one. "None of these is my
-    job" is read from its title's stored record (`careerwright.profile.targets`); the
-    occupation it names comes from the field's own source, as before."""
-    field = document.current_role
-    if field.state is not FieldState.PROVIDED or field.value is None:
-        return None
-    found = store.source(tx, workspace_id, field.source_ref_id) if field.source_ref_id else None
-    if found is not None and found.kind is SourceKind.OCCUPATION_CHOICE and found.locator:
-        concept = taxonomy_store.concepts_by_uri(tx, [found.locator]).get(found.locator)
-        if concept is not None:
-            return ResolvedTitle(field.value, ProfileField.CURRENT_ROLE, (concept,), chosen=True)
-    key = taxonomy_store.concept_keys(tx, [field.value])[field.value]
-    record = store.target_records(tx, workspace_id, [key]).get(key)
-    declined = record is not None and record.link is TargetLink.NONE_OF_THESE
-    occupations = () if declined else _labelled(tx, field.value)
-    return ResolvedTitle(
-        field.value, ProfileField.CURRENT_ROLE, occupations, chosen=False, declined=declined
-    )
-
-
-def targets(tx: Tx, records: list[TargetRecord]) -> list[ResolvedTitle]:
-    """Each target (`careerwright.profile.targets.stored_targets`, one per title as a
-    concept), as its record names it in ESCO: its occupation (chosen, or the one holding its
-    title as a label), else every occupation holding its title as a label. The pack's
-    crosswalk is Skills' alone. An occupation the held release lacks is simply absent."""
+def _resolved(tx: Tx, records: list[TargetRecord], field: ProfileField) -> list[ResolvedTitle]:
     uris = {u for r in records for u in (r.esco_occupation, *r.label_matches) if u is not None}
     held = taxonomy_store.concepts_by_uri(tx, uris)
     resolved: list[ResolvedTitle] = []
@@ -75,12 +44,27 @@ def targets(tx: Tx, records: list[TargetRecord]) -> list[ResolvedTitle]:
         chosen = record.link is TargetLink.OCCUPATION_CHOICE
         declined = record.link is TargetLink.NONE_OF_THESE
         resolved.append(
-            ResolvedTitle(
-                record.title,
-                ProfileField.TARGET_TITLES,
-                () if declined else occupations,
-                chosen,
-                declined,
-            )
+            ResolvedTitle(record.title, field, () if declined else occupations, chosen, declined)
         )
     return resolved
+
+
+def role(tx: Tx, record: TargetRecord) -> ResolvedTitle:
+    """The role, as its record (`careerwright.profile.targets.role_record`) names it in ESCO."""
+    [resolved] = _resolved(tx, [record], ProfileField.CURRENT_ROLE)
+    return resolved
+
+
+def current_role(
+    tx: Tx, workspace_id: uuid.UUID, document: ProfileDocument, pack: PackTargets
+) -> ResolvedTitle | None:
+    """The role the person gave, or None when they have not given one."""
+    record = role_record(tx, workspace_id, document, pack)
+    return None if record is None else role(tx, record)
+
+
+def targets(tx: Tx, records: list[TargetRecord]) -> list[ResolvedTitle]:
+    """Each target (`careerwright.profile.targets.stored_targets`, one per title as a
+    concept), as its record names it in ESCO. The pack's crosswalk is Skills' alone. An
+    occupation the held release lacks is simply absent."""
+    return _resolved(tx, records, ProfileField.TARGET_TITLES)

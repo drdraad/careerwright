@@ -368,7 +368,7 @@ def record_evidence(
         for r in m.rows
         if r.subject == command.subject and r.kind in LEVELLED_KINDS and r.gate is None
     ]
-    role = usual.role_occupation(tx, workspace_id)
+    role = usual.role_occupation(tx, workspace_id, pack_targets(data))
     usual_subjects = (
         {usual.subject_of(s.skill_id) for s in usual.essential_skills(role)} if role else set()
     )

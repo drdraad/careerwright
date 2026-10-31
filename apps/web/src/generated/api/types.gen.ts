@@ -4025,6 +4025,12 @@ export type NameRole = {
      * The title, kept exactly as given.
      */
     title: string;
+    /**
+     * None Of These
+     *
+     * True: the person picked "None of these is my job" under the type-ahead's partial list, ESCO's closest titles: the title names no ESCO occupation, and nothing asks them to pick another.
+     */
+    none_of_these?: boolean;
 };
 
 /**
@@ -4613,7 +4619,7 @@ export type OriginOut = {
      *
      * Why there are fewer than six, if there are, as facts the web words.
      */
-    fewer_reasons: Array<NothingFound | FewMatched | KindsOfWorkShown | ExclusionsRemoved | TitleNotMatched | TitleKeptAsOwn | TitleMatchedSeveral | NoSharedOccupation>;
+    fewer_reasons: Array<NothingFound | FewMatched | KindsOfWorkShown | ExclusionsRemoved | TitleNotMatched | RoleNotMatched | TitleKeptAsOwn | TitleMatchedSeveral | NoSharedOccupation>;
     connection: ConnectionOut | null;
     salary_floor: SalaryFloorOut | null;
 };
@@ -6594,6 +6600,28 @@ export const RightsClass = {
 export type RightsClass = typeof RightsClass[keyof typeof RightsClass];
 
 /**
+ * RoleNotMatched
+ *
+ * The person's current or last role matched no occupation in ESCO: it is kept in their
+ * words and nothing is joined to it. Nothing asks them to choose another (Task 6d slice B
+ * fix round 1, design review I-2).
+ */
+export type RoleNotMatched = {
+    /**
+     * Reason
+     */
+    reason: 'role_not_matched';
+    /**
+     * Outcome
+     */
+    outcome: 'not_matched';
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
  * RoleOccupationOut
  */
 export type RoleOccupationOut = {
@@ -7885,7 +7913,7 @@ export type SlateOut = {
      *
      * Why there are fewer than six, if there are, as facts the web words.
      */
-    fewer_reasons: Array<NothingFound | FewMatched | KindsOfWorkShown | ExclusionsRemoved | TitleNotMatched | TitleKeptAsOwn | TitleMatchedSeveral | NoSharedOccupation>;
+    fewer_reasons: Array<NothingFound | FewMatched | KindsOfWorkShown | ExclusionsRemoved | TitleNotMatched | RoleNotMatched | TitleKeptAsOwn | TitleMatchedSeveral | NoSharedOccupation>;
     /**
      * Notes
      *
@@ -7944,7 +7972,7 @@ export type SlateOut = {
     /**
      * Unmatched Titles
      *
-     * Titles of the person's own that Careerwright couldn't match to an occupation in ESCO (case, punctuation and plurals folded): nothing is joined to them until the person chooses the ESCO occupation closest to each.
+     * Titles of the person's own that Careerwright couldn't match to an occupation in ESCO (case, punctuation and plurals folded): nothing is joined to them.
      */
     unmatched_titles: Array<string>;
     /**
@@ -7957,6 +7985,12 @@ export type SlateOut = {
      * The unexpected connection to the person's role; null without one.
      */
     connection: ConnectionOut | null;
+    /**
+     * Familiarity Known
+     *
+     * Whether the person's role or a target names an ESCO occupation, so Careerwright knows the kinds of work close to theirs: only then does a direction say it is different from their work (`less_familiar`).
+     */
+    familiarity_known: boolean;
 };
 
 /**
@@ -9655,7 +9689,8 @@ export type TitleMatchesOut = {
 /**
  * TitleNotMatched
  *
- * A title of the person's own matched no occupation in ESCO, so nothing is joined to it.
+ * A target title of the person's matched no occupation in ESCO, so nothing is joined to
+ * it until they choose the one closest to it (the sketch offers it).
  */
 export type TitleNotMatched = {
     /**

@@ -71,7 +71,7 @@ from careerwright.profile.safety import has_risk_stem
 from careerwright.profile.slate import MIN_SHARED_SKILLS, Emphasis, SlateControls
 from careerwright.profile.slate_explanation import RECORD_STEPS, build_input, check_explanation
 from careerwright.profile.slate_explanation import render_prompt as render_explanation_prompt
-from careerwright.profile.targets import resolve_target, target_titles
+from careerwright.profile.targets import resolve_target, role_record, target_titles
 from careerwright.vocabulary import DataMode, WorkState
 
 CASES_PATH = Path(__file__).with_name("evaluation_cases.json")
@@ -767,6 +767,7 @@ def _offline_slate(tx: Tx, case: Case, release: str | None) -> SlateView:
         SlateControls(),
         hard,
         list(records.values()),
+        role_record(tx, _SOURCE, document, pack),
     )
 
 

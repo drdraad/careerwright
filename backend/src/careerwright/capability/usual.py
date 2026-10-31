@@ -19,6 +19,7 @@ from careerwright.catalogue.records import OccupationDetail, SkillRef
 from careerwright.db import Tx
 from careerwright.profile import titles
 from careerwright.profile.commands import current_profile
+from careerwright.profile.targets import PackTargets
 
 
 class UsualState(StrEnum):
@@ -42,10 +43,10 @@ def subject_of(skill_id: uuid.UUID) -> str:
     return f"esco:{skill_id}"
 
 
-def role_occupation(tx: Tx, workspace_id: uuid.UUID) -> OccupationDetail | None:
+def role_occupation(tx: Tx, workspace_id: uuid.UUID, pack: PackTargets) -> OccupationDetail | None:
     """The occupation the person's current or last role names, when it names exactly one."""
     profile = current_profile(tx, workspace_id)
-    role = titles.current_role(tx, workspace_id, profile.document)
+    role = titles.current_role(tx, workspace_id, profile.document, pack)
     if role is None or len(role.occupations) != 1:
         return None
     return taxonomy_store.occupation(tx, role.occupations[0])

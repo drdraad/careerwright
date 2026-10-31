@@ -326,6 +326,7 @@ function slateFor(query: string): SlateOut {
     unmatched_titles: [],
     ambiguous_titles: [],
     connection: null,
+    familiarity_known: false, // no role or target given
   } as SlateOut;
 }
 

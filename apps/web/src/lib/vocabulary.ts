@@ -715,6 +715,10 @@ export const FEWER_REASON: Worded<FewerReason> = {
     `Your exclusions removed ${count(fact.count, "occupation", "occupations")}.`,
   title_not_matched: (fact) =>
     `Careerwright couldn't match ${q(fact.title)} to an occupation in ESCO, so it can't join other work to that title by shared skills. Choose the ESCO occupation closest to it.`,
+  // Task 6d slice B fix round 1: nothing offers the role a closest occupation after the start,
+  // so its words ask for none.
+  role_not_matched: (fact) =>
+    `Careerwright keeps ${q(fact.title)} as your role, in your words. It couldn't match it to an occupation in ESCO, so it joins no other work to it by shared skills.`,
   // Task 6d slice B: "None of these is my job". What isn't known yet; never asks for another.
   title_kept_as_own: (fact) =>
     `Careerwright keeps ${q(fact.title)} in your words and joins no other work to it by shared skills, because you said none of the ESCO occupations it offered is your job.`,

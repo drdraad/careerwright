@@ -1,6 +1,7 @@
 """Each target is stored once (Task 6d slice A; ADR 0015 decision 3; ADR 0012 and ADR 0007 as
 amended on 2026-10-31; the audit's code appendix, finding F5), and so is the person's current
-or last role when they name it at the first question (Task 6d slice B).
+or last role (Task 6d slice B and its fix round 1): its record is the role's one truth, written
+by every change of the role (`record_role`).
 
 When a target is chosen or saved, `resolve_target` decides once what it names, by one set of
 rules, and the record is stored with it (`target_records`, migration 0034). The slate, the
@@ -43,6 +44,7 @@ from careerwright.profile import store
 from careerwright.profile.document import FieldState, ProfileDocument
 from careerwright.profile.records import (
     PackTargetBasis,
+    SourceKind,
     TargetCoverage,
     TargetKind,
     TargetLink,
@@ -246,13 +248,66 @@ def record_targets(
         held[record.key] = record
 
 
-def title_record(tx: Tx, workspace_id: uuid.UUID, title: str, pack: PackTargets) -> TargetRecord:
-    """The stored record of one title (the role's, named at the first question), in the
-    person's spelling, or, with none stored, the record `resolve_target` would store; a read
-    stores nothing."""
+def _role_title(document: ProfileDocument) -> str | None:
+    field = document.current_role
+    return field.value if field.state is FieldState.PROVIDED and field.value else None
+
+
+def _held(tx: Tx, workspace_id: uuid.UUID, title: str) -> TargetRecord | None:
     key = taxonomy_store.concept_keys(tx, [title])[title]
-    held = store.target_records(tx, workspace_id, [key]).get(key)
-    return replace(held, title=title) if held else resolve_target(tx, workspace_id, title, pack)
+    return store.target_records(tx, workspace_id, [key]).get(key)
+
+
+def _role_choice(tx: Tx, workspace_id: uuid.UUID, document: ProfileDocument) -> Choice | None:
+    """The occupation the role's own source chose, when it cites a choice: what a role chosen
+    from ESCO before the role's record was kept (Task 6d slice B fix round 1) names."""
+    ref = document.current_role.source_ref_id
+    found = store.source(tx, workspace_id, ref) if ref else None
+    if found is None or found.kind is not SourceKind.OCCUPATION_CHOICE or not found.locator:
+        return None
+    return Choice(found.locator, found.source_ref_id)
+
+
+def role_record(
+    tx: Tx, workspace_id: uuid.UUID, document: ProfileDocument, pack: PackTargets
+) -> TargetRecord | None:
+    """The record of the person's current or last role, in their spelling, or None before they
+    give one. It is the role's one truth (app review I-1), one per title as a concept and shared
+    with a target of the same title. With none stored (a role saved before its record was
+    kept), the record `record_role` would store; a read stores nothing."""
+    title = _role_title(document)
+    if title is None:
+        return None
+    held = _held(tx, workspace_id, title)
+    if held is not None:
+        return replace(held, title=title)
+    return resolve_target(tx, workspace_id, title, pack, _role_choice(tx, workspace_id, document))
+
+
+def record_role(
+    tx: Tx,
+    recorded_by: uuid.UUID,
+    workspace_id: uuid.UUID,
+    document: ProfileDocument,
+    pack: PackTargets,
+    decided: TargetRecord | None = None,
+) -> None:
+    """Store the role's record: the one the person's decision made (`decided`: an occupation
+    chosen for the title, as itself or as the closest to it, or "None of these is my job"),
+    which replaces any earlier record of that title; else, when the title has none yet, the
+    one `resolve_target` decides. Any other change of the role's words keeps the record of
+    their title as a concept, so a choice made for it is never lost (capitals, or away and
+    back)."""
+    title = _role_title(document)
+    if title is None:
+        return
+    if decided is None:
+        if _held(tx, workspace_id, title) is not None:
+            return
+        decided = resolve_target(
+            tx, workspace_id, title, pack, _role_choice(tx, workspace_id, document)
+        )
+    store.upsert_target_record(tx, workspace_id, decided, recorded_by)
 
 
 def current_targets(
