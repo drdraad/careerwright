@@ -1291,6 +1291,17 @@ These decisions do not prevent a coherent architecture, but they do prevent hone
 
 # 22 Feedback assessment and revision record
 
+## L0 build decisions, 2026-10-31, approved by the product owner
+
+A whole-solution audit of the local build (L0) against this specification (`docs/reviews/l0-audit-2026-10-31.md`) proposed these decisions, and the product owner approved them on 31 October 2026. They record how L0 applies this specification. They are recorded here only: the sections they touch are unchanged, the version stays 1.3, no requirement is relaxed and no non-deferrable invariant changes. The development plan (v1.5) and ADR 0015 carry them for L0.
+
+| Decision | What it means for L0 |
+|---|---|
+| The ONS coding index corroborates titles (section 4, DIV-1) | The pinned ONS SOC 2020 coding index, already a TAX-1 input, is an authoritative occupational source for DIV-1: a title idea from the model that it lists is corroborated, as an ESCO label is. **"Independent"** in "independent employer evidence" means distinct hosts or distinct employers; syndicated copies of one advert count once. A title verified as a quoted span on pages from two independent permitted sources, or on one official source's page, is also corroborated. A title the person supplies is always kept in their own words, as a provisional concept. The model proposes, deterministic code corroborates and the person chooses. |
+| Options for any target (sections 10 and 11) | An option the person adds, and one that live research finds, for any target, is a workspace record in the section 18 shapes with `review_state: proposed`, never part of the option pack. A route built on one is qualified, never an unqualified "affordable and feasible", which is section 10's checkpoint rule. |
+| Muse Wonder for the product owner's live sessions (section 16) | `muse-wonder-1.0` (Standard) is brought forward from M1 for the product owner's own live sessions only: qualified first, started only by an explicit session command, capped per run and per session, and every call ledgered. It is not an escalation policy and is never automatic. The pinned Spark model stays the default and the release model unless the product owner decides otherwise, and automated checks never call a model. |
+| L0 deferrals | Not built in L0, and recorded so their absence is visible: one deep-research run that maps a person's whole role space (M1); the numeric salary and AI-range filters on the opportunity map, while L0 holds no reviewed pay mapping or AI score (a plain statement says so instead); two-minute, five-minute and deeper session modes (section 4); optional work samples (section 9); a what-if copy of a plan (section 3); the RegionCapability record (section 18); a revision history of answers on screen (section 3; every version is still kept); and language and region disparities in discovery's evaluation, since L0 has one language and one region. |
+
 ## Version 1.3 review decisions
 
 Version 1.3 (28 October 2026) applies an assessment of this specification and the local development plan against the repository after its first three local sprints (`docs/plan/l0-assessment-handover.md`). It makes two clarifications and one disclosure. No requirement is relaxed and no non-deferrable invariant changes. The product owner confirmed decisions D1 and D3 on 28 October 2026.
