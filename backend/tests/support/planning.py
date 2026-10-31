@@ -1,7 +1,9 @@
 """Planning inputs built from the M0 fixture pack (TRACE-01, P01, P03) and small constructed
 cases, every one labelled synthetic. The fixture adapter states what the fixture leaves
-implicit: wages arrive late in the month (the pack's validator assumes it; hand check H5).
-Nothing here enters the product."""
+implicit: wages arrive late in the month (the pack's validator assumes it; hand check H5), and
+the employed synthetic persona holds the right to work (Task 12a: unknown work rights leave
+every route unresolved, so a case about another rule states them). Nothing here enters the
+product."""
 
 import json
 from collections.abc import Mapping, Sequence
@@ -39,6 +41,7 @@ from careerwright.planning.compiler import (
     PlanningInputs,
     ReadinessBasis,
     ReceiptTiming,
+    WorkRights,
     compile_input,
 )
 from tests.support.capability import (
@@ -101,6 +104,7 @@ def trace_inputs(**changes: object) -> PlanningInputs:
         * trace["comparison_horizon_months"],
         initial_gates=trace["initial_completed_gates"],
         scenario_delay_months=DELAY_MONTHS,
+        work_rights=WorkRights.HELD,
         synthetic=True,
     )
     return inputs.model_copy(update=changes) if changes else inputs
@@ -233,6 +237,7 @@ def person(
     baseline: int | None = None,
     objective: str = "direct_spending",
     timing: ReceiptTiming = ReceiptTiming.LATER,
+    work_rights: WorkRights = WorkRights.HELD,
     **limits: object,
 ) -> PlanningInputs:
     """A synthetic person: `pay` and `hours` are the continuation's, a month and a week."""
@@ -266,6 +271,7 @@ def person(
             if availability is None
             else [availability] * horizon,
             "scenario_delay_months": DELAY_MONTHS,
+            "work_rights": work_rights,
             "synthetic": True,
             **limits,
         }
@@ -285,6 +291,8 @@ def option(
     pattern: WorkPattern | None = None,
     wage: int | None = None,
     supports: tuple[Support, ...] = (),
+    stacking_confirmed: bool = False,
+    condition_statuses: Mapping[str, EligibilityStatus] | None = None,
     offer: OfferGate | None = None,
     unknown_cost: str | None = None,
     recurring: Recurring | None = None,
@@ -294,7 +302,8 @@ def option(
     **offering: object,
 ) -> tuple[ActionConcept, Offering, Variant]:
     """One offering and one variant of a concept (`concept`, by default its own name).
-    `payments` are (month offset, amount)."""
+    `payments` are (month offset, amount); `condition_statuses` are the person's statuses for
+    the offering's `eligibility_conditions`."""
     plan = PaymentPlan(
         plan_id="plan",
         payments=[
@@ -339,6 +348,8 @@ def option(
         work_pattern=pattern,
         wage=Wage(net_income=gbp(wage), cited=CONSTRUCTED) if wage is not None else None,
         supports=list(supports),
+        stacking_confirmed=stacking_confirmed,
+        condition_statuses=dict(condition_statuses or {}),
     )
     return stable, dated, variant
 

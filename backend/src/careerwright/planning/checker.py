@@ -7,12 +7,15 @@ What it reports, kept apart (Global Constraint 6):
 
 - **Violations**, each named on its own: the direct-spend cap, the monthly payment cap, the
   monthly deficit cap and the reserve are four different limits, and the workload envelope
-  and a session clash are two. Every one found is listed, never only the first. A violation
-  is a conservative rejection by this monthly model, never a claim that the person cannot
-  afford a real schedule.
+  and a session clash are two; existing repayments alone above the payment cap are named as
+  the repayments, and more than one conditional job transition is its own. Every one found is
+  listed, never only the first. A violation is a conservative rejection by this monthly
+  model, never a claim that the person cannot afford a real schedule.
 - **Unresolved findings:** unknown dates, cost or timetable, a same-month application ("not
-  resolved by this monthly model", never "ineligible"), a missing baseline. Unknown never
-  passes and is never zero.
+  resolved by this monthly model", never "ineligible"), a missing baseline; and what waits on
+  the person (Task 12a): work rights not known to be held, an eligibility condition of a stated
+  fee or the stacking of two supports not confirmed, and their own "no" to an entry
+  requirement. Unknown never passes and is never zero.
 - **Ledgers and objectives:** the direct-spend, income-difference, liquidity and debt ledgers;
   months to the modelled application-readiness milestone, which the capability model decides;
   direct and economic cost.
@@ -39,7 +42,12 @@ from careerwright.capability.readiness import Assessment, Qualification, Readine
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
 from careerwright.money import Money, SignedMoney
 from careerwright.planning.catalogue import RecordState, Support, WorkPattern
-from careerwright.planning.compiler import CompiledVariant, MonthlyInput, ReceiptTiming
+from careerwright.planning.compiler import (
+    CompiledVariant,
+    MonthlyInput,
+    ReceiptTiming,
+    WorkRights,
+)
 from careerwright.planning.ledgers import (
     DebtLedger,
     DirectLedger,
@@ -48,7 +56,7 @@ from careerwright.planning.ledgers import (
     IncomeMonth,
     Ledgers,
     Liability,
-    LiquidityMonth,
+    balances,
     debt,
     liquidity,
 )
@@ -104,6 +112,22 @@ class FindingCode(StrEnum):
     # A payment due before the planning start: whether it was paid is not known.
     PAYMENT_BEFORE_START = "payment_before_start"
     ECONOMIC_COST_CAP = "economic_cost_cap"
+    # Task 12a (ADR 0013, amendment of 2026-10-31).
+    # The person's own "no" to the stated entry requirements; its next action is to check
+    # whether the provider accepts equivalent experience. Never ineligible.
+    ENTRY_REQUIREMENTS_NOT_MET = "entry_requirements_not_met"
+    # An eligibility condition of the stated fee the person has not confirmed (the reason).
+    ELIGIBILITY_UNCONFIRMED = "eligibility_unconfirmed"
+    # More than one support counted on one variant, its stacking not confirmed (spec section
+    # 10: never assume two schemes stack; exclusivity and eligible-cost caps likewise).
+    STACKING_UNCONFIRMED = "stacking_unconfirmed"
+    WORK_RIGHTS_UNKNOWN = "work_rights_unknown"
+    WORK_RIGHTS_NOT_HELD = "work_rights_not_held"  # this model checks no visa or sponsorship
+    # Existing debt repayments alone above the monthly payment cap: the reason names them.
+    REPAYMENTS_ABOVE_PAYMENT_CAP = "repayments_above_payment_cap"
+    # More than one conditional job transition (a job or apprenticeship behind an offer not yet
+    # accepted): spec section 12 allows one.
+    JOB_TRANSITIONS = "job_transitions"
 
 
 _UNRESOLVED = frozenset(
@@ -116,8 +140,14 @@ _UNRESOLVED = frozenset(
         FindingCode.BASELINE_MISSING,
         FindingCode.LIMIT_UNKNOWN,
         FindingCode.PAYMENT_BEFORE_START,
+        FindingCode.ENTRY_REQUIREMENTS_NOT_MET,
+        FindingCode.ELIGIBILITY_UNCONFIRMED,
+        FindingCode.STACKING_UNCONFIRMED,
+        FindingCode.WORK_RIGHTS_UNKNOWN,
+        FindingCode.WORK_RIGHTS_NOT_HELD,
     }
 )
+MOST_JOB_TRANSITIONS = 1  # spec section 12: at most one conditional bridge-role transition
 
 
 class Finding(StrictModel):
@@ -324,6 +354,9 @@ class _Check:
         self.before_start: list[Liability] = []
         self.debts, self.debt_service = self._debts()
         self.costs_known = True
+        # Every payment's amount and month is known, so each month's row is exact (a payment
+        # before the start leaves the total unknown but the rows exact).
+        self.payments_known = True
         self.support_outside = 0  # person-paid support received outside the horizon's months
         # A variant with no months can still bring pay or support: then the cash ledger is
         # not known, and a low month is not reported as a violation.
@@ -353,27 +386,44 @@ class _Check:
 
     def result(self) -> RouteCheck:
         self._selection()
+        self._work_rights()
         for timeline in self.present:
             self._costs(timeline)
         self._gates()
         income, hours = self._income_and_hours()
         self._workload(hours)
-        income_ledger = self._income_ledger(income)
+        income_ledger, lost = self._income_ledger(income)
         direct = self._direct_ledger()
+        bounds = balances(
+            self.inputs.opening_cash_minor,
+            early=self.months.early,
+            later=self.months.later,
+            outflows=[
+                living + paid + service
+                for living, paid, service in zip(
+                    self.inputs.living_outgoings_by_month,
+                    self.months.payments,
+                    self.debt_service,
+                    strict=True,
+                )
+            ],
+        )
         cash = liquidity(
             self.monthly.months,
-            opening_minor=self.inputs.opening_cash_minor,
+            bounds,
             reserve_minor=self.inputs.reserve_minor,
             early=self.months.early,
             later=self.months.later,
             living=self.inputs.living_outgoings_by_month,
             payments=self.months.payments,
             debt_service=self.debt_service,
+            payments_known=self.costs_known and self.payments_known,
+            receipts_known=self.receipts_known,
             complete=self.costs_known
             and self.receipts_known
             and all(t.placed for t in self.present),
         )
-        self._caps(income_ledger, cash.months)
+        self._caps(lost, bounds)
         readiness_state, readiness_qualifications, ready_at = self._readiness()
         economic = (
             direct.total_minor + income_ledger.difference_minor
@@ -416,7 +466,7 @@ class _Check:
                 max(self.months.payments) if complete_cash and self.months.payments else None
             ),
             minimum_prefunded_cash=_signed(
-                min(m.lower_bound_minor for m in cash.months) if complete_cash else None
+                min(lower for _, lower, _ in bounds) if complete_cash and bounds else None
             ),
             ledgers=Ledgers(direct=direct, income=income_ledger, liquidity=cash, debts=self.debts),
         )
@@ -436,6 +486,11 @@ class _Check:
         for group, members in sorted(groups.items()):
             if len(members) > 1:
                 self.add(FindingCode.EXCLUSIVE_GROUP, reason=group)
+        # A job or an apprenticeship behind an offer not yet accepted is a conditional job
+        # transition, whatever the scenario; an accepted offer is the starting position.
+        transitions = sum(v.conditional_offer for v in self.selected)
+        if transitions > MOST_JOB_TRANSITIONS:
+            self.add(FindingCode.JOB_TRANSITIONS, amount=transitions, limit=MOST_JOB_TRANSITIONS)
         for timeline in self.present:
             variant = timeline.variant
             if not variant.placed:
@@ -448,6 +503,16 @@ class _Check:
                 self.add(FindingCode.STARTS_BEFORE_PLANNING, variant_id=variant.variant_id)
             if variant.entry_unconfirmed:
                 self.add(FindingCode.ENTRY_REQUIREMENTS_UNCONFIRMED, variant_id=variant.variant_id)
+            if variant.entry_not_met:
+                self.add(FindingCode.ENTRY_REQUIREMENTS_NOT_MET, variant_id=variant.variant_id)
+
+    def _work_rights(self) -> None:
+        """Every route needs the right to work; this model checks no visa or sponsorship."""
+        rights = self.inputs.work_rights
+        if rights is WorkRights.UNKNOWN:
+            self.add(FindingCode.WORK_RIGHTS_UNKNOWN)
+        elif rights is WorkRights.NOT_HELD:
+            self.add(FindingCode.WORK_RIGHTS_NOT_HELD)
 
     def _gates(self) -> None:
         initial = set(self.inputs.initial_gates)
@@ -538,19 +603,38 @@ class _Check:
         ]
         waived = any(c.support.covers_fees_in_full and c.offset == 0 for c in covers)
         if variant.cost_unknown is not None and not waived:
-            self.costs_known = False
+            self._unknown_payments()
             self.add(
                 FindingCode.COST_UNKNOWN, variant_id=variant.variant_id, reason=variant.cost_unknown
             )
         due = self._due(timeline)
-        if variant.recurring is not None and not (waived or variant.recurring.total_minor):
-            self.costs_known = False
+        recurring = variant.recurring
+        if recurring is not None and not (waived or recurring.total_minor):
+            self._unknown_payments()
             self.add(
                 FindingCode.COST_UNKNOWN,
                 variant_id=variant.variant_id,
                 reason="the number or the exact amount of its payments is not stated",
             )
-            self._single_payment(variant.recurring.amount.minor_units, variant.variant_id)
+            self._single_payment(recurring.amount.minor_units, variant.variant_id)
+        # A stated fee that is an eligible learner's: while a condition is unconfirmed, the
+        # stated payments stay a lower bound for the limits (funding never raises a price),
+        # and the cost itself is not known. Where no fee is stated, its cost is the unknown.
+        stated = variant.cost_unknown is None and (recurring is None or bool(recurring.total_minor))
+        if stated and not waived and variant.unconfirmed_conditions:
+            self._unknown_payments()
+            for condition in variant.unconfirmed_conditions:
+                self.add(
+                    FindingCode.ELIGIBILITY_UNCONFIRMED,
+                    variant_id=variant.variant_id,
+                    reason=condition,
+                )
+        # Never assume two schemes stack (spec section 10): every counted support still reduces
+        # the known part, the least the person could pay, so a limit broken even with all of
+        # them is broken; whether they combine is unresolved until the person confirms it.
+        if len(counted) > 1 and not variant.stacking_confirmed:
+            self._unknown_payments()
+            self.add(FindingCode.STACKING_UNCONFIRMED, variant_id=variant.variant_id)
         fees = 0
         for index, kind, amount, when in sorted(due, key=lambda d: (d[0] is None, d[0] or 0)):
             covered = 0
@@ -564,6 +648,7 @@ class _Check:
             paid = amount - covered
             fees += paid if kind != "extra" else 0
             if index is None:
+                self.payments_known = False  # it could fall in any month
                 self.unscheduled.append(
                     Liability(variant_id=variant.variant_id, due=None, amount_minor=paid)
                 )
@@ -583,6 +668,11 @@ class _Check:
             if support.paid_to == "person":
                 self._receipt(timeline, support, fees)
                 fees = max(0, fees - support.amount_minor)
+
+    def _unknown_payments(self) -> None:
+        """Some payment's amount is not known: neither the total nor any month's row is."""
+        self.costs_known = False
+        self.payments_known = False
 
     def _award_offset(self, support: Support) -> int:
         """Months after the variant's start at which an award is made."""
@@ -632,10 +722,12 @@ class _Check:
 
     def _single_payment(self, amount: int, variant_id: str) -> None:
         """A payment whose month is unknown still exceeds the monthly cap in any month, with
-        the least any month's debt repayments add (spec section 12: P_m + R_m <= M_m)."""
+        the least any month's debt repayments add (spec section 12: P_m + R_m <= M_m). Where
+        those repayments alone already exceed it, they are named instead, never the option."""
         cap = self.inputs.monthly_payment_cap_minor
-        total = amount + min(self.debt_service, default=0)
-        if cap is not None and total > cap:
+        least = min(self.debt_service, default=0)
+        total = amount + least
+        if cap is not None and least <= cap < total:
             self.add(
                 FindingCode.MONTHLY_PAYMENT_CAP,
                 variant_id=variant_id,
@@ -783,41 +875,45 @@ class _Check:
 
     # Ledgers and limits (S5.5).
 
-    def _income_ledger(self, income: list[int]) -> IncomeLedger:
+    def _income_ledger(self, income: list[int]) -> tuple[IncomeLedger, list[int]]:
+        """The income ledger, and each month's known pay lost against the baseline (0 without
+        one) for the deficit cap. Pay from an option with no months could fall in any month,
+        so then no month's route income is shown."""
         baseline = self.inputs.baseline
         complete = all(
             t.placed or (t.variant.work_pattern is None and t.variant.wage is None)
             for t in self.present
         )
+        lost = [
+            baseline.net_income_by_month[n] - pay if baseline else 0 for n, pay in enumerate(income)
+        ]
         months = [
             IncomeMonth(
                 month=self.label(n + 1),
                 baseline_minor=baseline.net_income_by_month[n] if baseline else None,
-                route_minor=pay,
-                difference_minor=baseline.net_income_by_month[n] - pay if baseline else None,
+                route_minor=pay if complete else None,
+                difference_minor=lost[n] if baseline and complete else None,
             )
             for n, pay in enumerate(income)
         ]
-        difference = (
-            sum(m.difference_minor or 0 for m in months)
-            if baseline is not None and complete
-            else None
-        )
-        return IncomeLedger(
+        difference = sum(lost) if baseline is not None and complete else None
+        ledger = IncomeLedger(
             baseline_label=baseline.label if baseline else None,
             continuation_label=self.inputs.continuation.label,
             months=months,
             complete=complete,
             difference_minor=difference,
         )
+        return ledger, lost
 
     def _direct_ledger(self) -> DirectLedger:
+        known = self.payments_known  # else a month's figures would be partial ones
         months = [
             DirectMonth(
                 month=self.label(n + 1),
-                payments_minor=self.months.payments[n],
-                paid_to_provider_minor=self.months.to_provider[n],
-                support_minor=self.months.support[n],
+                payments_minor=self.months.payments[n] if known else None,
+                paid_to_provider_minor=self.months.to_provider[n] if known else None,
+                support_minor=self.months.support[n] if known else None,
             )
             for n in range(self.horizon)
         ]
@@ -836,7 +932,7 @@ class _Check:
             total_minor=max(0, total) if self.costs_known else None,
         )
 
-    def _caps(self, income: IncomeLedger, cash: list[LiquidityMonth]) -> None:
+    def _caps(self, lost: list[int], bounds: list[tuple[int, int, int]]) -> None:
         inputs = self.inputs
         # The known part only: an unknown cost can only add to it, so exceeding a cap on the
         # known part is a violation whatever the rest turns out to be.
@@ -865,13 +961,25 @@ class _Check:
             )
         cap = inputs.monthly_payment_cap_minor
         for n, amount in enumerate(self.months.payments):
-            # Spec section 12: P_m + R_m <= M_m, every repayment included (ADR 0013 decision 6).
-            outgoing = amount + self.debt_service[n]
-            if cap is not None and outgoing > cap:
+            # Spec section 12: P_m + R_m <= M_m, every repayment included (ADR 0013 decision 6;
+            # session 2, D15 yes). Repayments alone above it are named as the repayments.
+            repaying = self.debt_service[n]
+            if cap is not None and repaying > cap:
+                self.add(
+                    FindingCode.REPAYMENTS_ABOVE_PAYMENT_CAP,
+                    month=self.label(n + 1),
+                    amount=repaying,
+                    limit=cap,
+                    unit="minor_units",
+                    reason=", ".join(
+                        d.debt_id for d in self.debts if d.months[n].repayment_minor > 0
+                    ),
+                )
+            elif cap is not None and amount + repaying > cap:
                 self.add(
                     FindingCode.MONTHLY_PAYMENT_CAP,
                     month=self.label(n + 1),
-                    amount=outgoing,
+                    amount=amount + repaying,
                     limit=cap,
                     unit="minor_units",
                 )
@@ -880,28 +988,25 @@ class _Check:
             if inputs.baseline is None:
                 self.add(FindingCode.BASELINE_MISSING, reason="the deficit cap needs a baseline")
             else:
-                for n, row in enumerate(income.months):
-                    deficit = (
-                        self.months.payments[n]
-                        - self.months.support[n]
-                        + (row.difference_minor or 0)
-                    )
+                for n, pay_lost in enumerate(lost):
+                    deficit = self.months.payments[n] - self.months.support[n] + pay_lost
                     if deficit > deficit_cap:
                         self.add(
                             FindingCode.MONTHLY_DEFICIT_CAP,
-                            month=row.month,
+                            month=self.label(n + 1),
                             amount=deficit,
                             limit=deficit_cap,
                             unit="minor_units",
                         )
         reserve = inputs.reserve_minor
         if reserve is not None and self.receipts_known and all(t.placed for t in self.present):
-            for cash_month in cash:
-                if cash_month.lower_bound_minor < reserve:
+            # The known part: an unknown payment can only lower a month's bound further.
+            for n, (_, lower, _) in enumerate(bounds):
+                if lower < reserve:
                     self.add(
                         FindingCode.RESERVE,
-                        month=cash_month.month,
-                        amount=cash_month.lower_bound_minor,
+                        month=self.label(n + 1),
+                        amount=lower,
                         limit=reserve,
                         unit="minor_units",
                     )

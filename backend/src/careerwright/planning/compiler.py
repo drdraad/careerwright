@@ -36,6 +36,7 @@ from careerwright.planning.catalogue import (
     Catalogue,
     CatalogueLabel,
     Citation,
+    EligibilityStatus,
     Hours,
     OfferGate,
     PaymentPlan,
@@ -60,6 +61,16 @@ class ReceiptTiming(StrEnum):
 
     BEFORE_OUTFLOWS = "before_outflows"
     LATER = "later"
+
+
+class WorkRights(StrEnum):
+    """The person's right to work in the UK, as they state it (spec sections 1 and 3). Never
+    inferred from a city. Only `held` lets a route be feasible: this model checks no visa or
+    sponsorship, so `not_held` and `unknown` leave every route unresolved, never ineligible."""
+
+    HELD = "held"
+    NOT_HELD = "not_held"  # they would need a visa or sponsorship
+    UNKNOWN = "unknown"
 
 
 class Baseline(StrictModel):
@@ -117,7 +128,7 @@ class PlanningInputs(StrictModel):
     direct_spend_cap_minor: Minor | None
     monthly_payment_cap_minor: Minor | None
     # A separately named limit on the monthly incremental deficit against the baseline:
-    # payments, less support received, plus income lost (spec section 12; provisional, R6).
+    # payments, less support received, plus income lost (spec section 12; session 2, D14 yes).
     monthly_deficit_cap_minor: Minor | None = None
     economic_cost_cap_minor: int | None = None  # an optional preference, never a hard cap
     weekly_availability_by_month: list[Hours] | None  # the minimum weekly hours in each month
@@ -127,6 +138,7 @@ class PlanningInputs(StrictModel):
     # How much later the delay scenario moves every conditional offer and award: declared once
     # for the comparison, so every route meets the same stress case (PLN-08).
     scenario_delay_months: Annotated[int, Field(ge=1, le=MAX_HORIZON_MONTHS)]
+    work_rights: WorkRights  # stated by every caller: never a default
     synthetic: bool
 
     @model_validator(mode="after")
@@ -191,6 +203,10 @@ class CompiledVariant(StrictModel):
     payments: list[CompiledPayment]
     recurring: Recurring | None
     supports: list[Support]
+    stacking_confirmed: bool  # its supports may be combined, as the person confirmed
+    # The offering's eligibility conditions the person has not confirmed: its stated fee is
+    # an eligible learner's, so it is not known to be theirs.
+    unconfirmed_conditions: list[str]
     work_pattern: WorkPattern | None
     wage: Wage | None
     offer_gate: OfferGate | None
@@ -198,7 +214,8 @@ class CompiledVariant(StrictModel):
     grants: list[str]
     application_deadline: date | None
     application_gate: str | None
-    entry_unconfirmed: bool  # stated entry requirements the person has not confirmed
+    entry_unconfirmed: bool  # stated entry requirements the person has not yet answered
+    entry_not_met: bool  # the person's own "no" to them: still unresolved, never ineligible
 
     @property
     def conditional_offer(self) -> bool:
@@ -313,6 +330,12 @@ def compile_input(
                 ],
                 recurring=plan.recurring if plan is not None else None,
                 supports=variant.supports,
+                stacking_confirmed=variant.stacking_confirmed,
+                unconfirmed_conditions=[
+                    c.field
+                    for c in offering.eligibility_conditions
+                    if variant.condition_statuses.get(c.field) is not EligibilityStatus.CONFIRMED
+                ],
                 work_pattern=variant.work_pattern,
                 wage=variant.wage,
                 offer_gate=offering.offer_gate,
@@ -329,7 +352,9 @@ def compile_input(
                 application_deadline=offering.application_deadline,
                 application_gate=offering.application_gate,
                 entry_unconfirmed=bool(concept.entry_requirements)
-                and variant.entry_requirements_met is not True,
+                and variant.entry_requirements_met is None,
+                entry_not_met=bool(concept.entry_requirements)
+                and variant.entry_requirements_met is False,
             )
         )
     return MonthlyInput(

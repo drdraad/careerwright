@@ -54,6 +54,7 @@ from careerwright.planning.compiler import (
     PlanningInputs,
     ReadinessBasis,
     ReceiptTiming,
+    WorkRights,
     compile_input,
 )
 from careerwright.planning.pack import pack_catalogue
@@ -146,6 +147,9 @@ def p01_inputs() -> PlanningInputs:
             "weekly_availability_by_month": [trace["available_weekly_hours_envelope"]] * horizon,
             "initial_gates": trace["initial_completed_gates"],
             "scenario_delay_months": DELAY_MONTHS,
+            # Session 2's package read P01 as holding the right to work (the fixture's
+            # employed persona; Task 12a made the input explicit), so its rows stay as asked.
+            "work_rights": WorkRights.HELD,
             "synthetic": True,
         }
     )

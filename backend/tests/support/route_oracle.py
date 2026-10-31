@@ -25,9 +25,17 @@ from careerwright.planning.catalogue import (
     Session,
     Support,
 )
-from careerwright.planning.compiler import CompiledVariant, MonthlyInput, ReceiptTiming
+from careerwright.planning.compiler import (
+    CompiledVariant,
+    MonthlyInput,
+    ReceiptTiming,
+    WorkRights,
+)
 
 MOST_ACTIONS = 6  # spec section 12: at most six selected actions
+# Spec section 12: at most one conditional bridge-role transition, that is one job or
+# apprenticeship the route moves into behind an offer the person has not yet accepted.
+MOST_OFFERS_TO_AWAIT = 1
 REACHED = frozenset(
     {
         ReadinessState.CONDITIONAL_ON_ASSESSED_COMPLETION,
@@ -108,7 +116,8 @@ class Oracle:
 
     def _inputs_unknown(self) -> bool:
         """A hard limit, the weekly availability, or a baseline the comparison needs is not
-        stated."""
+        stated, or the person is not known to hold the right to work (no visa or sponsorship
+        is checked here, so a "no" is not known either way)."""
         inputs = self.monthly.inputs
         limits = (inputs.direct_spend_cap_minor, inputs.monthly_payment_cap_minor)
         needs_baseline = (
@@ -119,13 +128,15 @@ class Oracle:
             or inputs.reserve_minor is None
             or inputs.weekly_availability_by_month is None
             or (needs_baseline and inputs.baseline is None)
+            or inputs.work_rights is not WorkRights.HELD
         )
 
     def _unknown_alone(self, v: CompiledVariant) -> bool:
         """The option has an unknown of its own (its dates, cost, weekly hours or entry
-        requirements, or a payment before the start) and breaks nothing that would rule out every
-        route containing it whatever the unknown turns out to be (its own spend above a cap, a
-        start before the planning start, a deadline already passed)."""
+        requirements, the person's "no" to them, a payment before the start, an unconfirmed
+        eligibility condition of its fee, or supports not confirmed to stack) and breaks nothing
+        that would rule out every route containing it whatever the unknown turns out to be (its
+        own spend above a cap, a start before the planning start, a deadline already passed)."""
         inputs = self.monthly.inputs
         alone = _RouteCheck(self, [v])
         alone._money(v)  # its own payments and support, and any single payment above the cap
@@ -133,6 +144,7 @@ class Oracle:
         unknown = (
             not _placed(v)
             or v.entry_unconfirmed
+            or v.entry_not_met
             or not alone.costs_known
             or (v.weekly_hours is None and any(_active(v, m) for m in horizon))
         )
@@ -228,12 +240,17 @@ class _RouteCheck:
         self.debt = self._debt()
 
     def run(self) -> Checked:
+        if self.inputs.work_rights is not WorkRights.HELD:
+            self.unknown = True
+        awaiting = [v for v in self.chosen if v.offer_gate and not v.offer_gate.accepted]
+        if len(awaiting) > MOST_OFFERS_TO_AWAIT:
+            self.broken = True
         for v in self.chosen:
             if v.start_date is None or v.finish_date is None:
                 self.unknown = True
             elif v.start_index is not None and v.start_index < 1:
                 self.broken = True
-            if v.entry_unconfirmed:
+            if v.entry_unconfirmed or v.entry_not_met:  # a "no" is never "ineligible"
                 self.unknown = True
         for v in self.chosen:
             self._money(v)
@@ -306,6 +323,16 @@ class _RouteCheck:
             self.costs_known = False
             self.unknown = True
             self._too_much_at_once(recurring.amount.minor_units)
+        # A fee the page states for an eligible learner is the person's only once they have
+        # confirmed every condition; a fee not stated at all is already unknown.
+        fee_stated = v.cost_unknown is None and (recurring is None or bool(recurring_total))
+        if fee_stated and not waived and v.unconfirmed_conditions:
+            self.costs_known = False
+            self.unknown = True
+        # Two schemes are never assumed to stack.
+        if len(counted) >= 2 and not v.stacking_confirmed:
+            self.costs_known = False
+            self.unknown = True
         due: list[tuple[int | None, str, int]] = []
         for payment in v.payments:
             if payment.due is not None:

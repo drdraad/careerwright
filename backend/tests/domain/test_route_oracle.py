@@ -1,9 +1,12 @@
 """The search against an independent Cartesian-product oracle on generated tiny instances
 (spec section 12, OPT-1; S6.6; plan section 7). The oracle (`tests/support/route_oracle.py`)
 shares no code with the search or the route checker. Generated instances reach every rule the
-pruning rests on (both spend caps, work patterns, sessions, workload, prerequisites, exclusive
-groups, bridge roles, every unknown that sets an option aside) and the ones it must never prune
-on (the reserve, receipts, support, debt, the deficit cap, applications, economic cost)."""
+pruning rests on (both spend caps, repayments alone above the payment cap, work patterns,
+sessions, workload, prerequisites, exclusive groups, bridge roles, two offers still to accept,
+every unknown that sets an option aside, Task 12a's included: a "no" to the entry requirements,
+unconfirmed eligibility conditions, supports not confirmed to stack, work rights not known to
+be held) and the ones it must never prune on (the reserve, receipts, support, debt, the deficit
+cap, applications, economic cost)."""
 
 from datetime import date, time
 
@@ -32,6 +35,7 @@ from careerwright.planning.compiler import (
     ExistingDebt,
     MonthlyInput,
     ReceiptTiming,
+    WorkRights,
     compile_input,
 )
 from careerwright.planning.search import Coverage, Outcome, search_routes
@@ -53,6 +57,7 @@ from tests.support.route_oracle import Oracle
 
 ROWS = ("fixture:row-one", "fixture:row-two")
 GATES = ("gate:one", "gate:two")
+CONDITIONS = ("eligibility_age", "eligibility_residency")
 FEE = st.integers(min_value=0, max_value=40_000)
 SLOW = settings(max_examples=150, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 STATUS = {
@@ -103,8 +108,25 @@ def variant(
 
     begins = month_start(START, draw(st.integers(min_value=0, max_value=horizon)))
     dated = not unknown()
-    kind = ActionKind.WORK if odds(draw, 6) else ActionKind.LEARNING
-    offered = kind is ActionKind.WORK or odds(draw, 10)
+    kind = (
+        ActionKind.WORK
+        if odds(draw, 6)
+        else ActionKind.APPRENTICESHIP
+        if odds(draw, 6)
+        else ActionKind.LEARNING
+    )
+    offered = kind is not ActionKind.LEARNING or odds(draw, 10)
+    # An eligible learner's fee (review 13a, C07): each condition confirmed or not.
+    conditions = (
+        [Fact(field=field, value="a stated condition") for field in CONDITIONS]
+        if odds(draw, 5)
+        else []
+    )
+    statuses = {
+        field: draw(st.sampled_from(EligibilityStatus))
+        for field in CONDITIONS
+        if bool(conditions) and draw(st.booleans())
+    }
     deadline = None
     if odds(draw, 12):  # a deadline at the end of December 2026 has passed by the start
         deadline = month_end(START, draw(st.integers(min_value=0, max_value=horizon)))
@@ -132,7 +154,10 @@ def variant(
         kind=kind,
         pattern=work_pattern(draw) if odds(draw, 3) else None,
         wage=draw(st.integers(min_value=0, max_value=100_000)) if offered else None,
-        supports=(funding(draw),) if odds(draw, 4) else (),
+        supports=tuple(funding(draw) for _ in range(draw(st.sampled_from([0, 0, 0, 1, 2])))),
+        stacking_confirmed=draw(st.booleans()),
+        condition_statuses=statuses,
+        eligibility_conditions=conditions,
         offer=OfferGate(accepted=draw(st.booleans()), role_class="synthetic role")
         if offered
         else None,
@@ -150,6 +175,9 @@ def variant(
         concept_record = concept_record.model_copy(
             update={"entry_requirements": [Fact(field="entry", value="a stated requirement")]}
         )
+        # Not yet answered, or the person's own yes or no.
+        met = draw(st.sampled_from([None, True, False]))
+        chosen = chosen.model_copy(update={"entry_requirements_met": met})
     return concept_record, offering, chosen
 
 
@@ -168,11 +196,13 @@ def instances(draw: st.DrawFn, *, unknowns: bool) -> MonthlyInput:
         return None if unknown() else draw(st.integers(min_value=low, max_value=high))
 
     debts = []
-    if odds(draw, 6):
+    if odds(draw, 5):
+        # Now and then repayments alone above the monthly payment cap (session 2, D15).
+        most = 120_000 if odds(draw, 2) else 20_000
         debts = [
             ExistingDebt(
                 debt_id="debt:constructed",
-                monthly_repayment_minor=draw(st.integers(min_value=0, max_value=20_000)),
+                monthly_repayment_minor=draw(st.integers(min_value=0, max_value=most)),
                 balance_minor=draw(st.one_of(st.none(), st.integers(0, 100_000))),
                 annual_interest_bps=draw(st.one_of(st.none(), st.integers(0, 3_000))),
                 cited=CONSTRUCTED,
@@ -203,6 +233,9 @@ def instances(draw: st.DrawFn, *, unknowns: bool) -> MonthlyInput:
         commitments=commitments if odds(draw, 5) else [],
         existing_debts=debts,
         initial_gates=[draw(st.sampled_from(GATES))] if odds(draw, 4) else [],
+        work_rights=draw(st.sampled_from([WorkRights.UNKNOWN, WorkRights.NOT_HELD]))
+        if unknown()
+        else WorkRights.HELD,
     )
     options = []
     for c in range(draw(st.integers(min_value=2, max_value=4))):

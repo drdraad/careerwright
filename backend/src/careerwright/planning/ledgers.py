@@ -12,6 +12,11 @@ S5.5), in integer GBP minor units. Pure.
   (TIME1-05). A month-end balance never rescues a month whose lower bound fails.
 - **Debt:** existing debt's balance, interest and repayment, apart from cash. New borrowing is
   never planned (spec section 10).
+
+A month's figure that rests on an amount not known (a payment whose amount or month is not
+stated, pay from an option with no dates) is null, never the known part shown as a known one
+(Task 12a). The checker still tests its limits on the known part, which an unknown payment can
+only make worse.
 """
 
 from pydantic import BaseModel, ConfigDict
@@ -26,12 +31,15 @@ class StrictModel(BaseModel):
 
 
 class DirectMonth(StrictModel):
+    """One month's direct spending; each figure is null when some payment's amount or month
+    is not known."""
+
     month: str
-    payments_minor: Minor  # what the person pays this month
+    payments_minor: Minor | None  # what the person pays this month
     paid_to_provider_minor: (
-        Minor  # fees support covered at the provider: never paid, never received
+        Minor | None  # fees support covered at the provider: never paid, never received
     )
-    support_minor: Minor  # confirmed support paid to the person, against direct cost
+    support_minor: Minor | None  # confirmed support paid to the person, against direct cost
 
 
 class Liability(StrictModel):
@@ -56,7 +64,7 @@ class DirectLedger(StrictModel):
 class IncomeMonth(StrictModel):
     month: str
     baseline_minor: Minor | None  # None: no confirmed baseline
-    route_minor: Minor
+    route_minor: Minor | None  # None: pay from an option with no months could fall here
     difference_minor: int | None  # baseline less route: lost pay is positive
 
 
@@ -69,15 +77,18 @@ class IncomeLedger(StrictModel):
 
 
 class LiquidityMonth(StrictModel):
+    """One month's cash. Living costs and repayments are always known; a figure resting on
+    an unknown payment or receipt, or on an earlier month that does, is null."""
+
     month: str
-    opening_minor: int
-    early_receipts_minor: Minor  # proven to arrive before this month's outflows
+    opening_minor: int | None
+    early_receipts_minor: Minor | None  # proven to arrive before this month's outflows
     living_minor: Minor
-    payments_minor: Minor
+    payments_minor: Minor | None
     debt_service_minor: Minor
-    lower_bound_minor: int  # opening + early receipts - outflows: what must stay >= reserve
-    later_receipts_minor: Minor
-    closing_minor: int
+    lower_bound_minor: int | None  # opening + early receipts - outflows: must stay >= reserve
+    later_receipts_minor: Minor | None
+    closing_minor: int | None
 
 
 class LiquidityLedger(StrictModel):
@@ -106,38 +117,55 @@ class Ledgers(StrictModel):
     debts: list[DebtLedger]
 
 
+def balances(
+    opening_minor: int, *, early: list[int], later: list[int], outflows: list[int]
+) -> list[tuple[int, int, int]]:
+    """Each month's opening balance, prefunded lower bound and closing balance (TIME1-05): the
+    outflows are paid from the opening balance and the early receipts; later receipts open
+    the next month."""
+    found = []
+    balance = opening_minor
+    for n, out in enumerate(outflows):
+        lower = balance + early[n] - out
+        closing = lower + later[n]
+        found.append((balance, lower, closing))
+        balance = closing
+    return found
+
+
 def liquidity(
     months: list[str],
+    bounds: list[tuple[int, int, int]],
     *,
-    opening_minor: int,
     reserve_minor: int | None,
     early: list[int],
     later: list[int],
     living: list[int],
     payments: list[int],
     debt_service: list[int],
+    payments_known: bool,
+    receipts_known: bool,
     complete: bool,
 ) -> LiquidityLedger:
+    """The cash ledger from `balances`, a figure shown only where everything it rests on is
+    known: the first opening is the opening cash, and an unknown month makes every later
+    balance unknown."""
     rows = []
-    balance = opening_minor
     for n, month in enumerate(months):
-        outflows = living[n] + payments[n] + debt_service[n]
-        lower = balance + early[n] - outflows
-        closing = lower + later[n]
+        opening, lower, closing = bounds[n]
         rows.append(
             LiquidityMonth(
                 month=month,
-                opening_minor=balance,
-                early_receipts_minor=early[n],
+                opening_minor=opening if n == 0 or complete else None,
+                early_receipts_minor=early[n] if receipts_known else None,
                 living_minor=living[n],
-                payments_minor=payments[n],
+                payments_minor=payments[n] if payments_known else None,
                 debt_service_minor=debt_service[n],
-                lower_bound_minor=lower,
-                later_receipts_minor=later[n],
-                closing_minor=closing,
+                lower_bound_minor=lower if complete else None,
+                later_receipts_minor=later[n] if receipts_known else None,
+                closing_minor=closing if complete else None,
             )
         )
-        balance = closing
     return LiquidityLedger(reserve_minor=reserve_minor, months=rows, complete=complete)
 
 

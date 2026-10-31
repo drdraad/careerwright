@@ -63,8 +63,10 @@ def test_each_route_is_prefunded_every_month_with_late_wages(letter: str) -> Non
     assert liquidity.complete
     assert check.minimum_prefunded_cash is not None
     assert check.minimum_prefunded_cash.minor_units == lowest
-    assert min(liquidity.months, key=lambda m: m.lower_bound_minor).month == month
-    assert all(m.lower_bound_minor >= 50000 for m in liquidity.months)
+    bounds = [(m.lower_bound_minor, m.month) for m in liquidity.months]
+    assert all(lower is not None for lower, _ in bounds)  # every figure of TRACE-01 is known
+    assert min((lower or 0, label) for lower, label in bounds)[1] == month
+    assert all((lower or 0) >= 50000 for lower, _ in bounds)
     assert check.peak_monthly_payment is not None
     assert check.peak_monthly_payment.minor_units <= 150000
     assert check.direct_cost is not None

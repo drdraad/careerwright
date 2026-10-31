@@ -59,6 +59,12 @@ def run(inputs: PlanningInputs, options: list[tuple], route: list[str]) -> Route
     return check_route(compile_input(inputs, catalogue_of(*options)), route)
 
 
+def known(value: int | None) -> int:
+    """A ledger figure these cases always know: every amount and month is stated."""
+    assert value is not None
+    return value
+
+
 @pytest.mark.req("TIME1-05", "FIN1-03", "FIN1-10")
 @settings(max_examples=150, deadline=None)
 @given(case=cases())
@@ -71,22 +77,23 @@ def test_the_ledgers_keep_their_identities_in_whole_minor_units(
     opening = inputs.opening_cash_minor
 
     for month in cash:
-        outflows = month.living_minor + month.payments_minor + month.debt_service_minor
+        outflows = month.living_minor + known(month.payments_minor) + month.debt_service_minor
+        lower, closing = known(month.lower_bound_minor), known(month.closing_minor)
         assert month.opening_minor == opening
-        assert month.lower_bound_minor == opening + month.early_receipts_minor - outflows
-        assert month.closing_minor == month.lower_bound_minor + month.later_receipts_minor
-        assert month.lower_bound_minor <= month.closing_minor  # later receipts are never negative
-        opening = month.closing_minor
+        assert lower == opening + known(month.early_receipts_minor) - outflows
+        assert closing == lower + known(month.later_receipts_minor)
+        assert lower <= closing  # later receipts are never negative
+        opening = closing
     direct = result.ledgers.direct
     assert result.direct_cost is not None
-    assert result.direct_cost.minor_units == sum(m.payments_minor for m in direct.months) + sum(
-        i.amount_minor for i in direct.beyond_horizon
-    )
+    assert result.direct_cost.minor_units == sum(
+        known(m.payments_minor) for m in direct.months
+    ) + sum(i.amount_minor for i in direct.beyond_horizon)
     if inputs.baseline is not None:
         assert result.economic_cost is not None
         months = result.ledgers.income.months
         baseline = inputs.baseline.net_income_by_month
-        lost = sum(b - m.route_minor for b, m in zip(baseline, months, strict=True))
+        lost = sum(b - known(m.route_minor) for b, m in zip(baseline, months, strict=True))
         assert result.economic_cost.minor_units == result.direct_cost.minor_units + lost
     every = [*cash, *direct.months, *result.ledgers.income.months]
     assert all(

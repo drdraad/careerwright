@@ -11,13 +11,15 @@ model needs more than a page states, the field stays unknown rather than guessed
   is never a bound, hours give no calendar length and a range gives no single finish;
 - each way of taking a course (full time, part time) is its own offering, carrying the
   course's planned outcomes;
-- a total fee with no stated schedule is one payment in the offering's first month
-  (provisional, R6), and an instalment plan without its count or exact amount has no total;
+- a total fee with no stated schedule is one payment in the offering's first month (session
+  2, D12 yes), and an instalment plan without its count or exact amount has no total;
 - an apprenticeship is one composite action: its weekly hours, its offer gate and its
   application deadline, with its advertised wage kept as information, because a gross wage
   is never a confirmed take-home income;
 - a funding page is an instrument's rules, and a course's funding conditions are facts: a
-  person's status needs the person, so no variant here carries support.
+  person's status needs the person, so no variant here carries support. Its eligibility
+  conditions (an `eligibility_` field: an age, an area, the right to work) are also served as
+  the conditions its stated fee holds under, for the person to confirm (review 13a, C07).
 """
 
 from calendar import monthrange
@@ -63,7 +65,9 @@ from careerwright.planning.catalogue import (
 
 DAYS_PER_WEEK = 7
 MONTHS_PER_YEAR = 12
-WHOLE_FEE_DUE = 0  # month offset of a total fee with no stated schedule (provisional, R6)
+WHOLE_FEE_DUE = 0  # month offset of a total fee with no stated schedule (session 2, D12 yes)
+# The pack's claim fields for an eligibility condition of an offering's funding.
+ELIGIBILITY_FIELD_PREFIX = "eligibility_"
 PROVIDER_OUTCOME_NOTE = (
     "a provider's employment-outcome claim: unverified, since no method or denominator is "
     "given (spec section 10)"
@@ -224,6 +228,7 @@ class _Reader:
                 if why is not None
             }
             deadline = self._date(source.application_deadline)
+            funding = self.facts(source.funding_conditions)
             found.append(
                 Offering(
                     offering_id=offering_id,
@@ -239,6 +244,9 @@ class _Reader:
                     application_gate=f"admission:{offering_id}" if deadline else None,
                     offer_gate=OfferGate(accepted=False) if apprenticeship else None,
                     outcomes_from=None if offering_id == source.record_id else source.record_id,
+                    eligibility_conditions=[
+                        f for f in funding if f.field.startswith(ELIGIBILITY_FIELD_PREFIX)
+                    ],
                     synthetic=False,
                     facts=[
                         self.fact("intake", source.intake, note=start_note),
@@ -250,7 +258,7 @@ class _Reader:
                         self.fact("wage", source.wage),
                         self.fact("location", source.location),
                         *self.facts(source.extra_costs),
-                        *self.facts(source.funding_conditions),
+                        *funding,
                     ],
                 )
             )

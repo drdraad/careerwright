@@ -5571,6 +5571,13 @@ export const OfferingSchema = {
             ],
             title: 'Outcomes From'
         },
+        eligibility_conditions: {
+            items: {
+                $ref: '#/components/schemas/Fact'
+            },
+            type: 'array',
+            title: 'Eligibility Conditions'
+        },
         synthetic: {
             type: 'boolean',
             title: 'Synthetic'
@@ -12705,6 +12712,20 @@ export const VariantSchema = {
             title: 'Supports',
             description: 'The support the person has confirmed for this variant: empty means none confirmed yet, never that none is available.'
         },
+        stacking_confirmed: {
+            type: 'boolean',
+            title: 'Stacking Confirmed',
+            description: 'The person confirmed that this variant\'s supports may be combined: neither excludes the other and together they stay within each one\'s eligible costs. Until then, more than one support leaves the route unresolved.',
+            default: false
+        },
+        condition_statuses: {
+            additionalProperties: {
+                $ref: '#/components/schemas/EligibilityStatus'
+            },
+            type: 'object',
+            title: 'Condition Statuses',
+            description: 'The person\'s status for each of the offering\'s eligibility conditions, by the condition\'s field: only `confirmed` meets one.'
+        },
         entry_requirements_met: {
             anyOf: [
                 {
@@ -12715,7 +12736,7 @@ export const VariantSchema = {
                 }
             ],
             title: 'Entry Requirements Met',
-            description: 'Whether the person meets the stated entry requirements: null is not yet confirmed, never ineligible.'
+            description: 'Whether the person meets the stated entry requirements: null is not yet confirmed; false is their own \'no\', still never ineligible.'
         }
     },
     additionalProperties: false,

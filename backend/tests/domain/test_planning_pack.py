@@ -224,3 +224,24 @@ def test_what_the_person_has_not_confirmed_is_served_as_not_yet_confirmed() -> N
     properties = Variant.model_json_schema()["properties"]
     assert "none confirmed yet" in properties["supports"]["description"]
     assert "not yet confirmed" in properties["entry_requirements_met"]["description"]
+
+
+@pytest.mark.req("OPTN-03", "FUNDING-05")
+def test_a_fee_s_stated_eligibility_conditions_are_served_for_the_person_to_confirm() -> None:
+    # Review 13a (C07, reviewed pack 0.2.0): "£0.00" for a learner aged 19 or over, living in
+    # one of four areas (Bristol is not among them) and with the right to work.
+    reviewed = load_pack("0.2.0")
+    bristol = pack_catalogue(reviewed, "it-support-technician-bristol")
+    c07 = offering(bristol, "offering:C07")
+
+    cited = [(c.field, c.cited.claim_id if c.cited else None) for c in c07.eligibility_conditions]
+    assert cited == [
+        ("eligibility_age", "C07.eligibility_age"),
+        ("eligibility_residency", "C07.eligibility_residency"),
+        ("eligibility_work_rights", "C07.eligibility_work_rights"),
+    ]
+    [variant] = [v for v in bristol.variants if v.offering_id == "offering:C07"]
+    assert variant.condition_statuses == {}  # nothing assumed for the person
+    # A page's other funding facts (a route's name, "may be free") are not conditions to confirm.
+    leeds = pack_catalogue(reviewed, "bookkeeping-assistant-leeds")
+    assert all(o.eligibility_conditions == [] for o in leeds.offerings)

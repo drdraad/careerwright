@@ -15,6 +15,7 @@ from careerwright.errors import CareerwrightError, ErrorCode
 from careerwright.planning.catalogue import (
     ActionConcept,
     ActionKind,
+    Fact,
     OfferGate,
     Offering,
     Variant,
@@ -23,9 +24,11 @@ from careerwright.planning.catalogue import (
 from careerwright.planning.checker import FindingCode, FindingKind, Scenario, Verdict
 from careerwright.planning.compiler import (
     Commitment,
+    ExistingDebt,
     MonthlyInput,
     PlanningInputs,
     ReadinessBasis,
+    WorkRights,
     compile_input,
 )
 from careerwright.planning.layers import dominates
@@ -53,6 +56,7 @@ from tests.support.planning import (
     pattern,
     person,
     readiness_of,
+    support,
     trace_catalogue,
     trace_inputs,
     trace_readiness,
@@ -585,6 +589,93 @@ def test_an_unknown_hard_limit_leaves_every_route_unresolved_and_says_which() ->
     ]
     assert result.expanded_states == 1  # every route has it: nothing further is checked
     assert result.pruned == {PruningRule.INPUT_UNRESOLVED: 1}
+
+
+# Task 12a's findings, classed for the set-aside screen and pruning (ADR 0016 rule 2).
+
+
+@pytest.mark.req("OPT1-07", "BND1-04", "PLN-11")
+def test_unknown_work_rights_leave_every_route_unresolved_and_say_so() -> None:
+    options = [course("fine", fee=200)]
+    result = solve(
+        someone(horizon=3, work_rights=WorkRights.UNKNOWN),
+        options,
+        readiness_of({"offering:fine": (ROW,)}),
+    )
+
+    assert result.outcome is Outcome.UNRESOLVED  # never "no route", never ineligible
+    assert [f.code for f in result.blocking_inputs] == [FindingCode.WORK_RIGHTS_UNKNOWN]
+    assert result.pruned == {PruningRule.INPUT_UNRESOLVED: 1}
+
+
+@pytest.mark.req("OPT1-07", "OPT1-02", "PLN-06")
+def test_an_option_waiting_on_the_person_s_own_confirmation_is_set_aside_with_it() -> None:
+    concept, offering, variant = course("refused", fee=200)
+    stated = concept.model_copy(
+        update={"entry_requirements": [Fact(field="entry_requirement", value="GCSE maths")]}
+    )
+    two = (support(paid_to="provider", amount=50), support(paid_to="provider", amount=50))
+    options = [
+        (stated, offering, variant.model_copy(update={"entry_requirements_met": False})),
+        course("stacked", fee=200, supports=two),
+        course(
+            "eligible-only",
+            eligibility_conditions=[Fact(field="eligibility_age", value={"minimum_age": 19})],
+        ),
+        course("fine", fee=200),
+    ]
+    teaches = {f"offering:{n}": (ROW,) for n in ("refused", "stacked", "eligible-only", "fine")}
+    result = solve(someone(horizon=3), options, readiness_of(teaches))
+
+    # Each is that option's own: every route containing it repeats it.
+    assert {s.variant_id: (s.codes, s.kind) for s in result.set_aside} == {
+        "refused": ([FindingCode.ENTRY_REQUIREMENTS_NOT_MET], FindingKind.UNRESOLVED),
+        "stacked": ([FindingCode.STACKING_UNCONFIRMED], FindingKind.UNRESOLVED),
+        "eligible-only": ([FindingCode.ELIGIBILITY_UNCONFIRMED], FindingKind.UNRESOLVED),
+    }
+    assert routes(result) == [("fine",)]
+    assert result.outcome is Outcome.ROUTES_FOUND
+
+
+@pytest.mark.req("OPT1-02", "BND1-06")
+def test_a_second_conditional_job_transition_is_pruned_and_never_archived() -> None:
+    awaiting = OfferGate(accepted=False, role_class="synthetic role")
+    options = [
+        course("apprenticeship", kind=ActionKind.APPRENTICESHIP, offer=awaiting, wage=10000),
+        course("bridge-job", kind=ActionKind.WORK, offer=awaiting, wage=10000),
+        course("z-later", first=1),
+    ]
+    teaches = {f"offering:{n}": (ROW,) for n in ("apprenticeship", "bridge-job", "z-later")}
+    result = solve(someone(horizon=3), options, readiness_of(teaches))
+
+    assert not any({"apprenticeship", "bridge-job"} <= set(r) for r in routes(result))
+    assert result.pruned == {PruningRule.JOB_TRANSITIONS: 1}
+    # The empty route, three singles, three pairs: the pair's extension is never checked.
+    assert result.expanded_states == 7
+    assert result.not_feasible == 1
+
+
+@pytest.mark.req("OPT1-07", "LIMITS-05", "FIN1-06")
+def test_repayments_alone_above_the_payment_cap_are_the_starting_position_never_an_option_s() -> (
+    None
+):
+    card = ExistingDebt(
+        debt_id="card", monthly_repayment_minor=1500, balance_minor=None, cited=CONSTRUCTED
+    )
+    options = [course("fine", fee=200), course("dear", fee=900)]
+    teaches = {"offering:fine": (ROW,), "offering:dear": (ROW,)}
+    result = solve(
+        someone(horizon=2, monthly_cap=1000, existing_debts=[card]), options, readiness_of(teaches)
+    )
+
+    assert [(f.code, f.month, f.reason) for f in result.starting_violations] == [
+        (FindingCode.REPAYMENTS_ABOVE_PAYMENT_CAP, "2027-01", "card"),
+        (FindingCode.REPAYMENTS_ABOVE_PAYMENT_CAP, "2027-02", "card"),
+    ]
+    assert result.set_aside == []  # no option is blamed for the person's own repayments
+    assert result.pruned == {PruningRule.MONTHLY_PAYMENT_CAP: 1}
+    assert result.expanded_states == 3  # the empty route and each option alone
+    assert result.outcome is Outcome.NO_ROUTE_IN_BOUNDED_MODEL  # nothing here is unknown
 
 
 @pytest.mark.req("OPT1-07")

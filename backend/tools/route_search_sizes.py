@@ -89,6 +89,7 @@ from careerwright.planning.compiler import (
     MonthlyInput,
     PlanningInputs,
     ReadinessBasis,
+    WorkRights,
     compile_input,
 )
 from careerwright.planning.search import M0SearchLimits, search_routes
@@ -308,6 +309,7 @@ def _person(months: int, family: Family) -> PlanningInputs:
         monthly_payment_cap_minor=monthly_cap,
         weekly_availability_by_month=[available] * months,
         scenario_delay_months=2,
+        work_rights=WorkRights.HELD,  # a synthetic person: the size is about the tree
         synthetic=True,
     )
 

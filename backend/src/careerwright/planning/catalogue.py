@@ -188,6 +188,10 @@ class Offering(StrictModel):
     # The dated offering whose planned outcomes (OUT-1) this one carries, when one intake is
     # taken several ways (full time, part time); None: its own.
     outcomes_from: str | None = None
+    # The eligibility conditions its page states for its funding (an age, an area, the right to
+    # work): its stated fee is an eligible learner's, so until the person confirms each one the
+    # fee is not theirs (review 13a, C07: "£0.00" for an eligible learner).
+    eligibility_conditions: list[Fact] = Field(default_factory=list)
     synthetic: bool
     cited: Citation | None = None
     facts: list[Fact] = Field(default_factory=list)  # every consequential field, cited
@@ -347,10 +351,21 @@ class Variant(StrictModel):
         description="The support the person has confirmed for this variant: empty means none "
         "confirmed yet, never that none is available.",
     )
+    stacking_confirmed: bool = Field(
+        default=False,
+        description="The person confirmed that this variant's supports may be combined: "
+        "neither excludes the other and together they stay within each one's eligible costs. "
+        "Until then, more than one support leaves the route unresolved.",
+    )
+    condition_statuses: dict[str, EligibilityStatus] = Field(
+        default_factory=dict,
+        description="The person's status for each of the offering's eligibility conditions, "
+        "by the condition's field: only `confirmed` meets one.",
+    )
     entry_requirements_met: bool | None = Field(
         default=None,
         description="Whether the person meets the stated entry requirements: null is not yet "
-        "confirmed, never ineligible.",
+        "confirmed; false is their own 'no', still never ineligible.",
     )
 
 

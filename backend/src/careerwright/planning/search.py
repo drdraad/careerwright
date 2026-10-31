@@ -19,13 +19,16 @@ every selected variant is present on its own dates, and on one fact of the tree:
 adds variants of later concepts.
 
 1. *Input-level unknowns.* The empty route's unresolved findings (`limit_unknown`,
-   `baseline_missing`, `workload_unknown` for unstated availability) come from the inputs
-   alone, so every route has them: nothing is checked further, and the result names them.
+   `baseline_missing`, `workload_unknown` for unstated availability, `work_rights_unknown` and
+   `work_rights_not_held`) come from the inputs alone, so every route has them: nothing is
+   checked further, and the result names them.
 2. *A variant no route can use* is set aside before the search: unknown dates, cost, entry
    requirements or weekly hours, a payment due before the planning start, a start before it,
-   an application deadline already passed, or, alone, a direct cost or a month's payments
-   above its cap. Each is computed from the variant by itself (its dates, its payments and
-   own support, its hours), so every route containing it repeats it, or, for unknown weekly
+   an application deadline already passed, the person's "no" to its entry requirements, an
+   eligibility condition of its stated fee not confirmed, supports whose stacking is not
+   confirmed, or, alone, a direct cost or a month's payments above its cap. Each is computed
+   from the variant by itself (its dates, its payments and own support, its hours, the
+   person's answers about it), so every route containing it repeats it, or, for unknown weekly
    hours, is unknown or over the limit in each month the variant is active. The screen runs
    before every other cut, the empty route's included, so an option set aside for an unknown
    always reaches the outcome; its record keeps every unknown and every breach its own check
@@ -34,9 +37,11 @@ adds variants of later concepts.
    zero (a variant's support reduces only its own fees), and a month's payments are the sum of
    each variant's own payments in it, beside debt repayments fixed by the inputs. Adding a
    variant never lowers either, so a child whose sum already exceeds the direct-spend cap or a
-   month's payment cap is never checked, nor anything below it.
-4. *Conflicting work patterns and session clashes* persist: both variants stay active in that
-   month, with the same patterns and sessions.
+   month's payment cap is never checked, nor anything below it; nor is a node whose
+   repayments alone already exceed that cap.
+4. *Conflicting work patterns, session clashes and a second conditional job transition*
+   persist: both variants stay active in that month, with the same patterns and sessions, and
+   adding a variant never takes away an offer still to be accepted.
 5. *Workload in a month.* The load is the job's hours, the fixed commitments and the active
    variants' weekly hours. The job's hours come from the first variant in route order that is
    active with a work pattern, else from the continuation. Later variants come later in route
@@ -100,11 +105,13 @@ from careerwright.planning.families import (
 from careerwright.planning.layers import peel
 
 ALGORITHM_VERSION = "canonical-dfs-1"
-PRUNING_VERSION = "sound-pruning-2"  # the six rules above: change it with any rule
+PRUNING_VERSION = "sound-pruning-3"  # the six rules above: change it with any rule
 _READINESS_UNKNOWN = frozenset(
     {ReadinessState.NOT_YET_ASSESSED, ReadinessState.INSUFFICIENT_COVERAGE}
 )
-# Rule 2: a variant's own findings, which every route containing it repeats.
+# Rule 2: a variant's own findings, which every route containing it repeats. Task 12a's are
+# computed from the variant alone too: the person's "no" to its entry requirements, its stated
+# fee's unconfirmed eligibility conditions, and its supports' unconfirmed stacking.
 _OWN_UNRESOLVED = frozenset(
     {
         FindingCode.DATES_UNKNOWN,
@@ -112,6 +119,9 @@ _OWN_UNRESOLVED = frozenset(
         FindingCode.ENTRY_REQUIREMENTS_UNCONFIRMED,
         FindingCode.PAYMENT_BEFORE_START,
         FindingCode.WORKLOAD_UNKNOWN,
+        FindingCode.ENTRY_REQUIREMENTS_NOT_MET,
+        FindingCode.ELIGIBILITY_UNCONFIRMED,
+        FindingCode.STACKING_UNCONFIRMED,
     }
 )
 _OWN_VIOLATIONS = frozenset(
@@ -163,6 +173,7 @@ class PruningRule(StrEnum):
     MONTHLY_PAYMENT_CAP = "monthly_payment_cap"
     CONFLICTING_WORK_PATTERNS = "conflicting_work_patterns"
     SESSION_CLASH = "session_clash"
+    JOB_TRANSITIONS = "job_transitions"
     WORKLOAD = "workload"
     PREREQUISITE = "prerequisite"
 
@@ -514,12 +525,14 @@ class _Search:
             code = finding.code
             if code is FindingCode.DIRECT_SPEND_CAP:
                 return PruningRule.DIRECT_SPEND_CAP
-            if code is FindingCode.MONTHLY_PAYMENT_CAP:
+            if code in (FindingCode.MONTHLY_PAYMENT_CAP, FindingCode.REPAYMENTS_ABOVE_PAYMENT_CAP):
                 return PruningRule.MONTHLY_PAYMENT_CAP
             if code is FindingCode.CONFLICTING_WORK_PATTERNS:
                 return PruningRule.CONFLICTING_WORK_PATTERNS
             if code is FindingCode.SESSION_CLASH:
                 return PruningRule.SESSION_CLASH
+            if code is FindingCode.JOB_TRANSITIONS:
+                return PruningRule.JOB_TRANSITIONS
             month = self.month_index.get(finding.month or "")
             if code is FindingCode.WORKLOAD and month is not None and self._load_stays(node, month):
                 return PruningRule.WORKLOAD
@@ -722,10 +735,12 @@ def _active(variant: CompiledVariant, month: int) -> bool:
 
 
 def _spend(check: RouteCheck) -> _Spend:
+    """A route's known spend. A searched route's payments are all known (rule 2 sets aside an
+    option whose amounts are not); were one not, 0 could only prune less."""
     direct = check.direct_cost.minor_units if check.direct_cost is not None else 0
     return _Spend(
         direct=direct,
-        payments=tuple(m.payments_minor for m in check.ledgers.direct.months),
+        payments=tuple(m.payments_minor or 0 for m in check.ledgers.direct.months),
     )
 
 

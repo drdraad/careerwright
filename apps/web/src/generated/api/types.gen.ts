@@ -3745,6 +3745,10 @@ export type Offering = {
      */
     outcomes_from?: string | null;
     /**
+     * Eligibility Conditions
+     */
+    eligibility_conditions?: Array<Fact>;
+    /**
      * Synthetic
      */
     synthetic: boolean;
@@ -8098,9 +8102,23 @@ export type Variant = {
      */
     supports?: Array<Support>;
     /**
+     * Stacking Confirmed
+     *
+     * The person confirmed that this variant's supports may be combined: neither excludes the other and together they stay within each one's eligible costs. Until then, more than one support leaves the route unresolved.
+     */
+    stacking_confirmed?: boolean;
+    /**
+     * Condition Statuses
+     *
+     * The person's status for each of the offering's eligibility conditions, by the condition's field: only `confirmed` meets one.
+     */
+    condition_statuses?: {
+        [key: string]: EligibilityStatus;
+    };
+    /**
      * Entry Requirements Met
      *
-     * Whether the person meets the stated entry requirements: null is not yet confirmed, never ineligible.
+     * Whether the person meets the stated entry requirements: null is not yet confirmed; false is their own 'no', still never ineligible.
      */
     entry_requirements_met?: boolean | null;
 };

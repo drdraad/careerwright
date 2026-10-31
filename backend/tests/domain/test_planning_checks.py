@@ -47,6 +47,7 @@ from careerwright.planning.compiler import (
     PlanningInputs,
     ReadinessBasis,
     ReceiptTiming,
+    WorkRights,
     compile_input,
 )
 from tests.support.capability import fixture, self_report, skill_row, synthetic_matrix
@@ -482,8 +483,8 @@ def test_p03_s_unconfirmed_grant_contributes_nothing_to_unconditional_figures() 
     result = check(person(opening=p03["opening_cash_minor"]), course)
 
     assert p03["expected"]["unconfirmed_grant_in_unconditional_ledger"] == 0
-    assert sum(m.support_minor for m in result.ledgers.direct.months) == 0
-    assert sum(m.later_receipts_minor for m in result.ledgers.liquidity.months) == 0
+    assert [m.support_minor for m in result.ledgers.direct.months] == [0]
+    assert [m.later_receipts_minor for m in result.ledgers.liquidity.months] == [0]
     assert result.direct_cost is not None
     assert result.direct_cost.minor_units == 30000
     assert result.conditions == []
@@ -656,7 +657,7 @@ def test_delay_and_no_offer_change_both_the_time_and_the_income() -> None:
     assert [m.route_minor for m in delay.ledgers.income.months] == [0, 0] + [120000] * 3 + [0]
     assert none.months_to_readiness is None
     assert none.verdict is Verdict.READINESS_NOT_REACHED
-    assert sum(m.route_minor for m in none.ledgers.income.months) == 0
+    assert [m.route_minor for m in none.ledgers.income.months] == [0] * 6
 
 
 # OPTN-09: a proposed record never enters an unqualified "affordable and feasible" result.
@@ -793,7 +794,7 @@ def test_a_delayed_award_to_the_provider_leaves_the_person_paying_until_it_arriv
         compile_input(person(horizon=3, opening=100000), catalogue_of(course)), ["c"]
     )
 
-    def paid(scenario: Scenario) -> list[int]:
+    def paid(scenario: Scenario) -> list[int | None]:
         return [m.payments_minor for m in evaluation.scenario(scenario).ledgers.direct.months]
 
     assert paid(Scenario.BASE) == [0, 0, 0]
@@ -814,3 +815,275 @@ def test_existing_debt_repayments_count_inside_the_monthly_payment_cap() -> None
 
     assert finding(over, FindingCode.MONTHLY_PAYMENT_CAP) == [("2027-01", 25000)]
     assert within.feasibility is Feasibility.FEASIBLE  # 10000 + 10000 = 20000, at the cap
+
+
+# Task 12a: the rules the person's stored inputs need (ADR 0013, amendment of 2026-10-31).
+
+
+@pytest.mark.req("BND1-04", "PLN-06", "PLN-11")
+@pytest.mark.parametrize(
+    ("rights", "code"),
+    [
+        (WorkRights.UNKNOWN, FindingCode.WORK_RIGHTS_UNKNOWN),
+        (WorkRights.NOT_HELD, FindingCode.WORK_RIGHTS_NOT_HELD),
+    ],
+)
+def test_work_rights_not_known_to_be_held_leave_a_route_unresolved_never_ineligible(
+    rights: WorkRights, code: FindingCode
+) -> None:
+    held = check(person(opening=100000), option("course"))
+    unknown = check(person(opening=100000, work_rights=rights), option("course"))
+
+    assert held.feasibility is Feasibility.FEASIBLE
+    [found] = unknown.findings
+    assert (found.code, found.kind) == (code, FindingKind.UNRESOLVED)
+    # This model checks no visa or sponsorship, so a person's "no" is never "ineligible".
+    assert unknown.feasibility is Feasibility.UNRESOLVED
+    assert unknown.verdict is Verdict.UNRESOLVED
+
+
+@pytest.mark.req("PLN-06", "PLN-11", "FUNDING-05")
+def test_two_supports_on_one_option_leave_it_unresolved_until_stacking_is_confirmed() -> None:
+    grant = support(paid_to="provider", amount=30000)
+    bursary = support(paid_to="provider", amount=20000, kind=InstrumentKind.BURSARY)
+    fee = ((0, 60000),)
+    unconfirmed = check(
+        person(opening=100000), option("c", payments=fee, supports=(grant, bursary))
+    )
+    stacked = check(
+        person(opening=100000),
+        option("c", payments=fee, supports=(grant, bursary), stacking_confirmed=True),
+    )
+    refused = support(paid_to="provider", amount=20000, award=AwardState.REFUSED, assumed=True)
+    one = check(person(opening=100000), option("c", payments=fee, supports=(grant, refused)))
+
+    [found] = unconfirmed.findings
+    assert (found.code, found.kind, found.variant_id) == (
+        FindingCode.STACKING_UNCONFIRMED,
+        FindingKind.UNRESOLVED,
+        "c",
+    )
+    assert unconfirmed.direct_cost is None  # never the summed support shown as known
+    assert unconfirmed.feasibility is Feasibility.UNRESOLVED
+    assert stacked.feasibility is Feasibility.FEASIBLE
+    assert stacked.direct_cost is not None
+    assert stacked.direct_cost.minor_units == 10000  # £600 less £300 and £200
+    # A refused award is not counted, so nothing is stacked.
+    assert one.feasibility is Feasibility.FEASIBLE
+
+
+@pytest.mark.req("PLN-06", "PLN-11")
+def test_stacked_support_still_shows_a_breach_it_cannot_cure() -> None:
+    # Even with both supports, £500 is left to pay in one month against a £400 cap.
+    grant = support(paid_to="provider", amount=30000)
+    bursary = support(paid_to="provider", amount=20000, kind=InstrumentKind.BURSARY)
+    result = check(
+        person(opening=100000, monthly_cap=40000),
+        option("c", payments=((0, 100000),), supports=(grant, bursary)),
+    )
+
+    assert codes(result) == {"stacking_unconfirmed", "monthly_payment_cap"}
+    assert result.feasibility is Feasibility.NOT_FEASIBLE_IN_MODEL
+
+
+@pytest.mark.req("FIN1-06", "PAYCAP-03", "PLN-11")
+def test_a_payment_cap_broken_by_existing_repayments_alone_names_the_repayments() -> None:
+    # Session 2, D15 yes: existing repayments count in the cap, so alone above it every route
+    # fails; the finding says it is the repayments, never the option.
+    card = ExistingDebt(
+        debt_id="card", monthly_repayment_minor=15000, balance_minor=None, cited=CONSTRUCTED
+    )
+    loan = ExistingDebt(
+        debt_id="car", monthly_repayment_minor=5000, balance_minor=None, cited=CONSTRUCTED
+    )
+    inputs = person(horizon=2, opening=1_000_000, monthly_cap=18000, existing_debts=[card, loan])
+    result = check(inputs, option("course", payments=((0, 1000),)))
+    empty = check(inputs, route=[])
+
+    found = [f for f in result.findings if f.code is FindingCode.REPAYMENTS_ABOVE_PAYMENT_CAP]
+    assert [(f.month, f.amount, f.limit, f.reason, f.kind) for f in found] == [
+        ("2027-01", 20000, 18000, "card, car", FindingKind.VIOLATION),
+        ("2027-02", 20000, 18000, "card, car", FindingKind.VIOLATION),
+    ]
+    assert FindingCode.MONTHLY_PAYMENT_CAP.value not in codes(result)  # not the course's
+    assert codes(empty) == {"repayments_above_payment_cap"}
+    # Below the cap alone, a payment that takes them over is the monthly payment cap's.
+    within = person(horizon=2, opening=1_000_000, monthly_cap=25000, existing_debts=[card, loan])
+    over = check(within, option("course", payments=((0, 6000),)))
+    assert codes(over) == {"monthly_payment_cap"}
+    assert finding(over, FindingCode.MONTHLY_PAYMENT_CAP) == [("2027-01", 26000)]
+
+
+@pytest.mark.req("PAYCAP-01", "PLN-11")
+def test_an_undated_payment_is_not_blamed_for_a_cap_the_repayments_already_break() -> None:
+    card = ExistingDebt(
+        debt_id="card", monthly_repayment_minor=15000, balance_minor=None, cited=CONSTRUCTED
+    )
+    inputs = person(opening=1_000_000, monthly_cap=10000, existing_debts=[card])
+    undated = option("undated", start=None, finish=None, payments=((0, 1000),))
+
+    result = check(inputs, undated)
+
+    assert FindingCode.MONTHLY_PAYMENT_CAP.value not in codes(result)  # the option is not blamed
+    assert FindingCode.REPAYMENTS_ABOVE_PAYMENT_CAP.value in codes(result)
+
+
+@pytest.mark.req("OPTN-03", "PLN-06")
+def test_an_explicit_no_to_the_entry_requirements_has_its_own_finding_and_stays_unresolved() -> (
+    None
+):
+    concept, offering, variant = option("course")
+    required = concept.model_copy(
+        update={"entry_requirements": [Fact(field="entry_requirement", value="GCSE maths")]}
+    )
+
+    def answered(met: bool | None) -> RouteCheck:
+        answer = variant.model_copy(update={"entry_requirements_met": met})
+        return check(person(), (required, offering, answer))
+
+    not_met = answered(False)
+
+    # Its next action is "check whether the provider accepts equivalent experience" (the web's
+    # words for this code): a "no" is never "ineligible", so the route stays unresolved.
+    [found] = not_met.findings
+    assert (found.code, found.kind, found.variant_id) == (
+        FindingCode.ENTRY_REQUIREMENTS_NOT_MET,
+        FindingKind.UNRESOLVED,
+        "course",
+    )
+    assert not_met.feasibility is Feasibility.UNRESOLVED
+    assert codes(answered(None)) == {"entry_requirements_unconfirmed"}
+    assert answered(True).feasibility is Feasibility.FEASIBLE
+
+
+@pytest.mark.req("BND1-06", "PLN-05", "PLN-06")
+def test_two_conditional_job_transitions_in_one_route_are_not_feasible_in_this_model() -> None:
+    # Spec section 12: at most one conditional bridge-role transition. An apprenticeship behind
+    # its offer and a bridge job behind its own are two.
+    def apprenticeship(accepted: bool) -> tuple:  # type: ignore[type-arg]
+        return option(
+            "apprenticeship",
+            kind=ActionKind.APPRENTICESHIP,
+            hours=10,
+            wage=100000,
+            offer=OfferGate(accepted=accepted),
+        )
+
+    def job(accepted: bool) -> tuple:  # type: ignore[type-arg]
+        return option(
+            "job",
+            kind=ActionKind.WORK,
+            hours=10,
+            wage=100000,
+            offer=OfferGate(accepted=accepted, role_class="data clerk"),
+        )
+
+    both = check(person(opening=100000), apprenticeship(False), job(False))
+    one = check(person(opening=100000), apprenticeship(False), job(True))
+
+    [found] = both.findings
+    assert (found.code, found.kind, found.amount, found.limit) == (
+        FindingCode.JOB_TRANSITIONS,
+        FindingKind.VIOLATION,
+        2,
+        1,
+    )
+    assert both.feasibility is Feasibility.NOT_FEASIBLE_IN_MODEL
+    # An offer already accepted is the starting position, not a condition.
+    assert one.feasibility is Feasibility.FEASIBLE
+    assert check(person(opening=100000), apprenticeship(False)).feasibility is Feasibility.FEASIBLE
+
+
+@pytest.mark.req("OPTN-03", "PLN-06", "FUNDING-05")
+def test_a_fee_stated_for_eligible_learners_waits_for_each_condition_to_be_confirmed() -> None:
+    # Review 13a (C07): a £0 fee "for an eligible learner", with an age, a residency and a
+    # work-rights condition. An unconfirmed condition leaves the fee's effect unresolved.
+    conditions = [
+        Fact(field="eligibility_age", value={"minimum_age": 19}),
+        Fact(field="eligibility_residency", value=["London", "West Midlands"]),
+    ]
+
+    def with_statuses(**statuses: EligibilityStatus) -> RouteCheck:
+        return check(
+            person(opening=100000),
+            option(
+                "bootcamp",
+                payments=((0, 0),),
+                eligibility_conditions=conditions,
+                condition_statuses=statuses,
+            ),
+        )
+
+    nothing = with_statuses()
+    lives_elsewhere = with_statuses(
+        eligibility_age=EligibilityStatus.CONFIRMED,
+        eligibility_residency=EligibilityStatus.INELIGIBLE,
+    )
+    confirmed = with_statuses(
+        eligibility_age=EligibilityStatus.CONFIRMED,
+        eligibility_residency=EligibilityStatus.CONFIRMED,
+    )
+
+    assert [(f.code, f.reason) for f in nothing.findings] == [
+        (FindingCode.ELIGIBILITY_UNCONFIRMED, "eligibility_age"),
+        (FindingCode.ELIGIBILITY_UNCONFIRMED, "eligibility_residency"),
+    ]
+    assert nothing.direct_cost is None  # the £0 is an eligible learner's, never assumed
+    assert nothing.feasibility is Feasibility.UNRESOLVED
+    # Living outside the stated areas: the page states no fee for anyone else, so unresolved.
+    assert [(f.code, f.reason) for f in lives_elsewhere.findings] == [
+        (FindingCode.ELIGIBILITY_UNCONFIRMED, "eligibility_residency")
+    ]
+    assert lives_elsewhere.feasibility is Feasibility.UNRESOLVED
+    assert confirmed.feasibility is Feasibility.FEASIBLE
+    assert confirmed.direct_cost is not None
+    assert confirmed.direct_cost.minor_units == 0
+    # Where no fee is stated at all, its cost is what is unknown: the conditions add nothing.
+    unpriced = check(
+        person(opening=100000),
+        option("unpriced", unknown_cost="not stated", eligibility_conditions=conditions),
+    )
+    assert codes(unpriced) == {"cost_unknown"}
+
+
+@pytest.mark.req("PLN-11", "FIN1-02")
+def test_a_month_row_resting_on_an_unknown_amount_is_null_never_a_partial_figure() -> None:
+    # A known £10 extra beside a fee the page does not state: each month's figure is unknown.
+    partial = check(
+        person(horizon=2, opening=100000),
+        option(
+            "course",
+            finish=date(2027, 2, 28),
+            payments=((0, 1000),),
+            unknown_cost="no fee is stated",
+        ),
+    )
+    direct, cash = partial.ledgers.direct, partial.ledgers.liquidity
+
+    assert [m.payments_minor for m in direct.months] == [None, None]
+    assert [m.support_minor for m in direct.months] == [None, None]
+    assert [m.payments_minor for m in cash.months] == [None, None]
+    assert [m.lower_bound_minor for m in cash.months] == [None, None]
+    assert [m.closing_minor for m in cash.months] == [None, None]
+    assert cash.months[0].opening_minor == 100000  # the opening cash itself is known
+    assert cash.months[1].opening_minor is None  # it follows January's unknown outflows
+    assert [m.living_minor for m in cash.months] == [0, 0]  # known inputs stay known
+    assert (direct.complete, cash.complete) == (False, False)
+    # A payment due before the start leaves the total unknown, but each month's own payments
+    # are exactly known.
+    early = check(
+        person(horizon=2, opening=100000),
+        option("course", payments=((0, 1000),), due=((date(2026, 12, 15), 5000),)),
+    )
+    assert [m.payments_minor for m in early.ledgers.direct.months] == [1000, 0]
+    assert early.direct_cost is None
+    # Pay from an option with no dates could fall in any month: no month's income is known.
+    reduced = pattern(WorkPatternKind.REDUCED_HOURS, 20, 120000)
+    undated = check(
+        person(horizon=2, opening=100000, pay=200000, baseline=200000),
+        option("undated", start=None, finish=None, pattern=reduced),
+    )
+    income = undated.ledgers.income
+    assert [(m.route_minor, m.difference_minor) for m in income.months] == [(None, None)] * 2
+    assert [m.baseline_minor for m in income.months] == [200000, 200000]
+    assert [m.early_receipts_minor for m in undated.ledgers.liquidity.months] == [None, None]

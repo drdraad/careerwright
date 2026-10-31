@@ -111,10 +111,15 @@ def test_a_set_aside_course_keeps_what_to_confirm_apart_from_what_already_rules_
     assert c09.violations == [FindingCode.PREREQUISITE_NOT_USABLE, FindingCode.WORKLOAD]
 
 
-@pytest.mark.req("OPT1-16")
-def test_a_dated_free_pack_course_without_weekly_hours_waits_for_a_timetable() -> None:
+@pytest.mark.req("OPT1-16", "OPTN-03")
+def test_a_dated_free_pack_course_waits_for_its_eligibility_and_a_timetable() -> None:
     result = search("it-support-technician-bristol")
     [c07] = [s for s in result.set_aside if s.variant_id == "offering:C07"]
 
-    # C07 runs from 16 November 2026 for 12 weeks and states a £0 fee, but no weekly hours.
-    assert c07.codes == [FindingCode.WORKLOAD_UNKNOWN]
+    # C07 runs from 16 November 2026 for 12 weeks and states a £0 fee for an eligible learner
+    # (aged 19+, living in one of four areas that exclude Bristol, with the right to work),
+    # but no weekly hours. Until the person confirms each condition, the £0 is not theirs
+    # (Task 12a, the controller's ruling on review 13a's C07).
+    assert c07.codes == [FindingCode.ELIGIBILITY_UNCONFIRMED, FindingCode.WORKLOAD_UNKNOWN]
+    assert c07.kind is FindingKind.UNRESOLVED
+    assert c07.violations == []
