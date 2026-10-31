@@ -6,7 +6,7 @@
 // sheet (S0-V01, S0-V02), checked by what is actually on top at their centre, not by
 // screenshots.
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { asBrowser, emulatorToken, talkedWorkspace } from "./api";
+import { asBrowser, emulatorToken, roleQuestionWorkspace, talkedWorkspace } from "./api";
 import {
   brightFills,
   chapterUrl,
@@ -184,8 +184,14 @@ test("[STATE-09][STATE-08][BND1-02] the demo takes a target in the person's word
   test.setTimeout(300_000);
   const workspace = await demoWorkspace("Never loops, sure (synthetic)");
   await signIn(page, "ada", chapterUrl("you", workspace));
-  // Before the first answer: what Careerwright covers, and the entry choice as the bright
-  // action, never Send on an empty field (F17).
+  // Before the first answer: what Careerwright is for (session 2: "not sure" what the start
+  // page was for) and covers, and the entry choice as the bright action, never Send on an
+  // empty field (F17).
+  await expect(
+    page.getByText(
+      "Careerwright helps you find work that could suit you, see what it would take, and plan a route you can afford.",
+    ),
+  ).toBeVisible();
   await expect(page.getByText("Careerwright covers England for now.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Send" })).not.toHaveClass(/btn-primary/);
   await page.getByRole("button", { name: "I know my direction" }).click();
@@ -249,6 +255,93 @@ test("[STATE-09] exploring by example replies reaches the role question, whose S
   );
   await expect(page.getByRole("heading", { name: "Directions to explore" })).toBeFocused();
   await expect(page.getByRole("button", { name: "Suggest directions" })).toHaveCount(0);
+});
+
+/** Sends a message and returns the demo interviewer's checked reply to it (each message
+ *  sent here is different, so its turn is found by its words). */
+async function replyTo(page: Page, message: string): Promise<string> {
+  await send(page, message);
+  const words = page
+    .locator(".turn-you", { has: page.getByText(message, { exact: true }) })
+    .locator("xpath=following-sibling::div[contains(@class, 'turn-careerwright')]")
+    .locator("p");
+  await expect(words).toHaveText(/^Demo interviewer \(synthetic\): /, { timeout: 60_000 });
+  await expect(page.getByText(/not checked yet/)).toHaveCount(0);
+  return (await words.textContent()) ?? "";
+}
+
+/** Every question the demo asks already answered: nothing is left to ask (demo mode). */
+async function answeredWorkspace(token: string): Promise<string> {
+  const { workspace_id: id } = await asBrowser<{ workspace_id: string }>(
+    "POST",
+    "/v1/workspaces",
+    token,
+    { name: "Everything answered (synthetic)", data_mode: "demo", synthetic: true },
+  );
+  const base = `/v1/workspaces/${id}`;
+  const blank = await asBrowser<{ document: Record<string, unknown> }>(
+    "GET",
+    `${base}/profile`,
+    token,
+  );
+  const profile: Record<string, unknown> = Object.fromEntries(
+    Object.keys(blank.document)
+      .filter((field) => field !== "schema_version")
+      .map((field) => [field, { state: "unasked" }]),
+  );
+  profile.current_role = { state: "provided", value: "warehouse supervisor" };
+  profile.cities = { state: "provided", value: ["Leeds"] };
+  profile.weekly_study_hours = { state: "unknown" };
+  profile.direct_spend_cap = { state: "prefer_not_to_say" };
+  profile.target_titles = { state: "provided", value: ["nurse"] };
+  await asBrowser("PUT", `${base}/profile`, token, { expected_version: 0, profile });
+  await asBrowser("PUT", `${base}/interview/preferences`, token, {
+    expected_version: 0,
+    entry_mode: "unsure",
+    conversation_mode: null,
+    paused: false,
+  });
+  return id;
+}
+
+test("[STATE-09] the demo's way on names only what is in sight: the role question's two buttons, and after the last question the views (app review I1)", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  const token = await emulatorToken("ada");
+
+  // The first probe: at the role question, the natural typed answer. Its two buttons are in
+  // sight there, never example replies, so the reply names the buttons.
+  await signIn(page, "ada", chapterUrl("you", await roleQuestionWorkspace(token)));
+  const role = page.getByRole("heading", {
+    name: "Do you have a role in mind, or would you like to explore?",
+  });
+  await expect(role).toBeVisible();
+  const explore = await replyTo(page, "Explore");
+  await expect(role).toBeVisible(); // still unanswered: asked again, with the way on
+  await expect(page.getByRole("group", { name: "Example replies" })).toHaveCount(0);
+  expect(explore).not.toMatch(/example repl/i);
+  for (const name of ["Show me suggestions", "Name a role"]) {
+    expect(explore, "the reply names the buttons in sight").toContain(name);
+    await expect(page.getByRole("button", { name })).toBeVisible();
+  }
+
+  // The second probe: after the last question nothing is in front, so there are no example
+  // replies and Skip has nothing to answer. Every reply says what to do next, in views that
+  // are in sight, and never sends the person back to Skip (it looped).
+  await page.goto(chapterUrl("you", await answeredWorkspace(token)));
+  const replies = [await replyTo(page, "What next?")];
+  await expect(page.locator(".question")).toHaveCount(0);
+  replies.push(await replyTo(page, "Skip"), await replyTo(page, "Skip."));
+  for (const said of replies) {
+    expect(said, "never points to Skip or to examples").not.toMatch(/Skip|example repl/i);
+    expect(said).toContain("Suggestions");
+    expect(said).toContain("What we know");
+  }
+  await expect(page.locator(".question")).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Example replies" })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Suggestions" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "What we know" })).toBeVisible();
 });
 
 test("[PROF-09] a message with a risk stem is sent as usual, with the support panel and a smaller step", async ({
@@ -470,12 +563,17 @@ test.describe("phone, first screen", () => {
     await signIn(page, "ada", chapterUrl("you", await demoWorkspace("Start (synthetic)")));
     await firstScreen(page, page.getByRole("button", { name: "Help me explore" }));
 
-    // A reply to review, what we know and the suggestions, each at the top of its view.
+    // What we know in the fixture workspace: four answers, two of them limits explained, and a
+    // long "Not asked yet" (design review I3: three short answers fitted where these didn't).
+    await page.goto(chapterUrl("you"));
+    await youView(page, "What we know");
+    await expect(page.getByRole("region", { name: "Not asked yet" })).toBeVisible();
+    await firstScreen(page, page.getByRole("button", { name: "Edit answers directly" }));
+
+    // A reply to review and the suggestions, each at the top of its view.
     await page.goto(chapterUrl("you", await talkedWorkspace(token)));
     const tray = page.getByRole("region", { name: /To review:/ });
     await firstScreen(page, tray.getByRole("button", { name: /^(Accept|Confirm)/ }).first());
-    await youView(page, "What we know");
-    await firstScreen(page, page.getByRole("button", { name: "Edit answers directly" }));
     await youView(page, "Suggestions");
     const directions = page.getByRole("region", { name: "Directions to explore" });
     await firstScreen(

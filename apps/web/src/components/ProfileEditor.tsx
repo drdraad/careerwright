@@ -45,15 +45,18 @@ export function ProfileEditor({
   workspaceId,
   profile,
   headingRef,
-  openTargets = 0,
+  openTargets = false,
+  onTargetsOpened,
 }: {
   workspaceId: string;
   profile: ProfileOut;
   /** Where focus can land when the form is opened from elsewhere, so it is never lost. */
   headingRef?: Ref<HTMLHeadingElement>;
-  /** Each new value is a request ("Name a role") to open the target roles ready to type: a
-   *  change to the draft only, saved like any other by the person. */
-  openTargets?: number;
+  /** A request ("Name a role") to open the target roles ready to type: a change to the draft
+   *  only, saved like any other by the person. Applied once: the form tells the chapter, which
+   *  clears it, so a later opening of the form changes nothing (app review I3). */
+  openTargets?: boolean;
+  onTargetsOpened?(): void;
 }) {
   const queries = useQueryClient();
   const save = useSaveProfile(workspaceId);
@@ -78,14 +81,15 @@ export function ProfileEditor({
   const form = useRef<HTMLFormElement>(null);
   const [focusTargets, setFocusTargets] = useState(false);
   useEffect(() => {
-    if (openTargets === 0) return;
+    if (!openTargets) return;
     setDraft((current) =>
       current.target_titles.state === "provided"
         ? current
         : { ...current, target_titles: { ...current.target_titles, state: "provided" } },
     );
     setFocusTargets(true);
-  }, [openTargets]);
+    onTargetsOpened?.();
+  }, [openTargets, onTargetsOpened]);
   useEffect(() => {
     if (!focusTargets) return;
     const box = form.current?.querySelector<HTMLInputElement>("[data-field='target_titles'] input");

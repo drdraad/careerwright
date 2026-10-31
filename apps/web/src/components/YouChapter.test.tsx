@@ -358,6 +358,25 @@ describe("[PROF-08][REC1-10] the chapter leads with how to start", () => {
     expect(screen.getByRole("button", { name: "Help me explore instead" })).toBeVisible();
   });
 
+  it("says in one line what Careerwright is for, before the entry choice, at the start only", async () => {
+    // Session 2, the start page: "It's for inputing information about yourself and your job
+    // preferences, not sure".
+    fakeApi(routes({ preferences: prefs(null), turns: [] }));
+    renderYou();
+    const purpose = await screen.findByText(
+      "Careerwright helps you find work that could suit you, see what it would take, and plan a route you can afford.",
+    );
+    const choice = screen.getByRole("heading", { name: "How would you like to start?" });
+    expect(purpose).toBeVisible();
+    expect(purpose.compareDocumentPosition(choice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    cleanup();
+    fakeApi(routes({ preferences: prefs("unsure"), turns: [] }));
+    renderYou();
+    await screen.findByRole("group", { name: "Example replies" });
+    expect(screen.queryByText(/Careerwright helps you find work/)).toBeNull();
+  });
+
   it("[PROF-08] has the reply field from the first screen, and no tone setting in the chapter", async () => {
     // Session 2: "Chat should be immediate"; "ditch the tone selection - this should be in
     // preferences" (it is in the account menu, `ConversationTone`).
@@ -425,6 +444,22 @@ describe("[UI-06][UI-04] one idea per view: the conversation, what we know and t
     await user.keyboard("{Home}");
     expect(conversation).toHaveFocus();
     expect(screen.getByLabelText("Reply to Careerwright")).toBeVisible();
+  });
+
+  it("[UI-12] puts What we know's action under its heading, before the answers, and opens the form right under it (D-I3)", async () => {
+    fakeApi(routes({ preferences: prefs("unsure"), turns: [] }));
+    const user = renderYou();
+    await user.click(await screen.findByRole("tab", { name: "What we know" }));
+    const follows = (first: Node, then: Node) =>
+      (first.compareDocumentPosition(then) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+    const edit = screen.getByRole("button", { name: "Edit answers directly" });
+    const shown = screen.getByRole("region", { name: "Your answers" });
+    expect(follows(screen.getByRole("heading", { name: "What we know" }), edit)).toBe(true);
+    expect(follows(edit, shown)).toBe(true);
+    await user.click(edit);
+    const form = await screen.findByRole("form", { name: "Edit your answers" });
+    expect(follows(edit, form) && follows(form, shown)).toBe(true);
   });
 
   it("explains the two limits in plain words where they are shown", async () => {
@@ -1364,6 +1399,53 @@ describe("[STATE-09] the demo conversation never loops: example replies and two 
     await screen.findByRole("heading", { name: "Is there a role you want?" });
     expect(screen.getByRole("button", { name: "Show me suggestions" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Name a role" })).toBeVisible();
+  });
+
+  it("keeps keyboard focus when an example reply is tapped: it moves to the reply field (A-I2)", async () => {
+    const sent = fakeApi(routes({ preferences: prefs("unsure"), turns: [] }, [sendsTurn]));
+    const user = renderYou();
+
+    const examples = await screen.findByRole("group", { name: "Example replies" });
+    await user.click(within(examples).getByRole("button", { name: "Skip" }));
+
+    // The tapped button goes while the message is sent; focus never falls to the page.
+    await waitFor(() => expect(screen.getByLabelText("Reply to Careerwright")).toHaveFocus());
+    await waitFor(() =>
+      expect(sent.filter((s) => s.method === "POST").map((s) => s.body)).toEqual([
+        { expected_profile_version: 1, message: "Skip" },
+      ]),
+    );
+  });
+
+  it("opens target entry once for Name a role: a later opening changes no answer, and saving goes through (A-I3)", async () => {
+    const sent = fakeApi(
+      routes({ preferences: prefs("unsure"), turns: [asking("target_titles", ROLE_QUESTION)] }, [
+        { method: "PUT", path: /\/profile$/, answer: { ...withEvidence, version: 2 } },
+      ]),
+    );
+    const user = renderYou(withEvidence);
+
+    await user.click(await screen.findByRole("button", { name: "Name a role" }));
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "Target role 1" })).toHaveFocus(),
+    );
+    // The person changes their mind: the form closes, and later opens to change something else.
+    await user.click(screen.getByRole("button", { name: "Close the answer form" }));
+    expect(screen.queryByRole("heading", { name: "Edit your answers" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Edit answers directly" }));
+
+    expect(await screen.findByLabelText("How you answer target roles")).toHaveValue("unasked");
+    expect(screen.queryByRole("textbox", { name: "Target role 1" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Close the answer form" })).toHaveFocus();
+    await user.selectOptions(screen.getByLabelText("How you answer weekly study hours"), "unknown");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(sent.some((s) => s.method === "PUT")).toBe(true));
+    const saved = sent.find((s) => s.method === "PUT")?.body as {
+      profile: Record<string, { state: string }>;
+    };
+    expect(saved.profile.target_titles?.state).toBe("unasked");
+    expect(saved.profile.weekly_study_hours?.state).toBe("unknown");
   });
 
   it("says Careerwright covers England for now, before the first answer only (BND1-02)", async () => {

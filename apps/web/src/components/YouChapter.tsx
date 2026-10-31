@@ -30,7 +30,14 @@
 // current, and focus goes to them) and "Name a role" (the answer form opens at the target roles,
 // ready to type). Neither commits anything; a target is still chosen only by the person. "Help
 // me explore instead" hands focus to the suggestions that replace it.
-import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { ProfileOut, WorkspaceOut } from "@/generated/api";
 import { reviewable, turnFailed, turnRunning } from "@/lib/conversation";
 import {
@@ -140,8 +147,10 @@ export function YouChapter({
   // Where focus goes once it is in the page: the notice in the view the person is in, the
   // answer form's heading, or the suggestions' heading.
   const [focusTo, setFocusTo] = useState<"notice" | "form" | "directions" | null>(null);
-  // Each "Name a role": the answer form opens with its target roles ready, focused there.
-  const [openTarget, setOpenTarget] = useState(0);
+  // "Name a role": the answer form opens with its target roles ready, focused there. Cleared
+  // once the form has applied it, so a later opening of the form changes nothing.
+  const [openTarget, setOpenTarget] = useState(false);
+  const targetsOpened = useCallback(() => setOpenTarget(false), []);
   // Both views that show the save notice have their own copy, each with its own heading.
   const conversationNotice = useRef<HTMLHeadingElement>(null);
   const knownNotice = useRef<HTMLHeadingElement>(null);
@@ -243,7 +252,7 @@ export function YouChapter({
   const nameRole = () => {
     setView("known");
     setEditing(true);
-    setOpenTarget((request) => request + 1);
+    setOpenTarget(true);
   };
   const showSuggestions = () => {
     setView("suggestions");
@@ -362,18 +371,21 @@ export function YouChapter({
             profile={profile}
             editing={editing}
             onEdit={() => setEditing((open) => !open)}
+            form={
+              editing && (
+                <div id="edit-answers">
+                  <ProfileEditor
+                    key={id}
+                    workspaceId={id}
+                    profile={profile}
+                    headingRef={formTitle}
+                    openTargets={openTarget}
+                    onTargetsOpened={targetsOpened}
+                  />
+                </div>
+              )
+            }
           />
-          {editing && (
-            <div id="edit-answers">
-              <ProfileEditor
-                key={id}
-                workspaceId={id}
-                profile={profile}
-                headingRef={formTitle}
-                openTargets={openTarget}
-              />
-            </div>
-          )}
           {/* A second idea (a route sketch for the target), so one step away (D-M6). */}
           <details className="details">
             <summary>The early sketch for your target</summary>

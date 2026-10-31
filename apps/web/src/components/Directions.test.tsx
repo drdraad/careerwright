@@ -826,6 +826,24 @@ const joined: SuggestionOut = {
     skill("k5", "use hand tools"),
   ],
 };
+/** The slate's unexpected connection: found from the person's role, which they called "cycle
+ *  courier" and ESCO titles "bicycle courier" (an alternative title). */
+const connected: SuggestionOut = {
+  ...joined,
+  why_it_could_suit: [
+    "Your current role: “cycle courier”. ESCO lists 5 of the same essential skills for both, so Careerwright joined them by those skills.",
+  ],
+};
+const connection: SlateOut["connection"] = {
+  concept_id: "o1",
+  title: "bicycle mechanic",
+  role_title: "bicycle courier",
+  sentence: "A bicycle courier and a bicycle mechanic share 5 essential skills.",
+  shared_skill_count: 5,
+  shared_skills: joined.shared_skills,
+  still_uncertain:
+    "These are the skills ESCO lists for both roles. They aren't compared with your own experience yet.",
+};
 
 describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpected connection and a chosen target", () => {
   it("names the first skills it was joined by, the rest one step away (the audit's F4)", async () => {
@@ -833,10 +851,9 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpe
     const { user } = renderDirections();
 
     const mechanic = await card();
+    // The reason above says how they were joined; this line only names the skills (D-I2).
     expect(
-      within(mechanic).getByText(
-        "Careerwright joined them by these skills: adjust brakes, fit tyres and replace chains.",
-      ),
+      within(mechanic).getByText("Among them: adjust brakes, fit tyres and replace chains."),
     ).toBeVisible();
     const rest = within(mechanic).getByText("The other 2 skills");
     expect(within(mechanic).getByText("true wheels")).not.toBeVisible();
@@ -845,35 +862,55 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpe
     expect(within(mechanic).getByText("use hand tools")).toBeVisible();
   });
 
-  it("shows the unexpected connection on its suggestion, in words, its skills one step away", async () => {
-    const connection: SlateOut["connection"] = {
-      concept_id: "o1",
-      title: "bicycle mechanic",
-      role_title: "bicycle courier",
-      sentence: "A bicycle courier and a bicycle mechanic share 5 essential skills.",
-      shared_skill_count: 5,
-      shared_skills: joined.shared_skills,
-      still_uncertain:
-        "These are the skills ESCO lists for both roles. They aren't compared with your own experience yet.",
-    };
-    fakeApi([{ method: "GET", path: /\/slate$/, answer: { ...slate([joined]), connection } }]);
+  it("names all the skills it was joined by when there are only a few", async () => {
+    const few = { ...joined, shared_skills: joined.shared_skills.slice(0, 3) };
+    fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([few]) }]);
+    renderDirections();
+
+    const mechanic = await card();
+    expect(
+      within(mechanic).getByText("Those skills: adjust brakes, fit tyres and replace chains."),
+    ).toBeVisible();
+    expect(within(mechanic).queryByText(/The other/)).toBeNull();
+  });
+
+  it("shows the unexpected connection on its suggestion, its skills named, the rest one step away", async () => {
+    fakeApi([{ method: "GET", path: /\/slate$/, answer: { ...slate([connected]), connection } }]);
     const { user } = renderDirections();
 
     const mechanic = await card();
     expect(within(mechanic).getByText("An unexpected connection")).toBeVisible();
+    // What Careerwright hasn't checked is said in its own words, never what a list contains.
     expect(
       within(mechanic).getByText(
-        "Careerwright joined this to your role, “bicycle courier”, by 5 essential skills ESCO lists for both.",
+        "Among them: adjust brakes, fit tyres and replace chains. Careerwright hasn't compared them with your own experience yet.",
       ),
     ).toBeVisible();
-    // Its skills are one step away, never only counted; the plain joined-by line gives way.
-    expect(within(mechanic).queryByText(/Careerwright joined them by these skills/)).toBeNull();
-    expect(within(mechanic).getByText("adjust brakes")).not.toBeVisible();
-    await user.click(within(mechanic).getByText("The 5 skills"));
-    expect(within(mechanic).getByText("adjust brakes")).toBeVisible();
-    expect(
-      within(mechanic).getByText(/aren't compared with your own experience yet/),
-    ).toBeVisible();
+    expect(within(mechanic).queryByText(/These are the skills ESCO lists/)).toBeNull();
+    expect(within(mechanic).getByText("true wheels")).not.toBeVisible();
+    await user.click(within(mechanic).getByText("The other 2 skills"));
+    expect(within(mechanic).getByText("true wheels")).toBeVisible();
+  });
+
+  it("states the join once on each card, and never calls ESCO's title the person's role (D-I2, A-M1)", async () => {
+    const plain = { ...joined, concept_id: "o2", title: "bicycle repairer" };
+    fakeApi([
+      { method: "GET", path: /\/slate$/, answer: { ...slate([connected, plain]), connection } },
+    ]);
+    const { user } = renderDirections();
+
+    const mechanic = await card();
+    await user.click(await screen.findByRole("button", { name: /Bicycle repairer/ }));
+    const repairer = await screen.findByRole("article", { name: "Bicycle repairer" });
+    const joins = (shown: HTMLElement) => shown.textContent?.match(/joined/g)?.length ?? 0;
+    await waitFor(() => expect(joins(repairer)).toBe(1)); // the reason that found it, once
+    await user.click(within(mechanic).getByRole("button", { name: /Bicycle mechanic/ }));
+    await waitFor(() => expect(joins(mechanic)).toBe(1));
+    // The person said "cycle courier"; ESCO titles their role "bicycle courier". The card quotes
+    // the person's words only, and never names ESCO's title as "your role".
+    expect(mechanic).toHaveTextContent("“cycle courier”");
+    expect(mechanic).not.toHaveTextContent("“bicycle courier”");
+    expect(mechanic).not.toHaveTextContent(/your role/i);
   });
 
   it("says a chosen target is saved, with what it usually asks for, and keeps the slate current", async () => {

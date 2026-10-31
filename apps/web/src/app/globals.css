@@ -1803,9 +1803,11 @@
 }
 
 /* Below a desktop's width the person's facts come first (the audit's F14): the strip keeps the
-   target, work area and budget on one line, each ending in an ellipsis if it must (What we know
-   names them in full, and assistive tech reads all of each), and the world's controls move into
-   the account menu, beside calm mode, with their words and switches. */
+   target, work area and budget whole, never cut. Each takes the width its words need, not an
+   equal share; one that doesn't fit beside the others moves to the next row whole, and only a
+   value wider than the whole row (three long targets) wraps, by words, under its label, which
+   stays on one line (design review I1). The world's controls move into the account menu,
+   beside calm mode, with their words and switches. */
 @media (max-width: 1179px) {
   .strip .strip-wide,
   .strip .world-controls {
@@ -1814,16 +1816,16 @@
 
   .strip .strip-target,
   .strip .strip-fact {
-    flex: 1 1 0;
+    flex: 0 1 auto;
     min-width: 0;
+    align-items: baseline;
+    white-space: nowrap;
   }
 
   .strip .strip-target strong,
   .strip .strip-fact strong {
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
   }
 }
 

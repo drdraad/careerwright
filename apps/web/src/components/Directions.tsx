@@ -221,7 +221,7 @@ function WrittenNote({ state }: { state: WrittenState }) {
     return (
       <p className="small muted">
         Careerwright wrote notes for your first set of suggestions; this one appeared when you
-        changed the view, so it has none. How Careerwright found it is below.
+        changed the view, so it has none.
       </p>
     );
   }
@@ -257,14 +257,19 @@ const FIRST_SKILLS = 3;
 const listed = (items: string[]) =>
   items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 
-/** The skills a suggestion was joined by: the first few named, the rest one step away. */
-function JoinedBy({ skills }: { skills: SharedSkillOut[] }) {
+/** The skills a suggestion was joined by, under the reason that says how it was joined (the
+ *  API's, which quotes the person's own words): the first few named, the rest one step away.
+ *  The join is said once, by that reason (D-I2). On the slate's unexpected connection, what
+ *  Careerwright hasn't checked yet is said with them; its light in the world is Task M's. */
+function JoinedBy({ skills, connection }: { skills: SharedSkillOut[]; connection: boolean }) {
   if (skills.length === 0) return null;
   const rest = skills.slice(FIRST_SKILLS);
+  const first = listed(skills.slice(0, FIRST_SKILLS).map((s) => s.label));
   return (
     <div className="grid gap-4">
       <p className="small">
-        {SUGGESTION_WORDS.joinedBy} {listed(skills.slice(0, FIRST_SKILLS).map((s) => s.label))}.
+        {SUGGESTION_WORDS.skillsNamed(first, rest.length > 0)}
+        {connection && ` ${SUGGESTION_WORDS.notCompared}`}
       </p>
       {rest.length > 0 && (
         <details className="details">
@@ -276,27 +281,6 @@ function JoinedBy({ skills }: { skills: SharedSkillOut[] }) {
           </ul>
         </details>
       )}
-    </div>
-  );
-}
-
-/** The slate's unexpected connection, in words, its skills one step away; its light in the
- *  world is Task M's. */
-function Connection({ connection }: { connection: ConnectionOut }) {
-  return (
-    <div className="grid gap-4">
-      <p className="small">
-        {SUGGESTION_WORDS.connectionLine(connection.role_title, connection.shared_skill_count)}
-      </p>
-      <details className="details">
-        <summary>{SUGGESTION_WORDS.connectionSkills(connection.shared_skill_count)}</summary>
-        <ul className="plain-list mt-8">
-          {connection.shared_skills.map((skill) => (
-            <li key={skill.skill_id}>{skill.label}</li>
-          ))}
-        </ul>
-        <p className="small muted mt-8">{connection.still_uncertain}</p>
-      </details>
     </div>
   );
 }
@@ -472,11 +456,7 @@ function SuggestionCard({
                   <li key={line}>{line}</li>
                 ))}
               </ul>
-              {connection !== null ? (
-                <Connection connection={connection} />
-              ) : (
-                <JoinedBy skills={suggestion.shared_skills} />
-              )}
+              <JoinedBy skills={suggestion.shared_skills} connection={connection !== null} />
             </div>
           </div>
           <div className="grid gap-4">

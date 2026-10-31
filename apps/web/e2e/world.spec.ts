@@ -449,6 +449,42 @@ for (const viewport of VIEWPORTS.filter((v) => v.width < 968)) {
   });
 }
 
+/**
+ * The strip's facts as the person reads them: each one's words, whether its label sits on one
+ * line, and whether its value is cut (an ellipsis) or runs past the strip.
+ */
+function stripFacts(page: Page) {
+  return page.getByRole("banner").evaluate((strip) => {
+    const edge = strip.getBoundingClientRect().right;
+    return [...strip.querySelectorAll<HTMLElement>(".strip-target, .strip-fact")].map((fact) => {
+      const value = fact.querySelector("strong");
+      const label = document.createRange();
+      if (fact.firstChild !== null) label.selectNodeContents(fact.firstChild);
+      const rows = new Set([...label.getClientRects()].map((rect) => Math.round(rect.top)));
+      return {
+        words: fact.innerText.replace(/\s+/g, " ").trim(),
+        labelRows: rows.size,
+        cut: value === null || value.scrollWidth > value.clientWidth + 1,
+        past: fact.getBoundingClientRect().right > edge + 1,
+      };
+    });
+  });
+}
+
+/** Every fact in sight, its label on one line and its words whole (D-I1). */
+async function expectFactsWhole(page: Page, expected: RegExp[]) {
+  await page.evaluate(() => document.fonts.ready);
+  const facts = await stripFacts(page);
+  expect(facts.map((fact) => fact.words)).toEqual(
+    expected.map((pattern) => expect.stringMatching(pattern)),
+  );
+  for (const fact of facts) {
+    expect(fact.labelRows, `${fact.words}: its label on one line`).toBe(1);
+    expect(fact.cut, `${fact.words}: its value is shown whole`).toBe(false);
+    expect(fact.past, `${fact.words}: inside the strip`).toBe(false);
+  }
+}
+
 test("[WLD-05][UI-09][UI-05] below a desktop's width the strip keeps the person's facts, and the world's controls are in the account menu (F14)", async ({
   browser,
 }) => {
@@ -465,6 +501,23 @@ test("[WLD-05][UI-09][UI-05] below a desktop's width the strip keeps the person'
     if (viewport.width > 760) {
       await expect(strip.getByText(/^Work area /)).toBeVisible();
       await expect(strip.getByText(/^Budget /)).toBeVisible();
+      // Each fact has the room its words need, a money value never cut inside its digits
+      // (design review I1: "Budget Up to £1,50…" with room to spare).
+      await expectFactsWhole(page, [
+        /^Target Data quality analyst$/,
+        /^Work area \S.*$/,
+        /^Budget Up to £[\d,]+, at most £[\d,]+ a month$/,
+      ]);
+      // Three long targets and a budget not confirmed: still whole, "Not confirmed" included.
+      await page.goto(chapterUrl("you", await longTargetsWorkspace()));
+      await expect(saved(page)).toHaveText("Answers saved");
+      await expectFactsWhole(page, [
+        new RegExp(`^Target ${LONG_TARGETS[0]}, .*${LONG_TARGETS[2]}$`),
+        /^Work area Manchester$/,
+        /^Budget Not confirmed$/,
+      ]);
+      await page.goto(chapterUrl("you"));
+      await expect(saved(page)).toHaveText("Answers saved");
     }
     await expect(strip.getByRole("button", { name: /^Hold the world still/ })).toHaveCount(0);
     await expect(strip.getByRole("button", { name: /^Sound/ })).toHaveCount(0);

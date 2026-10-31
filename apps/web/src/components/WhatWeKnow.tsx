@@ -4,7 +4,7 @@
 // explained in plain words (session 2: "total spending limit and monthly payment limit - what
 // do these mean??"), and the way in to edit them. `SaveNotice` says what the last decision
 // saved, with Undo in its own colour (session 2, C3), wherever the person is.
-import { type Ref, useId } from "react";
+import { type ReactNode, type Ref, useId } from "react";
 import type { ProfileOut } from "@/generated/api";
 import { describeField } from "@/lib/profile";
 import { useRevertProfile } from "@/lib/queries";
@@ -85,20 +85,39 @@ export function SaveNotice({
   );
 }
 
+/**
+ * The view's action comes first, under its heading, and the answer form it opens right under
+ * it, so a phone shows the decision in its first screen however many answers there are (F7,
+ * design review I3); the answers follow.
+ */
 export function WhatWeKnow({
   profile,
   onEdit,
   editing,
+  form,
 }: {
   profile: ProfileOut;
   onEdit(): void;
   editing: boolean;
+  /** The answer form, while it is open. */
+  form: ReactNode;
 }) {
   const known = PROFILE_FIELD_ORDER.filter((name) => profile.document[name].state !== "unasked");
   const open = PROFILE_FIELD_ORDER.filter((name) => profile.document[name].state === "unasked");
 
   return (
     <>
+      <div>
+        <Button
+          variant="secondary"
+          aria-expanded={editing}
+          aria-controls="edit-answers"
+          onClick={onEdit}
+        >
+          {editing ? "Close the answer form" : "Edit answers directly"}
+        </Button>
+      </div>
+      {form}
       <section className="known-group" aria-labelledby="known-answers">
         <h3 id="known-answers">Your answers</h3>
         {known.length === 0 ? (
@@ -127,16 +146,6 @@ export function WhatWeKnow({
           <p className="small muted">{open.map((name) => PROFILE_FIELDS[name].label).join(", ")}</p>
         </section>
       )}
-      <div>
-        <Button
-          variant="secondary"
-          aria-expanded={editing}
-          aria-controls="edit-answers"
-          onClick={onEdit}
-        >
-          {editing ? "Close the answer form" : "Edit answers directly"}
-        </Button>
-      </div>
     </>
   );
 }

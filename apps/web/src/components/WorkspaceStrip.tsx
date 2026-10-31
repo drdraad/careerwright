@@ -6,14 +6,14 @@
 // updates say nothing while they work; when they don't, the strip says so (an announced
 // status). Settings such as calm mode and how Careerwright talks with you live in the account
 // menu, never on the first screen (plan section 4). The synthetic label shows at every width.
-// A tablet's strip is two rows: the synthetic label, the target, the work area and the budget
-// (each ending in an ellipsis if it must: the person's facts come first, the audit's F14), then
-// the states and the account menu; below a desktop's width the world's controls are in the
-// account menu (`menu`), beside calm mode. On a phone the strip keeps the saved state, any update
-// state and the account menu (which also leads to the workspaces), on one row while updates
-// connect or reconnect; a stopped state and a failed refresh take a row of their own, so their
-// words are read whole: the top bar carries the chapter and the synthetic label, and the world
-// names the target.
+// A tablet's strip shows the synthetic label, the target, the work area and the budget, each
+// whole (the person's facts come first, the audit's F14: a fact that doesn't fit moves to the
+// next row), then a row of the states and the account menu; below a desktop's width the
+// world's controls are in the account menu (`menu`), beside calm mode. On a phone the strip
+// keeps the saved state, any update state and the account menu (which also leads to the
+// workspaces), on one row while updates connect or reconnect; a stopped state and a failed
+// refresh take a row of their own, so their words are read whole: the top bar carries the
+// chapter and the synthetic label, and the world names the target.
 import * as Popover from "@radix-ui/react-popover";
 import Link from "next/link";
 import type { ReactNode } from "react";

@@ -261,20 +261,24 @@ export const ROLE_OR_EXPLORE = {
 /** Before detailed collection (BND1-02): what Careerwright covers, in one plain line. */
 export const ENGLAND_ONLY = "Careerwright covers England for now.";
 
+/** Before the entry choice: what Careerwright is for, in one plain line (session 2's start
+ *  page: "It's for inputing information about yourself and your job preferences, not sure"). */
+export const PURPOSE =
+  "Careerwright helps you find work that could suit you, see what it would take, and plan a route you can afford.";
+
 /** A suggestion's words beyond the API's (Task W2E): each says what Careerwright did. */
 export const SUGGESTION_WORDS = {
   /** A suggestion that is one of the person's targets (STATE-10). */
   chosen: "Saved as one of your targets",
-  /** The skills it was joined to a title of the person's by: the first few (the audit's F4). */
-  joinedBy: "Careerwright joined them by these skills:",
+  /** The skills it was joined to a title of the person's by, named under the reason that says
+   *  so (the API's): the first few (the audit's F4), the join never stated twice (D-I2). */
+  skillsNamed: (first: string, more: boolean) =>
+    more ? `Among them: ${first}.` : `Those skills: ${first}.`,
   otherSkills: (count: number) => `The other ${count} ${count === 1 ? "skill" : "skills"}`,
   /** The slate's unexpected connection, in words; its light in the world is Task M's. */
   connection: "An unexpected connection",
-  connectionLine: (role: string, count: number) =>
-    `Careerwright joined this to your role, “${role}”, by ${count} essential ${
-      count === 1 ? "skill" : "skills"
-    } ESCO lists for both.`,
-  connectionSkills: (count: number) => `The ${count} ${count === 1 ? "skill" : "skills"}`,
+  /** What the connection's skills haven't been checked against yet. */
+  notCompared: "Careerwright hasn't compared them with your own experience yet.",
 } as const;
 
 /** A streamed reply's state in words. Only "incomplete" is final; nothing streamed is saved. */
@@ -706,16 +710,15 @@ export const NOTE_RECOVERY = {
 } as const;
 
 /** The line on each card when its note is missing: after a run that failed, or after a
- *  request refused before any run existed. */
+ *  request refused before any run existed. "How Careerwright found it" follows at once. */
 export const NOTE_CARD = {
   failed: {
     detail: "no written note",
-    after: "Nothing from it was kept; how Careerwright found this suggestion is below.",
+    after: "Nothing from it was kept.",
   },
   refused: {
     detail: "no written note",
-    after:
-      "Careerwright didn't ask the model, so nothing was sent; how Careerwright found this suggestion is below.",
+    after: "Careerwright didn't ask the model, so nothing was sent.",
   },
 } as const;
 

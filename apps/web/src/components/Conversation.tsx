@@ -13,8 +13,9 @@
 // it is, dismissible, and the question steps aside while it is shown (no career question that
 // turn).
 //
-// Task W2E: until the first answer, one plain line says Careerwright covers England for now
-// (BND1-02), and the entry choice is the bright action, never Send on an empty field (F17).
+// Task W2E: before the entry choice, one plain line says what Careerwright is for; until the
+// first answer, one says Careerwright covers England for now (BND1-02); and the entry choice
+// is the bright action, never Send on an empty field (F17).
 // Each demo question offers one-tap example replies the demo interviewer reads (STATE-09), and
 // the role-or-explore question offers two ways on that open existing views.
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
@@ -42,6 +43,7 @@ import {
   FAILURE_CLASS,
   OPENING_QUESTION,
   PARTIAL_REPLY,
+  PURPOSE,
   ROLE_OR_EXPLORE,
 } from "@/lib/vocabulary";
 import { useSupportShown } from "@/lib/world/settings";
@@ -179,6 +181,9 @@ function EntryChoice({
 }) {
   return (
     <section className="question" aria-labelledby="entry-title">
+      {/* What Careerwright is for, before the choice (session 2: "not sure" what the start
+          page was for). One line, and no helper text beyond it. */}
+      <p className="measure mb-12">{PURPOSE}</p>
       <h2 id="entry-title" className="display">
         How would you like to start?
       </h2>
@@ -449,7 +454,12 @@ export function Conversation({
                   sendBlocked === undefined && (
                     <ExampleReplies
                       replies={EXAMPLE_REPLIES[asks]}
-                      onSend={(text) => void send(text)}
+                      onSend={(text) => {
+                        // The examples go while it is sent; focus goes to the reply field,
+                        // which stays, never to the page (app review I2).
+                        replyField.current?.focus();
+                        void send(text);
+                      }}
                     />
                   )
                 )}
