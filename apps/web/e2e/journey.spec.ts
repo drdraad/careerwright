@@ -1,6 +1,7 @@
 // The Sprint 1 journey (plan, Sprint 1 demonstrable outcome): sign in as a seeded identity,
-// edit the profile, inspect the fixture route, restart every service, reopen the same work.
-// Throughout, the browser talks only to the web origin and the local Auth emulator.
+// edit the profile, open Routes (a place not built yet since the fixture route preview left
+// the person's path, Task W2E), restart every service, reopen the same work. Throughout, the
+// browser talks only to the web origin and the local Auth emulator.
 import { expect, test } from "@playwright/test";
 import {
   chapterUrl,
@@ -19,7 +20,7 @@ test.beforeEach(() => {
   stack("reset-demo");
 });
 
-test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, inspect a fixture route, restart, reopen", async ({
+test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, open Routes, restart, reopen", async ({
   page,
 }) => {
   test.setTimeout(420_000);
@@ -53,27 +54,15 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, inspect a fixture rout
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
 
-  // The fixture route preview, labelled as such, and route B's figures from the fixture.
+  // Routes, a place not built yet in this workspace too: the fixture route preview left the
+  // person's path (Task W2E, the audit's ruling), so nothing here is anyone's route.
   await page
     .getByRole("navigation", { name: "Chapters" })
-    .getByRole("link", { name: "Routes" })
+    .getByRole("link", { name: /^Routes/ })
     .click();
-  await expect(page.getByText("Fixture preview: not your routes")).toBeVisible();
-  const routeB = page.getByRole("button", { name: /^Route B/ });
-  await routeB.click();
-  const routeDrawer = page.getByRole("dialog", { name: "Route B" });
-  await expect(routeDrawer.getByText("Synthetic fixture route")).toBeVisible();
-  await expect(
-    routeDrawer.getByText("minimum prefunded cash balance of £4,850", { exact: false }),
-  ).toBeVisible();
-  await expect(
-    routeDrawer
-      .getByRole("definition")
-      .filter({ hasText: /^£600$/ })
-      .first(),
-  ).toBeVisible();
-  await routeDrawer.getByRole("button", { name: "Close route B" }).click();
-  await expect(routeB).toBeFocused();
+  // The place's own kicker (the rail's marks say it in lower case).
+  await expect(page.getByText("Not built yet", { exact: true })).toBeVisible();
+  await expect(page.getByText("Fixture preview: not your routes")).toHaveCount(0);
 
   // Restart every service. The open page notices, reconnects, and keeps working.
   const stopped = Date.now();
@@ -86,7 +75,7 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, inspect a fixture rout
   // above) is the only marker: nothing refetches, so there is no "Couldn't refresh" notice.
   // Never a blank or an error page in place of the work.
   await expect(page.getByRole("heading", { level: 1, name: "Routes" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Route B/ })).toBeVisible();
+  await expect(page.getByText("Not built yet", { exact: true })).toBeVisible();
   stack("demo");
   // The restarted emulator re-imports its seed, which revokes ID tokens issued before; the
   // stream is refused once (401), refreshes the token and reconnects. "Live" proves that path.

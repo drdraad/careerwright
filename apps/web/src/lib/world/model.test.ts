@@ -32,7 +32,7 @@ function profile(changes: Partial<ProfileDocument>, version = 1): ProfileOut {
   };
 }
 
-describe("[UI-04] the world draws what the person has said, and nothing else", () => {
+describe("[WLD-04][UI-04] the world draws what the person has said, and nothing else", () => {
   it("waits, dark, with one unlit light while nothing is loaded or answered", () => {
     expect(worldFromProfile(undefined)).toEqual(EMPTY_WORLD);
     expect(worldFromProfile(profile({}, 0))).toEqual(EMPTY_WORLD);

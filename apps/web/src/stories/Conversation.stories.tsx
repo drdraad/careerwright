@@ -493,6 +493,37 @@ export const SavedWithUndo: Story = {
   ),
 };
 
+/** A decided demo turn whose next question asks about `asks` (Task W2E, STATE-09). */
+const asking = (
+  asks: NonNullable<TurnOut["proposal"]>["asks_about"],
+  question: string,
+): TurnOut => ({
+  ...turn("complete", {
+    ...(proposal as NonNullable<TurnOut["proposal"]>),
+    reply: "Demo interviewer (synthetic): Thank you.",
+    changes: [],
+    next_question: question,
+    asks_about: asks,
+  }),
+});
+/** A demo question with its one-tap example replies. */
+export const DemoQuestionWithExamples: Story = {
+  render: you(
+    chapterRoutes(prefs("unsure"), [
+      asking("cities", "Which English cities could you work in? Name up to three."),
+    ]),
+  ),
+};
+/** "Do you have a role in mind, or would you like to explore?": two ways on, which open
+ *  existing views and commit nothing. */
+export const RoleOrExplore: Story = {
+  render: you(
+    chapterRoutes(prefs("unsure"), [
+      asking("target_titles", "Do you have a role in mind, or would you like to explore?"),
+    ]),
+  ),
+};
+
 const directions =
   (shown: SuggestionOut[], status: WorkState = "complete", reachedNoModel = false) =>
   () => (
@@ -514,6 +545,104 @@ export const SlateNotePending: Story = { render: directions(full, "running") };
 export const SlateNoteUnavailable: Story = { render: directions(full, "failed") };
 /** The note was refused before any request reached a model: Try again, on a click. */
 export const SlateNoteRetry: Story = { render: directions(full, "failed", true) };
+const skill = (id: string, label: string) => ({ skill_id: id, label, skill_type: "skill" });
+const joinedSkills = [
+  skill("k1", "manage warehouse operations"),
+  skill("k2", "plan work schedules"),
+  skill("k3", "supervise staff"),
+  skill("k4", "ensure health and safety"),
+  skill("k5", "use logistics software"),
+];
+/** Joined to the person's role by shared skills: the first few named, the rest one step away;
+ *  the slate's unexpected connection is shown in words on its own suggestion (Task W2E). */
+const joined = full.map((shown, i) =>
+  i < 2
+    ? {
+        ...shown,
+        channels: ["shared_skills" as const],
+        why_it_could_suit: [
+          "Your current role: “warehouse supervisor”. ESCO lists 5 of the same essential skills for both, so Careerwright joined them by those skills.",
+        ],
+        shared_skills: joinedSkills,
+      }
+    : shown,
+);
+export const SlateJoinedBySkillsWithAConnection: Story = {
+  render: () => (
+    <Api
+      routes={[
+        {
+          method: "GET",
+          path: /\/slate$/,
+          answer: {
+            ...slate(joined),
+            connection: {
+              concept_id: joined[0]?.concept_id ?? "",
+              title: joined[0]?.title ?? "",
+              role_title: "warehouse supervisor",
+              sentence:
+                "A warehouse supervisor and an agricultural machinery technician share 5 essential skills.",
+              shared_skill_count: 5,
+              shared_skills: joinedSkills,
+              still_uncertain:
+                "These are the skills ESCO lists for both roles. They aren't compared with your own experience yet.",
+            },
+          },
+        },
+      ]}
+    >
+      <Directions
+        workspaceId={WS}
+        profile={profile}
+        discovery={discoveryWith(note("complete", joined, false))}
+      />
+    </Api>
+  ),
+};
+/** A suggestion made a target from this slate: confirmed in place with what it usually asks
+ *  for, and the slate still current (STATE-10). */
+export const SlateTargetChosen: Story = {
+  render: () => (
+    <Api
+      routes={[
+        { method: "GET", path: /\/slate$/, answer: slate(full) },
+        {
+          method: "GET",
+          path: /\/sketch$/,
+          answer: {
+            ...sketch,
+            not_asked: [],
+            targets: [
+              {
+                title: "agricultural machinery technician",
+                resolution: "esco",
+                occupations: [],
+                close_matches: [],
+                requirements: ["repair agricultural machinery", "use hand tools", "test equipment"],
+                requirement_count: 12,
+                regulated: false,
+                research_status: "Not researched yet.",
+              },
+            ],
+          },
+        },
+      ]}
+    >
+      <Directions
+        workspaceId={WS}
+        profile={{
+          ...profile,
+          version: 4,
+          document: {
+            ...profile.document,
+            target_titles: given(["agricultural machinery technician"]),
+          },
+        }}
+        discovery={discoveryWith(note("complete", full, false))}
+      />
+    </Api>
+  ),
+};
 /** A confirmed salary floor (slice 7B fix round 1, review A M8): applied, with what it left
  *  out, what met it and why the rest were kept. In L0 no UK occupation mapping is reviewed,
  *  so it leaves no suggestion out, and says so. */

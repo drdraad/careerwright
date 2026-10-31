@@ -60,7 +60,7 @@ const names = () =>
     .getAllByRole("listitem")
     .map((item) => item.textContent);
 
-describe("[UI-07][UI-05] the world behind every chapter", () => {
+describe("[WLD-01][WLD-02][WLD-03][WLD-07][UI-07][UI-05] the world behind every chapter", () => {
   beforeEach(() => {
     gl.refuses = false;
     motion({ reduce: false, webgl2: false });
@@ -230,6 +230,37 @@ describe("[UI-07][UI-05] the world behind every chapter", () => {
       vi.advanceTimersByTime(3000);
     });
     expect(world()).toHaveAttribute("data-motion", "running");
+  });
+
+  it("measures the panels again when a view is shown or hidden, with nothing added or removed (re-review N1)", async () => {
+    // The You chapter's views stay mounted and switch by `hidden`: with no child or text
+    // change, the world must still notice that the panel over it moved.
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    motion({ reduce: true, webgl2: false });
+    const panel = document.createElement("div");
+    panel.setAttribute("data-world-panel", "");
+    const view = document.createElement("div");
+    panel.append(view);
+    document.body.append(panel);
+    const measured = vi.spyOn(panel, "getBoundingClientRect");
+    render(<World place="you" input={input} calm={false} paused={false} />);
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+
+    for (const change of [
+      () => view.setAttribute("hidden", ""),
+      () => view.removeAttribute("hidden"),
+    ]) {
+      const before = measured.mock.calls.length;
+      change();
+      await act(async () => {
+        await Promise.resolve(); // the observer's records arrive as a microtask
+        vi.advanceTimersByTime(100);
+      });
+      expect(measured.mock.calls.length).toBeGreaterThan(before);
+    }
+    panel.remove();
   });
 
   it("swells when the person's light comes on, never for what was there on arrival", () => {

@@ -104,6 +104,93 @@ export async function saveElsewhere(
   return saved.version;
 }
 
+/** Waits until a run (a turn's, a discovery's) is complete. */
+async function completes(path: string, token: string) {
+  await expect
+    .poll(
+      async () => (await asBrowser<{ run: { status: string } }>("GET", path, token)).run.status,
+      { timeout: 60_000 },
+    )
+    .toBe("complete");
+}
+
+/**
+ * The four early answers given and no target, then a message the demo interviewer notes
+ * nothing from: its question is "Do you have a role in mind, or would you like to explore?",
+ * with no tray before it (demo mode).
+ */
+export async function roleQuestionWorkspace(token: string): Promise<string> {
+  const { workspace_id: id } = await asBrowser<{ workspace_id: string }>(
+    "POST",
+    "/v1/workspaces",
+    token,
+    { name: "Role or explore (synthetic)", data_mode: "demo", synthetic: true },
+  );
+  const base = `/v1/workspaces/${id}`;
+  const blank = await asBrowser<{ document: Record<string, unknown> }>(
+    "GET",
+    `${base}/profile`,
+    token,
+  );
+  const profile: Record<string, unknown> = Object.fromEntries(
+    Object.keys(blank.document)
+      .filter((field) => field !== "schema_version")
+      .map((field) => [field, { state: "unasked" }]),
+  );
+  profile.current_role = { state: "provided", value: "warehouse supervisor" };
+  profile.enjoyed_tasks = { state: "provided", value: ["fixing bikes"] };
+  profile.cities = { state: "provided", value: ["Leeds"] };
+  profile.weekly_study_hours = { state: "unknown" };
+  profile.direct_spend_cap = { state: "prefer_not_to_say" };
+  await asBrowser("PUT", `${base}/profile`, token, { expected_version: 0, profile });
+  await asBrowser("PUT", `${base}/interview/preferences`, token, {
+    expected_version: 0,
+    entry_mode: "unsure",
+    conversation_mode: null,
+    paused: false,
+  });
+  const turn = await asBrowser<{ turn_id: string }>("POST", `${base}/interview/turns`, token, {
+    expected_profile_version: 1,
+    message: "Synthetic: hello.",
+  });
+  await completes(`${base}/interview/turns/${turn.turn_id}`, token);
+  return id;
+}
+
+type Listed = { concept_id: string; title: string; direction: string };
+const LISTED_ORDER = ["close_to_current", "transferable", "less_familiar"];
+
+/**
+ * As `talkedWorkspace`, with the suggestion its slate opens on made a target, from the slate:
+ * the slate stays current (STATE-10). Returns the workspace and the target's title.
+ */
+export async function chosenTargetWorkspace(
+  token: string,
+): Promise<{ workspace: string; title: string }> {
+  const workspace = await talkedWorkspace(token);
+  const base = `/v1/workspaces/${workspace}`;
+  const [found] = (
+    await asBrowser<{ items: { discovery_id: string }[] }>("GET", `${base}/discoveries`, token)
+  ).items;
+  if (found === undefined) throw new Error("no discovery");
+  const slate = await asBrowser<{ suggestions: Listed[] }>(
+    "GET",
+    `${base}/discoveries/${found.discovery_id}/slate`,
+    token,
+  );
+  // The slate lists its suggestions grouped by direction, and opens on the first listed.
+  const [first] = LISTED_ORDER.flatMap((direction) =>
+    slate.suggestions.filter((s) => s.direction === direction),
+  );
+  if (first === undefined) throw new Error("no suggestion");
+  await asBrowser("POST", `${base}/targets`, token, {
+    expected_version: 1,
+    concept_id: first.concept_id,
+    discovery_id: found.discovery_id,
+  });
+  return { workspace, title: first.title };
+}
+
 /** Answers, a reply to review and a completed discovery, through the API (demo mode). */
 export async function talkedWorkspace(token: string): Promise<string> {
   const { workspace_id: id } = await asBrowser<{ workspace_id: string }>(

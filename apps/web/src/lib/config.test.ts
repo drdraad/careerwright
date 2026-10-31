@@ -6,7 +6,6 @@ const SAFE = {
   CAREERWRIGHT_AUTH_EMULATOR_URL: "http://127.0.0.1:59099",
   CAREERWRIGHT_FIREBASE_PROJECT_ID: "demo-careerwright",
   CAREERWRIGHT_WEB_ALLOWED_HOSTS: "127.0.0.1:53000,localhost:53000",
-  CAREERWRIGHT_FIXTURES_DIR: "/fixtures/m0",
 };
 
 describe("[SEC-03][BND1-13] the web server refuses unsafe configuration", () => {
@@ -16,7 +15,6 @@ describe("[SEC-03][BND1-13] the web server refuses unsafe configuration", () => 
       authEmulatorUrl: "http://127.0.0.1:59099",
       firebaseProjectId: "demo-careerwright",
       allowedHosts: ["127.0.0.1:53000", "localhost:53000"],
-      fixturesDir: "/fixtures/m0",
     });
   });
 
@@ -31,7 +29,6 @@ describe("[SEC-03][BND1-13] the web server refuses unsafe configuration", () => 
     ["CAREERWRIGHT_WEB_ALLOWED_HOSTS", "127.0.0.1:53000,careerwright.example.com:53000"],
     ["CAREERWRIGHT_WEB_ALLOWED_HOSTS", "127.0.0.1"],
     ["CAREERWRIGHT_WEB_ALLOWED_HOSTS", ""],
-    ["CAREERWRIGHT_FIXTURES_DIR", ""],
   ])("refuses %s=%j", (name, value) => {
     expect(() => readWebConfig({ ...SAFE, [name]: value })).toThrow(name);
   });

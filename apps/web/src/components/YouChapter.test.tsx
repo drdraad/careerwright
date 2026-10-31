@@ -152,12 +152,12 @@ function routes(
   ];
 }
 
-function renderYou() {
+function renderYou(shown: ProfileOut = profile, where: WorkspaceOut = workspace) {
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queries}>
       <EvidenceProvider>
-        <YouChapter workspace={workspace} profile={profile} />
+        <YouChapter workspace={where} profile={shown} />
       </EvidenceProvider>
     </QueryClientProvider>,
   );
@@ -624,6 +624,9 @@ describe("[UI-04][UI-06] one decision at a time, and Resume while paused", () =>
       name: "What would you most like to be different about your working life?",
     });
     await waitFor(() => expect(question).toHaveFocus());
+    // Back to answering: Send is bright once there is something to send (F17).
+    expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-secondary");
+    await user.type(screen.getByRole("textbox", { name: "Reply to Careerwright" }), "Hello");
     expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-primary");
     expect(sent.filter((s) => s.method === "PUT").map((s) => s.body)).toEqual([
       { expected_version: 1, entry_mode: "unsure", conversation_mode: null, paused: true },
@@ -1161,24 +1164,29 @@ describe("[UI-06][STATE-01] a failed reply says why and keeps one primary action
 describe("[UI-04][S0-V08] one filled primary action in each state of the chapter", () => {
   const count = visiblePrimaries;
 
-  it("is Send when nothing waits, the tray's Save while reviewing, and Send at the entry", async () => {
+  it("is the entry choice at the start, Send once there is something to send, and the tray's Save while reviewing", async () => {
     fakeApi(routes({ preferences: prefs(null), turns: [] }));
-    renderYou();
+    const start = renderYou();
     await screen.findByRole("button", { name: "Help me explore" });
-    // Chat is immediate (session 2): Send is the one action; the two equal choices are quick
-    // answers, neither pushed.
-    expect(screen.getByRole("button", { name: "Help me explore" })).toHaveClass("btn-secondary");
-    expect(screen.getByRole("button", { name: "I know my direction" })).toHaveClass(
-      "btn-secondary",
-    );
+    // Until the first answer the bright action is the entry choice, never Send on an empty
+    // field (the audit's F17): the two equal choices together, edged in the action colour,
+    // neither filled over the other.
+    expect(screen.getByRole("button", { name: "Help me explore" })).toHaveClass("btn-choice");
+    expect(screen.getByRole("button", { name: "I know my direction" })).toHaveClass("btn-choice");
+    expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-secondary");
+    expect(count()).toBe(0);
+    // Chat is still immediate (session 2): typed first, Send is the one bright action.
+    await start.type(screen.getByRole("textbox", { name: "Reply to Careerwright" }), "Hello");
     expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-primary");
     expect(count()).toBe(1);
 
     cleanup();
     fakeApi(routes({ preferences: prefs("unsure"), turns: [] }));
-    renderYou();
+    const opened = renderYou();
     await screen.findByRole("button", { name: "Send" });
-    expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-primary");
+    expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-secondary");
+    expect(count()).toBe(0);
+    await opened.type(screen.getByRole("textbox", { name: "Reply to Careerwright" }), "Hello");
     expect(count()).toBe(1);
 
     cleanup();
@@ -1192,5 +1200,207 @@ describe("[UI-04][S0-V08] one filled primary action in each state of the chapter
     await user.click(screen.getByRole("button", { name: "Edit answers directly" }));
     expect(await screen.findByRole("button", { name: "Save changes" })).toBeVisible();
     expect(count()).toBe(1); // the form's Save while it is open
+  });
+});
+
+/** A decided demo turn whose next question asks about `asks` (the API's `asks_about`). */
+const asking = (
+  asks: NonNullable<TurnOut["proposal"]>["asks_about"],
+  question: string,
+): TurnOut => ({
+  ...turn("complete", {
+    ...(proposal as NonNullable<TurnOut["proposal"]>),
+    changes: [],
+    next_question: question,
+    asks_about: asks,
+  }),
+});
+const ROLE_QUESTION = "Do you have a role in mind, or would you like to explore?";
+const keyStored: Route = {
+  method: "GET",
+  path: /\/credentials$/,
+  answer: {
+    items: [
+      {
+        credential_id: "c1",
+        provider: "meta",
+        active: true,
+        consented_at: "2027-01-01T00:00:00Z",
+        created_by: "a1",
+        created_at: "2027-01-01T00:00:00Z",
+        revoked_at: null,
+        replaced_by: null,
+      },
+    ],
+  },
+};
+const sendsTurn = { method: "POST", path: /\/interview\/turns$/, status: 202, answer: {} };
+const withEvidence: ProfileOut = {
+  ...profile,
+  document: {
+    ...answers,
+    current_role: { state: "provided", value: "warehouse supervisor", source_ref_id: "s1" },
+  },
+};
+
+describe("[STATE-09] the demo conversation never loops: example replies and two ways on", () => {
+  it("offers the opening question's example replies and sends one in a tap", async () => {
+    const sent = fakeApi(routes({ preferences: prefs("unsure"), turns: [] }, [sendsTurn]));
+    const user = renderYou();
+
+    const examples = await screen.findByRole("group", { name: "Example replies" });
+    expect(
+      within(examples)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["I enjoy working with people", "Skip"]);
+    await user.click(within(examples).getByRole("button", { name: "Skip" }));
+
+    await waitFor(() =>
+      expect(sent.filter((s) => s.method === "POST").map((s) => s.body)).toEqual([
+        { expected_profile_version: 1, message: "Skip" },
+      ]),
+    );
+  });
+
+  it("offers each demo question's own examples, read from what it asks about", async () => {
+    fakeApi(
+      routes({
+        preferences: prefs("unsure"),
+        turns: [asking("cities", "Which English cities could you work in? Name up to three.")],
+      }),
+    );
+    renderYou();
+
+    const examples = await screen.findByRole("group", { name: "Example replies" });
+    expect(
+      within(examples)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Leeds", "Skip"]);
+  });
+
+  it("offers no examples for a model's question: a live interview reads free text", async () => {
+    const live = { ...workspace, data_mode: "live_assisted" as const };
+    fakeApi(
+      routes({ preferences: prefs("unsure"), turns: [asking(null, "What draws you to it?")] }, [
+        keyStored,
+      ]),
+    );
+    renderYou(profile, live);
+
+    await screen.findByRole("heading", { name: "What draws you to it?" });
+    expect(screen.queryByRole("group", { name: "Example replies" })).toBeNull();
+  });
+
+  it("asks a role or suggestions with two buttons: suggestions opens and starts them, focus with it", async () => {
+    const sent = fakeApi(
+      routes({ preferences: prefs("unsure"), turns: [asking("target_titles", ROLE_QUESTION)] }, [
+        { method: "POST", path: /\/discoveries$/, status: 202, answer: {} },
+      ]),
+    );
+    const user = renderYou(withEvidence);
+
+    await screen.findByRole("heading", { name: ROLE_QUESTION });
+    expect(screen.queryByRole("group", { name: "Example replies" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Show me suggestions" }));
+
+    expect(screen.getByRole("tab", { name: "Suggestions" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Directions to explore" })).toHaveFocus(),
+    );
+    await waitFor(() =>
+      expect(
+        sent
+          .filter((s) => s.method === "POST" && s.path.endsWith("/discoveries"))
+          .map((s) => s.body),
+      ).toEqual([{ expected_profile_version: 1 }]),
+    );
+    // Nothing else was written: no answer, no target.
+    expect(sent.filter((s) => s.method !== "GET" && !s.path.endsWith("/discoveries"))).toEqual([]);
+  });
+
+  it("opens the answer form at the target roles, ready to type, for Name a role", async () => {
+    const sent = fakeApi(
+      routes({ preferences: prefs("unsure"), turns: [asking("target_titles", ROLE_QUESTION)] }),
+    );
+    const user = renderYou(withEvidence);
+
+    await user.click(await screen.findByRole("button", { name: "Name a role" }));
+
+    expect(screen.getByRole("tab", { name: "What we know" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "Target role 1" })).toHaveFocus(),
+    );
+    expect(sent.filter((s) => s.method !== "GET")).toEqual([]); // nothing saved by itself
+  });
+
+  it("offers the same two in a live interview once the early answers are given and no target", async () => {
+    const live = { ...workspace, data_mode: "live_assisted" as const };
+    const given = { state: "unknown" as const, value: null, source_ref_id: "s1" };
+    const early: ProfileOut = {
+      ...profile,
+      document: {
+        ...answers,
+        current_role: given,
+        cities: given,
+        weekly_study_hours: given,
+        direct_spend_cap: given,
+      },
+    };
+    fakeApi(
+      routes({ preferences: prefs("unsure"), turns: [asking(null, "Is there a role you want?")] }, [
+        keyStored,
+      ]),
+    );
+    renderYou(early, live);
+
+    await screen.findByRole("heading", { name: "Is there a role you want?" });
+    expect(screen.getByRole("button", { name: "Show me suggestions" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Name a role" })).toBeVisible();
+  });
+
+  it("says Careerwright covers England for now, before the first answer only (BND1-02)", async () => {
+    fakeApi(routes({ preferences: prefs(null), turns: [] }));
+    renderYou();
+    expect(await screen.findByText("Careerwright covers England for now.")).toBeVisible();
+
+    cleanup();
+    fakeApi(routes({ preferences: prefs("unsure"), turns: [turn("complete", proposal)] }));
+    renderYou();
+    await screen.findByRole("region", { name: /To review/ });
+    expect(screen.queryByText("Careerwright covers England for now.")).toBeNull();
+  });
+});
+
+describe("[UI-06] focus follows a sure person who asks to explore instead", () => {
+  it("moves focus to the suggestions that replace Help me explore instead", async () => {
+    const state = { preferences: prefs("sure"), turns: [] as TurnOut[] };
+    fakeApi(
+      routes(state, [
+        {
+          method: "PUT",
+          path: /\/interview\/preferences$/,
+          answer: () => {
+            state.preferences = { ...state.preferences, version: 2, entry_mode: "unsure" };
+            return state.preferences;
+          },
+        },
+      ]),
+    );
+    const user = renderYou(withEvidence);
+    await user.click(await screen.findByRole("tab", { name: "Suggestions" }));
+
+    await user.click(screen.getByRole("button", { name: "Help me explore instead" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Directions to explore" })).toHaveFocus(),
+    );
   });
 });

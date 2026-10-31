@@ -12,6 +12,11 @@
 // refusal if the send is refused (ADR 0007 decision 7): announced politely, focus left where
 // it is, dismissible, and the question steps aside while it is shown (no career question that
 // turn).
+//
+// Task W2E: until the first answer, one plain line says Careerwright covers England for now
+// (BND1-02), and the entry choice is the bright action, never Send on an empty field (F17).
+// Each demo question offers one-tap example replies the demo interviewer reads (STATE-09), and
+// the role-or-explore question offers two ways on that open existing views.
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import type {
   EntryMode,
@@ -21,14 +26,23 @@ import type {
   TurnOut,
   WorkspaceOut,
 } from "@/generated/api";
-import { replyView, turnFailed, turnRunning } from "@/lib/conversation";
+import {
+  asksRoleOrExplore,
+  questionAsks,
+  replyView,
+  turnFailed,
+  turnRunning,
+} from "@/lib/conversation";
 import { type MessageSender, useSetPreferences, useTurnReply } from "@/lib/queries";
 import {
+  ENGLAND_ONLY,
   ENTRY_MODE,
+  EXAMPLE_REPLIES,
   FAILED_REPLY_LABEL,
   FAILURE_CLASS,
   OPENING_QUESTION,
   PARTIAL_REPLY,
+  ROLE_OR_EXPLORE,
 } from "@/lib/vocabulary";
 import { useSupportShown } from "@/lib/world/settings";
 import { Alert } from "./Alert";
@@ -52,6 +66,10 @@ type Props = {
   primary: string;
   announce(text: string): void;
   onEditAnswers(): void;
+  /** "Show me suggestions": opens the suggestions and asks for some (STATE-09). */
+  onShowSuggestions(): void;
+  /** "Name a role": opens the answer form at the target roles (STATE-09). */
+  onNameRole(): void;
   /** What the latest reply proposes, or what the last decision on it did: right after it. */
   review?: ReactNode;
   /** Quiet things at the end of the view (the stored key's details). */
@@ -166,11 +184,12 @@ function EntryChoice({
       </h2>
       <div className="choices">
         {/* The two choices name themselves; their glosses were helper text that didn't help
-            (session 2: "too much helper text"). */}
+            (session 2: "too much helper text"). Together they are the start's bright action,
+            never Send on an empty field (F17). */}
         {(Object.keys(ENTRY_MODE) as EntryMode[]).map((entry) => (
           <Button
             key={entry}
-            variant="secondary"
+            variant="choice"
             aria-pressed={preferences.entry_mode === entry}
             onClick={() => onChoose(entry)}
           >
@@ -179,6 +198,27 @@ function EntryChoice({
         ))}
       </div>
     </section>
+  );
+}
+
+/** Under a demo question: replies the demo interviewer reads, each sent in one tap. */
+function ExampleReplies({
+  replies,
+  onSend,
+}: {
+  replies: readonly string[];
+  onSend(text: string): void;
+}) {
+  if (replies.length === 0) return null;
+  return (
+    <fieldset className="example-replies mt-12">
+      <legend className="sr-only">Example replies</legend>
+      {replies.map((reply) => (
+        <Button key={reply} variant="secondary" onClick={() => onSend(reply)}>
+          {reply}
+        </Button>
+      ))}
+    </fieldset>
   );
 }
 
@@ -198,6 +238,8 @@ export function Conversation({
   primary,
   announce,
   onEditAnswers,
+  onShowSuggestions,
+  onNameRole,
   review,
   after,
 }: Props) {
@@ -223,6 +265,8 @@ export function Conversation({
       ? OPENING_QUESTION[preferences.entry_mode]
       : null);
   const entryNeeded = preferences.entry_mode === null && turns.length === 0;
+  const asks = questionAsks(answered, preferences.entry_mode);
+  const roleOrExplore = asksRoleOrExplore(asks, demo, preferences.entry_mode, profile.document);
 
   // Each new checked reply is announced once; a reply already there on load is not news.
   const announced = useRef<string | null | undefined>(undefined);
@@ -389,11 +433,33 @@ export function Conversation({
                     Answer in your own words, or say Skip, Unknown or Prefer not to say.
                   </p>
                 )}
+                {roleOrExplore ? (
+                  // Two ways on that open existing views; neither commits anything (STATE-09).
+                  <div className="choices">
+                    <Button variant="choice" onClick={onShowSuggestions}>
+                      {ROLE_OR_EXPLORE.explore}
+                    </Button>
+                    <Button variant="choice" onClick={onNameRole}>
+                      {ROLE_OR_EXPLORE.name}
+                    </Button>
+                  </div>
+                ) : (
+                  demo &&
+                  asks !== null &&
+                  sendBlocked === undefined && (
+                    <ExampleReplies
+                      replies={EXAMPLE_REPLIES[asks]}
+                      onSend={(text) => void send(text)}
+                    />
+                  )
+                )}
               </section>
             )
           )}
         </>
       )}
+      {/* Before detailed collection (BND1-02). */}
+      {turns.length === 0 && <p className="small muted">{ENGLAND_ONLY}</p>}
       {/* Saving the entry choice or a pause failed: said where the choice was made. */}
       {setPreferences.error !== null && <RequestFailure error={setPreferences.error} />}
 
@@ -429,9 +495,10 @@ export function Conversation({
           onChange={(event) => setMessage(event.target.value)}
         />
         <div className="grid justify-items-end gap-4">
+          {/* Bright only with something to send: never Send on an empty field (F17). */}
           <Button
             type="submit"
-            variant={primary === "send" ? "primary" : "secondary"}
+            variant={primary === "send" && message.trim() !== "" ? "primary" : "secondary"}
             disabledReason={sendBlocked}
           >
             Send
@@ -442,7 +509,7 @@ export function Conversation({
       {(!entryNeeded || demo) && (
         <div className="thread-meta">
           {!entryNeeded && !preferences.paused && (
-            // Named for what it pauses: the world's "Pause motion" is on the same screen.
+            // Named for what it pauses; the world's own control is "Hold the world still" (F17).
             <Button
               variant="quiet"
               onClick={() => {

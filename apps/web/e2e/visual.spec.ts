@@ -1,10 +1,12 @@
 // The visual review package (plan section 5, UI-11): every chapter and the shell's default,
 // selected, empty, stale, unavailable and failed states, and the You chapter's states as
-// rebuilt in Sprint W (the start with its reply field, what we know with the limits explained,
-// a reply to review, a decided reply with Undo, the slate in its own view with its written note
-// written, pending and unavailable, the support panel, a failed reply, key
-// consent, Unknown/Skipped/Prefer not to say, the scrolled stale conflict and its Save, and
-// expanded phone sheets), and the route comparison's disclosure and lower layers (Task 6c), at
+// rebuilt in Sprint W and finished in Task W2E (the start with its reply field, what we know
+// with the limits explained, a reply to review, a decided reply with Undo, the role-or-explore
+// question with its two ways on, the slate in its own view with its written note written,
+// pending and unavailable, a chosen target confirmed in place, the support panel, a failed
+// reply, key consent, Unknown/Skipped/Prefer not to say, the scrolled stale conflict and its
+// Save, and expanded phone sheets), Routes not built yet in the fixture workspace too (the
+// route preview left the person's path, the audit's ruling), at
 // 1440×900, 390×844 and 768×1024, plus the home page at 200 % zoom, each with the automatable
 // checks: axe (WCAG 2.0, 2.1 and 2.2 A/AA), horizontal overflow, a label overprinting its
 // value, a select cutting off its chosen option, console errors and font loading. These
@@ -16,7 +18,14 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { asBrowser, emulatorToken, saveElsewhere, talkedWorkspace } from "./api";
+import {
+  asBrowser,
+  chosenTargetWorkspace,
+  emulatorToken,
+  roleQuestionWorkspace,
+  saveElsewhere,
+  talkedWorkspace,
+} from "./api";
 import { type AxeViolation, axe, chapterUrl, liveUpdates, saved, signIn, youView } from "./helpers";
 import { FIXTURE_WORKSPACE, stack } from "./stack";
 
@@ -248,6 +257,10 @@ type Scratch = {
   /** As `talked`, for the shot that decides the reply's proposals (its own, so `talked` keeps
    *  its reply to review and its slate current). */
   decided: string;
+  /** The early answers given, no target: "Do you have a role in mind…" with its two ways on. */
+  asking: string;
+  /** As `talked`, with the suggestion its slate opens on made a target from the slate. */
+  chosen: string;
 };
 
 /** `scratch` workspaces are new synthetic workspaces of Ada's (see `Scratch`). */
@@ -367,11 +380,40 @@ const shots = (scratch: Scratch): Shot[] => [
     },
   },
   {
+    // The demo's role question: two ways on, which open existing views (STATE-09).
+    name: "you--role-or-explore",
+    as: "ada",
+    url: chapterUrl("you", scratch.asking),
+    ready: async (page) => {
+      await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
+      await expect(
+        page.getByRole("heading", {
+          name: "Do you have a role in mind, or would you like to explore?",
+        }),
+      ).toBeVisible();
+      await expect(page.getByRole("button", { name: "Show me suggestions" })).toBeVisible();
+    },
+  },
+  {
     // The slate with its written note (S2.7), here the demo explainer's.
     name: "you--slate",
     as: "ada",
     url: chapterUrl("you", scratch.talked),
     ready: slateNote(/Written by the demo explainer \(synthetic\)/),
+  },
+  {
+    // A target chosen from the slate: confirmed in place, never "out of date" (STATE-10).
+    name: "you--target-chosen",
+    as: "ada",
+    url: chapterUrl("you", scratch.chosen),
+    ready: async (page) => {
+      await heading("You")(page);
+      await youView(page, "Suggestions");
+      await expect(page.getByRole("heading", { name: "Saved as one of your targets" })).toBeVisible(
+        { timeout: 60_000 },
+      );
+      await expect(page.getByText("Based on your earlier answers")).toHaveCount(0);
+    },
   },
   {
     name: "you--slate-note-pending",
@@ -477,49 +519,16 @@ const shots = (scratch: Scratch): Shot[] => [
   { name: "roles", as: "ada", url: chapterUrl("roles"), ready: heading("Roles") },
   { name: "skills", as: "ada", url: chapterUrl("skills"), ready: heading("Skills") },
   { name: "options", as: "ada", url: chapterUrl("options"), ready: heading("Options") },
-  { name: "routes", as: "ada", url: chapterUrl("routes"), ready: heading("Routes") },
   {
-    // The comparison's definitions, opened from their disclosure (V-03).
-    name: "routes--compared",
+    // The fixture workspace too: the route preview left the person's path (Storybook keeps
+    // it for design review until Routes is built).
+    name: "routes",
     as: "ada",
     url: chapterUrl("routes"),
     ready: async (page) => {
       await heading("Routes")(page);
-      await page.getByText("What's being compared").click();
-      await expect(page.getByText(/every route here is ready only once/)).toBeVisible();
-    },
-  },
-  {
-    // The lower layers: route D's layer 2 disc and route E's layer 3 ring, with their cards.
-    name: "routes--layers",
-    as: "ada",
-    url: chapterUrl("routes"),
-    ready: async (page) => {
-      await heading("Routes")(page);
-      await page
-        .getByRole("heading", { name: /^Layer 3/ })
-        .evaluate((element) => element.scrollIntoView({ block: "center" }));
-    },
-  },
-  {
-    name: "routes--route-b",
-    as: "ada",
-    url: chapterUrl("routes"),
-    ready: async (page) => {
-      await heading("Routes")(page);
-      await page.getByRole("button", { name: /^Route B/ }).click();
-      await expect(page.getByText("Synthetic fixture route")).toBeVisible();
-    },
-  },
-  {
-    name: "routes--route-b-expanded",
-    as: "ada",
-    url: chapterUrl("routes"),
-    ready: async (page) => {
-      await heading("Routes")(page);
-      await page.getByRole("button", { name: /^Route B/ }).click();
-      await expect(page.getByText("Synthetic fixture route")).toBeVisible();
-      await expandSheet(page, "Route B");
+      await expect(page.getByText("Not built yet", { exact: true })).toBeVisible();
+      await expect(page.getByText("Fixture preview: not your routes")).toHaveCount(0);
     },
   },
   { name: "plan", as: "ada", url: chapterUrl("plan"), ready: heading("Plan") },
@@ -528,8 +537,9 @@ const shots = (scratch: Scratch): Shot[] => [
     as: "ada",
     url: chapterUrl("routes", scratch.empty),
     ready: async (page) => {
-      // A place not built yet: the reference's short card, one sentence on why it is empty.
-      await expect(page.getByText("Not built yet")).toBeVisible();
+      // A place not built yet: the reference's short card, one sentence on why it is empty
+      // (its kicker; the rail's marks say it in lower case).
+      await expect(page.getByText("Not built yet", { exact: true })).toBeVisible();
       await expect(page.getByText(/^Route search isn't ready yet/)).toBeVisible();
       await expect(page.getByRole("banner").getByText("Nothing saved yet")).toBeVisible();
       await expect(liveUpdates(page, "Live")).toBeVisible();
@@ -754,6 +764,8 @@ for (const viewport of VIEWPORTS) {
         talked: await talkedWorkspace(token),
         live: await create("Live, no key yet (synthetic)", "live_assisted"),
         decided: await talkedWorkspace(token),
+        asking: await roleQuestionWorkspace(token),
+        chosen: (await chosenTargetWorkspace(token)).workspace,
       };
       const results: Result[] = [];
       const errors: string[] = [];

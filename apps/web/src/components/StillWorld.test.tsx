@@ -31,7 +31,7 @@ function sceneWith(state: TrailState): Scene {
   };
 }
 
-describe("[UI-04][UI-05] the still world draws each trail at its measured strength", () => {
+describe("[WLD-03][UI-04][UI-05] the still world draws each trail at its measured strength", () => {
   it.each(Object.entries(TRAIL_OPACITY))("draws %s trails at %s", (state, strength) => {
     const { getByTestId } = render(
       <StillWorld scene={sceneWith(state as TrailState)} view={view} vp={vp} />,

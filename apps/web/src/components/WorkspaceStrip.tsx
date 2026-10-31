@@ -6,11 +6,14 @@
 // updates say nothing while they work; when they don't, the strip says so (an announced
 // status). Settings such as calm mode and how Careerwright talks with you live in the account
 // menu, never on the first screen (plan section 4). The synthetic label shows at every width.
-// A tablet's strip is two rows: the synthetic label and the target, then the states and
-// controls. On a phone the strip keeps the saved state, any update state, the world's
-// controls, the account menu (which also leads to the workspaces) and any failure, on one row
-// in every update state (the state's words end in an ellipsis if they must): the top bar
-// carries the chapter and the synthetic label, and the world names the target.
+// A tablet's strip is two rows: the synthetic label, the target, the work area and the budget
+// (each ending in an ellipsis if it must: the person's facts come first, the audit's F14), then
+// the states and the account menu; below a desktop's width the world's controls are in the
+// account menu (`menu`), beside calm mode. On a phone the strip keeps the saved state, any update
+// state and the account menu (which also leads to the workspaces), on one row while updates
+// connect or reconnect; a stopped state and a failed refresh take a row of their own, so their
+// words are read whole: the top bar carries the chapter and the synthetic label, and the world
+// names the target.
 import * as Popover from "@radix-ui/react-popover";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -33,9 +36,12 @@ type Props = {
   /** A refresh failed after a successful load: what is shown is what was last loaded. */
   refreshFailed: boolean;
   email: string | null;
-  /** The world's visible controls: pause motion and sound. */
+  /** The world's visible controls on a desktop: holding it still and sound. */
   controls?: ReactNode;
-  /** Settings shown in the account menu (how Careerwright talks with you, calm mode). */
+  /** Why the world is still, while the calm support panel shows (on a phone, the top bar's). */
+  status?: ReactNode;
+  /** Settings shown in the account menu (how Careerwright talks with you, calm mode, and
+   *  below a desktop's width the world's controls). */
   settings?: ReactNode;
   onSignOut(): void;
 };
@@ -77,7 +83,10 @@ function LiveUpdates({ status, onReconnect }: { status: StreamStatus; onReconnec
   const glyph = status.state === "stopped" ? "error" : "running";
   const tone = status.state === "stopped" && status.reason !== "closed" ? "error" : "neutral";
   return (
-    <span className={live ? "sr-only" : "strip-item strip-updates flex items-center gap-8"}>
+    <span
+      className={live ? "sr-only" : "strip-item strip-updates flex items-center gap-8"}
+      data-state={status.state}
+    >
       <span className="status" data-tone={tone} role="status" aria-live="polite">
         {/* Named in words, so it is never read as the state of what the page loaded (V-02). */}
         {!live && (
@@ -112,6 +121,7 @@ export function WorkspaceStrip({
   refreshFailed,
   email,
   controls,
+  status,
   settings,
   onSignOut,
 }: Props) {
@@ -170,10 +180,10 @@ export function WorkspaceStrip({
           <span className="strip-item strip-optional strip-target">
             Target <strong>{describeField(profile.document.target_titles)}</strong>
           </span>
-          <span className="strip-item strip-wide">
+          <span className="strip-item strip-optional strip-fact">
             Work area <strong>{describeField(profile.document.cities)}</strong>
           </span>
-          <span className="strip-item strip-wide">
+          <span className="strip-item strip-optional strip-fact">
             Budget <strong className="tnum">{budget(profile)}</strong>
           </span>
         </>
@@ -201,6 +211,7 @@ export function WorkspaceStrip({
           </span>
         )}
         <LiveUpdates status={events} onReconnect={onReconnect} />
+        {status}
         {controls}
         <Popover.Root>
           <Popover.Trigger className="strip-switch" aria-label="Account and settings">

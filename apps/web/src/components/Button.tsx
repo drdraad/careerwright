@@ -2,8 +2,10 @@ import { type ButtonHTMLAttributes, forwardRef, type ReactNode, useId } from "re
 import { Glyph, type GlyphName } from "./Glyph";
 
 /** `accept` and `undo` are the two decisions on a proposed change, colour coded as well as
- *  worded (session 2, C3); neither is ever the view's primary action. */
-type Variant = "primary" | "secondary" | "quiet" | "icon" | "accept" | "undo";
+ *  worded (session 2, C3); neither is ever the view's primary action. `choice` is one of a
+ *  question's equal answers that together are the view's bright action (how to start; a role
+ *  or suggestions): edged and lettered in the action colour, never a second fill (F17). */
+type Variant = "primary" | "secondary" | "quiet" | "icon" | "accept" | "undo" | "choice";
 
 type Props = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "disabled"> & {
   variant?: Variant;

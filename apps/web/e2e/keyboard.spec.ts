@@ -44,25 +44,32 @@ test("[UI-06] the skip link moves past the rail to the chapter", async ({ page }
   await expect(page.locator("main#main")).toBeFocused();
 });
 
+/** Opens What we know's answer form, where each answer's Source opens the evidence drawer.
+ *  (Task W2E: the route preview, the drawer's earlier example here, left the person's path.) */
+async function answerForm(page: Page) {
+  await page.getByRole("tab", { name: "What we know" }).click();
+  await page.getByRole("button", { name: "Edit answers directly" }).click();
+  return page.getByRole("button", { name: "Source for total spending limit" });
+}
+
 test("[UI-06] the drawer opens from the keyboard and returns focus when it closes", async ({
   page,
 }) => {
-  await page.goto(chapterUrl("routes"));
-  const routeA = page.getByRole("button", { name: /^Route A/ });
-  await tabTo(page, routeA);
+  const source = await answerForm(page);
+  await tabTo(page, source);
   await page.keyboard.press("Enter");
-  const drawer = page.getByRole("dialog", { name: "Route A" });
-  await expect(drawer.getByRole("heading", { name: "Route A" })).toBeFocused();
-  await tabTo(page, drawer.getByRole("button", { name: "Close route A" }), 20);
+  const drawer = page.getByRole("dialog", { name: "Where this came from" });
+  await expect(drawer.getByRole("heading", { name: "Where this came from" })).toBeFocused();
+  await tabTo(page, drawer.getByRole("button", { name: "Close where this came from" }), 20);
   await page.keyboard.press("Enter");
   await expect(drawer).toBeHidden();
-  await expect(routeA).toBeFocused();
+  await expect(source).toBeFocused();
 
   await page.keyboard.press("Enter");
   await expect(drawer).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
-  await expect(routeA).toBeFocused();
+  await expect(source).toBeFocused();
 });
 
 test("[UI-06][STATE-06][PROF-04] the You chapter completes from the keyboard, and focus returns to what each step did", async ({
@@ -148,6 +155,8 @@ test("[UI-06][REC1-07] a suggestion opens and becomes a target from the keyboard
   await tabTo(page, second.getByRole("button", { name: /Make this a target/ }), 5);
   await page.keyboard.press("Enter");
   await expect(saved(page, 2)).toBeVisible();
+  // The choice gives way to the words that say it is saved, and focus goes there (STATE-10).
+  await expect(second.getByRole("heading", { name: "Saved as one of your targets" })).toBeFocused();
 });
 
 test.describe("phone", () => {
@@ -167,11 +176,12 @@ test.describe("phone", () => {
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(chapterUrl("skills"));
 
-    await page.goto(chapterUrl("routes"));
-    const routeB = page.getByRole("button", { name: /^Route B/ });
-    await tabTo(page, routeB);
+    await page.goto(chapterUrl("you"));
+    await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
+    const source = await answerForm(page);
+    await tabTo(page, source);
     await page.keyboard.press("Enter");
-    const drawer = page.getByRole("dialog", { name: "Route B" });
+    const drawer = page.getByRole("dialog", { name: "Where this came from" });
     const more = drawer.getByRole("button", { name: "More" });
     await expect(more).toHaveAttribute("aria-expanded", "false");
     const peek = (await drawer.boundingBox())?.height ?? 0;
@@ -186,6 +196,6 @@ test.describe("phone", () => {
     expect(expanded).toBeGreaterThan(600);
     await page.keyboard.press("Escape");
     await expect(drawer).toBeHidden();
-    await expect(routeB).toBeFocused();
+    await expect(source).toBeFocused();
   });
 });

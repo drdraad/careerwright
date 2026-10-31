@@ -45,7 +45,7 @@ const STRIP = (vp: Viewport, h: number, y = 0): Rect => ({
 const origin = (vp: Viewport) =>
   buildScene(world(), vp, SETTLED).nodes.find((n) => n.kind === "origin")?.p ?? [0, 0, 0];
 
-describe("[UI-04] the world's layout never says more than the evidence", () => {
+describe("[WLD-04][UI-04] the world's layout never says more than the evidence", () => {
   it("stands every destination at one depth and height, in title order from left to right", () => {
     const scene = buildScene(world(), DESKTOP, SETTLED);
     const destinations = scene.nodes.filter((n) => n.kind === "destination");
@@ -108,7 +108,7 @@ describe("[UI-04] the world's layout never says more than the evidence", () => {
   });
 });
 
-describe("[UI-09] each chapter is a place the view travels to", () => {
+describe("[WLD-01][WLD-07][UI-09] each chapter is a place the view travels to", () => {
   it.each([DESKTOP, TABLET, PHONE])(
     "keeps the person's light in view at every place (%o)",
     (vp) => {
@@ -178,6 +178,35 @@ describe("[UI-09] each chapter is a place the view travels to", () => {
       expect(p.x, node.id).toBeLessThan(vp.w);
     }
   });
+
+  it.each([
+    ["tablet", TABLET, [RAIL(TABLET), STRIP(TABLET, 106)]],
+    ["phone", PHONE, [STRIP(PHONE, 65, 0), STRIP(PHONE, 57, 65)]],
+  ] as const)(
+    "on a %s, stands the person and the targets in the slim band above the You console (F7)",
+    (_, vp, bars) => {
+      // The console starts 144 px below the bars (globals.css): the world takes no more room
+      // than what it shows, and the person's light is still in view above the console.
+      const top = bars
+        .filter((bar) => bar.h < vp.h / 2)
+        .reduce((y, bar) => Math.max(y, bar.y + bar.h), 0);
+      const panel = {
+        x: vp === PHONE ? 0 : 128,
+        y: top + 144,
+        w: vp === PHONE ? 390 : 600,
+        h: 900,
+      };
+      const clear = clearArea(vp, bars, [panel]);
+      expect(clear?.backdrop).toBeUndefined();
+      const view = placeView("you", vp, clear);
+      const scene = buildScene(world(), vp, SETTLED);
+      for (const node of scene.nodes) {
+        const p = project(node.p, view);
+        expect(p.y, node.id).toBeGreaterThan(top);
+        expect(p.y, node.id).toBeLessThan(panel.y);
+      }
+    },
+  );
 
   it("leaves the world as a backdrop where the panels leave no room to stand", () => {
     // A phone's You chapter fills the screen below the header.

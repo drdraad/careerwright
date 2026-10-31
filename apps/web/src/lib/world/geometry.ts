@@ -74,8 +74,11 @@ export type Rect = {
 
 /** Narrower than this, a span beside the panels is no place to stand. */
 const MIN_CLEAR = 240;
-/** Shorter than this, a band above or below the panels is no place to stand either. */
-const MIN_BAND = 240;
+/** Shorter than this, a band above or below the panels is no place to stand either: room for
+ *  the names above the horizon and below the person's light (ROOM_ABOVE, ROOM_BELOW) and a
+ *  little plain between. The You chapter's band on a tablet or phone is this and a margin
+ *  (globals.css): the world takes no more room than what it shows there (Task W2E, F7). */
+const MIN_BAND = 128;
 /** Room kept above the horizon's lights and below the person's light for their names. */
 const ROOM_ABOVE = 56;
 const ROOM_BELOW = 48;

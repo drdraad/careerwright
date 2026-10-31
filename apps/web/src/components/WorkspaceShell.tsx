@@ -205,10 +205,15 @@ export function WorkspaceShell({
             onReconnect={events.restart}
             refreshFailed={refreshFailed(me, workspace, profile)}
             email={auth.state.email}
-            controls={<WorldControls settings={world} supportShown={supportShown} />}
+            controls={<WorldControls settings={world} />}
+            status={supportShown && <StillWhileSupport />}
             settings={
-              // Calm mode is this viewer's; the tone, under its own heading, this workspace's.
+              // Calm mode is this viewer's, and below a desktop's width the world's controls
+              // join it; the tone, under its own heading, is this workspace's.
               <>
+                <div className="menu-world">
+                  <WorldControls settings={world} />
+                </div>
                 <CalmMode settings={world} />
                 <ConversationTone workspaceId={workspaceId} />
               </>

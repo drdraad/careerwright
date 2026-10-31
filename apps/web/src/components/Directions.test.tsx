@@ -184,14 +184,18 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
   connection: null,
 });
 
-function renderDirections(shown: DiscoveryOut = discovery, unavailable?: string) {
+function renderDirections(
+  shown: DiscoveryOut = discovery,
+  unavailable?: string,
+  withProfile: ProfileOut = profile,
+) {
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = (found: DiscoveryOut) => (
     <QueryClientProvider client={queries}>
       <EvidenceProvider>
         <Directions
           workspaceId={WS}
-          profile={profile}
+          profile={withProfile}
           discovery={found}
           {...(unavailable === undefined ? {} : { unavailable })}
         />
@@ -637,7 +641,11 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
 
     await card();
     expect(screen.getByText(/No request reached the model/)).toBeVisible();
-    expect(screen.getByText("Raise the limit or wait for the next month.")).toBeVisible();
+    // F10: the words name no control the app doesn't have yet.
+    expect(
+      screen.getByText("Careerwright stopped before spending more. Your work is kept."),
+    ).toBeVisible();
+    expect(screen.queryByText(/Raise the limit/)).toBeNull();
     expect(noteRequests(sent)).toHaveLength(0); // never automatic
     await user.click(screen.getByRole("button", { name: "Try again : the written note" }));
 
@@ -793,7 +801,8 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     const sent = fakeApi([slateRoute]);
     renderDirections(discoveryWith(null), "Store a Meta API key to continue.");
     await card();
-    const stale = { ...discoveryWith(null), profile_version: 1 } as DiscoveryOut;
+    // Made from earlier answers: the API's own rule (STATE-10), no longer a version compare.
+    const stale = { ...discoveryWith(null), profile_version: 1, current: false } as DiscoveryOut;
     renderDirections(stale);
     await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(2));
 
@@ -801,3 +810,183 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     expect(screen.queryByText("How Careerwright found it")).toBeNull(); // nothing to set it apart from
   });
 });
+
+const skill = (id: string, label: string) => ({ skill_id: id, label, skill_type: "skill" });
+const joined: SuggestionOut = {
+  ...suggestion,
+  channels: ["shared_skills"],
+  why_it_could_suit: [
+    "Your current role: “bicycle courier”. ESCO lists 5 of the same essential skills for both, so Careerwright joined them by those skills.",
+  ],
+  shared_skills: [
+    skill("k1", "adjust brakes"),
+    skill("k2", "fit tyres"),
+    skill("k3", "replace chains"),
+    skill("k4", "true wheels"),
+    skill("k5", "use hand tools"),
+  ],
+};
+
+describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpected connection and a chosen target", () => {
+  it("names the first skills it was joined by, the rest one step away (the audit's F4)", async () => {
+    fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([joined]) }]);
+    const { user } = renderDirections();
+
+    const mechanic = await card();
+    expect(
+      within(mechanic).getByText(
+        "Careerwright joined them by these skills: adjust brakes, fit tyres and replace chains.",
+      ),
+    ).toBeVisible();
+    const rest = within(mechanic).getByText("The other 2 skills");
+    expect(within(mechanic).getByText("true wheels")).not.toBeVisible();
+    await user.click(rest);
+    expect(within(mechanic).getByText("true wheels")).toBeVisible();
+    expect(within(mechanic).getByText("use hand tools")).toBeVisible();
+  });
+
+  it("shows the unexpected connection on its suggestion, in words, its skills one step away", async () => {
+    const connection: SlateOut["connection"] = {
+      concept_id: "o1",
+      title: "bicycle mechanic",
+      role_title: "bicycle courier",
+      sentence: "A bicycle courier and a bicycle mechanic share 5 essential skills.",
+      shared_skill_count: 5,
+      shared_skills: joined.shared_skills,
+      still_uncertain:
+        "These are the skills ESCO lists for both roles. They aren't compared with your own experience yet.",
+    };
+    fakeApi([{ method: "GET", path: /\/slate$/, answer: { ...slate([joined]), connection } }]);
+    const { user } = renderDirections();
+
+    const mechanic = await card();
+    expect(within(mechanic).getByText("An unexpected connection")).toBeVisible();
+    expect(
+      within(mechanic).getByText(
+        "Careerwright joined this to your role, “bicycle courier”, by 5 essential skills ESCO lists for both.",
+      ),
+    ).toBeVisible();
+    // Its skills are one step away, never only counted; the plain joined-by line gives way.
+    expect(within(mechanic).queryByText(/Careerwright joined them by these skills/)).toBeNull();
+    expect(within(mechanic).getByText("adjust brakes")).not.toBeVisible();
+    await user.click(within(mechanic).getByText("The 5 skills"));
+    expect(within(mechanic).getByText("adjust brakes")).toBeVisible();
+    expect(
+      within(mechanic).getByText(/aren't compared with your own experience yet/),
+    ).toBeVisible();
+  });
+
+  it("says a chosen target is saved, with what it usually asks for, and keeps the slate current", async () => {
+    const chosen: ProfileOut = {
+      ...profile,
+      version: 3,
+      document: {
+        ...profile.document,
+        target_titles: { state: "provided", value: ["bicycle mechanic"], source_ref_id: "s2" },
+      },
+    };
+    const sketch = {
+      label: "Early sketch, not a checked route",
+      profile_version: 3,
+      inputs: {},
+      not_asked: [],
+      steps: [],
+      targets: [
+        {
+          title: "bicycle mechanic",
+          resolution: "esco",
+          occupations: [],
+          close_matches: [],
+          requirements: ["adjust brakes", "fit tyres"],
+          requirement_count: 9,
+          regulated: false,
+          research_status: "Not researched yet.",
+        },
+      ],
+    };
+    fakeApi([slateRoute, { method: "GET", path: /\/sketch$/, answer: sketch }]);
+    // Made at version 2; version 3 only added this target, chosen from it: still current.
+    renderDirections(discovery, undefined, chosen);
+
+    const mechanic = await card();
+    expect(
+      await within(mechanic).findByRole("heading", { name: "Saved as one of your targets" }),
+    ).toBeVisible();
+    expect(within(mechanic).getByText("What this work usually asks for, from ESCO:")).toBeVisible();
+    expect(within(mechanic).getByText("Adjust brakes")).toBeVisible();
+    expect(within(mechanic).getByText("And 7 more essential skills in ESCO.")).toBeVisible();
+    expect(within(mechanic).queryByRole("button", { name: /Make this a target/ })).toBeNull();
+    // Never "out of date" for the person's own choice, and Suggest again isn't pushed.
+    expect(screen.queryByText("Based on your earlier answers")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Suggest again" })).toBeNull();
+  });
+
+  it("moves focus to the words that say the target is saved, where it was chosen", async () => {
+    const state = { profile };
+    fakeApi([
+      slateRoute,
+      {
+        method: "POST",
+        path: /\/targets$/,
+        status: 201,
+        answer: () => {
+          state.profile = {
+            ...profile,
+            version: 3,
+            document: {
+              ...profile.document,
+              target_titles: {
+                state: "provided",
+                value: ["bicycle mechanic"],
+                source_ref_id: "s2",
+              },
+            },
+          };
+          return state.profile;
+        },
+      },
+      {
+        method: "GET",
+        path: /\/sketch$/,
+        answer: {
+          label: "",
+          profile_version: 3,
+          inputs: {},
+          not_asked: [],
+          steps: [],
+          targets: [],
+        },
+      },
+    ]);
+    const { user, rerenderWith } = renderChoosing();
+
+    await user.click(await screen.findByRole("button", { name: /Make this a target/ }));
+    rerenderWith(state.profile);
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Saved as one of your targets" })).toHaveFocus(),
+    );
+  });
+
+  it("still marks a slate made from earlier answers, with Suggest again as the bright action", async () => {
+    fakeApi([slateRoute]);
+    renderDirections({ ...discovery, current: false } as DiscoveryOut);
+
+    expect(await screen.findByText("Based on your earlier answers")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Suggest again" })).toHaveClass("btn-primary");
+  });
+});
+
+/** Directions whose profile the test replaces after a choice, as the shell's query would. */
+function renderChoosing() {
+  const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const view = (shown: ProfileOut) => (
+    <QueryClientProvider client={queries}>
+      <EvidenceProvider>
+        <Directions workspaceId={WS} profile={shown} discovery={discovery} />
+      </EvidenceProvider>
+    </QueryClientProvider>
+  );
+  const { rerender } = render(view(profile));
+  return { user: userEvent.setup(), rerenderWith: (shown: ProfileOut) => rerender(view(shown)) };
+}

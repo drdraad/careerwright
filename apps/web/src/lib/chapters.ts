@@ -1,13 +1,15 @@
 // The six persistent chapters (spec section 3). They are navigable states, not a wizard, so
 // none is numbered and none is locked. Each is a place in the one world (plan section 4).
+// `built`: the chapter holds something of the person's in this build; the rail marks every
+// other one as not built yet, so no dead end is found by clicking it (the audit's F2).
 
 export const CHAPTERS = [
-  { id: "you", label: "You" },
-  { id: "roles", label: "Roles" },
-  { id: "skills", label: "Skills" },
-  { id: "options", label: "Options" },
-  { id: "routes", label: "Routes" },
-  { id: "plan", label: "Plan" },
+  { id: "you", label: "You", built: true },
+  { id: "roles", label: "Roles", built: false },
+  { id: "skills", label: "Skills", built: false },
+  { id: "options", label: "Options", built: false },
+  { id: "routes", label: "Routes", built: false },
+  { id: "plan", label: "Plan", built: false },
 ] as const;
 
 export type ChapterId = (typeof CHAPTERS)[number]["id"];

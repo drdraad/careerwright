@@ -413,6 +413,16 @@
     color: var(--text-on-space);
   }
 
+  /* A chapter not built yet says so under its name, in sight before it is clicked (F2). */
+  .chapter-later {
+    font-family: var(--font-body);
+    font-size: var(--type-12);
+    font-weight: 400;
+    line-height: 1.2;
+    color: var(--text-on-space-muted);
+    text-align: center;
+  }
+
   .landmark {
     width: 14px;
     height: 14px;
@@ -622,6 +632,16 @@
     background: transparent;
     border-color: var(--line-control);
     color: var(--fg);
+  }
+
+  /* A question's equal answers, together the view's bright action (how to start; a role or
+     suggestions): the action colour edges and letters them, so none is filled over the other
+     and nothing else in the view is bright (F17). */
+  .btn-choice {
+    background: transparent;
+    border-color: var(--action);
+    color: var(--action);
+    box-shadow: 0 0 22px -8px var(--glow-action);
   }
 
   /* Quiet and icon actions take the text colour, marked by an underline or their glyph: teal
@@ -1034,27 +1054,9 @@
     gap: var(--space-8);
   }
 
-  /* The strip's world controls, and only they, become glyph buttons: calm mode in the account
-     menu keeps its words and its switch. */
-  .world-controls .world-switch {
-    display: none;
-  }
-
-  .world-controls .world-toggle {
-    justify-content: center;
-    min-width: 40px;
-    padding: 0;
-  }
-
-  /* On, a glyph button is ringed in white (white means "on"; teal stays for selection). */
-  .world-controls .world-toggle[aria-pressed="true"] {
-    border-color: var(--text-on-space);
-    background: var(--surface-space-raised-2);
-  }
-
   /* "Still while support is shown" moves to the top bar, beside the chapter, where it adds no
      row; it wraps there if it must. */
-  .world-controls .world-still-status {
+  .strip .world-still-status {
     display: none;
   }
 
@@ -1145,15 +1147,6 @@
   .page-title,
   .chapter-place .page-title {
     font-size: var(--type-31);
-  }
-
-  .world-controls .world-toggle-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
 }
 
@@ -1450,6 +1443,17 @@
     margin-top: var(--space-16);
   }
 
+  /* A demo question's one-tap replies: quiet, and wrapping rather than crowding. */
+  .example-replies {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-8);
+    min-width: 0;
+    margin-inline: 0;
+    padding: 0;
+    border: 0;
+  }
+
   /* The reply field sits in the console's flow, right under the question, never floating over
      what is above it: in the narrow console a floating field covered the tray's Save and the
      start's choices (axe target-size, Task W2C). */
@@ -1606,6 +1610,21 @@
     box-shadow: inset 4px 0 0 var(--selection);
   }
 
+  /* The unexpected connection's mark on its suggestion, open or not, so it can be found. */
+  .suggestion-kicker {
+    color: var(--fg-muted);
+    font-size: var(--type-14);
+    font-weight: 600;
+  }
+
+  /* A suggestion that is one of the person's targets, where the choice was. */
+  .target-saved {
+    padding: var(--space-12) var(--space-16);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-control);
+    background: var(--surface-card);
+  }
+
   .suggestion h4 {
     font-family: var(--font-display);
     font-weight: 600;
@@ -1676,19 +1695,25 @@
 
 /* Where the console leaves the world too narrow a span beside it (the rail's 96 px, its 32 px
    margin, the console's 600 px and geometry.ts's MIN_CLEAR of 240 px: below 968 px), the
-   person's light stands in a band above the console in every view, never shorter than
-   geometry.ts's MIN_BAND of 240 px, so the You place never falls back to a backdrop behind
-   it. A short console sits low, under more of the world; a long one starts below the band and
-   scrolls with the page (Task W2C fix round 1). */
+   person's light stands in a band above the console in every view. The band takes no more room
+   than what the world shows here, the person's light and the targets' names (the audit's F7,
+   plan section 4: on a phone the decision comes first): geometry.ts's MIN_BAND and a margin. A
+   short console sits low, under more of the world; a long one starts below the band and scrolls
+   with the page. Too short a window to hold both (a phone turned sideways) keeps no band, and
+   the world stands behind the console (re-review N3). */
 @media (max-width: 967px) {
   .workarea:has(> .chapter-you) {
-    /* At least MIN_BAND and a margin; on a taller screen, room for the light's arc at full
-       size and the names around it (as docs/design draws it). */
-    padding-top: max(300px, 34vh);
+    padding-top: 144px;
   }
 
   .chapter-you {
     margin-top: auto;
+  }
+}
+
+@media (max-width: 967px) and (max-height: 560px) {
+  .workarea:has(> .chapter-you) {
+    padding-top: 0;
   }
 }
 
@@ -1704,9 +1729,10 @@
     white-space: nowrap;
   }
 
-  /* One row in every update state (A-M1): the state's words take the room left and end in an
-     ellipsis rather than pushing the account menu to a second row; assistive tech reads them
-     all. A failed refresh, rarer, takes a row of its own. */
+  /* One row while updates connect or reconnect (A-M1): the state's words take the room left and
+     end in an ellipsis rather than pushing the account menu to a second row; assistive tech
+     reads them all. A stopped state, whose reason the person must read (re-review N2), and a
+     failed refresh, both rarer, take a row of their own. */
   .strip-updates {
     flex: 1 1 0;
     min-width: 0;
@@ -1716,18 +1742,43 @@
     min-width: 0;
   }
 
-  .strip-updates > .status > span {
+  .strip-updates:not([data-state="stopped"]) > .status > span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  .strip-updates[data-state="stopped"],
   .strip-refresh-failed {
     flex-basis: 100%;
   }
 
+  /* Under the saved state and the account menu, not between them. */
+  .strip-updates[data-state="stopped"] {
+    order: 1;
+  }
+
   .question .display {
     font-size: var(--type-25);
+  }
+
+  /* The slate's view controls on one row, scrolled sideways, so its first choice is in the
+     first screen (F7: on a phone the decision comes first). */
+  .segmented {
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .segmented .btn {
+    flex: none;
+  }
+
+  /* The suggestions' heading and the open suggestion's title take less height on a phone, so a
+     long title (two lines) still leaves its choice in the first screen (F7). */
+  .directions h2,
+  .suggestion h4 {
+    font-size: var(--type-20);
   }
 
   .turn-you {
@@ -1751,23 +1802,34 @@
   }
 }
 
+/* Below a desktop's width the person's facts come first (the audit's F14): the strip keeps the
+   target, work area and budget on one line, each ending in an ellipsis if it must (What we know
+   names them in full, and assistive tech reads all of each), and the world's controls move into
+   the account menu, beside calm mode, with their words and switches. */
 @media (max-width: 1179px) {
-  .strip .strip-wide {
+  .strip .strip-wide,
+  .strip .world-controls {
     display: none;
   }
 
-  /* One line: a long target ends in an ellipsis here; the world and "What we know" name it
-     in full, and assistive tech reads all of it. */
-  .strip .strip-target {
+  .strip .strip-target,
+  .strip .strip-fact {
     flex: 1 1 0;
     min-width: 0;
   }
 
-  .strip .strip-target strong {
+  .strip .strip-target strong,
+  .strip .strip-fact strong {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+@media (min-width: 1180px) {
+  .menu-world {
+    display: none;
   }
 }
 

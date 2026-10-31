@@ -14,10 +14,29 @@ type Props = {
   progress: Partial<Record<ChapterId, ChapterProgress>>;
 };
 
-/** The mark in words; the current chapter is announced by `aria-current` instead. */
-function Mark({ progress, current }: { progress: ChapterProgress | undefined; current: boolean }) {
-  if (current) return null;
-  return <span className="sr-only">{progress === "visited" ? ", visited" : ", not started"}</span>;
+/** The mark in words; the current chapter is announced by `aria-current` instead. A chapter
+ *  not built yet says so in sight, before it is clicked (the audit's F2). */
+function Mark({
+  progress,
+  current,
+  built,
+}: {
+  progress: ChapterProgress | undefined;
+  current: boolean;
+  built: boolean;
+}) {
+  return (
+    <>
+      {!built && (
+        <span className="chapter-later">
+          <span className="sr-only">,</span> not built yet
+        </span>
+      )}
+      {!current && (
+        <span className="sr-only">{progress === "visited" ? ", visited" : ", not started"}</span>
+      )}
+    </>
+  );
 }
 
 export function ChapterRail({ workspaceId, current, progress }: Props) {
@@ -40,7 +59,11 @@ export function ChapterRail({ workspaceId, current, progress }: Props) {
               >
                 <span className="landmark" aria-hidden="true" />
                 {chapter.label}
-                <Mark progress={progress[chapter.id]} current={chapter.id === current} />
+                <Mark
+                  progress={progress[chapter.id]}
+                  current={chapter.id === current}
+                  built={chapter.built}
+                />
               </Link>
             </li>
           ))}
@@ -76,7 +99,11 @@ export function ChapterMenu({ workspaceId, current, progress }: Props) {
                   >
                     <span className="landmark" aria-hidden="true" />
                     {chapter.label}
-                    <Mark progress={progress[chapter.id]} current={chapter.id === current} />
+                    <Mark
+                      progress={progress[chapter.id]}
+                      current={chapter.id === current}
+                      built={chapter.built}
+                    />
                   </Link>
                 </li>
               ))}

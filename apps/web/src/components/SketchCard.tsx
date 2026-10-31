@@ -3,7 +3,7 @@
 // from ESCO, and the steps still unresolved. Always labelled an early sketch, never a checked
 // or best route; it names no provider, price or date. An ambiguous title is resolved only by
 // the person's choice, never guessed.
-import type { ProfileOut } from "@/generated/api";
+import type { ProfileOut, TargetSketchOut } from "@/generated/api";
 import { useChooseTarget, useSketch } from "@/lib/queries";
 import { PROFILE_FIELDS, RESOLUTION } from "@/lib/vocabulary";
 import { Button } from "./Button";
@@ -12,6 +12,35 @@ import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
 
 const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** What a target matched to one ESCO occupation usually asks for, from ESCO: its first
+ *  essential skills, how many more there are, and whether ESCO marks it regulated. */
+export function TargetRequirements({ target }: { target: TargetSketchOut }) {
+  if (target.resolution !== "esco") return null;
+  return (
+    <>
+      <p className="small">What this work usually asks for, from ESCO:</p>
+      <ul className="plain-list">
+        {target.requirements.map((requirement) => (
+          <li key={requirement}>{sentence(requirement)}</li>
+        ))}
+      </ul>
+      {target.requirement_count !== null &&
+        target.requirement_count > target.requirements.length && (
+          <p className="small muted">
+            And {target.requirement_count - target.requirements.length} more essential skills in
+            ESCO.
+          </p>
+        )}
+      {target.regulated && (
+        <p className="small">
+          ESCO marks this as a regulated profession in at least one European country. Whether
+          England requires registration isn't checked yet.
+        </p>
+      )}
+    </>
+  );
+}
 
 export function SketchCard({ workspaceId, profile }: { workspaceId: string; profile: ProfileOut }) {
   const sketch = useSketch(workspaceId);
@@ -47,29 +76,7 @@ export function SketchCard({ workspaceId, profile }: { workspaceId: string; prof
             <p className="small">
               <strong>{sentence(target.title)}</strong>: {RESOLUTION[target.resolution]}
             </p>
-            {target.resolution === "esco" && (
-              <>
-                <p className="small">What this work usually asks for, from ESCO:</p>
-                <ul className="plain-list">
-                  {target.requirements.map((requirement) => (
-                    <li key={requirement}>{sentence(requirement)}</li>
-                  ))}
-                </ul>
-                {target.requirement_count !== null &&
-                  target.requirement_count > target.requirements.length && (
-                    <p className="small muted">
-                      And {target.requirement_count - target.requirements.length} more essential
-                      skills in ESCO.
-                    </p>
-                  )}
-                {target.regulated && (
-                  <p className="small">
-                    ESCO marks this as a regulated profession in at least one European country.
-                    Whether England requires registration isn't checked yet.
-                  </p>
-                )}
-              </>
-            )}
+            <TargetRequirements target={target} />
             {(target.resolution === "ambiguous" || target.resolution === "not_found") &&
               (target.resolution === "ambiguous" ? target.occupations : target.close_matches)
                 .length > 0 && (

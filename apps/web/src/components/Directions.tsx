@@ -17,8 +17,9 @@
 //
 // Never overwhelming (session 2): the slate's notes on how it searched wait in one disclosure
 // under the count line, and the open suggestion's choice comes right after its title.
-import { useEffect, useId, useState } from "react";
+import { type Ref, useEffect, useId, useRef, useState } from "react";
 import type {
+  ConnectionOut,
   Direction,
   DiscoveryOut,
   Emphasis,
@@ -26,6 +27,7 @@ import type {
   NotIncludedOut,
   ProfileOut,
   ProposalOrigin,
+  SharedSkillOut,
   SlateExplanationOut,
   SlateOut,
   SuggestionOut,
@@ -38,6 +40,7 @@ import {
   type SlateControls,
   useChooseTarget,
   useNoteRequests,
+  useSketch,
   useSlate,
   useSubmitDiscovery,
 } from "@/lib/queries";
@@ -54,6 +57,7 @@ import {
   NOTE_REFUSAL_REASON,
   type NoteRefusalWords,
   RECORD_PART,
+  SUGGESTION_WORDS,
 } from "@/lib/vocabulary";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
@@ -61,6 +65,7 @@ import { useEvidence } from "./EvidenceDrawer";
 import { Glyph } from "./Glyph";
 import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
+import { TargetRequirements } from "./SketchCard";
 import { StatusBadge } from "./Status";
 
 const EVIDENCE = [
@@ -245,19 +250,117 @@ function WrittenNote({ state }: { state: WrittenState }) {
   );
 }
 
+/** How many of the skills a suggestion was joined by are named on its card; the rest are one
+ *  step away (the audit's F4). */
+const FIRST_SKILLS = 3;
+
+const listed = (items: string[]) =>
+  items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+
+/** The skills a suggestion was joined by: the first few named, the rest one step away. */
+function JoinedBy({ skills }: { skills: SharedSkillOut[] }) {
+  if (skills.length === 0) return null;
+  const rest = skills.slice(FIRST_SKILLS);
+  return (
+    <div className="grid gap-4">
+      <p className="small">
+        {SUGGESTION_WORDS.joinedBy} {listed(skills.slice(0, FIRST_SKILLS).map((s) => s.label))}.
+      </p>
+      {rest.length > 0 && (
+        <details className="details">
+          <summary>{SUGGESTION_WORDS.otherSkills(rest.length)}</summary>
+          <ul className="plain-list mt-8">
+            {rest.map((skill) => (
+              <li key={skill.skill_id}>{skill.label}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+/** The slate's unexpected connection, in words, its skills one step away; its light in the
+ *  world is Task M's. */
+function Connection({ connection }: { connection: ConnectionOut }) {
+  return (
+    <div className="grid gap-4">
+      <p className="small">
+        {SUGGESTION_WORDS.connectionLine(connection.role_title, connection.shared_skill_count)}
+      </p>
+      <details className="details">
+        <summary>{SUGGESTION_WORDS.connectionSkills(connection.shared_skill_count)}</summary>
+        <ul className="plain-list mt-8">
+          {connection.shared_skills.map((skill) => (
+            <li key={skill.skill_id}>{skill.label}</li>
+          ))}
+        </ul>
+        <p className="small muted mt-8">{connection.still_uncertain}</p>
+      </details>
+    </div>
+  );
+}
+
+/** A suggestion that is one of the person's targets: said where it was chosen, with what it
+ *  usually asks for (STATE-10). */
+function TargetSaved({
+  workspaceId,
+  title,
+  headingRef,
+}: {
+  workspaceId: string;
+  title: string;
+  headingRef: Ref<HTMLHeadingElement>;
+}) {
+  const sketch = useSketch(workspaceId);
+  const headingId = useId();
+  const target = sketch.data?.targets.find(
+    (t) => t.title.toLocaleLowerCase("en-GB") === title.toLocaleLowerCase("en-GB"),
+  );
+  return (
+    <section className="target-saved grid gap-8" aria-labelledby={headingId}>
+      <h5 id={headingId} className="status font-semibold" tabIndex={-1} ref={headingRef}>
+        <Glyph name="accept" />
+        <span>{SUGGESTION_WORDS.chosen}</span>
+      </h5>
+      {sketch.data === undefined ? (
+        sketch.error ? (
+          <RequestFailure
+            error={sketch.error}
+            actions={
+              <Button variant="secondary" onClick={() => void sketch.refetch()}>
+                Try again
+              </Button>
+            }
+          />
+        ) : (
+          <LoadingState stage="Loading what this work usually asks for" lines={1} />
+        )
+      ) : (
+        target !== undefined && <TargetRequirements target={target} />
+      )}
+    </section>
+  );
+}
+
 function SuggestionCard({
+  workspaceId,
   suggestion,
   slate,
   targets,
   written,
   open,
   primary,
+  connection,
+  focusSaved,
+  onSavedFocused,
   onOpen,
   onChoose,
   onExcludeTitle,
   onExcludeFamily,
   choosing,
 }: {
+  workspaceId: string;
   suggestion: SuggestionOut;
   slate: SlateOut;
   targets: string[];
@@ -266,6 +369,11 @@ function SuggestionCard({
   open: boolean;
   /** Whether "Make this a target" is the view's one bright primary action. */
   primary: boolean;
+  /** The slate's unexpected connection, when this suggestion is it. */
+  connection: ConnectionOut | null;
+  /** Just chosen as a target: focus goes to the words that say it is saved. */
+  focusSaved: boolean;
+  onSavedFocused(): void;
   onOpen(): void;
   onChoose(): void;
   onExcludeTitle(): void;
@@ -279,12 +387,21 @@ function SuggestionCard({
   );
   const full = targets.length >= listLimit("target_titles");
   const body = useId();
+  const saved = useRef<HTMLHeadingElement>(null);
+  // The choice is replaced by the words that say it is saved; focus follows once they show.
+  useEffect(() => {
+    if (focusSaved && saved.current !== null) {
+      saved.current.focus();
+      onSavedFocused();
+    }
+  });
   return (
     <article
       className="card suggestion"
       data-open={open}
       aria-labelledby={`s-${suggestion.concept_id}`}
     >
+      {connection !== null && <p className="suggestion-kicker">{SUGGESTION_WORDS.connection}</p>}
       <h4 id={`s-${suggestion.concept_id}`}>
         <button
           type="button"
@@ -305,23 +422,27 @@ function SuggestionCard({
       {open && (
         <div id={body} className="grid gap-12">
           {/* The choice first, so its bright action is in view with a real slate; what the
-              work is and why it could suit you follow (D-I3). */}
+              work is and why it could suit you follow (D-I3). Once chosen, the choice gives
+              way to the words that say so, with what the work usually asks for (STATE-10). */}
+          {already && (
+            <TargetSaved workspaceId={workspaceId} title={suggestion.title} headingRef={saved} />
+          )}
           <div className="flex flex-wrap items-center gap-8">
-            <Button
-              variant={primary ? "primary" : "secondary"}
-              onClick={onChoose}
-              disabledReason={
-                already
-                  ? "Already one of your targets."
-                  : full
+            {!already && (
+              <Button
+                variant={primary ? "primary" : "secondary"}
+                onClick={onChoose}
+                disabledReason={
+                  full
                     ? `You have ${listLimit("target_titles")} targets: remove one first.`
                     : choosing
                       ? "Saving…"
                       : undefined
-              }
-            >
-              Make this a target <span className="sr-only">: {title}</span>
-            </Button>
+                }
+              >
+                Make this a target <span className="sr-only">: {title}</span>
+              </Button>
+            )}
             <Button variant="quiet" onClick={onExcludeTitle}>
               Not for me <span className="sr-only">: {title}</span>
             </Button>
@@ -351,6 +472,11 @@ function SuggestionCard({
                   <li key={line}>{line}</li>
                 ))}
               </ul>
+              {connection !== null ? (
+                <Connection connection={connection} />
+              ) : (
+                <JoinedBy skills={suggestion.shared_skills} />
+              )}
             </div>
           </div>
           <div className="grid gap-4">
@@ -515,6 +641,8 @@ function Slate({
   const [controls, setControls] = useState<SlateControls>(NO_CONTROLS);
   // The suggestion shown in full; by default the first one listed.
   const [opened, setOpened] = useState<string | null>(null);
+  // The suggestion just made a target: focus goes to the words that say it is saved.
+  const [chosen, setChosen] = useState<string | null>(null);
   const slate = useSlate(workspaceId, discovery.discovery_id, controls);
   const choose = useChooseTarget(workspaceId);
   const notes = useNoteRequests(workspaceId, discovery.discovery_id);
@@ -523,12 +651,7 @@ function Slate({
   // One request per slate, when the person first sees it for the current answers: a view
   // change, a change of chapter or a refresh never asks again here (the page keeps every
   // request), and the API answers any repeat with the same run.
-  const wanted =
-    canWrite &&
-    shown &&
-    suggested &&
-    explanation === null &&
-    discovery.profile_version === profile.version;
+  const wanted = canWrite && shown && suggested && explanation === null && discovery.current;
   const { askOnce } = notes;
   useEffect(() => {
     if (wanted) askOnce({ expected_profile_version: profile.version });
@@ -653,20 +776,29 @@ function Slate({
             {group.map((suggestion) => (
               <SuggestionCard
                 key={suggestion.concept_id}
+                workspaceId={workspaceId}
                 suggestion={suggestion}
                 slate={data}
                 targets={targets}
                 written={noteFor(suggestion)}
                 open={suggestion.concept_id === open}
                 primary={choosePrimary}
+                connection={
+                  data.connection?.concept_id === suggestion.concept_id ? data.connection : null
+                }
+                focusSaved={chosen === suggestion.concept_id}
+                onSavedFocused={() => setChosen(null)}
                 onOpen={() => setOpened(suggestion.concept_id)}
                 choosing={choose.isPending}
                 onChoose={() =>
-                  choose.mutate({
-                    expected_version: profile.version,
-                    concept_id: suggestion.concept_id,
-                    discovery_id: discovery.discovery_id,
-                  })
+                  choose.mutate(
+                    {
+                      expected_version: profile.version,
+                      concept_id: suggestion.concept_id,
+                      discovery_id: discovery.discovery_id,
+                    },
+                    { onSuccess: () => setChosen(suggestion.concept_id) },
+                  )
                 }
                 onExcludeTitle={() =>
                   setControls((current) => ({
@@ -692,12 +824,40 @@ function Slate({
   );
 }
 
+/**
+ * Whether a new set of suggestions is wanted (none yet, one that failed, or one made from
+ * earlier answers and not running) and why one can't start now, if it can't. "Show me
+ * suggestions" in the conversation and this view's own button follow the same rule.
+ */
+export function suggestionStart(
+  profile: ProfileOut,
+  discovery: DiscoveryOut | null,
+  unavailable: string | undefined,
+  starting: boolean,
+): { wanted: boolean; blocked: string | undefined } {
+  const hasEvidence = EVIDENCE.some((name) => profile.document[name].state === "provided");
+  const blocked =
+    unavailable ??
+    (!hasEvidence
+      ? "Tell Careerwright what you do now, what you enjoy or what you can do first."
+      : starting
+        ? "Starting…"
+        : undefined);
+  const wanted =
+    discovery === null ||
+    (!stillRunning(discovery.run.status) &&
+      (!discovery.current || discovery.run.status !== "complete"));
+  return { wanted, blocked };
+}
+
 export function Directions({
   workspaceId,
   profile,
   discovery,
   unavailable,
   shown = true,
+  submit: shared,
+  headingRef,
 }: {
   workspaceId: string;
   profile: ProfileOut;
@@ -706,23 +866,24 @@ export function Directions({
   unavailable?: string;
   /** Whether the person can see it: the written note is asked for only once they can. */
   shown?: boolean;
+  /** The chapter's own request for suggestions, so "Show me suggestions" and this view share
+   *  one (its "Starting…" included). */
+  submit?: ReturnType<typeof useSubmitDiscovery>;
+  /** Where focus lands when the person is brought here ("Help me explore instead"). */
+  headingRef?: Ref<HTMLHeadingElement>;
 }) {
-  const submit = useSubmitDiscovery(workspaceId);
-  const hasEvidence = EVIDENCE.some((name) => profile.document[name].state === "provided");
+  const own = useSubmitDiscovery(workspaceId);
+  const submit = shared ?? own;
   const start = () => submit.mutate({ expected_profile_version: profile.version });
-  const blocked =
-    unavailable ??
-    (!hasEvidence
-      ? "Tell Careerwright what you do now, what you enjoy or what you can do first."
-      : submit.isPending
-        ? "Starting…"
-        : undefined);
+  const { blocked } = suggestionStart(profile, discovery, unavailable, submit.isPending);
   const running = discovery !== null && stillRunning(discovery.run.status);
-  const stale = discovery !== null && discovery.profile_version < profile.version;
+  // Made from earlier answers: something besides the targets chosen from it changed since
+  // (the API's rule, STATE-10). Choosing a suggestion never makes its own slate out of date.
+  const stale = discovery !== null && !discovery.current;
 
   return (
     <section className="grid gap-16" aria-labelledby="directions-title">
-      <h2 id="directions-title" className="display text-25">
+      <h2 id="directions-title" className="display text-25" tabIndex={-1} ref={headingRef}>
         Directions to explore
       </h2>
       <p className="small muted measure">

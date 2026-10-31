@@ -4,14 +4,17 @@
 // confirmed by name (PROF-04).
 import type {
   DecideTurn,
+  EntryMode,
   FailureClass,
   FieldEdit,
   PartialCompleteness,
   PartialReplyOut,
+  ProfileDocument,
   ProposedChangeOut,
   TurnOut,
   WorkState,
 } from "@/generated/api";
+import { OPENING_ASKS, type ProfileFieldName } from "./vocabulary";
 
 export type ReplyView =
   | { kind: "checked"; text: string }
@@ -102,6 +105,44 @@ export function decisionFor(
       .map((change) => change.field),
     edits: edited,
   };
+}
+
+/** The four early-value answers (spec section 3: current work, work area, weekly availability
+ *  and budget), which the interview asks for before it asks about a role. */
+const EARLY_VALUE = ["current_role", "cities", "weekly_study_hours", "direct_spend_cap"] as const;
+
+/**
+ * What the question in view asks about, where Careerwright knows: the opening's for the
+ * entry the person chose ("open" for an unsure person's), or the demo interviewer's own
+ * (`asks_about`). A model's question is never classified: null.
+ */
+export function questionAsks(
+  answered: TurnOut | undefined,
+  entry: EntryMode | null,
+): ProfileFieldName | "open" | null {
+  if (answered?.proposal) return answered.proposal.asks_about ?? null;
+  return entry === null ? null : OPENING_ASKS[entry];
+}
+
+/**
+ * Whether the question in view is "Do you have a role in mind, or would you like to explore?",
+ * which offers "Show me suggestions" and "Name a role" (STATE-09): the demo interviewer's role
+ * question for someone who didn't say they know their direction; in a live interview, whose
+ * questions are never classified, the stage at which it is asked: the four early answers
+ * given and no target yet.
+ */
+export function asksRoleOrExplore(
+  asks: ProfileFieldName | "open" | null,
+  demo: boolean,
+  entry: EntryMode | null,
+  document: ProfileDocument,
+): boolean {
+  if (entry === "sure") return false;
+  if (demo) return asks === "target_titles";
+  return (
+    document.target_titles.state === "unasked" &&
+    EARLY_VALUE.every((name) => document[name].state !== "unasked")
+  );
 }
 
 /** The newest turn with proposals, if they are not yet decided on; stale when the profile

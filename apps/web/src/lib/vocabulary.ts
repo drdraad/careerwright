@@ -222,6 +222,61 @@ export const OPENING_QUESTION: Record<EntryMode, string> = {
   unsure: "What would you most like to be different about your working life?",
 };
 
+/** What each opening question asks about: the target, or nothing in particular ("open"). */
+export const OPENING_ASKS: Record<EntryMode, ProfileFieldName | "open"> = {
+  sure: "target_titles",
+  unsure: "open",
+};
+
+/**
+ * One-tap example replies under each demo question, by what it asks about (the API's
+ * `asks_about`, or the opening's). Each is a reply the demo interviewer reads (its fixed
+ * patterns, or Skip, Unknown and Prefer not to say), so tapping one never brings the same
+ * question back (STATE-09; backend `test_interview_agent.py` taps each). A field the demo
+ * never asks about has none.
+ */
+export const EXAMPLE_REPLIES: Record<ProfileFieldName | "open", readonly string[]> = {
+  open: ["I enjoy working with people", "Skip"],
+  target_titles: ["I want to be a nurse", "Skip"],
+  current_role: ["I'm a warehouse supervisor", "Skip"],
+  cities: ["Leeds", "Skip"],
+  weekly_study_hours: ["5 hours a week", "Unknown"],
+  direct_spend_cap: ["Up to £600", "Prefer not to say"],
+  monthly_payment_cap: [],
+  minimum_salary: [],
+  enjoyed_tasks: [],
+  confident_tasks: [],
+  evidenced_tasks: [],
+  work_style: [],
+  preferred_name: [],
+};
+
+/** "Do you have a role in mind, or would you like to explore?": two ways on, in the
+ *  conversation, that open existing views and commit nothing by themselves (STATE-09). */
+export const ROLE_OR_EXPLORE = {
+  explore: "Show me suggestions",
+  name: "Name a role",
+} as const;
+
+/** Before detailed collection (BND1-02): what Careerwright covers, in one plain line. */
+export const ENGLAND_ONLY = "Careerwright covers England for now.";
+
+/** A suggestion's words beyond the API's (Task W2E): each says what Careerwright did. */
+export const SUGGESTION_WORDS = {
+  /** A suggestion that is one of the person's targets (STATE-10). */
+  chosen: "Saved as one of your targets",
+  /** The skills it was joined to a title of the person's by: the first few (the audit's F4). */
+  joinedBy: "Careerwright joined them by these skills:",
+  otherSkills: (count: number) => `The other ${count} ${count === 1 ? "skill" : "skills"}`,
+  /** The slate's unexpected connection, in words; its light in the world is Task M's. */
+  connection: "An unexpected connection",
+  connectionLine: (role: string, count: number) =>
+    `Careerwright joined this to your role, “${role}”, by ${count} essential ${
+      count === 1 ? "skill" : "skills"
+    } ESCO lists for both.`,
+  connectionSkills: (count: number) => `The ${count} ${count === 1 ? "skill" : "skills"}`,
+} as const;
+
 /** A streamed reply's state in words. Only "incomplete" is final; nothing streamed is saved. */
 export const PARTIAL_REPLY: Record<PartialCompleteness, { label: string }> = {
   none: { label: "Careerwright is reading your message" },
@@ -248,9 +303,10 @@ export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string
     title: "That model isn't allowed for this workspace's data",
     action: "Nothing was sent. Check the workspace's data label.",
   },
+  // F10: names no control the app doesn't have yet (Task 3b adds the spending line).
   budget_exceeded: {
     title: "The spending limit for model calls is reached",
-    action: "Raise the limit or wait for the next month.",
+    action: "Careerwright stopped before spending more. Your work is kept.",
   },
   provider_authentication: {
     title: "Meta didn't accept the key",
@@ -516,7 +572,7 @@ const ERROR_WORDS: Record<ErrorCode, Omit<ErrorStatement, "tone">> = {
   },
   BUDGET_EXCEEDED: {
     title: "The spending limit for model calls is reached",
-    action: "Raise the limit or wait for the next month.",
+    action: "Careerwright stopped before spending more. Your work is kept.",
   },
   SOLVE_LIMIT_REACHED: {
     title: "The route search stopped at its limit",

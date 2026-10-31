@@ -45,11 +45,15 @@ export function ProfileEditor({
   workspaceId,
   profile,
   headingRef,
+  openTargets = 0,
 }: {
   workspaceId: string;
   profile: ProfileOut;
   /** Where focus can land when the form is opened from elsewhere, so it is never lost. */
   headingRef?: Ref<HTMLHeadingElement>;
+  /** Each new value is a request ("Name a role") to open the target roles ready to type: a
+   *  change to the draft only, saved like any other by the person. */
+  openTargets?: number;
 }) {
   const queries = useQueryClient();
   const save = useSaveProfile(workspaceId);
@@ -68,6 +72,28 @@ export function ProfileEditor({
   useEffect(() => {
     if (stale !== null) notice.current?.focus();
   }, [stale]);
+
+  // "Name a role": the target roles answered, ready to type, whatever they were, and focus in
+  // their first box once it shows.
+  const form = useRef<HTMLFormElement>(null);
+  const [focusTargets, setFocusTargets] = useState(false);
+  useEffect(() => {
+    if (openTargets === 0) return;
+    setDraft((current) =>
+      current.target_titles.state === "provided"
+        ? current
+        : { ...current, target_titles: { ...current.target_titles, state: "provided" } },
+    );
+    setFocusTargets(true);
+  }, [openTargets]);
+  useEffect(() => {
+    if (!focusTargets) return;
+    const box = form.current?.querySelector<HTMLInputElement>("[data-field='target_titles'] input");
+    if (box) {
+      box.focus();
+      setFocusTargets(false);
+    }
+  });
 
   // Follow newer versions saved elsewhere while nothing is being edited here (never an older
   // one: after a stale save the form is already on the newer version).
@@ -144,6 +170,7 @@ export function ProfileEditor({
 
   return (
     <form
+      ref={form}
       className="grid max-w-[760px] gap-16"
       noValidate
       aria-labelledby={`${idPrefix}-title`}
@@ -224,6 +251,7 @@ export function ProfileEditor({
               key={name}
               className="field first:border-t-0"
               aria-labelledby={`${idPrefix}-${name}`}
+              data-field={name}
             >
               <div className="flex flex-wrap items-baseline justify-between gap-8">
                 <h3 id={`${idPrefix}-${name}`} className="field-label">

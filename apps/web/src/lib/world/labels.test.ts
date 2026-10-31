@@ -15,7 +15,7 @@ const overlaps = (a: Box, b: Box) =>
 const over = (box: Box | null | undefined, x: number) =>
   box != null && box.x <= x && x <= box.x + box.w;
 
-describe("[UI-07] the world's words are placed beside their lights", () => {
+describe("[WLD-06][UI-07] the world's words are placed beside their lights", () => {
   it("puts a name above or below its own light, centred on it", () => {
     const spots = layoutLabels(
       [

@@ -650,9 +650,10 @@ export function World({
     placeLabels(words.current, keyRef.current, labels, explained, placeView(place, vp, clear), vp);
   }, [still, vp, labels, explained, place, clear]);
 
-  // The bars and panels over the world change as chapters load, grow and scroll, and the names
-  // change size when the display face arrives: the place moves into the part they leave clear,
-  // and the words move clear of them, at most once a frame.
+  // The bars and panels over the world change as chapters load, grow and scroll, as a view is
+  // shown or hidden (the You chapter's views stay mounted and switch by `hidden`: re-review N1),
+  // and the names change size when the display face arrives: the place moves into the part
+  // they leave clear, and the words move clear of them, at most once a frame.
   useEffect(() => {
     if (vp === null) return;
     let queued = 0;
@@ -680,7 +681,14 @@ export function World({
     };
     replace();
     const changes = new MutationObserver(replace);
-    changes.observe(document.body, { childList: true, subtree: true, characterData: true });
+    changes.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      // A disclosure opening grows its panel as much as new children would.
+      attributeFilter: ["hidden", "open"],
+    });
     window.addEventListener("scroll", replace, { passive: true, capture: true });
     const fonts = document.fonts;
     fonts?.addEventListener?.("loadingdone", replace);

@@ -10,8 +10,6 @@ export type WebConfig = {
   firebaseProjectId: string;
   /** `host:port` values the web origin answers to; anything else is refused (DNS rebinding). */
   allowedHosts: string[];
-  /** The supplied fixture pack, read by the fixture adapter. */
-  fixturesDir: string;
 };
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
@@ -56,7 +54,6 @@ const VARIABLES = [
   "CAREERWRIGHT_AUTH_EMULATOR_URL",
   "CAREERWRIGHT_FIREBASE_PROJECT_ID",
   "CAREERWRIGHT_WEB_ALLOWED_HOSTS",
-  "CAREERWRIGHT_FIXTURES_DIR",
 ] as const;
 
 export function readWebConfig(env: Record<string, string | undefined>): WebConfig {
@@ -84,7 +81,6 @@ export function readWebConfig(env: Record<string, string | undefined>): WebConfi
     ),
     firebaseProjectId: projectId,
     allowedHosts: hosts,
-    fixturesDir: required(env, "CAREERWRIGHT_FIXTURES_DIR"),
   };
 }
 

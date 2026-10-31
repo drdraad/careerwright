@@ -1,15 +1,14 @@
 "use client";
 // What each chapter shows in this build, as its place in the world (plan section 4). You holds
-// the conversation, what we know and the directions to explore; Routes shows the labelled
-// fixture preview in the fixture workspace; the other chapters are places not built yet, and
-// say so plainly in a short card: where the place is, why it is empty and what to do next,
-// with what it will hold and which answers it depends on one step away (spec section 3:
-// useful, honest empty states).
+// the conversation, what we know and the directions to explore; the other chapters are places
+// not built yet, and say so plainly in a short card: where the place is, why it is empty and
+// what to do next, with what it will hold and which answers it depends on one step away (spec
+// section 3: useful, honest empty states). The fixture route preview left the person's path
+// (the audit's ruling): it stays in Storybook and the design review until Routes is built.
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { ProfileOut } from "@/generated/api";
 import { CHAPTERS, type ChapterId, chapterHref } from "@/lib/chapters";
-import type { RoutePreview as Preview } from "@/lib/fixtures/trace";
 import { describeField } from "@/lib/profile";
 import { type ChapterNeeds, chapterNeeds } from "@/lib/readiness";
 import { PROFILE_FIELDS, type ProfileFieldName } from "@/lib/vocabulary";
@@ -18,7 +17,6 @@ import { Button } from "./Button";
 import { Glyph } from "./Glyph";
 import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
-import { RoutePreview } from "./RoutePreview";
 import { useWorkspaceData } from "./WorkspaceShell";
 import { YouChapter } from "./YouChapter";
 
@@ -177,13 +175,7 @@ export function PlannedChapter({
   );
 }
 
-export function ChapterView({
-  chapter,
-  routePreview,
-}: {
-  chapter: ChapterId;
-  routePreview: Preview | null;
-}) {
+export function ChapterView({ chapter }: { chapter: ChapterId }) {
   const { workspace, profile, profileError, retryProfile } = useWorkspaceData();
 
   // While loading or after a failed load the page still says which chapter it is.
@@ -217,13 +209,6 @@ export function ChapterView({
     );
   } else if (chapter === "you") {
     body = <YouChapter workspace={workspace} profile={profile} />;
-  } else if (chapter === "routes" && workspace.fixture && routePreview !== null) {
-    body = (
-      <>
-        <h1 className="page-title">Routes</h1>
-        <RoutePreview preview={routePreview} />
-      </>
-    );
   } else if (chapter === "routes") {
     shape = "place";
     body = (

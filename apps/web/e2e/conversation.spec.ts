@@ -6,7 +6,7 @@
 // sheet (S0-V01, S0-V02), checked by what is actually on top at their centre, not by
 // screenshots.
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { asBrowser, emulatorToken } from "./api";
+import { asBrowser, emulatorToken, talkedWorkspace } from "./api";
 import {
   brightFills,
   chapterUrl,
@@ -143,6 +143,12 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   await choose.click();
   await expect(saved(page, 4)).toBeVisible();
   await expect(banner.getByText(title, { exact: false })).toBeVisible();
+  // Confirmed where it was chosen, with what it usually asks for, and never "out of date": the
+  // only change since the slate was this choice from it (STATE-10).
+  await expect(first.getByRole("heading", { name: "Saved as one of your targets" })).toBeFocused();
+  await expect(first.getByText("What this work usually asks for, from ESCO:")).toBeVisible();
+  await expect(directions.getByText("Based on your earlier answers")).toHaveCount(0);
+  await expect(directions.getByRole("button", { name: "Suggest again" })).toHaveCount(0);
 
   // The early sketch, one step away in What we know (a second idea there, design review M6):
   // ESCO's requirements for the target, every step not resolved yet.
@@ -153,6 +159,96 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   await expect(sketch.getByText(/Not resolved yet/).first()).toBeVisible();
 
   expect(externalRequests(requests)).toEqual([]);
+});
+
+/** Accepts or confirms every change the reply proposes and saves them. */
+async function keepAll(page: Page) {
+  const tray = page.getByRole("region", { name: /To review:/ });
+  await expect(tray).toBeVisible({ timeout: 60_000 });
+  for (const choose of await tray.getByRole("button", { name: /^(Accept|Confirm)/ }).all()) {
+    await choose.click();
+  }
+  await tray.getByRole("button", { name: /^Save \d+ to What we know/ }).click();
+  await expect(page.getByRole("heading", { name: "Saved to What we know" })).toBeFocused();
+}
+
+/** The question in view, or null once there is none. */
+async function questionShown(page: Page): Promise<string | null> {
+  const question = page.locator(".question h2");
+  return (await question.count()) === 0 ? null : ((await question.textContent()) ?? "");
+}
+
+test("[STATE-09][STATE-08][BND1-02] the demo takes a target in the person's words and Skip, and never asks the same question twice", async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  const workspace = await demoWorkspace("Never loops, sure (synthetic)");
+  await signIn(page, "ada", chapterUrl("you", workspace));
+  // Before the first answer: what Careerwright covers, and the entry choice as the bright
+  // action, never Send on an empty field (F17).
+  await expect(page.getByText("Careerwright covers England for now.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send" })).not.toHaveClass(/btn-primary/);
+  await page.getByRole("button", { name: "I know my direction" }).click();
+  const opening = "Which role are you aiming for, and at what level?";
+  await expect(page.getByRole("heading", { name: opening })).toBeVisible();
+  const asked = [await questionShown(page)];
+  expect(asked[0]).toBe(opening);
+
+  await send(page, "I want to be a nurse");
+  await keepAll(page);
+  // Then the last example under each question (Skip, Unknown or Prefer not to say), until the
+  // demo has nothing left to ask.
+  for (let question = await questionShown(page); question !== null; ) {
+    expect(asked, "never the same question twice").not.toContain(question);
+    asked.push(question);
+    await page.getByRole("group", { name: "Example replies" }).getByRole("button").last().click();
+    await keepAll(page);
+    question = await questionShown(page);
+  }
+  expect(asked).toHaveLength(5); // the target, then the four practical questions, each once
+  await youView(page, "What we know");
+  await expect(
+    page.getByRole("tabpanel", { name: "What we know" }).getByText("nurse", { exact: true }),
+  ).toBeVisible();
+});
+
+test("[STATE-09] exploring by example replies reaches the role question, whose Show me suggestions opens and starts them", async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  const workspace = await demoWorkspace("Never loops, explore (synthetic)");
+  await signIn(page, "ada", chapterUrl("you", workspace));
+  await page.getByRole("button", { name: "Help me explore" }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "What would you most like to be different about your working life?",
+    }),
+  ).toBeVisible();
+  const role = "Do you have a role in mind, or would you like to explore?";
+  const asked: string[] = [];
+  for (let question = await questionShown(page); question !== role; ) {
+    expect(question).not.toBeNull();
+    expect(asked, "never the same question twice").not.toContain(question);
+    asked.push(question ?? "");
+    await page.getByRole("group", { name: "Example replies" }).getByRole("button").first().click();
+    await keepAll(page);
+    question = await questionShown(page);
+  }
+  expect(asked).toHaveLength(5); // the opening, then the four practical questions
+
+  // Two ways on, which open existing views; neither commits anything by itself.
+  await expect(page.getByRole("group", { name: "Example replies" })).toHaveCount(0);
+  const started = page.waitForRequest(
+    (request) => request.method() === "POST" && request.url().endsWith("/discoveries"),
+  );
+  await page.getByRole("button", { name: "Show me suggestions" }).click();
+  await started;
+  await expect(page.getByRole("tab", { name: "Suggestions" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByRole("heading", { name: "Directions to explore" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Suggest directions" })).toHaveCount(0);
 });
 
 test("[PROF-09] a message with a risk stem is sent as usual, with the support panel and a smaller step", async ({
@@ -211,6 +307,38 @@ test("[UI-09] V-08: the strip keeps its height when updates are interrupted, on 
     expect(live, `${viewport.width} px`).toBeGreaterThan(0);
     expect(reconnecting, `${viewport.width} px: one row while reconnecting`).toBe(live);
   }
+});
+
+test("[UI-09] on a phone a stopped update says why in words read whole, not cut off (re-review N2)", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.route("**/events/stream*", (route) =>
+    route.fulfill({
+      status: 404,
+      json: {
+        error: {
+          code: "NOT_FOUND",
+          message: "",
+          retryable: false,
+          stage: "request",
+          correlation_id: "n2",
+          details: {},
+        },
+      },
+    }),
+  );
+  await signIn(page, "ada", chapterUrl("you"));
+  const stopped = liveUpdates(page, /^Updates: Stopped: access to this workspace ended$/);
+  await expect(stopped).toBeVisible();
+  const words = stopped.locator("span").last();
+  const cut = await words.evaluate((element) => element.scrollWidth > element.clientWidth + 1);
+  expect(cut, "the stopped state's reason is shown whole").toBe(false);
+  const box = await words.boundingBox();
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(390);
+  await expect(page.getByRole("button", { name: "Account and settings" })).toBeVisible();
+  await context.close();
 });
 
 test.describe("phone", () => {
@@ -321,6 +449,56 @@ test.describe("phone", () => {
     await page.keyboard.press("Enter");
     await sent; // Enter on the focused Try again sends the message again
   });
+});
+
+test.describe("phone, first screen", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  /** At the top of the view, wholly in the first screen and on top at its centre. */
+  async function firstScreen(page: Page, target: Locator) {
+    await expect(target).toBeVisible({ timeout: 60_000 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expectOnTop(page, target);
+  }
+
+  test("[UI-12][F7] at 390 × 844 each view's first decision is in the first screen", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    const token = await emulatorToken("ada");
+    // The start: the entry choice.
+    await signIn(page, "ada", chapterUrl("you", await demoWorkspace("Start (synthetic)")));
+    await firstScreen(page, page.getByRole("button", { name: "Help me explore" }));
+
+    // A reply to review, what we know and the suggestions, each at the top of its view.
+    await page.goto(chapterUrl("you", await talkedWorkspace(token)));
+    const tray = page.getByRole("region", { name: /To review:/ });
+    await firstScreen(page, tray.getByRole("button", { name: /^(Accept|Confirm)/ }).first());
+    await youView(page, "What we know");
+    await firstScreen(page, page.getByRole("button", { name: "Edit answers directly" }));
+    await youView(page, "Suggestions");
+    const directions = page.getByRole("region", { name: "Directions to explore" });
+    await firstScreen(
+      page,
+      directions
+        .getByRole("article")
+        .first()
+        .getByRole("button", { name: /Make this a target/ }),
+    );
+  });
+});
+
+test("[UI-12] in a window too short for a band (a phone turned sideways) the console starts in the first screen (re-review N3)", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ viewport: { width: 844, height: 390 } });
+  const page = await context.newPage();
+  await signIn(page, "ada", chapterUrl("you", await demoWorkspace("Sideways (synthetic)")));
+  const start = page.getByRole("button", { name: "Help me explore" });
+  await expect(start).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expectOnTop(page, start);
+  await context.close();
 });
 
 test("[UI-09] V-02: a failed profile load recovers in place with Try again", async ({ page }) => {

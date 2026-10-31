@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
-import type { PartialReplyOut, ProposedChangeOut, RunOut, TurnOut } from "@/generated/api";
+import type {
+  PartialReplyOut,
+  ProfileDocument,
+  ProposalOut,
+  ProposedChangeOut,
+  RunOut,
+  TurnOut,
+} from "@/generated/api";
 import {
+  asksRoleOrExplore,
   type Choices,
   decisionFor,
+  questionAsks,
   replyView,
   reviewable,
   turnFailed,
@@ -191,5 +200,61 @@ describe("[MODEL-03] run states come from the generated enum, in one place", () 
     expect(turnFailed({ ...turn("complete"), proposal: null })).toBe(true); // no checked reply
     expect(turnFailed(turn("complete"))).toBe(false);
     expect(turnRunning(turn("complete"))).toBe(false);
+  });
+});
+
+const SRC = "8d1f6f8e-46a1-5c2b-9d0e-3f7a1b2c4d5e";
+const unasked = { state: "unasked", value: null, source_ref_id: null } as const;
+const known = { state: "unknown", value: null, source_ref_id: SRC } as const;
+const blank: ProfileDocument = {
+  schema_version: "3",
+  preferred_name: unasked,
+  current_role: unasked,
+  cities: unasked,
+  target_titles: unasked,
+  weekly_study_hours: unasked,
+  direct_spend_cap: unasked,
+  monthly_payment_cap: unasked,
+  enjoyed_tasks: unasked,
+  confident_tasks: unasked,
+  evidenced_tasks: unasked,
+  work_style: unasked,
+  minimum_salary: unasked,
+};
+const earlyAnswers: ProfileDocument = {
+  ...blank,
+  current_role: known,
+  cities: known,
+  weekly_study_hours: known,
+  direct_spend_cap: known,
+};
+
+describe("[STATE-09] what the question in view asks about, and the role-or-explore question", () => {
+  it("knows the opening's and the demo interviewer's questions, never a model's", () => {
+    const asked = (asks: ProposalOut["asks_about"]): TurnOut => ({
+      ...turn("complete"),
+      proposal: { ...(turn("complete").proposal as ProposalOut), asks_about: asks },
+    });
+    expect(questionAsks(undefined, "sure")).toBe("target_titles");
+    expect(questionAsks(undefined, "unsure")).toBe("open");
+    expect(questionAsks(undefined, null)).toBeNull(); // typed before choosing
+    expect(questionAsks(asked("cities"), "unsure")).toBe("cities");
+    expect(questionAsks(asked(null), "unsure")).toBeNull();
+  });
+
+  it("offers suggestions or naming a role at the demo's role question, and live at its stage", () => {
+    expect(asksRoleOrExplore("target_titles", true, "unsure", blank)).toBe(true);
+    expect(asksRoleOrExplore("target_titles", true, null, blank)).toBe(true);
+    // A sure person's opening asks for the target itself: no exploring offered.
+    expect(asksRoleOrExplore("target_titles", true, "sure", blank)).toBe(false);
+    expect(asksRoleOrExplore("cities", true, "unsure", earlyAnswers)).toBe(false);
+    // Live: once the four early answers are given (Unknown counts) and no target is.
+    expect(asksRoleOrExplore(null, false, "unsure", earlyAnswers)).toBe(true);
+    expect(asksRoleOrExplore(null, false, "unsure", { ...earlyAnswers, cities: unasked })).toBe(
+      false,
+    );
+    expect(
+      asksRoleOrExplore(null, false, "unsure", { ...earlyAnswers, target_titles: known }),
+    ).toBe(false);
   });
 });

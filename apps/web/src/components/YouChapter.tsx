@@ -24,6 +24,12 @@
 // says what it did, in the view the person is in. "Add the details yourself" opens the answer
 // form in What we know and moves focus to its heading. Moving between views keeps focus on the
 // view's tab.
+//
+// The demo never loops (Task W2E, STATE-09): "Do you have a role in mind, or would you like to
+// explore?" offers "Show me suggestions" (the suggestions open, asking for a set where none is
+// current, and focus goes to them) and "Name a role" (the answer form opens at the target roles,
+// ready to type). Neither commits anything; a target is still chosen only by the person. "Help
+// me explore instead" hands focus to the suggestions that replace it.
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { ProfileOut, WorkspaceOut } from "@/generated/api";
 import { reviewable, turnFailed, turnRunning } from "@/lib/conversation";
@@ -33,11 +39,12 @@ import {
   usePreferences,
   useSendMessage,
   useSetPreferences,
+  useSubmitDiscovery,
   useTurns,
 } from "@/lib/queries";
 import { Button } from "./Button";
 import { Conversation } from "./Conversation";
-import { Directions } from "./Directions";
+import { Directions, suggestionStart } from "./Directions";
 import { KeySetup } from "./KeySetup";
 import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
@@ -130,13 +137,17 @@ export function YouChapter({
   // The last decision's outcome, with how many turns there were when it was made.
   const [outcome, setOutcome] = useState<{ value: SaveOutcome; turns: number } | null>(null);
   const [announcement, setAnnouncement] = useState("");
-  // Where focus goes once it is in the page: the notice in the view the person is in, or the
-  // answer form's heading.
-  const [focusTo, setFocusTo] = useState<"notice" | "form" | null>(null);
+  // Where focus goes once it is in the page: the notice in the view the person is in, the
+  // answer form's heading, or the suggestions' heading.
+  const [focusTo, setFocusTo] = useState<"notice" | "form" | "directions" | null>(null);
+  // Each "Name a role": the answer form opens with its target roles ready, focused there.
+  const [openTarget, setOpenTarget] = useState(0);
   // Both views that show the save notice have their own copy, each with its own heading.
   const conversationNotice = useRef<HTMLHeadingElement>(null);
   const knownNotice = useRef<HTMLHeadingElement>(null);
   const formTitle = useRef<HTMLHeadingElement>(null);
+  const directionsTitle = useRef<HTMLHeadingElement>(null);
+  const suggest = useSubmitDiscovery(id);
 
   // A repeated announcement still changes the region's text, so it is read again.
   const announce = (text: string) =>
@@ -147,13 +158,16 @@ export function YouChapter({
     setFocusTo("notice");
   };
 
-  // The notice mounts with the outcome, the form when it opens; focus moves once it is there.
+  // The notice mounts with the outcome, the form when it opens, the suggestions when the
+  // person can explore; focus moves once it is there.
   useEffect(() => {
     if (focusTo === null) return;
     const target =
       focusTo === "form"
         ? formTitle.current
-        : (view === "known" ? knownNotice : conversationNotice).current;
+        : focusTo === "directions"
+          ? directionsTitle.current
+          : (view === "known" ? knownNotice : conversationNotice).current;
     if (target !== null) {
       target.focus();
       setFocusTo(null);
@@ -223,6 +237,21 @@ export function YouChapter({
     setView("known");
     setEditing(true);
     setFocusTo("form");
+  };
+  // "Name a role" and "Show me suggestions" open existing views and actions; neither commits
+  // anything by itself (a target is still chosen only by the person, STATE-09).
+  const nameRole = () => {
+    setView("known");
+    setEditing(true);
+    setOpenTarget((request) => request + 1);
+  };
+  const showSuggestions = () => {
+    setView("suggestions");
+    setFocusTo("directions");
+    const start = suggestionStart(profile, discovery.data, unavailable, suggest.isPending);
+    if (start.wanted && start.blocked === undefined) {
+      suggest.mutate({ expected_profile_version: profile.version });
+    }
   };
 
   // A save stays undoable until something newer is saved; "nothing saved" and "undone" are
@@ -301,6 +330,8 @@ export function YouChapter({
             primary={primary}
             announce={announce}
             onEditAnswers={edit}
+            onShowSuggestions={showSuggestions}
+            onNameRole={nameRole}
             review={
               <>
                 {saveNotice(conversationNotice)}
@@ -334,7 +365,13 @@ export function YouChapter({
           />
           {editing && (
             <div id="edit-answers">
-              <ProfileEditor key={id} workspaceId={id} profile={profile} headingRef={formTitle} />
+              <ProfileEditor
+                key={id}
+                workspaceId={id}
+                profile={profile}
+                headingRef={formTitle}
+                openTargets={openTarget}
+              />
             </div>
           )}
           {/* A second idea (a route sketch for the target), so one step away (D-M6). */}
@@ -354,14 +391,20 @@ export function YouChapter({
               You know your direction, so suggestions are optional.{" "}
               <Button
                 variant="quiet"
-                onClick={() =>
-                  setPreferences.mutate({
-                    expected_version: current.version,
-                    entry_mode: "unsure",
-                    conversation_mode: current.conversation_mode,
-                    paused: current.paused,
-                  })
-                }
+                onClick={() => {
+                  // The button goes with the change; focus goes to the suggestions that
+                  // replace it, never to the page (fix round 1, concern 3).
+                  setFocusTo("directions");
+                  setPreferences.mutate(
+                    {
+                      expected_version: current.version,
+                      entry_mode: "unsure",
+                      conversation_mode: current.conversation_mode,
+                      paused: current.paused,
+                    },
+                    { onError: () => setFocusTo(null) },
+                  );
+                }}
                 disabledReason={setPreferences.isPending ? "Saving…" : undefined}
               >
                 Help me explore instead
@@ -374,6 +417,8 @@ export function YouChapter({
               discovery={discovery.data}
               unavailable={unavailable}
               shown={view === "suggestions"}
+              submit={suggest}
+              headingRef={directionsTitle}
             />
           )}
           {setPreferences.error !== null && <RequestFailure error={setPreferences.error} />}

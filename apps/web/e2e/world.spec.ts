@@ -1,12 +1,13 @@
 // The world in the app (plan section 4, Sprint W SW.3): one persistent world behind all six
 // chapters; changing chapter travels to its place; the still world shows the same names as the
-// moving one, under reduced motion, calm mode and pause, at every size; the visible controls
-// pause motion and leave sound off until asked, and calm mode lives in the account menu; the
+// moving one, under reduced motion, calm mode and pause, at every size; the controls hold the
+// world still and leave sound off until asked (in the strip on a desktop, in the account menu
+// below one), and calm mode lives in the account menu; the
 // calm support panel stills the world; a chapter not built yet says so in its place, above a
 // short card; every light's name sits beside it, clear of the panels; and nothing leaves this
 // machine. On the real stack, demo mode.
 import { type Browser, expect, type Page, test } from "@playwright/test";
-import { asBrowser, emulatorToken } from "./api";
+import { asBrowser, emulatorToken, talkedWorkspace } from "./api";
 import {
   chapterUrl,
   externalRequests,
@@ -132,6 +133,15 @@ async function toggleCalm(page: Page) {
   await page.keyboard.press("Escape");
 }
 
+/** "Hold the world still": in the strip on a desktop, in the account menu below one (F14). */
+async function holdStill(page: Page) {
+  const hold = page.getByRole("button", { name: /^Hold the world still/ });
+  const inMenu = (await hold.count()) === 0;
+  if (inMenu) await page.getByRole("button", { name: "Account and settings" }).click();
+  await hold.click();
+  if (inMenu) await page.keyboard.press("Escape");
+}
+
 /**
  * Opens a menu, stands the key to the lights where the menu is and reports whether the menu is
  * what shows there: wherever the two meet, the menu is on top.
@@ -161,7 +171,7 @@ async function menuOverKey(page: Page, opener: { name: string | RegExp }) {
 test.describe("moving", () => {
   test.use({ reducedMotion: "no-preference" });
 
-  test("[UI-09][UI-05][BND1-11] one world stays behind every chapter while the view travels", async ({
+  test("[WLD-01][UI-09][UI-05][BND1-11] one world stays behind every chapter while the view travels", async ({
     page,
   }) => {
     const requests = recordRequests(page);
@@ -190,14 +200,16 @@ test.describe("moving", () => {
     expect(externalRequests(requests)).toEqual([]);
   });
 
-  test("[UI-05] pause stills the ambient motion; calm mode, in the account menu, draws the world still and is kept", async ({
+  test("[WLD-05][UI-05] holding the world still stops the ambient motion; calm mode, in the account menu, draws the world still and is kept", async ({
     page,
   }) => {
     await signIn(page, "ada", chapterUrl("roles"));
     await expect(world(page)).toHaveAttribute("data-world-mode", "moving");
     await expect(world(page)).toHaveAttribute("data-motion", "running");
 
-    const pause = page.getByRole("button", { name: /^Pause motion/ });
+    // Named apart from the interview's "Pause the interview" (the audit's F17).
+    const pause = page.getByRole("button", { name: /^Hold the world still/ });
+    await expect(page.getByRole("button", { name: /^Pause motion/ })).toHaveCount(0);
     await pause.click();
     await expect(pause).toHaveAttribute("aria-pressed", "true");
     await expect(world(page)).toHaveAttribute("data-motion", "still");
@@ -221,7 +233,7 @@ test.describe("moving", () => {
     await expect(world(page)).toHaveAttribute("data-world-mode", "moving");
   });
 
-  test("[UI-05][PROF-09] the calm support panel stills the world, and Pause keeps the person's own choice", async ({
+  test("[WLD-08][UI-05][PROF-09] the calm support panel stills the world, and holding it keeps the person's own choice", async ({
     page,
   }) => {
     const token = await emulatorToken("ada");
@@ -246,7 +258,7 @@ test.describe("moving", () => {
     await expect(
       page.getByRole("status").filter({ hasText: "Still while support is shown" }),
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: /^Pause motion/ })).toHaveAttribute(
+    await expect(page.getByRole("button", { name: /^Hold the world still/ })).toHaveAttribute(
       "aria-pressed",
       "false",
     );
@@ -257,7 +269,7 @@ test.describe("moving", () => {
   });
 });
 
-test("[UI-06] the menus open over the key to the lights", async ({ page }) => {
+test("[WLD-06][UI-06] the menus open over the key to the lights", async ({ page }) => {
   await signIn(page, "ada", chapterUrl("roles"));
   await expect(page.locator(".world-key")).toHaveAttribute("data-placed", "true");
   expect(await menuOverKey(page, { name: /^Workspace/ }), "the workspace menu").toBe(true);
@@ -267,7 +279,9 @@ test("[UI-06] the menus open over the key to the lights", async ({ page }) => {
 test.describe("phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("[UI-05] calm mode in the account menu keeps its words and its switch", async ({ page }) => {
+  test("[WLD-05][UI-05] calm mode in the account menu keeps its words and its switch", async ({
+    page,
+  }) => {
     await signIn(page, "ada", chapterUrl("you"));
     await page.getByRole("button", { name: "Account and settings" }).click();
     const calm = page.getByRole("button", { name: /^Calm mode/ });
@@ -278,12 +292,12 @@ test.describe("phone", () => {
     await expect(calm.locator(".world-switch")).toBeVisible();
   });
 
-  test("[UI-06] the chapter menu opens over the key to the lights", async ({ page }) => {
+  test("[WLD-06][UI-06] the chapter menu opens over the key to the lights", async ({ page }) => {
     await signIn(page, "ada", chapterUrl("roles"));
     expect(await menuOverKey(page, { name: /open chapter menu/ })).toBe(true);
   });
 
-  test("[UI-05][PROF-09] the support status sits in the top bar and adds no row to the strip", async ({
+  test("[WLD-08][UI-05][PROF-09] the support status sits in the top bar and adds no row to the strip", async ({
     page,
   }) => {
     const token = await emulatorToken("ada");
@@ -342,7 +356,9 @@ async function settledHeight(page: Page): Promise<number> {
   );
 }
 
-test("[UI-07][UI-05] with no light the key explains, the key is not shown", async ({ page }) => {
+test("[WLD-02][UI-07][UI-05] with no light the key explains, the key is not shown", async ({
+  page,
+}) => {
   // W2A re-review 2, Minor 3: the empty-key case. A new workspace has no destination, skill or
   // opening: the person's light is named, and nothing it draws needs a key.
   const token = await emulatorToken("ada");
@@ -371,76 +387,148 @@ test("[UI-07][UI-05] with no light the key explains, the key is not shown", asyn
   }
 });
 
-/** `geometry.ts`'s MIN_BAND: a band of world shorter than this above the panels is no place to
- *  stand, and the world falls back to a backdrop behind them. */
-const MIN_BAND = 240;
+/**
+ * The person's light's name, the key to the lights (when placed), the You console and its three
+ * tabs, as they stand now, and whether each tab is what a tap at its centre reaches.
+ */
+function youBoxes(page: Page) {
+  return page.evaluate(() => {
+    const box = (e: Element | null) => {
+      if (e === null) return null;
+      const r = e.getBoundingClientRect();
+      return { x: r.left, y: r.top, w: r.width, h: r.height };
+    };
+    const tabs = [...document.querySelectorAll<HTMLElement>("[role='tab']")];
+    return {
+      you: box(document.querySelector(".world-label[data-label='origin'][data-shown='true']")),
+      key: box(document.querySelector(".world-key[data-placed='true']")),
+      console: box(document.querySelector("[data-world-panel]")),
+      tabs: tabs.map(box),
+      onTop: tabs.map((tab) => {
+        const r = tab.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return hit !== null && tab.contains(hit);
+      }),
+    };
+  });
+}
 
 for (const viewport of VIEWPORTS.filter((v) => v.width < 968)) {
-  test(`[UI-07][UI-05] the person's light stands above the You console in every view (${viewport.width}×${viewport.height})`, async ({
+  test(`[WLD-07][UI-07][UI-12][UI-05] after every change of view the person's light stands above the console, and the key covers neither it nor a tab (${viewport.width}×${viewport.height})`, async ({
     browser,
   }) => {
-    // Design review I2: on a tablet and a phone the You place lost its world in most views.
+    // Re-review N1 (the audit's F8): the views switch by `hidden`, so the world must place
+    // itself again with no scroll and no child added. Each box is read where it stands now,
+    // after the change, never a value left by the view before.
     const context = await browser.newContext({ viewport, reducedMotion: "reduce" });
     const page = await context.newPage();
     await signIn(page, "ada", chapterUrl("you"));
-    for (const view of ["Conversation", "What we know", "Suggestions"] as const) {
-      await youView(page, view);
-      await page.evaluate(() => window.scrollTo(0, 0));
-      await page.waitForTimeout(900); // the names settle
-      const band = await page.evaluate(() => {
-        const bars = [...document.querySelectorAll("[data-covers-world]:not([data-world-panel])")]
-          .map((e) => e.getBoundingClientRect())
-          .filter((r) => r.width > 0 && r.height > 0 && r.height < window.innerHeight * 0.9);
-        const top = Math.max(0, ...bars.map((r) => r.bottom));
-        const panel = document.querySelector("[data-world-panel]")?.getBoundingClientRect();
-        return (panel?.top ?? 0) - top;
-      });
-      expect(band, `${view}: the band of world above the console`).toBeGreaterThanOrEqual(MIN_BAND);
-      const { labels } = await layout(page);
-      expect(
-        labels.map((label) => label.name),
-        `${view}: the person's light is named`,
-      ).toContain("You");
+    await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
+    for (const view of ["What we know", "Suggestions", "Conversation", "What we know"] as const) {
+      const tab = page.getByRole("tab", { name: view });
+      await tab.click(); // the tabs are in view at the top: the page does not scroll
+      await expect(tab).toHaveAttribute("aria-selected", "true");
+      expect(await page.evaluate(() => window.scrollY), `${view}: no scroll`).toBe(0);
+      await page.waitForTimeout(300); // a frame or two: the world places itself again
+      const { you, key, console: panel, tabs, onTop } = await youBoxes(page);
+      expect(panel, view).not.toBeNull();
+      expect(you, `${view}: the person's light is named, in view`).not.toBeNull();
+      if (you === null || panel === null) continue;
+      expect(you.y + you.h, `${view}: "You" above the console`).toBeLessThanOrEqual(panel.y);
+      if (key !== null) {
+        expect(overlap(key, panel), `${view}: the key over the console`).toBe(false);
+        for (const [i, shown] of tabs.entries()) {
+          if (shown !== null)
+            expect(overlap(key, shown), `${view}: the key over tab ${i}`).toBe(false);
+        }
+      }
+      // An "on top" check: a tap at each tab's centre reaches the tab, nothing over it (F8).
+      expect(onTop, `${view}: each tab on top`).toEqual([true, true, true]);
     }
     await context.close();
   });
 }
 
+test("[WLD-05][UI-09][UI-05] below a desktop's width the strip keeps the person's facts, and the world's controls are in the account menu (F14)", async ({
+  browser,
+}) => {
+  for (const viewport of [
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+  ]) {
+    // Motion allowed, so holding the world still is the person's own choice to make.
+    const context = await browser.newContext({ viewport, reducedMotion: "no-preference" });
+    const page = await context.newPage();
+    await signIn(page, "ada", chapterUrl("you"));
+    const strip = page.getByRole("banner");
+    await expect(saved(page)).toHaveText("Answers saved");
+    if (viewport.width > 760) {
+      await expect(strip.getByText(/^Work area /)).toBeVisible();
+      await expect(strip.getByText(/^Budget /)).toBeVisible();
+    }
+    await expect(strip.getByRole("button", { name: /^Hold the world still/ })).toHaveCount(0);
+    await expect(strip.getByRole("button", { name: /^Sound/ })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Account and settings" }).click();
+    const hold = page.getByRole("button", { name: /^Hold the world still/ });
+    await expect(hold).toBeVisible();
+    await expect(hold.locator(".world-switch")).toBeVisible(); // its switch, with its words
+    await expect(page.getByRole("button", { name: /^Sound/ })).toBeVisible();
+    await hold.click();
+    await expect(hold).toHaveAttribute("aria-pressed", "true");
+    await context.close();
+  }
+});
+
 /** The chapter's words as read: the same in every way of drawing the world. */
 const chapterText = (page: Page) => page.locator("main").innerText();
 
 for (const viewport of VIEWPORTS) {
-  test(`[UI-05][UI-07] the You chapter says the same in the moving and the still world, in every view (${viewport.width}×${viewport.height})`, async ({
+  test(`[WLD-03][UI-05][UI-07] the You chapter says the same in the moving and the still world, in every view (${viewport.width}×${viewport.height})`, async ({
     browser,
   }) => {
-    test.setTimeout(180_000);
-    const seen = new Map<Mode, string[]>();
-    for (const mode of MODES) {
-      const page = await modePage(browser, viewport, mode);
-      await open(page, chapterUrl("you"), "You", mode);
-      const views: string[] = [];
-      for (const view of ["Conversation", "What we know", "Suggestions"] as const) {
-        await youView(page, view);
-        await expect(page.getByRole("tab", { name: view })).toHaveAttribute(
-          "aria-selected",
-          "true",
-        );
-        await expect(page.getByText("Loading the early sketch")).toHaveCount(0);
-        views.push(await chapterText(page));
+    test.setTimeout(300_000);
+    // Fix round 1, concern 4: the fixture workspace, and one that isn't the fixture's, with a
+    // reply to review, a slate and its written note.
+    const talked = await talkedWorkspace(await emulatorToken("ada"));
+    for (const workspace of [undefined, talked]) {
+      const seen = new Map<Mode, string[]>();
+      for (const mode of MODES) {
+        const page = await modePage(browser, viewport, mode);
+        await open(page, chapterUrl("you", workspace), "You", mode);
+        const views: string[] = [];
+        for (const view of ["Conversation", "What we know", "Suggestions"] as const) {
+          await youView(page, view);
+          await expect(page.getByRole("tab", { name: view })).toHaveAttribute(
+            "aria-selected",
+            "true",
+          );
+          await expect(page.getByText("Loading the early sketch")).toHaveCount(0);
+          if (workspace === talked && view === "Suggestions") {
+            // The note is asked for when the slate first shows; its words settle first.
+            await expect(
+              page.getByText(/Written by the demo explainer \(synthetic\)/).first(),
+            ).toBeVisible({ timeout: 60_000 });
+          }
+          views.push(await chapterText(page));
+        }
+        seen.set(mode, views);
+        await page.context().close();
       }
-      seen.set(mode, views);
-      await page.context().close();
+      const moving = seen.get("moving");
+      expect(moving?.[0]).toContain("Reply to Careerwright");
+      for (const mode of MODES) {
+        expect(seen.get(mode), `${workspace ?? "fixture"}: ${mode} against moving`).toEqual(moving);
+      }
     }
-    const moving = seen.get("moving");
-    expect(moving?.[0]).toContain("Reply to Careerwright");
-    for (const mode of MODES) expect(seen.get(mode), `${mode} against moving`).toEqual(moving);
   });
 }
 
-test("[UI-09] a chapter not built yet shows its place, and says so", async ({ page }) => {
+test("[WLD-01][UI-09] a chapter not built yet shows its place, and says so", async ({ page }) => {
   await signIn(page, "ada", chapterUrl("skills"));
   await expect(page.getByRole("heading", { level: 1, name: "Skills" })).toBeVisible();
-  await expect(page.getByText("Not built yet")).toBeVisible();
+  // The place's kicker (the rail's marks, Task W2E, say it in lower case).
+  await expect(page.getByText("Not built yet", { exact: true })).toBeVisible();
   await expect(page.getByText("The ground between you and a destination.")).toBeVisible();
   await expect(world(page)).toHaveAttribute("data-place", "skills");
 });
@@ -471,14 +559,14 @@ async function open(page: Page, url: string, chapter: string, mode: Mode) {
     mode === "moving" || mode === "paused" ? "moving" : "still",
   );
   if (mode === "paused") {
-    await page.getByRole("button", { name: /^Pause motion/ }).click();
+    await holdStill(page);
     await expect(world(page)).toHaveAttribute("data-motion", "still");
   }
   await page.waitForTimeout(900);
 }
 
 for (const viewport of VIEWPORTS) {
-  test(`[UI-05][UI-07] the still world shows the same names as the moving one, in every chapter (${viewport.width}×${viewport.height}, three long targets)`, async ({
+  test(`[WLD-03][UI-05][UI-07] the still world shows the same names as the moving one, in every chapter (${viewport.width}×${viewport.height}, three long targets)`, async ({
     browser,
   }) => {
     test.setTimeout(240_000);
@@ -511,7 +599,7 @@ for (const viewport of VIEWPORTS) {
     for (const page of pages.values()) await page.context().close();
   });
 
-  test(`[UI-07] every name in the world sits clear of the panels and of each other (${viewport.width}×${viewport.height})`, async ({
+  test(`[WLD-06][UI-07] every name in the world sits clear of the panels and of each other (${viewport.width}×${viewport.height})`, async ({
     browser,
   }) => {
     for (const reducedMotion of ["reduce", "no-preference"] as const) {

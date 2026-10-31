@@ -1,10 +1,12 @@
 "use client";
-// The world's controls (plan section 4; WCAG 2.2.2). In the strip: pause the ambient motion at
-// any time, and sound (off until the person turns it on). In the account menu: calm mode (the
-// world drawn still, kept between visits), a setting kept off the first screen. Each is a toggle
-// button whose pressed state is its setting. While the calm support panel shows, the world is
-// still on its own: Pause keeps showing the person's own choice, and a status says why (in the
-// strip, or on a phone in the top bar, where it adds no row; the other copy is not displayed).
+// The world's controls (plan section 4; WCAG 2.2.2). In the strip on a desktop, and in the
+// account menu below a desktop's width (the person's facts come first there, the audit's F14):
+// hold the world still at any time (named apart from "Pause the interview", F17), and sound
+// (off until the person turns it on). In the account menu: calm mode (the world drawn still,
+// kept between visits), a setting kept off the first screen. Each is a toggle button whose
+// pressed state is its setting. While the calm support panel shows, the world is still on its
+// own: holding it keeps showing the person's own choice, and a status says why (in the strip,
+// or on a phone in the top bar, where it adds no row; the other copy is not displayed).
 import type { WorldSettings } from "@/lib/world/settings";
 import { Glyph, type GlyphName } from "./Glyph";
 
@@ -41,14 +43,7 @@ function Toggle({
   );
 }
 
-export function WorldControls({
-  settings,
-  supportShown = false,
-}: {
-  settings: WorldSettings;
-  /** The calm support panel is showing, so the world is still whatever Pause says. */
-  supportShown?: boolean;
-}) {
+export function WorldControls({ settings }: { settings: WorldSettings }) {
   const { reduced, calm, paused, soundOn } = settings;
   const still = reduced || calm;
   return (
@@ -56,12 +51,11 @@ export function WorldControls({
       <legend className="sr-only">The world</legend>
       <Toggle
         glyph="pause"
-        label="Pause motion"
+        label="Hold the world still"
         pressed={paused || still}
         fixed={still ? "the world is already drawn still" : undefined}
         onToggle={() => settings.setPaused(!paused)}
       />
-      {supportShown && <StillWhileSupport />}
       <Toggle
         glyph="sound"
         label="Sound"

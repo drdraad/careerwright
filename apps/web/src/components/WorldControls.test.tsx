@@ -1,18 +1,20 @@
-// The world's controls (plan section 4; WCAG 2.2.2): in the strip, pause ambient motion at any
-// time and sound, off until the person turns it on (session W1); in the account menu, calm
-// mode, kept between visits. While the calm support panel shows, the world is still on its
-// own: Pause keeps the person's own choice and a status says why.
+// The world's controls (plan section 4; WCAG 2.2.2): hold the world still at any time (named
+// apart from "Pause the interview", the audit's F17) and sound, off until the person turns it
+// on (session W1); in the account menu, calm mode, kept between visits. While the calm support
+// panel shows, the world is still on its own: holding it keeps the person's own choice and a
+// status says why.
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useWorldSettings } from "@/lib/world/settings";
-import { CalmMode, WorldControls } from "./WorldControls";
+import { CalmMode, StillWhileSupport, WorldControls } from "./WorldControls";
 
 function Harness({ supportShown = false }: { supportShown?: boolean }) {
   const settings = useWorldSettings();
   return (
     <>
-      <WorldControls settings={settings} supportShown={supportShown} />
+      <WorldControls settings={settings} />
+      {supportShown && <StillWhileSupport />}
       <CalmMode settings={settings} />
     </>
   );
@@ -41,8 +43,9 @@ class FakeAudioContext {
 }
 
 const toggle = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}`) });
+const HOLD = "Hold the world still";
 
-describe("[UI-05][UI-06] the world's controls", () => {
+describe("[WLD-05][WLD-08][UI-05][UI-06] the world's controls", () => {
   beforeEach(() => {
     window.localStorage.clear();
     contexts.length = 0;
@@ -51,32 +54,34 @@ describe("[UI-05][UI-06] the world's controls", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("starts moving, with sound off, and pauses ambient motion at any time", async () => {
+  it("starts moving, with sound off, and holds the world still at any time", async () => {
     const user = userEvent.setup();
     render(<Harness />);
 
-    expect(toggle("Pause motion")).toHaveAttribute("aria-pressed", "false");
+    expect(toggle(HOLD)).toHaveAttribute("aria-pressed", "false");
     expect(toggle("Calm mode")).toHaveAttribute("aria-pressed", "false");
     expect(toggle("Sound")).toHaveAttribute("aria-pressed", "false");
+    // Never a second "Pause" beside the interview's (F17).
+    expect(screen.queryByRole("button", { name: /^Pause/ })).toBeNull();
 
-    await user.click(toggle("Pause motion"));
-    expect(toggle("Pause motion")).toHaveAttribute("aria-pressed", "true");
-    await user.click(toggle("Pause motion"));
-    expect(toggle("Pause motion")).toHaveAttribute("aria-pressed", "false");
+    await user.click(toggle(HOLD));
+    expect(toggle(HOLD)).toHaveAttribute("aria-pressed", "true");
+    await user.click(toggle(HOLD));
+    expect(toggle(HOLD)).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("keeps calm mode between visits, and calm stills everything, so pause is already on", async () => {
+  it("keeps calm mode between visits, and calm stills everything, so holding is already on", async () => {
     const user = userEvent.setup();
     const { unmount } = render(<Harness />);
     await user.click(toggle("Calm mode"));
 
     expect(toggle("Calm mode")).toHaveAttribute("aria-pressed", "true");
-    expect(toggle("Pause motion")).toHaveAttribute("aria-pressed", "true");
-    expect(toggle("Pause motion")).toHaveAttribute("aria-disabled", "true");
-    expect(toggle("Pause motion")).toHaveAccessibleName(/the world is already drawn still/);
+    expect(toggle(HOLD)).toHaveAttribute("aria-pressed", "true");
+    expect(toggle(HOLD)).toHaveAttribute("aria-disabled", "true");
+    expect(toggle(HOLD)).toHaveAccessibleName(/the world is already drawn still/);
     // Still focusable, and pressing it changes nothing while calm mode holds the world still.
-    await user.click(toggle("Pause motion"));
-    expect(toggle("Pause motion")).toHaveAttribute("aria-pressed", "true");
+    await user.click(toggle(HOLD));
+    expect(toggle(HOLD)).toHaveAttribute("aria-pressed", "true");
     expect(document.documentElement.dataset.calm).toBe("true");
     unmount();
 
@@ -106,14 +111,14 @@ describe("[UI-05][UI-06] the world's controls", () => {
     expect(contexts[0]?.close).toHaveBeenCalledOnce();
   });
 
-  it("says the world is still while support is shown, and keeps Pause as the person left it", async () => {
+  it("says the world is still while support is shown, and keeps holding as the person left it", async () => {
     const user = userEvent.setup();
     render(<Harness supportShown />);
 
     expect(screen.getByRole("status")).toHaveTextContent("Still while support is shown");
-    expect(toggle("Pause motion")).toHaveAttribute("aria-pressed", "false");
-    expect(toggle("Pause motion")).not.toHaveAttribute("aria-disabled");
-    await user.click(toggle("Pause motion"));
-    expect(toggle("Pause motion")).toHaveAttribute("aria-pressed", "true");
+    expect(toggle(HOLD)).toHaveAttribute("aria-pressed", "false");
+    expect(toggle(HOLD)).not.toHaveAttribute("aria-disabled");
+    await user.click(toggle(HOLD));
+    expect(toggle(HOLD)).toHaveAttribute("aria-pressed", "true");
   });
 });
