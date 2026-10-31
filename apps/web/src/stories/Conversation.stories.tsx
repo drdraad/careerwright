@@ -7,6 +7,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
+import { userEvent, within } from "storybook/test";
 import { Directions } from "@/components/Directions";
 import { KeySetup } from "@/components/KeySetup";
 import { SaveNotice } from "@/components/WhatWeKnow";
@@ -21,6 +22,8 @@ import type {
   SlateExplanationOut,
   SlateOut,
   SuggestionOut,
+  TitleMatchesOut,
+  TitleMatchOut,
   TurnOut,
   WorkState,
   WorkspaceOut,
@@ -425,9 +428,9 @@ const limitProposal: TurnOut["proposal"] = {
   ready_for_review: true,
 };
 
-// The start (Task 6d slice B): the first question leads; then "Which of these is closest?" for a
-// UK job title; then how to start, with what isn't known yet for a title kept in the person's
-// own words.
+// The start (Task 6d slice B): the first question leads, its type-ahead open for a UK title, a
+// partial question and none found; then "Which of these is closest?" for a UK job title; then
+// how to start, with what isn't known yet for a title kept in the person's own words.
 const roleNamed = (title: string): ProfileOut => ({
   ...profile,
   document: { ...profile.document, current_role: given(title) },
@@ -481,6 +484,74 @@ const unanswered: ProfileOut = {
 };
 export const Start: Story = {
   render: you(chapterRoutes(prefs(null), []), "conversation", unanswered),
+};
+
+// The type-ahead open (Task 6d slice B fix round 1, design review M-3): what the person sees as
+// they type, each from the scripted API's answer for those words.
+const typeAhead = (answer: Omit<TitleMatchesOut, "release" | "limit">): Route => ({
+  method: "GET",
+  path: /\/taxonomy\/titles$/,
+  answer: { release: { dataset_id: "esco-v1.2.1-en-csv", sample: false }, limit: 8, ...answer },
+});
+const typed =
+  (words: string): Story["play"] =>
+  async ({ canvasElement }) => {
+    const field = await within(canvasElement).findByRole("combobox", { name: "Your job title" });
+    await userEvent.type(field, words);
+  };
+const startTyping = (answer: Omit<TitleMatchesOut, "release" | "limit">): Story["render"] =>
+  you([typeAhead(answer), ...chapterRoutes(prefs(null), [])], "conversation", unanswered);
+export const StartTypeAheadUkTitle: Story = {
+  render: startTyping({
+    query: "Registered nurse",
+    matches: [
+      {
+        source: "uk_title_index",
+        title: "Registered nurse",
+        soc_codes: ["2235", "2237"],
+        isco_groups: [{ code: "2221", label: "Nursing professionals" }],
+      },
+    ],
+    total: 0,
+    uk_total: 1,
+    partial: false,
+    support_note: null,
+  }),
+  play: typed("Registered nurse"),
+};
+const escoTitle = (title: string, code: string, label: string): TitleMatchOut => ({
+  source: "esco",
+  concept_id: `c-${title}`,
+  concept_kind: "esco",
+  title,
+  matched_label: title,
+  label_kind: "preferred",
+  isco_group: { code, label },
+});
+export const StartTypeAheadPartial: Story = {
+  render: startTyping({
+    query: "Bookkeeping assistant",
+    matches: [
+      escoTitle("bookkeeper", "4311", "Accounting and bookkeeping clerks"),
+      escoTitle("payroll clerk", "4313", "Payroll clerks"),
+    ],
+    total: 2,
+    uk_total: 0,
+    partial: true,
+    support_note: null,
+  }),
+  play: typed("Bookkeeping assistant"),
+};
+export const StartTypeAheadNoneFound: Story = {
+  render: startTyping({
+    query: "Orbital gardener",
+    matches: [],
+    total: 0,
+    uk_total: 0,
+    partial: false,
+    support_note: null,
+  }),
+  play: typed("Orbital gardener"),
 };
 export const StartWhichIsClosest: Story = {
   render: you(

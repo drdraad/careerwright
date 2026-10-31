@@ -261,7 +261,18 @@ type Scratch = {
   asking: string;
   /** As `talked`, with the suggestion its slate opens on made a target from the slate. */
   chosen: string;
+  /** New, its role named "Registered nurse" at the first question: "Which of these is
+   *  closest?" (Task 6d slice B). */
+  named: string;
 };
+
+/** The first question's type-ahead open for these words (nothing is saved by typing). */
+const typeAhead =
+  (words: string, shown: (page: Page) => ReturnType<Page["getByText"]>) => async (page: Page) => {
+    await heading("You")(page);
+    await page.getByRole("combobox", { name: "Your job title" }).fill(words);
+    await expect(shown(page)).toBeVisible();
+  };
 
 /** `scratch` workspaces are new synthetic workspaces of Ada's (see `Scratch`). */
 const shots = (scratch: Scratch): Shot[] => [
@@ -286,6 +297,43 @@ const shots = (scratch: Scratch): Shot[] => [
       await expect(page.getByRole("combobox", { name: "Your job title" })).toBeVisible();
       // Chat is immediate (session 2): the reply field is there from the first screen.
       await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toBeVisible();
+    },
+  },
+  {
+    // The type-ahead open (Task 6d slice B fix round 1, design review M-3): a UK job title, the
+    // partial question, and none found.
+    name: "you--type-ahead-uk-title",
+    as: "ada",
+    url: chapterUrl("you", scratch.empty),
+    ready: typeAhead("Registered nurse", (page) =>
+      page.getByRole("option", { name: /^Registered nurse\s*,\s*UK job title \(ONS\)$/ }),
+    ),
+  },
+  {
+    name: "you--type-ahead-partial",
+    as: "ada",
+    url: chapterUrl("you", scratch.empty),
+    ready: typeAhead("Bookkeeping assistant", (page) =>
+      page.getByText("Careerwright couldn't match that title in ESCO. Is it one of these?"),
+    ),
+  },
+  {
+    // A made-up single word (synthetic) that no list holds.
+    name: "you--type-ahead-none-found",
+    as: "ada",
+    url: chapterUrl("you", scratch.empty),
+    ready: typeAhead("Zzyzx", (page) =>
+      page.getByText("Careerwright found no job title holding those words."),
+    ),
+  },
+  {
+    name: "you--closest",
+    as: "ada",
+    url: chapterUrl("you", scratch.named),
+    ready: async (page) => {
+      await heading("You")(page);
+      await expect(page.getByRole("heading", { name: "Which of these is closest?" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "None of these is my job" })).toBeVisible();
     },
   },
   {
@@ -768,7 +816,12 @@ for (const viewport of VIEWPORTS) {
         decided: await talkedWorkspace(token),
         asking: await roleQuestionWorkspace(token),
         chosen: (await chosenTargetWorkspace(token)).workspace,
+        named: await create("Your title (synthetic)", "demo"),
       };
+      await asBrowser("POST", `/v1/workspaces/${scratch.named}/origin/role/title`, token, {
+        expected_version: 0,
+        title: "Registered nurse",
+      });
       const results: Result[] = [];
       const errors: string[] = [];
       const pages = new Map<string, Page>();

@@ -571,6 +571,29 @@ test.describe("phone, first screen", () => {
     await skipFirstQuestion(page);
     await firstScreen(page, page.getByRole("button", { name: "Help me explore" }));
 
+    // The closest step and the entry choice with its kept-words line (Task 6d slice B fix
+    // round 1, design review M-3): their decisions are in the first screen too.
+    await page.goto(chapterUrl("you", await demoWorkspace("Closest, phone (synthetic)")));
+    await page.getByRole("combobox", { name: "Your job title" }).fill("Registered nurse");
+    await page
+      .getByRole("option", { name: /^Registered nurse\s*,\s*UK job title \(ONS\)$/ })
+      .click();
+    await expect(page.getByRole("heading", { name: "Which of these is closest?" })).toBeFocused();
+    const none = page.getByRole("button", { name: "None of these is my job" });
+    await firstScreen(page, none);
+    await firstScreen(
+      page,
+      page.getByRole("region", { name: "Nursing professionals" }).getByRole("button").first(),
+    );
+    await none.click();
+    await firstScreen(
+      page,
+      page.getByText(
+        "Careerwright found “Registered nurse” in the UK job-title index and keeps it as your role, in your words. What this work asks for isn't known yet.",
+      ),
+    );
+    await firstScreen(page, page.getByRole("button", { name: "Help me explore" }));
+
     // What we know in the fixture workspace: four answers, two of them limits explained, and a
     // long "Not asked yet" (design review I3: three short answers fitted where these didn't).
     await page.goto(chapterUrl("you"));

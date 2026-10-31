@@ -24,6 +24,28 @@ async function demoWorkspace(name: string): Promise<string> {
   return created.workspace_id;
 }
 
+type Origin = {
+  role: { text: string | null; state: string; occupation: unknown };
+  usual_skills: unknown[];
+  destinations: unknown[];
+};
+
+/** The origin the page reads: what the world and the start state about the role. */
+async function originOf(workspace: string): Promise<Origin> {
+  return asBrowser<Origin>("GET", `/v1/workspaces/${workspace}/origin`, await emulatorToken("ada"));
+}
+
+/** Acceptance 5: nothing states skills or destinations for a role no ESCO occupation names.
+ *  (This replaced a check that the world draws no skill labels, which it never does: design
+ *  review M-6.) */
+async function statesNoSkills(workspace: string) {
+  const shown = await originOf(workspace);
+  expect(shown.role.state).toBe("not_in_esco");
+  expect(shown.role.occupation).toBeNull();
+  expect(shown.usual_skills).toEqual([]);
+  expect(shown.destinations).toEqual([]);
+}
+
 const field = (page: Page) => page.getByRole("combobox", { name: "Your job title" });
 const origin = (page: Page) => page.locator(".world-label[data-label='origin']");
 const ukTitle = (page: Page, title: string) =>
@@ -45,7 +67,8 @@ test("[DIV1-13][DIV1-14][WLD-01] any UK title is offered as you type; picking on
 }) => {
   test.setTimeout(120_000);
   const requests = recordRequests(page);
-  await signIn(page, "ada", chapterUrl("you", await demoWorkspace("Your title (synthetic)")));
+  const workspace = await demoWorkspace("Your title (synthetic)");
+  await signIn(page, "ada", chapterUrl("you", workspace));
   await expect(
     page.getByRole("heading", { name: "What do you do now, or what did you do last?" }),
   ).toBeVisible();
@@ -89,7 +112,7 @@ test("[DIV1-13][DIV1-14][WLD-01] any UK title is offered as you type; picking on
     ),
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "How would you like to start?" })).toBeFocused();
-  await expect(page.locator(".world-label[data-kind='skill']")).toHaveCount(0);
+  await statesNoSkills(workspace);
   expect(externalRequests(requests)).toEqual([]);
 });
 
@@ -98,7 +121,8 @@ test("[DIV1-13][DIV1-03][WLD-01] a title neither list holds is kept in the perso
 }) => {
   test.setTimeout(120_000);
   const requests = recordRequests(page);
-  await signIn(page, "ada", chapterUrl("you", await demoWorkspace("Own words (synthetic)")));
+  const workspace = await demoWorkspace("Own words (synthetic)");
+  await signIn(page, "ada", chapterUrl("you", workspace));
 
   // Acceptance 3: ESCO's closest titles are asked about, and "None of these is my job" keeps
   // the words as typed.
@@ -119,7 +143,7 @@ test("[DIV1-13][DIV1-03][WLD-01] a title neither list holds is kept in the perso
   // It asks no one to pick a different job: no closest question, straight on to how to start.
   await expect(page.getByRole("heading", { name: "Which of these is closest?" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "How would you like to start?" })).toBeVisible();
-  await expect(page.locator(".world-label[data-kind='skill']")).toHaveCount(0);
+  await statesNoSkills(workspace);
   await youView(page, "What we know");
   await expect(
     page.getByRole("tabpanel", { name: "What we know" }).getByText("Bookkeeping assistant", {
@@ -127,4 +151,29 @@ test("[DIV1-13][DIV1-03][WLD-01] a title neither list holds is kept in the perso
     }),
   ).toBeVisible();
   expect(externalRequests(requests)).toEqual([]);
+});
+
+test("[PROF-09][DIV1-13][WLD-08] a risk phrase at the first question shows the calm panel, stills the world and keeps nothing", async ({
+  page,
+}) => {
+  // Design review I-3, in the demo: the title field goes through the support screen as a
+  // message does. The phrase is the support tests' own (`conversation.spec.ts`).
+  test.setTimeout(120_000);
+  const workspace = await demoWorkspace("Support at the start (synthetic)");
+  await signIn(page, "ada", chapterUrl("you", workspace));
+
+  await field(page).fill("Some days I just want to die.");
+  const panel = page.getByRole("region", { name: "Support is available" });
+  await expect(panel).toContainText("Careerwright hasn't kept it as your role.");
+  await expect(panel).toContainText("Samaritans: Call 116 123");
+  await expect(page.locator(".world")).toHaveAttribute("data-distress", "true");
+  await expect(page.getByRole("option")).toHaveCount(0); // nothing offered in those words
+  await field(page).press("Enter");
+
+  // Nothing kept: no role; the person can type again or skip.
+  expect((await originOf(workspace)).role).toMatchObject({ text: null, state: "not_answered" });
+  await expect(page.getByRole("button", { name: "Skip for now" })).toBeVisible();
+  await panel.getByRole("button", { name: "Dismiss the support note" }).click();
+  await expect(page.locator(".world")).toHaveAttribute("data-distress", "false");
+  await expect(field(page)).toBeFocused();
 });
