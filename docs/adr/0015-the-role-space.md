@@ -135,9 +135,11 @@ kept.
   decision 5, ADR 0007 decisions 4, 5, 13 and 14, ADR 0009 decision 12, ADR 0010, ADR 0012
   decision 10 and ADR 0014 decisions 3 and 4 are amended on the same date.
 - The specification's revision record (section 22, 2026-10-31) names the ONS coding index as
-  an authoritative occupational source for DIV-1 and defines "independent". No invariant is
-  relaxed: the model proposes, deterministic code corroborates, the person chooses, and
-  unknown stays shadow.
+  an authoritative occupational source for DIV-1, defines "independent", and records that L0
+  widens DIV-1's corroboration clause as the product owner approved (two independent
+  permitted sources of any class, or one official source). No invariant is relaxed: the
+  model proposes, deterministic code corroborates, the person chooses, and unknown stays
+  shadow.
 - Register: new rows DIV1-13, DIV1-14, DIV1-15, PROF-10, PROF-11, PROF-12, MAP1-09 and
   TEST1-15. DIV1-04 is corrected: its employer-evidence half was never built in Task 7, and
   Task 6e builds it.

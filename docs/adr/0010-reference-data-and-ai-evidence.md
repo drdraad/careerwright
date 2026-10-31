@@ -232,10 +232,11 @@ The product owner approved the audit's decision 2 on 2026-10-31: Careerwright re
 any UK job title the ONS coding index lists (ADR 0015). Such a title carries ONS's own SOC
 2020 unit group and ISCO-08 codes, so it can show official figures without a guess:
 
-- **Pay for an ONS-coded title** is the ASHE figures for its own ONS unit group or groups,
-  by region, labelled as the group's, never as the title's or the person's. These are the
-  same candidate-group figures an unreviewed ESCO occupation already shows (decision 5). A
-  title ONS codes to more than one group shows every group, none picked.
+- **Pay for an ONS-coded title** is the ASHE figures for its own SOC 2020 unit group or
+  groups, as the ONS index codes it, by region, labelled as the group's, never as the
+  title's or the person's. These are the same candidate-group figures an unreviewed ESCO
+  occupation already shows (decision 5). A title ONS codes to more than one unit group shows
+  every group, none picked.
 - **AI evidence** for it is its ISCO-08 group's exposure, labelled the group's (decision 6).
 - **Nothing else changes.** Modelled pay still exists only through an accountable
   reviewer's reviewed mapping (none in L0, H-10). The salary floor's rule (decision 8) is

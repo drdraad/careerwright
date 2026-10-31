@@ -1,10 +1,10 @@
 # ADR 0014: The living world, Careerwright's experience direction
 
-- Status: Proposed, 2026-10-30. Accepted when the product owner approves plan v1.4. Session
-  W1 (2026-10-30, `docs/reviews/session-w1-answers.md`) made the spike's choices, recorded in
-  decisions 2, 6 and 8 by Task W2. **Accepted, with the amendment of 2026-10-31** (the last
-  section): the product owner approved the audit, which keeps decisions 1–8 and changes
-  decision 9.
+- Status: **Accepted 2026-10-30; amended 2026-10-31.** Proposed on 2026-10-30, and accepted
+  the same day, when the product owner approved plan v1.4 ("commit"). Session W1
+  (2026-10-30, `docs/reviews/session-w1-answers.md`) made the spike's choices, recorded in
+  decisions 2, 6 and 8 by Task W2. The amendment of 2026-10-31 (the last section) follows the
+  product owner's approval of the audit: it keeps decisions 1–8 and changes decision 9.
 - Date: 2026-10-30
 - Supersedes, for L0: the "calm observatory" art direction (spec section 14), the visual scope
   and renderer limits of plan v1.3 (sections 1, 4 and 5) and the visual direction in

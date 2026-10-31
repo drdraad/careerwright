@@ -945,10 +945,11 @@ space; this ADR changes as follows.
   the product owner's answer there says otherwise.
 - **Decision 13: a title of the person's own that ESCO doesn't hold now has a path.** The
   person's words are kept. "Which of these is closest?" offers the ESCO occupations in the
-  title's ONS group, and "None of these is my job" leaves the role with no ESCO occupation:
-  it joins nothing in the slate, and the slate says what Careerwright did with it (R11). The
-  type-ahead's partial results ("Careerwright couldn't match that title in ESCO. Is it one
-  of these?") gain "None of these is my job", which leads to the person's own words.
+  title's ISCO-08 group, as the ONS index codes it, and "None of these is my job" leaves the
+  role with no ESCO occupation: it joins nothing in the slate, and the slate says what
+  Careerwright did with it (R11). The type-ahead's partial results ("Careerwright couldn't
+  match that title in ESCO. Is it one of these?") gain "None of these is my job", which
+  leads to the person's own words.
 - **Decision 14: the unexpected connection stays a fact about two roles.** The product
   owner's ESCO research adds a rule: no revelation rests on ESCO's essential skills alone.
   How the connection meets it is to be settled by Task 6d, asking the product owner before a

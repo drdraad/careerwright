@@ -331,7 +331,9 @@ holds). ADR 0015 records the role space; this ADR changes as follows.
   provisional concept only once one of those corroborates it; until then it stays a search
   hypothesis (DIV1-04), shown as not yet found. Why: the specification lets such a title
   count once "an authoritative occupational/professional source or independent employer
-  evidence" backs it (DIV-1), and the ONS index is already pinned and imported.
+  evidence" backs it (DIV-1), and the ONS index is already pinned and imported. L0 widens
+  that clause to independent permitted sources of any class, as the product owner approved
+  (spec section 22, 2026-10-31).
 - **The person's own words are always kept.** Nothing typed at the first question is
   refused (Task 6d). The duplicate check stays: a title that is an ESCO label as a concept
   becomes that occupation, never a second concept, and the person's words stay its label.

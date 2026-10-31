@@ -244,12 +244,15 @@ app before release."
    only the You chapter, and session W2's gate kept every other chapter waiting for the
    world's spectacle. From here: finish the You chapter (Task W2E); recognise any UK title
    and get live sessions ready (Tasks 6d and 3b); research roles no list holds (Task 6e);
-   a short session W2, with the planning inputs (Task 12a) and the search's durable part
-   (Task 13b) meanwhile; then Skills (10), Options (12b), Routes (14) and Plan (15); the
+   a short session W2; then Skills (10), Options (12b), Routes (14) and Plan (15); the
    end-to-end session; option research for any target (7e); Roles (8); the chapters'
    moments (M); then 16, 17 and the final review. Task 12 is split into 12a (the stored
-   inputs, backend) and 12b (the Options chapter). Task 13a moved early and runs now. The
-   dependency rules are in the task file.
+   inputs, backend) and 12b (the Options chapter). Beside that, one worktree track runs the
+   backend one task at a time, each after the last is integrated: the search core (Task
+   13a, moved early, running now), then the planning inputs (Task 12a), then the search's
+   durable part (Task 13b). Task 12a changes the planning rules that 13a's oracle and 13b's
+   solver read, so none of the three overlaps another. The dependency rules and each card's
+   Parallel line are in the task file.
 2. **Sessions (decision 3, amended).** Sessions 1, 2 and W1 are held. Session W2 becomes a
    short first look: about 30 minutes, live on Muse Wonder (ADR 0003, amendment), about five
    questions, and no score threshold. Session 3 merges into one end-to-end session of about
