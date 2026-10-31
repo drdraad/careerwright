@@ -1004,3 +1004,18 @@ space; this ADR changes as follows.
   to it by shared skills, because you said none of the ESCO occupations it offered is your
   job."). The slate's rules, ranking and thresholds are unchanged: every evaluation case
   recorded before Task 6d gives the same slate (DSC-20, new, is compared on its own).
+- **Amendment line, Task 6d slice B fix round 1 (2026-10-31): the first question goes through
+  decision 7's screen, and the slate says less for a role in the person's words.** The
+  controller's ruling: the first question's title field is screened as a message is
+  (`support-policy-8`). The type-ahead matches nothing on words that trigger it and brings the
+  calm panel instead; `name_role` never keeps such a title as the role, and every refusal of
+  one carries the panel. The panel's line there says no title was kept, without repeating the
+  words ("If anything you typed is about how you are feeling, support is available any time,
+  from people trained to help. Careerwright hasn't kept it as your role."); the person can type
+  again or skip. Nothing about it is stored or used for suitability. The screen's words and
+  windows are unchanged; the new use and its line are not yet reviewed as built
+  (`REVIEW_STATUS`). Whether direct entries in What we know are screened too is a policy
+  question for the product owner. Decision 13: a role kept in the person's words names no
+  closest occupation after the start, so its fact (`role_not_matched`) asks for none, and a
+  direction is "Something different" only where the slate's own fact says the person's kind
+  of work is known (`familiarity_known`).

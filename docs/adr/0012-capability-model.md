@@ -399,3 +399,17 @@ its rules on protected gates, unknown and readiness (decisions 4, 5 and 7) are u
   "(children's)", "(learning disabilities)") never reaches P03's adult "Registered nurse" by
   its title; a neutral qualifier still does. Migration 0036 decides again each stored record
   the bracket rule had taken there.
+- **Amendment line, Task 6d slice B fix round 1 (2026-10-31): the role's seed is its record,
+  and two known limits.** Decision 10's seed for the person's role is the occupation its
+  title's record names (ADR 0015, fix round 1's line), so an edit of the role's words that
+  keeps the title as a concept keeps the closest occupation they chose, and a target with the
+  role's title is seeded by the same choice. Known L0 limits, recorded and not fixed (ruling
+  R11; the app review's M-3 and M-7):
+  - The other-field rule lists the fields that never reach P03's adult nurse, not the
+    qualifiers that may: "(paediatric)", "(child)", "(RMN)", "(psychiatric)" and "(mental)"
+    still reach it by the bracket rule. These are hypothetical forms here (no probe, fixture
+    or corpus page shows one). The fail-safe alternative, reaching a pack target by the bracket
+    rule only for known-neutral qualifiers, is a policy choice for the product owner.
+  - Importance edits made against P03's rows for a target 0036 decided again (one whose
+    qualifier names another nursing field) stay stored but no longer apply: that target no
+    longer has P03's rows. 0036 doesn't move or remove them.

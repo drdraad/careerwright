@@ -253,3 +253,47 @@ Decisions 1 to 3's first step is built (S2.8; `careerwright.catalogue.uk_titles`
   never takes a title to the pack's "Registered nurse", whose evidence is adult nursing
   (`careerwright.profile.targets.OTHER_FIELDS`); a neutral one ("(adult)") still does. 0036
   decides again each stored record the bracket rule had taken there.
+
+## Amendment line, Task 6d slice B fix round 1 (2026-10-31): one record for the role, and the person's refusal kept
+
+The two reviews' findings, fixed (the fix list, `task-6dB-fix-round-1.md`). Session W2 still
+judges the words.
+- **The role's record is its one truth** (decision 3). Every reader takes the role's ESCO
+  occupation from its title's record (`careerwright.profile.targets.role_record`), as each
+  target's is taken, never from the role's source. Every write that changes the role stores it
+  (`record_role`, in the one write path): a decision the person makes (an ESCO title chosen as
+  such, a closest occupation, "None of these is my job") replaces the record of that title;
+  any other change keeps the record of its title as a concept, so capitals, or away and back,
+  never lose a choice, and the origin never says "chosen" for an occupation the role no longer
+  names. A role saved before its record was kept is decided as it would be stored.
+- **"None of these is my job" is the person's refusal, wherever it is offered.** Under the
+  type-ahead's partial list it is recorded on the title (`NameRole.none_of_these`), and at the
+  closest question every answer is a new profile version, so a tab holding an older version
+  conflicts. Enter with no option chosen keeps the person's typed words, never a partial match
+  and never a refusal they didn't make. The slate's fact for a role kept in their words,
+  `role_not_matched`, asks for no other job ("Careerwright keeps “…” as your role, in your
+  words. It couldn't match it to an occupation in ESCO, so it joins no other work to it by
+  shared skills."), and "Something different" is said only where the slate's own fact says the
+  role's or a target's kind of work is known (`familiarity_known`).
+- **The first question goes through the support screen** (ADR 0007 decision 7, the
+  controller's ruling): a title that triggers it matches nothing, is offered nothing and never
+  repeated back, is never kept as the role, and the calm panel shows and stills the world.
+- **The closest question** is not asked when none of the title's groups holds an ESCO
+  occupation in the held release (there is nothing to pick); its groups are named in plain
+  words, never by code; and "Change my job title" goes back to the first question.
+- **Migration 0038's CHECKs** repeat the rules: an ONS title has at least one SOC 2020 and
+  one ISCO-08 code, and `none_of_these` is recorded only with who decided it, on an ONS title
+  or the person's own words (the partial list's refusal is on their own words), never an ESCO
+  title.
+- **Known limits (L0, recorded, not fixed; ruling R11):**
+  - A record is keyed by the title as a concept, but its kind is decided on the exact spelling
+    of whichever write came first: "Registered nurse." and "Registered nurses" share the record
+    of "Registered nurse", and "Registered nurses" is not itself an index title.
+  - The type-ahead leaves out an index title that ESCO holds as a concept, but ESCO's own list
+    matches word beginnings: an index title whose ESCO twin is written with "&" or an accent
+    can drop out of both lists and fall to the partial list.
+  - On a database migrated to 0035 without the index, own-words records stay own words once
+    the index arrives: nothing decides them again. Setup imports the index before anything is
+    stored, so this needs a database made outside setup.
+  - 0036's SQL folds case with `lower()` where the index's normalised titles use Python's
+    `casefold()`; they differ only for letters such as "ß", which no index title holds.
