@@ -106,6 +106,7 @@ describe("[STATE-05][DIV1-03] the sketch says what matching each title did", () 
       targets: [
         target("registered nurse", "not_found", "pack_target"),
         target("bus operator", "ambiguous"),
+        target("orbital gardener", "not_found"),
       ],
       steps: [
         { step: "compare", state: "unresolved" },
@@ -119,8 +120,9 @@ describe("[STATE-05][DIV1-03] the sketch says what matching each title did", () 
       screen.getByText("Careerwright can check skills, options and routes for this role."),
     ).toBeVisible();
     expect(
-      screen.getByText("Careerwright can't check skills, options or routes for this role yet."),
-    ).toBeVisible();
+      screen.getAllByText("Careerwright can't check skills, options or routes for this role yet."),
+    ).toHaveLength(2);
+    // Only the title no pack target covers reads "Not researched" (fix round 1).
     expect(
       screen.getByText(
         "Careerwright couldn't match this title to an occupation in ESCO, so there's no requirement list yet. Not researched.",
@@ -137,5 +139,35 @@ describe("[STATE-05][DIV1-03] the sketch says what matching each title did", () 
       "Find courses, work routes or funding for any gaps. Not resolved yet. Not researched yet: no providers, prices or dates.",
       "Check the time and cost against your week and budget. Not resolved yet. Uses your weekly hours. Your spending limit isn't known, so costs can't be checked yet.",
     ]);
+  });
+
+  it("[PROF-10] never says a pack role ESCO doesn't name is not researched", async () => {
+    // Task 6d slice A fix round 1 (review I-1): three of the option pack's four titles are no
+    // ESCO label, so the sketch said both "Careerwright can check skills, options and routes
+    // for this role" and "… there's no requirement list yet. Not researched." The option pack
+    // researched them; its coverage line says what Careerwright can check.
+    renderSketch({
+      profile_version: 1,
+      inputs: INPUTS,
+      not_asked: [],
+      targets: [
+        target("Registered nurse", "not_found", "pack_target"),
+        target("Data quality analyst", "not_found", "pack_target"),
+        target("Bookkeeping assistant", "provisional", "pack_target"),
+      ],
+      steps: [],
+    });
+
+    expect(
+      await screen.findAllByText(
+        "Careerwright can check skills, options and routes for this role.",
+      ),
+    ).toHaveLength(3);
+    for (const title of ["Registered nurse", "Data quality analyst", "Bookkeeping assistant"]) {
+      expect(screen.getByText(title).closest("p")).toHaveTextContent(
+        `${title}: ${title === "Bookkeeping assistant" ? "Your own title: " : ""}Careerwright couldn't match it in ESCO`,
+      );
+    }
+    expect(document.body.textContent).not.toMatch(/Not researched|no requirement list/);
   });
 });

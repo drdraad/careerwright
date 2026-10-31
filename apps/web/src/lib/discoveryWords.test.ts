@@ -368,9 +368,21 @@ describe("[DIV1-07][AIR1-05] the hard filters and the title ideas, in words", ()
 
 describe("[STATE-05][PROF-10] the sketch's words and a target's coverage", () => {
   it("words a target ESCO names", () => {
-    expect(RESEARCH_STATUS.esco).toBe(
+    expect(RESEARCH_STATUS.esco("not_covered")).toBe(
       "Requirements from ESCO; not yet compared with your experience.",
     );
+  });
+
+  it("says a title it couldn't match isn't researched only when no pack target covers it", () => {
+    const unmatched =
+      "Careerwright couldn't match this title to an occupation in ESCO, so there's no requirement list yet. Not researched.";
+    for (const resolution of ["not_found", "provisional"] as const) {
+      expect(RESEARCH_STATUS[resolution]("not_covered")).toBe(unmatched);
+      // Fix round 1 (review I-1): the option pack researched it; its coverage line says what
+      // Careerwright can check, so the sketch says nothing more.
+      expect(RESEARCH_STATUS[resolution]("pack_target")).toBeNull();
+      expect(RESEARCH_STATUS[resolution]("several_pack_targets")).toBeNull();
+    }
   });
 
   it("says plainly what Careerwright can do for each target", () => {

@@ -54,6 +54,13 @@ export function TargetCoverageLine({ target }: { target: TargetSketchOut }) {
   return <p className="small">{TARGET_COVERAGE[target.coverage](target.resolution === "esco")}</p>;
 }
 
+/** What the target's match and coverage mean for its requirements; none for a pack target
+ *  ESCO doesn't name, which its coverage line already covers. */
+function ResearchStatus({ target }: { target: TargetSketchOut }) {
+  const status = RESEARCH_STATUS[target.resolution](target.coverage);
+  return status === null ? null : <p className="small muted">{status}</p>;
+}
+
 export function SketchCard({ workspaceId, profile }: { workspaceId: string; profile: ProfileOut }) {
   const sketch = useSketch(workspaceId);
   const choose = useChooseTarget(workspaceId);
@@ -119,7 +126,7 @@ export function SketchCard({ workspaceId, profile }: { workspaceId: string; prof
                   </div>
                 </div>
               )}
-            <p className="small muted">{RESEARCH_STATUS[target.resolution]}</p>
+            <ResearchStatus target={target} />
           </div>
         ))
       )}

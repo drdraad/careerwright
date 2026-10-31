@@ -754,15 +754,24 @@ export function titleIdeasWords(ideas: SlateOut["title_ideas"]): string | null {
 /** The early requirement sketch's label: never a checked or best route. */
 export const SKETCH_LABEL = "Early sketch, not a checked route";
 
-/** What a target's resolution means for its requirements, under each sketched target. */
-export const RESEARCH_STATUS: Record<Resolution, string> = {
-  esco: "Requirements from ESCO; not yet compared with your experience.",
-  ambiguous:
+/** For a title Careerwright couldn't match in ESCO, by its coverage; null says nothing more. The
+ *  option pack researched a pack target, and its coverage line says what Careerwright can
+ *  check, so it never reads "not researched" (Task 6d slice A fix round 1; say less). */
+const UNMATCHED_STATUS: Record<TargetCoverage, string | null> = {
+  pack_target: null,
+  several_pack_targets: null,
+  not_covered:
+    "Careerwright couldn't match this title to an occupation in ESCO, so there's no requirement list yet. Not researched.",
+};
+
+/** What a target's resolution means for its requirements, under each sketched target, from
+ *  its match and its coverage; null: no line. */
+export const RESEARCH_STATUS: Record<Resolution, (coverage: TargetCoverage) => string | null> = {
+  esco: () => "Requirements from ESCO; not yet compared with your experience.",
+  ambiguous: () =>
     "Careerwright matched this title to several occupations in ESCO. Choose the one you mean.",
-  provisional:
-    "Careerwright couldn't match this title to an occupation in ESCO, so there's no requirement list yet. Not researched.",
-  not_found:
-    "Careerwright couldn't match this title to an occupation in ESCO, so there's no requirement list yet. Not researched.",
+  provisional: (coverage) => UNMATCHED_STATUS[coverage],
+  not_found: (coverage) => UNMATCHED_STATUS[coverage],
 };
 
 /** The sketch's generic steps, each unresolved, with what each can use so far. */
