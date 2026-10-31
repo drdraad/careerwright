@@ -77,6 +77,12 @@ after it change documents only):
   (the attempt ended `succeeded`, not `cancelled`) and a restart that left the crashed
   attempt unmarked (`[None, 'succeeded']`, not `['interrupted', 'succeeded']`).
 - Live calls: none (cost $0). Not run: nothing human-only applies to this backend sprint.
+- **Fix round 1**, rebased onto `l0-local-release` at `f7f0e4d`: `make check` exit 0 (1,740
+  fast backend tests, 391 Vitest tests, the client matching the OpenAPI document);
+  `make acceptance` exit 0 under the lock (407 integration and stack tests in 9 min 42 s, the
+  Storybook build, 56 Playwright tests in 9.3 min). One test was added and two tests' register
+  tags changed after that run, so `test_route_solves.py` was run again under the lock: 21 of 21
+  passed. Each fixed behaviour has a test that failed before its fix (the task report).
 
 ## The six questions
 
