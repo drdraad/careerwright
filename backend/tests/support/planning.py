@@ -3,8 +3,10 @@ cases, every one labelled synthetic. The fixture adapter states what the fixture
 implicit: wages arrive late in the month (the pack's validator assumes it; hand check H5).
 Nothing here enters the product."""
 
-from datetime import date
-from typing import Literal
+import json
+from collections.abc import Mapping, Sequence
+from datetime import date, timedelta
+from typing import Any, Literal
 
 from careerwright.capability.readiness import ReadinessState
 from careerwright.money import Money
@@ -37,9 +39,20 @@ from careerwright.planning.compiler import (
     ReadinessBasis,
     ReceiptTiming,
 )
-from tests.support.capability import fixture, trace_evidence, trace_matrix, trace_outcomes
+from tests.support.capability import (
+    FIXTURES,
+    fixture,
+    planned,
+    self_report,
+    skill_row,
+    synthetic_matrix,
+    trace_evidence,
+    trace_matrix,
+    trace_outcomes,
+)
 
 TRACE = "fixtures/m0/worked_trace.json"
+DIRECTAI = FIXTURES.parent / "reconstructed" / "directai.json"
 FIXTURE = Citation(basis=CitationBasis.FIXTURE, locator=TRACE)
 CONSTRUCTED = Citation(basis=CitationBasis.FIXTURE, locator="constructed test case")
 COURSES = ("A", "B", "C", "D", "E")
@@ -49,6 +62,12 @@ DELAY_MONTHS = 2  # a constructed stress case; TRACE-01 has no condition for it 
 
 def gbp(minor: int) -> Money:
     return Money(minor_units=minor, currency="GBP")
+
+
+def directai_fixture() -> dict[str, Any]:
+    """The reconstructed A-I direct-spending fixture (`fixtures/README.md`, ruling R1)."""
+    data: dict[str, Any] = json.loads(DIRECTAI.read_text(encoding="utf-8"))
+    return data
 
 
 def trace_inputs(**changes: object) -> PlanningInputs:
@@ -166,6 +185,25 @@ def trace_readiness() -> ReadinessBasis:
     )
 
 
+def pack_person(start: date = date(2026, 11, 1), horizon: int = 24) -> PlanningInputs:
+    """P01's figures (TRACE-01's money and hours, unchanged), planning from the month after the
+    option pack's date over the M0 maximum horizon, so the pack's stated intakes fall inside
+    it. P01's fixture admission is not carried: it is TRACE-01's, not a pack course's."""
+    inputs = trace_inputs()
+    data = inputs.model_dump()
+    month = inputs.continuation.net_income_by_month[0]
+    data.update(
+        planning_start=start,
+        horizon_months=horizon,
+        living_outgoings_by_month=[inputs.living_outgoings_by_month[0]] * horizon,
+        weekly_availability_by_month=[(inputs.weekly_availability_by_month or [0])[0]] * horizon,
+        initial_gates=[],
+    )
+    data["baseline"]["net_income_by_month"] = [month] * horizon
+    data["continuation"]["net_income_by_month"] = [month] * horizon
+    return PlanningInputs.model_validate(data)
+
+
 def trace_route(letter: str) -> dict[str, object]:
     route: dict[str, object] = next(
         r for r in fixture("worked_trace.json")["routes"] if r["id"] == letter
@@ -250,9 +288,11 @@ def option(
     recurring: Recurring | None = None,
     synthetic: bool = True,
     group: str | None = None,
+    concept: str | None = None,
     **offering: object,
 ) -> tuple[ActionConcept, Offering, Variant]:
-    """One concept with one offering and one variant. `payments` are (month offset, amount)."""
+    """One offering and one variant of a concept (`concept`, by default its own name).
+    `payments` are (month offset, amount)."""
     plan = PaymentPlan(
         plan_id="plan",
         payments=[
@@ -265,10 +305,10 @@ def option(
         recurring=recurring,
         unknown=unknown_cost,
     )
-    concept = ActionConcept(
-        concept_id=f"concept:{name}",
+    stable = ActionConcept(
+        concept_id=f"concept:{concept or name}",
         kind=kind,
-        title=name,
+        title=concept or name,
         provider=None,
         review_state=state,
         exclusive_group=group,
@@ -278,7 +318,7 @@ def option(
     dated = Offering.model_validate(
         {
             "offering_id": f"offering:{name}",
-            "concept_id": concept.concept_id,
+            "concept_id": stable.concept_id,
             "review_state": state,
             "start": start,
             "finish": finish,
@@ -298,13 +338,18 @@ def option(
         wage=Wage(net_income=gbp(wage), cited=CONSTRUCTED) if wage is not None else None,
         supports=list(supports),
     )
-    return concept, dated, variant
+    return stable, dated, variant
 
 
 def catalogue_of(*options: tuple[ActionConcept, Offering, Variant]) -> Catalogue:
+    """The options' concepts (each once: several starts may share one), offerings and
+    variants."""
+    concepts: dict[str, ActionConcept] = {}
+    for concept, _, _ in options:
+        concepts.setdefault(concept.concept_id, concept)
     return Catalogue(
         label=CatalogueLabel(name="constructed", dated=START, synthetic=True),
-        concepts=[c for c, _, _ in options],
+        concepts=list(concepts.values()),
         offerings=[o for _, o, _ in options],
         variants=[v for _, _, v in options],
     )
@@ -340,3 +385,71 @@ def support(
 
 def pattern(kind: WorkPatternKind, hours: int, pay: int) -> WorkPattern:
     return WorkPattern(kind=kind, hours_per_week=hours, net_income=gbp(pay), cited=CONSTRUCTED)
+
+
+# Readiness for constructed cases: a target of essential skill rows at level 2, the person's
+# self-reported level for each, and the rows each course's assessed completion reaches.
+
+ROW = "fixture:route-skill"
+RUBRIC = "fixture-rubric-1"
+REQUIRED = 2
+
+
+def readiness_of(
+    teaches: Mapping[str, Sequence[str]],
+    *,
+    rows: tuple[str, ...] = (ROW,),
+    current: int = REQUIRED - 1,
+) -> ReadinessBasis:
+    """`teaches` maps an offering ID to the rows its assessed completion brings to level 2."""
+    return ReadinessBasis(
+        matrix=synthetic_matrix(
+            "Synthetic route target", [skill_row(r, REQUIRED, RUBRIC) for r in rows]
+        ),
+        evidence=[self_report(r, current, RUBRIC) for r in rows],
+        statements=[],
+        outcomes=[
+            planned(offering, row, REQUIRED, RUBRIC)
+            for offering, taught in teaches.items()
+            for row in taught
+        ],
+        evidence_version=1,
+    )
+
+
+# The A-I direct-spending fixture as a search instance. The fixture states each route's
+# months, total direct cost and layer only; the rest is constructed here and labelled so: each
+# route is one course in one exclusive group, starting with the planning start and finishing at
+# the end of its last month, its whole cost paid in its first month, every limit far above it.
+
+
+def directai_instance() -> tuple[PlanningInputs, Catalogue, ReadinessBasis]:
+    routes = directai_fixture()["routes"]
+    horizon = max(r["time_months"] for r in routes)
+    options = [
+        option(
+            route["id"],
+            start=START,
+            finish=month_end(START, route["time_months"]),
+            payments=((0, route["direct_spend_minor"]),),
+            group="fixture:directai:core-training",
+        )
+        for route in routes
+    ]
+    inputs = person(horizon=horizon, opening=UNTESTED_LIMIT, objective="direct_spending")
+    catalogue = catalogue_of(*options).model_copy(
+        update={"label": CatalogueLabel(name="DIRECTAI", dated=START, synthetic=True)}
+    )
+    readiness = readiness_of({f"offering:{r['id']}": (ROW,) for r in routes})
+    return inputs, catalogue, readiness
+
+
+def month_start(first: date, months: int) -> date:
+    """The first day of the month `months` after `first`'s month."""
+    year, month = divmod(first.month - 1 + months, 12)
+    return date(first.year + year, month + 1, 1)
+
+
+def month_end(first: date, months: int) -> date:
+    """The last day of the `months`th month counting `first`'s month as the first."""
+    return month_start(first, months) - timedelta(days=1)

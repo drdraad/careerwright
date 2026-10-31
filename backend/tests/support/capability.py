@@ -221,6 +221,36 @@ def trace_evidence() -> list[SkillEvidence]:
     ]
 
 
+def planned(offering_id: str, skill_id: str, level: int, rubric: str) -> PlannedOutcome:
+    """A constructed course's planned outcome: an assessed work sample at `level`, accepted as a
+    modelling assumption, so a conditional scenario counts it (synthetic)."""
+    return PlannedOutcome(
+        outcome_id=f"{offering_id}:outcome:{skill_id}",
+        offering_id=offering_id,
+        option_id=offering_id,
+        option_title=offering_id,
+        skill_id=skill_id,
+        outcome_type=OutcomeType.SKILL_LEVEL,
+        level_on_completion=level,
+        evidence_kind=EvidenceKind.ASSESSED_WORK_SAMPLE,
+        confidence=Confidence.PROVISIONAL,
+        source_span=OutcomeSpan(
+            claim_id=None,
+            source_id="fixture:constructed",
+            source_hash="0" * 64,
+            start=0,
+            end=1,
+            pointer=None,
+            retrieved_at=None,
+            excerpt="constructed",
+        ),
+        rubric_version=rubric,
+        review_state=OutcomeReview.ACCEPTED_ASSUMPTION,
+        provenance=Provenance.PROVIDER_CLAIM,
+        as_of=date(2027, 1, 1),
+    )
+
+
 def trace_outcomes(course: str = "fixture:course:A") -> list[PlannedOutcome]:
     trace = fixture("worked_trace.json")
     action = next(a for a in trace["catalogue"]["actions"] if a["id"] == course)
