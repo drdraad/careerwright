@@ -31,7 +31,7 @@ from tools.live_smoke import Api
 from tools.session import (
     COPIED_COLUMNS,
     SESSION_RUN_LIMIT_NANO_USD,
-    SESSION_SPEND_NANO_USD,
+    SESSION_SPEND_PER_WORKSPACE_NANO_USD,
     copy_session_calls,
     set_session_caps,
 )
@@ -68,7 +68,7 @@ def wonder_api(api_deps: ApiDependencies) -> Iterator[ApiClient]:
     settings = api_deps.settings.model_copy(
         update={
             "default_run_spend_limit_nano_usd": SESSION_RUN_LIMIT_NANO_USD,
-            "default_period_spend_limit_nano_usd": SESSION_SPEND_NANO_USD,
+            "default_period_spend_limit_nano_usd": SESSION_SPEND_PER_WORKSPACE_NANO_USD,
         }
     )
     with TestClient(
@@ -219,7 +219,7 @@ def test_the_session_caps_go_on_each_live_workspace_not_marked_synthetic_and_hol
     after = _spend(session, session.personal)
     assert (after["run_limit_nano_usd"], after["period_limit_nano_usd"]) == (
         SESSION_RUN_LIMIT_NANO_USD,
-        before["period_committed_nano_usd"] + SESSION_SPEND_NANO_USD,
+        before["period_committed_nano_usd"] + SESSION_SPEND_PER_WORKSPACE_NANO_USD,
     )
     assert after["version"] == before["version"] + 1
     assert _spend(session, session.synthetic) == untouched
@@ -234,12 +234,13 @@ def test_the_session_caps_go_on_each_live_workspace_not_marked_synthetic_and_hol
         "refused_scope": None,
     }
     assert _estimate(session, session.synthetic, "interview_turn").json()["model_id"] == TEST_MODEL
-    # A second session adds its own $5 to what the month has committed by then.
+    # A second session adds its own $5 to what the workspace's month has committed by then.
     [again] = set_session_caps(Api(Target(session.api.http), session.token))
     assert (
-        again.period_limit_nano_usd == after["period_committed_nano_usd"] + SESSION_SPEND_NANO_USD
+        again.period_limit_nano_usd
+        == after["period_committed_nano_usd"] + SESSION_SPEND_PER_WORKSPACE_NANO_USD
     )
-    # Past the session's spend, the product's own checks refuse the next turn before it runs.
+    # Past the workspace's spend, the product's own checks refuse the next turn before it runs.
     spent = _spend(session, session.personal)
     nearly = spent["period_committed_nano_usd"] + interview.worst_case_nano_usd(WONDER_MODEL_ID) - 1
     limited = session.api.write(
@@ -326,7 +327,7 @@ def test_the_ledger_copy_reads_counts_cost_and_state_only_and_writes_no_text(
 
     turn = _attempt(infra, session.turn_run)
     [row] = [r for r in first.copied if session.turn_run in r.notes]
-    assert row.budget_scope == f"live-session-{turn['started_at']:%Y-%m-%d}"
+    assert row.budget_scope == f"live-app-{turn['started_at']:%Y-%m-%d}"
     assert "interview turn" in row.purpose
     assert (row.model_id, row.is_production_model) == (WONDER_MODEL_ID, True)
     assert (row.input_tokens, row.output_tokens, row.estimated_cost_nano_usd) == (

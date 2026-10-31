@@ -1,26 +1,33 @@
 """The product owner's live sessions on Muse Wonder (ADR 0003, amendment of 2026-10-31).
 
 `make session` starts the normal live stack, as `make dev` does: the same Compose project
-and CAREERWRIGHT_HOME, nothing stopped, reset or rebuilt. It differs in two settings:
+and CAREERWRIGHT_HOME, nothing reset or rebuilt. It differs in two settings, so a running
+API and worker restart with them (Compose recreates both); a run in flight restarts too, its
+interrupted call counted at its full reservation. Nothing else is stopped.
 - `muse-wonder-1.0` is the production model, so every workspace not marked synthetic runs
   Wonder. Synthetic workspaces keep the test model, and the test model's safeguards (in code
   and the database CHECK) are untouched.
 - The API's default limits are the session's caps, for a workspace whose key is first stored
   during the session.
 Then it sets the session's caps, through the API as each invited person, on every live
-workspace not marked synthetic: a run may reserve at most `SESSION_RUN_LIMIT_NANO_USD`, and
-this month's limit becomes what the month has already committed plus `SESSION_SPEND_NANO_USD`,
-so the session can add at most that. The product's own reservation enforces both before
-every call; unknown costs keep their full reservation. Running `make dev` afterwards goes
-back to Spark; the limits stay as set, and the spending line in the app changes them.
+workspace not marked synthetic. The caps are per workspace (the product owner's ruling of
+31 October 2026): a run may reserve at most `SESSION_RUN_LIMIT_NANO_USD`, and a workspace's
+monthly limit becomes what its month has already committed plus
+`SESSION_SPEND_PER_WORKSPACE_NANO_USD`, so the session can add at most that to each
+workspace. Its total ceiling is that much for each workspace capped at start, plus as much
+again for each workspace whose key is stored during the session; the start summary prints
+it. The product's own reservation enforces both caps before every call; unknown costs keep
+their full reservation. Running `make dev` afterwards goes back to Spark (restarting the API
+and worker again); the limits stay as set, and the spending line in the app changes them.
 
-`make session-ledger` copies each model attempt the app made into
-`docs/evidence/live-usage.jsonl` and `.md` (ruling R5), under the scope
-`live-session-<the attempt's UTC date>`. It reads only each attempt's model, run kind, token
-and search counts, cost, reservation, state and time, and its identifiers, so that no
-attempt is copied twice: never a message, answer, prompt, output or other text. A cost Meta
-did not report counts its full reservation. An attempt still in flight is not copied yet,
-and the command fails until it has settled.
+`make session-ledger` copies every model attempt in the live stack's database, under `make
+session` or `make dev` alike, into `docs/evidence/live-usage.jsonl` and `.md` (ruling R5),
+under the scope `live-app-<the attempt's UTC date>`; the dates keep each session's apart. It
+reads the database through the stack's published port, so the stack must be up. It reads
+only each attempt's model, run kind, token and search counts, cost, reservation, state and
+time, and its identifiers, so that no attempt is copied twice: never a message, answer,
+prompt, output or other text. A cost Meta did not report counts its full reservation. An
+attempt still in flight is not copied yet, and the command fails until it has settled.
 
 Neither ever runs in `make check` or `make acceptance`: starting a session is the product
 owner's or the controller's act.
@@ -31,7 +38,7 @@ Run from `backend/`: `uv run --locked python -m tools.session start|ledger`.
 import argparse
 import json
 import sys
-from collections.abc import Iterable, Mapping, Set
+from collections.abc import Iterable, Mapping, Sequence, Set
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -49,15 +56,17 @@ from careerwright.seed import INVITED_ACTORS
 from careerwright.vocabulary import DataMode
 from tools.live_smoke import RESPONSES_ENDPOINT, Api
 from tools.localenv import careerwright_home, ensure_local_home
-from tools.stack import CORE_SERVICES, DEFAULT_PROJECT, Stack, ports_from_env
+from tools.stack import CORE_SERVICES, Stack, ports_from_env, project_from_env
 from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry, LiveCallRecord
 
-# The session's caps (the audit's Muse Wonder notes; ADR 0003, amendment): about $0.75 a run,
+# The session's caps, each per workspace (the audit's Muse Wonder notes; ADR 0003, amendment
+# and its qualification result; the product owner's ruling of 31 October 2026): $0.75 a run,
 # so every run kind's three attempts fit on Wonder ($0.552 at most, a slate's written note),
-# and about $5 a session.
+# and $5 per workspace on top of what its month has committed.
 SESSION_RUN_LIMIT_NANO_USD = 750_000_000
-SESSION_SPEND_NANO_USD = 5_000_000_000
-SESSION_SCOPE_PREFIX = "live-session"
+SESSION_SPEND_PER_WORKSPACE_NANO_USD = 5_000_000_000
+# The ledger copy's scope: every attempt in the live stack's database, by its UTC date.
+LEDGER_SCOPE_PREFIX = "live-app"
 WORKSPACE_PAGE = 200  # the API's largest page
 
 # What the ledger copy reads of the product's run records, and nothing else.
@@ -96,10 +105,11 @@ MAX_REQUESTS: Mapping[str, int] = {
 
 
 def session_stack() -> Stack:
-    """The normal live stack (`make dev`'s project, home and ports) with the session's two
-    settings; the synthetic role is pinned to the test model."""
+    """The normal live stack (`make dev`'s project, home and ports, read as every stack
+    command reads them) with the session's two settings; the synthetic role is pinned to the
+    test model."""
     return Stack(
-        project=DEFAULT_PROJECT,
+        project=project_from_env(),
         home=careerwright_home(),
         ports=ports_from_env(),
         live=True,
@@ -107,18 +117,23 @@ def session_stack() -> Stack:
             ("CAREERWRIGHT_META_PRODUCTION_MODEL", WONDER_MODEL_ID),
             ("CAREERWRIGHT_SYNTHETIC_MODEL_ROLE", "test"),
             ("CAREERWRIGHT_DEFAULT_RUN_SPEND_LIMIT_NANO_USD", str(SESSION_RUN_LIMIT_NANO_USD)),
-            ("CAREERWRIGHT_DEFAULT_PERIOD_SPEND_LIMIT_NANO_USD", str(SESSION_SPEND_NANO_USD)),
+            (
+                "CAREERWRIGHT_DEFAULT_PERIOD_SPEND_LIMIT_NANO_USD",
+                str(SESSION_SPEND_PER_WORKSPACE_NANO_USD),
+            ),
         ),
     )
 
 
 def session_limits(spend: Mapping[str, Any]) -> dict[str, int]:
     """The session's limits for a workspace's spend as the API states it: the run cap, and
-    this month's committed spend (unknown costs at their full reservation) plus the session."""
+    this month's committed spend (unknown costs at their full reservation) plus the
+    session's $5 for this workspace."""
     return {
         "expected_version": int(spend["version"]),
         "run_limit_nano_usd": SESSION_RUN_LIMIT_NANO_USD,
-        "period_limit_nano_usd": int(spend["period_committed_nano_usd"]) + SESSION_SPEND_NANO_USD,
+        "period_limit_nano_usd": int(spend["period_committed_nano_usd"])
+        + SESSION_SPEND_PER_WORKSPACE_NANO_USD,
     }
 
 
@@ -184,12 +199,52 @@ def _sign_in(stack: Stack, email: str) -> str:
     return str(response.json()["idToken"])
 
 
+def session_summary(web_origin: str, capped: Sequence[SessionCap]) -> str:
+    """What `make session` prints once its caps are set. The caps are per workspace, so the
+    session's total ceiling is $5 for each workspace capped now, and each workspace whose key
+    is stored during the session adds $5 (it gets the API's session defaults)."""
+    per_workspace = format_usd(SESSION_SPEND_PER_WORKSPACE_NANO_USD)
+    lines = [
+        f"Careerwright: {web_origin}  (open this in a browser)",
+        f"Workspaces not marked synthetic run {WONDER_MODEL_ID}; synthetic ones keep the test "
+        "model.",
+        "The caps are per workspace: each run may reserve at most "
+        f"{format_usd(SESSION_RUN_LIMIT_NANO_USD)}, and each workspace may spend at most "
+        f"{per_workspace} more this month.",
+    ]
+    lines += [
+        f"  {cap.name}: {format_usd(cap.committed_nano_usd)} committed this month, limit now "
+        f"{format_usd(cap.period_limit_nano_usd)}, each run at most "
+        f"{format_usd(cap.run_limit_nano_usd)}"
+        for cap in capped
+    ]
+    if not capped:
+        lines.append("  No live workspace yet: a new one gets these limits when its key is stored.")
+    if len(capped) > 1:
+        which = f"{per_workspace} for each of the {len(capped)} workspaces capped now"
+    elif capped:
+        which = f"{per_workspace} for the 1 workspace capped now"
+    else:
+        which = "no workspace is capped yet"
+    lines += [
+        "So this session can spend at most "
+        f"{format_usd(len(capped) * SESSION_SPEND_PER_WORKSPACE_NANO_USD)} in all: {which}. "
+        f"Each workspace whose key is stored during the session adds {per_workspace}.",
+        "After the session, while the stack is still up (before `make stop`), run `make "
+        "session-ledger`: it copies every model attempt in this stack's database into the "
+        "cost ledger.",
+    ]
+    return "\n".join(lines)
+
+
 def start() -> int:
     stack = session_stack()
     ensure_local_home(stack.home)
     print(
-        f"starting a live session on {WONDER_MODEL_ID} (project {stack.project}; nothing is "
-        "stopped or reset)...",
+        f"starting a live session on {WONDER_MODEL_ID} (project {stack.project}): a running "
+        "API and worker restart with the session's settings, and a run in flight restarts, "
+        "its interrupted call counted at its full reservation; nothing else is stopped and "
+        "no data is reset...",
         flush=True,
     )
     stack.up(*CORE_SERVICES)
@@ -198,30 +253,16 @@ def start() -> int:
         for actor in INVITED_ACTORS:
             target = StackApi(http, stack.web_origin)
             capped += set_session_caps(Api(target, _sign_in(stack, actor.email)))
-    print(f"Careerwright: {stack.web_origin}  (open this in a browser)")
-    print(
-        f"Workspaces not marked synthetic run {WONDER_MODEL_ID}; synthetic ones keep the test "
-        "model. Each run may reserve at most "
-        f"{format_usd(SESSION_RUN_LIMIT_NANO_USD)}; this session may add at most "
-        f"{format_usd(SESSION_SPEND_NANO_USD)} to each workspace's month."
-    )
-    for cap in capped:
-        print(
-            f"  {cap.name}: {format_usd(cap.committed_nano_usd)} committed this month, limit "
-            f"now {format_usd(cap.period_limit_nano_usd)}, each run at most "
-            f"{format_usd(cap.run_limit_nano_usd)}"
-        )
-    if not capped:
-        print("  No live workspace yet: a new one gets these limits when its key is stored.")
-    print("After the session: `make session-ledger` copies its calls into the cost ledger.")
+    print(session_summary(stack.web_origin, capped), flush=True)
     return 0
 
 
 def _copied(records: Iterable[LiveCallRecord]) -> Set[tuple[str, int]]:
-    """The attempts already in the ledger's session scopes, by (run ID, attempt ID)."""
+    """The attempts already in the ledger's `live-app-<date>` scopes, by (run ID, attempt
+    ID)."""
     found = set()
     for record in records:
-        if record.budget_scope.startswith(SESSION_SCOPE_PREFIX) and record.notes:
+        if record.budget_scope.startswith(f"{LEDGER_SCOPE_PREFIX}-") and record.notes:
             notes = json.loads(record.notes)
             found.add((str(notes["run_id"]), int(notes["attempt_id"])))
     return found
@@ -233,10 +274,11 @@ def session_entry(attempt: Mapping[str, Any]) -> LiveCallEntry:
     started: datetime = attempt["started_at"]
     succeeded = attempt["outcome"] == "succeeded"
     return LiveCallEntry(
-        budget_scope=f"{SESSION_SCOPE_PREFIX}-{started:%Y-%m-%d}",
+        budget_scope=f"{LEDGER_SCOPE_PREFIX}-{started:%Y-%m-%d}",
         purpose=(
-            f"live session: one {kind.value.replace('_', ' ')} attempt in the app (copied from "
-            "its run record: model, kind, counts, cost and state only)"
+            f"live app: one {kind.value.replace('_', ' ')} attempt from the live stack's "
+            "database (`make session-ledger` copies every attempt there, by its UTC date: "
+            "model, kind, counts, cost and state only)"
         ),
         http_requests=max(1, attempt["requests_sent"] or MAX_REQUESTS[kind]),
         model_id=attempt["model_id"],

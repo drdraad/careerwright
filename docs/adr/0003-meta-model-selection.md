@@ -185,8 +185,10 @@ rows, $0.115534 in all (`docs/evidence/live-usage.md`, rows 36-43).
   12 sources seen, 1 billed search, $0.032396. Its response carried three search queries.
   The billed 1 is most likely Meta's own `tool_usage` count; if Meta bills each search
   action, two more cost $0.005. So Wonder keeping to `max_tool_calls` 1 is not shown. The
-  product's search asks for at most two, and the activity's input-token bound still holds
-  each search to its reservation's tokens. All six candidates were excluded for their URL
+  product's search asks for at most two. The activity checks a search's measured searches
+  and input tokens against its reservation's bounds only after the call: an attempt past
+  them fails `bound_exceeded`, but its spend has already happened and is counted. All six
+  candidates were excluded for their URL
   scheme (`scheme_not_allowed`), so the search proposed nothing (`all_excluded`): one
   synthetic search, recorded as found, for Task 8 to watch on Wonder.
 - Rows 38-43, five evaluation cases through the stack on Wonder: four passed (DSC-01,
@@ -199,3 +201,11 @@ rows, $0.115534 in all (`docs/evidence/live-usage.md`, rows 36-43).
 The registry records schema output, streaming and web search for `muse-wonder-1.0`, with
 this evaluation. The interview prompt is unchanged: the product owner judges the questions
 in session W2.
+
+**The session's caps are per workspace** (the product owner's ruling, 2026-10-31: "$5 per
+workspace"). This settles the amendment's "about $5 a session". `make session` gives each
+live workspace not marked synthetic $0.75 a run and $5 on top of what its month has
+committed, and a workspace whose key is stored during the session gets $0.75 a run and $5
+from the API's defaults. So a session's total is at most $5 for each workspace capped at
+start, plus $5 for each workspace keyed during it; the command prints that total when it
+starts. The product's own reservation holds every call to its workspace's caps.

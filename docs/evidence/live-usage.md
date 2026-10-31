@@ -45,11 +45,12 @@ hand.
   calls (at most $0.20 an invocation), then at most six evaluation cases (at most
   $0.40 an invocation); at most 14 requests and $0.50 worst case in all, enforced
   in `backend/tools/live_smoke.py` and `backend/tools/live_eval.py`.
-  `live-session-<date>` (`make session-ledger`, Task 3b): each model attempt the
-  app made, by the UTC date it started, copied from the product's run records
-  (model, kind, counts, cost and state; never content). The product's own
-  reservation caps it with the session's limits (`make session`: $0.75 a run, $5
-  a session), not this ledger.
+  `live-app-<date>` (`make session-ledger`, Task 3b): every model attempt in the
+  live stack's database (`make session` or `make dev`), by the UTC date it
+  started, copied from the product's run records (model, kind, counts, cost and
+  state; never content). The product's own reservation caps it with each
+  workspace's limits (`make session`: $0.75 a run and $5 per workspace), not
+  this ledger.
 - A row for an activity attempt that sent more than one request (the call and its
   validation repair) shows `x N` after the endpoint; its tokens and cost are the
   attempt's total, and the caps count every request.

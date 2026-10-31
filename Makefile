@@ -22,10 +22,13 @@
 #                           test model (scope live-extract: at most 3 requests, $0.30), ledgered
 #   make session            the product owner's live session: `make dev`'s stack with Muse Wonder
 #                           as the production model (synthetic workspaces keep the test model),
-#                           and the session's caps on each live workspace not marked synthetic
-#                           ($0.75 a run, $5 a session); nothing is stopped or reset
-#   make session-ledger     copy each model attempt the app made (counts, cost and state, never
-#                           content) into docs/evidence/live-usage.*, scope live-session-<date>
+#                           and caps per workspace on each live workspace not marked synthetic
+#                           ($0.75 a run, $5 per workspace; it prints the session's total);
+#                           a running API and worker restart, and a run in flight restarts (its
+#                           call counted at its full reservation); no data is reset
+#   make session-ledger     with the stack up: copy every model attempt in its database (counts,
+#                           cost and state, never content) into docs/evidence/live-usage.*,
+#                           scope live-app-<date>
 #   make stop               stop every service, bounded; persisted work is kept
 #   make reset-demo         recreate the named fixture workspace only
 #   make rotate-master-key  add a master key version, reload it, reseal every sealed record

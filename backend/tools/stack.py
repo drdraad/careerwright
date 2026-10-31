@@ -189,6 +189,14 @@ def _start(stack: Stack, mode: str) -> None:
         print("Demo mode: no Careerwright service has a route out of this machine.")
 
 
+def project_from_env() -> str:
+    """The Compose project every stack command acts on: `make dev`'s, unless
+    CAREERWRIGHT_PROJECT names another (the acceptance run's own `make demo` does, with
+    CAREERWRIGHT_HOME and the ports, to keep off the real stack). Read here only, so `make
+    session` and `make stop` never act on different stacks."""
+    return os.environ.get("CAREERWRIGHT_PROJECT", DEFAULT_PROJECT)
+
+
 def ports_from_env() -> Ports:
     """Host ports for the default stack; override when another project holds one."""
     defaults = Ports()
@@ -217,11 +225,8 @@ def main(argv: list[str] | None = None) -> None:
         ),
     )
     # A separate project and CAREERWRIGHT_HOME, for test harnesses (the browser journey); the make
-    # targets use the defaults, unless the acceptance run's own `make demo` sets
-    # CAREERWRIGHT_PROJECT (with CAREERWRIGHT_HOME and the ports) to keep off the real stack.
-    parser.add_argument(
-        "--project", default=os.environ.get("CAREERWRIGHT_PROJECT", DEFAULT_PROJECT)
-    )
+    # targets use the environment's (`project_from_env`).
+    parser.add_argument("--project", default=project_from_env())
     parser.add_argument("--home", type=Path, default=None)
     args = parser.parse_args(argv)
     ports = ports_from_env()
