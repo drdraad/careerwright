@@ -686,7 +686,7 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     // F10: the words point to the spending line, the control that raises the limit (Task 3b).
     expect(
       screen.getByText(
-        "Careerwright stopped before spending more. Your work is kept. You can raise the limit under Model spending, in the Account and settings menu.",
+        "Careerwright stopped before spending more. Your work is kept. You can raise the limit under Model spending, in the menu at the top.",
       ),
     ).toBeVisible();
     expect(noteRequests(sent)).toHaveLength(0); // never automatic

@@ -19,13 +19,18 @@ export function RunEstimate({ workspaceId, kind }: { workspaceId: string; kind: 
   if (shown.model_mode === "fixture") {
     return <p className="small muted">{RUN_ESTIMATE.free}</p>;
   }
+  // Refused by the run limit, one attempt needs more than it, and the API's maxima are clipped
+  // to it: stating either as the cost would understate the need, so only the refusal shows.
+  const refusedByRunLimit = shown.refused_scope === "run";
   return (
     <div className="grid gap-4">
-      <p className="small">
-        {RUN_ESTIMATE.costs(formatUsd(shown.per_run_nano_usd))}
-        {shown.hard_maximum_nano_usd > shown.per_run_nano_usd &&
-          ` ${RUN_ESTIMATE.restart(formatUsd(shown.hard_maximum_nano_usd))}`}
-      </p>
+      {!refusedByRunLimit && (
+        <p className="small">
+          {RUN_ESTIMATE.costs(formatUsd(shown.per_run_nano_usd))}
+          {shown.hard_maximum_nano_usd > shown.per_run_nano_usd &&
+            ` ${RUN_ESTIMATE.restart(formatUsd(shown.hard_maximum_nano_usd))}`}
+        </p>
+      )}
       {shown.refused_scope !== null && (
         <p className="small">{RUN_ESTIMATE.refused[shown.refused_scope]}</p>
       )}

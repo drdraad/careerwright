@@ -34,12 +34,22 @@ describe("[MODEL-10] the spending line shows what was spent and the limit, and c
     expect(await screen.findByText("$0.42 of $5.12 spent this month")).toBeVisible();
     expect(screen.getByRole("heading", { name: "Model spending" })).toBeVisible();
     expect(screen.getByText("Each run can use up to $0.75.")).toBeVisible();
+    // What Careerwright does, never what Meta did: the count includes calls still in flight.
     expect(
-      screen.getByText(
-        "Meta didn't report the cost of 1 call, so Careerwright counts it at its most.",
-      ),
+      screen.getByText("Careerwright counts 1 call at its most until its cost is known."),
     ).toBeVisible();
     expect(screen.getByText("Meta bills in US dollars.")).toBeVisible();
+  });
+
+  it("counts several calls at their most until their costs are known", async () => {
+    fakeApi([{ method: "GET", path: /\/spend$/, answer: { ...spend, unknown_cost_attempts: 3 } }]);
+    shown();
+
+    expect(
+      await screen.findByText(
+        "Careerwright counts 3 calls at their most until their costs are known.",
+      ),
+    ).toBeVisible();
   });
 
   it("changes the limits with the expected-version command, in dollars", async () => {
@@ -97,8 +107,10 @@ describe("[MODEL-10] the spending line shows what was spent and the limit, and c
     expect(sent).toEqual([]);
   });
 
-  it("the words for a reached limit point to the spending line", () => {
-    const where = "You can raise the limit under Model spending, in the Account and settings menu.";
+  it("the words for a reached limit point to the spending line, in a menu people can see", () => {
+    // The menu's name, "Account and settings", is for screen readers only: sighted people
+    // see its glyph at the top, so the words name that.
+    const where = "You can raise the limit under Model spending, in the menu at the top.";
     expect(RAISE_THE_LIMIT).toBe(where);
     expect(FAILURE_CLASS.budget_exceeded.action).toContain(where);
     expect(ERROR_STATEMENT.BUDGET_EXCEEDED.action).toContain(where);

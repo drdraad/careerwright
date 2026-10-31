@@ -41,19 +41,24 @@ import type { UsdInputProblem } from "./usd";
 /** Only error and stale add a hue; everything else is carried by glyph and words. */
 export type Tone = "neutral" | "unknown" | "stale" | "error";
 
-/** Where a reached spending limit can be raised: the spending line (`ModelSpending`). */
+/**
+ * Where a reached spending limit can be raised: the spending line (`ModelSpending`). The menu
+ * is named as sighted people see it, a menu glyph at the top; its name, "Account and
+ * settings", is for screen readers only.
+ */
 export const RAISE_THE_LIMIT =
-  "You can raise the limit under Model spending, in the Account and settings menu.";
+  "You can raise the limit under Model spending, in the menu at the top.";
 
 /** The spending line in the account menu (MODEL-10). Amounts are in US dollars, as Meta bills. */
 export const SPENDING = {
   heading: "Model spending",
   spent: (spent: string, limit: string) => `${spent} of ${limit} spent this month`,
   perRun: (limit: string) => `Each run can use up to ${limit}.`,
+  // What Careerwright does, never what Meta did: the count includes calls still in flight.
   unknown: (calls: number) =>
     calls === 1
-      ? "Meta didn't report the cost of 1 call, so Careerwright counts it at its most."
-      : `Meta didn't report the cost of ${calls} calls, so Careerwright counts each at its most.`,
+      ? "Careerwright counts 1 call at its most until its cost is known."
+      : `Careerwright counts ${calls} calls at their most until their costs are known.`,
   demo: "This demo workspace never calls a model, so it spends nothing.",
   dollars: "Meta bills in US dollars.",
   change: "Change",

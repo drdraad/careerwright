@@ -61,6 +61,15 @@ export const EstimateFits: Story = { render: shownEstimate(estimate) };
 export const EstimateRefusedByTheMonth: Story = {
   render: shownEstimate({ ...estimate, refused_scope: "period" }),
 };
+// The API's maxima are clipped to the run limit here, so no cost is stated: only the refusal.
+export const EstimateRefusedByTheRunLimit: Story = {
+  render: shownEstimate({
+    ...estimate,
+    per_run_nano_usd: 150_000_000,
+    hard_maximum_nano_usd: 150_000_000,
+    refused_scope: "run",
+  }),
+};
 export const EstimateOnADemoStandIn: Story = {
   render: shownEstimate({
     ...estimate,

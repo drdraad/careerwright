@@ -43,9 +43,27 @@ describe("[MODEL-08] a paid run's estimated cost shows before it starts", () => 
 
     expect(
       await screen.findByText(
-        "This month's spending limit doesn't leave room for it. You can raise the limit under Model spending, in the Account and settings menu.",
+        "This month's spending limit doesn't leave room for it. You can raise the limit under Model spending, in the menu at the top.",
       ),
     ).toBeVisible();
+  });
+
+  it("when the run limit refuses it, never states that limit as its cost", async () => {
+    // One attempt needs more than the run limit, so the API's maximum is clipped to it.
+    shown({
+      ...estimate,
+      per_run_nano_usd: 150_000_000,
+      hard_maximum_nano_usd: 150_000_000,
+      refused_scope: "run",
+    });
+
+    expect(
+      await screen.findByText(
+        "It needs more than this workspace's limit for one run. You can raise the limit under Model spending, in the menu at the top.",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText(/can cost/)).toBeNull();
+    expect(screen.queryByText(/\$0\.15/)).toBeNull();
   });
 
   it("says a demo stand-in costs nothing", async () => {
