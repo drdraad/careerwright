@@ -439,13 +439,21 @@ describe("[DIV1-13][DIV1-14] the first question's words (Task 6d slice B)", () =
     expect(CLOSEST.found("Nurse", 3)).toBe(
       "Careerwright found “Nurse” in the UK job-title index and looked up the ESCO occupations in the groups it's in.",
     );
+    // Plain words only, never the group's code (Task 6d slice B fix round 1, design M-5).
     expect(CLOSEST.group({ code: "2221", label: "Nursing professionals" })).toBe(
-      "Nursing professionals (ISCO-08 2221)",
+      "Nursing professionals",
     );
-    expect(CLOSEST.group({ code: "2421", label: null })).toBe("ISCO-08 group 2421");
+    expect(CLOSEST.group({ code: "2421", label: null })).toBe("A group ESCO doesn't name");
     expect(CLOSEST.empty).toBe("Careerwright found no ESCO occupation in this group.");
     expect(CLOSEST.more(79)).toBe("Show 79 more");
     expect(CLOSEST.noneOfThese).toBe("None of these is my job");
+    expect(CLOSEST.back).toBe("Change my job title");
+  });
+
+  it("[UI-06] counts the titles to choose from, and says where the support panel is", () => {
+    expect(FIRST_ANSWER.count(1)).toBe("1 job title to choose from.");
+    expect(FIRST_ANSWER.count(8)).toBe("8 job titles to choose from.");
+    expect(FIRST_ANSWER.supportShown).toBe("Support information is shown below.");
   });
 
   it("says what isn't known yet for a title kept in the person's words, and asks for no other", () => {

@@ -890,11 +890,13 @@ export const CLOSEST = {
   question: "Which of these is closest?",
   found: (title: string, groups: number) =>
     `Careerwright found ${q(title)} in the UK job-title index and looked up the ESCO occupations in the ${groups === 1 ? "group" : "groups"} it's in.`,
-  group: (group: UkGroupOut) =>
-    group.label === null ? `ISCO-08 group ${group.code}` : `${group.label} (ISCO-08 ${group.code})`,
+  // Plain words only: the group's code is never shown (design review M-5).
+  group: (group: UkGroupOut) => group.label ?? "A group ESCO doesn't name",
   empty: "Careerwright found no ESCO occupation in this group.",
   more: (count: number) => `Show ${count} more`,
   noneOfThese: "None of these is my job",
+  /** Back to the first question, to fix a wrongly picked title (design review M-4). */
+  back: "Change my job title",
 } as const;
 
 /** What Careerwright did with a first answer it can name no ESCO occupation for: what isn't

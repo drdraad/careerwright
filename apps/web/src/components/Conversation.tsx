@@ -177,7 +177,9 @@ type StartStep = "first" | "loading" | "closest" | "entry";
 /** The start, one decision at a time (plan section 4, "The first ten seconds"; Task 6d slice
  *  B): the first question, then "Which of these is closest?" for a UK job title, then how to
  *  start. The first answer lights the world at once and needs no key; "Skip for now" goes
- *  straight to how to start, saving nothing. Focus follows the decision to the next step. */
+ *  straight to how to start, saving nothing. "Change my job title" goes back from the closest
+ *  question to the first, its title in the field to fix. Focus follows the decision to the next
+ *  step, and never moves after a save that failed. */
 function Start({
   workspace,
   profile,
@@ -192,6 +194,8 @@ function Start({
   const id = workspace.workspace_id;
   const [skipped, setSkipped] = useState(false);
   const [leaving, setLeaving] = useState<StartStep | null>(null);
+  // The title the person went back from the closest question to fix, while it is the role.
+  const [backFrom, setBackFrom] = useState<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const role = profile.document.current_role;
   const answered = role.state === "provided";
@@ -199,8 +203,9 @@ function Start({
   const shown = origin.data?.role;
   // The origin answers for the role it was computed from; until it matches, it is loading.
   const current = shown !== undefined && shown.text === role.value ? shown : undefined;
+  const fixing = backFrom !== null && backFrom === role.value;
   const step: StartStep =
-    role.state === "unasked" && !skipped
+    (role.state === "unasked" && !skipped) || fixing
       ? "first"
       : !answered || origin.error !== null
         ? "entry"
@@ -210,11 +215,17 @@ function Start({
             ? "closest"
             : "entry";
   useEffect(() => {
+    // A new role (the fixed title, or one saved elsewhere) ends going back.
+    if (backFrom !== null && role.value !== backFrom) setBackFrom(null);
+  }, [backFrom, role.value]);
+  useEffect(() => {
     if (leaving !== null && step !== leaving && step !== "loading" && heading.current) {
       heading.current.focus();
       setLeaving(null);
     }
   });
+  // A failed save keeps the step on screen, saying why; focus must not jump later (N-M6).
+  const failed = () => setLeaving(null);
   if (step === "first") {
     return (
       <FirstQuestion
@@ -222,24 +233,35 @@ function Start({
         profile={profile}
         headingRef={heading}
         lead={<p className="measure mb-12">{PURPOSE}</p>}
+        initial={fixing ? backFrom : ""}
         onAnswered={() => setLeaving("first")}
+        // The same title again changes nothing: back to its closest question.
+        onSaved={() => setBackFrom(null)}
+        onFailed={failed}
         onSkip={() => {
           setLeaving("first");
-          setSkipped(true);
+          if (fixing) setBackFrom(null);
+          else setSkipped(true);
         }}
       />
     );
   }
   if (step === "loading") return <LoadingState stage="Looking at your answer" lines={2} />;
   if (step === "closest" && current?.closest && current.text !== null) {
+    const title = current.text;
     return (
       <ClosestQuestion
         workspaceId={id}
         profile={profile}
-        title={current.text}
+        title={title}
         closest={current.closest}
         headingRef={heading}
         onAnswered={() => setLeaving("closest")}
+        onFailed={failed}
+        onBack={() => {
+          setLeaving("closest");
+          setBackFrom(title);
+        }}
       />
     );
   }

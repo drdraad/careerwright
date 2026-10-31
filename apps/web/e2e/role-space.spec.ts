@@ -65,7 +65,8 @@ test("[DIV1-13][DIV1-14][WLD-01] any UK title is offered as you type; picking on
   console.log(`the world answered the first answer in ${took} ms`);
   expect(took).toBeLessThan(ANSWERED_WITHIN_MS);
   await expect(page.getByRole("heading", { name: "Which of these is closest?" })).toBeFocused();
-  const group = page.getByRole("region", { name: /\(ISCO-08 2221\)$/ });
+  // ISCO-08 group 2221, named in plain words (design review M-5).
+  const group = page.getByRole("region", { name: "Nursing professionals" });
   await expect(group.getByRole("button", { name: "specialist nurse" })).toBeVisible();
   await expect(
     group.getByRole("button", { name: "nurse responsible for general care" }),

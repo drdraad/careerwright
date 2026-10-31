@@ -1520,10 +1520,14 @@ class ClosestOffer:
 
 def closest_offer(tx: Tx, record: TargetRecord) -> ClosestOffer | None:
     """The closest question for a title's record, or None when it isn't asked: the index
-    doesn't list the title, or ESCO holds it as a label (then ESCO names it, or asks which)."""
+    doesn't list the title, ESCO holds it as a label (then ESCO names it, or asks which), or
+    none of its groups holds an ESCO occupation, so there is nothing to pick (design review
+    M-5). A group with none beside one with some is still shown, honestly empty."""
     if not record.isco_codes or record.label_matches:
         return None
     found = taxonomy_store.occupations_in_groups(tx, record.isco_codes)
+    if not found:
+        return None
     labels = taxonomy_store.isco_labels(tx, record.isco_codes)
     groups = [
         ClosestGroup(UkGroup(code, labels.get(code)), [o for o in found if o.isco_code == code])

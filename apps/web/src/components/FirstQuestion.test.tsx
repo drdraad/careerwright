@@ -422,12 +422,14 @@ describe("[DIV1-14] which ESCO occupation is closest, or none of them", () => {
         "Careerwright found “Nurse” in the UK job-title index and looked up the ESCO occupations in the groups it's in.",
       ),
     ).toBeVisible();
-    const nursing = screen.getByRole("region", { name: "Nursing professionals (ISCO-08 2221)" });
+    // Design review M-5: plain words only, never a code ("(ISCO-08 2221)") the person reads.
+    const nursing = screen.getByRole("region", { name: "Nursing professionals" });
     expect(within(nursing).getAllByRole("button")).toHaveLength(2);
-    const empty = screen.getByRole("region", { name: "ISCO-08 group 2421" });
+    const empty = screen.getByRole("region", { name: "A group ESCO doesn't name" });
     expect(
       within(empty).getByText("Careerwright found no ESCO occupation in this group."),
     ).toBeVisible();
+    expect(document.body).not.toHaveTextContent(/ISCO|2221|2421/);
     for (const button of within(nursing).getAllByRole("button")) {
       expect(button).not.toHaveClass("btn-primary"); // none picked for them
     }
@@ -458,7 +460,7 @@ describe("[DIV1-14] which ESCO occupation is closest, or none of them", () => {
       />,
     );
 
-    const group = screen.getByRole("region", { name: "Supply managers (ISCO-08 1324)" });
+    const group = screen.getByRole("region", { name: "Supply managers" });
     expect(within(group).getAllByRole("button", { name: /^occupation/ })).toHaveLength(12);
     await user.click(within(group).getByRole("button", { name: "Show 3 more" }));
     expect(within(group).getAllByRole("button", { name: /^occupation/ })).toHaveLength(15);
@@ -469,5 +471,78 @@ describe("[DIV1-14] which ESCO occupation is closest, or none of them", () => {
       expected_version: 3,
       concept_id: null,
     });
+  });
+
+  it("says Saving… beside the chosen answer only, and saves one answer at a time", async () => {
+    // Design review M-8: every occupation button showed its own "Saving…", 13 or more at once.
+    const sent = fakeApi([
+      { method: "POST", path: /\/origin\/role\/closest$/, answer: () => new Promise(() => {}) },
+    ]);
+    const user = wrap(
+      <ClosestQuestion
+        workspaceId={WS}
+        profile={profile}
+        title="Nurse"
+        closest={closest([
+          {
+            group: { code: "2221", label: "Nursing professionals" },
+            occupations: [
+              { concept_id: "c1", title: "nurse responsible for general care", esco_uri: "u1" },
+              { concept_id: "c2", title: "specialist nurse", esco_uri: "u2" },
+            ],
+          },
+        ])}
+      />,
+    );
+
+    const chosen = screen.getByRole("button", { name: "specialist nurse" });
+    await user.click(chosen);
+    await waitFor(() => expect(screen.getAllByText("Saving…")).toHaveLength(1));
+    expect(chosen).toHaveAccessibleDescription("Saving…");
+    await user.click(screen.getByRole("button", { name: "nurse responsible for general care" }));
+    await user.click(screen.getByRole("button", { name: "None of these is my job" }));
+    expect(sent.filter((s) => s.method === "POST")).toHaveLength(1);
+  });
+
+  it("offers a way back to the title field, and says when saving failed", async () => {
+    fakeApi([
+      {
+        method: "POST",
+        path: /\/origin\/role\/closest$/,
+        status: 409,
+        answer: {
+          error: {
+            code: "STALE_INPUT_VERSION",
+            message: "",
+            retryable: false,
+            stage: "profile",
+            correlation_id: "c1",
+            details: { current_version: 4 },
+          },
+        },
+      },
+    ]);
+    const back = vi.fn();
+    const failed = vi.fn();
+    const user = wrap(
+      <ClosestQuestion
+        workspaceId={WS}
+        profile={profile}
+        title="Nurse"
+        closest={closest([
+          {
+            group: { code: "2221", label: "Nursing professionals" },
+            occupations: [{ concept_id: "c2", title: "specialist nurse", esco_uri: "u2" }],
+          },
+        ])}
+        onBack={back}
+        onFailed={failed}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "None of these is my job" }));
+    await waitFor(() => expect(failed).toHaveBeenCalledOnce());
+    await user.click(screen.getByRole("button", { name: "Change my job title" }));
+    expect(back).toHaveBeenCalledOnce();
   });
 });

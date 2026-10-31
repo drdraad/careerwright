@@ -3,7 +3,7 @@
 // changes, a message with a risk stem is sent with the support panel beside it, and one action
 // is the primary.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type {
@@ -22,7 +22,7 @@ import type {
 } from "@/generated/api";
 import { useProfile } from "@/lib/queries";
 import { FIRST_QUESTION } from "@/lib/vocabulary";
-import { fakeApi, type Route } from "@/test/fakeApi";
+import { fakeApi, type Route, type Sent } from "@/test/fakeApi";
 import { EvidenceProvider } from "./EvidenceDrawer";
 import { YouChapter } from "./YouChapter";
 
@@ -1054,6 +1054,118 @@ describe("[DIV1-13][DIV1-14] the start: the first question, which is closest, th
       expected_version: 2,
       concept_id: null,
     });
+  });
+
+  it("goes back from which is closest to the title field, to fix a wrongly picked title", async () => {
+    // Design review M-4, its first part: there was no way back from the closest question.
+    const state: Live = { preferences: prefs(null), turns: [], profile };
+    const sent = fakeApi(
+      liveRoutes(state, [
+        {
+          method: "GET",
+          path: /\/taxonomy\/titles$/,
+          answer: (s: Sent) => {
+            const q = new URLSearchParams(s.query).get("q") ?? "";
+            const title = q.startsWith("D") ? "Doula" : "Registered nurse";
+            return titles(q, [{ source: "uk_title_index", title, soc_codes: [], isco_groups: [] }]);
+          },
+        },
+        {
+          method: "POST",
+          path: /\/origin\/role\/title$/,
+          status: 201,
+          answer: (s: Sent) => {
+            const body = s.body as { title: string };
+            state.profile = named(body.title, state.profile.version + 1);
+            return state.profile;
+          },
+        },
+        {
+          method: "GET",
+          path: /\/origin$/,
+          answer: () => origin(String(state.profile.document.current_role.value), "ons", "not_yet"),
+        },
+      ]),
+    );
+    const { user } = renderLive();
+
+    await user.type(
+      await screen.findByRole("combobox", { name: "Your job title" }),
+      "Registered nurse",
+    );
+    await user.click(await screen.findByRole("option", { name: /UK job title \(ONS\)/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Which of these is closest?" })).toHaveFocus(),
+    );
+    await user.click(screen.getByRole("button", { name: "Change my job title" }));
+
+    const again = await screen.findByRole("heading", {
+      name: "What do you do now, or what did you do last?",
+    });
+    await waitFor(() => expect(again).toHaveFocus());
+    const field = screen.getByRole("combobox", { name: "Your job title" });
+    expect(field).toHaveValue("Registered nurse"); // the title to fix, kept to edit
+    await user.clear(field);
+    await user.type(field, "Doula");
+    await user.click(await screen.findByRole("option", { name: /^Doula\s*,\s*UK job title/ }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Which of these is closest?" })).toHaveFocus(),
+    );
+    expect(screen.getByText(/Careerwright found “Doula” in the UK job-title index/)).toBeVisible();
+    expect(sent.filter((s) => s.path.endsWith("/origin/role/title")).map((s) => s.body)).toEqual([
+      { expected_version: 1, title: "Registered nurse" },
+      { expected_version: 2, title: "Doula" },
+    ]);
+  });
+
+  it("never moves focus later when saving the first answer failed (N-M6)", async () => {
+    // Design review M-8: the start remembered it was leaving the question after a failed save,
+    // so a role that arrived later by another path moved focus unasked.
+    const state: Live = { preferences: prefs(null), turns: [], profile };
+    fakeApi(
+      liveRoutes(state, [
+        {
+          method: "GET",
+          path: /\/taxonomy\/titles$/,
+          answer: titles("Registered nurse", [
+            { source: "uk_title_index", title: "Registered nurse", soc_codes: [], isco_groups: [] },
+          ]),
+        },
+        {
+          method: "POST",
+          path: /\/origin\/role\/title$/,
+          status: 409,
+          answer: {
+            error: {
+              code: "STALE_INPUT_VERSION",
+              message: "",
+              retryable: false,
+              stage: "profile",
+              correlation_id: "c1",
+              details: { current_version: 2 },
+            },
+          },
+        },
+        {
+          method: "GET",
+          path: /\/origin$/,
+          answer: () => origin("Registered nurse", "ons", null),
+        },
+      ]),
+    );
+    const { user, queries } = renderLive();
+
+    const field = await screen.findByRole("combobox", { name: "Your job title" });
+    await user.type(field, "Registered nurse");
+    await user.click(await screen.findByRole("option", { name: /UK job title \(ONS\)/ }));
+    // It says why, and stays on the question.
+    expect(await screen.findByText("This changed since you loaded it")).toBeVisible();
+    // The role arrives by another path (another tab saved it): focus stays where it is.
+    state.profile = named("Registered nurse", 2);
+    await act(() => queries.invalidateQueries());
+    const start = await screen.findByRole("heading", { name: "How would you like to start?" });
+    expect(start).not.toHaveFocus();
   });
 
   it("keeps the person's own words and says what isn't known yet, asking for no other job", async () => {

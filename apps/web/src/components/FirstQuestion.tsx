@@ -71,7 +71,9 @@ export function FirstQuestion({
   profile,
   headingRef,
   lead,
+  initial = "",
   onAnswered,
+  onSaved,
   onFailed,
   onSkip,
 }: {
@@ -81,8 +83,12 @@ export function FirstQuestion({
   headingRef?: Ref<HTMLHeadingElement>;
   /** A line above the question (what Careerwright is for). */
   lead?: ReactNode;
+  /** The words in the field to start with: the title the person came back to fix. */
+  initial?: string;
   /** The person answered: the start moves on once the answer is saved. */
   onAnswered?(): void;
+  /** The answer was saved (it may have changed nothing: the same title again). */
+  onSaved?(): void;
   /** Saving the answer failed: the question stays, saying why (or with the support panel). */
   onFailed?(): void;
   /** "Skip for now": the start goes on without an answer (nothing is saved). */
@@ -90,7 +96,7 @@ export function FirstQuestion({
 }) {
   const id = useId();
   const field = useRef<HTMLInputElement>(null);
-  const [typed, setTyped] = useState("");
+  const [typed, setTyped] = useState(initial);
   const [open, setOpen] = useState(false);
   // No option is active until the person moves to one, so Enter keeps their own words: a
   // partial match they didn't choose is never saved (design review I-1).
@@ -121,9 +127,12 @@ export function FirstQuestion({
     text !== "" && body === undefined && (settled.trim() !== text || found.isFetching);
   const saving = chooseRole.isPending || nameRole.isPending;
   const failure = chooseRole.error ?? nameRole.error;
-  const failed = (error: Error) => {
-    if (error instanceof ApiError && error.supportNote !== null) setSupport(error.supportNote);
-    onFailed?.();
+  const settle = {
+    onSuccess: () => onSaved?.(),
+    onError: (error: Error) => {
+      if (error instanceof ApiError && error.supportNote !== null) setSupport(error.supportNote);
+      onFailed?.();
+    },
   };
 
   const pick = (option: Option, refused: boolean) => {
@@ -138,17 +147,14 @@ export function FirstQuestion({
           concept_id: option.match.concept_id,
           label: option.match.matched_label,
         },
-        { onError: failed },
+        settle,
       );
       return;
     }
     const title = option.kind === "uk" ? option.title.title : option.text;
     // Under a partial list the own-words option is "None of these is my job": the person's
     // refusal of ESCO's closest titles, recorded so nothing later asks for another job.
-    nameRole.mutate(
-      { expected_version, title, ...(refused && { none_of_these: true }) },
-      { onError: failed },
-    );
+    nameRole.mutate({ expected_version, title, ...(refused && { none_of_these: true }) }, settle);
   };
   const chosen = (option: Option) => pick(option, option.kind === "own" && partial);
 
@@ -323,6 +329,8 @@ export function ClosestQuestion({
   closest,
   headingRef,
   onAnswered,
+  onFailed,
+  onBack,
 }: {
   workspaceId: string;
   profile: ProfileOut;
@@ -331,14 +339,27 @@ export function ClosestQuestion({
   headingRef?: Ref<HTMLHeadingElement>;
   /** The person answered: the start moves on once the answer is saved. */
   onAnswered?(): void;
+  /** Saving the answer failed: the question stays, saying why. */
+  onFailed?(): void;
+  /** "Change my job title": back to the first question, to fix a wrongly picked title. */
+  onBack?(): void;
 }) {
   const id = useId();
   const choose = useChooseClosest(workspaceId);
   const [more, setMore] = useState<ReadonlySet<string>>(new Set());
-  const saving = choose.isPending ? "Saving…" : undefined;
+  // The answer being saved (null: "None of these is my job"): only its button says Saving…,
+  // and no other answer is sent until it is done (design review M-8).
+  const [choosing, setChoosing] = useState<string | null>(null);
+  const saving = (concept_id: string | null) =>
+    choose.isPending && choosing === concept_id ? "Saving…" : undefined;
   const answer = (concept_id: string | null) => {
+    if (choose.isPending) return;
+    setChoosing(concept_id);
     onAnswered?.();
-    choose.mutate({ expected_version: profile.version, concept_id });
+    choose.mutate(
+      { expected_version: profile.version, concept_id },
+      { onError: () => onFailed?.() },
+    );
   };
   const firstMore = useRef<HTMLButtonElement>(null);
   return (
@@ -348,9 +369,14 @@ export function ClosestQuestion({
       </h2>
       <p className="small mt-12 measure">{CLOSEST.found(title, closest.groups.length)}</p>
       <div className="choices">
-        <Button variant="choice" onClick={() => answer(null)} disabledReason={saving}>
+        <Button variant="choice" onClick={() => answer(null)} disabledReason={saving(null)}>
           {CLOSEST.noneOfThese}
         </Button>
+        {onBack !== undefined && (
+          <Button variant="quiet" onClick={onBack}>
+            {CLOSEST.back}
+          </Button>
+        )}
       </div>
       {closest.groups.map(({ group, occupations }) => {
         const all = more.has(group.code);
@@ -374,7 +400,7 @@ export function ClosestQuestion({
                     ref={n === GROUP_SHOWN ? firstMore : undefined}
                     variant="secondary"
                     onClick={() => answer(occupation.concept_id)}
-                    disabledReason={saving}
+                    disabledReason={saving(occupation.concept_id)}
                   >
                     {occupation.title}
                   </Button>

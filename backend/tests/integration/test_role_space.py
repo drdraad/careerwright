@@ -449,15 +449,20 @@ def test_a_title_coded_to_several_groups_shows_every_group_none_picked(
     doula = origin(api, ada, workspace)["role"]
     assert name_role(api, ada, workspace, "Data quality analyst", 1).status_code == 201
     analyst = origin(api, ada, workspace)["role"]
+    nothing_offered = closest(api, ada, workspace, None, 2)
 
     assert name_role(api, ada, workspace, "Nurse", 2).status_code == 201
     nurse = origin(api, ada, workspace)["role"]
 
     assert [g["group"]["code"] for g in doula["closest"]["groups"]] == ["5322"]
-    # A group the held release has no occupation in is still shown, honestly empty.
-    [empty] = analyst["closest"]["groups"]
-    assert (empty["group"]["code"], empty["occupations"]) == ("2421", [])
-    assert analyst["closest"]["decision"] == "not_yet"
+    # Design review M-5: a title whose groups hold no ESCO occupation in the held release is
+    # never asked "Which of these is closest?" with nothing to pick; its group is kept.
+    assert (analyst["closest"], analyst["kind"], analyst["state"]) == (None, "ons", "not_in_esco")
+    assert [g["code"] for g in analyst["uk_groups"]] == ["2421"]
+    assert (nothing_offered.status_code, nothing_offered.json()["error"]["details"]["reason"]) == (
+        422,
+        "not_offered",
+    )
     # Coded to two groups: both are shown, with their occupations, and none is picked.
     assert [g["group"]["code"] for g in nurse["closest"]["groups"]] == ["2221", "5322"]
     assert (nurse["closest"]["decision"], nurse["closest"]["chosen"]) == ("not_yet", None)
