@@ -135,6 +135,7 @@ const proposal: TurnOut["proposal"] = {
     },
   ],
   next_question: "Which kinds of machines did you most like fixing?",
+  asks_about: null,
   missing_critical_fields: [],
   ready_for_review: true,
 };
@@ -183,6 +184,7 @@ const suggestion = (
   try_it: [
     `Talk to someone who works as a ${title} about a typical week (an informational interview).`,
   ],
+  shared_skills: [],
 });
 const slate = (suggestions: SuggestionOut[]): SlateOut => ({
   discovery_id: "d1",
@@ -313,6 +315,7 @@ const discoveryWith = (explanation: SlateExplanationOut | null) =>
   ({
     discovery_id: "d1",
     profile_version: 3,
+    current: true,
     run: { status: "complete" },
     proposal: null,
     explanation,
@@ -421,6 +424,7 @@ const limitProposal: TurnOut["proposal"] = {
     },
   ],
   next_question: "How many hours a week could you give to learning?",
+  asks_about: null,
   missing_critical_fields: ["weekly_study_hours"],
   ready_for_review: true,
 };

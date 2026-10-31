@@ -2246,6 +2246,11 @@ export const DiscoveryOutSchema = {
             title: 'Profile Version',
             description: 'The profile version it read, pinned.'
         },
+        current: {
+            type: 'boolean',
+            title: 'Current',
+            description: 'Whether it was made from the current answers: true while every profile version since the pinned one changed only the targets, each chosen from this discovery\'s slate; false once anything else changed.'
+        },
         run: {
             $ref: '#/components/schemas/RunOut'
         },
@@ -2276,6 +2281,7 @@ export const DiscoveryOutSchema = {
     required: [
         'discovery_id',
         'profile_version',
+        'current',
         'run',
         'proposal',
         'explanation'
@@ -7095,6 +7101,17 @@ export const ProposalOutSchema = {
             ],
             title: 'Next Question'
         },
+        asks_about: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ProfileField'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'The field the demo interviewer\'s next question asks about, so the web can offer its one-tap example replies; null for a model\'s question, which is never classified, and when there is no question.'
+        },
         missing_critical_fields: {
             items: {
                 $ref: '#/components/schemas/ProfileField'
@@ -7116,6 +7133,7 @@ export const ProposalOutSchema = {
         'reply',
         'changes',
         'next_question',
+        'asks_about',
         'missing_critical_fields',
         'ready_for_review'
     ],
@@ -11277,6 +11295,14 @@ export const SuggestionOutSchema = {
             type: 'array',
             title: 'Try It',
             description: 'Low-cost ways to test the idea before committing.'
+        },
+        shared_skills: {
+            items: {
+                $ref: '#/components/schemas/SharedSkillOut'
+            },
+            type: 'array',
+            title: 'Shared Skills',
+            description: 'The essential skills Careerwright joined it to a title of the person\'s by (those ESCO lists for both), by label; empty unless it was joined by shared skills.'
         }
     },
     additionalProperties: false,
@@ -11298,7 +11324,8 @@ export const SuggestionOutSchema = {
         'what_might_not_suit',
         'entry_gates',
         'evidence_gaps',
-        'try_it'
+        'try_it',
+        'shared_skills'
     ],
     title: 'SuggestionOut',
     description: 'A career hypothesis (spec section 4\'s `CareerSuggestion`): an ESCO occupation, the\nanswers that found it and ESCO\'s facts about it, in words. Becoming a target needs the\nperson\'s choice (`POST .../targets`).'

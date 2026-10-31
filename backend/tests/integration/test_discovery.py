@@ -7,16 +7,19 @@ them, ESCO hits, the deterministic slate and, only by the person's choice, a tar
 import dataclasses
 import json
 import re
+import uuid
 from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
 from typing import Any
 
 import pytest
+import sqlalchemy as sa
 from fastapi.testclient import TestClient
 
 from careerwright.api.app import create_app
 from careerwright.api.deps import ApiDependencies
+from careerwright.catalogue import taxonomy_store
 from careerwright.catalogue.esco import concept_id
 from careerwright.catalogue.pay import MappingReview, MappingReviewPack
 from careerwright.catalogue.taxonomy import held_release
@@ -350,6 +353,55 @@ def test_a_suggestion_becomes_a_target_only_by_the_person_s_choice(scenario: Sce
     assert scenario.profile()["version"] == 3
 
 
+@pytest.mark.req("STATE-10")
+def test_a_target_chosen_from_the_slate_leaves_it_current_and_any_other_change_does_not(
+    scenario: Scenario,
+) -> None:
+    discovery_id = discover(scenario)["discovery_id"]
+    first, second = slate(scenario, discovery_id)["suggestions"][:2]
+
+    def current() -> bool:
+        found = scenario.api.get(f"{base(scenario)}/discoveries/{discovery_id}", scenario.token)
+        assert found.status_code == 200, found.text
+        return bool(found.json()["current"])
+
+    def choose(version: int, chosen: dict[str, Any]) -> None:
+        body = {
+            "expected_version": version,
+            "concept_id": chosen["concept_id"],
+            "discovery_id": discovery_id,
+        }
+        made = scenario.api.write("POST", f"{base(scenario)}/targets", scenario.token, body)
+        assert made.status_code == 201, made.text
+
+    assert current()
+    choose(2, first)
+    choose(3, second)
+    assert current()  # two choices from this slate: still made from the current answers
+    # Its one written note can still be asked for: it quotes the answers it pinned.
+    note = scenario.api.write(
+        "POST",
+        f"{base(scenario)}/discoveries/{discovery_id}/explanation",
+        scenario.token,
+        {"expected_profile_version": 4},
+    )
+    assert note.status_code == 202, note.text
+    targets = scenario.profile()["document"]["target_titles"]["value"]
+    edited = {
+        **ANSWERS,
+        "target_titles": {"state": "provided", "value": targets},
+        "cities": {"state": "provided", "value": ["York"]},
+    }
+    put = scenario.api.write(
+        "PUT",
+        f"{base(scenario)}/profile",
+        scenario.token,
+        {"expected_version": 4, "profile": edited},
+    )
+    assert put.status_code == 201, put.text
+    assert not current()  # another answer changed: based on earlier answers
+
+
 @pytest.mark.req("DIV1-06", "DIV1-03")
 def test_a_role_esco_does_not_list_is_reported_never_searched_by_its_words(
     scenario: Scenario,
@@ -397,6 +449,31 @@ def test_a_role_esco_lists_joins_other_work_by_shared_essential_skills_only(
     [trolley] = [s for s in result["suggestions"] if s["title"] == "trolley bus driver"]
     assert "shared_skills" in trolley["channels"]
     assert "ESCO lists 4 of the same essential skills" in " ".join(trolley["why_it_could_suit"])
+    # The four are named, by label (Task W2E, the audit's F4): never only counted.
+    named = [skill["label"] for skill in trolley["shared_skills"]]
+    assert len(named) == 4
+    assert named == sorted(named)
+    engine = migrator_engine(scenario.infra)
+    try:
+        with system_transaction(engine) as tx:
+            [bus] = tx.execute(
+                sa.text(
+                    "SELECT concept_id FROM careerwright.occupation_concepts "
+                    "WHERE preferred_label = 'bus driver'"
+                )
+            ).scalars()
+            both = taxonomy_store.shared_essential_skills(
+                tx, [bus], uuid.UUID(trolley["concept_id"])
+            )
+    finally:
+        engine.dispose()
+    assert named == [skill.preferred_label for skill in both]
+    # Work found by a search, not joined by skills, names none.
+    assert all(
+        s["shared_skills"] == []
+        for s in result["suggestions"]
+        if "shared_skills" not in s["channels"]
+    )
     assert result["unmatched_titles"] == []
 
 

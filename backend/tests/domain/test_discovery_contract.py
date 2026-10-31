@@ -28,9 +28,11 @@ from careerwright.profile.document import (
     FIELD_NAMES,
     ProfileInput,
     apply_profile_input,
+    apply_updates,
     empty_profile,
+    input_type,
 )
-from careerwright.profile.exploration import release_note, with_article
+from careerwright.profile.exploration import changed_only_by_choices, release_note, with_article
 from careerwright.profile.fixture_discovery import fixture_queries, prompt_context
 from careerwright.profile.interview import ProfileField, ProposalOrigin
 
@@ -69,6 +71,34 @@ def problems(out: DiscoveryOutput, ctx: DiscoveryInput | None = None) -> list[st
     proposal, found = check_discovery(out, ctx or context(), ProposalOrigin.MODEL)
     assert (proposal is None) == bool(found)
     return found
+
+
+def answered(doc: Any, source: uuid.UUID, **fields: Any) -> Any:
+    """The next document: these fields answered, citing `source`."""
+    updates = {
+        name: (input_type(name).model_validate({"state": "provided", "value": value}), source)
+        for name, value in fields.items()
+    }
+    return apply_updates(doc, updates)[0]
+
+
+@pytest.mark.req("STATE-10")
+def test_a_slate_stays_current_while_only_targets_chosen_from_it_change() -> None:
+    pinned = document(current_role="warehouse supervisor", cities=["Leeds"])
+    chose, chose_again, typed = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    first = answered(pinned, chose, target_titles=["logistics manager"])
+    second = answered(first, chose_again, target_titles=["logistics manager", "statistician"])
+    choices = frozenset({chose, chose_again})
+
+    assert changed_only_by_choices([pinned], choices)  # nothing changed since
+    assert changed_only_by_choices([pinned, first, second], choices)
+    # Any other change, or a target the person typed in, means the answers changed.
+    assert not changed_only_by_choices(
+        [pinned, first, answered(first, typed, cities=["York"])], choices
+    )
+    assert not changed_only_by_choices(
+        [pinned, answered(pinned, typed, target_titles=["statistician"])], choices
+    )
 
 
 @pytest.mark.req("REC1-01", "DIV1-10")

@@ -34,9 +34,11 @@ changes no suggestion.
 
 import re
 import uuid
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from enum import StrEnum
+from itertools import pairwise
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -94,6 +96,7 @@ from careerwright.profile.discovery import (
     evidence_of,
 )
 from careerwright.profile.document import (
+    FIELD_NAMES,
     FieldState,
     ProfileDocument,
     TextInput,
@@ -214,6 +217,50 @@ class DiscoveryView:
     run: Run
     proposal: DiscoveryProposal | None  # only once the run is complete
     explanation: ExplanationView | None = None  # its slate's one written explanation, if asked
+    # Made from the current answers: nothing changed since but targets chosen from its slate.
+    current: bool = True
+
+
+def changed_only_by_choices(
+    documents: Sequence[ProfileDocument], choices: Collection[uuid.UUID]
+) -> bool:
+    """Whether each profile version after the first (the one a discovery pinned; oldest
+    first) changed only its targets, each time citing one of `choices`: the person's choices
+    of occupations from that discovery's slate. Choosing a suggestion confirms it; it never
+    makes the slate "based on earlier answers" (STATE-10; ADR 0007, amendment of Task W2E).
+    Any other change, a target typed in included, means the answers changed."""
+    for before, after in pairwise(documents):
+        for name in FIELD_NAMES:
+            if getattr(before, name) == getattr(after, name):
+                continue
+            if name != "target_titles" or after.target_titles.source_ref_id not in choices:
+                return False
+    return True
+
+
+def answers_current(tx: Tx, run: Run) -> bool:
+    """Whether a discovery was made from the current answers (`changed_only_by_choices`)."""
+    pinned = run.profile_version or 0
+    latest = profile_store.current_profile(tx, run.workspace_id)
+    if latest is None or latest.version == pinned:
+        return True
+    versions = profile_store.list_profile_versions(
+        tx, run.workspace_id, before=None, limit=latest.version - pinned + 1
+    )
+    documents = [version.document for version in reversed(versions)]
+    choices = {
+        doc.target_titles.source_ref_id
+        for doc in documents[1:]
+        if doc.target_titles.source_ref_id is not None
+    }
+    chosen_here = {
+        source_ref_id
+        for source_ref_id in choices
+        if (source := profile_store.source(tx, run.workspace_id, source_ref_id)) is not None
+        and source.kind is SourceKind.OCCUPATION_CHOICE
+        and source.run_id == run.run_id
+    }
+    return changed_only_by_choices(documents, chosen_here)
 
 
 @dataclass(frozen=True)
@@ -231,6 +278,9 @@ class Suggestion:
     candidate: Candidate
     facts: OccupationFacts
     explanation: Explanation
+    # The essential skills it was joined to a title of the person's by, by label (none unless
+    # it was joined by shared skills).
+    shared_skills: list[SkillRef] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -399,7 +449,12 @@ def _explanation(tx: Tx, keyring: Keyring, discovery_run: Run) -> ExplanationVie
 
 
 def _view(tx: Tx, keyring: Keyring, run: Run) -> DiscoveryView:
-    return DiscoveryView(run, _proposal(tx, keyring, run), _explanation(tx, keyring, run))
+    return DiscoveryView(
+        run,
+        _proposal(tx, keyring, run),
+        _explanation(tx, keyring, run),
+        current=answers_current(tx, run),
+    )
 
 
 def visible_discovery(
@@ -865,7 +920,7 @@ def compute_slate(
         discovery=view,
         release=release,
         slate=slate,
-        suggestions=_suggestions(slate, facts, bool(familiar_families)),
+        suggestions=_suggestions(tx, slate, facts, bool(familiar_families)),
         queries=queries,
         unsupported_hypotheses=unsupported,
         unsearchable_queries=[query.text for query in unsearchable],
@@ -895,16 +950,30 @@ def _occupations(facts: dict[uuid.UUID, OccupationFacts]) -> dict[uuid.UUID, Occ
 
 
 def _suggestions(
-    slate: Slate, facts: dict[uuid.UUID, OccupationFacts], familiarity_known: bool
+    tx: Tx, slate: Slate, facts: dict[uuid.UUID, OccupationFacts], familiarity_known: bool
 ) -> list[Suggestion]:
     return [
         Suggestion(
             candidate,
             facts[candidate.occupation.concept_id],
             explain(candidate, facts[candidate.occupation.concept_id], familiarity_known),
+            shared_skills=_joined_by(tx, candidate),
         )
         for candidate in slate.suggestions
     ]
+
+
+def _joined_by(tx: Tx, candidate: Candidate) -> list[SkillRef]:
+    """The essential skills a suggestion was joined by: those ESCO lists for both it and a
+    title of the person's, by label. Only what reached this occupation itself counts (a role
+    folded into it keeps its own skills); none unless it was joined by shared skills."""
+    skills = {
+        skill
+        for match in candidate.own_matches
+        if match.shared_skills is not None
+        for skill in match.skills
+    }
+    return taxonomy_store.essential_skills_by_id(tx, skills)
 
 
 # The person's titles are matched with case, punctuation, hyphens and simple plurals folded
@@ -1132,7 +1201,8 @@ def submit_explanation(
     new slate, with a note of its own.
 
     Refused before any run exists when the discovery has no validated searches, when the
-    answers it pinned are not the current ones (it would quote answers since changed), when
+    answers it pinned are not the current ones (it would quote answers since changed; a
+    target chosen from its slate since changes none, `changed_only_by_choices`), when
     no pinned answer is one the note can quote (`accepted_quotation`, as the demo explainer
     reads it), or when its slate is empty."""
     visible_workspace(tx, workspace_id, lock=True)
@@ -1164,7 +1234,8 @@ def submit_explanation(
             },
         )
     pinned = view.run.profile_version or 0
-    if pinned != profile.version:
+    # The note quotes the pinned answers; a target chosen from this slate since changes none.
+    if not view.current:
         raise CareerwrightError(
             ErrorCode.STALE_INPUT_VERSION,
             "Your answers changed after these suggestions were made. Suggest again first.",
@@ -1422,7 +1493,7 @@ def first_slate(tx: Tx, workspace_id: uuid.UUID, hard: HardFilterInput) -> First
         occupation=taxonomy_store.occupation(tx, concept),
         choices=[],
         slate=slate,
-        suggestions=_suggestions(slate, facts, familiarity_known=True),
+        suggestions=_suggestions(tx, slate, facts, familiarity_known=True),
         connection=_connection(tx, slate, role, named, facts, frozenset({ROLE_JOIN})),
         salary_floor=floor,
     )

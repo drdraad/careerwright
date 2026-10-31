@@ -65,6 +65,7 @@ def discovery_out(tx: Tx, keyring: Keyring, view: DiscoveryView) -> DiscoveryOut
     return DiscoveryOut(
         discovery_id=view.run.run_id,
         profile_version=view.run.profile_version or 0,
+        current=view.current,
         run=run_out(tx, keyring, view.run),
         proposal=DiscoveryProposalOut.of(view.proposal) if view.proposal else None,
         explanation=explanation_out(tx, keyring, view.explanation) if view.explanation else None,

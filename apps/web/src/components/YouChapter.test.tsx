@@ -130,6 +130,7 @@ const proposal: TurnOut["proposal"] = {
     },
   ],
   next_question: "How many hours a week could you give to learning?",
+  asks_about: null,
   missing_critical_fields: ["weekly_study_hours"],
   ready_for_review: true,
 };
@@ -232,6 +233,7 @@ function visiblePrimaries(): number {
 const discovered = {
   discovery_id: "d1",
   profile_version: 1,
+  current: true,
   run: { status: "complete" },
   proposal: null,
   explanation: {
@@ -262,6 +264,7 @@ const suggestionNamed = (id: string, title: string): SuggestionOut => ({
   entry_gates: [],
   evidence_gaps: [],
   try_it: [],
+  shared_skills: [],
 });
 
 /** The slate for `discovered`, less whatever the view excludes (`exclude_concept`). */

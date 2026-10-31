@@ -71,6 +71,7 @@ def test_a_turn_runs_durably_and_its_proposals_cite_the_message(scenario: Scenar
     assert (turn["profile_version"], turn["decision"]) == (1, None)
     proposal = turn["proposal"]
     assert (proposal["origin"], proposal["profile_version"]) == ("model", 1)
+    assert proposal["asks_about"] is None  # a model's question is never classified
     assert proposal["reply"].startswith(scenario.output_sentinel)
     changes = {c["field"]: c for c in proposal["changes"]}
     assert changes["cities"]["value"] == ["Leeds"]
@@ -725,6 +726,11 @@ def test_a_demo_workspace_interviews_offline_with_the_labelled_fixture_interview
         "cities": ["Bristol"],
         "weekly_study_hours": 5.0,
     }
+    # Its next question names the field it asks about, for the web's example replies (STATE-09).
+    assert (proposal["next_question"], proposal["asks_about"]) == (
+        "What do you do now, or what did you do most recently?",
+        "current_role",
+    )
     # The fixture streams its reply like a provider; the validated proposal supersedes it.
     events = api.get(f"/v1/workspaces/{workspace}/events", ada).json()["items"]
     assert any(e["kind"] == "run.partial_updated" for e in events)

@@ -58,6 +58,7 @@ function turn(status: RunOut["status"], changes: ProposedChangeOut[] = []): Turn
             reply: "Checked reply.",
             changes,
             next_question: "Which role?",
+            asks_about: null,
             missing_critical_fields: [],
             ready_for_review: true,
           }

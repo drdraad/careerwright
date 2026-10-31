@@ -534,6 +534,22 @@ def shared_essential_skills(
     return [SkillRef(**dict(row)) for row in rows]
 
 
+def essential_skills_by_id(tx: Tx, skill_ids: Iterable[uuid.UUID]) -> list[SkillRef]:
+    """These skills from the held release, by label (as essential skills of some occupation)."""
+    ids = sorted({str(i) for i in skill_ids})
+    if not ids:
+        return []
+    rows = tx.execute(
+        sa.text(
+            "SELECT s.skill_id, s.preferred_label, s.skill_type, 'essential' AS relation "
+            "FROM careerwright.skills s WHERE s.skill_id = ANY(CAST(:ids AS uuid[])) "
+            "ORDER BY s.preferred_label, s.skill_id"
+        ),
+        {"ids": ids},
+    ).mappings()
+    return [SkillRef(**dict(row)) for row in rows]
+
+
 def concepts_by_uri(tx: Tx, uris: Iterable[str]) -> dict[str, uuid.UUID]:
     """The held release's occupations with these ESCO URIs (unknown URIs are absent)."""
     rows = tx.execute(

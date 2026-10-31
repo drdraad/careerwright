@@ -185,6 +185,11 @@ class DiscoveryOut(ResponseModel):
 
     discovery_id: uuid.UUID
     profile_version: int = Field(description="The profile version it read, pinned.")
+    current: bool = Field(
+        description="Whether it was made from the current answers: true while every profile "
+        "version since the pinned one changed only the targets, each chosen from this "
+        "discovery's slate; false once anything else changed."
+    )
     run: RunOut
     proposal: DiscoveryProposalOut | None
     explanation: SlateExplanationOut | None = Field(
@@ -223,6 +228,18 @@ class SourceRefOut(ResponseModel):
     release: str
 
 
+class SharedSkillOut(ResponseModel):
+    skill_id: uuid.UUID
+    label: str
+    skill_type: str | None
+
+    @classmethod
+    def of(cls, skill: SkillRef) -> "SharedSkillOut":
+        return cls(
+            skill_id=skill.skill_id, label=skill.preferred_label, skill_type=skill.skill_type
+        )
+
+
 class SuggestionOut(ResponseModel):
     """A career hypothesis (spec section 4's `CareerSuggestion`): an ESCO occupation, the
     answers that found it and ESCO's facts about it, in words. Becoming a target needs the
@@ -246,6 +263,10 @@ class SuggestionOut(ResponseModel):
     entry_gates: list[str]
     evidence_gaps: list[str]
     try_it: list[str] = Field(description="Low-cost ways to test the idea before committing.")
+    shared_skills: list[SharedSkillOut] = Field(
+        description="The essential skills Careerwright joined it to a title of the person's "
+        "by (those ESCO lists for both), by label; empty unless it was joined by shared skills."
+    )
 
     @classmethod
     def of(cls, suggestion: Suggestion, release: TaxonomyRelease) -> "SuggestionOut":
@@ -271,6 +292,7 @@ class SuggestionOut(ResponseModel):
             entry_gates=words.entry_gates,
             evidence_gaps=words.evidence_gaps,
             try_it=words.try_it,
+            shared_skills=[SharedSkillOut.of(skill) for skill in suggestion.shared_skills],
         )
 
 
@@ -433,18 +455,6 @@ class AiResilienceFilterOut(ResponseModel):
             pack_version=view.pack_version,
             pack_dated=view.pack_dated,
             summary=summary,
-        )
-
-
-class SharedSkillOut(ResponseModel):
-    skill_id: uuid.UUID
-    label: str
-    skill_type: str | None
-
-    @classmethod
-    def of(cls, skill: SkillRef) -> "SharedSkillOut":
-        return cls(
-            skill_id=skill.skill_id, label=skill.preferred_label, skill_type=skill.skill_type
         )
 
 

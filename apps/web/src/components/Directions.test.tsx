@@ -93,6 +93,7 @@ const discoveryWith = (found: SlateExplanationOut | null): DiscoveryOut =>
   ({
     discovery_id: "d1",
     profile_version: 2,
+    current: true,
     run: { status: "complete" },
     proposal: null,
     explanation: found,
@@ -119,6 +120,7 @@ const suggestion: SuggestionOut = {
   entry_gates: ["Entry requirements aren't researched yet."],
   evidence_gaps: ["Pay, demand and listings in your work areas aren't researched yet."],
   try_it: ["Talk to someone who works as a bicycle mechanic about a typical week."],
+  shared_skills: [],
 };
 const slate = (shown: SuggestionOut[]): SlateOut => ({
   discovery_id: "d1",

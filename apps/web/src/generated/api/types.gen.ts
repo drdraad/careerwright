@@ -1534,6 +1534,12 @@ export type DiscoveryOut = {
      * The profile version it read, pinned.
      */
     profile_version: number;
+    /**
+     * Current
+     *
+     * Whether it was made from the current answers: true while every profile version since the pinned one changed only the targets, each chosen from this discovery's slate; false once anything else changed.
+     */
+    current: boolean;
     run: RunOut;
     proposal: DiscoveryProposalOut | null;
     /**
@@ -4670,6 +4676,10 @@ export type ProposalOut = {
      */
     next_question: string | null;
     /**
+     * The field the demo interviewer's next question asks about, so the web can offer its one-tap example replies; null for a model's question, which is never classified, and when there is no question.
+     */
+    asks_about: ProfileField | null;
+    /**
      * Missing Critical Fields
      */
     missing_critical_fields: Array<ProfileField>;
@@ -7241,6 +7251,12 @@ export type SuggestionOut = {
      * Low-cost ways to test the idea before committing.
      */
     try_it: Array<string>;
+    /**
+     * Shared Skills
+     *
+     * The essential skills Careerwright joined it to a title of the person's by (those ESCO lists for both), by label; empty unless it was joined by shared skills.
+     */
+    shared_skills: Array<SharedSkillOut>;
 };
 
 /**

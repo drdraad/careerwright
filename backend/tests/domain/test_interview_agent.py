@@ -19,17 +19,22 @@ from careerwright.identity.activity import PartialWriter
 from careerwright.identity.failures import FailureClass, classify_failure
 from careerwright.identity.model_registry import ModelMode
 from careerwright.money import Money
-from careerwright.profile.document import empty_profile
+from careerwright.profile.document import FieldState, empty_profile
 from careerwright.profile.fixture_interviewer import (
+    QUESTIONS,
     REPLY_PREFIX,
     SMALLER_STEP_REPLY,
     SURE_QUESTION,
     UNSURE_QUESTION,
+    asked_field,
     fixture_turn,
 )
 from careerwright.profile.interview import (
+    AnsweredState,
+    ContextField,
     ContextMessage,
     InterviewProposal,
+    InterviewTurnOutput,
     ProfileField,
     PromptContext,
     ProposalOrigin,
@@ -164,7 +169,9 @@ def test_the_fixture_follows_the_entry_the_person_chose() -> None:
     unsure = asked(EntryMode.UNSURE, "Hello.")
 
     assert sure == SURE_QUESTION  # the target and its level first, no exploration
-    assert unsure == UNSURE_QUESTION  # what they want to change, before any practical limit
+    # The open question (what they want to change) is the opening the web asks before any
+    # practical limit; it is never asked twice (Task W2E, F1), so the first practical one follows.
+    assert unsure == QUESTIONS[ProfileField.CURRENT_ROLE]
     assert asked(None, "I could work in York.") == asked(EntryMode.UNSURE, "I could work in York.")
 
 
@@ -368,6 +375,154 @@ def test_the_fixture_follows_the_smaller_step_instruction_and_asks_no_career_que
     assert [c.field for c in flagged.changes] == [ProfileField.CITIES]  # proceeds as usual
     assert plain.next_question is not None
     assert SMALLER_STEP_REPLY not in plain.reply
+
+
+def demo_turn(
+    *texts: str,
+    entry: EntryMode | None = None,
+    answered: dict[ProfileField, FieldState] | None = None,
+) -> TurnInput:
+    """A turn whose earlier messages each had a reply, with the given fields answered."""
+    ctx = turn_input(*texts)
+    profile = dict(ctx.profile)
+    for name, state in (answered or {}).items():
+        profile[name] = ContextField(state=state)
+    return ctx.model_copy(
+        update={
+            "entry_mode": entry,
+            "profile": profile,
+            "replies": {
+                m.ref: "Demo interviewer (synthetic): Thank you." for m in ctx.messages[:-1]
+            },
+        }
+    )
+
+
+def demo(ctx: TurnInput) -> InterviewTurnOutput:
+    out = fixture_turn(prompt_context(ctx))
+    proposal, problems = check_turn(out, ctx, ProposalOrigin.FIXTURE)
+    assert problems == []  # every new answer passes the same check a model's does
+    assert proposal is not None
+    return out
+
+
+@pytest.mark.req("STATE-09")
+def test_the_demo_interviewer_takes_a_target_in_the_persons_words() -> None:
+    out = demo(demo_turn("I want to be a nurse.", entry=EntryMode.SURE))
+
+    assert [(u.field, u.items) for u in out.proposed_updates] == [
+        (ProfileField.TARGET_TITLES, ["nurse"])
+    ]
+    assert out.next_question == QUESTIONS[ProfileField.CURRENT_ROLE]  # never the same again
+
+
+@pytest.mark.req("STATE-09", "STATE-08")
+def test_skip_unknown_and_prefer_not_to_say_answer_the_question_in_front() -> None:
+    # The opening question a sure person sees is about the target.
+    skipped = demo(demo_turn("Skip", entry=EntryMode.SURE))
+    assert [(u.field, u.state) for u in skipped.proposed_updates] == [
+        (ProfileField.TARGET_TITLES, AnsweredState.SKIPPED)
+    ]
+    assert skipped.next_question == QUESTIONS[ProfileField.CURRENT_ROLE]
+    # Later, the question in front is the one asked after the last answered message.
+    role_saved = {ProfileField.CURRENT_ROLE: FieldState.PROVIDED}
+    unknown = demo(demo_turn("I'm a warehouse supervisor", "unknown.", answered=role_saved))
+    assert [(u.field, u.state) for u in unknown.proposed_updates] == [
+        (ProfileField.CITIES, AnsweredState.UNKNOWN)
+    ]
+    assert unknown.next_question == QUESTIONS[ProfileField.WEEKLY_STUDY_HOURS]
+    before_budget = {
+        ProfileField.CURRENT_ROLE: FieldState.PROVIDED,
+        ProfileField.CITIES: FieldState.PROVIDED,
+        ProfileField.WEEKLY_STUDY_HOURS: FieldState.PROVIDED,
+    }
+    declined = demo(demo_turn("5 hours a week", "Prefer not to say", answered=before_budget))
+    assert [(u.field, u.state) for u in declined.proposed_updates] == [
+        (ProfileField.DIRECT_SPEND_CAP, AnsweredState.PREFER_NOT_TO_SAY)
+    ]
+    assert declined.next_question == QUESTIONS[ProfileField.TARGET_TITLES]
+    # A word inside a longer message is not the person skipping the question.
+    assert demo(demo_turn("Skip the small talk", entry=EntryMode.SURE)).proposed_updates == []
+
+
+@pytest.mark.req("STATE-09")
+def test_the_question_in_front_follows_the_last_answered_message_even_when_none_was_kept() -> None:
+    # "Leeds" was answered with the hours question next; the person kept none of its changes,
+    # so their work areas are still not asked. "Skip" answers the hours question they saw.
+    out = demo(demo_turn("I'm a warehouse supervisor in Leeds.", "Skip"))
+
+    assert [(u.field, u.state) for u in out.proposed_updates] == [
+        (ProfileField.WEEKLY_STUDY_HOURS, AnsweredState.SKIPPED)
+    ]
+
+
+@pytest.mark.req("STATE-09")
+def test_the_open_question_is_the_opening_and_is_never_asked_twice() -> None:
+    for reply in ("Hello.", "Skip", "More time outdoors"):
+        out = demo(demo_turn(reply, entry=EntryMode.UNSURE))
+        assert out.proposed_updates == []
+        assert out.next_question == QUESTIONS[ProfileField.CURRENT_ROLE], reply
+        assert out.reply == REPLY_PREFIX + "Thank you."
+
+
+@pytest.mark.req("STATE-09")
+def test_an_answer_the_demo_cant_read_says_so_and_names_the_way_on() -> None:
+    out = demo(demo_turn("Something with animals", entry=EntryMode.SURE))
+
+    assert out.proposed_updates == []
+    assert out.next_question == SURE_QUESTION  # still not answered: asked again, with the way on
+    assert out.reply == (
+        REPLY_PREFIX + "Thank you. I couldn't note anything from that. Tap an example reply, or "
+        "say Skip."
+    )
+
+
+# The web's one-tap example replies for each demo question (`EXAMPLE_REPLIES` in
+# apps/web/src/lib/vocabulary.ts), keyed by what the question asks about.
+EXAMPLE_REPLIES: dict[ProfileField | None, tuple[str, ...]] = {
+    None: ("I enjoy working with people", "Skip"),
+    ProfileField.TARGET_TITLES: ("I want to be a nurse", "Skip"),
+    ProfileField.CURRENT_ROLE: ("I'm a warehouse supervisor", "Skip"),
+    ProfileField.CITIES: ("Leeds", "Skip"),
+    ProfileField.WEEKLY_STUDY_HOURS: ("5 hours a week", "Unknown"),
+    ProfileField.DIRECT_SPEND_CAP: ("Up to £600", "Prefer not to say"),
+}
+
+
+@pytest.mark.req("STATE-09")
+def test_a_demo_conversation_tapping_example_replies_never_asks_the_same_question_twice() -> None:
+    """Each run taps one example per question and saves what it notes, as a person would; the
+    question shown after each reply is new, and the conversation ends."""
+    for entry in (EntryMode.SURE, EntryMode.UNSURE):
+        for pick in (0, 1):
+            texts: list[str] = []
+            answered: dict[ProfileField, FieldState] = {}
+            shown: str | None = SURE_QUESTION if entry is EntryMode.SURE else UNSURE_QUESTION
+            asked = [shown]
+            about: ProfileField | None = (
+                ProfileField.TARGET_TITLES if entry is EntryMode.SURE else None
+            )
+            while shown is not None:
+                texts.append(EXAMPLE_REPLIES[about][pick])
+                out = demo(demo_turn(*texts, entry=entry, answered=answered))
+                if about is not None:
+                    assert about in {u.field for u in out.proposed_updates}, texts[-1]
+                for update in out.proposed_updates:
+                    answered[update.field] = FieldState(update.state.value)
+                shown = out.next_question
+                assert shown not in asked, (entry, pick, texts)
+                asked.append(shown)
+                about = asked_field(shown)
+                assert shown is None or about is not None, shown
+            assert ProfileField.TARGET_TITLES in answered
+
+
+def test_each_demo_question_names_what_it_asks_about() -> None:
+    assert asked_field(SURE_QUESTION) is ProfileField.TARGET_TITLES
+    for asked_about, question in QUESTIONS.items():
+        assert asked_field(question) is asked_about
+    assert asked_field("Which colour do you like?") is None
+    assert asked_field(None) is None
 
 
 def test_the_fixture_ignores_an_amount_beyond_the_money_bound() -> None:

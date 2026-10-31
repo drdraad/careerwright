@@ -13,6 +13,7 @@ from careerwright.money import Money
 from careerwright.profile import safety
 from careerwright.profile.conversation import TurnView
 from careerwright.profile.document import SalaryFloor
+from careerwright.profile.fixture_interviewer import asked_field
 from careerwright.profile.interview import (
     AnsweredState,
     InterviewProposal,
@@ -105,11 +106,17 @@ class ProposalOut(ResponseModel):
     reply: str
     changes: list[ProposedChangeOut]
     next_question: str | None
+    asks_about: ProfileField | None = Field(
+        description="The field the demo interviewer's next question asks about, so the web can "
+        "offer its one-tap example replies; null for a model's question, which is never "
+        "classified, and when there is no question."
+    )
     missing_critical_fields: list[ProfileField]
     ready_for_review: bool
 
     @classmethod
     def of(cls, proposal: InterviewProposal) -> "ProposalOut":
+        fixture = proposal.origin is ProposalOrigin.FIXTURE
         return cls(
             origin=proposal.origin,
             prompt_version=proposal.prompt_version,
@@ -117,6 +124,7 @@ class ProposalOut(ResponseModel):
             reply=proposal.reply,
             changes=[ProposedChangeOut.of(c) for c in proposal.changes],
             next_question=proposal.next_question,
+            asks_about=asked_field(proposal.next_question) if fixture else None,
             missing_critical_fields=proposal.missing_critical_fields,
             ready_for_review=proposal.ready_for_review,
         )
