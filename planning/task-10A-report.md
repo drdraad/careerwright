@@ -134,3 +134,43 @@ Every source change in this round used Edit or Write. `ruff format` and `pnpm ru
 **Checks:**
 - Focused run under the lock with the build shim: `pytest -m integration tests/integration/test_skills.py` gave **8 passed** (log `/tmp/skills-int.log`). The lock was removed afterwards.
 - `make check` (Adzuna variables unset, Node 24): exit 0. Backend 2,159 passed; Vitest 471 passed.
+
+## Follow-up: readiness on a draft checklist
+
+The product owner chose option A (2026-11-01): show the judgement, labelled as based on a draft checklist.
+
+Worktree `/home/user/careerwright-wt/10a`, branch `wt-10a`, rebased onto `claude/confident-ramanujan-ux3saw` (f2fcb98; the rebase was clean, only docs and planning had moved). Commits:
+- `5a4e33c` Task 10A follow-up: Skills shows readiness on a draft checklist, with the rubrics' review state
+- `9a31930` Task 10A follow-up: ADR 0012 amendment line and register row (head)
+
+Status: DONE.
+
+### What changed
+- **`capability/skills.py`:**
+  - A target is `assessed` wherever a required row has a rubric and the result is not `insufficient_coverage`.
+  - Its `readiness` is the capability model's result, unchanged. It is the same object `GET .../readiness` gives, and still carries the `proposed_rubrics` qualification.
+  - New field on each target: `rubric_review`. It is `reviewed` when every rubric the result rests on is reviewed, `proposed` when any is a draft, and `null` when not assessed.
+  - Nothing modelled (`no_rubric`, which covers eligibility alone, such as the nurse target) and `insufficient_coverage` stay `not_assessed`, with no result. Nothing about gates, levels or qualifications changed.
+- **Public change:** the reason `rubrics_not_reviewed` is no longer produced, so I removed it from the enum. The web used it only in the generated client. The client is regenerated.
+- **`api/capability_schemas.py`:** the `SkillsOut` docstring (it appears in the OpenAPI document) now describes the new rule.
+- **Docs:** an ADR 0012 amendment line with the product owner's answer, and a follow-up note on register row RDY1-03.
+
+### Tests (RED, then GREEN)
+- Written first in `tests/domain/test_skills_chapter.py`. Before the code change: **9 failed, 16 passed** (`uv run --locked pytest -q tests/domain/test_skills_chapter.py`). After it: **25 passed**.
+  - The three pack targets on draft rubrics are assessed, with `rubric_review == "proposed"`. Their readiness equals `assess(...)`, carries `proposed_rubrics`, and with no evidence is neither ready nor `insufficient_coverage`.
+  - A reviewed rubric gives `rubric_review == "reviewed"`.
+  - One draft rubric beside reviewed ones gives `proposed`.
+  - Not assessed, with `rubric_review` null: the nurse target (gate only), a target outside the pack, and insufficient coverage.
+  - P05's case on the real bookkeeping target: ready now, apply now, labelled `proposed`, and qualified by both `proposed_rubrics` and `proposed_records`.
+- `tests/integration/test_skills.py`: the data target is now `assessed` and `proposed`, and its `readiness` equals `/readiness`'s result for the same target. **Not run:** I changed no SQL, so the dispatch's focused run didn't apply. The controller runs integration.
+
+### Checks
+- `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` (Node 24) on the final tree, after the rebase and the docs commit: **exit 0**. Backend 2,160 passed, 8 skipped. Vitest 471 passed. Biome, `tsc` and client drift clean.
+- Integration and acceptance: not run. The controller runs acceptance.
+- No live calls: $0. No web requests, no Docker.
+
+### Rule note
+Every source change used Edit or Write. `pnpm run generate` is a generator.
+
+### Skip when reviewing
+`apps/web/src/generated/**` (regenerated client).
