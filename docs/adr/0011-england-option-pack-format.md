@@ -322,8 +322,14 @@ reviewed.
   `via_proxy` true and `address_checked` false (ADR 0009, amendment of 2026-11-01).
 - **A page that does not state its value adds nothing.** The apprentice's training fee
   (F04 names the government and the employer as payers, not what the apprentice pays) and
-  the nursing degree's UCAS deadline (C12's located excerpts hold the heading, not the
-  date) keep 0.2.0's unknowns (`pending_slots`, OI-14).
+  the nursing degree's UCAS deadline (C12's located excerpts show "13 Jan" beside the steps
+  of its 2027 entry section, not which step the date belongs to or its year) keep 0.2.0's
+  unknowns (`pending_slots`, OI-14).
+- **A scheme's kind says only what its page states.** `grant` means never repaid, and
+  planning counts a grant as support. The 16 to 19 Bursary Fund's pages do not say whether
+  a bursary is repaid, so `funding:F10` is a `programme` (no money by itself) until a page
+  says so. A session row asks a kind only beside the span that states it, and never asks an
+  award state: no page states one.
 - **Two student-finance regimes, two records each.** Courses starting before 1 January 2027
   take the 2026 to 2027 caps (`funding:F05`); courses starting on or after it, the Lifelong
   Learning Entitlement's (`funding:F12`), which the page says covers "most undergraduate"

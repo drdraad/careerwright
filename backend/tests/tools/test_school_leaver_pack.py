@@ -5,6 +5,7 @@ did not state their value."""
 
 import hashlib
 import json
+import re
 from datetime import date
 from typing import Any
 
@@ -19,6 +20,7 @@ from careerwright.catalogue.option_pack import (
     load_pack,
     pack_path,
 )
+from careerwright.planning.catalogue import NON_REPAYABLE, InstrumentKind
 from tools.corpus import locate
 from tools.localenv import REPO_ROOT
 from tools.school_leaver_pack import (
@@ -93,11 +95,40 @@ def test_the_loans_say_how_they_are_paid_and_repaid_and_who_qualifies() -> None:
     for loan in (tuition, living):
         assert loan.instrument_kind == "loan"
         assert "9% of income" in str(PACK.value(loan.repayment))
-        fields = {PACK.claim(c).field for c in loan.rules}
+    # Every student loan, before and from 1 January 2027, carries its page's age rule.
+    for record_id in ("funding:F05", "funding:F05.maintenance", "funding:F12"):
+        fields = {PACK.claim(c).field for c in funds[record_id].rules}
         assert {"rule_age_limit", "rule_residency"} <= fields
-    assert bursary.instrument_kind == "grant"
+    assert "F12.rule_age_limit.tuition" in funds["funding:F12"].rules
+    assert "under 60 on the first day" in str(PACK.value("F12.rule_age_limit.tuition"))
+    assert "F12.rule_age_limit.maintenance" in funds["funding:F12.maintenance"].rules
+    assert "60 or above" in str(PACK.value("F12.rule_age_limit.maintenance"))
+    # The bursary is never a grant (never repaid) on an assumption: its pages do not say.
+    assert bursary.instrument_kind == "programme"
     assert PACK.value("F11.rule_age") == {"minimum_age": 16, "on": "31 August 2026"}
     assert isinstance(bursary.repayment, Unknown)  # the pages do not say: never assumed
+
+
+@pytest.mark.req("OPTN-14")
+def test_planning_counts_no_bursary_money_until_a_page_says_it_is_never_repaid() -> None:
+    bursary = next(f for f in PACK.funding_instruments if f.record_id == "funding:F10")
+
+    assert InstrumentKind(bursary.instrument_kind) not in NON_REPAYABLE
+
+
+@pytest.mark.req("OPTN-14")
+@pytest.mark.parametrize(
+    ("claim_id", "deciding"),
+    [
+        ("F04.rule_age", "aged 16 to 24"),
+        ("F06.rule_residency.three_years", "first day of your first academic year"),
+        ("F12.rule_age_limit.tuition", "under 60 on the first day of your course"),
+        ("F05.loan_maximum.tuition", "2026 to 2027 academic year"),
+        ("F05.loan_maximum.with_parents", "2026 to 2027 academic year"),
+    ],
+)
+def test_a_rule_s_deciding_words_are_inside_its_own_excerpt(claim_id: str, deciding: str) -> None:
+    assert deciding in PACK.claim(claim_id).excerpt
 
 
 @pytest.mark.req("OPTN-14")
@@ -206,6 +237,42 @@ def test_the_session_package_is_the_tool_s_output_with_the_route_rows_first() ->
     # A changed record's rows session 2 already asked are not asked again.
     assert not [r for r in first + rest if r.record_id == "funding:F02" and r.field == "rule_age"]
     assert text.count("| yes / no |") == len(first) + len(rest)
+
+
+@pytest.mark.req("OPTN-14")
+def test_the_package_asks_only_what_a_page_can_settle_in_plain_words() -> None:
+    first, rest = package_rows(PACK, BEFORE)
+    text = PACKAGE_PATH.read_text(encoding="utf-8")
+    rows = [line for line in text.splitlines() if line.startswith("| Q")]
+
+    # Every row's kind is beside a span; the award state, which no page states, is never asked.
+    assert "(no claim)" not in text
+    assert "award state" not in text
+    kinds = [r for r in first + rest if r.field == "kind"]
+    assert {r.record_id for r in kinds} == {r for r in NEW_RECORDS if r.startswith("funding:")}
+    assert all(row.span != "(no span)" for row in kinds)
+    # What the person reads holds no record id, field name or code: the reference column
+    # (the fifth) is the only place for a claim and its characters.
+    for line in rows:
+        read = " ".join(line.split(" | ")[1:4])
+        assert not re.search(r"funding:|option:|offering:|_|H-07|OI-\d|R2\b", read), line
+    # The UCAS date: found beside the steps, its step and year unknown, read at the session.
+    [ucas] = [line for line in rows if "UCAS" in line.split(" | ")[1]]
+    assert "13 Jan" in ucas
+    assert "the date: ______" in ucas
+    assert "which step the date belongs to, or its year" in ucas
+    assert len(rows) == len(first) + len(rest) + 1
+
+
+@pytest.mark.req("OPTN-14")
+def test_the_manifest_says_where_the_ucas_date_was_found_and_enters_no_value() -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    [c12] = [s for s in manifest["pending_slots"] if s["id"] == "C12"]
+
+    assert "13 Jan" in c12["why_not_used"]
+    assert "which step" in c12["why_not_used"]
+    offering = next(o for o in PACK.offerings if o.record_id == "offering:C08")
+    assert isinstance(offering.application_deadline, Unknown)
 
 
 def test_every_new_funding_record_cites_only_its_own_pages() -> None:

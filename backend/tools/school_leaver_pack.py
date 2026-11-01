@@ -16,8 +16,11 @@ v1.6; ADR 0011), every new or changed record `proposed` for the school-leaver pa
 - **Unchanged:** every other record, and versions 0.1.0 and 0.2.0 with their pins.
 - **Not in it** (no value is guessed): the apprentice's training fee (the funding page names
   the government and the employer as payers, not what the apprentice pays) and the nursing
-  degree's UCAS deadline (the UCAS page's located excerpts name the date's heading, not the
-  date). Both fields keep their 0.2.0 unknowns.
+  degree's UCAS deadline (the UCAS page shows "13 Jan" beside the steps of its 2027 entry
+  section, but its located excerpts do not show which step the date belongs to, or its
+  year). Both fields keep their 0.2.0 unknowns.
+- **The bursary is a programme, not a grant:** its pages do not say whether it is repaid,
+  so no plan counts it as money (a grant is never repaid).
 
 It also writes the school-leaver pack session's package (`docs/reviews/`): every row of the
 new and changed records beside its span, the ones that change a route first.
@@ -29,7 +32,9 @@ exactly this tool's output.
 """
 
 import argparse
+import html
 import json
+import re
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -37,6 +42,7 @@ from typing import Any
 from careerwright.catalogue.option_pack import (
     CLAIM_FIELD_SHAPES,
     Claim,
+    FundingInstrument,
     OptionPackError,
     Pack,
     Ref,
@@ -46,7 +52,7 @@ from careerwright.catalogue.option_pack import (
     parse_pack,
 )
 from tools.localenv import REPO_ROOT
-from tools.option_pack_files import DASH, TABLE, Row, _Rows
+from tools.option_pack_files import DASH, Row, _cited, _Rows
 
 SOURCE_VERSION = "0.2.0"  # the reviewed version this one adds to
 VERSION = "0.3.0"
@@ -63,7 +69,7 @@ NOTES = [
     "Version 0.3.0 adds the school-leaver pages (Task 7f, plan v1.6) to version 0.2.0: ten "
     "GOV.UK pages on student finance, its repayment plans, the Advanced Learner Loan, the 16 to "
     "19 Bursary Fund and apprenticeship training funding (F04-F13) and the Department for "
-    "Education's introduction of T Levels (C11), retrieved on 2026-11-01. Its seven new "
+    "Education's introduction of T Levels (C11), retrieved on 2026-11-01. Its eight new "
     "records and one changed record (funding:F02) are proposed for the school-leaver pack "
     "session; versions 0.1.0 and 0.2.0 are unchanged.",
     "The 2026-11-01 pages were fetched by the controller through the guarded fetcher via the "
@@ -79,8 +85,13 @@ NOTES = [
     "Not in 0.3.0, so no value is guessed: the apprentice's training fee (offering:C09) stays "
     "unknown, since the funding page (F04) names the government and the employer as payers "
     "but not what the apprentice pays; the nursing degree's UCAS deadline (offering:C08) stays "
-    "unknown, since the UCAS page's located excerpts (C12, class other, not in this pack) name "
-    "the equal consideration date's heading but not the date.",
+    "unknown: the UCAS page (C12, class other, not in this pack) shows '13 Jan' beside the "
+    "step headings of its '2027 entry application deadlines' section, but its located "
+    "excerpts do not show which step the date belongs to, or its year.",
+    "The 16 to 19 Bursary Fund (funding:F10) is a programme, not a grant: its pages do not "
+    "say whether a bursary is repaid, so no plan counts it as money. The Lifelong Learning "
+    "Entitlement's Tuition Fee Loan carries its page's age rule (under 60 on the first day "
+    "of the course), and its Maintenance Loan the page's rule for those 60 or above.",
 ]
 NEW_FUNDING: list[dict[str, Any]] = [
     {
@@ -151,7 +162,9 @@ NEW_FUNDING: list[dict[str, Any]] = [
         "record_id": "funding:F10",
         "source_ids": ["F10", "F11"],
         "programme": "F10.programme",
-        "instrument_kind": "grant",
+        # Not "grant" (never repaid): no page says whether a bursary is repaid, and a
+        # programme plans no money by itself (planning/catalogue.py: NON_REPAYABLE).
+        "instrument_kind": "programme",
         "eligible_costs": "F10.eligible_costs",
         "rules": [
             "F11.rule_age",
@@ -162,7 +175,10 @@ NEW_FUNDING: list[dict[str, Any]] = [
             "F10.rule_age_exception",
         ],
         "timing": "F10.timing",
-        "repayment": {"unknown": "the pages do not say whether a bursary is repaid"},
+        "repayment": {
+            "unknown": "the pages do not say whether a bursary is repaid, so no plan counts "
+            "it as money"
+        },
         "exclusions": [],
         "published_on": "F10.published_on",
         "rules_updated_on": "F10.rules_updated_on",
@@ -186,6 +202,7 @@ NEW_FUNDING: list[dict[str, Any]] = [
         "rules": [
             "F12.rule_start",
             "F12.rule_course",
+            "F12.rule_age_limit.tuition",
             "F12.rule_residency.status",
             "F12.rule_residency.home",
             "F12.rule_residency.three_years",
@@ -196,6 +213,7 @@ NEW_FUNDING: list[dict[str, Any]] = [
         "published_on": "F12.published_on",
         "rules_updated_on": "F12.rules_updated_on",
         "facts": [
+            "F12.instrument_kind",
             "F12.loan_maximum.tuition",
             "F12.loan_maximum.tuition_total",
             "F12.credits",
@@ -215,6 +233,7 @@ NEW_FUNDING: list[dict[str, Any]] = [
         "rules": [
             "F12.rule_start",
             "F12.rule_course",
+            "F12.rule_age_limit.maintenance",
             "F12.rule_residency.status",
             "F12.rule_residency.home",
             "F12.rule_residency.three_years",
@@ -227,6 +246,7 @@ NEW_FUNDING: list[dict[str, Any]] = [
         "published_on": "F12.published_on",
         "rules_updated_on": "F12.rules_updated_on",
         "facts": [
+            "F12.instrument_kind",
             "F12.loan_maximum.maintenance",
             "F12.first_payment",
             "F12.payment_schedule",
@@ -395,6 +415,29 @@ class _EveryFact(_Rows):
             if field != "instrument_kind":  # asked with the record's kind
                 self.ask(record_id, f"fact: {field}", claim_id)
 
+    def funding(self, fund: FundingInstrument) -> None:
+        """Session 2's funding rows, but the kind is asked only beside a span that states it,
+        in words a page can settle; the award state is never asked (no page states one)."""
+        kinds = [c for c in fund.facts if self._pack.claim(c).field == "instrument_kind"]
+        if kinds:
+            stated = self._pack.claim(kinds[0]).value
+            shown = KIND_WORDS.get(fund.instrument_kind) or str(stated)
+            self.ask(fund.record_id, "kind", kinds[0], shown)
+        for name in ("eligible_costs", "published_on", "rules_updated_on", "timing", "repayment"):
+            self.ask(fund.record_id, name, getattr(fund, name))
+        for claim_id in fund.rules:
+            self.ask(fund.record_id, self._pack.claim(claim_id).field, claim_id)
+        self.facts(fund.record_id, fund.facts)
+
+
+# A kind as the person reads it. A programme has no words of its own: its row shows what the
+# page says the scheme is.
+KIND_WORDS = {
+    "loan": "a loan: it is paid back",
+    "grant": "a grant: it is never paid back",
+    "fee_waiver": "a fee waiver: the fee is not charged",
+}
+
 
 def _record_rows(pack: Pack, record_id: str) -> list[Row]:
     rows = _EveryFact(pack)
@@ -411,7 +454,7 @@ def _record_rows(pack: Pack, record_id: str) -> list[Row]:
 # qualifies, length and hours. The rest (titles, dates of publication, descriptions) come after.
 FIRST_FIELDS = (
     *("timing", "repayment", "eligible_costs", "fee_total", "duration", "schedule", "wage"),
-    *("intake", "application_deadline", "entry requirement", "instrument kind and award state"),
+    *("intake", "application_deadline", "entry requirement", "kind"),
 )
 FIRST_PREFIXES = ("rule_", "exclusion", "fact: loan_", "fact: bursary_", "fact: repayment_")
 FIRST_FACTS = (
@@ -438,48 +481,142 @@ def package_rows(pack: Pack, before: Pack) -> tuple[list[Row], list[Row]]:
     return first, rest
 
 
-WAITING = """\
-## Still unknown (not asked)
+# The package's words (CLAUDE.md, "Talking to the user"): each record, field and page in plain
+# words; the claim and its place on the page go in the reference column only.
+RECORD_NAMES = {
+    "funding:F02": "The Advanced Learner Loan",
+    "funding:F05": "Tuition Fee Loan, for courses starting before 1 January 2027",
+    "funding:F05.maintenance": "Maintenance Loan, for courses starting before 1 January 2027",
+    "funding:F10": "The 16 to 19 Bursary Fund",
+    "funding:F12": "Tuition Fee Loan, for courses starting from 1 January 2027",
+    "funding:F12.maintenance": "Maintenance Loan, for courses starting from 1 January 2027",
+    "funding:F04": "Government funding for apprenticeship training",
+    "option:C11": "A T Level",
+    "offering:C11": "A T Level",
+}
+WHO_CAN_GET_IT = "Who can get it"
+FIELD_WORDS = {
+    "kind": "What it is",
+    "eligible_costs": "What it pays for",
+    "eligible_costs_travel": "What else it pays for",
+    "timing": "How it is paid",
+    "repayment": "How it is paid back",
+    "published_on": "First published",
+    "rules_updated_on": "Last updated",
+    "rule_age": "Age rule",
+    "rule_age_band": "Age rule",
+    "rule_age_limit": "Age rule",
+    "rule_age_exception": "Age rule: the exceptions",
+    "rule_residency": "Where you live",
+    "rule_course": WHO_CAN_GET_IT,
+    "rule_previous_study": WHO_CAN_GET_IT,
+    "rule_provider": WHO_CAN_GET_IT,
+    "rule_vulnerable_group": "Who can get the larger bursary",
+    "loan_minimum": "Least you can borrow",
+    "loan_maximum": "Most you can borrow",
+    "bursary_maximum": "Most you can get",
+    "amount_rule": "How much you get",
+    "means_test": "What you must tell them",
+    "interest": "Interest",
+    "interest_rule": "When interest is added",
+    "write_off": "When what is left is cancelled",
+    "repayment_plan": "Repayment plan",
+    "repayment_threshold": "Paid back only on income over",
+    "repayment_rule": "What sets each repayment",
+    "rules_change": "When the rules change",
+    "payment_schedule": "When payments arrive",
+    "other_funding": "Other money",
+    "employer_share": "What the employer pays",
+    "alternative_if_eligible": "Something to get instead",
+    "discretionary_criteria": "Who decides",
+    "entry requirement": "Who can start",
+    "credential": "What you get at the end",
+    "assessment": "Grades",
+    "size_equivalence": "How big it is",
+    "placement_duration": "Work placement",
+    "classroom_hours": "Classroom hours",
+    "pass_rule": "To pass",
+    "availability": "Where it is taught",
+    "subject": "Subjects",
+    "progression": "What it leads to",
+    "fee_total": "Fee",
+    "instalment": "Paying the fee in parts",
+    "intake": "Start date",
+    "application_deadline": "Apply by",
+    "duration": "Length",
+    "schedule": "Hours each week",
+    "wage": "Pay while training",
+}
+PAGE_NAMES = {
+    "C11": "Introduction of T Levels (Department for Education)",
+    "F04": "Employing an apprentice: get funding (written for employers)",
+    "F05": "Student finance for new full-time students (courses before 2027)",
+    "F06": "Student finance: who qualifies (courses before 2027)",
+    "F07": "Repaying your student loan: what you pay",
+    "F08": "Advanced Learner Loan: what you'll get",
+    "F09": "Advanced Learner Loan",
+    "F10": "16 to 19 Bursary Fund",
+    "F11": "16 to 19 Bursary Fund: eligibility",
+    "F12": "Student finance for courses starting on or after 1 January 2027",
+    "F13": "Repaying your student loan: which repayment plan you are on",
+}
+UCAS_PAGE = (  # C12, pending its rights review: not in the pack
+    "https://www.ucas.com/applying/applying-to-university/dates-and-deadlines-for-uni-applications"
+)
+UCAS_ROW = (
+    "The nursing degree: when to apply (UCAS)",
+    "Apply by (UCAS's equal consideration date, 2027 entry)",
+    "Not known yet. Please open UCAS's page and read the date beside “Equal consideration date"
+    " for applications for most undergraduate courses”",
+    "Careerwright found “13 Jan” beside the steps of the “2027 entry application deadlines”"
+    " section. The words it kept don't show which step the date belongs to, or its year",
+    "C12 (UCAS)",
+    "the date: ______",
+)
 
-- **The apprentice's training fee** (`offering:C09`). GOV.UK's funding page for employers
-  (F04) says the government and the employer pay for the training (asked below), but not
-  what the apprentice pays. The fee stays unknown, never £0.
-- **The nursing degree's UCAS deadline** (`offering:C08`). UCAS's dates page (C12) was
-  fetched, but the parts located on it name the "Equal consideration date for applications
-  for most undergraduate courses" without the date itself. The deadline stays unknown. The
-  page is not GOV.UK, so its rights wait for you at this session.
+KNOW_FIRST = """\
+## Good to know first
 
-## Which loans a September 2027 start gets
-
-Student finance changes for courses starting on or after 1 January 2027. The pack keeps both
-sets of rules, each with its own record:
-
-- **Courses starting before then:** `funding:F05` and `funding:F05.maintenance` (the 2026 to
-  2027 caps).
-- **Courses starting on or after then:** `funding:F12` and `funding:F12.maintenance`, the
-  Lifelong Learning Entitlement. The page says it covers "most undergraduate" courses but
-  names none, so the nursing degree (from September 2027) falls here only if it is one of
-  them.
+- **Which loans a September 2027 start gets.** Student finance changes for courses starting
+  on or after 1 January 2027. Careerwright keeps both sets of rules: the older loans for
+  courses starting before then, and the new loans (the "Lifelong Learning Entitlement")
+  from then on. The new page says they cover "most undergraduate" courses, but it names
+  none. So the nursing degree, starting in September 2027, gets the new loans only if it is
+  one of those courses.
+- **The bursary is not counted as money in a plan.** A grant is never paid back. The
+  bursary's pages don't say whether a bursary is paid back, so Careerwright doesn't call it
+  a grant, and no plan counts it as money. If you know a page that says it is never paid
+  back, tell us at the session.
+- **Still not known:**
+  - What an apprentice pays for training. The funding page is written for employers. It
+    says the government and the employer pay, but not what the apprentice pays. It stays
+    unknown, never £0.
+  - The nursing degree's UCAS date. On UCAS's dates page, Careerwright found "13 Jan" in
+    the "2027 entry application deadlines" section, beside the steps. The words it kept
+    don't show which step the date belongs to, or its year. So the date stays unknown.
+    Question Q{ucas} asks you to read it on the page. UCAS is not GOV.UK, so whether
+    Careerwright may keep words from its page is also yours to decide.
 """
 
 HOW = """\
 ## How to answer
 
-1. Read the row's excerpt. Open the page if you need its context: each page's address is in
-   `corpus/manifest.json` (slots F04 to F13 and C11).
-2. Write **yes** if the page states the value as shown. For an "unknown" row, yes means the
-   page does not state it.
-3. Write **no** otherwise, with the right reading.
-4. Leave a row blank if you cannot decide.
+1. Read the page's words in the row. If they aren't enough, open the page (the list of
+   pages is at the end).
+2. Write **yes** if the page says what Careerwright read. For a "Not stated" row, yes means
+   the page really doesn't say it.
+3. Write **no** if it doesn't, and what the page says instead.
+4. Leave it blank if you can't tell.
 
-A record becomes reviewed only when every one of its rows is answered yes. Otherwise it stays
-proposed, and a "no" is applied as a correction with its span. Version {version} is not
-changed: the decisions are published as a new version. The rows ask no rights question: every
-page they cite is GOV.UK, under the Open Government Licence.
+Each thing (a loan, the bursary, the T Level) counts as checked only when all its rows are
+yes. A "no" is put right in a new version, from the page's words.
 
-Money is shown in pounds. "up to" is a cap the page states, never what a person gets.
-Excerpts are the page's own text, HTML included, with runs of whitespace collapsed. The live
-page may have changed since {dated}: answer from the excerpt.
+Money is in pounds. "Up to" is the most a scheme gives, never what a person gets. The page's
+words are shown without the web page's markup. The pages may have changed since {dated}:
+answer from the words shown.
+
+Every page the yes/no rows quote is GOV.UK, free to use under the Open Government Licence, so
+none of them asks about rights.
 """
 
 
@@ -487,43 +624,136 @@ def _minutes(rows: int) -> int:
     return -(-rows * SECONDS_PER_ROW // 60)
 
 
+TABLE = [
+    "| # | Question | What Careerwright read | The page's words | Reference¹ | Right? |",
+    "|---|---|---|---|---|---|",
+]
+DATED_FIELDS = ("published_on", "rules_updated_on")
+NOT_STATED = "not stated on the page"
+
+
+def _long_date(day: date) -> str:
+    return f"{day.day} {day:%B %Y}"
+
+
+def _plain_value(row: Row) -> str:
+    """What Careerwright read, in the person's words: pounds without empty pence, dates in
+    words, an unknown as "Not stated", and no claim ids."""
+    value = row.value
+    if value.startswith("unknown: "):
+        reason = value.removeprefix("unknown: ")
+        if reason.startswith(NOT_STATED):
+            value = "Not stated on the page" + reason.removeprefix(NOT_STATED)
+        else:
+            value = f"Not stated on the page: {reason}"
+    elif row.field.removeprefix("fact: ") in DATED_FIELDS:
+        value = _long_date(date.fromisoformat(value))
+    value = re.sub(r"£([\d,]+)\.00\b", r"£\1", value)
+    value = re.sub(r" \([A-Z]\d+\.[\w.]+\)", "", value)  # a claim's id
+    return value[:1].upper() + value[1:]
+
+
+def _claim_of(pack: Pack, row: Row) -> Claim | None:
+    """The claim a row cites (its span is `_cited`'s "`excerpt` (claim id, place)")."""
+    if row.span == "(no span)":
+        return None
+    claim = pack.claim(row.span.rsplit(" (", 1)[1].split(",", 1)[0])
+    if _cited(claim) != row.span:
+        raise OptionPackError(f"a row's span is not {claim.claim_id}'s")
+    return claim
+
+
+def _page_words(claim: Claim | None) -> str:
+    """The excerpt without its markup; a page's hidden detail (a meta tag) by name."""
+    if claim is None:
+        return "(none)"
+    text = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", claim.excerpt)).split())
+    text = re.sub(r"\s+([).,:;])", r"\1", re.sub(r"\(\s+", "(", text))  # a tag's spaces
+    if not text:
+        meta = re.fullmatch(r'<meta name="([^"]+)" content="([^"]+)">', claim.excerpt.strip())
+        if meta is None:
+            raise OptionPackError(f"{claim.claim_id}'s excerpt has no words")
+        return f"(the page's hidden details) {meta[1]}: {meta[2]}"
+    return f"“{text.replace('|', '/')}”"
+
+
+def _reference(claim: Claim | None) -> str:
+    if claim is None:
+        return ""
+    span = claim.span
+    if span.pointer is not None:
+        return f"{claim.claim_id}, {span.pointer}"
+    return f"{claim.claim_id}, characters {span.start}{DASH}{span.end}"
+
+
+def _question(row: Row) -> str:
+    return FIELD_WORDS[row.field.removeprefix("fact: ")]
+
+
+def _table(pack: Pack, rows: list[Row], number: int) -> tuple[list[str], int]:
+    """One part's rows, under a heading for each record, numbered from `number`."""
+    lines: list[str] = []
+    heading = None
+    for row in rows:
+        if RECORD_NAMES[row.record_id] != heading:
+            heading = RECORD_NAMES[row.record_id]
+            lines += ["", f"### {heading}", "", *TABLE]
+        number += 1
+        claim = _claim_of(pack, row)
+        cells = [_question(row), _plain_value(row), _page_words(claim), _reference(claim)]
+        lines.append(f"| Q{number} | {' | '.join(cells)} | yes / no |")
+    return lines, number
+
+
+def _pages(pack: Pack, rows: list[Row]) -> list[str]:
+    cited = {c.source_id for r in rows if (c := _claim_of(pack, r)) is not None}
+    sources = [s for s in pack.sources if s.source_id in cited]
+    lines = ["## The pages", "", "| Reference | Page | Address |", "|---|---|---|"]
+    lines += [f"| {s.source_id} | {PAGE_NAMES[s.source_id]} | {s.url} |" for s in sources]
+    lines.append(f"| C12 | UCAS: dates and deadlines for uni applications | {UCAS_PAGE} |")
+    return lines
+
+
 def review_package(pack: Pack, before: Pack) -> str:
-    """The school-leaver pack session's package, as Markdown: the same text for the same
-    packs, so its question numbers are stable."""
+    """The school-leaver pack session's package, as Markdown in plain words: the same text
+    for the same packs, so its question numbers are stable."""
     first, rest = package_rows(pack, before)
-    total = len(first) + len(rest)
-    records = changed_records(pack, before)
+    ucas = len(first) + 1
+    total = ucas + len(rest)
+    things = list(dict.fromkeys(RECORD_NAMES[r] for r in changed_records(pack, before)))
     lines = [
-        f"# The school-leaver pack session: option pack {pack.pack_version} (H-07)",
+        f"# Checking the school-leaver facts (option pack {pack.pack_version})",
         "",
-        "Generated by `tools.school_leaver_pack --package` (from `backend/`). Do not edit it by",
-        "hand: a fast test checks it against the tool's output, so its numbers stay stable.",
+        "Careerwright read eleven GOV.UK pages on money and courses for school leavers. Each",
+        "row below is one thing it read, beside the page's own words. Please check each one.",
         "",
-        "- **Status:** agent preparation (Task 7f). The review is not run - requires human",
-        "  (H-07, ruling R2). Nothing in this file is an answer. The product owner may rule",
-        "  that an AI's check of the rote rows counts as their review, as at session 2; an",
-        "  agent never assumes it.",
-        f"- **What:** {total} yes/no questions on the {len(records)} records new or changed in",
-        f"  {pack.pack_version}: {', '.join(f'`{r}`' for r in records)}.",
-        f"- **Time:** about {_minutes(total)} minutes at {SECONDS_PER_ROW} seconds a row. Part 1"
-        f" ({len(first)} rows) holds",
-        "  everything that changes a route: money, how each loan is paid and repaid, who",
-        "  qualifies, length and hours. Stop after it if time is short.",
+        "- **Status:** not run — requires human. Nothing here is answered yet. You may decide",
+        "  that an AI's check of the simple rows counts as yours, as you did last time;",
+        "  Careerwright never assumes it.",
+        "- **What it covers:**",
+        *(f"  - {thing}" for thing in things),
+        f"- **Time:** about {_minutes(total)} minutes for {total} questions. Part 1 (Q1{DASH}"
+        f"Q{ucas}) is",
+        "  everything that changes a plan: money, how each loan is paid and paid back, who can",
+        "  get it, length and hours. If time is short, stop after Part 1.",
         "",
-        WAITING,
-        HOW.format(version=pack.pack_version, dated=pack.dated.isoformat()),
+        KNOW_FIRST.format(ucas=ucas),
+        HOW.format(dated=_long_date(pack.dated)),
     ]
-    n = 0
-    for title, rows in (
-        (f"Part 1: what changes a route (Q1{DASH}Q{len(first)})", first),
-        (f"Part 2: the rest (Q{len(first) + 1}{DASH}Q{total})", rest),
-    ):
-        lines += [f"## {title}", "", *TABLE]
-        for row in rows:
-            n += 1
-            cells = [f"Q{n}", f"`{row.record_id}`", row.field, row.value, row.span]
-            lines.append(f"| {' | '.join(cells)} | yes / no |")
-        lines.append("")
+    part_1, n = _table(pack, first, 0)
+    lines += [f"## Part 1: what changes a plan (Q1{DASH}Q{ucas})", *part_1]
+    heading, *cells = UCAS_ROW
+    lines += ["", f"### {heading}", "", *TABLE, f"| Q{ucas} | {' | '.join(cells)} |", ""]
+    part_2, _ = _table(pack, rest, n + 1)
+    lines += [f"## Part 2: the rest (Q{ucas + 1}{DASH}Q{total})", *part_2, ""]
+    lines += [*_pages(pack, first + rest), ""]
+    lines += [
+        "¹ The reference names the claim and where its words sit on the saved page (characters",
+        "from the start). You don't need it to answer.",
+        "",
+        "Generated by `tools.school_leaver_pack --package` (from `backend/`). Don't edit it by",
+        "hand: a test checks it against the tool.",
+    ]
     return "\n".join(lines).rstrip("\n") + "\n"
 
 

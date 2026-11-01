@@ -433,12 +433,12 @@
    "field": "rule_age_band",
    "value": "an employer not paying the levy: the government pays 100% (up to the funding band maximum) for an apprentice aged 16 to 24",
    "span": {
-    "start": 5643,
-    "end": 5769
+    "start": 50392,
+    "end": 50548
    },
-   "excerpt": "The government will pay 100% of the cost (up to the funding band maximum) of training and assessing an apprentice if they are:",
-   "occurrences": 2,
-   "note": "the list goes on: 'aged 16 to 24'; 'aged 15' with a late-summer birthday"
+   "excerpt": "The government will pay 100% of the cost (up to the funding band maximum) of training and assessing an apprentice if they are:</p>\n\n<ul>\n  <li>aged 16 to 24",
+   "occurrences": 1,
+   "note": "the list's first item; it goes on: 'aged 15' with a late-summer birthday"
   },
   {
    "claim_id": "F04.employer_share",
@@ -599,12 +599,12 @@
     "applies_to": "a full-time student, the 2026 to 2027 academic year"
    },
    "span": {
-    "start": 48892,
+    "start": 48798,
     "end": 48977
    },
-   "excerpt": "If you’re a full-time student</th>\n      <td>Up to £9,535</td>\n      <td>Up to £9,790",
+   "excerpt": "2026 to 2027 academic year</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <th scope=\"row\">If you’re a full-time student</th>\n      <td>Up to £9,535</td>\n      <td>Up to £9,790",
    "occurrences": 1,
-   "note": "the table's second column, headed '2026 to 2027 academic year' (the first is 2025 to 2026); a cap, never what a student gets"
+   "note": "the excerpt starts at the table's second (last) column heading, '2026 to 2027 academic year' (the first is 2025 to 2026); a cap, never what a student gets"
   },
   {
    "claim_id": "F05.loan_maximum.with_parents",
@@ -618,12 +618,12 @@
     "applies_to": "living with parents, the 2026 to 2027 academic year"
    },
    "span": {
-    "start": 51579,
+    "start": 51485,
     "end": 51659
    },
-   "excerpt": "Living with your parents</th>\n      <td>Up to £8,877</td>\n      <td>Up to £9,118",
+   "excerpt": "2026 to 2027 academic year</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <th scope=\"row\">Living with your parents</th>\n      <td>Up to £8,877</td>\n      <td>Up to £9,118",
    "occurrences": 1,
-   "note": "the table's second column, headed '2026 to 2027 academic year' (the first is 2025 to 2026); a cap, never what a student gets"
+   "note": "the excerpt starts at the table's second (last) column heading, '2026 to 2027 academic year' (the first is 2025 to 2026); a cap, never what a student gets"
   },
   {
    "claim_id": "F05.loan_maximum.away",
@@ -780,12 +780,12 @@
    "field": "rule_residency",
    "value": "living in the UK, Channel Islands or Isle of Man for 3 years before the first day of the first academic year",
    "span": {
-    "start": 15591,
-    "end": 15687
+    "start": 59267,
+    "end": 59454
    },
-   "excerpt": "you’ve been continuously living in the UK, Channel Islands or Isle of Man for 3 years before the",
-   "occurrences": 2,
-   "note": "the sentence goes on: 'first day of your first academic year (apart from temporary absences such as holidays)'"
+   "excerpt": "you’ve been continuously living in the UK, Channel Islands or Isle of Man for 3 years before the <a href=\"/guidance/understanding-academic-years\">first day of your first academic year</a>",
+   "occurrences": 1,
+   "note": "the sentence goes on: '(apart from temporary absences such as holidays)'"
   },
   {
    "claim_id": "F06.rule_course",
@@ -1284,6 +1284,44 @@
    "excerpt": "This includes most undergraduate and some postgraduate and further education courses.",
    "occurrences": 3,
    "note": "'most': whether a particular course is included is not stated"
+  },
+  {
+   "claim_id": "F12.rule_age_limit.tuition",
+   "source_id": "F12",
+   "field": "rule_age_limit",
+   "value": "under 60 on the first day of the course, to apply for a Tuition Fee Loan",
+   "span": {
+    "start": 55234,
+    "end": 55319
+   },
+   "excerpt": "You must be under 60 on the first day of your course to apply for a Tuition Fee Loan.",
+   "occurrences": 1,
+   "note": "unlike the earlier regime (F06: no upper age limit for Tuition Fee Loans)"
+  },
+  {
+   "claim_id": "F12.rule_age_limit.maintenance",
+   "source_id": "F12",
+   "field": "rule_age_limit",
+   "value": "aged 60 or above: may be able to apply for an additional loan to help cover living costs",
+   "span": {
+    "start": 55330,
+    "end": 55433
+   },
+   "excerpt": "If you’re 60 or above, you may be able to apply for an additional loan to help cover your living costs.",
+   "occurrences": 1,
+   "note": "the page's only age rule for living costs; it says 'an additional loan', not a Maintenance Loan by name, and does not say on which day the age counts"
+  },
+  {
+   "claim_id": "F12.instrument_kind",
+   "source_id": "F12",
+   "field": "instrument_kind",
+   "value": "loan: any student loan borrowed is paid back",
+   "span": {
+    "start": 8342,
+    "end": 8479
+   },
+   "excerpt": "Any student loans you borrow need to be paid back, but not until you’ve finished or left your course, and you earn over a certain amount.",
+   "occurrences": 3
   },
   {
    "claim_id": "F12.eligible_costs.tuition",
