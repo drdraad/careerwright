@@ -402,10 +402,16 @@ payments, and the route carries it as a loan to repay. `PRUNING_VERSION` is now
 - **Rule 2** (a variant's own, set aside): `loan_amount_unknown`. Whether the loan counts in
   the base scenario, and its amount, come from the variant alone, so every route containing it
   repeats the finding.
-- **Rule 3** (spend caps) still holds: a loan pays only its own option's fees, after that
-  option's own support, so a route's direct spending and each month's payments are still the
-  sums of each option's own, checked alone, and adding an option never lowers them. The fee a
-  loan pays is in neither sum.
+- **Rule 3** (spend caps) holds because no option's own direct spending goes below £0: a
+  loan pays only its own option's fees, after that option's own support at the provider, and
+  support paid to the person lowers only what the person pays of that option's fees (fix
+  round 1, review 12c, Critical 1: as first written, a grant beside a loan was set against the
+  fee the loan paid, so an option's own spending could be negative and lower another's; the
+  search then cut a feasible route and said "no route" with complete coverage). So a route's
+  direct spending and each month's payments are the sums of each option's own, checked alone,
+  and adding an option never lowers them. The fee a loan pays is in neither sum. The rule
+  itself is unchanged, so `PRUNING_VERSION` stays `sound-pruning-5`; the reviewer's case is an
+  explicit example on both oracle properties (`grant_beside_loan`).
 - **Never pruned:** a route that rests on a loan not yet approved is a condition
   (`confirm_loan_approved`, qualification `conditional_loan`), carried on its schedule like an
   award's; the search reads the base scenario only (decision 3), so the self-paid route beside

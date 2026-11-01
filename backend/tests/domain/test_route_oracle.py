@@ -52,6 +52,7 @@ from tests.support.planning import (
     START,
     catalogue_of,
     gbp,
+    grant_beside_loan,
     loan_statuses,
     month_end,
     month_start,
@@ -421,6 +422,7 @@ def test_the_oracle_reads_a_tuition_fee_loan_in_every_state() -> None:
 @example(monthly=undated_relief())  # review 13a, Important 1
 @example(monthly=repayments_beside_an_unknown())  # review 12a, Important 3
 @example(monthly=loan_statuses())  # Task 12c: the tuition fee loan in every state
+@example(monthly=grant_beside_loan())  # review 12c, Critical 1
 @given(monthly=INSTANCES)
 def test_the_search_finds_exactly_the_oracle_s_feasible_schedules_objectives_and_layers(
     monthly: MonthlyInput,
@@ -465,6 +467,7 @@ def test_the_rank_stage_s_layers_equal_iterative_peeling_on_every_complete_searc
 @pytest.mark.req("OPT1-08", "FUNDING-06")
 @SLOW
 @example(monthly=loan_statuses())
+@example(monthly=grant_beside_loan())  # review 12c, Critical 1
 @given(monthly=INSTANCES)
 def test_the_independent_checker_agrees_with_the_route_checker_on_every_candidate(
     monthly: MonthlyInput,
@@ -477,6 +480,10 @@ def test_the_independent_checker_agrees_with_the_route_checker_on_every_candidat
         assert mine.status == STATUS[theirs.feasibility], sorted(route)
         # What the tuition fee loans pay, as loans to repay (Task 12c): unknown stays unknown.
         assert mine.borrowed == borrowed(theirs.loans_to_repay), sorted(route)
+        # A route rests on a loan not yet approved only where it pays something, or its
+        # amount is unknown (review 12c, Minor 1).
+        rests = any(c.kind == "loan" for c in theirs.conditions)
+        assert mine.rests_on_loan == rests, sorted(route)
         if mine.status == "feasible":
             assert mine.months == theirs.months_to_readiness, sorted(route)
             cost = theirs.objective_cost.minor_units if theirs.objective_cost else None

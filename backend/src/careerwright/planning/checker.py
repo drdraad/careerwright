@@ -436,6 +436,8 @@ class _Check:
         self.conditions: list[Condition] = []
         self.loans: list[LoanToRepay] = []
         self.lent = 0  # what tuition fee loans paid: in the economic cost only
+        # Support paid to the person set against a fee a loan paid: the economic cost only.
+        self.support_beside_loans = 0
 
     def add(self, code: FindingCode, **values: object) -> None:
         kind = (
@@ -496,7 +498,8 @@ class _Check:
         # later, so it moves when the person pays, never what the change costs (spec section
         # 12: loan principal is a liquidity source, not a discount; ADR 0013, Task 12c).
         economic = (
-            max(0, self._net_paid() + self.lent) + income_ledger.difference_minor
+            max(0, self._net_paid() + self.lent - self.support_beside_loans)
+            + income_ledger.difference_minor
             if direct.total_minor is not None and income_ledger.difference_minor is not None
             else None
         )
@@ -724,7 +727,7 @@ class _Check:
         if len(counted) > 1 and not variant.stacking_confirmed:
             self._unknown_support(counted)
             self.add(FindingCode.STACKING_UNCONFIRMED, variant_id=variant.variant_id)
-        fees = 0
+        fees = gross = 0
         for index, kind, amount, when in sorted(due, key=lambda d: (d[0] is None, d[0] or 0)):
             covered = 0
             for cover in covers if kind != "extra" else []:
@@ -740,8 +743,11 @@ class _Check:
             if loan is not None and kind != "extra" and self._covered(timeline, index, loan.offset):
                 lent = loan.lend(index, amount - covered)
             paid = amount - covered - lent
-            # Support paid to the person lowers the fees once, whoever pays them.
-            fees += paid + lent if kind != "extra" else 0
+            # Support paid to the person lowers the fees the person pays, so an option's own
+            # direct spending never goes below £0 (search rule 3; review 12c, Critical 1). The
+            # economic cost sets it against the whole fee, whoever pays it (`gross`).
+            fees += paid if kind != "extra" else 0
+            gross += paid + lent if kind != "extra" else 0
             if index is None:
                 self.payments_known = False  # it could fall in any month
                 self.unscheduled.append(
@@ -762,9 +768,14 @@ class _Check:
         for support in counted:
             if support.paid_to == "person":
                 self._receipt(timeline, support, fees)
+                # What the support lowers of the fee a loan paid: the economic cost only.
+                self.support_beside_loans += min(support.amount_minor, gross) - min(
+                    support.amount_minor, fees
+                )
                 fees = max(0, fees - support.amount_minor)
+                gross = max(0, gross - support.amount_minor)
         if loan is not None:
-            self._to_repay(variant.variant_id, loan)
+            self._to_repay(variant, loan)
 
     def _loan(self, timeline: _Timeline) -> "_Lender | None":
         """The variant's tuition fee loan, if it counts in this scenario, as a conditional award
@@ -777,15 +788,6 @@ class _Check:
             loan.confirmed or (loan.conditional and self.scenario is not Scenario.NO_AWARD)
         ):
             return None
-        if loan.conditional:
-            self.conditions.append(
-                Condition(
-                    kind="loan",
-                    variant_id=variant.variant_id,
-                    instrument_id=None,
-                    verification="confirm_loan_approved",
-                )
-            )
         if loan.amount is None:
             self._unknown_payments()
             self.add(FindingCode.LOAN_AMOUNT_UNKNOWN, variant_id=variant.variant_id)
@@ -796,10 +798,22 @@ class _Check:
             left=loan.amount.minor_units if loan.amount is not None else None,
         )
 
-    def _to_repay(self, variant_id: str, loan: "_Lender") -> None:
+    def _to_repay(self, variant: CompiledVariant, loan: "_Lender") -> None:
         """What the loan paid, as a loan to repay: by the month each fee falls due, or, while
-        its amount is unknown, one entry with neither amount nor month (never £0)."""
+        its amount is unknown, one entry with neither amount nor month (never £0). A loan not
+        yet approved makes the route rest on it only where it pays something or its amount is
+        unknown: one that pays nothing changes nothing (review 12c, Minor 1)."""
+        variant_id = variant.variant_id
         self.lent += sum(loan.lent.values())
+        if loan.conditional and (loan.left is None or loan.lent):
+            self.conditions.append(
+                Condition(
+                    kind="loan",
+                    variant_id=variant_id,
+                    instrument_id=None,
+                    verification="confirm_loan_approved",
+                )
+            )
         if loan.left is None:
             self.loans.append(
                 LoanToRepay(

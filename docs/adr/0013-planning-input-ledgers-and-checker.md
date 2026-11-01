@@ -373,8 +373,13 @@ Requirements: FUNDING-06, FUNDING-04 (its L0 change), FIN1-02, FIN1-10. Rulings 
    is in neither the cash ledger, nor the direct spending the direct-spend cap reads, nor the
    monthly payment cap's payments, and it is never support (`paid_to_provider` stays the
    support's), a grant, income or a receipt. FIN-1: a payment straight to a provider is left
-   out of both sides, never counted twice. Support paid to the person is still set against
-   the fee once, whoever pays the fee; the person's direct spending never goes below £0.
+   out of both sides, never counted twice. Support paid to the person (a grant or bursary)
+   lowers the person's direct spending only by what they pay of that option's fees, as before
+   Task 12c, so no option's own spending goes below £0 (fix round 1, review 12c, Critical 1:
+   setting it against the fee the loan paid made an option's spending negative, and the
+   search's spend-cap rule then said "no route" where one existed). In plain words: a grant
+   beside a loan can't pay for something else. The economic cost sets the grant against the
+   whole fee once, the loan's part included.
 3. **Shown as a loan to repay.** A route's check and every archived schedule carry
    `loans_to_repay`: for each option, what the loan pays by the month each fee falls due (a
    month beyond the horizon included), marked conditional or not. Its repayment is `null`:
@@ -387,7 +392,10 @@ Requirements: FUNDING-06, FUNDING-04 (its L0 change), FIN1-02, FIN1-10. Rulings 
    where the person pays the fee, beside it (FUNDING-05). In `delay` it pays only the fees
    due `scenario_delay_months` or more after the option starts (decision 9). Refused,
    ineligible or insufficient information: it does not count, as for an award. A loan is
-   never an award: the condition and the qualification are its own.
+   never an award: the condition and the qualification are its own. A loan not yet approved
+   that pays nothing (no fee due, or every fee covered by support at the provider) makes
+   nothing conditional; with its amount unknown it still does (fix round 1, review 12c,
+   Minor 1).
 5. **An unknown amount** of a loan that counts is `loan_amount_unknown`, unresolved, never
    £0: the direct cost and the month rows are unknown, and the route lists one loan to repay
    with neither amount nor month. The known part takes the loan to pay every fee, the least the
