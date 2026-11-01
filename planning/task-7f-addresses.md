@@ -76,3 +76,60 @@ keeps the job class's development split. So the next new course family is group 
 - Expected unknowns: student finance amounts for 2027 to 2028 may not be published yet
   (the pages may state 2026 to 2027 only); the T Level page states no provider or fee (then
   unknown, never 0); UCAS may state a date without the year's entry named.
+
+## After the first fetch (2026-11-01): what each page gave, and what to fetch next
+
+The fetch took 9 of 10 pages. Labels and records are in pack 0.3.0 (wt-7f).
+
+| Slot | Result | Used? |
+|---|---|---|
+| F05, F06 | Both loans: what they pay, how, who qualifies, the 2026 to 2027 caps | Yes |
+| F07 | 9% over each plan's threshold, interest | Yes. It doesn't say which plan a 2027 course is on, or when a loan is written off: fetch F13 |
+| F08, F09 | Advanced Learner Loan: paid to the provider, covers fees only, repaid over a threshold | Yes (`funding:F02`) |
+| F10, F11 | 16 to 19 Bursary Fund: age 16 to under 19 on 31 August 2026, up to £1,200, provider decides | Yes |
+| C11 | T Level: 2 years, 315-hour placement, 1,100 to 1,300 classroom hours, no fee or provider named | Yes |
+| F04 | "Become an apprentice" says who can start and the pay, **not** who pays for training | No. Fetch a replacement (below) |
+| C12 | 404 | No. Fetch a replacement (below) |
+
+One more finding: F05 says student finance changes for courses starting on or after
+1 January 2027. The nursing degree starts in September 2027, so the 2026 to 2027 figures may
+not apply to it. Its page is linked from F05: fetch F12.
+
+### Command 1: the UCAS deadline (C12, one page)
+
+```
+cd /home/user/careerwright-wt/7f/backend && uv run --locked python -m tools.corpus \
+  --batch /home/user/careerwright/planning/task-7f-fetch-plan-c12.json \
+  --proxy "$HTTPS_PROXY" --proxy-ca /root/.ccr/ca-bundle.crt \
+  > /home/user/careerwright/planning/task-7f-fetch-output-c12.json
+```
+
+- Proposed: https://www.ucas.com/applying/applying-to-university/key-dates-and-deadlines.
+  This is a guess from UCAS's current address pattern (`/applying/...`, seen in links on
+  C11 and F05's pages). It must state the 2027-entry equal-consideration date.
+- Fallback, if it fails: run `task-7f-fetch-plan-c12-find.json` the same way (UCAS's home
+  page, nothing kept but the hash; the output shows each "deadline" or "key dates" link with
+  100 characters around it). I then propose the address it shows. A second fallback guess:
+  https://www.ucas.com/undergraduate/applying-university/ucas-undergraduate-when-apply.
+- Class `other`, pending human rights review (OI-07): the product owner classes it at the
+  school-leaver pack session.
+
+### Command 2: the apprentice's fee and the 2027 student finance pages (F04, F12, F13)
+
+```
+cd /home/user/careerwright-wt/7f/backend && uv run --locked python -m tools.corpus \
+  --batch /home/user/careerwright/planning/task-7f-fetch-plan-more.json \
+  --proxy "$HTTPS_PROXY" --proxy-ca /root/.ccr/ca-bundle.crt \
+  > /home/user/careerwright/planning/task-7f-fetch-output-more.json
+```
+
+| Slot | Address | Must state | Family, split |
+|---|---|---|---|
+| F04 | https://www.gov.uk/employing-an-apprentice/get-funding (a guess) | That an apprentice doesn't pay for their training | govuk-mainstream-guide, holdout |
+| F12 | https://www.gov.uk/student-finance-on-or-after-1-january-2027 (linked from F05) | What a student starting from 1 January 2027 can get, and how it is paid | new family, funding group 4, development, unless it is a mainstream guide (then holdout) |
+| F13 | https://www.gov.uk/repaying-your-student-loan/which-repayment-plan-you-are-on (linked from F07) | Which plan a course starting in 2027 is on | govuk-mainstream-guide, holdout |
+
+F04 fallbacks, if its page doesn't say it either: the apprenticeship funding rules on GOV.UK
+(https://www.gov.uk/government/publications/apprenticeship-funding-rules-2025-to-2026 lists
+them; the rule says a provider or employer must not ask an apprentice to pay towards their
+training), or apprenticeships.gov.uk if that host is allowed.

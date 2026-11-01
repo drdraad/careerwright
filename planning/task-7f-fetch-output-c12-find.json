@@ -1,0 +1,192 @@
+[
+  {
+    "slot": "C12",
+    "url": "https://www.ucas.com/",
+    "final_url": "https://www.ucas.com/",
+    "retrieved_at": "2026-11-01T18:42:11.570018+00:00",
+    "attempt": {
+      "status": "succeeded",
+      "reason": null
+    },
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "483e853a69983bc43f4fb9ed6bfcbfe75fcf19e78ae37e81cc7e06f9a2b66544",
+    "byte_count": 140092,
+    "rights_status": "pending human rights review",
+    "retention": "excerpts",
+    "extraction": "no_job_posting",
+    "postings": [],
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": null,
+    "located": [
+      {
+        "excerpt": "deadline",
+        "count": 10,
+        "offsets": [
+          [
+            17767,
+            17775
+          ],
+          [
+            17818,
+            17826
+          ],
+          [
+            33962,
+            33970
+          ],
+          [
+            34013,
+            34021
+          ],
+          [
+            64416,
+            64424
+          ]
+        ],
+        "texts": [
+          "deadline",
+          "deadline",
+          "deadline",
+          "deadline",
+          "deadline"
+        ],
+        "contexts": [
+          [
+            17667,
+            17875,
+            " university</a></h3><ul><li><a href=\"https://www.ucas.com/applying/applying-to-university/dates-and-deadlines-for-uni-applications\" title=\"\">Dates and deadlines</a></li>\n<li><a href=\"https://www.ucas.com/appl"
+          ],
+          [
+            17718,
+            17926,
+            "as.com/applying/applying-to-university/dates-and-deadlines-for-uni-applications\" title=\"\">Dates and deadlines</a></li>\n<li><a href=\"https://www.ucas.com/applying/applying-to-university/writing-your-personal-s"
+          ],
+          [
+            33862,
+            34070,
+            " university</a></h3><ul><li><a href=\"https://www.ucas.com/applying/applying-to-university/dates-and-deadlines-for-uni-applications\" title=\"\">Dates and deadlines</a></li>\n<li><a href=\"https://www.ucas.com/appl"
+          ],
+          [
+            33913,
+            34121,
+            "as.com/applying/applying-to-university/dates-and-deadlines-for-uni-applications\" title=\"\">Dates and deadlines</a></li>\n<li><a href=\"https://www.ucas.com/applying/applying-to-university/writing-your-personal-s"
+          ],
+          [
+            64316,
+            64524,
+            "h3><ul><li><a href=\"https://www.ucas.com/advisers/help-and-training/key-dates-timeline\">Application deadlines</a></li>\n<li><a href=\"https://www.ucas.com/advisers/help-and-training/guides-resources-and-trainin"
+          ]
+        ]
+      },
+      {
+        "excerpt": "key dates",
+        "count": 0,
+        "offsets": [],
+        "texts": [],
+        "contexts": []
+      },
+      {
+        "excerpt": "Key dates",
+        "count": 5,
+        "offsets": [
+          [
+            20230,
+            20239
+          ],
+          [
+            36425,
+            36434
+          ],
+          [
+            56922,
+            56931
+          ],
+          [
+            68583,
+            68592
+          ],
+          [
+            72555,
+            72564
+          ]
+        ],
+        "texts": [
+          "Key dates",
+          "Key dates",
+          "Key dates",
+          "Key dates",
+          "Key dates"
+        ],
+        "contexts": [
+          [
+            20130,
+            20339,
+            "om/discover/advice-for-parents-carers-and-guardians/key-dates-and-the-application-journey\" title=\"\">Key dates</a></li>\n<li><a href=\"https://www.ucas.com/discover/advice-for-parents-carers-and-guardians/how-to-"
+          ],
+          [
+            36325,
+            36534,
+            "om/discover/advice-for-parents-carers-and-guardians/key-dates-and-the-application-journey\" title=\"\">Key dates</a></li>\n<li><a href=\"https://www.ucas.com/discover/advice-for-parents-carers-and-guardians/how-to-"
+          ],
+          [
+            56822,
+            57031,
+            "</a></li>\n<li><a href=\"https://www.ucas.com/advisers/help-and-training/key-dates-timeline\" title=\"\">Key dates timeline</a></li>\n<li><a href=\"https://www.ucas.com/advisers/news/sign-up-to-our-newsletters\" title"
+          ],
+          [
+            68483,
+            68692,
+            "ning/supporting-you-through-confirmation-and-clearing/confirmation-and-clearing-key-dates\" title=\"\">Key dates </a></li>\n</ul>\n</li>\n</ul>\n</li>\n</ul>\n\n</template>\n<template id=\"global-meganav-employer\">\n<ul><l"
+          ],
+          [
+            72455,
+            72664,
+            "li><a href=\"https://www.ucas.com/applying/applying-university/dates-and-deadlines-uni-applications\">Key dates</a></li>\n<li><a href=\"https://www.ucas.com/about-us/policies/privacy-policies-and-declarations/ucas"
+          ]
+        ]
+      },
+      {
+        "excerpt": "dates-and-deadlines",
+        "count": 3,
+        "offsets": [
+          [
+            17757,
+            17776
+          ],
+          [
+            33952,
+            33971
+          ],
+          [
+            72517,
+            72536
+          ]
+        ],
+        "texts": [
+          "dates-and-deadlines",
+          "dates-and-deadlines",
+          "dates-and-deadlines"
+        ],
+        "contexts": [
+          [
+            17657,
+            17876,
+            "pplying to university</a></h3><ul><li><a href=\"https://www.ucas.com/applying/applying-to-university/dates-and-deadlines-for-uni-applications\" title=\"\">Dates and deadlines</a></li>\n<li><a href=\"https://www.ucas.com/apply"
+          ],
+          [
+            33852,
+            34071,
+            "pplying to university</a></h3><ul><li><a href=\"https://www.ucas.com/applying/applying-to-university/dates-and-deadlines-for-uni-applications\" title=\"\">Dates and deadlines</a></li>\n<li><a href=\"https://www.ucas.com/apply"
+          ],
+          [
+            72417,
+            72636,
+            "quest form</a></h3></li>\n</ul>\n</li>\n<li><a href=\"https://www.ucas.com/applying/applying-university/dates-and-deadlines-uni-applications\">Key dates</a></li>\n<li><a href=\"https://www.ucas.com/about-us/policies/privacy-po"
+          ]
+        ]
+      }
+    ]
+  }
+]

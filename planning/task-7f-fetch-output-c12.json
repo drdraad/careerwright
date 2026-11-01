@@ -1,0 +1,219 @@
+[
+  {
+    "slot": "C12",
+    "url": "https://www.ucas.com/applying/applying-to-university/dates-and-deadlines-for-uni-applications",
+    "final_url": "https://www.ucas.com/applying/applying-to-university/dates-and-deadlines-for-uni-applications",
+    "retrieved_at": "2026-11-01T18:42:21.152037+00:00",
+    "attempt": {
+      "status": "succeeded",
+      "reason": null
+    },
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "7f9d2e045146f204949de8e8d8c2bd1651921d639ac0ce8008019c36c103b996",
+    "byte_count": 142699,
+    "rights_status": "pending human rights review",
+    "retention": "excerpts",
+    "extraction": "no_job_posting",
+    "postings": [],
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": null,
+    "located": [
+      {
+        "excerpt": "January 2027",
+        "count": 0,
+        "offsets": [],
+        "texts": [],
+        "contexts": []
+      },
+      {
+        "excerpt": "equal consideration",
+        "count": 0,
+        "offsets": [],
+        "texts": [],
+        "contexts": []
+      },
+      {
+        "excerpt": "deadline",
+        "count": 38,
+        "offsets": [
+          [
+            1600,
+            1608
+          ],
+          [
+            1690,
+            1698
+          ],
+          [
+            1747,
+            1755
+          ],
+          [
+            1852,
+            1860
+          ],
+          [
+            6488,
+            6496
+          ]
+        ],
+        "texts": [
+          "deadline",
+          "deadline",
+          "deadline",
+          "deadline",
+          "deadline"
+        ],
+        "contexts": [
+          [
+            1500,
+            1708,
+            "script>\n\n    <meta charset=\"utf-8\" />\n<meta name=\"description\" content=\"Some courses have different deadlines, and many are a long time in advance of the start of the course. Find out which deadline applies t"
+          ],
+          [
+            1590,
+            1798,
+            "different deadlines, and many are a long time in advance of the start of the course. Find out which deadline applies to you, and what you need to do by that deadline.\" />\n<link rel=\"canonical\" href=\"https://w"
+          ],
+          [
+            1647,
+            1855,
+            "of the start of the course. Find out which deadline applies to you, and what you need to do by that deadline.\" />\n<link rel=\"canonical\" href=\"https://www.ucas.com/applying/applying-to-university/dates-and-dea"
+          ],
+          [
+            1752,
+            1960,
+            "ine.\" />\n<link rel=\"canonical\" href=\"https://www.ucas.com/applying/applying-to-university/dates-and-deadlines-for-uni-applications\" />\n<meta name=\"Generator\" content=\"Drupal 11 (https://www.drupal.org)\" />\n<m"
+          ],
+          [
+            6388,
+            6596,
+            "       {\n            \"@type\": \"ListItem\",\n            \"position\": 4,\n            \"name\": \"Dates and deadlines for uni applications \",\n            \"item\": \"https://www.ucas.com/applying/applying-to-university/"
+          ]
+        ]
+      },
+      {
+        "excerpt": "18:00",
+        "count": 7,
+        "offsets": [
+          [
+            118405,
+            118410
+          ],
+          [
+            119104,
+            119109
+          ],
+          [
+            119919,
+            119924
+          ],
+          [
+            121091,
+            121096
+          ],
+          [
+            122915,
+            122920
+          ]
+        ],
+        "texts": [
+          "18:00",
+          "18:00",
+          "18:00",
+          "18:00",
+          "18:00"
+        ],
+        "contexts": [
+          [
+            118305,
+            118510,
+            "          </div>\n                                <h4 class=\"step-by-step-item__title\">\n            (18:00 UK time) Equal consideration date for applications to the universities of Oxford and Cambridge, and"
+          ],
+          [
+            119004,
+            119209,
+            "           </div>\n                                <h4 class=\"step-by-step-item__title\">\n            18:00 (UK time) Application date for PGCE teacher training courses in Wales\n          </h4>\n          <di"
+          ],
+          [
+            119819,
+            120024,
+            "          </div>\n                                <h4 class=\"step-by-step-item__title\">\n            (18:00 UK time) Equal consideration date for applications for most undergraduate courses\n          </h4>\n "
+          ],
+          [
+            120991,
+            121196,
+            "          </div>\n                                <h4 class=\"step-by-step-item__title\">\n            (18:00 UK time) Applications received by this deadline will be sent to universities and colleges\n         "
+          ],
+          [
+            122815,
+            123020,
+            "          </div>\n                                <h4 class=\"step-by-step-item__title\">\n            (18:00 UK time) Last day for UG reply swaps \n          </h4>\n          <div class=\"step-by-step-item__body"
+          ]
+        ]
+      },
+      {
+        "excerpt": "2027 entry",
+        "count": 5,
+        "offsets": [
+          [
+            114524,
+            114534
+          ],
+          [
+            116970,
+            116980
+          ],
+          [
+            117413,
+            117423
+          ],
+          [
+            123387,
+            123397
+          ],
+          [
+            123586,
+            123596
+          ]
+        ],
+        "texts": [
+          "2027 entry",
+          "2027 entry",
+          "2027 entry",
+          "2027 entry",
+          "2027 entry"
+        ],
+        "contexts": [
+          [
+            114424,
+            114634,
+            "per wrapper--padding\">\n  <div class=\"content-section prose content-indent\">\n                  <h2>  2027 entry application deadlines\n\n\n</h2>\n              <p><strong>For courses starting in 2027</strong>&nbsp;("
+          ],
+          [
+            116870,
+            117080,
+            "                       <h4 class=\"step-by-step-item__title\">\n            UCAS’ search tool displays 2027 entry courses\n          </h4>\n          <div class=\"step-by-step-item__body prose\">\n            \n        "
+          ],
+          [
+            117313,
+            117523,
+            "                       <h4 class=\"step-by-step-item__title\">\n            UCAS applications open for 2027 entry\n          </h4>\n          <div class=\"step-by-step-item__body prose\">\n            <p>You can regist"
+          ],
+          [
+            123287,
+            123497,
+            "                   <h4 class=\"step-by-step-item__title\">\n            (18:00 UK time) Final date for 2027 entry applications\n          </h4>\n          <div class=\"step-by-step-item__body prose\">\n            <p>U"
+          ],
+          [
+            123486,
+            123696,
+            "       <p>UCAS applications must be with us by 18:00 (UK time) today to meet the final deadline for 2027 entry courses.&nbsp;</p>\n          </div>\n        </li>\n              <li class=\"step-by-step-item\">\n    "
+          ]
+        ]
+      }
+    ]
+  }
+]
