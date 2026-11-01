@@ -105,7 +105,7 @@ describe("[WLD-01][WLD-02][WLD-03][WLD-07][UI-07][UI-05] the world behind every 
 
     const words = screen.getByRole("complementary", { name: "Your world" });
     expect(within(words).getByText("Keep accurate records").closest("li")).toHaveTextContent(
-      "Keep accurate records: ESCO lists it for this kind of work, not confirmed yet",
+      "Keep accurate records: ESCO lists it, not confirmed yet",
     );
     expect(within(words).getByText("Check data for errors").closest("li")).toHaveTextContent(
       "Check data for errors: you said you've done it",

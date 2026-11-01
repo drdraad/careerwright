@@ -145,7 +145,8 @@ type Label = {
 };
 
 const SKILL_CAPTION: Record<WorldSkill["state"], string> = {
-  usual: "ESCO lists it for this kind of work, not confirmed yet",
+  // Short, as a label beside its light; the key says "for this kind of work".
+  usual: "ESCO lists it, not confirmed yet",
   said: "you said you've done it",
 };
 
