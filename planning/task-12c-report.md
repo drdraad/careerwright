@@ -1,0 +1,158 @@
+# Task 12c report: a tuition fee loan is a loan to repay (backend, no interface)
+
+- Branch `wt-12c` in `/home/user/careerwright-wt/12c`, rebased onto
+  `claude/confident-ramanujan-ux3saw` at 0118ea0. Head: b2b4eeb.
+- Status: DONE_WITH_CONCERNS (the concerns: integration and acceptance not run, Docker down;
+  migration 0040 not yet run against PostgreSQL; Task 6f may also take number 0040).
+
+## For the product owner, in plain words
+
+What changed: a student can now say "a tuition fee loan pays my university fee straight to the
+university". Careerwright then:
+- leaves that fee out of their cash, their spending limit and their monthly limit;
+- shows it as a loan to repay later, with its amount and the month it is paid;
+- if the loan isn't approved yet, shows the route as "if your loan is approved", beside the
+  route where they pay the fee themselves;
+- if they don't know the amount, says it can't tell yet, never £0.
+
+A maintenance loan, or any other loan, is still not counted as money towards the plan.
+
+How the loan counts in the "cost over the plan": the full fee still counts, once. A loan is
+paid back, so it changes when the fee is paid and from whose pocket, not what the change
+costs. This changes no result on any existing test example, because none has a loan.
+
+One question for you:
+1. Should an Advanced Learner Loan count the same way? As far as I know it is also paid straight
+   to the college for the course fee (I could not check this here). Yes would treat a college
+   course's fee paid by that loan as a loan to repay, not the person's own spending. Today it
+   stays "information to check", as you decided for every loan except the tuition fee loan.
+
+## What I implemented
+
+Files changed (backend, docs, generated client):
+- `backend/src/careerwright/planning/catalogue.py`: `TuitionFeeLoan` (amount, null when not
+  known; eligibility and application, the funding statuses; an approval needs confirmed
+  eligibility), on `Variant.tuition_fee_loan`. Not a `Support`: a support of kind `loan` is
+  still refused.
+- `planning/inputs.py`: `TuitionFeeLoanInput` on `VariantInputs.tuition_fee_loan`, read into the
+  variant as the person's assumption (`accepted_assumption`). It is stored through Task 12a's one
+  command (expected version, Idempotency-Key, `run_idempotent`, `actor_transaction`); no new
+  command or endpoint.
+- `planning/compiler.py`: the compiled variant carries the loan (default null, so a snapshot
+  sealed before reads); its review state joins the variant's.
+- `planning/ledgers.py`: `LoanToRepay` (option, month due, amount, repayment always null in L0,
+  conditional).
+- `planning/checker.py`: the loan pays the fees and instalments (never extras) left after
+  support to the provider, up to its amount; that money is in no payment row, cash row, support
+  row or receipt; `loans_to_repay` on the check; a loan not yet approved adds a `Condition` of
+  kind `loan` (`confirm_loan_approved`) and the qualification `conditional_loan`, counts in base
+  and delay (delayed like an award), not in `no_award`; an unknown amount is
+  `loan_amount_unknown` (unresolved), with the direct cost and month rows null; the economic cost
+  adds what the loan paid, once. New helper `_net_paid` replaces two copies of the same sum.
+- `planning/search.py`: `loan_amount_unknown` joins rule 2's own findings; `PRUNING_VERSION`
+  `sound-pruning-5`; `Schedule.loans_to_repay` (default empty, so an older stored result reads).
+- `planning/families.py`: the loan and its application state are material financing.
+- `migrations/versions/r0040_tuition_fee_loans.py`: two CHECKs on the inputs document (the
+  loan's statuses are among the four of each; approved needs confirmed eligibility). The
+  existing CHECKs already keep its money GBP and non-negative and refuse a loan as support.
+- `apps/web/src/generated/*`: regenerated (`pnpm run generate`), after the rebase too.
+- `docs/adr/0013-...md`: the Task 12c amendment (eight rulings, the economic cost in plain words)
+  and a pointer in decision 5. `docs/adr/0016-...md`: the Task 12c amendment (classing, the
+  oracle).
+- `docs/requirements-register.md` (last commit, after the rebase): FUNDING-06 and FUNDING-04.
+- Tests: new `backend/tests/domain/test_planning_tuition_loan.py`; additions to
+  `test_planning_inputs.py`, `test_route_oracle.py`, `tests/support/planning.py`,
+  `tests/support/route_oracle.py`, `tests/integration/test_planning_inputs.py`.
+- Proposed CLAUDE.md words: `/home/user/careerwright/planning/task-12c-claude-md-proposal.md`
+  (CLAUDE.md is not edited).
+
+DBOS `application_version` stays `careerwright-l0-1`: no workflow's step sequence changed.
+
+## Rulings (each costs little if wrong)
+
+1. **Statuses count as for an award, without the "assumed" flag.** Approved (needs confirmed
+   eligibility) counts everywhere. Not yet approved (not applied or applied), not refused, with
+   confirmed or potential eligibility, makes the route conditional. Refused, ineligible or
+   insufficient information: it does not count (ADR 0013 decision 5). Why no `assumed` flag: the
+   brief says any loan not yet approved makes the route conditional; the person stating the
+   loan is already the choice.
+2. **"Beside the self-paid route" is the `no_award` scenario** (decision 5's FUNDING-05
+   mechanism). The search reads the base scenario only (ADR 0016 decision 3), so its schedule is
+   the conditional one; `evaluate_route` gives both.
+3. **The economic cost counts the fee the loan pays, once** (spec section 12: "loan principal is
+   a liquidity source, not a discount"). Section 22 changes only cash and spending limits. No
+   fixture or regression family has a loan, so no best trade-off changes (R14); no question
+   needed. Interest and repayment are not modelled: a known limit, null on the loan.
+4. **An unknown amount is always unresolved** when the loan counts, even on an option with no
+   stated fee (simplest, and never £0). The known part takes the loan to pay every fee, the least
+   the person could pay, so a cap broken even then is broken.
+5. **Order:** support to the provider first, then the loan, then the person; extras are the
+   person's. A grant paid to the person is set against the whole fee once, whoever pays it, and
+   the person's direct spending never goes below £0. With no loan, every figure is as before.
+6. **For a "from £X a month" plan with no count**, the single-instalment cap check uses what the
+   person pays after a loan that pays from the start.
+7. **No restriction by option kind**: a loan on an option with no fee pays nothing.
+8. **"The oracle is written again"** read as: the loan rule is written fresh into the existing
+   independent oracle, from section 22 and FIN-1, reading only the loan's raw fields (not
+   `confirmed`/`conditional`), sharing no code with the checker. The rest of the oracle is
+   unchanged.
+9. **Schema version stays "1"**: the field is optional and null by default, so every stored
+   document still reads.
+
+## Checks run
+
+- `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` with Node 24 on PATH:
+  - before the rebase: passed (backend 1,756 passed, 8 skipped; Vitest 442 passed);
+  - after the rebase: passed (backend 1,760 passed, 8 skipped, 421 deselected; Vitest 447);
+  - after the register commit: passed (same counts).
+  - The 8 skips are pre-existing: `test_session_2_pack.py`, page bodies kept only on the
+    curating machine.
+- TDD evidence:
+  - RED, checker and inputs (types in place, behaviour not):
+    `pytest tests/domain/test_planning_tuition_loan.py tests/domain/test_planning_inputs.py`:
+    12 failed, 20 passed (the passing ones: the three statuses that must not count, and the
+    maintenance loan refusal, which held already). GREEN after the checker: 32 passed.
+  - RED, oracle: with loans in the generated instances and no oracle rule,
+    `pytest tests/domain/test_route_oracle.py`: 2 failed (search vs oracle; checker vs
+    independent checker), 5 passed. GREEN after the oracle rule: 8 passed (one new test).
+- Coverage probe (not committed): over 300 generated instances, loans in every application
+  state, 32 to 44 options set aside for an unknown loan amount, and archived routes with
+  confirmed and conditional loans. The fixed `loan_statuses` instance is an `@example` on the
+  two oracle properties, so every state is reached on every run.
+- TRACE-01, the A–I fixture and every regression family: unchanged, their tests pass in
+  `make check`.
+
+## Not run
+
+- **Integration and acceptance not run: Docker down.** Tests I changed that did not run:
+  - `tests/integration/test_planning_inputs.py::test_every_input_round_trips_through_its_command_and_a_stale_version_is_refused`
+    (now round-trips a loan and refuses a stale version with it);
+  - `::test_a_loan_is_refused_as_support_before_anything_is_stored` (marker and comment only);
+  - `::test_the_database_repeats_the_domain_rules` (three new cases: a loan's unknown
+    application state, an approval without confirmed eligibility, a negative amount).
+- Migration 0040 has not run against PostgreSQL 16. Its jsonpath uses the same `!=` form as
+  migration 0033's CHECKs.
+- No live calls; cost £0.
+
+## Concerns
+
+- Task 6f (main tree) may add a migration too (its card says so). If it takes 0040 first, mine
+  is renumbered at the next rebase.
+- The stale-version refusal for this field is only covered by the integration test, which did
+  not run. The write path itself is Task 12a's and unchanged.
+
+## Changed test inputs or assertions (disclosed)
+
+- `test_route_oracle.py`: the generator now gives about one option in three a tuition fee loan
+  in any state, and an option with a loan always has one or two fees drawn up to £3,000 (others
+  as before). This changes which instances Hypothesis explores for the existing properties. The
+  search-vs-oracle property also asserts what each archived route's loans pay; the
+  checker-vs-oracle property asserts it for every candidate. No assertion was removed or
+  softened.
+- `tests/integration/test_planning_inputs.py::everything()`: each option's answer now names its
+  `tuition_fee_loan` (null on one, a loan not yet approved on the other), so the round trip
+  covers it.
+
+## Skip when reviewing
+
+`apps/web/src/generated/` (regenerated client).
