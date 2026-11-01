@@ -54,11 +54,13 @@ SCHEMA_PATH = PACKS_DIR / "england-option-pack.schema.json"
 # Every committed version, pinned by the SHA-256 of its file's bytes: a version never
 # changes; a correction or a review is a new version. 0.1.0 is Task 7b's, every record
 # proposed; 0.2.0 is session 2's review of it (Task 7c, `tools.session_2_pack`); 0.3.0 adds
-# the school-leaver pages to 0.2.0, its new records proposed (Task 7f, `tools.school_leaver_pack`).
+# the school-leaver pages to 0.2.0, its new records proposed (Task 7f, `tools.school_leaver_pack`);
+# 0.4.0 is the school-leaver pack session's review of 0.3.0 (`tools.school_leaver_review`).
 PINS: dict[str, str] = {
     "0.1.0": "d7ff17d73a9b17b43529b5cbbe4349ef016f7268c4ac4c2a6a53a13f97e6a3d3",
     "0.2.0": "162d2773e295c7832ff3b311738bdd20d111538b15f1df49932fecfc82702a56",
     "0.3.0": "b1167ff506c00b59821dfc8d122d66e3767c3e59e41a0e58c3d151329169f284",
+    "0.4.0": "d005713b404bcbe911ee9c2d4e7d0c9f9117013e059159d75a82487fcc01b3c8",
 }
 
 SHA256 = r"^[0-9a-f]{64}$"
@@ -272,6 +274,9 @@ class Offering(Record):
     """A dated offer of an option (spec section 18, Offering): intake, fees, timetable."""
 
     option_id: str
+    # Further pages that state this offer's values, beside its option's own page: the
+    # admissions service's dates page for a degree's deadline (ADR 0011, 2026-11-01).
+    source_ids: list[str] = Field(default_factory=list)
     intake: Ref
     application_deadline: Ref
     duration: Ref
@@ -756,7 +761,7 @@ def _own_sources(pack: Pack, record: Record) -> set[str]:
     if isinstance(record, SkillRequirement):
         return _own_sources(pack, by_id[record.job_posting_id])
     if isinstance(record, Offering):
-        return _own_sources(pack, by_id[record.option_id])
+        return _own_sources(pack, by_id[record.option_id]) | set(record.source_ids)
     if isinstance(record, Outcome):
         return _own_sources(pack, by_id[record.offering_id])
     return set()
@@ -782,6 +787,11 @@ def _references(pack: Pack) -> list[str]:
         links += [(q.record_id, q.job_posting_id, JobPosting), (q.record_id, q.target_id, None)]
     for o in pack.offerings:
         links += [(o.record_id, o.option_id, LearningOption)]
+        found += [
+            f"{o.record_id} names source {s}, which is not a source"
+            for s in o.source_ids
+            if s not in sources
+        ]
     for u in pack.outcomes:
         links += [(u.record_id, u.offering_id, Offering)]
     for record_id, linked, kind in links:

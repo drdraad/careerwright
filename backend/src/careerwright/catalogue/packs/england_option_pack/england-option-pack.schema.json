@@ -632,6 +632,13 @@
           "title": "Option Id",
           "type": "string"
         },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
         "intake": {
           "anyOf": [
             {

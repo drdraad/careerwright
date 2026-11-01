@@ -245,6 +245,34 @@ def test_a_record_citing_another_source_s_claim_is_a_problem() -> None:
     assert "claim J01.title is cited by no record" in found  # and its own title is orphaned
 
 
+@pytest.mark.req("OPTN-10", "OPTN-14")
+def test_an_offering_cites_a_further_page_only_when_it_names_that_page() -> None:
+    # A degree's deadline is on the admissions service's page, not the course's (ADR 0011,
+    # 2026-11-01): the offering names that page, and only then may cite its claim.
+    data = minimal()
+    data["sources"].append(source("C02", "course_page"))
+    data["claims"].append(claim("C02.deadline", "C02", "application_deadline", "2027-01-13"))
+    offering = data["offerings"][0]
+    offering["application_deadline"] = "C02.deadline"
+
+    assert "offering:C01.application_deadline cites C02.deadline, from C02, not from its own " in (
+        " ".join(problems(data))
+    )
+    offering["source_ids"] = ["C02"]
+    assert problems(data) == []
+    offering["source_ids"] = ["C09"]
+    assert "offering:C01 names source C09, which is not a source" in problems(data)
+
+
+@pytest.mark.req("OPTN-10")
+def test_an_offering_naming_no_further_page_is_written_as_before() -> None:
+    # The field is optional and left out when empty, so every earlier version's bytes stand.
+    pack = parse_pack(minimal())
+
+    assert pack.offerings[0].source_ids == []
+    assert '"source_ids"' not in dump_pack(pack).split('"offerings"')[1].split('"outcomes"')[0]
+
+
 @pytest.mark.req("OPTN-10")
 @pytest.mark.parametrize(
     "value",
@@ -630,8 +658,8 @@ def test_the_committed_values_say_typical_repayable_and_not_counted_where_their_
 
 @pytest.mark.req("TEST1-09", "OPTN-10")
 def test_the_corpus_manifest_and_the_pack_record_the_same_pages_and_labels() -> None:
-    # The manifest records the latest version: 0.3.0, 0.2.0 (session 2's review) with the
-    # school-leaver pages (Task 7f).
+    # The manifest records the latest version: 0.4.0, the school-leaver pack session's review
+    # of 0.3.0 (0.2.0, session 2's review, with the school-leaver pages; Task 7f).
     latest = max(PINS, key=lambda v: tuple(int(n) for n in v.split(".")))
     pack = load_pack(latest)
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
@@ -641,7 +669,7 @@ def test_the_corpus_manifest_and_the_pack_record_the_same_pages_and_labels() -> 
         claims_by_slot.setdefault(c.source_id, []).append(c.claim_id)
     first = {s.source_id: s for s in load_pack("0.1.0").sources}
 
-    assert latest == manifest["option_pack"]["version"] == "0.3.0"
+    assert latest == manifest["option_pack"]["version"] == "0.4.0"
     assert manifest["option_pack"]["sha256"] == PINS[latest]
     assert manifest["option_pack"]["path"].endswith(pack_path(latest).name)
     assert all(first[s.source_id] == s for s in pack.sources if s.source_id in first)
@@ -656,7 +684,9 @@ def test_the_corpus_manifest_and_the_pack_record_the_same_pages_and_labels() -> 
         assert datetime.fromisoformat(slot["retrieved_at"]) == source.retrieved_at
         assert slot["labels"]["in"] == pack_path(latest).name
         assert slot["labels"]["claims"] == claims_by_slot[source.source_id]
-        review = "session 2 (H-07)" if source.source_id in first else "not run - requires human"
+        review = (
+            "session 2 (H-07)" if source.source_id in first else "the school-leaver pack session"
+        )
         assert slot["label_review"].startswith(review), source.source_id
 
 

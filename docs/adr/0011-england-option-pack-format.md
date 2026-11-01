@@ -335,3 +335,37 @@ reviewed.
   Learning Entitlement's (`funding:F12`), which the page says covers "most undergraduate"
   courses without naming them. No record links a loan to a course: which applies follows
   the course's start, and whether the course is covered stays the page's word.
+
+## Amendment, 2026-11-01 (Task 7f, second half: version 0.4.0, the school-leaver review)
+
+- **Version 0.4.0 is the school-leaver pack session's review of 0.3.0.** A review is a new
+  version: 0.3.0 was committed, merged and named by the session's question sheet, so it
+  stays byte-identical, as 0.1.0 did under session 2. `tools.school_leaver_review` reads the
+  product owner's record (`docs/reviews/school-leaver-pack-session.md`) and applies it to
+  0.3.0; `tools.option_pack_files --pack` publishes the result, pinned as
+  `d005713b404bcbe911ee9c2d4e7d0c9f9117013e059159d75a82487fcc01b3c8`. A fast test checks the
+  committed file is exactly that output.
+- **Whose answers.** An AI checked all 139 rows, and the product owner ruled that its check
+  counts as their review. They answered the six rows sent back themselves. Each record's
+  review names "an AI check, counted as the product owner's review by their ruling of
+  2026-11-01" (with "and the product owner's own answers" where one of theirs applies), the
+  date and the session.
+- **Reviewed** when every one of a record's rows is yes, or a correction or decision the
+  product owner gave. Their approved corrections count, unlike session 2's agent-applied
+  ones, because they decided the corrected value itself. A record with an undecided row
+  stays `proposed` with its approved corrections applied (`funding:F04`, Q101). A record
+  whose earlier review left it proposed keeps that review and state, and its decision notes
+  this session's rows (`funding:F02`). Result: 62 of 129 records reviewed, none left out.
+- **A row left undecided makes its field unknown** with the review's reason (Q101: who
+  the government pays beyond the 95% share). A claim no record cites any more is left out.
+- **An offering may name further pages (`Offering.source_ids`).** A degree's application
+  deadline is on the admissions service's page, not the course's. An offering may now cite
+  a claim from a page it names there, beside its option's own page; the validator checks
+  each named page exists. The field is optional and left out when empty, so every earlier
+  version parses and writes byte for byte as before, and `format_version` stays 1.
+- **UCAS's page (C12) is class `other` with the product owner's rights decision.** They
+  allowed short quotes from it as evidence, so it keeps its hash and one excerpt, cut from
+  the text the controller's fetches located; its body is never kept. Its "13 Jan" shows no
+  year: 13 January 2027 is the product owner's answer to Q115, named in the claim's note.
+- **Consumers:** Task 12b pins 0.4.0. No capability reference is written for it here, so
+  the capability model's pin (0.2.0 with reference 0.2.0) is unchanged.
