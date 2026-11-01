@@ -23,7 +23,10 @@ Proxy mode (`FetchProxy`; ADR 0009, 2026-11-01 amendment) is for the controller'
 alone, in an environment whose only way out is an allowlisting HTTPS proxy: each connection
 is a CONNECT tunnel through that proxy, and TLS is verified against the CA bundle it names.
 The proxy, not Careerwright, then picks the address it connects to, so the resolved-address
-check does not run (no name is looked up here); every other check stays. The product never
+check does not run (no name is looked up here). Where the proxy intercepts TLS (the cloud
+session's does), the certificate checked is the proxy's, from that bundle, not the site's:
+the proxy, not Careerwright, vouches that the page came from that host. Every other check
+stays. The product never
 selects it: the restricted worker builds its fetcher without one and its settings refuse one.
 """
 

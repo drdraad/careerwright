@@ -676,6 +676,10 @@ manifest and the rights policy) are unchanged.
 - **What it gives up:** in proxy mode the proxy, not Careerwright, picks the address it
   connects to. So the resolved-address check (decision 2's connect-time check of every
   address a name resolves to) does not run. No name is looked up at all.
+- **It also gives up the site's own certificate** when the proxy intercepts TLS, as the
+  cloud session's proxy does. Careerwright then checks the proxy's certificate, issued from
+  the named bundle, not one the site presented. So the proxy, not Careerwright, vouches that
+  the page came from that host.
 - **What still runs:** every other guard. The URL checks (https or http only, no
   credentials, ports 80 and 443, and no host that is `localhost`, single-label, a local
   suffix, an encoded address or a private or reserved IP literal), every redirect checked by
