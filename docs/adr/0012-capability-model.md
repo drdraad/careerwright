@@ -421,3 +421,33 @@ its rules on protected gates, unknown and readiness (decisions 4, 5 and 7) are u
   level, never a demotion of a protected gate, and is read by no matrix, question or readiness
   result. Seniority and industry beside the role or a target are kept the same way; matching
   and readiness ignore them. The Skills chapter (Task 10) offers the marks on a target's list.
+- **Amendment line, Task 10A (2026-11-01): the Skills chapter's facts** (backend; screens in
+  10B). `GET .../capability/skills` gives, per target, codes and numbers only
+  (`careerwright.capability.skills`):
+  - what ESCO lists for the occupation its record names, or none (`seed`: `esco_occupation`,
+    `none_of_these`, `no_occupation`), each skill with the person's "not part of my job" mark,
+    read by nothing computed;
+  - the person's own examples, each with the spans they chose. Decision 11's open item is
+    closed by the person's selection: `POST .../capability/advert-spans` (expected capability
+    version, Idempotency-Key, no model run) stores offsets into the kept text, checked there
+    (`careerwright.capability.adverts`; migration 0045). The spans are shown, not yet read into
+    matrix rows: `exemplar_rows_read` stays false;
+  - what the target asks (its required rows, each with its review state and its pack
+    records' date) and, beside each, the person's qualifications whose words (as a concept,
+    whole words) appear in it: expected is `expected_not_met`; achieved beside a protected
+    gate is `achieved_unverified` (decision 4: unresolved until verified at its source);
+    no entry fact feeds readiness;
+  - **readiness only where a reviewed rubric exists** (provisional, R6): `assessed` needs at
+    least one required row a rubric models, every such rubric `reviewed`, and a result other
+    than `insufficient_coverage`. Otherwise `not_assessed` with its reason (`no_rubric`,
+    `insufficient_coverage`, `rubrics_not_reviewed`) and no result. Reference 0.1.0 is
+    `proposed` (session 2 said no to every anchor set), so today no target is assessed in
+    Skills; `GET .../readiness` and planning are unchanged;
+  - and once: the question graph shared across targets, and the usual skills of the
+    person's role, null (never empty) with no role.
+  The ten course pages' mappings are reviewed one by one in
+  `test_course_outcomes_review.py` (packs 0.1.0 and 0.2.0): none states a level, and
+  completing any course, as stated or accepted, never raises its row or makes its target
+  ready, so a route resting on it reads "readiness not reached in this model". The app still
+  reads pack and reference 0.1.0; moving the capability model to a later pack is not this
+  line's.
