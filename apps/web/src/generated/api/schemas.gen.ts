@@ -6210,7 +6210,8 @@ export const NotYetFoundReasonSchema = {
     type: 'string',
     enum: [
         'not_on_any_page',
-        'one_source_only'
+        'one_source_only',
+        'pages_unread'
     ],
     title: 'NotYetFoundReason',
     description: 'Why a role read from its pages is not yet found: never evidence it doesn\'t exist.'
@@ -10918,7 +10919,7 @@ export const RoleResearchOutSchema = {
                     type: 'null'
                 }
             ],
-            description: 'With not_yet_found: no page read shows the title, or only one source does.'
+            description: 'With not_yet_found: every page was read and none shows the title (not_on_any_page), only one source does (one_source_only), or none read shows it and some couldn\'t be read (pages_unread; the pages whose title_verified is None), never counted as pages without the title.'
         },
         sources: {
             type: 'integer',

@@ -227,6 +227,23 @@ describe("[DIV1-15][MODEL-08] research this role", () => {
     expect(screen.queryByRole("button", { name: ROLE_RESEARCH.makeTarget })).toBeNull();
   });
 
+  it("never says the pages lack the title when it couldn't read them", async () => {
+    // The first live run (2026-11-01): every page failed, so nothing is known of the title.
+    const unreadPages = research({
+      state: "not_yet_found",
+      not_yet_found_reason: "pages_unread",
+      search: run("s1"),
+      reading: run("a1"),
+      pages: [0, 1, 2, 3, 4].map((n) => page(n, `site${n}.example`, null, null)),
+    });
+    shown([unreadPages]);
+
+    expect(await screen.findByText(ROLE_RESEARCH.state.not_yet_found)).toBeVisible();
+    expect(screen.getByText(ROLE_RESEARCH.notYetFound.pages_unread)).toBeVisible();
+    expect(screen.getByText(ROLE_RESEARCH.unread(5))).toBeVisible();
+    expect(screen.queryByText(ROLE_RESEARCH.notYetFound.not_on_any_page)).toBeNull();
+  });
+
   it("never offers to make the person's own title a target again", async () => {
     const found = research({ state: "found", sources: 2, search: run("s1"), reading: run("a1") });
     shown([found], [], [{ title: TITLE, why: "role" }]);

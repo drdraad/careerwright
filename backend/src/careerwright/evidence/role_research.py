@@ -271,7 +271,9 @@ class ResearchState(StrEnum):
     READING = "reading"
     READING_STOPPED = "reading_stopped"  # failed or cancelled before the rule could say found
     FOUND = "found"  # on two independent sources, or one official page
-    NOT_YET_FOUND = "not_yet_found"  # in independent sources: every page read, not enough
+    # In independent sources: the reading ended, not enough (its reason says whether every
+    # page was read).
+    NOT_YET_FOUND = "not_yet_found"
 
 
 @dataclass(frozen=True)
@@ -326,7 +328,9 @@ def _pages(tx: Tx, reading: Run) -> tuple[list[PageView], Corroboration]:
         for t in targets
         if (a := last.get(t.position)) is not None and a.attempt_id in checks
     ]
-    result = corroborate(evidence)
+    # A target with no check recorded (blocked, failed or not tried yet) wasn't read: never a
+    # page without the title (`NotYetFoundReason.PAGES_UNREAD`).
+    result = corroborate(evidence, unread=len(targets) - len(evidence))
     group_of = {ref: n for n, group in enumerate(result.groups, start=1) for ref in group}
     pages: list[PageView] = []
     for target in targets:

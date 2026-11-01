@@ -183,8 +183,12 @@ class RoleVerdict(StrEnum):
 class NotYetFoundReason(StrEnum):
     """Why a role read from its pages is not yet found: never evidence it doesn't exist."""
 
-    NOT_ON_ANY_PAGE = "not_on_any_page"  # no page read shows the title word for word
+    # Every page proposed was read, and none shows the title word for word.
+    NOT_ON_ANY_PAGE = "not_on_any_page"
     ONE_SOURCE_ONLY = "one_source_only"  # it is, but on one source (copies counted once)
+    # No page read shows it, and some (or all) couldn't be read: they might, so nothing is
+    # said of them. A blocked, failed or unread page is never a page without the title.
+    PAGES_UNREAD = "pages_unread"
 
 
 @dataclass(frozen=True)
@@ -207,6 +211,7 @@ class Corroboration:
     # The pages showing the title, grouped by source: copies of one advert, and pages of one
     # site, share a group.
     groups: list[list[str]] = field(default_factory=list)
+    unread: int = 0  # the pages proposed that couldn't be read (blocked, failed or not tried)
 
 
 def _copies(a: TitleCheck, b: TitleCheck) -> bool:
@@ -224,8 +229,12 @@ def _one_source(a: PageEvidence, b: PageEvidence) -> bool:
     return not (employers_a and employers_b and not employers_a & employers_b)
 
 
-def corroborate(pages: Sequence[PageEvidence]) -> Corroboration:
-    """ADR 0015's rule over the pages read for one title, in the order given."""
+def corroborate(pages: Sequence[PageEvidence], *, unread: int = 0) -> Corroboration:
+    """ADR 0015's rule over the pages read for one title, in the order given, beside the
+    `unread` pages proposed for it that couldn't be read. With no page at all there is
+    nothing to say: that is the caller's "no pages", never a result."""
+    if unread < 0 or not (pages or unread):
+        raise ValueError("no page to corroborate")
     verified = [p for p in pages if p.check.verified]
     parent = list(range(len(verified)))
 
@@ -245,6 +254,11 @@ def corroborate(pages: Sequence[PageEvidence]) -> Corroboration:
     groups = list(grouped.values())
     official = any(p.rights_class in OFFICIAL_CLASSES for p in verified)
     if official or len(groups) >= INDEPENDENT_SOURCES:
-        return Corroboration(RoleVerdict.FOUND, None, len(groups), official, groups)
-    reason = NotYetFoundReason.ONE_SOURCE_ONLY if verified else NotYetFoundReason.NOT_ON_ANY_PAGE
-    return Corroboration(RoleVerdict.NOT_YET_FOUND, reason, len(groups), official, groups)
+        return Corroboration(RoleVerdict.FOUND, None, len(groups), official, groups, unread)
+    if verified:
+        reason = NotYetFoundReason.ONE_SOURCE_ONLY
+    elif unread:
+        reason = NotYetFoundReason.PAGES_UNREAD
+    else:
+        reason = NotYetFoundReason.NOT_ON_ANY_PAGE
+    return Corroboration(RoleVerdict.NOT_YET_FOUND, reason, len(groups), official, groups, unread)

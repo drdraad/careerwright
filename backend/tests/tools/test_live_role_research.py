@@ -14,9 +14,9 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RequestUsage
 
 from careerwright.evidence.acquire import AcquisitionResult
-from careerwright.evidence.records import AttemptStatus, InputRoute, RightsClass
+from careerwright.evidence.records import AttemptReason, AttemptStatus, InputRoute, RightsClass
 from tests.support.fake_models import SEARCHED, search_parts
-from tools.live_role_research import PAGES_PRINTED, ROLE_SCOPE, research_role
+from tools.live_role_research import PAGES_PRINTED, ROLE_SCOPE, page_notes, research_role
 from tools.live_smoke import SmokeSettings
 from tools.usage_ledger import CallOutcome, Ledger
 
@@ -113,3 +113,41 @@ def test_the_paid_call_is_ledgered_before_any_page_is_read(
     assert (row.budget_scope, row.outcome) == (ROLE_SCOPE, CallOutcome.OK)
     assert row.estimated_cost_nano_usd is not None
     assert (tmp_path / "live-usage.md").read_text(encoding="utf-8").count(ROLE_SCOPE) >= 1
+
+
+def _failed(url: str) -> AcquisitionResult:
+    return AcquisitionResult(
+        route=InputRoute.FETCH,
+        provider=url.split("/")[2],
+        requested_url=url,
+        status=AttemptStatus.FAILED,
+        reason=AttemptReason.ROBOTS_UNREACHABLE,
+        fetched_at=datetime(2026, 11, 1, tzinfo=UTC),
+    )
+
+
+@pytest.mark.req("DIV1-15")
+def test_pages_that_could_not_be_read_are_printed_as_unread_never_not_on_any_page() -> None:
+    # Ledger row 44 (2026-11-01): every page's robots.txt was unreachable.
+    urls = [f"https://site{n}.example/role" for n in range(5)]
+    none_read = page_notes(TITLE, [_failed(u) for u in urls])
+    partly_read = page_notes(
+        TITLE,
+        [_failed(urls[0]), _page(urls[1]).model_copy(update={"role_text": "Synthetic test page."})],
+    )
+
+    for notes, unread in ((none_read, 5), (partly_read, 1)):
+        assert (notes["verdict"], notes["reason"], notes["unread"]) == (
+            "not_yet_found",
+            "pages_unread",
+            unread,
+        )
+    # No page to read is no verdict at all, never "not on any page".
+    assert page_notes(TITLE, []) == {
+        "pages": [],
+        "verdict": None,
+        "reason": "no_pages",
+        "unread": 0,
+        "sources": 0,
+        "official": False,
+    }
