@@ -41,10 +41,8 @@
   },
   {
     "slot": "C11",
-    "url": "https://leedscitycollege.ac.uk/courses/t-level-accounting/",
-    "rights_class": "course-provider",
-    "terms": "Leeds City College, a further-education college's own course page (session 1 line A3); footer \"© 2026 Leeds City College\"; no terms of use restricting reading or private copies are linked from its pages (read 2026-10-29 on C02, the same host)",
-    "locate": ["T Level", "Accounting", "fee", "Start date"]
+    "url": "https://www.gov.uk/government/publications/introduction-of-t-levels/introduction-of-t-levels",
+    "locate": ["industry placement", "45 days", "2-year", "16 to 19", "equivalent to 3 A levels"]
   },
   {
     "slot": "C12",

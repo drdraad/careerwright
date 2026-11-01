@@ -3,183 +3,833 @@
     "slot": "F04",
     "url": "https://www.gov.uk/become-apprentice",
     "final_url": "https://www.gov.uk/become-apprentice",
-    "retrieved_at": "2026-11-01T16:28:31.556911+00:00",
+    "retrieved_at": "2026-11-01T18:23:54.462155+00:00",
     "attempt": {
-      "status": "failed",
-      "reason": "robots_unreachable"
+      "status": "succeeded",
+      "reason": null
     },
-    "http_status": null,
-    "content_type": null,
-    "sha256": null,
-    "byte_count": null,
-    "rights_status": "pending human rights review",
-    "retention": null,
-    "extraction": null,
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "a97eefaef6c2bd2f96cac350c60b5c0d5bf654aab8a23b667767cade949282cb",
+    "byte_count": 83553,
+    "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+    "retention": "body",
+    "extraction": "no_job_posting",
     "postings": [],
-    "kept_body": null
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": "var/evidence/corpus/F04/a97eefaef6c2bd2f96cac350c60b5c0d5bf654aab8a23b667767cade949282cb.html",
+    "located": [
+      {
+        "excerpt": "pay for",
+        "count": 1,
+        "offsets": [
+          [
+            44900,
+            44907
+          ]
+        ],
+        "texts": [
+          "pay for"
+        ]
+      },
+      {
+        "excerpt": "training costs",
+        "count": 0,
+        "offsets": [],
+        "texts": []
+      },
+      {
+        "excerpt": "do not have to pay",
+        "count": 0,
+        "offsets": [],
+        "texts": []
+      }
+    ]
   },
   {
     "slot": "F05",
     "url": "https://www.gov.uk/student-finance/new-fulltime-students",
     "final_url": "https://www.gov.uk/student-finance/new-fulltime-students",
-    "retrieved_at": "2026-11-01T16:28:31.561211+00:00",
+    "retrieved_at": "2026-11-01T18:23:55.434145+00:00",
     "attempt": {
-      "status": "failed",
-      "reason": "robots_unreachable"
+      "status": "succeeded",
+      "reason": null
     },
-    "http_status": null,
-    "content_type": null,
-    "sha256": null,
-    "byte_count": null,
-    "rights_status": "pending human rights review",
-    "retention": null,
-    "extraction": null,
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "b2e143fd5e8dc3a3ead099a46ff65e1634f8a3fffd536cbe6357c4724d938719",
+    "byte_count": 107633,
+    "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+    "retention": "body",
+    "extraction": "no_job_posting",
     "postings": [],
-    "kept_body": null
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": "var/evidence/corpus/F05/b2e143fd5e8dc3a3ead099a46ff65e1634f8a3fffd536cbe6357c4724d938719.html",
+    "located": [
+      {
+        "excerpt": "Tuition Fee Loan",
+        "count": 10,
+        "offsets": [
+          [
+            4632,
+            4648
+          ],
+          [
+            5178,
+            5194
+          ],
+          [
+            6315,
+            6331
+          ],
+          [
+            6485,
+            6501
+          ],
+          [
+            48059,
+            48075
+          ]
+        ],
+        "texts": [
+          "Tuition Fee Loan",
+          "Tuition Fee Loan",
+          "Tuition Fee Loan",
+          "Tuition Fee Loan",
+          "Tuition Fee Loan"
+        ]
+      },
+      {
+        "excerpt": "Maintenance Loan",
+        "count": 16,
+        "offsets": [
+          [
+            4720,
+            4736
+          ],
+          [
+            7985,
+            8001
+          ],
+          [
+            8523,
+            8539
+          ],
+          [
+            8738,
+            8754
+          ],
+          [
+            10797,
+            10813
+          ]
+        ],
+        "texts": [
+          "Maintenance Loan",
+          "Maintenance Loan",
+          "Maintenance Loan",
+          "Maintenance Loan",
+          "Maintenance Loan"
+        ]
+      },
+      {
+        "excerpt": "paid directly",
+        "count": 6,
+        "offsets": [
+          [
+            5292,
+            5305
+          ],
+          [
+            8233,
+            8246
+          ],
+          [
+            48569,
+            48582
+          ],
+          [
+            50600,
+            50613
+          ],
+          [
+            76175,
+            76188
+          ]
+        ],
+        "texts": [
+          "paid directly",
+          "paid directly",
+          "paid directly",
+          "paid directly",
+          "paid directly"
+        ]
+      },
+      {
+        "excerpt": "start of each term",
+        "count": 3,
+        "offsets": [
+          [
+            8277,
+            8295
+          ],
+          [
+            50644,
+            50662
+          ],
+          [
+            76219,
+            76237
+          ]
+        ],
+        "texts": [
+          "start of each term",
+          "start of each term",
+          "start of each term"
+        ]
+      }
+    ]
   },
   {
     "slot": "F06",
     "url": "https://www.gov.uk/student-finance/who-qualifies",
     "final_url": "https://www.gov.uk/student-finance/who-qualifies",
-    "retrieved_at": "2026-11-01T16:28:36.561755+00:00",
+    "retrieved_at": "2026-11-01T18:24:00.210687+00:00",
     "attempt": {
-      "status": "failed",
-      "reason": "robots_unreachable"
+      "status": "succeeded",
+      "reason": null
     },
-    "http_status": null,
-    "content_type": null,
-    "sha256": null,
-    "byte_count": null,
-    "rights_status": "pending human rights review",
-    "retention": null,
-    "extraction": null,
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "632d291b9ddd8c971d83b445b763764fe8e45c47dbe68c4885ebddedb67d01d4",
+    "byte_count": 112866,
+    "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+    "retention": "body",
+    "extraction": "no_job_posting",
     "postings": [],
-    "kept_body": null
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": "var/evidence/corpus/F06/632d291b9ddd8c971d83b445b763764fe8e45c47dbe68c4885ebddedb67d01d4.html",
+    "located": [
+      {
+        "excerpt": "3 years",
+        "count": 2,
+        "offsets": [
+          [
+            15669,
+            15676
+          ],
+          [
+            59345,
+            59352
+          ]
+        ],
+        "texts": [
+          "3 years",
+          "3 years"
+        ]
+      },
+      {
+        "excerpt": "settled status",
+        "count": 2,
+        "offsets": [
+          [
+            15270,
+            15284
+          ],
+          [
+            59022,
+            59036
+          ]
+        ],
+        "texts": [
+          "settled status",
+          "settled status"
+        ]
+      },
+      {
+        "excerpt": "age",
+        "count": 61,
+        "offsets": [
+          [
+            1711,
+            1714
+          ],
+          [
+            2167,
+            2170
+          ],
+          [
+            2234,
+            2237
+          ],
+          [
+            2590,
+            2593
+          ],
+          [
+            2616,
+            2619
+          ]
+        ],
+        "texts": [
+          "age",
+          "age",
+          "age",
+          "age",
+          "age"
+        ]
+      }
+    ]
   },
   {
     "slot": "F07",
     "url": "https://www.gov.uk/repaying-your-student-loan/what-you-pay",
     "final_url": "https://www.gov.uk/repaying-your-student-loan/what-you-pay",
-    "retrieved_at": "2026-11-01T16:28:41.561663+00:00",
+    "retrieved_at": "2026-11-01T18:24:05.207624+00:00",
     "attempt": {
-      "status": "failed",
-      "reason": "robots_unreachable"
+      "status": "succeeded",
+      "reason": null
     },
-    "http_status": null,
-    "content_type": null,
-    "sha256": null,
-    "byte_count": null,
-    "rights_status": "pending human rights review",
-    "retention": null,
-    "extraction": null,
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "3fd0db419cf67326251e87f0602fb5515f50d07a86e448bcd09212ab286463c4",
+    "byte_count": 111396,
+    "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+    "retention": "body",
+    "extraction": "no_job_posting",
     "postings": [],
-    "kept_body": null
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": "var/evidence/corpus/F07/3fd0db419cf67326251e87f0602fb5515f50d07a86e448bcd09212ab286463c4.html",
+    "located": [
+      {
+        "excerpt": "Plan 5",
+        "count": 6,
+        "offsets": [
+          [
+            6880,
+            6886
+          ],
+          [
+            9571,
+            9577
+          ],
+          [
+            13155,
+            13161
+          ],
+          [
+            56571,
+            56577
+          ],
+          [
+            58450,
+            58456
+          ]
+        ],
+        "texts": [
+          "Plan 5",
+          "Plan 5",
+          "Plan 5",
+          "Plan 5",
+          "Plan 5"
+        ]
+      },
+      {
+        "excerpt": "9%",
+        "count": 22,
+        "offsets": [
+          [
+            7402,
+            7404
+          ],
+          [
+            8080,
+            8082
+          ],
+          [
+            8585,
+            8587
+          ],
+          [
+            12226,
+            12228
+          ],
+          [
+            13688,
+            13690
+          ]
+        ],
+        "texts": [
+          "9%",
+          "9%",
+          "9%",
+          "9%",
+          "9%"
+        ]
+      },
+      {
+        "excerpt": "written off",
+        "count": 1,
+        "offsets": [
+          [
+            54522,
+            54533
+          ]
+        ],
+        "texts": [
+          "written off"
+        ]
+      }
+    ]
   },
   {
     "slot": "F08",
     "url": "https://www.gov.uk/advanced-learner-loan/what-youll-get",
     "final_url": "https://www.gov.uk/advanced-learner-loan/what-youll-get",
-    "retrieved_at": "2026-11-01T16:28:46.561539+00:00",
+    "retrieved_at": "2026-11-01T18:24:10.640194+00:00",
     "attempt": {
-      "status": "failed",
-      "reason": "robots_unreachable"
+      "status": "succeeded",
+      "reason": null
     },
-    "http_status": null,
-    "content_type": null,
-    "sha256": null,
-    "byte_count": null,
-    "rights_status": "pending human rights review",
-    "retention": null,
-    "extraction": null,
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "595e858a121c2435b38fe7c0f8a5d3c642c4529680bb0e7cb33cc05587fe0e4a",
+    "byte_count": 68977,
+    "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+    "retention": "body",
+    "extraction": "no_job_posting",
     "postings": [],
-    "kept_body": null
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": "var/evidence/corpus/F08/595e858a121c2435b38fe7c0f8a5d3c642c4529680bb0e7cb33cc05587fe0e4a.html",
+    "located": [
+      {
+        "excerpt": "paid directly",
+        "count": 2,
+        "offsets": [
+          [
+            4935,
+            4948
+          ],
+          [
+            40573,
+            40586
+          ]
+        ],
+        "texts": [
+          "paid directly",
+          "paid directly"
+        ]
+      },
+      {
+        "excerpt": "college or training provider",
+        "count": 2,
+        "offsets": [
+          [
+            4957,
+            4985
+          ],
+          [
+            40595,
+            40623
+          ]
+        ],
+        "texts": [
+          "college or training provider",
+          "college or training provider"
+        ]
+      }
+    ]
   },
   {
     "slot": "F09",
     "url": "https://www.gov.uk/advanced-learner-loan",
     "final_url": "https://www.gov.uk/advanced-learner-loan",
-    "retrieved_at": "2026-11-01T16:28:51.561373+00:00",
+    "retrieved_at": "2026-11-01T18:24:15.582076+00:00",
     "attempt": {
-      "status": "failed",
-      "reason": "robots_unreachable"
+      "status": "succeeded",
+      "reason": null
     },
-    "http_status": null,
-    "content_type": null,
-    "sha256": null,
-    "byte_count": null,
-    "rights_status": "pending human rights review",
-    "retention": null,
-    "extraction": null,
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "66db5399deaa729cb8c9ea03ff152ac5aa338a163c3637d89956bb4e9a4e7dd6",
+    "byte_count": 91779,
+    "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+    "retention": "body",
+    "extraction": "no_job_posting",
     "postings": [],
-    "kept_body": null
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": "var/evidence/corpus/F09/66db5399deaa729cb8c9ea03ff152ac5aa338a163c3637d89956bb4e9a4e7dd6.html",
+    "located": [
+      {
+        "excerpt": "pay back",
+        "count": 0,
+        "offsets": [],
+        "texts": []
+      },
+      {
+        "excerpt": "earning over",
+        "count": 0,
+        "offsets": [],
+        "texts": []
+      }
+    ]
   },
   {
     "slot": "F10",
     "url": "https://www.gov.uk/1619-bursary-fund",
     "final_url": "https://www.gov.uk/1619-bursary-fund",
-    "retrieved_at": "2026-11-01T16:28:56.561197+00:00",
+    "retrieved_at": "2026-11-01T18:24:20.491641+00:00",
     "attempt": {
-      "status": "failed",
-      "reason": "robots_unreachable"
+      "status": "succeeded",
+      "reason": null
     },
-    "http_status": null,
-    "content_type": null,
-    "sha256": null,
-    "byte_count": null,
-    "rights_status": "pending human rights review",
-    "retention": null,
-    "extraction": null,
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "53575b3ea54c61d177fd17e9d5431a2ef01cd05a3ef3f857e7568a153c809f53",
+    "byte_count": 76782,
+    "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+    "retention": "body",
+    "extraction": "no_job_posting",
     "postings": [],
-    "kept_body": null
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": "var/evidence/corpus/F10/53575b3ea54c61d177fd17e9d5431a2ef01cd05a3ef3f857e7568a153c809f53.html",
+    "located": [
+      {
+        "excerpt": "16 to 19",
+        "count": 11,
+        "offsets": [
+          [
+            117,
+            125
+          ],
+          [
+            2695,
+            2703
+          ],
+          [
+            4175,
+            4183
+          ],
+          [
+            4471,
+            4479
+          ],
+          [
+            6302,
+            6310
+          ]
+        ],
+        "texts": [
+          "16 to 19",
+          "16 to 19",
+          "16 to 19",
+          "16 to 19",
+          "16 to 19"
+        ]
+      },
+      {
+        "excerpt": "£1,200",
+        "count": 6,
+        "offsets": [
+          [
+            2353,
+            2359
+          ],
+          [
+            2844,
+            2850
+          ],
+          [
+            4236,
+            4242
+          ],
+          [
+            6386,
+            6392
+          ],
+          [
+            37143,
+            37149
+          ]
+        ],
+        "texts": [
+          "£1,200",
+          "£1,200",
+          "£1,200",
+          "£1,200",
+          "£1,200"
+        ]
+      },
+      {
+        "excerpt": "bursary",
+        "count": 57,
+        "offsets": [
+          [
+            2665,
+            2672
+          ],
+          [
+            4411,
+            4418
+          ],
+          [
+            5245,
+            5252
+          ],
+          [
+            5633,
+            5640
+          ],
+          [
+            5662,
+            5669
+          ]
+        ],
+        "texts": [
+          "bursary",
+          "bursary",
+          "bursary",
+          "bursary",
+          "bursary"
+        ]
+      }
+    ]
   },
   {
     "slot": "F11",
     "url": "https://www.gov.uk/1619-bursary-fund/eligibility",
     "final_url": "https://www.gov.uk/1619-bursary-fund/eligibility",
-    "retrieved_at": "2026-11-01T16:29:01.561324+00:00",
+    "retrieved_at": "2026-11-01T18:24:25.059822+00:00",
     "attempt": {
-      "status": "failed",
-      "reason": "robots_unreachable"
+      "status": "succeeded",
+      "reason": null
     },
-    "http_status": null,
-    "content_type": null,
-    "sha256": null,
-    "byte_count": null,
-    "rights_status": "pending human rights review",
-    "retention": null,
-    "extraction": null,
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "227f6d4380d8245593bd8fa36dd6ff810a32f0079a2ebdca4374df71ca054f1e",
+    "byte_count": 71121,
+    "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+    "retention": "body",
+    "extraction": "no_job_posting",
     "postings": [],
-    "kept_body": null
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": "var/evidence/corpus/F11/227f6d4380d8245593bd8fa36dd6ff810a32f0079a2ebdca4374df71ca054f1e.html",
+    "located": [
+      {
+        "excerpt": "31 August",
+        "count": 2,
+        "offsets": [
+          [
+            4500,
+            4509
+          ],
+          [
+            40651,
+            40660
+          ]
+        ],
+        "texts": [
+          "31 August",
+          "31 August"
+        ]
+      },
+      {
+        "excerpt": "aged 16",
+        "count": 2,
+        "offsets": [
+          [
+            6569,
+            6576
+          ],
+          [
+            42281,
+            42288
+          ]
+        ],
+        "texts": [
+          "aged 16",
+          "aged 16"
+        ]
+      },
+      {
+        "excerpt": "aged 19",
+        "count": 0,
+        "offsets": [],
+        "texts": []
+      }
+    ]
   },
   {
     "slot": "C11",
-    "url": "https://leedscitycollege.ac.uk/courses/t-level-accounting/",
-    "final_url": "https://leedscitycollege.ac.uk/courses/t-level-accounting/",
-    "retrieved_at": "2026-11-01T16:29:06.561130+00:00",
+    "url": "https://www.gov.uk/government/publications/introduction-of-t-levels/introduction-of-t-levels",
+    "final_url": "https://www.gov.uk/government/publications/introduction-of-t-levels/introduction-of-t-levels",
+    "retrieved_at": "2026-11-01T18:24:30.457297+00:00",
     "attempt": {
-      "status": "failed",
-      "reason": "robots_unreachable"
+      "status": "succeeded",
+      "reason": null
     },
-    "http_status": null,
-    "content_type": null,
-    "sha256": null,
-    "byte_count": null,
-    "rights_status": "pending human rights review",
-    "retention": null,
-    "extraction": null,
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "06095b9df361e27fa5826ae320331a0edb8dae9281797179c483a797605ff321",
+    "byte_count": 110438,
+    "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+    "retention": "body",
+    "extraction": "no_job_posting",
     "postings": [],
-    "kept_body": null
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": "var/evidence/corpus/C11/06095b9df361e27fa5826ae320331a0edb8dae9281797179c483a797605ff321.html",
+    "located": [
+      {
+        "excerpt": "industry placement",
+        "count": 32,
+        "offsets": [
+          [
+            4671,
+            4689
+          ],
+          [
+            7124,
+            7142
+          ],
+          [
+            9404,
+            9422
+          ],
+          [
+            10227,
+            10245
+          ],
+          [
+            10561,
+            10579
+          ]
+        ],
+        "texts": [
+          "industry placement",
+          "industry placement",
+          "industry placement",
+          "industry placement",
+          "industry placement"
+        ]
+      },
+      {
+        "excerpt": "45 days",
+        "count": 4,
+        "offsets": [
+          [
+            4728,
+            4735
+          ],
+          [
+            10403,
+            10410
+          ],
+          [
+            69934,
+            69941
+          ],
+          [
+            73748,
+            73755
+          ]
+        ],
+        "texts": [
+          "45 days",
+          "45 days",
+          "45 days",
+          "45 days"
+        ]
+      },
+      {
+        "excerpt": "2-year",
+        "count": 2,
+        "offsets": [
+          [
+            4143,
+            4149
+          ],
+          [
+            69348,
+            69354
+          ]
+        ],
+        "texts": [
+          "2-year",
+          "2-year"
+        ]
+      },
+      {
+        "excerpt": "16 to 19",
+        "count": 10,
+        "offsets": [
+          [
+            9602,
+            9610
+          ],
+          [
+            17576,
+            17584
+          ],
+          [
+            17645,
+            17653
+          ],
+          [
+            17896,
+            17904
+          ],
+          [
+            18004,
+            18012
+          ]
+        ],
+        "texts": [
+          "16 to 19",
+          "16 to 19",
+          "16 to 19",
+          "16 to 19",
+          "16 to 19"
+        ]
+      },
+      {
+        "excerpt": "equivalent to 3 A levels",
+        "count": 2,
+        "offsets": [
+          [
+            6176,
+            6200
+          ],
+          [
+            70635,
+            70659
+          ]
+        ],
+        "texts": [
+          "equivalent to 3 A levels",
+          "equivalent to 3 A levels"
+        ]
+      }
+    ]
   },
   {
     "slot": "C12",
     "url": "https://www.ucas.com/undergraduate/applying-to-university/undergraduate-key-dates-and-deadlines",
     "final_url": "https://www.ucas.com/undergraduate/applying-to-university/undergraduate-key-dates-and-deadlines",
-    "retrieved_at": "2026-11-01T16:29:06.563393+00:00",
+    "retrieved_at": "2026-11-01T18:24:35.138542+00:00",
     "attempt": {
       "status": "failed",
-      "reason": "robots_unreachable"
+      "reason": "http_error"
     },
-    "http_status": null,
+    "http_status": 404,
     "content_type": null,
     "sha256": null,
     "byte_count": null,
@@ -187,6 +837,8 @@
     "retention": null,
     "extraction": null,
     "postings": [],
+    "via_proxy": true,
+    "address_checked": false,
     "kept_body": null
   }
 ]
