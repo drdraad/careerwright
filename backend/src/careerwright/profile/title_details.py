@@ -76,11 +76,14 @@ def _titles(document: ProfileDocument) -> list[tuple[TitleUse, str]]:
 
 def _views(tx: Tx, workspace_id: uuid.UUID, document: ProfileDocument) -> list[TitleDetailsView]:
     """Each of the person's titles with its details (version 0 with none), the role first,
-    then the targets in their order, one per title as a concept."""
-    mine = _titles(document)
-    if not mine:
+    then the targets in their order, one per title as a concept. A title with no letters or
+    digits (punctuation or emoji alone) has no concept to keep details by, so it takes none:
+    a save for it is refused as `not_your_title`, as the slate skips it."""
+    given = _titles(document)
+    if not given:
         return []
-    keys = taxonomy_store.concept_keys(tx, [title for _, title in mine])
+    keys = taxonomy_store.concept_keys(tx, [title for _, title in given])
+    mine = [(use, title) for use, title in given if keys[title] != ""]
     held = {
         use: store.title_details(tx, workspace_id, use, [keys[t] for u, t in mine if u is use])
         for use in TitleUse
