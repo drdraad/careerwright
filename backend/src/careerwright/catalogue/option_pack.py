@@ -58,7 +58,7 @@ SCHEMA_PATH = PACKS_DIR / "england-option-pack.schema.json"
 PINS: dict[str, str] = {
     "0.1.0": "d7ff17d73a9b17b43529b5cbbe4349ef016f7268c4ac4c2a6a53a13f97e6a3d3",
     "0.2.0": "162d2773e295c7832ff3b311738bdd20d111538b15f1df49932fecfc82702a56",
-    "0.3.0": "47f968bbad257d854a7636dc4aa4c39533f91d864735233e6fbe36b684334e77",
+    "0.3.0": "b1167ff506c00b59821dfc8d122d66e3767c3e59e41a0e58c3d151329169f284",
 }
 
 SHA256 = r"^[0-9a-f]{64}$"

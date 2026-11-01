@@ -29,8 +29,12 @@ are labelled in pack 0.3.0 and wait for the school-leaver pack session.**
 - **Still unknown** (OI-14), never guessed: the apprentice's training fee (F04 names the
   government and the employer as payers, not what the apprentice pays) and the nursing
   degree's UCAS deadline. UCAS's dates page (C12, in `pending_slots`, class `other`, hash
-  and excerpts only) was fetched, but its located excerpts name the deadline's heading, not
-  its date, so it adds no claim.
+  and excerpts only) was fetched twice. The re-fetch found "13 Jan" beside the steps of its
+  2027 entry section, but its located excerpts don't show which step the date belongs to,
+  or its year, so it adds no claim. The product owner reads the date on the page at the
+  school-leaver pack session.
+- **The bursary is a programme, not a grant** (`funding:F10`): its pages don't say whether
+  a bursary is repaid, so no plan counts it as money.
 - **Which loans a September 2027 start gets:** courses starting on or after 1 January 2027
   take the Lifelong Learning Entitlement's loans (F12, "most undergraduate" courses);
   earlier ones the 2026 to 2027 caps (F05). Both are kept, each in its own record.
