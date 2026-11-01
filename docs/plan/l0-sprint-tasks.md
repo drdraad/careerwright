@@ -407,7 +407,7 @@ route search core), 12a (the stored planning inputs) and 13b (the search as a bo
 each integrated; Task 3b (live sessions ready on Muse Wonder), integrated; and Task 6d's
 slices A (facts instead of sentences; each target stored once) and B (the title flow over
 ESCO and the ONS index). **Held:** sessions 1, 2 and W1. The ledger
-(`.superpowers/sdd/l0-sprint-tasks/progress.md`) has every commit range and ruling.
+(`planning/progress.md`) has every commit range and ruling.
 
 **Finishing:** Task 6d slice C (seniority and industry, ESCO's list named as ESCO's, "not
 part of my job", pasted CV text deferred), in the main tree, built to dc68d79; its last
@@ -445,7 +445,7 @@ app before release." Its decisions 1 to 8 are all yes.
 - 1 November 2026, in their words: "NB: I don't want to over-rely on existing skills in the
   process. Many users will be final year school students who have never had a job before."
   A walk through the whole path as a Year 13 student with no job (the controller's
-  `.superpowers/sdd/l0-sprint-tasks/audit-no-job-yet.md`) found eight problems and ten
+  `planning/audit-no-job-yet.md`) found eight problems and ten
   decisions. They answered "A and B, not #10" (yes to decisions 1–9, no to 10) and approved
   where each fits ("go"). Plan v1.6 applies them: below, and in the specification's section
   22.
@@ -1042,7 +1042,7 @@ qualifications and commitments"), section 4 (the structured profile's "Work/stud
 credentials"; the adaptive conversational policy's opening question) and section 22 (the
 rows of 1 November 2026); ADR 0006 (the saved answers and the interview contract) and ADR
 0007 (the support policy); rulings R5, R11 and R14. The school-leaver walk
-(`.superpowers/sdd/l0-sprint-tasks/audit-no-job-yet.md`): findings 1, 3, 4 and 8, and its
+(`planning/audit-no-job-yet.md`): findings 1, 3, 4 and 8, and its
 section 2, rows 1, 3, 4 and 8.
 
 Who it serves: a final-year school student who has never had a job, and anyone between jobs,
@@ -1339,7 +1339,7 @@ Sprint cards: the corpus items of "Sprint 3", "Sprint 4" and "Sprint 5", and pla
 scheme's "residency and age rules", repayment terms), 11 (the M0 option pack) and 18; ADR
 0011 (a committed version never changes; a correction or a review is a new version with its
 own pin, loaded only through `load_pack`); rulings R3, R7, R9, R10 and R11. The school-leaver
-walk (`.superpowers/sdd/l0-sprint-tasks/audit-no-job-yet.md`), findings 2 and 6.
+walk (`planning/audit-no-job-yet.md`), findings 2 and 6.
 
 In two halves, as Tasks 7b and 7c ran: curate and label, then publish after the session.
 
@@ -1890,7 +1890,7 @@ v1.6 amends it) and "Sprint 6a Prove the optimiser and layers on instances that 
 sides or excluded from both; never count them twice") and 22 (the tuition fee loan row);
 ADR 0013 decisions 5 and 11 and ADR 0016 (the pruning rules and the oracle), as amended;
 Global Constraint 1. The school-leaver walk
-(`.superpowers/sdd/l0-sprint-tasks/audit-no-job-yet.md`), finding 2.
+(`planning/audit-no-job-yet.md`), finding 2.
 
 Why: a loan is never support today, so a degree's fee counts as the student's own spending
 and cash, and against a student's limits a degree would read "not feasible in this monthly
