@@ -83,10 +83,25 @@ class Exec(Exception):  # noqa: N818 - stands in for os.execvp, which never retu
     pass
 
 
+def mounts_file(tmp_path: Path, private: Path, kind: str | None) -> Path:
+    """A `/proc/mounts` listing with `private` mounted as `kind` (None: not mounted)."""
+    lines = ["overlay / overlay rw,relatime 0 0", "tmpfs /dev tmpfs rw,nosuid 0 0"]
+    if kind is not None:
+        lines.append(f"{kind} {private} {kind} rw,nosuid,nodev,noexec,relatime 0 0")
+    listing = tmp_path / "mounts"
+    listing.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return listing
+
+
 def started(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, euid: int = 0, mounted: bool = True
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    euid: int = 0,
+    mounted: str | None = "tmpfs",
 ) -> list[tuple[str, object]]:
-    """Run `main` with the process calls recorded instead of made."""
+    """Run `main` with the process calls recorded instead of made. `mounted`: the file
+    system type the private directory is mounted as, or None."""
     given = owner_only_tree(tmp_path / "host")
     private = private_dir(tmp_path)
     calls: list[tuple[str, object]] = []
@@ -104,7 +119,7 @@ def started(
     monkeypatch.setattr(entrypoint, "PRIVATE", private)
     monkeypatch.setattr(pwd, "getpwnam", getpwnam)
     monkeypatch.setattr(os, "geteuid", lambda: euid)
-    monkeypatch.setattr(os.path, "ismount", lambda path: mounted and path == private)
+    monkeypatch.setattr(entrypoint, "MOUNTS", mounts_file(tmp_path, private, mounted))
     monkeypatch.setattr(os, "setgroups", lambda groups: calls.append(("groups", groups)))
     monkeypatch.setattr(os, "setgid", lambda gid: calls.append(("gid", gid)))
     monkeypatch.setattr(os, "setuid", lambda uid: calls.append(("uid", uid)))
@@ -135,9 +150,11 @@ def test_it_drops_every_privilege_before_the_service_runs(
 @pytest.mark.parametrize(
     ("euid", "mounted", "argv", "reason"),
     [
-        (10001, True, ["python"], "must start as root"),
-        (0, False, ["python"], "is not a tmpfs mount"),
-        (0, True, [], "usage"),
+        (10001, "tmpfs", ["python"], "must start as root"),
+        (0, None, ["python"], "is not a tmpfs mount"),
+        # A disk volume or bind mount in the tmpfs's place would put the copies on disk.
+        (0, "ext4", ["python"], "is not a tmpfs mount"),
+        (0, "tmpfs", [], "usage"),
     ],
 )
 @pytest.mark.req("ACQ-05")
@@ -145,7 +162,7 @@ def test_it_refuses_to_start_rather_than_run_without_its_files_or_as_root(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     euid: int,
-    mounted: bool,
+    mounted: str | None,
     argv: list[str],
     reason: str,
 ) -> None:
@@ -156,3 +173,18 @@ def test_it_refuses_to_start_rather_than_run_without_its_files_or_as_root(
 
     assert [c for c in calls if c[0] in ("uid", "exec")] == []
     assert list((tmp_path / "private").iterdir()) == []
+
+
+@pytest.mark.req("ACQ-05")
+def test_only_the_mount_in_use_at_the_private_directory_counts(tmp_path: Path) -> None:
+    private = Path("/run/careerwright/private")
+    listing = tmp_path / "mounts"
+    listing.write_text(
+        "tmpfs /run/careerwright/private tmpfs rw 0 0\n"
+        "/dev/sda1 /run/careerwright/private ext4 rw 0 0\n"  # mounted over the tmpfs
+        "tmpfs /run/careerwright/private/inner tmpfs rw 0 0\n",
+        encoding="utf-8",
+    )
+    assert not entrypoint.is_tmpfs(private, listing)
+    assert entrypoint.is_tmpfs(private / "inner", listing)
+    assert not entrypoint.is_tmpfs(private.parent, listing)

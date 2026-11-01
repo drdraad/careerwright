@@ -178,7 +178,8 @@ owned by its service user, then drops to that user:
 - The backend services that need it (`migrate`, `api`, `worker`, `acquisition`) run as
   `user: root` with `python -m careerwright.entrypoint` as their entrypoint and a tmpfs at
   `/run/careerwright/private` (mode 0700, 1 MiB, `noexec,nosuid,nodev`). The entrypoint
-  refuses to run unless it is root and that path is a mount. It copies each regular file of
+  refuses to run unless it is root and that path is a tmpfs, as `/proc/mounts` lists the
+  mount in use there (a disk volume in its place is refused). It copies each regular file of
   `/run/secrets`, `/run/careerwright/keys` and `/run/careerwright/adzuna`, whichever the
   container has, to `/run/careerwright/private/<name>/` (files 0400, directories 0500,
   owned by `careerwright`), clears supplementary groups, sets the group, then the user,
@@ -197,19 +198,25 @@ own files, because it copies only what Compose gave it. The copies live in memor
 with the container: no value is printed, passed as an argument, put in the environment, an
 image layer or on disk. A restart (`make rotate-master-key` restarts the API and worker)
 copies afresh, so a new key version arrives as before. Root inside the container reads the
-bind mounts on Linux, under rootless Docker (where it is the host user) and on Docker
-Desktop, so the Mac keeps working.
+bind mounts on a rootful Linux Docker host: the stack tests ran there (the cloud host,
+2026-11-01). Two other set-ups should work by reasoning but were not tested: rootless Docker,
+where root inside is the host user, and Docker Desktop on the Mac, where root in its VM reads
+the shared folders. One set-up does not work: under `userns-remap`, root inside is mapped to
+another host uid, which cannot read the owner-only files. There the copy stops with a
+permission error and the container does not start, so it fails loudly, never quietly.
 
-**Rejected.** Compose's `uid`, `gid` and `mode` on a secret: for a file secret Compose has
-bind-mounted the file and ignored them, and they cannot cover the `keys/` directory, whose
-versions vary, so it would fix only half. Not proven on this Compose (v5.6.1): the Docker
-daemon was not running for this task. Making the host files group-readable, or `chown`ing
+**Rejected.** Compose's `uid`, `gid` and `mode` on a secret: Compose's documentation
+describes a file secret as a bind mount of the file, where these are not applied, and they
+cannot cover the `keys/` directory, whose versions vary, so it would fix only half. That
+the options are ignored was not tested here. Making the host files group-readable, or `chown`ing
 them to the container uids: that weakens the host's owner-only rule. Running the services
 as the host user's uid: on a root host that is root. A one-shot copy into a shared volume:
 a volume is on disk, and a tmpfs volume empties when its writer exits.
 
 **Consequences.** Compose's init (PID 1) and any `docker compose exec` or health check in
 those four containers now run as root, as PostgreSQL's always have; the service itself runs
-as `careerwright` with no supplementary group. `test_each_service_runs_as_its_own_user_holding_read_only_copies_of_its_own_files`
-checks the service's user, its groups and every copy's owner and mode;
-`tests/domain/test_container_entrypoint.py` checks the copy and the privilege drop.
+as `careerwright` with no supplementary group. Every container runs with
+`no-new-privileges` (review follow-up, 2026-11-01), so no setuid binary in an image can
+raise a process again; the drop from root (`setuid`, `gosu`) is unaffected. `test_each_service_runs_as_its_own_user_holding_read_only_copies_of_its_own_files`
+checks the service's user, its groups, `no-new-privileges` and every copy's owner and mode;
+`tests/domain/test_container_entrypoint.py` checks the copy, the tmpfs and the privilege drop.

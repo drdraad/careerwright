@@ -5,7 +5,9 @@ Configuration comes from the environment and files only. A Meta model is built w
 key the activity opened just in time; the fixture interviewer, query proposer and explainer
 (demo workspaces only) need no key and make no network call.
 
-Run: `python -m careerwright.worker`; health check: `python -m careerwright.worker --check`.
+Run: `python -m careerwright.worker`; health check: `python -m careerwright.worker --check`,
+or, without importing the worker (the container's check, which must answer within its
+timeout), `python -m careerwright.identity.heartbeat`.
 """
 
 import sys
@@ -23,7 +25,7 @@ from careerwright.evidence.acquisition import AcquisitionRuntime
 from careerwright.evidence.extraction_agent import PAGE_EXTRACTION_TASK
 from careerwright.evidence.search_agent import SOURCE_SEARCH_TASK
 from careerwright.evidence.service_client import HttpAcquisitionClient
-from careerwright.identity import connection_check, run_store, worker, workflow
+from careerwright.identity import connection_check, heartbeat, run_store, worker, workflow
 from careerwright.identity.activity import (
     CONNECTION_CHECK_TASK,
     ActivityRuntime,
@@ -120,7 +122,7 @@ def _utc_now() -> datetime:
 
 def main() -> None:
     if sys.argv[1:] == ["--check"]:
-        sys.exit(worker.check())
+        sys.exit(heartbeat.check())
     configure_logging("worker")
     settings = WorkerSettings()
     # Fail closed on an unusable model configuration before any work is accepted.

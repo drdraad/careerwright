@@ -22,12 +22,15 @@ from careerwright.evidence.corroboration import (
 from careerwright.evidence.fetcher import Fetcher
 from careerwright.evidence.pages import EXCERPT_CHARS, EXTRACTION_TEXT_BYTES, role_text
 from careerwright.evidence.records import AdvertiserKind, JobCopy, RightsClass
+from careerwright.evidence.role_research import pages_to_read
 from careerwright.evidence.search import (
     INSTRUCTIONS,
     MAX_PROMPT_BYTES,
     ROLE_INSTRUCTIONS,
     ROLE_PROMPT_VERSION,
     RoleSearchInput,
+    SearchCandidate,
+    SearchProposal,
     SearchPurpose,
     render_role_prompt,
     role_prompt_bytes,
@@ -101,6 +104,34 @@ def test_a_role_search_is_one_bounded_request_whose_candidates_are_checked_by_co
         ("https://jobs.board.example/ad/9", False),
     ]
     assert [e.reason for e in proposal.excluded] == ["source_not_permitted"]
+
+
+@pytest.mark.req("DIV1-15", "ACQ-06")
+def test_the_pages_to_read_leave_the_port_to_the_restricted_workers_own_check() -> None:
+    # As a job acquisition records its targets: a page on another port is still read, so the
+    # restricted worker's fetch check refuses it as a blocked attempt (on record, never "none
+    # found"), and a test server's port is read there. Anything not safe to record is dropped.
+    urls = [
+        "https://careers.northwind.example:8443/role",
+        "https://user:secret@jobs.board.example/role",
+        "https://10.0.0.1/role",
+        "https://growers.guild.example/role",
+        "https://careers.northwind.example:8443/role",
+    ]
+    proposal = SearchProposal(
+        purpose=SearchPurpose.ROLE_RESEARCH,
+        target=TITLE,
+        city="England",
+        candidates=[SearchCandidate(url=u, title="T", grounded=True) for u in urls],
+        excluded=[],
+        queries=[f"{TITLE} England"],
+        sources_seen=len(urls),
+    )
+
+    assert pages_to_read(proposal) == [
+        "https://careers.northwind.example:8443/role",
+        "https://growers.guild.example/role",
+    ]
 
 
 # --- the page's text: all of it, without personal details ---------------------------------

@@ -21,11 +21,17 @@ x-models: &models
   CAREERWRIGHT_META_PRODUCTION_MODEL: ${CAREERWRIGHT_META_PRODUCTION_MODEL:-muse-spark-1.3}
   CAREERWRIGHT_SYNTHETIC_MODEL_ROLE: ${CAREERWRIGHT_SYNTHETIC_MODEL_ROLE:-test}
 
+# No process in any container may gain privileges through a setuid or file-capability
+# binary. Dropping from root to the service user (setuid, gosu) is unaffected.
+x-no-new-privileges: &no-new-privileges
+  - no-new-privileges:true
+
 # One backend image; only `migrate` declares the build so parallel builds cannot race.
 x-backend: &backend
   image: careerwright-l0/backend:local
   networks: [internal]
   init: true
+  security_opt: *no-new-privileges
 
 # A backend service given secrets or a host directory (ADR 0004, amendment 2026-11-01). On a
 # Linux host those keep their owner-only host permissions, which the service user (uid 10001)
@@ -46,6 +52,7 @@ services:
     # private directory for the postgres user (ADR 0004, amendment 2026-11-01).
     entrypoint: ["bash", "/careerwright/entrypoint.sh"]
     command: ["postgres"]
+    security_opt: *no-new-privileges
     environment:
       POSTGRES_PASSWORD_FILE: /run/careerwright/private/secrets/pg_superuser
     secrets: [pg_superuser, pg_migrator, pg_api, pg_worker, pg_dbos_owner, pg_dbos_runtime]
@@ -69,6 +76,7 @@ services:
     build: ./docker/auth
     networks: [internal]
     init: true
+    security_opt: *no-new-privileges
     stop_grace_period: 5s
 
   migrate:
@@ -148,7 +156,8 @@ services:
     # The worker exits within its own shutdown deadline; Docker kills it after this grace.
     stop_grace_period: 15s
     healthcheck:
-      test: ["CMD", "python", "-m", "careerwright.worker", "--check"]
+      # Standard library only: importing the worker itself can outlast the timeout.
+      test: ["CMD", "python", "-m", "careerwright.identity.heartbeat"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -202,6 +211,7 @@ services:
     image: careerwright-l0/web:local
     networks: [internal]
     init: true
+    security_opt: *no-new-privileges
     environment:
       CAREERWRIGHT_API_INTERNAL_URL: http://api:8000
       CAREERWRIGHT_AUTH_EMULATOR_URL: http://127.0.0.1:${CAREERWRIGHT_AUTH_PORT:-59099}

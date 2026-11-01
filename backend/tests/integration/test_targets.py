@@ -153,6 +153,8 @@ def test_a_chosen_occupation_is_stored_with_the_choice_and_the_pack_target_it_co
         "label_matches": 1,
         "coverage": "pack_target",
         "pack_target_id": "registered-nurse-manchester",
+        # Task 6e fix round 1 (review M2): chosen from ESCO, so a list holds the title.
+        "on_a_list": True,
     }
     # The pack's title: Skills seeds it through the crosswalk, but ESCO itself names no
     # occupation for it, so the slate and the sketch join nothing to it.

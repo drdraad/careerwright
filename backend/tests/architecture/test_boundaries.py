@@ -391,6 +391,15 @@ def test_the_acquisition_worker_cannot_reach_a_database_key_model_or_profile() -
     assert forbidden == []
 
 
+@pytest.mark.req("ARC1-08")
+def test_the_worker_s_health_check_imports_nothing_but_the_standard_library() -> None:
+    # The container's health check must answer within its timeout: importing the worker
+    # (DBOS, Pydantic AI, every run kind) outlasted it on a Linux Docker host.
+    reached, vendors = import_closure("careerwright.identity.heartbeat")
+
+    assert (reached, vendors) == ({"careerwright.identity.heartbeat"}, set())
+
+
 @pytest.mark.req("ACQ-05")
 def test_the_acquisition_worker_has_no_setting_for_a_database_key_or_model() -> None:
     from careerwright.acquisition import AcquisitionSettings

@@ -98,6 +98,8 @@ def test_every_call_the_worker_made_is_ledgered_even_after_the_poll_gave_up(
     )
     models = ModelChoice.configure(TEST_MODEL, "muse-spark-1.3", "test")
     try:
+        # The sleeps below time a running worker's calls, not its start (seconds on a slow host).
+        worker.wait_ready()
         result = smoke(
             IntegrationTarget(infra, api.http, worker),
             SecretStr(f"sk-smoke-{secrets.token_urlsafe(32)}"),
@@ -153,6 +155,7 @@ def test_a_worker_that_cannot_be_stopped_still_leaves_every_possible_call_ledger
     )
     models = ModelChoice.configure(TEST_MODEL, "muse-spark-1.3", "test")
     try:
+        worker.wait_ready()  # as above: the sleep times a running worker's calls
         with pytest.raises(raised) as stopped:
             smoke(
                 UnstoppableTarget(infra, api.http, worker, failure=failure),

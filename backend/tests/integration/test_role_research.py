@@ -245,12 +245,22 @@ def test_one_source_leaves_it_not_yet_found_in_independent_sources(
 
 @pytest.mark.req("DIV1-15")
 @pytest.mark.parametrize(
-    ("paths", "reason", "unread"),
+    ("paths", "state", "reason", "reading", "unread"),
     [
-        ([("growers.guild.example", "/role/instructing")], "not_on_any_page", 0),
+        (
+            [("growers.guild.example", "/role/instructing")],
+            "not_yet_found",
+            "not_on_any_page",
+            ("complete", None),
+            0,
+        ),
+        # No page read: the acquisition run fails, never an empty success
+        # (`acquisition.publish_acquisition`), so the reading stopped before it could say.
         (
             [("growers.guild.example", "/role/missing"), ("jobs.board.example", "/role/missing")],
-            "pages_unread",
+            "reading_stopped",
+            None,
+            ("failed", "retrieval_failed"),
             2,
         ),
         (
@@ -258,7 +268,9 @@ def test_one_source_leaves_it_not_yet_found_in_independent_sources(
                 ("growers.guild.example", "/role/instructing"),
                 ("jobs.board.example", "/role/missing"),
             ],
+            "not_yet_found",
             "pages_unread",
+            ("complete", None),
             1,
         ),
     ],
@@ -272,16 +284,19 @@ def test_a_page_that_could_not_be_read_is_never_a_page_without_the_title(
     service_url: str,
     tmp_path: Path,
     paths: list[tuple[str, str]],
-    reason: str,
+    state: str,
+    reason: str | None,
+    reading: tuple[str, str | None],
     unread: int,
 ) -> None:
     # The first live run (2026-11-01): every page failed, and the result said "not on any page".
-    # A missing page answers 404, so its reading fails and the run still completes.
+    # A missing page answers 404, so its reading fails; the run completes if any page was read.
     scenario = make_scenario(infra, api, ada, tmp_path)
     shown = research_of(infra, api, scenario, sources, service_url, tmp_path, paths)
 
-    assert (shown["state"], shown["not_yet_found_reason"]) == ("not_yet_found", reason)
-    assert (shown["sources"], shown["reading"]["status"]) == (0, "complete")
+    assert (shown["state"], shown["not_yet_found_reason"]) == (state, reason)
+    assert shown["sources"] == 0
+    assert (shown["reading"]["status"], shown["reading"]["failure_class"]) == reading
     not_read = [p for p in shown["pages"] if p["title_verified"] is None]
     assert [(p["status"], p["reason"]) for p in not_read] == [("failed", "http_error")] * unread
 

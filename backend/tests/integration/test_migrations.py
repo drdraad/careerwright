@@ -643,11 +643,14 @@ def test_0040_gives_every_stored_profile_both_new_answers_not_yet_asked(infra: I
     }
     try:
         migrate_app(engine, "0039")
+        owner = INVITED_ACTORS[0]
         with engine.begin() as tx:
+            # A fresh database holds no actor: the workspace's owner is invited first.
+            identity_store.upsert_actor(tx, owner.actor_id, owner.email, owner.display_name)
             workspace = identity_store.insert_workspace(
                 tx,
                 workspace_id=uuid.uuid4(),
-                owner_actor_id=INVITED_ACTORS[0].actor_id,
+                owner_actor_id=owner.actor_id,
                 name="Saved before schema 4 (synthetic)",
                 data_mode=DataMode.DEMO,
                 synthetic=True,
