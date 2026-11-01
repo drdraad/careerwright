@@ -300,9 +300,10 @@ def test_the_acquisition_worker_holds_no_database_secret_master_key_or_model_key
     acquisition = _inspect(demo_stack, "acquisition")
     worker = _inspect(demo_stack, "worker")
 
-    mounts = {m["Destination"] for m in acquisition["Mounts"]}
-    assert mounts == {"/run/careerwright/adzuna"}
-    assert all(m["RW"] is False for m in acquisition["Mounts"])
+    # Its in-memory private directory holds copies of what it was given, nothing more.
+    host_mounts = [m for m in acquisition["Mounts"] if m["Type"] != "tmpfs"]
+    assert {m["Destination"] for m in host_mounts} == {"/run/careerwright/adzuna"}
+    assert all(m["RW"] is False for m in host_mounts)
     names = {entry.partition("=")[0] for entry in acquisition["Config"]["Env"]}
     assert not {n for n in names if "DATABASE" in n or "MASTER_KEY" in n or "META" in n}
     assert demo_stack.exec("acquisition", "ls", "/run/secrets").returncode != 0
@@ -389,7 +390,66 @@ def test_no_database_password_or_master_key_value_is_anywhere_in_the_acquisition
     assert acquisition["files"] > 1_000  # it searched the whole filesystem
     assert acquisition["hits"] == []
     assert not any(n in environment for n in needles)
-    assert {"/run/secrets/pg_worker", "/run/careerwright/keys/v1.key"} <= set(worker["hits"])
+    assert {
+        "/run/secrets/pg_worker",
+        "/run/careerwright/keys/v1.key",
+        # The copies the worker reads (ADR 0004, amendment 2026-11-01).
+        "/run/careerwright/private/secrets/pg_worker",
+        "/run/careerwright/private/keys/v1.key",
+    } <= set(worker["hits"])
+
+
+# Runs inside a container as root: for each service process, its user IDs; for each private
+# copy, its owner and mode. Prints names and numbers only, never a file's content.
+PRIVATE_VIEW = """
+import json, os
+service = []
+for pid in filter(str.isdigit, os.listdir('/proc')):
+    try:
+        with open(f'/proc/{pid}/status') as f:
+            status = {k: v.strip() for k, _, v in (line.partition(':') for line in f)}
+    except OSError:
+        continue
+    if status.get('PPid') == '1':  # the service, under Compose's init; never an exec'd check
+        service.append({'uid': sorted(set(status['Uid'].split())), 'groups': status['Groups']})
+private = '/run/careerwright/private'
+files = {}
+for root, dirs, names in os.walk(private):
+    for path in [root, *(os.path.join(root, n) for n in names)]:
+        info = os.stat(path)
+        files[os.path.relpath(path, private)] = [info.st_uid, oct(info.st_mode & 0o777)]
+print(json.dumps({'service': service, 'files': files}))
+"""
+
+
+@pytest.mark.req("MODEL-05", "ACQ-05")
+def test_each_service_runs_as_its_own_user_holding_read_only_copies_of_its_own_files(
+    demo_stack: Stack,
+) -> None:
+    # On a Linux host the secrets and keys stay owner-only on the host. Each container starts
+    # as root just long enough to copy what it was given into memory for its service user,
+    # then drops to that user (ADR 0004, amendment 2026-11-01). The acquisition worker was
+    # given no secret and no key, so it holds a copy of neither.
+    home = demo_stack.home
+    keys = [f"keys/{p.name}" for p in sorted((home / "keys").iterdir())]
+    adzuna = [f"adzuna/{p.name}" for p in sorted((home / "adzuna").iterdir())]
+    given = {
+        "api": ["secrets", "secrets/pg_api", "keys", *keys],
+        "worker": ["secrets", "secrets/pg_worker", "secrets/pg_dbos_runtime", "keys", *keys],
+        "acquisition": ["adzuna", *adzuna],
+    }
+    directory, copy = [10001, "0o500"], [10001, "0o400"]
+
+    for service, names in given.items():
+        view = json.loads(demo_stack.exec(service, "python", "-c", PRIVATE_VIEW).stdout)
+
+        assert view["service"] == [{"uid": ["10001"], "groups": ""}], service
+        assert view["files"] == {
+            ".": directory,
+            **{name: directory if "/" not in name else copy for name in names},
+        }, service
+    for path in (home / "secrets", home / "keys", *(home / "secrets").iterdir()):
+        assert path.stat().st_mode & 0o077 == 0  # still owner-only on the host
 
 
 @pytest.mark.req("ARC1-08")

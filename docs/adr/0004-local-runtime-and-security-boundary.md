@@ -157,9 +157,59 @@ records how they are realised, and the choices a later task must not undo silent
 
 - Not done in Task 3: run cancellation (DUR-05, with the solver in T13), workflow-history
   deletion (DUR-06), backup and restore (SEC-07), the web app and generated TypeScript client
-  (Task 4), Linux/amd64 hosts (Compose secrets are bind mounts whose permissions differ on
-  Linux; unverified).
+  (Task 4). Linux hosts: see the amendment of 2026-11-01.
 - Changing the activity's step sequence needs a new DBOS `application_version`
   (`careerwright-l0-1`) and a drain of in-flight runs (ADR 0002 decision 9).
 - A later run kind that handles profile data must keep the minimum-data rule (spec section
   19) and extend the leak scans with that data's sentinels.
+
+## Amendment, 2026-11-01 (the stack on a Linux Docker host; the product owner's yes)
+
+**Problem.** Compose file secrets and the `keys/` and `adzuna/` directories are bind mounts
+of `CAREERWRIGHT_HOME`, which `make setup` makes owner-only (0600 files, 0700 directories).
+On Linux a bind mount keeps the host owner and mode, so the service users (postgres, uid
+999; the backend's `careerwright`, uid 10001) could not read them, and every integration and
+stack test failed at setup. Docker Desktop for Mac hides host ownership, so it never showed.
+
+**Decision.** Each container that is given secrets or a host directory starts as root just
+long enough to copy exactly what it was given into a container-private in-memory directory
+owned by its service user, then drops to that user:
+
+- The backend services that need it (`migrate`, `api`, `worker`, `acquisition`) run as
+  `user: root` with `python -m careerwright.entrypoint` as their entrypoint and a tmpfs at
+  `/run/careerwright/private` (mode 0700, 1 MiB, `noexec,nosuid,nodev`). The entrypoint
+  refuses to run unless it is root and that path is a mount. It copies each regular file of
+  `/run/secrets`, `/run/careerwright/keys` and `/run/careerwright/adzuna`, whichever the
+  container has, to `/run/careerwright/private/<name>/` (files 0400, directories 0500,
+  owned by `careerwright`), clears supplementary groups, sets the group, then the user,
+  sets `HOME` as Docker would, and `exec`s the service's command. Standard library only.
+- PostgreSQL runs `docker/postgres/entrypoint.sh` (mounted read-only) as root first. It
+  copies the secrets for the postgres user the same way, then `exec`s the image's own
+  `docker-entrypoint.sh`, which drops to postgres as before. `POSTGRES_PASSWORD_FILE` and
+  the init script read the copies.
+- Every `*_PASSWORD_FILE`, `CAREERWRIGHT_MASTER_KEY_DIR` and
+  `CAREERWRIGHT_ADZUNA_CREDENTIALS_DIR` points at the copy. The bind mounts, the Compose
+  secrets and which container gets which are unchanged. `edge` and `web` are unchanged.
+
+**Why this way.** The host keeps its meaning: owner-only files, and `check_permissions`
+unchanged; nothing becomes group- or world-readable. Each container still holds only its
+own files, because it copies only what Compose gave it. The copies live in memory and go
+with the container: no value is printed, passed as an argument, put in the environment, an
+image layer or on disk. A restart (`make rotate-master-key` restarts the API and worker)
+copies afresh, so a new key version arrives as before. Root inside the container reads the
+bind mounts on Linux, under rootless Docker (where it is the host user) and on Docker
+Desktop, so the Mac keeps working.
+
+**Rejected.** Compose's `uid`, `gid` and `mode` on a secret: for a file secret Compose has
+bind-mounted the file and ignored them, and they cannot cover the `keys/` directory, whose
+versions vary, so it would fix only half. Not proven on this Compose (v5.6.1): the Docker
+daemon was not running for this task. Making the host files group-readable, or `chown`ing
+them to the container uids: that weakens the host's owner-only rule. Running the services
+as the host user's uid: on a root host that is root. A one-shot copy into a shared volume:
+a volume is on disk, and a tmpfs volume empties when its writer exits.
+
+**Consequences.** Compose's init (PID 1) and any `docker compose exec` or health check in
+those four containers now run as root, as PostgreSQL's always have; the service itself runs
+as `careerwright` with no supplementary group. `test_each_service_runs_as_its_own_user_holding_read_only_copies_of_its_own_files`
+checks the service's user, its groups and every copy's owner and mode;
+`tests/domain/test_container_entrypoint.py` checks the copy and the privilege drop.
