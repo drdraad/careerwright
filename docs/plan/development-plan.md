@@ -28,49 +28,7 @@ The earlier ten-day private-beta target is not adopted. The current instruction 
 
 Scope and architecture come first, followed by the design contract, sprint roadmap, detailed sprint cards, test strategy and release checklist. Each sprint card identifies deliverables, acceptance evidence and its coherence review. Keep the source specification alongside this plan for complete domain definitions.
 
-**Version 1.1 (28 October 2026)** applies the L0 assessment handover written after Sprints 0–2 (`docs/plan/l0-assessment-handover.md`), with its decisions D1–D3 confirmed by the product owner and recorded in ADR 0008. Human review becomes a scheduled resource with three sessions (sections 6 and 10). The required corpus becomes a reviewed England option pack (section 9). The remaining work follows the critical chain, and Sprint 6 is split into 6a and 6b (section 6). One formative comprehension session follows Sprint 5 (section 5). Adzuna stays optional (Sprint 3) and two risks are added (section 12). Sprint 2 gains the span-cited explanation the specification now permits (S2.7). Scope is otherwise unchanged: the dendrite, the three Pareto layers and the sliders all stay; only their order changes.
-
-**Version 1.2 (29 October 2026)** applies an intermediate code review held after the Sprint 3 acquisition core (`docs/reviews/intermediate-code-review-2026-10-29.md`; ADR 0008, amendment). Scope and architecture are unchanged. Four changes:
-
-1. A focused cancellation lock-order correction, with a concurrent regression test, runs right after the Sprint 3 backend and before the option pack (section 6).
-2. Real evidence is the next proof of progress. From the option pack to review session 2, the chain (option pack → Sprint 4 backend → Sprint 5 backend → session 2) takes priority. Infrastructure polish that no failing check or reproduced defect requires is listed for the final review instead. The option pack also reports an early, unreviewed accuracy read on its development split.
-3. Language rules (the support screen, explanation validation, redaction, and the pay, date and work-mode readers) grow only for a reproduced defect or an evaluation failure. A fail-safe outcome (unknown, unclear, not kept) is preferred to a new pattern. Safeguards and accepted limitations stay as recorded (section 12).
-4. Review session 2 also holds Sprint 2's design review, which tests scanning, understanding and choosing. Its findings are applied before more interface detail is added (sections 6 and 10).
-
-**Version 1.3 (29 October 2026)** adds Sprint 10 at the product owner's request: an operator's manual, written by doing every task it describes in the built product. Friction points found along the way are logged. Those a small change can smooth are fixed in the sprint. A larger refactor for user experience is put to the product owner only when there is high conviction that its benefit outweighs its cost. Nothing else changes.
-
-**Version 1.4 (30 October 2026)** applies the product owner's experience direction, given after review session 2 (ADR 0014). Careerwright becomes one living world in which the six chapters are places, not pages (section 4, rewritten). It replaces the calm observatory of the specification's art direction and lifts the visual scope limits of section 1. A new Sprint W builds the world before more chapter interfaces: a spike of three directions, session W1 to choose one, new design references, the world in the app with the You chapter rebuilt, and session W2 to judge it (sections 6 and 10). The review rubric gains three questions (section 5). The estimate grows by 13–16 engineering days and about two hours of the product owner's time. The domain, the numbers and the integrity rules are unchanged.
-
-**Version 1.5 (31 October 2026)** applies the whole-solution audit the product owner asked for (`docs/reviews/l0-audit-2026-10-31.md`; ADR 0008, amendment of 2026-10-31). They approved it on 31 October 2026: "Approved - proceed. Where subagent work can be done cleanly in parallel, do so but coordinate well to avoid them causing conflicts. Yes, I have 5 people who can try the app before release." Their directions, in their words:
-
-- "The visuals are important, but they must be subservient to having a practical, useful product."
-- "I want to check that the development plan is still sensible, and get us back on track with the sprints, even if we have to refactor some of them to ensure coherency and pragmatism."
-- "One thing that is really important to me is that we aren't limited to a prefilled list of roles - the real world is much more complex than those standardised job lists, and I want to avoid the frustration of your ideal job not appearing as an option to select. This is where deep research and LLMs have a part to play to fill out the "role space" more fully. I want it to feel like you have an omniscient career coach who knows all possible jobs that could fit you."
-- "We can also start being a bit more generous with token use in human testing - I would like to use muse wonder for this."
-
-The changes:
-
-1. **The decision path first.** Skills, Options, Routes and Plan come next, built plainly in the world as it stands, to Sprint W's design references. Each chapter's moment moves to a new Sprint M, after the path works (sections 4 and 6). Sprint W closes at the world shell, the You chapter and the deterministic sources.
-2. **Roles beyond a fixed list** (ADR 0015). Sprint 2 gains S2.8 (your title, recognised: ESCO, the ONS coding index and the person's own words) and S2.9 (research this role), before session W2 and Skills.
-3. **Options for any target.** Sprint 5's stored planning inputs become a backend slice of their own, before the Options chapter, and the chapter gains "add an option yourself" (S5.7). Sprint 3 gains option research for any target (S3.7), after the Plan chapter. Such options are proposed records marked not reviewed, and a route built on one is qualified.
-4. **Live sessions on Muse Wonder** for the product owner (S1.6): qualified first, started by a session command, capped and ledgered, with a spending line in the app. Spark stays the release default.
-5. **Shorter sessions.** Session W2 becomes a short first look (about 30 minutes, live, about five questions, no score threshold). Session 3 merges into one end-to-end session after Sprint 8 (about 1 hour). "Every category at least 4" stays the bar for release (sections 5 and 10).
-6. **A new order** (section 6). Backend work never waits for a session. Sprints 7 and 8 lose the session 3 gate. Roles comes after the end-to-end session.
-7. **Shorter review loops** and up to two implementers at once (task file, rulings R11 to R15).
-8. The remaining work is sized in agent hours (section 6), the L0 deferrals are listed (section 1), and the risk register is corrected (section 12).
-
-The domain, the numbers and the integrity rules are unchanged.
-
-**Version 1.6 (1 November 2026)** applies the product owner's school-leaver decisions. On 1 November 2026 they said: "NB: I don't want to over-rely on existing skills in the process. Many users will be final year school students who have never had a job before." A walk through the whole path as a Year 13 student with no job found eight problems and ten decisions. They answered yes to the first nine and no to the tenth ("A and B, not #10"), and approved where each fits ("go"). The changes:
-
-1. **School students aged 17 and 18 are in scope** (section 1). The release checks the rules for young people's data before any real student uses Careerwright (Sprint 9).
-2. **No job yet** (S2.10). The first question takes "I haven't had a job yet", two optional answers hold what the person is doing now and their qualifications, the conversation opens without asking for a job, and the calm support panel adds Childline. A synthetic school leaver joins the evaluation cases and session W2's people (with S2.9).
-3. **A tuition fee loan paid straight to the university is a loan to repay,** not the student's own spending (Sprint 5). This is the one planning rule that changes, for L0 only.
-4. **A route longer than 24 months says so plainly,** with no planning change (section 1; Sprint 7).
-5. **A reviewed school-leaver version of the option pack** (section 9), with one short review session (section 10).
-6. Hours that change on a date ("free from September") are a known limit, not built (section 1).
-
-Section 6 gives the order. The specification's revision record (section 22) records how L0 applies these. The other numbers and integrity rules are unchanged.
+Each version's changes, from v1.1 to v1.6, are in the "Revision history" at the end of this plan, with the earlier orders of work. Section 6 gives the current order.
 
 # 1 The local delivery boundary
 
@@ -322,59 +280,7 @@ Begin source curation in Sprint 0 and complete the required corpus across Sprint
 
 The critical chain is validated inputs → evidence and outcomes → monthly feasibility → solver/archive → coordinated comparison → immutable exports. Visual exploration and data labelling can proceed alongside that chain with explicit contracts. An unresolved blocker affects dependent work, while independent design, fixtures and pure-domain tasks can continue.
 
-**Order of the remaining work (v1.1).** The backend slices of Sprints 4 and 5 run before the Roles chapter UI, because in L0 the dendrite has no live vacancy data and every role is unscored: the Roles chapter is requested and stays in scope, but it does not feed the chain. After Sprint 2, work proceeds in this order:
-
-1. Sprint 2 addition S2.7, then the Sprint 0–1 visual corrections.
-2. Sprint 3 acquisition backend (S3.1–S3.4 and the reduced S3.6), then the cancellation lock-order correction (v1.2).
-3. The England option pack (section 9).
-4. Sprint 4 backend, then Sprint 5 backend.
-5. Review session 2, then the reviewed option pack published from its record.
-6. Session 2's Sprint 2 design findings applied, then Sprint 4 Skills chapter and review, then Sprint 5 Options chapter and review.
-7. Sprint 3 Roles chapter (S3.5), job scoring and review, after review session 1.
-8. Sprints 6a, 6b, 7 (closing after review session 3), 8, 9 and 10.
-
-**Order from here (v1.4).** Steps 1–5 are done, through review session 2. Step 6's design findings now belong to Sprint W, which comes before any more chapter interface:
-
-1. Sprint W's spike, then session W1, where the product owner chooses a direction.
-2. The reviewed option pack published from session 2's record (it may run while session W1 is awaited).
-3. The rest of Sprint W, then session W2, the product owner's review of the world.
-4. Sprint 4 Skills chapter and review, then Sprint 5 Options chapter and review, built in the world.
-5. Sprint 3 Roles chapter (S3.5), job scoring and review, after review session 1.
-6. Sprints 6a, 6b, 7 (closing after review session 3), 8, 9 and 10.
-
-Backend work (the option pack, Sprints 6a and 6b) may fill any wait for a session. Interface work waits for session W2.
-
-**Order from here (v1.5).** The v1.4 list above stays as history. The audit of 31 October 2026 found the decision path waiting behind the world's spectacle, and the product owner approved this order on 31 October 2026. Each step names its task in the task file; agent hours are the audit's estimates, review included.
-
-| # | Work | Sprint | Waits for | Agent hours |
-|---|---|---|---|---|
-| 0 | The approved changes applied to the plan, the task file, the register, the ADRs and `CLAUDE.md` | — | the product owner's yes (given) | 1 |
-| 1 | Finish the You chapter: the pending re-review; the demo interviewer unblocked; a chosen target confirmed, not "out of date"; shared skills named and the unexpected connection shown (done; from 1 November 2026 a plain line, never a revelation); on a phone the decision first; the "England only" line; the demo route preview out of the person's path; the Sprint W review | W | — | 5–9 |
-| 2 | Your title, recognised: titles from ESCO and the ONS coding index, the person's own words always kept, each target stored once with its occupation, source and coverage, optional seniority and industry | 2 (S2.8) | 1 | 5–10 |
-| 3 | Live sessions ready: Muse Wonder qualified, a session command with caps, a spending line in the app, each session's calls copied into the cost ledger, the first live run of the real-data path through the app | 1 (S1.6) | — | 3–6 |
-| 4 | Research this role, for a title no list holds | 2 (S2.9) | 2, 3 | 8–15 |
-| 5 | Session W2, short: about 30 minutes, live, on Muse Wonder; the product owner uses the You chapter, roles included, and answers about five questions; no score threshold | W | 1–4 | the product owner's time |
-| 6 | Planning inputs, stored and confirmed (backend): income, cash, living costs, reserve, commitments, debts, availability; work rights and remote working | 5 (S5.3, S5.4 inputs) | 7's core (it runs in the worktree track during session W2) | 3–6 |
-| 7 | Route search core: the exact search, the independent check, the three layers, measured sizes; its durable add-ons sized from these measurements | 6a, 6b | — for the core (running now); 6 for the durable add-ons | 5–10 (+2–8) |
-| 8 | Skills, for any target: what the occupation lists, labelled as such; what the person's chosen adverts ask for; evidence questions; readiness where a reviewed rubric exists, and "not assessed yet, here's what it asks" elsewhere | 4 | 5, 2 | 8–14 |
-| 9 | Options: the review checkpoint, collecting step 6's inputs, and "add an option yourself", saved as not reviewed | 5 (S5.3, S5.7) | 6, 8 | 7–12 |
-| 10 | Routes: real computed routes in plain words; routes built on options that aren't reviewed say so | 7 | 7, 9 | 8–14 |
-| 11 | Plan: first the snapshot, the Plan chapter, print, JSON and calendar; then revise and replan, with the answers' revision history | 8 | 10 | 6–10 |
-| 12 | The end-to-end session (about 1 hour; replaces session 3): from You to a printed plan; formative scores; the product owner chooses which moments to build | — | 11 | the product owner's time |
-| 13 | Find options for this role: live research of courses and funding for any target, as records marked not reviewed | 3 (S3.7) | 11 | 8–15 |
-| 14 | Roles: the opportunity map, real listings, role cards with "not enough evidence yet" outlooks; one plain line instead of pay and AI filters | 3 (S3.5) | 11, 12 | 6–10 |
-| 15 | The moments, in the product owner's order, each on a set budget; the frame re-measure, with the product owner warned before any window opens | M | 12, 14 | 6–12 |
-| 16 | Release qualification, the operator's manual and the final review; every review score at least 4 stays the release bar | 9, 10 | all | 8–16 |
-
-The rows sum to about 89–168 agent hours (the report quoted 80–150), about one to two weeks of continuous build, plus about 1½ hours of the product owner's sessions and the release checks. History says ±30%.
-
-- Backend work never waits for a session: steps 6 and 7, and step 13's research backend, may run while a session is awaited. Chapter interfaces wait for session W2.
-- Up to two implementers run at once, on disjoint modules (the product owner's approval of 31 October 2026; task file ruling R15). Each task card says which tasks it may overlap.
-- The backend steps run in one worktree track, one task at a time, each started after the last is integrated: step 7's core (Task 13a), then step 6 (Task 12a), then step 7's durable add-ons (Task 13b). Step 6 changes the planning rules that the core's independent check and the durable search read, so none of the three overlaps another. Step 6 may overlap steps 1 to 4 in the main tree; Options and Routes (steps 9 and 10) never overlap the durable add-ons, because all three change the planning module.
-- Roles stays after the decision path because routes don't need it. The reason v1.1 gave, that the dendrite has no live vacancy data, no longer holds: the Adzuna credentials exist and the free-tier integration was qualified live in Sprint 3.
-- The end-to-end session may offer the product owner a smaller L0 if time matters by then (the audit's shape C: the opportunity map and replanning moved to the next milestone). That would need a specification change, and nothing is cut until they say so.
-
-**Order from here (v1.6, 1 November 2026).** The v1.5 table above stays; its steps 0, 1, 3, 6 and 7 are done, and step 2 is in its last slice. The product owner's school-leaver decisions (the v1.6 note under "How to use this plan") add three steps and lines on later ones, and they approved where each fits ("go"):
+**Order from here (v1.6, 1 November 2026).** The v1.5 table (in the "Revision history" at the end) gives each step's scope and agent hours; its steps 0, 1, 3, 6 and 7 are done, and step 2 is in its last slice. The product owner's school-leaver decisions (the v1.6 note in the "Revision history" at the end) add three steps and lines on later ones, and they approved where each fits ("go"):
 
 - **The main tree:** your title, recognised (its last slice) → **no job yet** (S2.10; Task 6f; about 15–20 agent hours) → research this role, which also adds the synthetic school leaver and her evaluation cases (Task 6e; about 2–3 hours more) → session W2 → Skills → Options → Routes → Plan → the end-to-end session → find options for this role → Roles → the moments → release.
 - **The worktree, beside it:** **a tuition fee loan is a loan to repay** (Sprint 5; Task 12c; about 8–12 hours; it may start beside no job yet) → **the school-leaver option pack** (section 9; Task 7f; about 6–10 hours and one short review session with the product owner). Options waits for both, and Routes for the loan. The loan never runs beside Options or Routes, which change the planning module too.
@@ -383,7 +289,13 @@ The rows sum to about 89–168 agent hours (the report quoted 80–150), about o
 
 The new work sums to about 42–65 agent hours by the walk's row estimates (its summary quoted 35 to 55), plus the one short review session.
 
-Review session 1 can be held at any point before the Roles chapter; held before the option pack is curated, it lets the pack's pages be classified against its rights policy rather than left pending human review. Each sprint's review is written when its last slice finishes, so the Sprint 3 review follows those of Sprints 4 and 5. Until v1.5 one implementer ran at a time, so slices without a dependency on each other ran one after the other, in either order. From v1.5 up to two run at once, as each task card's Parallel line allows (task file, ruling R15).
+Still in force from the v1.5 order (its step numbers are the v1.5 table's, in the "Revision history"):
+
+- Backend work never waits for a session: steps 6 and 7, and step 13's research backend, may run while a session is awaited. Chapter interfaces wait for session W2.
+- Roles stays after the decision path because routes don't need it. The reason v1.1 gave, that the dendrite has no live vacancy data, no longer holds: the Adzuna credentials exist and the free-tier integration was qualified live in Sprint 3.
+- The end-to-end session may offer the product owner a smaller L0 if time matters by then (the audit's shape C: the opportunity map and replanning moved to the next milestone). That would need a specification change, and nothing is cut until they say so.
+
+Each sprint's review is written when its last slice finishes, so the Sprint 3 review follows those of Sprints 4 and 5.
 
 **Human review sessions.** Human review is a scheduled resource, not an event between sprints. From v1.5 the fixed sessions are 1, 2 and W1 (held), session W2 (a short first look) and the end-to-end session, which replaces session 3; section 10 names the gates each closes. Each is a dispatch precondition for the work after it: no dependent slice starts until its session has happened. About 1½ hours of them remain. From v1.6 one more short session reviews the school-leaver option pack before the Options chapter (section 10). The other human checks (the Sprint 3 and Sprint 9 design reviews, VoiceOver, Safari, the five Sprint 9 task sessions and the privacy decision) keep their positions in the sprint cards; none of them is a dispatch precondition.
 
@@ -1085,3 +997,109 @@ References checked on 27 October 2026. These narrow checks support the integrati
 | Language-rule refinement becomes open-ended (support screen, explanation validation, redaction, value readers) | Grow a rule only for a reproduced defect or an evaluation failure. Prefer a fail-safe outcome (unknown, unclear, not kept) to a new pattern. Record a hypothetical form as a known limit. Keep the safeguards and accepted limitations as recorded (v1.2; ruling R11 in the task file, widened in v1.5 to the slate's notes and matching rules). |
 | Infrastructure polish displaces evidence | From the option pack to review session 2, polish that no failing check or reproduced defect requires goes to the final review list (v1.2; ruling R12 in the task file). From v1.5 this holds for every remaining task (ruling R13, "Path before polish"). |
 | The numerical core is unexercised on real, reviewed options before Sprint 9 | Build the England option pack from the required corpus (section 9), run the TRACE-01 checker on P01's real option set and review it at session 2, and hold one formative comprehension session after Sprint 5 (section 5). |
+
+# Revision history
+
+Moved here from "How to use this plan" and section 6 on 1 November 2026 (the lean clean-up, the product owner's yes), word for word. Section 6 gives the current order; the lists below are the record of how it got there.
+
+## Version notes
+
+**Version 1.1 (28 October 2026)** applies the L0 assessment handover written after Sprints 0–2 (`docs/plan/archive/l0-assessment-handover.md`), with its decisions D1–D3 confirmed by the product owner and recorded in ADR 0008. Human review becomes a scheduled resource with three sessions (sections 6 and 10). The required corpus becomes a reviewed England option pack (section 9). The remaining work follows the critical chain, and Sprint 6 is split into 6a and 6b (section 6). One formative comprehension session follows Sprint 5 (section 5). Adzuna stays optional (Sprint 3) and two risks are added (section 12). Sprint 2 gains the span-cited explanation the specification now permits (S2.7). Scope is otherwise unchanged: the dendrite, the three Pareto layers and the sliders all stay; only their order changes.
+
+**Version 1.2 (29 October 2026)** applies an intermediate code review held after the Sprint 3 acquisition core (`docs/reviews/intermediate-code-review-2026-10-29.md`; ADR 0008, amendment). Scope and architecture are unchanged. Four changes:
+
+1. A focused cancellation lock-order correction, with a concurrent regression test, runs right after the Sprint 3 backend and before the option pack (section 6).
+2. Real evidence is the next proof of progress. From the option pack to review session 2, the chain (option pack → Sprint 4 backend → Sprint 5 backend → session 2) takes priority. Infrastructure polish that no failing check or reproduced defect requires is listed for the final review instead. The option pack also reports an early, unreviewed accuracy read on its development split.
+3. Language rules (the support screen, explanation validation, redaction, and the pay, date and work-mode readers) grow only for a reproduced defect or an evaluation failure. A fail-safe outcome (unknown, unclear, not kept) is preferred to a new pattern. Safeguards and accepted limitations stay as recorded (section 12).
+4. Review session 2 also holds Sprint 2's design review, which tests scanning, understanding and choosing. Its findings are applied before more interface detail is added (sections 6 and 10).
+
+**Version 1.3 (29 October 2026)** adds Sprint 10 at the product owner's request: an operator's manual, written by doing every task it describes in the built product. Friction points found along the way are logged. Those a small change can smooth are fixed in the sprint. A larger refactor for user experience is put to the product owner only when there is high conviction that its benefit outweighs its cost. Nothing else changes.
+
+**Version 1.4 (30 October 2026)** applies the product owner's experience direction, given after review session 2 (ADR 0014). Careerwright becomes one living world in which the six chapters are places, not pages (section 4, rewritten). It replaces the calm observatory of the specification's art direction and lifts the visual scope limits of section 1. A new Sprint W builds the world before more chapter interfaces: a spike of three directions, session W1 to choose one, new design references, the world in the app with the You chapter rebuilt, and session W2 to judge it (sections 6 and 10). The review rubric gains three questions (section 5). The estimate grows by 13–16 engineering days and about two hours of the product owner's time. The domain, the numbers and the integrity rules are unchanged.
+
+**Version 1.5 (31 October 2026)** applies the whole-solution audit the product owner asked for (`docs/reviews/l0-audit-2026-10-31.md`; ADR 0008, amendment of 2026-10-31). They approved it on 31 October 2026: "Approved - proceed. Where subagent work can be done cleanly in parallel, do so but coordinate well to avoid them causing conflicts. Yes, I have 5 people who can try the app before release." Their directions, in their words:
+
+- "The visuals are important, but they must be subservient to having a practical, useful product."
+- "I want to check that the development plan is still sensible, and get us back on track with the sprints, even if we have to refactor some of them to ensure coherency and pragmatism."
+- "One thing that is really important to me is that we aren't limited to a prefilled list of roles - the real world is much more complex than those standardised job lists, and I want to avoid the frustration of your ideal job not appearing as an option to select. This is where deep research and LLMs have a part to play to fill out the "role space" more fully. I want it to feel like you have an omniscient career coach who knows all possible jobs that could fit you."
+- "We can also start being a bit more generous with token use in human testing - I would like to use muse wonder for this."
+
+The changes:
+
+1. **The decision path first.** Skills, Options, Routes and Plan come next, built plainly in the world as it stands, to Sprint W's design references. Each chapter's moment moves to a new Sprint M, after the path works (sections 4 and 6). Sprint W closes at the world shell, the You chapter and the deterministic sources.
+2. **Roles beyond a fixed list** (ADR 0015). Sprint 2 gains S2.8 (your title, recognised: ESCO, the ONS coding index and the person's own words) and S2.9 (research this role), before session W2 and Skills.
+3. **Options for any target.** Sprint 5's stored planning inputs become a backend slice of their own, before the Options chapter, and the chapter gains "add an option yourself" (S5.7). Sprint 3 gains option research for any target (S3.7), after the Plan chapter. Such options are proposed records marked not reviewed, and a route built on one is qualified.
+4. **Live sessions on Muse Wonder** for the product owner (S1.6): qualified first, started by a session command, capped and ledgered, with a spending line in the app. Spark stays the release default.
+5. **Shorter sessions.** Session W2 becomes a short first look (about 30 minutes, live, about five questions, no score threshold). Session 3 merges into one end-to-end session after Sprint 8 (about 1 hour). "Every category at least 4" stays the bar for release (sections 5 and 10).
+6. **A new order** (section 6). Backend work never waits for a session. Sprints 7 and 8 lose the session 3 gate. Roles comes after the end-to-end session.
+7. **Shorter review loops** and up to two implementers at once (task file, rulings R11 to R15).
+8. The remaining work is sized in agent hours (section 6), the L0 deferrals are listed (section 1), and the risk register is corrected (section 12).
+
+The domain, the numbers and the integrity rules are unchanged.
+
+**Version 1.6 (1 November 2026)** applies the product owner's school-leaver decisions. On 1 November 2026 they said: "NB: I don't want to over-rely on existing skills in the process. Many users will be final year school students who have never had a job before." A walk through the whole path as a Year 13 student with no job found eight problems and ten decisions. They answered yes to the first nine and no to the tenth ("A and B, not #10"), and approved where each fits ("go"). The changes:
+
+1. **School students aged 17 and 18 are in scope** (section 1). The release checks the rules for young people's data before any real student uses Careerwright (Sprint 9).
+2. **No job yet** (S2.10). The first question takes "I haven't had a job yet", two optional answers hold what the person is doing now and their qualifications, the conversation opens without asking for a job, and the calm support panel adds Childline. A synthetic school leaver joins the evaluation cases and session W2's people (with S2.9).
+3. **A tuition fee loan paid straight to the university is a loan to repay,** not the student's own spending (Sprint 5). This is the one planning rule that changes, for L0 only.
+4. **A route longer than 24 months says so plainly,** with no planning change (section 1; Sprint 7).
+5. **A reviewed school-leaver version of the option pack** (section 9), with one short review session (section 10).
+6. Hours that change on a date ("free from September") are a known limit, not built (section 1).
+
+Section 6 gives the order. The specification's revision record (section 22) records how L0 applies these. The other numbers and integrity rules are unchanged.
+
+## Earlier orders of the remaining work
+
+**Order of the remaining work (v1.1).** The backend slices of Sprints 4 and 5 run before the Roles chapter UI, because in L0 the dendrite has no live vacancy data and every role is unscored: the Roles chapter is requested and stays in scope, but it does not feed the chain. After Sprint 2, work proceeds in this order:
+
+1. Sprint 2 addition S2.7, then the Sprint 0–1 visual corrections.
+2. Sprint 3 acquisition backend (S3.1–S3.4 and the reduced S3.6), then the cancellation lock-order correction (v1.2).
+3. The England option pack (section 9).
+4. Sprint 4 backend, then Sprint 5 backend.
+5. Review session 2, then the reviewed option pack published from its record.
+6. Session 2's Sprint 2 design findings applied, then Sprint 4 Skills chapter and review, then Sprint 5 Options chapter and review.
+7. Sprint 3 Roles chapter (S3.5), job scoring and review, after review session 1.
+8. Sprints 6a, 6b, 7 (closing after review session 3), 8, 9 and 10.
+
+**Order from here (v1.4).** Steps 1–5 are done, through review session 2. Step 6's design findings now belong to Sprint W, which comes before any more chapter interface:
+
+1. Sprint W's spike, then session W1, where the product owner chooses a direction.
+2. The reviewed option pack published from session 2's record (it may run while session W1 is awaited).
+3. The rest of Sprint W, then session W2, the product owner's review of the world.
+4. Sprint 4 Skills chapter and review, then Sprint 5 Options chapter and review, built in the world.
+5. Sprint 3 Roles chapter (S3.5), job scoring and review, after review session 1.
+6. Sprints 6a, 6b, 7 (closing after review session 3), 8, 9 and 10.
+
+Backend work (the option pack, Sprints 6a and 6b) may fill any wait for a session. Interface work waits for session W2.
+
+**Order from here (v1.5).** The v1.4 list above stays as history. The audit of 31 October 2026 found the decision path waiting behind the world's spectacle, and the product owner approved this order on 31 October 2026. Each step names its task in the task file; agent hours are the audit's estimates, review included.
+
+| # | Work | Sprint | Waits for | Agent hours |
+|---|---|---|---|---|
+| 0 | The approved changes applied to the plan, the task file, the register, the ADRs and `CLAUDE.md` | — | the product owner's yes (given) | 1 |
+| 1 | Finish the You chapter: the pending re-review; the demo interviewer unblocked; a chosen target confirmed, not "out of date"; shared skills named and the unexpected connection shown (done; from 1 November 2026 a plain line, never a revelation); on a phone the decision first; the "England only" line; the demo route preview out of the person's path; the Sprint W review | W | — | 5–9 |
+| 2 | Your title, recognised: titles from ESCO and the ONS coding index, the person's own words always kept, each target stored once with its occupation, source and coverage, optional seniority and industry | 2 (S2.8) | 1 | 5–10 |
+| 3 | Live sessions ready: Muse Wonder qualified, a session command with caps, a spending line in the app, each session's calls copied into the cost ledger, the first live run of the real-data path through the app | 1 (S1.6) | — | 3–6 |
+| 4 | Research this role, for a title no list holds | 2 (S2.9) | 2, 3 | 8–15 |
+| 5 | Session W2, short: about 30 minutes, live, on Muse Wonder; the product owner uses the You chapter, roles included, and answers about five questions; no score threshold | W | 1–4 | the product owner's time |
+| 6 | Planning inputs, stored and confirmed (backend): income, cash, living costs, reserve, commitments, debts, availability; work rights and remote working | 5 (S5.3, S5.4 inputs) | 7's core (it runs in the worktree track during session W2) | 3–6 |
+| 7 | Route search core: the exact search, the independent check, the three layers, measured sizes; its durable add-ons sized from these measurements | 6a, 6b | — for the core (running now); 6 for the durable add-ons | 5–10 (+2–8) |
+| 8 | Skills, for any target: what the occupation lists, labelled as such; what the person's chosen adverts ask for; evidence questions; readiness where a reviewed rubric exists, and "not assessed yet, here's what it asks" elsewhere | 4 | 5, 2 | 8–14 |
+| 9 | Options: the review checkpoint, collecting step 6's inputs, and "add an option yourself", saved as not reviewed | 5 (S5.3, S5.7) | 6, 8 | 7–12 |
+| 10 | Routes: real computed routes in plain words; routes built on options that aren't reviewed say so | 7 | 7, 9 | 8–14 |
+| 11 | Plan: first the snapshot, the Plan chapter, print, JSON and calendar; then revise and replan, with the answers' revision history | 8 | 10 | 6–10 |
+| 12 | The end-to-end session (about 1 hour; replaces session 3): from You to a printed plan; formative scores; the product owner chooses which moments to build | — | 11 | the product owner's time |
+| 13 | Find options for this role: live research of courses and funding for any target, as records marked not reviewed | 3 (S3.7) | 11 | 8–15 |
+| 14 | Roles: the opportunity map, real listings, role cards with "not enough evidence yet" outlooks; one plain line instead of pay and AI filters | 3 (S3.5) | 11, 12 | 6–10 |
+| 15 | The moments, in the product owner's order, each on a set budget; the frame re-measure, with the product owner warned before any window opens | M | 12, 14 | 6–12 |
+| 16 | Release qualification, the operator's manual and the final review; every review score at least 4 stays the release bar | 9, 10 | all | 8–16 |
+
+The rows sum to about 89–168 agent hours (the report quoted 80–150), about one to two weeks of continuous build, plus about 1½ hours of the product owner's sessions and the release checks. History says ±30%.
+
+- Backend work never waits for a session: steps 6 and 7, and step 13's research backend, may run while a session is awaited. Chapter interfaces wait for session W2.
+- Up to two implementers run at once, on disjoint modules (the product owner's approval of 31 October 2026; task file ruling R15). Each task card says which tasks it may overlap.
+- The backend steps run in one worktree track, one task at a time, each started after the last is integrated: step 7's core (Task 13a), then step 6 (Task 12a), then step 7's durable add-ons (Task 13b). Step 6 changes the planning rules that the core's independent check and the durable search read, so none of the three overlaps another. Step 6 may overlap steps 1 to 4 in the main tree; Options and Routes (steps 9 and 10) never overlap the durable add-ons, because all three change the planning module.
+- Roles stays after the decision path because routes don't need it. The reason v1.1 gave, that the dendrite has no live vacancy data, no longer holds: the Adzuna credentials exist and the free-tier integration was qualified live in Sprint 3.
+- The end-to-end session may offer the product owner a smaller L0 if time matters by then (the audit's shape C: the opportunity map and replanning moved to the next milestone). That would need a specification change, and nothing is cut until they say so.
+
+Review session 1 can be held at any point before the Roles chapter; held before the option pack is curated, it lets the pack's pages be classified against its rights policy rather than left pending human review. Each sprint's review is written when its last slice finishes, so the Sprint 3 review follows those of Sprints 4 and 5. Until v1.5 one implementer ran at a time, so slices without a dependency on each other ran one after the other, in either order. From v1.5 up to two run at once, as each task card's Parallel line allows (task file, ruling R15).
