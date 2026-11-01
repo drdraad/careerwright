@@ -45,6 +45,9 @@ REACHED = frozenset(
         ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS,
     }
 )
+# Spec section 22 and the product owner's provisional yes: the loans paid straight to the
+# provider that are a loan to repay rather than the student's own money.
+PAID_TO_THE_PROVIDER = frozenset({"tuition_fee_loan", "advanced_learner_loan"})
 NOT_YET_KNOWN = frozenset({ReadinessState.NOT_YET_ASSESSED, ReadinessState.INSUFFICIENT_COVERAGE})
 
 Status = Literal["feasible", "not_feasible", "unresolved"]
@@ -384,9 +387,13 @@ class _RouteCheck:
         # limits or cash, and it is no receipt either. Approved, it is used in every case; not
         # yet approved but not refused, for someone who is or may be eligible, the route counts
         # on it (the base case). Its amount not stated: nobody knows what the student pays, but
-        # at least nothing of the tuition (so a cap broken even then is broken).
+        # at least nothing of the tuition (so a cap broken even then is broken). The product
+        # owner's provisional yes (2026-11-01): an Advanced Learner Loan paid to the college
+        # is read exactly the same way; no other loan ever reaches here.
         # `loan_room`: False with no loan used, None with an unknown amount, else what is left.
         loan = v.tuition_fee_loan
+        if loan is not None and loan.kind.value not in PAID_TO_THE_PROVIDER:
+            raise ValueError("only a tuition fee loan or an Advanced Learner Loan is a loan here")
         loan_room: int | Literal[False] | None = False
         if loan is not None and _loan_used(loan):
             if loan.amount is None:

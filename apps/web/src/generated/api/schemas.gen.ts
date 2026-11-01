@@ -3635,6 +3635,16 @@ export const FamilyActionSchema = {
     title: 'FamilyAction'
 } as const;
 
+export const FeeLoanKindSchema = {
+    type: 'string',
+    enum: [
+        'tuition_fee_loan',
+        'advanced_learner_loan'
+    ],
+    title: 'FeeLoanKind',
+    description: 'The two loans paid straight to the provider that are a loan to repay in L0: a tuition\nfee loan (spec section 22, 2026-11-01) and, by the product owner\'s provisional yes of the\nsame day, an Advanced Learner Loan. One rule for both; the kind only says which.'
+} as const;
+
 export const FewMatchedSchema = {
     properties: {
         reason: {
@@ -5045,6 +5055,10 @@ export const LoanToRepaySchema = {
             type: 'string',
             title: 'Variant Id'
         },
+        kind: {
+            $ref: '#/components/schemas/FeeLoanKind',
+            default: 'tuition_fee_loan'
+        },
         due: {
             anyOf: [
                 {
@@ -5090,7 +5104,7 @@ export const LoanToRepaySchema = {
         'conditional'
     ],
     title: 'LoanToRepay',
-    description: 'What a tuition fee loan paid straight to the provider pays for a route (spec section\n22): a loan the person repays later, never their payment, cash, support or a receipt. Facts\nonly; the web words them (R11).'
+    description: 'What a fee loan paid straight to the provider (a tuition fee loan or an Advanced Learner\nLoan) pays for a route (spec section 22): a loan the person repays later, never their\npayment, cash, support or a receipt. Facts only; the web words them (R11).'
 } as const;
 
 export const LocationSchema = {
@@ -16476,6 +16490,11 @@ export const TrendStateSchema = {
 
 export const TuitionFeeLoanSchema = {
     properties: {
+        kind: {
+            $ref: '#/components/schemas/FeeLoanKind',
+            description: 'Which loan: a tuition fee loan unless the person says otherwise.',
+            default: 'tuition_fee_loan'
+        },
         amount: {
             anyOf: [
                 {
@@ -16510,11 +16529,16 @@ export const TuitionFeeLoanSchema = {
         'cited'
     ],
     title: 'TuitionFeeLoan',
-    description: 'A tuition fee loan paid straight to the provider, as the person states it for one\nvariant (spec section 22, 2026-11-01; FUNDING-06). It pays the variant\'s fees (never its\nextra costs), after any support paid to the provider, up to its amount: what it pays is not\nthe person\'s payment, cash or direct spending, and the route carries it as a loan to repay\nlater. It is never support, a grant, income or a receipt, and Careerwright never chooses\nit: the person states it. Its repayment is not modelled in L0: unknown, never 0.\n\nIts statuses are the funding statuses (ADR 0013 decision 5): only a loan the person\nconfirms approved counts in every scenario; one not yet approved, for which they are or may\nbe eligible, makes the route conditional on it, beside the route where they pay the fee\n(the no-award scenario). An unknown amount leaves the route unresolved, never £0.'
+    description: 'A fee loan paid straight to the provider (a tuition fee loan, or an Advanced Learner\nLoan: `kind`), as the person states it for one\nvariant (spec section 22, 2026-11-01; FUNDING-06). It pays the variant\'s fees (never its\nextra costs), after any support paid to the provider, up to its amount: what it pays is not\nthe person\'s payment, cash or direct spending, and the route carries it as a loan to repay\nlater. It is never support, a grant, income or a receipt, and Careerwright never chooses\nit: the person states it. Its repayment is not modelled in L0: unknown, never 0.\n\nIts statuses are the funding statuses (ADR 0013 decision 5): only a loan the person\nconfirms approved counts in every scenario; one not yet approved, for which they are or may\nbe eligible, makes the route conditional on it, beside the route where they pay the fee\n(the no-award scenario). An unknown amount leaves the route unresolved, never £0.'
 } as const;
 
 export const TuitionFeeLoanInputSchema = {
     properties: {
+        kind: {
+            $ref: '#/components/schemas/FeeLoanKind',
+            description: 'Which loan: a tuition fee loan unless the person says otherwise.',
+            default: 'tuition_fee_loan'
+        },
         amount: {
             anyOf: [
                 {
@@ -16540,7 +16564,7 @@ export const TuitionFeeLoanInputSchema = {
         'application'
     ],
     title: 'TuitionFeeLoanInput',
-    description: 'A tuition fee loan paid straight to the provider, as the person states it for one option\n(spec section 22, 2026-11-01): its amount and its funding statuses (ADR 0013 decision 5).\nThe rules of `planning.catalogue.TuitionFeeLoan`: an approval needs confirmed eligibility.\nNever support: a maintenance loan or any other loan stated as a support is refused.'
+    description: 'A fee loan paid straight to the provider, as the person states it for one option (spec\nsection 22, 2026-11-01): which loan (a tuition fee loan, or an Advanced Learner Loan by the\nproduct owner\'s provisional yes), its amount and its funding statuses (ADR 0013 decision\n5). The rules of `planning.catalogue.TuitionFeeLoan`: an approval needs confirmed\neligibility. Never support: a maintenance loan or any other loan is refused.'
 } as const;
 
 export const TurnOutSchema = {

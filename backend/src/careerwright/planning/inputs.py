@@ -43,6 +43,7 @@ from careerwright.planning.catalogue import (
     Citation,
     CitationBasis,
     EligibilityStatus,
+    FeeLoanKind,
     Hours,
     InstrumentKind,
     RecordState,
@@ -171,11 +172,16 @@ class SupportInput(StrictModel):
 
 
 class TuitionFeeLoanInput(StrictModel):
-    """A tuition fee loan paid straight to the provider, as the person states it for one option
-    (spec section 22, 2026-11-01): its amount and its funding statuses (ADR 0013 decision 5).
-    The rules of `planning.catalogue.TuitionFeeLoan`: an approval needs confirmed eligibility.
-    Never support: a maintenance loan or any other loan stated as a support is refused."""
+    """A fee loan paid straight to the provider, as the person states it for one option (spec
+    section 22, 2026-11-01): which loan (a tuition fee loan, or an Advanced Learner Loan by the
+    product owner's provisional yes), its amount and its funding statuses (ADR 0013 decision
+    5). The rules of `planning.catalogue.TuitionFeeLoan`: an approval needs confirmed
+    eligibility. Never support: a maintenance loan or any other loan is refused."""
 
+    kind: FeeLoanKind = Field(
+        default=FeeLoanKind.TUITION_FEE_LOAN,
+        description="Which loan: a tuition fee loan unless the person says otherwise.",
+    )
     amount: Money | None = Field(default=None, description="Null: not known, never £0.")
     eligibility: EligibilityStatus
     application: AwardState

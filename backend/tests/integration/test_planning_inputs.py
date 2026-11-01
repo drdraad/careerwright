@@ -109,8 +109,10 @@ def everything() -> dict[str, Any]:
                 "wage": None,
                 "supports": [],
                 "stacking_confirmed": False,
-                # Task 12c: a tuition fee loan paid to the provider, not yet approved.
+                # Task 12c: a fee loan paid to the provider, not yet approved (its follow-up: an
+                # Advanced Learner Loan, by the product owner's provisional yes).
                 "tuition_fee_loan": {
+                    "kind": "advanced_learner_loan",
                     "amount": gbp(925000),
                     "eligibility": "potentially_eligible",
                     "application": "applied",
@@ -388,6 +390,19 @@ def test_another_person_sees_none_of_it_and_history_is_append_only(
             ]
         },
         {"outcome_decisions": [{"outcome_id": "o", "decision": "maybe"}]},
+        # Task 12c's follow-up: a fee loan is a tuition fee loan or an Advanced Learner Loan.
+        {
+            "variants": [
+                {
+                    "variant_id": "v",
+                    "tuition_fee_loan": {
+                        "kind": "maintenance_loan",
+                        "eligibility": "confirmed",
+                        "application": "applied",
+                    },
+                }
+            ]
+        },
         # Task 12c: a tuition fee loan's statuses, and an approval needs confirmed eligibility.
         {
             "variants": [

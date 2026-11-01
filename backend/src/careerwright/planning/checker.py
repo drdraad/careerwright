@@ -49,7 +49,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from careerwright.capability.readiness import Assessment, Qualification, ReadinessState, assess
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
 from careerwright.money import Money, SignedMoney
-from careerwright.planning.catalogue import RecordState, Support, WorkPattern
+from careerwright.planning.catalogue import FeeLoanKind, RecordState, Support, WorkPattern
 from careerwright.planning.compiler import (
     CompiledVariant,
     MonthlyInput,
@@ -804,6 +804,8 @@ class _Check:
         yet approved makes the route rest on it only where it pays something or its amount is
         unknown: one that pays nothing changes nothing (review 12c, Minor 1)."""
         variant_id = variant.variant_id
+        stated = variant.tuition_fee_loan
+        kind = stated.kind if stated is not None else FeeLoanKind.TUITION_FEE_LOAN
         self.lent += sum(loan.lent.values())
         if loan.conditional and (loan.left is None or loan.lent):
             self.conditions.append(
@@ -817,7 +819,11 @@ class _Check:
         if loan.left is None:
             self.loans.append(
                 LoanToRepay(
-                    variant_id=variant_id, due=None, amount=None, conditional=loan.conditional
+                    variant_id=variant_id,
+                    kind=kind,
+                    due=None,
+                    amount=None,
+                    conditional=loan.conditional,
                 )
             )
             return
@@ -825,6 +831,7 @@ class _Check:
             self.loans.append(
                 LoanToRepay(
                     variant_id=variant_id,
+                    kind=kind,
                     due=self.label(index) if index is not None else None,
                     amount=_money(amount),
                     conditional=loan.conditional,
