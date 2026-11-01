@@ -702,7 +702,7 @@
         let n = 0;
         return atConsole(`
           <h2 class="sentence">Directions to explore</h2>
-          <p class="small muted">Occupations from ESCO, found from your own answers. Ideas to test, not a judgement of fit: no score or percentage.</p>
+          <p class="small muted">Occupations from ESCO, the EU's list of jobs and skills, found from your answers. Ideas to test, not a judgement of fit.</p>
           <div class="segmented" role="group" aria-label="Which directions to show">${["Balanced", "Closer to what I do", "Less familiar", "Broader", "More depth"].map((e, i) => `<button type="button" class="btn btn-secondary" aria-pressed="${i === 0}">${e}</button>`).join("")}</div>
           <p class="small muted">6 of up to 6, from 31 occupations found by 1 search of ESCO. 17 more were found but not kept.</p>
           <details class="notes"><summary>How Careerwright searched (${NOTES.length} notes)</summary><ul class="bullets">${NOTES.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></details>
