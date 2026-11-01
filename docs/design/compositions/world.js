@@ -713,7 +713,7 @@
       return atConsole(`
           <p class="question">What do you do now, or what did you do last?</p>
           <p class="answer"${failed ? ' data-failed="true"' : ""}>Synthetic: I check customer records for a housing association.${failed ? `<br><span class="status" data-tone="error">${glyph("error")}Not processed</span>` : ""}</p>
-          ${failed ? `<div class="alert" data-tone="error" role="alert">${glyph("error")}<div><p><strong>Careerwright's reply didn't arrive</strong></p><p class="small muted">Your message is kept. Nothing about you changed.</p></div></div>` : `<p>Records officers usually need these skills. Pick any you've used, and it lights up.</p>`}
+          ${failed ? `<div class="alert" data-tone="error" role="alert">${glyph("error")}<div><p><strong>Careerwright's reply didn't arrive</strong></p><p class="small muted">Your message is kept. Nothing about you changed.</p></div></div>` : `<p>ESCO lists these skills for records officer work. Pick any you've used, and it lights up.</p>`}
           <p class="field" aria-hidden="true">Tell me more…</p>
           <div class="row"><button type="button" class="btn btn-primary">${failed ? "Try again" : "Send"}</button></div>`);
     }
@@ -902,7 +902,7 @@
         li.dataset.for = l.id;
         if (l.selected) li.dataset.selected = "true";
         li.innerHTML = `<span class="name">${esc(l.name)}</span>`;
-        if (l.state === "usual") li.innerHTML += `<span class="caption">ESCO lists it for this kind of work, not confirmed yet</span>`;
+        if (l.state === "usual") li.innerHTML += `<span class="caption">ESCO lists it, not confirmed yet</span>`;
         if (l.state === "said") li.innerHTML += `<span class="caption">you said so</span>`;
         if (l.state === "shadow" && !l.name.includes("no bridge")) li.innerHTML += `<span class="caption">not known yet</span>`;
         host.append(li);

@@ -47,12 +47,16 @@ import unicodedata
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-POLICY_VERSION = "support-policy-9"
+# support-policy-10 (Task 6d slice C, the product owner's "every place a person types"): the
+# answers typed in a conversation's review step, and a title's seniority and industry, are
+# screened as What we know's direct entries are, with the same lines.
+POLICY_VERSION = "support-policy-10"
 CHECKED_ON = "2026-10-28"
 REVIEW_STATUS = (
     "accepted for L0 at session 1 (human gate H-12); the three phrasings added on 2026-10-28, "
-    "and the screens of the first question and of What we know with their lines, added on "
-    "2026-10-31, are not yet reviewed as built"
+    "the screens of the first question and of What we know with their lines, added on "
+    "2026-10-31, and the screens of the conversation's review step and of a title's "
+    "seniority and industry, added on 2026-11-01, are not yet reviewed as built"
 )
 
 # Normalisation: the listed apostrophe variants to `'`, the hyphens U+2010 and U+2011 to `-`,
