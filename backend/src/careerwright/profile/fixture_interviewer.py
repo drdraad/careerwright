@@ -112,11 +112,14 @@ _EXPECTED = re.compile(
     r"[^.,;!?]{0,40})",
     re.IGNORECASE,
 )
+# Only an explicit verb of having it, never a bare "have" or "got to" (Task 6f review I2).
 _ACHIEVED = re.compile(
-    rf"\bI(?:'ve| have)? (?:got|passed|have) ([^.,;!?]{{0,60}}?\b{_QUALIFICATION_WORD}\b"
+    rf"\bI(?:'ve| have)? (?:got|passed) (?!to\b)([^.,;!?]{{0,60}}?\b{_QUALIFICATION_WORD}\b"
     r"[^.,;!?]{0,40})",
     re.IGNORECASE,
 )
+# A message that mentions a retake, a resit or a fail is never read as achieved.
+_NOT_ACHIEVED = re.compile(r"\b(?:re-?tak|re-?sit|fail)", re.IGNORECASE)
 _DONE = re.compile(r"\bI ((?:help|volunteer)\b[^.,;!?]{3,80})", re.IGNORECASE)
 # What someone is, read by `_ROLE`, that is what they are doing now, never a job title.
 _NOT_A_JOB = re.compile(r"\b(?:student|pupil|carer)$", re.IGNORECASE)
@@ -396,9 +399,12 @@ def _status(text: str) -> WorkStatus | None:
 
 def _qualification(text: str) -> str | None:
     """One qualification in the model's item form: "expected: …" for one being taken,
-    "achieved: …" for one they have; None when the message names neither."""
+    "achieved: …" for one they plainly have; None when the message names neither, or when it
+    mentions a retake or a fail and names none being taken."""
     if expected := _EXPECTED.search(text):
         return f"expected: {expected.group(1).strip()}"
+    if _NOT_ACHIEVED.search(text):
+        return None
     if achieved := _ACHIEVED.search(text):
         return f"achieved: {achieved.group(1).strip()}"
     return None

@@ -634,6 +634,26 @@ def test_the_demo_notes_what_the_person_is_doing_now_and_a_qualification_they_ar
         ], words
 
 
+@pytest.mark.req("PROF-13")
+def test_the_demo_never_reads_a_retake_or_a_fail_as_achieved() -> None:
+    # Task 6f review I2: a bare "have" is not a verb of having passed.
+    for words in (
+        "I have to retake my GCSE maths.",
+        "I have failed my GCSE maths.",
+        "I've got to resit my GCSE maths.",
+        "I got a U in GCSE maths, so I failed it.",
+    ):
+        out = demo(demo_turn(words))
+        achieved = [
+            item
+            for u in out.proposed_updates
+            if u.field is ProfileField.QUALIFICATIONS
+            for item in u.items or []
+            if item.startswith("achieved:")
+        ]
+        assert achieved == [], words
+
+
 def test_each_demo_question_names_what_it_asks_about() -> None:
     assert asked_field(SURE_QUESTION) is ProfileField.TARGET_TITLES
     for asked_about, question in QUESTIONS.items():

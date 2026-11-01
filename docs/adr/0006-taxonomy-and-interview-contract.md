@@ -361,12 +361,17 @@ asks for or infers age.
   `qualifications`, each in the person's words and marked achieved or expected (at most 8).
   Both take Skip, Unknown and Prefer not to say, are never limits, and go through the one
   write path and the interview contract (the model proposes, the person confirms). The model
-  writes a qualification as "achieved: …" or "expected: …"; its name is "stated" only when it
-  appears in the cited messages, and a work status is always shown as a reading. An expected
+  writes a qualification as "achieved: …" or "expected: …". A qualification's status and a
+  work status are always shown as Careerwright's reading, never as "You said", even where
+  the words appear in the cited messages (fix round 1). An expected
   qualification is shown as expected everywhere and never read as achieved; Skills (Task 10)
   and Options (Task 12b) read both as entry facts later. Saved answers schema version 4;
   migration 0040 rewrites every stored document with both not yet asked (each answer it held
   keeps its state, value and source), and an older document still reads that way.
+- **The one exception to append-only saved answers:** migration 0040 adds the two
+  not-yet-asked answers to stored documents in place. A schema migration may add
+  not-yet-asked answers in place; nothing else about a saved version changes, and no other
+  write updates one.
 - **The interview works without a job** (`interview-turn-5`): the instructions say "Someone
   may not have had a job yet: ask about school or college, volunteering, caring, clubs and
   hobbies; never treat no job as a gap", name the new answers (each asked at most once, a

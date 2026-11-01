@@ -336,7 +336,8 @@ def test_a_qualification_is_proposed_achieved_or_expected_stated_only_from_their
         QualificationAnswer(name="GCSE maths", status=QualificationStatus.ACHIEVED),
         QualificationAnswer(name="A-level biology", status=QualificationStatus.EXPECTED),
     ]
-    assert change.basis is Basis.STATED  # each name appears in the message it cites
+    # Each name appears in the message it cites, but each status is a reading (fix round 1).
+    assert change.basis is Basis.INFERRED
     assert change.field_input().value == change.value
     unsaid = check_turn(
         output(update("qualifications", items=["achieved: A-level chemistry"])),
@@ -348,6 +349,26 @@ def test_a_qualification_is_proposed_achieved_or_expected_stated_only_from_their
     assert 'qualifications: give each as "achieved: name" or "expected: name"' in problems(
         output(update("qualifications", items=["A-level biology"])), ctx
     )
+
+
+@pytest.mark.req("PROF-13")
+def test_a_status_the_person_never_said_is_never_shown_as_their_words() -> None:
+    # Task 6f review I1: the name is quoted, the status is not; "working" is not a status said.
+    taking = check_turn(
+        output(update("qualifications", items=["achieved: A-level biology"])),
+        context("I am taking A-level biology this year."),
+        ProposalOrigin.MODEL,
+    )[0]
+    working = check_turn(
+        output(update("work_status", text="working")),
+        context("I am working towards my A-levels."),
+        ProposalOrigin.MODEL,
+    )[0]
+
+    assert taking is not None
+    assert working is not None
+    assert taking.changes[0].basis is Basis.INFERRED
+    assert working.changes[0].basis is Basis.INFERRED
 
 
 @pytest.mark.req("STATE-11", "PROF-14")
