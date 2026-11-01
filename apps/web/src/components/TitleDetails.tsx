@@ -234,8 +234,9 @@ function OneTitle({ workspaceId, details }: { workspaceId: string; details: Titl
         {saved ? TITLE_DETAILS.saved : ""}
       </p>
       <DetailsForm
-        // A saved version starts the form again from what was saved.
-        key={details.version}
+        // A saved seniority or industry starts the form again from what was saved; a mark
+        // saves a new version but keeps an open form and the words typed in it.
+        key={`${details.seniority}|${details.industry}`}
         details={details}
         saving={save.isPending}
         onSave={onSave}
@@ -249,14 +250,27 @@ function OneTitle({ workspaceId, details }: { workspaceId: string; details: Titl
           }}
         />
       )}
-      {isRole && (
-        <ListedSkills
-          details={details}
-          skills={origin.data?.usual_skills ?? []}
-          saving={save.isPending}
-          onSave={onSave}
-        />
-      )}
+      {isRole &&
+        (origin.data === undefined ? (
+          // A list that failed to load is said, never shown as a role with no list.
+          origin.error ? (
+            <RequestFailure
+              error={origin.error}
+              actions={
+                <Button variant="secondary" onClick={() => void origin.refetch()}>
+                  Try again
+                </Button>
+              }
+            />
+          ) : null
+        ) : (
+          <ListedSkills
+            details={details}
+            skills={origin.data.usual_skills}
+            saving={save.isPending}
+            onSave={onSave}
+          />
+        ))}
       {save.error !== null && <RequestFailure error={save.error} />}
     </section>
   );
