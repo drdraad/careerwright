@@ -5,14 +5,16 @@ span. Pages are synthetic."""
 import hashlib
 import json
 from datetime import date
+from ipaddress import IPv4Address, IPv6Address
 from pathlib import Path
 from typing import Any
 
 import pytest
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
+from careerwright.evidence.acquire import Pacer
 from careerwright.evidence.adzuna import AdzunaQuery, recorded_url
-from careerwright.evidence.fetcher import Fetcher, fetch_proxy
+from careerwright.evidence.fetcher import Fetcher, HostNotFoundError, fetch_proxy
 from careerwright.evidence.records import Retention, RightsClass
 from careerwright.evidence.sources import PageRights
 from tests.domain.test_pages import POSTING, page
@@ -22,9 +24,12 @@ from tests.support.fake_proxy import fake_proxy
 from tests.support.source_server import Scripted, SourceServer, source_server
 from tests.tools.test_live_adzuna import APP_ID, APP_KEY, fake_acquire
 from tools.corpus import (
+    MAX_CONTEXT,
     acquire_for_corpus,
     adzuna_for_corpus,
     agent_classification,
+    corpus_batch,
+    load_batch,
     locate,
     main,
 )
@@ -93,6 +98,65 @@ def test_in_proxy_mode_the_page_goes_through_the_proxy_and_its_record_says_so(
     assert (out["via_proxy"], out["address_checked"]) == (True, False)
     assert proxy.connects() == [authority, authority]  # robots.txt, then the page
     assert server.paths() == ["/robots.txt", "/jobs/1"]
+
+
+@pytest.mark.req("ACQ-01", "ACQ-06")
+def test_in_proxy_mode_a_batch_sends_every_page_through_the_proxy_with_one_pacer(
+    tmp_path: Path,
+) -> None:
+    body = page(POSTING).encode()
+    bundle = make_ca().bundle(tmp_path / "bundle.pem")
+    pacer, waits = _paced()
+    routes = {"/p/1": Scripted(body=body), "/p/2": Scripted(body=body)}
+    with source_server(routes) as server, fake_proxy() as proxy:
+        authority = f"www.gov.uk:{server.port}"
+        proxy.routes[authority] = server.port
+        proxied = Fetcher(
+            resolve=scripted_resolver({}),  # no name resolves: none is looked up
+            user_agent="CareerwrightL0/test",
+            extra_allowed=frozenset({("127.0.0.1", server.port)}),
+            proxy=fetch_proxy(proxy.url, bundle),
+        )
+        entries = load_batch(
+            json.dumps(
+                [
+                    {"slot": "F04", "url": f"http://{authority}/p/1"},
+                    {"slot": "F05", "url": f"http://{authority}/p/2", "locate": ["Data"]},
+                ]
+            )
+        )
+        out = corpus_batch(
+            entries, fetcher=proxied, pacer=pacer, evidence_dir=tmp_path / "evidence"
+        )
+
+    assert [(r["slot"], r["via_proxy"], r["address_checked"]) for r in out] == [
+        ("F04", True, False),
+        ("F05", True, False),
+    ]
+    assert all(r["sha256"] == hashlib.sha256(body).hexdigest() for r in out)
+    assert waits == [5.0]  # the second GOV.UK page waited its rate limit
+    assert set(proxy.connects()) == {authority}
+    assert {"/p/1", "/p/2"} <= set(server.paths())
+
+
+def test_a_batch_run_builds_one_proxied_fetcher_from_the_proxy_flags(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps([{"slot": "F04", "url": "https://www.gov.uk/become-apprentice"}]))
+    bundle = make_ca().bundle(tmp_path / "bundle.pem")
+    given: list[Fetcher] = []
+
+    def batch(entries: Any, *, fetcher: Fetcher) -> list[dict[str, object]]:
+        given.append(fetcher)
+        return [{"slot": e.slot} for e in entries]
+
+    monkeypatch.setattr("tools.corpus.corpus_batch", batch)
+    main(["--batch", str(plan), "--proxy", "http://127.0.0.1:3128", "--proxy-ca", str(bundle)])
+
+    [fetcher] = given
+    assert fetcher.via_proxy
+    assert json.loads(capsys.readouterr().out) == [{"slot": "F04"}]
 
 
 @pytest.mark.parametrize(
@@ -323,6 +387,146 @@ def test_an_adzuna_slot_past_the_scope_cap_is_refused_before_any_request(tmp_pat
         )
 
     assert sent == []
+
+
+def _paced() -> tuple[Pacer, list[float]]:
+    now = [0.0]
+    waits: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        waits.append(seconds)
+        now[0] += seconds
+
+    return Pacer(clock=lambda: now[0], sleep=sleep), waits
+
+
+def _no_such_host(host: str, port: int) -> list[IPv4Address | IPv6Address]:
+    raise HostNotFoundError
+
+
+@pytest.mark.req("ACQ-06")
+def test_a_batch_paces_every_page_of_a_host_to_its_rate_limit_and_records_each_failure(
+    tmp_path: Path,
+) -> None:
+    """One fetcher and one pacer for the whole batch: each page of a host after its first
+    waits the host's rate limit (`sources.json`: 5 seconds). No request leaves: no name
+    resolves, so every page is recorded with its failure and the batch goes on."""
+    pacer, waits = _paced()
+    entries = load_batch(
+        json.dumps(
+            [
+                {"slot": "F04", "url": "https://www.gov.uk/become-apprentice"},
+                {"slot": "C12", "url": "https://www.ucas.com/undergraduate"},
+                {"slot": "F05", "url": "https://www.gov.uk/student-finance"},
+                {"slot": "F06", "url": "https://www.gov.uk/1619-bursary-fund"},
+            ]
+        )
+    )
+
+    out = corpus_batch(
+        entries,
+        fetcher=Fetcher(user_agent="CareerwrightL0/test", resolve=_no_such_host),
+        pacer=pacer,
+        evidence_dir=tmp_path,
+    )
+
+    assert waits == [5.0, 5.0]  # the second and third GOV.UK pages; UCAS's first is free
+    assert [r["slot"] for r in out] == ["F04", "C12", "F05", "F06"]
+    assert [r["attempt"] for r in out] == [{"status": "failed", "reason": "robots_unreachable"}] * 4
+    assert all(r["sha256"] is None and r["kept_body"] is None for r in out)
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.req("ACQ-06", "TEST1-09")
+def test_a_batch_applies_each_entry_s_own_classification_and_excerpts(tmp_path: Path) -> None:
+    body = page(POSTING).encode()
+    entries = load_batch(
+        json.dumps(
+            [
+                {"slot": "F04", "url": "{gov}"},
+                {
+                    "slot": "C12",
+                    "url": "{other}",
+                    "locate": ["Data Quality Analyst"],
+                    "context": 10,
+                },
+                {
+                    "slot": "C11",
+                    "url": "{other}",
+                    "rights_class": "employer-posting",
+                    "terms": EMPLOYER_TERMS,
+                },
+            ]
+        )
+    )
+    with source_server({"/p/1": Scripted(body=body)}) as server:
+        gov = f"http://www.gov.uk:{server.port}/p/1"
+        other = f"http://careers.northwind.example:{server.port}/p/1"
+        entries = [
+            e.model_copy(update={"url": e.url.format(gov=gov, other=other)}) for e in entries
+        ]
+        listed, unlisted, classified = corpus_batch(
+            entries, fetcher=fetcher(server), pacer=_paced()[0], evidence_dir=tmp_path
+        )
+
+    assert str(listed["rights_status"]).startswith("govuk: ")
+    assert listed["kept_body"] is not None
+    assert "located" not in listed
+    assert unlisted["rights_status"] == "pending human rights review"
+    assert unlisted["kept_body"] is None
+    located: Any = unlisted["located"]
+    [found] = located
+    text = body.decode()
+    [start, end, around] = found["contexts"][0]
+    assert around == text[start:end]
+    assert "Data Quality Analyst" in around
+    assert end - start == len("Data Quality Analyst") + 20
+    assert str(classified["rights_status"]).startswith("employer-posting: ")
+    assert {p.name for p in tmp_path.iterdir()} == {"F04", "C11"}
+
+
+@pytest.mark.req("TEST1-09")
+def test_a_located_excerpt_s_context_is_bounded_and_clipped_to_the_text() -> None:
+    [found] = locate("abc Leeds xyz", ["Leeds"], context=2)
+    [edge] = locate("Leeds", ["Leeds"], context=2)
+
+    assert found["contexts"] == [[2, 11, "c Leeds x"]]
+    assert edge["contexts"] == [[0, 5, "Leeds"]]
+    assert "contexts" not in locate("Leeds", ["Leeds"])[0]  # only when asked for
+
+
+@pytest.mark.parametrize(
+    ("entry", "problem"),
+    [
+        ({"slot": "C11", "url": "https://a", "rights_class": "course-provider"}, "needs terms"),
+        ({"slot": "C11", "url": "https://a", "context": MAX_CONTEXT + 1}, "less than or equal"),
+        ({"slot": "C11", "url": "https://a", "split": "holdout"}, "Extra inputs"),
+    ],
+    ids=["a class without its terms", "context past its bound", "an unknown key"],
+)
+def test_a_batch_with_a_bad_entry_is_refused_before_any_fetch(
+    entry: dict[str, object], problem: str
+) -> None:
+    good = {"slot": "F04", "url": "https://www.gov.uk/become-apprentice"}
+    with pytest.raises(ValidationError, match=problem):
+        load_batch(json.dumps([good, entry]))
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [["--slot", "F04"], ["--rights-class", "other"], ["--locate", "Leeds"], ["--context", "5"]],
+)
+def test_a_batch_takes_no_single_page_option(
+    tmp_path: Path, extra: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps([{"slot": "F04", "url": "https://www.gov.uk/become-apprentice"}]))
+
+    with pytest.raises(SystemExit) as refused:
+        main(["--batch", str(plan), *extra])
+
+    assert refused.value.code == 2
+    assert "each page's options from its plan" in capsys.readouterr().err
 
 
 def test_a_class_other_than_other_without_its_terms_is_refused() -> None:
