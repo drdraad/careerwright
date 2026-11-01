@@ -23,7 +23,14 @@ planning file, contract or dispatch names a Mac path or branch, read it as below
 - No `var/` datasets (not fetched here). `make check` passes without them (controller's run,
   2026-11-01: backend 1,739 passed, Vitest 442).
 
-## Docker
-The Docker daemon is not running and no images are cached. Integration tests and
-`make acceptance` cannot run until the product owner decides. Never start Docker and never
-pull an image yourself. Report "integration and acceptance not run: Docker down".
+## Docker (from 2026-11-01 afternoon, the product owner's yes)
+The controller starts `dockerd` in the container and builds the images with
+`planning/cloud-build-images.sh` (the session proxy and its CA, build-time only; the
+repository's Dockerfiles unchanged). Docker Hub is reachable. Implementers still never start
+Docker, pull or build images: the controller runs integration and `make acceptance` once per
+batch, under the lock. Report them as "not run: the controller runs acceptance".
+
+## Network allowlist (the product owner's settings, not ours)
+Blocked until the product owner adds them: `www.childline.org.uk`, `www.gov.uk`,
+`www.ucas.com`, and the dataset hosts `ec.europa.eu`, `esco.ec.europa.eu`, `www.ons.gov.uk`,
+`huggingface.co` (so no `var/` datasets). Integration uses the committed ESCO sample.
