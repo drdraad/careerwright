@@ -1,0 +1,1091 @@
+{
+ "about": "The school-leaver pages' labels (Task 7f, 2026-11-01): each page as the controller's fetch recorded it (planning/task-7f-fetch-output.json; through the session's HTTPS proxy, so via_proxy true and address_checked false), and each claim with its span located in the kept body (first occurrence; exact count). tools.school_leaver_pack builds pack 0.3.0 from them.",
+ "sources": [
+  {
+   "source_id": "F05",
+   "kind": "funding_page",
+   "route": "fetch",
+   "url": "https://www.gov.uk/student-finance/new-fulltime-students",
+   "final_url": "https://www.gov.uk/student-finance/new-fulltime-students",
+   "retrieved_at": "2026-11-01T18:23:55.434145+00:00",
+   "http_status": 200,
+   "content_type": "text/html",
+   "sha256": "b2e143fd5e8dc3a3ead099a46ff65e1634f8a3fffd536cbe6357c4724d938719",
+   "rights_class": "govuk",
+   "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+   "retention": "body",
+   "template_family": "govuk-mainstream-guide",
+   "split": "holdout"
+  },
+  {
+   "source_id": "F06",
+   "kind": "funding_page",
+   "route": "fetch",
+   "url": "https://www.gov.uk/student-finance/who-qualifies",
+   "final_url": "https://www.gov.uk/student-finance/who-qualifies",
+   "retrieved_at": "2026-11-01T18:24:00.210687+00:00",
+   "http_status": 200,
+   "content_type": "text/html",
+   "sha256": "632d291b9ddd8c971d83b445b763764fe8e45c47dbe68c4885ebddedb67d01d4",
+   "rights_class": "govuk",
+   "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+   "retention": "body",
+   "template_family": "govuk-mainstream-guide",
+   "split": "holdout"
+  },
+  {
+   "source_id": "F07",
+   "kind": "funding_page",
+   "route": "fetch",
+   "url": "https://www.gov.uk/repaying-your-student-loan/what-you-pay",
+   "final_url": "https://www.gov.uk/repaying-your-student-loan/what-you-pay",
+   "retrieved_at": "2026-11-01T18:24:05.207624+00:00",
+   "http_status": 200,
+   "content_type": "text/html",
+   "sha256": "3fd0db419cf67326251e87f0602fb5515f50d07a86e448bcd09212ab286463c4",
+   "rights_class": "govuk",
+   "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+   "retention": "body",
+   "template_family": "govuk-mainstream-guide",
+   "split": "holdout"
+  },
+  {
+   "source_id": "F08",
+   "kind": "funding_page",
+   "route": "fetch",
+   "url": "https://www.gov.uk/advanced-learner-loan/what-youll-get",
+   "final_url": "https://www.gov.uk/advanced-learner-loan/what-youll-get",
+   "retrieved_at": "2026-11-01T18:24:10.640194+00:00",
+   "http_status": 200,
+   "content_type": "text/html",
+   "sha256": "595e858a121c2435b38fe7c0f8a5d3c642c4529680bb0e7cb33cc05587fe0e4a",
+   "rights_class": "govuk",
+   "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+   "retention": "body",
+   "template_family": "govuk-mainstream-guide",
+   "split": "holdout"
+  },
+  {
+   "source_id": "F09",
+   "kind": "funding_page",
+   "route": "fetch",
+   "url": "https://www.gov.uk/advanced-learner-loan",
+   "final_url": "https://www.gov.uk/advanced-learner-loan",
+   "retrieved_at": "2026-11-01T18:24:15.582076+00:00",
+   "http_status": 200,
+   "content_type": "text/html",
+   "sha256": "66db5399deaa729cb8c9ea03ff152ac5aa338a163c3637d89956bb4e9a4e7dd6",
+   "rights_class": "govuk",
+   "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+   "retention": "body",
+   "template_family": "govuk-mainstream-guide",
+   "split": "holdout"
+  },
+  {
+   "source_id": "F10",
+   "kind": "funding_page",
+   "route": "fetch",
+   "url": "https://www.gov.uk/1619-bursary-fund",
+   "final_url": "https://www.gov.uk/1619-bursary-fund",
+   "retrieved_at": "2026-11-01T18:24:20.491641+00:00",
+   "http_status": 200,
+   "content_type": "text/html",
+   "sha256": "53575b3ea54c61d177fd17e9d5431a2ef01cd05a3ef3f857e7568a153c809f53",
+   "rights_class": "govuk",
+   "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+   "retention": "body",
+   "template_family": "govuk-mainstream-guide",
+   "split": "holdout"
+  },
+  {
+   "source_id": "F11",
+   "kind": "funding_page",
+   "route": "fetch",
+   "url": "https://www.gov.uk/1619-bursary-fund/eligibility",
+   "final_url": "https://www.gov.uk/1619-bursary-fund/eligibility",
+   "retrieved_at": "2026-11-01T18:24:25.059822+00:00",
+   "http_status": 200,
+   "content_type": "text/html",
+   "sha256": "227f6d4380d8245593bd8fa36dd6ff810a32f0079a2ebdca4374df71ca054f1e",
+   "rights_class": "govuk",
+   "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+   "retention": "body",
+   "template_family": "govuk-mainstream-guide",
+   "split": "holdout"
+  },
+  {
+   "source_id": "C11",
+   "kind": "course_page",
+   "route": "fetch",
+   "url": "https://www.gov.uk/government/publications/introduction-of-t-levels/introduction-of-t-levels",
+   "final_url": "https://www.gov.uk/government/publications/introduction-of-t-levels/introduction-of-t-levels",
+   "retrieved_at": "2026-11-01T18:24:30.457297+00:00",
+   "http_status": 200,
+   "content_type": "text/html",
+   "sha256": "06095b9df361e27fa5826ae320331a0edb8dae9281797179c483a797605ff321",
+   "rights_class": "govuk",
+   "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+   "retention": "body",
+   "template_family": "govuk-html-publication",
+   "split": "development"
+  }
+ ],
+ "claims": [
+  {
+   "claim_id": "F05.programme.tuition",
+   "source_id": "F05",
+   "field": "programme",
+   "value": "Tuition Fee Loan",
+   "span": {
+    "start": 4632,
+    "end": 4648
+   },
+   "excerpt": "Tuition Fee Loan",
+   "occurrences": 10
+  },
+  {
+   "claim_id": "F05.programme.maintenance",
+   "source_id": "F05",
+   "field": "programme",
+   "value": "Maintenance Loan",
+   "span": {
+    "start": 4720,
+    "end": 4736
+   },
+   "excerpt": "Maintenance Loan",
+   "occurrences": 16
+  },
+  {
+   "claim_id": "F05.eligible_costs.tuition",
+   "source_id": "F05",
+   "field": "eligible_costs",
+   "value": "course tuition fees",
+   "span": {
+    "start": 4630,
+    "end": 4685
+   },
+   "excerpt": "a Tuition Fee Loan to help pay your course tuition fees",
+   "occurrences": 3
+  },
+  {
+   "claim_id": "F05.eligible_costs.maintenance",
+   "source_id": "F05",
+   "field": "eligible_costs",
+   "value": "living costs",
+   "span": {
+    "start": 4718,
+    "end": 4767
+   },
+   "excerpt": "a Maintenance Loan to help with your living costs",
+   "occurrences": 3
+  },
+  {
+   "claim_id": "F05.timing.tuition",
+   "source_id": "F05",
+   "field": "timing",
+   "value": "paid directly to the university or college, which sets the tuition fee",
+   "span": {
+    "start": 5226,
+    "end": 5339
+   },
+   "excerpt": "Your university or college sets your tuition fee, and the loan is paid directly to them. You have to pay it back.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F05.instrument_kind.tuition",
+   "source_id": "F05",
+   "field": "instrument_kind",
+   "value": "loan: you have to pay it back",
+   "span": {
+    "start": 5226,
+    "end": 5339
+   },
+   "excerpt": "Your university or college sets your tuition fee, and the loan is paid directly to them. You have to pay it back.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F05.timing.maintenance",
+   "source_id": "F05",
+   "field": "timing",
+   "value": "paid directly into the student's bank account at the start of each term",
+   "span": {
+    "start": 8221,
+    "end": 8327
+   },
+   "excerpt": "The loan is paid directly into your bank account at the start of each term. You have to pay the loan back.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F05.instrument_kind.maintenance",
+   "source_id": "F05",
+   "field": "instrument_kind",
+   "value": "loan: you have to pay the loan back",
+   "span": {
+    "start": 8221,
+    "end": 8327
+   },
+   "excerpt": "The loan is paid directly into your bank account at the start of each term. You have to pay the loan back.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F05.loan_maximum.tuition",
+   "source_id": "F05",
+   "field": "loan_maximum",
+   "value": {
+    "currency": "GBP",
+    "maximum_minor_units": 979000,
+    "period": "year",
+    "repayable": null,
+    "applies_to": "a full-time student, the 2026 to 2027 academic year"
+   },
+   "span": {
+    "start": 48892,
+    "end": 48977
+   },
+   "excerpt": "If you’re a full-time student</th>\n      <td>Up to £9,535</td>\n      <td>Up to £9,790",
+   "occurrences": 1,
+   "note": "the table's second column, headed '2026 to 2027 academic year' (the first is 2025 to 2026); a cap, never what a student gets"
+  },
+  {
+   "claim_id": "F05.loan_maximum.with_parents",
+   "source_id": "F05",
+   "field": "loan_maximum",
+   "value": {
+    "currency": "GBP",
+    "maximum_minor_units": 911800,
+    "period": "year",
+    "repayable": null,
+    "applies_to": "living with parents, the 2026 to 2027 academic year"
+   },
+   "span": {
+    "start": 51579,
+    "end": 51659
+   },
+   "excerpt": "Living with your parents</th>\n      <td>Up to £8,877</td>\n      <td>Up to £9,118",
+   "occurrences": 1,
+   "note": "the table's second column, headed '2026 to 2027 academic year' (the first is 2025 to 2026); a cap, never what a student gets"
+  },
+  {
+   "claim_id": "F05.loan_maximum.away",
+   "source_id": "F05",
+   "field": "loan_maximum",
+   "value": {
+    "currency": "GBP",
+    "maximum_minor_units": 1083000,
+    "period": "year",
+    "repayable": null,
+    "applies_to": "living away from parents, outside London, the 2026 to 2027 academic year"
+   },
+   "span": {
+    "start": 51706,
+    "end": 51809
+   },
+   "excerpt": "Living away from your parents, outside London</th>\n      <td>Up to £10,544</td>\n      <td>Up to £10,830",
+   "occurrences": 1,
+   "note": "the table's second column, headed '2026 to 2027 academic year' (the first is 2025 to 2026); a cap, never what a student gets"
+  },
+  {
+   "claim_id": "F05.loan_maximum.london",
+   "source_id": "F05",
+   "field": "loan_maximum",
+   "value": {
+    "currency": "GBP",
+    "maximum_minor_units": 1413500,
+    "period": "year",
+    "repayable": null,
+    "applies_to": "living away from parents, in London, the 2026 to 2027 academic year"
+   },
+   "span": {
+    "start": 51856,
+    "end": 51954
+   },
+   "excerpt": "Living away from your parents, in London</th>\n      <td>Up to £13,762</td>\n      <td>Up to £14,135",
+   "occurrences": 1,
+   "note": "the table's second column, headed '2026 to 2027 academic year' (the first is 2025 to 2026); a cap, never what a student gets"
+  },
+  {
+   "claim_id": "F05.means_test",
+   "source_id": "F05",
+   "field": "means_test",
+   "value": "the student gives their household income and course start date",
+   "span": {
+    "start": 50444,
+    "end": 50579
+   },
+   "excerpt": "You have to give details of your <a href=\"/apply-for-student-finance/household-income\">household income</a> and your course start date.",
+   "occurrences": 1
+  },
+  {
+   "claim_id": "F05.amount_rule",
+   "source_id": "F05",
+   "field": "amount_rule",
+   "value": "the maximum depends on where the student lives",
+   "span": {
+    "start": 9054,
+    "end": 9111
+   },
+   "excerpt": "The maximum amount you can get depends on where you live.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F05.rules_change",
+   "source_id": "F05",
+   "field": "rules_change",
+   "value": "student finance changes for courses starting on or after 1 January 2027; this page's amounts are for the 2025 to 2026 and 2026 to 2027 academic years",
+   "span": {
+    "start": 48273,
+    "end": 48433
+   },
+   "excerpt": "Student finance is changing. If your course starts on or after 1 January 2027, <a href=\"/student-finance-on-or-after-1-january-2027\">find out what you could get",
+   "occurrences": 1,
+   "note": "the change itself is on another page, which this capture does not hold"
+  },
+  {
+   "claim_id": "F05.published_on",
+   "source_id": "F05",
+   "field": "published_on",
+   "value": "2012-10-16",
+   "span": {
+    "start": 14838,
+    "end": 14912
+   },
+   "excerpt": "<meta name=\"govuk:first-published-at\" content=\"2012-10-16T17:47:30+01:00\">",
+   "occurrences": 1,
+   "note": "the page's metadata state its first publication"
+  },
+  {
+   "claim_id": "F05.rules_updated_on",
+   "source_id": "F05",
+   "field": "rules_updated_on",
+   "value": "2025-01-02",
+   "span": {
+    "start": 14984,
+    "end": 15057
+   },
+   "excerpt": "<meta name=\"govuk:public-updated-at\" content=\"2025-01-02T10:40:28+00:00\">",
+   "occurrences": 1,
+   "note": "the page's metadata state its last public update"
+  },
+  {
+   "claim_id": "F06.rule_age_limit.tuition",
+   "source_id": "F06",
+   "field": "rule_age_limit",
+   "value": "no upper age limit for a Tuition Fee Loan",
+   "span": {
+    "start": 13959,
+    "end": 14018
+   },
+   "excerpt": "There’s no upper age limit for Tuition Fee Loans or grants.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F06.rule_age_limit.maintenance",
+   "source_id": "F06",
+   "field": "rule_age_limit",
+   "value": "aged 60 or over on the first day of the first academic year: limited Maintenance Loan funding",
+   "span": {
+    "start": 58117,
+    "end": 58196
+   },
+   "excerpt": "If you’re 60 or over</h3>\n\n<p>You may get limited funding for Maintenance Loans",
+   "occurrences": 1
+  },
+  {
+   "claim_id": "F06.rule_residency.status",
+   "source_id": "F06",
+   "field": "rule_residency",
+   "value": "a UK national or Irish citizen, or with settled status in the UK (anyone else: the student finance checker)",
+   "span": {
+    "start": 15220,
+    "end": 15295
+   },
+   "excerpt": "If you’re a UK national or Irish citizen or have ‘settled status’ in the UK",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F06.rule_residency.home",
+   "source_id": "F06",
+   "field": "rule_residency",
+   "value": "home in England",
+   "span": {
+    "start": 15535,
+    "end": 15558
+   },
+   "excerpt": "your home is in England",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F06.rule_residency.three_years",
+   "source_id": "F06",
+   "field": "rule_residency",
+   "value": "living in the UK, Channel Islands or Isle of Man for 3 years before the first day of the first academic year",
+   "span": {
+    "start": 15591,
+    "end": 15687
+   },
+   "excerpt": "you’ve been continuously living in the UK, Channel Islands or Isle of Man for 3 years before the",
+   "occurrences": 2,
+   "note": "the sentence goes on: 'first day of your first academic year (apart from temporary absences such as holidays)'"
+  },
+  {
+   "claim_id": "F06.rule_course",
+   "source_id": "F06",
+   "field": "rule_course",
+   "value": "a first degree (for example BA, BSc or BEd), among the listed courses",
+   "span": {
+    "start": 6452,
+    "end": 6494
+   },
+   "excerpt": "a first degree, for example BA, BSc or BEd",
+   "occurrences": 6
+  },
+  {
+   "claim_id": "F06.rule_previous_study",
+   "source_id": "F06",
+   "field": "rule_previous_study",
+   "value": "usually only for a first higher education qualification",
+   "span": {
+    "start": 9638,
+    "end": 9735
+   },
+   "excerpt": "You’ll usually only get student finance if you’re doing your first higher education qualification",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F06.exclusion.degree_apprenticeship",
+   "source_id": "F06",
+   "field": "exclusion",
+   "value": "not for a degree apprenticeship",
+   "span": {
+    "start": 9438,
+    "end": 9519
+   },
+   "excerpt": "You are not eligible for student finance if you’re doing a degree apprenticeship.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F07.repayment",
+   "source_id": "F07",
+   "field": "repayment",
+   "value": "9% of income over the plan's income threshold (Plans 1, 2, 4 and 5)",
+   "span": {
+    "start": 7402,
+    "end": 7469
+   },
+   "excerpt": "9% of your income over the threshold if you’re on Plan 1, 2, 4 or 5",
+   "occurrences": 2,
+   "note": "which plan a course starting in 2027 is on is not on this page"
+  },
+  {
+   "claim_id": "F07.repayment_threshold.plan_5",
+   "source_id": "F07",
+   "field": "repayment_threshold",
+   "value": {
+    "currency": "GBP",
+    "minor_units": 2500000,
+    "period": "year",
+    "at_least": false,
+    "repayable": null
+   },
+   "span": {
+    "start": 56571,
+    "end": 56600
+   },
+   "excerpt": "Plan 5</td>\n      <td>£25,000",
+   "occurrences": 1,
+   "note": "Plan 5's yearly income threshold"
+  },
+  {
+   "claim_id": "F07.repayment_rule",
+   "source_id": "F07",
+   "field": "repayment_rule",
+   "value": "what is repaid depends on income, not on the amount owed",
+   "span": {
+    "start": 5395,
+    "end": 5517
+   },
+   "excerpt": "The amount you owe (which is a total of what you’ve borrowed plus interest) has no impact on how much you repay each year.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F07.interest.plan_5",
+   "source_id": "F07",
+   "field": "interest",
+   "value": "currently 4.1% on Plan 5",
+   "span": {
+    "start": 9553,
+    "end": 9577
+   },
+   "excerpt": "4.1% if you’re on Plan 5",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F07.interest_rule",
+   "source_id": "F07",
+   "field": "interest_rule",
+   "value": "interest is added even when not working or earning below the threshold",
+   "span": {
+    "start": 9800,
+    "end": 9933
+   },
+   "excerpt": "Interest is still added (‘applied’) to the amount you owe even if you’re not working or your income is below the repayment threshold.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F08.timing",
+   "source_id": "F08",
+   "field": "timing",
+   "value": "paid directly to the college or training provider",
+   "span": {
+    "start": 4889,
+    "end": 4986
+   },
+   "excerpt": "The minimum loan you can get is £300 and it’s paid directly to your college or training provider.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F08.loan_minimum",
+   "source_id": "F08",
+   "field": "loan_minimum",
+   "value": {
+    "currency": "GBP",
+    "minor_units": 30000
+   },
+   "span": {
+    "start": 4889,
+    "end": 4986
+   },
+   "excerpt": "The minimum loan you can get is £300 and it’s paid directly to your college or training provider.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F08.eligible_costs",
+   "source_id": "F08",
+   "field": "eligible_costs",
+   "value": "course fees only, not living costs",
+   "span": {
+    "start": 4833,
+    "end": 4888
+   },
+   "excerpt": "It only covers your course fees, not your living costs.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F08.amount_rule",
+   "source_id": "F08",
+   "field": "amount_rule",
+   "value": "the learner need not borrow the full cost and can pay part of it",
+   "span": {
+    "start": 5118,
+    "end": 5211
+   },
+   "excerpt": "You do not have to borrow the full cost of your course - you can pay for some of it yourself.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F09.repayment",
+   "source_id": "F09",
+   "field": "repayment",
+   "value": "repaid once income is over a threshold amount",
+   "span": {
+    "start": 6782,
+    "end": 6849
+   },
+   "excerpt": "when your income is over a certain amount (the ‘threshold’ amount).",
+   "occurrences": 3,
+   "note": "the threshold itself is not on this page"
+  },
+  {
+   "claim_id": "F09.interest",
+   "source_id": "F09",
+   "field": "interest",
+   "value": "interest charged from the day of the first payment",
+   "span": {
+    "start": 6880,
+    "end": 6946
+   },
+   "excerpt": "You’ll be charged interest from the day you get the first payment.",
+   "occurrences": 3
+  },
+  {
+   "claim_id": "F09.alternative_if_eligible",
+   "source_id": "F09",
+   "field": "alternative_if_eligible",
+   "value": "a level 3 learner might get an adult skills fund grant instead, which is not repaid",
+   "span": {
+    "start": 62297,
+    "end": 62483
+   },
+   "excerpt": "If you’re studying a level 3 qualification, you might be eligible for a grant from the adult skills fund (<abbr title=\"adult skills fund\">ASF</abbr>) instead of an Advanced Learner Loan.",
+   "occurrences": 1
+  },
+  {
+   "claim_id": "F09.write_off",
+   "source_id": "F09",
+   "field": "write_off",
+   "value": "an Access to HE course's loan is written off once a higher education course is completed",
+   "span": {
+    "start": 7409,
+    "end": 7576
+   },
+   "excerpt": "Student Finance England will ‘write off’ any outstanding Advanced Learner Loan balances you owe for an Access to HE course once you complete a higher education course.",
+   "occurrences": 3
+  },
+  {
+   "claim_id": "F10.programme",
+   "source_id": "F10",
+   "field": "programme",
+   "value": "16 to 19 Bursary Fund",
+   "span": {
+    "start": 117,
+    "end": 138
+   },
+   "excerpt": "16 to 19 Bursary Fund",
+   "occurrences": 6
+  },
+  {
+   "claim_id": "F10.instrument_kind",
+   "source_id": "F10",
+   "field": "instrument_kind",
+   "value": "bursary: money for education-related costs, used by the student or their provider",
+   "span": {
+    "start": 5706,
+    "end": 5806
+   },
+   "excerpt": "A bursary is money that you, or your education or training provider, can use to pay for things like:",
+   "occurrences": 3
+  },
+  {
+   "claim_id": "F10.rule_age_band",
+   "source_id": "F10",
+   "field": "rule_age_band",
+   "value": "aged 16 to 19",
+   "span": {
+    "start": 4395,
+    "end": 4484
+   },
+   "excerpt": "You could get a bursary to help with education-related costs if you’re aged 16 to 19 and:",
+   "occurrences": 3
+  },
+  {
+   "claim_id": "F10.rule_provider",
+   "source_id": "F10",
+   "field": "rule_provider",
+   "value": "at a publicly funded school or college in England, not a university",
+   "span": {
+    "start": 4534,
+    "end": 4611
+   },
+   "excerpt": "studying at a publicly funded school or college in England - not a university",
+   "occurrences": 3
+  },
+  {
+   "claim_id": "F10.rule_age_exception",
+   "source_id": "F10",
+   "field": "rule_age_exception",
+   "value": "19 or over: only if continuing a course started aged 16 to 18 (or with an EHC plan)",
+   "span": {
+    "start": 5317,
+    "end": 5404
+   },
+   "excerpt": "are continuing on a course you started aged 16 to 18 (known as being a ’19+ continuer’)",
+   "occurrences": 3,
+   "note": "the list goes on: 'have an education, health and care (EHC) plan'"
+  },
+  {
+   "claim_id": "F10.eligible_costs",
+   "source_id": "F10",
+   "field": "eligible_costs",
+   "value": "education-related costs: clothing, books and other equipment for the course",
+   "span": {
+    "start": 5856,
+    "end": 5907
+   },
+   "excerpt": "clothing, books and other equipment for your course",
+   "occurrences": 3
+  },
+  {
+   "claim_id": "F10.eligible_costs_travel",
+   "source_id": "F10",
+   "field": "eligible_costs_travel",
+   "value": "transport and lunch on study or training days",
+   "span": {
+    "start": 5940,
+    "end": 5986
+   },
+   "excerpt": "transport and lunch on days you study or train",
+   "occurrences": 3
+  },
+  {
+   "claim_id": "F10.bursary_maximum",
+   "source_id": "F10",
+   "field": "bursary_maximum",
+   "value": {
+    "currency": "GBP",
+    "maximum_minor_units": 120000,
+    "period": null,
+    "repayable": null,
+    "applies_to": "a bursary for students in vulnerable groups"
+   },
+   "span": {
+    "start": 39649,
+    "end": 39705
+   },
+   "excerpt": "You could get a bursary worth up to £1,200, depending on",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
+  },
+  {
+   "claim_id": "F10.amount_rule",
+   "source_id": "F10",
+   "field": "amount_rule",
+   "value": "a discretionary bursary: the provider decides how much and what it is used for",
+   "span": {
+    "start": 39990,
+    "end": 40074
+   },
+   "excerpt": "Your education or training provider decides how much you get and what it’s used for.",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
+  },
+  {
+   "claim_id": "F10.timing",
+   "source_id": "F10",
+   "field": "timing",
+   "value": "the provider decides how the bursary is paid (an instalment, or things like a travel pass or free meals)",
+   "span": {
+    "start": 40266,
+    "end": 40317
+   },
+   "excerpt": "Your provider will decide how you get your bursary.",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
+  },
+  {
+   "claim_id": "F10.over_19",
+   "source_id": "F10",
+   "field": "rule_age_exception",
+   "value": "over 19: only a discretionary bursary",
+   "span": {
+    "start": 40176,
+    "end": 40247
+   },
+   "excerpt": "If you’re over 19, you’ll only be eligible for a discretionary bursary.",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
+  },
+  {
+   "claim_id": "F10.published_on",
+   "source_id": "F10",
+   "field": "published_on",
+   "value": "2011-11-11",
+   "span": {
+    "start": 7099,
+    "end": 7173
+   },
+   "excerpt": "<meta name=\"govuk:first-published-at\" content=\"2011-11-11T12:15:29+00:00\">",
+   "occurrences": 1,
+   "note": "the page's metadata state its first publication"
+  },
+  {
+   "claim_id": "F10.rules_updated_on",
+   "source_id": "F10",
+   "field": "rules_updated_on",
+   "value": "2015-04-29",
+   "span": {
+    "start": 7245,
+    "end": 7318
+   },
+   "excerpt": "<meta name=\"govuk:public-updated-at\" content=\"2015-04-29T14:46:24+01:00\">",
+   "occurrences": 1,
+   "note": "the page's metadata state its last public update"
+  },
+  {
+   "claim_id": "F11.rule_age",
+   "source_id": "F11",
+   "field": "rule_age",
+   "value": {
+    "minimum_age": 16,
+    "on": "31 August 2026"
+   },
+   "span": {
+    "start": 4469,
+    "end": 4514
+   },
+   "excerpt": "be at least 16 and under 19 on 31 August 2026",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F11.rule_age_band",
+   "source_id": "F11",
+   "field": "rule_age_band",
+   "value": "under 19 on 31 August 2026",
+   "span": {
+    "start": 4469,
+    "end": 4514
+   },
+   "excerpt": "be at least 16 and under 19 on 31 August 2026",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F11.rule_provider",
+   "source_id": "F11",
+   "field": "rule_provider",
+   "value": "at a publicly funded school or college, or on an unpaid training course",
+   "span": {
+    "start": 4547,
+    "end": 4627
+   },
+   "excerpt": "study at a publicly funded school or college, or be on an unpaid training course",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F11.rule_residency",
+   "source_id": "F11",
+   "field": "rule_residency",
+   "value": "meets the residency requirements, which the school or college can check",
+   "span": {
+    "start": 4660,
+    "end": 4731
+   },
+   "excerpt": "meet the residency requirements - your school or college can check this",
+   "occurrences": 2,
+   "note": "the requirements themselves are not on this page"
+  },
+  {
+   "claim_id": "F11.rule_vulnerable_group",
+   "source_id": "F11",
+   "field": "rule_vulnerable_group",
+   "value": "a vulnerable-group bursary: for example in or recently left local authority care (or on listed benefits)",
+   "span": {
+    "start": 5027,
+    "end": 5078
+   },
+   "excerpt": "you’re in or you recently left local authority care",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F11.discretionary_criteria",
+   "source_id": "F11",
+   "field": "discretionary_criteria",
+   "value": "each school or college sets its own criteria for a discretionary bursary",
+   "span": {
+    "start": 6111,
+    "end": 6191
+   },
+   "excerpt": "Your school or college will have their own criteria for discretionary bursaries.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.title",
+   "source_id": "C11",
+   "field": "title",
+   "value": "T Level",
+   "span": {
+    "start": 115,
+    "end": 139
+   },
+   "excerpt": "Introduction of T Levels",
+   "occurrences": 6
+  },
+  {
+   "claim_id": "C11.duration",
+   "source_id": "C11",
+   "field": "duration",
+   "value": [
+    {
+     "unit": "years",
+     "minimum": 2,
+     "maximum": 2,
+     "mode": null,
+     "typical": false,
+     "unbounded": false
+    }
+   ],
+   "span": {
+    "start": 4130,
+    "end": 4235
+   },
+   "excerpt": "T Levels are 2-year courses which are taken after GCSEs and are broadly equivalent in size to 3 A Levels.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.entry_requirement",
+   "source_id": "C11",
+   "field": "entry_requirement",
+   "value": "taken after GCSEs",
+   "span": {
+    "start": 4130,
+    "end": 4235
+   },
+   "excerpt": "T Levels are 2-year courses which are taken after GCSEs and are broadly equivalent in size to 3 A Levels.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.size_equivalence",
+   "source_id": "C11",
+   "field": "size_equivalence",
+   "value": "broadly equivalent in size to 3 A Levels",
+   "span": {
+    "start": 4130,
+    "end": 4235
+   },
+   "excerpt": "T Levels are 2-year courses which are taken after GCSEs and are broadly equivalent in size to 3 A Levels.",
+   "occurrences": 2,
+   "note": "the page names no qualification level for a T Level"
+  },
+  {
+   "claim_id": "C11.placement_duration",
+   "source_id": "C11",
+   "field": "placement_duration",
+   "value": [
+    {
+     "unit": "hours",
+     "minimum": 315,
+     "maximum": null,
+     "mode": null,
+     "typical": false,
+     "unbounded": false
+    }
+   ],
+   "span": {
+    "start": 4668,
+    "end": 4735
+   },
+   "excerpt": "an industry placement of at least 315 hours – approximately 45 days",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.classroom_hours",
+   "source_id": "C11",
+   "field": "classroom_hours",
+   "value": [
+    {
+     "unit": "hours",
+     "minimum": 1100,
+     "maximum": 1300,
+     "mode": null,
+     "typical": true,
+     "unbounded": false
+    }
+   ],
+   "span": {
+    "start": 6844,
+    "end": 6994
+   },
+   "excerpt": "We expect the typical time to be between 1100 and 1300 classroom hours across the 2 years plus the mandatory Industry Placement of at least 315 hours.",
+   "occurrences": 2,
+   "note": "over the 2 years"
+  },
+  {
+   "claim_id": "C11.delivery_mode",
+   "source_id": "C11",
+   "field": "delivery_mode",
+   "value": "a technical qualification and an industry placement with an employer",
+   "span": {
+    "start": 9327,
+    "end": 9440
+   },
+   "excerpt": "T Levels require students to undertake both a technical qualification and an industry placement with an employer.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.credential",
+   "source_id": "C11",
+   "field": "credential",
+   "value": "a nationally recognised T Level certificate with the overall grade",
+   "span": {
+    "start": 12798,
+    "end": 12949
+   },
+   "excerpt": "Students who complete their T Level get a nationally recognised certificate which shows their overall grade and a breakdown of what they have achieved.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.assessment",
+   "source_id": "C11",
+   "field": "assessment",
+   "value": "an overall grade: pass, merit, distinction or distinction*",
+   "span": {
+    "start": 13007,
+    "end": 13090
+   },
+   "excerpt": "an overall grade for the T Level, shown as pass, merit, distinction or distinction*",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.pass_rule",
+   "source_id": "C11",
+   "field": "pass_rule",
+   "value": "a grade 4 in English and maths GCSE is not required to pass",
+   "span": {
+    "start": 9632,
+    "end": 9776
+   },
+   "excerpt": "T Level students are not required to achieve either a grade 4 in English and maths GCSE or level 2 in functional skills to pass their programme.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.availability",
+   "source_id": "C11",
+   "field": "availability",
+   "value": "at selected colleges, schools and other providers across England",
+   "span": {
+    "start": 4744,
+    "end": 4835
+   },
+   "excerpt": "The courses are available at selected colleges, schools and other providers across England.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.subject_accounting",
+   "source_id": "C11",
+   "field": "subject",
+   "value": "accounting (T Level courses since September 2022)",
+   "span": {
+    "start": 85082,
+    "end": 85160
+   },
+   "excerpt": "September 2022</h3>\n\n<p>T Level courses started in:</p>\n\n<ul>\n  <li>accounting",
+   "occurrences": 1
+  },
+  {
+   "claim_id": "C11.progression",
+   "source_id": "C11",
+   "field": "progression",
+   "value": "UCAS tariff points are allocated to T Levels",
+   "span": {
+    "start": 14467,
+    "end": 14511
+   },
+   "excerpt": "UCAS tariff points are allocated to T Levels",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.published_on",
+   "source_id": "C11",
+   "field": "published_on",
+   "value": "2018-05-25",
+   "span": {
+    "start": 28470,
+    "end": 28544
+   },
+   "excerpt": "<meta name=\"govuk:first-published-at\" content=\"2018-05-25T13:10:59+01:00\">",
+   "occurrences": 1,
+   "note": "the page's metadata state its first publication"
+  },
+  {
+   "claim_id": "C11.rules_updated_on",
+   "source_id": "C11",
+   "field": "rules_updated_on",
+   "value": "2026-01-26",
+   "span": {
+    "start": 28616,
+    "end": 28689
+   },
+   "excerpt": "<meta name=\"govuk:public-updated-at\" content=\"2026-01-26T12:32:02+00:00\">",
+   "occurrences": 1,
+   "note": "the page's metadata state its last public update"
+  }
+ ]
+}

@@ -357,13 +357,14 @@ def test_the_corpus_manifest_records_the_reviewed_version_and_each_page_s_review
         by_slot.setdefault(c.source_id, []).append(c.claim_id)
     states = {r.record_id: r.review_state for r in REVIEWED.records()}
 
-    assert manifest["option_pack"]["version"] == VERSION
-    assert manifest["option_pack"]["sha256"] == PINS[VERSION]
-    assert manifest["option_pack"]["path"].endswith(pack_path(VERSION).name)
+    # The manifest has moved on to 0.3.0 (Task 7f), which keeps every 0.2.0 claim and record
+    # review; each page's label review still reads session 2's decisions.
+    assert VERSION in manifest["option_pack"]["records"]
+    assert PINS[VERSION] in manifest["option_pack"]["records"]
     for source in REVIEWED.sources:
         slot = slots[source.source_id]
-        assert slot["labels"]["in"] == pack_path(VERSION).name
         assert slot["labels"]["claims"] == by_slot[source.source_id], source.source_id
+        assert pack_path(VERSION).name in slot["label_review"], source.source_id
         reviewed = sum(states[r] is ReviewState.REVIEWED for r in slot["pack_records"])
         words = f"{reviewed} of {len(slot['pack_records'])} records reviewed"
         assert slot["label_review"].startswith("session 2"), source.source_id
