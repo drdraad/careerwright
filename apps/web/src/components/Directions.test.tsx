@@ -353,6 +353,52 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     expect(await screen.findByRole("button", { name: "Closer to what I do" })).toBeVisible();
   });
 
+  it("[PROF-14] resets Closer to what I do to Balanced once it isn't offered, so no hidden view stays applied", async () => {
+    // Task 6f review M3: chosen while the role was known, then the role stops being known.
+    const sent = fakeApi([slateRoute]);
+    const working: ProfileOut = {
+      ...profile,
+      document: {
+        ...profile.document,
+        current_role: { state: "provided", value: "Baker", source_ref_id: "s2" },
+      },
+    };
+    const noJob: ProfileOut = {
+      ...profile,
+      document: {
+        ...profile.document,
+        current_role: { state: "no_job_yet", value: null, source_ref_id: "s3" },
+      },
+    };
+    const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = (shown: ProfileOut) => (
+      <QueryClientProvider client={queries}>
+        <EvidenceProvider>
+          <Directions workspaceId={WS} profile={shown} discovery={discovery} />
+        </EvidenceProvider>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(view(working));
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Closer to what I do" }));
+    await waitFor(() =>
+      expect(sent.some((s) => s.query.includes("emphasis=practical"))).toBe(true),
+    );
+
+    rerender(view(noJob));
+
+    expect(screen.queryByRole("button", { name: "Closer to what I do" })).toBeNull();
+    expect(await screen.findByRole("button", { name: "Balanced" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await waitFor(() =>
+      expect(sent.filter((s) => s.path.endsWith("/slate")).at(-1)?.query).toContain(
+        "emphasis=balanced",
+      ),
+    );
+  });
+
   it("[DIV1-04][TEST1-15] lists a title idea the UK job-title index lists beside the slate, with its answers", async () => {
     const ideas: SlateOut["title_ideas"] = [
       {
