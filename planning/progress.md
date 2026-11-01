@@ -60,7 +60,7 @@ list. Append new events at the end, one line each ("Ruling: what — why — cos
   Childline link question (A 1110), research beside the role in You (6e M5, A 1082), and
   `planning/carry-forward-task-W2D.md`.
 - Skills: match entry facts by whole words? (Task 10A review M2,
-  `planning/archive/task-10A-review.md`).
+  `planning/task-10A-review.md`).
 - The first real-data live run on Muse Wonder needs your own key pasted into the app.
 - Role research: the two-host "found" case is covered offline only; live scope is used up
   (A 1159).
@@ -118,7 +118,7 @@ review can confirm they landed.
 - Linux stack Minors M2, M3 (`planning/archive/task-linux-stack-review.md`; A 1117).
 - Task 7f: other Minors (`planning/task-7f-review.md`; A 1132); six claims whose deciding
   words sit beyond 200 characters (A 1136).
-- Task 10A Minors M1, M3–M6 (`planning/archive/task-10A-review.md`; A 1144).
+- Task 10A Minors M1, M3–M6 (`planning/task-10A-review.md`; A 1144).
 
 ## Events (from 2026-11-01, newest last)
 PO answers (2026-11-01, verbatim): "yes, fix 1-3, 4. no not fair, 5 yes, 6 yes" — recorded in docs/reviews/school-leaver-pack-session.md (292e9e8). The school-leaver pack session is held (AI check counted as the PO's review by their ruling; six rows decided by the PO). Task 7f second half: dispatched (opus), worktree wt-7f reset to 292e9e8, task-7f-second-half-dispatch.md.
