@@ -193,13 +193,13 @@ export const BusiestScene: Story = { render: () => <Busiest /> };
 
 const CUE_WORDS: Record<Cue, string> = {
   swell: "Swell: your light comes on",
-  chime: "Chime: a connection lights up",
+  chime: "Chime: no trigger yet (shared skills are a plain line)",
   tick: "Tick: you pick a skill",
 };
 
 /**
  * The three cues, each played from a click (the browser allows sound only after one). Only the
- * swell has a trigger in the app so far; the chime and the tick have none until W2C.
+ * swell has a trigger in the app so far; the chime and the tick have none (`lib/world/sound.ts`).
  */
 function Sounds() {
   const sound = useMemo(() => new Sound(), []);

@@ -494,7 +494,7 @@ school-leaver pack session, then its second half), each after the last is integr
 | The moving-and-still identical-words test covers only the fixture workspace | Task W2E |
 | The first answer's ignition | Task M |
 | The type-ahead's closest titles, asked as "Careerwright couldn't match that title in ESCO. Is it one of these?" | Task 6d, with "None of these is my job" leading to the person's own words |
-| The unexpected connection lit in the world | Task M; its sentence and shared skills in words → Task W2E |
+| The unexpected connection lit in the world | Dropped (the product owner, 1 November 2026: "Always a plain line"); shared skills in words on each suggestion → Task W2E, done |
 | The overlooked strength's proposal and confirm step; `held_back` on a support turn; its destinations on the horizon | Task M, all together |
 | "Usual in your role, not confirmed yet" | Task 10 |
 | Suggestions drawn as rings; "Make this a target" previewing its destination | Task M |
@@ -918,7 +918,8 @@ Deliver:
   lists these for this kind of work"; the person can mark one "not part of my job" (a
   display state, never evidence); and no revelation rests on ESCO's essential skills alone.
   How the unexpected connection meets the last rule is to be settled by Task 6d, asking the
-  product owner before a second round (R14).
+  product owner before a second round (R14). Settled on 1 November 2026: "Always a plain
+  line", never a revelation.
 - **Pasted CV text, if it stays small.** The person pastes a CV, and its facts come back as
   proposals through the same review tray; nothing commits unconfirmed. Whether it is small
   enough is to be settled by Task 6d; if not, it is recorded as an L0 deferral (plan
@@ -1444,7 +1445,8 @@ all six chapters (SW.3); the You chapter rebuilt in the world with session 2's d
 findings applied (SW.4), transcribing the product owner's record and deciding nothing on
 their behalf (R2); the first moments and the two revelations (SW.5): the unexpected
 connection from the slate, joined by shared essential skills and checked on "data analyst"
-and the five personas (amending ADR 0007), and the overlooked strength as a new bounded run
+and the five personas (amending ADR 0007; from 1 November 2026 a plain line, never a
+revelation), and the overlooked strength as a new bounded run
 kind whose quotation is span-verified and confirmed by the person (live calls R5; tests use
 the test model or fixtures only); the new requirement family in the register
 (SW.6). Prepare session W2's package: captures at the three viewports, motion on and off,
@@ -1486,7 +1488,8 @@ Deliver, each as something the person sees:
 - **Shared skills named, and the unexpected connection shown.** Each suggestion names the
   skills it shares (the first few, the rest one step away), not only their count. The
   slate's computed connection is shown in words, its skills one step away; its light in the
-  world is Task M's.
+  world is Task M's. (Superseded on 1 November 2026, "Always a plain line": the computed
+  connection is removed and nothing is lit for it; Task 6d slice C.)
 - **On a phone the decision comes first** (F7, F8). At 390 × 844, any view with a pending
   decision shows its first decision in the first screen, and the world band takes no more
   room than what it shows. The key button never covers a tab: an "on top" check covers the
@@ -1540,7 +1543,9 @@ integration was qualified live, R4). Roles comes after the decision path because
 don't need it. Every role is still unscored, and no reviewed pay mapping exists (H-10).
 
 Deliver the Roles chapter as its place in the world, the horizon, to Task W2's design
-references (plan section 4; R13); its moment, the unexpected connection, is Task M's. Keep
+references (plan section 4; R13); its moment is Task M's to choose. Shared skills are a plain
+line on each suggestion, and no suggestion is singled out (the product owner, 1 November
+2026: "Always a plain line"). Keep
 VIS-1's hierarchy and industry shown by glyph and label (ADR 0014): SVG/D3 dendrite with
 stable anchors, company expansion, up to 100 visible job nodes, explicit aggregation
 counts; a pay lens of each listing's own advertised or predicted pay, labelled as such;
@@ -2159,8 +2164,8 @@ Sprint card: "Sprint M Give each chapter its moment". Plan section 4; ADR 0014 (
 Deliver, in the product owner's order, each within the budget the controller states in the
 dispatch (agent hours and the frame budget). A moment they chose to skip is not built.
 - The first answer's ignition.
-- The unexpected connection lit in the world (its light and a joining trail), its shared
-  skills one step away.
+- Not a candidate: the unexpected connection. Shared skills are "Always a plain line" (the
+  product owner, 1 November 2026); nothing is lit or played for them.
 - Decisions previewed in the world: suggestions drawn as rings, the open one singled out;
   "Make this a target" previewing its destination before it is saved.
 - The overlooked strength: its proposal and confirm step (the `strength_proposal` run, built
