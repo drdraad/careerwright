@@ -140,7 +140,7 @@ def test_a_message_with_a_risk_stem_is_sent_with_the_support_panel_and_none_of_i
     # step and a title's seniority and industry ("every place a person types") are screened
     # too. Accepted at session 1; the three phrasings and the screens added after it are not
     # yet reviewed.
-    assert panel["policy_version"] == safety.POLICY_VERSION == "support-policy-10"
+    assert panel["policy_version"] == safety.POLICY_VERSION == "support-policy-11"
     assert panel["review_status"] == safety.REVIEW_STATUS
     assert panel["review_status"].startswith("accepted for L0 at session 1")
     assert "not yet reviewed as built" in panel["review_status"]

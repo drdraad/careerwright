@@ -3,8 +3,8 @@
 // workspace is always synthetic (the API enforces it too); a synthetic one is labelled for good.
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState } from "react";
-import type { DataMode } from "@/generated/api";
+import { useEffect, useId, useRef, useState } from "react";
+import type { DataMode, SupportNoteOut } from "@/generated/api";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { chapterHref } from "@/lib/chapters";
@@ -15,6 +15,7 @@ import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
 import { NotInvited, RequestFailure } from "./PageState";
 import { SyntheticLabel } from "./Status";
+import { SupportNote } from "./SupportNote";
 
 const updated = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
 
@@ -25,24 +26,66 @@ const MODE_HINT: Record<Extract<DataMode, "demo" | "live_assisted">, string> = {
     "Uses your Meta API key for the interview and suggestions, so what you write is sent to Meta's model.",
 };
 
+/** A new workspace. Its name is typed, so it goes through the support screen as What we know's
+ *  entries do (the product owner's "every place a person types"): the workspace is created as
+ *  usual and the calm panel, from the API, shows here before anything opens; the person opens
+ *  the workspace from the panel when they choose. Nothing about it is stored. */
 export function CreateWorkspace({ onCreated }: { onCreated(id: string): void }) {
   const create = useCreateWorkspace();
   const [name, setName] = useState("");
   const [mode, setMode] = useState<Extract<DataMode, "demo" | "live_assisted">>("demo");
   const [synthetic, setSynthetic] = useState(true);
+  // The calm panel the last create brought, and the workspace it created, if any.
+  const [support, setSupport] = useState<{ note: SupportNoteOut; created: string | null } | null>(
+    null,
+  );
+  const heading = useRef<HTMLHeadingElement>(null);
   const id = useId();
+  const opening = support?.created ?? null;
   return (
     <form
       className="grid gap-12"
       onSubmit={(event) => {
         event.preventDefault();
+        setSupport(null);
         create.mutate(
           { name: name.trim(), data_mode: mode, synthetic: mode === "demo" ? true : synthetic },
-          { onSuccess: (workspace) => onCreated(workspace.workspace_id) },
+          {
+            onSuccess: (workspace) => {
+              if (workspace.support_note === null) {
+                onCreated(workspace.workspace_id);
+                return;
+              }
+              setName("");
+              setSupport({ note: workspace.support_note, created: workspace.workspace_id });
+            },
+            onError: (error) => {
+              const note = error instanceof ApiError ? error.supportNote : null;
+              if (note !== null) setSupport({ note, created: null });
+            },
+          },
         );
       }}
     >
-      <h2 className="section-title">New workspace</h2>
+      <h2 className="section-title" tabIndex={-1} ref={heading}>
+        New workspace
+      </h2>
+      {support !== null && (
+        <SupportNote
+          note={support.note}
+          actions={
+            opening !== null && (
+              <Button variant="secondary" onClick={() => onCreated(opening)}>
+                Open the new workspace
+              </Button>
+            )
+          }
+          onDismiss={() => {
+            setSupport(null);
+            heading.current?.focus(); // the button goes; focus is never lost
+          }}
+        />
+      )}
       <div className="grid gap-4">
         <label htmlFor={`${id}-name`} className="field-label">
           Name

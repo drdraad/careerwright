@@ -7,7 +7,7 @@ from datetime import datetime
 from pydantic import Field
 
 from careerwright.api.envelope import ErrorEnvelope
-from careerwright.api.schemas import ProfileOut, ResponseModel, RunOut
+from careerwright.api.schemas import ProfileOut, ResponseModel, RunOut, WorkspaceOut
 from careerwright.identity.records import PartialCompleteness, PartialReply
 from careerwright.money import Money
 from careerwright.profile import safety
@@ -277,6 +277,25 @@ class ProfileSavedOut(ProfileOut):
 class ProfileRefusedOut(ErrorEnvelope):
     """A refused direct edit. When an entry it makes triggers the support screen, the panel
     comes with the refusal, since the edit was screened before anything could refuse it."""
+
+    support_note: SupportNoteOut | None = None
+
+
+class WorkspaceSavedOut(WorkspaceOut):
+    """A workspace as created or renamed, with the support panel when its name triggers the
+    support screen: saved as usual, like What we know's direct entries."""
+
+    support_note: SupportNoteOut | None
+
+    @classmethod
+    def saved(cls, workspace: WorkspaceOut, *, support: bool) -> "WorkspaceSavedOut":
+        note = SupportNoteOut.beside_an_entry(saved=True) if support else None
+        return cls(**workspace.model_dump(), support_note=note)
+
+
+class WorkspaceRefusedOut(ErrorEnvelope):
+    """A refused create or rename, with the support panel when its name triggers the support
+    screen."""
 
     support_note: SupportNoteOut | None = None
 

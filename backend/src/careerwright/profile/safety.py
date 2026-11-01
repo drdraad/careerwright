@@ -50,7 +50,9 @@ from dataclasses import dataclass
 # support-policy-10 (Task 6d slice C, the product owner's "every place a person types"): the
 # answers typed in a conversation's review step, and a title's seniority and industry, are
 # screened as What we know's direct entries are, with the same lines.
-POLICY_VERSION = "support-policy-10"
+# support-policy-11 (Task 6d slice C fix round 1, the same direction): a workspace's name, as
+# it is created or renamed, is screened the same way, with the same lines.
+POLICY_VERSION = "support-policy-11"
 CHECKED_ON = "2026-10-28"
 REVIEW_STATUS = (
     "accepted for L0 at session 1 (human gate H-12); the three phrasings added on 2026-10-28, "

@@ -17013,6 +17013,103 @@ export const WorkspacePageSchema = {
     title: 'WorkspacePage'
 } as const;
 
+export const WorkspaceRefusedOutSchema = {
+    properties: {
+        error: {
+            $ref: '#/components/schemas/ErrorBody'
+        },
+        support_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SupportNoteOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'error'
+    ],
+    title: 'WorkspaceRefusedOut',
+    description: 'A refused create or rename, with the support panel when its name triggers the support\nscreen.'
+} as const;
+
+export const WorkspaceSavedOutSchema = {
+    properties: {
+        workspace_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Workspace Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        data_mode: {
+            $ref: '#/components/schemas/DataMode'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic',
+            description: 'Persistent synthetic-data label; never changes.'
+        },
+        fixture: {
+            type: 'boolean',
+            title: 'Fixture',
+            description: 'The named fixture workspace that `make reset-demo` resets.'
+        },
+        version: {
+            type: 'integer',
+            title: 'Version'
+        },
+        last_event_seq: {
+            type: 'integer',
+            title: 'Last Event Seq',
+            description: 'The workspace\'s latest status-event sequence number when read: pass it as Last-Event-ID to receive only what happens after this read.'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        support_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SupportNoteOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'workspace_id',
+        'name',
+        'data_mode',
+        'synthetic',
+        'fixture',
+        'version',
+        'last_event_seq',
+        'created_at',
+        'updated_at',
+        'support_note'
+    ],
+    title: 'WorkspaceSavedOut',
+    description: 'A workspace as created or renamed, with the support panel when its name triggers the\nsupport screen: saved as usual, like What we know\'s direct entries.'
+} as const;
+
 export const WriteInputsSchema = {
     properties: {
         expected_version: {
