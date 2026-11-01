@@ -1308,7 +1308,7 @@ A whole-solution audit of the local build (L0) against this specification (`docs
 
 ## Version 1.3 review decisions
 
-Version 1.3 (28 October 2026) applies an assessment of this specification and the local development plan against the repository after its first three local sprints (`docs/plan/l0-assessment-handover.md`). It makes two clarifications and one disclosure. No requirement is relaxed and no non-deferrable invariant changes. The product owner confirmed decisions D1 and D3 on 28 October 2026.
+Version 1.3 (28 October 2026) applies an assessment of this specification and the local development plan against the repository after its first three local sprints (`docs/plan/archive/l0-assessment-handover.md`). It makes two clarifications and one disclosure. No requirement is relaxed and no non-deferrable invariant changes. The product owner confirmed decisions D1 and D3 on 28 October 2026.
 
 | Reviewer proposal | Decision and change |
 |---|---|
