@@ -296,6 +296,35 @@ def test_a_value_has_the_one_shape_its_field_declares(
     assert (problem or "C01.duration is not duration") in found
 
 
+@pytest.mark.req("OPTN-10", "OPTN-14")
+@pytest.mark.parametrize(
+    ("value", "fits"),
+    [
+        (
+            {"currency": "GBP", "maximum_minor_units": 979000, "period": "year"}
+            | {"repayable": None, "applies_to": "the 2026 to 2027 academic year"},
+            True,
+        ),
+        (
+            {"currency": "GBP", "maximum_minor_units": 120000, "period": None, "repayable": None},
+            True,
+        ),
+        ("Up to £9,790", False),
+        (
+            {"currency": "GBP", "maximum_minor_units": -1, "period": "year", "repayable": None},
+            False,
+        ),
+    ],
+    ids=["a yearly cap", "a cap with no period", "money as text", "a negative cap"],
+)
+def test_a_cap_is_its_own_shape_never_text_or_negative(value: object, fits: bool) -> None:
+    data = minimal()
+    data["claims"].append(claim("C01.loan_maximum", "C01", "loan_maximum", value))
+    data["offerings"][0]["facts"] = ["C01.loan_maximum"]
+
+    assert ("C01.loan_maximum is not limit" not in problems(data)) is fits
+
+
 @pytest.mark.req("OPTN-10")
 def test_a_record_field_checks_the_shape_of_the_claim_it_cites_whatever_the_claim_is_called() -> (
     None
@@ -601,7 +630,8 @@ def test_the_committed_values_say_typical_repayable_and_not_counted_where_their_
 
 @pytest.mark.req("TEST1-09", "OPTN-10")
 def test_the_corpus_manifest_and_the_pack_record_the_same_pages_and_labels() -> None:
-    # The manifest records the latest version: session 2's reviewed one (Task 7c).
+    # The manifest records the latest version: 0.3.0, 0.2.0 (session 2's review) with the
+    # school-leaver pages (Task 7f).
     latest = max(PINS, key=lambda v: tuple(int(n) for n in v.split(".")))
     pack = load_pack(latest)
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
@@ -609,10 +639,13 @@ def test_the_corpus_manifest_and_the_pack_record_the_same_pages_and_labels() -> 
     claims_by_slot: dict[str, list[str]] = {}
     for c in pack.claims:
         claims_by_slot.setdefault(c.source_id, []).append(c.claim_id)
+    first = {s.source_id: s for s in load_pack("0.1.0").sources}
 
-    assert latest == manifest["option_pack"]["version"] == "0.2.0"
+    assert latest == manifest["option_pack"]["version"] == "0.3.0"
     assert manifest["option_pack"]["sha256"] == PINS[latest]
-    assert pack.sources == load_pack("0.1.0").sources  # the review changed no page
+    assert manifest["option_pack"]["path"].endswith(pack_path(latest).name)
+    assert all(first[s.source_id] == s for s in pack.sources if s.source_id in first)
+    assert set(first) < {s.source_id for s in pack.sources}  # the reviews changed no page
     assert set(slots) == {s.source_id for s in pack.sources}
     for source in pack.sources:
         slot = slots[source.source_id]
@@ -621,8 +654,10 @@ def test_the_corpus_manifest_and_the_pack_record_the_same_pages_and_labels() -> 
             assert slot[key] == getattr(source, key), (source.source_id, key)
         assert slot["split"] == source.split.value
         assert datetime.fromisoformat(slot["retrieved_at"]) == source.retrieved_at
+        assert slot["labels"]["in"] == pack_path(latest).name
         assert slot["labels"]["claims"] == claims_by_slot[source.source_id]
-        assert slot["label_review"].startswith("session 2 (H-07)")
+        review = "session 2 (H-07)" if source.source_id in first else "not run - requires human"
+        assert slot["label_review"].startswith(review), source.source_id
 
 
 @pytest.mark.req("OPTN-10")

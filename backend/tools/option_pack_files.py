@@ -51,7 +51,8 @@ TRACE_PERSONA = "P01"  # TRACE-01's real option set (plan section 10)
 # or a schedule, and these, which change a route or a reading of one. Identity facts
 # (source IDs, codes, posting dates) and descriptions are not asked.
 ASKED_SHAPES = frozenset(
-    {"money", "rate", "pay", "instalment", "date", "dates", "deadline", "duration", "schedule"}
+    {"money", "rate", "limit", "pay", "instalment", "date", "dates", "deadline", "duration"}
+    | {"schedule"}
 )
 ASKED_FIELDS = frozenset(
     {
@@ -103,6 +104,11 @@ def show(field: str, value: object) -> str:
         bound = "at least " if value["at_least"] else ""
         repayable = {True: ", repayable", False: ", not repayable"}.get(value["repayable"], "")
         return f"{bound}{pounds(value['minor_units'])} per {value['period']}{repayable}"
+    if isinstance(value, dict) and shape == "limit":
+        period = f" per {value['period']}" if value["period"] else ", no period stated"
+        repayable = {True: ", repayable", False: ", not repayable"}.get(value["repayable"], "")
+        case = f" ({value['applies_to']})" if value.get("applies_to") else ""
+        return f"up to {pounds(value['maximum_minor_units'])}{period}{repayable}{case}"
     if isinstance(value, dict) and shape == "pay":
         return _pay(value)
     if isinstance(value, dict) and shape == "instalment":

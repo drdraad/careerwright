@@ -1857,6 +1857,72 @@
       "title": "LevelsRule",
       "type": "object"
     },
+    "limit": {
+      "additionalProperties": false,
+      "description": "The most a scheme pays or lends (\"Up to £9,790\"): a cap, never an amount anyone gets.\n`applies_to` names the year or case the page states it for.",
+      "properties": {
+        "currency": {
+          "const": "GBP",
+          "title": "Currency",
+          "type": "string"
+        },
+        "maximum_minor_units": {
+          "minimum": 0,
+          "title": "Maximum Minor Units",
+          "type": "integer"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "enum": [
+                "year",
+                "month",
+                "week",
+                "day",
+                "hour"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Period"
+        },
+        "repayable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Repayable"
+        },
+        "applies_to": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Applies To"
+        }
+      },
+      "required": [
+        "currency",
+        "maximum_minor_units",
+        "period",
+        "repayable"
+      ],
+      "title": "Limit",
+      "type": "object"
+    },
     "money": {
       "additionalProperties": false,
       "properties": {
@@ -2119,6 +2185,8 @@
     "access_period": "duration",
     "advertiser": "advertiser",
     "application_deadline": "date",
+    "bursary_maximum": "limit",
+    "classroom_hours": "duration",
     "contract_duration": "duration",
     "contract_end": "date",
     "date_posted": "date",
@@ -2142,11 +2210,15 @@
     "intakes_stated": "dates",
     "level": "level",
     "lle_interaction": "level_change",
+    "loan_maximum": "limit",
+    "loan_minimum": "money",
     "location": "place",
     "location_conflict": "place",
     "occupation_crosswalk": "crosswalk",
+    "placement_duration": "duration",
     "price_valid_until": "date",
     "published_on": "date",
+    "repayment_threshold": "rate",
     "rule_age": "age_rule",
     "rule_course_level": "levels",
     "rule_earnings": "earnings_rule",

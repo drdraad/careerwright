@@ -53,10 +53,12 @@ PACKS_DIR = Path(__file__).parent / "packs" / "england_option_pack"
 SCHEMA_PATH = PACKS_DIR / "england-option-pack.schema.json"
 # Every committed version, pinned by the SHA-256 of its file's bytes: a version never
 # changes; a correction or a review is a new version. 0.1.0 is Task 7b's, every record
-# proposed; 0.2.0 is session 2's review of it (Task 7c, `tools.session_2_pack`).
+# proposed; 0.2.0 is session 2's review of it (Task 7c, `tools.session_2_pack`); 0.3.0 adds
+# the school-leaver pages to 0.2.0, its new records proposed (Task 7f, `tools.school_leaver_pack`).
 PINS: dict[str, str] = {
     "0.1.0": "d7ff17d73a9b17b43529b5cbbe4349ef016f7268c4ac4c2a6a53a13f97e6a3d3",
     "0.2.0": "162d2773e295c7832ff3b311738bdd20d111538b15f1df49932fecfc82702a56",
+    "0.3.0": "18be29cd6a7a575fa10ac0e1f72eb67e26562d8997d93555123da1cea13436b3",
 }
 
 SHA256 = r"^[0-9a-f]{64}$"
@@ -425,6 +427,17 @@ class Rate(StrictModel):
     repayable: bool | None  # null: the page does not say (never read as false)
 
 
+class Limit(StrictModel):
+    """The most a scheme pays or lends ("Up to £9,790"): a cap, never an amount anyone gets.
+    `applies_to` names the year or case the page states it for."""
+
+    currency: Literal["GBP"]
+    maximum_minor_units: Minor
+    period: Period | None  # null: the page states no period
+    repayable: bool | None  # null: the page does not say (never read as false)
+    applies_to: Text | None = None
+
+
 class Pay(StrictModel):
     """Advertised or provider-predicted pay: a range, a point (equal ends) or one bound."""
 
@@ -537,6 +550,7 @@ SHAPES: dict[str, TypeAdapter[Any]] = {
     "text": TypeAdapter(Text),
     "money": TypeAdapter(Money),
     "rate": TypeAdapter(Rate),
+    "limit": TypeAdapter(Limit),
     "pay": TypeAdapter(Pay),
     "instalment": TypeAdapter(Instalment),
     "date": TypeAdapter(IsoDate),
@@ -559,8 +573,12 @@ SHAPES: dict[str, TypeAdapter[Any]] = {
     "description_kind": TypeAdapter(Literal["full", "snippet"]),
 }
 _BY_SHAPE = {
-    "money": ("fee_total", "fee_was", "extra_cost", "exam_fee"),
-    "rate": ("fee_per_year_home", "fee_per_year_international", "support_grant"),
+    "money": ("fee_total", "fee_was", "extra_cost", "exam_fee", "loan_minimum"),
+    "rate": (
+        *("fee_per_year_home", "fee_per_year_international", "support_grant"),
+        "repayment_threshold",
+    ),
+    "limit": ("loan_maximum", "bursary_maximum"),
     "pay": ("salary", "salary_conflict", "salary_annual_statement", "salary_point", "wage"),
     "instalment": ("instalment",),
     "date": (
@@ -571,7 +589,7 @@ _BY_SHAPE = {
     "deadline": ("valid_through",),
     "duration": (
         *("duration", "duration_conflict", "contract_duration", "duration_limit"),
-        "access_period",
+        *("access_period", "placement_duration", "classroom_hours"),
     ),
     "schedule": ("schedule", "study_type", "weekly_hours", "working_pattern"),
     "place": ("location", "location_conflict"),

@@ -298,3 +298,28 @@ reviewed.
   feasible" (ruling R9), and every surface shows it as not reviewed, in plain words.
 - **To be settled:** where the records are stored, by Task 12b; how a pasted page's values
   are read, by Task 12b; the course and funding extraction schema, by Task 7e.
+
+## Amendment, 2026-11-01 (Task 7f: the school-leaver pages, version 0.3.0)
+
+- **Version 0.3.0 adds to 0.2.0, it does not re-review it.** It is 0.2.0 with eight
+  school-leaver pages and their records (plan v1.6), built by `tools.school_leaver_pack`
+  from `backend/tools/school_leaver_labels.json` and pinned like every version. Its five
+  new records are `proposed`, with no review. The Advanced Learner Loan (`funding:F02`)
+  gains how it is paid and repaid from two more pages of its guide; it was and stays
+  `proposed`, and keeps session 2's review record as given. Every other record, and
+  versions 0.1.0 and 0.2.0, are unchanged.
+- **A cap is its own shape (`limit`).** A page that states "Up to £9,790" states the most a
+  scheme lends or pays, never what a person gets, and neither `money` (an exact amount) nor
+  `rate` (an exact amount per period) can say that. `limit` holds the maximum in GBP minor
+  units, its period (null when the page states none), `repayable` (null when the page does
+  not say) and the case or year it applies to. The claim fields `loan_maximum` and
+  `bursary_maximum` take it; `loan_minimum` takes `money`, `repayment_threshold` takes
+  `rate`, and `placement_duration` and `classroom_hours` take `duration`.
+- **`format_version` stays 1.** The change only adds a shape and claim field names: every
+  earlier version still parses and checks as it did, and no consumer reads the new fields.
+- **The fetch route is recorded.** The 2026-11-01 pages were fetched through the session's
+  HTTPS proxy, which chooses the address, so each slot in `corpus/manifest.json` records
+  `via_proxy` true and `address_checked` false (ADR 0009, amendment of 2026-11-01).
+- **A page that does not state its value adds nothing.** The apprentice's training fee
+  (F04's page does not state it) and the nursing degree's UCAS deadline (C12 answered 404)
+  keep 0.2.0's unknowns until a page states them (`pending_slots`, OI-14).
