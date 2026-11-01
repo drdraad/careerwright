@@ -200,3 +200,27 @@ Two more things for you, not rows:
 ¹ The question sheet is `docs/reviews/school-leaver-pack-questions.md` (pack 0.3.0, not yet
 published). The saved pages are in `var/evidence/corpus/`. UCAS's kept words are in
 `planning/task-7f-fetch-output-c12.json` and `planning/task-7f-fetch-output-c12-date.json`.
+
+## The product owner's answers to the rows sent back (1 November 2026)
+
+Written down word for word as given: "yes, fix 1-3, 4. no not fair, 5 yes, 6 yes".
+
+What each answered, as the controller asked it:
+
+1. Q75, new Tuition Fee Loan: correct it to the page's words (only the £39,160 total "may
+   change"). Answer: yes, fix.
+2. Q95, new Maintenance Loan (£15,415): remove the claim that the amount may change. Answer:
+   yes, fix.
+3. Q104, apprenticeship training: the employer pays 5% only if it doesn't pay the
+   apprenticeship levy; other employers pay 25%. Answer: yes, fix.
+4. Q110, T Level start date: is "start date not stated" fair? Answer: no, not fair. The
+   record states what the page does say ("T Levels started in September 2020"; providers
+   offering T Level courses "from September 2025"); a particular provider's next start stays
+   unknown.
+5. Q115, the nursing degree's UCAS deadline: record 13 January 2027, citing UCAS's 2027-entry
+   "Equal consideration date for applications for most undergraduate courses" and GOV.UK's
+   student finance page naming nursing among undergraduate courses. Answer: yes.
+6. UCAS's words: Careerwright may keep short quotes from UCAS's page as evidence. Answer:
+   yes (the product owner's rights decision for this page).
+
+Q101 (who the government pays beyond the 95% share) was not sent back: it stays unknown.
