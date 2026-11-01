@@ -12,13 +12,13 @@ support by migration 0033's CHECK.
 
 Forward-only (see `docs/runbook.md`).
 
-Revision ID: 0043
+Revision ID: 0044
 """
 
 from careerwright.migrations.sql import run_script
 
-revision = "0043"
-down_revision = "0042"
+revision = "0044"
+down_revision = "0043"
 branch_labels = None
 depends_on = None
 

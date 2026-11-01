@@ -426,6 +426,6 @@ kind of the same statement, not a second rule: `TuitionFeeLoan.kind` (and the in
 `tuition_fee_loan` (the default, so every stored document keeps its meaning) or
 `advanced_learner_loan`, and everything above (what it pays, its statuses, an unknown amount,
 the economic cost, the search, the oracle) is shared. The loan to repay names its kind, and
-so does a family's financing (`advanced_learner_loan:<application>`). Migration 0043's CHECK
+so does a family's financing (`advanced_learner_loan:<application>`). Migration 0044's CHECK
 allows only the two kinds. The pruning rules are unchanged (`sound-pruning-5`). A maintenance
 loan and every other loan stay refused as support.
