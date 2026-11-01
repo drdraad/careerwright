@@ -1,0 +1,175 @@
+[
+  {
+    "slot": "C12",
+    "url": "https://www.ucas.com/applying/applying-to-university/dates-and-deadlines-for-uni-applications",
+    "final_url": "https://www.ucas.com/applying/applying-to-university/dates-and-deadlines-for-uni-applications",
+    "retrieved_at": "2026-11-01T18:51:23.374616+00:00",
+    "attempt": {
+      "status": "succeeded",
+      "reason": null
+    },
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "7f9d2e045146f204949de8e8d8c2bd1651921d639ac0ce8008019c36c103b996",
+    "byte_count": 142699,
+    "rights_status": "pending human rights review",
+    "retention": "excerpts",
+    "extraction": "no_job_posting",
+    "postings": [],
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": null,
+    "located": [
+      {
+        "excerpt": "January",
+        "count": 2,
+        "offsets": [
+          [
+            129033,
+            129040
+          ],
+          [
+            129088,
+            129095
+          ]
+        ],
+        "texts": [
+          "January",
+          "January"
+        ],
+        "contexts": [
+          [
+            128933,
+            129140,
+            "ort, you can apply to a student finance organisation.</p>\n\n<h4>Does your course start early between January and July?</h4>\n\n<p>A few courses start between January and July, rather than the more typical start"
+          ],
+          [
+            128988,
+            129195,
+            "p>\n\n<h4>Does your course start early between January and July?</h4>\n\n<p>A few courses start between January and July, rather than the more typical start dates of September/October.</p>\n\n<ul>\n\t<li>This kind o"
+          ]
+        ]
+      },
+      {
+        "excerpt": "Jan",
+        "count": 3,
+        "offsets": [
+          [
+            119811,
+            119814
+          ],
+          [
+            129033,
+            129036
+          ],
+          [
+            129088,
+            129091
+          ]
+        ],
+        "texts": [
+          "Jan",
+          "Jan",
+          "Jan"
+        ],
+        "contexts": [
+          [
+            119711,
+            119914,
+            "     <div class=\"step-by-step-item__date font-inch\" style=\"line-height: 1.2rem\">\n                13 Jan\n              </div>\n                                <h4 class=\"step-by-step-item__title\">\n        "
+          ],
+          [
+            128933,
+            129136,
+            "ort, you can apply to a student finance organisation.</p>\n\n<h4>Does your course start early between January and July?</h4>\n\n<p>A few courses start between January and July, rather than the more typical s"
+          ],
+          [
+            128988,
+            129191,
+            "p>\n\n<h4>Does your course start early between January and July?</h4>\n\n<p>A few courses start between January and July, rather than the more typical start dates of September/October.</p>\n\n<ul>\n\t<li>This ki"
+          ]
+        ]
+      },
+      {
+        "excerpt": "most undergraduate courses",
+        "count": 1,
+        "offsets": [
+          [
+            119980,
+            120006
+          ]
+        ],
+        "texts": [
+          "most undergraduate courses"
+        ],
+        "contexts": [
+          [
+            119880,
+            120106,
+            "tep-by-step-item__title\">\n            (18:00 UK time) Equal consideration date for applications for most undergraduate courses\n          </h4>\n          <div class=\"step-by-step-item__body prose\">\n            \n          </div>"
+          ]
+        ]
+      },
+      {
+        "excerpt": "2027",
+        "count": 8,
+        "offsets": [
+          [
+            48904,
+            48908
+          ],
+          [
+            114524,
+            114528
+          ],
+          [
+            114614,
+            114618
+          ],
+          [
+            116970,
+            116974
+          ],
+          [
+            117413,
+            117417
+          ]
+        ],
+        "texts": [
+          "2027",
+          "2027",
+          "2027",
+          "2027",
+          "2027"
+        ],
+        "contexts": [
+          [
+            48804,
+            49008,
+            "iders/our-products-and-services/student-recruitment-and-marketing/connect-with-future-applicants-ar-2027-ucas-events\" title=\"\">Exhibiting as a university or college</a></li>\n<li><a href=\"https://www.ucas."
+          ],
+          [
+            114424,
+            114628,
+            "per wrapper--padding\">\n  <div class=\"content-section prose content-indent\">\n                  <h2>  2027 entry application deadlines\n\n\n</h2>\n              <p><strong>For courses starting in 2027</strong>&"
+          ],
+          [
+            114514,
+            114718,
+            "    <h2>  2027 entry application deadlines\n\n\n</h2>\n              <p><strong>For courses starting in 2027</strong>&nbsp;(and for&nbsp;<a href=\"/undergraduate/applying-university/when-apply/deferred-entry\">"
+          ],
+          [
+            116870,
+            117074,
+            "                       <h4 class=\"step-by-step-item__title\">\n            UCAS’ search tool displays 2027 entry courses\n          </h4>\n          <div class=\"step-by-step-item__body prose\">\n            \n  "
+          ],
+          [
+            117313,
+            117517,
+            "                       <h4 class=\"step-by-step-item__title\">\n            UCAS applications open for 2027 entry\n          </h4>\n          <div class=\"step-by-step-item__body prose\">\n            <p>You can "
+          ]
+        ]
+      }
+    ]
+  }
+]
