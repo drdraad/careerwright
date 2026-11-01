@@ -38,8 +38,8 @@ person, and nothing it sees reaches the profile, a proposal or a suggestion.
 the wording, the word lists, the windows and the resources. The three phrasings they asked
 for there were added on 2026-10-28 after the session, as constructions (a controller
 ruling), and are not yet reviewed as built (`REVIEW_STATUS`). The resources were checked on
-the services' own pages on `CHECKED_ON`; nothing here is invented, and anything not on those
-pages is left out.
+the services' own pages on `CHECKED_ON` (Childline, added after, on `CHILDLINE_CHECKED_ON`,
+by the product owner); nothing here is invented, and anything not on those pages is left out.
 """
 
 import re
@@ -52,13 +52,18 @@ from dataclasses import dataclass
 # screened as What we know's direct entries are, with the same lines.
 # support-policy-11 (Task 6d slice C fix round 1, the same direction): a workspace's name, as
 # it is created or renamed, is screened the same way, with the same lines.
-POLICY_VERSION = "support-policy-11"
+# support-policy-12 (Task 6f, the school-leaver walk's finding 8): Childline joins the
+# services, for children and young people, in the words its own page gave the product owner
+# on 2026-11-01 (planning/childline-checked-2026-11-01.md). No age limit: that page stated none.
+POLICY_VERSION = "support-policy-12"
 CHECKED_ON = "2026-10-28"
+CHILDLINE_CHECKED_ON = "2026-11-01"
 REVIEW_STATUS = (
     "accepted for L0 at session 1 (human gate H-12); the three phrasings added on 2026-10-28, "
     "the screens of the first question and of What we know with their lines, added on "
-    "2026-10-31, and the screens of the conversation's review step and of a title's "
-    "seniority and industry, added on 2026-11-01, are not yet reviewed as built"
+    "2026-10-31, the screens of the conversation's review step and of a title's "
+    "seniority and industry, and Childline's line, added on 2026-11-01, are not yet reviewed "
+    "as built"
 )
 
 # Normalisation: the listed apostrophe variants to `'`, the hyphens U+2010 and U+2011 to `-`,
@@ -392,6 +397,13 @@ SUPPORT_RESOURCES: tuple[SupportResource, ...] = (
         "If you would rather text than talk",
         "https://giveusashout.org/get-help/",
         CHECKED_ON,
+    ),
+    SupportResource(
+        "Childline",
+        "Call 0800 1111 or use the 1-2-1 chat online (free, 24 hours a day, 7 days a week)",
+        "For children and young people",
+        "https://www.childline.org.uk/get-support/contacting-childline/",
+        CHILDLINE_CHECKED_ON,
     ),
 )
 

@@ -371,6 +371,7 @@ test("[PROF-09] a message with a risk stem is sent as usual, with the support pa
 
   const panel = page.getByRole("region", { name: "Support is available" });
   await expect(panel).toContainText("Samaritans: Call 116 123");
+  await expect(panel).toContainText("Childline: Call 0800 1111"); // support-policy-12
   await expect(panel).toContainText("Call 999 or go to A&E");
   await expect(page.getByText(/^You, \d\d:\d\d$/)).toHaveCount(1); // sent, with no extra step
   // The demo interviewer got the smaller-step instruction for this turn: it acknowledges the

@@ -122,8 +122,9 @@ Each is one yes or no. Yes keeps it as it is.
    built?
 6. In What we know, some optional answers say "Less precise without it: Nothing for now: …".
    Should that line go for answers nothing uses yet?
-7. Childline in the calm support panel: to add when Childline's details are checked. Nothing
-   to answer yet.
+7. The calm support panel now ends with this line, from what you checked on Childline's site:
+   "Childline: Call 0800 1111 or use the 1-2-1 chat online (free, 24 hours a day, 7 days a
+   week). For children and young people." Is it right as built?
 
 ---
 
@@ -146,7 +147,7 @@ Each is one yes or no. Yes keeps it as it is.
 | S4 | Two places to type at the start | | not run — requires human |
 | S5 | The support panel's title line | | not run — requires human |
 | S6 | "Less precise without it: Nothing for now" | | not run — requires human |
-| S7 | Childline in the support panel | to add when Childline's details are checked | not run — requires human |
+| S7 | Childline's line in the support panel | | not run — requires human |
 
 ---
 

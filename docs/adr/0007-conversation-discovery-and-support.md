@@ -1081,3 +1081,14 @@ space; this ADR changes as follows.
   answer a person types in What we know or the review step; what they are doing now is a
   choice from a fixed list, with no words typed. That is the same place and screen as before,
   so the policy's version is unchanged (`support-policy-11`).
+- **Amendment line, Task 6f follow-up (2026-11-01): Childline joins the panel's services**
+  (`support-policy-12`; the school-leaver walk's finding 8, decision 9). Decision 7's services
+  are now five: after Shout, "Childline: Call 0800 1111 or use the 1-2-1 chat online (free, 24
+  hours a day, 7 days a week). For children and young people." Every detail is one the
+  product owner checked by eye on Childline's own page on 1 November 2026
+  (`planning/childline-checked-2026-11-01.md`; the site refuses automated requests), and its
+  `checked_on` is that day, so the panel names Childline's date beside the others'. Nothing
+  asks for or infers an age, so it shows to everyone, in every place the panel shows, and says
+  who it is for in Childline's own words; it states no age limit, which that page did not.
+  The screen's words, lists and windows are unchanged. Not yet reviewed as built
+  (`REVIEW_STATUS`; H-12, session W2).

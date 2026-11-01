@@ -10,6 +10,7 @@ used."""
 import pytest
 
 from careerwright.profile.safety import (
+    POLICY_VERSION,
     SUPPORT_RESOURCES,
     has_risk_stem,
     inferred_sensitive_terms,
@@ -223,9 +224,26 @@ def test_the_support_resources_are_the_checked_uk_services_with_their_sources() 
         "NHS 111": "Call 111 and choose the mental health option, or use 111 online",
         "Samaritans": "Call 116 123 (free, any time, day or night)",
         "Shout": "Text SHOUT to 85258 (free, 24/7)",
+        "Childline": "Call 0800 1111 or use the 1-2-1 chat online (free, 24 hours a day, "
+        "7 days a week)",
     }
     assert all(resource.source_url.startswith("https://") for resource in SUPPORT_RESOURCES)
-    assert {resource.checked_on for resource in SUPPORT_RESOURCES} == {"2026-10-28"}
+    checked = {resource.name: resource.checked_on for resource in SUPPORT_RESOURCES}
+    assert checked.pop("Childline") == "2026-11-01"
+    assert set(checked.values()) == {"2026-10-28"}
+
+
+@pytest.mark.req("PROF-15")
+def test_childline_is_listed_for_children_and_young_people_in_its_own_checked_words() -> None:
+    # Only what the product owner checked on Childline's own page on 2026-11-01
+    # (planning/childline-checked-2026-11-01.md): no age limit, which that page didn't state.
+    childline = next(r for r in SUPPORT_RESOURCES if r.name == "Childline")
+
+    assert childline.when == "For children and young people"
+    assert childline.source_url == "https://www.childline.org.uk/get-support/contacting-childline/"
+    assert not any(ch.isdigit() for ch in childline.when)  # no age stated
+    assert [r.name for r in SUPPORT_RESOURCES][-1] == "Childline"  # beside the others
+    assert POLICY_VERSION == "support-policy-12"
 
 
 @pytest.mark.req("REC1-02")

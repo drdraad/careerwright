@@ -253,6 +253,7 @@ test("[PROF-09][DIV1-13][WLD-08] a risk phrase at the first question shows the c
     "Careerwright keeps it as your job title only if you choose to. You can also type again or skip this question.",
   );
   await expect(panel).toContainText("Samaritans: Call 116 123");
+  await expect(panel).toContainText("Childline: Call 0800 1111"); // support-policy-12
   await expect(page.locator(".world")).toHaveAttribute("data-distress", "true");
   await expect(page.getByRole("option")).toHaveCount(0); // nothing offered in those words
   await field(page).press("Enter");
