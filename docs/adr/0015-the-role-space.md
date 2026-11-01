@@ -369,3 +369,57 @@ Decision 4 is settled and decision 3's optional fields are built. Session W2 jud
 - **Known limits (L0, recorded):** a role and a target with the same title as a concept keep
   their details apart (by use), but two spellings of one title share them, as their records do;
   the workspace export (format 4) doesn't carry title details yet.
+
+## Amendment line, Task 6e (2026-11-01): research this role
+
+Decisions 1 to 3's fourth layer is built (S2.9; `careerwright.evidence.role_research`,
+`careerwright.evidence.corroboration`, migration 0042). Words are worded in the web from codes
+(ruling R11); session W2 judges them. The live qualification is the controller's
+(`make live-role-research`, R5).
+- **The search** is a source search with its own purpose (ADR 0009 decision 12, amendment):
+  the same run kind, task and bounds (one request, no repair, at most two tool calls; worst
+  case $0.008 on the test model, $0.045 on Spark), a sealed `RoleSearchInput` of the title
+  alone, and its own instructions (`role-search-1`) that send `{"role": title, "country":
+  "England"}` and nothing else (SEC-05). Its estimated cost is the source search's, shown
+  before it starts. A title ESCO holds as a label, or the UK job-title index lists, is refused
+  (`title_already_listed`): it needs no research. A demo workspace never searches.
+- **The reading** is an acquisition of up to five of the search's candidates (those the search
+  really returned first), started by the person's research (the web asks for it as soon as the
+  search is done; asked again, the API answers with the same reading). Each target carries the
+  title; the restricted worker returns the page's whole visible text without personal details
+  (`pages.role_text`, never told the title), and the DBOS worker checks the title and records
+  only the text's hash, the span, an excerpt of at most 200 characters and a passage
+  fingerprint (`role_page_checks`). A role page is never recorded as a job, never handed to a
+  model and never kept beyond what its class permits. It does not join another run's fetch of
+  the same page or wait out a job page's back-off: it needs its own check; per-host pacing
+  still holds.
+- **The rule** (decision 2) is decided on read: found on two independent sources or one
+  official page. Copies fold first: two pages are one source when a structured posting of one
+  is the same job as one of the other (`jobs.same_job`), or when the title and the 24 words
+  after it are the same on both. Two pages of one host are one source unless each names an
+  employer and they differ. A page that couldn't be read is never counted as a page without
+  the title: a reading that ended before the rule could say found is `reading_stopped`, never
+  "not yet found", and a complete reading with unread pages says how many. Verified spans are
+  a fact, so a role found before a reading was stopped stays found.
+- **The record** (decision 3) is `role_researches`: the title, its search, its reading,
+  `review_state` always `proposed` (a CHECK), dated and private to the workspace. Its page checks
+  are its source claims, with the quotes and the dates one step away in the web. Making a found
+  title idea a target is the person's click through the profile's one write path; its target
+  record stays the person's words (`own_words`) and the research is its evidence beside it.
+- **Where it shows:** under the slate, "Titles no list holds": the person's role and targets
+  kept in their own words and the title ideas not yet found, each with "Research this role",
+  live workspaces only.
+- **Duties and entry requirements on opening a found role are deferred (decision 6 settled):**
+  they don't fit L0's per-role bound. One role-description extraction is a page-extraction run:
+  worst case $0.0034 on the test model and $0.048 on Spark per page, three DBOS attempts each.
+  Quoting even one page's duties would more than double a role's worst case ($0.045 search plus
+  $0.048), five pages would cost up to $0.24 on Spark (up to $0.72 counting every attempt), and
+  on Muse Wonder one page at its bounds (about $0.16) already passes the default $0.15 run limit,
+  so a provider outage would read as "over budget" (the audit's appendix F, section 6). Doing it
+  inside the bound would need either a smaller page cut or one page only, and a new extraction
+  schema qualified live: both are new decisions for the end-to-end session or M1, not a stretch
+  of this bound. Until then a found role shows only the verified quotes of its title.
+- **Known limits (L0, recorded):** a copy of an advert reworded around the title on another host
+  counts as a second source unless its structured data says it is the same job; a title shown
+  only in a page's navigation or a list of links still counts as the page using it; the search's
+  quality for role pages is unqualified until the controller's live run.
