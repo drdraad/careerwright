@@ -36,8 +36,8 @@ list. Append new events at the end, one line each ("Ruling: what — why — cos
 | Acceptance fix | complete | fd4f939, 61597ee |
 | 10A (Skills backend) | complete, integrated | dbc1bd1..d011472, b24668e, 81010d3; draft-checklist readiness 93c1e0e..51c03eb |
 | e2e fix | complete | 53ca60d, c2f1cc9 |
-| 7f (school-leaver pack) | first half complete (integrated 5420d35); second half next | 276c79d..bb438fc; session record 5ff2a18 |
-| School-leaver pack session | held: an AI check counted as the product owner's review (their ruling) | `docs/reviews/school-leaver-pack-session.md` |
+| 7f (school-leaver pack) | first half complete (integrated 5420d35); second half running | 276c79d..bb438fc; session record 5ff2a18, answers 292e9e8 |
+| School-leaver pack session | held: an AI check counted as the product owner's review (their ruling); the six rows sent back answered | `docs/reviews/school-leaver-pack-session.md` |
 | Lean clean-up (documents) | running | f4b129a.. |
 | 10B (Skills screens) | waits for session W2 (backend half done as 10A) | — |
 | 12b, 14, 15 | wait (order: `planning/controller-state.md`) | — |
@@ -48,13 +48,14 @@ list. Append new events at the end, one line each ("Ruling: what — why — cos
 ## Running now
 - Acceptance run 10 (the controller, on 51c03eb and after).
 - The lean clean-up (documents only, main tree).
-- Next: Task 7f's second half publishes pack 0.3.0 from the session record; session W2.
+- Task 7f's second half (worktree wt-7f from 292e9e8, `planning/task-7f-second-half-dispatch.md`):
+  publishes pack 0.3.0 from the session record.
+- Next: session W2.
 
 ## Open questions for the product owner
-- The school-leaver pack: six rows need you (`docs/reviews/school-leaver-pack-session.md`,
-  "For you"): Q75, Q95 and Q104 (the pages say something different); Q101, Q110 and Q115
-  (the pages don't settle them).
-- The school-leaver pack: may Careerwright keep words from UCAS (not a GOV.UK page)?
+- None left on the school-leaver pack: the six rows sent back (Q75, Q95, Q104, Q110, Q115 and
+  UCAS's words) were answered on 1 November 2026; Q101 stays unknown
+  (`docs/reviews/school-leaver-pack-session.md`).
 - Session W2's sheet: the lines starting "Session W2" in A (906, 958, 965, 1060), the
   Childline link question (A 1110), research beside the role in You (6e M5, A 1082), and
   `planning/carry-forward-task-W2D.md`.
@@ -118,3 +119,6 @@ review can confirm they landed.
 - Task 7f: other Minors (`planning/task-7f-review.md`; A 1132); six claims whose deciding
   words sit beyond 200 characters (A 1136).
 - Task 10A Minors M1, M3–M6 (`planning/archive/task-10A-review.md`; A 1144).
+
+## Events (from 2026-11-01, newest last)
+PO answers (2026-11-01, verbatim): "yes, fix 1-3, 4. no not fair, 5 yes, 6 yes" — recorded in docs/reviews/school-leaver-pack-session.md (292e9e8). The school-leaver pack session is held (AI check counted as the PO's review by their ruling; six rows decided by the PO). Task 7f second half: dispatched (opus), worktree wt-7f reset to 292e9e8, task-7f-second-half-dispatch.md.
