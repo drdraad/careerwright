@@ -30,6 +30,7 @@ from typing import NoReturn
 
 SERVICE_USER = "careerwright"
 PRIVATE = Path("/run/careerwright/private")
+MOUNTS = Path("/proc/mounts")
 GIVEN: tuple[tuple[str, Path], ...] = (
     ("secrets", Path("/run/secrets")),
     ("keys", Path("/run/careerwright/keys")),
@@ -65,6 +66,17 @@ def copy_given(given: Sequence[tuple[str, Path]], private: Path, uid: int, gid: 
     return sorted(copied)
 
 
+def is_tmpfs(path: Path, mounts: Path) -> bool:
+    """Whether `path` is itself a tmpfs mount point, as the kernel lists it: the last mount
+    there is the one in use. Any other mount (a disk volume, a bind mount) is not memory."""
+    found = None
+    for line in mounts.read_text(encoding="utf-8").splitlines():
+        fields = line.split()
+        if len(fields) >= 3 and fields[1] == str(path):
+            found = fields[2]
+    return found == "tmpfs"
+
+
 def main(argv: Sequence[str] | None = None) -> NoReturn:
     command = list(sys.argv[1:] if argv is None else argv)
     if not command:
@@ -74,7 +86,7 @@ def main(argv: Sequence[str] | None = None) -> NoReturn:
             "careerwright.entrypoint must start as root to give the service its files "
             "(compose.yaml sets `user: root`)"
         )
-    if not os.path.ismount(PRIVATE):
+    if not is_tmpfs(PRIVATE, MOUNTS):
         raise SystemExit(f"{PRIVATE} is not a tmpfs mount; the copies must stay in memory")
     user = pwd.getpwnam(SERVICE_USER)
     copy_given(GIVEN, PRIVATE, user.pw_uid, user.pw_gid)

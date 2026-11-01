@@ -49,6 +49,19 @@ class Worker:
         if self.process.poll() is None:
             self.kill()
 
+    def wait_ready(self, timeout_s: float = 60.0) -> None:
+        """Until the worker's loop has made its first good pass (its heartbeat exists). Its
+        imports alone take seconds on a slow host, so a test that times what a running
+        worker does starts its clock here."""
+        beat = self.log_path.with_suffix(".heartbeat")
+
+        def ready() -> bool:
+            if self.process.poll() is not None:
+                raise RuntimeError(f"worker exited before it was ready; see {self.log_path}")
+            return beat.exists()
+
+        wait_for(ready, timeout_s=timeout_s, what=f"the worker's first pass ({self.log_path})")
+
     def wait_exit(self, timeout_s: float) -> int:
         code = self.process.wait(timeout=timeout_s)
         self._log.close()

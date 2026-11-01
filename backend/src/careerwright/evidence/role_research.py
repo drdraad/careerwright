@@ -34,6 +34,7 @@ from careerwright.config import RuntimeMode
 from careerwright.db import Tx
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
 from careerwright.evidence import role_store, store
+from careerwright.evidence.acquisition import RECORDABLE_PORTS
 from careerwright.evidence.addresses import CheckedUrl, check_url
 from careerwright.evidence.corroboration import (
     Corroboration,
@@ -191,11 +192,14 @@ def _proposal(tx: Tx, keyring: Keyring, run: Run) -> SearchProposal | None:
 
 def pages_to_read(proposal: SearchProposal) -> list[str]:
     """Up to `MAX_PAGES` candidates, the pages the search really returned first, each still
-    passing the fetch checks."""
+    passing the fetch checks but the port's. The port is left, as a job acquisition's
+    targets leave it (`acquisition.RECORDABLE_PORTS`), to the restricted worker's own fetch
+    check: it refuses a port other than 80 or 443 as a blocked attempt, on record, and it
+    alone knows a controlled test server's port. The search already excludes other ports."""
     ordered = sorted(proposal.candidates, key=lambda c: not c.grounded)
     urls: list[str] = []
     for candidate in ordered:
-        checked = check_url(candidate.url)
+        checked = check_url(candidate.url, allowed_ports=RECORDABLE_PORTS)
         if isinstance(checked, CheckedUrl) and checked.url not in urls:
             urls.append(checked.url)
     return urls[:MAX_PAGES]

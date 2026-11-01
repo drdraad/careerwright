@@ -18,14 +18,13 @@ import threading
 import time
 import uuid
 from collections.abc import Callable, Mapping
-from pathlib import Path
 from types import FrameType
 from typing import NoReturn
 
 from dbos import DBOS, DBOSConfig, DBOSPortableJSONSerializer, SetWorkflowID
 
 from careerwright.db import Engine, system_transaction
-from careerwright.identity import activity, run_store, workflow
+from careerwright.identity import activity, heartbeat, run_store, workflow
 from careerwright.identity.activity import ActivityRuntime
 
 APP_NAME = "careerwright"
@@ -35,10 +34,6 @@ APPLICATION_VERSION = "careerwright-l0-1"
 DISPATCH_INTERVAL_S = 0.2
 RECONCILE_INTERVAL_S = 60.0
 SHUTDOWN_DEADLINE_S = 10.0
-HEARTBEAT_FILE = Path(
-    os.environ.get("CAREERWRIGHT_WORKER_HEARTBEAT", "/tmp/careerwright-worker-heartbeat")  # noqa: S108
-)
-HEARTBEAT_STALE_S = 15.0
 EXIT_SHUTDOWN_TIMEOUT = 75
 _log = logging.getLogger("careerwright.worker")
 
@@ -119,18 +114,6 @@ def reconcile_errored_runs(runtime: ActivityRuntime) -> int:
     )
 
 
-def _heartbeat() -> None:
-    HEARTBEAT_FILE.touch()
-
-
-def check() -> int:
-    try:
-        age = time.time() - HEARTBEAT_FILE.stat().st_mtime
-    except OSError:
-        return 1
-    return 0 if age < HEARTBEAT_STALE_S else 1
-
-
 def loop_pass(
     engine: Engine,
     runtime: ActivityRuntime,
@@ -147,7 +130,7 @@ def loop_pass(
         if time.monotonic() >= next_reconcile:
             next_reconcile = time.monotonic() + RECONCILE_INTERVAL_S
             reconcile_errored_runs(runtime)
-        _heartbeat()
+        heartbeat.beat()
     except Exception as error:
         _log.warning("worker pass failed", extra={"error_class": type(error).__name__})
     return next_reconcile

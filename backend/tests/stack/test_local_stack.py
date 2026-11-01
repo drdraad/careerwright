@@ -7,6 +7,7 @@ import base64
 import json
 import socket
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -78,12 +79,40 @@ def test_only_the_edge_publishes_ports_and_only_on_loopback(demo_stack: Stack) -
     assert httpx.get(f"{demo_stack.api_url}/readyz", timeout=10).json() == {"status": "ready"}
 
 
+def host_address(stack: Stack) -> tuple[str, str]:
+    """(where the listener binds, the name or address a container dials to reach it). Docker
+    Desktop forwards `host.docker.internal` to the host's loopback. A Linux Docker host
+    defines no such name, and a container reaches the host only at an address of the
+    host's own, so the listener binds to the `edge` bridge's gateway, which only the
+    containers' bridges can reach (the Linux-host acceptance run, 2026-11-01)."""
+    if sys.platform != "linux":
+        return "127.0.0.1", "host.docker.internal"
+    gateway = subprocess.run(  # noqa: S603
+        [  # noqa: S607
+            "docker",
+            "network",
+            "inspect",
+            f"{stack.project}_edge",
+            "--format",
+            "{{(index .IPAM.Config 0).Gateway}}",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    ).stdout.strip()
+    assert gateway, "the edge network has no gateway address"
+    return gateway, gateway
+
+
 @pytest.fixture
-def host_listener() -> Iterator[tuple[int, list[bool]]]:
-    """A TCP listener on the host's loopback: the 'outside world' for the egress probe."""
+def host_listener(demo_stack: Stack) -> Iterator[tuple[tuple[str, int], list[bool]]]:
+    """A TCP listener on the host, outside every container network: the 'outside world' for
+    the egress probe. Yields the address a container dials, and whether anything arrived."""
+    bind, dial = host_address(demo_stack)
     server = socket.socket()
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind(("127.0.0.1", 0))
+    server.bind((bind, 0))
     server.listen()
     server.settimeout(0.5)
     accepted: list[bool] = []
@@ -100,7 +129,7 @@ def host_listener() -> Iterator[tuple[int, list[bool]]]:
 
     thread = threading.Thread(target=accept, daemon=True)
     thread.start()
-    yield server.getsockname()[1], accepted
+    yield (dial, server.getsockname()[1]), accepted
     stop.set()
     thread.join(timeout=5)
     server.close()
@@ -134,23 +163,25 @@ NODE_PROBE = (
     "s.on('error',"
     "e=>r(e.code));s.on('timeout',()=>{s.destroy();r('timeout')})});const d=new Promise(r=>dns."
     "lookup('example.com',e=>r(e?e.code:'resolved')));Promise.all([t('TEST_NET',443),"
-    "t('host.docker.internal',PORT),d]).then(([a,b,c])=>console.log(JSON.stringify({outside:a,"
+    "t('HOST',PORT),d]).then(([a,b,c])=>console.log(JSON.stringify({outside:a,"
     "host:b,dns:c})))"
 )
 
 BASH_PROBE = (
-    "for t in TEST_NET/443 host.docker.internal/PORT; do "
+    "for t in TEST_NET/443 HOST/PORT; do "
     'if timeout 4 bash -c "exec 3<>/dev/tcp/$t" 2>/dev/null; then echo "$t connected"; '
     'else echo "$t blocked"; fi; done'
 )
 
 
-def probe(stack: Stack, service: str, port: int, *, outside: bool = True) -> str:
-    """Connect to the host listener and, when `outside`, to TEST_NET and resolve a public
-    name through the container's resolver. The host listener is the egress evidence; the
-    edge control and the live-mode workers have a real route, so they probe the host only."""
+def probe(stack: Stack, service: str, listener: tuple[str, int], *, outside: bool = True) -> str:
+    """Connect to the host listener (`host_listener`'s address) and, when `outside`, to
+    TEST_NET and resolve a public name through the container's resolver. The host listener is
+    the egress evidence; the edge control and the live-mode workers have a real route, so
+    they probe the host only."""
+    host, port = listener
     if service in ("api", "edge", "worker", "acquisition"):
-        targets = [("host", ("host.docker.internal", port))]
+        targets = [("host", (host, port))]
         if outside:
             targets.append(("outside", (TEST_NET, 443)))
         script = PYTHON_PROBE.replace("TARGETS", repr(targets)).replace("OUTSIDE", str(outside))
@@ -159,13 +190,17 @@ def probe(stack: Stack, service: str, port: int, *, outside: bool = True) -> str
         command = [
             "node",
             "-e",
-            NODE_PROBE.replace("PORT", str(port)).replace("TEST_NET", TEST_NET),
+            NODE_PROBE.replace("HOST", host)
+            .replace("PORT", str(port))
+            .replace("TEST_NET", TEST_NET),
         ]
     else:
         command = [
             "bash",
             "-c",
-            BASH_PROBE.replace("PORT", str(port)).replace("TEST_NET", TEST_NET),
+            BASH_PROBE.replace("HOST", host)
+            .replace("PORT", str(port))
+            .replace("TEST_NET", TEST_NET),
         ]
     return stack.exec(service, *command, timeout=60).stdout.strip()
 
@@ -224,19 +259,19 @@ def test_only_the_dbos_worker_can_reach_the_acquisition_worker(demo_stack: Stack
 
 @pytest.mark.req("BND1-11")
 def test_demo_mode_services_have_no_route_out_and_the_probe_can_see_one(
-    demo_stack: Stack, host_listener: tuple[int, list[bool]]
+    demo_stack: Stack, host_listener: tuple[tuple[str, int], list[bool]]
 ) -> None:
-    port, accepted = host_listener
+    listener, accepted = host_listener
 
     # Positive control: the same probe from the edge, the one container on a normal bridge,
     # reaches the host listener. So a "blocked" result below is not a broken probe.
-    control = json.loads(probe(demo_stack, "edge", port, outside=False))
+    control = json.loads(probe(demo_stack, "edge", listener, outside=False))
     assert control["host"] == "connected"
     assert accepted
 
     accepted.clear()
     services = ("api", "worker", "acquisition", "auth", "web", "postgres")
-    results = {service: probe(demo_stack, service, port) for service in services}
+    results = {service: probe(demo_stack, service, listener) for service in services}
 
     assert "connected" not in results["postgres"], results
     for service in ("api", "worker", "acquisition", "auth", "web"):
@@ -250,21 +285,21 @@ def test_demo_mode_services_have_no_route_out_and_the_probe_can_see_one(
 
 @pytest.mark.req("BND1-11", "ACQ-05")
 def test_live_mode_gives_the_two_workers_and_nothing_else_a_route_out(
-    demo_stack: Stack, host_listener: tuple[int, list[bool]]
+    demo_stack: Stack, host_listener: tuple[tuple[str, int], list[bool]]
 ) -> None:
-    port, accepted = host_listener
+    listener, accepted = host_listener
     live = Stack(
         project=demo_stack.project, home=demo_stack.home, ports=demo_stack.ports, live=True
     )
     live.up(*CORE_SERVICES)
     try:
         for service in ("worker", "acquisition"):
-            reached = json.loads(probe(live, service, port, outside=False))
+            reached = json.loads(probe(live, service, listener, outside=False))
             assert reached["host"] == "connected", service
             assert accepted
             accepted.clear()
-        api = json.loads(probe(live, "api", port, outside=False))
-        web = json.loads(probe(live, "web", port))
+        api = json.loads(probe(live, "api", listener, outside=False))
+        web = json.loads(probe(live, "web", listener))
         assert api["host"] != "connected"
         assert web["host"] != "connected"
         assert web["outside"] != "connected"
@@ -275,7 +310,8 @@ def test_live_mode_gives_the_two_workers_and_nothing_else_a_route_out(
     finally:
         demo_stack.up(*CORE_SERVICES)  # back to demo for the remaining tests
     for service in ("worker", "acquisition"):
-        assert json.loads(probe(demo_stack, service, port, outside=False))["host"] != "connected"
+        reached = json.loads(probe(demo_stack, service, listener, outside=False))
+        assert reached["host"] != "connected", service
 
 
 def _inspect(stack: Stack, service: str) -> dict[str, Any]:
@@ -411,7 +447,11 @@ for pid in filter(str.isdigit, os.listdir('/proc')):
     except OSError:
         continue
     if status.get('PPid') == '1':  # the service, under Compose's init; never an exec'd check
-        service.append({'uid': sorted(set(status['Uid'].split())), 'groups': status['Groups']})
+        service.append({
+            'uid': sorted(set(status['Uid'].split())),
+            'groups': status['Groups'],
+            'no_new_privs': status['NoNewPrivs'],
+        })
 private = '/run/careerwright/private'
 files = {}
 for root, dirs, names in os.walk(private):
@@ -443,7 +483,8 @@ def test_each_service_runs_as_its_own_user_holding_read_only_copies_of_its_own_f
     for service, names in given.items():
         view = json.loads(demo_stack.exec(service, "python", "-c", PRIVATE_VIEW).stdout)
 
-        assert view["service"] == [{"uid": ["10001"], "groups": ""}], service
+        # No setuid binary in the image can raise it again (compose.yaml: no-new-privileges).
+        assert view["service"] == [{"uid": ["10001"], "groups": "", "no_new_privs": "1"}], service
         assert view["files"] == {
             ".": directory,
             **{name: directory if "/" not in name else copy for name in names},
