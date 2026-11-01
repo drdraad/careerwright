@@ -33,3 +33,6 @@ next-env.d.ts
 
 # OS
 .DS_Store
+
+# The agent workspace lives in planning/; review diffs are regenerated on demand by planning/review-pkg.sh
+planning/review-*.diff
