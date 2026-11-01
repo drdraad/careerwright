@@ -124,3 +124,13 @@ Readiness stays strict, as you asked: the rubrics in reference 0.2.0 are still `
 
 ### Rule note
 Every source change in this round used Edit or Write. `ruff format` and `pnpm run generate` are generators.
+
+## Follow-up: the three failing tests in acceptance run 7
+
+**Cause:** the mistake was in the test, not the code. The helper `paste()` in `tests/integration/test_skills.py` read `pasted.json()["job_id"]`. The paste endpoint actually answers with the job's details, `{"job": {"job_id": …}, "claims": […]}`, the same shape `test_acquisition.py` already reads. The helper now reads `["job"]["job_id"]`. No assertion changed.
+
+**Commit:** `81010d3`, in the main tree, committed with an explicit pathspec.
+
+**Checks:**
+- Focused run under the lock with the build shim: `pytest -m integration tests/integration/test_skills.py` gave **8 passed** (log `/tmp/skills-int.log`). The lock was removed afterwards.
+- `make check` (Adzuna variables unset, Node 24): exit 0. Backend 2,159 passed; Vitest 471 passed.
