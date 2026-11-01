@@ -77,6 +77,8 @@ def unasked_profile() -> dict[str, dict[str, Any]]:
             "evidenced_tasks",
             "work_style",
             "minimum_salary",
+            "work_status",
+            "qualifications",
         )
     }
 

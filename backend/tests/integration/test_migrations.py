@@ -610,6 +610,87 @@ def test_0036_records_uk_titles_and_takes_another_nursing_field_off_the_adult_pa
     ]
 
 
+@pytest.mark.req("PROF-13")
+def test_0040_gives_every_stored_profile_both_new_answers_not_yet_asked(infra: Infra) -> None:
+    # Task 6f: a version 3 document (and a version 1 one) stored before 0040 becomes version 4
+    # with what the person is doing now and their qualifications not yet asked; every answer
+    # it held keeps its state, value and source.
+    database = f"careerwright_schema_4_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    engine = migrator_engine(infra, database)
+    source = str(uuid.uuid4())
+    held = {"state": "provided", "value": "Baker", "source_ref_id": source}
+    later = ("work_status", "qualifications")
+    version_3 = {
+        "schema_version": "3",
+        **{name: {"state": "unasked"} for name in ProfileInput.model_fields if name not in later},
+        "current_role": held,
+    }
+    version_1 = {
+        "schema_version": "1",
+        **{
+            name: {"state": "unasked"}
+            for name in (
+                "preferred_name",
+                "current_role",
+                "cities",
+                "target_titles",
+                "weekly_study_hours",
+                "direct_spend_cap",
+                "monthly_payment_cap",
+            )
+        },
+    }
+    try:
+        migrate_app(engine, "0039")
+        with engine.begin() as tx:
+            workspace = identity_store.insert_workspace(
+                tx,
+                workspace_id=uuid.uuid4(),
+                owner_actor_id=INVITED_ACTORS[0].actor_id,
+                name="Saved before schema 4 (synthetic)",
+                data_mode=DataMode.DEMO,
+                synthetic=True,
+            ).workspace_id
+            for version, document in ((1, version_1), (2, version_3)):
+                tx.exec_driver_sql(
+                    "INSERT INTO careerwright.profile_versions (workspace_id, version, "
+                    "schema_version, document) VALUES (%(ws)s, %(version)s, %(schema)s, "
+                    "%(document)s::jsonb)",
+                    {
+                        "ws": workspace,
+                        "version": version,
+                        "schema": document["schema_version"],
+                        "document": json.dumps(document),
+                    },
+                )
+        migrate_app(engine)
+        with system_transaction(engine) as tx:
+            first = profile_store.profile_version(tx, workspace, 1)
+            second = profile_store.profile_version(tx, workspace, 2)
+    finally:
+        engine.dispose()
+
+    rows = infra.query(
+        "SELECT version, schema_version, document FROM careerwright.profile_versions "
+        "WHERE workspace_id = %s ORDER BY version",
+        (workspace,),
+        database=database,
+    )
+    for row in rows:
+        assert row["schema_version"] == "4"
+        document = row["document"]
+        assert isinstance(document, dict)
+        assert document["schema_version"] == "4"
+        assert document["work_status"] == {"state": "unasked"}
+        assert document["qualifications"] == {"state": "unasked"}
+    assert rows[1]["document"]["current_role"] == held  # kept exactly, with its source
+    assert first is not None
+    assert second is not None
+    assert second.document.current_role.value == "Baker"
+    assert first.document.enjoyed_tasks.state is FieldState.UNASKED
+
+
 def add_discovery_then_a_choice(tx: sa.Connection, keyring: Keyring) -> tuple[uuid.UUID, uuid.UUID]:
     """Ada's demo workspace (its note runs offline) before 0034: version 1 with an answer and
     three targets, a discovery pinned to it, and version 2, the bicycle mechanic chosen from

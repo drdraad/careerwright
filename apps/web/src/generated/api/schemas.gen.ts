@@ -744,7 +744,8 @@ export const AnsweredStateSchema = {
         'provided',
         'unknown',
         'skipped',
-        'prefer_not_to_say'
+        'prefer_not_to_say',
+        'no_job_yet'
     ],
     title: 'AnsweredState',
     description: 'A proposal answers a field; it never returns one to "not asked".'
@@ -2426,7 +2427,7 @@ export const DecideTurnSchema = {
                 type: 'string'
             },
             type: 'array',
-            maxItems: 12,
+            maxItems: 14,
             title: 'Accept'
         },
         confirm_hard_constraints: {
@@ -2434,7 +2435,7 @@ export const DecideTurnSchema = {
                 $ref: '#/components/schemas/ProfileField'
             },
             type: 'array',
-            maxItems: 12,
+            maxItems: 14,
             title: 'Confirm Hard Constraints'
         },
         edits: {
@@ -2442,7 +2443,7 @@ export const DecideTurnSchema = {
                 $ref: '#/components/schemas/FieldEdit'
             },
             type: 'array',
-            maxItems: 12,
+            maxItems: 14,
             title: 'Edits',
             description: 'The person\'s own answers for fields this turn proposed, saved instead of those proposals (as direct entries) in the same version as the accepted ones.'
         }
@@ -3676,6 +3677,12 @@ export const FieldEditSchema = {
                 },
                 {
                     $ref: '#/components/schemas/SalaryInput'
+                },
+                {
+                    $ref: '#/components/schemas/WorkStatusInput'
+                },
+                {
+                    $ref: '#/components/schemas/QualificationListInput'
                 }
             ],
             title: 'Answer'
@@ -3698,7 +3705,8 @@ export const FieldStateSchema = {
         'provided',
         'unknown',
         'skipped',
-        'prefer_not_to_say'
+        'prefer_not_to_say',
+        'no_job_yet'
     ],
     title: 'FieldState'
 } as const;
@@ -6000,6 +6008,23 @@ export const NeededInputSchema = {
         'work_rights'
     ],
     title: 'NeededInput'
+} as const;
+
+export const NoJobYetSchema = {
+    properties: {
+        expected_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Version'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_version'
+    ],
+    title: 'NoJobYet',
+    description: 'The first answer "I haven\'t had a job yet" (Task 6f; the product owner\'s words).'
 } as const;
 
 export const NoSharedOccupationSchema = {
@@ -8523,9 +8548,9 @@ export const ProfileDocumentSchema = {
     properties: {
         schema_version: {
             type: 'string',
-            const: '3',
+            const: '4',
             title: 'Schema Version',
-            default: '3'
+            default: '4'
         },
         preferred_name: {
             $ref: '#/components/schemas/TextField'
@@ -8562,6 +8587,12 @@ export const ProfileDocumentSchema = {
         },
         minimum_salary: {
             $ref: '#/components/schemas/SalaryField'
+        },
+        work_status: {
+            $ref: '#/components/schemas/WorkStatusField'
+        },
+        qualifications: {
+            $ref: '#/components/schemas/QualificationListField'
         }
     },
     additionalProperties: false,
@@ -8578,7 +8609,9 @@ export const ProfileDocumentSchema = {
         'confident_tasks',
         'evidenced_tasks',
         'work_style',
-        'minimum_salary'
+        'minimum_salary',
+        'work_status',
+        'qualifications'
     ],
     title: 'ProfileDocument',
     description: 'A stored profile version\'s content: each field with the source that established it.'
@@ -8598,7 +8631,9 @@ export const ProfileFieldSchema = {
         'confident_tasks',
         'evidenced_tasks',
         'work_style',
-        'minimum_salary'
+        'minimum_salary',
+        'work_status',
+        'qualifications'
     ],
     title: 'ProfileField',
     description: 'The only names a proposal may use: the profile\'s own fields.'
@@ -8648,6 +8683,14 @@ export const ProfileInputSchema = {
         minimum_salary: {
             $ref: '#/components/schemas/SalaryInput',
             description: 'The lowest gross pay the person will accept, with its period: a hard limit, set only by their confirmation. Applied as a hard filter, with counts: a suggestion or a vacancy is left out only when the highest pay it states in this period is below it; unknown, predicted or other-period pay is never below it.'
+        },
+        work_status: {
+            $ref: '#/components/schemas/WorkStatusInput',
+            description: 'What the person is doing now (optional): working, in education or training, looking for work, caring, or other.'
+        },
+        qualifications: {
+            $ref: '#/components/schemas/QualificationListInput',
+            description: 'Qualifications the person has or is taking (optional), at most 8, each achieved or expected. An expected one is never counted as achieved.'
         }
     },
     additionalProperties: false,
@@ -8664,7 +8707,9 @@ export const ProfileInputSchema = {
         'confident_tasks',
         'evidenced_tasks',
         'work_style',
-        'minimum_salary'
+        'minimum_salary',
+        'work_status',
+        'qualifications'
     ],
     title: 'ProfileInput',
     description: 'What a client submits: states and values only.'
@@ -9142,6 +9187,12 @@ export const ProposedChangeOutSchema = {
                 },
                 {
                     items: {
+                        $ref: '#/components/schemas/QualificationAnswer'
+                    },
+                    type: 'array'
+                },
+                {
+                    items: {
                         type: 'string'
                     },
                     type: 'array'
@@ -9157,7 +9208,7 @@ export const ProposedChangeOutSchema = {
                 }
             ],
             title: 'Value',
-            description: 'The proposed answer, typed as the field\'s input; null unless provided. A list is the complete list after the change: accepting it replaces the field\'s list.'
+            description: 'The proposed answer, typed as the field\'s input; null unless provided (Unknown, Skipped, Prefer not to say, or for the current role, `no_job_yet`). A list is the complete list after the change: accepting it replaces the field\'s list. What the person is doing now is one of `WorkStatus`\'s codes.'
         },
         basis: {
             $ref: '#/components/schemas/Basis',
@@ -9370,6 +9421,106 @@ export const QualificationSchema = {
     ],
     title: 'Qualification',
     description: 'Why a result is not unqualified. M0 matrices are always provisional.'
+} as const;
+
+export const QualificationAnswerSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 120,
+            minLength: 1,
+            title: 'Name'
+        },
+        status: {
+            $ref: '#/components/schemas/QualificationStatus'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'name',
+        'status'
+    ],
+    title: 'QualificationAnswer',
+    description: 'A qualification in the person\'s words, achieved or expected.'
+} as const;
+
+export const QualificationListFieldSchema = {
+    properties: {
+        state: {
+            $ref: '#/components/schemas/FieldState'
+        },
+        value: {
+            anyOf: [
+                {
+                    items: {
+                        $ref: '#/components/schemas/QualificationAnswer'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Value'
+        },
+        source_ref_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Ref Id'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'state'
+    ],
+    title: 'QualificationListField'
+} as const;
+
+export const QualificationListInputSchema = {
+    properties: {
+        state: {
+            $ref: '#/components/schemas/FieldState'
+        },
+        value: {
+            anyOf: [
+                {
+                    items: {
+                        $ref: '#/components/schemas/QualificationAnswer'
+                    },
+                    type: 'array',
+                    maxItems: 8
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Value'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'state'
+    ],
+    title: 'QualificationListInput'
+} as const;
+
+export const QualificationStatusSchema = {
+    type: 'string',
+    enum: [
+        'achieved',
+        'expected'
+    ],
+    title: 'QualificationStatus'
 } as const;
 
 export const QueryChannelSchema = {
@@ -15738,7 +15889,7 @@ export const TitleMatchesOutSchema = {
         partial: {
             type: 'boolean',
             title: 'Partial',
-            description: 'True: neither ESCO nor the UK job-title index lists a title with every word typed, and these ESCO occupations hold the most of them, rarer words first. Ask "Careerwright couldn\'t match that title in ESCO. Is it one of these?", with "None of these is my job", which keeps the person\'s own words: the person chooses one or none, and nothing is joined to the typed words.'
+            description: 'True: neither ESCO nor the UK job-title index lists a title with every word typed, and these ESCO occupations hold the most of them, rarer words first. Ask whether it is one of these, naming ESCO plainly, with "None of these is my job", which keeps the person\'s own words: the person chooses one or none, and nothing is joined to the typed words.'
         },
         support_note: {
             anyOf: [
@@ -16810,6 +16961,79 @@ export const WorkStateSchema = {
     ],
     title: 'WorkState',
     description: 'One state vocabulary (spec section 3, STATE-01). A failure is never an empty success.'
+} as const;
+
+export const WorkStatusSchema = {
+    type: 'string',
+    enum: [
+        'working',
+        'in_education_or_training',
+        'looking_for_work',
+        'caring',
+        'other'
+    ],
+    title: 'WorkStatus',
+    description: 'What the person is doing now (spec section 3\'s work status), in their own choice.'
+} as const;
+
+export const WorkStatusFieldSchema = {
+    properties: {
+        state: {
+            $ref: '#/components/schemas/FieldState'
+        },
+        value: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/WorkStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        source_ref_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Ref Id'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'state'
+    ],
+    title: 'WorkStatusField'
+} as const;
+
+export const WorkStatusInputSchema = {
+    properties: {
+        state: {
+            $ref: '#/components/schemas/FieldState'
+        },
+        value: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/WorkStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'state'
+    ],
+    title: 'WorkStatusInput'
 } as const;
 
 export const WorkspaceExportSchema = {

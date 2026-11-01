@@ -511,6 +511,132 @@ def test_an_answer_typed_in_the_review_step_goes_through_the_support_screen(
     assert all("support" not in str(r["response"]) for r in receipts)
 
 
+@pytest.mark.req("STATE-11", "PROF-07")
+def test_i_havent_had_a_job_yet_is_saved_as_the_role_s_answer_and_the_demo_never_asks_again(
+    infra: Infra, api: ApiClient, demo_api: ApiClient, ada: str, tmp_path: Path
+) -> None:
+    # Task 6f: the first question's "I haven't had a job yet" goes through the one write path
+    # with an expected version and an Idempotency-Key; it is an answer (never a title, Skipped
+    # or Unknown) and the demo interviewer's next questions never ask for a job.
+    workspace = demo_api.write(
+        "POST",
+        "/v1/workspaces",
+        ada,
+        {"name": "No job yet (synthetic)", "data_mode": "demo", "synthetic": True},
+    ).json()["workspace_id"]
+    path = f"/v1/workspaces/{workspace}/origin/role/no-job-yet"
+
+    saved = demo_api.write("POST", path, ada, {"expected_version": 0})
+    again = demo_api.write("POST", path, ada, {"expected_version": 1})
+    stale = demo_api.write("POST", path, ada, {"expected_version": 0})
+
+    assert saved.status_code == 201, saved.text
+    role = saved.json()["document"]["current_role"]
+    assert (role["state"], role["value"]) == ("no_job_yet", None)
+    [source] = infra.query(
+        "SELECT kind FROM careerwright.source_references WHERE source_ref_id = %s",
+        (role["source_ref_id"],),
+    )
+    assert source["kind"] == "direct_entry"
+    assert (again.status_code, again.json()["version"]) == (200, 1)
+    assert stale.json()["error"]["code"] == "STALE_INPUT_VERSION"
+    # The origin has no role to join from, and says so as not answered with a title.
+    assert origin(demo_api, ada, workspace)["role"]["text"] is None
+    # The demo interviewer, asked to explore, opens without a job and asks what they enjoy.
+    demo_api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace}/interview/preferences",
+        ada,
+        {
+            "expected_version": 0,
+            "entry_mode": "unsure",
+            "conversation_mode": "practical",
+            "paused": False,
+        },
+    )
+    scenario = make_scenario(infra, api, ada, tmp_path)
+    turns = f"/v1/workspaces/{workspace}/interview/turns"
+    submitted = demo_api.write(
+        "POST", turns, ada, {"expected_profile_version": 1, "message": "Somewhere friendly."}
+    )
+    assert submitted.status_code == 202, submitted.text
+    worker = scenario.worker("no-job-yet")
+    scenario.wait_terminal(submitted.json()["turn_id"])
+    assert worker.stop() == 0
+    proposal = demo_api.get(f"{turns}/{submitted.json()['turn_id']}", ada).json()["proposal"]
+    assert proposal["asks_about"] == "enjoyed_tasks"
+    assert "current_role" not in proposal["missing_critical_fields"]
+
+
+def as_input(document: dict[str, Any]) -> dict[str, Any]:
+    """A stored document as the whole-profile input: states and values, no sources."""
+    return {
+        name: {"state": field["state"]}
+        if field["state"] != "provided"
+        else {"state": "provided", "value": field["value"]}
+        for name, field in document.items()
+        if name != "schema_version"
+    }
+
+
+@pytest.mark.req("PROF-13", "PROF-07", "STATE-08")
+def test_what_the_person_is_doing_now_and_an_expected_qualification_round_trip_both_ways(
+    infra: Infra, api: ApiClient, demo_api: ApiClient, ada: str, tmp_path: Path
+) -> None:
+    # Task 6f: the two new answers through the same command as a direct edit (PUT /profile)
+    # and as a confirmed demo proposal; an expected qualification stays expected.
+    workspace = demo_api.write(
+        "POST",
+        "/v1/workspaces",
+        ada,
+        {"name": "Two new answers (synthetic)", "data_mode": "demo", "synthetic": True},
+    ).json()["workspace_id"]
+    scenario = make_scenario(infra, api, ada, tmp_path)
+    turn_id = decided_turn(
+        demo_api,
+        ada,
+        workspace,
+        scenario,
+        "I'm in Year 13 doing biology and chemistry A-levels.",
+        0,
+    )
+    after = demo_api.get(f"/v1/workspaces/{workspace}/profile", ada).json()
+    document = after["document"]
+    assert (document["work_status"]["state"], document["work_status"]["value"]) == (
+        "provided",
+        "in_education_or_training",
+    )
+    assert document["qualifications"]["value"] == [
+        {"name": "biology and chemistry A-levels", "status": "expected"}
+    ]
+    assert turn_id
+    # The same answers changed directly: Skipped, and a qualification marked achieved.
+    edited = demo_api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace}/profile",
+        ada,
+        {
+            "expected_version": after["version"],
+            "profile": {
+                **as_input(document),
+                "work_status": {"state": "skipped"},
+                "qualifications": {
+                    "state": "provided",
+                    "value": [{"name": "GCSE maths", "status": "achieved"}],
+                },
+            },
+        },
+    )
+    assert edited.status_code == 201, edited.text
+    saved = edited.json()["document"]
+    assert saved["work_status"] == {
+        "state": "skipped",
+        "value": None,
+        "source_ref_id": saved["work_status"]["source_ref_id"],
+    }
+    assert saved["qualifications"]["value"] == [{"name": "GCSE maths", "status": "achieved"}]
+
+
 def run_strength(
     api: ApiClient, token: str, workspace: str, scenario: Scenario, turn_id: str, version: int
 ) -> dict[str, Any]:

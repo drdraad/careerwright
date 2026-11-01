@@ -16,11 +16,15 @@ from careerwright.profile.document import (
     MAX_TASKS,
     VERSION_2_FIELDS,
     VERSION_3_FIELDS,
+    VERSION_4_FIELDS,
     FieldState,
     ProfileDocument,
     ProfileInput,
+    QualificationAnswer,
+    QualificationStatus,
     TextInput,
     TextListInput,
+    WorkStatus,
     apply_profile_input,
     apply_updates,
     empty_profile,
@@ -187,7 +191,7 @@ def test_a_version_1_document_reads_with_the_new_fields_not_asked() -> None:
 
     document = ProfileDocument.model_validate(stored)
 
-    assert document.schema_version == "3"
+    assert document.schema_version == "4"
     assert document.cities.value == ["Leeds"]
     for name in later:
         assert getattr(document, name).state is FieldState.UNASKED
@@ -206,7 +210,7 @@ def test_a_version_2_document_reads_with_work_style_not_asked() -> None:
 
     document = ProfileDocument.model_validate(stored)
 
-    assert document.schema_version == "3"
+    assert document.schema_version == "4"
     assert document.enjoyed_tasks.value == ["fixing bikes"]
     assert document.work_style.state is FieldState.UNASKED
     assert document.minimum_salary.state is FieldState.UNASKED
@@ -388,3 +392,116 @@ def test_city_count_property_accepts_at_most_three(cities: list[str]) -> None:
 def test_unknown_fields_are_rejected() -> None:
     with pytest.raises(ValidationError):
         ProfileInput.model_validate({"preferred_name": {"state": "unasked"}, "api_key": "x"})
+
+
+# Task 6f: no job yet, what the person is doing now, and their qualifications (schema version 4).
+
+
+@pytest.mark.req("STATE-11")
+def test_i_havent_had_a_job_yet_is_an_answer_about_the_role_never_a_title_skip_or_unknown() -> None:
+    new = profile_input(current_role={"state": "no_job_yet"})
+
+    document = apply_profile_input(empty_profile(), new, SOURCE)
+
+    assert document.current_role.state is FieldState.NO_JOB_YET
+    assert document.current_role.value is None  # never a job title
+    assert document.current_role.source_ref_id == SOURCE  # an answer, with its source
+    with pytest.raises(ValidationError, match="only a provided field has a value"):
+        profile_input(current_role={"state": "no_job_yet", "value": "student"})
+
+
+@pytest.mark.req("STATE-11")
+@pytest.mark.parametrize("name", [n for n in FIELD_NAMES if n != "current_role"])
+def test_only_the_role_can_be_answered_i_havent_had_a_job_yet(name: str) -> None:
+    new = profile_input(**{name: {"state": "no_job_yet"}})
+
+    with pytest.raises(CareerwrightError) as raised:
+        apply_profile_input(empty_profile(), new, SOURCE)
+
+    assert raised.value.code is ErrorCode.VALIDATION_FAILED
+    assert raised.value.details == {"field": name, "reason": "not_this_field"}
+
+
+@pytest.mark.req("PROF-13", "STATE-08")
+def test_what_the_person_is_doing_now_is_one_of_five_answers_or_skip_unknown_or_decline() -> None:
+    for status in ("working", "in_education_or_training", "looking_for_work", "caring", "other"):
+        document = apply_profile_input(
+            empty_profile(), profile_input(work_status=provided(status)), SOURCE
+        )
+        assert document.work_status.value == WorkStatus(status)
+    for state in ("skipped", "unknown", "prefer_not_to_say"):
+        document = apply_profile_input(
+            empty_profile(), profile_input(work_status={"state": state}), SOURCE
+        )
+        assert (document.work_status.state, document.work_status.value) == (state, None)
+    with pytest.raises(ValidationError):
+        profile_input(work_status=provided("retired"))
+
+
+@pytest.mark.req("PROF-13")
+def test_a_qualification_is_kept_achieved_or_expected_never_one_for_the_other() -> None:
+    new = profile_input(
+        qualifications=provided(
+            [
+                {"name": "GCSE maths, grade 6", "status": "achieved"},
+                {"name": "A-level biology", "status": "expected"},
+            ]
+        )
+    )
+
+    document = apply_profile_input(empty_profile(), new, SOURCE)
+
+    assert document.qualifications.value == [
+        QualificationAnswer(name="GCSE maths, grade 6", status=QualificationStatus.ACHIEVED),
+        QualificationAnswer(name="A-level biology", status=QualificationStatus.EXPECTED),
+    ]
+    with pytest.raises(ValidationError):
+        profile_input(qualifications=provided([{"name": "A-level biology"}]))  # no status
+    with pytest.raises(ValidationError):
+        profile_input(qualifications=provided([{"name": "A-level biology", "status": "likely"}]))
+
+
+@pytest.mark.req("PROF-13")
+def test_qualifications_are_bounded_and_one_named_twice_is_refused() -> None:
+    many = [{"name": f"GCSE {n}", "status": "achieved"} for n in range(MAX_TASKS + 1)]
+    with pytest.raises(CareerwrightError) as raised:
+        apply_profile_input(empty_profile(), profile_input(qualifications=provided(many)), SOURCE)
+    assert raised.value.details == {"field": "qualifications", "limit": MAX_TASKS}
+
+    twice = [
+        {"name": "A-level biology", "status": "expected"},
+        {"name": "a-level Biology", "status": "achieved"},
+    ]
+    with pytest.raises(CareerwrightError) as raised:
+        apply_profile_input(empty_profile(), profile_input(qualifications=provided(twice)), SOURCE)
+    assert raised.value.details == {"field": "qualifications", "reason": "duplicate"}
+
+
+@pytest.mark.req("PROF-13")
+def test_a_version_3_document_reads_with_both_new_answers_not_asked() -> None:
+    stored = {
+        "schema_version": "3",
+        **{name: {"state": "unasked"} for name in FIELD_NAMES if name not in VERSION_4_FIELDS},
+        "current_role": {"state": "provided", "value": "Baker", "source_ref_id": str(SOURCE)},
+    }
+
+    document = ProfileDocument.model_validate(stored)
+
+    assert document.schema_version == "4"
+    assert document.current_role.value == "Baker"
+    assert document.work_status.state is FieldState.UNASKED
+    assert document.qualifications.state is FieldState.UNASKED
+
+
+def test_migration_0040_names_every_field_added_after_version_1() -> None:
+    from careerwright.migrations.versions import r0040_work_status_and_qualifications as m0040
+
+    later = (*VERSION_2_FIELDS, *VERSION_3_FIELDS, *VERSION_4_FIELDS)
+    assert later == m0040.ADDED_AFTER_VERSION_1
+    sql = m0040.SCHEMA
+    for name in later:
+        assert f"'{name}', '{{\"state\": \"unasked\"}}'::jsonb" in sql
+
+
+def test_neither_new_answer_is_a_hard_constraint() -> None:
+    assert {"work_status", "qualifications"}.isdisjoint(HARD_CONSTRAINTS)

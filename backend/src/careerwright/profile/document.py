@@ -13,8 +13,14 @@ person enjoys, what they believe they can do and what they have evidence they ca
 person says they like to work (spec section 4's "work style and personality" layer): a
 described preference that informs suggestions, never a limit (REC1-03) and never a
 personality type; and the salary floor, the lowest gross pay they will accept with its
-period, a hard constraint (product owner, H-11). Older documents read as version 3 with
-the later fields unasked.
+period, a hard constraint (product owner, H-11). Schema version 4 (Task 6f, the product
+owner's school-leaver decisions of 2026-11-01) adds two optional answers from spec section 3's
+minimum inputs: what the person is doing now (their work or study status, one of five) and
+their qualifications, each achieved or expected, so an expected one is never read as achieved.
+It also adds one answer for the current role alone, "I haven't had a job yet"
+(`no_job_yet`): an answer, never a job title, Skipped or Unknown. Nothing asks for or infers
+the person's age. Older documents read as version 4 with the later fields unasked (migration
+0040 also rewrote the stored ones).
 Cities must be on the finite English list and are stored by its name for the city.
 """
 
@@ -34,7 +40,7 @@ from careerwright.money import Money
 MAX_CITIES = 3
 MAX_TARGETS = 3
 MAX_TASKS = 8
-PROFILE_SCHEMA_VERSION: Literal["3"] = "3"
+PROFILE_SCHEMA_VERSION: Literal["4"] = "4"
 
 TextValue = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 HoursValue = Annotated[float, Field(ge=0, le=168)]
@@ -46,6 +52,33 @@ class FieldState(StrEnum):
     UNKNOWN = "unknown"
     SKIPPED = "skipped"
     PREFER_NOT_TO_SAY = "prefer_not_to_say"
+    # "I haven't had a job yet": the current role's answer only (`checked_input`), with no
+    # value. It is an answer, so the person's light comes on and nothing asks for a job again.
+    NO_JOB_YET = "no_job_yet"
+
+
+class WorkStatus(StrEnum):
+    """What the person is doing now (spec section 3's work status), in their own choice."""
+
+    WORKING = "working"
+    IN_EDUCATION_OR_TRAINING = "in_education_or_training"
+    LOOKING_FOR_WORK = "looking_for_work"
+    CARING = "caring"
+    OTHER = "other"
+
+
+class QualificationStatus(StrEnum):
+    ACHIEVED = "achieved"
+    EXPECTED = "expected"  # being taken now, or a result still to come: never counted as met
+
+
+class QualificationAnswer(BaseModel):
+    """A qualification in the person's words, achieved or expected."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: TextValue
+    status: QualificationStatus
 
 
 class _FieldInput[V](BaseModel):
@@ -136,6 +169,14 @@ class SalaryInput(_FieldInput[SalaryFloor]):
         return self
 
 
+class WorkStatusInput(_FieldInput[WorkStatus]):
+    pass
+
+
+class QualificationListInput(_FieldInput[list[QualificationAnswer]]):
+    value: Annotated[list[QualificationAnswer], _published_bound(MAX_TASKS)] | None = None
+
+
 class TextField(_Field[TextValue]):
     pass
 
@@ -156,7 +197,23 @@ class SalaryField(_Field[SalaryFloor]):
     pass
 
 
-FieldInput = TextInput | TextListInput | HoursInput | MoneyInput | SalaryInput
+class WorkStatusField(_Field[WorkStatus]):
+    pass
+
+
+class QualificationListField(_Field[list[QualificationAnswer]]):
+    pass
+
+
+FieldInput = (
+    TextInput
+    | TextListInput
+    | HoursInput
+    | MoneyInput
+    | SalaryInput
+    | WorkStatusInput
+    | QualificationListInput
+)
 
 
 class ProfileInput(BaseModel):
@@ -196,6 +253,16 @@ class ProfileInput(BaseModel):
             "below it; unknown, predicted or other-period pay is never below it."
         )
     )
+    work_status: WorkStatusInput = Field(
+        description="What the person is doing now (optional): working, in education or "
+        "training, looking for work, caring, or other."
+    )
+    qualifications: QualificationListInput = Field(
+        description=(
+            f"Qualifications the person has or is taking (optional), at most {MAX_TASKS}, each "
+            "achieved or expected. An expected one is never counted as achieved."
+        )
+    )
 
 
 class ProfileDocument(BaseModel):
@@ -203,7 +270,7 @@ class ProfileDocument(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["3"] = PROFILE_SCHEMA_VERSION
+    schema_version: Literal["4"] = PROFILE_SCHEMA_VERSION
     preferred_name: TextField
     current_role: TextField
     cities: TextListField
@@ -216,12 +283,14 @@ class ProfileDocument(BaseModel):
     evidenced_tasks: TextListField
     work_style: TextListField
     minimum_salary: SalaryField
+    work_status: WorkStatusField
+    qualifications: QualificationListField
 
     @model_validator(mode="before")
     @classmethod
     def _read_older_versions(cls, data: Any) -> Any:
-        """Version 1 had no interest or capability fields and version 2 no work style: they
-        were never asked."""
+        """Version 1 had no interest or capability fields, version 2 no work style and
+        version 3 no work status or qualifications: they were never asked."""
         version = data.get("schema_version") if isinstance(data, dict) else None
         later = _ADDED_AFTER.get(version) if isinstance(version, str) else None
         if later is None:
@@ -237,9 +306,11 @@ class ProfileDocument(BaseModel):
 FIELD_NAMES = tuple(ProfileInput.model_fields)
 VERSION_2_FIELDS = ("enjoyed_tasks", "confident_tasks", "evidenced_tasks")
 VERSION_3_FIELDS = ("work_style", "minimum_salary")
+VERSION_4_FIELDS = ("work_status", "qualifications")
 _ADDED_AFTER: Mapping[str, tuple[str, ...]] = {
-    "1": (*VERSION_2_FIELDS, *VERSION_3_FIELDS),
-    "2": VERSION_3_FIELDS,
+    "1": (*VERSION_2_FIELDS, *VERSION_3_FIELDS, *VERSION_4_FIELDS),
+    "2": (*VERSION_3_FIELDS, *VERSION_4_FIELDS),
+    "3": VERSION_4_FIELDS,
 }
 
 
@@ -249,6 +320,8 @@ class FieldKind(StrEnum):
     HOURS = "hours"
     MONEY = "money"
     SALARY = "salary"
+    WORK_STATUS = "work_status"
+    QUALIFICATIONS = "qualifications"
 
 
 @dataclass(frozen=True)
@@ -274,14 +347,21 @@ FIELD_SPECS: Mapping[str, FieldSpec] = {
     "work_style": FieldSpec(FieldKind.LIST, MAX_TASKS),
     # Added to the set by the product owner (H-11, 2026-10-28).
     "minimum_salary": FieldSpec(FieldKind.SALARY, hard_constraint=True),
+    # Task 6f (spec section 3's minimum inputs): optional, never limits.
+    "work_status": FieldSpec(FieldKind.WORK_STATUS),
+    "qualifications": FieldSpec(FieldKind.QUALIFICATIONS, MAX_TASKS),
 }
 HARD_CONSTRAINTS = frozenset(name for name, spec in FIELD_SPECS.items() if spec.hard_constraint)
+# The one field that takes "I haven't had a job yet".
+NO_JOB_YET_FIELD = "current_role"
 _INPUT_TYPES: Mapping[FieldKind, type[FieldInput]] = {
     FieldKind.TEXT: TextInput,
     FieldKind.LIST: TextListInput,
     FieldKind.HOURS: HoursInput,
     FieldKind.MONEY: MoneyInput,
     FieldKind.SALARY: SalaryInput,
+    FieldKind.WORK_STATUS: WorkStatusInput,
+    FieldKind.QUALIFICATIONS: QualificationListInput,
 }
 
 
@@ -306,18 +386,28 @@ def _invalid(name: str, reason: str, message: str) -> CareerwrightError:
 
 def checked_input(name: str, field: FieldInput) -> FieldInput:
     """One field's input after the cross-value rules: list bounds and duplicates, and cities
-    resolved to the finite English list (stored by the list's own name)."""
+    resolved to the finite English list (stored by the list's own name). "I haven't had a job
+    yet" answers the current role alone."""
     spec = FIELD_SPECS[name]
-    if spec.kind is not FieldKind.LIST or not isinstance(field.value, list):
+    if field.state is FieldState.NO_JOB_YET and name != NO_JOB_YET_FIELD:
+        raise _invalid(name, "not_this_field", "Only the current role takes that answer.")
+    if spec.kind not in (FieldKind.LIST, FieldKind.QUALIFICATIONS) or not isinstance(
+        field.value, list
+    ):
         return field
-    values: list[str] = field.value
-    if spec.max_items is not None and len(values) > spec.max_items:
+    if spec.max_items is not None and len(field.value) > spec.max_items:
         raise CareerwrightError(
             ErrorCode.LIMIT_EXCEEDED,
             f"At most {spec.max_items} {name.replace('_', ' ')} are supported; remove one first.",
             stage=ErrorStage.PROFILE,
             details={"field": name, "limit": spec.max_items},
         )
+    if spec.kind is FieldKind.QUALIFICATIONS:
+        names = [q.name.casefold() for q in field.value if isinstance(q, QualificationAnswer)]
+        if len(set(names)) != len(names):
+            raise _invalid(name, "duplicate", "The same qualification appears twice.")
+        return field
+    values = [value for value in field.value if isinstance(value, str)]
     if name == "cities":
         places = [resolve_city(value) for value in values]
         if any(place is None for place in places):

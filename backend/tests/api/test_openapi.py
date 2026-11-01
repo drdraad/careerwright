@@ -78,7 +78,9 @@ def test_the_profile_input_publishes_every_list_bound_the_server_checks() -> Non
 
     # The web reads these from the generated client instead of restating them.
     assert published == {
-        name: spec.max_items for name, spec in FIELD_SPECS.items() if spec.kind is FieldKind.LIST
+        name: spec.max_items
+        for name, spec in FIELD_SPECS.items()
+        if spec.kind in (FieldKind.LIST, FieldKind.QUALIFICATIONS)  # Task 6f: a list too
     }
 
 

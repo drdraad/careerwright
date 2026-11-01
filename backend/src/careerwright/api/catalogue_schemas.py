@@ -248,9 +248,9 @@ class TitleMatchesOut(ResponseModel):
     partial: bool = Field(
         description="True: neither ESCO nor the UK job-title index lists a title with every word "
         "typed, and these ESCO occupations hold the most of them, rarer words first. Ask "
-        '"Careerwright couldn\'t match that title in ESCO. Is it one of these?", with "None of '
-        "these is my job\", which keeps the person's own words: the person chooses one or "
-        "none, and nothing is joined to the typed words."
+        'whether it is one of these, naming ESCO plainly, with "None of these is my job", '
+        "which keeps the person's own words: the person chooses one or none, and nothing is "
+        "joined to the typed words."
     )
     support_note: SupportNoteOut | None = Field(
         description="The calm support panel, when what was typed triggers the support screen "

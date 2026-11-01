@@ -22,6 +22,7 @@ from careerwright.money import Money
 from careerwright.profile.document import FieldState, empty_profile
 from careerwright.profile.fixture_interviewer import (
     CRITICAL,
+    ENJOY_QUESTION,
     QUESTIONS,
     REPLY_PREFIX,
     SMALLER_STEP_REPLY,
@@ -170,10 +171,11 @@ def test_the_fixture_follows_the_entry_the_person_chose() -> None:
     unsure = asked(EntryMode.UNSURE, "Hello.")
 
     assert sure == SURE_QUESTION  # the target and its level first, no exploration
-    # The open question (what they want to change) is the opening the web asks before any
-    # practical limit; it is never asked twice (Task W2E, F1), so the first practical one follows.
-    assert unsure == QUESTIONS[ProfileField.CURRENT_ROLE]
-    assert asked(None, "I could work in York.") == asked(EntryMode.UNSURE, "I could work in York.")
+    # The open question is the opening the web asks before any practical limit; it is never
+    # asked twice (Task W2E, F1). An unsure person is asked next what they enjoy, at school, at
+    # work or in their own time (Task 6f), then the practical questions.
+    assert unsure == ENJOY_QUESTION
+    assert asked(None, "I could work in York.") == QUESTIONS[ProfileField.CURRENT_ROLE]
 
 
 def test_the_fixture_through_the_agent_returns_a_validated_fixture_proposal() -> None:
@@ -462,7 +464,7 @@ def test_the_open_question_is_the_opening_and_is_never_asked_twice() -> None:
     for reply in ("Hello.", "Skip", "More time outdoors"):
         out = demo(demo_turn(reply, entry=EntryMode.UNSURE))
         assert out.proposed_updates == []
-        assert out.next_question == QUESTIONS[ProfileField.CURRENT_ROLE], reply
+        assert out.next_question == ENJOY_QUESTION, reply
         assert out.reply == REPLY_PREFIX + "Thank you."
 
 
@@ -478,7 +480,11 @@ def test_an_answer_the_demo_cant_read_says_so_and_names_the_way_on() -> None:
     )
 
 
-EARLY_ANSWERS = {field: FieldState.PROVIDED for field in CRITICAL}
+# An unsure person is also asked what they enjoy, first (Task 6f).
+EARLY_ANSWERS = {
+    **{field: FieldState.PROVIDED for field in CRITICAL},
+    ProfileField.ENJOYED_TASKS: FieldState.PROVIDED,
+}
 
 
 @pytest.mark.req("STATE-09")
@@ -522,9 +528,10 @@ def test_after_the_last_question_any_message_says_what_to_do_next_and_skip_never
 # of a person who isn't sure, the web shows "Show me suggestions" and "Name a role" instead, so
 # there the walk types what the target question's examples say.
 EXAMPLE_REPLIES: dict[ProfileField | None, tuple[str, ...]] = {
-    None: ("I enjoy working with people", "Skip"),
+    None: ("I help run a youth football team", "Skip"),
+    ProfileField.ENJOYED_TASKS: ("I enjoy helping people", "Skip"),
     ProfileField.TARGET_TITLES: ("I want to be a nurse", "Skip"),
-    ProfileField.CURRENT_ROLE: ("I'm a warehouse supervisor", "Skip"),
+    ProfileField.CURRENT_ROLE: ("I'm a warehouse supervisor", "Skip", "I haven't had a job yet"),
     ProfileField.CITIES: ("Leeds", "Skip"),
     ProfileField.WEEKLY_STUDY_HOURS: ("5 hours a week", "Unknown"),
     ProfileField.DIRECT_SPEND_CAP: ("Up to £600", "Prefer not to say"),
@@ -536,7 +543,7 @@ def test_a_demo_conversation_tapping_example_replies_never_asks_the_same_questio
     """Each run taps one example per question and saves what it notes, as a person would; the
     question shown after each reply is new, and the conversation ends."""
     for entry in (EntryMode.SURE, EntryMode.UNSURE):
-        for pick in (0, 1):
+        for pick in (0, 1, 2):
             texts: list[str] = []
             answered: dict[ProfileField, FieldState] = {}
             shown: str | None = SURE_QUESTION if entry is EntryMode.SURE else UNSURE_QUESTION
@@ -545,7 +552,8 @@ def test_a_demo_conversation_tapping_example_replies_never_asks_the_same_questio
                 ProfileField.TARGET_TITLES if entry is EntryMode.SURE else None
             )
             while shown is not None:
-                texts.append(EXAMPLE_REPLIES[about][pick])
+                replies = EXAMPLE_REPLIES[about]
+                texts.append(replies[pick % len(replies)])
                 out = demo(demo_turn(*texts, entry=entry, answered=answered))
                 if about is not None:
                     assert about in {u.field for u in out.proposed_updates}, texts[-1]
@@ -557,6 +565,73 @@ def test_a_demo_conversation_tapping_example_replies_never_asks_the_same_questio
                 about = asked_field(shown)
                 assert shown is None or about is not None, shown
             assert ProfileField.TARGET_TITLES in answered
+
+
+@pytest.mark.req("STATE-11")
+def test_i_havent_had_a_job_yet_answers_the_role_and_the_job_question_is_never_asked_again() -> (
+    None
+):
+    for words in ("I haven't had a job yet", "I've never had a job.", "I have never worked."):
+        out = demo(demo_turn(words))
+        assert [(u.field, u.state, u.text) for u in out.proposed_updates] == [
+            (ProfileField.CURRENT_ROLE, AnsweredState.NO_JOB_YET, None)
+        ], words
+        assert out.next_question != QUESTIONS[ProfileField.CURRENT_ROLE], words
+        assert ProfileField.CURRENT_ROLE not in out.missing_critical_fields, words
+    # Saved, the answer means the job question is never asked again, whatever comes next.
+    no_job = {ProfileField.CURRENT_ROLE: FieldState.NO_JOB_YET}
+    for entry in (None, EntryMode.SURE, EntryMode.UNSURE):
+        asked: list[str | None] = []
+        answered = dict(no_job)
+        texts: list[str] = []
+        for text in ("Skip", "Skip", "Skip", "Skip", "Skip", "Skip"):
+            texts.append(text)
+            out = demo(demo_turn(*texts, entry=entry, answered=answered))
+            for update in out.proposed_updates:
+                answered[update.field] = FieldState(update.state.value)
+            asked.append(out.next_question)
+        assert QUESTIONS[ProfileField.CURRENT_ROLE] not in asked, entry
+
+
+@pytest.mark.req("PROF-14")
+def test_the_demo_opens_without_a_job_and_asks_an_unsure_person_what_they_enjoy() -> None:
+    assert UNSURE_QUESTION == "What would you like your working life to be like?"
+    assert ENJOY_QUESTION == "What do you enjoy doing, at school, at work or in your own time?"
+    assert asked_field(ENJOY_QUESTION) is ProfileField.ENJOYED_TASKS
+    assert "your next step" in QUESTIONS[ProfileField.DIRECT_SPEND_CAP]
+    assert "this change" not in " ".join(QUESTIONS.values())
+    # The example reply that isn't a job notes what the person does, under the opening.
+    out = demo(demo_turn("I help run a youth football team", entry=EntryMode.UNSURE))
+    assert [(u.field, u.items) for u in out.proposed_updates] == [
+        (ProfileField.EVIDENCED_TASKS, ["help run a youth football team"])
+    ]
+    assert out.next_question == ENJOY_QUESTION
+
+
+@pytest.mark.req("PROF-13")
+def test_the_demo_notes_what_the_person_is_doing_now_and_a_qualification_they_are_taking() -> None:
+    out = demo(demo_turn("I'm in Year 13 doing biology and chemistry A-levels."))
+    assert [(u.field, u.text, u.items) for u in out.proposed_updates] == [
+        (ProfileField.WORK_STATUS, "in_education_or_training", None),
+        (ProfileField.QUALIFICATIONS, None, ["expected: biology and chemistry A-levels"]),
+    ]
+    achieved = demo(demo_turn("I've got GCSE maths and English."))
+    assert [(u.field, u.items) for u in achieved.proposed_updates] == [
+        (ProfileField.QUALIFICATIONS, ["achieved: GCSE maths and English"])
+    ]
+    # "I'm a student" is what they are doing now, never a job title.
+    student = demo(demo_turn("I'm a student."))
+    assert [(u.field, u.text) for u in student.proposed_updates] == [
+        (ProfileField.WORK_STATUS, "in_education_or_training")
+    ]
+    for words, status in (
+        ("I'm looking for work.", "looking_for_work"),
+        ("I'm a carer.", "caring"),
+    ):
+        found = demo(demo_turn(words))
+        assert [(u.field, u.text) for u in found.proposed_updates] == [
+            (ProfileField.WORK_STATUS, status)
+        ], words
 
 
 def test_each_demo_question_names_what_it_asks_about() -> None:

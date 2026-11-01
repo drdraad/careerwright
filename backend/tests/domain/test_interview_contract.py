@@ -15,6 +15,8 @@ from careerwright.profile.document import (
     HARD_CONSTRAINTS,
     PayPeriod,
     ProfileInput,
+    QualificationAnswer,
+    QualificationStatus,
     SalaryFloor,
     apply_profile_input,
     empty_profile,
@@ -23,6 +25,7 @@ from careerwright.profile.interview import (
     CONTEXT_MARKER,
     INSTRUCTIONS,
     MAX_PROMPT_BYTES,
+    PROMPT_VERSION,
     SCHEMA_ALLOWANCE_TOKENS,
     ContextMessage,
     InterviewTurnOutput,
@@ -270,6 +273,95 @@ def test_unknown_skip_and_prefer_not_to_say_are_proposable_and_never_zero(state:
     assert change.field_input().value is None
 
 
+@pytest.mark.req("STATE-11")
+def test_i_havent_had_a_job_yet_is_proposable_for_the_role_alone_with_no_value() -> None:
+    proposal, found = check_turn(
+        output(update("current_role", state="no_job_yet", basis="inferred")),
+        context("I haven't had a job yet."),
+        ProposalOrigin.MODEL,
+    )
+
+    assert found == []
+    assert proposal is not None
+    [change] = proposal.changes
+    assert (change.state.value, change.value, change.basis) == ("no_job_yet", None, Basis.INFERRED)
+    assert change.field_input().state.value == "no_job_yet"
+    elsewhere = problems(
+        output(update("work_status", state="no_job_yet")), context("I haven't had a job yet.")
+    )
+    assert elsewhere == ["work_status: Only the current role takes that answer."]
+    titled = problems(
+        output(update("current_role", state="no_job_yet", text="student")),
+        context("I haven't had a job yet."),
+    )
+    assert titled == ["current_role: a no_job_yet answer has no text or items"]
+
+
+@pytest.mark.req("PROF-13")
+def test_what_the_person_is_doing_now_is_proposed_as_a_code_and_read_as_inferred() -> None:
+    ctx = context("I'm in Year 13 at school.")
+    proposal, found = check_turn(
+        output(update("work_status", text="in_education_or_training")), ctx, ProposalOrigin.MODEL
+    )
+
+    assert found == []
+    assert proposal is not None
+    [change] = proposal.changes
+    assert change.value == "in_education_or_training"
+    assert change.basis is Basis.INFERRED  # a reading of their words, never their words
+    assert change.hard_constraint is False
+    assert problems(output(update("work_status", text="retired")), ctx) == [
+        "work_status: the value is not valid for this field"
+    ]
+
+
+@pytest.mark.req("PROF-13")
+def test_a_qualification_is_proposed_achieved_or_expected_stated_only_from_their_words() -> None:
+    ctx = context("I got GCSE maths last year and I'm doing A-level biology now.")
+    proposal, found = check_turn(
+        output(
+            update(
+                "qualifications",
+                items=["achieved: GCSE maths", "expected: A-level biology"],
+            )
+        ),
+        ctx,
+        ProposalOrigin.MODEL,
+    )
+
+    assert found == []
+    assert proposal is not None
+    [change] = proposal.changes
+    assert change.value == [
+        QualificationAnswer(name="GCSE maths", status=QualificationStatus.ACHIEVED),
+        QualificationAnswer(name="A-level biology", status=QualificationStatus.EXPECTED),
+    ]
+    assert change.basis is Basis.STATED  # each name appears in the message it cites
+    assert change.field_input().value == change.value
+    unsaid = check_turn(
+        output(update("qualifications", items=["achieved: A-level chemistry"])),
+        ctx,
+        ProposalOrigin.MODEL,
+    )[0]
+    assert unsaid is not None
+    assert unsaid.changes[0].basis is Basis.INFERRED
+    assert 'qualifications: give each as "achieved: name" or "expected: name"' in problems(
+        output(update("qualifications", items=["A-level biology"])), ctx
+    )
+
+
+@pytest.mark.req("STATE-11", "PROF-14")
+def test_the_instructions_say_someone_may_not_have_had_a_job_yet_and_the_version_moved() -> None:
+    assert PROMPT_VERSION == "interview-turn-5"
+    assert (
+        "Someone may not have had a job yet: ask about school or college, volunteering, "
+        "caring, clubs and hobbies; never treat no job as a gap" in " ".join(INSTRUCTIONS.split())
+    )
+    assert "no_job_yet" in INSTRUCTIONS
+    assert "this change" not in INSTRUCTIONS
+    assert "the change" not in INSTRUCTIONS
+
+
 def test_a_reply_without_proposals_is_valid() -> None:
     proposal, found = check_turn(
         output(next_question=None, missing_critical_fields=[], ready_for_review=False),
@@ -409,7 +501,7 @@ def test_the_prompt_says_how_the_person_chose_to_start_and_to_be_spoken_to() -> 
     payload = json.loads(render_prompt(ctx).removeprefix(CONTEXT_MARKER))
 
     assert (payload["entry"], payload["mode"]) == ("sure", "gentle")
-    assert ctx.prompt_version == "interview-turn-4"
+    assert ctx.prompt_version == "interview-turn-5"
 
 
 @pytest.mark.req("PROF-09")
