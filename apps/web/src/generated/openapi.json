@@ -4500,7 +4500,7 @@
           "research"
         ],
         "summary": "Read Role Pages",
-        "description": "Read the search's pages, up to five, through the restricted acquisition worker (202);\n200 with the same research when its reading has started already. It calls no model.",
+        "description": "Read the search's pages, up to five, through the restricted acquisition worker (202);\n200 with the same research when its reading has started already. It calls no model. A\nrepeat with the same Idempotency-Key answers with the research as it is now.",
         "operationId": "read_role_pages",
         "security": [
           {
@@ -17002,6 +17002,11 @@
             ],
             "description": "esco: an ESCO title chosen as such; ons: a title the UK job-title index lists; own_words: neither. Null before they answer."
           },
+          "on_a_list": {
+            "type": "boolean",
+            "title": "On A List",
+            "description": "A list Careerwright holds has the title itself (ESCO, the UK job-title index, or the option pack by its title); false: the title can be researched. False before they answer."
+          },
           "uk_groups": {
             "items": {
               "$ref": "#/components/schemas/UkGroupOut"
@@ -17031,6 +17036,7 @@
           "occupation",
           "choices",
           "kind",
+          "on_a_list",
           "uk_groups",
           "closest"
         ],
@@ -21575,6 +21581,11 @@
             ],
             "title": "Pack Target Id",
             "description": "The option pack's target, when covered."
+          },
+          "on_a_list": {
+            "type": "boolean",
+            "title": "On A List",
+            "description": "A list Careerwright holds has the title itself (ESCO, the UK job-title index, or the option pack by its title); false: the title can be researched."
           }
         },
         "additionalProperties": false,
@@ -21587,7 +21598,8 @@
           "concept_id",
           "label_matches",
           "coverage",
-          "pack_target_id"
+          "pack_target_id",
+          "on_a_list"
         ],
         "title": "TargetRecordOut",
         "description": "A target as it is stored once, when chosen or saved: what it names, the source of that\nlink and how far Careerwright can cover it. Every chapter reads this record, so a title\nresolves the same everywhere."

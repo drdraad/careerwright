@@ -6846,6 +6846,12 @@ export type RoleOut = {
      */
     kind: TargetKind | null;
     /**
+     * On A List
+     *
+     * A list Careerwright holds has the title itself (ESCO, the UK job-title index, or the option pack by its title); false: the title can be researched. False before they answer.
+     */
+    on_a_list: boolean;
+    /**
      * Uk Groups
      *
      * Every ISCO-08 group the UK job-title index codes the title to (ons only).
@@ -9599,6 +9605,12 @@ export type TargetRecordOut = {
      * The option pack's target, when covered.
      */
     pack_target_id: string | null;
+    /**
+     * On A List
+     *
+     * A list Careerwright holds has the title itself (ESCO, the UK job-title index, or the option pack by its title); false: the title can be researched.
+     */
+    on_a_list: boolean;
 };
 
 /**

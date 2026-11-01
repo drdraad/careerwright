@@ -10699,6 +10699,11 @@ export const RoleOutSchema = {
             ],
             description: 'esco: an ESCO title chosen as such; ons: a title the UK job-title index lists; own_words: neither. Null before they answer.'
         },
+        on_a_list: {
+            type: 'boolean',
+            title: 'On A List',
+            description: 'A list Careerwright holds has the title itself (ESCO, the UK job-title index, or the option pack by its title); false: the title can be researched. False before they answer.'
+        },
         uk_groups: {
             items: {
                 $ref: '#/components/schemas/UkGroupOut'
@@ -10728,6 +10733,7 @@ export const RoleOutSchema = {
         'occupation',
         'choices',
         'kind',
+        'on_a_list',
         'uk_groups',
         'closest'
     ],
@@ -15361,6 +15367,11 @@ export const TargetRecordOutSchema = {
             ],
             title: 'Pack Target Id',
             description: 'The option pack\'s target, when covered.'
+        },
+        on_a_list: {
+            type: 'boolean',
+            title: 'On A List',
+            description: 'A list Careerwright holds has the title itself (ESCO, the UK job-title index, or the option pack by its title); false: the title can be researched.'
         }
     },
     additionalProperties: false,
@@ -15373,7 +15384,8 @@ export const TargetRecordOutSchema = {
         'concept_id',
         'label_matches',
         'coverage',
-        'pack_target_id'
+        'pack_target_id',
+        'on_a_list'
     ],
     title: 'TargetRecordOut',
     description: 'A target as it is stored once, when chosen or saved: what it names, the source of that\nlink and how far Careerwright can cover it. Every chapter reads this record, so a title\nresolves the same everywhere.'

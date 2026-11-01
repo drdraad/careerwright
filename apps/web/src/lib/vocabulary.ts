@@ -631,7 +631,7 @@ export const ROLE_RESEARCH = {
   heading: "Titles no list holds",
   intro:
     "Careerwright can search the web for pages that use one of these titles, then check each page itself.",
-  sends: "It sends only the title and “England”, nothing about you.",
+  sends: "It sends only the title and “England”, nothing else about you.",
   start: "Research this role",
   again: "Research again",
   cancel: "Stop",
@@ -639,7 +639,8 @@ export const ROLE_RESEARCH = {
   why: {
     role: "Your role, in your words",
     target: "Your target, in your words",
-    idea: "A title Careerwright thought of, not yet found",
+    // Not "not yet found": the research below may have found it (fix round 1, review M3).
+    idea: "A title Careerwright thought of",
   },
   state: {
     searching: "Searching the web for pages that use this title…",

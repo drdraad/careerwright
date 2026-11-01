@@ -1060,6 +1060,7 @@ const storedAs = (title?: string, conceptId?: string): TargetRecordsOut => ({
             label_matches: 1,
             coverage: "not_covered",
             pack_target_id: null,
+            on_a_list: true,
           },
         ],
 });

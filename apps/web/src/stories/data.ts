@@ -104,6 +104,7 @@ export function storedTargets(document: ProfileDocument): TargetRecordOut[] {
     label_matches: 0,
     coverage: title === persona.target_titles[0] ? "pack_target" : "not_covered",
     pack_target_id: title === persona.target_titles[0] ? "data-quality-analyst-manchester" : null,
+    on_a_list: false, // the pack covers the first by its crosswalk, not its title
   }));
 }
 

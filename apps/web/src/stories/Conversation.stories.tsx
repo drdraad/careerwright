@@ -452,6 +452,7 @@ const originOf = (title: string, kind: "ons" | "own_words", closest: boolean) =>
       occupation: null,
       choices: [],
       kind,
+      on_a_list: kind === "ons",
       uk_groups: closest ? [{ code: "2221", label: "Nursing professionals" }] : [],
       closest: closest
         ? {
