@@ -305,6 +305,8 @@ async function answeredWorkspace(token: string): Promise<string> {
   profile.weekly_study_hours = { state: "unknown" };
   profile.direct_spend_cap = { state: "prefer_not_to_say" };
   profile.target_titles = { state: "provided", value: ["nurse"] };
+  // An unsure person is asked what they enjoy first (Task 6f), so it is answered here too.
+  profile.enjoyed_tasks = { state: "provided", value: ["helping people"] };
   await asBrowser("PUT", `${base}/profile`, token, { expected_version: 0, profile });
   await asBrowser("PUT", `${base}/interview/preferences`, token, {
     expected_version: 0,
