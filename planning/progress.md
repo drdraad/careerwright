@@ -1030,3 +1030,4 @@ Task 6d: complete (slices A, B, C).
 Carried to Task M: the chime has no trigger (the connection's moment is gone). Carried to Task 8: design M1, world.js singles out one pair in the Roles reference.
 Controller: Childline's site (www.childline.org.uk) does not resolve from this session: outside the network allowlist. Asked the PO to allow it.
 Ruling (6f without Childline): Task 6f dispatches now with Childline held back (no placeholder, no policy bump for it), sent later as a follow-up once the controller can check the site — the card forbids details from memory, and the rest of 6f doesn't depend on it — cost if wrong: one small follow-up and a second policy version bump.
+Task 6f: dispatched (opus, acaa43c9197abf8b0), main tree, BASE 7b3a41e, dispatch task-6f-dispatch.md, report task-6f-report.md (Childline held back; design I1 added).
