@@ -114,3 +114,21 @@ The same flags work on `tools.corpus --adzuna` and `tools.accuracy_read`.
 
 None generated. The `tests/support/certificates.py` keys are made fresh for each test and
 never stored.
+
+## Fix round 1 (review I1)
+
+- **The change:** wording only, no code change. Proxy mode gives up a second thing, not just
+  the address check. When the proxy intercepts TLS (the cloud session's proxy does),
+  Careerwright checks the proxy's certificate, not the site's. So the proxy, not Careerwright,
+  vouches that the page came from that host.
+- **Where it's said:**
+  - In ADR 0009's amendment, as a new bullet under "What it gives up": `docs/adr/0009-evidence-acquisition.md`.
+  - In the opening comment of `backend/src/careerwright/evidence/fetcher.py`.
+- **The commit:** ee263a3. I rebased onto `claude/confident-ramanujan-ux3saw` (3b809ad), so the
+  earlier commits are now fbf1e36 (the proxy mode) and 36f1a59 (the register row).
+- **The register commit is no longer last.** The fix commit after it touches no register row.
+- **Check:** `export PATH=/opt/node24/bin:$PATH; env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check`
+  after the rebase. Exit 0.
+  - Backend: 1,911 passed, 8 skipped.
+  - Web: Vitest 471 passed.
+- **The review's 5 Minors** are left for the final review list, as directed.
