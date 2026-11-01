@@ -3,17 +3,25 @@ decision 2; ADR 0009 decision 12, amendment; ruling R5), budget-capped and ledge
 
 One role-research search on the test model, in this process, through the product's own task
 code and bound check (`run_search` on a `RoleSearchInput`: the title and "England", nothing
-else), for a synthetic test title (no person's data; `--title`, `TITLE=`). Then up to five of
-its candidate pages (`role_research.pages_to_read`) are read through the restricted
-acquisition worker's own code in this process (`acquire_page`: the URL checks, the source
-manifest, robots.txt, pacing, redaction; each page's class from the manifest), and the title
-is checked on each by the product's own corroboration code (`check_title`, `corroborate`).
-No model reads a page. The one provider request is ledgered in its own scope
-(`live-role-research`: at most 3 requests and $0.10 worst case in all, the test model only),
-whatever happens, with what the search proposed and what the pages showed in the row's notes
-(hosts, classes, whether each page uses the title, the verdict; hosts only, never a URL or a
-page's words). The page reads call no model and cost nothing; they are counted in the notes.
-Then the requests sent, the result and the row are scanned for the key.
+else), for a synthetic test title (no person's data; `--title`, `TITLE=`). The one provider
+request is ledgered in its own scope (`live-role-research`: at most 3 requests and $0.10
+worst case in all, the test model only) as soon as it returns, before any page is read, with
+what the search proposed in the row's notes; then the requests sent, the result and the row
+are scanned for the key.
+
+Then up to five of its candidate pages (`role_research.pages_to_read`) are read with the
+restricted acquisition worker's own code (`acquire_page`: the URL checks, the source manifest,
+robots.txt, pacing, redaction; each page's class from the manifest), and the title is checked
+on each by the product's own corroboration code (`check_title`, `corroborate`). No model reads
+a page, and the reads cost nothing, so they have no ledger row: what the pages showed (hosts,
+classes, whether each page uses the title, the verdict; hosts only, never a URL or a page's
+words) is printed with the row's number, scanned for the key too.
+
+The pages are read in this process, the one holding the Meta key: not through the restricted
+worker's own boundary (its separate service with no database, master key or model key). So
+this run is evidence for the code that reads and checks pages, not for that deployment
+boundary; the product's reading always goes through the restricted worker
+(`tests/integration/test_role_research.py`).
 
 The key is read from the repository's gitignored `.env` into a `SecretStr`, never a command
 argument and never printed. Run from `backend/`: `uv run --locked python -m tools.live_role_research
@@ -67,11 +75,13 @@ ROLE_RESEARCH = SmokeKind(
     search.MAX_REQUESTS,
     search.worst_case_nano_usd,
     "role research in process: one search told only a synthetic title and England (the "
-    "product's own task code and bound check), then up to five of its pages read through "
-    "the guarded fetcher and the title checked on each by code (no model reads a page)",
+    "product's own task code and bound check), then up to five of its pages read in this "
+    "process (not through the restricted worker's boundary) with the guarded fetcher and the "
+    "title checked on each by code (no model reads a page; page results printed, not ledgered)",
 )
 
 Reader = Callable[[str], AcquisitionResult]
+PAGES_PRINTED = "pages read (no model call; hosts only), key scan"
 
 
 def _reader() -> Reader:
@@ -162,8 +172,8 @@ def research_role(
         if proposal is not None:
             notes |= search_notes(proposal.model_dump(mode="json"))
             notes["prompt_version"] = search.ROLE_PROMPT_VERSION
-            reader = read or _reader()
-            notes |= page_notes(context.title, [reader(url) for url in pages_to_read(proposal)])
+        # The paid call is ledgered as soon as it returns, before any page is read, so nothing
+        # that happens while reading can leave it unrecorded (fix round 1, review I3).
         record = ledger.append(
             LiveCallEntry(
                 budget_scope=ROLE_SCOPE,
@@ -194,12 +204,22 @@ def research_role(
         key = Needle("Meta key", settings.api_key.get_secret_value(), fragment_length=12)
         findings = scan(cells, [key])
     print(
-        f"outcome {outcome}; verdict {notes.get('verdict')}; sources {notes.get('sources')}; "
-        f"pages {len(notes.get('pages', []))}; ledger row {record.seq}; {len(cells)} cells "
-        f"scanned, {len(findings)} findings",
+        f"outcome {outcome}; ledger row {record.seq}; {len(cells)} cells scanned, "
+        f"{len(findings)} findings",
         flush=True,
     )
-    return 0 if outcome == "succeeded" and not findings else 1
+    if proposal is None:
+        return 1
+    # The pages: no provider call, so no ledger row. What they showed is printed with the
+    # row's number, for the run's report.
+    reader = read or _reader()
+    pages = {"ledger_row": record.seq} | page_notes(
+        context.title, [reader(url) for url in pages_to_read(proposal)]
+    )
+    printed = json.dumps(pages)
+    page_findings = scan([("page notes", printed)], [key])
+    print(f"{PAGES_PRINTED} {len(page_findings)} findings: {printed}", flush=True)
+    return 0 if outcome == "succeeded" and not findings and not page_findings else 1
 
 
 def main(argv: list[str] | None = None) -> None:

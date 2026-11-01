@@ -162,9 +162,11 @@ def test_pages_from_two_hosts_that_show_the_title_make_the_role_found(
     for shown_page in shown["pages"]:  # the quote and the date, one step away
         assert TITLE in shown_page["quote"]
         assert shown_page["retrieved_at"] is not None
-    # A role page is never a job and never goes to a model.
+    # A role page is never a job, never a job source and never goes to a model: the Jobs
+    # chapter still says no source was checked (fix round 1, review I2).
     jobs = api.get(f"/v1/workspaces/{scenario.workspace_id}/jobs", ada).json()
     assert jobs["total_jobs"] == 0
+    assert (jobs["coverage"], jobs["empty_reason"]) == ({}, "no_sources_checked")
     assert (
         infra.query(
             "SELECT run_id FROM careerwright.runs WHERE workspace_id = %s AND kind = "
@@ -310,8 +312,20 @@ def test_a_reading_is_started_once_and_can_be_cancelled(
     first = api.write("POST", f"{base}/reading", scenario.token)
     again = api.write("POST", f"{base}/reading", scenario.token)
     run_id = first.json()["reading"]["run_id"]
-    cancel = api.write(
-        "POST", f"/v1/workspaces/{scenario.workspace_id}/runs/{run_id}/cancel", scenario.token
+    # A job request for the same page while the reading waits starts its own acquisition: a
+    # role reading records no job, so it is never joined (fix round 1, review I2).
+    jobs = api.write(
+        "POST",
+        f"/v1/workspaces/{scenario.workspace_id}/research/acquisitions",
+        scenario.token,
+        {"urls": [page(sources, "careers.northwind.example", "/role/guild")]},
+    )
+    jobs_run = jobs.json()["acquisition"]["run"]["run_id"]
+    stopped_jobs, cancel = (
+        api.write(
+            "POST", f"/v1/workspaces/{scenario.workspace_id}/runs/{run}/cancel", scenario.token
+        )
+        for run in (jobs_run, run_id)
     )
     worker = start_worker(infra, tmp_path / "cancel.log")
     try:
@@ -326,5 +340,8 @@ def test_a_reading_is_started_once_and_can_be_cancelled(
 
     assert (first.status_code, again.status_code) == (202, 200)
     assert again.json()["reading"]["run_id"] == run_id
-    assert cancel.status_code == 202
+    assert jobs.status_code == 202, jobs.text
+    assert jobs.json()["skipped"] == []
+    assert jobs_run != run_id
+    assert (stopped_jobs.status_code, cancel.status_code) == (202, 202)
     assert shown["state"] == "reading_stopped"  # never "not yet found"

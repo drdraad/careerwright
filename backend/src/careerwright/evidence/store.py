@@ -209,7 +209,8 @@ def set_target_status(tx: Tx, run_id: uuid.UUID, position: int, status: str) -> 
 
 
 def urls_in_flight(tx: Tx, workspace_id: uuid.UUID, urls: list[str]) -> dict[str, uuid.UUID]:
-    """URL -> the queued or running acquisition run already working on it."""
+    """URL -> the queued or running acquisition run already working on it for jobs (a page
+    read for role research records no job, so a job request never joins one)."""
     if not urls:
         return {}
     rows = tx.execute(
@@ -217,6 +218,7 @@ def urls_in_flight(tx: Tx, workspace_id: uuid.UUID, urls: list[str]) -> dict[str
             "SELECT DISTINCT ON (t.url) t.url, t.run_id FROM careerwright.acquisition_targets t "
             "JOIN careerwright.runs r ON r.run_id = t.run_id "
             "WHERE t.workspace_id = :ws AND t.url = ANY(:urls) AND t.status = 'queued' "
+            "AND t.role_title IS NULL "
             "AND r.status IN ('queued', 'running') "
             "AND NOT EXISTS (SELECT 1 FROM careerwright.run_cancellations c WHERE c.run_id = "
             "r.run_id) "
@@ -227,13 +229,26 @@ def urls_in_flight(tx: Tx, workspace_id: uuid.UUID, urls: list[str]) -> dict[str
     return {r.url: r.run_id for r in rows}
 
 
+def _not_a_role_page(attempt: str) -> str:
+    """SQL: the attempt (by its alias) was no page read for role research (Task 6e fix round
+    1, review I2): a role page is never a job source, so the job paths' coverage, joins and
+    back-off never count one."""
+    return (
+        "NOT EXISTS (SELECT 1 FROM careerwright.acquisition_targets rt "
+        f"WHERE rt.run_id = {attempt}.run_id AND rt.position = {attempt}.position "
+        "AND rt.role_title IS NOT NULL)"
+    )
+
+
 def url_history(tx: Tx, workspace_id: uuid.UUID, url: str) -> tuple[int, datetime | None]:
-    """(consecutive failures since the last success, the last attempt's start) for a URL."""
+    """(consecutive failures since the last success, the last attempt's start) for a URL, of
+    the job paths' attempts only."""
     rows = tx.execute(
         sa.text(
-            "SELECT status, started_at FROM careerwright.source_attempts "
-            "WHERE workspace_id = :ws AND requested_url = :url AND status <> 'pending' "
-            "ORDER BY started_at DESC LIMIT 20"
+            "SELECT a.status, a.started_at FROM careerwright.source_attempts a "
+            "WHERE a.workspace_id = :ws AND a.requested_url = :url AND a.status <> 'pending' "
+            f"AND {_not_a_role_page('a')} "
+            "ORDER BY a.started_at DESC LIMIT 20"
         ),
         {"ws": workspace_id, "url": url},
     ).all()
@@ -442,7 +457,8 @@ NO_POSTING_FOUND_BY_MODEL = "no_posting_found_by_model"
 def coverage(tx: Tx, workspace_id: uuid.UUID) -> dict[str, int]:
     """The latest attempt's outcome per source the workspace tried, a retrieved source with
     no readable posting counted apart (spec section 7: "Display result count, deduplication
-    count and coverage status"). Pasted text is the person's own input, not a source tried.
+    count and coverage status"). Pasted text is the person's own input, not a source tried, and
+    a page read for role research is no job source (Task 6e fix round 1, review I2).
 
     A page handed to model extraction (fix round 2) reads as what its run recorded,
     whatever the run's state (a run cancelled while its call was out keeps its result,
@@ -473,8 +489,8 @@ def coverage(tx: Tx, workspace_id: uuid.UUID) -> dict[str, int]:
             "WHEN latest.status = 'succeeded' AND latest.extraction = ANY(:unreadable) "
             "THEN :unread ELSE latest.status END AS outcome, count(*) AS n "
             "FROM (SELECT DISTINCT ON (coalesce(requested_url, attempt_id::text)) attempt_id, "
-            "run_id, status, extraction FROM careerwright.source_attempts "
-            "WHERE workspace_id = :ws AND route <> 'pasted_text' "
+            "run_id, status, extraction FROM careerwright.source_attempts s "
+            f"WHERE workspace_id = :ws AND route <> 'pasted_text' AND {_not_a_role_page('s')} "
             "ORDER BY coalesce(requested_url, attempt_id::text), started_at DESC) latest "
             "LEFT JOIN careerwright.runs ar ON ar.run_id = latest.run_id "
             "LEFT JOIN careerwright.page_extractions e ON e.attempt_id = latest.attempt_id "
