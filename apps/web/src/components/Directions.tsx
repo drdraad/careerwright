@@ -908,8 +908,8 @@ export function Directions({
         Directions to explore
       </h2>
       <p className="small muted measure">
-        Occupations from {ESCO_NAMED}, found from your own answers. Ideas to test, not a judgement
-        of fit: no score or percentage.
+        Occupations from {ESCO_NAMED}, found from your answers. Ideas to test, not a judgement of
+        fit.
       </p>
       {discovery === null || (stale && !running) ? (
         <>

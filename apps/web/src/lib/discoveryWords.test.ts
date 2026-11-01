@@ -520,14 +520,15 @@ describe("[STATE-05][PROF-10] the sketch's words and a target's coverage", () =>
   });
 });
 
-describe("[PROF-11] ESCO's list and the details beside a title, in words (Task 6d slice C)", () => {
+describe("[MAP1-09][PROF-11] ESCO's list and the details beside a title, in words (Task 6d slice C)", () => {
   it("calls ESCO's list ESCO's, for the kind of work, and names ESCO plainly", () => {
     expect(ESCO_LISTS).toBe("ESCO lists these for this kind of work:");
-    expect(ESCO_NAMED).toBe("ESCO, the European Union's public list of occupations and skills");
+    // Short, so the suggestions' first decision stays in a phone's first screen (UI-12).
+    expect(ESCO_NAMED).toBe("ESCO, the EU's list of jobs and skills");
     expect(TITLE_DETAILS.listed(1)).toBe("The skill ESCO lists for this kind of work");
     expect(TITLE_DETAILS.listed(24)).toBe("The 24 skills ESCO lists for this kind of work");
     expect(TITLE_DETAILS.listedIntro).toBe(
-      "ESCO, the European Union's public list of occupations and skills, lists these as essential for this kind of work. Careerwright hasn't compared them with your own experience.",
+      "ESCO, the EU's list of jobs and skills, lists these as essential for this kind of work. Careerwright hasn't compared them with your own experience.",
     );
   });
 

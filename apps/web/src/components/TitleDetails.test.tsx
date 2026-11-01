@@ -54,7 +54,7 @@ const get = (answer: TitleDetailsListOut): Route => ({
 });
 const originRoute = (answer: OriginOut): Route => ({ method: "GET", path: /\/origin$/, answer });
 
-describe("[PROF-11] seniority and industry beside each title, and ESCO's list for the role", () => {
+describe("[PROF-11][MAP1-09] seniority and industry beside each title, and ESCO's list for the role", () => {
   it("shows nothing for a person who gave no title", async () => {
     const { sent } = renderDetails([get(list())]);
     await waitFor(() => expect(sent.some((s) => s.path.endsWith("/profile/titles"))).toBe(true));
@@ -94,6 +94,10 @@ describe("[PROF-11] seniority and industry beside each title, and ESCO's list fo
       industry: null,
       not_part_of_job: [],
     });
+    // The form gives way to what was saved; focus goes to the title's heading, never lost.
+    await waitFor(() =>
+      expect(within(section).getByRole("heading", { name: "Your role: Bookkeeper" })).toHaveFocus(),
+    );
   });
 
   it("lets the person mark a skill ESCO lists for their role not part of their job", async () => {
@@ -112,9 +116,7 @@ describe("[PROF-11] seniority and industry beside each title, and ESCO's list fo
     await user.click(
       await within(section).findByText("The 2 skills ESCO lists for this kind of work"),
     );
-    expect(
-      within(section).getByText(/ESCO, the European Union's public list of occupations and skills/),
-    ).toBeVisible();
+    expect(within(section).getByText(/ESCO, the EU's list of jobs and skills/)).toBeVisible();
     const mark = within(section).getByRole("button", { name: "Not part of my job: keep records" });
     expect(mark).toHaveAttribute("aria-pressed", "false");
     await user.click(mark);

@@ -187,10 +187,13 @@ def set_title_details(
             stage=ErrorStage.PROFILE,
             details={"current_version": current.version},
         )
-    if command.not_part_of_job:
+    # Only a newly marked skill is checked: a mark made before stays a display state even when
+    # the title's occupation has changed since, so it never blocks a later save.
+    added = [skill for skill in command.not_part_of_job if skill not in current.not_part_of_job]
+    if added:
         record = _record(tx, workspace_id, latest.document, command.title_use, key, pack)
         listed = listed_skills(tx, record, command.title_use)
-        if any(skill not in listed for skill in command.not_part_of_job):
+        if any(skill not in listed for skill in added):
             raise _invalid(
                 "not_part_of_job",
                 "not_listed",

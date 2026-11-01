@@ -333,8 +333,9 @@ export const PURPOSE =
   "Careerwright helps you find work that could suit you, see what it would take, and plan a route you can afford.";
 
 /** ESCO in plain words, where a view first names it beside skills it lists (Task 6d slice C,
- *  the product owner's ESCO research). */
-export const ESCO_NAMED = "ESCO, the European Union's public list of occupations and skills";
+ *  the product owner's ESCO research). Short: on the suggestions it must not push the first
+ *  decision out of a phone's first screen. */
+export const ESCO_NAMED = "ESCO, the EU's list of jobs and skills";
 
 /** The essential skills ESCO lists for a role or a target: ESCO's list for that kind of work,
  *  never the person's skills and never what the work "usually" needs (ADR 0015 decision 4). */

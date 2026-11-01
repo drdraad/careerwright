@@ -12,6 +12,7 @@ import pytest
 from careerwright.profile import safety
 from tests.integration.test_interview_choices import DISTRESS
 from tests.integration.test_origin import choose_role, occupation, origin
+from tests.integration.test_role_space import closest, name_role
 from tests.support.client import ApiClient, profile_with
 from tests.support.infra import Infra
 
@@ -165,6 +166,52 @@ def test_a_skill_marked_not_part_of_my_job_is_a_display_state_never_evidence(
     assert unlisted.json()["error"]["details"]["reason"] == "not_listed"
     assert unmarked.status_code == 201, unmarked.text
     assert all(not u["not_part_of_job"] for u in origin(api, ada, workspace)["usual_skills"])
+
+
+@pytest.mark.req("PROF-11", "MAP1-09")
+def test_a_mark_kept_from_an_earlier_closest_choice_never_blocks_a_later_save(
+    api: ApiClient, ada: str
+) -> None:
+    # Self-review: a role whose closest occupation the person later let go ("None of these is
+    # my job") lists no skills; the marks made before are kept, and saving its seniority must
+    # still work. Only a newly marked skill is checked against what ESCO lists.
+    workspace = api.create_workspace(ada, "Marks kept (synthetic)")["workspace_id"]
+    assert name_role(api, ada, workspace, "Registered nurse", 0).status_code == 201
+    [group] = origin(api, ada, workspace)["role"]["closest"]["groups"]
+    specialist = next(o["concept_id"] for o in group["occupations"] if "specialist" in o["title"])
+    assert closest(api, ada, workspace, specialist, 1).status_code == 201
+    skill = origin(api, ada, workspace)["usual_skills"][0]["skill_id"]
+    marked = put_details(
+        api, ada, workspace, "role", "Registered nurse", 0, not_part_of_job=[skill]
+    )
+    assert marked.status_code == 201, marked.text
+    assert closest(api, ada, workspace, None, 2).status_code == 201
+
+    later = put_details(
+        api,
+        ada,
+        workspace,
+        "role",
+        "Registered nurse",
+        1,
+        seniority="Band 6",
+        not_part_of_job=[skill],
+    )
+    added = put_details(
+        api,
+        ada,
+        workspace,
+        "role",
+        "Registered nurse",
+        2,
+        seniority="Band 6",
+        not_part_of_job=[skill, str(uuid.uuid4())],
+    )
+
+    assert later.status_code == 201, later.text
+    assert (later.json()["seniority"], later.json()["not_part_of_job"]) == ("Band 6", [skill])
+    assert added.status_code == 422, added.text
+    assert added.json()["error"]["details"]["reason"] == "not_listed"
 
 
 @pytest.mark.req("PROF-09", "PROF-11")

@@ -1018,7 +1018,7 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, as a plain
     expect(within(mechanic).queryByText(/The other/)).toBeNull();
   });
 
-  it("states the skills a suggestion shares with the role as a plain line, never as a discovery (the product owner, 1 November 2026)", async () => {
+  it("[MAP1-09] states the skills a suggestion shares with the role as a plain line, never as a discovery (the product owner, 1 November 2026)", async () => {
     fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([connected]) }]);
     const { user } = renderDirections();
 
@@ -1027,6 +1027,13 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, as a plain
       within(mechanic).getByText("Among them: adjust brakes, fit tyres and replace chains."),
     ).toBeVisible();
     expect(mechanic).not.toHaveTextContent(/unexpected|connection/i);
+    // ESCO named plainly where the suggestions first name it, short enough to keep the first
+    // decision in a phone's first screen (UI-12).
+    expect(
+      screen.getByText(
+        "Occupations from ESCO, the EU's list of jobs and skills, found from your answers. Ideas to test, not a judgement of fit.",
+      ),
+    ).toBeVisible();
     expect(within(mechanic).getByText("true wheels")).not.toBeVisible();
     await user.click(within(mechanic).getByText("The other 2 skills"));
     expect(within(mechanic).getByText("true wheels")).toBeVisible();

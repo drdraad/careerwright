@@ -161,7 +161,7 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   await expect(sketch.getByText("ESCO lists these for this kind of work:")).toBeVisible();
   await expect(
     sketch.getByText(
-      "Careerwright looked up each target in ESCO, the European Union's public list of occupations and skills.",
+      "Careerwright looked up each target in ESCO, the EU's list of jobs and skills.",
     ),
   ).toBeVisible();
   await expect(sketch.getByText(/Not resolved yet/).first()).toBeVisible();

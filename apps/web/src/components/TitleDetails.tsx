@@ -19,7 +19,12 @@ import { SupportNote } from "./SupportNote";
 const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 const given = (text: string) => (text.trim() === "" ? null : text.trim());
 
-type Save = (next: Pick<TitleDetailsOut, "seniority" | "industry" | "not_part_of_job">) => void;
+/** `fromForm`: the save closes the form, so focus moves to the title's heading once it is
+ *  saved; a mark's toggle keeps its own focus. */
+type Save = (
+  next: Pick<TitleDetailsOut, "seniority" | "industry" | "not_part_of_job">,
+  fromForm?: boolean,
+) => void;
 
 /** One title's seniority and industry, said as given or not, and the form that changes them. */
 function DetailsForm({
@@ -61,11 +66,14 @@ function DetailsForm({
           className="grid gap-8"
           onSubmit={(event) => {
             event.preventDefault();
-            onSave({
-              seniority: given(seniority),
-              industry: given(industry),
-              not_part_of_job: details.not_part_of_job,
-            });
+            onSave(
+              {
+                seniority: given(seniority),
+                industry: given(industry),
+                not_part_of_job: details.not_part_of_job,
+              },
+              true,
+            );
           }}
         >
           <Field
@@ -200,7 +208,7 @@ function OneTitle({ workspaceId, details }: { workspaceId: string; details: Titl
   const [support, setSupport] = useState<SupportNoteOut | null>(null);
   const [saved, setSaved] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
-  const onSave: Save = (next) => {
+  const onSave: Save = (next, fromForm = false) => {
     setSaved(false);
     void save
       .mutateAsync({
@@ -212,6 +220,7 @@ function OneTitle({ workspaceId, details }: { workspaceId: string; details: Titl
       .then((stored) => {
         setSupport(stored.support_note ?? null);
         setSaved(true);
+        if (fromForm) heading.current?.focus();
       })
       .catch((error: unknown) => setSupport(error instanceof ApiError ? error.supportNote : null));
   };
