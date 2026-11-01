@@ -1,0 +1,403 @@
+[
+  {
+    "slot": "F04",
+    "url": "https://www.gov.uk/employing-an-apprentice/get-funding",
+    "final_url": "https://www.gov.uk/employing-an-apprentice/get-funding",
+    "retrieved_at": "2026-11-01T18:41:54.640826+00:00",
+    "attempt": {
+      "status": "succeeded",
+      "reason": null
+    },
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "1006f11706cba81754a8353fd2d5fc6b66dc3dad9a495a672bc646c8da480421",
+    "byte_count": 86424,
+    "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+    "retention": "body",
+    "extraction": "no_job_posting",
+    "postings": [],
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": "var/evidence/corpus/F04/1006f11706cba81754a8353fd2d5fc6b66dc3dad9a495a672bc646c8da480421.html",
+    "located": [
+      {
+        "excerpt": "apprentice",
+        "count": 168,
+        "offsets": [
+          [
+            130,
+            140
+          ],
+          [
+            158,
+            168
+          ],
+          [
+            2384,
+            2394
+          ],
+          [
+            2647,
+            2657
+          ],
+          [
+            2700,
+            2710
+          ]
+        ],
+        "texts": [
+          "apprentice",
+          "apprentice",
+          "apprentice",
+          "apprentice",
+          "apprentice"
+        ]
+      },
+      {
+        "excerpt": "pay for",
+        "count": 6,
+        "offsets": [
+          [
+            4877,
+            4884
+          ],
+          [
+            9945,
+            9952
+          ],
+          [
+            10073,
+            10080
+          ],
+          [
+            49782,
+            49789
+          ],
+          [
+            53744,
+            53751
+          ]
+        ],
+        "texts": [
+          "pay for",
+          "pay for",
+          "pay for",
+          "pay for",
+          "pay for"
+        ]
+      },
+      {
+        "excerpt": "must not",
+        "count": 0,
+        "offsets": [],
+        "texts": []
+      },
+      {
+        "excerpt": "contribute",
+        "count": 0,
+        "offsets": [],
+        "texts": []
+      },
+      {
+        "excerpt": "training costs",
+        "count": 0,
+        "offsets": [],
+        "texts": []
+      },
+      {
+        "excerpt": "do not have to pay",
+        "count": 0,
+        "offsets": [],
+        "texts": []
+      }
+    ]
+  },
+  {
+    "slot": "F12",
+    "url": "https://www.gov.uk/student-finance-on-or-after-1-january-2027",
+    "final_url": "https://www.gov.uk/student-finance-on-or-after-1-january-2027",
+    "retrieved_at": "2026-11-01T18:41:55.956189+00:00",
+    "attempt": {
+      "status": "succeeded",
+      "reason": null
+    },
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "a398a2c154ed5ce49ff40e7d7756d18961b4663c5f6ed7aeb400c05f45977ae3",
+    "byte_count": 116653,
+    "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+    "retention": "body",
+    "extraction": "no_job_posting",
+    "postings": [],
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": "var/evidence/corpus/F12/a398a2c154ed5ce49ff40e7d7756d18961b4663c5f6ed7aeb400c05f45977ae3.html",
+    "located": [
+      {
+        "excerpt": "Lifelong Learning Entitlement",
+        "count": 22,
+        "offsets": [
+          [
+            4811,
+            4840
+          ],
+          [
+            4861,
+            4890
+          ],
+          [
+            5073,
+            5102
+          ],
+          [
+            6699,
+            6728
+          ],
+          [
+            42839,
+            42868
+          ]
+        ],
+        "texts": [
+          "Lifelong Learning Entitlement",
+          "Lifelong Learning Entitlement",
+          "Lifelong Learning Entitlement",
+          "Lifelong Learning Entitlement",
+          "Lifelong Learning Entitlement"
+        ]
+      },
+      {
+        "excerpt": "Tuition Fee Loan",
+        "count": 50,
+        "offsets": [
+          [
+            5938,
+            5954
+          ],
+          [
+            6136,
+            6152
+          ],
+          [
+            6485,
+            6501
+          ],
+          [
+            6812,
+            6828
+          ],
+          [
+            7255,
+            7271
+          ]
+        ],
+        "texts": [
+          "Tuition Fee Loan",
+          "Tuition Fee Loan",
+          "Tuition Fee Loan",
+          "Tuition Fee Loan",
+          "Tuition Fee Loan"
+        ]
+      },
+      {
+        "excerpt": "Maintenance Loan",
+        "count": 29,
+        "offsets": [
+          [
+            6025,
+            6041
+          ],
+          [
+            6158,
+            6174
+          ],
+          [
+            43803,
+            43819
+          ],
+          [
+            43906,
+            43922
+          ],
+          [
+            48222,
+            48238
+          ]
+        ],
+        "texts": [
+          "Maintenance Loan",
+          "Maintenance Loan",
+          "Maintenance Loan",
+          "Maintenance Loan",
+          "Maintenance Loan"
+        ]
+      },
+      {
+        "excerpt": "1 January 2027",
+        "count": 26,
+        "offsets": [
+          [
+            167,
+            181
+          ],
+          [
+            2489,
+            2503
+          ],
+          [
+            2906,
+            2920
+          ],
+          [
+            3141,
+            3155
+          ],
+          [
+            4344,
+            4358
+          ]
+        ],
+        "texts": [
+          "1 January 2027",
+          "1 January 2027",
+          "1 January 2027",
+          "1 January 2027",
+          "1 January 2027"
+        ]
+      },
+      {
+        "excerpt": "September 2027",
+        "count": 4,
+        "offsets": [
+          [
+            72056,
+            72070
+          ],
+          [
+            72133,
+            72147
+          ],
+          [
+            72270,
+            72284
+          ],
+          [
+            73213,
+            73227
+          ]
+        ],
+        "texts": [
+          "September 2027",
+          "September 2027",
+          "September 2027",
+          "September 2027"
+        ]
+      }
+    ]
+  },
+  {
+    "slot": "F13",
+    "url": "https://www.gov.uk/repaying-your-student-loan/which-repayment-plan-you-are-on",
+    "final_url": "https://www.gov.uk/repaying-your-student-loan/which-repayment-plan-you-are-on",
+    "retrieved_at": "2026-11-01T18:42:00.508608+00:00",
+    "attempt": {
+      "status": "succeeded",
+      "reason": null
+    },
+    "http_status": 200,
+    "content_type": "text/html",
+    "sha256": "020eeef15d91eabf9cfe42bb0c7a066dbbab6ba0d9f2abd1ef4c5b643c19b9ee",
+    "byte_count": 94738,
+    "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+    "retention": "body",
+    "extraction": "no_job_posting",
+    "postings": [],
+    "via_proxy": true,
+    "address_checked": false,
+    "kept_body": "var/evidence/corpus/F13/020eeef15d91eabf9cfe42bb0c7a066dbbab6ba0d9f2abd1ef4c5b643c19b9ee.html",
+    "located": [
+      {
+        "excerpt": "Plan 5",
+        "count": 2,
+        "offsets": [
+          [
+            6322,
+            6328
+          ],
+          [
+            46842,
+            46848
+          ]
+        ],
+        "texts": [
+          "Plan 5",
+          "Plan 5"
+        ]
+      },
+      {
+        "excerpt": "1 August 2023",
+        "count": 2,
+        "offsets": [
+          [
+            6264,
+            6277
+          ],
+          [
+            46806,
+            46819
+          ]
+        ],
+        "texts": [
+          "1 August 2023",
+          "1 August 2023"
+        ]
+      },
+      {
+        "excerpt": "Advanced Learner Loan",
+        "count": 4,
+        "offsets": [
+          [
+            6610,
+            6631
+          ],
+          [
+            7677,
+            7698
+          ],
+          [
+            47043,
+            47064
+          ],
+          [
+            47845,
+            47866
+          ]
+        ],
+        "texts": [
+          "Advanced Learner Loan",
+          "Advanced Learner Loan",
+          "Advanced Learner Loan",
+          "Advanced Learner Loan"
+        ]
+      },
+      {
+        "excerpt": "Lifelong Learning",
+        "count": 2,
+        "offsets": [
+          [
+            6788,
+            6805
+          ],
+          [
+            47177,
+            47194
+          ]
+        ],
+        "texts": [
+          "Lifelong Learning",
+          "Lifelong Learning"
+        ]
+      }
+    ]
+  }
+]
