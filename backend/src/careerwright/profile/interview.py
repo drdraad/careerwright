@@ -328,25 +328,17 @@ def _quoted(value: str, texts: list[str]) -> bool:
     return bool(needle) and any(pattern.search(_quotable(text)) for text in texts)
 
 
-def _held_name(item: object) -> str:
-    """A held qualification's name, as the profile or a sealed turn input holds it."""
-    if isinstance(item, QualificationAnswer):
-        return item.name
-    return str(item.get("name", "")) if isinstance(item, dict) else str(item)
-
-
 def _basis(update: ModelUpdate, cited: list[str], held: object) -> Basis:
     """`stated` only when the model claims it and every new value the update proposes
     appears in the messages it cites (items the profile already holds need no quote);
-    anything else, including an answer with no value to quote, is shown as `inferred`."""
+    anything else, including an answer with no value to quote, is shown as `inferred`. A
+    qualification's status and a work status are always readings of their words, never their
+    words (Task 6f review I1), so both are always `inferred`."""
     if update.basis is not Basis.STATED or update.state is not AnsweredState.PROVIDED:
         return Basis.INFERRED
-    if FIELD_SPECS[update.field.value].kind is FieldKind.QUALIFICATIONS:
-        # Each new qualification's name is quoted; its status is a reading of their words.
-        kept = {_quotable(_held_name(item)) for item in held} if isinstance(held, list) else set()
-        named = [part[1] for part in map(_qualification_parts, update.items or []) if part]
-        values = [text for text in named if _quotable(text) not in kept]
-    elif update.items is not None:
+    if FIELD_SPECS[update.field.value].kind in (FieldKind.QUALIFICATIONS, FieldKind.WORK_STATUS):
+        return Basis.INFERRED
+    if update.items is not None:
         kept = {_quotable(str(item)) for item in held} if isinstance(held, list) else set()
         values = [item for item in update.items if _quotable(item) not in kept]
     elif FIELD_SPECS[update.field.value].kind is FieldKind.SALARY:
