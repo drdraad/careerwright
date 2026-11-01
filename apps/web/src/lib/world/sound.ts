@@ -1,14 +1,16 @@
 // Three short cues the product owner asked for at session W1, "subtle and evocative, not
-// cheesy": a swell when the person's light comes on, a chime when a connection lights up and a
-// tick when a skill is picked. Off until the person turns sound on (from a click, so the
-// browser lets audio start). Synthesised in the browser: no audio files and no requests.
+// cheesy": a swell when the person's light comes on, a chime, and a tick when a skill is
+// picked. Off until the person turns sound on (from a click, so the browser lets audio start).
+// Synthesised in the browser: no audio files and no requests.
 
 export type Cue = "swell" | "chime" | "tick";
 
 /**
- * Only the swell has a trigger so far (the person's light coming on, World.tsx). The chime and
- * the tick have no trigger until W2C brings connections lighting up and picking a skill; until
- * then they play only from the `World / Three sounds` story.
+ * Only the swell has a trigger so far (the person's light coming on, World.tsx). The chime was
+ * made for a connection lighting up, which is dropped (the product owner, 1 November 2026:
+ * shared skills are "Always a plain line"), so it has no trigger unless Task M gives it
+ * another; the tick has none until picking a skill exists. Until then both play only from the
+ * `World / Three sounds` story.
  */
 export const CUES: readonly Cue[] = ["swell", "chime", "tick"];
 

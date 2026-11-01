@@ -78,8 +78,10 @@ others, and its a bit too [noisy] with the dashed lines." So:
   travelling shimmer along the horizon and the trails' sway were taken out, and the motes cut
   from 2,400 to 360: nothing moves without meaning, one idea at a time.
 - **Sound** (session W1: "subtle and evocative, not cheesy!"): a low swell when the person's
-  light comes on, a soft two-note chime when a connection lights up, a small glass tick when a
-  skill is picked. Off until the person turns sound on.
+  light comes on, a soft two-note chime, a small glass tick when a skill is picked. Off until
+  the person turns sound on. The chime was drawn for a connection lighting up; that moment is
+  dropped (the product owner, 1 November 2026: shared skills are "Always a plain line"), so
+  the chime has no trigger until Task M asks the product owner whether it gets another.
 - **Lettering:** Outfit, the product owner's choice ("Keep Outfit").
 
 ## One colour, one meaning
