@@ -1,0 +1,28 @@
+{
+  "label": "Synthetic persona: not a real person. A test card only; it never fills a live field.",
+  "synthetic": true,
+  "id": "SL01",
+  "name": "Maya (synthetic)",
+  "source": "The product owner's decision of 2026-11-01 (plan v1.6, Task 6e; TEST1-16). Kept apart from the supplied pack: nothing under fixtures/m0 changes.",
+  "age": 17,
+  "city": "Leeds",
+  "entry_mode": "unsure",
+  "current_role": {"state": "no_job_yet"},
+  "work_status": "in_education_or_training",
+  "qualifications": [
+    {"name": "A-level biology", "status": "expected"},
+    {"name": "A-level chemistry", "status": "expected"},
+    {"name": "A-level psychology", "status": "expected"}
+  ],
+  "volunteering": "Helps run a Brownies group at her local youth club.",
+  "unsure": "She doesn't know yet what she wants to do.",
+  "first_words": "I'm in Year 13 doing biology, chemistry and psychology. I've never had a job but I help run a Brownies group.",
+  "enjoys_words": "I enjoy doing practicals in the chemistry lab and helping the younger girls with crafts.",
+  "never": [
+    "a job title: she has never had a job",
+    "an income or a salary",
+    "anything she didn't say"
+  ],
+  "evaluation_cases": ["INT-16", "INT-17", "DSC-21", "STR-01", "STR-02"],
+  "browser_case": "apps/web/e2e/role-space.spec.ts: \"I haven't had a job yet\" lights the world within ten seconds (Task 6f)"
+}

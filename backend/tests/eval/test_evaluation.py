@@ -3,20 +3,24 @@ support screen and the output guard) pass their cases, and the semantic checks c
 failures they name (TEST1-10). Discovery cases run against the full ESCO release in
 `tests/integration/test_evaluation.py`; interview cases need a model and run live only."""
 
+import json
 from typing import Any
 
 import pytest
 
 from tools.evaluation import (
     PAIRED,
+    SCHOOL_LEAVER,
     Case,
     CaseKind,
     FailureType,
+    _discovery,
     evaluate,
     failures_by_type,
     load_cases,
     observe_guard,
     observe_interview_demo,
+    observe_strength,
     observe_support,
 )
 
@@ -64,6 +68,72 @@ def test_every_demo_interview_case_passes_on_the_demo_interviewer(case: Case) ->
     # model's run of the same case is Task 6e's (R5).
     assert case.kind is CaseKind.INTERVIEW
     assert evaluate(case, observe_interview_demo(case), {}) == []
+
+
+@pytest.mark.req("TEST1-16")
+@pytest.mark.parametrize("case", [c for c in CASES if c.kind is CaseKind.STRENGTH], ids=str)
+def test_every_strength_case_passes(case: Case) -> None:
+    # Task 6e: a canned strength proposal through the same deterministic check a model's
+    # passes: a quotation of the person's own words is accepted, anything else refused.
+    assert evaluate(case, observe_strength(case), {}) == []
+
+
+@pytest.mark.req("TEST1-16")
+def test_the_synthetic_school_leaver_is_labelled_kept_apart_and_has_her_cases() -> None:
+    card = json.loads(SCHOOL_LEAVER.read_text(encoding="utf-8"))
+    hers = [case for case in CASES if case.persona == card["id"]]
+
+    assert card["synthetic"] is True
+    assert card["label"].startswith("Synthetic")
+    assert "m0" not in SCHOOL_LEAVER.parts  # never in the supplied pack
+    assert card["current_role"] == {"state": "no_job_yet"}  # no invented job title
+    assert not {"income", "current_net_income_minor", "salary"} & set(card)  # no income
+    # Four to six cases with the browser test of the no-job first answer (Task 6f's).
+    assert 4 <= len(hers) + 1 <= 6
+    assert {case.kind for case in hers} == {
+        CaseKind.INTERVIEW,
+        CaseKind.DISCOVERY,
+        CaseKind.STRENGTH,
+    }
+    assert all(case.synthetic and "TEST1-16" in case.requirements for case in hers)
+    assert [c.id for c in hers if c.kind is CaseKind.INTERVIEW] == card["evaluation_cases"][:2]
+    assert {c.id for c in hers} == set(card["evaluation_cases"])
+
+
+@pytest.mark.req("TEST1-16")
+def test_a_strength_that_is_not_her_words_fails_its_check() -> None:
+    case = BY_ID["STR-01"]
+    accepted = observe_strength(case)
+    paraphrase = {**accepted, "strength": {**accepted["strength"], "quotation": "lab skills"}}
+
+    assert evaluate(case, accepted, {}) == []
+    assert [f.type for f in evaluate(case, paraphrase, {})] == [FailureType.GROUNDING]
+    assert [f.type for f in evaluate(case, {"problems": ["x"], "strength": None}, {})] == [
+        FailureType.GUARD
+    ]
+
+
+@pytest.mark.req("TEST1-16", "REC1-05")
+def test_nothing_close_to_now_fails_a_suggestion_close_to_a_job_she_never_had() -> None:
+    case = BY_ID["DSC-21"]
+    [check] = [e for e in case.expect if e.check == "nothing_close_to_now"]
+    close = {
+        "direction": "close_to_current",
+        "reasons": [{"reason": "searched_through_skill", "field": "enjoyed_tasks"}],
+    }
+    joined = {
+        "direction": "transferable",
+        "reasons": [{"reason": "joined_by_shared_skills", "field": "current_role"}],
+    }
+    far = {
+        "direction": "less_familiar",
+        "reasons": [{"reason": "searched_through_skill", "field": "enjoyed_tasks"}],
+    }
+
+    for shown, failed in (([close], True), ([joined], True), ([far], False)):
+        found = _discovery({"suggestions": shown}, check, set())
+        assert (found is not None) is failed
+        assert found is None or found.type is FailureType.GROUNDING
 
 
 def test_state_is_fails_a_job_title_or_a_skip_for_no_job_yet() -> None:
