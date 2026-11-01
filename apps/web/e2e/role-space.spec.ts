@@ -141,7 +141,7 @@ test("[PROF-11] seniority and industry beside the role, and a skill ESCO lists m
   await expect(details.getByText("Seniority: Band 6. Industry: not given.")).toBeVisible();
 
   await details.getByText(/skills ESCO lists for this kind of work$/).click();
-  const mark = details.getByRole("button", { name: /^Not part of my job: / }).first();
+  const mark = details.getByRole("button", { name: /^Not part of my job\s*:/ }).first();
   await expect(mark).toHaveAttribute("aria-pressed", "false");
   await mark.click();
   await expect(mark).toHaveAttribute("aria-pressed", "true");

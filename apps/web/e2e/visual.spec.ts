@@ -273,7 +273,51 @@ type Scratch = {
   /** New, its role named "Registered nurse" at the first question: "Which of these is
    *  closest?" (Task 6d slice B). */
   named: string;
+  /** As `named`, the closest occupation chosen, with seniority and industry given and one
+   *  skill ESCO lists marked "not part of my job" (Task 6d slice C). */
+  detailed: string;
 };
+
+/** A role with its closest ESCO occupation, its seniority and industry, and one skill ESCO
+ *  lists for its kind of work marked not part of the job. */
+async function detailedWorkspace(token: string): Promise<string> {
+  const { workspace_id: workspace } = await asBrowser<{ workspace_id: string }>(
+    "POST",
+    "/v1/workspaces",
+    token,
+    { name: "Seniority and industry (synthetic)", data_mode: "demo", synthetic: true },
+  );
+  const base = `/v1/workspaces/${workspace}`;
+  await asBrowser("POST", `${base}/origin/role/title`, token, {
+    expected_version: 0,
+    title: "Registered nurse",
+  });
+  type Closest = {
+    role: { closest: { groups: { occupations: { concept_id: string; title: string }[] }[] } };
+  };
+  const offered = await asBrowser<Closest>("GET", `${base}/origin`, token);
+  const specialist = offered.role.closest.groups
+    .flatMap((group) => group.occupations)
+    .find((occupation) => occupation.title === "specialist nurse");
+  await asBrowser("POST", `${base}/origin/role/closest`, token, {
+    expected_version: 1,
+    concept_id: specialist?.concept_id,
+  });
+  const chosen = await asBrowser<{ usual_skills: { skill_id: string }[] }>(
+    "GET",
+    `${base}/origin`,
+    token,
+  );
+  await asBrowser("PUT", `${base}/profile/titles`, token, {
+    expected_version: 0,
+    title_use: "role",
+    title: "Registered nurse",
+    seniority: "Band 6",
+    industry: "NHS",
+    not_part_of_job: chosen.usual_skills.slice(0, 1).map((skill) => skill.skill_id),
+  });
+  return workspace;
+}
 
 /** The first question's type-ahead open for these words, in a new workspace: nothing is saved
  *  yet, and typing saves nothing. */
@@ -372,6 +416,22 @@ const shots = (scratch: Scratch): Shot[] => [
       await inYou("What we know")(page);
       await expect(page.getByText(/^The most you'd spend on the whole change/)).toBeVisible();
       await expect(page.getByText("Loading the early sketch")).toHaveCount(0); // B-M5
+    },
+  },
+  {
+    // Seniority and industry beside the role, and the skills ESCO lists for its kind of work,
+    // one marked "not part of my job" (Task 6d slice C).
+    name: "you--title-details",
+    as: "ada",
+    url: chapterUrl("you", scratch.detailed),
+    ready: async (page) => {
+      await inYou("What we know")(page);
+      const details = page.getByRole("region", { name: "Seniority and industry" });
+      await expect(details.getByText("Seniority: Band 6. Industry: NHS.")).toBeVisible();
+      await details.getByText(/skills ESCO lists for this kind of work$/).click();
+      await expect(
+        details.getByRole("button", { name: /^Not part of my job\s*:/ }).first(),
+      ).toHaveAttribute("aria-pressed", "true");
     },
   },
   {
@@ -879,6 +939,7 @@ for (const viewport of VIEWPORTS) {
         asking: await roleQuestionWorkspace(token),
         chosen: (await chosenTargetWorkspace(token)).workspace,
         named: await create("Your title (synthetic)", "demo"),
+        detailed: await detailedWorkspace(token),
       };
       await asBrowser("POST", `/v1/workspaces/${scratch.named}/origin/role/title`, token, {
         expected_version: 0,
