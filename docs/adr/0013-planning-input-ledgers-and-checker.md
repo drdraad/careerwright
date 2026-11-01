@@ -16,7 +16,8 @@
 - Date: 2026-10-29
 - Amended: 2026-10-31, the product owner's approval of the audit (the last section): the
   stored inputs (Task 12a), and workspace options read beside the pack; then Task 12a's
-  settlement (its own section, after it).
+  settlement (its own section, after it). Amended 2026-11-01 (Task 12c, the last section): a
+  tuition fee loan paid straight to the provider is a loan to repay (decision 5).
 - Requirements: TIME1-01-TIME1-06, FIN1-01-FIN1-12, OPTN-01, OPTN-02, OPTN-04, OPTN-05,
   OPTN-07, OPTN-09, PLN-01-PLN-09, TEST1-14, and the TRACE01, PREFUND, PAYCAP, TIME, WORKLOAD,
   ECON and FUNDING families; spec sections 10, 11, 12, 18 and 20; rulings R6, R9, R11, R12;
@@ -101,7 +102,9 @@ independent oracle must share no code with it. Nothing here is model-backed.
      support paid to the person is a receipt in its month and reduces direct cost once
      (FUNDING-03). Unconfirmed support is never proven early, so it never pays for an earlier
      outflow (PREFUND-03).
-   - A loan is information: a loan as support is refused (FUNDING-04). Existing debt is a fixed
+   - A loan is information: a loan as support is refused (FUNDING-04; from 2026-11-01 one loan
+     has its own rule, Task 12c's amendment: a tuition fee loan paid straight to the provider
+     is a loan to repay, still never support). Existing debt is a fixed
      commitment: its repayments are outflows, and its balance, integer interest (rounded half
      up) and repayment have their own ledger.
 
@@ -347,3 +350,65 @@ review 13a (C07, C09 and one job transition) applied.
 Not here: storage of an option's own facts the person supplies (a start date, a cost, weekly
 hours) and "add an option yourself" (Task 12b); the planning inputs in the workspace export
 (capability evidence is not exported either); the solve's stage checks (Task 14).
+
+## Amendment, 2026-11-01 (Task 12c): a tuition fee loan paid straight to the provider
+
+The product owner's school-leaver decision 6 (yes, 1 November 2026; specification section 22,
+the tuition fee loan row): a tuition fee loan paid straight to the university is not cash out
+of the student's pocket; it is shown as a loan to repay later. Counted as their own money, a
+degree's fee would read "not feasible in this monthly model" against any student's limits.
+Requirements: FUNDING-06, FUNDING-04 (its L0 change), FIN1-02, FIN1-10. Rulings of this task
+(not R6; each costs little if wrong).
+
+1. **Where it lives.** One answer per option, beside its supports:
+   `VariantInputs.tuition_fee_loan` (its amount, null when not known, and the funding statuses:
+   eligibility and application, the four of each), stored in the planning inputs document
+   through Task 12a's one command (an expected version and an Idempotency-Key through
+   `run_idempotent`). Migration 0040 adds two CHECKs repeating its rules. In the planning
+   model it is `catalogue.TuitionFeeLoan` on the variant: the person's assumption
+   (`accepted_assumption`), so a route resting on it is qualified. It is no `Support` and no
+   `InstrumentKind`: a support of kind `loan` is still refused, a maintenance loan included.
+2. **What it pays.** The variant's fees and instalments, never its extra costs, after any
+   support paid to the provider, up to its amount, in the order they fall due. What it pays
+   is in neither the cash ledger, nor the direct spending the direct-spend cap reads, nor the
+   monthly payment cap's payments, and it is never support (`paid_to_provider` stays the
+   support's), a grant, income or a receipt. FIN-1: a payment straight to a provider is left
+   out of both sides, never counted twice. Support paid to the person is still set against
+   the fee once, whoever pays the fee; the person's direct spending never goes below £0.
+3. **Shown as a loan to repay.** A route's check and every archived schedule carry
+   `loans_to_repay`: for each option, what the loan pays by the month each fee falls due (a
+   month beyond the horizon included), marked conditional or not. Its repayment is `null`:
+   not modelled in L0, never 0. Facts only; Tasks 12b and 14 word them (R11).
+4. **Its status** (decision 5's funding rules, as for an award): approved, which needs
+   confirmed eligibility, it counts in every scenario. Not yet approved, not refused, and the
+   person confirmed or potentially eligible, the route rests on it: it counts in `base` and
+   `delay`, with a blocking verification (a `Condition` of kind `loan`,
+   `confirm_loan_approved`) and the qualification `conditional_loan`; `no_award` is the route
+   where the person pays the fee, beside it (FUNDING-05). In `delay` it pays only the fees
+   due `scenario_delay_months` or more after the option starts (decision 9). Refused,
+   ineligible or insufficient information: it does not count, as for an award. A loan is
+   never an award: the condition and the qualification are its own.
+5. **An unknown amount** of a loan that counts is `loan_amount_unknown`, unresolved, never
+   £0: the direct cost and the month rows are unknown, and the route lists one loan to repay
+   with neither amount nor month. The known part takes the loan to pay every fee, the least the
+   person could pay, so a limit broken even then is broken.
+6. **The economic cost** (the cost over the horizon) **still counts the fee the loan pays,
+   once.** In plain words: a loan is paid back, so it changes when and from whose pocket the
+   fee is paid, not what the change costs. This is section 12's own rule ("loan principal is a
+   liquidity source, not a discount or an additional copy of tuition cost"), and section 22
+   changes only the person's cash and spending limits. So a loan-funded route and the
+   self-paid route have the same economic cost; with the direct-spending objective the loan
+   lowers what the person spends. The loan's interest and repayment terms are not modelled
+   (unknown, on the loan to repay): a known L0 limit. No existing fixture or regression family
+   holds a tuition fee loan, so this reading changes no best trade-off there (R14).
+7. **Nothing else changes.** Every other loan stays information; Careerwright chooses no
+   borrowing (the person states the loan); existing debt stays a fixed commitment; the
+   families of routes count the loan as material financing (`tuition_fee_loan:<application>`).
+   TRACE-01, the A–I fixture and every regression family keep their values.
+8. **The oracle and the search** (ADR 0016's Task 12c amendment): the oracle writes the rule
+   again from section 22 and section 12, its generated instances carry the loan in every
+   state, and `loan_amount_unknown` is a variant's own finding for pruning rule 2.
+
+Known limit: the loan is the person's statement of an amount; Careerwright does not compute a
+student's entitlement, a fee cap or a maintenance loan, and the Advanced Learner Loan is still
+refused as support (a question for the product owner, in Task 12c's report).
