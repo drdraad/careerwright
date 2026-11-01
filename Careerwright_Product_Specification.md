@@ -1203,7 +1203,7 @@ Model output evaluations must cover hallucinated course names, fabricated citati
 
 ## M0 fixture pack and worked trace [M0, TEST-1]
 
-The accompanying `Nessa_M0_Fixtures.zip` contains five **synthetic** JSON personas, a complete numeric worked trace, a source-corpus manifest and a small executable validation script. No persona is a real user; no synthetic course price or regulatory fixture is published as evidence. These fixtures are contract examples for the future application, not proof that an application has been built or tested end to end.
+The accompanying `Careerwright_M0_Fixtures.zip` contains five **synthetic** JSON personas, a complete numeric worked trace, a source-corpus manifest and a small executable validation script. No persona is a real user; no synthetic course price or regulatory fixture is published as evidence. These fixtures are contract examples for the future application, not proof that an application has been built or tested end to end.
 
 | Persona | Scenario | Required result |
 |---|---|---|

@@ -2,7 +2,7 @@
 
 Careerwright L0: a local career-planning app (FastAPI, Pydantic AI, DBOS and PostgreSQL 16
 backend; Next.js web app in `apps/web`). Authority order: `Careerwright_Product_Specification.md`
-(v1.3), then `docs/plan/development-plan.md` (v1.4), then `docs/plan/l0-sprint-tasks.md`. For the
+(v1.3), then `docs/plan/development-plan.md` (v1.6), then `docs/plan/l0-sprint-tasks.md`. For the
 experience and the interface, the plan's section 4 (ADR 0014) overrides the specification's art
 direction. Decisions live in `docs/adr/`; the latest sprint review is in `docs/reviews/`.
 
@@ -41,7 +41,7 @@ the first screen.
 - Within ten seconds the person has changed something and the world has answered.
 - Progress visibly transforms the world. Evidence unlocks understanding. Decisions show
   their consequences before they are confirmed.
-- Revelations (an overlooked strength, an unexpected connection, a credible route) are
+- Revelations (an overlooked strength, a credible route) are
   earned: built from deterministic results and verified spans, each with its reason one step
   away. The model never decides one; it may only propose a strength as a quotation of the
   person's words, which code verifies and the person confirms (ADR 0014).
@@ -89,8 +89,8 @@ Run from the repository root (details: `docs/runbook.md`).
 
 ## Repository facts
 - The product was called Nessa until 2026-10-30 (the product owner's rename). The old name
-  stays only where changing it would rewrite a record or a pinned file: the supplied pack
-  (`fixtures/m0`, `Nessa_M0_Fixtures.zip`, `Nessa_Local_Development_Plan.docx`), the pinned
+  stays only where changing it would rewrite a record or a pinned file: the supplied pack's
+  contents (`fixtures/m0`, and the files inside `Careerwright_M0_Fixtures.zip`), the pinned
   format names `nessa-england-option-pack` and `nessa-capability-reference`, corpus case
   X01's fetched address, and past reviews and evidence (`docs/reviews`, `docs/evidence`).
   Setups made before the rename (`~/.nessa/l0`, the `nessa-l0` Docker volumes) are not used.

@@ -98,7 +98,8 @@ These bind every task and every review.
 
 ## Standing rulings (apply to every task)
 
-- R1 Fixture pack: `Nessa_M0_Fixtures.zip` *is* now supplied. Use the original pack
+- R1 Fixture pack: `Careerwright_M0_Fixtures.zip` (named `Nessa_M0_Fixtures.zip` until
+  2026-11-01) *is* now supplied. Use the original pack
   (P01–P05, worked_trace.json, source_corpus_manifest.json, validate_fixtures.py) instead
   of reconstructing it, and still independently check its expected values by hand.
   The A–I direct-spend fixture: use it if present in the pack; otherwise reconstruct it
@@ -286,6 +287,21 @@ These bind every task and every review.
     implementer rebases onto it; an implementer never moves `l0-local-release`. On a
     conflict in the generated client, regenerate it; a migration whose revision number
     another task took is renumbered to the next free one.
+- R16 Speed (the product owner, 1 November 2026: "I'm finding this development process too
+  slow"; they chose all four of these).
+  - **One reviewer per piece,** covering both the experience and the code, instead of two
+    halves.
+  - **One fix round at most.** Inside a piece, only safety, truth (a false statement, a
+    failure shown as an empty success, a false evidence record) and lost-input problems are
+    fixed. Everything else goes on a list: the product owner's session sheet, Task M or the
+    final review. After the fix round the controller checks the diff and the tests itself; a
+    second review runs only for a Critical finding.
+  - **Full checks once per piece.** Implementers run `make check` after each change and
+    `make acceptance` once, at the end of the piece (after its fix round, if any). A flaky
+    failure is re-run once; a second failure is a finding.
+  - **Up to three implementers at once,** on disjoint modules: one in the main tree and up to
+    two in worktrees. This widens R15's two; R15's other rules stand. Each card's
+    **Parallel** line still decides what may overlap.
 
 ## Order, dependencies and dispatch preconditions (plan v1.6, ADR 0008)
 

@@ -5,13 +5,14 @@ regulator or vacancy, and no fixture may fill a missing live field (Global Const
 
 ## `m0/`: the supplied M0 fixture pack (original, unchanged)
 
-Extracted from `Nessa_M0_Fixtures.zip` at the repository root. The files are byte-identical
+Extracted from `Careerwright_M0_Fixtures.zip` at the repository root (named
+`Nessa_M0_Fixtures.zip` until 2026-11-01; renamed, bytes unchanged). The files are byte-identical
 to the archive members (checked with `shasum -a 256` on 2026-10-27; do not edit them; if the
 pack changes, re-extract it and re-run the hand check).
 
 | File | SHA-256 |
 |---|---|
-| `Nessa_M0_Fixtures.zip` (archive) | `7d166655ed883e5bfe2365437a6a2959df17baafe8f6966af2c970e44c205380` |
+| `Careerwright_M0_Fixtures.zip` (archive) | `7d166655ed883e5bfe2365437a6a2959df17baafe8f6966af2c970e44c205380` |
 | `README.txt` | `bb1af8bd8b693cdd2e58b2e060029bedf1f6f1f23fe91680122427c112e8135c` |
 | `personas/P01.json` | `03e72eefa7f975fc50c075a17f2136a0f39385efce25ccdb2834b5f9a5ec518e` |
 | `personas/P02.json` | `ae78009ca6b1c85cf1d705f9a6bc046409600a12ef21acacdfb22ddf4b97dd52` |
