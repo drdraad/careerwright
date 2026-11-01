@@ -632,3 +632,19 @@ manifest and the rights policy) are unchanged.
 - **Still open:** "The live search proposed no candidate in two tries; candidate quality is
   unqualified." Task 6e's live test qualifies the role-research purpose once, on the test
   model with a synthetic title.
+
+## Amendment line, Task 6e (2026-11-01): role research built
+
+- **The role-research purpose** of decision 12 is built as a sealed input of its own on the same
+  `source_search` run kind and task (`RoleSearchInput`, `role-search-1`), so no run kind, no
+  workflow and no reservation changed; a proposal records its `purpose` (older ones read as job
+  searches).
+- **The role-evidence acquisition** is an ordinary acquisition whose targets carry the title
+  (`acquisition_targets.role_title`, migration 0042, only on a fetch target). The worker asks
+  the restricted worker for the page's visible text (`FetchRequest.read_text`; the worker is
+  never told the title), records the attempt as before, keeps the body only where the class
+  permits, and records the title check (`role_page_checks`) instead of postings; it starts no
+  extraction and never marks a job attempted. ADR 0015's amendment line has the rule.
+- **The role-description schema is deferred**, with its reasons in ADR 0015's Task 6e line: it
+  doesn't fit the per-role bound. No workflow's step sequence changed: DBOS
+  `application_version` stays `careerwright-l0-1`.
