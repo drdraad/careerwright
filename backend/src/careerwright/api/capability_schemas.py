@@ -5,12 +5,15 @@ one definition of each state and enum (Global Constraint 10)."""
 import uuid
 from datetime import date
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
+from careerwright.api.origin_schemas import UsualSkillOut
 from careerwright.capability.commands import CapabilityChange, CapabilityData
 from careerwright.capability.matrix import Matrix
 from careerwright.capability.questions import QuestionGraph
 from careerwright.capability.readiness import Assessment
+from careerwright.capability.skills import PersonQualification, TargetSkills
+from careerwright.capability.skills_commands import SkillsView, UsualInRole
 from careerwright.catalogue.option_pack import ReviewState
 from careerwright.vocabulary import DataMode
 
@@ -88,6 +91,62 @@ class ReadinessOut(_Out):
     pack: PackLabel
     reference: ReferenceLabel
     assessments: list[Assessment]  # one per target: the current scenario
+
+
+class UsualInRoleOut(_Out):
+    """The essential skills ESCO lists for the kind of work of the person's role: usual in
+    their role, not confirmed yet. Display only: wherever anything is computed it stays
+    unresolved, and it is never evidence."""
+
+    role_title: str  # in the person's words
+    occupation_id: uuid.UUID
+    occupation_label: str  # ESCO's preferred label
+    skills: list[UsualSkillOut]  # never empty
+
+    @classmethod
+    def of(cls, found: UsualInRole) -> "UsualInRoleOut":
+        return cls(
+            role_title=found.role_title,
+            occupation_id=found.occupation.concept_id,
+            occupation_label=found.occupation.preferred_label,
+            skills=[UsualSkillOut.of(s) for s in found.skills],
+        )
+
+
+class SkillsOut(_Out):
+    """The Skills chapter's facts: for each target, what ESCO lists for its occupation, the
+    person's own examples and the parts they chose, what the target asks with the person's
+    qualifications beside it, and readiness only where a reviewed rubric exists ("not
+    assessed yet" otherwise, never a result). Codes and numbers only: the web words them."""
+
+    version: int  # the capability version: every Skills write's expected version
+    profile_version: int
+    synthetic: bool
+    data_mode: DataMode
+    pack: PackLabel  # the pack's date and review states, wherever its records are (R9)
+    reference: ReferenceLabel
+    targets: list[TargetSkills]  # one per target, in the profile's order
+    questions: QuestionGraph  # the evidence questions, shared across targets
+    usual_in_role: UsualInRoleOut | None = Field(
+        description="Absent (null), never empty, when the person has no role, or none naming "
+        "one ESCO occupation."
+    )
+    qualifications: list[PersonQualification]  # in the person's words, achieved or expected
+
+    @classmethod
+    def of(cls, view: SkillsView, data: CapabilityData) -> "SkillsOut":
+        return cls(
+            version=view.version,
+            profile_version=view.profile_version,
+            synthetic=view.synthetic,
+            data_mode=view.data_mode,
+            pack=PackLabel.of(data),
+            reference=ReferenceLabel.of(data),
+            targets=view.targets,
+            questions=view.questions,
+            usual_in_role=UsualInRoleOut.of(view.usual_in_role) if view.usual_in_role else None,
+            qualifications=view.qualifications,
+        )
 
 
 class CapabilityChangeOut(_Out):

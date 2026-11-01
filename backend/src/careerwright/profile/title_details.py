@@ -114,6 +114,18 @@ def role_marks(tx: Tx, workspace_id: uuid.UUID, document: ProfileDocument) -> fr
     return frozenset()
 
 
+def target_details(
+    tx: Tx, workspace_id: uuid.UUID, document: ProfileDocument
+) -> dict[str, TitleDetails]:
+    """Each target's details by its title as a concept (version 0 with none saved): the marks
+    on the skills ESCO lists for its kind of work are display only."""
+    return {
+        view.details.title_key: view.details
+        for view in _views(tx, workspace_id, document)
+        if view.details.title_use is TitleUse.TARGET
+    }
+
+
 def entered_words(tx: Tx, workspace_id: uuid.UUID, command: SetTitleDetails) -> list[str]:
     """What a save enters in words: a seniority or an industry the version it was made
     against doesn't hold. What the support screen reads (ADR 0007): a stored version never

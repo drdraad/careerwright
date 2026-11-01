@@ -1153,3 +1153,34 @@ def exemplar_count(tx: Tx, workspace_id: uuid.UUID, target_key: str) -> int:
             {"ws": workspace_id, "target": target_key},
         ).scalar_one()
     )
+
+
+def exemplar_copies(tx: Tx, workspace_id: uuid.UUID) -> dict[str, list[CopyRow]]:
+    """The person's own pasted examples, by the target they were pasted for, oldest first."""
+    rows = tx.execute(
+        sa.text(
+            f"SELECT {_COPY_COLUMNS}, copy ->> 'exemplar_for' AS target "
+            "FROM careerwright.job_copies WHERE workspace_id = :ws "
+            "AND copy ->> 'exemplar_for' IS NOT NULL ORDER BY created_at, copy_id"
+        ),
+        {"ws": workspace_id},
+    )
+    found: dict[str, list[CopyRow]] = {}
+    for row in rows:
+        found.setdefault(row.target, []).append(_copy_row(row))
+    return found
+
+
+def pasted_document(tx: Tx, attempt_id: uuid.UUID) -> tuple[str, SealedValue] | None:
+    """The sealed body of a text the person pasted, with its SHA-256; None for any other
+    source's body or another person's (migration 0045's function decides)."""
+    row = tx.execute(
+        sa.text(
+            "SELECT content_sha256, key_version, nonce, ciphertext "
+            "FROM careerwright.pasted_example_document(:id)"
+        ),
+        {"id": attempt_id},
+    ).one_or_none()
+    if row is None:
+        return None
+    return row.content_sha256, SealedValue(row.key_version, bytes(row.nonce), bytes(row.ciphertext))

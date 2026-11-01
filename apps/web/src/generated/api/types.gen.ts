@@ -177,6 +177,50 @@ export type ActorOut = {
 };
 
 /**
+ * AdvertExample
+ *
+ * One of the person's own example adverts for the target, with their chosen spans.
+ */
+export type AdvertExample = {
+    /**
+     * Job Id
+     */
+    job_id: string;
+    /**
+     * Title
+     */
+    title: string | null;
+    /**
+     * Employer
+     */
+    employer: string | null;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Spans
+     */
+    spans: Array<SelectedSpan>;
+};
+
+/**
+ * AdvertSpan
+ *
+ * Character offsets into an example's text: `start` inclusive, `end` exclusive.
+ */
+export type AdvertSpan = {
+    /**
+     * Start
+     */
+    start: number;
+    /**
+     * End
+     */
+    end: number;
+};
+
+/**
  * AdvertiserKind
  */
 export const AdvertiserKind = {
@@ -1978,6 +2022,20 @@ export const EmptyReason = {
 export type EmptyReason = typeof EmptyReason[keyof typeof EmptyReason];
 
 /**
+ * EntryFact
+ *
+ * One of the person's qualifications, beside a requirement that names it.
+ */
+export type EntryFact = {
+    /**
+     * Qualification
+     */
+    qualification: string;
+    status: QualificationStatus;
+    standing: EntryStanding;
+};
+
+/**
  * EntryMode
  *
  * How the person chose to start (spec section 3, the You chapter).
@@ -1990,6 +2048,20 @@ export const EntryMode = { SURE: 'sure', UNSURE: 'unsure' } as const;
  * How the person chose to start (spec section 3, the You chapter).
  */
 export type EntryMode = typeof EntryMode[keyof typeof EntryMode];
+
+/**
+ * EntryStanding
+ */
+export const EntryStanding = {
+    EXPECTED_NOT_MET: 'expected_not_met',
+    ACHIEVED_UNVERIFIED: 'achieved_unverified',
+    ACHIEVED_STATED: 'achieved_stated'
+} as const;
+
+/**
+ * EntryStanding
+ */
+export type EntryStanding = typeof EntryStanding[keyof typeof EntryStanding];
 
 /**
  * EqualPoint
@@ -2140,6 +2212,42 @@ export type EscoLink = {
      * Relation
      */
     relation: 'essential' | 'optional';
+};
+
+/**
+ * EscoListedSkill
+ *
+ * A skill ESCO lists for the occupation's kind of work: ESCO's, never the person's.
+ */
+export type EscoListedSkill = {
+    /**
+     * Skill Id
+     */
+    skill_id: string;
+    /**
+     * Subject
+     */
+    subject: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Skill Type
+     */
+    skill_type: string | null;
+    /**
+     * Relation
+     */
+    relation: 'essential' | 'optional';
+    /**
+     * Row Id
+     */
+    row_id: string;
+    /**
+     * Not Part Of Job
+     */
+    not_part_of_job: boolean;
 };
 
 /**
@@ -4167,6 +4275,20 @@ export type NoSharedOccupation = {
 };
 
 /**
+ * NotAssessedReason
+ */
+export const NotAssessedReason = {
+    NO_RUBRIC: 'no_rubric',
+    INSUFFICIENT_COVERAGE: 'insufficient_coverage',
+    RUBRICS_NOT_REVIEWED: 'rubrics_not_reviewed'
+} as const;
+
+/**
+ * NotAssessedReason
+ */
+export type NotAssessedReason = typeof NotAssessedReason[keyof typeof NotAssessedReason];
+
+/**
  * NotIncluded
  *
  * Why a pooled occupation is not on the slate ("show why this wasn't included").
@@ -5127,6 +5249,19 @@ export type PaymentPlan = {
      * Unknown
      */
     unknown?: string | null;
+};
+
+/**
+ * PersonQualification
+ *
+ * A qualification the person gave (Task 6f), in their words.
+ */
+export type PersonQualification = {
+    /**
+     * Name
+     */
+    name: string;
+    status: QualificationStatus;
 };
 
 /**
@@ -6680,6 +6815,58 @@ export type RenameWorkspaceIn = {
 };
 
 /**
+ * Requirement
+ *
+ * A required row of the target's matrix: what the target asks.
+ */
+export type Requirement = {
+    /**
+     * Row Id
+     */
+    row_id: string;
+    /**
+     * Subject
+     */
+    subject: string;
+    /**
+     * Label
+     */
+    label: string;
+    kind: RowKind;
+    scope: RowScope;
+    importance: Importance;
+    gate: GateInfo | null;
+    /**
+     * Rubric Version
+     */
+    rubric_version: string | null;
+    /**
+     * Rubric Review State
+     */
+    rubric_review_state: 'proposed' | 'reviewed' | null;
+    /**
+     * Required Level
+     */
+    required_level: number | null;
+    /**
+     * Review State
+     */
+    review_state: 'proposed' | 'reviewed';
+    /**
+     * As Of
+     */
+    as_of: string | null;
+    /**
+     * Employer Specific
+     */
+    employer_specific: boolean;
+    /**
+     * Entry Facts
+     */
+    entry_facts: Array<EntryFact>;
+};
+
+/**
  * ResearchState
  *
  * Where a research is. Only `found` and `not_yet_found` are results; neither says a role
@@ -7933,6 +8120,73 @@ export type SearchedThroughSkill = {
 };
 
 /**
+ * SeedState
+ *
+ * Where the target's ESCO list comes from.
+ */
+export const SeedState = {
+    ESCO_OCCUPATION: 'esco_occupation',
+    NONE_OF_THESE: 'none_of_these',
+    NO_OCCUPATION: 'no_occupation'
+} as const;
+
+/**
+ * SeedState
+ *
+ * Where the target's ESCO list comes from.
+ */
+export type SeedState = typeof SeedState[keyof typeof SeedState];
+
+/**
+ * SelectAdvertSpans
+ *
+ * The parts of one of the person's own example adverts that say what the target asks
+ * for, as character offsets into its text. An empty list clears the selection.
+ */
+export type SelectAdvertSpans = {
+    /**
+     * Expected Version
+     *
+     * 0 while nothing has been recorded.
+     */
+    expected_version: number;
+    /**
+     * Target
+     *
+     * One of the profile's target titles.
+     */
+    target: string;
+    /**
+     * Job Id
+     *
+     * One of the person's own examples for that target.
+     */
+    job_id: string;
+    /**
+     * Spans
+     */
+    spans: Array<AdvertSpan>;
+};
+
+/**
+ * SelectedSpan
+ */
+export type SelectedSpan = {
+    /**
+     * Start
+     */
+    start: number;
+    /**
+     * End
+     */
+    end: number;
+    /**
+     * Excerpt
+     */
+    excerpt: string;
+};
+
+/**
  * Session
  *
  * A fixed timetable session, for clashes (TIME1-04): a weekday (0 is Monday) and times.
@@ -8167,6 +8421,55 @@ export type SkillRefOut = {
      * essential or optional (ESCO's occupation-skill link).
      */
     relation: string;
+};
+
+/**
+ * SkillsAssessmentState
+ */
+export const SkillsAssessmentState = { ASSESSED: 'assessed', NOT_ASSESSED: 'not_assessed' } as const;
+
+/**
+ * SkillsAssessmentState
+ */
+export type SkillsAssessmentState = typeof SkillsAssessmentState[keyof typeof SkillsAssessmentState];
+
+/**
+ * SkillsOut
+ *
+ * The Skills chapter's facts: for each target, what ESCO lists for its occupation, the
+ * person's own examples and the parts they chose, what the target asks with the person's
+ * qualifications beside it, and readiness only where a reviewed rubric exists ("not
+ * assessed yet" otherwise, never a result). Codes and numbers only: the web words them.
+ */
+export type SkillsOut = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    data_mode: DataMode;
+    pack: PackLabel;
+    reference: ReferenceLabel;
+    /**
+     * Targets
+     */
+    targets: Array<TargetSkills>;
+    questions: QuestionGraph;
+    /**
+     * Absent (null), never empty, when the person has no role, or none naming one ESCO occupation.
+     */
+    usual_in_role: UsualInRoleOut | null;
+    /**
+     * Qualifications
+     */
+    qualifications: Array<PersonQualification>;
 };
 
 /**
@@ -9696,6 +9999,62 @@ export type TargetSketchOut = {
 };
 
 /**
+ * TargetSkills
+ */
+export type TargetSkills = {
+    /**
+     * Target Key
+     */
+    target_key: string;
+    /**
+     * Target Title
+     */
+    target_title: string;
+    /**
+     * Matrix Version
+     */
+    matrix_version: string;
+    /**
+     * Definition Version
+     */
+    definition_version: string;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    seed: SeedState;
+    occupation: OccupationLink | null;
+    occupation_note: OccupationNote | null;
+    /**
+     * Esco Release
+     */
+    esco_release: string | null;
+    pack_target: PackTargetLink | null;
+    pack_target_note: PackTargetNote | null;
+    /**
+     * Details Version
+     *
+     * This target's title details, the marks' expected version.
+     */
+    details_version: number;
+    /**
+     * Esco Listed
+     */
+    esco_listed: Array<EscoListedSkill>;
+    /**
+     * Examples
+     */
+    examples: Array<AdvertExample>;
+    /**
+     * Requirements
+     */
+    requirements: Array<Requirement>;
+    assessment_state: SkillsAssessmentState;
+    not_assessed_reason: NotAssessedReason | null;
+    readiness: Assessment | null;
+};
+
+/**
  * TargetStatus
  */
 export const TargetStatus = {
@@ -10633,6 +10992,32 @@ export const UrlRefusal = {
  * Why a URL is not fetched. Each is a policy refusal, recorded as a blocked attempt.
  */
 export type UrlRefusal = typeof UrlRefusal[keyof typeof UrlRefusal];
+
+/**
+ * UsualInRoleOut
+ *
+ * The essential skills ESCO lists for the kind of work of the person's role: usual in
+ * their role, not confirmed yet. Display only: wherever anything is computed it stays
+ * unresolved, and it is never evidence.
+ */
+export type UsualInRoleOut = {
+    /**
+     * Role Title
+     */
+    role_title: string;
+    /**
+     * Occupation Id
+     */
+    occupation_id: string;
+    /**
+     * Occupation Label
+     */
+    occupation_label: string;
+    /**
+     * Skills
+     */
+    skills: Array<UsualSkillOut>;
+};
 
 /**
  * UsualSkillOut
@@ -14173,6 +14558,40 @@ export type GetCapabilityReadinessResponses = {
 
 export type GetCapabilityReadinessResponse = GetCapabilityReadinessResponses[keyof GetCapabilityReadinessResponses];
 
+export type GetSkillsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/capability/skills';
+};
+
+export type GetSkillsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetSkillsError = GetSkillsErrors[keyof GetSkillsErrors];
+
+export type GetSkillsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SkillsOut;
+};
+
+export type GetSkillsResponse = GetSkillsResponses[keyof GetSkillsResponses];
+
 export type RecordSkillEvidenceData = {
     body: RecordEvidence;
     headers?: {
@@ -14302,6 +14721,48 @@ export type EditMatrixRowResponses = {
 };
 
 export type EditMatrixRowResponse = EditMatrixRowResponses[keyof EditMatrixRowResponses];
+
+export type SelectAdvertSpansData = {
+    body: SelectAdvertSpans;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/capability/advert-spans';
+};
+
+export type SelectAdvertSpansErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type SelectAdvertSpansError = SelectAdvertSpansErrors[keyof SelectAdvertSpansErrors];
+
+export type SelectAdvertSpansResponses = {
+    /**
+     * Successful Response
+     */
+    201: CapabilityChangeOut;
+};
+
+export type SelectAdvertSpansResponse = SelectAdvertSpansResponses[keyof SelectAdvertSpansResponses];
 
 export type SetCapabilityQuestionsData = {
     body: SetQuestions;

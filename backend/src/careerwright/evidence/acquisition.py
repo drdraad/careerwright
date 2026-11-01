@@ -752,6 +752,40 @@ def job_detail(
     return view, store.claims_of_copies(tx, [c.copy_id for c in copies])
 
 
+@dataclass(frozen=True)
+class Example:
+    """One of the person's own pasted examples, with its text as it was kept (third parties'
+    contact details removed before it was sealed)."""
+
+    job_id: uuid.UUID
+    title: str | None
+    employer: str | None
+    text: str
+    sha256: str
+
+
+def examples(tx: Tx, keyring: Keyring, workspace_id: uuid.UUID) -> dict[str, list[Example]]:
+    """The person's own examples, by the target they were pasted for (its `title_key`),
+    oldest first. Only text the person pasted is opened, never a fetched page's body; one
+    whose body can't be read is an internal error, never a missing example."""
+    found: dict[str, list[Example]] = {}
+    for target, copies in store.exemplar_copies(tx, workspace_id).items():
+        for row in copies:
+            sealed = store.pasted_document(tx, row.attempt_id)
+            if row.job_id is None or sealed is None:
+                raise CareerwrightError(
+                    ErrorCode.INTERNAL_ERROR,
+                    "An example's text could not be read.",
+                    stage=ErrorStage.EXECUTION,
+                )
+            sha256, value = sealed
+            text = keyring.open(value, document_context(workspace_id, row.attempt_id)).decode()
+            found.setdefault(target, []).append(
+                Example(row.job_id, row.copy.title, row.copy.employer, text, sha256)
+            )
+    return found
+
+
 def set_favourite(
     tx: Tx, actor: Actor, workspace_id: uuid.UUID, job_id: uuid.UUID, *, favourite: bool
 ) -> None:

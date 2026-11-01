@@ -1,7 +1,8 @@
-"""SQL for the capability state, skill evidence, requirement statements, matrix edits and
-overlooked strengths (adapter; migrations 0029 and 0031). Every table but the state is
-append-only."""
+"""SQL for the capability state, skill evidence, requirement statements, matrix edits,
+overlooked strengths and the person's chosen advert spans (adapter; migrations 0029, 0031 and
+0045). Every table but the state is append-only."""
 
+import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -9,6 +10,7 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy import exc
 
+from careerwright.capability.adverts import AdvertSpan
 from careerwright.capability.evidence import (
     Answer,
     EvidenceContext,
@@ -192,6 +194,70 @@ def edits(tx: Tx, workspace_id: uuid.UUID, target_key: str) -> list[RowEdit]:
             }
         )
         for row in rows
+    ]
+
+
+@dataclass(frozen=True)
+class SpanSelection:
+    """The latest spans the person chose in one example for one target (migration 0045)."""
+
+    target_key: str
+    job_id: uuid.UUID
+    content_sha256: str  # the example text's, when they chose
+    spans: list[AdvertSpan]
+
+
+def insert_span_selection(
+    tx: Tx,
+    workspace_id: uuid.UUID,
+    state_version: int,
+    *,
+    selection_id: uuid.UUID,
+    target_key: str,
+    job_id: uuid.UUID,
+    content_sha256: str,
+    spans: list[AdvertSpan],
+    recorded_by: uuid.UUID,
+    recorded_at: datetime,
+) -> None:
+    tx.execute(
+        sa.text(
+            "INSERT INTO careerwright.advert_span_selections (selection_id, workspace_id, "
+            "state_version, target_key, job_id, content_sha256, spans, recorded_by, recorded_at) "
+            "VALUES (:id, :ws, :version, :target, :job, :sha, CAST(:spans AS jsonb), :by, :at)"
+        ),
+        {
+            "id": selection_id,
+            "ws": workspace_id,
+            "version": state_version,
+            "target": target_key,
+            "job": job_id,
+            "sha": content_sha256,
+            "spans": json.dumps([s.model_dump(mode="json") for s in spans]),
+            "by": recorded_by,
+            "at": recorded_at,
+        },
+    )
+
+
+def span_selections(tx: Tx, workspace_id: uuid.UUID) -> list[SpanSelection]:
+    """The latest selection for each target and example."""
+    rows = tx.execute(
+        sa.text(
+            "SELECT DISTINCT ON (target_key, job_id) target_key, job_id, content_sha256, spans "
+            "FROM careerwright.advert_span_selections WHERE workspace_id = :ws "
+            "ORDER BY target_key, job_id, state_version DESC"
+        ),
+        {"ws": workspace_id},
+    )
+    return [
+        SpanSelection(
+            r.target_key,
+            r.job_id,
+            r.content_sha256,
+            [AdvertSpan.model_validate(s) for s in r.spans],
+        )
+        for r in rows
     ]
 
 

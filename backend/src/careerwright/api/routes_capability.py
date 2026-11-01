@@ -1,6 +1,7 @@
 """Capability endpoints (S4.1-S4.6): read the provisional matrices, the combined question
-graph and readiness; record skill evidence, requirement statements and matrix edits; stop or
-resume the questions. Every write takes an expected version and an Idempotency-Key."""
+graph and readiness, and the Skills chapter's facts (Task 10); record skill evidence,
+requirement statements, matrix edits and the person's chosen advert spans; stop or resume the
+questions. Every write takes an expected version and an Idempotency-Key."""
 
 import uuid
 
@@ -14,6 +15,7 @@ from careerwright.api.capability_schemas import (
     QuestionsOut,
     ReadinessOut,
     ReferenceLabel,
+    SkillsOut,
 )
 from careerwright.api.deps import CallerDep, Deps, IdempotencyKey
 from careerwright.api.envelope import ERROR_RESPONSES
@@ -29,6 +31,11 @@ from careerwright.capability.commands import (
     record_evidence,
     record_statement,
     set_questions,
+)
+from careerwright.capability.skills_commands import (
+    SelectAdvertSpans,
+    select_advert_spans,
+    skills_view,
 )
 from careerwright.db import Tx, actor_transaction
 from careerwright.identity.receipts import CommandResult, Execute, fingerprint, run_idempotent
@@ -87,6 +94,18 @@ def get_readiness(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> Rea
         reference=ReferenceLabel.of(deps.capability),
         assessments=readiness(view, deps.capability),
     )
+
+
+@router.get("/skills", response_model=SkillsOut, operation_id="get_skills")
+def get_skills(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> SkillsOut:
+    """The Skills chapter's facts for each target: what ESCO lists for its occupation (with the
+    person's "not part of my job" marks), their own examples and the parts they chose, what
+    the target asks with their qualifications beside it, and readiness only where a reviewed
+    rubric exists; the evidence questions shared across targets; and the usual skills of the
+    person's role, absent without a role."""
+    with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
+        view = skills_view(tx, workspace_id, deps.capability, deps.keyring)
+    return SkillsOut.of(view, deps.capability)
 
 
 def _write(
@@ -202,6 +221,41 @@ def post_edit(
 
     return _write(
         deps, caller, key, workspace_id, "edit_matrix_row", body.model_dump(mode="json"), execute
+    )
+
+
+@router.post(
+    "/advert-spans",
+    status_code=201,
+    response_model=CapabilityChangeOut,
+    operation_id="select_advert_spans",
+)
+def post_advert_spans(
+    workspace_id: uuid.UUID,
+    body: SelectAdvertSpans,
+    caller: CallerDep,
+    deps: Deps,
+    key: IdempotencyKey,
+) -> JSONResponse:
+    """The parts of one of the person's own example adverts that say what a target asks for
+    (offsets into its text; an empty list clears them). No model run."""
+
+    def execute(tx: Tx) -> CommandResult:
+        change = select_advert_spans(
+            tx, caller.actor, workspace_id, body, keyring=deps.keyring, now=deps.clock()
+        )
+        return CommandResult(
+            201, CapabilityChangeOut.of(change).model_dump(mode="json"), workspace_id
+        )
+
+    return _write(
+        deps,
+        caller,
+        key,
+        workspace_id,
+        "select_advert_spans",
+        body.model_dump(mode="json"),
+        execute,
     )
 
 
