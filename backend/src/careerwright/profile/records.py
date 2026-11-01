@@ -184,6 +184,19 @@ class TargetRecord:
         """The occupation the target names in ESCO itself (chosen, or its one label)."""
         return self.occupation_uri if self.link in ESCO_LINKS else None
 
+    @property
+    def on_a_list(self) -> bool:
+        """Whether a list Careerwright holds has the title itself: ESCO (chosen as its title, or
+        holding it as a label), the UK job-title index, or the option pack by the target's own
+        title. An occupation chosen as the closest, or the pack's crosswalk to it, leaves the
+        title in the person's words on no list: it is the one "Research this role" is for (Task
+        6e fix round 1, review M2)."""
+        return (
+            self.kind is not TargetKind.OWN_WORDS
+            or bool(self.label_matches)
+            or self.pack_target_basis == "title"
+        )
+
 
 class TitleUse(StrEnum):
     """Which of the person's titles details sit beside."""

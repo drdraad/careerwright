@@ -5,6 +5,7 @@ and the corroboration rule decides whether the role is found. Offline: a fake pr
 the controlled source server; every page is synthetic and labelled so."""
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -33,6 +34,7 @@ from careerwright.evidence.search import (
 )
 from careerwright.evidence.search_agent import run_search
 from careerwright.identity.model_registry import ModelMode
+from careerwright.profile.records import TargetCoverage, TargetKind, TargetLink, TargetRecord
 from tests.domain.test_source_search import Provider, ignore
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
 from tests.support.fake_models import SEARCHED, search_parts
@@ -510,6 +512,44 @@ def test_pages_that_never_show_the_title_say_so() -> None:
     assert result.verdict is RoleVerdict.NOT_YET_FOUND
     assert result.reason is NotYetFoundReason.NOT_ON_ANY_PAGE
     assert result.sources == 0
+
+
+def record(**changes: object) -> TargetRecord:
+    base = TargetRecord(
+        title="Client onboarding assistant",
+        key="client onboarding assistant",
+        kind=TargetKind.OWN_WORDS,
+        occupation_uri=None,
+        link=TargetLink.NONE,
+        label_matches=(),
+        coverage=TargetCoverage.NOT_COVERED,
+        pack_target_id=None,
+        pack_target_basis=None,
+        pack_version="0.2.0",
+    )
+    return replace(base, **changes)  # type: ignore[arg-type]
+
+
+@pytest.mark.req("DIV1-15")
+def test_only_a_title_no_list_holds_is_offered_for_research() -> None:
+    occupation = "http://data.europa.eu/esco/occupation/x"
+    # The person's own words, even with an occupation they chose as the closest: no list has
+    # the title itself.
+    assert not record().on_a_list
+    assert not record(
+        link=TargetLink.OCCUPATION_CHOICE,
+        occupation_uri=occupation,
+        coverage="pack_target",
+        pack_target_id="t",
+        pack_target_basis="esco_crosswalk",
+    ).on_a_list
+    # ESCO holds it as a label (one or several), it is an ESCO or a UK index title, or the
+    # option pack names it as a target: a list holds it (review M2).
+    assert record(label_matches=(occupation,), link=TargetLink.EXACT_LABEL).on_a_list
+    assert record(label_matches=(occupation, occupation + "y")).on_a_list
+    assert record(kind=TargetKind.ESCO).on_a_list
+    assert record(kind=TargetKind.ONS).on_a_list
+    assert record(pack_target_id="t", pack_target_basis="title").on_a_list
 
 
 def test_a_title_check_keeps_no_page_text() -> None:

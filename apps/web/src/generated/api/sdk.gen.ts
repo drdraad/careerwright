@@ -714,7 +714,8 @@ export const startRoleResearch = <ThrowOnError extends boolean = false>(options:
  * Read Role Pages
  *
  * Read the search's pages, up to five, through the restricted acquisition worker (202);
- * 200 with the same research when its reading has started already. It calls no model.
+ * 200 with the same research when its reading has started already. It calls no model. A
+ * repeat with the same Idempotency-Key answers with the research as it is now.
  */
 export const readRolePages = <ThrowOnError extends boolean = false>(options: Options<ReadRolePagesData, ThrowOnError>): RequestResult<ReadRolePagesResponses, ReadRolePagesErrors, ThrowOnError> => (options.client ?? client).post<ReadRolePagesResponses, ReadRolePagesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

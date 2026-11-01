@@ -845,7 +845,10 @@ function Slate({
 }
 
 /** The titles no list holds that the person can research (Task 6e; ADR 0015 decision 2): their
- *  role and targets kept in their own words, and the title ideas not yet found. */
+ *  role and targets that no list holds (the API's `on_a_list`: kept in their words is not
+ *  enough, since ESCO or the option pack may hold the title), and the title ideas not yet
+ *  found. An idea the person made a target stays Careerwright's idea, so ideas come before
+ *  targets (fix round 1, review M2 and M3). */
 export function researchable(
   role: RoleOut | undefined,
   targets: readonly TargetRecordOut[] | undefined,
@@ -858,12 +861,12 @@ export function researchable(
       titles.push({ title, why });
     }
   };
-  if (role?.kind === "own_words" && role.text !== null) add(role.text, "role");
-  for (const target of targets ?? []) {
-    if (target.kind === "own_words") add(target.title, "target");
-  }
+  if (role?.kind === "own_words" && !role.on_a_list && role.text !== null) add(role.text, "role");
   for (const idea of ideas) {
     if (TITLE_IDEA_SHOWN[idea.reason] === "not_yet_found") add(idea.title, "idea");
+  }
+  for (const target of targets ?? []) {
+    if (target.kind === "own_words" && !target.on_a_list) add(target.title, "target");
   }
   return titles;
 }

@@ -175,6 +175,17 @@ def test_pages_from_two_hosts_that_show_the_title_make_the_role_found(
         )
         == []
     )
+    # The commands' plaintext receipts hold the research's ID only: never the title (it may be
+    # a model's idea), a proposed page or a quote (fix round 1, review M6).
+    receipts = infra.query(
+        "SELECT command, response FROM careerwright.command_receipts WHERE workspace_id = %s "
+        "AND command IN ('start_role_research', 'read_role_pages') ORDER BY command",
+        (scenario.workspace_id,),
+    )
+    assert receipts == [
+        {"command": c, "response": {"research_id": shown["research_id"]}}
+        for c in ("read_role_pages", "start_role_research")
+    ]
     # Only the title's span and excerpt are kept of the page's text.
     [check] = infra.query(
         "SELECT * FROM careerwright.role_page_checks WHERE excerpt LIKE %s LIMIT 1", ("%Leeds%",)

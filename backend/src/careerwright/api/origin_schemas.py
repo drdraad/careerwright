@@ -125,6 +125,11 @@ class RoleOut(ResponseModel):
         description="esco: an ESCO title chosen as such; ons: a title the UK job-title index "
         "lists; own_words: neither. Null before they answer."
     )
+    on_a_list: bool = Field(
+        description="A list Careerwright holds has the title itself (ESCO, the UK job-title "
+        "index, or the option pack by its title); false: the title can be researched. False "
+        "before they answer."
+    )
     uk_groups: list[UkGroupOut] = Field(
         description="Every ISCO-08 group the UK job-title index codes the title to (ons only)."
     )
@@ -200,6 +205,7 @@ class OriginOut(ResponseModel):
                 else None,
                 choices=[RoleOccupationOut.of_facts(f) for f in first.choices],
                 kind=first.record.kind if first.record else None,
+                on_a_list=first.record.on_a_list if first.record else False,
                 uk_groups=[UkGroupOut.of(g) for g in first.uk_groups],
                 closest=ClosestOut.of(first.closest) if first.closest else None,
             ),

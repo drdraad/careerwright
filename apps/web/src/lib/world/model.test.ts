@@ -23,6 +23,7 @@ function record(title: string): TargetRecordOut {
     label_matches: 0,
     coverage: "not_covered",
     pack_target_id: null,
+    on_a_list: false,
   };
 }
 

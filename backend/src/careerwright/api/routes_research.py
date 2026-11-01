@@ -200,12 +200,10 @@ def start_role_research(
             defaults=deps.spend_defaults,
             now=deps.clock(),
         )
-        view = role_research.view(tx, deps.keyring, workspace_id, research_id)
-        out = role_research_out(tx, deps.keyring, view)
-        return CommandResult(202, out.model_dump(mode="json"), workspace_id)
+        return CommandResult(202, _research_receipt(research_id), workspace_id)
 
     request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
-    status, response = run_idempotent(
+    status, receipt = run_idempotent(
         deps.engine,
         caller.actor.actor_id,
         key,
@@ -213,7 +211,29 @@ def start_role_research(
         fingerprint("start_role_research", request),
         execute,
     )
-    return JSONResponse(response, status_code=status)
+    return _research_answer(deps, caller, workspace_id, status, receipt)
+
+
+def _research_receipt(research_id: uuid.UUID) -> dict[str, object]:
+    """A research command's plaintext receipt: the research's ID only. Its title may be a
+    model's title idea and its pages a model's proposals, so neither is kept in it (CLAUDE.md:
+    a receipt never carries model output; fix round 1, review M6)."""
+    return {"research_id": str(research_id)}
+
+
+def _research_answer(
+    deps: Deps,
+    caller: CallerDep,
+    workspace_id: uuid.UUID,
+    status: int,
+    receipt: dict[str, object],
+) -> JSONResponse:
+    """The research as it is now, read again after the command (or its replay)."""
+    with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
+        research_id = uuid.UUID(str(receipt["research_id"]))
+        view = role_research.view(tx, deps.keyring, workspace_id, research_id)
+        out = role_research_out(tx, deps.keyring, view)
+    return JSONResponse(out.model_dump(mode="json"), status_code=status)
 
 
 @router.post(
@@ -230,7 +250,8 @@ def read_role_pages(
     key: IdempotencyKey,
 ) -> JSONResponse:
     """Read the search's pages, up to five, through the restricted acquisition worker (202);
-    200 with the same research when its reading has started already. It calls no model."""
+    200 with the same research when its reading has started already. It calls no model. A
+    repeat with the same Idempotency-Key answers with the research as it is now."""
 
     def execute(tx: Tx) -> CommandResult:
         started = role_research.start_reading(
@@ -242,12 +263,10 @@ def read_role_pages(
             runtime_mode=deps.settings.runtime_mode,
             now=deps.clock(),
         )
-        view = role_research.view(tx, deps.keyring, workspace_id, research_id)
-        out = role_research_out(tx, deps.keyring, view)
-        return CommandResult(202 if started else 200, out.model_dump(mode="json"), workspace_id)
+        return CommandResult(202 if started else 200, _research_receipt(research_id), workspace_id)
 
     request = {"workspace_id": str(workspace_id), "research_id": str(research_id)}
-    status, response = run_idempotent(
+    status, receipt = run_idempotent(
         deps.engine,
         caller.actor.actor_id,
         key,
@@ -255,7 +274,7 @@ def read_role_pages(
         fingerprint("read_role_pages", request),
         execute,
     )
-    return JSONResponse(response, status_code=status)
+    return _research_answer(deps, caller, workspace_id, status, receipt)
 
 
 @router.get(

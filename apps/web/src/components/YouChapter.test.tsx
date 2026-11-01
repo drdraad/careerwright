@@ -1011,6 +1011,7 @@ describe("[DIV1-13][DIV1-14] the start: the first question, which is closest, th
         occupation: null,
         choices: [],
         kind,
+        on_a_list: kind === "ons",
         uk_groups: kind === "ons" ? [{ code: "2221", label: "Nursing professionals" }] : [],
         closest:
           decision === null

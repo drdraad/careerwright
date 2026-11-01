@@ -121,7 +121,8 @@ describe("[DIV1-15][MODEL-08] research this role", () => {
 
     expect(await screen.findByText(/This can cost up to \$0\.05 on your Meta key\./)).toBeVisible();
     expect(
-      screen.getByText(/It sends only the title and “England”, nothing about you\./),
+      // The title may be the person's own role, so "nothing else" (review M7).
+      screen.getByText(/It sends only the title and “England”, nothing else about you\./),
     ).toBeVisible();
     await user.click(screen.getByRole("button", { name: ROLE_RESEARCH.start }));
 
@@ -238,34 +239,47 @@ describe("[DIV1-15][MODEL-08] research this role", () => {
 describe("[DIV1-15] which titles can be researched", () => {
   const idea = (title: string, reason: SlateOut["title_ideas"][number]["reason"]) =>
     ({ title, reason }) as SlateOut["title_ideas"][number];
-  const target = (title: string, kind: TargetRecordOut["kind"]) =>
-    ({ title, kind }) as TargetRecordOut;
+  const target = (title: string, kind: TargetRecordOut["kind"], on_a_list = kind !== "own_words") =>
+    ({ title, kind, on_a_list }) as TargetRecordOut;
+  const role = (text: string, kind: RoleOut["kind"], on_a_list = kind !== "own_words") =>
+    ({ kind, text, on_a_list }) as RoleOut;
 
   it("takes the role and targets in the person's own words and the ideas not yet found", () => {
-    const role = { kind: "own_words", text: "Bookkeeping assistant" } as RoleOut;
-
     expect(
       researchable(
-        role,
+        role("Client onboarding assistant", "own_words"),
         [target("Prompt engineer", "ons"), target("Orbital gardener", "own_words")],
         [
           idea("data analyst", "in_esco"),
           idea("Prompt engineer", "in_uk_title_index"),
           idea(TITLE, "not_yet_found"),
-          idea("orbital gardener", "not_yet_found"),
           idea("calm person", "not_searched"),
         ],
       ),
     ).toEqual([
-      { title: "Bookkeeping assistant", why: "role" },
-      { title: "Orbital gardener", why: "target" },
+      { title: "Client onboarding assistant", why: "role" },
       { title: TITLE, why: "idea" },
+      { title: "Orbital gardener", why: "target" },
     ]);
   });
 
-  it("takes nothing a list holds", () => {
-    const role = { kind: "ons", text: "Prompt engineer" } as RoleOut;
+  it("takes nothing a list holds, own words that ESCO or the option pack holds included", () => {
+    // Kept in the person's words, but ESCO holds the title as a label (review M2): the API
+    // says so, and the research would be refused.
+    expect(
+      researchable(
+        role("Data analyst", "own_words", true),
+        [target("data analyst", "esco"), target("Bookkeeping assistant", "own_words", true)],
+        [],
+      ),
+    ).toEqual([]);
+    expect(researchable(role("Prompt engineer", "ons"), [], [])).toEqual([]);
+  });
 
-    expect(researchable(role, [target("data analyst", "esco")], [])).toEqual([]);
+  it("keeps a title Careerwright thought of as its idea once it is made a target", () => {
+    // Review M3: never "Your target, in your words" for a model's idea.
+    expect(
+      researchable(undefined, [target(TITLE, "own_words")], [idea(TITLE, "not_yet_found")]),
+    ).toEqual([{ title: TITLE, why: "idea" }]);
   });
 });

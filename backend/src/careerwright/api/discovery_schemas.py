@@ -579,6 +579,10 @@ class TargetRecordOut(ResponseModel):
     )
     coverage: TargetCoverage
     pack_target_id: str | None = Field(description="The option pack's target, when covered.")
+    on_a_list: bool = Field(
+        description="A list Careerwright holds has the title itself (ESCO, the UK job-title "
+        "index, or the option pack by its title); false: the title can be researched."
+    )
 
     @classmethod
     def of(cls, record: TargetRecord) -> "TargetRecordOut":
@@ -592,6 +596,7 @@ class TargetRecordOut(ResponseModel):
             label_matches=len(record.label_matches),
             coverage=record.coverage,
             pack_target_id=record.pack_target_id,
+            on_a_list=record.on_a_list,
         )
 
 
