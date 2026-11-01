@@ -462,6 +462,17 @@ describe("[PROF-09][DIV1-13] the title field goes through the support screen, as
     await user.type(field(), RISK);
     const panel = await screen.findByRole("region", { name: "Support is available" });
     expect(sent.filter((s) => s.method === "POST")).toEqual([]); // never kept by itself
+    // Design re-review 2, R2-M1: the choice sits right after the line that names it, before
+    // the services, so a phone's first screen holds it.
+    const offered = await within(panel).findByRole("button", { name: "Keep it as my job title" });
+    expect(
+      offered.compareDocumentPosition(within(panel).getByRole("list")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      within(panel).getByText(titlePanel.message).compareDocumentPosition(offered) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     // The choice is for the words the screen answered, only while they are in the field.
     await user.clear(field());
     await user.type(field(), "Orbital gardener");

@@ -10,6 +10,7 @@ import { type ReactNode, useState } from "react";
 import { userEvent, within } from "storybook/test";
 import { Directions } from "@/components/Directions";
 import { KeySetup } from "@/components/KeySetup";
+import { TitleDetails } from "@/components/TitleDetails";
 import { SaveNotice } from "@/components/WhatWeKnow";
 import { YouChapter, type YouView } from "@/components/YouChapter";
 import type {
@@ -368,6 +369,7 @@ const chapterRoutes = (preferences: PreferencesOut, turns: TurnOut[], reply?: ob
   },
   { method: "GET", path: /\/discoveries$/, answer: { items: [], next_cursor: null } },
   { method: "GET", path: /\/sketch$/, answer: sketch },
+  { method: "GET", path: /\/profile\/titles$/, answer: { profile_version: 1, titles: [] } },
 ];
 
 const meta: Meta = { title: "You", parameters: { surface: "reading" } };
@@ -857,3 +859,69 @@ const key = (credentials: CredentialOut[]) => () => (
 );
 export const KeyConsent: Story = { render: key([]) };
 export const KeyStored: Story = { render: key([stored]) };
+
+/** Seniority and industry beside each title, each optional and never a default, and the
+ *  skills ESCO lists for the role's kind of work, one marked "not part of my job" (Task 6d
+ *  slice C). */
+const details = {
+  title_use: "role" as const,
+  title: "warehouse supervisor",
+  seniority: "Senior",
+  industry: null,
+  not_part_of_job: ["k3"],
+  version: 1,
+};
+const listedSkill = (id: string, label: string) => ({
+  skill_id: id,
+  subject: `esco:${id}`,
+  label,
+  skill_type: "skill/competence",
+  state: "usual_in_role" as const,
+  answer: null,
+  evidence_id: null,
+  not_part_of_job: id === "k3",
+});
+export const WhatWeKnowTitleDetails: Story = {
+  render: () => (
+    <Api
+      routes={[
+        {
+          method: "GET",
+          path: /\/profile\/titles$/,
+          answer: {
+            profile_version: 2,
+            titles: [
+              details,
+              {
+                ...details,
+                title_use: "target",
+                title: "Logistics manager",
+                seniority: null,
+                not_part_of_job: [],
+                version: 0,
+              },
+            ],
+          },
+        },
+        {
+          method: "GET",
+          path: /\/origin$/,
+          answer: {
+            usual_skills: [
+              listedSkill("k1", "manage stock levels"),
+              listedSkill("k2", "plan work schedules"),
+              listedSkill("k3", "supervise staff"),
+            ],
+          },
+        },
+      ]}
+    >
+      <TitleDetails workspaceId={WS} />
+    </Api>
+  ),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(
+      await within(canvasElement).findByText("The 3 skills ESCO lists for this kind of work"),
+    );
+  },
+};

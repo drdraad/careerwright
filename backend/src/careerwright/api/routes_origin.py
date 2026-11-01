@@ -37,6 +37,7 @@ from careerwright.db import Tx, actor_transaction
 from careerwright.errors import CareerwrightError
 from careerwright.identity.keyring import Keyring
 from careerwright.identity.receipts import CommandResult, fingerprint, run_idempotent
+from careerwright.profile.commands import current_profile
 from careerwright.profile.exploration import (
     ChooseClosest,
     ChooseRole,
@@ -48,6 +49,7 @@ from careerwright.profile.exploration import (
     name_role,
 )
 from careerwright.profile.safety import has_risk_stem
+from careerwright.profile.title_details import role_marks
 from careerwright.vocabulary import WorkState
 
 router = APIRouter(
@@ -61,7 +63,8 @@ def get_origin(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> Origin
         hard = hard_filters(tx, workspace_id, deps.mapping_reviews, deps.assessment_packs)
         first = first_slate(tx, workspace_id, hard, deps.pack_targets)
         evidence = capability_store.evidence(tx, workspace_id)
-        found = usual.usual_skills(first.occupation, evidence) if first.occupation else []
+        marked = role_marks(tx, workspace_id, current_profile(tx, workspace_id).document)
+        found = usual.usual_skills(first.occupation, evidence, marked) if first.occupation else []
         version = capability_store.state(tx, workspace_id).version
         return OriginOut.of(first, found, version)
 

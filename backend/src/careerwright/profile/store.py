@@ -1,5 +1,5 @@
-"""SQL for profile versions and source references, both append-only, and for each target's
-stored record (adapter)."""
+"""SQL for profile versions and source references, both append-only, for each target's
+stored record, and for the person's details beside a title, append-only (adapter)."""
 
 import uuid
 from collections.abc import Iterable
@@ -20,6 +20,8 @@ from careerwright.profile.records import (
     TargetKind,
     TargetLink,
     TargetRecord,
+    TitleDetails,
+    TitleUse,
 )
 
 _SOURCE_COLUMNS = (
@@ -240,6 +242,86 @@ def upsert_target_record(
             "by": recorded_by,
         },
     )
+
+
+_DETAIL_COLUMNS = (
+    "title_use, title_key, version, seniority, industry, not_part_of_job, recorded_by, recorded_at"
+)
+
+
+def _details(row: sa.RowMapping) -> TitleDetails:
+    return TitleDetails(
+        title_use=TitleUse(row["title_use"]),
+        title_key=row["title_key"],
+        version=row["version"],
+        seniority=row["seniority"],
+        industry=row["industry"],
+        not_part_of_job=tuple(row["not_part_of_job"]),
+        recorded_by=row["recorded_by"],
+        recorded_at=row["recorded_at"],
+    )
+
+
+def title_details(
+    tx: Tx, workspace_id: uuid.UUID, title_use: TitleUse, keys: Iterable[str]
+) -> dict[str, TitleDetails]:
+    """The latest details of each of these titles (by concept key) that has any, by key."""
+    rows = tx.execute(
+        sa.text(
+            f"SELECT DISTINCT ON (title_key) {_DETAIL_COLUMNS} FROM careerwright.title_details "
+            "WHERE workspace_id = :ws AND title_use = :use "
+            "AND title_key = ANY(CAST(:keys AS text[])) ORDER BY title_key, version DESC"
+        ),
+        {"ws": workspace_id, "use": title_use.value, "keys": sorted(set(keys))},
+    ).mappings()
+    return {row["title_key"]: _details(row) for row in rows}
+
+
+def title_details_at(
+    tx: Tx, workspace_id: uuid.UUID, title_use: TitleUse, key: str, version: int
+) -> TitleDetails | None:
+    row = (
+        tx.execute(
+            sa.text(
+                f"SELECT {_DETAIL_COLUMNS} FROM careerwright.title_details WHERE workspace_id = "
+                ":ws AND title_use = :use AND title_key = :key AND version = :version"
+            ),
+            {"ws": workspace_id, "use": title_use.value, "key": key, "version": version},
+        )
+        .mappings()
+        .one_or_none()
+    )
+    return None if row is None else _details(row)
+
+
+def insert_title_details(
+    tx: Tx, workspace_id: uuid.UUID, details: TitleDetails, recorded_by: uuid.UUID
+) -> TitleDetails:
+    """Store a title's next version of details; the caller holds the workspace lock and has
+    checked the expected version."""
+    row = (
+        tx.execute(
+            sa.text(
+                "INSERT INTO careerwright.title_details (workspace_id, title_use, title_key, "
+                "version, seniority, industry, not_part_of_job, recorded_by) VALUES (:ws, :use, "
+                ":key, :version, :seniority, :industry, CAST(:marks AS uuid[]), :by) "
+                f"RETURNING {_DETAIL_COLUMNS}"
+            ),
+            {
+                "ws": workspace_id,
+                "use": details.title_use.value,
+                "key": details.title_key,
+                "version": details.version,
+                "seniority": details.seniority,
+                "industry": details.industry,
+                "marks": [str(skill) for skill in details.not_part_of_job],
+                "by": recorded_by,
+            },
+        )
+        .mappings()
+        .one()
+    )
+    return _details(row)
 
 
 def current_profile(tx: Tx, workspace_id: uuid.UUID) -> ProfileVersion | None:

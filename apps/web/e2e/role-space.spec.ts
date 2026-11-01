@@ -116,6 +116,44 @@ test("[DIV1-13][DIV1-14][WLD-01] any UK title is offered as you type; picking on
   expect(externalRequests(requests)).toEqual([]);
 });
 
+test("[PROF-11] seniority and industry beside the role, and a skill ESCO lists marked not part of my job, in the demo", async ({
+  page,
+}) => {
+  // Task 6d slice C: each optional and never a default; the mark is a display state, never
+  // evidence. No key, nothing leaves this machine.
+  test.setTimeout(120_000);
+  const requests = recordRequests(page);
+  const workspace = await demoWorkspace("Seniority and industry (synthetic)");
+  await signIn(page, "ada", chapterUrl("you", workspace));
+  await field(page).fill("Registered nurse");
+  await ukTitle(page, "Registered nurse").click();
+  await page.getByRole("button", { name: "specialist nurse" }).click();
+  await expect(page.getByRole("heading", { name: "How would you like to start?" })).toBeFocused();
+
+  await youView(page, "What we know");
+  const details = page.getByRole("region", { name: "Seniority and industry" });
+  await expect(details.getByText("Seniority and industry: not given.")).toBeVisible();
+  await details
+    .getByRole("button", { name: "Add seniority or industry for Registered nurse" })
+    .click();
+  await details.getByLabel("Seniority (optional)").fill("Band 6");
+  await details.getByRole("button", { name: "Save" }).click();
+  await expect(details.getByText("Seniority: Band 6. Industry: not given.")).toBeVisible();
+
+  await details.getByText(/skills ESCO lists for this kind of work$/).click();
+  const mark = details.getByRole("button", { name: /^Not part of my job: / }).first();
+  await expect(mark).toHaveAttribute("aria-pressed", "false");
+  await mark.click();
+  await expect(mark).toHaveAttribute("aria-pressed", "true");
+  const shown = await asBrowser<{
+    usual_skills: { state: string; not_part_of_job: boolean }[];
+  }>("GET", `/v1/workspaces/${workspace}/origin`, await emulatorToken("ada"));
+  const marked = shown.usual_skills.filter((skill) => skill.not_part_of_job);
+  expect(marked).toHaveLength(1);
+  expect(marked[0]?.state).toBe("usual_in_role"); // still ESCO's, never the person's evidence
+  expect(externalRequests(requests)).toEqual([]);
+});
+
 test("[DIV1-13][DIV1-03][WLD-01] a title neither list holds is kept in the person's own words, and the world still answers", async ({
   page,
 }) => {
@@ -209,5 +247,17 @@ test.describe("phone", () => {
     expect(shown.y + shown.height).toBeLessThanOrEqual(typed.y); // above the field
     expect(heading.y).toBeGreaterThanOrEqual(0); // in view as it appears, nothing scrolled
     expect(heading.y + heading.height).toBeLessThanOrEqual(844);
+    // Design re-review 2, R2-M1: the choice the panel's line names sits next to that line,
+    // above the services, so it is in the first screen too.
+    const line = await panel
+      .getByText(/keeps it as your job title only if you choose/)
+      .boundingBox();
+    const keep = await panel.getByRole("button", { name: "Keep it as my job title" }).boundingBox();
+    const services = await panel.getByRole("list").boundingBox();
+    expect(line && keep && services).toBeTruthy();
+    if (line === null || keep === null || services === null) return;
+    expect(keep.y).toBeGreaterThanOrEqual(line.y + line.height); // right after the line
+    expect(keep.y + keep.height).toBeLessThanOrEqual(services.y); // before the services
+    expect(keep.y + keep.height).toBeLessThanOrEqual(844); // in the first screen
   });
 });

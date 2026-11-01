@@ -134,11 +134,11 @@ class RoleOut(ResponseModel):
 
 
 class UsualSkillOut(ResponseModel):
-    """An essential skill of the person's role in ESCO. `usual_in_role`: usual in your role,
-    not confirmed yet, for display only (wherever anything is computed it is unresolved).
-    `self_reported`: the person said they have used or done it (their own claim, never
-    evidence). Record "I've used this" with `POST .../capability/evidence`, its `subject` and
-    `answer: used`."""
+    """An essential skill ESCO lists for the kind of work of the person's role, never the
+    person's own skill. `usual_in_role`: ESCO lists it for this kind of work, not confirmed
+    yet, for display only (wherever anything is computed it is unresolved). `self_reported`:
+    the person said they have used or done it (their own claim, never evidence). Record "I've
+    used this" with `POST .../capability/evidence`, its `subject` and `answer: used`."""
 
     skill_id: uuid.UUID
     subject: str
@@ -147,6 +147,10 @@ class UsualSkillOut(ResponseModel):
     state: UsualState
     answer: Answer | None = Field(description="The person's latest answer about it, if any.")
     evidence_id: uuid.UUID | None
+    not_part_of_job: bool = Field(
+        description="The person marked it not part of their job (`PUT .../profile/titles`): a "
+        "display state, never evidence, never used for suitability or readiness."
+    )
 
     @classmethod
     def of(cls, usual: UsualSkill) -> "UsualSkillOut":
@@ -158,6 +162,7 @@ class UsualSkillOut(ResponseModel):
             state=usual.state,
             answer=usual.answer,
             evidence_id=usual.evidence_id,
+            not_part_of_job=usual.not_part_of_job,
         )
 
 

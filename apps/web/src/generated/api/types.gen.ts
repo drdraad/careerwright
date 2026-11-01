@@ -1697,18 +1697,31 @@ export type DecisionOut = {
 };
 
 /**
- * DecisionResult
+ * DecisionRefusedOut
  *
- * The decision and the resulting profile. The proposals are read from the turn: this
- * response is stored as the command's receipt, and model output is kept sealed.
+ * A refused decision. When an answer typed in it triggers the support screen, the panel
+ * comes with the refusal.
  */
-export type DecisionResult = {
+export type DecisionRefusedOut = {
+    error: ErrorBody;
+    support_note?: SupportNoteOut | null;
+};
+
+/**
+ * DecisionSavedOut
+ *
+ * A turn's decision, with the support panel when an answer the person typed in the review
+ * step triggers the support screen (the product owner's "every place a person types",
+ * 2026-10-31): like What we know's direct entries, it is saved as usual.
+ */
+export type DecisionSavedOut = {
     /**
      * Turn Id
      */
     turn_id: string;
     decision: DecisionOut;
     profile: ProfileOut;
+    support_note: SupportNoteOut | null;
 };
 
 /**
@@ -2146,6 +2159,7 @@ export const EventKind = {
     CONCEPT_PROVISIONAL_CREATED: 'concept.provisional_created',
     INTERVIEW_TURN_DECIDED: 'interview.turn_decided',
     INTERVIEW_PREFERENCES_UPDATED: 'interview.preferences_updated',
+    PROFILE_TITLE_DETAILS_UPDATED: 'profile.title_details_updated',
     CAPABILITY_UPDATED: 'capability.updated',
     PLANNING_INPUTS_UPDATED: 'planning.inputs_updated'
 } as const;
@@ -7712,6 +7726,45 @@ export type SetSpendLimits = {
 };
 
 /**
+ * SetTitleDetails
+ *
+ * The whole of a title's details, as the person leaves them.
+ */
+export type SetTitleDetails = {
+    /**
+     * Expected Version
+     *
+     * This title's details; 0 while none saved.
+     */
+    expected_version: number;
+    title_use: TitleUse;
+    /**
+     * Title
+     *
+     * Your role, or one of your targets, as your answers hold it (as a concept).
+     */
+    title: string;
+    /**
+     * Seniority
+     *
+     * Optional, in your words; null: not given.
+     */
+    seniority: string | null;
+    /**
+     * Industry
+     *
+     * Optional, in your words; null: not given.
+     */
+    industry: string | null;
+    /**
+     * Not Part Of Job
+     *
+     * Skills ESCO lists as essential for this kind of work that you marked not part of your job: a display state, never evidence.
+     */
+    not_part_of_job?: Array<string>;
+};
+
+/**
  * SharedSkillOut
  */
 export type SharedSkillOut = {
@@ -9493,6 +9546,116 @@ export type TextListInput = {
 };
 
 /**
+ * TitleDetailsListOut
+ */
+export type TitleDetailsListOut = {
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    /**
+     * Titles
+     *
+     * Your role first, if you gave one, then your targets in order.
+     */
+    titles: Array<TitleDetailsOut>;
+};
+
+/**
+ * TitleDetailsOut
+ *
+ * The person's own details beside their role or a target (`careerwright.profile.
+ * title_details`): each optional and never a default, ignored by matching; the skills ESCO
+ * lists for its kind of work that they marked not part of their job are a display state,
+ * never evidence.
+ */
+export type TitleDetailsOut = {
+    title_use: TitleUse;
+    /**
+     * Title
+     *
+     * As your answers hold it.
+     */
+    title: string;
+    /**
+     * Seniority
+     *
+     * In your words; null: not given.
+     */
+    seniority: string | null;
+    /**
+     * Industry
+     *
+     * In your words; null: not given.
+     */
+    industry: string | null;
+    /**
+     * Not Part Of Job
+     *
+     * ESCO skill IDs you marked.
+     */
+    not_part_of_job: Array<string>;
+    /**
+     * Version
+     *
+     * 0 while none saved.
+     */
+    version: number;
+};
+
+/**
+ * TitleDetailsRefusedOut
+ *
+ * A refused save of a title's details, with the support panel when its words trigger the
+ * support screen.
+ */
+export type TitleDetailsRefusedOut = {
+    error: ErrorBody;
+    support_note?: SupportNoteOut | null;
+};
+
+/**
+ * TitleDetailsSavedOut
+ *
+ * A title's details as saved, with the support panel when words the save enters trigger
+ * the support screen: saved as usual, like What we know's direct entries.
+ */
+export type TitleDetailsSavedOut = {
+    title_use: TitleUse;
+    /**
+     * Title
+     *
+     * As your answers hold it.
+     */
+    title: string;
+    /**
+     * Seniority
+     *
+     * In your words; null: not given.
+     */
+    seniority: string | null;
+    /**
+     * Industry
+     *
+     * In your words; null: not given.
+     */
+    industry: string | null;
+    /**
+     * Not Part Of Job
+     *
+     * ESCO skill IDs you marked.
+     */
+    not_part_of_job: Array<string>;
+    /**
+     * Version
+     *
+     * 0 while none saved.
+     */
+    version: number;
+    support_note: SupportNoteOut | null;
+};
+
+/**
  * TitleIdea
  *
  * A title Careerwright thought of, and what it did with it: only an idea ESCO holds or the
@@ -9734,6 +9897,20 @@ export type TitleRefusedOut = {
     error: ErrorBody;
     support_note?: SupportNoteOut | null;
 };
+
+/**
+ * TitleUse
+ *
+ * Which of the person's titles details sit beside.
+ */
+export const TitleUse = { ROLE: 'role', TARGET: 'target' } as const;
+
+/**
+ * TitleUse
+ *
+ * Which of the person's titles details sit beside.
+ */
+export type TitleUse = typeof TitleUse[keyof typeof TitleUse];
 
 /**
  * TooGeneral
@@ -10072,11 +10249,11 @@ export type UrlRefusal = typeof UrlRefusal[keyof typeof UrlRefusal];
 /**
  * UsualSkillOut
  *
- * An essential skill of the person's role in ESCO. `usual_in_role`: usual in your role,
- * not confirmed yet, for display only (wherever anything is computed it is unresolved).
- * `self_reported`: the person said they have used or done it (their own claim, never
- * evidence). Record "I've used this" with `POST .../capability/evidence`, its `subject` and
- * `answer: used`.
+ * An essential skill ESCO lists for the kind of work of the person's role, never the
+ * person's own skill. `usual_in_role`: ESCO lists it for this kind of work, not confirmed
+ * yet, for display only (wherever anything is computed it is unresolved). `self_reported`:
+ * the person said they have used or done it (their own claim, never evidence). Record "I've
+ * used this" with `POST .../capability/evidence`, its `subject` and `answer: used`.
  */
 export type UsualSkillOut = {
     /**
@@ -10104,6 +10281,12 @@ export type UsualSkillOut = {
      * Evidence Id
      */
     evidence_id: string | null;
+    /**
+     * Not Part Of Job
+     *
+     * The person marked it not part of their job (`PUT .../profile/titles`): a display state, never evidence, never used for suitability or readiness.
+     */
+    not_part_of_job: boolean;
 };
 
 /**
@@ -11042,6 +11225,86 @@ export type PutProfileResponses = {
 };
 
 export type PutProfileResponse = PutProfileResponses[keyof PutProfileResponses];
+
+export type GetTitleDetailsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/profile/titles';
+};
+
+export type GetTitleDetailsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetTitleDetailsError = GetTitleDetailsErrors[keyof GetTitleDetailsErrors];
+
+export type GetTitleDetailsResponses = {
+    /**
+     * Successful Response
+     */
+    200: TitleDetailsListOut;
+};
+
+export type GetTitleDetailsResponse = GetTitleDetailsResponses[keyof GetTitleDetailsResponses];
+
+export type PutTitleDetailsData = {
+    body: SetTitleDetails;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/profile/titles';
+};
+
+export type PutTitleDetailsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': TitleDetailsRefusedOut;
+    /**
+     * Typed error envelope
+     */
+    '5XX': TitleDetailsRefusedOut;
+};
+
+export type PutTitleDetailsError = PutTitleDetailsErrors[keyof PutTitleDetailsErrors];
+
+export type PutTitleDetailsResponses = {
+    /**
+     * Nothing changed; no new version.
+     */
+    200: TitleDetailsSavedOut;
+    /**
+     * Successful Response
+     */
+    201: TitleDetailsSavedOut;
+};
+
+export type PutTitleDetailsResponse = PutTitleDetailsResponses[keyof PutTitleDetailsResponses];
 
 export type RevertProfileData = {
     body: RevertProfile;
@@ -12016,11 +12279,11 @@ export type DecideTurnErrors = {
     /**
      * Typed error envelope
      */
-    '4XX': ErrorEnvelope;
+    '4XX': DecisionRefusedOut;
     /**
      * Typed error envelope
      */
-    '5XX': ErrorEnvelope;
+    '5XX': DecisionRefusedOut;
 };
 
 export type DecideTurnError = DecideTurnErrors[keyof DecideTurnErrors];
@@ -12029,11 +12292,11 @@ export type DecideTurnResponses = {
     /**
      * Decided; no field changed.
      */
-    200: DecisionResult;
+    200: DecisionSavedOut;
     /**
      * Successful Response
      */
-    201: DecisionResult;
+    201: DecisionSavedOut;
 };
 
 export type DecideTurnResponse = DecideTurnResponses[keyof DecideTurnResponses];

@@ -183,3 +183,26 @@ class TargetRecord:
     def esco_occupation(self) -> str | None:
         """The occupation the target names in ESCO itself (chosen, or its one label)."""
         return self.occupation_uri if self.link in ESCO_LINKS else None
+
+
+class TitleUse(StrEnum):
+    """Which of the person's titles details sit beside."""
+
+    ROLE = "role"  # their current or last role
+    TARGET = "target"
+
+
+@dataclass(frozen=True)
+class TitleDetails:
+    """The person's own details beside a title, by the title as a concept: never a default
+    (None: not given), ignored by matching; the marks are a display state, never evidence.
+    Version 0: nothing saved yet."""
+
+    title_use: TitleUse
+    title_key: str
+    version: int
+    seniority: str | None = None
+    industry: str | None = None
+    not_part_of_job: tuple[uuid.UUID, ...] = ()  # ESCO skill IDs, in the person's order
+    recorded_by: uuid.UUID | None = None
+    recorded_at: datetime | None = None

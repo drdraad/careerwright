@@ -17,7 +17,8 @@ export function SupportNote({
 }: {
   note: SupportNoteOut;
   onDismiss(): void;
-  /** The way forward the panel's words name, beside Dismiss (keeping a typed title). */
+  /** The way forward the panel's words name (keeping a typed title): right after the line
+   *  that names it, before the services, so a phone's first screen holds it (R2-M1). */
   actions?: ReactNode;
 }) {
   // While it shows, the world is still (plan section 4: distress stills the world).
@@ -30,6 +31,9 @@ export function SupportNote({
         Support is available
       </h3>
       <p>{note.message}</p>
+      {actions !== undefined && actions !== null && actions !== false && (
+        <div className="flex flex-wrap items-center gap-8">{actions}</div>
+      )}
       <ul className="plain-list">
         {note.resources.map((resource) => (
           <li key={resource.name}>
@@ -44,7 +48,6 @@ export function SupportNote({
         </p>
       )}
       <div className="flex flex-wrap items-center gap-8">
-        {actions}
         <Button variant="quiet" onClick={onDismiss}>
           Dismiss <span className="sr-only">the support note</span>
         </Button>

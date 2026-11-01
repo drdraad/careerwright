@@ -34,6 +34,7 @@ import type {
   TargetCoverage,
   TargetKind,
   TitleIdeaReason,
+  TitleUse,
   TooGeneralBy,
   UkGroupOut,
   WorkState,
@@ -338,6 +339,42 @@ export const ESCO_NAMED = "ESCO, the European Union's public list of occupations
 /** The essential skills ESCO lists for a role or a target: ESCO's list for that kind of work,
  *  never the person's skills and never what the work "usually" needs (ADR 0015 decision 4). */
 export const ESCO_LISTS = "ESCO lists these for this kind of work:";
+
+/** The person's own details beside a title (Task 6d slice C, ADR 0015 decisions 3 and 4):
+ *  each optional, never a default, never used to match work. Shown only for a title the person
+ *  gave, so nothing here presumes a job (the product owner, 1 November 2026). */
+export const TITLE_USE: Record<TitleUse, string> = {
+  role: "Your role",
+  target: "Target role",
+};
+export const TITLE_DETAILS = {
+  heading: "Seniority and industry",
+  intro: "Optional. Careerwright keeps them beside each title and doesn't use them to match work.",
+  seniority: "Seniority (optional)",
+  seniorityHint: "For example: trainee, senior or Band 6.",
+  industry: "Industry (optional)",
+  industryHint: "For example: retail, construction or the NHS.",
+  given: (seniority: string | null, industry: string | null) =>
+    seniority === null && industry === null
+      ? "Seniority and industry: not given."
+      : [`Seniority: ${seniority ?? "not given"}.`, `Industry: ${industry ?? "not given"}.`].join(
+          " ",
+        ),
+  open: (title: string, given: boolean) =>
+    `${given ? "Change" : "Add"} seniority or industry for ${title}`,
+  save: "Save",
+  saved: "Saved.",
+  cancel: "Cancel",
+  /** The skills ESCO lists for the role's kind of work, one step away. */
+  listed: (count: number) =>
+    count === 1
+      ? "The skill ESCO lists for this kind of work"
+      : `The ${count} skills ESCO lists for this kind of work`,
+  listedIntro: `${ESCO_NAMED}, lists these as essential for this kind of work. Careerwright hasn't compared them with your own experience.`,
+  notPart: "Not part of my job",
+  notPartSaid:
+    "You said this isn't part of your job. Careerwright doesn't use it to check anything.",
+} as const;
 
 /** A suggestion's words beyond the API's (Task W2E): each says what Careerwright did. */
 export const SUGGESTION_WORDS = {

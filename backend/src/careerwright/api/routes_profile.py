@@ -9,7 +9,15 @@ from fastapi.responses import JSONResponse
 from careerwright.api.catalogue_schemas import ProvisionalConceptOut, ProvisionalConceptPage
 from careerwright.api.deps import CallerDep, Deps, IdempotencyKey
 from careerwright.api.envelope import ERROR_RESPONSES, correlation_id, error_body, error_status
-from careerwright.api.interview_schemas import ProfileRefusedOut, ProfileSavedOut, SupportNoteOut
+from careerwright.api.interview_schemas import (
+    ProfileRefusedOut,
+    ProfileSavedOut,
+    SupportNoteOut,
+    TitleDetailsListOut,
+    TitleDetailsOut,
+    TitleDetailsRefusedOut,
+    TitleDetailsSavedOut,
+)
 from careerwright.api.pagination import (
     DEFAULT_LIMIT,
     MAX_LIMIT,
@@ -29,7 +37,7 @@ from careerwright.db import Tx, actor_transaction
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
 from careerwright.identity.receipts import CommandResult, fingerprint, run_idempotent
 from careerwright.identity.workspaces import visible_workspace
-from careerwright.profile import store
+from careerwright.profile import store, title_details
 from careerwright.profile.commands import (
     RevertProfile,
     current_profile,
@@ -38,7 +46,9 @@ from careerwright.profile.commands import (
     write_profile,
 )
 from careerwright.profile.concepts import RegisterProvisionalConcept, register_provisional_concept
+from careerwright.profile.document import FIELD_NAMES
 from careerwright.profile.safety import has_risk_stem
+from careerwright.profile.title_details import SetTitleDetails
 
 router = APIRouter(
     prefix="/v1/workspaces/{workspace_id}", responses=ERROR_RESPONSES, tags=["profile"]
@@ -75,8 +85,9 @@ def put_profile(
     usual, with the calm support panel beside the answer, or beside its refusal."""
     # Screened before anything can refuse it, so a refusal shows the panel too; derived from
     # the request every time and never stored, not even in the receipt.
+    answers = {name: getattr(body.profile, name) for name in FIELD_NAMES}
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
-        entered = entered_words(tx, workspace_id, body.expected_version, body.profile)
+        entered = entered_words(tx, workspace_id, body.expected_version, answers)
     support = any(has_risk_stem(words) for words in entered)
 
     def execute(tx: Tx) -> CommandResult:
@@ -112,6 +123,76 @@ def put_profile(
         )
         return JSONResponse(refused.model_dump(mode="json"), status_code=error_status(error))
     saved = ProfileSavedOut.saved(ProfileOut.model_validate(response), support=support)
+    return JSONResponse(saved.model_dump(mode="json"), status_code=status)
+
+
+@router.get("/profile/titles", response_model=TitleDetailsListOut, operation_id="get_title_details")
+def get_title_details(
+    workspace_id: uuid.UUID, caller: CallerDep, deps: Deps
+) -> TitleDetailsListOut:
+    """The person's own details beside their role and each target: seniority and industry,
+    each optional (null: not given), and the skills ESCO lists for the work they marked not
+    part of their job. Matching ignores them."""
+    with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
+        version, views = title_details.current_title_details(tx, workspace_id)
+    return TitleDetailsListOut(
+        profile_version=version, titles=[TitleDetailsOut.of(v) for v in views]
+    )
+
+
+@router.put(
+    "/profile/titles",
+    response_model=TitleDetailsSavedOut,
+    status_code=201,
+    responses={
+        200: {"model": TitleDetailsSavedOut, "description": "Nothing changed; no new version."},
+        "4XX": {"model": TitleDetailsRefusedOut, "description": "Typed error envelope"},
+        "5XX": {"model": TitleDetailsRefusedOut, "description": "Typed error envelope"},
+    },
+    operation_id="put_title_details",
+)
+def put_title_details(
+    workspace_id: uuid.UUID,
+    body: SetTitleDetails,
+    caller: CallerDep,
+    deps: Deps,
+    key: IdempotencyKey,
+    http: Request,
+) -> JSONResponse:
+    """Save the details beside one of the person's titles. The words it enters go through the
+    support screen, as What we know's direct entries do: saved as usual, with the calm panel
+    beside the answer or its refusal, derived from the request and never stored."""
+    with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
+        entered = title_details.entered_words(tx, workspace_id, body)
+    support = any(has_risk_stem(words) for words in entered)
+
+    def execute(tx: Tx) -> CommandResult:
+        view, created = title_details.set_title_details(
+            tx, caller.actor, workspace_id, body, deps.pack_targets
+        )
+        return CommandResult(
+            201 if created else 200, TitleDetailsOut.of(view).model_dump(mode="json"), workspace_id
+        )
+
+    request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
+    try:
+        status, response = run_idempotent(
+            deps.engine,
+            caller.actor.actor_id,
+            key,
+            "set_title_details",
+            fingerprint("set_title_details", request),
+            execute,
+        )
+    except CareerwrightError as error:
+        if not support:
+            raise
+        refused = TitleDetailsRefusedOut(
+            error=error_body(error, correlation_id(http)),
+            support_note=SupportNoteOut.beside_an_entry(saved=False),
+        )
+        return JSONResponse(refused.model_dump(mode="json"), status_code=error_status(error))
+    saved = TitleDetailsSavedOut.saved(TitleDetailsOut.model_validate(response), support=support)
     return JSONResponse(saved.model_dump(mode="json"), status_code=status)
 
 

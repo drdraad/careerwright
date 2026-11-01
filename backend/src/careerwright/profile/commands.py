@@ -210,16 +210,17 @@ def write_profile(
 
 
 def entered_words(
-    tx: Tx, workspace_id: uuid.UUID, expected_version: int, new: ProfileInput
+    tx: Tx, workspace_id: uuid.UUID, expected_version: int, answers: Mapping[str, FieldInput]
 ) -> list[str]:
-    """What a direct edit enters in words: each answer given in words, and each item of a list
-    of them, that the version it was made against doesn't hold (every one, when that version
-    can't be read). What the support screen reads for What we know (ADR 0007): a stored version
-    never changes, so a replay of the edit reads the same words."""
+    """What a direct entry enters in words (`answers`, by field: What we know's whole edit, or
+    the answers typed in a conversation's review step): each answer given in words, and each
+    item of a list of them, that the version it was made against doesn't hold (every one, when
+    that version can't be read). What the support screen reads (ADR 0007): a stored version
+    never changes, so a replay reads the same words."""
     base = store.profile_version(tx, workspace_id, expected_version)
     words: list[str] = []
-    for name in FIELD_NAMES:
-        given = getattr(new, name).value
+    for name, answer in answers.items():
+        given = answer.value
         held = None if base is None else getattr(base.document, name).value
         if isinstance(given, str) and given != held:
             words.append(given)

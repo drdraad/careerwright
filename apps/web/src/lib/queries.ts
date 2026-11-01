@@ -19,7 +19,7 @@ import {
   chooseTarget,
   createWorkspace,
   type DecideTurn,
-  type DecisionResult,
+  type DecisionSavedOut,
   type DiscoveryOut,
   decideTurn,
   type Emphasis,
@@ -33,6 +33,7 @@ import {
   getSketch,
   getSlate,
   getSpend,
+  getTitleDetails,
   getTurnReply,
   getWorkspace,
   listCredentials,
@@ -53,6 +54,7 @@ import {
   putPreferences,
   putProfile,
   putSpendLimits,
+  putTitleDetails,
   type RevertProfile,
   type RunKind,
   revertProfile,
@@ -60,6 +62,7 @@ import {
   rotateCredential,
   type SetPreferences,
   type SetSpendLimits,
+  type SetTitleDetails,
   type SketchOut,
   type SlateOut,
   type SourceOut,
@@ -74,6 +77,8 @@ import {
   submitExplanation,
   submitTurn,
   type TargetRecordsOut,
+  type TitleDetailsListOut,
+  type TitleDetailsSavedOut,
   type TitleMatchesOut,
   type TurnOut,
   type TurnSubmittedOut,
@@ -104,6 +109,7 @@ export const keys = {
   sketch: (id: string) => ["ws", id, "sketch"] as const,
   targets: (id: string) => ["ws", id, "targets"] as const,
   origin: (id: string) => ["ws", id, "origin"] as const,
+  titleDetails: (id: string) => ["ws", id, "profile", "titles"] as const,
   credentials: (id: string) => ["ws", id, "credentials"] as const,
   spend: (id: string) => ["ws", id, "spend"] as const,
   estimate: (id: string, kind: RunKind) => ["ws", id, "spend", "estimate", kind] as const,
@@ -387,6 +393,8 @@ export function useSubmitTurn(id: string) {
 
 export type Decide = { turnId: string; body: DecideTurn };
 
+/** A turn's decision. Answers typed in the review step go through the support screen, so the
+ *  result (or the refusal's `ApiError`) may carry the calm panel; it is never stored. */
 export function useDecideTurn(id: string) {
   return useCommand(
     id,
@@ -398,7 +406,7 @@ export function useDecideTurn(id: string) {
           headers: { "Idempotency-Key": key },
           throwOnError: true,
         })
-      ).data as DecisionResult,
+      ).data as DecisionSavedOut,
   );
 }
 
@@ -596,6 +604,35 @@ export function useOrigin(id: string, enabled = true) {
     retry: retryable,
     enabled,
   });
+}
+
+/** The person's own details beside their role and each target (`GET .../profile/titles`). */
+export function useTitleDetails(id: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.titleDetails(id),
+    queryFn: async (): Promise<TitleDetailsListOut> =>
+      (await getTitleDetails({ path: path(id), throwOnError: true })).data,
+    retry: retryable,
+    enabled,
+  });
+}
+
+/** Saving a title's details: seniority, industry and the skills marked not part of the job.
+ *  Its words go through the support screen, so the result (or the refusal's `ApiError`) may
+ *  carry the calm panel; it is never stored. */
+export function useSaveTitleDetails(id: string) {
+  return useCommand(
+    id,
+    async (body: SetTitleDetails, key: string) =>
+      (
+        await putTitleDetails({
+          path: path(id),
+          body,
+          headers: { "Idempotency-Key": key },
+          throwOnError: true,
+        })
+      ).data as TitleDetailsSavedOut,
+  );
 }
 
 /** The first answer: an ESCO occupation the person picked from the type-ahead. */

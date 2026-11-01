@@ -2515,7 +2515,32 @@ export const DecisionOutSchema = {
     title: 'DecisionOut'
 } as const;
 
-export const DecisionResultSchema = {
+export const DecisionRefusedOutSchema = {
+    properties: {
+        error: {
+            $ref: '#/components/schemas/ErrorBody'
+        },
+        support_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SupportNoteOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'error'
+    ],
+    title: 'DecisionRefusedOut',
+    description: 'A refused decision. When an answer typed in it triggers the support screen, the panel\ncomes with the refusal.'
+} as const;
+
+export const DecisionSavedOutSchema = {
     properties: {
         turn_id: {
             type: 'string',
@@ -2527,6 +2552,16 @@ export const DecisionResultSchema = {
         },
         profile: {
             $ref: '#/components/schemas/ProfileOut'
+        },
+        support_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SupportNoteOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     additionalProperties: false,
@@ -2534,10 +2569,11 @@ export const DecisionResultSchema = {
     required: [
         'turn_id',
         'decision',
-        'profile'
+        'profile',
+        'support_note'
     ],
-    title: 'DecisionResult',
-    description: 'The decision and the resulting profile. The proposals are read from the turn: this\nresponse is stored as the command\'s receipt, and model output is kept sealed.'
+    title: 'DecisionSavedOut',
+    description: 'A turn\'s decision, with the support panel when an answer the person typed in the review\nstep triggers the support screen (the product owner\'s "every place a person types",\n2026-10-31): like What we know\'s direct entries, it is saved as usual.'
 } as const;
 
 export const DescriptionKindSchema = {
@@ -3106,6 +3142,7 @@ export const EventKindSchema = {
         'concept.provisional_created',
         'interview.turn_decided',
         'interview.preferences_updated',
+        'profile.title_details_updated',
         'capability.updated',
         'planning.inputs_updated'
     ],
@@ -12181,6 +12218,76 @@ export const SetSpendLimitsSchema = {
     title: 'SetSpendLimits'
 } as const;
 
+export const SetTitleDetailsSchema = {
+    properties: {
+        expected_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Version',
+            description: 'This title\'s details; 0 while none saved.'
+        },
+        title_use: {
+            $ref: '#/components/schemas/TitleUse'
+        },
+        title: {
+            type: 'string',
+            maxLength: 120,
+            minLength: 1,
+            title: 'Title',
+            description: 'Your role, or one of your targets, as your answers hold it (as a concept).'
+        },
+        seniority: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 120,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Seniority',
+            description: 'Optional, in your words; null: not given.'
+        },
+        industry: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 120,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Industry',
+            description: 'Optional, in your words; null: not given.'
+        },
+        not_part_of_job: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            maxItems: 100,
+            title: 'Not Part Of Job',
+            description: 'Skills ESCO lists as essential for this kind of work that you marked not part of your job: a display state, never evidence.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_version',
+        'title_use',
+        'title',
+        'seniority',
+        'industry'
+    ],
+    title: 'SetTitleDetails',
+    description: 'The whole of a title\'s details, as the person leaves them.'
+} as const;
+
 export const SharedSkillOutSchema = {
     properties: {
         skill_id: {
@@ -15168,6 +15275,192 @@ export const TextListInputSchema = {
     title: 'TextListInput'
 } as const;
 
+export const TitleDetailsListOutSchema = {
+    properties: {
+        profile_version: {
+            type: 'integer',
+            title: 'Profile Version'
+        },
+        titles: {
+            items: {
+                $ref: '#/components/schemas/TitleDetailsOut'
+            },
+            type: 'array',
+            title: 'Titles',
+            description: 'Your role first, if you gave one, then your targets in order.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'profile_version',
+        'titles'
+    ],
+    title: 'TitleDetailsListOut'
+} as const;
+
+export const TitleDetailsOutSchema = {
+    properties: {
+        title_use: {
+            $ref: '#/components/schemas/TitleUse'
+        },
+        title: {
+            type: 'string',
+            title: 'Title',
+            description: 'As your answers hold it.'
+        },
+        seniority: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Seniority',
+            description: 'In your words; null: not given.'
+        },
+        industry: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Industry',
+            description: 'In your words; null: not given.'
+        },
+        not_part_of_job: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Not Part Of Job',
+            description: 'ESCO skill IDs you marked.'
+        },
+        version: {
+            type: 'integer',
+            title: 'Version',
+            description: '0 while none saved.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title_use',
+        'title',
+        'seniority',
+        'industry',
+        'not_part_of_job',
+        'version'
+    ],
+    title: 'TitleDetailsOut',
+    description: 'The person\'s own details beside their role or a target (`careerwright.profile.\ntitle_details`): each optional and never a default, ignored by matching; the skills ESCO\nlists for its kind of work that they marked not part of their job are a display state,\nnever evidence.'
+} as const;
+
+export const TitleDetailsRefusedOutSchema = {
+    properties: {
+        error: {
+            $ref: '#/components/schemas/ErrorBody'
+        },
+        support_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SupportNoteOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'error'
+    ],
+    title: 'TitleDetailsRefusedOut',
+    description: 'A refused save of a title\'s details, with the support panel when its words trigger the\nsupport screen.'
+} as const;
+
+export const TitleDetailsSavedOutSchema = {
+    properties: {
+        title_use: {
+            $ref: '#/components/schemas/TitleUse'
+        },
+        title: {
+            type: 'string',
+            title: 'Title',
+            description: 'As your answers hold it.'
+        },
+        seniority: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Seniority',
+            description: 'In your words; null: not given.'
+        },
+        industry: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Industry',
+            description: 'In your words; null: not given.'
+        },
+        not_part_of_job: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Not Part Of Job',
+            description: 'ESCO skill IDs you marked.'
+        },
+        version: {
+            type: 'integer',
+            title: 'Version',
+            description: '0 while none saved.'
+        },
+        support_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SupportNoteOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'title_use',
+        'title',
+        'seniority',
+        'industry',
+        'not_part_of_job',
+        'version',
+        'support_note'
+    ],
+    title: 'TitleDetailsSavedOut',
+    description: 'A title\'s details as saved, with the support panel when words the save enters trigger\nthe support screen: saved as usual, like What we know\'s direct entries.'
+} as const;
+
 export const TitleIdeaSchema = {
     properties: {
         title: {
@@ -15528,6 +15821,16 @@ export const TitleRefusedOutSchema = {
     ],
     title: 'TitleRefusedOut',
     description: 'A refused first answer in the person\'s own words. When the title triggers the support\nscreen (`careerwright.profile.safety`), it is never kept as the role, and the calm support\npanel comes with the refusal, whatever the refusal is.'
+} as const;
+
+export const TitleUseSchema = {
+    type: 'string',
+    enum: [
+        'role',
+        'target'
+    ],
+    title: 'TitleUse',
+    description: 'Which of the person\'s titles details sit beside.'
 } as const;
 
 export const TooGeneralSchema = {
@@ -16093,6 +16396,11 @@ export const UsualSkillOutSchema = {
                 }
             ],
             title: 'Evidence Id'
+        },
+        not_part_of_job: {
+            type: 'boolean',
+            title: 'Not Part Of Job',
+            description: 'The person marked it not part of their job (`PUT .../profile/titles`): a display state, never evidence, never used for suitability or readiness.'
         }
     },
     additionalProperties: false,
@@ -16104,10 +16412,11 @@ export const UsualSkillOutSchema = {
         'skill_type',
         'state',
         'answer',
-        'evidence_id'
+        'evidence_id',
+        'not_part_of_job'
     ],
     title: 'UsualSkillOut',
-    description: 'An essential skill of the person\'s role in ESCO. `usual_in_role`: usual in your role,\nnot confirmed yet, for display only (wherever anything is computed it is unresolved).\n`self_reported`: the person said they have used or done it (their own claim, never\nevidence). Record "I\'ve used this" with `POST .../capability/evidence`, its `subject` and\n`answer: used`.'
+    description: 'An essential skill ESCO lists for the kind of work of the person\'s role, never the\nperson\'s own skill. `usual_in_role`: ESCO lists it for this kind of work, not confirmed\nyet, for display only (wherever anything is computed it is unresolved). `self_reported`:\nthe person said they have used or done it (their own claim, never evidence). Record "I\'ve\nused this" with `POST .../capability/evidence`, its `subject` and `answer: used`.'
 } as const;
 
 export const UsualStateSchema = {

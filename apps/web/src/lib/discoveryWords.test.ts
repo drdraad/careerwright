@@ -14,6 +14,8 @@ import type {
 import {
   aiFilterWords,
   CLOSEST,
+  ESCO_LISTS,
+  ESCO_NAMED,
   FIRST_ANSWER,
   FIRST_QUESTION,
   fewerReason,
@@ -25,6 +27,8 @@ import {
   suggestionReason,
   suggestionWords,
   TARGET_COVERAGE,
+  TITLE_DETAILS,
+  TITLE_USE,
   titleIdeasListed,
   titleIdeasWords,
   UK_TITLE_IDEAS,
@@ -512,6 +516,33 @@ describe("[STATE-05][PROF-10] the sketch's words and a target's coverage", () =>
     );
     expect(TARGET_COVERAGE.not_covered(false)).toBe(
       "Careerwright can't check skills, options or routes for this role yet.",
+    );
+  });
+});
+
+describe("[PROF-11] ESCO's list and the details beside a title, in words (Task 6d slice C)", () => {
+  it("calls ESCO's list ESCO's, for the kind of work, and names ESCO plainly", () => {
+    expect(ESCO_LISTS).toBe("ESCO lists these for this kind of work:");
+    expect(ESCO_NAMED).toBe("ESCO, the European Union's public list of occupations and skills");
+    expect(TITLE_DETAILS.listed(1)).toBe("The skill ESCO lists for this kind of work");
+    expect(TITLE_DETAILS.listed(24)).toBe("The 24 skills ESCO lists for this kind of work");
+    expect(TITLE_DETAILS.listedIntro).toBe(
+      "ESCO, the European Union's public list of occupations and skills, lists these as essential for this kind of work. Careerwright hasn't compared them with your own experience.",
+    );
+  });
+
+  it("says what isn't given, never a default", () => {
+    expect(TITLE_DETAILS.given(null, null)).toBe("Seniority and industry: not given.");
+    expect(TITLE_DETAILS.given("Senior", null)).toBe("Seniority: Senior. Industry: not given.");
+    expect(TITLE_DETAILS.given(null, "Retail")).toBe("Seniority: not given. Industry: Retail.");
+    expect(TITLE_DETAILS.open("Doula", false)).toBe("Add seniority or industry for Doula");
+    expect(TITLE_DETAILS.open("Doula", true)).toBe("Change seniority or industry for Doula");
+    expect(TITLE_USE).toEqual({ role: "Your role", target: "Target role" });
+    expect(TITLE_DETAILS.intro).toBe(
+      "Optional. Careerwright keeps them beside each title and doesn't use them to match work.",
+    );
+    expect(TITLE_DETAILS.notPartSaid).toBe(
+      "You said this isn't part of your job. Careerwright doesn't use it to check anything.",
     );
   });
 });

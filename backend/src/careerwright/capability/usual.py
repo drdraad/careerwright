@@ -1,12 +1,13 @@
-"""The skills a person's role usually needs (plan section 4, "Usual is not confirmed"; Sprint W
-SW.5; ADR 0014 decision 4).
+"""The essential skills ESCO lists for the kind of work of a person's role (plan section 4,
+"Usual is not confirmed"; Sprint W SW.5; ADR 0014 decision 4; ADR 0015 decision 4).
 
 When the person's current or last role names one ESCO occupation, its essential skills are
-"usual in your role, not confirmed yet": a state of their own, for display only. Wherever
-anything is computed (readiness, gaps, ranks) such a skill is unresolved, so nothing here
-feeds a computation. The person picking one ("I've used this", `Answer.USED`) is their own
-claim, recorded as a self-report through the capability's one evidence command: it shows
-as self-reported, never as evidence.
+ESCO's list for that kind of work, "not confirmed yet": a state of their own, for display
+only, never the person's skills. Wherever anything is computed (readiness, gaps, ranks) such
+a skill is unresolved, so nothing here feeds a computation. The person picking one ("I've used
+this", `Answer.USED`) is their own claim, recorded as a self-report through the capability's
+one evidence command: it shows as self-reported, never as evidence. A skill they marked "not
+part of my job" (`careerwright.profile.title_details`) is flagged for display only.
 """
 
 import uuid
@@ -23,7 +24,8 @@ from careerwright.profile.targets import PackTargets
 
 
 class UsualState(StrEnum):
-    USUAL_IN_ROLE = "usual_in_role"  # ESCO lists it as essential to the role: not confirmed yet
+    # ESCO lists it as essential to the role's kind of work: not confirmed yet.
+    USUAL_IN_ROLE = "usual_in_role"
     SELF_REPORTED = "self_reported"  # the person said they have used or done it
 
 
@@ -37,6 +39,8 @@ class UsualSkill:
     state: UsualState
     answer: Answer | None  # the person's latest answer about it, if any
     evidence_id: uuid.UUID | None  # that answer's record
+    # The person marked it "not part of my job": a display state, never evidence.
+    not_part_of_job: bool = False
 
 
 def subject_of(skill_id: uuid.UUID) -> str:
@@ -56,9 +60,14 @@ def essential_skills(occupation: OccupationDetail) -> list[SkillRef]:
     return [s for s in occupation.skills if s.relation == "essential"]
 
 
-def usual_skills(occupation: OccupationDetail, evidence: list[SkillEvidence]) -> list[UsualSkill]:
-    """The role's essential skills, each usual in the role unless the person's latest
-    answer about it says they have used or done it (self-reported)."""
+def usual_skills(
+    occupation: OccupationDetail,
+    evidence: list[SkillEvidence],
+    not_part_of_job: frozenset[uuid.UUID] = frozenset(),
+) -> list[UsualSkill]:
+    """The role's essential skills, each ESCO's for its kind of work unless the person's latest
+    answer about it says they have used or done it (self-reported), each flagged when the
+    person marked it not part of their job (`not_part_of_job`, display only)."""
     latest: dict[str, SkillEvidence] = {}
     for record in sorted(evidence, key=lambda e: e.recorded_at):
         latest[record.subject] = record
@@ -78,6 +87,7 @@ def usual_skills(occupation: OccupationDetail, evidence: list[SkillEvidence]) ->
                 state,
                 said.answer if said else None,
                 said.evidence_id if said else None,
+                skill.skill_id in not_part_of_job,
             )
         )
     return found

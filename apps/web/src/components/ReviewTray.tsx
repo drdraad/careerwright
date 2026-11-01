@@ -9,7 +9,13 @@
 // as one version, or nothing at all (the tray and its edits stay, with the reason). Nothing
 // changes until the person saves.
 import { useState } from "react";
-import type { ProfileDocument, ProfileOut, ProposedChangeOut, TurnOut } from "@/generated/api";
+import type {
+  ProfileDocument,
+  ProfileOut,
+  ProposedChangeOut,
+  SupportNoteOut,
+  TurnOut,
+} from "@/generated/api";
 import { ApiError } from "@/lib/api";
 import { type Choice, type Choices, decisionFor, type Edits } from "@/lib/conversation";
 import {
@@ -38,6 +44,9 @@ type Props = {
   resendBlocked: string | undefined;
   onResend(message: string): void;
   onSaved(after: ProfileOut): void;
+  /** The calm support panel the API sent with the decision or its refusal, when an answer
+   *  typed here triggered the support screen; null otherwise. */
+  onSupport(note: SupportNoteOut | null): void;
 };
 
 /** Whether the person said it or Careerwright read it in (a truth the dashed edge also shows).
@@ -81,6 +90,7 @@ export function ReviewTray({
   resendBlocked,
   onResend,
   onSaved,
+  onSupport,
 }: Props) {
   const decide = useDecideTurn(workspaceId);
   const evidence = useEvidence();
@@ -123,8 +133,14 @@ export function ReviewTray({
         turnId: turn.turn_id,
         body: decisionFor(changes, choices, profile.version, answers),
       })
-      .catch(() => null);
-    if (after !== null) onSaved(after.profile);
+      .catch((error: unknown) => {
+        onSupport(error instanceof ApiError ? error.supportNote : null);
+        return null;
+      });
+    if (after !== null) {
+      onSupport(after.support_note ?? null);
+      onSaved(after.profile);
+    }
   };
 
   const showSource = (change: ProposedChangeOut) =>

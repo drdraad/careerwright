@@ -786,7 +786,7 @@ describe("[STATE-06][PROF-04] the review tray saves only what the person chose a
 });
 
 describe("[STATE-06] an edit in the tray is checked first and saved with the decision", () => {
-  const decided = (state: Live): Route => ({
+  const decided = (state: Live, support_note: SupportNoteOut | null = null): Route => ({
     method: "POST",
     path: /\/turns\/t1\/decision$/,
     status: 201,
@@ -798,7 +798,7 @@ describe("[STATE-06] an edit in the tray is checked first and saved with the dec
           decision: {} as TurnOut["decision"],
         },
       ];
-      return { turn_id: "t1", decision: {}, profile: state.profile };
+      return { turn_id: "t1", decision: {}, profile: state.profile, support_note };
     },
   });
 
@@ -842,6 +842,43 @@ describe("[STATE-06] an edit in the tray is checked first and saved with the dec
       confirm_hard_constraints: [],
       edits: [{ field: "weekly_study_hours", answer: { state: "provided", value: 6 } }],
     });
+  });
+
+  it("[PROF-09] shows the calm support panel beside the save when an answer typed in the review step triggers the screen", async () => {
+    // The product owner's "every place a person types" (31 October 2026). The words are the
+    // web tests' existing fixture; the panel is the API's.
+    const state: Live = {
+      preferences: prefs("unsure"),
+      turns: [turn("complete", proposal)],
+      profile,
+    };
+    const entryPanel: SupportNoteOut = {
+      ...panel,
+      policy_version: "support-policy-9",
+      message:
+        "If anything you typed is about how you are feeling, support is available any time, " +
+        "from people trained to help. Your answers were saved as usual.",
+    };
+    const sent = fakeApi(liveRoutes(state, [decided(state, entryPanel)]));
+    const { user } = renderLive();
+    const tray = await screen.findByRole("region", { name: /To review: 2 changes/ });
+
+    await user.click(within(tray).getByRole("button", { name: "Edit current role" }));
+    await user.clear(within(tray).getByLabelText("Current role"));
+    await user.type(
+      within(tray).getByLabelText("Current role"),
+      "I volunteer on a suicide prevention helpline.",
+    );
+    await user.click(within(tray).getByRole("button", { name: /Save 1 to What we know/ }));
+
+    const shown = await screen.findByRole("region", { name: "Support is available" });
+    expect(shown).toHaveTextContent("Your answers were saved as usual.");
+    expect(await screen.findByRole("heading", { name: "Saved to What we know" })).toBeVisible();
+    expect(sent.filter((s) => s.path.endsWith("/decision"))).toHaveLength(1);
+    // Kept until the person dismisses it; focus goes to what the save did.
+    await user.click(within(shown).getByRole("button", { name: /Dismiss/ }));
+    expect(screen.queryByRole("region", { name: "Support is available" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Saved to What we know" })).toHaveFocus();
   });
 
   it("keeps the edit and says why when saving fails", async () => {

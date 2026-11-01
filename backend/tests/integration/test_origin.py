@@ -16,7 +16,9 @@ from fastapi.testclient import TestClient
 from careerwright.api.app import create_app
 from careerwright.api.deps import ApiDependencies
 from careerwright.config import RuntimeMode
+from careerwright.profile import safety
 from tests.integration.durable import Scenario, make_scenario
+from tests.integration.test_interview_choices import DISTRESS
 from tests.support.client import ApiClient, profile_with
 from tests.support.infra import API_BASE, Infra
 
@@ -454,6 +456,59 @@ def test_the_conversation_s_change_of_the_role_keeps_the_role_s_record(
     assert role["occupation"]["concept_id"] == specialist
     assert (role["closest"]["decision"], role["closest"]["chosen"]) == ("chosen", specialist)
     assert shown["usual_skills"]  # the chosen occupation's skills still seed the role
+
+
+@pytest.mark.req("PROF-09", "PROF-07")
+def test_an_answer_typed_in_the_review_step_goes_through_the_support_screen(
+    infra: Infra, api: ApiClient, demo_api: ApiClient, ada: str, tmp_path: Path
+) -> None:
+    # The product owner's "every place a person types" (31 October 2026; slice B's re-review
+    # 2, app R2-M1): an answer typed in the conversation's review step is a direct entry, like
+    # What we know's, and goes through the same screen. The input is the existing fixture.
+    workspace = demo_api.write(
+        "POST",
+        "/v1/workspaces",
+        ada,
+        {"name": "Typed in review (synthetic)", "data_mode": "demo", "synthetic": True},
+    ).json()["workspace_id"]
+    scenario = make_scenario(infra, api, ada, tmp_path)
+    turns = f"/v1/workspaces/{workspace}/interview/turns"
+    submitted = demo_api.write(
+        "POST", turns, ada, {"expected_profile_version": 0, "message": "I am a Registered Nurse."}
+    )
+    assert submitted.status_code == 202, submitted.text
+    turn_id = submitted.json()["turn_id"]
+    worker = scenario.worker("typed-in-review")
+    scenario.wait_terminal(turn_id)
+    assert worker.stop() == 0
+    [change] = [
+        c
+        for c in demo_api.get(f"{turns}/{turn_id}", ada).json()["proposal"]["changes"]
+        if c["field"] == "current_role"
+    ]
+    typed = {"field": "current_role", "answer": {"state": "provided", "value": DISTRESS}}
+    decision = {"accept": [], "confirm_hard_constraints": [], "edits": [typed]}
+
+    stale = demo_api.write(
+        "POST", f"{turns}/{turn_id}/decision", ada, {"expected_version": 4, **decision}
+    )
+    saved = demo_api.write(
+        "POST", f"{turns}/{turn_id}/decision", ada, {"expected_version": 0, **decision}
+    )
+
+    assert change["state"] == "provided"
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["support_note"]["message"] == safety.SUPPORT_NOTE_ENTRY_NOT_SAVED
+    # Saved as usual, as the person typed it, with the calm panel beside the answer.
+    assert saved.status_code == 201, saved.text
+    assert saved.json()["profile"]["document"]["current_role"]["value"] == DISTRESS
+    assert saved.json()["support_note"]["message"] == safety.SUPPORT_NOTE_ENTRY
+    receipts = infra.query(
+        "SELECT response FROM careerwright.command_receipts WHERE workspace_id = %s",
+        (workspace,),
+    )
+    assert receipts
+    assert all("support" not in str(r["response"]) for r in receipts)
 
 
 def run_strength(

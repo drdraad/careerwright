@@ -12,7 +12,9 @@ from careerwright.api.deps import CallerDep, Deps, IdempotencyKey
 from careerwright.api.envelope import ERROR_RESPONSES, correlation_id, error_body, error_status
 from careerwright.api.interview_schemas import (
     DecisionOut,
+    DecisionRefusedOut,
     DecisionResult,
+    DecisionSavedOut,
     PartialReplyOut,
     PreferencesOut,
     SupportNoteOut,
@@ -31,6 +33,7 @@ from careerwright.identity.receipts import CommandResult, fingerprint, run_idemp
 from careerwright.identity.runs import partial_reply
 from careerwright.identity.workspaces import visible_workspace
 from careerwright.profile import interview_store
+from careerwright.profile.commands import entered_words
 from careerwright.profile.conversation import (
     DecideTurn,
     SubmitTurn,
@@ -187,9 +190,13 @@ def list_turns(
 
 @router.post(
     "/turns/{turn_id}/decision",
-    response_model=DecisionResult,
+    response_model=DecisionSavedOut,
     status_code=201,
-    responses={200: {"model": DecisionResult, "description": "Decided; no field changed."}},
+    responses={
+        200: {"model": DecisionSavedOut, "description": "Decided; no field changed."},
+        "4XX": {"model": DecisionRefusedOut, "description": "Typed error envelope"},
+        "5XX": {"model": DecisionRefusedOut, "description": "Typed error envelope"},
+    },
     operation_id="decide_turn",
 )
 def decide(
@@ -199,7 +206,16 @@ def decide(
     caller: CallerDep,
     deps: Deps,
     key: IdempotencyKey,
+    http: Request,
 ) -> JSONResponse:
+    """The person's decision on a turn's proposals. The answers they type instead of a
+    proposal are direct entries, so their words go through the support screen, as What we
+    know's do: saved as usual, with the calm panel beside the answer or its refusal."""
+    typed = {edit.field.value: edit.answer for edit in body.edits}
+    with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
+        entered = entered_words(tx, workspace_id, body.expected_version, typed)
+    support = any(has_risk_stem(words) for words in entered)
+
     def execute(tx: Tx) -> CommandResult:
         decision, profile = decide_turn(
             tx,
@@ -222,12 +238,22 @@ def decide(
         "turn_id": str(turn_id),
         **body.model_dump(mode="json"),
     }
-    status, response = run_idempotent(
-        deps.engine,
-        caller.actor.actor_id,
-        key,
-        "decide_turn",
-        fingerprint("decide_turn", request),
-        execute,
-    )
-    return JSONResponse(response, status_code=status)
+    try:
+        status, response = run_idempotent(
+            deps.engine,
+            caller.actor.actor_id,
+            key,
+            "decide_turn",
+            fingerprint("decide_turn", request),
+            execute,
+        )
+    except CareerwrightError as error:
+        if not support:
+            raise
+        refused = DecisionRefusedOut(
+            error=error_body(error, correlation_id(http)),
+            support_note=SupportNoteOut.beside_an_entry(saved=False),
+        )
+        return JSONResponse(refused.model_dump(mode="json"), status_code=error_status(error))
+    saved = DecisionSavedOut.saved(DecisionResult.model_validate(response), support=support)
+    return JSONResponse(saved.model_dump(mode="json"), status_code=status)

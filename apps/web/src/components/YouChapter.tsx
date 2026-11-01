@@ -38,7 +38,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ProfileOut, WorkspaceOut } from "@/generated/api";
+import type { ProfileOut, SupportNoteOut, WorkspaceOut } from "@/generated/api";
 import { reviewable, turnFailed, turnRunning } from "@/lib/conversation";
 import {
   useCredentials,
@@ -58,6 +58,8 @@ import { RequestFailure } from "./PageState";
 import { ProfileEditor } from "./ProfileEditor";
 import { ReviewTray } from "./ReviewTray";
 import { SketchCard } from "./SketchCard";
+import { SupportNote } from "./SupportNote";
+import { TitleDetails } from "./TitleDetails";
 import { SaveNotice, type SaveOutcome, WhatWeKnow } from "./WhatWeKnow";
 
 const NO_KEY = "Connect a Meta key first.";
@@ -143,6 +145,9 @@ export function YouChapter({
   const [editing, setEditing] = useState(false);
   // The last decision's outcome, with how many turns there were when it was made.
   const [outcome, setOutcome] = useState<{ value: SaveOutcome; turns: number } | null>(null);
+  // The calm panel beside the last decision, when an answer typed in its review step
+  // triggered the support screen: kept until dismissed or the next decision, never stored.
+  const [reviewNote, setReviewNote] = useState<SupportNoteOut | null>(null);
   const [announcement, setAnnouncement] = useState("");
   // Where focus goes once it is in the page: the notice in the view the person is in, the
   // answer form's heading, or the suggestions' heading.
@@ -309,6 +314,17 @@ export function YouChapter({
             : { kind: "kept_none" },
         )
       }
+      onSupport={setReviewNote}
+    />
+  );
+  const reviewPanel = reviewNote !== null && (
+    <SupportNote
+      note={reviewNote}
+      onDismiss={() => {
+        setReviewNote(null);
+        // The button goes; focus goes to what the save did, or back to the tray.
+        (conversationNotice.current ?? document.getElementById("tray-title"))?.focus();
+      }}
     />
   );
 
@@ -344,6 +360,7 @@ export function YouChapter({
             review={
               <>
                 {saveNotice(conversationNotice)}
+                {reviewPanel}
                 {tray}
               </>
             }
@@ -386,6 +403,7 @@ export function YouChapter({
               )
             }
           />
+          <TitleDetails workspaceId={id} />
           {/* A second idea (a route sketch for the target), so one step away (D-M6). */}
           <details className="details">
             <summary>The early sketch for your target</summary>

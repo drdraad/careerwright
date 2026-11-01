@@ -26,8 +26,10 @@ from careerwright.profile.records import (
     ConversationMode,
     EntryMode,
     InterviewPreferences,
+    TitleUse,
     TurnDecision,
 )
+from careerwright.profile.title_details import TitleDetailsView
 
 
 class ProposedChangeOut(ResponseModel):
@@ -279,6 +281,58 @@ class ProfileRefusedOut(ErrorEnvelope):
     support_note: SupportNoteOut | None = None
 
 
+class TitleDetailsOut(ResponseModel):
+    """The person's own details beside their role or a target (`careerwright.profile.
+    title_details`): each optional and never a default, ignored by matching; the skills ESCO
+    lists for its kind of work that they marked not part of their job are a display state,
+    never evidence."""
+
+    title_use: TitleUse
+    title: str = Field(description="As your answers hold it.")
+    seniority: str | None = Field(description="In your words; null: not given.")
+    industry: str | None = Field(description="In your words; null: not given.")
+    not_part_of_job: list[uuid.UUID] = Field(description="ESCO skill IDs you marked.")
+    version: int = Field(description="0 while none saved.")
+
+    @classmethod
+    def of(cls, view: TitleDetailsView) -> "TitleDetailsOut":
+        details = view.details
+        return cls(
+            title_use=details.title_use,
+            title=view.title,
+            seniority=details.seniority,
+            industry=details.industry,
+            not_part_of_job=list(details.not_part_of_job),
+            version=details.version,
+        )
+
+
+class TitleDetailsListOut(ResponseModel):
+    profile_version: int
+    titles: list[TitleDetailsOut] = Field(
+        description="Your role first, if you gave one, then your targets in order."
+    )
+
+
+class TitleDetailsSavedOut(TitleDetailsOut):
+    """A title's details as saved, with the support panel when words the save enters trigger
+    the support screen: saved as usual, like What we know's direct entries."""
+
+    support_note: SupportNoteOut | None
+
+    @classmethod
+    def saved(cls, details: TitleDetailsOut, *, support: bool) -> "TitleDetailsSavedOut":
+        note = SupportNoteOut.beside_an_entry(saved=True) if support else None
+        return cls(**details.model_dump(), support_note=note)
+
+
+class TitleDetailsRefusedOut(ErrorEnvelope):
+    """A refused save of a title's details, with the support panel when its words trigger the
+    support screen."""
+
+    support_note: SupportNoteOut | None = None
+
+
 class PreferencesOut(ResponseModel):
     """How the person chose to start and to be interviewed, and whether it is paused. Null:
     not chosen yet (the interviewer then keeps to the practical mode)."""
@@ -312,3 +366,23 @@ class DecisionResult(ResponseModel):
     turn_id: uuid.UUID
     decision: DecisionOut
     profile: ProfileOut
+
+
+class DecisionSavedOut(DecisionResult):
+    """A turn's decision, with the support panel when an answer the person typed in the review
+    step triggers the support screen (the product owner's "every place a person types",
+    2026-10-31): like What we know's direct entries, it is saved as usual."""
+
+    support_note: SupportNoteOut | None
+
+    @classmethod
+    def saved(cls, result: DecisionResult, *, support: bool) -> "DecisionSavedOut":
+        note = SupportNoteOut.beside_an_entry(saved=True) if support else None
+        return cls(**result.model_dump(), support_note=note)
+
+
+class DecisionRefusedOut(ErrorEnvelope):
+    """A refused decision. When an answer typed in it triggers the support screen, the panel
+    comes with the refusal."""
+
+    support_note: SupportNoteOut | None = None
