@@ -306,5 +306,8 @@ with the browser's Origin unchanged.
 - The web container refuses to serve and its log says "refuses to serve": a `CAREERWRIGHT_*`
   variable is unsafe (a non-loopback host or emulator, or a non-`demo-` project).
 - The client is out of date (`make check` says so): run `pnpm run generate` in `apps/web`.
-- Linux hosts are unverified: Compose file secrets are bind mounts, and owner-only files
-  may not be readable by the container users there (Docker Desktop maps ownership).
+- On a Linux host the secrets and master keys stay owner-only. Each container that needs
+  them starts as root just long enough to copy its own into memory for its service user,
+  then drops to that user (ADR 0004, amendment 2026-11-01). If a service's log says "must
+  start as root" or "is not a tmpfs mount", its `user` or `tmpfs` line in `compose.yaml`
+  was changed.
