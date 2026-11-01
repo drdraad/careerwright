@@ -329,8 +329,8 @@ Decision 4 is settled and decision 3's optional fields are built. Session W2 jud
   lists these for this kind of work", never the person's skills and never what the work
   "usually" needs without that source (the sketch, a chosen target, the world's key: "ESCO lists
   it, not confirmed yet"). ESCO is named in plain words where a view first shows its list ("ESCO,
-  the European Union's public list of occupations and skills": the suggestions, the sketch, the
-  role's list). The API code `usual_in_role` keeps its name; its description says whose list it
+  the EU's list of jobs and skills": the suggestions, the sketch, the role's list; short, so the
+  suggestions' first decision stays in a phone's first screen). The API code `usual_in_role` keeps its name; its description says whose list it
   is.
 - **"Not part of my job."** Beside the person's own role, its ESCO list is one step away in What
   we know, and they may mark any of its skills "not part of my job": a display state kept per
