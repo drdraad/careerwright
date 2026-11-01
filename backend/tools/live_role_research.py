@@ -23,6 +23,10 @@ this run is evidence for the code that reads and checks pages, not for that depl
 boundary; the product's reading always goes through the restricted worker
 (`tests/integration/test_role_research.py`).
 
+`--proxy URL --proxy-ca PATH` read the pages through an explicit HTTPS proxy
+(`tools.fetch_proxy`; the Meta call is unchanged): the proxy then picks each address, so the
+printed pages say `via_proxy` true and `address_checked` false.
+
 The key is read from the repository's gitignored `.env` into a `SecretStr`, never a command
 argument and never printed. Run from `backend/`: `uv run --locked python -m tools.live_role_research
 [--title "..."]`.
@@ -51,6 +55,8 @@ from careerwright.identity.activity import PartialWriter, measured_usage
 from careerwright.identity.failures import BoundExceededError, classify_failure
 from careerwright.identity.model_choice import ModelChoice
 from careerwright.identity.model_registry import ModelMode, estimate_cost_nano_usd, format_usd
+from tools.fetch_proxy import add_arguments as add_proxy_arguments
+from tools.fetch_proxy import fetcher_from, route_fields
 from tools.leak_scan import Needle, scan
 from tools.live_smoke import (
     RESPONSES_ENDPOINT,
@@ -84,8 +90,9 @@ Reader = Callable[[str], AcquisitionResult]
 PAGES_PRINTED = "pages read (no model call; hosts only), key scan"
 
 
-def _reader() -> Reader:
-    fetcher = Fetcher(user_agent=load_manifest().user_agent)  # production: no extra origins
+def _reader(fetcher: Fetcher | None) -> Reader:
+    # Without `--proxy`, the product's own construction: no extra origins, no proxy.
+    fetcher = fetcher or Fetcher(user_agent=load_manifest().user_agent)
     pacer = Pacer()
     return lambda url: acquire_page(fetcher, pacer, url, now=datetime.now(UTC), read_text=True)
 
@@ -143,8 +150,10 @@ def research_role(
     title: str = DEFAULT_TITLE,
     build: Callable[[str, SecretStr], Model] | None = None,
     read: Reader | None = None,
+    fetcher: Fetcher | None = None,
 ) -> int:
-    """`build` replaces Meta and `read` the guarded fetcher in tests only."""
+    """`build` replaces Meta and `read` the guarded fetcher in tests only. `fetcher`: the one
+    the pages are read with (`--proxy`'s), else the product's construction."""
     models = ModelChoice.configure(settings.meta_test_model, settings.meta_production_model, "test")
     context = search.RoleSearchInput(title=" ".join(title.split()))
     with ledger.exclusive():
@@ -223,9 +232,11 @@ def research_role(
         return 1
     # The pages: no provider call, so no ledger row. What they showed is printed with the
     # row's number, for the run's report.
-    reader = read or _reader()
-    pages = {"ledger_row": record.seq} | page_notes(
-        context.title, [reader(url) for url in pages_to_read(proposal)]
+    reader = read or _reader(fetcher)
+    pages = (
+        {"ledger_row": record.seq}
+        | route_fields(fetcher)
+        | page_notes(context.title, [reader(url) for url in pages_to_read(proposal)])
     )
     printed = json.dumps(pages)
     page_findings = scan([("page notes", printed)], [key])
@@ -236,8 +247,10 @@ def research_role(
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--title", default=DEFAULT_TITLE, help="a synthetic test title")
+    add_proxy_arguments(parser)
     args = parser.parse_args(argv)
-    sys.exit(research_role(SmokeSettings(), Ledger(), title=args.title))
+    fetcher = fetcher_from(args, parser)  # before the paid call: a bad flag costs nothing
+    sys.exit(research_role(SmokeSettings(), Ledger(), title=args.title, fetcher=fetcher))
 
 
 if __name__ == "__main__":

@@ -663,3 +663,32 @@ manifest and the rights policy) are unchanged.
   is read, and prints the pages' results with the row's number. It reads pages in its own
   process, which holds the Meta key, not through the restricted worker's service: its evidence
   covers the code that reads and checks pages, not that deployment boundary.
+
+## Amendment, 2026-11-01 (the product owner's yes): proxy mode for the controller's tools
+
+- **Why:** in a cloud session the only way out is an allowlisting HTTPS proxy, and there is no
+  DNS. The guarded fetcher looks names up itself and connects straight to the address it
+  checked, so from there every page was `robots_unreachable`.
+- **What:** the fetcher has a proxy mode, off by default. Each connection is a CONNECT tunnel
+  through a proxy named by an explicit flag (`--proxy URL`), and TLS is verified against the
+  CA bundle named by another (`--proxy-ca PATH`). Both are required together. Verification is
+  never turned off.
+- **What it gives up:** in proxy mode the proxy, not Careerwright, picks the address it
+  connects to. So the resolved-address check (decision 2's connect-time check of every
+  address a name resolves to) does not run. No name is looked up at all.
+- **What still runs:** every other guard. The URL checks (https or http only, no
+  credentials, ports 80 and 443, and no host that is `localhost`, single-label, a local
+  suffix, an encoded address or a private or reserved IP literal), every redirect checked by
+  the same rules, robots.txt fetched through the same tunnel, the source manifest's class
+  and admission, pacing, size and time limits, and redaction. A proxy's refusal of a CONNECT
+  is `connection_failed`, never retried, and never taken for the site's own status: a
+  refused robots.txt is unreachable, never a 4xx that would allow everything.
+- **Who may use it:** only the controller's tools that read pages (`tools.corpus`,
+  `tools.live_role_research`, `tools.accuracy_read`), in an environment whose egress is an
+  allowlisting proxy. Never the product: the restricted worker builds its fetcher without a
+  proxy, its settings refuse `CAREERWRIGHT_FETCH_PROXY` outright, the fetcher reads no proxy
+  from the environment, and no product module names proxy mode
+  (`tests/domain/test_fetch_proxy.py`).
+- **Evidence says so:** a tool's output carries `via_proxy` and `address_checked` fields. A
+  page fetched in proxy mode says `via_proxy: true, address_checked: false`, so no record
+  claims an address check that did not run.

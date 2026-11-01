@@ -18,6 +18,13 @@ every phase: the name lookup, each connect (at most `MAX_ADDRESSES` tried), ever
 write, TLS and the response's status line and headers. The response is bounded in
 redirects, size (decompressed size too) and content type. Failures are labels, classified
 from types and statuses only; no exception message or response body is kept.
+
+Proxy mode (`FetchProxy`; ADR 0009, 2026-11-01 amendment) is for the controller's tools
+alone, in an environment whose only way out is an allowlisting HTTPS proxy: each connection
+is a CONNECT tunnel through that proxy, and TLS is verified against the CA bundle it names.
+The proxy, not Careerwright, then picks the address it connects to, so the resolved-address
+check does not run (no name is looked up here); every other check stays. The product never
+selects it: the restricted worker builds its fetcher without one and its settings refuse one.
 """
 
 import ipaddress
@@ -30,6 +37,7 @@ import time
 import zlib
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin, urlsplit
 
@@ -56,6 +64,7 @@ ROBOTS_MAX_BYTES = 512_000  # RFC 9309: parse at least 500 KiB
 ROBOTS_CACHE_S = 600.0
 HTTP_ERROR = "http_error"  # the status itself is the failure's `http_status`
 MAX_ADDRESSES = 4  # tried in turn when a name resolves to several
+MAX_PROXY_REPLY = 8_192  # a CONNECT reply's status line and headers
 
 Resolve = Callable[[str, int], list[IPAddress]]
 # Called before the first request to each host of a page fetch, with the seconds left of its
@@ -75,6 +84,41 @@ class FetchLimits:
 
 
 DEFAULT_LIMITS = FetchLimits()
+
+
+@dataclass(frozen=True)
+class FetchProxy:
+    """An explicit HTTPS proxy reached in plain HTTP and spoken to only with CONNECT, and the
+    CA bundle that TLS through it is verified against. Built by `fetch_proxy`."""
+
+    host: str
+    port: int
+    ca_file: Path
+
+
+class ProxyConfigError(ValueError):
+    """A proxy URL or CA bundle that proxy mode cannot use. Its message never repeats the
+    URL, which may come from the environment."""
+
+
+def fetch_proxy(url: str, ca_file: Path) -> FetchProxy:
+    """Proxy mode's settings, checked: an `http://host:port` URL with no credentials, path,
+    query or fragment, and a CA bundle that is a readable file. TLS verification is never
+    turned off: the bundle is required."""
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError:
+        raise ProxyConfigError("the proxy URL does not parse") from None
+    if parts.scheme != "http" or not parts.hostname or port is None:
+        raise ProxyConfigError("the proxy URL must be http://host:port")
+    if parts.username is not None or parts.password is not None:
+        raise ProxyConfigError("the proxy URL may not hold credentials")
+    if parts.path not in ("", "/") or parts.query or parts.fragment:
+        raise ProxyConfigError("the proxy URL may hold only a host and a port")
+    if not ca_file.is_file():
+        raise ProxyConfigError("the proxy's CA bundle is not a file")
+    return FetchProxy(parts.hostname, port, ca_file)
 
 
 @dataclass(frozen=True)
@@ -120,6 +164,11 @@ class _AddressRefusedError(Exception):
 
 class _TooLargeError(Exception):
     pass
+
+
+class _ProxyRefusedError(Exception):
+    """The proxy answered CONNECT with a status other than 2xx (a policy denial, most
+    often): not retried."""
 
 
 def _resolve_within(resolve: Resolve, host: str, port: int, timeout: float) -> list[IPAddress]:
@@ -203,7 +252,9 @@ def system_resolve(host: str, port: int) -> list[IPAddress]:
 
 class _GuardedBackend(httpcore2.NetworkBackend):
     """Resolves at connect time, refuses the host if any answer is not allowed, and connects
-    to an address that passed; all within the deadline."""
+    to an address that passed; all within the deadline. In proxy mode it looks nothing up:
+    it opens a CONNECT tunnel to the host's name through the proxy, and `address` stays
+    None, since Careerwright never learns or checks the address the proxy chose."""
 
     def __init__(
         self,
@@ -211,13 +262,58 @@ class _GuardedBackend(httpcore2.NetworkBackend):
         allowed: Callable[[IPAddress, int], bool],
         deadline: float,
         clock: Callable[[], float],
+        proxy: FetchProxy | None = None,
     ) -> None:
         self._resolve = resolve
         self._allowed = allowed
         self._deadline = deadline
         self._clock = clock
+        self._proxy = proxy
         self._inner = httpcore2.SyncBackend()
         self.address: str | None = None
+
+    def _tunnel(
+        self,
+        proxy: FetchProxy,
+        host: str,
+        port: int,
+        timeout: float | None,
+        socket_options: Iterable[httpcore2.SOCKET_OPTION] | None,
+    ) -> httpcore2.NetworkStream:
+        """A CONNECT tunnel to `host:port` through the proxy, once it answers 2xx with
+        nothing after its headers."""
+        stream = _BoundedStream(
+            self._inner.connect_tcp(
+                proxy.host, proxy.port, timeout=self._within(timeout), socket_options=socket_options
+            ),
+            self._deadline,
+            self._clock,
+        )
+        try:
+            authority = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+            stream.write(
+                f"CONNECT {authority} HTTP/1.1\r\nHost: {authority}\r\n\r\n".encode("ascii"),
+                timeout,
+            )
+            reply = b""
+            while b"\r\n\r\n" not in reply:
+                if len(reply) > MAX_PROXY_REPLY:
+                    raise httpcore2.RemoteProtocolError
+                chunk = stream.read(MAX_PROXY_REPLY, timeout)
+                if not chunk:
+                    raise httpcore2.ConnectError
+                reply += chunk
+            head, _, rest = reply.partition(b"\r\n\r\n")
+            version, _, status = head.split(b"\r\n", 1)[0].partition(b" ")
+            code = status[:3]
+            if rest or not version.startswith(b"HTTP/1.") or not code.isdigit():
+                raise httpcore2.RemoteProtocolError
+            if not 200 <= int(code) < 300:
+                raise _ProxyRefusedError
+        except BaseException:
+            stream.close()
+            raise
+        return stream
 
     def _within(self, timeout: float | None) -> float:
         remaining = self._deadline - self._clock()
@@ -233,6 +329,8 @@ class _GuardedBackend(httpcore2.NetworkBackend):
         local_address: str | None = None,
         socket_options: Iterable[httpcore2.SOCKET_OPTION] | None = None,
     ) -> httpcore2.NetworkStream:
+        if self._proxy is not None:
+            return self._tunnel(self._proxy, host, port, timeout, socket_options)
         addresses = _resolve_within(self._resolve, host, port, self._within(timeout))
         if not addresses or not all(self._allowed(a, port) for a in addresses):
             raise _AddressRefusedError
@@ -445,7 +543,8 @@ def _content_type(value: str | None) -> tuple[str, str | None]:
 class Fetcher:
     """`extra_allowed` names (host, port) origins that the address and port checks let
     through: only the controlled test server's, never set in production (`careerwright.acquisition`
-    constructs this with none)."""
+    constructs this with none). `proxy`: proxy mode, for the controller's tools only (the
+    module's docstring); never set in production either."""
 
     def __init__(
         self,
@@ -455,6 +554,7 @@ class Fetcher:
         user_agent: str,
         extra_allowed: frozenset[tuple[str, int]] = frozenset(),
         clock: Callable[[], float] = time.monotonic,
+        proxy: FetchProxy | None = None,
     ) -> None:
         self._resolve = resolve
         self.limits = limits
@@ -462,8 +562,16 @@ class Fetcher:
         self._extra_allowed = extra_allowed
         self._ports = ALLOWED_PORTS | {port for _, port in extra_allowed}
         self._clock = clock
-        self._ssl = ssl.create_default_context(cafile=certifi.where())
+        self._proxy = proxy
+        # Verification stays on in both modes; proxy mode trusts its own bundle instead.
+        cafile = str(proxy.ca_file) if proxy is not None else certifi.where()
+        self._ssl = ssl.create_default_context(cafile=cafile)
         self._robots: dict[str, tuple[float, RobotsRules]] = {}
+
+    @property
+    def via_proxy(self) -> bool:
+        """Whether this fetcher is in proxy mode, where no resolved address is checked."""
+        return self._proxy is not None
 
     def check(self, url: str) -> CheckedUrl | UrlRefusal:
         """`addresses.check_url` with this fetcher's ports."""
@@ -501,7 +609,9 @@ class Fetcher:
         checked against its origin's robots.txt first."""
         requested = checked.url
         redirects: list[str] = []
-        backend = _GuardedBackend(self._resolve, self._address_allowed, visit.deadline, self._clock)
+        backend = _GuardedBackend(
+            self._resolve, self._address_allowed, visit.deadline, self._clock, self._proxy
+        )
         with httpcore2.ConnectionPool(
             ssl_context=self._ssl,
             network_backend=backend,
@@ -654,6 +764,8 @@ class Fetcher:
             )
         except _TooLargeError:
             return failed("too_large")
+        except _ProxyRefusedError:
+            return failed("connection_failed")  # the proxy's refusal: not retried
         except (
             httpcore2.ConnectTimeout,
             httpcore2.ReadTimeout,

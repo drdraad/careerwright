@@ -24,6 +24,10 @@ snippet slots, Task 7b): through `make live-adzuna`'s own path (`tools.live_adzu
 the product's adapter, the `live-adzuna` scope's cap, a ledger row at $0, the leak scan), its
 class the manifest's job board, so only its hash and the claims' excerpts (JSON pointers).
 
+`--proxy URL --proxy-ca PATH` (both modes) fetch through an explicit HTTPS proxy
+(`tools.fetch_proxy`): the proxy then picks each address, so the record says `via_proxy`
+true and `address_checked` false; every other check runs as above.
+
 Run from `backend/`: `uv run --locked python -m tools.corpus --slot J12 --url https://...`
 or `... --slot J03 --adzuna "bookkeeping assistant" Leeds`.
 """
@@ -52,9 +56,10 @@ from careerwright.evidence.sources import (
     PageRights,
     classify_page,
     is_listed,
-    load_manifest,
     retention,
 )
+from tools.fetch_proxy import add_arguments as add_proxy_arguments
+from tools.fetch_proxy import fetcher_from, route_fields
 from tools.live_adzuna import Acquire, AdzunaSettings, missing_credentials, search
 from tools.localenv import REPO_ROOT
 from tools.usage_ledger import Ledger
@@ -142,6 +147,10 @@ class _Witness(Fetcher):
     def check(self, url: str) -> CheckedUrl | UrlRefusal:
         return self._inner.check(url)
 
+    @property
+    def via_proxy(self) -> bool:
+        return self._inner.via_proxy
+
     def fetch_page(self, url: str, admit: Admit | None = None) -> Fetched | FetchFailure:
         result = self._inner.fetch_page(url, admit)
         if isinstance(result, Fetched):
@@ -194,7 +203,7 @@ def acquire_for_corpus(
         directory.mkdir(parents=True, exist_ok=True)
         body_path = directory / f"{result.content_sha256}.html"
         body_path.write_bytes(base64.b64decode(result.body_b64))
-    out = record(result)
+    out = record(result) | route_fields(fetcher)
     shown = body_path and (
         body_path.relative_to(REPO_ROOT) if body_path.is_relative_to(REPO_ROOT) else body_path
     )
@@ -224,7 +233,7 @@ def adzuna_for_corpus(
         credentials, ledger, (query,), acquire=acquire, fetcher=fetcher, purpose=f"corpus {slot}: "
     )
     [result] = searched.results
-    out = record(result)
+    out = record(result) | route_fields(fetcher)
     out["total_matching"] = result.total
     out["kept_body"] = None
     out["leak_scan"] = {"cells": searched.cells, "findings": searched.findings}
@@ -248,7 +257,9 @@ def main(argv: list[str] | None = None) -> None:
         metavar="EXCERPT",
         help="a label's excerpt to locate in the hashed text (repeat for each)",
     )
+    add_proxy_arguments(parser)
     args = parser.parse_args(argv)
+    fetcher = fetcher_from(args, parser)
     if args.adzuna:
         if args.rights_class or args.terms:
             parser.error("an Adzuna search takes the manifest's class: no --rights-class")
@@ -258,9 +269,10 @@ def main(argv: list[str] | None = None) -> None:
             sys.exit(2)
         what, where = args.adzuna
         query = AdzunaQuery(what=what, where=where, results_per_page=ADZUNA_RESULTS)
-        out = adzuna_for_corpus(args.slot, query, (settings.app_id, settings.app_key), Ledger())
+        out = adzuna_for_corpus(
+            args.slot, query, (settings.app_id, settings.app_key), Ledger(), fetcher=fetcher
+        )
     else:
-        fetcher = Fetcher(user_agent=load_manifest().user_agent)
         out = acquire_for_corpus(
             args.slot,
             args.url,
