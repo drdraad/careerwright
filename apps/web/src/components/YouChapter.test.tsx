@@ -557,6 +557,30 @@ describe("[UI-06][UI-04] one idea per view: the conversation, what we know and t
   });
 });
 
+describe("[STATE-09] a reply typed while the last one is on its way is kept", () => {
+  it("clears only the words that were sent, never a newer message typed meanwhile", async () => {
+    let release: (value: unknown) => void = () => {};
+    const held = new Promise((resolve) => {
+      release = resolve;
+    });
+    fakeApi(
+      routes({ preferences: prefs("unsure"), turns: [] }, [
+        { method: "POST", path: /\/interview\/turns$/, status: 202, answer: () => held },
+      ]),
+    );
+    const user = renderYou();
+
+    const field = await screen.findByLabelText("Reply to Careerwright");
+    await user.type(field, "What next?");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.clear(field);
+    await user.type(field, "Skip"); // typed before the first send has answered
+    await act(async () => release(turn("queued")));
+
+    await waitFor(() => expect(field).toHaveValue("Skip")); // the newer words are kept
+  });
+});
+
 describe("[UI-06] moving between the views keeps what the person typed or chose", () => {
   it("keeps a typed reply, the tray's choices, the answer form's edits and the slate's picks", async () => {
     // App review I1: each view unmounted when another opened, and took these with it.

@@ -470,7 +470,9 @@ export function Conversation({
 
   const send = async (text: string) => {
     const sent = await sender.send({ expected_profile_version: profile.version, message: text });
-    if (sent && text === message.trim()) setMessage("");
+    // Compared with the field as it is now, not as it was at send: words typed while this
+    // message was on its way are the person's next message and are kept.
+    if (sent) setMessage((current) => (current.trim() === text ? "" : current));
   };
 
   const shown = showEarlier ? turns : turns.slice(-EARLIER_SHOWN);
