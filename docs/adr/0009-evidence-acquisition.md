@@ -648,3 +648,18 @@ manifest and the rights policy) are unchanged.
 - **The role-description schema is deferred**, with its reasons in ADR 0015's Task 6e line: it
   doesn't fit the per-role bound. No workflow's step sequence changed: DBOS
   `application_version` stays `careerwright-l0-1`.
+
+## Amendment line, Task 6e fix round 1 (2026-11-01): role pages apart from job sources
+
+- **Decision 6 for role pages:** copies of one advert fold by any passage around the title and
+  sources are compared by registrable domain (ADR 0015's fix round line; migration 0043).
+- **A role page is never a job source:** coverage, the Jobs chapter's empty reason, the join of
+  a URL in flight and its back-off read only attempts whose target carries no role title
+  (`store._not_a_role_page`), so a person who never searched for jobs still reads "no source
+  checked".
+- **Receipts:** the role research commands' plaintext receipts hold the research's ID only (its
+  title may be a model's idea, its pages a model's proposals); the answer is read again.
+- **`make live-role-research`** ledgers its one paid call as soon as it returns, before any page
+  is read, and prints the pages' results with the row's number. It reads pages in its own
+  process, which holds the Meta key, not through the restricted worker's service: its evidence
+  covers the code that reads and checks pages, not that deployment boundary.

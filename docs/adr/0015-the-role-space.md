@@ -423,3 +423,31 @@ Decisions 1 to 3's fourth layer is built (S2.9; `careerwright.evidence.role_rese
   counts as a second source unless its structured data says it is the same job; a title shown
   only in a page's navigation or a list of links still counts as the page using it; the search's
   quality for role pages is unqualified until the controller's live run.
+
+## Amendment line, Task 6e fix round 1 (2026-11-01): copies, sites, hidden text, lists
+
+- **Copies fold by any passage around the title** (review I1; migration 0043,
+  `role_page_checks.passages`). At each of the title's first 16 places on a page, the title with
+  the 24 words after it and the 24 words before it with the title are fingerprinted (a side
+  with fewer than 8 words, where the text ends, is not; a place with neither stands for the
+  whole text). Two pages sharing any fingerprint are copies. A page's `<title>`, navigation and
+  footer name the title too, but the advert's body still shares its passage, so they never make
+  two copies differ.
+- **One site is one source:** pages are compared by registrable domain (`corroboration.site`:
+  the last two labels, or three under a UK two-level suffix such as `co.uk` or `gov.uk`), so
+  `www.` and `careers.` of one domain are one site. Two pages of one site are still two
+  sources only when each names a different employer.
+- **Both err towards "not yet found":** two independent pages that share 24 words around the
+  title (a shared template's words included), or two sites under another country's two-level
+  suffix, count once. That replaces the earlier limit "a copy reworded around the title counts
+  twice" only in part: a copy reworded on both sides of every mention still counts twice unless
+  its structured data says it is the same job.
+- **Visible text is what a reader sees:** `pages.role_text` leaves out `<script>`, `<style>`,
+  `<noscript>`, `<template>`, elements marked `hidden`, and elements styled `display: none` or
+  `visibility: hidden` in their own `style` attribute (style sheets are not read: a title hidden
+  by a style sheet's class still counts).
+- **"Titles no list holds" lists only those:** the role and each target carry `on_a_list`
+  (ESCO as its title or a label, the UK job-title index, or the option pack by the target's own
+  title). A title Careerwright thought of stays its idea once made a target.
+- **A role page is no job source:** the Jobs chapter's coverage, its empty reason, a job
+  request's join and its back-off leave out every attempt whose target carries a role title.
