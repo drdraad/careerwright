@@ -212,3 +212,135 @@ Pack 0.3.0 (unpublished) was changed in place and re-pinned:
 
 Skip the generated files: `england-option-pack-0.3.0.json` and
 `school-leaver-pack-questions.md` (both checked by tests against the tool's output).
+
+## Second half (2026-11-01)
+
+**Status: DONE.** Branch `wt-7f` (worktree `/home/user/careerwright-wt/7f`), rebased onto
+`claude/confident-ramanujan-ux3saw` (5b56005; no conflict). Head `ac16d6e`.
+
+### Hand-off to Task 12b
+
+| What | Version | SHA-256 |
+|---|---|---|
+| England option pack (reviewed) | `0.4.0` | `d005713b404bcbe911ee9c2d4e7d0c9f9117013e059159d75a82487fcc01b3c8` |
+
+Pin with `load_pack("0.4.0")`. Only `reviewed` records hold reviewed values. No capability
+reference is written for 0.4.0, so the capability model's pin (pack 0.2.0 with reference
+0.2.0) is unchanged; if 12b needs the capability model on 0.4.0 it needs a reference 0.4.0
+(the same gap as 0.3.0's).
+
+### Commits
+
+1. `e7b0916` Publish option pack 0.4.0: the school-leaver pack session's review of 0.3.0.
+2. `ac16d6e` Register: OPTN-14 verified, the school-leaver parts of OPTN-10, TEST1-09 and
+   H-07, the session held (after the rebase).
+
+### What changed
+
+- **Why 0.4.0, not 0.3.0.** ADR 0011: a committed version never changes, and a review is a
+  new version. 0.3.0 is committed, merged into the integration branch, and named by the
+  session's question sheet (its question numbers are generated from it). Changing it in
+  place would break the sheet the record answers. So 0.3.0 stays byte-identical and the
+  review is 0.4.0, as session 2's review of 0.1.0 was 0.2.0.
+- **Built, not edited.** `backend/tools/school_leaver_review.py` reads the record
+  (`docs/reviews/school-leaver-pack-session.md`): every row's answer from its "Every row"
+  list, and it refuses to build unless the ruling and the product owner's answers appear
+  word for word. Each record's rows come from 0.3.0's own sheet (`package_rows`), with Q115
+  as `offering:C08`. Published by `tools.option_pack_files --pack`; a fast test checks the
+  committed file is the tool's output.
+- **Result:** 62 of 129 records reviewed, 67 proposed, none left out. 579 claims (6 added,
+  3 left out: `F12.rates_change`, `F04.employer_share`, `F04.timing`).
+  - Reviewed (reviewer "an AI check, counted as the product owner's review by their ruling
+    of 2026-11-01", with ", and the product owner's own answers" where one of theirs
+    applies; 2026-11-01; "the school-leaver pack session (2026-11-01)"): `funding:F05`,
+    `funding:F05.maintenance`, `funding:F10`, `funding:F12`, `funding:F12.maintenance`,
+    `option:C11`, `offering:C11`.
+  - `offering:C08` stays reviewed, its review now naming session 2's rows and Q115 (the
+    product owner's own answer).
+  - `funding:F04` stays proposed (Q101 undecided), with Q104's correction applied.
+  - `funding:F02` keeps session 2's state and review; its decision now ends "The
+    school-leaver pack session (2026-11-01): Q1-Q8, Q116 yes."
+- **Corrections** (each a span-cited claim whose note names the question and the product
+  owner's answer):
+
+| Row | Record | New claim | Span | Value |
+|---|---|---|---|---|
+| Q75 | funding:F12 | `F12.rates_change.tuition_total` (replaces `F12.rates_change`) | F12 56626–56820, kept body, count 1 | the £39,160 total is based on current rates and may change over time |
+| Q95 | funding:F12.maintenance | (none: `F12.rates_change` dropped from its facts) | — | no "may change" on £15,415 |
+| Q104 | funding:F04 | `F04.employer_share.non_levy` (replaces `F04.employer_share`) | F04 6006–6103, count 2; note cites the heading 5570–5611 | 5% where the employer does not pay the levy, for all other apprentices |
+| Q104 | funding:F04 | `F04.employer_share.levy` | F04 9187–9243, count 2; note cites 8652–8686 and 8818–8950 | 25% where it pays the levy and has used all its funds, for all other apprentices |
+| Q110 | offering:C11 | `C11.started`, `C11.providers_listed` (facts); intake unknown with the review's reason | C11 5245–5279 and 5454–5508, count 2 each | "T Levels started in September 2020"; providers "from September 2025" |
+| Q115 | offering:C08 | `C12.application_deadline` (`application_deadline`; `source_ids: ["C12"]`) | C12 119808–120006, count 1 | 2027-01-13 |
+
+  - Q101 (undecided): `funding:F04.timing` is unknown, its reason the review's words (the
+    page says the government pays the provider directly only for the 95% share).
+  - The C12 excerpt runs from "13 Jan" to "...most undergraduate courses" (198 characters,
+    mostly markup): the shortest span holding both the date and the step it belongs to. It
+    was cut from the contexts the controller's two C12 fetches located (same SHA-256), and
+    a test checks it against them. Its note cites the "2027 entry application deadlines"
+    heading (114524–114556) and F12's priority additional entitlement list naming nursing
+    (66326–66395, 66458–66465), each checked by a test.
+- **Format.** `Offering.source_ids` (optional, default empty, left out when empty): an
+  offering may cite a claim from a further page it names. The validator checks every named
+  page exists. Every earlier version parses and writes byte for byte as before, and
+  `format_version` stays 1. The schema is regenerated. ADR 0011 amendment.
+- **UCAS's page (C12)** joins the pack and the manifest's slots: class `other`, retention
+  excerpts, rights status "permitted: short quotes as evidence, never the body (the product
+  owner's rights decision, 2026-11-01, ...)". Template family `ucas-dates-and-deadlines`,
+  course group 8 by the split rule, so holdout. Its body is not kept anywhere.
+- **Manifest 0.7.0 and README:** the reviewed version; every slot's labels now in 0.4.0;
+  each school-leaver slot's `label_review` counts its accepted records; C12 moved from
+  `pending_slots` (now empty) to the slots; 12 course pages collected; F04's `why`
+  corrected; OI-07 records C12's decision (C08 stays open); OI-14 keeps only the
+  apprentice's fee, and notes Q101.
+- **Register (last commit, after the rebase):** OPTN-14 verified; the Task 7f parts of
+  OPTN-10 and TEST1-09; H-07's school-leaver part; the school-leaver pack session row
+  "held".
+- **Tests:** `backend/tests/tools/test_school_leaver_review.py` (new: tool output and pin;
+  earlier pins; every row answered once; reviewed only when every row is yes or decided;
+  F02 kept; nothing else changed; each correction; the C12 deadline and rights; kept-body
+  and located-text checks; the manifest). `tests/domain/test_option_pack.py`: two format
+  tests and the manifest test moved to 0.4.0. `tests/tools/test_school_leaver_pack.py`: its
+  two manifest assertions about C12 as pending replaced (C12 left `pending_slots`); its
+  pack assertions about 0.3.0 unchanged.
+
+### Rulings
+
+1. **0.4.0, a new version** (above).
+2. **A product owner's approved correction counts as a yes** (the dispatch's reading of the
+   partial-record rule). Unlike session 2's agent-applied corrections, they decided the
+   corrected value itself.
+3. **Q101 makes `funding:F04.timing` unknown** and drops its claim: the record says the row
+   "stays unknown", and an undecided value is not served (7c's amended rule for "?").
+4. **The reviewer string** for records with one of the product owner's own answers adds
+   "and the product owner's own answers"; `offering:C08`'s reviewer stays "the product
+   owner" (session 2's adopted rows plus their own Q115).
+5. **`offering:C08.as_of` stays 2026-10-29** (its own page's retrieval); C12 carries its own
+   retrieval time.
+6. **F12's nursing span is cited in the C12 claim's note, not as a new F12 fact,** so no
+   unreviewed value enters a reviewed record (7c's precedent for a note citing a lead-in).
+
+### Checks
+
+- TDD: the two new format tests ran against the code without the change (option_pack.py
+  stashed): 2 failed. With it: passed. The pack tests were written after the tool (the pack
+  is generated output); each asserts the record's effect, not the tool's internals.
+- `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check`, Node 24 on PATH, on the final
+  rebased code: passed. Backend 2,182 passed, 9 skipped; Vitest 472 passed; ruff, mypy,
+  Biome, `tsc`, the fixture validator and the client-drift check passed.
+- The kept-body checks ran here (the `var` link) and passed; the C12 check ran against the
+  controller's fetch records in `planning/`.
+- `make acceptance`: not run (the controller runs acceptance).
+- No web request, no live call (cost $0), no Docker.
+
+### Concerns
+
+- One process slip: I made one small fix to `backend/tools/school_leaver_review.py` (the
+  C11 span offsets and two cleanups) with a short Python edit script instead of the Edit
+  tool. The result was then checked by the tests and lint like everything else.
+- The capability reference gap for 0.4.0 (above) is Task 12b's to decide.
+
+### For the reviewer
+
+Skip the generated files: `england-option-pack-0.4.0.json` and
+`england-option-pack.schema.json` (both checked by tests against the tools' output).
