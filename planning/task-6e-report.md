@@ -294,3 +294,72 @@ request, no Docker. Migration **0043** (`r0043_role_page_passages.py`, `down_rev
 - On a replay, the research commands answer with today's state, not the first answer's.
 - The API's refusal doesn't include option pack titles; the web's list does.
 - Listed for later (not done): M4, M5 (a session W2 question), M10, M11.
+
+## Follow-up: unread pages
+
+Worktree `/home/user/careerwright-wt/6e-unread`, branch `wt-6e-unread`, rebased onto
+`claude/confident-ramanujan-ux3saw` (0179b65). Commits: 081f514 (the fix), 4480d12 (ADR 0015
+line and register row, last).
+
+### The trace (step 1)
+- The product: `role_research._pages` gave `corroborate` only the pages with a recorded title
+  check. Only a successful read records one (`acquisition._record_role_page`). Blocked, failed
+  and untried pages were dropped silently.
+- The acquisition workflow carries on past a failed page and publishes, so the reading run
+  ends `complete` even when every page failed. The view then said `not_yet_found` with
+  `not_on_any_page`, the same bug as ledger row 44. The web showed "None of the pages
+  Careerwright read uses the title word for word" next to "5 pages couldn't be read": a
+  contradiction.
+- Some failed: the same wrong reason, plus the unread count.
+- None proposed: the product says `no_pages` (and `start_reading` refuses), so `corroborate` is
+  never reached. The live tool, though, called `corroborate([])` and printed `not_on_any_page`
+  for an empty list.
+- A failed or cancelled reading with nothing verified was already `reading_stopped`, with no
+  reason. That is unchanged.
+
+### What changed
+- `evidence/corroboration.py`: `corroborate(pages, *, unread=0)`. `Corroboration.unread` is new.
+  A new reason, `pages_unread`: no page read shows the title, and at least one page couldn't be
+  read. `not_on_any_page` now needs every page read. One verified source with unread pages
+  stays `one_source_only`, and the count is kept. No pages and no unread raises `ValueError`:
+  that isn't a result.
+- `evidence/role_research.py`: `unread` is the number of targets with no check. The state
+  comment no longer says "every page read".
+- `tools/live_role_research.py`: the printed notes carry `unread`. With no page to read, the
+  verdict is `null` with reason `no_pages`.
+- API: the enum gains `pages_unread` and the field description says what each reason means.
+  The client was regenerated (`pnpm run generate`): only an enum value and a description.
+- Web: `ROLE_RESEARCH.notYetFound.pages_unread` = "Careerwright couldn't read every page the
+  search found, so it can't say yet." It shows above the existing unread count ("5 pages
+  couldn't be read, so they aren't counted either way.").
+- ADR 0015: one line under "The rule". Register: the DIV1-15 row's evidence column.
+- No migration: the reason is computed when read, and no stored CHECK lists it.
+
+### Rulings
+- One reason code covers both "none read" and "some read". The count (the API's pages with
+  `title_verified` null, which the web already counts) says how many. Separate codes would add
+  nothing the count doesn't already show.
+- `unread` defaults to 0 so the existing domain tests keep their meaning. Both product callers
+  pass it.
+
+### Checks
+- RED: the four new or changed domain tests failed before the fix (`4 failed, 45 passed`). The
+  live-tool and web tests were written beside the fix and not run before it (not shown RED).
+  GREEN after:
+  `tests/domain/test_role_research.py tests/tools/test_live_role_research.py`, 52 passed.
+- Web: `RoleResearch.test.tsx`, 11 passed (new: "never says the pages lack the title when it
+  couldn't read them").
+- `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` (final code, after the rebase):
+  ruff and mypy clean, backend 1,860 passed and 8 skipped, fixture validator passed, the client
+  matches, Biome and `tsc` clean, Vitest 468 passed.
+- Integration (new parametrized
+  `test_a_page_that_could_not_be_read_is_never_a_page_without_the_title`: every page read, none
+  read, one of two read, with 404 pages as the failures) and acceptance: not run, because the
+  controller runs them.
+- Live calls: none ($0).
+
+### Concerns
+- The integration test assumes a 404 page is a non-transient `http_error` and the run still
+  completes. That is what `fetcher.py` and `evidence/workflow.py` do, but it hasn't been run
+  here.
+- Generated paths to skip: `apps/web/src/generated/`.
