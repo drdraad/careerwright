@@ -13,42 +13,57 @@ architectural), and continue. Stop and report BLOCKED only for a genuine blocker
 ## Your job
 1. Implement the slice the brief names, completely, to a production standard. Use TDD
    for domain logic (failing test first). Keep files focused; one responsibility each.
-2. Verify by execution. Run the focused tests while iterating; run the task's full
-   relevant checks (`make check`, `make acceptance` once they exist) once before your
-   final commit. Test output should be clean (no stray warnings).
-3. Commit coherent increments on branch `l0-local-release` (messages end with
+2. Verify by execution. Run the focused tests while iterating, and
+   `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` (Node 24 on PATH:
+   `export PATH=/opt/node24/bin:$PATH;`) after each change and once before your final
+   commit. The controller runs `make acceptance` once per batch; report it as "not run: the
+   controller runs acceptance". Test output should be clean (no stray warnings).
+3. Commit coherent increments on the branch your dispatch names (messages end with
    `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`). Never push.
 4. Update `docs/requirements-register.md` rows your work closes (once it exists).
 5. Self-review your own diff (completeness, names, YAGNI, tests that assert real
    behaviour, no secrets, no masked failures) and fix what you find.
 
-## Parallel work (from 2026-10-31, the product owner: "Where subagent work can be done
+## This machine and parallel work (from 2026-10-31, the product owner: "Where subagent work can be done
 ## cleanly in parallel, do so but coordinate well to avoid them causing conflicts")
-Up to three implementers may run at once (R16): one in the main tree, up to two in worktrees.
-Your dispatch says which tree is yours:
-- **The main tree** (`/Users/darianraad/Code/careerwright`, branch
-  `l0-local-release`): commit with a pathspec (`git commit -- <paths>`), never `git add -A`
-  or `git commit -a`; another agent's files may be changing beside yours.
-- **A worktree** (its path and branch are in your dispatch): work and commit only there.
-  Before your final report, rebase your branch onto the current `l0-local-release`
-  (`git rebase l0-local-release`; the worktree shares the repository). On a conflict in
-  `apps/web/src/generated`, regenerate (`pnpm run generate`) instead of hand-merging. If you
-  added a migration and another landed with the same revision number, renumber yours to the
-  next free one. Re-run `make check` after the rebase. The controller fast-forwards
-  `l0-local-release` to your branch; you never touch `l0-local-release` yourself.
+Up to four implementers may run at once (R12–R17 in the sprint tasks file, today's rules):
+one in the main tree, up to three in worktrees, on disjoint files. This machine is a Linux
+cloud container; its note is `planning/env-cloud.md`. Your dispatch says which tree is yours:
+- **The main tree** (`/home/user/careerwright`, integration branch
+  `claude/confident-ramanujan-ux3saw`): commit with a pathspec (`git commit -- <paths>`),
+  never `git add -A` or `git commit -a`; another agent's files may be changing beside yours.
+- **A worktree** (`/home/user/careerwright-wt/<id>`, branch `wt-<id>`; both are in your
+  dispatch): work and commit only there. Before your final report, rebase your branch onto
+  the current `claude/confident-ramanujan-ux3saw`
+  (`git rebase claude/confident-ramanujan-ux3saw`; the worktree shares the repository). On a
+  conflict in `apps/web/src/generated`, regenerate (`pnpm run generate`) instead of
+  hand-merging. If you added a migration and another landed with the same revision number,
+  renumber yours to the next free one. Re-run `make check` after the rebase. The controller
+  fast-forwards `claude/confident-ramanujan-ux3saw` to your branch; you never touch it
+  yourself.
 - **Shared files:** `docs/requirements-register.md` and `docs/plan/*` change only in your
   last commit, after the rebase, and only the rows or lines your work closes.
-- **Checks (R16, the product owner's speed rules):** run `make check` after each change, and
-  `make acceptance` only once, at the end of your piece (after its fix round, if any). A
-  flaky failure is re-run once; a second failure is reported as a finding.
-- **One full acceptance run at a time** (its Compose projects and ports are fixed). Before
-  `make acceptance`, take the lock: `mkdir /Users/darianraad/Code/careerwright/.superpowers/acceptance.lock`
+- **Checks (R16 and R17, the product owner's speed rules):** run
+  `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` after each change (the
+  container exports both Adzuna variables and one test reads the process environment; never
+  print either value). The controller runs `make acceptance` once per batch of integrated
+  pieces or halves. A flaky failure is re-run once; a second failure is reported as a
+  finding.
+- **Docker and the network:** never start Docker, pull or build images; the controller does
+  (`planning/cloud-build-images.sh`). Make no web requests and no live calls: the controller
+  makes every one.
+- **One full acceptance run at a time** (its Compose projects and ports are fixed). If your
+  dispatch asks you for a focused stack or integration test run, or for `make acceptance`,
+  take the lock first: `mkdir /home/user/careerwright/.superpowers/acceptance.lock`
   (it fails if another agent holds it). Remove it with `rmdir` the moment your run ends,
   pass or fail. Take and release it in one guarded command, so you can only ever remove a
   lock you took: `mkdir <lock> && { make acceptance; rc=$?; rmdir <lock>; exit $rc; }`.
   Never chain a run after a failed `mkdir` with `;`. Never remove a lock you didn't take,
   and never recreate one. The same applies to any focused stack or integration test run. If the lock is held, do other work and try again later; if it is still
   held at the end, report "make acceptance not run: lock held" and the controller runs it.
+  The acceptance journeys run on the machine's own Chromium:
+  `CAREERWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium`; never reinstall Playwright's
+  browsers here.
 - Never stop, reset or remove another project's containers or volumes, and never run
   `make stop` (it stops the product owner's stack).
 
