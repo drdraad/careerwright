@@ -1,7 +1,8 @@
 """The Skills chapter's facts (Task 10, backend half; MAP1-01, ASSESS-03, RDY1-03, PROF-13,
-STATE-11; ADR 0012 as amended): readiness only where a reviewed rubric exists, "not part of
-my job" never evidence, an expected qualification never met, and the person's chosen advert
-spans checked against their own text."""
+STATE-11; ADR 0012 as amended): readiness wherever a rubric models the target, with the
+rubrics' review state (a draft checklist says so), "not part of my job" never evidence, an
+expected qualification never met, and the person's chosen advert spans checked against their
+own text."""
 
 import hashlib
 import uuid
@@ -27,7 +28,13 @@ from careerwright.capability.matrix import (
     RubricView,
     build_matrix,
 )
-from careerwright.capability.readiness import Assessment, ReadinessState, assess
+from careerwright.capability.readiness import (
+    Assessment,
+    PrimaryAction,
+    Qualification,
+    ReadinessState,
+    assess,
+)
 from careerwright.capability.reference import PINS as REFERENCE_PINS
 from careerwright.capability.reference import reference_path
 from careerwright.capability.skills import (
@@ -115,7 +122,7 @@ def test_skills_reads_the_reviewed_pack_0_2_0_and_its_reference_through_their_pi
     assert hashlib.sha256(reference_bytes).hexdigest() == REFERENCE_PINS["0.2.0"]
 
 
-# --- readiness only where a reviewed rubric exists ---------------------------------------
+# --- readiness wherever a rubric models it, with its review state ------------------------
 
 
 @pytest.mark.req("RDY1-03", "ASSESS-03", "MAP1-09")
@@ -124,7 +131,7 @@ def test_a_target_outside_the_pack_is_not_assessed_and_shows_what_esco_lists() -
 
     assert found.assessment_state is SkillsAssessmentState.NOT_ASSESSED
     assert found.not_assessed_reason is NotAssessedReason.NO_RUBRIC
-    assert found.readiness is None
+    assert (found.readiness, found.rubric_review) == (None, None)
     assert found.seed is SeedState.ESCO_OCCUPATION
     assert [(s.label, s.relation) for s in found.esco_listed] == [
         ("SQL", "essential"),
@@ -143,22 +150,9 @@ def test_none_of_these_is_my_job_means_no_esco_list_and_never_a_readiness_result
     assert facts(outside_the_pack(None)).seed is SeedState.NO_OCCUPATION
 
 
-@pytest.mark.req("RDY1-03", "OPTN-08")
-@pytest.mark.parametrize(
-    ("target", "reason"),
-    [
-        ("data-quality-analyst-manchester", NotAssessedReason.RUBRICS_NOT_REVIEWED),
-        ("it-support-technician-bristol", NotAssessedReason.RUBRICS_NOT_REVIEWED),
-        ("bookkeeping-assistant-leeds", NotAssessedReason.RUBRICS_NOT_REVIEWED),
-        # Only the registration gate is required: no rubric, so never a readiness result.
-        ("registered-nurse-manchester", NotAssessedReason.NO_RUBRIC),
-    ],
-)
-def test_no_pack_target_is_assessed_while_its_rubrics_are_proposed(
-    target: str, reason: NotAssessedReason
-) -> None:
+def pack_matrix(target: str) -> Matrix:
     pack_target = next(t for t in PACK.targets if t.target_id == target)
-    matrix = build_matrix(
+    return build_matrix(
         pack_target.title,
         pack=PACK,
         reference=REFERENCE,
@@ -168,17 +162,91 @@ def test_no_pack_target_is_assessed_while_its_rubrics_are_proposed(
         synthetic=False,
     )
 
+
+@pytest.mark.req("RDY1-03", "OPTN-08", "OPTN-09")
+@pytest.mark.parametrize(
+    "target",
+    [
+        "data-quality-analyst-manchester",
+        "it-support-technician-bristol",
+        "bookkeeping-assistant-leeds",
+    ],
+)
+def test_a_pack_target_on_draft_rubrics_is_assessed_and_says_its_rubrics_are_proposed(
+    target: str,
+) -> None:
+    # The product owner's answer (2026-11-01): show the result, labelled a draft checklist.
+    matrix = pack_matrix(target)
+
     found = facts(matrix)
 
-    assert found.assessment_state is SkillsAssessmentState.NOT_ASSESSED
-    assert found.not_assessed_reason is reason
-    assert found.readiness is None
+    assert found.assessment_state is SkillsAssessmentState.ASSESSED
+    assert found.not_assessed_reason is None
+    assert found.rubric_review == "proposed"
+    assert found.readiness == current(matrix)  # the same result `/readiness` gives
+    assert found.readiness is not None
+    assert Qualification.PROPOSED_RUBRICS in found.readiness.qualifications
+    # No evidence yet: unknown is never met, and the target is never ready.
+    assert found.readiness.state not in {
+        ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS,
+        ReadinessState.INSUFFICIENT_COVERAGE,
+    }
     # What it asks: every required row, its review state and its pack records' date (R9).
     assert {r.row_id for r in found.requirements} == {r.row_id for r in matrix.rows if r.required}
     assert all(r.review_state == "proposed" for r in found.requirements)
     # Its records' retrieval date, never the pack's date and never "current".
     assert {r.as_of for r in found.requirements} == {date(2026, 10, 29)}
     assert all(r.gate.protected for r in found.requirements if r.gate is not None)
+
+
+@pytest.mark.req("RDY1-03", "RDY1-04", "OPTN-08")
+def test_the_nurse_target_with_only_its_registration_gate_is_still_not_assessed() -> None:
+    # Only the registration gate is required: no rubric, so never a readiness result.
+    found = facts(pack_matrix("registered-nurse-manchester"))
+
+    assert found.assessment_state is SkillsAssessmentState.NOT_ASSESSED
+    assert found.not_assessed_reason is NotAssessedReason.NO_RUBRIC
+    assert (found.readiness, found.rubric_review) == (None, None)
+
+
+@pytest.mark.req("RDY1-03", "OPTN-09")
+def test_p05_apply_now_shows_in_skills_labelled_as_resting_on_draft_rubrics() -> None:
+    # The review's P05 case: `/readiness` says apply now, and Skills now agrees.
+    matrix = pack_matrix("bookkeeping-assistant-leeds")
+    evidence = []
+    for row_id in (
+        "pack:bookkeeping-assistant-leeds:reconciliation",
+        "pack:bookkeeping-assistant-leeds:records",
+    ):
+        row = matrix.row(row_id)
+        assert row is not None
+        assert row.rubric is not None
+        evidence.append(self_report(row.subject, 2, row.rubric.version_id))
+    work = [statement("gate:uk-right-to-work", Holding.HELD, verified=True)]
+    assessment = assess(
+        matrix, evidence=evidence, statements=work, outcomes=OUTCOMES, evidence_version=1
+    )
+
+    found = target_skills(
+        matrix,
+        assessment,
+        none_of_these=False,
+        marks=frozenset(),
+        details_version=0,
+        examples=[],
+        qualifications=[],
+        keys={},
+    )
+
+    assert found.assessment_state is SkillsAssessmentState.ASSESSED
+    assert found.rubric_review == "proposed"
+    assert found.readiness == assessment
+    assert found.readiness.state is ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS
+    assert found.readiness.primary_action is PrimaryAction.REVIEW_CURRENT_POSTINGS_AND_APPLY
+    # Never unqualified: the draft rubrics and the proposed records are named.
+    assert {Qualification.PROPOSED_RUBRICS, Qualification.PROPOSED_RECORDS} <= set(
+        found.readiness.qualifications
+    )
 
 
 @pytest.mark.req("RDY1-03")
@@ -190,7 +258,9 @@ def test_a_rubric_beside_a_row_no_answer_can_settle_is_insufficient_coverage() -
         "Synthetic target", [reviewed(skill_row("fixture:a", 2, RUBRIC)), no_rubric]
     )
 
-    assert facts(matrix).not_assessed_reason is NotAssessedReason.INSUFFICIENT_COVERAGE
+    found = facts(matrix)
+    assert found.not_assessed_reason is NotAssessedReason.INSUFFICIENT_COVERAGE
+    assert (found.readiness, found.rubric_review) == (None, None)
 
 
 @pytest.mark.req("RDY1-03", "MAP1-04")
@@ -211,6 +281,7 @@ def test_readiness_is_shown_with_its_versions_where_every_rubric_is_reviewed() -
     )
 
     assert found.assessment_state is SkillsAssessmentState.ASSESSED
+    assert found.rubric_review == "reviewed"
     assert found.readiness == assessment
     assert found.readiness.state is ReadinessState.READY_NOW_FOR_MODELLED_REQUIREMENTS
     assert (found.matrix_version, found.definition_version) == (
@@ -223,13 +294,18 @@ def test_readiness_is_shown_with_its_versions_where_every_rubric_is_reviewed() -
     )
 
 
-def test_one_proposed_rubric_beside_reviewed_ones_keeps_the_target_not_assessed() -> None:
+@pytest.mark.req("RDY1-03", "OPTN-09")
+def test_one_proposed_rubric_beside_reviewed_ones_labels_the_result_proposed() -> None:
     matrix = synthetic_matrix(
         "Synthetic target",
         [reviewed(skill_row("fixture:a", 2, RUBRIC)), skill_row("fixture:b", 2, RUBRIC)],
     )
 
-    assert facts(matrix).not_assessed_reason is NotAssessedReason.RUBRICS_NOT_REVIEWED
+    found = facts(matrix)
+
+    assert found.assessment_state is SkillsAssessmentState.ASSESSED
+    assert found.rubric_review == "proposed"
+    assert found.readiness == current(matrix)
 
 
 def test_an_assessment_of_another_matrix_is_refused() -> None:

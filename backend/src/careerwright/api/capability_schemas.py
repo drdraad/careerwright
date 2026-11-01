@@ -116,8 +116,9 @@ class UsualInRoleOut(_Out):
 class SkillsOut(_Out):
     """The Skills chapter's facts: for each target, what ESCO lists for its occupation, the
     person's own examples and the parts they chose, what the target asks with the person's
-    qualifications beside it, and readiness only where a reviewed rubric exists ("not
-    assessed yet" otherwise, never a result). Codes and numbers only: the web words them."""
+    qualifications beside it, and readiness wherever a rubric models it, with the rubrics'
+    review state (`rubric_review`: `proposed` means a draft checklist; "not assessed yet"
+    otherwise, never a result). Codes and numbers only: the web words them."""
 
     version: int  # the capability version: every Skills write's expected version
     profile_version: int

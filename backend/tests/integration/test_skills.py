@@ -91,10 +91,17 @@ def test_a_target_outside_the_pack_is_not_assessed_yet_and_shows_what_it_asks(
     assert outside["seed"] == "no_occupation"
     assert (outside["esco_listed"], outside["requirements"], outside["examples"]) == ([], [], [])
     # A pack target: what it asks, each row with its review state and its records' date (R9).
+    assert outside["rubric_review"] is None
+    # Its rubrics are drafts: assessed, labelled `proposed`, and the same result `/readiness`
+    # gives for that target (the product owner's answer, 2026-11-01).
     data = target(body, DATA)
-    assert data["assessment_state"] == "not_assessed"
-    assert data["not_assessed_reason"] == "rubrics_not_reviewed"
-    assert data["readiness"] is None
+    assert data["assessment_state"] == "assessed"
+    assert data["not_assessed_reason"] is None
+    assert data["rubric_review"] == "proposed"
+    readiness = api.get(f"{base(workspace_id)}/readiness", ada).json()["assessments"]
+    same = next(a for a in readiness if a["target_title"] == DATA)
+    assert data["readiness"] == same
+    assert "proposed_rubrics" in data["readiness"]["qualifications"]
     assert data["requirements"]
     assert {r["review_state"] for r in data["requirements"]} == {"proposed"}
     assert {r["as_of"] for r in data["requirements"]} == {"2026-10-29"}

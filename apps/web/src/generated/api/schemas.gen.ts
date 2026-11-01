@@ -6309,8 +6309,7 @@ export const NotAssessedReasonSchema = {
     type: 'string',
     enum: [
         'no_rubric',
-        'insufficient_coverage',
-        'rubrics_not_reviewed'
+        'insufficient_coverage'
     ],
     title: 'NotAssessedReason'
 } as const;
@@ -13429,7 +13428,7 @@ export const SkillsOutSchema = {
         'qualifications'
     ],
     title: 'SkillsOut',
-    description: 'The Skills chapter\'s facts: for each target, what ESCO lists for its occupation, the\nperson\'s own examples and the parts they chose, what the target asks with the person\'s\nqualifications beside it, and readiness only where a reviewed rubric exists ("not\nassessed yet" otherwise, never a result). Codes and numbers only: the web words them.'
+    description: 'The Skills chapter\'s facts: for each target, what ESCO lists for its occupation, the\nperson\'s own examples and the parts they chose, what the target asks with the person\'s\nqualifications beside it, and readiness wherever a rubric models it, with the rubrics\'\nreview state (`rubric_review`: `proposed` means a draft checklist; "not assessed yet"\notherwise, never a result). Codes and numbers only: the web words them.'
 } as const;
 
 export const SkipReasonSchema = {
@@ -16116,6 +16115,21 @@ export const TargetSkillsSchema = {
                     type: 'null'
                 }
             ]
+        },
+        rubric_review: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: [
+                        'proposed',
+                        'reviewed'
+                    ]
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rubric Review'
         }
     },
     additionalProperties: false,
@@ -16138,7 +16152,8 @@ export const TargetSkillsSchema = {
         'requirements',
         'assessment_state',
         'not_assessed_reason',
-        'readiness'
+        'readiness',
+        'rubric_review'
     ],
     title: 'TargetSkills'
 } as const;

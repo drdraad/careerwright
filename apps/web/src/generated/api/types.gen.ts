@@ -4283,11 +4283,7 @@ export type NoSharedOccupation = {
 /**
  * NotAssessedReason
  */
-export const NotAssessedReason = {
-    NO_RUBRIC: 'no_rubric',
-    INSUFFICIENT_COVERAGE: 'insufficient_coverage',
-    RUBRICS_NOT_REVIEWED: 'rubrics_not_reviewed'
-} as const;
+export const NotAssessedReason = { NO_RUBRIC: 'no_rubric', INSUFFICIENT_COVERAGE: 'insufficient_coverage' } as const;
 
 /**
  * NotAssessedReason
@@ -8449,8 +8445,9 @@ export type SkillsAssessmentState = typeof SkillsAssessmentState[keyof typeof Sk
  *
  * The Skills chapter's facts: for each target, what ESCO lists for its occupation, the
  * person's own examples and the parts they chose, what the target asks with the person's
- * qualifications beside it, and readiness only where a reviewed rubric exists ("not
- * assessed yet" otherwise, never a result). Codes and numbers only: the web words them.
+ * qualifications beside it, and readiness wherever a rubric models it, with the rubrics'
+ * review state (`rubric_review`: `proposed` means a draft checklist; "not assessed yet"
+ * otherwise, never a result). Codes and numbers only: the web words them.
  */
 export type SkillsOut = {
     /**
@@ -10063,6 +10060,10 @@ export type TargetSkills = {
     assessment_state: SkillsAssessmentState;
     not_assessed_reason: NotAssessedReason | null;
     readiness: Assessment | null;
+    /**
+     * Rubric Review
+     */
+    rubric_review: 'proposed' | 'reviewed' | null;
 };
 
 /**
