@@ -1,0 +1,55 @@
+[
+  {
+    "slot": "F04",
+    "url": "https://www.gov.uk/become-apprentice",
+    "locate": ["pay for", "training costs", "do not have to pay"]
+  },
+  {
+    "slot": "F05",
+    "url": "https://www.gov.uk/student-finance/new-fulltime-students",
+    "locate": ["Tuition Fee Loan", "Maintenance Loan", "paid directly", "start of each term"]
+  },
+  {
+    "slot": "F06",
+    "url": "https://www.gov.uk/student-finance/who-qualifies",
+    "locate": ["3 years", "settled status", "age"]
+  },
+  {
+    "slot": "F07",
+    "url": "https://www.gov.uk/repaying-your-student-loan/what-you-pay",
+    "locate": ["Plan 5", "9%", "written off"]
+  },
+  {
+    "slot": "F08",
+    "url": "https://www.gov.uk/advanced-learner-loan/what-youll-get",
+    "locate": ["paid directly", "college or training provider"]
+  },
+  {
+    "slot": "F09",
+    "url": "https://www.gov.uk/advanced-learner-loan",
+    "locate": ["pay back", "earning over"]
+  },
+  {
+    "slot": "F10",
+    "url": "https://www.gov.uk/1619-bursary-fund",
+    "locate": ["16 to 19", "£1,200", "bursary"]
+  },
+  {
+    "slot": "F11",
+    "url": "https://www.gov.uk/1619-bursary-fund/eligibility",
+    "locate": ["31 August", "aged 16", "aged 19"]
+  },
+  {
+    "slot": "C11",
+    "url": "https://leedscitycollege.ac.uk/courses/t-level-accounting/",
+    "rights_class": "course-provider",
+    "terms": "Leeds City College, a further-education college's own course page (session 1 line A3); footer \"© 2026 Leeds City College\"; no terms of use restricting reading or private copies are linked from its pages (read 2026-10-29 on C02, the same host)",
+    "locate": ["T Level", "Accounting", "fee", "Start date"]
+  },
+  {
+    "slot": "C12",
+    "url": "https://www.ucas.com/undergraduate/applying-to-university/undergraduate-key-dates-and-deadlines",
+    "locate": ["January 2027", "equal consideration", "deadline", "18:00"],
+    "context": 100
+  }
+]

@@ -1,0 +1,192 @@
+[
+  {
+    "slot": "F04",
+    "url": "https://www.gov.uk/become-apprentice",
+    "final_url": "https://www.gov.uk/become-apprentice",
+    "retrieved_at": "2026-11-01T16:28:31.556911+00:00",
+    "attempt": {
+      "status": "failed",
+      "reason": "robots_unreachable"
+    },
+    "http_status": null,
+    "content_type": null,
+    "sha256": null,
+    "byte_count": null,
+    "rights_status": "pending human rights review",
+    "retention": null,
+    "extraction": null,
+    "postings": [],
+    "kept_body": null
+  },
+  {
+    "slot": "F05",
+    "url": "https://www.gov.uk/student-finance/new-fulltime-students",
+    "final_url": "https://www.gov.uk/student-finance/new-fulltime-students",
+    "retrieved_at": "2026-11-01T16:28:31.561211+00:00",
+    "attempt": {
+      "status": "failed",
+      "reason": "robots_unreachable"
+    },
+    "http_status": null,
+    "content_type": null,
+    "sha256": null,
+    "byte_count": null,
+    "rights_status": "pending human rights review",
+    "retention": null,
+    "extraction": null,
+    "postings": [],
+    "kept_body": null
+  },
+  {
+    "slot": "F06",
+    "url": "https://www.gov.uk/student-finance/who-qualifies",
+    "final_url": "https://www.gov.uk/student-finance/who-qualifies",
+    "retrieved_at": "2026-11-01T16:28:36.561755+00:00",
+    "attempt": {
+      "status": "failed",
+      "reason": "robots_unreachable"
+    },
+    "http_status": null,
+    "content_type": null,
+    "sha256": null,
+    "byte_count": null,
+    "rights_status": "pending human rights review",
+    "retention": null,
+    "extraction": null,
+    "postings": [],
+    "kept_body": null
+  },
+  {
+    "slot": "F07",
+    "url": "https://www.gov.uk/repaying-your-student-loan/what-you-pay",
+    "final_url": "https://www.gov.uk/repaying-your-student-loan/what-you-pay",
+    "retrieved_at": "2026-11-01T16:28:41.561663+00:00",
+    "attempt": {
+      "status": "failed",
+      "reason": "robots_unreachable"
+    },
+    "http_status": null,
+    "content_type": null,
+    "sha256": null,
+    "byte_count": null,
+    "rights_status": "pending human rights review",
+    "retention": null,
+    "extraction": null,
+    "postings": [],
+    "kept_body": null
+  },
+  {
+    "slot": "F08",
+    "url": "https://www.gov.uk/advanced-learner-loan/what-youll-get",
+    "final_url": "https://www.gov.uk/advanced-learner-loan/what-youll-get",
+    "retrieved_at": "2026-11-01T16:28:46.561539+00:00",
+    "attempt": {
+      "status": "failed",
+      "reason": "robots_unreachable"
+    },
+    "http_status": null,
+    "content_type": null,
+    "sha256": null,
+    "byte_count": null,
+    "rights_status": "pending human rights review",
+    "retention": null,
+    "extraction": null,
+    "postings": [],
+    "kept_body": null
+  },
+  {
+    "slot": "F09",
+    "url": "https://www.gov.uk/advanced-learner-loan",
+    "final_url": "https://www.gov.uk/advanced-learner-loan",
+    "retrieved_at": "2026-11-01T16:28:51.561373+00:00",
+    "attempt": {
+      "status": "failed",
+      "reason": "robots_unreachable"
+    },
+    "http_status": null,
+    "content_type": null,
+    "sha256": null,
+    "byte_count": null,
+    "rights_status": "pending human rights review",
+    "retention": null,
+    "extraction": null,
+    "postings": [],
+    "kept_body": null
+  },
+  {
+    "slot": "F10",
+    "url": "https://www.gov.uk/1619-bursary-fund",
+    "final_url": "https://www.gov.uk/1619-bursary-fund",
+    "retrieved_at": "2026-11-01T16:28:56.561197+00:00",
+    "attempt": {
+      "status": "failed",
+      "reason": "robots_unreachable"
+    },
+    "http_status": null,
+    "content_type": null,
+    "sha256": null,
+    "byte_count": null,
+    "rights_status": "pending human rights review",
+    "retention": null,
+    "extraction": null,
+    "postings": [],
+    "kept_body": null
+  },
+  {
+    "slot": "F11",
+    "url": "https://www.gov.uk/1619-bursary-fund/eligibility",
+    "final_url": "https://www.gov.uk/1619-bursary-fund/eligibility",
+    "retrieved_at": "2026-11-01T16:29:01.561324+00:00",
+    "attempt": {
+      "status": "failed",
+      "reason": "robots_unreachable"
+    },
+    "http_status": null,
+    "content_type": null,
+    "sha256": null,
+    "byte_count": null,
+    "rights_status": "pending human rights review",
+    "retention": null,
+    "extraction": null,
+    "postings": [],
+    "kept_body": null
+  },
+  {
+    "slot": "C11",
+    "url": "https://leedscitycollege.ac.uk/courses/t-level-accounting/",
+    "final_url": "https://leedscitycollege.ac.uk/courses/t-level-accounting/",
+    "retrieved_at": "2026-11-01T16:29:06.561130+00:00",
+    "attempt": {
+      "status": "failed",
+      "reason": "robots_unreachable"
+    },
+    "http_status": null,
+    "content_type": null,
+    "sha256": null,
+    "byte_count": null,
+    "rights_status": "pending human rights review",
+    "retention": null,
+    "extraction": null,
+    "postings": [],
+    "kept_body": null
+  },
+  {
+    "slot": "C12",
+    "url": "https://www.ucas.com/undergraduate/applying-to-university/undergraduate-key-dates-and-deadlines",
+    "final_url": "https://www.ucas.com/undergraduate/applying-to-university/undergraduate-key-dates-and-deadlines",
+    "retrieved_at": "2026-11-01T16:29:06.563393+00:00",
+    "attempt": {
+      "status": "failed",
+      "reason": "robots_unreachable"
+    },
+    "http_status": null,
+    "content_type": null,
+    "sha256": null,
+    "byte_count": null,
+    "rights_status": "pending human rights review",
+    "retention": null,
+    "extraction": null,
+    "postings": [],
+    "kept_body": null
+  }
+]
