@@ -146,3 +146,35 @@ The final whole `make acceptance` ran at `61597ee`, under the lock with the buil
 ## Paths a reviewer can skip
 None generated. `apps/web/storybook-static/` and `test-results/` are build output from the
 acceptance runs and are not committed.
+
+## Browser journeys (acceptance run 8's two Playwright failures)
+
+### 1. `e2e/conversation.spec.ts` [STATE-09] "the demo's way on names only what is in sight"
+- Cause: the test's `answeredWorkspace` fixture ("every question the demo asks already
+  answered") predates Task 6f. It sets the entry to "Help me explore" (`unsure`), and since 6f
+  the demo asks an unsure person "What do you enjoy doing, at school, at work or in your own
+  time?" (field `enjoyed_tasks`) before the practical questions. The fixture left that field
+  unasked, so after "What next?" the demo rightly asked it and `.question` had 1 element.
+- Ruling: the product is right, the fixture is stale. The demo asks the enjoy question only
+  while `enjoyed_tasks` is unasked (`_first_unanswered` in `profile/fixture_interviewer.py`),
+  so it is never asked twice. The two other 6f answers (what you're doing now,
+  qualifications) are never asked by the demo, so they were not the cause.
+- Fix: the fixture now answers `enjoyed_tasks` ("helping people"). No assertion changed.
+
+### 2. `e2e/storybook.spec.ts` [UI-04][UI-06], story `components--status-vocabulary-on-space`
+- Cause: the trace's console entry names `http://127.0.0.1:<port>/favicon.ico`. Storybook's
+  `iframe.html` declares no icon, so the full Chromium this machine uses
+  (`CAREERWRIGHT_CHROMIUM_PATH`) asks for `/favicon.ico` on its first page, and the static
+  build has none (it has `favicon.svg`). Only the first story hit it: the browser asks once.
+- Fix: new `apps/web/.storybook/preview-head.html` declares the build's own
+  `./favicon.svg` as the frame's icon (checked in the rebuilt `storybook-static/iframe.html`).
+  The test and its static server are unchanged.
+
+### Checks (final code)
+- Focused Playwright, under the lock, with the build shim and the machine's Chromium:
+  `pnpm run build-storybook` then `pnpm exec playwright test e2e/conversation.spec.ts
+  e2e/storybook.spec.ts`: **12 passed** (both previously failing tests included). Lock
+  released; no `careerwright-l0-*` containers left.
+- `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` (Node 24): **rc 0**; pytest
+  2,159 passed, 8 skipped; Vitest 45 files, 471 passed; lint, types, client drift clean.
+- `make acceptance`: not run, the controller runs acceptance.
