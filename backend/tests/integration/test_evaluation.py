@@ -107,7 +107,6 @@ def slate_shape(observed: dict[str, Any]) -> dict[str, Any]:
         "not_included": [[n["concept_id"], n["reason"]] for n in observed["not_included"]],
         "unmatched_titles": observed["unmatched_titles"],
         "ambiguous_titles": observed["ambiguous_titles"],
-        "connection": observed["connection"]["concept_id"] if observed["connection"] else None,
         "queries": [
             [q["query_id"], q["text"], q["hits"], q["reach"], q["too_general"]]
             for q in observed["queries"]
@@ -128,7 +127,13 @@ def test_every_evaluation_case_s_slate_is_the_one_before_targets_were_stored_onc
     # Task 6d slice A: the notes became facts and each target is read from its stored
     # record; the slate's ranking, rules and thresholds don't change (R11). Slice B adds a
     # case (DSC-20, title ideas beside the slate); every case recorded before is compared.
-    before = json.loads(SLATES_BEFORE.read_text(encoding="utf-8"))
+    # Slice C: the slate no longer singles out a connection (the product owner's "Always a
+    # plain line"), so the recording's `connection` is not compared; the file is unchanged.
+    recorded = json.loads(SLATES_BEFORE.read_text(encoding="utf-8"))
+    before = {
+        case: {key: value for key, value in shape.items() if key != "connection"}
+        for case, shape in recorded.items()
+    }
     cases = [case for case in load_cases() if case.kind is CaseKind.DISCOVERY]
     assert set(before) <= {case.id for case in cases}
     with system_transaction(full_release) as tx:

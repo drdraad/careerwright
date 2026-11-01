@@ -457,24 +457,6 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         )
         quiet = size < target and not said
         return Failure(FailureType.THIN_EVIDENCE, f"pool {size}, no reason") if quiet else None
-    if e.check == "connection":
-        connection = observed.get("connection")
-        if connection is None:
-            return Failure(FailureType.DIVERSITY, "no unexpected connection")
-        by_id = {s["concept_id"]: s for s in suggestions}
-        count = connection["shared_skill_count"]
-        ok = (
-            count >= MIN_SHARED_SKILLS
-            and len(connection["shared_skills"]) == count
-            and connection["concept_id"] in by_id
-            and by_id[connection["concept_id"]]["direction"] != "close_to_current"
-        )
-        return None if ok else Failure(FailureType.GROUNDING, f"connection {connection}")
-    if e.check == "no_connection":
-        # A role several occupations hold as a title is no one occupation to state a fact
-        # about (Task W2B fix round 1).
-        connection = observed.get("connection")
-        return None if connection is None else Failure(FailureType.GROUNDING, f"{connection}")
     if e.check == "titles_unmatched":
         unmatched = observed["unmatched_titles"]
         missing = [title for title in e.words if title not in unmatched]

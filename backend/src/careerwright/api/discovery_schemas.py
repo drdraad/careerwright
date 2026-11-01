@@ -17,12 +17,7 @@ from careerwright.catalogue.records import ConceptKind, SkillRef, TaxonomyReleas
 from careerwright.money import Money
 from careerwright.profile.discovery import DiscoveryProposal, EvidenceItem, QueryChannel
 from careerwright.profile.document import FieldState, PayPeriod
-from careerwright.profile.exploration import (
-    AiFilterView,
-    ConnectionView,
-    SlateView,
-    Suggestion,
-)
+from careerwright.profile.exploration import AiFilterView, SlateView, Suggestion
 from careerwright.profile.interview import ProfileField, ProposalOrigin
 from careerwright.profile.records import TargetCoverage, TargetKind, TargetLink, TargetRecord
 from careerwright.profile.sketch import OccupationRef, Resolution, Sketch, Step, TargetSketch
@@ -433,29 +428,6 @@ class AiResilienceFilterOut(ResponseModel):
         )
 
 
-class ConnectionOut(ResponseModel):
-    """The unexpected connection: one suggestion joined to the person's role by the
-    essential skills the two share in ESCO, outside the role's own kind of work and never a
-    title the person named; the one sharing the most. It is a fact about the two roles,
-    never about the person, and the shared skills are its evidence, one step away."""
-
-    concept_id: uuid.UUID
-    title: str
-    role_title: str = Field(description="The person's role, as ESCO titles it.")
-    shared_skill_count: int
-    shared_skills: list[SharedSkillOut] = Field(description="The essential skills both list.")
-
-    @classmethod
-    def of(cls, view: ConnectionView) -> "ConnectionOut":
-        return cls(
-            concept_id=view.destination.concept_id,
-            title=view.destination.preferred_label,
-            role_title=view.role_title,
-            shared_skill_count=len(view.shared),
-            shared_skills=[SharedSkillOut.of(s) for s in view.shared],
-        )
-
-
 class SlateOut(ResponseModel):
     """A varied slate of up to six career hypotheses from the discovery's searches, computed
     deterministically each time it is read, with every count that explains it. A title of
@@ -506,9 +478,6 @@ class SlateOut(ResponseModel):
         "occupations in ESCO: nothing is joined to them until the person chooses which one "
         "they mean."
     )
-    connection: ConnectionOut | None = Field(
-        description="The unexpected connection to the person's role; null without one."
-    )
     familiarity_known: bool = Field(
         description="Whether the person's role or a target names an ESCO occupation, so "
         "Careerwright knows the kinds of work close to theirs: only then does a direction say "
@@ -538,7 +507,6 @@ class SlateOut(ResponseModel):
             not_included=[NotIncludedOut.of(left, view.titles) for left in slate.not_included],
             unmatched_titles=view.unmatched_titles,
             ambiguous_titles=view.ambiguous_titles,
-            connection=ConnectionOut.of(view.connection) if view.connection else None,
             familiarity_known=view.familiarity_known,
         )
 

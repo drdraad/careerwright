@@ -1,6 +1,6 @@
 """API contract for the world's first moments (plan section 4; Sprint W SW.5): the origin (the
-person's role, the skills it usually needs and the first destinations, with the unexpected
-connection) and the overlooked strength. Computed by deterministic code over ESCO; only the
+person's role, the essential skills ESCO lists for its kind of work and the first
+destinations) and the overlooked strength. Computed by deterministic code over ESCO; only the
 strength's proposal comes from a model, and code verifies it before it is shown."""
 
 import uuid
@@ -9,12 +9,7 @@ from datetime import datetime
 from pydantic import Field
 
 from careerwright.api.catalogue_schemas import IscoGroupOut, UkGroupOut
-from careerwright.api.discovery_schemas import (
-    ConnectionOut,
-    ReleaseRefOut,
-    SalaryFloorOut,
-    SuggestionOut,
-)
+from careerwright.api.discovery_schemas import ReleaseRefOut, SalaryFloorOut, SuggestionOut
 from careerwright.api.envelope import ErrorEnvelope
 from careerwright.api.interview_schemas import SupportNoteOut
 from careerwright.api.schemas import ResponseModel, RunOut
@@ -182,7 +177,6 @@ class OriginOut(ResponseModel):
     fewer_reasons: list[FewerReason] = Field(
         description="Why there are fewer than six, if there are, as facts the web words."
     )
-    connection: ConnectionOut | None
     salary_floor: SalaryFloorOut | None
 
     @classmethod
@@ -207,7 +201,6 @@ class OriginOut(ResponseModel):
             usual_skills=[UsualSkillOut.of(u) for u in usual],
             destinations=[SuggestionOut.of(s, first.release) for s in first.suggestions],
             fewer_reasons=first.slate.fewer_reasons if first.slate else [],
-            connection=ConnectionOut.of(first.connection) if first.connection else None,
             salary_floor=SalaryFloorOut.of(first.salary_floor) if first.salary_floor else None,
         )
 

@@ -2156,48 +2156,6 @@ export const ConnectionCheckResultSchema = {
     description: 'What the model proposes for the synthetic persona. Structurally valid is not true.\n\nLengths are checked by a validator rather than schema keywords, so the JSON schema sent\nto Meta stays within strict mode (Meta then enforces the structure itself).'
 } as const;
 
-export const ConnectionOutSchema = {
-    properties: {
-        concept_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Concept Id'
-        },
-        title: {
-            type: 'string',
-            title: 'Title'
-        },
-        role_title: {
-            type: 'string',
-            title: 'Role Title',
-            description: 'The person\'s role, as ESCO titles it.'
-        },
-        shared_skill_count: {
-            type: 'integer',
-            title: 'Shared Skill Count'
-        },
-        shared_skills: {
-            items: {
-                $ref: '#/components/schemas/SharedSkillOut'
-            },
-            type: 'array',
-            title: 'Shared Skills',
-            description: 'The essential skills both list.'
-        }
-    },
-    additionalProperties: false,
-    type: 'object',
-    required: [
-        'concept_id',
-        'title',
-        'role_title',
-        'shared_skill_count',
-        'shared_skills'
-    ],
-    title: 'ConnectionOut',
-    description: 'The unexpected connection: one suggestion joined to the person\'s role by the\nessential skills the two share in ESCO, outside the role\'s own kind of work and never a\ntitle the person named; the one sharing the most. It is a fact about the two roles,\nnever about the person, and the shared skills are its evidence, one step away.'
-} as const;
-
 export const ContinuationInputSchema = {
     properties: {
         hours_per_week: {
@@ -6941,16 +6899,6 @@ export const OriginOutSchema = {
             title: 'Fewer Reasons',
             description: 'Why there are fewer than six, if there are, as facts the web words.'
         },
-        connection: {
-            anyOf: [
-                {
-                    $ref: '#/components/schemas/ConnectionOut'
-                },
-                {
-                    type: 'null'
-                }
-            ]
-        },
         salary_floor: {
             anyOf: [
                 {
@@ -6972,7 +6920,6 @@ export const OriginOutSchema = {
         'usual_skills',
         'destinations',
         'fewer_reasons',
-        'connection',
         'salary_floor'
     ],
     title: 'OriginOut',
@@ -12719,17 +12666,6 @@ export const SlateOutSchema = {
             title: 'Ambiguous Titles',
             description: 'Titles of the person\'s own that Careerwright matched to several occupations in ESCO: nothing is joined to them until the person chooses which one they mean.'
         },
-        connection: {
-            anyOf: [
-                {
-                    $ref: '#/components/schemas/ConnectionOut'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            description: 'The unexpected connection to the person\'s role; null without one.'
-        },
         familiarity_known: {
             type: 'boolean',
             title: 'Familiarity Known',
@@ -12758,7 +12694,6 @@ export const SlateOutSchema = {
         'not_included',
         'unmatched_titles',
         'ambiguous_titles',
-        'connection',
         'familiarity_known'
     ],
     title: 'SlateOut',

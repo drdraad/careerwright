@@ -27,11 +27,6 @@ family is one of their current role's or targets', or their role or a target fou
 building on skills they could carry over (a transferable or cross-industry query, or a skill
 join, found it), or something different (anything else).
 
-**The unexpected connection** (`unexpected_connection`) singles out one suggestion joined to
-the person's role by shared essential skills, outside their own kind of work and never a
-title they named: the one sharing the most. It is a fact about two roles, never about the
-person.
-
 **Slate.** A constrained greedy reranker, with no claim of optimality: each step takes the
 eligible candidate with the highest relevance plus bonuses for a family, an ISCO major group
 and a direction not yet shown (aiming at two of each direction), less a penalty per
@@ -617,41 +612,3 @@ def choose_slate(
         fewer_reasons=fewer,
         notes=[policy.note] if policy.note else [],
     )
-
-
-@dataclass(frozen=True)
-class Connection:
-    """The unexpected connection: a suggestion joined to the person's role by the essential
-    skills the two share, in another kind of work, never a title the person named."""
-
-    candidate: Candidate
-    shared_skills: int
-
-
-def unexpected_connection(
-    slate: Slate,
-    role_joins: frozenset[str],
-    own_families: frozenset[str],
-    named: frozenset[uuid.UUID],
-) -> Connection | None:
-    """Of the slate's suggestions that a join from the person's role found itself (`role_joins`:
-    those queries' IDs; never through a role folded into it), outside the role's own kinds of
-    work (`own_families`) and not a title the person named: the one sharing the most essential
-    skills with the role, then
-    the larger share of both roles' skills, then the first in the slate. None when no
-    suggestion qualifies: a revelation with no source is never shown."""
-    best: tuple[tuple[int, float, int], Connection] | None = None
-    for position, candidate in enumerate(slate.suggestions):
-        occupation = candidate.occupation
-        if occupation.family_code in own_families or occupation.concept_id in named:
-            continue
-        joined = [
-            m for m in candidate.own_matches if m.query.query_id in role_joins and m.shared_skills
-        ]
-        if not joined:
-            continue
-        top = max(joined, key=lambda m: (m.shared_skills or 0, m.score))
-        rank = (top.shared_skills or 0, top.score, -position)
-        if best is None or rank > best[0]:
-            best = (rank, Connection(candidate, top.shared_skills or 0))
-    return None if best is None else best[1]

@@ -1,6 +1,6 @@
 """The first answer on the full pinned ESCO release (plan section 4, "The first ten seconds";
 Sprint W SW.5): the type-ahead, the answer saved, and the world's response (the role's usual
-skills, the first destinations joined by shared essential skills, the unexpected connection),
+skills, the first destinations joined by shared essential skills),
 each through the real API against real PostgreSQL 16, with no model call, timed against the
 one-second budget, for "data analyst" and the heaviest roles ESCO holds; and the type-ahead
 for titles ESCO does not list. The timings are printed with the run (`-s`); the database
@@ -119,16 +119,14 @@ def test_the_first_answer_changes_the_world_within_one_second_on_the_pinned_rele
         "destinations:",
         [(d["title"], d["family"]["code"], d["direction"]) for d in body["destinations"]],
     )
-    print("connection:", body["connection"]["title"] if body["connection"] else None)
     assert len(body["usual_skills"]) == 36  # ESCO v1.2.1 lists 36 for the data analyst
     assert {s["state"] for s in body["usual_skills"]} == {"usual_in_role"}
     assert len(body["destinations"]) >= 4
     assert "data analyst" not in [d["title"] for d in body["destinations"]]  # the origin
     assert all(d["reasons"][0]["reason"] == "joined_by_shared_skills" for d in body["destinations"])
-    connection = body["connection"]
-    assert connection is not None
-    assert connection["role_title"] == "data analyst"
-    assert connection["shared_skill_count"] >= 3
+    # The product owner's answer (1 November 2026, "Always a plain line"): each destination
+    # states the skills it shares as a plain fact; none is singled out as a connection.
+    assert "connection" not in body
 
 
 # The heaviest first answers on ESCO v1.2.1: the occupation with the most essential skills,

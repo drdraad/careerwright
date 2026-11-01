@@ -136,7 +136,6 @@ from careerwright.profile.slate import (
     choose_slate,
     skill_join,
     too_general,
-    unexpected_connection,
 )
 from careerwright.profile.slate_explanation import (
     RECORD_STEPS,
@@ -339,21 +338,9 @@ class SlateView:
     # The person's titles several ESCO occupations hold: nothing is joined to them until the
     # person chooses which they mean.
     ambiguous_titles: list[str] = field(default_factory=list)
-    connection: "ConnectionView | None" = None
     # Whether a title of the person's (their role or a target) names an ESCO occupation, so the
     # slate's directions say how close each is to their work (design review M-2).
     familiarity_known: bool = False
-
-
-@dataclass(frozen=True)
-class ConnectionView:
-    """The unexpected connection (plan section 4; ADR 0007 decision 13): a fact about two
-    roles, never about the person, with the essential skills both list one step away."""
-
-    role_title: str  # the person's role as ESCO titles it
-    candidate: Candidate
-    destination: OccupationFacts
-    shared: list[SkillRef]  # the essential skills ESCO lists for both, by label
 
 
 @dataclass(frozen=True)
@@ -791,7 +778,6 @@ def compute_slate(
     queries: list[PoolQuery] = []
     unsearchable: list[DiscoveryQuery] = []
     joins: set[str] = set()  # the queries a title's skill join answered, never read
-    role_joins: set[str] = set()
     styles: list[str] = []  # one-word work-style answers a search or idea rested on: not run
     general: dict[str, SkillSearch] = {}  # each search too general to find work alone
     for query in proposal.queries:
@@ -804,8 +790,6 @@ def compute_slate(
                 channel = SlateChannel(query.channel.value)
                 queries.append(_joined(tx, query.query_id, title, channel, tuple(query.based_on)))
                 joins.add(query.query_id)
-                if title is role:
-                    role_joins.add(query.query_id)
             continue
         searched = _searched(tx, query)
         if searched is None:
@@ -824,7 +808,6 @@ def compute_slate(
         if _joinable(role):
             queries.append(_joined(tx, ROLE_JOIN, role, SlateChannel.SHARED_SKILLS, (item,)))
             joins.add(ROLE_JOIN)
-            role_joins.add(ROLE_JOIN)
         familiar.update(role.occupations)
     for index, target in enumerate(named, start=1):
         item = EvidenceItem(field=ProfileField.TARGET_TITLES, text=target.text)
@@ -939,7 +922,6 @@ def compute_slate(
         ai_filter=ai_filter,
         unmatched_titles=[t.text for t in unmatched],
         ambiguous_titles=[t.text for t in ambiguous],
-        connection=_connection(tx, slate, role, named, facts, frozenset(role_joins)),
         familiarity_known=bool(familiar_families),
     )
 
@@ -1104,29 +1086,6 @@ def _join_note(query: PoolQuery) -> JoinKeptBest:
     return JoinKeptBest(
         title=query.text, found=query.reach, kept=len(query.hits), min_shared=MIN_SHARED_SKILLS
     )
-
-
-def _connection(
-    tx: Tx,
-    slate: Slate,
-    role: ResolvedTitle | None,
-    named: list[ResolvedTitle],
-    facts: dict[uuid.UUID, OccupationFacts],
-    role_joins: frozenset[str],
-) -> ConnectionView | None:
-    """The slate's unexpected connection to the person's role, with the skills the two
-    share (ESCO) one step away. None unless the role names exactly one ESCO occupation: a
-    role several occupations hold as a title is no one occupation to state a fact about."""
-    if role is None or len(role.occupations) != 1:
-        return None
-    own = facts[role.occupations[0]]  # the role's own occupation is always pooled
-    names = frozenset(c for t in [role, *named] for c in t.occupations)
-    found = unexpected_connection(slate, role_joins, frozenset({own.family.code}), names)
-    if found is None:
-        return None
-    destination = found.candidate.occupation.concept_id
-    shared = taxonomy_store.shared_essential_skills(tx, role.occupations, destination)
-    return ConnectionView(own.preferred_label, found.candidate, facts[destination], shared)
 
 
 def submit_explanation(
@@ -1655,8 +1614,8 @@ class RoleState(StrEnum):
 class FirstSlate:
     """The world's answer to the first question, computed by deterministic code over the
     held ESCO release with no model call: the person's role, the essential skills it usually
-    needs, and the first destinations, joined to it by shared essential skills, with the
-    unexpected connection among them. Recomputed on each read."""
+    needs, and the first destinations, joined to it by shared essential skills. Recomputed on
+    each read."""
 
     profile_version: int
     release: TaxonomyRelease
@@ -1670,7 +1629,6 @@ class FirstSlate:
     choices: list[OccupationFacts] = field(default_factory=list)  # an ambiguous role's
     slate: Slate | None = None  # None until the role names one occupation
     suggestions: list[Suggestion] = field(default_factory=list)
-    connection: ConnectionView | None = None
     salary_floor: FloorCounts | None = None
 
 
@@ -1680,7 +1638,7 @@ def first_slate(
     """The first scatter of destinations follows from the first answer alone: the role's
     occupation joined to others by shared essential skills (the role itself is the origin,
     never a destination), chosen by the slate's rules and its hard filters (the confirmed
-    salary floor), with the unexpected connection singled out."""
+    salary floor)."""
     release = held_release(tx)
     profile = current_profile(tx, workspace_id)
     record = role_record(tx, workspace_id, profile.document, pack)
@@ -1718,7 +1676,6 @@ def first_slate(
             slate,
             fewer_reasons=[NoSharedOccupation(title=title, min_shared=MIN_SHARED_SKILLS)],
         )
-    named = titles.targets(tx, stored_targets(tx, workspace_id, profile.document, pack))
     return FirstSlate(
         profile_version=profile.version,
         release=release,
@@ -1731,6 +1688,5 @@ def first_slate(
         choices=[],
         slate=slate,
         suggestions=_suggestions(tx, slate, facts, familiarity_known=True),
-        connection=_connection(tx, slate, role, named, facts, frozenset({ROLE_JOIN})),
         salary_floor=floor,
     )

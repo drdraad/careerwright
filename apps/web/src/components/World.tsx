@@ -145,7 +145,7 @@ type Label = {
 };
 
 const SKILL_CAPTION: Record<WorldSkill["state"], string> = {
-  usual: "usual in your role, not confirmed yet",
+  usual: "ESCO lists it for this kind of work, not confirmed yet",
   said: "you said you've done it",
 };
 
@@ -776,7 +776,7 @@ export function World({
             {legend.usual && (
               <li>
                 <span className="world-key-mark" data-key="usual" aria-hidden="true" />
-                Faint ring: usual in your role, not confirmed yet
+                Faint ring: ESCO lists it for this kind of work, not confirmed yet
               </li>
             )}
             {legend.shadow && (

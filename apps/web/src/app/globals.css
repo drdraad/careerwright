@@ -1657,13 +1657,6 @@
     box-shadow: inset 4px 0 0 var(--selection);
   }
 
-  /* The unexpected connection's mark on its suggestion, open or not, so it can be found. */
-  .suggestion-kicker {
-    color: var(--fg-muted);
-    font-size: var(--type-14);
-    font-weight: 600;
-  }
-
   /* A suggestion that is one of the person's targets, where the choice was. */
   .target-saved {
     padding: var(--space-12) var(--space-16);

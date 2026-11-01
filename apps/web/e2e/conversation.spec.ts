@@ -146,10 +146,10 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   await choose.click();
   await expect(saved(page, 4)).toBeVisible();
   await expect(banner.getByText(title, { exact: false })).toBeVisible();
-  // Confirmed where it was chosen, with what it usually asks for, and never "out of date": the
-  // only change since the slate was this choice from it (STATE-10).
+  // Confirmed where it was chosen, with what ESCO lists for the work, and never "out of date":
+  // the only change since the slate was this choice from it (STATE-10).
   await expect(first.getByRole("heading", { name: "Saved as one of your targets" })).toBeFocused();
-  await expect(first.getByText("What this work usually asks for, from ESCO:")).toBeVisible();
+  await expect(first.getByText("ESCO lists these for this kind of work:")).toBeVisible();
   await expect(directions.getByText("Based on your earlier answers")).toHaveCount(0);
   await expect(directions.getByRole("button", { name: "Suggest again" })).toHaveCount(0);
 
@@ -158,7 +158,12 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   await youView(page, "What we know");
   await page.getByText("The early sketch for your target").click();
   const sketch = page.getByRole("region", { name: "Early sketch, not a checked route" });
-  await expect(sketch.getByText("What this work usually asks for, from ESCO:")).toBeVisible();
+  await expect(sketch.getByText("ESCO lists these for this kind of work:")).toBeVisible();
+  await expect(
+    sketch.getByText(
+      "Careerwright looked up each target in ESCO, the European Union's public list of occupations and skills.",
+    ),
+  ).toBeVisible();
   await expect(sketch.getByText(/Not resolved yet/).first()).toBeVisible();
 
   expect(externalRequests(requests)).toEqual([]);

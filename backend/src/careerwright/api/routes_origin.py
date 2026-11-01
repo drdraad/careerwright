@@ -1,7 +1,7 @@
 """The world's first moments (plan section 4; Sprint W SW.5; S2.8): answer the first question
 with an ESCO occupation, a UK job title or the person's own words, and "Which of these is
-closest?"; read the origin (the role, the skills it usually needs, the first destinations and
-the unexpected connection); and ask for, read and decide a turn's overlooked strength. Every
+closest?"; read the origin (the role, the essential skills ESCO lists for its kind of work and
+the first destinations); and ask for, read and decide a turn's overlooked strength. Every
 write takes an expected version and an Idempotency-Key."""
 
 import uuid

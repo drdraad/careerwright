@@ -19,7 +19,6 @@
 // under the count line, and the open suggestion's choice comes right after its title.
 import { type Ref, useEffect, useId, useRef, useState } from "react";
 import type {
-  ConnectionOut,
   Direction,
   DiscoveryOut,
   Emphasis,
@@ -53,6 +52,7 @@ import {
   DIRECTION,
   EMPHASIS,
   ERROR_STATEMENT,
+  ESCO_NAMED,
   FAILURE_CLASS,
   fewerReason,
   floorWords,
@@ -271,18 +271,16 @@ const listed = (items: string[]) =>
 
 /** The skills a suggestion was joined by, under the reason that says how it was joined (the
  *  API's, which quotes the person's own words): the first few named, the rest one step away.
- *  The join is said once, by that reason (D-I2). On the slate's unexpected connection, what
- *  Careerwright hasn't checked yet is said with them; its light in the world is Task M's. */
-function JoinedBy({ skills, connection }: { skills: SharedSkillOut[]; connection: boolean }) {
+ *  The join is said once, by that reason (D-I2), as a plain fact about the two roles: no
+ *  suggestion is singled out as a discovery (the product owner, 1 November 2026: "Always a
+ *  plain line"). */
+function JoinedBy({ skills }: { skills: SharedSkillOut[] }) {
   if (skills.length === 0) return null;
   const rest = skills.slice(FIRST_SKILLS);
   const first = listed(skills.slice(0, FIRST_SKILLS).map((s) => s.label));
   return (
     <div className="grid gap-4">
-      <p className="small">
-        {SUGGESTION_WORDS.skillsNamed(first, rest.length > 0)}
-        {connection && ` ${SUGGESTION_WORDS.notCompared}`}
-      </p>
+      <p className="small">{SUGGESTION_WORDS.skillsNamed(first, rest.length > 0)}</p>
       {rest.length > 0 && (
         <details className="details">
           <summary>{SUGGESTION_WORDS.otherSkills(rest.length)}</summary>
@@ -298,7 +296,7 @@ function JoinedBy({ skills, connection }: { skills: SharedSkillOut[]; connection
 }
 
 /** A suggestion that is one of the person's targets: said where it was chosen, with how far
- *  Careerwright can cover it and what it usually asks for (STATE-10; PROF-10). */
+ *  Careerwright can cover it and the skills ESCO lists for it (STATE-10; PROF-10). */
 function TargetSaved({
   workspaceId,
   conceptId,
@@ -330,7 +328,7 @@ function TargetSaved({
             }
           />
         ) : (
-          <LoadingState stage="Loading what this work usually asks for" lines={1} />
+          <LoadingState stage="Loading the skills ESCO lists for this kind of work" lines={1} />
         )
       ) : (
         target !== undefined && (
@@ -352,7 +350,6 @@ function SuggestionCard({
   written,
   open,
   primary,
-  connection,
   focusSaved,
   onSavedFocused,
   onOpen,
@@ -371,8 +368,6 @@ function SuggestionCard({
   open: boolean;
   /** Whether "Make this a target" is the view's one bright primary action. */
   primary: boolean;
-  /** The slate's unexpected connection, when this suggestion is it. */
-  connection: ConnectionOut | null;
   /** Just chosen as a target: focus goes to the words that say it is saved. */
   focusSaved: boolean;
   onSavedFocused(): void;
@@ -403,7 +398,6 @@ function SuggestionCard({
       data-open={open}
       aria-labelledby={`s-${suggestion.concept_id}`}
     >
-      {connection !== null && <p className="suggestion-kicker">{SUGGESTION_WORDS.connection}</p>}
       <h4 id={`s-${suggestion.concept_id}`}>
         <button
           type="button"
@@ -425,7 +419,7 @@ function SuggestionCard({
         <div id={body} className="grid gap-12">
           {/* The choice first, so its bright action is in view with a real slate; what the
               work is and why it could suit you follow (D-I3). Once chosen, the choice gives
-              way to the words that say so, with what the work usually asks for (STATE-10). */}
+              way to the words that say so, with the skills ESCO lists for it (STATE-10). */}
           {already && (
             <TargetSaved
               workspaceId={workspaceId}
@@ -478,7 +472,7 @@ function SuggestionCard({
                   <li key={line}>{line}</li>
                 ))}
               </ul>
-              <JoinedBy skills={suggestion.shared_skills} connection={connection !== null} />
+              <JoinedBy skills={suggestion.shared_skills} />
             </div>
           </div>
           <div className="grid gap-4">
@@ -785,9 +779,6 @@ function Slate({
                 written={noteFor(suggestion)}
                 open={suggestion.concept_id === open}
                 primary={choosePrimary}
-                connection={
-                  data.connection?.concept_id === suggestion.concept_id ? data.connection : null
-                }
                 focusSaved={chosen === suggestion.concept_id}
                 onSavedFocused={() => setChosen(null)}
                 onOpen={() => setOpened(suggestion.concept_id)}
@@ -917,8 +908,8 @@ export function Directions({
         Directions to explore
       </h2>
       <p className="small muted measure">
-        Occupations from ESCO, found from your own answers. Ideas to test, not a judgement of fit:
-        no score or percentage.
+        Occupations from {ESCO_NAMED}, found from your own answers. Ideas to test, not a judgement
+        of fit: no score or percentage.
       </p>
       {discovery === null || (stale && !running) ? (
         <>

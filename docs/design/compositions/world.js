@@ -665,7 +665,7 @@
             <div><dt>Monthly payment limit<span class="explained">${MONTHLY}</span></dt><dd class="tnum">${money(F.p01.monthlyPaymentCapMinor)}</dd></div>
           </dl>
           <p class="small muted">Not asked yet: current role, weekly study hours, lowest pay you'd accept.</p>
-          <details class="more"><summary>The early sketch for your target</summary><p class="small muted">Early sketch, not a checked route: what data quality analyst work usually asks for, from ESCO, and every step not resolved yet.</p></details>`);
+          <details class="more"><summary>The early sketch for your target</summary><p class="small muted">Early sketch, not a checked route: the skills ESCO lists for data quality analyst work, and every step not resolved yet.</p></details>`);
       }
       if (state === "suggestions") {
         // A real slate's shape (design review I3: never only the attractive fixture): the slate
@@ -734,9 +734,8 @@
       return `
         <section class="panel low panel-roles" aria-labelledby="title">
           <h1 id="title" class="title">Roles</h1>
-          <p class="kicker">${glyph("synthetic")}An unexpected connection: an example</p>
-          <p class="sentence">Data quality analysts and statisticians share 6 essential skills.</p>
-          <p class="small muted">A field you didn't name, joined to yours by skills, not job titles. A place you could head for. Not a job offer.</p>
+          <p class="small">ESCO lists 6 of the same essential skills for data quality analysts and statisticians.</p>
+          <p class="small muted">Joined by skills, not job titles. A place you could head for. Not a job offer.</p>
           ${phone ? `<p class="small muted">Openings for ${esc(T.targetTitle.toLowerCase())}: ${openings}.</p>` : ""}
           ${stale ? `<div class="alert" data-tone="stale">${glyph("stale")}<div><p><strong>Last checked 2 days ago</strong></p><p class="small muted">The job board didn't answer today. Its openings are kept from 2 days ago and may have closed.</p></div></div>` : ""}
           ${unknown ? `<div class="alert" data-tone="unknown">${glyph("unknown")}<div><p><strong>Leeds: none found in the ${L.totals.sourcesChecked} sources checked</strong></p><p class="small muted">Not "no jobs": only these sources were searched. Pay not stated on ${count(unpaid, "opening", "openings")}.</p></div></div>` : ""}
@@ -751,7 +750,7 @@
           <p class="where">The ground between you and ${esc(T.targetTitle.toLowerCase())}.</p>
           <ul class="list">
             <li>${glyph(unknown ? "unknown" : "said")}<span>Check data for errors</span><span class="small muted">${unknown ? "Not known yet" : "You said so"}</span></li>
-            <li>${glyph("unknown")}<span>Query related tables</span><span class="small muted">${unknown ? "Not known yet" : "Usual in your role, not confirmed yet"}</span></li>
+            <li>${glyph("unknown")}<span>Query related tables</span><span class="small muted">${unknown ? "Not known yet" : "ESCO lists it for this kind of work, not confirmed yet"}</span></li>
             <li>${glyph("unknown")}<span>Validate keys and missing values</span><span class="small muted">Not known yet</span></li>
             <li>${glyph("conditional")}<span>Pass the assessed report</span><span class="small muted">A gate</span></li>
           </ul>
@@ -810,10 +809,10 @@
     destination: ["disc-destination", "Warm lights: places you chose to head for"],
     suggested: ["ring-destination", "Warm rings: places suggested to you"],
     said: ["disc-said", "Bright: you said you've done it"],
-    usual: ["ring-usual", "Faint ring: usual in your role, not confirmed yet"],
+    usual: ["ring-usual", "Faint ring: ESCO lists it for this kind of work, not confirmed yet"],
     shadow: ["line-shadow", "Grey: not known yet"],
     "stretch-said": ["line-said", "Bright: a skill you said you have"],
-    "stretch-usual": ["line-usual", "Fainter: usual in your role, not confirmed yet"],
+    "stretch-usual": ["line-usual", "Fainter: ESCO lists it for this kind of work, not confirmed yet"],
     "stretch-shadow": ["line-shadow", "Grey: not known yet"],
     next: ["ring-next", "Teal ring: your next step"],
     opening: ["dot-opening", "Small lights: openings, by area"],
@@ -903,7 +902,7 @@
         li.dataset.for = l.id;
         if (l.selected) li.dataset.selected = "true";
         li.innerHTML = `<span class="name">${esc(l.name)}</span>`;
-        if (l.state === "usual") li.innerHTML += `<span class="caption">usual in your role, not confirmed yet</span>`;
+        if (l.state === "usual") li.innerHTML += `<span class="caption">ESCO lists it for this kind of work, not confirmed yet</span>`;
         if (l.state === "said") li.innerHTML += `<span class="caption">you said so</span>`;
         if (l.state === "shadow" && !l.name.includes("no bridge")) li.innerHTML += `<span class="caption">not known yet</span>`;
         host.append(li);

@@ -6,7 +6,8 @@ export type Vec3 = readonly [number, number, number];
 
 /**
  * The declared meanings. Everything that varies in brightness or solidity comes from one of these.
- * - usual: the person's role usually needs it, not confirmed yet (display only, ADR 0014).
+ * - usual: ESCO lists it for the person's kind of work, not confirmed yet (display only, ADR
+ *   0014; ADR 0015 decision 4).
  * - said: the person said they have done it.
  * - shadow: not known yet. Drawn as a quiet solid slate trail, never absent and never zero.
  * - opening: an opening around a destination (the Roles place, and the busiest scene).

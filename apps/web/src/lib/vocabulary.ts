@@ -331,6 +331,14 @@ export const ENGLAND_ONLY = "Careerwright covers England for now.";
 export const PURPOSE =
   "Careerwright helps you find work that could suit you, see what it would take, and plan a route you can afford.";
 
+/** ESCO in plain words, where a view first names it beside skills it lists (Task 6d slice C,
+ *  the product owner's ESCO research). */
+export const ESCO_NAMED = "ESCO, the European Union's public list of occupations and skills";
+
+/** The essential skills ESCO lists for a role or a target: ESCO's list for that kind of work,
+ *  never the person's skills and never what the work "usually" needs (ADR 0015 decision 4). */
+export const ESCO_LISTS = "ESCO lists these for this kind of work:";
+
 /** A suggestion's words beyond the API's (Task W2E): each says what Careerwright did. */
 export const SUGGESTION_WORDS = {
   /** A suggestion that is one of the person's targets (STATE-10). */
@@ -340,10 +348,6 @@ export const SUGGESTION_WORDS = {
   skillsNamed: (first: string, more: boolean) =>
     more ? `Among them: ${first}.` : `Those skills: ${first}.`,
   otherSkills: (count: number) => `The other ${count} ${count === 1 ? "skill" : "skills"}`,
-  /** The slate's unexpected connection, in words; its light in the world is Task M's. */
-  connection: "An unexpected connection",
-  /** What the connection's skills haven't been checked against yet. */
-  notCompared: "Careerwright hasn't compared them with your own experience yet.",
 } as const;
 
 /** A streamed reply's state in words. Only "incomplete" is final; nothing streamed is saved. */
@@ -958,13 +962,13 @@ export const SKETCH_STEP: Record<
 };
 
 /** How far Careerwright can cover a target, in one plain line where it is chosen (Task 6d
- *  slice A; session W2 judges the words). `asks`: whether Careerwright can show what the work
- *  usually asks for (the target names one ESCO occupation). */
+ *  slice A; session W2 judges the words). `asks`: whether Careerwright can show what ESCO lists
+ *  for the work (the target names one ESCO occupation). */
 export const TARGET_COVERAGE: Record<TargetCoverage, (asks: boolean) => string> = {
   pack_target: () => "Careerwright can check skills, options and routes for this role.",
   not_covered: (asks) =>
     asks
-      ? "Careerwright can show what this work usually asks for. It can't check skills, options or routes for it yet."
+      ? "Careerwright can show the skills ESCO lists for this kind of work. It can't check skills, options or routes for it yet."
       : "Careerwright can't check skills, options or routes for this role yet.",
   several_pack_targets: () =>
     "Careerwright can't check skills, options or routes for this role yet.",

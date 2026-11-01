@@ -198,7 +198,6 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
   ],
   unmatched_titles: [],
   ambiguous_titles: [],
-  connection: null,
   familiarity_known: false,
 });
 
@@ -986,18 +985,11 @@ const joined: SuggestionOut = {
     skill("k5", "use hand tools"),
   ],
 };
-/** The slate's unexpected connection: found from the person's role, which they called "cycle
- *  courier" and ESCO titles "bicycle courier" (an alternative title). */
+/** Joined to the person's role, which they called "cycle courier" and ESCO titles "bicycle
+ *  courier" (an alternative title). */
 const connected: SuggestionOut = { ...joined, reasons: joinedBy("cycle courier") };
-const connection: SlateOut["connection"] = {
-  concept_id: "o1",
-  title: "bicycle mechanic",
-  role_title: "bicycle courier",
-  shared_skill_count: 5,
-  shared_skills: joined.shared_skills,
-};
 
-describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpected connection and a chosen target", () => {
+describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, as a plain line, and a chosen target", () => {
   it("names the first skills it was joined by, the rest one step away (the audit's F4)", async () => {
     fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([joined]) }]);
     const { user } = renderDirections();
@@ -1026,19 +1018,15 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpe
     expect(within(mechanic).queryByText(/The other/)).toBeNull();
   });
 
-  it("shows the unexpected connection on its suggestion, its skills named, the rest one step away", async () => {
-    fakeApi([{ method: "GET", path: /\/slate$/, answer: { ...slate([connected]), connection } }]);
+  it("states the skills a suggestion shares with the role as a plain line, never as a discovery (the product owner, 1 November 2026)", async () => {
+    fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([connected]) }]);
     const { user } = renderDirections();
 
     const mechanic = await card();
-    expect(within(mechanic).getByText("An unexpected connection")).toBeVisible();
-    // What Careerwright hasn't checked is said in its own words, never what a list contains.
     expect(
-      within(mechanic).getByText(
-        "Among them: adjust brakes, fit tyres and replace chains. Careerwright hasn't compared them with your own experience yet.",
-      ),
+      within(mechanic).getByText("Among them: adjust brakes, fit tyres and replace chains."),
     ).toBeVisible();
-    expect(within(mechanic).queryByText(/These are the skills ESCO lists/)).toBeNull();
+    expect(mechanic).not.toHaveTextContent(/unexpected|connection/i);
     expect(within(mechanic).getByText("true wheels")).not.toBeVisible();
     await user.click(within(mechanic).getByText("The other 2 skills"));
     expect(within(mechanic).getByText("true wheels")).toBeVisible();
@@ -1046,9 +1034,7 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpe
 
   it("states the join once on each card, and never calls ESCO's title the person's role (D-I2, A-M1)", async () => {
     const plain = { ...joined, concept_id: "o2", title: "bicycle repairer" };
-    fakeApi([
-      { method: "GET", path: /\/slate$/, answer: { ...slate([connected, plain]), connection } },
-    ]);
+    fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([connected, plain]) }]);
     const { user } = renderDirections();
 
     const mechanic = await card();
@@ -1107,10 +1093,12 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, the unexpe
     // Coverage, from the target's stored record, in one plain line.
     expect(
       within(mechanic).getByText(
-        "Careerwright can show what this work usually asks for. It can't check skills, options or routes for it yet.",
+        "Careerwright can show the skills ESCO lists for this kind of work. It can't check skills, options or routes for it yet.",
       ),
     ).toBeVisible();
-    expect(within(mechanic).getByText("What this work usually asks for, from ESCO:")).toBeVisible();
+    // ESCO's list for the kind of work, never what the work "usually" asks (the PO's research).
+    expect(within(mechanic).getByText("ESCO lists these for this kind of work:")).toBeVisible();
+    expect(mechanic).not.toHaveTextContent(/usually/);
     expect(within(mechanic).getByText("Adjust brakes")).toBeVisible();
     expect(within(mechanic).getByText("And 7 more essential skills in ESCO.")).toBeVisible();
     expect(within(mechanic).queryByRole("button", { name: /Make this a target/ })).toBeNull();

@@ -1452,41 +1452,6 @@ export type ConnectionCheckResult = {
 };
 
 /**
- * ConnectionOut
- *
- * The unexpected connection: one suggestion joined to the person's role by the
- * essential skills the two share in ESCO, outside the role's own kind of work and never a
- * title the person named; the one sharing the most. It is a fact about the two roles,
- * never about the person, and the shared skills are its evidence, one step away.
- */
-export type ConnectionOut = {
-    /**
-     * Concept Id
-     */
-    concept_id: string;
-    /**
-     * Title
-     */
-    title: string;
-    /**
-     * Role Title
-     *
-     * The person's role, as ESCO titles it.
-     */
-    role_title: string;
-    /**
-     * Shared Skill Count
-     */
-    shared_skill_count: number;
-    /**
-     * Shared Skills
-     *
-     * The essential skills both list.
-     */
-    shared_skills: Array<SharedSkillOut>;
-};
-
-/**
  * ContinuationInput
  *
  * The common work and pay every route returns to (FIN-1): never a target wage.
@@ -4627,7 +4592,6 @@ export type OriginOut = {
      * Why there are fewer than six, if there are, as facts the web words.
      */
     fewer_reasons: Array<NothingFound | FewMatched | KindsOfWorkShown | ExclusionsRemoved | TitleNotMatched | RoleNotMatched | TitleKeptAsOwn | TitleMatchedSeveral | NoSharedOccupation>;
-    connection: ConnectionOut | null;
     salary_floor: SalaryFloorOut | null;
 };
 
@@ -8029,10 +7993,6 @@ export type SlateOut = {
      * Titles of the person's own that Careerwright matched to several occupations in ESCO: nothing is joined to them until the person chooses which one they mean.
      */
     ambiguous_titles: Array<string>;
-    /**
-     * The unexpected connection to the person's role; null without one.
-     */
-    connection: ConnectionOut | null;
     /**
      * Familiarity Known
      *

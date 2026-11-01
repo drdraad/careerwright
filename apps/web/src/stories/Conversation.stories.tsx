@@ -237,7 +237,6 @@ const slate = (suggestions: SuggestionOut[]): SlateOut => ({
   not_included: [],
   unmatched_titles: [],
   ambiguous_titles: [],
-  connection: null,
   // The stories' role joins work by shared skills, so its kind of work is known.
   familiarity_known: true,
 });
@@ -474,7 +473,6 @@ const originOf = (title: string, kind: "ons" | "own_words", closest: boolean) =>
     usual_skills: [],
     destinations: [],
     fewer_reasons: [],
-    connection: null,
     salary_floor: null,
   },
 });
@@ -690,8 +688,8 @@ const joinedSkills = [
   skill("k4", "ensure health and safety"),
   skill("k5", "use logistics software"),
 ];
-/** Joined to the person's role by shared skills: the first few named, the rest one step away;
- *  the slate's unexpected connection is shown in words on its own suggestion (Task W2E). */
+/** Joined to the person's role by shared skills: the first few named, the rest one step away,
+ *  each a plain fact about the two roles (the product owner, 1 November 2026). */
 const joined = full.map((shown, i) =>
   i < 2
     ? {
@@ -710,26 +708,9 @@ const joined = full.map((shown, i) =>
       }
     : shown,
 );
-export const SlateJoinedBySkillsWithAConnection: Story = {
+export const SlateJoinedBySkills: Story = {
   render: () => (
-    <Api
-      routes={[
-        {
-          method: "GET",
-          path: /\/slate$/,
-          answer: {
-            ...slate(joined),
-            connection: {
-              concept_id: joined[0]?.concept_id ?? "",
-              title: joined[0]?.title ?? "",
-              role_title: "warehouse supervisor",
-              shared_skill_count: 5,
-              shared_skills: joinedSkills,
-            },
-          },
-        },
-      ]}
-    >
+    <Api routes={[{ method: "GET", path: /\/slate$/, answer: slate(joined) }]}>
       <Directions
         workspaceId={WS}
         profile={profile}

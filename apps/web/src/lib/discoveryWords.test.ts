@@ -508,7 +508,7 @@ describe("[STATE-05][PROF-10] the sketch's words and a target's coverage", () =>
       "Careerwright can check skills, options and routes for this role.",
     );
     expect(TARGET_COVERAGE.not_covered(true)).toBe(
-      "Careerwright can show what this work usually asks for. It can't check skills, options or routes for it yet.",
+      "Careerwright can show the skills ESCO lists for this kind of work. It can't check skills, options or routes for it yet.",
     );
     expect(TARGET_COVERAGE.not_covered(false)).toBe(
       "Careerwright can't check skills, options or routes for this role yet.",

@@ -1,11 +1,13 @@
 "use client";
-// The early requirement sketch (spec section 3, STATE-05): what each target usually asks for,
-// from ESCO, and the steps still unresolved. Always labelled an early sketch, never a checked
-// or best route; it names no provider, price or date. An ambiguous title is resolved only by
-// the person's choice, never guessed.
+// The early requirement sketch (spec section 3, STATE-05): the essential skills ESCO lists for
+// each target's kind of work, and the steps still unresolved. Always labelled an early sketch,
+// never a checked or best route; it names no provider, price or date. An ambiguous title is
+// resolved only by the person's choice, never guessed.
 import type { ProfileOut, TargetSketchOut } from "@/generated/api";
 import { useChooseTarget, useSketch } from "@/lib/queries";
 import {
+  ESCO_LISTS,
+  ESCO_NAMED,
   PROFILE_FIELDS,
   RESEARCH_STATUS,
   RESOLUTION,
@@ -20,13 +22,13 @@ import { RequestFailure } from "./PageState";
 
 const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-/** What a target matched to one ESCO occupation usually asks for, from ESCO: its first
- *  essential skills, how many more there are, and whether ESCO marks it regulated. */
+/** The essential skills ESCO lists for the kind of work of a target matched to one ESCO
+ *  occupation: the first few, how many more there are, and whether ESCO marks it regulated. */
 export function TargetRequirements({ target }: { target: TargetSketchOut }) {
   if (target.resolution !== "esco") return null;
   return (
     <>
-      <p className="small">What this work usually asks for, from ESCO:</p>
+      <p className="small">{ESCO_LISTS}</p>
       <ul className="plain-list">
         {target.requirements.map((requirement) => (
           <li key={requirement}>{sentence(requirement)}</li>
@@ -90,48 +92,49 @@ export function SketchCard({ workspaceId, profile }: { workspaceId: string; prof
           A sketch needs a target role. Name one, or ask Careerwright for directions to explore.
         </p>
       ) : (
-        data.targets.map((target) => (
-          <div key={target.title} className="grid gap-8">
-            <p className="small">
-              <strong>{sentence(target.title)}</strong>: {RESOLUTION[target.resolution]}
-            </p>
-            <TargetCoverageLine target={target} />
-            <TargetRequirements target={target} />
-            {(target.resolution === "ambiguous" ||
-              target.resolution === "not_found" ||
-              target.resolution === "uk_title") &&
-              (target.resolution === "ambiguous" ? target.occupations : target.close_matches)
-                .length > 0 && (
-                <div className="grid gap-4">
-                  <p className="small">
-                    {target.resolution === "ambiguous" ? "Which do you mean?" : "Closest in ESCO:"}
-                  </p>
-                  <div className="flex flex-wrap gap-8">
-                    {(target.resolution === "ambiguous"
-                      ? target.occupations
-                      : target.close_matches
-                    ).map((occupation) => (
-                      <Button
-                        key={occupation.concept_id}
-                        variant="secondary"
-                        onClick={() =>
-                          choose.mutate({
-                            expected_version: profile.version,
-                            concept_id: occupation.concept_id,
-                            replaces: target.title,
-                          })
-                        }
-                      >
-                        Use {sentence(occupation.title)}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            <ResearchStatus target={target} />
-          </div>
-        ))
+        <p className="small muted">Careerwright looked up each target in {ESCO_NAMED}.</p>
       )}
+      {data.targets.map((target) => (
+        <div key={target.title} className="grid gap-8">
+          <p className="small">
+            <strong>{sentence(target.title)}</strong>: {RESOLUTION[target.resolution]}
+          </p>
+          <TargetCoverageLine target={target} />
+          <TargetRequirements target={target} />
+          {(target.resolution === "ambiguous" ||
+            target.resolution === "not_found" ||
+            target.resolution === "uk_title") &&
+            (target.resolution === "ambiguous" ? target.occupations : target.close_matches).length >
+              0 && (
+              <div className="grid gap-4">
+                <p className="small">
+                  {target.resolution === "ambiguous" ? "Which do you mean?" : "Closest in ESCO:"}
+                </p>
+                <div className="flex flex-wrap gap-8">
+                  {(target.resolution === "ambiguous"
+                    ? target.occupations
+                    : target.close_matches
+                  ).map((occupation) => (
+                    <Button
+                      key={occupation.concept_id}
+                      variant="secondary"
+                      onClick={() =>
+                        choose.mutate({
+                          expected_version: profile.version,
+                          concept_id: occupation.concept_id,
+                          replaces: target.title,
+                        })
+                      }
+                    >
+                      Use {sentence(occupation.title)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+          <ResearchStatus target={target} />
+        </div>
+      ))}
       {data.steps.length > 0 && (
         <ol className="plain-list">
           {data.steps.map(({ step }) => (

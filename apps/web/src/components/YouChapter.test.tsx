@@ -335,7 +335,6 @@ function slateFor(query: string): SlateOut {
     not_included: [],
     unmatched_titles: [],
     ambiguous_titles: [],
-    connection: null,
     familiarity_known: false, // no role or target given
   } as SlateOut;
 }
@@ -991,7 +990,6 @@ describe("[DIV1-13][DIV1-14] the start: the first question, which is closest, th
       usual_skills: [],
       destinations: [],
       fewer_reasons: [],
-      connection: null,
       salary_floor: null,
     }) as unknown as OriginOut;
   const titles = (q: string, matches: TitleMatchesOut["matches"], partial = false) =>

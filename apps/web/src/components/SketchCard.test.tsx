@@ -181,4 +181,31 @@ describe("[STATE-05][DIV1-03] the sketch says what matching each title did", () 
       "Find courses, work routes or funding for any gaps. Not resolved yet. Not researched yet: no providers, prices or dates.",
     );
   });
+
+  it("[PROF-11] calls a target's skills ESCO's list for this kind of work, and names ESCO plainly once", async () => {
+    // The product owner's ESCO research: ESCO's list is ESCO's, never the person's skills or
+    // what the work "usually" asks for.
+    const listed = (title: string): Target => ({
+      ...target(title, "esco"),
+      occupations: [{ concept_id: title, title, isco_group: { code: "7231", label: "Mechanics" } }],
+      requirements: ["adjust brakes", "fit tyres"],
+      requirement_count: 9,
+    });
+    renderSketch({
+      profile_version: 1,
+      inputs: INPUTS,
+      not_asked: [],
+      targets: [listed("bicycle mechanic"), listed("motorcycle mechanic")],
+      steps: [],
+    });
+
+    expect(await screen.findAllByText("ESCO lists these for this kind of work:")).toHaveLength(2);
+    expect(
+      screen.getAllByText(
+        "Careerwright looked up each target in ESCO, the European Union's public list of occupations and skills.",
+      ),
+    ).toHaveLength(1);
+    expect(screen.getAllByText("Adjust brakes")).toHaveLength(2);
+    expect(document.body.textContent).not.toMatch(/usually/);
+  });
 });

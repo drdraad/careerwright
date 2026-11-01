@@ -1,7 +1,6 @@
 """Destinations joined by shared essential skills, never by shared words in a title (plan
 section 4, Sprint W SW.5; ADR 0007 decision 13): the skill join's hits, the direction they
-take and the unexpected connection singled out from a slate. Hand-built occupations; no
-database."""
+take. Hand-built occupations; no database."""
 
 import uuid
 
@@ -14,15 +13,12 @@ from careerwright.profile.slate import (
     JOIN_HITS,
     MIN_SHARED_SKILLS,
     Direction,
-    Hit,
     Occupation,
     PoolQuery,
     SlateChannel,
     build_pool,
-    choose_slate,
     skill_join,
     skill_join_hits,
-    unexpected_connection,
 )
 
 ROLE = EvidenceItem(field=ProfileField.CURRENT_ROLE, text="data analyst")
@@ -150,91 +146,3 @@ def test_a_joined_role_is_close_in_the_person_s_own_kind_of_work_and_transferabl
     assert directions["data entry clerk"] is Direction.TRANSFERABLE
     shared = {c.occupation.title: c.matches[0].shared_skills for c in pool}
     assert shared["chief data officer"] == 7
-
-
-@pytest.mark.req("DIV1-12")
-def test_the_unexpected_connection_is_the_strongest_join_outside_the_person_s_kind_of_work() -> (
-    None
-):
-    slate = choose_slate(build_pool([join()], OCCUPATIONS, frozenset({"251"})))
-
-    found = unexpected_connection(slate, frozenset({"skills"}), frozenset({"251"}), frozenset())
-
-    assert found is not None
-    # 251 (the data analyst's own kind of work) never counts, however many skills it shares.
-    assert found.candidate.occupation.family_code != "251"
-    assert found.candidate in slate.suggestions
-    # The ICT information and knowledge manager shares 8 essential skills, the most outside
-    # the person's own kind of work.
-    assert (found.candidate.occupation.title, found.shared_skills) == (
-        "ICT information and knowledge manager",
-        8,
-    )
-
-
-def test_a_connection_is_never_a_title_the_person_named() -> None:
-    slate = choose_slate(build_pool([join()], OCCUPATIONS, frozenset({"251"})))
-    named = frozenset({concept("ICT information and knowledge manager")})
-
-    found = unexpected_connection(slate, frozenset({"skills"}), frozenset({"251"}), named)
-
-    assert found is not None
-    assert (found.candidate.occupation.title, found.shared_skills) == ("chief data officer", 7)
-
-
-def test_equal_shared_skills_go_to_the_larger_share_of_both_roles() -> None:
-    occupations = {
-        o.concept_id: o for o in (occupation("broad role", "212"), occupation("narrow role", "331"))
-    }
-    query = PoolQuery(
-        "skills",
-        "data analyst",
-        SlateChannel.SHARED_SKILLS,
-        (ROLE,),
-        skill_join_hits(
-            36,
-            [
-                SkillNeighbour(concept("broad role"), 7, 50),  # 7 of 79
-                SkillNeighbour(concept("narrow role"), 7, 16),  # 7 of 45
-            ],
-        ),
-    )
-    slate = choose_slate(build_pool([query], occupations, frozenset({"251"})))
-
-    found = unexpected_connection(slate, frozenset({"skills"}), frozenset({"251"}), frozenset())
-
-    assert {s.occupation.title for s in slate.suggestions} == {"broad role", "narrow role"}
-    assert found is not None
-    assert found.candidate.occupation.title == "narrow role"
-
-
-def test_no_connection_without_a_join_from_the_person_s_role() -> None:
-    other = PoolQuery(
-        "q1",
-        "analysing data",
-        SlateChannel.TASKS,
-        (ROLE,),
-        (Hit(concept("statistician"), 1.0, label_match=False),),
-    )
-    slate = choose_slate(build_pool([other, join()], OCCUPATIONS, frozenset({"251"})))
-
-    assert unexpected_connection(slate, frozenset(), frozenset({"251"}), frozenset()) is None
-    only_own = choose_slate(
-        build_pool(
-            [
-                PoolQuery(
-                    "skills",
-                    "data analyst",
-                    SlateChannel.SHARED_SKILLS,
-                    (ROLE,),
-                    skill_join_hits(36, [SkillNeighbour(concept("data scientist"), 22, 63)]),
-                )
-            ],
-            OCCUPATIONS,
-            frozenset({"251"}),
-        )
-    )
-    assert (
-        unexpected_connection(only_own, frozenset({"skills"}), frozenset({"251"}), frozenset())
-        is None
-    )

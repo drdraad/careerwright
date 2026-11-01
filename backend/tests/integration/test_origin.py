@@ -140,7 +140,7 @@ def test_the_origin_shows_usual_skills_and_destinations_joined_by_shared_skills(
     assert assistant["direction"] == "close_to_current"  # the same kind of work
     [reason] = assistant["reasons"]
     assert (reason["reason"], reason["shared"]) == ("joined_by_shared_skills", 5)
-    assert shown["connection"] is None  # nothing outside the bookkeeper's kind of work
+    assert "connection" not in shown  # shared skills are a plain fact on each destination
     assert shown["release"]["sample"] is True
 
     used = api.write(

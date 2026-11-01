@@ -497,14 +497,13 @@
     {
       "id": "DSC-10",
       "kind": "discovery",
-      "title": "\"data analyst\" (session 2): every suggestion joins the role by shared essential skills, never by a word in a title, with an unexpected connection",
+      "title": "\"data analyst\" (session 2): every suggestion joins the role by shared essential skills, never by a word in a title",
       "requirements": ["DIV1-06", "DIV1-10", "DIV1-12", "REC1-06"],
       "synthetic": true,
       "profile": {"current_role": "data analyst"},
       "expect": [
         {"check": "size_at_least", "count": 4},
         {"check": "joined_by_skills"},
-        {"check": "connection"},
         {"check": "includes_direction", "direction": "close_to_current"},
         {"check": "includes_direction", "direction": "transferable"},
         {"check": "family_limit"},
@@ -586,7 +585,6 @@
       "expect": [
         {"check": "size_at_least", "count": 4},
         {"check": "joined_by_skills"},
-        {"check": "connection"},
         {"check": "grounded"},
         {"check": "distinct"}
       ],
@@ -595,13 +593,12 @@
     {
       "id": "DSC-16",
       "kind": "discovery",
-      "title": "A role several occupations hold as a title joins nothing until the person chooses which, and no connection states a fact about it",
+      "title": "A role several occupations hold as a title joins nothing until the person chooses which",
       "requirements": ["DIV1-03", "DIV1-12"],
       "synthetic": true,
       "profile": {"current_role": "bus operator"},
       "expect": [
         {"check": "titles_ambiguous", "words": ["bus operator"]},
-        {"check": "no_connection"},
         {"check": "fewer_has_reason"},
         {"check": "grounded"},
         {"check": "distinct"}

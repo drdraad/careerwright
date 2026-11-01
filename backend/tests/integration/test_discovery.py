@@ -19,7 +19,6 @@ from fastapi.testclient import TestClient
 
 from careerwright.api.app import create_app
 from careerwright.api.deps import ApiDependencies
-from careerwright.catalogue import taxonomy_store
 from careerwright.catalogue.esco import concept_id
 from careerwright.catalogue.pay import MappingReview, MappingReviewPack
 from careerwright.catalogue.taxonomy import held_release
@@ -465,7 +464,7 @@ def test_a_role_esco_does_not_list_is_reported_never_searched_by_its_words(
 
     assert result["unmatched_titles"] == ["Of the"]
     assert "Of the" not in [q["text"] for q in result["queries"]]
-    assert result["connection"] is None  # no role ESCO holds, so nothing to connect to
+    assert "connection" not in result  # no suggestion is singled out (the plain line)
 
 
 @pytest.mark.req("DIV1-10", "DIV1-12")
@@ -509,12 +508,22 @@ def test_a_role_esco_lists_joins_other_work_by_shared_essential_skills_only(
                     "WHERE preferred_label = 'bus driver'"
                 )
             ).scalars()
-            both = taxonomy_store.shared_essential_skills(
-                tx, [bus], uuid.UUID(trolley["concept_id"])
-            )
+            # Read from the release itself, beside the API's own answer.
+            both = tx.execute(
+                sa.text(
+                    "SELECT DISTINCT s.preferred_label FROM careerwright.occupation_skills r "
+                    "JOIN careerwright.skills s ON s.skill_id = r.skill_id "
+                    "WHERE r.concept_id = :other AND r.relation = 'essential' AND r.skill_id IN "
+                    "(SELECT a.skill_id FROM careerwright.occupation_skills a "
+                    "WHERE a.concept_id = :bus AND a.relation = 'essential') "
+                    "ORDER BY s.preferred_label"
+                ),
+                {"other": uuid.UUID(trolley["concept_id"]), "bus": bus},
+            ).scalars()
+            shared = list(both)
     finally:
         engine.dispose()
-    assert named == [skill.preferred_label for skill in both]
+    assert named == shared
     # Work found by a search, not joined by skills, names none.
     assert all(
         s["shared_skills"] == []

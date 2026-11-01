@@ -572,24 +572,6 @@ def skill_neighbours(
     ]
 
 
-def shared_essential_skills(
-    tx: Tx, anchors: Iterable[uuid.UUID], other: uuid.UUID
-) -> list[SkillRef]:
-    """The essential skills `other` shares with the anchor occupations, by label."""
-    rows = tx.execute(
-        sa.text(
-            "SELECT DISTINCT s.skill_id, s.preferred_label, s.skill_type, r.relation "
-            "FROM careerwright.occupation_skills r JOIN careerwright.skills s ON s.skill_id = "
-            "r.skill_id WHERE r.concept_id = :other AND r.relation = 'essential' "
-            "AND r.skill_id IN (SELECT a.skill_id FROM careerwright.occupation_skills a "
-            "WHERE a.concept_id = ANY(CAST(:ids AS uuid[])) AND a.relation = 'essential') "
-            "ORDER BY s.preferred_label, s.skill_id"
-        ),
-        {"other": other, "ids": [str(i) for i in sorted(set(anchors))]},
-    ).mappings()
-    return [SkillRef(**dict(row)) for row in rows]
-
-
 def essential_skills_by_id(tx: Tx, skill_ids: Iterable[uuid.UUID]) -> list[SkillRef]:
     """These skills from the held release, by label (as essential skills of some occupation)."""
     ids = sorted({str(i) for i in skill_ids})
