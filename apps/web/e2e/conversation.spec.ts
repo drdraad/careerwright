@@ -32,7 +32,11 @@ async function demoWorkspace(name: string): Promise<string> {
 
 async function send(page: Page, message: string) {
   await page.getByRole("textbox", { name: "Reply to Careerwright" }).fill(message);
-  await page.getByRole("button", { name: "Send" }).click();
+  // Send says why it can't while the last turn is still finishing ("Careerwright is still
+  // replying."), even once its words are shown; a click then sends nothing, as for a person.
+  const button = page.getByRole("button", { name: "Send" });
+  await expect(button).not.toHaveAttribute("aria-disabled", "true", { timeout: 60_000 });
+  await button.click();
 }
 
 /** In the viewport and on top at its centre: nothing (such as the sheet) covers it. */

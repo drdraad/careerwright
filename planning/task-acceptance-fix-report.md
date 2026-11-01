@@ -178,3 +178,28 @@ acceptance runs and are not committed.
 - `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` (Node 24): **rc 0**; pytest
   2,159 passed, 8 skipped; Vitest 45 files, 471 passed; lint, types, client drift clean.
 - `make acceptance`: not run, the controller runs acceptance.
+
+### Follow-up: [STATE-09] failing later, at the second "Skip" reply (acceptance run 9)
+- What the trace shows: the "Skip" message was never posted. Only one turn was POSTed (the one
+  for "What next?"). When the test filled "Skip", the field still held "What next?", and Send was
+  `aria-disabled`. Its reason was "Careerwright is still replying.": the reply's words were
+  already shown, but the turn list had not yet marked the turn finished. The click sent nothing.
+  When that first send settled, the field was emptied, and "Skip" with it.
+- Product cause (a lost input): `Conversation.tsx` `send` cleared the field with
+  `text === message.trim()`, where `message` was the field's value when sending began, which
+  always equals the sent text. So it emptied the field even when the person had typed a new
+  message while the first was on its way. Fix: it now compares against the field's value at
+  that moment (`setMessage(current => current.trim() === text ? "" : current)`). Only the words
+  that were sent are cleared.
+  RED then GREEN: the new `YouChapter.test.tsx` test "[STATE-09] a reply typed while the last
+  one is on its way is kept…" failed first (the field was empty, not "Skip"), then passed.
+- Test cause: the helper clicked Send while the product was blocking it on purpose, with a
+  stated reason. Blocking a send while a turn finishes is intended. `send()` in
+  `e2e/conversation.spec.ts` now waits until Send is no longer `aria-disabled` (up to 60 s)
+  before clicking, as a person would. This waits longer; it does not loosen any assertion. No
+  expectation changed.
+- Why my first run passed: timing. The turn usually finishes before the next fill.
+- Checks: `e2e/conversation.spec.ts` run 3 times in a row under the lock (build shim,
+  machine Chromium): **11 passed** each time. Lock released, no `careerwright-l0-*`
+  containers left. `make check` rc 0 (pytest 2,159 passed; Vitest 45 files, 472 passed).
+  `make acceptance`: not run, the controller runs acceptance.
