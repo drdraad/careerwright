@@ -17,7 +17,7 @@ records nothing.
 """
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Literal
 
@@ -119,17 +119,20 @@ class CapabilityView:
     matrices: list[Matrix]
     evidence: list[SkillEvidence]
     statements: list[RequirementStatement]
+    records: list[TargetRecord] = field(default_factory=list)  # each matrix's, in its order
 
 
 def capability_view(tx: Tx, workspace_id: uuid.UUID, data: CapabilityData) -> CapabilityView:
     workspace = visible_workspace(tx, workspace_id)
     profile = current_profile(tx, workspace_id)
     matrices: list[Matrix] = []
+    records: list[TargetRecord] = []
     if target_titles(profile.document):
         release = held_release(tx)  # TAXONOMY_UNAVAILABLE without one: never an empty matrix
+        records = stored_targets(tx, workspace_id, profile.document, pack_targets(data))
         matrices = [
             _matrix(tx, workspace_id, record, data, release, synthetic=workspace.synthetic)
-            for record in stored_targets(tx, workspace_id, profile.document, pack_targets(data))
+            for record in records
         ]
     state = store.state(tx, workspace_id)
     return CapabilityView(
@@ -141,6 +144,7 @@ def capability_view(tx: Tx, workspace_id: uuid.UUID, data: CapabilityData) -> Ca
         matrices=matrices,
         evidence=store.evidence(tx, workspace_id),
         statements=store.statements(tx, workspace_id),
+        records=records,
     )
 
 
@@ -247,13 +251,13 @@ def questions(view: CapabilityView) -> QuestionGraph:
     )
 
 
-class _Command(BaseModel):
+class VersionedCommand(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     expected_version: int = Field(ge=0, description="0 while nothing has been recorded.")
 
 
-class RecordEvidence(_Command):
+class RecordEvidence(VersionedCommand):
     """An answer about a skill: the level is chosen against `rubric_version`'s anchors. The
     subject is a skill of a target's matrix, or one of the essential skills the person's
     role usually needs (`esco:<skill ID>`): "I've used this" is `answer: used`, no level."""
@@ -276,7 +280,7 @@ class RecordEvidence(_Command):
     outcome_id: str | None = Field(default=None, max_length=200)
 
 
-class RecordStatement(_Command):
+class RecordStatement(VersionedCommand):
     """Whether the person holds a credential, experience or eligibility requirement."""
 
     subject: str = Field(min_length=1, max_length=200)
@@ -285,7 +289,7 @@ class RecordStatement(_Command):
     verification_note: str | None = Field(default=None, max_length=300)
 
 
-class EditRow(_Command):
+class EditRow(VersionedCommand):
     """Set a row's importance, or challenge its source, at the checkpoint."""
 
     target: TextValue = Field(description="One of the profile's target titles.")
@@ -301,7 +305,7 @@ class EditRow(_Command):
     )
 
 
-class SetQuestions(_Command):
+class SetQuestions(VersionedCommand):
     stopped: bool = Field(description="Stop or pause the questions; false resumes them.")
 
 
@@ -323,7 +327,7 @@ def _invalid(reason: str, message: str, field: str) -> CareerwrightError:
     )
 
 
-def _advance(
+def advance_version(
     tx: Tx, actor: Actor, workspace_id: uuid.UUID, expected: int, *, stopped: bool | None = None
 ) -> tuple[int, bool]:
     """The next capability version; the caller holds the workspace lock."""
@@ -341,7 +345,7 @@ def _advance(
     return expected + 1, keep
 
 
-def _event(tx: Tx, workspace_id: uuid.UUID, version: int) -> None:
+def capability_event(tx: Tx, workspace_id: uuid.UUID, version: int) -> None:
     identity_store.append_event(
         tx,
         workspace_id,
@@ -414,9 +418,9 @@ def record_checked_evidence(
 ) -> CapabilityChange:
     """Record evidence its command already checked, as the next capability version; the
     caller holds the workspace lock."""
-    version, stopped = _advance(tx, actor, workspace_id, expected_version)
+    version, stopped = advance_version(tx, actor, workspace_id, expected_version)
     store.insert_evidence(tx, workspace_id, version, evidence)
-    _event(tx, workspace_id, version)
+    capability_event(tx, workspace_id, version)
     return CapabilityChange(version, stopped, evidence.evidence_id)
 
 
@@ -455,9 +459,9 @@ def record_statement(
         raise _invalid(
             "verified_only_if_held", "Only a requirement you hold can be verified.", "verified"
         ) from None
-    version, stopped = _advance(tx, actor, workspace_id, command.expected_version)
+    version, stopped = advance_version(tx, actor, workspace_id, command.expected_version)
     store.insert_statement(tx, workspace_id, version, statement)
-    _event(tx, workspace_id, version)
+    capability_event(tx, workspace_id, version)
     return CapabilityChange(version, stopped, statement.statement_id)
 
 
@@ -534,9 +538,9 @@ def edit_row(
             "to_definition_version": after.definition_version,
         }
     )
-    version, stopped = _advance(tx, actor, workspace_id, command.expected_version)
+    version, stopped = advance_version(tx, actor, workspace_id, command.expected_version)
     store.insert_edit(tx, workspace_id, version, key, recorded)
-    _event(tx, workspace_id, version)
+    capability_event(tx, workspace_id, version)
     return CapabilityChange(
         version, stopped, edit.edit_id, after.matrix_version, after.definition_version
     )
@@ -546,8 +550,8 @@ def set_questions(
     tx: Tx, actor: Actor, workspace_id: uuid.UUID, command: SetQuestions
 ) -> CapabilityChange:
     visible_workspace(tx, workspace_id, lock=True)
-    version, stopped = _advance(
+    version, stopped = advance_version(
         tx, actor, workspace_id, command.expected_version, stopped=command.stopped
     )
-    _event(tx, workspace_id, version)
+    capability_event(tx, workspace_id, version)
     return CapabilityChange(version, stopped, None)

@@ -305,6 +305,83 @@ export const ActorOutSchema = {
     title: 'ActorOut'
 } as const;
 
+export const AdvertExampleSchema = {
+    properties: {
+        job_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Job Id'
+        },
+        title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        employer: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Employer'
+        },
+        text: {
+            type: 'string',
+            title: 'Text'
+        },
+        spans: {
+            items: {
+                $ref: '#/components/schemas/SelectedSpan'
+            },
+            type: 'array',
+            title: 'Spans'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'job_id',
+        'title',
+        'employer',
+        'text',
+        'spans'
+    ],
+    title: 'AdvertExample',
+    description: 'One of the person\'s own example adverts for the target, with their chosen spans.'
+} as const;
+
+export const AdvertSpanSchema = {
+    properties: {
+        start: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Start'
+        },
+        end: {
+            type: 'integer',
+            minimum: 1,
+            title: 'End'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'start',
+        'end'
+    ],
+    title: 'AdvertSpan',
+    description: 'Character offsets into an example\'s text: `start` inclusive, `end` exclusive.'
+} as const;
+
 export const AdvertiserKindSchema = {
     type: 'string',
     enum: [
@@ -2899,6 +2976,30 @@ export const EmptyReasonSchema = {
     description: 'Why a listing has no vacancy (STATE-02): never a bare empty list. Only\n`none_found_in_sources_checked` says the sources read held none, and only an API\'s own\nempty answer can give it (fix round 2, review B N1); a page model extraction read and\nfound no advert on gives `no_posting_found_by_model`, never that (ruling 9).'
 } as const;
 
+export const EntryFactSchema = {
+    properties: {
+        qualification: {
+            type: 'string',
+            title: 'Qualification'
+        },
+        status: {
+            $ref: '#/components/schemas/QualificationStatus'
+        },
+        standing: {
+            $ref: '#/components/schemas/EntryStanding'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'qualification',
+        'status',
+        'standing'
+    ],
+    title: 'EntryFact',
+    description: 'One of the person\'s qualifications, beside a requirement that names it.'
+} as const;
+
 export const EntryModeSchema = {
     type: 'string',
     enum: [
@@ -2907,6 +3008,16 @@ export const EntryModeSchema = {
     ],
     title: 'EntryMode',
     description: 'How the person chose to start (spec section 3, the You chapter).'
+} as const;
+
+export const EntryStandingSchema = {
+    type: 'string',
+    enum: [
+        'expected_not_met',
+        'achieved_unverified',
+        'achieved_stated'
+    ],
+    title: 'EntryStanding'
 } as const;
 
 export const EqualPointSchema = {
@@ -3125,6 +3236,64 @@ export const EscoLinkSchema = {
         'relation'
     ],
     title: 'EscoLink'
+} as const;
+
+export const EscoListedSkillSchema = {
+    properties: {
+        skill_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Skill Id'
+        },
+        subject: {
+            type: 'string',
+            title: 'Subject'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        skill_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Skill Type'
+        },
+        relation: {
+            type: 'string',
+            enum: [
+                'essential',
+                'optional'
+            ],
+            title: 'Relation'
+        },
+        row_id: {
+            type: 'string',
+            title: 'Row Id'
+        },
+        not_part_of_job: {
+            type: 'boolean',
+            title: 'Not Part Of Job'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'skill_id',
+        'subject',
+        'label',
+        'skill_type',
+        'relation',
+        'row_id',
+        'not_part_of_job'
+    ],
+    title: 'EscoListedSkill',
+    description: 'A skill ESCO lists for the occupation\'s kind of work: ESCO\'s, never the person\'s.'
 } as const;
 
 export const EventKindSchema = {
@@ -6134,6 +6303,16 @@ export const NoSharedOccupationSchema = {
     description: 'The role\'s join found no other occupation sharing enough essential skills.'
 } as const;
 
+export const NotAssessedReasonSchema = {
+    type: 'string',
+    enum: [
+        'no_rubric',
+        'insufficient_coverage',
+        'rubrics_not_reviewed'
+    ],
+    title: 'NotAssessedReason'
+} as const;
+
 export const NotIncludedSchema = {
     type: 'string',
     enum: [
@@ -7781,6 +7960,26 @@ export const PaymentPlanSchema = {
     ],
     title: 'PaymentPlan',
     description: 'One way of paying for an offering. With `unknown` set, its cost is not stated.'
+} as const;
+
+export const PersonQualificationSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        status: {
+            $ref: '#/components/schemas/QualificationStatus'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'name',
+        'status'
+    ],
+    title: 'PersonQualification',
+    description: 'A qualification the person gave (Task 6f), in their words.'
 } as const;
 
 export const PlaceListSchema = {
@@ -10514,6 +10713,130 @@ export const RenameWorkspaceInSchema = {
     title: 'RenameWorkspaceIn'
 } as const;
 
+export const RequirementSchema = {
+    properties: {
+        row_id: {
+            type: 'string',
+            title: 'Row Id'
+        },
+        subject: {
+            type: 'string',
+            title: 'Subject'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        kind: {
+            $ref: '#/components/schemas/RowKind'
+        },
+        scope: {
+            $ref: '#/components/schemas/RowScope'
+        },
+        importance: {
+            $ref: '#/components/schemas/Importance'
+        },
+        gate: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/GateInfo'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        rubric_version: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rubric Version'
+        },
+        rubric_review_state: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: [
+                        'proposed',
+                        'reviewed'
+                    ]
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rubric Review State'
+        },
+        required_level: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Required Level'
+        },
+        review_state: {
+            type: 'string',
+            enum: [
+                'proposed',
+                'reviewed'
+            ],
+            title: 'Review State'
+        },
+        as_of: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'As Of'
+        },
+        employer_specific: {
+            type: 'boolean',
+            title: 'Employer Specific'
+        },
+        entry_facts: {
+            items: {
+                $ref: '#/components/schemas/EntryFact'
+            },
+            type: 'array',
+            title: 'Entry Facts'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'row_id',
+        'subject',
+        'label',
+        'kind',
+        'scope',
+        'importance',
+        'gate',
+        'rubric_version',
+        'rubric_review_state',
+        'required_level',
+        'review_state',
+        'as_of',
+        'employer_specific',
+        'entry_facts'
+    ],
+    title: 'Requirement',
+    description: 'A required row of the target\'s matrix: what the target asks.'
+} as const;
+
 export const ResearchStateSchema = {
     type: 'string',
     enum: [
@@ -12555,6 +12878,86 @@ export const SearchedThroughSkillSchema = {
     title: 'SearchedThroughSkill'
 } as const;
 
+export const SeedStateSchema = {
+    type: 'string',
+    enum: [
+        'esco_occupation',
+        'none_of_these',
+        'no_occupation'
+    ],
+    title: 'SeedState',
+    description: 'Where the target\'s ESCO list comes from.'
+} as const;
+
+export const SelectAdvertSpansSchema = {
+    properties: {
+        expected_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Version',
+            description: '0 while nothing has been recorded.'
+        },
+        target: {
+            type: 'string',
+            maxLength: 120,
+            minLength: 1,
+            title: 'Target',
+            description: 'One of the profile\'s target titles.'
+        },
+        job_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Job Id',
+            description: 'One of the person\'s own examples for that target.'
+        },
+        spans: {
+            items: {
+                $ref: '#/components/schemas/AdvertSpan'
+            },
+            type: 'array',
+            maxItems: 12,
+            title: 'Spans'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_version',
+        'target',
+        'job_id',
+        'spans'
+    ],
+    title: 'SelectAdvertSpans',
+    description: 'The parts of one of the person\'s own example adverts that say what the target asks\nfor, as character offsets into its text. An empty list clears the selection.'
+} as const;
+
+export const SelectedSpanSchema = {
+    properties: {
+        start: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Start'
+        },
+        end: {
+            type: 'integer',
+            minimum: 1,
+            title: 'End'
+        },
+        excerpt: {
+            type: 'string',
+            title: 'Excerpt'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'start',
+        'end',
+        'excerpt'
+    ],
+    title: 'SelectedSpan'
+} as const;
+
 export const SessionSchema = {
     properties: {
         weekday: {
@@ -12945,6 +13348,84 @@ export const SkillRefOutSchema = {
         'relation'
     ],
     title: 'SkillRefOut'
+} as const;
+
+export const SkillsAssessmentStateSchema = {
+    type: 'string',
+    enum: [
+        'assessed',
+        'not_assessed'
+    ],
+    title: 'SkillsAssessmentState'
+} as const;
+
+export const SkillsOutSchema = {
+    properties: {
+        version: {
+            type: 'integer',
+            title: 'Version'
+        },
+        profile_version: {
+            type: 'integer',
+            title: 'Profile Version'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        },
+        data_mode: {
+            $ref: '#/components/schemas/DataMode'
+        },
+        pack: {
+            $ref: '#/components/schemas/PackLabel'
+        },
+        reference: {
+            $ref: '#/components/schemas/ReferenceLabel'
+        },
+        targets: {
+            items: {
+                $ref: '#/components/schemas/TargetSkills'
+            },
+            type: 'array',
+            title: 'Targets'
+        },
+        questions: {
+            $ref: '#/components/schemas/QuestionGraph'
+        },
+        usual_in_role: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/UsualInRoleOut'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Absent (null), never empty, when the person has no role, or none naming one ESCO occupation.'
+        },
+        qualifications: {
+            items: {
+                $ref: '#/components/schemas/PersonQualification'
+            },
+            type: 'array',
+            title: 'Qualifications'
+        }
+    },
+    type: 'object',
+    required: [
+        'version',
+        'profile_version',
+        'synthetic',
+        'data_mode',
+        'pack',
+        'reference',
+        'targets',
+        'questions',
+        'usual_in_role',
+        'qualifications'
+    ],
+    title: 'SkillsOut',
+    description: 'The Skills chapter\'s facts: for each target, what ESCO lists for its occupation, the\nperson\'s own examples and the parts they chose, what the target asks with the person\'s\nqualifications beside it, and readiness only where a reviewed rubric exists ("not\nassessed yet" otherwise, never a result). Codes and numbers only: the web words them.'
 } as const;
 
 export const SkipReasonSchema = {
@@ -15506,6 +15987,158 @@ export const TargetSketchOutSchema = {
     title: 'TargetSketchOut'
 } as const;
 
+export const TargetSkillsSchema = {
+    properties: {
+        target_key: {
+            type: 'string',
+            title: 'Target Key'
+        },
+        target_title: {
+            type: 'string',
+            title: 'Target Title'
+        },
+        matrix_version: {
+            type: 'string',
+            title: 'Matrix Version'
+        },
+        definition_version: {
+            type: 'string',
+            title: 'Definition Version'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        },
+        seed: {
+            $ref: '#/components/schemas/SeedState'
+        },
+        occupation: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/OccupationLink'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        occupation_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/OccupationNote'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        esco_release: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Esco Release'
+        },
+        pack_target: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/PackTargetLink'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        pack_target_note: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/PackTargetNote'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        details_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Details Version',
+            description: 'This target\'s title details, the marks\' expected version.'
+        },
+        esco_listed: {
+            items: {
+                $ref: '#/components/schemas/EscoListedSkill'
+            },
+            type: 'array',
+            title: 'Esco Listed'
+        },
+        examples: {
+            items: {
+                $ref: '#/components/schemas/AdvertExample'
+            },
+            type: 'array',
+            title: 'Examples'
+        },
+        requirements: {
+            items: {
+                $ref: '#/components/schemas/Requirement'
+            },
+            type: 'array',
+            title: 'Requirements'
+        },
+        assessment_state: {
+            $ref: '#/components/schemas/SkillsAssessmentState'
+        },
+        not_assessed_reason: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/NotAssessedReason'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        readiness: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Assessment'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'target_key',
+        'target_title',
+        'matrix_version',
+        'definition_version',
+        'synthetic',
+        'seed',
+        'occupation',
+        'occupation_note',
+        'esco_release',
+        'pack_target',
+        'pack_target_note',
+        'details_version',
+        'esco_listed',
+        'examples',
+        'requirements',
+        'assessment_state',
+        'not_assessed_reason',
+        'readiness'
+    ],
+    title: 'TargetSkills'
+} as const;
+
 export const TargetStatusSchema = {
     type: 'string',
     enum: [
@@ -16965,6 +17598,40 @@ export const UrlRefusalSchema = {
     ],
     title: 'UrlRefusal',
     description: 'Why a URL is not fetched. Each is a policy refusal, recorded as a blocked attempt.'
+} as const;
+
+export const UsualInRoleOutSchema = {
+    properties: {
+        role_title: {
+            type: 'string',
+            title: 'Role Title'
+        },
+        occupation_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Occupation Id'
+        },
+        occupation_label: {
+            type: 'string',
+            title: 'Occupation Label'
+        },
+        skills: {
+            items: {
+                $ref: '#/components/schemas/UsualSkillOut'
+            },
+            type: 'array',
+            title: 'Skills'
+        }
+    },
+    type: 'object',
+    required: [
+        'role_title',
+        'occupation_id',
+        'occupation_label',
+        'skills'
+    ],
+    title: 'UsualInRoleOut',
+    description: 'The essential skills ESCO lists for the kind of work of the person\'s role: usual in\ntheir role, not confirmed yet. Display only: wherever anything is computed it stays\nunresolved, and it is never evidence.'
 } as const;
 
 export const UsualSkillOutSchema = {
