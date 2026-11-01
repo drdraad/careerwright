@@ -87,8 +87,10 @@ live-adzuna:
 live-extract:
 	$(BACKEND) $(UV) python -m tools.live_smoke --extract
 
+# TITLE reaches the command as the shell's own variable (make exports a command-line variable),
+# never pasted into the command line, so its quotes and backquotes stay words of the title.
 live-role-research:
-	$(BACKEND) $(UV) python -m tools.live_role_research $(if $(TITLE),--title "$(TITLE)",)
+	$(BACKEND) $(UV) python -m tools.live_role_research $(if $(TITLE),--title "$$TITLE",)
 
 session:
 	$(BACKEND) $(UV) python -m tools.session start

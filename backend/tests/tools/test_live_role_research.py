@@ -16,7 +16,7 @@ from pydantic_ai.usage import RequestUsage
 from careerwright.evidence.acquire import AcquisitionResult
 from careerwright.evidence.records import AttemptStatus, InputRoute, RightsClass
 from tests.support.fake_models import SEARCHED, search_parts
-from tools.live_role_research import ROLE_SCOPE, research_role
+from tools.live_role_research import PAGES_PRINTED, ROLE_SCOPE, research_role
 from tools.live_smoke import SmokeSettings
 from tools.usage_ledger import CallOutcome, Ledger
 
@@ -56,7 +56,7 @@ def _page(url: str) -> AcquisitionResult:
 
 @pytest.mark.req("DIV1-15", "MODEL-08", "SEC-05")
 def test_one_search_is_sent_only_the_title_and_its_pages_are_checked_and_ledgered(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setenv("META_API_KEY", "not-a-real-key")
     ledger = Ledger(tmp_path / "live-usage.jsonl")
@@ -81,7 +81,35 @@ def test_one_search_is_sent_only_the_title_and_its_pages_are_checked_and_ledgere
         False,
     )
     assert row.estimated_cost_nano_usd is not None
-    notes = json.loads(row.notes)
-    assert (notes["verdict"], notes["sources"]) == ("found", 2)
-    assert [p["title_verified"] for p in notes["pages"]] == [True, True]
-    assert "https://" not in row.notes  # hosts only, never a URL
+    assert json.loads(row.notes)["candidates"] == 2
+    # What the pages showed is printed with the row's number (the row is written before any
+    # page is read, fix round 1, review I3).
+    line = next(x for x in capsys.readouterr().out.splitlines() if x.startswith(PAGES_PRINTED))
+    pages = json.loads(line.removeprefix(PAGES_PRINTED).partition(": ")[2])
+    assert (pages["ledger_row"], pages["verdict"], pages["sources"]) == (row.seq, "found", 2)
+    assert [p["title_verified"] for p in pages["pages"]] == [True, True]
+    assert "https://" not in line  # hosts only, never a URL
+
+
+@pytest.mark.req("DIV1-15", "MODEL-08")
+def test_the_paid_call_is_ledgered_before_any_page_is_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("META_API_KEY", "not-a-real-key")
+    ledger = Ledger(tmp_path / "live-usage.jsonl")
+    rows_when_read: list[int] = []
+
+    def failing(url: str) -> AcquisitionResult:
+        rows_when_read.append(len(ledger.records()))
+        raise KeyboardInterrupt  # stopped mid-reading (Ctrl-C), or anything unexpected
+
+    with pytest.raises(KeyboardInterrupt):
+        research_role(
+            SmokeSettings(_env_file=None), ledger, title=TITLE, build=_meta([]), read=failing
+        )
+
+    [row] = ledger.records()
+    assert rows_when_read == [1]  # the paid call's row was already written
+    assert (row.budget_scope, row.outcome) == (ROLE_SCOPE, CallOutcome.OK)
+    assert row.estimated_cost_nano_usd is not None
+    assert (tmp_path / "live-usage.md").read_text(encoding="utf-8").count(ROLE_SCOPE) >= 1
