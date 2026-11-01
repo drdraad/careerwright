@@ -44,7 +44,9 @@ import {
   listWorkspaces,
   matchTitles,
   type NameRole,
+  type NoJobYet,
   nameRole,
+  noJobYet,
   type OriginOut,
   type PartialReplyOut,
   type PreferencesOut,
@@ -658,6 +660,23 @@ export function useNameRole(id: string) {
     async (body: NameRole, key: string) =>
       (
         await nameRole({
+          path: path(id),
+          body,
+          headers: { "Idempotency-Key": key },
+          throwOnError: true,
+        })
+      ).data as ProfileOut,
+  );
+}
+
+/** The first answer "I haven't had a job yet" (Task 6f): an answer about the current role,
+ *  never a job title, Skipped or Unknown. */
+export function useNoJobYet(id: string) {
+  return useCommand(
+    id,
+    async (body: NoJobYet, key: string) =>
+      (
+        await noJobYet({
           path: path(id),
           body,
           headers: { "Idempotency-Key": key },

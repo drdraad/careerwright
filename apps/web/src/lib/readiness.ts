@@ -46,6 +46,9 @@ export function chapterNeeds(
     withoutStart: start.filter(
       (name) => document[name].state !== "unasked" && document[name].state !== "provided",
     ),
-    lessPrecise: refine.filter((name) => document[name].state !== "provided"),
+    // "I haven't had a job yet" is a full answer, never a gap (Task 6f).
+    lessPrecise: refine.filter(
+      (name) => document[name].state !== "provided" && document[name].state !== "no_job_yet",
+    ),
   };
 }

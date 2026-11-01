@@ -116,6 +116,51 @@ test("[DIV1-13][DIV1-14][WLD-01] any UK title is offered as you type; picking on
   expect(externalRequests(requests)).toEqual([]);
 });
 
+test("[STATE-11][PROF-14] “I haven't had a job yet” lights the world within ten seconds, and nothing asks for a job again, in the demo with no key", async ({
+  page,
+}) => {
+  // Task 6f: an answer about the role, never a job title, Skipped or Unknown.
+  test.setTimeout(120_000);
+  const requests = recordRequests(page);
+  const workspace = await demoWorkspace("No job yet (synthetic)");
+  await signIn(page, "ada", chapterUrl("you", workspace));
+  await expect(
+    page.getByRole("heading", { name: "What do you do now, or what did you do last?" }),
+  ).toBeVisible();
+
+  const took = await answer(page, () =>
+    page.getByRole("button", { name: "I haven't had a job yet" }).click(),
+  );
+  console.log(`the world answered "I haven't had a job yet" in ${took} ms`);
+  expect(took).toBeLessThan(ANSWERED_WITHIN_MS);
+  await expect(page.getByRole("heading", { name: "How would you like to start?" })).toBeFocused();
+  await expect(page.getByText(/what this work asks for/i)).toHaveCount(0);
+
+  // Exploring opens without a job, and the demo's next question asks what they enjoy.
+  await page.getByRole("button", { name: "Help me explore" }).click();
+  await expect(
+    page.getByRole("heading", { name: "What would you like your working life to be like?" }),
+  ).toBeVisible();
+  await page
+    .getByRole("group", { name: "Example replies" })
+    .getByRole("button", { name: "Skip" })
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      name: "What do you enjoy doing, at school, at work or in your own time?",
+    }),
+  ).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("combobox", { name: "Your job title" })).toHaveCount(0);
+
+  await youView(page, "What we know");
+  await expect(
+    page.getByRole("tabpanel", { name: "What we know" }).getByText("I haven't had a job yet", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(externalRequests(requests)).toEqual([]);
+});
+
 test("[PROF-11] seniority and industry beside the role, and a skill ESCO lists marked not part of my job, in the demo", async ({
   page,
 }) => {
@@ -140,7 +185,7 @@ test("[PROF-11] seniority and industry beside the role, and a skill ESCO lists m
   await details.getByRole("button", { name: "Save" }).click();
   await expect(details.getByText("Seniority: Band 6. Industry: not given.")).toBeVisible();
 
-  await details.getByText(/skills ESCO lists for this kind of work$/).click();
+  await details.getByText(/skills that ESCO, .* lists for this kind of work$/).click();
   const mark = details.getByRole("button", { name: /^Not part of my job\s*:/ }).first();
   await expect(mark).toHaveAttribute("aria-pressed", "false");
   await mark.click();
@@ -166,7 +211,9 @@ test("[DIV1-13][DIV1-03][WLD-01] a title neither list holds is kept in the perso
   // the words as typed.
   await field(page).fill("Bookkeeping assistant");
   await expect(
-    page.getByText("Careerwright couldn't match that title in ESCO. Is it one of these?"),
+    page.getByText(
+      "Careerwright couldn't match that title in ESCO, the EU's list of jobs and skills. Is it one of these?",
+    ),
   ).toBeVisible();
   const own = page.getByRole("option", { name: /^None of these is my job/ });
   await expect(own).toContainText("Use my own words: “Bookkeeping assistant”");

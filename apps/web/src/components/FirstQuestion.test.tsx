@@ -132,6 +132,7 @@ function api(answers: Record<string, TitleMatchesOut>): Sent[] {
     { method: "POST", path: /\/origin\/role\/title$/, status: 201, answer: profile },
     { method: "POST", path: /\/origin\/role$/, status: 201, answer: profile },
     { method: "POST", path: /\/origin\/role\/closest$/, status: 201, answer: profile },
+    { method: "POST", path: /\/origin\/role\/no-job-yet$/, status: 201, answer: profile },
   ]);
 }
 
@@ -206,9 +207,10 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
     const user = wrap(<Held workspaceId={WS} profile={profile} onSkip={() => {}} />);
 
     await user.type(field(), "Bookkeeping assistant");
+    // ESCO named plainly where the start first lists its titles (Task 6f, design I1).
     expect(
       await screen.findByText(
-        "Careerwright couldn't match that title in ESCO. Is it one of these?",
+        "Careerwright couldn't match that title in ESCO, the EU's list of jobs and skills. Is it one of these?",
       ),
     ).toBeVisible();
     const own = screen.getByRole("option", { name: /None of these is my job/ });
@@ -382,7 +384,8 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
     await waitFor(() => expect(status).toHaveTextContent("1 job title to choose from."));
     await user.clear(field());
     await user.type(field(), "Bookkeeping assistant");
-    const question = "Careerwright couldn't match that title in ESCO. Is it one of these?";
+    const question =
+      "Careerwright couldn't match that title in ESCO, the EU's list of jobs and skills. Is it one of these?";
     await waitFor(() => expect(status).toHaveTextContent(question));
     expect(status).toHaveTextContent("2 job titles to choose from.");
     expect(field()).toHaveAccessibleDescription(question);
@@ -402,6 +405,70 @@ describe("[DIV1-13] the first question finds any UK title, and keeps the person'
     await user.click(screen.getByRole("button", { name: "Skip for now" }));
     expect(skipped).toHaveBeenCalledOnce();
     expect(sent.filter((s) => s.method !== "GET")).toEqual([]);
+  });
+
+  it("[STATE-11] offers “I haven't had a job yet” beside “Skip for now”, and saves it as an answer, never a title", async () => {
+    const sent = api({});
+    const answered = vi.fn();
+    const saved = vi.fn();
+    const skipped = vi.fn();
+    const user = wrap(
+      <Held
+        workspaceId={WS}
+        profile={profile}
+        onSkip={skipped}
+        onAnswered={answered}
+        onSaved={saved}
+      />,
+    );
+
+    const noJob = screen.getByRole("button", { name: "I haven't had a job yet" });
+    const skip = screen.getByRole("button", { name: "Skip for now" });
+    // Beside it: the two quiet ways on share one row under the field.
+    expect(noJob.parentElement).toBe(skip.parentElement);
+
+    await user.click(noJob);
+    await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+    expect(sent.filter((s) => s.method === "POST")).toEqual([
+      expect.objectContaining({
+        path: `/v1/workspaces/${WS}/origin/role/no-job-yet`,
+        body: { expected_version: 3 },
+      }),
+    ]);
+    expect(answered).toHaveBeenCalledOnce();
+    expect(skipped).not.toHaveBeenCalled(); // an answer, never a skip
+  });
+
+  it("[STATE-11] keeps the question, saying why, when saving “I haven't had a job yet” fails", async () => {
+    fakeApi([
+      {
+        method: "POST",
+        path: /\/origin\/role\/no-job-yet$/,
+        status: 409,
+        answer: {
+          error: {
+            code: "STALE_INPUT_VERSION",
+            message: "",
+            retryable: false,
+            stage: "profile",
+            correlation_id: "c1",
+            details: { current_version: 4 },
+          },
+        },
+      },
+    ]);
+    const failed = vi.fn();
+    const user = wrap(
+      <Held workspaceId={WS} profile={profile} onSkip={() => {}} onFailed={failed} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "I haven't had a job yet" }));
+
+    await waitFor(() => expect(failed).toHaveBeenCalledOnce());
+    expect(
+      screen.getByRole("heading", { name: "What do you do now, or what did you do last?" }),
+    ).toBeVisible();
+    expect(await screen.findByText("This changed since you loaded it")).toBeVisible();
   });
 });
 
@@ -621,7 +688,7 @@ describe("[DIV1-14] which ESCO occupation is closest, or none of them", () => {
     expect(screen.getByRole("heading", { name: "Which of these is closest?" })).toBeVisible();
     expect(
       screen.getByText(
-        "Careerwright found “Nurse” in the UK job-title index and looked up the ESCO occupations in the groups it's in.",
+        "Careerwright found “Nurse” in the UK job-title index and looked up the occupations in the groups it's in, in ESCO, the EU's list of jobs and skills.",
       ),
     ).toBeVisible();
     // Design review M-5: plain words only, never a code ("(ISCO-08 2221)") the person reads.

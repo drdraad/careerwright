@@ -26,7 +26,9 @@ const profile: ProfileOut = {
   created_by: null,
   created_at: "2027-01-01T00:00:00Z",
   document: {
-    schema_version: "3",
+    schema_version: "4",
+    work_status: unasked,
+    qualifications: unasked,
     preferred_name: unasked,
     current_role: unasked,
     cities: unasked,
@@ -250,9 +252,10 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     expect(screen.getByText(/Only 1 occupation matched/)).not.toBeVisible();
     await openNotes(user, 3);
     expect(screen.getByText(/Only 1 occupation matched/)).toBeVisible();
+    // Task 6f: the note loses its "yet" (the school-leaver walk's word pass).
     expect(
       screen.getByText(
-        "Careerwright doesn't know your current work yet, so it can't say which directions are close to it.",
+        "Careerwright doesn't know your current work, so it can't say which directions are close to it.",
       ),
     ).toBeVisible();
     // Never shown as a suggestion, and named for what Careerwright did (W2B re-review 5; Task
@@ -292,12 +295,62 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     expect(screen.queryByRole("heading", { name: "Something different" })).toBeNull();
     await openNotes(user, 2);
     // The role was given, so it never says Careerwright doesn't know the person's work.
-    expect(screen.queryByText(/doesn't know your current work yet/)).toBeNull();
+    expect(screen.queryByText(/doesn't know your current work/)).toBeNull();
     cleanup();
 
     known = true;
     renderDirections(discovery, undefined, kept);
     expect(await screen.findByRole("heading", { name: "Something different" })).toBeVisible();
+  });
+
+  it("[PROF-14] with no work known, never says close to what they do now, offers no Closer to what I do, and never tells someone with no job yet that their work isn't known", async () => {
+    const noJob = { state: "no_job_yet" as const, value: null, source_ref_id: "s3" };
+    const withTarget: ProfileOut = {
+      ...profile,
+      document: {
+        ...profile.document,
+        current_role: noJob,
+        target_titles: { state: "provided", value: ["Nurse"], source_ref_id: "s3" },
+      },
+    };
+    const close = { ...suggestion, direction: "close_to_current" as const };
+    let answer = () => ({ ...slate([close]), familiarity_known: true });
+    fakeApi([{ method: "GET", path: /\/slate$/, answer: () => answer() }]);
+    renderDirections(discovery, undefined, withTarget);
+
+    // Close only to the role they named: never "Close to what you do now".
+    expect(
+      await screen.findByRole("heading", { name: "Close to the roles you named" }),
+    ).toBeVisible();
+    expect(screen.queryByText("Close to what you do now")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Closer to what I do" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Balanced" })).toBeVisible();
+    cleanup();
+
+    // No role, no target: someone who said they haven't had a job is never told their work
+    // isn't known.
+    answer = () => slate([suggestion]);
+    const nothingNamed: ProfileOut = {
+      ...profile,
+      document: { ...profile.document, current_role: noJob },
+    };
+    const { user } = renderDirections(discovery, undefined, nothingNamed);
+    expect(await screen.findByRole("heading", { name: "Directions to consider" })).toBeVisible();
+    await openNotes(user, 2);
+    expect(screen.queryByText(/doesn't know your current work/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Closer to what I do" })).toBeNull();
+    cleanup();
+
+    // A role kept in their words: "Closer to what I do" is offered.
+    const working: ProfileOut = {
+      ...profile,
+      document: {
+        ...profile.document,
+        current_role: { state: "provided", value: "Baker", source_ref_id: "s2" },
+      },
+    };
+    renderDirections(discovery, undefined, working);
+    expect(await screen.findByRole("button", { name: "Closer to what I do" })).toBeVisible();
   });
 
   it("[DIV1-04][TEST1-15] lists a title idea the UK job-title index lists beside the slate, with its answers", async () => {

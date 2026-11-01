@@ -29,7 +29,9 @@ import { YouChapter } from "./YouChapter";
 const WS = "w-you";
 const unasked = { state: "unasked" as const, value: null, source_ref_id: null };
 const answers: ProfileDocument = {
-  schema_version: "3",
+  schema_version: "4",
+  work_status: unasked,
+  qualifications: unasked,
   preferred_name: unasked,
   current_role: unasked,
   cities: unasked,
@@ -542,7 +544,7 @@ describe("[UI-06][UI-04] one idea per view: the conversation, what we know and t
     const answersShown = await screen.findByRole("region", { name: "Your answers" });
     expect(within(answersShown).getByText("Total spending limit")).toBeVisible();
     expect(
-      within(answersShown).getByText(/The most you'd spend on the whole change, all added up/),
+      within(answersShown).getByText(/The most you'd spend on your next step, all added up/),
     ).toBeVisible();
     expect(
       within(answersShown).getByText(/The most you could pay out in any one month/),
@@ -689,7 +691,7 @@ describe("[UI-04][UI-06] one decision at a time, and Resume while paused", () =>
 
     await user.click(resume);
     const question = await screen.findByRole("heading", {
-      name: "What would you most like to be different about your working life?",
+      name: "What would you like your working life to be like?",
     });
     await waitFor(() => expect(question).toHaveFocus());
     // Back to answering: Send is bright once there is something to send (F17).
@@ -1101,6 +1103,43 @@ describe("[DIV1-13][DIV1-14] the start: the first question, which is closest, th
     });
   });
 
+  it("[STATE-11] goes on to how to start after “I haven't had a job yet”, which the role shows as an answer, never asked again", async () => {
+    const state: Live = { preferences: prefs(null), turns: [], profile };
+    const sent = fakeApi(
+      liveRoutes(state, [
+        {
+          method: "POST",
+          path: /\/origin\/role\/no-job-yet$/,
+          status: 201,
+          answer: () => {
+            state.profile = {
+              ...profile,
+              version: profile.version + 1,
+              document: {
+                ...profile.document,
+                current_role: { state: "no_job_yet", value: null, source_ref_id: "s-none" },
+              },
+            };
+            return state.profile;
+          },
+        },
+      ]),
+    );
+    const { user } = renderLive();
+
+    await user.click(await screen.findByRole("button", { name: "I haven't had a job yet" }));
+    const start = await screen.findByRole("heading", { name: "How would you like to start?" });
+    await waitFor(() => expect(start).toHaveFocus());
+    // Never the job question again, and no role line that talks about work.
+    expect(screen.queryByRole("combobox", { name: "Your job title" })).toBeNull();
+    expect(document.body.textContent).not.toMatch(/what this work asks for/i);
+    expect(sent.filter((s) => s.method === "POST").map((s) => s.path)).toEqual([
+      `/v1/workspaces/${WS}/origin/role/no-job-yet`,
+    ]);
+    // No origin is asked for: there is no role to join from.
+    expect(sent.some((s) => s.path.endsWith("/origin"))).toBe(false);
+  });
+
   it("goes back from which is closest to the title field, to fix a wrongly picked title", async () => {
     // Design review M-4, its first part: there was no way back from the closest question.
     const state: Live = { preferences: prefs(null), turns: [], profile };
@@ -1265,7 +1304,7 @@ describe("[DIV1-13][DIV1-14] the start: the first question, which is closest, th
     // Once the start is done, it sits where the message panel does, above the reply field.
     await user.click(screen.getByRole("button", { name: "Help me explore" }));
     await screen.findByRole("heading", {
-      name: "What would you most like to be different about your working life?",
+      name: "What would you like your working life to be like?",
     });
     expect(panel()).toBeVisible();
     expect(
@@ -1422,7 +1461,7 @@ describe("[UI-06] each new reply is announced once, and focus follows the first 
     await user.click(await screen.findByRole("button", { name: "Help me explore" }));
 
     const question = await screen.findByRole("heading", {
-      name: "What would you most like to be different about your working life?",
+      name: "What would you like your working life to be like?",
     });
     await waitFor(() => expect(question).toHaveFocus());
   });
@@ -1645,7 +1684,7 @@ describe("[UI-06] focus moves to the question only when the entry choice is save
     state.preferences = prefs("unsure");
     await queries.invalidateQueries();
     const question = await screen.findByRole("heading", {
-      name: "What would you most like to be different about your working life?",
+      name: "What would you like your working life to be like?",
     });
     expect(question).not.toHaveFocus();
   });
@@ -1780,7 +1819,7 @@ describe("[STATE-09] the demo conversation never loops: example replies and two 
       within(examples)
         .getAllByRole("button")
         .map((b) => b.textContent),
-    ).toEqual(["I enjoy working with people", "Skip"]);
+    ).toEqual(["I help run a youth football team", "Skip"]); // one that isn't a job (Task 6f)
     await user.click(within(examples).getByRole("button", { name: "Skip" }));
 
     await waitFor(() =>

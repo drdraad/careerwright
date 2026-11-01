@@ -207,7 +207,9 @@ const SRC = "8d1f6f8e-46a1-5c2b-9d0e-3f7a1b2c4d5e";
 const unasked = { state: "unasked", value: null, source_ref_id: null } as const;
 const known = { state: "unknown", value: null, source_ref_id: SRC } as const;
 const blank: ProfileDocument = {
-  schema_version: "3",
+  schema_version: "4",
+  work_status: unasked,
+  qualifications: unasked,
   preferred_name: unasked,
   current_role: unasked,
   cities: unasked,
@@ -256,5 +258,12 @@ describe("[STATE-09] what the question in view asks about, and the role-or-explo
     expect(
       asksRoleOrExplore(null, false, "unsure", { ...earlyAnswers, target_titles: known }),
     ).toBe(false);
+  });
+
+  it("[PROF-14] offers Show me suggestions in a live interview with no current role at all", () => {
+    // Task 6f: "Show me suggestions" never waits for a current-role answer.
+    expect(
+      asksRoleOrExplore(null, false, "unsure", { ...earlyAnswers, current_role: unasked }),
+    ).toBe(true);
   });
 });

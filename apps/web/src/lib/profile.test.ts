@@ -9,7 +9,9 @@ const SOURCE = "6f1d3c2a-0000-4000-8000-000000000001";
 
 function document(overrides: Partial<ProfileDocument> = {}): ProfileDocument {
   return {
-    schema_version: "3",
+    schema_version: "4",
+    work_status: { state: "unasked", value: null, source_ref_id: null },
+    qualifications: { state: "unasked", value: null, source_ref_id: null },
     preferred_name: { state: "unasked", value: null, source_ref_id: null },
     current_role: { state: "unknown", value: null, source_ref_id: SOURCE },
     cities: { state: "provided", value: ["Manchester"], source_ref_id: SOURCE },
@@ -60,8 +62,46 @@ describe("[API-04] the profile form sends exactly what was answered, in integer 
         evidenced_tasks: { state: "unasked" },
         work_style: { state: "unasked" },
         minimum_salary: { state: "unasked" },
+        work_status: { state: "unasked" },
+        qualifications: { state: "unasked" },
       },
     });
+  });
+
+  it("[PROF-13][STATE-11] round-trips no job yet, what the person is doing now and an expected qualification", () => {
+    const stored = document({
+      current_role: { state: "no_job_yet", value: null, source_ref_id: SOURCE },
+      work_status: { state: "provided", value: "in_education_or_training", source_ref_id: SOURCE },
+      qualifications: {
+        state: "provided",
+        value: [
+          { name: "GCSE maths", status: "achieved" },
+          { name: "A-level biology", status: "expected" },
+        ],
+        source_ref_id: SOURCE,
+      },
+    });
+
+    const result = inputFrom(draftFrom(stored));
+
+    expect(result.ok && result.input.current_role).toEqual({ state: "no_job_yet" });
+    expect(result.ok && result.input.work_status).toEqual({
+      state: "provided",
+      value: "in_education_or_training",
+    });
+    expect(result.ok && result.input.qualifications).toEqual({
+      state: "provided",
+      value: [
+        { name: "GCSE maths", status: "achieved" },
+        { name: "A-level biology", status: "expected" },
+      ],
+    });
+    // In words: an expected qualification always says so, never reads as achieved.
+    expect(describeField(stored.current_role, "current_role")).toBe("I haven't had a job yet");
+    expect(describeField(stored.work_status, "work_status")).toBe("In education or training");
+    expect(describeField(stored.qualifications, "qualifications")).toBe(
+      "GCSE maths (achieved), A-level biology (expected, not achieved yet)",
+    );
   });
 
   it("[PROF-04] sends a salary floor as gross pounds with its period, never converted", () => {
@@ -133,6 +173,7 @@ describe("[API-04] the profile form sends exactly what was answered, in integer 
       "confident_tasks",
       "evidenced_tasks",
       "work_style",
+      "qualifications", // Task 6f
     ]);
     for (const [name, published, used] of lists) expect([name, used]).toEqual([name, published]);
   });

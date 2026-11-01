@@ -33,7 +33,9 @@ function profile(changes: Partial<ProfileDocument>, version = 1): ProfileOut {
     created_by: null,
     created_at: "2027-01-01T00:00:00Z",
     document: {
-      schema_version: "3",
+      schema_version: "4",
+      work_status: unasked,
+      qualifications: unasked,
       preferred_name: unasked,
       current_role: unasked,
       cities: unasked,

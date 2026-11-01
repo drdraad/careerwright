@@ -429,19 +429,21 @@ describe("[DIV1-13][DIV1-14] the first question's words (Task 6d slice B)", () =
     expect(FIRST_ANSWER.ownWords("Bookkeeping assistant")).toBe(
       "Use my own words: “Bookkeeping assistant”",
     );
+    // ESCO named plainly where the start first lists its titles (Task 6f, design I1).
     expect(FIRST_ANSWER.partial).toBe(
-      "Careerwright couldn't match that title in ESCO. Is it one of these?",
+      "Careerwright couldn't match that title in ESCO, the EU's list of jobs and skills. Is it one of these?",
     );
+    expect(FIRST_ANSWER.noJobYet).toBe("I haven't had a job yet");
     expect(FIRST_ANSWER.noneOfThese).toBe("None of these is my job");
   });
 
   it("asks which ESCO occupation is closest, and says what it looked up", () => {
     expect(CLOSEST.question).toBe("Which of these is closest?");
     expect(CLOSEST.found("Registered nurse", 1)).toBe(
-      "Careerwright found “Registered nurse” in the UK job-title index and looked up the ESCO occupations in the group it's in.",
+      "Careerwright found “Registered nurse” in the UK job-title index and looked up the occupations in the group it's in, in ESCO, the EU's list of jobs and skills.",
     );
     expect(CLOSEST.found("Nurse", 3)).toBe(
-      "Careerwright found “Nurse” in the UK job-title index and looked up the ESCO occupations in the groups it's in.",
+      "Careerwright found “Nurse” in the UK job-title index and looked up the occupations in the groups it's in, in ESCO, the EU's list of jobs and skills.",
     );
     // Plain words only, never the group's code (Task 6d slice B fix round 1, design M-5).
     expect(CLOSEST.group({ code: "2221", label: "Nursing professionals" })).toBe(
@@ -525,10 +527,15 @@ describe("[MAP1-09][PROF-11] ESCO's list and the details beside a title, in word
     expect(ESCO_LISTS).toBe("ESCO lists these for this kind of work:");
     // Short, so the suggestions' first decision stays in a phone's first screen (UI-12).
     expect(ESCO_NAMED).toBe("ESCO, the EU's list of jobs and skills");
-    expect(TITLE_DETAILS.listed(1)).toBe("The skill ESCO lists for this kind of work");
-    expect(TITLE_DETAILS.listed(24)).toBe("The 24 skills ESCO lists for this kind of work");
+    // Named plainly in the disclosure's summary, before its intro (Task 6f, design I1).
+    expect(TITLE_DETAILS.listed(1)).toBe(
+      "The skill that ESCO, the EU's list of jobs and skills, lists for this kind of work",
+    );
+    expect(TITLE_DETAILS.listed(24)).toBe(
+      "The 24 skills that ESCO, the EU's list of jobs and skills, lists for this kind of work",
+    );
     expect(TITLE_DETAILS.listedIntro).toBe(
-      "ESCO, the EU's list of jobs and skills, lists these as essential for this kind of work. Careerwright hasn't compared them with your own experience.",
+      "ESCO lists these as essential for this kind of work. Careerwright hasn't compared them with your own experience.",
     );
   });
 

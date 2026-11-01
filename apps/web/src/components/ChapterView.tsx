@@ -75,7 +75,7 @@ function Needs({ profile, needs }: { profile: ProfileOut; needs: ChapterNeeds })
         {needs.uses.map((name) => (
           <div key={name} className="contents">
             <dt>{PROFILE_FIELDS[name].label}</dt>
-            <dd>{describeField(profile.document[name])}</dd>
+            <dd>{describeField(profile.document[name], name)}</dd>
           </div>
         ))}
       </dl>

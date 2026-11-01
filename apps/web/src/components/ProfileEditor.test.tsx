@@ -16,7 +16,9 @@ const SRC = "8d1f6f8e-46a1-5c2b-9d0e-3f7a1b2c4d5e";
 
 function documentWith(cities: string[]): ProfileDocument {
   return {
-    schema_version: "3",
+    schema_version: "4",
+    work_status: { state: "unasked", value: null, source_ref_id: null },
+    qualifications: { state: "unasked", value: null, source_ref_id: null },
     preferred_name: { state: "unasked", value: null, source_ref_id: null },
     current_role: { state: "unasked", value: null, source_ref_id: null },
     cities: { state: "provided", value: cities, source_ref_id: SRC },
@@ -193,6 +195,69 @@ describe("[DUR-04][API-04] saving the profile is an expected-version, idempotent
         direct_spend_cap: { state: "provided", value: { minor_units: 150000, currency: "GBP" } },
         monthly_payment_cap: { state: "unknown" },
       },
+    });
+  });
+
+  it("[PROF-13][PROF-07] saves what the person is doing now and an expected qualification through the same command", async () => {
+    const current = { profile: profileOut(1, ["Manchester"]) };
+    const sent = api(current, [json(201, profileOut(2, ["Manchester"]))]);
+    const user = renderEditor(current.profile);
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "How you answer what you're doing now" }),
+      "provided",
+    );
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "What you're doing now" }),
+      "In education or training",
+    );
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "How you answer qualifications" }),
+      "provided",
+    );
+    await user.type(screen.getByRole("textbox", { name: "Qualification 1" }), "A-level biology");
+    // Neither status is picked for the person: unmarked, the save is refused with the reason.
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("Mark each qualification achieved or expected.")).toBeVisible();
+    expect(sent.some((request) => request.method === "PUT")).toBe(false);
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Qualification 1: achieved or expected" }),
+      "expected",
+    );
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(sent.find((request) => request.method === "PUT")?.body).toMatchObject({
+      expected_version: 1,
+      profile: {
+        work_status: { state: "provided", value: "in_education_or_training" },
+        qualifications: {
+          state: "provided",
+          value: [{ name: "A-level biology", status: "expected" }],
+        },
+      },
+    });
+  });
+
+  it("[STATE-11] offers “I haven't had a job yet” for the current role only, and never calls it a gap", async () => {
+    const current = { profile: profileOut(1, ["Manchester"]) };
+    const sent = api(current, [json(201, profileOut(2, ["Manchester"]))]);
+    const user = renderEditor(current.profile);
+
+    const role = screen.getByRole("combobox", { name: "How you answer current role" });
+    expect(within(role).getByRole("option", { name: "I haven't had a job yet" })).toBeTruthy();
+    const cities = screen.getByRole("combobox", { name: "How you answer work areas" });
+    expect(within(cities).queryByRole("option", { name: "I haven't had a job yet" })).toBeNull();
+    await user.selectOptions(role, "no_job_yet");
+    // An answer like any other: no "less precise without it" line beside it.
+    const section = role.closest("section");
+    expect(section).not.toBeNull();
+    expect(within(section as HTMLElement).queryByText(/Less precise without it/)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(sent.find((request) => request.method === "PUT")?.body).toMatchObject({
+      profile: { current_role: { state: "no_job_yet" } },
     });
   });
 

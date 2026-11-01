@@ -114,7 +114,9 @@ describe("[PROF-11][MAP1-09] seniority and industry beside each title, and ESCO'
 
     const section = await screen.findByRole("region", { name: "Seniority and industry" });
     await user.click(
-      await within(section).findByText("The 2 skills ESCO lists for this kind of work"),
+      await within(section).findByText(
+        "The 2 skills that ESCO, the EU's list of jobs and skills, lists for this kind of work",
+      ),
     );
     expect(within(section).getByText(/ESCO, the EU's list of jobs and skills/)).toBeVisible();
     const mark = within(section).getByRole("button", { name: "Not part of my job: keep records" });
@@ -156,7 +158,9 @@ describe("[PROF-11][MAP1-09] seniority and industry beside each title, and ESCO'
     );
     await user.type(within(section).getByLabelText("Seniority (optional)"), "Band 6");
     await user.click(
-      await within(section).findByText("The skill ESCO lists for this kind of work"),
+      await within(section).findByText(
+        "The skill that ESCO, the EU's list of jobs and skills, lists for this kind of work",
+      ),
     );
     await user.click(
       within(section).getByRole("button", { name: "Not part of my job: keep records" }),
@@ -215,7 +219,11 @@ describe("[PROF-11][MAP1-09] seniority and industry beside each title, and ESCO'
     const section = await screen.findByRole("region", { name: "Seniority and industry" });
     await userEvent
       .setup()
-      .click(await within(section).findByText("The skill ESCO lists for this kind of work"));
+      .click(
+        await within(section).findByText(
+          "The skill that ESCO, the EU's list of jobs and skills, lists for this kind of work",
+        ),
+      );
     expect(
       within(section).getByRole("button", { name: "Not part of my job: keep records" }),
     ).toHaveAttribute("aria-pressed", "true");
