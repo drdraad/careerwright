@@ -1,11 +1,12 @@
 # L0 sprint tasks (execution breakdown)
 
-This file breaks `docs/plan/development-plan.md` (the local development plan, v1.5) into
+This file breaks `docs/plan/development-plan.md` (the local development plan, v1.6) into
 implementation tasks for agent execution. Authority order: product specification
 (`Careerwright_Product_Specification.md`, v1.3) → development plan local overrides → this file.
 What is done and what comes next is in "Current position and next tasks" below. The
 remaining tasks follow the order, dependency rules and dispatch preconditions below (ADR
-0008), as Task A1 amended them with the product owner's approval of 2026-10-31.
+0008), as Task A1 amended them with the product owner's approval of 2026-10-31, and as plan
+v1.6 amended them with the product owner's school-leaver decisions of 2026-11-01.
 This file adds task slicing, environment facts and standing rulings only; it never
 relaxes the plan or the specification.
 
@@ -86,7 +87,7 @@ These bind every task and every review.
 - Host has a PostgreSQL 18 *client* only; the server must be PostgreSQL 16 in Docker.
 - No Java and no firebase CLI on the host: the Firebase Auth emulator must run in a
   container.
-- `META_API_KEY` is in `/Users/darianraad/Code/careerpathoptimizer/.env` (gitignored).
+- `META_API_KEY` is in `/Users/darianraad/Code/careerwright/.env` (gitignored).
   Load it from that file in code/tooling. Never print it, echo it, pass it as a command
   argument, write it elsewhere, or commit it.
 - Git: work on branch `l0-local-release`. Commit coherent increments with messages ending
@@ -172,16 +173,22 @@ These bind every task and every review.
     H-07; the comprehension session, H-13; the Sprint 2 design review, H-01;
     `docs/reviews/session-2-answers.md`) and session W1 (2026-10-30: the world's direction;
     `docs/reviews/session-w1-answers.md`).
-  - **Session W2, short** (about 30 minutes, live, on Muse Wonder). After Tasks W2E, 6d, 3b
-    and 6e. The product owner uses the You chapter in the app, roles included, and answers
+  - **Session W2, short** (about 30 minutes, live, on Muse Wonder). After Tasks W2E, 6d, 3b,
+    6f and 6e. The product owner uses the You chapter in the app, roles included, and answers
     about five questions: is the You chapter right enough to build the other chapters on
     (yes: the chapters follow its references); are the suggestions sensible for two or three
-    named people, one whose role is on no list, and is anything missing; keep Source Sans 3
-    for body text; keep leaf green for "accept", since words and a glyph carry it; any words
-    they didn't understand. No score threshold: any score is formative. The slate's
-    word-search rules are frozen (R11) and judged through the second question's examples,
-    not item by item. Task 6e prepares the package. Precondition for the chapter interfaces
-    (Tasks 10, 12b, 14, 15, 8 and M), never for backend tasks.
+    named people, one whose role is on no list and, from plan v1.6, the synthetic school
+    leaver, and is anything missing; keep Source Sans 3 for body text; keep leaf green for
+    "accept", since words and a glyph carry it; any words they didn't understand (the
+    opening question's words among them, plan v1.6). No score threshold: any score is
+    formative. The slate's word-search rules are frozen (R11) and judged through the second
+    question's examples, not item by item. Task 6e prepares the package. Precondition for the
+    chapter interfaces (Tasks 10, 12b, 14, 15, 8 and M), never for backend tasks.
+  - **The school-leaver pack session, short** (plan v1.6). After Task 7f's first half (the
+    school-leaver pages curated and labelled). The product owner answers yes or no on each new
+    or changed record's consequential fields, each beside its span, the consequential ones
+    first (H-07 for the new pack version). Task 7f prepares the package. Precondition for Task
+    7f's second half (publishing the reviewed version), and through it Task 12b.
   - **The end-to-end session** (about 1 hour; it replaces session 3). After Task 15. The
     product owner goes from You to a printed plan. It asks session 2's three route questions
     again on the real Routes chapter (the cost, the condition, what is uncertain); records
@@ -193,8 +200,10 @@ These bind every task and every review.
     category at least 4 (H-01); VoiceOver (H-03); Safari and print (H-04); five task
     sessions with other people (H-05; five participants are available, the product owner,
     2026-10-31); the privacy decision before anyone else's data is processed (H-08); the
-    review of committed excerpts for names before any push (session 1's delegated
-    decision); and the counterfactual comparison's pass rule (H-12, still open).
+    check of the rules for young people's data before any real student uses Careerwright
+    (H-15, plan v1.6); the review of committed excerpts for names before any push (session
+    1's delegated decision); and the counterfactual comparison's pass rule (H-12, still
+    open).
 - R11 Language rules have a boundary (plan v1.2; widened in plan v1.5). The support screen's
   stems, the explanation validation's word lists, redaction's patterns, the pay, date and
   work-mode readers, the agency words, and from v1.5 the slate's notes and its matching
@@ -265,7 +274,7 @@ These bind every task and every review.
 - R15 Parallel work (the product owner, 2026-10-31: "Where subagent work can be done
   cleanly in parallel, do so but coordinate well to avoid them causing conflicts").
   - Up to two implementers at once: one in the main tree, one in a git worktree
-    (`/Users/darianraad/Code/careerpathoptimizer-wt/<id>`, branch `wt-<id>`), on disjoint
+    (`/Users/darianraad/Code/careerwright-wt/<id>`, branch `wt-<id>`), on disjoint
     modules. Each task card's **Parallel** line says which tasks it may overlap; a card
     whose line says none runs alone.
   - In the main tree, commit with a pathspec only, never `git add -A` or `git commit -a`.
@@ -278,7 +287,7 @@ These bind every task and every review.
     conflict in the generated client, regenerate it; a migration whose revision number
     another task took is renumbered to the next free one.
 
-## Order, dependencies and dispatch preconditions (plan v1.5, ADR 0008)
+## Order, dependencies and dispatch preconditions (plan v1.6, ADR 0008)
 
 Execution: from plan v1.5, up to two implementers at once, on disjoint modules (R15). Each
 remaining card's **Parallel** line names the tasks it may overlap. Until v1.5 the
@@ -286,8 +295,9 @@ controller ran one implementer at a time; where the assessment handover
 (`docs/plan/l0-assessment-handover.md`) marked tasks as parallel (∥), they ran one after the
 other.
 
-Dependency rules (rules 1–6 are met; rules 7, 9–13 and 15 are as amended in plan v1.5;
-rules 16–18 are new):
+Dependency rules (rules 1–6 are met; rules 7, 9–13 and 15 are as amended in plan v1.5, and
+rules 7, 11, 13, 15 and 16 again in plan v1.6; rules 16–18 came with v1.5, and rules 19 and
+20 with v1.6):
 
 1. Task 6b after Task 6 (it extends Task 6's discovery). By controller ruling, Task 6c
    follows 6b and Task 7 follows 6c; neither depends on 6b's code.
@@ -300,9 +310,11 @@ rules 16–18 are new):
 4. Task 11 after Tasks 9 and 7b (its acceptance runs on the pack's P01 option set).
 5. Session 2 after Task 11.
 6. Task 7c after session 2 (it applies the product owner's H-07 record to the pack).
-7. Task 10 after Task 7c, Task 6d and session W2. Task 12 is split in plan v1.5: Task 12a
-   (the stored planning inputs, backend) after Task 7c and after Task 13a is integrated
-   (rule 10); Task 12b (the Options chapter) after Tasks 12a and 10 and session W2.
+7. Task 10 after Task 7c, Task 6d and session W2 (and Task 6f, which comes before session W2,
+   plan v1.6). Task 12 is split in plan v1.5: Task 12a (the stored planning inputs,
+   backend) after Task 7c and after Task 13a is integrated (rule 10); Task 12b (the Options
+   chapter) after Tasks 12a and 10 and session W2, and from plan v1.6 after Tasks 12c and 7f
+   (the tuition fee loan, and the school-leaver option pack it reads; rules 19 and 20).
 8. Session 1 before Task 8, and before any page body is retained beyond the classes it
    permits (held 2026-10-28).
 9. Task 8 after Task 7c, session 1, Task 15 and the end-to-end session (plan v1.5: Roles
@@ -312,37 +324,49 @@ rules 16–18 are new):
     worktree track (plan v1.5): Tasks 13a, then 12a, then 13b, one at a time in the
     worktree, each started after the last is integrated. Task 12a changes the planning
     rules that 13a's oracle and 13b's solver read, so none of the three overlaps another.
-11. Task 14 after Tasks 13b and 12b and session W2, with session 2's H-13 record as a
-    scope input; it closes on its own checks (session 3 is merged into the end-to-end
-    session).
+11. Task 14 after Tasks 13b, 12b and 12c (plan v1.6) and session W2, with session 2's H-13
+    record as a scope input; it closes on its own checks (session 3 is merged into the
+    end-to-end session).
 12. Task 15 after Task 14: slice 15A first, then 15B.
 13. Task 16 after every remaining task (W2E, 6d, 3b, 6e, 12a, 13a, 13b, 10, 12b, 14, 15,
-    7e, 8 and M) and after sessions 1, 2, W1, W2 and the end-to-end session: release
-    qualification needs all six chapters.
+    7e, 8 and M, and from plan v1.6 6f, 12c and 7f) and after sessions 1, 2, W1, W2, the
+    school-leaver pack session and the end-to-end session: release qualification needs all
+    six chapters.
 14. Task 17 after Task 16 (plan v1.3): the manual describes the qualified candidate, and its
     small fixes are re-qualified on top of it.
-15. The world (plan v1.4, amended in v1.5): Tasks W1 and W2's slices W2A, W2B and W2C part 1
-    are done; Task W2E closes Task W2 and Sprint W. Session W2 after Tasks W2E, 6d, 3b and
-    6e. The interface tasks (10, 12b, 14, 15, 8 and M) wait for session W2; the backend
-    tasks (12a, 13a, 13b) never wait for a session.
-16. The role space and live sessions (plan v1.5): Task 6d after Task W2E. Task 3b has no
-    task dependency. Task 6e after Tasks 6d and 3b.
+15. The world (plan v1.4, amended in v1.5 and v1.6): Tasks W1 and W2's slices W2A, W2B and
+    W2C part 1 are done; Task W2E closes Task W2 and Sprint W. Session W2 after Tasks W2E,
+    6d, 3b, 6f and 6e. The interface tasks (10, 12b, 14, 15, 8 and M) wait for session W2;
+    the backend tasks (12a, 13a, 13b, 12c) never wait for a session.
+16. The role space and live sessions (plan v1.5, amended in v1.6): Task 6d after Task W2E.
+    Task 3b has no task dependency. Task 6f after Task 6d (plan v1.6: it changes the same
+    first question). Task 6e after Tasks 6f and 3b.
 17. Options for any target (plan v1.5): Task 7e after Tasks 15 and 12b; it may start
     while the end-to-end session is awaited.
 18. The end-to-end session after Task 15. Task M after the end-to-end session and Task 8.
+19. The tuition fee loan (plan v1.6): Task 12c after Tasks 12a and 13b are integrated. It
+    never waits for a session. It runs in the worktree before Tasks 7f, 12b and 14, and
+    never beside 12b or 14: all three change `careerwright/planning`.
+20. The school-leaver option pack (plan v1.6): Task 7f after Task 12c, in the worktree. Its
+    second half (publishing the reviewed version) after the school-leaver pack session.
+    Task 12b after Task 7f.
 
-Suggested order (plan v1.5; the plan's section 6 "Order from here (v1.5)" gives each step's
-scope and agent hours), in two tracks (R15):
-- The main tree: Task A1's documents and the W2C part 1 re-review → W2E → 6d and 3b → 6e →
-  session W2 → 10 → 12b → 14 → 15 (15A, then 15B) → the end-to-end session → 7e → 8 → M →
-  16 → 17 → the final review.
-- The worktree, beside it: 13a → 12a → 13b, each started after the last is integrated
-  (rule 10). Task 12a may overlap W2E, 6d, 3b and 6e; Task 13b may overlap W2E, 6d, 3b, 6e
-  and 10. Tasks 12b and 14 never overlap 13b: all three change `careerwright/planning`.
+Suggested order (plan v1.6; the plan's section 6 "Order from here (v1.5)" gives each
+remaining v1.5 step's scope and agent hours, and "Order from here (v1.6)" the new steps), in
+two tracks (R15):
+- The main tree: 6d (its last slice) → 6f → 6e → session W2 → 10 → 12b → 14 → 15 (15A,
+  then 15B) → the end-to-end session → 7e → 8 → M → 16 → 17 → the final review.
+- The worktree, beside it: 12c → 7f (its first half, the school-leaver pack session, then
+  its second half), each started after the last is integrated. Task 12c may overlap 6f, 6e
+  and 10; Task 7f may overlap 6f, 6e and 10. Tasks 12b and 14 never overlap 12c: all three
+  change `careerwright/planning`. Task 12b starts after 7f is integrated.
 Backend tasks fill any wait for a session.
 
-History: the v1.4 order (after session 2) was W1 → session W1 → 7c → W2 → session W2 → 10
-→ 12 → 8 → 13a → 13b → 14 (closes after session 3) → 15 → 16 → 17, with backend tasks (7c,
+History: the v1.5 order was, in the main tree, Task A1's documents and the W2C part 1
+re-review → W2E → 6d and 3b → 6e → session W2 → 10 → 12b → 14 → 15 → the end-to-end session
+→ 7e → 8 → M → 16 → 17 → the final review, and in the worktree 13a → 12a → 13b (all three
+done by plan v1.6). The v1.4 order (after session 2) was W1 → session W1 → 7c → W2 →
+session W2 → 10 → 12 → 8 → 13a → 13b → 14 (closes after session 3) → 15 → 16 → 17, with backend tasks (7c,
 13a, 13b) running while a session was awaited and interface tasks waiting for session W2.
 The v1.1 order was 6b → 6c → 7 → 7d → 7b → 9 → 11 → session 2 → 7c → 10 → 12 → 8 → 13a →
 13b → 14 (closes after session 3) → 15 → 16 → 17. Session 1 could be held at any point before
@@ -358,18 +382,22 @@ Sprint reviews follow the order: the task that finishes a sprint writes its revi
 (Task 12b), and `sprint-6.md` (Task 13b) covers 6a and 6b. From plan v1.5, `sprint-w.md`
 is Task W2E's and `sprint-m.md` Task M's. Each review states the order it ran in.
 
-## Current position and next tasks (2026-10-31, plan v1.5)
+## Current position and next tasks (2026-11-01, plan v1.6)
 
-**Complete and reviewed:** Tasks 1–6, 6b, 6c, 7, 7d, 7b, 9, 11, 7c and W1; Task W2's slices
-W2A (the world layer and its design references) and W2B (the deterministic sources: the
-type-ahead, usual skills, the skill-joined slate, the unexpected connection, the overlooked
-strength run). **Held:** sessions 1, 2 and W1. The ledger
+**Complete and reviewed:** Tasks 1–6, 6b, 6c, 7, 7d, 7b, 9, 11, 7c and W1; Task W2 (slices
+W2A, W2B and W2C part 1) and Task W2E, which closed Sprint W (`docs/reviews/sprint-w.md`);
+Task A1's approved changes, applied to the documents; the worktree track, Tasks 13a (the
+route search core), 12a (the stored planning inputs) and 13b (the search as a bounded run),
+each integrated; Task 3b (live sessions ready on Muse Wonder), integrated; and Task 6d's
+slices A (facts instead of sentences; each target stored once) and B (the title flow over
+ESCO and the ONS index). **Held:** sessions 1, 2 and W1. The ledger
 (`.superpowers/sdd/l0-sprint-tasks/progress.md`) has every commit range and ruling.
 
-**In review:** Task W2, slice W2C part 1 (the You chapter in the world): built
-(166e4ef..6af1097), reviewed in two halves, fix round 1 committed (6af1097..f179d0f;
-`make check` and `make acceptance` pass on f179d0f). Its scoped re-review runs now; its open
-findings go to Task W2E.
+**Finishing:** Task 6d slice C (seniority and industry, ESCO's list named as ESCO's, "not
+part of my job", pasted CV text deferred), in the main tree, built to dc68d79; its last
+commit and its review follow. Task 3b's first live run of the real-data path waits for the
+product owner to paste their own key into the app; it joins session W2's preparation (Task
+6e).
 
 **Approved:** Task A1, the whole-solution audit (`docs/reviews/l0-audit-2026-10-31.md`; the
 decisions page `docs/reviews/l0-audit-2026-10-31-summary.md`), by the product owner on
@@ -392,20 +420,59 @@ app before release." Its decisions 1 to 8 are all yes.
 - "We can also start being a bit more generous with token use in human testing - I would
   like to use muse wonder for this."
 
+**The product owner's decisions since plan v1.5:**
+- 31 October 2026: leave the route search's disk-backed archive and its separate child
+  process out of L0, on Task 13a's measurements (Task 13b's card; specification section 22).
+- 1 November 2026: the unexpected connection is "Always a plain line": shared skills are a
+  plain fact about two roles, never a discovery moment (ADR 0015). Task M picks or drops the
+  Roles chapter's moment.
+- 1 November 2026, in their words: "NB: I don't want to over-rely on existing skills in the
+  process. Many users will be final year school students who have never had a job before."
+  A walk through the whole path as a Year 13 student with no job (the controller's
+  `.superpowers/sdd/l0-sprint-tasks/audit-no-job-yet.md`) found eight problems and ten
+  decisions. They answered "A and B, not #10" (yes to decisions 1–9, no to 10) and approved
+  where each fits ("go"). Plan v1.6 applies them: below, and in the specification's section
+  22.
+- 1 November 2026: the root folder moves to `/Users/darianraad/Code/careerwright`, and the
+  worktrees to `/Users/darianraad/Code/careerwright-wt/<id>`, at a clean point with no agent
+  running (the product owner's request; the ledger's ruling).
+
+**Where the school-leaver decisions go** (plan v1.6):
+
+| Decision | Goes to |
+|---|---|
+| 1. School students aged 17 and 18 are in scope | The specification's section 22; Task 16 checks the rules for young people's data before any real student uses Careerwright (H-15) |
+| 2. "I haven't had a job yet" beside "Skip for now" at the first question | New Task 6f |
+| 3. Two optional answers: what you're doing now, and qualifications (achieved or expected) | Task 6f; Tasks 10 and 12b read them as entry facts, an expected grade never met |
+| 4. An opening question that works without a job | Task 6f, with the walk's word pass; the final words are the product owner's at session W2 |
+| 5. A synthetic school leaver and 4–6 evaluation cases | Task 6e; she is one of session W2's people |
+| 6. A tuition fee loan paid straight to the university is a loan to repay, not the student's own money | New Task 12c (the checker, the independent oracle written fresh, the search's rules); Tasks 12b and 14 show it |
+| 7. A degree longer than the 24-month model | Task 14: words only, no planning change |
+| 8. A reviewed school-leaver option pack | New Task 7f, with one short review session (R10); Task 12b reads it |
+| 9. Childline in the calm support panel | Task 6f |
+| 10. Hours that change on a date ("free from September") | No: a known L0 limit (plan section 1; specification section 22) |
+
+The walk's other lines, approved with the placement: Task 10 shows no empty "usual in your
+role" panel without a role; Task 12b's checkpoint works for someone not working and shows
+each scheme's age rule; Task M answers a person with no job (the strength's horizon, the
+first answer's ignition); Task 7e's research names apprenticeships, degrees and their
+funding; Task 8 marks apprenticeship listings and takes a pasted apprenticeship advert.
+
 **Running now** (R15):
-- Task A1's approved changes, applied to the documents (main tree).
-- Task 13a, in the worktree `wt-13a`.
-- The W2C part 1 re-review (read-only); its open findings feed Task W2E.
+- Task 6d slice C, finishing (main tree).
+- This plan update, plan v1.6 (documents only, in the worktree `wt-plan`).
 
-**Next, in order** (the suggested order above): in the main tree, W2E → 6d and 3b → 6e →
-session W2 → 10 → 12b → 14 → 15 → the end-to-end session → 7e → 8 → M → 16 → 17 → the final
-review; in the worktree, 13a (running) → 12a → 13b, each after the last is integrated.
+**Next, in order** (the suggested order above): in the main tree, 6d slice C's review → 6f →
+6e → session W2 → 10 → 12b → 14 → 15 → the end-to-end session → 7e → 8 → M → 16 → 17 → the
+final review; in the worktree, 12c (it may start beside 6f) → 7f (its first half, the
+school-leaver pack session, then its second half), each after the last is integrated. Tasks
+6f and 12c start after the folder rename (the ledger's ruling).
 
-**Where the remaining Task W2 work went** (plan v1.5):
+**Where the remaining Task W2 work went** (plan v1.5; all of Task W2E's rows are done):
 
 | Item | Goes to |
 |---|---|
-| W2C part 1's scoped re-review | Running now; its open findings → Task W2E |
+| W2C part 1's scoped re-review | Done; its open findings went to Task W2E |
 | On a phone, the world band puts a long view's first decision a scroll away | Task W2E: on a phone the decision comes first |
 | "Help me explore instead" drops keyboard focus | Task W2E |
 | The moving-and-still identical-words test covers only the fixture workspace | Task W2E |
@@ -876,10 +943,11 @@ commands as a direct edit) and TEST1-15 (the unsupported-title evaluation cases)
 
 ## Task 6e: Sprint 2 — research this role (S2.9, the role space's second step, plan v1.5)
 
-**Preconditions:** Tasks 6d and 3b complete. No human session; this task prepares session
-W2's package.
-**Parallel:** may overlap Task 12a or 13b. Not 6d or 7e: they change the same title and
-evidence records.
+**Preconditions:** Tasks 6d, 6f (plan v1.6) and 3b complete. No human session; this task
+prepares session W2's package.
+**Parallel:** may overlap Task 12a or 13b, and from plan v1.6 Task 12c or 7f in the
+worktree. Not 6d or 7e: they change the same title and evidence records. Not 6f: its
+evaluation cases and first question come first.
 
 Sprint card: "Sprint 2 Deliver conversation and career discovery", S2.9 (plan v1.5). ADR
 0015; ADR 0009 decision 12 as amended (the role-research purpose); spec sections 4 (DIV-1),
@@ -909,20 +977,129 @@ Deliver:
 - Spend: worst case at most $0.045 per research run on Spark; the session command's run
   limit (about $0.75, Task 3b) lets three attempts fit on Wonder.
 - Regenerate the client.
+- **A synthetic school leaver** (plan v1.6; the product owner's decision of 1 November
+  2026): 17, in Year 13 with A-levels in progress, has never had a job, helps at a youth
+  club, unsure what she wants, Leeds. She is labelled synthetic wherever she appears and
+  kept apart from the supplied pack (`fixtures/m0` never changes; she never fills a live
+  field). Four to six evaluation cases: an interview in her words ("I'm in Year 13 doing
+  biology, chemistry and psychology. I've never had a job but I help run a Brownies
+  group"), which records what she enjoys and has done and invents no job title and no
+  income; a discovery from her school subjects and volunteering, grounded, with nothing
+  called close to what she does now; a strength proposal from her words, with a target
+  chosen from her slate; and the no-job first answer in the browser (Task 6f). One capped
+  live run of Task 6f's interview prompt on her cases (R5; the controller makes the call).
 - Finish: **session W2's package** (R10, R2), in plain words: how to start the session
-  command, the five questions, two or three named personas (one whose role is on no list)
-  and a record sheet. Each item "not run — requires human".
+  command, the five questions, two or three named personas (one whose role is on no list,
+  and from plan v1.6 the synthetic school leaver), one yes/no line on Childline in the calm
+  support panel (Task 6f; H-12), and a record sheet. Each item "not run — requires human".
 
 Acceptance (the role-space appendix's test): one live run on the test model with a synthetic
 title, capped and ledgered (R5). Pages from two different hosts that both contain the title
 make it found, with both quotes and dates one step away. One page, or two copies of one
 advert, leaves it "not yet found in independent sources". A page telling the model to do
-something changes nothing. Offline fixtures cover each of those cases; `make check` and
-`make acceptance` pass.
+something changes nothing. Offline fixtures cover each of those cases. From plan v1.6 the
+school leaver's cases pass offline, she is labelled synthetic on every surface that shows
+her, nothing under `fixtures/m0` changes (its hashes still match), and her live run is
+ledgered. `make check` and `make acceptance` pass.
 
 Register: closes DIV1-15 and the independent-source part of DIV1-04; the Task 6e parts of
 DIV1-03 and REC1-06 (a found role as a provisional concept, grounded by its pages), DIV1-10
-(user-proposed titles corroborated outside ESCO), MODEL-08, SEC-05 and TEST1-10.
+(user-proposed titles corroborated outside ESCO), MODEL-08, SEC-05 and TEST1-10. From plan
+v1.6: closes TEST1-16 (the synthetic school leaver and her cases).
+
+## Task 6f: Sprint 2 — no job yet (S2.10, plan v1.6)
+
+**Preconditions:** Task 6d complete (its last slice reviewed): this task changes the same
+first question, What we know and support screen. The product owner's school-leaver decisions
+of 1 November 2026 (decisions 2, 3, 4 and 9: yes). No human session: session W2 judges the
+result, and the opening question's final words are the product owner's there. The
+controller checks Childline's details on Childline's own website and passes them in the
+dispatch; this task's implementer makes no web request.
+**Parallel:** may overlap Task 12c or 7f in the worktree. It changes the saved answers'
+schema and adds a migration: if Task 12c also adds one, the one integrated second rebases,
+renumbers its migration and regenerates the client (R15). Not 6d or 6e: they change the same
+first question, profile and evaluation cases.
+
+Sprint card: "Sprint 2 Deliver conversation and career discovery", S2.10 (plan v1.6). Spec
+section 3 (minimum inputs: "Collect work status, current role/level, experience, relevant
+qualifications and commitments"), section 4 (the structured profile's "Work/study status …
+credentials"; the adaptive conversational policy's opening question) and section 22 (the
+rows of 1 November 2026); ADR 0006 (the saved answers and the interview contract) and ADR
+0007 (the support policy); rulings R5, R11 and R14. The school-leaver walk
+(`.superpowers/sdd/l0-sprint-tasks/audit-no-job-yet.md`): findings 1, 3, 4 and 8, and its
+section 2, rows 1, 3, 4 and 8.
+
+Who it serves: a final-year school student who has never had a job, and anyone between jobs,
+caring or returning to work. It adds no separate student mode: the same answers serve
+everyone. Nothing asks for or infers the person's age.
+
+Loop guard (R14): the sentence rule applies from the start; the product owner judges the
+words at session W2; at most one wording round.
+
+Deliver:
+- **"I haven't had a job yet"** beside "Skip for now" at the first question (the product
+  owner's words). It saves an answer about the person's current role, never a job title,
+  Skipped or Unknown, so the person's light comes on, and the start goes on to how to start.
+  Neither the demo nor the live interview asks the job question again, and the next
+  question asks what they enjoy. The person can change the answer in What we know. A browser
+  test proves the world answers within ten seconds of choosing it, in the demo, with no key.
+- **Two optional answers** (spec section 3's work status and qualifications): "What you're
+  doing now" (working, in education or training, looking for work, caring, other) and
+  "Qualifications, including ones you're taking", each marked achieved or expected. Both
+  take Skip, Unknown and Prefer not to say, and neither is asked twice. They go through the
+  one profile write path and the interview contract like every other answer (the model
+  proposes, the person confirms, ADR 0006): the saved answers' next schema version with a
+  forward-only migration (an existing profile gets both as not yet asked), the demo
+  interviewer's patterns, What we know and the generated client. An expected qualification
+  is shown as expected everywhere, never as achieved. Skills (Task 10) and Options (Task
+  12b) read both as entry facts later.
+- **The opening works without a job.** "Help me explore" opens with a question that asks
+  for no job, for example "What would you like your working life to be like?" (the product
+  owner settles the words at session W2). The walk's word pass:
+  - "this change" becomes "your next step";
+  - one example reply that isn't a job ("I help run a youth football team");
+  - the demo asks an unsure person "What do you enjoy doing, at school, at work or in your
+    own time?";
+  - the live interview's instructions gain one line, "Someone may not have had a job yet:
+    ask about school or college, volunteering, caring, clubs and hobbies; never treat no
+    job as a gap", and its prompt version goes up;
+  - the conversation's "Show me suggestions" no longer waits for a current-role answer;
+  - "Closer to what I do" is not offered when no work is known;
+  - the note for unknown work loses its "yet", and never tells someone who said they
+    haven't had a job that their work isn't known.
+  Every new sentence is worded in the web from facts (R11).
+- **Childline in the calm support panel,** for anyone under 19, beside the panel's other UK
+  services, with the details the controller checked on Childline's own website. The support
+  policy's version goes up (ADR 0007, amendment). Its review joins the support policy's
+  (H-12): Task 6e puts one yes/no line for it in session W2's package.
+- The evaluation cases' expectations follow the new answers and the no-job answer, offline,
+  on the demo interviewer. The capped live run of the new interview prompt is Task 6e's, on
+  the synthetic school leaver's cases (R5).
+- ADR 0006 and ADR 0007 gain amendment lines for the new answers, the opening and Childline.
+
+Acceptance, in the demo workspace with no key and no network:
+1. At the first question, "I haven't had a job yet" sits beside "Skip for now". Choosing it
+   lights the person's light within ten seconds (a browser test) and moves on to how to
+   start.
+2. Nothing asks for a job again. The demo's next question for an unsure person asks what
+   they enjoy, at school, at work or in their own time, and one example reply isn't a job. A
+   test shows the live interview's instructions carry the no-job line.
+3. "Show me suggestions" is offered with no current role. With no work known, no suggestion
+   is called close to what they do now, and "Closer to what I do" isn't offered.
+4. What you're doing now and a qualification marked expected round-trip through the same
+   command as a direct edit, show in What we know and are never asked twice; an expected
+   qualification never reads as achieved. An existing profile migrates forward with both not
+   yet asked.
+5. A risk word still shows the calm support panel, and it now lists Childline for anyone
+   under 19.
+
+Also: `make check` and `make acceptance` pass. The visual part is an agent pre-review only
+(R2); session W2 judges the words.
+
+Register: closes PROF-14 and PROF-15 (Childline's review stays "not run — requires human"
+until H-12 records it); the Task 6f parts of STATE-11 and PROF-13; the rows its work changes
+(PROF-07, PROF-08 and STATE-08: the new answers through the same commands, never asked
+again, with Skip, Unknown and Prefer not to say) gain a Task 6f part.
 
 ## Task 7: Sprint 3 — evidence acquisition backend (S3.1–S3.4, reduced S3.6)
 
@@ -1097,6 +1274,10 @@ Deliver:
   existing source search, sends only the target title and one of the person's cities
   (SEC-05). The restricted acquisition worker reads the candidate course and funding pages
   through the guarded fetcher; the source manifest decides each page's class.
+- **Apprenticeships and degrees too** (plan v1.6; the school-leaver walk): the
+  option-research purpose names apprenticeships, degrees and their funding beside courses,
+  so a school leaver's target finds its usual routes. It still sends only the target title
+  and one city.
 - **Values from verified spans only.** Structured data first; then the `page_extraction`
   pattern with a course and funding schema (the model quotes, deterministic code approves
   values read from verified spans; at most five pages per acquisition; the model's input is
@@ -1120,10 +1301,82 @@ the model to do something changes nothing; offline fixtures cover structured dat
 extraction and a refused page; the live scores are reported with their denominators; `make
 check` and `make acceptance` pass.
 
-Register: closes OPTN-12; the courses and funding parts of TEST1-13; FRESH-02's course and
+Register: closes OPTN-12 and, from plan v1.6, OPTN-16 (apprenticeships, degrees and their
+funding); the courses and funding parts of TEST1-13; FRESH-02's course and
 funding ages on workspace records; the Task 7e parts of ACQ-03, ACQ-07, API-06, MODEL-08,
 OPTN-09 (researched records `proposed`, never in the pack), SEC-05, TEST1-09 (the pack's
 course and funding pages run live) and TEST1-10.
+
+## Task 7f: Sprints 3–5 — the school-leaver option pack (plan v1.6)
+
+**Preconditions:** Task 12c complete (the tuition fee loan the new loan records load into);
+Tasks 7b and 7c complete (the pack's format and its reviewed version 0.2.0); session 1 held
+(the rights policy, H-06). Its second half (publishing) waits for the school-leaver pack
+session (R10); until then the controller records "blocked: awaiting the school-leaver pack
+session". The controller makes every fetch; this task's implementer makes no web request.
+**Parallel:** in the worktree, it may overlap the main-tree Tasks 6f, 6e and 10. Not 12b,
+which reads the version it publishes, or 12c, which comes before it in the worktree track.
+Not 7e or 8: they share `careerwright/evidence`.
+
+Sprint cards: the corpus items of "Sprint 3", "Sprint 4" and "Sprint 5", and plan section 9
+("The England option pack", v1.6). Spec sections 10 (funding and finance discovery: the
+scheme's "residency and age rules", repayment terms), 11 (the M0 option pack) and 18; ADR
+0011 (a committed version never changes; a correction or a review is a new version with its
+own pin, loaded only through `load_pack`); rulings R3, R7, R9, R10 and R11. The school-leaver
+walk (`.superpowers/sdd/l0-sprint-tasks/audit-no-job-yet.md`), findings 2 and 6.
+
+In two halves, as Tasks 7b and 7c ran: curate and label, then publish after the session.
+
+Deliver, first half:
+- **The pages:** the official page saying apprentices don't pay for their
+  training; Student Finance England's tuition fee loan and maintenance loan pages; the 16 to
+  19 Bursary Fund; one T Level or Level 3 course page; and the page that states the UCAS
+  deadline for the pack's nursing degree. This task proposes each address; the controller
+  fetches each through the Task 7 pipeline's guarded fetcher (`tools.corpus`, pacing within
+  one process) and passes the result. Each page is classed against the session 1 rights
+  policy, recording the class and the terms relied on; a page outside it stays "pending
+  human rights review" (R10). A page that can't be fetched is recorded with its failure,
+  never as "none found".
+- **Labels and records,** as Task 7b did: values with units or currency, spans as offsets or
+  stable selectors with minimal excerpts, missingness and expected unknowns; each page's
+  template family and holdout split assigned before any use. Records in the pack's shapes
+  (FundingInstrument for the two loans and the bursary, each with its age and residency
+  rules and, for the loans, how they are paid and repaid; LearningOption and Offering for
+  the course), every one `proposed`, dated and span-cited, or unknown with its reason. A
+  value the new pages support in an existing record (the apprenticeship's training fee,
+  from the no-fee page; the nursing degree's UCAS deadline) is a corrected value with its
+  span, in the new version only.
+- **A new pack version** that the Task 7b validator passes, distributed under the same rule
+  (R7, or committed if small and its rights permit); the earlier versions stay readable and
+  unchanged, each with its own pin. Nothing synthetic enters it, the synthetic school leaver
+  included. Update `corpus/manifest.json` and `corpus/README.md`.
+- **The school-leaver pack session's package** (R10, R2), in plain words: each new or
+  changed record's consequential fields (fees, the no-fee rule, the loans' payment and
+  repayment terms, age and residency rules, deadlines, dates) beside its span, as yes/no
+  questions, the consequential ones first, so the session stays short. The product owner
+  may rule that an AI's check of rote items counts as their review, as at session 2; an
+  agent never assumes it. Each item "not run — requires human".
+
+Deliver, second half (after the session):
+- Publish the reviewed version from the product owner's own record only, as Task 7c did: an
+  accepted record becomes `reviewed`, naming the reviewer, the decision date and the session;
+  a rejected record is left out, its reason kept in the review record; a corrected value is
+  changed with its span cited and the decision named; an undecided record stays `proposed`
+  (R9). Update `corpus/manifest.json` and `corpus/README.md` from the record.
+- Hand the reviewed version to Task 12b: its version and hash, which it pins.
+- No live call.
+
+Acceptance: every new page is in the manifest with its address, retrieval date, hash,
+rights status, template family, split and labels; the new version validates, and every new
+record is `proposed`, dated and span-cited or unknown with its reason; nothing synthetic is
+in the pack; no unpermitted body is in git; the session package is ready. After the session:
+the reviewed version validates; every `reviewed` record traces to a decision in the product
+owner's record; no rejected record is in it; every changed value is span-cited; the earlier
+versions are unchanged. `make check` passes after each half.
+
+Register: closes OPTN-14; the Task 7f parts of OPTN-10 (the versioned pack, now with
+school-leaver sources) and TEST1-09 (the new pages labelled); H-07 for the new version, from
+the product owner's own record.
 
 ## Task W1: Sprint W — the spike of three directions (SW.1)
 
@@ -1293,6 +1546,10 @@ From plan v1.5 (the audit's rulings and findings):
 - **Live listings** through Adzuna and the source search, in a live workspace. Before a
   research run starts, the person sees its estimated cost (Task 3b's estimate), and a run
   they started can be cancelled.
+- **Apprenticeships** (plan v1.6; the school-leaver walk): a listing that is an
+  apprenticeship is marked as one, and the person can paste an apprenticeship advert as one
+  of their own examples (MAP1-01). How a listing is known to be one is to be settled by Task
+  8; one it can't tell stays unmarked, never guessed.
 - The phone openings list one area per line, with its stale and unknown states captured
   (from Task W2's slice W2D).
 - The controller's carried items for this task come in the dispatch. Apply the Roles findings of
@@ -1319,8 +1576,8 @@ labelled as the group's, never as the title's or the person's; `make check` and 
 acceptance` pass.
 
 Register (plan v1.5): the VIS1 rows, AIR1-01, AIR1-08, AIR1-10 and AIR1-13; JOB-01, JOB-04,
-JOB-06 and JOB-07; the Task 8 parts of ACQ-03, ACQ-07, DUR-03, FRESH-02, MODEL-08, UI-09
-and TEST1-13 (jobs). The salary and AI-range filters (parts of VIS1-03, VIS1-07, VIS1-11 and
+JOB-06 and JOB-07, and from plan v1.6 JOB-09 (apprenticeships); the Task 8 parts of ACQ-03,
+ACQ-07, DUR-03, FRESH-02, MODEL-08, UI-09 and TEST1-13 (jobs). The salary and AI-range filters (parts of VIS1-03, VIS1-07, VIS1-11 and
 AIR1-05) are recorded as an L0 deferral.
 
 ## Task 9: Sprint 4 — capability model, protected gates and outcomes (S4.1–S4.6 backend)
@@ -1354,7 +1611,8 @@ earlier ranks.
 
 **Preconditions:** Task 7c complete (the reviewed pack, after session 2's H-07 on its
 course outcomes; Task 11 comes before it); Task 6d complete (the stored target record, plan
-v1.5); session W2 held (R10). No dependency on Task 12b or Task 8.
+v1.5); Task 6f complete (the person's qualifications, plan v1.6); session W2 held (R10). No
+dependency on Task 12b or Task 8.
 **Parallel:** may overlap Task 13b in the worktree. Not 12a (the worktree track runs it
 beside Tasks W2E, 6d, 3b and 6e only) or 12b, which follows it.
 
@@ -1379,7 +1637,12 @@ deleted after session W2 and stays in git history), and add session W2's outcome
   asks", never a readiness result;
 - "usual in your role, not confirmed yet" as a display state for the skills ESCO lists for
   the person's own role (from Task W2's slice W2C part 2); wherever something is computed it
-  stays unresolved (ADR 0014 decision 4).
+  stays unresolved (ADR 0014 decision 4). From plan v1.6, a person with no role (no job yet,
+  or none given) sees no such panel, never an empty one;
+- from plan v1.6 (Task 6f), the person's qualifications as entry facts beside the
+  requirements that name them: one marked expected is never counted as met, and one marked
+  achieved follows the gate rules as they stand (ADR 0012: held but unverified stays
+  unresolved for a protected gate; nothing finds a person ineligible).
 The controller's carried items for this task come in the dispatch.
 
 Sprint card: "Sprint 4 Build trustworthy skills and outcome assessment". Slice: the Skills
@@ -1401,10 +1664,13 @@ Sprint 4 part from the product owner's own session 2 record. `docs/reviews/sprin
 Acceptance (plan v1.5, beside the sprint card's): a target outside the option pack, or one
 whose closest occupation is "None of these is my job", shows "not assessed yet, here's what
 it asks" and never a readiness result; a skill the person marked "not part of my job" is
-shown as such and is never evidence; `make check` and `make acceptance` pass.
+shown as such and is never evidence; from plan v1.6, a qualification marked expected is
+never met, and a person with no role sees no "usual in your role" panel; `make check` and
+`make acceptance` pass.
 
 Register (plan v1.5): MAP1-01, MAP1-06, ASSESS-02, ASSESS-03 and RDY1-03; the Task 10 parts
-of MAP1-09, STATE-08, PROF-07, OPTN-08 and SEC-09.
+of MAP1-09, STATE-08, PROF-07, OPTN-08 and SEC-09; from plan v1.6, the Task 10 parts of
+PROF-13 (entry facts) and STATE-11 (no empty panel without a role).
 
 ## Task 11: Sprint 5 — offerings, funding, monthly compiler and ledgers (S5.1, S5.2, S5.4–S5.6)
 
@@ -1501,11 +1767,13 @@ confirmed inputs a solve needs).
 ## Task 12b: Sprint 5 — the Options chapter: review checkpoint, "add an option yourself" and the funding corpus + Sprint 5 review (split from Task 12, plan v1.5)
 
 **Preconditions:** Tasks 12a and 10 complete; Task 7c complete (the reviewed pack; session
-2, with its H-07 and H-13 records, and Task 11 come before it); session W2 held (R10). No
-dependency on Task 8.
-**Parallel:** none. Task 13b changes `careerwright/planning`, as this task's planning
-catalogue does (rule 10); Tasks 10, 14 and 7e share the Options chapter or the planning
-catalogue.
+2, with its H-07 and H-13 records, and Task 11 come before it); session W2 held (R10). From
+plan v1.6: Task 12c complete (the tuition fee loan), and Task 7f complete (the reviewed
+school-leaver option pack, after the school-leaver pack session; R10). No dependency on Task
+8.
+**Parallel:** none. Tasks 13b and 12c change `careerwright/planning`, as this task's planning
+catalogue does (rules 10 and 19); Tasks 10, 14 and 7e share the Options chapter or the
+planning catalogue.
 
 Build the Options chapter as its place in the world, to Task W2's design references (plan
 section 4; R13). Its moment, a gap's first credible bridge, is Task M's (plan v1.5).
@@ -1540,6 +1808,18 @@ From plan v1.5:
   12b.
 - The live path's scoring on the funding pages moves to Task 7e, which builds the funding
   extractor (TEST1-13).
+- From plan v1.6 (the product owner's school-leaver decisions; the school-leaver walk):
+  - **Someone not working:** the checkpoint's words work for a person with no job. The
+    baseline can be "staying in education", and "not working: 0 hours, £0" is said plainly.
+  - **The entry confirmation reads qualifications** (Task 6f): it names the qualification an
+    entry requirement asks for, and one the person expects reads "if you get your grades":
+    unresolved until confirmed, never met.
+  - **Each scheme's age rule beside it** (the pack holds it): shown, and never applied to an
+    age Careerwright doesn't know.
+  - **A tuition fee loan** (Task 12c): the checkpoint asks whether a tuition fee loan pays a
+    degree's fee straight to the university, and its status, through Task 12c's command,
+    and says in plain words that it is a loan to repay later, not the person's own money.
+  - The reviewed school-leaver pack version (Task 7f) is the one this task pins.
 - The controller's carried items for this task come in the dispatch.
 
 Deliver the Options chapter per the design: curated comparison by gap, pin/exclude,
@@ -1561,14 +1841,92 @@ outside the pack shows the plain line and the add action; the checkpoint never t
 silently; for each option the checkpoint names the fact the search lacks; P01, with the
 missing facts supplied at the checkpoint, gets computed routes from the route search (shown
 in Routes from Task 14), each qualified where it rests on a figure the person supplied, and
-without them the result names what is missing, never "no route"; `make check` and `make
-acceptance` pass; the visual review package per R2.
+without them the result names what is missing, never "no route"; from plan v1.6, a person
+not working reads "staying in education" and "not working: 0 hours, £0", an expected
+qualification reads "if you get your grades" and is never met, each scheme shows its age
+rule, and a tuition fee loan reads as a loan to repay; `make check` and `make acceptance`
+pass; the visual review package per R2.
 
-Register: closes OPTN-11, OPTN-03, OPTN-06, OUT1-09 and BND1-07; the Task 12b parts of
-OPTN-05, OPTN-07, OPTN-08, OPTN-09, OPTN-13 (the missing facts at the checkpoint), OUT1-04,
-FUNDING-04, FUNDING-05, FRESH-02, FRESH-06, ACQ-07, API-06, STATE-06 (a changed constraint
-shows the options it affects before invalidating them), TEST1-09 (the pack's funding pages
-consumed) and TEST1-14.
+Register: closes OPTN-11, OPTN-03, OPTN-06, OUT1-09 and BND1-07, and from plan v1.6 OPTN-15;
+the Task 12b parts of OPTN-05, OPTN-07, OPTN-08, OPTN-09, OPTN-13 (the missing facts at the
+checkpoint), OUT1-04, FUNDING-04, FUNDING-05, FRESH-02, FRESH-06, ACQ-07, API-06, STATE-06 (a
+changed constraint shows the options it affects before invalidating them), TEST1-09 (the
+pack's funding pages consumed) and TEST1-14, and from plan v1.6 of PROF-13 (the entry
+confirmation) and FUNDING-06 (the checkpoint asks about the loan).
+
+## Task 12c: Sprint 5 — a tuition fee loan is a loan to repay (backend, plan v1.6)
+
+**Preconditions:** Tasks 12a and 13b complete and integrated (the planning inputs and the
+search this task changes). The product owner's school-leaver decision 6 of 1 November 2026
+(yes) and the specification's section 22 row that records it. No human session, and it
+never waits for one.
+**Parallel:** in the worktree, it may overlap the main-tree Tasks 6f, 6e and 10, which
+don't change `careerwright/planning`. It may add API, a migration and the generated client,
+so it follows R15's rebase rules: it rebases onto `l0-local-release`, renumbers a migration
+whose number another task took and regenerates the client. Not 12b or 14: they change
+`careerwright/planning` too (rule 19). Task 7f follows it in the worktree track. It runs
+before Tasks 7f, 12b and 14.
+
+Sprint cards: "Sprint 5 Compile real options into an honest monthly model" (S5.2 as plan
+v1.6 amends it) and "Sprint 6a Prove the optimiser and layers on instances that complete"
+(the independent check). Spec sections 10 ("Funding and finance discovery"), 12 (FIN-1:
+"Third-party payments made directly to a provider are represented consistently on both
+sides or excluded from both; never count them twice") and 22 (the tuition fee loan row);
+ADR 0013 decisions 5 and 11 and ADR 0016 (the pruning rules and the oracle), as amended;
+Global Constraint 1. The school-leaver walk
+(`.superpowers/sdd/l0-sprint-tasks/audit-no-job-yet.md`), finding 2.
+
+Why: a loan is never support today, so a degree's fee counts as the student's own spending
+and cash, and against a student's limits a degree would read "not feasible in this monthly
+model" (the walk's reading of the rules; the checker's verdict was not traced). The product
+owner's decision: a tuition fee loan paid straight to the university is not cash out of the
+student's pocket; it is shown as a loan to repay later.
+
+Deliver, as backend and API with the client regenerated, and no interface:
+- **A tuition fee loan paid straight to the provider** is something the person can state on
+  an option, beside its supports, through Task 12a's command (an expected version and an
+  `Idempotency-Key`): the amount it pays and its status (the funding statuses, ADR 0013). The
+  fee it pays is not the person's own money: it is in neither their cash ledger nor the
+  direct spending the direct-spend cap reads, nor the monthly payment cap's payments. It is
+  never support, a grant, income or a receipt.
+- **Shown as a loan to repay later:** the route's result carries the amount borrowed and
+  when, as a loan to repay. What Careerwright doesn't know about its repayment stays
+  unknown, never 0. The result carries facts and codes, never a sentence (R11); Tasks 12b
+  and 14 word it.
+- **Its status:** only a loan the person confirms is approved takes the fee out of their own
+  spending unconditionally. One not yet approved makes the route conditional on it, beside
+  the route where they pay the fee themselves, with a blocking verification (the funded and
+  unfunded rule, FUNDING-05). An unknown amount leaves the route unresolved, never £0.
+- **How it enters the economic cost** (the cost over the horizon) is to be settled by Task
+  12c and stated in plain words in ADR 0013's amendment. If it changes which routes are best
+  trade-offs, it goes to the product owner first, as one question (R14).
+- **Nothing else changes:** every other loan, a maintenance loan paid to the student
+  included, is still refused as support and stays information to verify (spec section 10).
+  Careerwright chooses no borrowing. Existing debt stays a fixed commitment. TRACE-01, the
+  A–I fixture and every regression family keep their expected values.
+- **The search and its independent check:** each new or changed checker finding is classed
+  for the search's pruning rules (ADR 0016: is it the variant's own, repeated in every route
+  containing it? rule 2 then sets the option aside), and the pruning version goes up if a
+  rule changes. The independent oracle writes the rule again from its own reading of the
+  specification, its section 22 row and ADR 0013, sharing no code with the checker. Its
+  generated instances include the loan in every status, and the search must give exactly
+  the oracle's archive, objectives, layers and outcome.
+- A forward-only migration with CHECKs that repeat the domain rules, if the stored inputs
+  change.
+- ADR 0013 and ADR 0016 amendments. Propose the matching `CLAUDE.md` planning line ("a loan
+  is never support") with its exact words, for the product owner's approval.
+
+Acceptance: a constructed degree route whose fee a confirmed tuition fee loan pays: the fee
+is in neither the cash ledger nor the direct-spend or payment-cap figures, and the result
+carries the loan to repay with its amount; the same loan not yet approved gives a
+conditional route beside the self-paid one; an unknown amount leaves the route unresolved,
+never £0; a maintenance loan stated as support is still refused; the oracle agrees with the
+search on generated instances with the loan; a stale version is refused; TRACE-01, the A–I
+fixture and the existing regression families keep their values; `make check` and `make
+acceptance` pass.
+
+Register: the Task 12c parts of FUNDING-06 (the checker, the oracle and the search; Tasks
+12b and 14 show it) and FUNDING-04 (its L0 change).
 
 ## Task 13a: Sprint 6a — enumerator, checker, oracle and layers on instances that complete (S6.1, S6.2, S6.5–S6.7)
 
@@ -1652,9 +2010,10 @@ DUR-05; the Task 13b part of API-02 (`SOLVE_LIMIT_REACHED`).
 
 ## Task 14: Sprint 7 — coordinated route comparison (S7.1–S7.6) + Sprint 7 review
 
-**Preconditions:** Tasks 13b and 12b complete (plan v1.5); session 2's findings exist (the
-H-13 record, read as scope input); session W2 held. It closes on its own checks (plan v1.5:
-session 3 is merged into the end-to-end session, after Task 15).
+**Preconditions:** Tasks 13b and 12b complete (plan v1.5), and Task 12c (plan v1.6);
+session 2's findings exist (the H-13 record, read as scope input); session W2 held. It
+closes on its own checks (plan v1.5: session 3 is merged into the end-to-end session, after
+Task 15).
 **Parallel:** none: it joins the solver, the planning catalogue and the Options chapter.
 
 Sprint card: "Sprint 7 Make route comparison the signature experience". Whole sprint.
@@ -1691,6 +2050,14 @@ labels. Also from plan v1.5:
 near the bound (OPT1-15): lead with "Best trade-offs found", state the instance size and
 name the narrowing that would let the search complete, using Task 13a's measured sizes. Show
 the option pack's date and review states wherever pack records appear in a route (R9).
+- From plan v1.6 (the product owner's school-leaver decisions of 1 November 2026):
+  - **A route longer than the model,** such as a three-year degree: Routes says plainly
+    that it is longer than Careerwright can plan yet, never "no route", "not feasible" or
+    impossible. Words only, no planning change (spec section 1's explanatory
+    sketch and unsupported-model state; specification section 22).
+  - **A fee a tuition fee loan pays** (Task 12c) shows as a loan to repay later, with its
+    amount, never as support or the person's own spending; a route resting on a loan not yet
+    approved reads as conditional on it, beside the route without it.
 
 Deliver the Routes chapter as its place in the world, to Task W2's design references (plan
 section 4; R13); its moment, the credible route, is Task M's (plan v1.5). Using real solver
@@ -1712,14 +2079,16 @@ Acceptance (plan v1.5, beside the sprint card's): a route built on an option the
 added (Task 12b) reads qualified on screen, in plain words, never an unqualified
 "affordable and feasible"; P01, with the missing facts supplied at the checkpoint, gets
 computed routes in Routes, each qualified where it rests on a figure the person supplied,
-and without them Routes names what is missing, never "no route"; `make check` and `make
-acceptance` pass.
+and without them Routes names what is missing, never "no route"; from plan v1.6, a route
+longer than 24 months says it is longer than Careerwright can plan yet, and a fee a tuition
+fee loan pays reads as a loan to repay; `make check` and `make acceptance` pass.
 
 Register (plan v1.5): the VIS2 rows, ROU1-04, PARETO-04, DIRECTAI-02 and TRACE01-05; the
 Task 14 parts of OUT1-04, OPTN-13 (routes on the supplied facts), RDY1-02, API-02
 (`NO_ROUTE_IN_BOUNDED_MODEL`), API-04, API-05, API-06 (a route locates its supporting
 spans), DUR-03, STATE-06 (a changed constraint shows the routes it affects before
 invalidating them), UI-09 and FRESH-06; PLN-01, PLN-04, OPTN-04 and OUT1-08, as settled.
+From plan v1.6: closes PLN-12; the Task 14 part of FUNDING-06 (Routes shows the loan).
 
 ## Task 15: Sprint 8 — chosen plan, progress, revision and exports (S8.1–S8.6) + Sprint 8 review
 
@@ -1785,6 +2154,12 @@ dispatch (agent hours and the frame budget). A moment they chose to skip is not 
   0014 decision 3) are put to the product owner with its interface, one line each (R14).
 - A gap's first bridge (Options), the credible route (Routes), committing (Plan) and
   progress landmarks.
+- **Without a job, the world still answers** (plan v1.6; the school-leaver walk): when the
+  role names no ESCO occupation, the overlooked strength's horizon is the latest slate's
+  suggestions, not only the role's first destinations, so a person still exploring can
+  earn it; and the first answer's ignition also answers a first saved "what
+  you enjoy" (its first destinations from the skill search), so the world responds to a
+  person who has never had a job.
 - Sprint W's revelation acceptance: every revelation's sentence and evidence are in the DOM,
   the still world says the same, and a risk word holds every revelation back.
 - The frame re-measure on the busiest real scene and a scene with a name that cannot be
@@ -1797,15 +2172,16 @@ Acceptance: the plan's Sprint M acceptance; frame times reported with device, br
 scene; the existing journeys pass with motion on and off; `make check` and `make
 acceptance` pass. `docs/reviews/sprint-m.md`, with an agent pre-review only (R2).
 
-Register: the moments' rows of the world family (owned here); the frame-budget rows with
-Task 16.
+Register: the moments' rows of the world family (owned here), WLD-12 among them (plan
+v1.6); the frame-budget rows with Task 16.
 
 ## Task 16: Sprint 9 — local release qualification and handover (S9.1–S9.6)
 
 **Preconditions:** every remaining task complete (plan v1.5): W2E, 6d, 3b, 6e, 12a, 13a,
-13b, 10, 12b, 14, 15, 7e, 8 and M, after the earlier ones (6b, 6c, 7, 7d, 7b, 7c, 9, 11, W1
-and W2); release qualification needs all six chapters. Sessions 1, 2, W1, W2 and the
-end-to-end session held (R10). The Sprint 9 human gates (H-01, H-03, H-04, H-05, H-08) are
+13b, 10, 12b, 14, 15, 7e, 8 and M, and from plan v1.6 6f, 12c and 7f, after the earlier ones
+(6b, 6c, 7, 7d, 7b, 7c, 9, 11, W1 and W2); release qualification needs all six chapters.
+Sessions 1, 2, W1, W2, the school-leaver pack session and the end-to-end session held
+(R10). The Sprint 9 human gates (H-01, H-03, H-04, H-05, H-08, and from plan v1.6 H-15) are
 prepared as checklists and recorded "not run — requires human" (R2); none is a dispatch
 precondition. Five participants are available for the task sessions (H-05; the product
 owner, 2026-10-31).
@@ -1818,6 +2194,13 @@ the discovery evaluation adds its relevance-only and common-careers baselines (D
 and its release report states that L0 measures no language or region disparities because
 it has one language and one region (the plan's own note, plan section 1); and the release
 checks of R10 are prepared, including the name review of committed excerpts before any push.
+
+From plan v1.6 (the product owner's school-leaver decision 1 of 1 November 2026): school
+students aged 17 and 18 are in scope, so before any real student uses Careerwright a person
+checks the rules for young people's data, and the release report carries a privacy note on
+it beside the privacy decision (H-08). Its checklist is prepared here, and it is recorded
+"not run — requires human" (H-15) until a person records it; no engineering check stands in
+for it.
 
 Sprint card: "Sprint 9 Qualify and hand over the local release". Whole sprint plus the
 plan section 11 final reviewer demonstration (automatable parts).
@@ -1839,7 +2222,7 @@ long-tail coverage; its language and region part as the plan's note), REC1-09 (t
 comparison, its pass rule decided first), TEST1-15 (the live journey), PLN-09, MODEL-03
 (every adapter's contract tests on the final candidate) and API-02 (every error code on the
 final candidate); the frame-budget rows with Task M; the human gates H-01, H-03, H-04, H-05
-and H-08, prepared and recorded "not run — requires human".
+and H-08, and from plan v1.6 H-15, prepared and recorded "not run — requires human".
 
 ## Task 17: Sprint 10 — operator's manual and friction pass (S10.1–S10.5)
 
