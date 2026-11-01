@@ -41,7 +41,9 @@ const profile: ProfileOut = {
   created_by: null,
   created_at: "2027-01-01T00:00:00Z",
   document: {
-    schema_version: "3",
+    schema_version: "4",
+    work_status: unasked,
+    qualifications: unasked,
     preferred_name: unasked,
     current_role: given("Warehouse shift supervisor"),
     cities: given(["Leeds", "Manchester"]),
@@ -921,7 +923,9 @@ export const WhatWeKnowTitleDetails: Story = {
   ),
   play: async ({ canvasElement }) => {
     await userEvent.click(
-      await within(canvasElement).findByText("The 3 skills ESCO lists for this kind of work"),
+      await within(canvasElement).findByText(
+        "The 3 skills that ESCO, the EU's list of jobs and skills, lists for this kind of work",
+      ),
     );
   },
 };

@@ -132,8 +132,14 @@ export function WhatWeKnow({
                     <span className="fact-explained">{PROFILE_FIELDS[name].hint}</span>
                   )}
                 </dt>
-                <dd data-open={profile.document[name].state !== "provided"}>
-                  {describeField(profile.document[name])}
+                {/* "I haven't had a job yet" is an answer like any given one (Task 6f). */}
+                <dd
+                  data-open={
+                    profile.document[name].state !== "provided" &&
+                    profile.document[name].state !== "no_job_yet"
+                  }
+                >
+                  {describeField(profile.document[name], name)}
                 </dd>
               </div>
             ))}

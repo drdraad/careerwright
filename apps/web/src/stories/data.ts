@@ -38,7 +38,9 @@ const gbp = (minor: number) => ({ minor_units: minor, currency: "GBP" as const }
 
 /** P01's practical inputs as the API holds them after seeding. */
 export const p01Document: ProfileDocument = {
-  schema_version: "3",
+  schema_version: "4",
+  work_status: { state: "unasked", value: null, source_ref_id: null },
+  qualifications: { state: "unasked", value: null, source_ref_id: null },
   preferred_name: { state: "unasked", value: null, source_ref_id: null },
   current_role: { state: "unasked", value: null, source_ref_id: null },
   enjoyed_tasks: { state: "unasked", value: null, source_ref_id: null },

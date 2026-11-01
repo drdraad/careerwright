@@ -370,7 +370,9 @@ const shots = (scratch: Scratch): Shot[] => [
     as: "ada",
     url: chapterUrl("you", scratch.empty),
     ready: typeAhead("Bookkeeping assistant", (page) =>
-      page.getByText("Careerwright couldn't match that title in ESCO. Is it one of these?"),
+      page.getByText(
+        "Careerwright couldn't match that title in ESCO, the EU's list of jobs and skills. Is it one of these?",
+      ),
     ),
   },
   {
@@ -414,7 +416,7 @@ const shots = (scratch: Scratch): Shot[] => [
     url: chapterUrl("you"),
     ready: async (page) => {
       await inYou("What we know")(page);
-      await expect(page.getByText(/^The most you'd spend on the whole change/)).toBeVisible();
+      await expect(page.getByText(/^The most you'd spend on your next step/)).toBeVisible();
       await expect(page.getByText("Loading the early sketch")).toHaveCount(0); // B-M5
     },
   },
@@ -428,7 +430,7 @@ const shots = (scratch: Scratch): Shot[] => [
       await inYou("What we know")(page);
       const details = page.getByRole("region", { name: "Seniority and industry" });
       await expect(details.getByText("Seniority: Band 6. Industry: NHS.")).toBeVisible();
-      await details.getByText(/skills ESCO lists for this kind of work$/).click();
+      await details.getByText(/skills that ESCO, .* lists for this kind of work$/).click();
       await expect(
         details.getByRole("button", { name: /^Not part of my job\s*:/ }).first(),
       ).toHaveAttribute("aria-pressed", "true");

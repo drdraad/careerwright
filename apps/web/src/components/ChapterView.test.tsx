@@ -17,7 +17,9 @@ function profile(changes: Partial<ProfileDocument>): ProfileOut {
     created_by: null,
     created_at: "2027-01-01T00:00:00Z",
     document: {
-      schema_version: "3",
+      schema_version: "4",
+      work_status: { state: "unasked", value: null, source_ref_id: null },
+      qualifications: { state: "unasked", value: null, source_ref_id: null },
       preferred_name: { state: "unasked", value: null, source_ref_id: null },
       current_role: { state: "unasked", value: null, source_ref_id: null },
       cities: { state: "provided", value: ["Leeds"], source_ref_id: SRC },

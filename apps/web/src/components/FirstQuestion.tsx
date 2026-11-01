@@ -10,7 +10,8 @@
 // lights the person's light in the world at once (any answer does), and a UK title is followed
 // by "Which of these is closest?": the ESCO occupations in every group ONS codes it to, none
 // picked, and "None of these is my job", which leaves the role with no ESCO occupation and
-// never asks for another.
+// never asks for another. Beside "Skip for now", "I haven't had a job yet" (Task 6f) saves an
+// answer about the role, never a job title, Skipped or Unknown, so the light comes on too.
 //
 // What is typed goes through the support screen: the calm panel shows above the field, where
 // a phone's keyboard can't cover it, and the words are kept as the job title only by the
@@ -36,7 +37,13 @@ import type {
   UkTitleOut,
 } from "@/generated/api";
 import { ApiError } from "@/lib/api";
-import { useChooseClosest, useChooseRole, useNameRole, useTitleMatches } from "@/lib/queries";
+import {
+  useChooseClosest,
+  useChooseRole,
+  useNameRole,
+  useNoJobYet,
+  useTitleMatches,
+} from "@/lib/queries";
 import { CLOSEST, FIRST_ANSWER, FIRST_QUESTION } from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { RequestFailure } from "./PageState";
@@ -86,6 +93,7 @@ export function FirstQuestion({
   onSupport,
   onDismissSupport,
   skipLabel = FIRST_ANSWER.skip,
+  offerNoJob = true,
   onAnswered,
   onSaved,
   onFailed,
@@ -107,6 +115,8 @@ export function FirstQuestion({
   onDismissSupport(): void;
   /** The skip button's words: "Skip for now", or what it does while fixing a title. */
   skipLabel?: string;
+  /** Offer "I haven't had a job yet" beside the skip (not while fixing a title). */
+  offerNoJob?: boolean;
   /** The person answered: the start moves on once the answer is saved. */
   onAnswered?(): void;
   /** The answer was saved (it may have changed nothing: the same title again). */
@@ -128,6 +138,7 @@ export function FirstQuestion({
   const found = useTitleMatches(settled, OPTIONS_SHOWN);
   const chooseRole = useChooseRole(workspaceId);
   const nameRole = useNameRole(workspaceId);
+  const noJobYet = useNoJobYet(workspaceId);
   const text = typed.trim();
   // Only the answer for these very words: an earlier search's never stands for new text.
   const body = text !== "" && settled.trim() === text ? found.data : undefined;
@@ -149,8 +160,8 @@ export function FirstQuestion({
   const at = activeKey === null ? -1 : options.findIndex((o) => optionKey(o) === activeKey);
   const looking =
     text !== "" && body === undefined && (settled.trim() !== text || found.isFetching);
-  const saving = chooseRole.isPending || nameRole.isPending;
-  const failure = chooseRole.error ?? nameRole.error;
+  const saving = chooseRole.isPending || nameRole.isPending || noJobYet.isPending;
+  const failure = chooseRole.error ?? nameRole.error ?? noJobYet.error;
   // The support screen's own refusal is answered by the panel alone; any other says why.
   const calm =
     failure instanceof ApiError &&
@@ -200,6 +211,14 @@ export function FirstQuestion({
       },
       settle,
     );
+  };
+
+  // "I haven't had a job yet": an answer about the role, never a title (Task 6f).
+  const noJob = () => {
+    if (saving) return;
+    setOpen(false);
+    onAnswered?.();
+    noJobYet.mutate({ expected_version: profile.version }, settle);
   };
 
   const keys = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -334,7 +353,14 @@ export function FirstQuestion({
         {/* The support screen's own refusal shows the panel, never a failure notice. */}
         {failure !== null && !calm && <RequestFailure error={failure} />}
       </div>
-      <div className="mt-12">
+      <div className="mt-12 flex flex-wrap gap-8">
+        {/* Beside "Skip for now", in the product owner's words (Task 6f); not offered while
+            the person is fixing a title they gave. */}
+        {offerNoJob && (
+          <Button variant="quiet" onClick={noJob} disabledReason={saving ? "Saving…" : undefined}>
+            {FIRST_ANSWER.noJobYet}
+          </Button>
+        )}
         <Button variant="quiet" onClick={onSkip} disabledReason={saving ? "Saving…" : undefined}>
           {skipLabel}
         </Button>

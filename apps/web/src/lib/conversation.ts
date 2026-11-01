@@ -107,9 +107,10 @@ export function decisionFor(
   };
 }
 
-/** The four early-value answers (spec section 3: current work, work area, weekly availability
- *  and budget), which the interview asks for before it asks about a role. */
-const EARLY_VALUE = ["current_role", "cities", "weekly_study_hours", "direct_spend_cap"] as const;
+/** The early-value answers the live stage waits for before it offers "Show me suggestions":
+ *  work area, weekly availability and budget (spec section 3). Never the current role (Task
+ *  6f): someone who hasn't had a job may never give one. */
+const EARLY_VALUE = ["cities", "weekly_study_hours", "direct_spend_cap"] as const;
 
 /**
  * What the question in view asks about, where Careerwright knows: the opening's for the
@@ -128,7 +129,7 @@ export function questionAsks(
  * Whether the question in view is "Do you have a role in mind, or would you like to explore?",
  * which offers "Show me suggestions" and "Name a role" (STATE-09): the demo interviewer's role
  * question for someone who didn't say they know their direction; in a live interview, whose
- * questions are never classified, the stage at which it is asked: the four early answers
+ * questions are never classified, the stage at which it is asked: the early answers (never the role)
  * given and no target yet.
  */
 export function asksRoleOrExplore(

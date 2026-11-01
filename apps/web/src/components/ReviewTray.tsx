@@ -27,7 +27,13 @@ import {
   readField,
 } from "@/lib/profile";
 import { useDecideTurn } from "@/lib/queries";
-import { EXPLAINED_FIELDS, PROFILE_FIELDS, type ProfileFieldName } from "@/lib/vocabulary";
+import {
+  EXPLAINED_FIELDS,
+  FIELD_STATE,
+  fieldStates,
+  PROFILE_FIELDS,
+  type ProfileFieldName,
+} from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { useEvidence } from "./EvidenceDrawer";
 import { AnswerControl, FieldError, FieldStateSelect } from "./fields";
@@ -58,15 +64,8 @@ function kindOf(change: ProposedChangeOut): string {
 }
 
 function proposedValue(change: ProposedChangeOut): string {
-  if (change.value === null) {
-    return {
-      provided: "",
-      unknown: "Unknown",
-      skipped: "Skipped",
-      prefer_not_to_say: "Prefer not to say",
-    }[change.state];
-  }
-  return describeValue(change.value);
+  if (change.value === null) return change.state === "provided" ? "" : FIELD_STATE[change.state];
+  return describeValue(change.value, change.field as ProfileFieldName);
 }
 
 /** Where an edit starts: the proposal's own answer, or an empty answer to type into when
@@ -217,6 +216,7 @@ export function ReviewTray({
                 <FieldStateSelect
                   label={label}
                   draft={draft}
+                  states={fieldStates(field)}
                   describedBy={problem ? errorId : undefined}
                   onChange={setDraft}
                 />

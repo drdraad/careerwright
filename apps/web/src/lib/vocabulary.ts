@@ -22,6 +22,7 @@ import type {
   PayPeriod,
   ProfileField,
   ProfileInput,
+  QualificationStatus,
   RecordPart,
   Resolution,
   SalaryFloorOut,
@@ -38,6 +39,7 @@ import type {
   TooGeneralBy,
   UkGroupOut,
   WorkState,
+  WorkStatus,
 } from "@/generated/api";
 import { listLimit } from "./bounds";
 import { formatMoney } from "./money";
@@ -128,6 +130,8 @@ export const FIELD_STATE: Record<FieldState, string> = {
   unknown: "Unknown",
   skipped: "Skipped",
   prefer_not_to_say: "Prefer not to say",
+  // The current role's answer only (Task 6f): an answer, never a job title or a gap.
+  no_job_yet: "I haven't had a job yet",
 };
 
 /** The order the field-state control offers; "Answered" first. */
@@ -139,6 +143,14 @@ export const FIELD_STATE_ORDER: readonly FieldState[] = [
   "unasked",
 ];
 
+/** The states one field's control offers: the current role also takes "I haven't had a job
+ *  yet", straight after "Answered" (the API refuses it for any other field). */
+export function fieldStates(name: ProfileFieldName): readonly FieldState[] {
+  if (name !== "current_role") return FIELD_STATE_ORDER;
+  const [answered, ...rest] = FIELD_STATE_ORDER;
+  return answered === undefined ? FIELD_STATE_ORDER : [answered, "no_job_yet", ...rest];
+}
+
 export const DATA_MODE: Record<DataMode, string> = {
   demo: "Demo data",
   live_assisted: "Live-assisted",
@@ -147,13 +159,35 @@ export const DATA_MODE: Record<DataMode, string> = {
 
 export type ProfileFieldName = keyof ProfileInput;
 
-type FieldKind = "text" | "list" | "hours" | "money" | "salary";
+type FieldKind = "text" | "list" | "hours" | "money" | "salary" | "work_status" | "qualifications";
 
 type FieldWords = { label: string; hint: string; lessPrecise: string } & (
-  | { kind: Exclude<FieldKind, "list"> }
+  | { kind: Exclude<FieldKind, "list" | "qualifications"> }
   // A list's bound comes from the API's published schema (`listLimit` in ./profile).
-  | { kind: "list"; itemLabel: string }
+  | { kind: "list" | "qualifications"; itemLabel: string }
 );
+
+/** What the person is doing now (Task 6f; spec section 3's work status), in their words. */
+export const WORK_STATUS: Record<WorkStatus, string> = {
+  working: "Working",
+  in_education_or_training: "In education or training",
+  looking_for_work: "Looking for work",
+  caring: "Caring for someone",
+  other: "Something else",
+};
+
+/** A qualification's status, as it reads after its name. Expected is never read as achieved. */
+export const QUALIFICATION_STATUS: Record<QualificationStatus, string> = {
+  achieved: "achieved",
+  expected: "expected, not achieved yet",
+};
+
+/** The choice beside each qualification in the answer form; neither is picked for the person. */
+export const QUALIFICATION_CHOICE: Record<QualificationStatus, string> = {
+  achieved: "Achieved",
+  expected: "Expected: taking it, or waiting for the result",
+};
+export const QUALIFICATION_UNMARKED = "Achieved or expected?";
 
 /** A pay period as it reads after an amount ("£28,000 a year"). */
 export const PAY_PERIOD: Record<PayPeriod, string> = {
@@ -174,8 +208,21 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
   current_role: {
     label: "Current role",
     kind: "text",
-    hint: "Your current job title, or what you do now.",
+    hint: "Your job now, or your last one. If you haven't had a job yet, that's an answer too.",
     lessPrecise: "Which requirements you may already meet.",
+  },
+  work_status: {
+    label: "What you're doing now",
+    kind: "work_status",
+    hint: "Optional: working, in education or training, looking for work, caring, or something else.",
+    lessPrecise: "Nothing for now: Careerwright keeps it to check where you can start later.",
+  },
+  qualifications: {
+    label: "Qualifications",
+    kind: "qualifications",
+    itemLabel: "Qualification",
+    hint: "Optional, including ones you're taking. Mark each one achieved or expected.",
+    lessPrecise: "Nothing for now: Careerwright keeps them to check entry requirements later.",
   },
   cities: {
     label: "Work areas",
@@ -202,7 +249,7 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
   direct_spend_cap: {
     label: "Total spending limit",
     kind: "money",
-    hint: "The most you'd spend on the whole change, all added up: course fees, exams, equipment and the like. Pay you'd give up while you train isn't part of it.",
+    hint: "The most you'd spend on your next step, all added up: course fees, exams, equipment and the like. Pay you'd give up while you train isn't part of it.",
     lessPrecise: "Which routes are affordable: they are shown without a spending check.",
   },
   monthly_payment_cap: {
@@ -258,6 +305,8 @@ export const PROFILE_FIELD_ORDER: readonly ProfileFieldName[] = [
   "target_titles",
   "cities",
   "current_role",
+  "work_status",
+  "qualifications",
   "weekly_study_hours",
   "direct_spend_cap",
   "monthly_payment_cap",
@@ -285,7 +334,9 @@ export const CONVERSATION_MODE: Record<ConversationMode, string> = {
 /** Careerwright's first question for each entry, before any reply exists (spec section 4). */
 export const OPENING_QUESTION: Record<EntryMode, string> = {
   sure: "Which role are you aiming for, and at what level?",
-  unsure: "What would you most like to be different about your working life?",
+  // Asks for no job (Task 6f; the product owner settles the words at session W2). The demo
+  // interviewer's `UNSURE_QUESTION` is the same sentence.
+  unsure: "What would you like your working life to be like?",
 };
 
 /** What each opening question asks about: the target, or nothing in particular ("open"). */
@@ -302,19 +353,22 @@ export const OPENING_ASKS: Record<EntryMode, ProfileFieldName | "open"> = {
  * never asks about has none.
  */
 export const EXAMPLE_REPLIES: Record<ProfileFieldName | "open", readonly string[]> = {
-  open: ["I enjoy working with people", "Skip"],
+  // One example that isn't a job (Task 6f).
+  open: ["I help run a youth football team", "Skip"],
   target_titles: ["I want to be a nurse", "Skip"],
-  current_role: ["I'm a warehouse supervisor", "Skip"],
+  current_role: ["I'm a warehouse supervisor", "I haven't had a job yet", "Skip"],
   cities: ["Leeds", "Skip"],
   weekly_study_hours: ["5 hours a week", "Unknown"],
   direct_spend_cap: ["Up to £600", "Prefer not to say"],
   monthly_payment_cap: [],
   minimum_salary: [],
-  enjoyed_tasks: [],
+  enjoyed_tasks: ["I enjoy helping people", "Skip"],
   confident_tasks: [],
   evidenced_tasks: [],
   work_style: [],
   preferred_name: [],
+  work_status: [],
+  qualifications: [],
 };
 
 /** "Do you have a role in mind, or would you like to explore?": two ways on, in the
@@ -369,9 +423,11 @@ export const TITLE_DETAILS = {
   /** The skills ESCO lists for the role's kind of work, one step away. */
   listed: (count: number) =>
     count === 1
-      ? "The skill ESCO lists for this kind of work"
-      : `The ${count} skills ESCO lists for this kind of work`,
-  listedIntro: `${ESCO_NAMED}, lists these as essential for this kind of work. Careerwright hasn't compared them with your own experience.`,
+      ? `The skill that ${ESCO_NAMED}, lists for this kind of work`
+      : `The ${count} skills that ${ESCO_NAMED}, lists for this kind of work`,
+  // ESCO is named plainly in the summary above, where the person first meets it (Task 6f).
+  listedIntro:
+    "ESCO lists these as essential for this kind of work. Careerwright hasn't compared them with your own experience.",
   notPart: "Not part of my job",
   notPartSaid:
     "You said this isn't part of your job. Careerwright doesn't use it to check anything.",
@@ -573,6 +629,16 @@ export const DIRECTION: Record<Direction, string> = {
   less_familiar: "Something different",
 };
 
+/** The close group's heading when Careerwright knows no current work (Task 6f): with no role,
+ *  only the roles the person named make a suggestion close, so nothing is called close to
+ *  what they do now. */
+export const CLOSE_WITHOUT_WORK = "Close to the roles you named";
+
+/** Beside the suggestions when Careerwright knows neither the person's work nor a role they
+ *  named; never said to someone who told Careerwright they haven't had a job yet. */
+export const WORK_NOT_KNOWN =
+  "Careerwright doesn't know your current work, so it can't say which directions are close to it.";
+
 export const EMPHASIS: Record<Emphasis, string> = {
   balanced: "Balanced",
   practical: "Closer to what I do",
@@ -657,6 +723,8 @@ export const ANSWER_SOURCE: Record<ProfileField, string> = {
   evidenced_tasks: "What you have done",
   work_style: "How you like to work",
   minimum_salary: "The lowest pay you'd accept",
+  work_status: "What you're doing now",
+  qualifications: "Your qualifications",
 };
 
 type FoundNoWork = Extract<SlateNote, { reason: "answer_found_no_work" }>;
@@ -915,7 +983,8 @@ export const FIRST_ANSWER = {
   placeholder: "Start typing your job title",
   ukTitle: "UK job title (ONS)",
   escoTitle: (title: string) => `In ESCO as ${title}`,
-  partial: "Careerwright couldn't match that title in ESCO. Is it one of these?",
+  // ESCO named plainly where the start first lists its titles (Task 6f, design I1).
+  partial: `Careerwright couldn't match that title in ${ESCO_NAMED}. Is it one of these?`,
   ownWords: (typed: string) => `Use my own words: ${q(typed)}`,
   noneOfThese: "None of these is my job",
   nothing: "Careerwright found no job title holding those words.",
@@ -927,6 +996,8 @@ export const FIRST_ANSWER = {
   /** In the support panel: the person's own choice to keep what they typed (re-review R-M3). */
   keep: "Keep it as my job title",
   skip: "Skip for now",
+  /** Beside "Skip for now" (Task 6f, the product owner's words): an answer, never a title. */
+  noJobYet: "I haven't had a job yet",
   /** In place of "Skip for now" while fixing a title: it goes back (re-review R-M4). */
   backToClosest: "Back to “Which of these is closest?”",
 } as const;
@@ -935,7 +1006,7 @@ export const FIRST_ANSWER = {
 export const CLOSEST = {
   question: "Which of these is closest?",
   found: (title: string, groups: number) =>
-    `Careerwright found ${q(title)} in the UK job-title index and looked up the ESCO occupations in the ${groups === 1 ? "group" : "groups"} it's in.`,
+    `Careerwright found ${q(title)} in the UK job-title index and looked up the occupations in the ${groups === 1 ? "group" : "groups"} it's in, in ${ESCO_NAMED}.`,
   // Plain words only: the group's code is never shown (design review M-5).
   group: (group: UkGroupOut) => group.label ?? "A group ESCO doesn't name",
   empty: "Careerwright found no ESCO occupation in this group.",

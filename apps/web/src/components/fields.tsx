@@ -2,15 +2,18 @@
 // Form controls for one profile answer: how it is answered (its field state) and, when
 // answered, the value. Native controls, labelled and described, with errors announced.
 import { type ReactNode, useId } from "react";
-import type { FieldState, PayPeriod } from "@/generated/api";
+import type { FieldState, PayPeriod, QualificationStatus, WorkStatus } from "@/generated/api";
 import { listLimit } from "@/lib/bounds";
-import type { FieldDraft } from "@/lib/profile";
+import type { FieldDraft, QualificationDraft } from "@/lib/profile";
 import {
   FIELD_STATE,
   FIELD_STATE_ORDER,
   PAY_PERIOD,
   PROFILE_FIELDS,
   type ProfileFieldName,
+  QUALIFICATION_CHOICE,
+  QUALIFICATION_UNMARKED,
+  WORK_STATUS,
 } from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { Glyph } from "./Glyph";
@@ -33,8 +36,14 @@ export function FieldStateSelect({
   draft,
   disabledReason,
   describedBy,
+  states = FIELD_STATE_ORDER,
   onChange,
-}: ControlProps & { disabledReason?: string }) {
+}: ControlProps & {
+  disabledReason?: string;
+  /** The states this field takes (`fieldStates`): the current role adds "I haven't had a job
+   *  yet". */
+  states?: readonly FieldState[];
+}) {
   const id = useId();
   return (
     <div className="grid gap-4">
@@ -52,7 +61,7 @@ export function FieldStateSelect({
         )}
         onChange={(event) => onChange({ ...draft, state: event.target.value as FieldState })}
       >
-        {FIELD_STATE_ORDER.map((state) => (
+        {states.map((state) => (
           <option key={state} value={state}>
             {FIELD_STATE[state]}
           </option>
@@ -154,8 +163,122 @@ export function AnswerControl({
       <ListInput label={meta.label} itemLabel={meta.itemLabel} limit={listLimit(name)} {...props} />
     );
   }
+  if (meta.kind === "qualifications") {
+    return (
+      <QualificationsInput
+        label={meta.label}
+        itemLabel={meta.itemLabel}
+        limit={listLimit(name)}
+        {...props}
+      />
+    );
+  }
+  if (meta.kind === "work_status") return <WorkStatusInput label={meta.label} {...props} />;
   if (meta.kind === "salary") return <SalaryInput label={meta.label} {...props} />;
   return <ValueInput label={meta.label} kind={meta.kind} {...props} />;
+}
+
+/** What the person is doing now: one of five answers, none picked until they choose. */
+export function WorkStatusInput({ label, draft, error, describedBy, onChange }: ControlProps) {
+  const id = useId();
+  return (
+    <div className="grid gap-4">
+      <label htmlFor={id} className="small muted">
+        {label}
+      </label>
+      <select
+        id={id}
+        className="select"
+        value={draft.text}
+        aria-invalid={error !== undefined || undefined}
+        aria-describedby={describedBy}
+        onChange={(event) => onChange({ ...draft, text: event.target.value })}
+      >
+        <option value="">Choose one</option>
+        {(Object.keys(WORK_STATUS) as WorkStatus[]).map((status) => (
+          <option key={status} value={status}>
+            {WORK_STATUS[status]}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/** Qualifications, each in the person's words and marked achieved or expected (Task 6f):
+ *  neither is picked for them, so an expected one is never saved as achieved by default. */
+export function QualificationsInput({
+  label,
+  itemLabel,
+  limit,
+  draft,
+  error,
+  describedBy,
+  onChange,
+}: ListProps) {
+  const rows: QualificationDraft[] = draft.qualifications?.length
+    ? draft.qualifications
+    : [{ name: "", status: null }];
+  const full = rows.length >= limit;
+  const set = (next: QualificationDraft[]) => onChange({ ...draft, qualifications: next });
+  return (
+    <fieldset className="grid gap-8" aria-describedby={describedBy}>
+      <legend className="small muted">{label}</legend>
+      {rows.map((row, index) => {
+        const name = `${itemLabel} ${index + 1}`;
+        return (
+          // biome-ignore lint/suspicious/noArrayIndexKey: entries are positional and editable
+          <div key={index} className="flex flex-wrap items-center gap-8">
+            <input
+              className="input"
+              aria-label={name}
+              value={row.name}
+              aria-invalid={error !== undefined || undefined}
+              onChange={(event) =>
+                set(rows.map((r, at) => (at === index ? { ...r, name: event.target.value } : r)))
+              }
+            />
+            <select
+              className="select"
+              aria-label={`${name}: achieved or expected`}
+              value={row.status ?? ""}
+              onChange={(event) => {
+                const status =
+                  event.target.value === "" ? null : (event.target.value as QualificationStatus);
+                set(rows.map((r, at) => (at === index ? { ...r, status } : r)));
+              }}
+            >
+              <option value="">{QUALIFICATION_UNMARKED}</option>
+              {(Object.keys(QUALIFICATION_CHOICE) as QualificationStatus[]).map((status) => (
+                <option key={status} value={status}>
+                  {QUALIFICATION_CHOICE[status]}
+                </option>
+              ))}
+            </select>
+            {rows.length > 1 && (
+              <button
+                type="button"
+                className="btn btn-quiet"
+                aria-label={`Remove ${name}`}
+                onClick={() => set(rows.filter((_, at) => at !== index))}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        );
+      })}
+      <div className="flex flex-wrap items-center gap-8">
+        <Button
+          variant="quiet"
+          disabledReason={full ? `At most ${limit} are supported.` : undefined}
+          onClick={() => set([...rows, { name: "", status: null }])}
+        >
+          Add another {itemLabel.toLowerCase()}
+        </Button>
+      </div>
+    </fieldset>
+  );
 }
 
 type ListProps = ControlProps & { itemLabel: string; limit: number };

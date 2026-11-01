@@ -255,6 +255,7 @@ function Start({
         onDismissSupport={onDismissTitleNote}
         // While fixing a title, skipping goes back to its closest question (R-M4).
         skipLabel={fixing ? FIRST_ANSWER.backToClosest : FIRST_ANSWER.skip}
+        offerNoJob={!fixing}
         onAnswered={() => setLeaving("first")}
         // The same title again changes nothing: back to its closest question.
         onSaved={() => setBackFrom(null)}

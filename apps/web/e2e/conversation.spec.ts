@@ -73,7 +73,7 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   await page.getByRole("button", { name: "Help me explore" }).click();
   await expect(
     page.getByRole("heading", {
-      name: "What would you most like to be different about your working life?",
+      name: "What would you like your working life to be like?",
     }),
   ).toBeVisible();
 
@@ -237,7 +237,7 @@ test("[STATE-09] exploring by example replies reaches the role question, whose S
   await page.getByRole("button", { name: "Help me explore" }).click();
   await expect(
     page.getByRole("heading", {
-      name: "What would you most like to be different about your working life?",
+      name: "What would you like your working life to be like?",
     }),
   ).toBeVisible();
   const role = "Do you have a role in mind, or would you like to explore?";
@@ -250,7 +250,8 @@ test("[STATE-09] exploring by example replies reaches the role question, whose S
     await keepAll(page);
     question = await questionShown(page);
   }
-  expect(asked).toHaveLength(5); // the opening, then the four practical questions
+  // The opening, what they enjoy (Task 6f), then the four practical questions.
+  expect(asked).toHaveLength(6);
 
   // Two ways on, which open existing views; neither commits anything by itself.
   await expect(page.getByRole("group", { name: "Example replies" })).toHaveCount(0);
@@ -362,7 +363,7 @@ test("[PROF-09] a message with a risk stem is sent as usual, with the support pa
   await skipFirstQuestion(page);
   await page.getByRole("button", { name: "Help me explore" }).click();
   const opening = page.getByRole("heading", {
-    name: "What would you most like to be different about your working life?",
+    name: "What would you like your working life to be like?",
   });
   await expect(opening).toBeVisible();
 
@@ -587,7 +588,9 @@ test.describe("phone, first screen", () => {
     );
     await titleField.fill("Bookkeeping assistant");
     await expect(
-      page.getByText("Careerwright couldn't match that title in ESCO. Is it one of these?"),
+      page.getByText(
+        "Careerwright couldn't match that title in ESCO, the EU's list of jobs and skills. Is it one of these?",
+      ),
     ).toBeVisible();
     await firstScreen(page, page.getByRole("option", { name: /^None of these is my job/ }));
     await titleField.fill("");

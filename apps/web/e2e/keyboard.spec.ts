@@ -95,7 +95,7 @@ test("[UI-06][STATE-06][PROF-04] the You chapter completes from the keyboard, an
   await tabTo(page, page.getByRole("button", { name: "Help me explore" }));
   await page.keyboard.press("Enter");
   const opening = page.getByRole("heading", {
-    name: "What would you most like to be different about your working life?",
+    name: "What would you like your working life to be like?",
   });
   await expect(opening).toBeFocused();
   await tabTo(page, page.getByRole("textbox", { name: "Reply to Careerwright" }), 10);

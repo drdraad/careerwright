@@ -26,7 +26,12 @@ import {
   rebaseDraft,
 } from "@/lib/profile";
 import { profileQuery, useSaveProfile } from "@/lib/queries";
-import { PROFILE_FIELD_ORDER, PROFILE_FIELDS, type ProfileFieldName } from "@/lib/vocabulary";
+import {
+  fieldStates,
+  PROFILE_FIELD_ORDER,
+  PROFILE_FIELDS,
+  type ProfileFieldName,
+} from "@/lib/vocabulary";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { useEvidence } from "./EvidenceDrawer";
@@ -215,7 +220,7 @@ export function ProfileEditor({
               ? `The newer answers changed: ${stale.changed
                   .map(
                     (name) =>
-                      `${PROFILE_FIELDS[name].label} to ${describeField(stale.latest[name])}`,
+                      `${PROFILE_FIELDS[name].label} to ${describeField(stale.latest[name], name)}`,
                   )
                   .join("; ")}. ${
                   stale.conflicts.length > 0
@@ -283,6 +288,7 @@ export function ProfileEditor({
                 <FieldStateSelect
                   label={meta.label}
                   draft={field}
+                  states={fieldStates(name)}
                   describedBy={conflict ? conflictId : undefined}
                   onChange={(next) => change(name, next)}
                 />
@@ -296,15 +302,18 @@ export function ProfileEditor({
                   />
                 )}
               </div>
-              {field.state !== "provided" && field.state !== "unasked" && (
-                <p className="small muted">Less precise without it: {meta.lessPrecise}</p>
-              )}
+              {/* "I haven't had a job yet" is a full answer, never a gap (Task 6f). */}
+              {field.state !== "provided" &&
+                field.state !== "unasked" &&
+                field.state !== "no_job_yet" && (
+                  <p className="small muted">Less precise without it: {meta.lessPrecise}</p>
+                )}
               {stale?.kind === "rebased" && conflict && (
                 <p id={conflictId} className="status" data-tone="stale">
                   <Glyph name="stale" />
                   <span>
-                    The newer answers have {describeField(stale.latest[name])} here. Saving keeps
-                    your answer instead.
+                    The newer answers have {describeField(stale.latest[name], name)} here. Saving
+                    keeps your answer instead.
                   </span>
                 </p>
               )}

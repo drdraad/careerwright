@@ -38,7 +38,7 @@ export function FieldSource({ workspaceId, name, shown }: Props) {
   return (
     <SourceEvidence
       fieldLabel={PROFILE_FIELDS[name].label}
-      value={describeField(field)}
+      value={describeField(field, name)}
       lessPrecise={PROFILE_FIELDS[name].lessPrecise}
       source={source}
       loading={sources.isPending || !settled}

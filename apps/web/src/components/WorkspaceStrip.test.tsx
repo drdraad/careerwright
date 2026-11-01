@@ -91,7 +91,9 @@ describe("[STATE-07][UI-09] the strip states what it has, including what failed 
       created_by: null,
       created_at: "2027-01-01T00:00:00Z",
       document: {
-        schema_version: "3",
+        schema_version: "4",
+        work_status: unasked,
+        qualifications: unasked,
         preferred_name: unasked,
         current_role: unasked,
         cities: unasked,

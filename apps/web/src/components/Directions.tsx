@@ -49,6 +49,7 @@ import {
   ADDED_WEIGHT_ONLY,
   ANSWER_SOURCE,
   aiFilterWords,
+  CLOSE_WITHOUT_WORK,
   DIRECTION,
   EMPHASIS,
   ERROR_STATEMENT,
@@ -70,6 +71,7 @@ import {
   titleIdeasListed,
   titleIdeasWords,
   UK_TITLE_IDEAS,
+  WORK_NOT_KNOWN,
 } from "@/lib/vocabulary";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
@@ -679,9 +681,14 @@ function Slate({
   }
   const data = slate.data;
   const named = profile.document.target_titles;
-  const titlesGiven =
-    profile.document.current_role.state === "provided" ||
-    (named.state === "provided" && (named.value ?? []).length > 0);
+  const role = profile.document.current_role.state;
+  // Careerwright knows the person's work only from a role they gave (Task 6f): without one,
+  // nothing is close to what they do now, and "Closer to what I do" isn't offered.
+  const workKnown = role === "provided";
+  const titlesGiven = workKnown || (named.state === "provided" && (named.value ?? []).length > 0);
+  const emphases = (Object.keys(EMPHASIS) as Emphasis[]).filter(
+    (emphasis) => workKnown || emphasis !== "practical",
+  );
   // Only the API's own fact says the person's kind of work is known: a role kept in their own
   // words names no ESCO occupation, so nothing is "different" from it (design review M-2).
   const familiarityKnown = data.familiarity_known;
@@ -703,7 +710,7 @@ function Slate({
       </p>
       <fieldset className="segmented">
         <legend className="sr-only">Which directions to show</legend>
-        {(Object.keys(EMPHASIS) as Emphasis[]).map((emphasis) => (
+        {emphases.map((emphasis) => (
           <Button
             key={emphasis}
             variant="secondary"
@@ -730,12 +737,8 @@ function Slate({
           ...[aiFilterWords(data.ai_resilience_filter), titleIdeasWords(data.title_ideas)].filter(
             (line): line is string => line !== null,
           ),
-          ...(familiarityKnown || titlesGiven
-            ? []
-            : [
-                "Careerwright doesn't know your current work yet, so it can't say which " +
-                  "directions are close to it.",
-              ]),
+          // Never said to someone who told Careerwright they haven't had a job yet (Task 6f).
+          ...(familiarityKnown || titlesGiven || role === "no_job_yet" ? [] : [WORK_NOT_KNOWN]),
         ]}
       />
       {note.kind === "unavailable" && (
@@ -767,7 +770,9 @@ function Slate({
             <h3 id={`dir-${direction}`} className="section-title">
               {direction === "less_familiar" && !familiarityKnown
                 ? "Directions to consider"
-                : DIRECTION[direction]}
+                : direction === "close_to_current" && !workKnown
+                  ? CLOSE_WITHOUT_WORK
+                  : DIRECTION[direction]}
             </h3>
             {group.map((suggestion) => (
               <SuggestionCard

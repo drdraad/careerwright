@@ -6,7 +6,9 @@ const SRC = "8d1f6f8e-46a1-5c2b-9d0e-3f7a1b2c4d5e";
 
 function document(overrides: Partial<ProfileDocument> = {}): ProfileDocument {
   return {
-    schema_version: "3",
+    schema_version: "4",
+    work_status: { state: "unasked", value: null, source_ref_id: null },
+    qualifications: { state: "unasked", value: null, source_ref_id: null },
     preferred_name: { state: "unasked", value: null, source_ref_id: null },
     current_role: { state: "unasked", value: null, source_ref_id: null },
     cities: { state: "provided", value: ["Manchester"], source_ref_id: SRC },
@@ -38,6 +40,20 @@ describe("[STATE-08] Unknown, Skipped and Prefer not to say are answers, never a
       "direct_spend_cap",
       "monthly_payment_cap",
     ]);
+  });
+
+  it("[STATE-11] never calls “I haven't had a job yet” a gap that makes Skills less precise", () => {
+    const noJob = chapterNeeds(
+      "skills",
+      document({ current_role: { state: "no_job_yet", value: null, source_ref_id: SRC } }),
+    );
+    const skipped = chapterNeeds(
+      "skills",
+      document({ current_role: { state: "skipped", value: null, source_ref_id: SRC } }),
+    );
+
+    expect(noJob.lessPrecise).toEqual([]);
+    expect(skipped.lessPrecise).toEqual(["current_role"]);
   });
 
   it("asks only for what was never asked, and only where the chapter cannot start without it", () => {

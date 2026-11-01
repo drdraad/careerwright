@@ -1,17 +1,27 @@
 // Reading and editing the profile document (generated types only). A missing answer is shown
 // in words by its state, never as a zero, a blank or a guess (spec section 3, STATE-08).
-import type {
-  FieldEdit,
-  FieldState,
-  Money,
-  PayPeriod,
-  ProfileDocument,
-  ProfileInput,
-  SalaryFloor,
+import {
+  type FieldEdit,
+  type FieldState,
+  type Money,
+  type PayPeriod,
+  type ProfileDocument,
+  type ProfileInput,
+  type QualificationAnswer,
+  type QualificationStatus,
+  type SalaryFloor,
+  WorkStatus,
 } from "@/generated/api";
 import { listLimit } from "./bounds";
 import { formatMoney, type MoneyInputProblem, parseMoneyInput } from "./money";
-import { FIELD_STATE, PAY_PERIOD, PROFILE_FIELDS, type ProfileFieldName } from "./vocabulary";
+import {
+  FIELD_STATE,
+  PAY_PERIOD,
+  PROFILE_FIELDS,
+  type ProfileFieldName,
+  QUALIFICATION_STATUS,
+  WORK_STATUS,
+} from "./vocabulary";
 
 type AnyField = ProfileDocument[ProfileFieldName];
 type AnswerValue = NonNullable<AnyField["value"]>;
@@ -20,35 +30,59 @@ function isSalary(value: AnswerValue): value is SalaryFloor {
   return typeof value === "object" && !Array.isArray(value) && "period" in value;
 }
 
+const WORK_STATUSES: ReadonlySet<string> = new Set(Object.values(WorkStatus));
+
+function isWorkStatus(value: string): value is WorkStatus {
+  return WORK_STATUSES.has(value);
+}
+
 /** A salary floor as the person gave it: never annualised, always gross. */
 export function describeSalary(floor: SalaryFloor): string {
   return `${formatMoney(floor.amount)} ${PAY_PERIOD[floor.period]}, before tax`;
 }
 
-/** An answer's value as text (a proposal's value reads the same way). */
-export function describeValue(value: AnswerValue): string {
-  if (Array.isArray(value)) return value.join(", ");
+/** A qualification with its status: an expected one always says so (Task 6f). */
+export function describeQualification(qualification: QualificationAnswer): string {
+  return `${qualification.name} (${QUALIFICATION_STATUS[qualification.status]})`;
+}
+
+/** An answer's value as text (a proposal's value reads the same way). `name`: the field it
+ *  answers, so what the person is doing now reads in words, never as its code. */
+export function describeValue(value: AnswerValue, name?: ProfileFieldName): string {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item : describeQualification(item)))
+      .join(", ");
+  }
   if (isSalary(value)) return describeSalary(value);
   if (typeof value === "object") return formatMoney(value as Money);
   if (typeof value === "number") return `${value} hours a week`;
+  if (name === "work_status" && isWorkStatus(value)) return WORK_STATUS[value];
   return value;
 }
 
 /** The field as text: its value when answered, otherwise what its state means. */
-export function describeField(field: AnyField): string {
+export function describeField(field: AnyField, name?: ProfileFieldName): string {
   if (field.state !== "provided" || field.value === null || field.value === undefined) {
     return FIELD_STATE[field.state];
   }
-  return describeValue(field.value);
+  return describeValue(field.value, name);
 }
+
+/** One qualification as it is being typed: its name, and whether it is achieved or expected
+ *  (null until the person marks it: neither is picked for them). */
+export type QualificationDraft = { name: string; status: QualificationStatus | null };
 
 /** Editable form state: text for every value, so typing never loses what was typed. */
 export type FieldDraft = {
   state: FieldState;
+  /** A text, hours or money answer as typed; what the person is doing now, as its code. */
   text: string;
   items: string[];
   /** A salary floor's period; a year unless the person chooses another. */
   period?: PayPeriod;
+  /** Qualifications, each with its status. */
+  qualifications?: QualificationDraft[];
 };
 export type ProfileDraft = Record<ProfileFieldName, FieldDraft>;
 
@@ -64,11 +98,18 @@ function textOf(value: AnyField["value"]): string {
 export function fieldDraft(field: AnyField): FieldDraft {
   const value = field.value;
   const provided = field.state === "provided";
+  const list: ReadonlyArray<string | QualificationAnswer> = Array.isArray(value) ? value : [];
   const draft: FieldDraft = {
     state: field.state,
     text: provided ? textOf(value) : "",
-    items: Array.isArray(value) ? [...value] : [],
+    items: list.filter((item): item is string => typeof item === "string"),
   };
+  const qualifications = list.filter(
+    (item): item is QualificationAnswer => typeof item !== "string",
+  );
+  if (qualifications.length > 0) {
+    draft.qualifications = qualifications.map(({ name, status }) => ({ name, status }));
+  }
   if (provided && value !== null && value !== undefined && isSalary(value)) {
     draft.period = value.period;
   }
@@ -88,7 +129,9 @@ export type FieldProblem =
   | { kind: "money"; reason: MoneyInputProblem }
   | { kind: "hours" }
   | { kind: "too_many"; limit: number }
-  | { kind: "duplicate" };
+  | { kind: "duplicate" }
+  /** A qualification not yet marked achieved or expected. */
+  | { kind: "unmarked" };
 
 export type DraftResult =
   | { ok: true; input: ProfileInput }
@@ -165,11 +208,43 @@ function readSalary(field: FieldDraft): Read<ProfileInput["minimum_salary"]> {
   };
 }
 
+function readWorkStatus(field: FieldDraft): Read<ProfileInput["work_status"]> {
+  const other = unanswered(field);
+  if (other !== null) return { ok: true, input: other };
+  if (!isWorkStatus(field.text)) return { ok: false, problem: { kind: "required" } };
+  return { ok: true, input: { state: "provided", value: field.text } };
+}
+
+function readQualifications(
+  field: FieldDraft,
+  limit: number,
+): Read<ProfileInput["qualifications"]> {
+  const other = unanswered(field);
+  if (other !== null) return { ok: true, input: other };
+  const rows = (field.qualifications ?? [])
+    .map(({ name, status }) => ({ name: name.trim(), status }))
+    .filter(({ name }) => name !== "");
+  if (rows.length === 0) return { ok: false, problem: { kind: "required" } };
+  if (rows.length > limit) return { ok: false, problem: { kind: "too_many", limit } };
+  const folded = rows.map(({ name }) => name.toLocaleLowerCase("en-GB"));
+  if (new Set(folded).size !== folded.length) return { ok: false, problem: { kind: "duplicate" } };
+  const value: QualificationAnswer[] = [];
+  for (const { name, status } of rows) {
+    if (status === null) return { ok: false, problem: { kind: "unmarked" } };
+    value.push({ name, status });
+  }
+  return { ok: true, input: { state: "provided", value } };
+}
+
 /** One field's answer as the API takes it, or why it cannot be sent as typed. */
 export function readField(name: ProfileFieldName, draft: FieldDraft): Read<FieldAnswer> {
   switch (PROFILE_FIELDS[name].kind) {
     case "list":
       return readList(draft, listLimit(name));
+    case "qualifications":
+      return readQualifications(draft, listLimit(name));
+    case "work_status":
+      return readWorkStatus(draft);
     case "salary":
       return readSalary(draft);
     case "hours":
@@ -197,6 +272,8 @@ export function inputFrom(draft: ProfileDraft): DraftResult {
     evidenced_tasks: list("evidenced_tasks"),
     work_style: list("work_style"),
     minimum_salary: readSalary(draft.minimum_salary),
+    work_status: readWorkStatus(draft.work_status),
+    qualifications: readQualifications(draft.qualifications, listLimit("qualifications")),
   };
   const problems: Partial<Record<ProfileFieldName, FieldProblem>> = {};
   for (const name of Object.keys(read) as ProfileFieldName[]) {
@@ -215,7 +292,9 @@ export function inputFrom(draft: ProfileDraft): DraftResult {
     !read.confident_tasks.ok ||
     !read.evidenced_tasks.ok ||
     !read.work_style.ok ||
-    !read.minimum_salary.ok
+    !read.minimum_salary.ok ||
+    !read.work_status.ok ||
+    !read.qualifications.ok
   ) {
     return { ok: false, problems };
   }
@@ -232,6 +311,8 @@ export function inputFrom(draft: ProfileDraft): DraftResult {
     evidenced_tasks: read.evidenced_tasks.input,
     work_style: read.work_style.input,
     minimum_salary: read.minimum_salary.input,
+    work_status: read.work_status.input,
+    qualifications: read.qualifications.input,
   };
   return { ok: true, input };
 }
@@ -296,6 +377,8 @@ export function problemText(problem: FieldProblem): string {
       return `At most ${problem.limit} are supported. Remove one first.`;
     case "duplicate":
       return "The same entry appears twice.";
+    case "unmarked":
+      return "Mark each qualification achieved or expected.";
     case "money":
       return {
         empty: "Enter an amount.",
