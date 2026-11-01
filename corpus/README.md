@@ -86,12 +86,19 @@ and the short quoted spans that prove each extracted value.
    - Add `--locate "<excerpt>"`, once per labelled excerpt, to get each excerpt's offsets in
      the hashed text and its real count (`count`; the first 5 spans are listed). A run of
      spaces matches any whitespace, and the tool prints the exact text found. This is the
-     only way to place an excerpt on a page whose body is not kept.
+     only way to place an excerpt on a page whose body is not kept. Add `--context <N>` (at
+     most 100) to also print each span with up to N characters either side, to cut a
+     minimal excerpt from such a page.
    - For an Adzuna slot, run `--adzuna "<what>" "<where>"` in place of `--url`. That is one
      request through `make live-adzuna`'s own capped, ledgered, leak-scanned path.
-   - Each run is one process with its own pacer. Leave at least the host's rate limit
-     (`sources.json`, 5 seconds by default) between runs against the same host: a shell
-     loop of runs does not pace them.
+   - For several pages, run `--batch <plan.json>` in place of `--url` and `--slot`: a JSON
+     list of `{slot, url, rights_class, terms, locate, context}` (all but `slot` and `url`
+     optional), every entry checked before the first fetch, then fetched in order with one
+     pacer, so each host's rate limit holds across the batch. `--proxy` and `--proxy-ca`
+     apply to every page of it, and each page's record says so (`via_proxy`).
+   - Otherwise each run is one process with its own pacer. Leave at least the host's rate
+     limit (`sources.json`, 5 seconds by default) between runs against the same host: a
+     shell loop of runs does not pace them.
 3. Set `rights_status` from the rights policy above. Name the page's class and the terms
    relied on, quoted and dated: `<class id>: <terms, quoted and dated>` for any class but
    `other`, for example
