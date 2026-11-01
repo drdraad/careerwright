@@ -1,0 +1,5 @@
+- [Meta LLM cost discipline](meta-llm-cost-discipline.md) — track Meta credits; cheap models for tests, top model only in production
+- [Careerwright (formerly Nessa) L0 build](nessa-l0-build.md) — autonomous sprint execution; ledger at planning/progress.md; renamed 2026-10-30
+- [Plain language for the user](plain-language-for-user.md) — everything the user reads: everyday words, no internal codes, action first
+- [Role space beyond standard lists](role-space-beyond-standard-lists.md) — suggestions must not be limited to ESCO; LLMs and research fill the role space
+- [Users without work history](users-without-work-history.md) — many users are final-year school students with no job; never depend on an existing role or skills

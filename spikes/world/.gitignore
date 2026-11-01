@@ -1,0 +1,2 @@
+# Build output of the spike (rebuilt by `make spike-world`).
+dist/

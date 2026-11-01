@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.2",
+  "synthetic": true,
+  "jurisdiction": "GB-ENG",
+  "ui_language": "en-GB",
+  "currency": "GBP",
+  "taxonomy_ids_are_fixture_ids": true,
+  "data_as_of": "2027-01-01",
+  "id": "P03",
+  "description": "Low budget; grant and bridge-job income are not approved",
+  "entry_mode": "sure",
+  "cities": [
+    "Bristol"
+  ],
+  "target_titles": [
+    "IT support technician"
+  ],
+  "opening_cash_minor": 20000,
+  "reserve_minor": 10000,
+  "direct_spend_cap_minor": 30000,
+  "monthly_payment_cap_minor": 10000,
+  "borrowing_allowed": false,
+  "unconfirmed_grant_minor": 80000,
+  "bridge_offer_status": "not_received",
+  "expected": {
+    "unconfirmed_grant_in_unconditional_ledger": 0,
+    "bridge_wages_before_offer": 0,
+    "reject_option": {
+      "total_fee_minor": 30000,
+      "upfront_fee_minor": 20000
+    },
+    "reject_reason": "monthly_payment_cap",
+    "do_not_recommend_borrowing": true
+  }
+}

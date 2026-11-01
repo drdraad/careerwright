@@ -1,0 +1,1223 @@
+/* Careerwright world spike. One colour, one meaning:
+   orange = destinations only; teal = selection, the kept path and the primary action only;
+   blue to violet = the journey, graded the same along every trail; slate = not known yet.
+   Focus rings are white. */
+:root {
+  --ground: #03050b;
+  --ink: #f2f6ff;
+  --ink-soft: #c2cce2;
+  --ink-faint: #97a3c0;
+  --teal: #45f7d4;
+  --teal-ink: #022a22;
+  --orange: #ff9433;
+  --blue: #408cff;
+  --violet: #9e6bff;
+  --slate: #6f7ea3;
+  --glass: rgba(5, 8, 18, 0.88);
+  --glass-edge: rgba(120, 150, 220, 0.22);
+  --label-glass: rgba(3, 5, 11, 0.66);
+  --font-display: "Outfit Variable", system-ui, sans-serif;
+  --font-body: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+  --radius: 18px;
+  --label-radius: 999px;
+  --edge: 32px;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.sr-only,
+.node-label .state {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.world,
+.still-world {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}
+
+.still-world svg {
+  display: block;
+}
+
+/* A destination's light answers the pointer like its name does. */
+.over-light {
+  cursor: pointer;
+}
+
+.leaders {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.leaders line {
+  stroke: rgba(242, 246, 255, 0.4);
+  stroke-width: 1;
+}
+
+/* ---- Chrome: quiet, so the world speaks ------------------------------------------------ */
+
+.top {
+  position: fixed;
+  inset: 0 0 auto 0;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 16px var(--edge);
+  z-index: 5;
+  pointer-events: none;
+}
+
+.top > * {
+  pointer-events: auto;
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+  margin: 0;
+}
+
+.directions {
+  display: flex;
+  gap: 20px;
+  margin-inline: auto;
+}
+
+.directions a {
+  color: var(--ink-faint);
+  text-decoration: none;
+  padding: 4px 0;
+  font-size: 15px;
+  border-bottom: 1.5px solid transparent;
+}
+
+.directions a:hover {
+  color: var(--ink);
+}
+
+.directions a[aria-current="page"] {
+  color: var(--ink);
+  border-bottom-color: rgba(242, 246, 255, 0.7);
+}
+
+.controls {
+  display: flex;
+  gap: 18px;
+}
+
+/* Toggles keep a fixed label; their state is the switch (and aria-pressed). */
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  padding: 4px 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.control::before {
+  content: "";
+  width: 22px;
+  height: 12px;
+  border-radius: 6px;
+  border: 1.5px solid var(--ink-faint);
+  background: radial-gradient(circle at 5px 50%, var(--ink-soft) 3px, transparent 3.5px);
+}
+
+.control[aria-pressed="true"] {
+  color: var(--ink);
+}
+
+.control[aria-pressed="true"]::before {
+  border-color: var(--ink);
+  background: radial-gradient(circle at 15px 50%, var(--ground) 3px, transparent 3.5px), var(--ink);
+}
+
+.control:disabled {
+  cursor: default;
+  color: var(--ink-faint);
+}
+
+.bottom {
+  position: fixed;
+  inset: auto 0 0 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 12px var(--edge) 14px;
+  z-index: 5;
+  pointer-events: none;
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+
+.bottom > * {
+  pointer-events: auto;
+}
+
+.data-label,
+.spike-label {
+  margin: 0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--label-glass);
+}
+
+.data-label::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  border: 1.5px solid var(--ink-faint);
+  border-radius: 2px;
+  transform: rotate(45deg) translateY(-1px);
+}
+
+.spike {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.spike-tools {
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  border-radius: 8px;
+  padding: 3px 10px;
+  max-width: 320px;
+  color: var(--ink-soft);
+}
+
+.spike-tools summary {
+  cursor: pointer;
+}
+
+.spike-tools[open] {
+  padding-bottom: 12px;
+}
+
+.font-choice {
+  border: 0;
+  margin: 8px 0;
+  padding: 0;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.font-choice legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.mode-note {
+  margin: 8px 0 0;
+}
+
+/* ---- The question, in the world by the person's light ---------------------------------- */
+
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.stage > * {
+  pointer-events: auto;
+}
+
+.console {
+  position: absolute;
+  left: var(--ox, 50%);
+  top: var(--oy, 50%);
+  width: min(560px, calc(100vw - var(--ox, 0px) - 96px));
+  transform: translate(var(--ask-dx, 64px), var(--ask-dy, -50%));
+  text-align: left;
+}
+
+.question {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(30px, 3.3vw, 48px);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  margin: 0 0 20px;
+  text-wrap: balance;
+}
+
+:root[data-font="unbounded"] #app:not(.is-answered) .question {
+  font-size: clamp(26px, 2.7vw, 40px);
+}
+
+.combo {
+  position: relative;
+}
+
+.role-input {
+  width: 100%;
+  padding: 6px 0 10px;
+  border: 0;
+  background: transparent;
+  font-size: 24px;
+  caret-color: var(--ink);
+  outline: none;
+}
+
+.role-input::placeholder {
+  color: var(--ink-faint);
+}
+
+/* Each look draws its own line under the answer; focus brightens and thickens it. */
+.combo::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--ask-line);
+  opacity: 0.8;
+}
+
+.combo:focus-within::after {
+  height: 3px;
+  opacity: 1;
+  background: var(--ask-line-focus, var(--ask-line));
+}
+
+.options {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.option,
+.no-match {
+  padding: 5px 0;
+  font-size: 19px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.option::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 12px;
+  border: 1.5px solid var(--blue);
+  border-radius: 50%;
+  vertical-align: 2px;
+}
+
+.option[aria-selected="true"] {
+  color: var(--ink);
+}
+
+.option[aria-selected="true"]::before {
+  background: var(--teal);
+  border-color: var(--teal);
+}
+
+.no-match {
+  cursor: default;
+}
+
+.hint {
+  margin: 12px 0 0;
+  font-size: 15px;
+  color: var(--ink-faint);
+}
+
+/* Answered: the console steps aside and becomes the person's side of the conversation. */
+.is-answered .console {
+  left: var(--edge);
+  top: 76px;
+  width: 300px;
+  transform: none;
+  text-align: left;
+  padding: 14px 18px 14px;
+  border-radius: var(--radius);
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+}
+
+.is-answered .question {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.you-role {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 32px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+
+.answer-line {
+  margin: 0 0 2px;
+}
+
+.prompt {
+  margin: 0 0 8px;
+  color: var(--ink-soft);
+}
+
+.legend {
+  position: absolute;
+  left: var(--edge);
+  bottom: 48px;
+  list-style: none;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--label-glass);
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  display: grid;
+  gap: 2px;
+}
+
+#app:not(.is-answered) .legend {
+  display: none;
+}
+
+.glyph {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 9px;
+  border-radius: 50%;
+  vertical-align: -1px;
+}
+
+.glyph-usual {
+  border: 2px solid var(--blue);
+}
+
+.glyph-said {
+  background: #cfe0ff;
+  box-shadow: 0 0 8px var(--blue);
+}
+
+.glyph-shadow {
+  border: 2px dashed var(--slate);
+}
+
+.quiet {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.quiet:hover {
+  color: var(--ink);
+}
+
+/* Announcements for screen readers; the same words are on screen in the console and the card. */
+.status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- Words in the world -------------------------------------------------------------- */
+
+.world-words {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.world-words ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.node-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: max-content;
+  max-width: 220px;
+  pointer-events: auto;
+  --gap: calc(var(--r, 6px) + 8px);
+  translate: var(--gap) -50%;
+  transition: opacity 0.25s ease-out;
+  will-change: transform;
+}
+
+/* The entry plays once; a shown label never replays it, whatever the mode does. */
+.node-label:not([data-shown]) {
+  animation: label-in 0.45s ease-out var(--delay, 0s) both;
+}
+
+.node-label[data-side="left"] {
+  translate: calc(-100% - var(--gap)) -50%;
+  text-align: right;
+}
+
+.node-label[data-side="above"] {
+  translate: -50% calc(-100% - var(--gap));
+  text-align: center;
+}
+
+.node-label[data-side="below"] {
+  translate: -50% var(--gap);
+  text-align: center;
+}
+
+.node-label[data-align="start"] {
+  text-align: left;
+}
+
+.node-label[data-align="end"] {
+  text-align: right;
+}
+
+/* A label left of its light ends with its glyph, so the glyph sits beside its own light. */
+.node-label[data-align="end"] .name {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.node-label[data-align="end"] .name::before {
+  margin-right: 0;
+  margin-left: 7px;
+}
+
+.node-label[data-align="centre"] {
+  text-align: center;
+}
+
+@keyframes label-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* One idea at a time: what just changed speaks; the rest is quiet until pointed at or focused. */
+.node-label[data-voice="quiet"] {
+  opacity: 0.6;
+}
+
+.node-label:hover,
+.node-label:focus-within {
+  opacity: 1;
+  z-index: 2;
+}
+
+.node-label[data-caption] .state,
+.node-label:hover .state,
+.node-label:focus-within .state {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
+}
+
+.origin-label {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  padding: 1px 9px;
+  border-radius: var(--label-radius);
+  background: var(--label-glass);
+  translate: -50% calc(var(--r, 9px) + 10px);
+}
+
+#app:not(.is-answered) .origin-label {
+  display: none;
+}
+
+.node-label .name,
+.node-label .state {
+  display: block;
+}
+
+.node-label .name {
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.node-label .state {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.skill-toggle,
+.place-toggle,
+.unknowns .node-label {
+  display: block;
+  padding: 3px 9px 4px;
+  border-radius: var(--label-radius);
+  background: var(--label-glass);
+  border: 1px solid transparent;
+  text-align: inherit;
+}
+
+.skill-toggle,
+.place-toggle {
+  cursor: pointer;
+}
+
+.skill-toggle:hover,
+.place-toggle:hover {
+  border-color: rgba(160, 190, 255, 0.4);
+}
+
+.skill-toggle[aria-pressed="true"] {
+  border-color: rgba(207, 224, 255, 0.5);
+  background: rgba(10, 18, 40, 0.85);
+}
+
+.skill-toggle .name::before,
+.place-toggle .name::before,
+.unknowns .name::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+
+.skill-toggle .name::before {
+  border: 1.5px solid var(--blue);
+}
+
+.skill-toggle[aria-pressed="true"] .name::before {
+  background: #cfe0ff;
+  border-color: #cfe0ff;
+}
+
+.place-toggle .name::before {
+  background: var(--orange);
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.unknowns .name::before {
+  border: 1.5px dashed var(--slate);
+}
+
+.unknowns .node-label .name {
+  color: var(--ink-soft);
+}
+
+.places [data-kind="revealed"] .place-toggle {
+  border-color: rgba(255, 148, 51, 0.55);
+}
+
+.places [data-kind="revealed"] .name {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.places [data-selected="true"] .place-toggle {
+  border-color: var(--teal);
+}
+
+/* ---- The revelation card -------------------------------------------------------------- */
+
+.card {
+  position: absolute;
+  right: var(--edge);
+  top: 76px;
+  max-height: calc(100vh - 180px);
+  overflow: auto;
+  width: min(340px, calc(100vw - 2 * var(--edge)));
+  padding: 18px 20px 18px;
+  border-radius: var(--radius);
+  background: var(--glass);
+  border: 1px solid rgba(255, 148, 51, 0.35);
+  box-shadow: 0 0 60px rgba(255, 148, 51, 0.1);
+  animation: card-in 0.32s ease-out both;
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.card-kicker {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.card-sentence {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+}
+
+:root[data-font="unbounded"] .card-sentence {
+  font-size: 21px;
+}
+
+.card p {
+  margin-top: 0;
+}
+
+.card-reason,
+.card-unknown {
+  margin-bottom: 6px;
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+.card-unknown::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border: 1.5px dashed var(--slate);
+  border-radius: 50%;
+}
+
+.card-honest {
+  margin-bottom: 10px;
+  font-size: 15px;
+}
+
+.why {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(64, 140, 255, 0.07);
+  border: 1px solid rgba(64, 140, 255, 0.2);
+  font-size: 15px;
+}
+
+.why p {
+  margin: 0 0 8px;
+}
+
+.why-list {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+}
+
+.why-list .name {
+  display: block;
+}
+
+.why-list .state,
+.why-source,
+.why-unknown {
+  font-size: 14px;
+  color: var(--ink-faint);
+}
+
+.card-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.primary {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 22px;
+  background: var(--teal);
+  color: var(--teal-ink);
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 0 28px rgba(69, 247, 212, 0.35);
+}
+
+.primary:hover {
+  box-shadow: 0 0 36px rgba(69, 247, 212, 0.55);
+}
+
+.undo {
+  border: 1.5px solid rgba(242, 246, 255, 0.75);
+  background: transparent;
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.measure-readout {
+  position: fixed;
+  left: 50%;
+  top: 70px;
+  transform: translateX(-50%);
+  z-index: 9;
+  margin: 0;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.85);
+  font: 12px/1.4 var(--font-mono);
+  pointer-events: none;
+}
+
+/* ---- Growth: the question beside the seed; a soft root of light underlines the answer ----- */
+
+.dir-growth {
+  --ask-dx: 72px;
+  --ask-dy: -50%;
+  --ask-line: linear-gradient(90deg, rgba(64, 140, 255, 0.95), rgba(158, 107, 255, 0.7) 65%, transparent);
+  --ask-line-focus: linear-gradient(90deg, #f2f6ff, rgba(158, 107, 255, 0.9) 70%, transparent);
+}
+
+/* ---- Horizon: the question floats over the plain, above the person's light ------------- */
+
+.dir-horizon {
+  --ask-dx: -50%;
+  --ask-dy: calc(-100% - 64px);
+  --radius: 4px;
+  --label-radius: 4px;
+  --ask-line: linear-gradient(90deg, transparent, rgba(156, 180, 255, 0.85) 50%, transparent);
+  --ask-line-focus: linear-gradient(90deg, transparent, #f2f6ff 50%, transparent);
+}
+
+.dir-horizon #app:not(.is-answered) .console {
+  width: min(760px, calc(100vw - 2 * var(--edge)));
+  text-align: center;
+}
+
+.dir-horizon #app:not(.is-answered) .role-input {
+  text-align: center;
+}
+
+.dir-horizon .card {
+  border: 0;
+  border-top: 2px solid var(--orange);
+  box-shadow: 0 -20px 60px rgba(255, 148, 51, 0.08);
+}
+
+.dir-horizon .is-answered .console {
+  border: 0;
+  border-left: 2px solid rgba(160, 190, 255, 0.5);
+}
+
+.dir-horizon .place-toggle {
+  background: rgba(3, 5, 11, 0.45);
+}
+
+/* ---- Circuit: the question as a prompt beside the core; the answer runs out as a trace --- */
+
+.dir-circuit {
+  --ask-dx: 92px;
+  --ask-dy: -50%;
+  --radius: 3px;
+  --label-radius: 3px;
+  --ask-line: linear-gradient(90deg, rgba(64, 140, 255, 0.95), rgba(64, 140, 255, 0.95));
+  --ask-line-focus: linear-gradient(90deg, #f2f6ff, #f2f6ff);
+}
+
+.dir-circuit .combo {
+  padding-left: 22px;
+}
+
+.dir-circuit .combo::before {
+  content: ">";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  font: 600 22px/1 var(--font-mono);
+  color: var(--blue);
+}
+
+.dir-circuit .role-input {
+  font-family: var(--font-mono);
+  font-size: 22px;
+}
+
+.dir-circuit .control,
+.dir-circuit .primary,
+.dir-circuit .undo {
+  border-radius: 3px;
+}
+
+/* Corner ticks in blue mark the instrument panels; teal stays for selection and action. */
+.dir-circuit .card,
+.dir-circuit .is-answered .console {
+  border-color: rgba(120, 150, 220, 0.4);
+  background:
+    linear-gradient(var(--blue), var(--blue)) top left / 12px 1.5px no-repeat,
+    linear-gradient(var(--blue), var(--blue)) top left / 1.5px 12px no-repeat,
+    linear-gradient(var(--blue), var(--blue)) bottom right / 12px 1.5px no-repeat,
+    linear-gradient(var(--blue), var(--blue)) bottom right / 1.5px 12px no-repeat,
+    var(--glass);
+}
+
+.dir-circuit .card {
+  border-color: rgba(255, 148, 51, 0.45);
+}
+
+.dir-circuit .skill-toggle,
+.dir-circuit .place-toggle,
+.dir-circuit .unknowns .node-label {
+  border-left: 2px solid rgba(64, 140, 255, 0.6);
+}
+
+/* ---- Still: the same states and words, nothing moves ---------------------------------- */
+
+.is-still *,
+.is-still *::before,
+.is-still *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---- Phones: the world is the backdrop; words sit in sheets ---------------------------- */
+
+@media (max-width: 759px) {
+  :root {
+    --edge: 16px;
+  }
+  .top {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 10px var(--edge);
+  }
+  .directions {
+    order: 3;
+    margin: 0;
+  }
+  .controls {
+    margin-left: auto;
+    gap: 12px;
+  }
+  .control {
+    font-size: 13px;
+  }
+  #app:not(.is-answered) .console,
+  .dir-horizon #app:not(.is-answered) .console {
+    width: calc(100vw - 2 * var(--edge));
+    left: var(--edge);
+    top: calc(var(--oy, 30vh) + 48px);
+    transform: none;
+    text-align: center;
+  }
+  .is-answered .console {
+    top: 104px;
+    width: calc(100vw - 2 * var(--edge));
+    padding: 10px 14px;
+  }
+  .you-role {
+    font-size: 26px;
+    margin-bottom: 4px;
+  }
+  .legend,
+  .is-answered .prompt {
+    display: none;
+  }
+  .card {
+    right: var(--edge);
+    left: var(--edge);
+    top: auto;
+    bottom: 84px;
+    width: auto;
+    max-height: calc(100vh - 340px);
+    padding: 16px 18px;
+  }
+  .card-sentence {
+    font-size: 22px;
+  }
+  .spike-tools {
+    display: none;
+  }
+  .node-label {
+    max-width: 150px;
+  }
+  .node-label .name {
+    font-size: 13px;
+  }
+  .bottom {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    font-size: 12px;
+  }
+  .spike {
+    align-items: stretch;
+  }
+}
+
+/* ---- The chooser: already a world ------------------------------------------------------ */
+
+.chooser-page {
+  overflow: auto;
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(64, 140, 255, 0.14), transparent 70%),
+    radial-gradient(ellipse 40% 30% at 80% 10%, rgba(158, 107, 255, 0.08), transparent 70%),
+    var(--ground);
+}
+
+.chooser-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+.chooser-world .trail .glow {
+  fill: none;
+  stroke: url(#ch-trail);
+  stroke-width: 10;
+  opacity: 0.28;
+  filter: url(#ch-soft);
+}
+
+.chooser-world .trail .line {
+  fill: none;
+  stroke: url(#ch-trail);
+  stroke-width: 2;
+  opacity: 0.8;
+}
+
+.chooser-world .trail .flow {
+  fill: none;
+  stroke: #cfe0ff;
+  stroke-width: 1.6;
+  stroke-dasharray: 3 26;
+  opacity: 0.5;
+  animation: chooser-flow 2.8s linear infinite;
+}
+
+.chooser-world .trail .fibre,
+.chooser-world .trail .horizon,
+.chooser-world .trail .brackets {
+  fill: none;
+  stroke: #6b7cff;
+  stroke-width: 1.2;
+  opacity: 0.6;
+}
+
+.chooser-world .trail .horizon {
+  stroke: rgba(156, 180, 255, 0.7);
+}
+
+.chooser-world .trail .reflection {
+  fill: rgba(237, 245, 255, 0.25);
+}
+
+.chooser-world .trail .core {
+  fill: #edf5ff;
+}
+
+.chooser-world .trail.lit .line {
+  stroke-width: 3;
+  opacity: 1;
+}
+
+.chooser-world .trail.lit .glow {
+  opacity: 0.45;
+  stroke-width: 16;
+}
+
+.chooser-world .you-glow {
+  animation: chooser-breathe 4s ease-in-out infinite;
+}
+
+.motion-paused .chooser-world * {
+  animation-play-state: paused !important;
+}
+
+.chooser-controls {
+  position: fixed;
+  top: 16px;
+  right: var(--edge);
+  z-index: 5;
+}
+
+@keyframes chooser-flow {
+  to {
+    stroke-dashoffset: -29;
+  }
+}
+
+@keyframes chooser-breathe {
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.chooser {
+  position: relative;
+  max-width: 1120px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 32px var(--edge) 150px;
+}
+
+.chooser h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(30px, 4vw, 52px);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  margin: 36px 0 12px;
+}
+
+.chooser .lede {
+  font-size: 18px;
+  color: var(--ink-soft);
+  max-width: 54ch;
+  margin: 0 0 7vh;
+}
+
+.doors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+}
+
+.door {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 18px 16px 22px;
+  color: var(--ink);
+  text-decoration: none;
+  border-radius: 16px;
+}
+
+/* The doorway's light sits below its words, so the trail from the person ends beneath them. */
+.door-light {
+  order: 3;
+  width: 54px;
+  height: 54px;
+  margin-top: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(156, 196, 255, 0.35), transparent 70%);
+}
+
+.door-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: -0.02em;
+}
+
+.door-blurb {
+  color: var(--ink-soft);
+  max-width: 28ch;
+}
+
+.door:hover .door-name,
+.door:focus-visible .door-name {
+  text-decoration: underline;
+  text-underline-offset: 6px;
+  text-decoration-thickness: 2px;
+}
+
+.chooser .spike-label {
+  position: absolute;
+  left: var(--edge);
+  bottom: 24px;
+  font-size: 13px;
+  color: var(--ink-faint);
+}

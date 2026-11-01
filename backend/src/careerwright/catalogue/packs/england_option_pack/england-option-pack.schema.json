@@ -1,0 +1,2209 @@
+{
+  "$defs": {
+    "Claim": {
+      "additionalProperties": false,
+      "description": "SourceClaim (spec section 18): one value read from one source, with its span and the\nexact excerpt there, as an agent labelled it (label review: not run, requires human).",
+      "properties": {
+        "claim_id": {
+          "pattern": "^[JCF][0-9]{2}\\.[a-z0-9_.]+$",
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "source_id": {
+          "pattern": "^[JCF][0-9]{2}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "field": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Field",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "excerpt": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "occurrences": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 1,
+          "title": "Occurrences"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 600,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "claim_id",
+        "source_id",
+        "field",
+        "value",
+        "span",
+        "excerpt"
+      ],
+      "title": "Claim",
+      "type": "object"
+    },
+    "FundingInstrument": {
+      "additionalProperties": false,
+      "description": "A funding scheme's rules (spec section 18, FundingInstrument): never a conclusion about\na person's eligibility (spec section 11), so its award state is always `not_assessed`.",
+      "properties": {
+        "record_id": {
+          "pattern": "^[a-z_]+:[A-Za-z0-9_.-]+$",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "review_state": {
+          "$ref": "#/$defs/ReviewState"
+        },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Review"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "facts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Facts",
+          "type": "array"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "programme": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Programme"
+        },
+        "jurisdiction": {
+          "const": "GB-ENG",
+          "title": "Jurisdiction",
+          "type": "string"
+        },
+        "instrument_kind": {
+          "enum": [
+            "fee_waiver",
+            "grant",
+            "loan",
+            "programme"
+          ],
+          "title": "Instrument Kind",
+          "type": "string"
+        },
+        "eligible_costs": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Eligible Costs"
+        },
+        "rules": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Rules",
+          "type": "array"
+        },
+        "timing": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Timing"
+        },
+        "repayment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Repayment"
+        },
+        "exclusions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Exclusions",
+          "type": "array"
+        },
+        "award_state": {
+          "const": "not_assessed",
+          "title": "Award State",
+          "type": "string"
+        },
+        "published_on": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Published On"
+        },
+        "rules_updated_on": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Rules Updated On"
+        }
+      },
+      "required": [
+        "record_id",
+        "review_state",
+        "as_of",
+        "source_ids",
+        "programme",
+        "jurisdiction",
+        "instrument_kind",
+        "eligible_costs",
+        "rules",
+        "timing",
+        "repayment",
+        "exclusions",
+        "award_state",
+        "published_on",
+        "rules_updated_on"
+      ],
+      "title": "FundingInstrument",
+      "type": "object"
+    },
+    "JobPosting": {
+      "additionalProperties": false,
+      "description": "One source's copy of a vacancy (spec section 18, JobPosting); copies of one vacancy\nshare `vacancy_id` and count once.",
+      "properties": {
+        "record_id": {
+          "pattern": "^[a-z_]+:[A-Za-z0-9_.-]+$",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "review_state": {
+          "$ref": "#/$defs/ReviewState"
+        },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Review"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "facts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Facts",
+          "type": "array"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "vacancy_id": {
+          "title": "Vacancy Id",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Title"
+        },
+        "employer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Employer"
+        },
+        "advertiser": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Advertiser"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Location"
+        },
+        "work_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Work Mode"
+        },
+        "salary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Salary"
+        },
+        "date_posted": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Date Posted"
+        },
+        "valid_through": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Valid Through"
+        },
+        "employment_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Employment Type"
+        },
+        "description_kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Description Kind"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Status"
+        },
+        "requirement_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Requirement Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "record_id",
+        "review_state",
+        "as_of",
+        "source_id",
+        "target_id",
+        "vacancy_id",
+        "title",
+        "employer",
+        "advertiser",
+        "location",
+        "work_mode",
+        "salary",
+        "date_posted",
+        "valid_through",
+        "employment_type",
+        "description_kind",
+        "status",
+        "requirement_ids"
+      ],
+      "title": "JobPosting",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "LearningOption": {
+      "additionalProperties": false,
+      "description": "The stable syllabus and provider (spec section 18, LearningOption).",
+      "properties": {
+        "record_id": {
+          "pattern": "^[a-z_]+:[A-Za-z0-9_.-]+$",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "review_state": {
+          "$ref": "#/$defs/ReviewState"
+        },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Review"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "facts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Facts",
+          "type": "array"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Ids",
+          "type": "array"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Title"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Provider"
+        },
+        "credential": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Credential"
+        },
+        "awarding_body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Awarding Body"
+        },
+        "recognising_body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Recognising Body"
+        },
+        "level": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Level"
+        },
+        "delivery_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Delivery Mode"
+        },
+        "assessment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Assessment"
+        },
+        "entry_requirements": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Entry Requirements",
+          "type": "array"
+        }
+      },
+      "required": [
+        "record_id",
+        "review_state",
+        "as_of",
+        "source_id",
+        "target_ids",
+        "title",
+        "provider",
+        "credential",
+        "awarding_body",
+        "recognising_body",
+        "level",
+        "delivery_mode",
+        "assessment",
+        "entry_requirements"
+      ],
+      "title": "LearningOption",
+      "type": "object"
+    },
+    "Offering": {
+      "additionalProperties": false,
+      "description": "A dated offer of an option (spec section 18, Offering): intake, fees, timetable.",
+      "properties": {
+        "record_id": {
+          "pattern": "^[a-z_]+:[A-Za-z0-9_.-]+$",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "review_state": {
+          "$ref": "#/$defs/ReviewState"
+        },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Review"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "facts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Facts",
+          "type": "array"
+        },
+        "option_id": {
+          "title": "Option Id",
+          "type": "string"
+        },
+        "intake": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Intake"
+        },
+        "application_deadline": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Application Deadline"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Duration"
+        },
+        "schedule": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Schedule"
+        },
+        "fee_total": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Fee Total"
+        },
+        "instalment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Instalment"
+        },
+        "wage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Wage"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Location"
+        },
+        "extra_costs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Extra Costs",
+          "type": "array"
+        },
+        "funding_conditions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Funding Conditions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "record_id",
+        "review_state",
+        "as_of",
+        "option_id",
+        "intake",
+        "application_deadline",
+        "duration",
+        "schedule",
+        "fee_total",
+        "instalment",
+        "wage",
+        "location",
+        "extra_costs",
+        "funding_conditions"
+      ],
+      "title": "Offering",
+      "type": "object"
+    },
+    "Outcome": {
+      "additionalProperties": false,
+      "description": "A planned outcome row, `PlanAction.outcomes` (OUT-1): never demonstrated competence.\nA level needs a rubric and an assessment that supports it; otherwise null.",
+      "properties": {
+        "record_id": {
+          "pattern": "^[a-z_]+:[A-Za-z0-9_.-]+$",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "review_state": {
+          "$ref": "#/$defs/ReviewState"
+        },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Review"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "facts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Facts",
+          "type": "array"
+        },
+        "offering_id": {
+          "title": "Offering Id",
+          "type": "string"
+        },
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "level_on_completion": {
+          "anyOf": [
+            {
+              "maximum": 4,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Level On Completion"
+        },
+        "evidence_kind": {
+          "enum": [
+            "topic_mention",
+            "practice",
+            "assessed_work_sample",
+            "exam"
+          ],
+          "title": "Evidence Kind",
+          "type": "string"
+        },
+        "confidence": {
+          "enum": [
+            "unsupported",
+            "provisional",
+            "corroborated"
+          ],
+          "title": "Confidence",
+          "type": "string"
+        },
+        "source_span": {
+          "title": "Source Span",
+          "type": "string"
+        },
+        "rubric_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rubric Version"
+        },
+        "claim_state": {
+          "const": "planned_conditional",
+          "title": "Claim State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "record_id",
+        "review_state",
+        "as_of",
+        "offering_id",
+        "skill_id",
+        "level_on_completion",
+        "evidence_kind",
+        "confidence",
+        "source_span",
+        "rubric_version",
+        "claim_state"
+      ],
+      "title": "Outcome",
+      "type": "object"
+    },
+    "Retention": {
+      "enum": [
+        "body",
+        "excerpts"
+      ],
+      "title": "Retention",
+      "type": "string"
+    },
+    "Review": {
+      "additionalProperties": false,
+      "description": "A person's recorded decision on a record (H-07, session 2), as Task 7c transcribes it.",
+      "properties": {
+        "reviewer": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Reviewer",
+          "type": "string"
+        },
+        "decided_on": {
+          "format": "date",
+          "title": "Decided On",
+          "type": "string"
+        },
+        "session": {
+          "maxLength": 60,
+          "minLength": 1,
+          "title": "Session",
+          "type": "string"
+        },
+        "decision": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Decision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewer",
+        "decided_on",
+        "session",
+        "decision"
+      ],
+      "title": "Review",
+      "type": "object"
+    },
+    "ReviewState": {
+      "enum": [
+        "proposed",
+        "reviewed"
+      ],
+      "title": "ReviewState",
+      "type": "string"
+    },
+    "RightsClass": {
+      "description": "The session 1 rights policy's classes (H-06), as the evidence records name them.",
+      "enum": [
+        "govuk",
+        "public-sector",
+        "course-provider",
+        "professional-body",
+        "employer-posting",
+        "job-board",
+        "other"
+      ],
+      "title": "RightsClass",
+      "type": "string"
+    },
+    "Route": {
+      "enum": [
+        "fetch",
+        "adzuna"
+      ],
+      "title": "Route",
+      "type": "string"
+    },
+    "Skill": {
+      "additionalProperties": false,
+      "description": "A pack-local requirement row a target's postings share (`pack:<target>:<row>`); Task 9\nmaps rows to ESCO and gives them rubrics.",
+      "properties": {
+        "skill_id": {
+          "pattern": "^pack:[a-z0-9-]+:[a-z0-9-]+$",
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "skill",
+            "credential",
+            "experience"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "skill_id",
+        "target_id",
+        "label",
+        "kind"
+      ],
+      "title": "Skill",
+      "type": "object"
+    },
+    "SkillRequirement": {
+      "additionalProperties": false,
+      "description": "A requirement row from a posting (spec section 18, SkillRequirement). A posting states\nno behaviourally anchored level, so `required_level` stays null until a reviewed rubric\n(Task 9) sets it.",
+      "properties": {
+        "record_id": {
+          "pattern": "^[a-z_]+:[A-Za-z0-9_.-]+$",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "review_state": {
+          "$ref": "#/$defs/ReviewState"
+        },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Review"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "facts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Facts",
+          "type": "array"
+        },
+        "job_posting_id": {
+          "title": "Job Posting Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "skill_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Skill Id"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "skill",
+            "credential",
+            "experience",
+            "eligibility",
+            "task"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "importance": {
+          "enum": [
+            "essential",
+            "preferred",
+            "disputed",
+            "unknown"
+          ],
+          "title": "Importance",
+          "type": "string"
+        },
+        "gate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Gate"
+        },
+        "required_level": {
+          "anyOf": [
+            {
+              "maximum": 4,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Required Level"
+        }
+      },
+      "required": [
+        "record_id",
+        "review_state",
+        "as_of",
+        "job_posting_id",
+        "target_id",
+        "skill_id",
+        "text",
+        "kind",
+        "importance",
+        "gate",
+        "required_level"
+      ],
+      "title": "SkillRequirement",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "description": "One corpus page (`corpus/manifest.json` slot) as it was retrieved.",
+      "properties": {
+        "source_id": {
+          "pattern": "^[JCF][0-9]{2}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SourceKind"
+        },
+        "route": {
+          "$ref": "#/$defs/Route"
+        },
+        "url": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "final_url": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Final Url"
+        },
+        "retrieved_at": {
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "http_status": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Http Status"
+        },
+        "content_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Content Type"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "rights_class": {
+          "$ref": "#/$defs/RightsClass"
+        },
+        "rights_status": {
+          "maxLength": 1200,
+          "minLength": 1,
+          "title": "Rights Status",
+          "type": "string"
+        },
+        "retention": {
+          "$ref": "#/$defs/Retention"
+        },
+        "template_family": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Template Family",
+          "type": "string"
+        },
+        "split": {
+          "$ref": "#/$defs/Split"
+        },
+        "advert_pointer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Advert Pointer"
+        },
+        "occurrence_cap": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Occurrence Cap"
+        }
+      },
+      "required": [
+        "source_id",
+        "kind",
+        "route",
+        "url",
+        "retrieved_at",
+        "http_status",
+        "content_type",
+        "sha256",
+        "rights_class",
+        "rights_status",
+        "retention",
+        "template_family",
+        "split"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "SourceKind": {
+      "enum": [
+        "job_posting",
+        "course_page",
+        "funding_page"
+      ],
+      "title": "SourceKind",
+      "type": "string"
+    },
+    "Span": {
+      "additionalProperties": false,
+      "description": "Offsets into the hashed page text, or a JSON pointer into an API response.",
+      "properties": {
+        "start": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "pointer": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pointer"
+        }
+      },
+      "title": "Span",
+      "type": "object"
+    },
+    "Split": {
+      "description": "Assigned by template family before any tuning (OI-09): never tune on holdout.",
+      "enum": [
+        "development",
+        "holdout"
+      ],
+      "title": "Split",
+      "type": "string"
+    },
+    "Target": {
+      "additionalProperties": false,
+      "properties": {
+        "target_id": {
+          "pattern": "^[a-z0-9-]+$",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "persona": {
+          "enum": [
+            "P01",
+            "P02",
+            "P03",
+            "P04",
+            "P05"
+          ],
+          "title": "Persona",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "city": {
+          "minLength": 1,
+          "title": "City",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_id",
+        "persona",
+        "title",
+        "city"
+      ],
+      "title": "Target",
+      "type": "object"
+    },
+    "Unknown": {
+      "additionalProperties": false,
+      "description": "Why a field has no value: never zero, empty or a guess.",
+      "properties": {
+        "unknown": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Unknown",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unknown"
+      ],
+      "title": "Unknown",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "pack": {
+      "const": "nessa-england-option-pack",
+      "title": "Pack",
+      "type": "string"
+    },
+    "format_version": {
+      "const": 1,
+      "title": "Format Version",
+      "type": "integer"
+    },
+    "pack_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "title": "Pack Version",
+      "type": "string"
+    },
+    "dated": {
+      "format": "date",
+      "title": "Dated",
+      "type": "string"
+    },
+    "jurisdiction": {
+      "const": "GB-ENG",
+      "title": "Jurisdiction",
+      "type": "string"
+    },
+    "currency": {
+      "const": "GBP",
+      "title": "Currency",
+      "type": "string"
+    },
+    "synthetic": {
+      "const": false,
+      "title": "Synthetic",
+      "type": "boolean"
+    },
+    "label_review": {
+      "title": "Label Review",
+      "type": "string"
+    },
+    "notes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+    },
+    "targets": {
+      "items": {
+        "$ref": "#/$defs/Target"
+      },
+      "title": "Targets",
+      "type": "array"
+    },
+    "skills": {
+      "items": {
+        "$ref": "#/$defs/Skill"
+      },
+      "title": "Skills",
+      "type": "array"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/Source"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "claims": {
+      "items": {
+        "$ref": "#/$defs/Claim"
+      },
+      "title": "Claims",
+      "type": "array"
+    },
+    "job_postings": {
+      "items": {
+        "$ref": "#/$defs/JobPosting"
+      },
+      "title": "Job Postings",
+      "type": "array"
+    },
+    "skill_requirements": {
+      "items": {
+        "$ref": "#/$defs/SkillRequirement"
+      },
+      "title": "Skill Requirements",
+      "type": "array"
+    },
+    "learning_options": {
+      "items": {
+        "$ref": "#/$defs/LearningOption"
+      },
+      "title": "Learning Options",
+      "type": "array"
+    },
+    "offerings": {
+      "items": {
+        "$ref": "#/$defs/Offering"
+      },
+      "title": "Offerings",
+      "type": "array"
+    },
+    "outcomes": {
+      "items": {
+        "$ref": "#/$defs/Outcome"
+      },
+      "title": "Outcomes",
+      "type": "array"
+    },
+    "funding_instruments": {
+      "items": {
+        "$ref": "#/$defs/FundingInstrument"
+      },
+      "title": "Funding Instruments",
+      "type": "array"
+    }
+  },
+  "required": [
+    "pack",
+    "format_version",
+    "pack_version",
+    "dated",
+    "jurisdiction",
+    "currency",
+    "synthetic",
+    "label_review",
+    "notes",
+    "targets",
+    "skills",
+    "sources",
+    "claims",
+    "job_postings",
+    "skill_requirements",
+    "learning_options",
+    "offerings",
+    "outcomes",
+    "funding_instruments"
+  ],
+  "title": "Pack",
+  "type": "object",
+  "x-value-shapes": {
+    "advertiser": {
+      "enum": [
+        "employer",
+        "agency",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "age_rule": {
+      "additionalProperties": false,
+      "properties": {
+        "minimum_age": {
+          "maximum": 120,
+          "minimum": 0,
+          "title": "Minimum Age",
+          "type": "integer"
+        },
+        "on": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "On"
+        }
+      },
+      "required": [
+        "minimum_age"
+      ],
+      "title": "AgeRule",
+      "type": "object"
+    },
+    "count": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "crosswalk": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 2,
+          "title": "Candidates",
+          "type": "array"
+        },
+        "resolved": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Resolved"
+        }
+      },
+      "required": [
+        "candidates",
+        "resolved"
+      ],
+      "title": "Crosswalk",
+      "type": "object"
+    },
+    "date": {
+      "type": "string"
+    },
+    "dates": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "deadline": {
+      "type": "string"
+    },
+    "description_kind": {
+      "enum": [
+        "full",
+        "snippet"
+      ],
+      "type": "string"
+    },
+    "duration": {
+      "$defs": {
+        "DurationPart": {
+          "additionalProperties": false,
+          "description": "One way of taking it (full time, part time, self-paced) and how long it lasts.",
+          "properties": {
+            "unit": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "hours",
+                    "weeks",
+                    "months",
+                    "years"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Unit"
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Minimum"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Maximum"
+            },
+            "mode": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "full_time",
+                    "part_time",
+                    "self_paced"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mode"
+            },
+            "typical": {
+              "title": "Typical",
+              "type": "boolean"
+            },
+            "unbounded": {
+              "title": "Unbounded",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "unit",
+            "minimum",
+            "maximum",
+            "mode",
+            "typical",
+            "unbounded"
+          ],
+          "title": "DurationPart",
+          "type": "object"
+        }
+      },
+      "items": {
+        "$ref": "#/$defs/DurationPart"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "earnings_rule": {
+      "$defs": {
+        "Money": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "const": "GBP",
+              "title": "Currency",
+              "type": "string"
+            },
+            "minor_units": {
+              "minimum": 0,
+              "title": "Minor Units",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "currency",
+            "minor_units"
+          ],
+          "title": "Money",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "below_annual_gross": {
+          "$ref": "#/$defs/Money"
+        },
+        "area": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Area"
+        },
+        "or_unemployed": {
+          "default": false,
+          "title": "Or Unemployed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "below_annual_gross"
+      ],
+      "title": "EarningsRule",
+      "type": "object"
+    },
+    "flag": {
+      "type": "boolean"
+    },
+    "instalment": {
+      "additionalProperties": false,
+      "description": "A payment plan: an amount per period, a number of payments, or both.",
+      "properties": {
+        "currency": {
+          "const": "GBP",
+          "title": "Currency",
+          "type": "string"
+        },
+        "minor_units": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Minor Units"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "enum": [
+                "year",
+                "month",
+                "week",
+                "day",
+                "hour"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Period"
+        },
+        "count": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Count"
+        },
+        "at_least": {
+          "title": "At Least",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "currency",
+        "minor_units",
+        "period",
+        "count",
+        "at_least"
+      ],
+      "title": "Instalment",
+      "type": "object"
+    },
+    "level": {
+      "maximum": 8,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "level_change": {
+      "additionalProperties": false,
+      "properties": {
+        "levels": {
+          "items": {
+            "maximum": 8,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "minItems": 1,
+          "title": "Levels",
+          "type": "array"
+        },
+        "courses_starting_on_or_after": {
+          "title": "Courses Starting On Or After",
+          "type": "string"
+        },
+        "use_instead": {
+          "minLength": 1,
+          "title": "Use Instead",
+          "type": "string"
+        }
+      },
+      "required": [
+        "levels",
+        "courses_starting_on_or_after",
+        "use_instead"
+      ],
+      "title": "LevelChange",
+      "type": "object"
+    },
+    "levels": {
+      "additionalProperties": false,
+      "properties": {
+        "levels": {
+          "items": {
+            "maximum": 8,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "minItems": 1,
+          "title": "Levels",
+          "type": "array"
+        }
+      },
+      "required": [
+        "levels"
+      ],
+      "title": "LevelsRule",
+      "type": "object"
+    },
+    "money": {
+      "additionalProperties": false,
+      "properties": {
+        "currency": {
+          "const": "GBP",
+          "title": "Currency",
+          "type": "string"
+        },
+        "minor_units": {
+          "minimum": 0,
+          "title": "Minor Units",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "currency",
+        "minor_units"
+      ],
+      "title": "Money",
+      "type": "object"
+    },
+    "names": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "pay": {
+      "additionalProperties": false,
+      "description": "Advertised or provider-predicted pay: a range, a point (equal ends) or one bound.",
+      "properties": {
+        "currency": {
+          "const": "GBP",
+          "title": "Currency",
+          "type": "string"
+        },
+        "minimum_minor_units": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Minimum Minor Units"
+        },
+        "maximum_minor_units": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Maximum Minor Units"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "enum": [
+                "year",
+                "month",
+                "week",
+                "day",
+                "hour"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Period"
+        },
+        "basis": {
+          "enum": [
+            "advertised",
+            "predicted",
+            "unknown"
+          ],
+          "title": "Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "currency",
+        "minimum_minor_units",
+        "maximum_minor_units",
+        "period",
+        "basis"
+      ],
+      "title": "Pay",
+      "type": "object"
+    },
+    "place": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "locality": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Locality"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Region"
+        },
+        "postal_code": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Postal Code"
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "title": "Place",
+      "type": "object"
+    },
+    "rate": {
+      "additionalProperties": false,
+      "description": "An amount per period: a yearly fee, a yearly grant.",
+      "properties": {
+        "currency": {
+          "const": "GBP",
+          "title": "Currency",
+          "type": "string"
+        },
+        "minor_units": {
+          "minimum": 0,
+          "title": "Minor Units",
+          "type": "integer"
+        },
+        "period": {
+          "enum": [
+            "year",
+            "month",
+            "week",
+            "day",
+            "hour"
+          ],
+          "title": "Period",
+          "type": "string"
+        },
+        "at_least": {
+          "title": "At Least",
+          "type": "boolean"
+        },
+        "repayable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Repayable"
+        }
+      },
+      "required": [
+        "currency",
+        "minor_units",
+        "period",
+        "at_least",
+        "repayable"
+      ],
+      "title": "Rate",
+      "type": "object"
+    },
+    "schedule": {
+      "additionalProperties": false,
+      "description": "A working or study pattern: an offering's schedule, a posting's working pattern.",
+      "properties": {
+        "pattern": {
+          "anyOf": [
+            {
+              "enum": [
+                "full_time",
+                "part_time",
+                "flexible"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pattern"
+        },
+        "hours_per_week": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Hours Per Week"
+        }
+      },
+      "required": [
+        "pattern",
+        "hours_per_week"
+      ],
+      "title": "Schedule",
+      "type": "object"
+    },
+    "text": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "work_mode": {
+      "enum": [
+        "on_site",
+        "hybrid",
+        "remote"
+      ],
+      "type": "string"
+    }
+  },
+  "x-claim-field-shapes": {
+    "access_period": "duration",
+    "advertiser": "advertiser",
+    "application_deadline": "date",
+    "contract_duration": "duration",
+    "contract_end": "date",
+    "date_posted": "date",
+    "description_kind": "description_kind",
+    "duration": "duration",
+    "duration_conflict": "duration",
+    "duration_limit": "duration",
+    "eligibility_age": "age_rule",
+    "eligibility_earnings": "earnings_rule",
+    "eligibility_no_other_funded_training": "flag",
+    "eligibility_residency": "names",
+    "exam_fee": "money",
+    "extra_cost": "money",
+    "fee_per_year_home": "rate",
+    "fee_per_year_international": "rate",
+    "fee_total": "money",
+    "fee_was": "money",
+    "guided_hours": "count",
+    "instalment": "instalment",
+    "intake": "date",
+    "intakes_stated": "dates",
+    "level": "level",
+    "lle_interaction": "level_change",
+    "location": "place",
+    "location_conflict": "place",
+    "occupation_crosswalk": "crosswalk",
+    "price_valid_until": "date",
+    "published_on": "date",
+    "rule_age": "age_rule",
+    "rule_course_level": "levels",
+    "rule_earnings": "earnings_rule",
+    "rules_updated_on": "date",
+    "salary": "pay",
+    "salary_annual_statement": "pay",
+    "salary_conflict": "pay",
+    "salary_point": "pay",
+    "schedule": "schedule",
+    "study_type": "schedule",
+    "support_grant": "rate",
+    "valid_through": "deadline",
+    "wage": "pay",
+    "weekly_hours": "schedule",
+    "work_locations": "names",
+    "work_mode": "work_mode",
+    "working_pattern": "schedule"
+  },
+  "x-claim-field-shape-otherwise": "text",
+  "x-record-field-shapes": {
+    "FundingInstrument.eligible_costs": "text",
+    "FundingInstrument.exclusions": "text",
+    "FundingInstrument.programme": "text",
+    "FundingInstrument.published_on": "date",
+    "FundingInstrument.repayment": "text",
+    "FundingInstrument.rules_updated_on": "date",
+    "FundingInstrument.timing": "text",
+    "JobPosting.advertiser": "advertiser",
+    "JobPosting.date_posted": "date",
+    "JobPosting.description_kind": "description_kind",
+    "JobPosting.employer": "text",
+    "JobPosting.employment_type": "text",
+    "JobPosting.location": "place",
+    "JobPosting.salary": "pay",
+    "JobPosting.status": "text",
+    "JobPosting.title": "text",
+    "JobPosting.valid_through": "deadline",
+    "JobPosting.work_mode": "work_mode",
+    "LearningOption.assessment": "text",
+    "LearningOption.awarding_body": "text",
+    "LearningOption.credential": "text",
+    "LearningOption.delivery_mode": "text",
+    "LearningOption.entry_requirements": "text",
+    "LearningOption.level": "level",
+    "LearningOption.provider": "text",
+    "LearningOption.recognising_body": "text",
+    "LearningOption.title": "text",
+    "Offering.application_deadline": "date",
+    "Offering.duration": "duration",
+    "Offering.extra_costs": "money",
+    "Offering.fee_total": "money",
+    "Offering.instalment": "instalment",
+    "Offering.intake": "date",
+    "Offering.location": "place",
+    "Offering.schedule": "schedule",
+    "Offering.wage": "pay",
+    "Outcome.source_span": "text",
+    "SkillRequirement.text": "text"
+  }
+}

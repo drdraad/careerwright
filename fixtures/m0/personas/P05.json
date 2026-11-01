@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.2",
+  "synthetic": true,
+  "jurisdiction": "GB-ENG",
+  "ui_language": "en-GB",
+  "currency": "GBP",
+  "taxonomy_ids_are_fixture_ids": true,
+  "data_as_of": "2027-01-01",
+  "id": "P05",
+  "description": "Career returner with evidence already meeting all modelled requirements",
+  "entry_mode": "sure",
+  "cities": [
+    "Leeds"
+  ],
+  "target_titles": [
+    "Bookkeeping assistant"
+  ],
+  "skills": [
+    {
+      "skill_id": "fixture:reconciliation",
+      "required": 2,
+      "evidenced": 2
+    },
+    {
+      "skill_id": "fixture:records",
+      "required": 2,
+      "evidenced": 2
+    }
+  ],
+  "other_gates_confirmed": true,
+  "expected": {
+    "state": "READY_NOW_FOR_MODELLED_REQUIREMENTS",
+    "primary_action": "review_current_postings_and_apply",
+    "forced_training": false,
+    "show_degenerate_pareto_chart": false,
+    "show_evidence_recency_limitations": true
+  }
+}

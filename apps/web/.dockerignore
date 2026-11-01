@@ -1,0 +1,12 @@
+node_modules
+.next
+storybook-static
+test-results
+playwright-report
+e2e
+.storybook
+src/stories
+**/*.test.ts
+**/*.test.tsx
+vitest.config.ts
+playwright.config.ts

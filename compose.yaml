@@ -1,0 +1,217 @@
+# Careerwright L0 local stack (plan section 2; ADR 0004). Start it with `make dev` or `make demo`,
+# never by hand: the Makefile sets CAREERWRIGHT_HOME (secrets and master keys, outside the
+# repository), the runtime mode and the ports.
+#
+# Every service but one sits on the `internal` network, which has no route out of the
+# machine. The restricted acquisition worker sits on `acquisition`, a second internal
+# network it shares with the DBOS worker only, so no other container can ask it to fetch
+# (its own route out, in live mode, is never anyone else's). The `edge` relay is the only
+# service also on a normal bridge: it publishes the API, the Auth emulator, PostgreSQL and
+# the web app on 127.0.0.1 only. `compose.live.yaml` gives the worker (for Meta) and the
+# restricted acquisition worker (for permitted pages and Adzuna), and nothing else, a route
+# out; demo mode omits it.
+name: careerwright-l0
+
+x-local: &local
+  CAREERWRIGHT_ENVIRONMENT: local
+  CAREERWRIGHT_RUNTIME_MODE: ${CAREERWRIGHT_RUNTIME_MODE:-demo}
+
+x-models: &models
+  CAREERWRIGHT_META_TEST_MODEL: ${CAREERWRIGHT_META_TEST_MODEL:-muse-spark-1.3-contributor}
+  CAREERWRIGHT_META_PRODUCTION_MODEL: ${CAREERWRIGHT_META_PRODUCTION_MODEL:-muse-spark-1.3}
+  CAREERWRIGHT_SYNTHETIC_MODEL_ROLE: ${CAREERWRIGHT_SYNTHETIC_MODEL_ROLE:-test}
+
+# One backend image; only `migrate` declares the build so parallel builds cannot race.
+x-backend: &backend
+  image: careerwright-l0/backend:local
+  networks: [internal]
+  init: true
+
+services:
+  postgres:
+    # postgres:16.15-bookworm, multi-arch index digest (docs/dependencies.md).
+    image: postgres:16.15-bookworm@sha256:d81f7b51697014367236d07ec58b54153fc28f828b72bf247fe5c7487520bcb0
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_superuser
+    secrets: [pg_superuser, pg_migrator, pg_api, pg_worker, pg_dbos_owner, pg_dbos_runtime]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    networks: [internal]
+    stop_grace_period: 20s
+    healthcheck:
+      # TCP, not the socket: during initialisation the server listens on the socket only.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d careerwright_app"]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+
+  auth:
+    image: careerwright-l0/auth-emulator:15.34.1
+    build: ./docker/auth
+    networks: [internal]
+    init: true
+    stop_grace_period: 5s
+
+  migrate:
+    <<: *backend
+    build: ./backend
+    command: ["python", "-m", "careerwright.cli", "setup-database"]
+    environment:
+      <<: *local
+      CAREERWRIGHT_MIGRATOR_DATABASE_URL: postgresql+psycopg://careerwright_migrator@postgres:5432/careerwright_app
+      CAREERWRIGHT_MIGRATOR_DATABASE_PASSWORD_FILE: /run/secrets/pg_migrator
+      CAREERWRIGHT_DBOS_OWNER_DATABASE_URL: postgresql+psycopg://careerwright_dbos_owner@postgres:5432/careerwright_dbos
+      CAREERWRIGHT_DBOS_OWNER_DATABASE_PASSWORD_FILE: /run/secrets/pg_dbos_owner
+      CAREERWRIGHT_FIXTURES_DIR: /fixtures/m0
+      CAREERWRIGHT_MASTER_KEY_DIR: /run/careerwright/keys
+      # The pinned ESCO release `make setup` fetched (verified again before it is imported).
+      CAREERWRIGHT_DATASETS_DIR: /datasets
+    secrets: [pg_migrator, pg_dbos_owner]
+    volumes:
+      - ./fixtures:/fixtures:ro
+      - ./var/datasets:/datasets:ro
+      - ${CAREERWRIGHT_HOME:?run make setup}/keys:/run/careerwright/keys:ro
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  api:
+    <<: *backend
+    # --no-proxy-headers: the client address is always the socket peer, never a header.
+    command: ["uvicorn", "--factory", "careerwright.api.main:build_app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log", "--no-proxy-headers", "--timeout-graceful-shutdown", "5"]
+    environment:
+      <<: [*local, *models]
+      CAREERWRIGHT_API_INTERNAL_NETWORK_CLIENTS: "true"  # the edge relays from the internal subnet
+      CAREERWRIGHT_ALLOWED_HOSTS: 127.0.0.1:${CAREERWRIGHT_API_PORT:-58000},localhost:${CAREERWRIGHT_API_PORT:-58000},api:8000,127.0.0.1:8000
+      CAREERWRIGHT_ALLOWED_ORIGINS: http://127.0.0.1:${CAREERWRIGHT_WEB_PORT:-53000},http://localhost:${CAREERWRIGHT_WEB_PORT:-53000}
+      CAREERWRIGHT_FIREBASE_PROJECT_ID: demo-careerwright
+      FIREBASE_AUTH_EMULATOR_HOST: auth:9099
+      CAREERWRIGHT_APP_DATABASE_URL: postgresql+psycopg://careerwright_api@postgres:5432/careerwright_app
+      CAREERWRIGHT_APP_DATABASE_PASSWORD_FILE: /run/secrets/pg_api
+      CAREERWRIGHT_MASTER_KEY_DIR: /run/careerwright/keys
+      # Whether setup placed Adzuna credentials (live-vacancy workspaces); never the values.
+      CAREERWRIGHT_ADZUNA_CONFIGURED: ${CAREERWRIGHT_ADZUNA_CONFIGURED:-false}
+      # The limits a workspace gets when its key is stored: config.py's defaults, or the live
+      # session's caps (`make session`). A fast test keeps these defaults equal to config.py's.
+      CAREERWRIGHT_DEFAULT_RUN_SPEND_LIMIT_NANO_USD: ${CAREERWRIGHT_DEFAULT_RUN_SPEND_LIMIT_NANO_USD:-150000000}
+      CAREERWRIGHT_DEFAULT_PERIOD_SPEND_LIMIT_NANO_USD: ${CAREERWRIGHT_DEFAULT_PERIOD_SPEND_LIMIT_NANO_USD:-1000000000}
+    secrets: [pg_api]
+    volumes:
+      - ${CAREERWRIGHT_HOME:?run make setup}/keys:/run/careerwright/keys:ro
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      auth: {condition: service_healthy}
+    stop_grace_period: 10s
+    healthcheck:
+      test: ["CMD", "python", "-m", "careerwright.api.health", "http://127.0.0.1:8000/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "careerwright.worker"]
+    networks: [internal, acquisition]
+    environment:
+      <<: [*local, *models]
+      CAREERWRIGHT_APP_DATABASE_URL: postgresql+psycopg://careerwright_worker@postgres:5432/careerwright_app
+      CAREERWRIGHT_APP_DATABASE_PASSWORD_FILE: /run/secrets/pg_worker
+      CAREERWRIGHT_DBOS_DATABASE_URL: postgresql+psycopg://careerwright_dbos_runtime@postgres:5432/careerwright_dbos
+      CAREERWRIGHT_DBOS_DATABASE_PASSWORD_FILE: /run/secrets/pg_dbos_runtime
+      CAREERWRIGHT_MASTER_KEY_DIR: /run/careerwright/keys
+      CAREERWRIGHT_ACQUISITION_URL: http://acquisition:8100
+    secrets: [pg_worker, pg_dbos_runtime]
+    volumes:
+      - ${CAREERWRIGHT_HOME:?run make setup}/keys:/run/careerwright/keys:ro
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      acquisition: {condition: service_healthy}
+    # The worker exits within its own shutdown deadline; Docker kills it after this grace.
+    stop_grace_period: 15s
+    healthcheck:
+      test: ["CMD", "python", "-m", "careerwright.worker", "--check"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # The restricted acquisition worker (Global Constraint 8; ADR 0009): fetches permitted
+  # pages and runs Adzuna searches for the DBOS worker, and records nothing. It gets no
+  # database secret, master key, model key or profile: no secret, and one read-only mount,
+  # the Adzuna credentials that setup placed under CAREERWRIGHT_HOME (ruling R4). In live mode
+  # (compose.live.yaml) it has a route out; in demo mode it has none. It listens without
+  # authentication, so it is on the `acquisition` network only: the DBOS worker alone can
+  # reach it.
+  acquisition:
+    <<: *backend
+    command: ["python", "-m", "careerwright.acquisition"]
+    networks: [acquisition]
+    environment:
+      CAREERWRIGHT_ENVIRONMENT: local
+      CAREERWRIGHT_ADZUNA_CREDENTIALS_DIR: /run/careerwright/adzuna
+    volumes:
+      - ${CAREERWRIGHT_HOME:?run make setup}/adzuna:/run/careerwright/adzuna:ro
+    stop_grace_period: 5s
+    healthcheck:
+      test: ["CMD", "python", "-m", "careerwright.acquisition", "--check"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  edge:
+    <<: *backend
+    command: ["python", "-m", "careerwright.edge"]
+    environment:
+      CAREERWRIGHT_EDGE_ROUTES: 8000=api:8000,9099=auth:9099,5432=postgres:5432,3000=web:3000
+    networks: [internal, edge]
+    ports:
+      - 127.0.0.1:${CAREERWRIGHT_API_PORT:-58000}:8000
+      - 127.0.0.1:${CAREERWRIGHT_AUTH_PORT:-59099}:9099
+      - 127.0.0.1:${CAREERWRIGHT_PG_PORT:-56432}:5432
+      - 127.0.0.1:${CAREERWRIGHT_WEB_PORT:-53000}:3000
+    stop_grace_period: 5s
+    healthcheck:
+      test: ["CMD", "python", "-m", "careerwright.edge", "--check"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # The Next.js web app. The browser reaches it through the edge on 127.0.0.1; it forwards
+  # `/api/v1/*` to the API on this network (the browser's Origin unchanged) and answers only
+  # to the loopback Host values below. The Auth emulator URL is the browser's view of it.
+  web:
+    build: ./apps/web
+    image: careerwright-l0/web:local
+    networks: [internal]
+    init: true
+    environment:
+      CAREERWRIGHT_API_INTERNAL_URL: http://api:8000
+      CAREERWRIGHT_AUTH_EMULATOR_URL: http://127.0.0.1:${CAREERWRIGHT_AUTH_PORT:-59099}
+      CAREERWRIGHT_FIREBASE_PROJECT_ID: demo-careerwright
+      CAREERWRIGHT_WEB_ALLOWED_HOSTS: 127.0.0.1:${CAREERWRIGHT_WEB_PORT:-53000},localhost:${CAREERWRIGHT_WEB_PORT:-53000}
+    depends_on:
+      api: {condition: service_healthy}
+    stop_grace_period: 5s
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+networks:
+  internal:
+    internal: true
+  acquisition:
+    internal: true
+  edge: {}
+
+volumes:
+  pgdata: {}
+
+secrets:
+  pg_superuser: {file: "${CAREERWRIGHT_HOME:?run make setup}/secrets/pg_superuser"}
+  pg_migrator: {file: "${CAREERWRIGHT_HOME:?run make setup}/secrets/pg_migrator"}
+  pg_api: {file: "${CAREERWRIGHT_HOME:?run make setup}/secrets/pg_api"}
+  pg_worker: {file: "${CAREERWRIGHT_HOME:?run make setup}/secrets/pg_worker"}
+  pg_dbos_owner: {file: "${CAREERWRIGHT_HOME:?run make setup}/secrets/pg_dbos_owner"}
+  pg_dbos_runtime: {file: "${CAREERWRIGHT_HOME:?run make setup}/secrets/pg_dbos_runtime"}

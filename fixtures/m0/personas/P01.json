@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.2",
+  "synthetic": true,
+  "jurisdiction": "GB-ENG",
+  "ui_language": "en-GB",
+  "currency": "GBP",
+  "taxonomy_ids_are_fixture_ids": true,
+  "data_as_of": "2027-01-01",
+  "id": "P01",
+  "description": "Sure, employed; compare study against retained and reduced earnings",
+  "entry_mode": "sure",
+  "cities": [
+    "Manchester"
+  ],
+  "target_titles": [
+    "Data quality analyst"
+  ],
+  "personality_optional": {
+    "enjoyed_tasks": [
+      "finding inconsistencies",
+      "explaining evidence"
+    ],
+    "preferred_environment": [
+      "structured",
+      "collaborative"
+    ]
+  },
+  "current_net_income_minor": 200000,
+  "living_outgoings_minor": 100000,
+  "opening_cash_minor": 600000,
+  "reserve_minor": 50000,
+  "direct_spend_cap_minor": 150000,
+  "monthly_payment_cap_minor": 150000,
+  "borrowing_allowed": false,
+  "accepted_work_patterns": [
+    "retain_work",
+    "temporary_study_break",
+    "reduced_hours"
+  ],
+  "expected": {
+    "trace_id": "TRACE-01",
+    "front_1": [
+      "A",
+      "B",
+      "C"
+    ],
+    "front_2": [
+      "D"
+    ],
+    "front_3": [
+      "E"
+    ],
+    "selected_route": "B",
+    "ready_now": false
+  },
+  "work_pattern_approval": "confirmed_in_synthetic_fixture",
+  "weekly_total_availability_hours": 40
+}
