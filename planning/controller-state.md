@@ -11,12 +11,17 @@ product owner's yes), word for word, so briefs stop carrying controller state an
 - "Superseded rulings": the process wording that "R12–R17 How we build and review (current)"
   in the sprint tasks file replaced.
 
+Since the move: the plan's v1.1 to v1.5 orders ("Order from here (v1.5)" and the rest) are in
+its "Revision history" appendix; only the v1.6 order stays in its section 6. Superseded
+numbers in the text below (two implementers, R15) read as R12–R17's current rules. The only
+edit to the moved text is one link to the archived assessment handover.
+
 ## Order, dependencies and dispatch preconditions (plan v1.6, ADR 0008)
 
 Execution: from plan v1.5, up to two implementers at once, on disjoint modules (R15). Each
 remaining card's **Parallel** line names the tasks it may overlap. Until v1.5 the
 controller ran one implementer at a time; where the assessment handover
-(`docs/plan/l0-assessment-handover.md`) marked tasks as parallel (∥), they ran one after the
+(`docs/plan/archive/l0-assessment-handover.md`) marked tasks as parallel (∥), they ran one after the
 other.
 
 Dependency rules (rules 1–6 are met; rules 7, 9–13 and 15 are as amended in plan v1.5, and
