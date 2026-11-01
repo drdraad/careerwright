@@ -156,3 +156,55 @@ DBOS `application_version` stays `careerwright-l0-1`: no workflow's step sequenc
 ## Skip when reviewing
 
 `apps/web/src/generated/` (regenerated client).
+
+## Fix round 1
+
+Branch `wt-12c` rebased onto `claude/confident-ramanujan-ux3saw` at 6a3fef8. Head: b0f7715
+(fix 5f20fd6, register b0f7715). Migration 0040 is still free on the integration branch.
+
+### Changes
+1. **Critical 1 (a grant beside a loan broke spend-cap pruning).**
+   - The bug: ruling 5 set a grant paid to the person against the whole fee, the loan's part
+     included. That could make an option's own direct spending negative, and the search's
+     spend-cap rule summed a clamped £0. It then cut a feasible route and said "no route"
+     with complete coverage.
+   - The fix (`checker.py`): a grant paid to the person lowers direct spending only by what the
+     person pays of that option's fees, as before Task 12c. So no option's spending goes below
+     £0, and rule 3 holds again.
+   - The economic cost still sets the grant against the whole fee, once.
+   - The oracle reads the same rule its own way (`route_oracle.py`: "the tuition the student
+     pays" apart from "the tuition after grants at the provider").
+   - The reviewer's case is now `tests/support/planning.py::grant_beside_loan`, an explicit
+     example on both properties (search vs oracle, checker vs oracle).
+   - The pruning rule itself is unchanged, so the version stays `sound-pruning-5`.
+   - ADR 0016's rule 3 line and ADR 0013's ruling 2 now say this in plain words.
+2. **Minor 1 (a false condition).** A loan not yet approved now adds the `loan` condition (and
+   so `conditional_loan`) only when it pays something or its amount is unknown. The oracle
+   gained `rests_on_loan`, and the checker-vs-oracle property compares it on every candidate.
+
+### Tests and checks
+- New: `test_planning_tuition_loan.py::test_a_grant_beside_a_loan_never_takes_an_option_s_direct_spending_below_zero`
+  and `::test_a_loan_not_yet_approved_that_pays_nothing_makes_nothing_conditional`, plus the
+  `grant_beside_loan` examples.
+- RED before the fix: 5 failed.
+  - The two new tests.
+  - The extra-cost test (its changed assertion, below).
+  - Search vs oracle: it failed on the reviewer's example (the oracle found
+    `[course, degree]` and the search found no route).
+  - Checker vs oracle: it failed on the new `rests_on_loan` field.
+- GREEN: planning and route domain tests, 225 passed.
+- The reviewer's `/tmp/r12c/repro.py` now gives `no_route_in_bounded_model` from both the
+  search and the oracle. Under the corrected rule, the £1,000 grant can't pay for the £1,200
+  course, so the course breaks the £1,000 cap.
+- `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` after the rebase: passed
+  (backend 1,762 passed, 8 skipped (the same skips as before); Vitest 447).
+- Integration and acceptance not run: Docker down.
+
+### Changed test assertion (disclosed)
+- `test_a_loan_never_pays_an_extra_cost_and_a_grant_to_the_person_counts_once`: direct cost
+  £0 → £50. The grant may no longer lower the £50 extra, because it lowers only the tuition the
+  person pays (none). It also asserts the support row is £0. The economic cost is unchanged
+  (fee + £50 − £500).
+
+### Not done (listed for later)
+Minors 2, 3 and 4, as the fix round says.
