@@ -20,7 +20,11 @@
 #                           credentials read from .env in code, each request ledgered at $0
 #   make live-extract       one in-process page extraction of the synthetic fixture page on the
 #                           test model (scope live-extract: at most 3 requests, $0.30), ledgered
-#   make session            the product owner's live session: `make dev`'s stack with Muse Wonder
+#   make live-role-research one in-process "Research this role" on the test model: one search
+#                           told only a synthetic title (TITLE=...) and England, then up to five
+#                           of its pages read through the guarded fetcher and checked by code
+#                           (scope live-role-research: at most 3 requests, $0.10), ledgered
+#   make session           the product owner's live session: `make dev`'s stack with Muse Wonder
 #                           as the production model (synthetic workspaces keep the test model),
 #                           and caps per workspace on each live workspace not marked synthetic
 #                           ($0.75 a run, $5 per workspace; it prints the session's total);
@@ -44,7 +48,7 @@ WEB := cd apps/web &&
 export NEXT_TELEMETRY_DISABLED := 1
 export STORYBOOK_DISABLE_TELEMETRY := 1
 
-.PHONY: setup dev demo check acceptance live-smoke live-eval live-adzuna live-extract session session-ledger stop reset-demo status rotate-master-key reseal spike-world
+.PHONY: setup dev demo check acceptance live-smoke live-eval live-adzuna live-extract live-role-research session session-ledger stop reset-demo status rotate-master-key reseal spike-world
 
 setup:
 	$(BACKEND) uv python install 3.12 && uv sync --locked
@@ -82,6 +86,9 @@ live-adzuna:
 
 live-extract:
 	$(BACKEND) $(UV) python -m tools.live_smoke --extract
+
+live-role-research:
+	$(BACKEND) $(UV) python -m tools.live_role_research $(if $(TITLE),--title "$(TITLE)",)
 
 session:
 	$(BACKEND) $(UV) python -m tools.session start
