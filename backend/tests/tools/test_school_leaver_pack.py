@@ -206,21 +206,17 @@ def test_each_label_is_exactly_its_text_in_the_kept_body(claim: dict[str, Any]) 
 def test_the_pages_are_govuk_kept_privately_and_fetched_through_the_proxy() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     slots = {s["id"]: s for s in manifest["slots"]}
-    pending = {s["id"]: s for s in manifest["pending_slots"]}
 
     for source in (s for s in PACK.sources if s.source_id in NEW_SOURCES):
         assert source.rights_class.value == "govuk"
         assert source.retention.value == "body"  # never in git: var/evidence/corpus only
         assert "via_proxy true, address_checked false" in slots[source.source_id]["fetch_route"]
-    assert set(pending) == {"C12"}
-    assert pending["C12"]["attempt"] == {"status": "succeeded", "reason": None}
-    assert pending["C12"]["rights_status"] == "pending human rights review"
-    assert pending["C12"]["retention"] == "excerpts"
-    assert pending["C12"]["earlier_attempt"]["http_status"] == 404
-    assert pending["C12"]["status"].startswith("fetched, not used")
+    # UCAS's page (C12) left the pending slots when the session decided its rights and its
+    # date (0.4.0, tests/tools/test_school_leaver_review.py); it is the twelfth course page.
+    assert manifest["pending_slots"] == []
     assert manifest["collected_samples"] == {
         "full_job_postings": 20,
-        "course_pages": 11,
+        "course_pages": 12,
         "funding_pages": 13,
     }
 
@@ -265,14 +261,11 @@ def test_the_package_asks_only_what_a_page_can_settle_in_plain_words() -> None:
 
 
 @pytest.mark.req("OPTN-14")
-def test_the_manifest_says_where_the_ucas_date_was_found_and_enters_no_value() -> None:
-    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    [c12] = [s for s in manifest["pending_slots"] if s["id"] == "C12"]
-
-    assert "13 Jan" in c12["why_not_used"]
-    assert "which step" in c12["why_not_used"]
+def test_the_proposed_version_entered_no_value_for_the_ucas_date() -> None:
+    # 0.3.0 asked the product owner to read the date; only their answer (0.4.0) enters one.
     offering = next(o for o in PACK.offerings if o.record_id == "offering:C08")
     assert isinstance(offering.application_deadline, Unknown)
+    assert "C12" not in {s.source_id for s in PACK.sources}
 
 
 def test_every_new_funding_record_cites_only_its_own_pages() -> None:
