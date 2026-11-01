@@ -69,3 +69,58 @@ Status: DONE_WITH_CONCERNS (see Concerns).
 
 ## Skip when reviewing
 `apps/web/src/generated/**` (regenerated client).
+
+## Fix round 1
+
+Rebased onto `claude/confident-ramanujan-ux3saw` at e82a390, which includes the acceptance fix fd4f939 and 61597ee. The rebase was clean, and migration 0045 is still the next free number.
+
+Commits:
+- `1b99c40`: the Skills chapter's facts (rebased `dbc1bd1`)
+- `2bc364b`: the ADR lines and register rows (rebased `d011472`)
+- `b24668e`: this fix round, which is the head
+
+### Fix 1: span offsets now say their unit (review I1)
+- **The change:** `AdvertSpan.start` and `.end` are UTF-16 code units, the same unit a browser's selection gives. This is stated in the field descriptions and the OpenAPI document.
+- **On the server:** `capability/adverts.py` converts them to characters. An offset past the text is refused as `span_outside_text`. An offset inside an astral character (one that takes two UTF-16 units) is refused as `span_splits_character`.
+- **What is stored:** offsets are kept as the person chose them, in UTF-16 units, and read back through the same conversion.
+- **Wording updated:** the docstrings of the command, the route and migration 0045.
+- **Red first:** I wrote two tests before the fix:
+  - `test_offsets_are_utf16_code_units_after_and_inside_astral_characters`: a rocket emoji, then "SQL" written in mathematical bold letters, before and inside the spans.
+  - `test_a_span_splitting_an_astral_character_is_refused_with_its_reason`.
+  - Before the fix they failed. The excerpt came back as `'yst.\nYo'` instead of `'analyst'`, and the split span was not refused. After the fix both pass.
+
+### Fix 2: the capability model reads pack 0.2.0 and reference 0.2.0
+- **The change:** `PACK_VERSION` and `REFERENCE_VERSION` in `capability/commands.py` are now "0.2.0". Both are read through `load_pack` and `load_reference` and their pins.
+- **Reference 0.2.0 fits:** it exists, matches its pin and loads against pack 0.2.0. The four targets, their crosswalks, the rubrics and the gates are the same as in 0.1.0.
+- **What actually differs:**
+  - each record's review state;
+  - the `proposed_sources` uncertainty is dropped from rows whose sources are now reviewed;
+  - session 2's five corrected outcome mappings.
+- **What I checked stays the same:** in the domain, each target's readiness state, gaps and candidates are unchanged, and the planning catalogue's C04 values are unchanged.
+- **Scope:** this is app-wide, not Skills only. Planning and the other capability reads use the same `committed_data`, so no two chapters disagree.
+- **New test:** `test_skills_reads_the_reviewed_pack_0_2_0_and_its_reference_through_their_pins` checks the versions, and checks both files' SHA-256 against `PINS`.
+
+### Expected values that changed, and why
+1. **`tests/domain/test_targets.py::test_the_migration_backfills_with_the_committed_pack_targets_and_crosswalks`.** It said `committed.version == migration.PACK_VERSION`. Migration 0034 is fixed at 0.1.0, while the app now reads 0.2.0. It now asserts both versions explicitly, and still asserts that the targets and crosswalks are identical.
+2. **`tests/integration/test_capability.py`, the pack label:** 0.1.0 / 2026-10-29 / `records_reviewed == 0` becomes 0.2.0 / 2026-10-30 / 55 reviewed, 66 proposed.
+3. **`tests/integration/test_capability.py`, the NMC gate's citations:** they were all `proposed`. In 0.2.0 some are reviewed and some proposed. It now asserts the set {reviewed, proposed}, and that the row itself stays `proposed`. The `as_of` dates are unchanged: they are retrieval dates.
+4. **`tests/integration/test_capability.py`, the questions envelope's `pack.dated`:** 2026-10-29 becomes 2026-10-30.
+5. **`tests/integration/test_planning_options.py`:** the pack version and catalogue label change from 0.1.0 / 2026-10-29 to 0.2.0 / 2026-10-30. The C04 fee, its citation and the unknown start are unchanged (computed with `pack_catalogue`).
+6. **`tests/integration/test_migrations.py`, three `stored == decided` checks:**
+   - Records the migrations backfill carry `pack_version` "0.1.0". The resolver now stamps "0.2.0", and API writes in that test also stamp "0.2.0".
+   - A `decisions()` helper now compares the records with the pack version left out. The targets and crosswalks are identical, so the decisions themselves are unchanged.
+   - Nothing in the code reads a record's `pack_version`.
+7. **`tests/integration/test_skills.py`:** the pack label becomes 0.2.0 / 2026-10-30.
+8. **`tests/domain/test_skills_chapter.py`:** it now reads `committed_data()`. Its `as_of` check compares against the records' retrieval date (2026-10-29) instead of the pack's date.
+
+Readiness stays strict, as you asked: the rubrics in reference 0.2.0 are still `proposed`.
+
+### Checks
+- `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` (Node 24): **exit 0** on the final tree. Backend 2,159 passed, 8 skipped. Vitest 471 passed.
+- The first run had one Vitest failure: `FirstQuestion.test.tsx` "shows the calm panel, stills the world…". I didn't touch that file or its code. A re-run passed, so I treated it as flaky (rule R16).
+- The client was regenerated: the OpenAPI document now carries the offset descriptions.
+- Integration and acceptance were not run; the controller runs them. The integration expectations above are computed from the domain functions, not from a run.
+- No live calls.
+
+### Rule note
+Every source change in this round used Edit or Write. `ruff format` and `pnpm run generate` are generators.
