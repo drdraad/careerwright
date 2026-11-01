@@ -41,6 +41,7 @@ from tests.support.planning import (
     ROW,
     START,
     catalogue_of,
+    grant_beside_loan,
     month_end,
     option,
     person,
@@ -195,12 +196,68 @@ def test_a_loan_never_pays_an_extra_cost_and_a_grant_to_the_person_counts_once()
     assert result.loans_to_repay == [
         LoanToRepay(variant_id="degree", due=JAN, amount=gbp(FEE), conditional=False)
     ]
-    # The £500 grant is a receipt and lowers direct cost once, never below £0.
+    # The £500 grant is a receipt. Against direct spending it lowers only the tuition the
+    # person pays, which is none, never the extra (as before Task 12c): fix round 1.
     assert column(result, "liquidity", "later_receipts_minor") == [50_000, 0, 0]
-    assert result.direct_cost == gbp(0)
+    assert column(result, "direct", "support_minor") == [0, 0, 0]
+    assert result.direct_cost == gbp(5_000)
     # The economic cost counts the fee and the extra once, less the grant once.
     assert result.economic_cost is not None
     assert result.economic_cost.minor_units == FEE + 5_000 - 50_000
+
+
+@pytest.mark.req("FUNDING-06", "FUNDING-03", "OPT1-07")
+def test_a_grant_beside_a_loan_never_takes_an_option_s_direct_spending_below_zero() -> None:
+    # Review 12c, Critical 1: a £1,000 grant to the student beside a loan paying the whole
+    # £9,000 fee once read as -£1,000 of the degree's own spending, which the search's
+    # spend-cap pruning cannot see, so it said "no route" while the checker passed one.
+    monthly = grant_beside_loan()
+
+    degree_alone = check_route(monthly, ["degree"])
+    both = check_route(monthly, ["course", "degree"])
+    economic = check(
+        person(horizon=3, opening=1_000_000, objective="economic", baseline=0),
+        degree(
+            tuition_fee_loan=tuition_loan(900_000),
+            payments=((0, 900_000),),
+            supports=(support(paid_to="person", amount=100_000, month=0),),
+        ),
+    )
+    result = search_routes(monthly)
+
+    assert degree_alone.direct_cost == gbp(0)
+    assert column(degree_alone, "direct", "support_minor") == [0, 0, 0]
+    assert column(degree_alone, "liquidity", "later_receipts_minor") == [100_000, 0, 0]
+    # The £1,200 course is the student's own, above their £1,000 cap: the grant beside the
+    # loan never pays for another option.
+    assert both.direct_cost == gbp(120_000)
+    assert FindingCode.DIRECT_SPEND_CAP in codes(both)
+    assert result.outcome is Outcome.NO_ROUTE_IN_BOUNDED_MODEL
+    assert result.schedules == []
+    # The cost over the horizon: the fee once, less the grant once.
+    assert economic.economic_cost is not None
+    assert economic.economic_cost.minor_units == 800_000
+
+
+@pytest.mark.req("FUNDING-06", "FUNDING-05")
+def test_a_loan_not_yet_approved_that_pays_nothing_makes_nothing_conditional() -> None:
+    # Review 12c, Minor 1: no fee for it to pay, or every fee waived at the provider.
+    hoped = tuition_loan(FEE, application=AwardState.APPLIED)
+    waiver = support(paid_to="provider", amount=None, kind=InstrumentKind.FEE_WAIVER)
+    no_fee = check(student(), degree(payments=(), tuition_fee_loan=hoped))
+    waived = check(student(), degree(supports=(waiver,), tuition_fee_loan=hoped))
+    unpriced = check(
+        student(),
+        degree(payments=(), tuition_fee_loan=tuition_loan(None, application=AwardState.APPLIED)),
+    )
+
+    for result in (no_fee, waived):
+        assert result.feasibility is Feasibility.FEASIBLE
+        assert result.conditions == []
+        assert RouteQualification.CONDITIONAL_LOAN not in result.qualifications
+        assert result.loans_to_repay == []
+    # With its amount unknown, what it pays is not known, so the route still rests on it.
+    assert [c.kind for c in unpriced.conditions] == ["loan"]
 
 
 @pytest.mark.req("FUNDING-06", "FUNDING-05")

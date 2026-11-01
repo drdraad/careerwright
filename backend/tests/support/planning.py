@@ -547,6 +547,24 @@ def loan_statuses() -> MonthlyInput:
     return compile_input(inputs, catalogue_of(*options), readiness=readiness)
 
 
+def grant_beside_loan() -> MonthlyInput:
+    """Review 12c, Critical 1: a £9,000 degree whose fee a loan pays, beside a £1,000 grant to
+    the student, and a £1,200 course that alone reaches the target, under a £1,000 cap."""
+    options = [
+        option(
+            "degree",
+            finish=month_end(START, 3),
+            payments=((0, 900_000),),
+            supports=(support(paid_to="person", amount=100_000, month=0),),
+            tuition_fee_loan=tuition_loan(900_000),
+        ),
+        option("course", finish=month_end(START, 2), payments=((0, 120_000),)),
+    ]
+    inputs = person(horizon=3, opening=1_000_000, direct_cap=100_000, monthly_cap=1_000_000)
+    readiness = readiness_of({"offering:course": (ROW,)})
+    return compile_input(inputs, catalogue_of(*options), readiness=readiness)
+
+
 def month_start(first: date, months: int) -> date:
     """The first day of the month `months` after `first`'s month."""
     year, month = divmod(first.month - 1 + months, 12)

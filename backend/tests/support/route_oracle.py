@@ -58,6 +58,7 @@ class Checked:
     cost: int | None  # the comparison's cost: economic, or direct only
     readiness: ReadinessState | None  # the last state the route reaches
     borrowed: int | None  # what tuition fee loans pay the providers; None: not known
+    rests_on_loan: bool  # on a tuition fee loan not yet approved that pays something
 
 
 @dataclass(frozen=True)
@@ -278,6 +279,8 @@ class _RouteCheck:
         self.direct = 0  # the known part of direct cost
         self.borrowed = 0  # what tuition fee loans send to providers: a loan to repay
         self.borrowed_known = True
+        self.grant_on_loan_part = 0  # grants set against tuition a loan paid: the cost only
+        self.rests_on_loan = False
         self.costs_known = True
         self.debt = self._debt()
 
@@ -314,7 +317,7 @@ class _RouteCheck:
         # The cost over the horizon still holds the tuition the loan paid, once: a loan is
         # repaid, so it is not a discount (spec section 12), only not the student's money now.
         economic = (
-            max(0, self.direct + self.borrowed) + difference
+            max(0, self.direct + self.borrowed - self.grant_on_loan_part) + difference
             if self.costs_known and difference is not None
             else None
         )
@@ -331,6 +334,7 @@ class _RouteCheck:
             cost=cost,
             readiness=readiness,
             borrowed=self.borrowed if self.borrowed_known else None,
+            rests_on_loan=self.rests_on_loan,
         )
 
     def _each_month(self) -> range:
@@ -425,7 +429,9 @@ class _RouteCheck:
                 month = v.start_index + n if _placed(v) and v.start_index is not None else None
                 due.append((month, "instalment", recurring.amount.minor_units))
         left = [s.amount.minor_units if s.amount is not None else 0 for s in to_provider]
-        fees = 0
+        fees = 0  # the tuition the student pays themselves
+        whole = 0  # the tuition after grants at the provider, whoever pays it
+        lent_here = 0
         for month, kind, amount in sorted(due, key=lambda d: (d[0] is None, d[0] or 0)):
             covered = 0
             if kind != "extra":
@@ -442,9 +448,11 @@ class _RouteCheck:
                 if loan_room is not None:
                     loan_room -= from_loan
             self.borrowed += from_loan
+            lent_here += from_loan
             paid = amount - covered - from_loan
             if kind != "extra":
-                fees += amount - covered  # a grant to the person is set against the whole fee
+                fees += paid
+                whole += amount - covered
             if month is None:
                 self.direct += paid
                 self._too_much_at_once(paid)
@@ -473,7 +481,20 @@ class _RouteCheck:
                     self.late[month] += amount
                 self.support[month] += applied
             self.direct -= applied
+            # The student's own spending falls only by what they paid of the tuition; the cost
+            # of the change falls by the grant against the whole tuition, the loan's part too.
+            self.grant_on_loan_part += min(amount, whole) - applied
             fees = max(0, fees - amount)
+            whole = max(0, whole - amount)
+        # A loan still waiting for approval matters to the route only if it pays something,
+        # or nobody knows what it pays.
+        if (
+            loan is not None
+            and loan_room is not False
+            and loan.application is not AwardState.APPROVED
+            and (loan_room is None or lent_here > 0)
+        ):
+            self.rests_on_loan = True
 
     def _one_scheme_many_options(self) -> None:
         """A scheme counted on two options pays for both only if the person said so; two
