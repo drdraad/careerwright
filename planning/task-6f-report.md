@@ -213,3 +213,81 @@ None. No web request, no model call, no Docker.
 
 ## Paths a reviewer can skip
 `apps/web/src/generated/**` (regenerated client).
+
+# Fix round 1 (the only one, R16)
+
+Commits on `claude/confident-ramanujan-ux3saw` (from 9ef9e51):
+- `935b04b` a status is always a reading; the demo never reads a retake or a fail as achieved;
+  ADR 0006 records 0040's in-place exception (I1, I2, M1)
+- `29727f5` Closer to what I do resets to Balanced once it isn't offered (M3)
+- `3d136e3` Register: PROF-13 and PROF-14 name the new tests (last commit)
+
+Every source change used Edit; no heredoc, no stash, no generator was needed (no API change).
+
+## I1: a status the person never said is never "You said"
+- Fix: `profile/interview.py` `_basis` returns `inferred` for every `qualifications` and every
+  `work_status` change (the status is always Careerwright's reading). The qualification-name
+  quoting branch and its helper `_held_name` (now unused) are removed.
+- ADR 0006's amendment now says: a qualification's status and a work status are always shown
+  as Careerwright's reading, never as "You said", even where the words appear in the cited
+  messages.
+- Test (new): `test_interview_contract.py::test_a_status_the_person_never_said_is_never_shown_as_their_words`,
+  the review's two reproductions ("I am taking A-level biology this year." with `achieved:
+  A-level biology`; "working" from "I am working towards my A-levels.").
+- RED: `basis` was `stated` for both (pytest: `<Basis.STATED> is <Basis.INFERRED>`; the work
+  status checked directly through `check_turn`, `stated`).
+- GREEN: both `inferred`.
+- **Changed assertion (disclosed):** `test_a_qualification_is_proposed_achieved_or_expected_stated_only_from_their_words`
+  asserted `Basis.STATED`; it now asserts `Basis.INFERRED` (the status is a reading, the
+  review's fix). Its name is unchanged; the rest of the test is unchanged.
+- Ruling: in the model path, code doesn't decide whether a status is achieved (that would be a
+  new language rule). "Never achieved without their words" is met by never vouching for the
+  status: the person sees it as Careerwright's reading and confirms or changes it. The demo
+  path's patterns are fixed under I2.
+
+## I2: the demo never reads a retake or a fail as achieved
+- Fix: `profile/fixture_interviewer.py` `_ACHIEVED` takes only an explicit verb ("I got",
+  "I've got", "I have got", "I passed", "I've passed", "I have passed"), never a bare "have",
+  and never "got to …". A message mentioning a retake, a resit or a fail (`_NOT_ACHIEVED`) is
+  never read as achieved; an expected qualification ("I'm taking …") is still read as
+  expected. Nothing newly matches (the patterns only narrowed).
+- Test (new): `test_interview_agent.py::test_the_demo_never_reads_a_retake_or_a_fail_as_achieved`,
+  four sentences: the review's two ("I have to retake my GCSE maths.", "I have failed my GCSE
+  maths.") and two of mine ("I've got to resit my GCSE maths.", "I got a U in GCSE maths, so I
+  failed it.").
+- RED: all four gave `achieved: …` (`to retake my GCSE maths`, `failed my GCSE maths`,
+  `to resit my GCSE maths`, `a U in GCSE maths`).
+- GREEN: no achieved proposal for any. The existing demo test ("I've got GCSE maths and
+  English." achieved) still passes unchanged.
+
+## M3: "Closer to what I do" goes back to Balanced once it isn't offered
+- Fix: `Directions.tsx` `Slate` computes whether work is known before the slate query; if the
+  emphasis is "practical" and work isn't known, it sets the emphasis back to Balanced during
+  render, so the next slate request asks for `emphasis=balanced` and Balanced shows pressed.
+- Test (new): `Directions.test.tsx` "[PROF-14] resets Closer to what I do to Balanced once it
+  isn't offered, so no hidden view stays applied": choose it with a role given, then re-render
+  with "I haven't had a job yet".
+- RED: Balanced's `aria-pressed` stayed "false".
+- GREEN: Balanced pressed, the button gone, the last slate request `emphasis=balanced`.
+
+## M1: the append-only record
+- ADR 0006's amendment gains one line: migration 0040 adds the two not-yet-asked answers to
+  stored documents in place, the one exception to append-only saved answers. No code change.
+
+## Listed, not fixed now
+- M2: a replayed receipt from before migration 0040 returns a document without `work_status`
+  and `qualifications`; the web reads `document[name].state` for every field, so that replay,
+  put into the cache, would throw. It needs the same Idempotency-Key retried across an
+  upgrade, very unlikely locally. For the final review.
+- M4, M5, M6, M7: for the final review and session W2's sheet.
+
+## Commands and results (final code)
+- `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` after each change; the last run,
+  after the register commit: exit 0; backend 1,794 passed, 8 skipped; Vitest 43 files, 457
+  tests passed; ruff, mypy, Biome, `tsc`, client drift and the fixture validator clean. (One
+  earlier run failed on ruff PT018 in my new test; split the assertion and re-ran.)
+- Focused: `backend/.venv/bin/python -m pytest -q tests/domain/test_interview_contract.py
+  tests/domain/test_interview_agent.py` (79 passed); `pnpm exec vitest run
+  src/components/Directions.test.tsx` (34 passed).
+- Not run: integration, `make acceptance`, Playwright and captures (Docker down). No live
+  calls (no cost). Session W2's words: not run — requires human.
