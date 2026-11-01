@@ -63,6 +63,9 @@ class AcquisitionSettings(BaseSettings):
     adzuna_credentials_dir: Path | None = Field(
         default=None, validation_alias="CAREERWRIGHT_ADZUNA_CREDENTIALS_DIR"
     )
+    # The fetcher's proxy mode is the controller's tools' alone (ADR 0009, 2026-11-01
+    # amendment): a value here is refused at start, never ignored.
+    fetch_proxy: None = Field(default=None, validation_alias="CAREERWRIGHT_FETCH_PROXY")
 
 
 def load_adzuna_credentials(directory: Path | None) -> tuple[SecretStr, SecretStr] | None:
@@ -218,7 +221,7 @@ def main() -> None:
     configure_logging("acquisition")
     settings = AcquisitionSettings()
     manifest = load_manifest()  # fail closed on an unreadable source manifest
-    fetcher = Fetcher(user_agent=manifest.user_agent)  # production: no extra origins
+    fetcher = Fetcher(user_agent=manifest.user_agent)  # production: no extra origins, no proxy
     service = AcquisitionService(
         fetcher, credentials=load_adzuna_credentials(settings.adzuna_credentials_dir)
     )

@@ -18,6 +18,10 @@ Outcomes, per field: where the label states a value, `correct`, `incorrect` or `
 `unsupported` (the path asserts a value the page does not support). Raw counts with their
 denominators; 33 pages are too few for a rate to mean more (plan section 9).
 
+`--proxy URL --proxy-ca PATH` fetch through an explicit HTTPS proxy (`tools.fetch_proxy`):
+the proxy then picks each address, so the result says `via_proxy` true and `address_checked`
+false.
+
 Run from `backend/`: `uv run --locked python -m tools.accuracy_read`.
 """
 
@@ -36,6 +40,8 @@ from careerwright.evidence.fetcher import Fetcher
 from careerwright.evidence.pages import parse_page
 from careerwright.evidence.records import AdvertiserKind, JobCopy
 from careerwright.evidence.sources import load_manifest
+from tools.fetch_proxy import add_arguments as add_proxy_arguments
+from tools.fetch_proxy import fetcher_from, route_fields
 from tools.localenv import REPO_ROOT
 
 EVIDENCE_DIR = REPO_ROOT / "var" / "evidence" / "corpus"
@@ -207,6 +213,7 @@ def read(
         "label": "unreviewed labels, development split",
         "pack_version": pack.pack_version,
         "run_at": datetime.now(UTC).isoformat(),
+        **route_fields(fetcher),
         "pages": pages,
         "totals": {f"{k[0]}:{k[1]}": n for k, n in sorted(totals.items())},
         "by_field": {f"{k[0]}:{k[1]}": n for k, n in sorted(by_field.items())},
@@ -217,8 +224,9 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pack-version", default=PACK_VERSION)
     parser.add_argument("--out", type=Path, default=None, help="also write the JSON here")
+    add_proxy_arguments(parser)
     args = parser.parse_args(argv)
-    result = read(load_pack(args.pack_version))
+    result = read(load_pack(args.pack_version), fetcher=fetcher_from(args, parser))
     text = json.dumps(result, indent=2, ensure_ascii=False, default=str)
     if args.out:
         args.out.write_text(text + "\n")

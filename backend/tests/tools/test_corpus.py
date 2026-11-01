@@ -12,14 +12,22 @@ import pytest
 from pydantic import SecretStr
 
 from careerwright.evidence.adzuna import AdzunaQuery, recorded_url
-from careerwright.evidence.fetcher import Fetcher
+from careerwright.evidence.fetcher import Fetcher, fetch_proxy
 from careerwright.evidence.records import Retention, RightsClass
 from careerwright.evidence.sources import PageRights
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
+from tests.support.certificates import make_ca
+from tests.support.fake_proxy import fake_proxy
 from tests.support.source_server import Scripted, SourceServer, source_server
 from tests.tools.test_live_adzuna import APP_ID, APP_KEY, fake_acquire
-from tools.corpus import acquire_for_corpus, adzuna_for_corpus, agent_classification, locate
+from tools.corpus import (
+    acquire_for_corpus,
+    adzuna_for_corpus,
+    agent_classification,
+    locate,
+    main,
+)
 from tools.live_adzuna import MAX_SCOPE_REQUESTS, SCOPE
 from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry
 
@@ -55,9 +63,55 @@ def test_an_unlisted_page_keeps_only_its_hash_even_when_it_names_itself(tmp_path
     assert out["rights_status"] == "pending human rights review"
     assert out["kept_body"] is None
     assert not list(tmp_path.iterdir())
+    assert (out["via_proxy"], out["address_checked"]) == (False, True)
     postings: Any = out["postings"]
     [posting] = postings
     assert {c["field"] for c in posting["claims"]} >= {"title", "salary", "employer"}
+
+
+@pytest.mark.req("ACQ-01", "ACQ-06")
+def test_in_proxy_mode_the_page_goes_through_the_proxy_and_its_record_says_so(
+    tmp_path: Path,
+) -> None:
+    body = page(POSTING).encode()
+    bundle = make_ca().bundle(tmp_path / "bundle.pem")
+    evidence = tmp_path / "evidence"
+    with source_server({"/jobs/1": Scripted(body=body)}) as server, fake_proxy() as proxy:
+        authority = f"careers.northwind.example:{server.port}"
+        proxy.routes[authority] = server.port
+        proxied = Fetcher(
+            resolve=scripted_resolver({}),  # no name resolves: none is looked up
+            user_agent="CareerwrightL0/test",
+            extra_allowed=frozenset({("127.0.0.1", server.port)}),
+            proxy=fetch_proxy(proxy.url, bundle),
+        )
+        out = acquire_for_corpus(
+            "J12", f"http://{authority}/jobs/1", fetcher=proxied, evidence_dir=evidence
+        )
+
+    assert out["sha256"] == hashlib.sha256(body).hexdigest()
+    assert (out["via_proxy"], out["address_checked"]) == (True, False)
+    assert proxy.connects() == [authority, authority]  # robots.txt, then the page
+    assert server.paths() == ["/robots.txt", "/jobs/1"]
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [
+        ["--proxy", "http://127.0.0.1:3128"],
+        ["--proxy-ca", "/nonexistent/bundle.pem"],
+        ["--proxy", "http://user:secret@127.0.0.1:3128", "--proxy-ca", "/nonexistent.pem"],
+    ],
+    ids=["no bundle", "no proxy", "credentials in the URL"],
+)
+def test_proxy_flags_are_refused_unless_both_are_usable_and_never_echoed(
+    flags: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as stopped:
+        main(["--slot", "F04", "--url", "https://www.gov.uk/x", *flags])
+
+    assert stopped.value.code == 2
+    assert "secret" not in capsys.readouterr().err
 
 
 @pytest.mark.req("ACQ-06")

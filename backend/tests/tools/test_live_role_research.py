@@ -14,8 +14,11 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RequestUsage
 
 from careerwright.evidence.acquire import AcquisitionResult
+from careerwright.evidence.fetcher import Fetcher, fetch_proxy
 from careerwright.evidence.records import AttemptReason, AttemptStatus, InputRoute, RightsClass
+from tests.support.certificates import make_ca
 from tests.support.fake_models import SEARCHED, search_parts
+from tests.support.fake_proxy import fake_proxy
 from tools.live_role_research import PAGES_PRINTED, ROLE_SCOPE, page_notes, research_role
 from tools.live_smoke import SmokeSettings
 from tools.usage_ledger import CallOutcome, Ledger
@@ -88,7 +91,33 @@ def test_one_search_is_sent_only_the_title_and_its_pages_are_checked_and_ledgere
     pages = json.loads(line.removeprefix(PAGES_PRINTED).partition(": ")[2])
     assert (pages["ledger_row"], pages["verdict"], pages["sources"]) == (row.seq, "found", 2)
     assert [p["title_verified"] for p in pages["pages"]] == [True, True]
+    assert (pages["via_proxy"], pages["address_checked"]) == (False, True)
     assert "https://" not in line  # hosts only, never a URL
+
+
+@pytest.mark.req("DIV1-15", "ACQ-01")
+def test_with_proxy_mode_the_pages_go_through_the_proxy_and_the_print_says_so(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("META_API_KEY", "not-a-real-key")
+    bundle = make_ca().bundle(tmp_path / "bundle.pem")
+    with fake_proxy() as proxy:  # it refuses every host: nothing leaves loopback
+        fetcher = Fetcher(user_agent="CareerwrightL0/test", proxy=fetch_proxy(proxy.url, bundle))
+        code = research_role(
+            SmokeSettings(_env_file=None),
+            Ledger(tmp_path / "live-usage.jsonl"),
+            title=TITLE,
+            build=_meta([]),
+            fetcher=fetcher,
+        )
+
+    assert code == 0
+    assert proxy.connects() == ["careers.northwind.example:443", "jobs.board.example:443"]
+    line = next(x for x in capsys.readouterr().out.splitlines() if x.startswith(PAGES_PRINTED))
+    pages = json.loads(line.removeprefix(PAGES_PRINTED).partition(": ")[2])
+    assert (pages["via_proxy"], pages["address_checked"]) == (True, False)
+    assert [p["reason"] for p in pages["pages"]] == ["robots_unreachable"] * 2
+    assert (pages["verdict"], pages["reason"]) == ("not_yet_found", "pages_unread")
 
 
 @pytest.mark.req("DIV1-15", "MODEL-08")

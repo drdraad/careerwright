@@ -399,7 +399,9 @@ def test_the_acquisition_worker_has_no_setting_for_a_database_key_or_model() -> 
         "environment",
         "port",
         "adzuna_credentials_dir",
+        "fetch_proxy",  # a refusal, not a setting: it admits no value (ADR 0009 amendment)
     }
+    assert AcquisitionSettings.model_fields["fetch_proxy"].annotation is type(None)
 
 
 def published_ports(path: Path) -> list[str]:
