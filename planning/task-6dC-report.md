@@ -339,3 +339,96 @@ were started only by the test tooling, each time under the lock.
 ## Paths a reviewer can skip
 `apps/web/src/generated/**` (regenerated client), `docs/design/screenshots/**`,
 `docs/reviews/sprint-2/screenshots/**` (captures).
+
+# Fix round 1 (the only one, R16)
+
+A fresh implementer, cloud machine (`/home/user/careerwright`, branch
+`claude/confident-ramanujan-ux3saw`). FIX_BASE 33cb13e (the controller's ledger commit 8a95981
+landed beside it before my first commit). Commits 2a1eb10..9292b1a:
+- 2a1eb10 items 1 and 2 (web, `TitleDetails`)
+- 902adc6 item 3 (backend, punctuation titles)
+- f5f7958 item 4 (the workspace name screened; API, web, regenerated client, ADR 0007 line)
+- 9292b1a item 5 (records: register, plan, sprint tasks, design README, the chime's notes)
+
+## Items
+
+1. **Lost input (design I2 = app I1).** `DetailsForm` is keyed by the saved seniority and
+   industry, not the version, so a mark (a new version with the same details) keeps the open
+   form and its typed words; a save that changes them still resets and closes it.
+   Test: `TitleDetails.test.tsx` "keeps seniority or industry typed but not saved when the
+   person marks a skill" (types "Band 6", marks a skill, the GET answers the new version; the
+   field still holds "Band 6" and only the mark was sent).
+   RED (before the fix): `Unable to find a label with the text of: Seniority (optional)` at the
+   last assertion (the form had remounted closed). GREEN after.
+2. **Failure shown as empty (design I3, app M7).** For the role, a failed `GET .../origin`
+   with no data shows `RequestFailure` (its words from the error code) with "Try again"; while
+   loading, nothing (as before). Test: "says so when ESCO's list for the role couldn't be
+   loaded, never an empty list" (503 `TAXONOMY_UNAVAILABLE`: "The occupation list isn't loaded"
+   shows; Try again sends a new request). RED: `Unable to find an element with the text: The
+   occupation list isn't loaded`. GREEN after. (The test waits up to 8 s: the query retries a
+   5xx twice by design.)
+3. **Punctuation or emoji title (app M1).** Ruling: refuse, per the reviewer's fix. `_views`
+   leaves out titles whose concept key is empty, so GET lists no details for them and a PUT is
+   refused `VALIDATION_FAILED`/`not_your_title` (worded in the web: "Some answers aren't
+   valid"), never the `IntegrityError` 500. The web never offers such a title.
+   Tests: `backend/tests/domain/test_title_details.py` (new, no database: the store reads are
+   stand-ins; "-", "…" and an emoji as role and target beside "Doula").
+   RED: 3 failed, e.g. `At index 0 diff: (<TitleUse.ROLE: 'role'>, '🙂', '') != (<TitleUse.TARGET…`.
+   GREEN: 3 passed. Also `tests/integration/test_title_details.py::test_a_title_of_punctuation_alone_takes_no_details_and_a_save_for_it_is_refused`
+   (role "-": not listed, PUT 422 `not_your_title`): **not run, Docker down**.
+4. **The workspace name screened (design M9).** `POST /v1/workspaces` and `PATCH
+   /v1/workspaces/{id}` screen the name with `has_risk_stem` (the one policy, now
+   `support-policy-11`); saved as usual with `SupportNoteOut.beside_an_entry` (the same lines
+   as What we know) in `WorkspaceSavedOut`, or beside a refusal in `WorkspaceRefusedOut`; the
+   receipt stays the plain `WorkspaceOut`, nothing stored or used for suitability. Web:
+   `CreateWorkspace` shows the panel instead of navigating away, with "Open the new workspace"
+   right after the line (Dismiss returns focus to the form's heading); a refusal shows the
+   panel beside `RequestFailure`. A plain name opens the workspace at once, as before.
+   Ruling: rename is screened too (it is the same typed name; there is no web rename yet).
+   Tests (existing fixtures only: `DISTRESS` backend, the helpline sentence web):
+   - `WorkspaceList.test.tsx`, three tests. RED: 2 failed (`Unable to find role="region" and
+     name "Support is available"`), the plain-name test passed. GREEN: 4 of 4.
+   - `tests/api/test_openapi.py::test_a_workspace_s_name_is_answered_with_the_support_panel_beside_it`.
+     RED (routes and schemas stashed): failed at line 97. GREEN after.
+   - `tests/integration/test_workspaces_and_profiles.py::test_a_workspace_name_with_a_risk_word_is_saved_with_the_calm_panel_and_nothing_kept`
+     (create, replay, plain name, rename, refused rename, receipts): **not run, Docker down**.
+5. **False records (app M3, design M2, app M8).**
+   - PROF-11: "verified for display …; planned for T8 (search keeps them: Task 8's job
+     search)", tasks "T6d, T8".
+   - `development-plan.md`: the Roles row's moment, section 4's usual-skills and
+     revelations paragraphs, S3.5, the Sprint W outcome, SW.5 and its v1.5 note, SM.1, the
+     Sprint W row, and a note after the product owner's ten-seconds quotation (the quotation
+     itself is left as their words). `l0-sprint-tasks.md`: the deferral table row, the Task 6d
+     card's open question, the W2 and W2E cards (marked superseded, not rewritten), Task 8's
+     card and Task M's list.
+   - The app plays no cue for it (the chime never had a trigger). Its notes said "a chime when
+     a connection lights up": `sound.ts`, the `World / Three sounds` story label and the design
+     README now say it has no trigger, and Task M asks the product owner whether it gets
+     another. The cue itself is kept (their own ask at session W1).
+
+## Disclosed test changes
+- `test_interview_choices.py:143`: the pinned policy version "support-policy-10" →
+  "support-policy-11" (the new screened place, as slice C bumped it for its own).
+- `TitleDetails.test.tsx` and `WorkspaceList.test.tsx`: tests added only; `show()` in
+  `WorkspaceList.test.tsx` takes an optional `onCreated`. No existing assertion changed.
+
+## Checks
+- `export PATH=/opt/node24/bin:$PATH; env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check`
+  on the final code: rc 0. Backend: ruff and mypy clean, 1,743 passed, 8 skipped, 418
+  deselected; fixture validator passed; web: generated client current, Biome clean (153 files),
+  `tsc` clean, Vitest 43 files, 447 passed. (Earlier runs in this round failed on ruff format
+  and two `tsc` errors in my own files; fixed before the commits.)
+- `make acceptance`: **not run, Docker down** (never started).
+- Integration tests (the two new ones above and the changed pin): **not run, Docker down**.
+- `pnpm run review-screenshots`: **not run**: it starts the Compose stack (`tools.stack`),
+  Docker down.
+- Human-only: session W2's judgement of the new panel place and words, VoiceOver, Safari:
+  not run, requires human.
+
+## Not fixed (as the dispatch says)
+Design I1 (Task 6f); every other Minor, including the Roles design reference's single pair
+(design M1, `docs/design/compositions/world.js`), which still reads as one suggestion singled
+out. Task 8 builds Roles to it, so the controller may want it on Task 8's list.
+
+## Live calls
+None. No web request, no Docker, no model call.
