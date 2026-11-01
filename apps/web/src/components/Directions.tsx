@@ -26,6 +26,7 @@ import type {
   NotIncludedOut,
   ProfileOut,
   ProposalOrigin,
+  RoleOut,
   SharedSkillOut,
   SlateExplanationOut,
   SlateOut,
@@ -40,6 +41,7 @@ import {
   type SlateControls,
   useChooseTarget,
   useNoteRequests,
+  useOrigin,
   useSketch,
   useSlate,
   useSubmitDiscovery,
@@ -68,6 +70,7 @@ import {
   slateNote,
   suggestionReason,
   suggestionWords,
+  TITLE_IDEA_SHOWN,
   titleIdeasListed,
   titleIdeasWords,
   UK_TITLE_IDEAS,
@@ -79,6 +82,7 @@ import { useEvidence } from "./EvidenceDrawer";
 import { Glyph } from "./Glyph";
 import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
+import { type ResearchTitle, RoleResearchList } from "./RoleResearch";
 import { TargetCoverageLine, TargetRequirements } from "./SketchCard";
 import { StatusBadge } from "./Status";
 
@@ -652,6 +656,10 @@ function Slate({
   const [chosen, setChosen] = useState<string | null>(null);
   const slate = useSlate(workspaceId, discovery.discovery_id, controls);
   const targetRecords = useTargets(workspaceId);
+  // "Research this role" (Task 6e) searches the web: live workspaces only, never a demo.
+  const live =
+    discovery.run.data_mode === "live_assisted" || discovery.run.data_mode === "live_vacancy";
+  const origin = useOrigin(workspaceId, live);
   const choose = useChooseTarget(workspaceId);
   const notes = useNoteRequests(workspaceId, discovery.discovery_id);
   const explanation = discovery.explanation ?? null;
@@ -822,10 +830,42 @@ function Slate({
       })}
       {choose.error !== null && <RequestFailure error={choose.error} />}
       <UkTitleIdeas ideas={titleIdeasListed(data.title_ideas)} />
+      {live && (
+        <RoleResearchList
+          workspaceId={workspaceId}
+          profile={profile}
+          titles={researchable(origin.data?.role, targetRecords.data?.targets, data.title_ideas)}
+          canWrite={canWrite}
+        />
+      )}
       <NotShown items={data.not_included} />
       <p className="small muted">{data.release.attribution}</p>
     </div>
   );
+}
+
+/** The titles no list holds that the person can research (Task 6e; ADR 0015 decision 2): their
+ *  role and targets kept in their own words, and the title ideas not yet found. */
+export function researchable(
+  role: RoleOut | undefined,
+  targets: readonly TargetRecordOut[] | undefined,
+  ideas: SlateOut["title_ideas"],
+): ResearchTitle[] {
+  const titles: ResearchTitle[] = [];
+  const add = (title: string, why: ResearchTitle["why"]) => {
+    const key = title.trim().toLowerCase();
+    if (!titles.some((held) => held.title.trim().toLowerCase() === key)) {
+      titles.push({ title, why });
+    }
+  };
+  if (role?.kind === "own_words" && role.text !== null) add(role.text, "role");
+  for (const target of targets ?? []) {
+    if (target.kind === "own_words") add(target.title, "target");
+  }
+  for (const idea of ideas) {
+    if (TITLE_IDEA_SHOWN[idea.reason] === "not_yet_found") add(idea.title, "idea");
+  }
+  return titles;
 }
 
 /** Title ideas the UK job-title index lists (Task 6d slice B; ADR 0015 decision 2): each a

@@ -53,6 +53,7 @@ class TargetRow:
     status: str
     refusal: UrlRefusal | None = None  # why a submitted URL was refused
     refused_host: str | None = None  # its host as plain text, never a link
+    role_title: str | None = None  # role research: the title checked on the page (Task 6e)
 
 
 @dataclass(frozen=True)
@@ -150,13 +151,13 @@ def insert_target(
     query: dict[str, Any] | None,
     refusal: UrlRefusal | None = None,
     refused_host: str | None = None,
+    role_title: str | None = None,
 ) -> None:
     tx.execute(
         sa.text(
             "INSERT INTO careerwright.acquisition_targets (run_id, workspace_id, position, route, "
-            "url, "
-            "query, refusal, refused_host) VALUES (:run, :ws, :position, :route, :url, "
-            "CAST(:query AS jsonb), :refusal, :refused_host)"
+            "url, query, refusal, refused_host, role_title) VALUES (:run, :ws, :position, "
+            ":route, :url, CAST(:query AS jsonb), :refusal, :refused_host, :role_title)"
         ),
         {
             "run": run_id,
@@ -167,6 +168,7 @@ def insert_target(
             "query": None if query is None else json.dumps(query),
             "refusal": refusal.value if refusal else None,
             "refused_host": refused_host,
+            "role_title": role_title,
         },
     )
 
@@ -174,8 +176,9 @@ def insert_target(
 def targets(tx: Tx, run_id: uuid.UUID) -> list[TargetRow]:
     rows = tx.execute(
         sa.text(
-            "SELECT run_id, position, route, url, query, status, refusal, refused_host "
-            "FROM careerwright.acquisition_targets WHERE run_id = :run ORDER BY position"
+            "SELECT run_id, position, route, url, query, status, refusal, refused_host, "
+            "role_title FROM careerwright.acquisition_targets WHERE run_id = :run "
+            "ORDER BY position"
         ),
         {"run": run_id},
     ).mappings()
@@ -189,6 +192,7 @@ def targets(tx: Tx, run_id: uuid.UUID) -> list[TargetRow]:
             r["status"],
             UrlRefusal(r["refusal"]) if r["refusal"] else None,
             r["refused_host"],
+            r["role_title"],
         )
         for r in rows
     ]

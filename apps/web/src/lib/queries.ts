@@ -14,6 +14,7 @@ import {
   type ChooseRole,
   type ChooseTarget,
   type CreateWorkspace,
+  cancelRun,
   chooseClosest,
   chooseRole,
   chooseTarget,
@@ -38,6 +39,7 @@ import {
   getWorkspace,
   listCredentials,
   listDiscoveries,
+  listRoleResearch,
   listSources,
   listTargets,
   listTurns,
@@ -58,7 +60,9 @@ import {
   putSpendLimits,
   putTitleDetails,
   type RevertProfile,
+  type RoleResearchOut,
   type RunKind,
+  readRolePages,
   revertProfile,
   revokeCredential,
   rotateCredential,
@@ -69,11 +73,13 @@ import {
   type SlateOut,
   type SourceOut,
   type SpendOut,
+  type StartRoleResearch,
   type StoreKeyWritable,
   type SubmitDiscovery,
   type SubmitExplanation,
   type SubmitTurn,
   type SupportNoteOut,
+  startRoleResearch,
   storeCredential,
   submitDiscovery,
   submitExplanation,
@@ -110,6 +116,7 @@ export const keys = {
     ["ws", id, "discoveries", discoveryId, "note-requests"] as const,
   sketch: (id: string) => ["ws", id, "sketch"] as const,
   targets: (id: string) => ["ws", id, "targets"] as const,
+  roleResearch: (id: string) => ["ws", id, "role-research"] as const,
   origin: (id: string) => ["ws", id, "origin"] as const,
   titleDetails: (id: string) => ["ws", id, "profile", "titles"] as const,
   credentials: (id: string) => ["ws", id, "credentials"] as const,
@@ -704,6 +711,60 @@ export function useChooseClosest(id: string) {
 
 /** Each target as it is stored once, with what it names and its coverage: every view that
  *  asks which occupation a target is reads this, never the title (Task 6d slice A). */
+/** The workspace's role researches, newest first (Task 6e). */
+export function useRoleResearch(id: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.roleResearch(id),
+    queryFn: async (): Promise<RoleResearchOut[]> =>
+      (await listRoleResearch({ path: path(id), throwOnError: true })).data,
+    retry: retryable,
+    enabled,
+  });
+}
+
+/** "Research this role": one bounded search, told only the title and England. */
+export function useStartRoleResearch(id: string) {
+  return useCommand(
+    id,
+    async (body: StartRoleResearch, key: string) =>
+      (
+        await startRoleResearch({
+          path: path(id),
+          body,
+          headers: { "Idempotency-Key": key },
+          throwOnError: true,
+        })
+      ).data as RoleResearchOut,
+  );
+}
+
+/** Reads the pages a research's search found; asked again, it answers with the same reading. */
+export function useReadRolePages(id: string) {
+  return useCommand(
+    id,
+    async (researchId: string, key: string) =>
+      (
+        await readRolePages({
+          path: { workspace_id: id, research_id: researchId },
+          headers: { "Idempotency-Key": key },
+          throwOnError: true,
+        })
+      ).data as RoleResearchOut,
+  );
+}
+
+/** Asks for a run to stop (`POST .../runs/{id}/cancel`); the worker ends it. */
+export function useCancelRun(id: string) {
+  return useCommand(id, async (runId: string, key: string) => {
+    await cancelRun({
+      path: { workspace_id: id, run_id: runId },
+      headers: { "Idempotency-Key": key },
+      throwOnError: true,
+    });
+    return runId;
+  });
+}
+
 export function useTargets(id: string, enabled = true) {
   return useQuery({
     queryKey: keys.targets(id),

@@ -136,7 +136,8 @@ def _search_request(messages: list[ModelMessage]) -> dict[str, object] | None:
 def search_parts(request: dict[str, object], sentinel: str) -> list[Any]:
     """One search returning one page, and three candidates: that page (grounded), a page the
     search never returned, and a source the manifest denies."""
-    query = f"{request['role']} jobs {request['city']}"
+    # Role research (Task 6e) sends the title and the country, never a city.
+    query = f"{request['role']} jobs {request.get('city', request.get('country'))}"
     candidates = [
         {"url": SEARCHED, "title": f"{request['role']} {sentinel}".strip()},
         {"url": "https://jobs.board.example/ad/9", "title": "Not returned by the search"},

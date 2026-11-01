@@ -4198,6 +4198,20 @@ export type NotIncludedOut = {
 };
 
 /**
+ * NotYetFoundReason
+ *
+ * Why a role read from its pages is not yet found: never evidence it doesn't exist.
+ */
+export const NotYetFoundReason = { NOT_ON_ANY_PAGE: 'not_on_any_page', ONE_SOURCE_ONLY: 'one_source_only' } as const;
+
+/**
+ * NotYetFoundReason
+ *
+ * Why a role read from its pages is not yet found: never evidence it doesn't exist.
+ */
+export type NotYetFoundReason = typeof NotYetFoundReason[keyof typeof NotYetFoundReason];
+
+/**
  * NothingFound
  */
 export type NothingFound = {
@@ -6643,6 +6657,31 @@ export type RenameWorkspaceIn = {
 };
 
 /**
+ * ResearchState
+ *
+ * Where a research is. Only `found` and `not_yet_found` are results; neither says a role
+ * does or doesn't exist, only what Careerwright checked.
+ */
+export const ResearchState = {
+    SEARCHING: 'searching',
+    SEARCH_STOPPED: 'search_stopped',
+    NO_PAGES: 'no_pages',
+    READY_TO_READ: 'ready_to_read',
+    READING: 'reading',
+    READING_STOPPED: 'reading_stopped',
+    FOUND: 'found',
+    NOT_YET_FOUND: 'not_yet_found'
+} as const;
+
+/**
+ * ResearchState
+ *
+ * Where a research is. Only `found` and `not_yet_found` are results; neither says a role
+ * does or doesn't exist, only what Careerwright checked.
+ */
+export type ResearchState = typeof ResearchState[keyof typeof ResearchState];
+
+/**
  * Resolution
  */
 export const Resolution = {
@@ -6816,6 +6855,126 @@ export type RoleOut = {
      * "Which of these is closest?", when it is asked for this role.
      */
     closest: ClosestOut | null;
+};
+
+/**
+ * RolePageOut
+ *
+ * One page read for a title: what Careerwright checked, never what the page claims.
+ */
+export type RolePageOut = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Url
+     *
+     * The checked address read; a link, https or http.
+     */
+    url: string | null;
+    /**
+     * Host
+     */
+    host: string | null;
+    /**
+     * None: not tried yet.
+     */
+    status: AttemptStatus | null;
+    /**
+     * Why it was blocked or failed.
+     */
+    reason: AttemptReason | null;
+    /**
+     * Its class, from the source manifest.
+     */
+    rights_class: RightsClass | null;
+    /**
+     * Retrieved At
+     *
+     * When it was read, if it was.
+     */
+    retrieved_at: string | null;
+    /**
+     * Title Verified
+     *
+     * Whether the title is on the page word for word; None: the page wasn't read, so nothing is known about it.
+     */
+    title_verified: boolean | null;
+    /**
+     * Quote
+     *
+     * The page's own words around the title (at most 200 characters), where the title is verified.
+     */
+    quote: string | null;
+    /**
+     * Source
+     *
+     * The independent source it counts in (1, 2, ...): copies of one advert, and pages of one host, share one.
+     */
+    source: number | null;
+};
+
+/**
+ * RoleResearchOut
+ *
+ * Research this role: a title no list holds, searched (only the title and England were
+ * sent) and its pages read. Private to the workspace, proposed and dated. `found` and
+ * `not_yet_found` are the only results, and neither says whether a role exists.
+ */
+export type RoleResearchOut = {
+    /**
+     * Research Id
+     */
+    research_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Review State
+     */
+    review_state: 'proposed';
+    /**
+     * Created At
+     */
+    created_at: string;
+    state: ResearchState;
+    /**
+     * With not_yet_found: no page read shows the title, or only one source does.
+     */
+    not_yet_found_reason: NotYetFoundReason | null;
+    /**
+     * Sources
+     *
+     * Independent sources showing the title, copies counted once.
+     */
+    sources: number;
+    /**
+     * Official
+     *
+     * An official page (gov.uk, public sector or a professional body, by the source manifest) shows the title.
+     */
+    official: boolean;
+    /**
+     * Candidates
+     *
+     * The pages the search proposed that can be fetched.
+     */
+    candidates: number;
+    /**
+     * With no_pages: why the search proposed none (never that the role doesn't exist).
+     */
+    empty_reason: SearchEmptyReason | null;
+    search: RunOut;
+    /**
+     * None until the pages are being read.
+     */
+    reading: RunOut | null;
+    /**
+     * Pages
+     */
+    pages: Array<RolePageOut>;
 };
 
 /**
@@ -7537,12 +7696,17 @@ export type SearchOut = {
  * A source search's validated output: candidates only, never claims.
  */
 export type SearchProposal = {
+    purpose?: SearchPurpose;
     /**
      * Target
+     *
+     * The target role, or the title researched.
      */
     target: string;
     /**
      * City
+     *
+     * The city searched near; England for role research.
      */
     city: string;
     /**
@@ -7576,6 +7740,20 @@ export type SearchProposal = {
      */
     empty_reason?: SearchEmptyReason | null;
 };
+
+/**
+ * SearchPurpose
+ *
+ * What a source search looks for (ADR 0009 decision 12, amendment).
+ */
+export const SearchPurpose = { JOB_POSTINGS: 'job_postings', ROLE_RESEARCH: 'role_research' } as const;
+
+/**
+ * SearchPurpose
+ *
+ * What a source search looks for (ADR 0009 decision 12, amendment).
+ */
+export type SearchPurpose = typeof SearchPurpose[keyof typeof SearchPurpose];
 
 /**
  * SearchResult
@@ -8680,6 +8858,22 @@ export const SpendState = {
  * SpendState
  */
 export type SpendState = typeof SpendState[keyof typeof SpendState];
+
+/**
+ * StartRoleResearch
+ */
+export type StartRoleResearch = {
+    /**
+     * Expected Profile Version
+     */
+    expected_profile_version: number;
+    /**
+     * Title
+     *
+     * A title no list holds: your own words, or a title idea not yet found.
+     */
+    title: string;
+};
 
 /**
  * StatementView
@@ -13412,6 +13606,168 @@ export type GetSearchResponses = {
 };
 
 export type GetSearchResponse = GetSearchResponses[keyof GetSearchResponses];
+
+export type ListRoleResearchData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/role-research';
+};
+
+export type ListRoleResearchErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ListRoleResearchError = ListRoleResearchErrors[keyof ListRoleResearchErrors];
+
+export type ListRoleResearchResponses = {
+    /**
+     * Response List Role Research
+     *
+     * Successful Response
+     */
+    200: Array<RoleResearchOut>;
+};
+
+export type ListRoleResearchResponse = ListRoleResearchResponses[keyof ListRoleResearchResponses];
+
+export type StartRoleResearchData = {
+    body: StartRoleResearch;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/role-research';
+};
+
+export type StartRoleResearchErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type StartRoleResearchError = StartRoleResearchErrors[keyof StartRoleResearchErrors];
+
+export type StartRoleResearchResponses = {
+    /**
+     * Successful Response
+     */
+    202: RoleResearchOut;
+};
+
+export type StartRoleResearchResponse = StartRoleResearchResponses[keyof StartRoleResearchResponses];
+
+export type ReadRolePagesData = {
+    body?: never;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Research Id
+         */
+        research_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/role-research/{research_id}/reading';
+};
+
+export type ReadRolePagesErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ReadRolePagesError = ReadRolePagesErrors[keyof ReadRolePagesErrors];
+
+export type ReadRolePagesResponses = {
+    /**
+     * Successful Response
+     */
+    202: RoleResearchOut;
+};
+
+export type ReadRolePagesResponse = ReadRolePagesResponses[keyof ReadRolePagesResponses];
+
+export type GetRoleResearchData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Research Id
+         */
+        research_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/role-research/{research_id}';
+};
+
+export type GetRoleResearchErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetRoleResearchError = GetRoleResearchErrors[keyof GetRoleResearchErrors];
+
+export type GetRoleResearchResponses = {
+    /**
+     * Successful Response
+     */
+    200: RoleResearchOut;
+};
+
+export type GetRoleResearchResponse = GetRoleResearchResponses[keyof GetRoleResearchResponses];
 
 export type PasteTextData = {
     body: PasteText;

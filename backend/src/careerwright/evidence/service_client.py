@@ -24,7 +24,7 @@ class AcquisitionUnavailableError(Exception):
 
 
 class AcquisitionClient(Protocol):
-    def fetch(self, url: str) -> AcquisitionResult: ...
+    def fetch(self, url: str, *, read_text: bool = False) -> AcquisitionResult: ...
 
     def adzuna(self, query: AdzunaQuery) -> AcquisitionResult: ...
 
@@ -52,8 +52,9 @@ class HttpAcquisitionClient:
         except (ValueError, ValidationError):
             raise AcquisitionUnavailableError from None
 
-    def fetch(self, url: str) -> AcquisitionResult:
-        return self._post("/v1/fetch", FetchRequest(url=url).model_dump_json().encode())
+    def fetch(self, url: str, *, read_text: bool = False) -> AcquisitionResult:
+        request = FetchRequest(url=url, read_text=read_text)
+        return self._post("/v1/fetch", request.model_dump_json().encode())
 
     def adzuna(self, query: AdzunaQuery) -> AcquisitionResult:
         return self._post("/v1/adzuna", AdzunaRequest(query=query).model_dump_json().encode())

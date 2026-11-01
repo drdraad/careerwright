@@ -59,6 +59,9 @@ LOCALITY_CHARS, POSTAL_CODE_CHARS, COUNTRY_CHARS = 120, 20, 60  # `records.Locat
 # The most of a page's visible text model extraction reads (`visible_text`): one advert's
 # text fits, and the run's reservation is bounded by it (`careerwright.evidence.extraction`).
 EXTRACTION_TEXT_BYTES = 8_000
+# The most of a page's visible text role research checks a title against (`role_text`): no
+# model reads it, so it is bounded only so one answer from the worker stays small.
+ROLE_TEXT_BYTES = 200_000
 _DECODER = json.JSONDecoder()
 _COLON = re.compile(r"\s*:\s*")
 _DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
@@ -612,8 +615,20 @@ def visible_text(text: str) -> str:
     email that inline markup split included (`redaction.redact_shown`; fix round 4,
     re-review 4 A R4-1); then cut to `EXTRACTION_TEXT_BYTES` of UTF-8. Spans index into
     exactly this text, and its hash is theirs."""
+    return _shown(text, EXTRACTION_TEXT_BYTES)
+
+
+def role_text(text: str) -> str:
+    """What role research checks a title against (Task 6e; ADR 0015 decision 2): the same
+    visible text as `visible_text`, normalised and without personal details, cut only at
+    `ROLE_TEXT_BYTES`, since a title can be anywhere on the page. No model reads it, and it
+    is never kept: only its hash, the span and the excerpt around it."""
+    return _shown(text, ROLE_TEXT_BYTES)
+
+
+def _shown(text: str, limit: int) -> str:
     redacted = redact_shown(normalised_text(_plain(text)))
-    cut = redacted.encode()[:EXTRACTION_TEXT_BYTES]
+    cut = redacted.encode()[:limit]
     return cut.decode(errors="ignore").rstrip()
 
 

@@ -18,12 +18,14 @@ import type {
   FloorUnknown,
   ModelExtractionState,
   NotIncluded,
+  NotYetFoundReason,
   PartialCompleteness,
   PayPeriod,
   ProfileField,
   ProfileInput,
   QualificationStatus,
   RecordPart,
+  ResearchState,
   Resolution,
   SalaryFloorOut,
   SearchDid,
@@ -621,6 +623,58 @@ export const SEARCH_EMPTY_REASON: Record<SearchEmptyReason, { title: string; det
       "This isn't a sign there are no vacancies. Look on employers' own careers sites, or paste the advert.",
   },
 };
+
+/** "Research this role" (Task 6e; ADR 0015 decision 2): for a title no list holds. Every
+ *  sentence says what Careerwright did or checked, never what a page or a list contains, and
+ *  neither result says whether a role exists. */
+export const ROLE_RESEARCH = {
+  heading: "Titles no list holds",
+  intro:
+    "Careerwright can search the web for pages that use one of these titles, then check each page itself.",
+  sends: "It sends only the title and “England”, nothing about you.",
+  start: "Research this role",
+  again: "Research again",
+  cancel: "Stop",
+  noKey: "Store a Meta API key first.",
+  why: {
+    role: "Your role, in your words",
+    target: "Your target, in your words",
+    idea: "A title Careerwright thought of, not yet found",
+  },
+  state: {
+    searching: "Searching the web for pages that use this title…",
+    search_stopped: "The search stopped before it found any pages.",
+    no_pages: "The search found no page Careerwright could read.",
+    ready_to_read: "Reading the pages the search found…",
+    reading: "Reading the pages the search found…",
+    reading_stopped: "Careerwright stopped before it could read enough pages to say.",
+    found: "Found in independent sources.",
+    not_yet_found: "Not yet found in independent sources.",
+  } satisfies Record<ResearchState, string>,
+  noPagesDetail: "This isn't a sign the role doesn't exist.",
+  found: (sources: number, official: boolean) =>
+    official
+      ? "Careerwright found the title, word for word, on an official page."
+      : `Careerwright found the title, word for word, on pages from ${sources} independent sources.`,
+  notYetFound: {
+    one_source_only:
+      "Careerwright found the title, word for word, on one source only. Copies of one advert count once.",
+    not_on_any_page: "None of the pages Careerwright read uses the title word for word.",
+  } satisfies Record<NotYetFoundReason, string>,
+  unread: (pages: number) =>
+    pages === 1
+      ? "1 page couldn't be read, so it isn't counted either way."
+      : `${pages} pages couldn't be read, so they aren't counted either way.`,
+  checkedOnly:
+    "Careerwright checked only that each page uses the title word for word. No one has reviewed these pages.",
+  pages: "The pages Careerwright read",
+  pageVerified: "Uses the title",
+  pageNotVerified: "Doesn't use the title word for word",
+  pageUnread: "Not read",
+  read: (date: string) => `Read on ${date}`,
+  makeTarget: "Make this a target",
+  targetSaved: "Saved as one of your targets.",
+} as const;
 
 /** The slate's three directions (relative to what the person has told Careerwright). */
 export const DIRECTION: Record<Direction, string> = {

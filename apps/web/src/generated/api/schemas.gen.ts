@@ -6192,6 +6192,16 @@ export const NotIncludedOutSchema = {
     description: 'A pooled occupation the slate does not show, and why.'
 } as const;
 
+export const NotYetFoundReasonSchema = {
+    type: 'string',
+    enum: [
+        'not_on_any_page',
+        'one_source_only'
+    ],
+    title: 'NotYetFoundReason',
+    description: 'Why a role read from its pages is not yet found: never evidence it doesn\'t exist.'
+} as const;
+
 export const NothingFoundSchema = {
     properties: {
         reason: {
@@ -10489,6 +10499,22 @@ export const RenameWorkspaceInSchema = {
     title: 'RenameWorkspaceIn'
 } as const;
 
+export const ResearchStateSchema = {
+    type: 'string',
+    enum: [
+        'searching',
+        'search_stopped',
+        'no_pages',
+        'ready_to_read',
+        'reading',
+        'reading_stopped',
+        'found',
+        'not_yet_found'
+    ],
+    title: 'ResearchState',
+    description: 'Where a research is. Only `found` and `not_yet_found` are results; neither says a role\ndoes or doesn\'t exist, only what Careerwright checked.'
+} as const;
+
 export const ResolutionSchema = {
     type: 'string',
     enum: [
@@ -10707,6 +10733,240 @@ export const RoleOutSchema = {
     ],
     title: 'RoleOut',
     description: 'What the person\'s answer to "What do you do now, or what did you do last?" names in\nESCO. Nothing is guessed: an answer Careerwright couldn\'t match in ESCO joins nothing, and\none it matched to several occupations asks the person to choose. The answer is always kept\nin the person\'s words; `kind` says what Careerwright found them to be.'
+} as const;
+
+export const RolePageOutSchema = {
+    properties: {
+        position: {
+            type: 'integer',
+            title: 'Position'
+        },
+        url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Url',
+            description: 'The checked address read; a link, https or http.'
+        },
+        host: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host'
+        },
+        status: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/AttemptStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'None: not tried yet.'
+        },
+        reason: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/AttemptReason'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Why it was blocked or failed.'
+        },
+        rights_class: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/RightsClass'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Its class, from the source manifest.'
+        },
+        retrieved_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Retrieved At',
+            description: 'When it was read, if it was.'
+        },
+        title_verified: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title Verified',
+            description: 'Whether the title is on the page word for word; None: the page wasn\'t read, so nothing is known about it.'
+        },
+        quote: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Quote',
+            description: 'The page\'s own words around the title (at most 200 characters), where the title is verified.'
+        },
+        source: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source',
+            description: 'The independent source it counts in (1, 2, ...): copies of one advert, and pages of one host, share one.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'position',
+        'url',
+        'host',
+        'status',
+        'reason',
+        'rights_class',
+        'retrieved_at',
+        'title_verified',
+        'quote',
+        'source'
+    ],
+    title: 'RolePageOut',
+    description: 'One page read for a title: what Careerwright checked, never what the page claims.'
+} as const;
+
+export const RoleResearchOutSchema = {
+    properties: {
+        research_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Research Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        review_state: {
+            type: 'string',
+            const: 'proposed',
+            title: 'Review State'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        state: {
+            $ref: '#/components/schemas/ResearchState'
+        },
+        not_yet_found_reason: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/NotYetFoundReason'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'With not_yet_found: no page read shows the title, or only one source does.'
+        },
+        sources: {
+            type: 'integer',
+            title: 'Sources',
+            description: 'Independent sources showing the title, copies counted once.'
+        },
+        official: {
+            type: 'boolean',
+            title: 'Official',
+            description: 'An official page (gov.uk, public sector or a professional body, by the source manifest) shows the title.'
+        },
+        candidates: {
+            type: 'integer',
+            title: 'Candidates',
+            description: 'The pages the search proposed that can be fetched.'
+        },
+        empty_reason: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SearchEmptyReason'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'With no_pages: why the search proposed none (never that the role doesn\'t exist).'
+        },
+        search: {
+            $ref: '#/components/schemas/RunOut'
+        },
+        reading: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/RunOut'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'None until the pages are being read.'
+        },
+        pages: {
+            items: {
+                $ref: '#/components/schemas/RolePageOut'
+            },
+            type: 'array',
+            title: 'Pages'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'research_id',
+        'title',
+        'review_state',
+        'created_at',
+        'state',
+        'not_yet_found_reason',
+        'sources',
+        'official',
+        'candidates',
+        'empty_reason',
+        'search',
+        'reading',
+        'pages'
+    ],
+    title: 'RoleResearchOut',
+    description: 'Research this role: a title no list holds, searched (only the title and England were\nsent) and its pages read. Private to the workspace, proposed and dated. `found` and\n`not_yet_found` are the only results, and neither says whether a role exists.'
 } as const;
 
 export const RoleStateSchema = {
@@ -11936,13 +12196,19 @@ export const SearchOutSchema = {
 
 export const SearchProposalSchema = {
     properties: {
+        purpose: {
+            $ref: '#/components/schemas/SearchPurpose',
+            default: 'job_postings'
+        },
         target: {
             type: 'string',
-            title: 'Target'
+            title: 'Target',
+            description: 'The target role, or the title researched.'
         },
         city: {
             type: 'string',
-            title: 'City'
+            title: 'City',
+            description: 'The city searched near; England for role research.'
         },
         candidates: {
             items: {
@@ -12003,6 +12269,16 @@ export const SearchProposalSchema = {
     ],
     title: 'SearchProposal',
     description: 'A source search\'s validated output: candidates only, never claims.'
+} as const;
+
+export const SearchPurposeSchema = {
+    type: 'string',
+    enum: [
+        'job_postings',
+        'role_research'
+    ],
+    title: 'SearchPurpose',
+    description: 'What a source search looks for (ADR 0009 decision 12, amendment).'
 } as const;
 
 export const SearchResultSchema = {
@@ -13932,6 +14208,30 @@ export const SpendStateSchema = {
         'unknown'
     ],
     title: 'SpendState'
+} as const;
+
+export const StartRoleResearchSchema = {
+    properties: {
+        expected_profile_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Profile Version'
+        },
+        title: {
+            type: 'string',
+            maxLength: 120,
+            minLength: 1,
+            title: 'Title',
+            description: 'A title no list holds: your own words, or a title idea not yet found.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_profile_version',
+        'title'
+    ],
+    title: 'StartRoleResearch'
 } as const;
 
 export const StatementViewSchema = {

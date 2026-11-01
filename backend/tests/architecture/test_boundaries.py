@@ -78,6 +78,7 @@ ADAPTERS: dict[str, frozenset[str]] = {
     "careerwright.evidence.fetcher": frozenset({"httpcore2", "certifi"}),
     "careerwright.evidence.pages": frozenset({"scrapling"}),
     "careerwright.evidence.store": frozenset({"sqlalchemy"}),
+    "careerwright.evidence.role_store": frozenset({"sqlalchemy"}),  # Task 6e, ADR 0015
     "careerwright.evidence.workflow": frozenset({"dbos"}),
     "careerwright.evidence.search_agent": frozenset({"pydantic_ai"}),
     "careerwright.evidence.extraction_agent": frozenset({"pydantic_ai"}),  # fix round 2, ruling 10
