@@ -696,3 +696,14 @@ manifest and the rights policy) are unchanged.
 - **Evidence says so:** a tool's output carries `via_proxy` and `address_checked` fields. A
   page fetched in proxy mode says `via_proxy: true, address_checked: false`, so no record
   claims an address check that did not run.
+
+## Amendment line, Task 10A (2026-11-01): the API opens a body the person pasted
+
+The API role still reads no source body's ciphertext. Migration 0045 adds one SECURITY
+DEFINER function, `careerwright.pasted_example_document(attempt)`, which returns the sealed
+body only for a `pasted_text` attempt in a workspace the calling actor owns while their
+access is active. The API opens it with the master key to show the person their own
+example's text in Skills and to check the spans they choose in it (ADR 0012, Task 10A's
+line). A fetched page's body stays the worker's alone; the text was redacted before it was
+sealed, as before. Written, not run (the controller runs integration):
+`test_skills.py::test_the_api_opens_only_a_pasted_body_and_only_in_its_owner_s_workspace`.
