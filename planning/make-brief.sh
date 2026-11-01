@@ -14,5 +14,8 @@ section=$(awk -v id="$id" '
   intask { print }
 ' $PLAN)
 [ -n "$section" ] || { echo "Task $id not found in $PLAN" >&2; exit 3; }
-{ awk '/^## Task 1:/{exit} {print}' $PLAN; printf '%s\n' "$section"; } > $out
+# The preamble: everything before the first task card ("Always read", the Global
+# Constraints, Environment facts, Standing rulings). Controller state lives in
+# planning/controller-state.md and is never copied; the guard stops at its old headings too.
+{ awk '/^## (Task |Order, dependencies|Current position)/{exit} {print}' $PLAN; printf '%s\n' "$section"; } > $out
 echo "$PWD/$out ($(wc -l < $out | tr -d ' ') lines)"
