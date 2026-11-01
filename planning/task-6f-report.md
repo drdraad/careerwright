@@ -291,3 +291,70 @@ Every source change used Edit; no heredoc, no stash, no generator was needed (no
   src/components/Directions.test.tsx` (34 passed).
 - Not run: integration, `make acceptance`, Playwright and captures (Docker down). No live
   calls (no cost). Session W2's words: not run — requires human.
+
+---
+
+## Follow-up: Childline
+
+Worktree `/home/user/careerwright-wt/childline`, branch `wt-childline`, rebased onto
+`claude/confident-ramanujan-ux3saw` (58c8f99). Commits: `69828b9` (Childline in the panel)
+and `6104a86` (register, last).
+
+### What I built
+- `careerwright/profile/safety.py`: a fifth service after Shout, `support-policy-12`:
+  "Childline: Call 0800 1111 or use the 1-2-1 chat online (free, 24 hours a day, 7 days a
+  week). For children and young people." Source URL
+  `https://www.childline.org.uk/get-support/contacting-childline/` (the page checked);
+  `checked_on` is `CHILDLINE_CHECKED_ON = "2026-11-01"`, its own date. `REVIEW_STATUS` names
+  Childline's line as added on 2026-11-01, not yet reviewed as built. Every detail is one the
+  checked file marks verified; no age limit (not verified), and no other Childline detail
+  (message service, BSL, languages, 999, NSPCC) was added, to keep the line as short as the
+  others.
+- Every place the panel shows builds it from `SupportNoteOut` over `SUPPORT_RESOURCES`, so
+  Childline shows in all of them; no API shape change, so the generated client is unchanged
+  (drift check clean).
+- `SupportNote.tsx`: the footnote used the first service's date for all. With Childline
+  checked on another day that would have been untrue, so it now names any service checked on
+  another day: "These services were checked on their own websites on 28 October 2026, and
+  Childline on 1 November 2026." One date still reads as before.
+- ADR 0007: an amendment line for `support-policy-12`, naming the checked file.
+- Session W2: item 7 and record row S7 are one yes/no line showing the panel's new words,
+  not run — requires human.
+- Register: PROF-15 implemented; its review not run — requires human.
+
+### Rulings
+1. **No link is drawn in the panel.** The panel shows no links for any service today (only
+   words); "its https link" is met as the resource's `source_url`, https, which tests check.
+   I used the page the details were checked on (the field's meaning for every other
+   service), not the 1-2-1 chat page. Making the chat a tap-through link would add an API
+   field and change the panel's design for one service: a question for the controller or
+   session W2, not taken here.
+2. **"Free" covers both call and chat** in the line's bracket, from the verified "You can
+   call us for free on 0800 1111 or speak online using the 1-2-1 chats" and the "We're free
+   and confidential" heading. If the controller reads "free" as verified for calls only, the
+   bracket can move to after "0800 1111".
+3. **Order:** Childline last, after the four existing services.
+
+### Checks
+- RED first: the new and updated tests in `tests/domain/test_safety.py` and
+  `tests/api/test_support_note.py` failed (7 failed) before the change; GREEN after (167
+  passed). `SupportNote.test.tsx`: the two-dates footnote test failed first, then passed.
+- `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` (Node 24 on PATH), before and
+  after the rebase, and after the register edit: exit 0; backend 1,866 passed, 8 skipped;
+  Vitest 45 files, 471 tests; ruff, mypy, Biome, `tsc`, client drift and the fixture
+  validator clean.
+- Tests added: `test_safety.py::test_childline_is_listed_for_children_and_young_people_in_its_own_checked_words`
+  (policy version pinned, no age), the resources test updated; `tests/api/test_support_note.py`
+  (every `SupportNoteOut` place: sent, refused, title, entry saved and refused; five services,
+  Childline's words, https link, version 12); `SupportNote.test.tsx` (three).
+- Written, not run (the controller runs integration and acceptance):
+  `test_interview_choices.py` (SERVICES has Childline, version 12, every link https; reused by
+  `test_role_space.py` and `test_workspaces_and_profiles.py`), `conversation.spec.ts` and
+  `role-space.spec.ts` (the panel contains "Childline: Call 0800 1111"), and the visual
+  review's panel fixture (`visual.spec.ts`).
+- No web requests, no live calls (no cost), no Docker.
+
+### Concerns
+- The visual review fixture's other fields were already stale (policy 7); I only added
+  Childline to it.
+- Review status: not run — requires human (H-12, session W2, S7).
