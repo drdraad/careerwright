@@ -116,11 +116,13 @@ def funding(draw: st.DrawFn) -> Support:
 
 
 def fee_loan(draw: st.DrawFn, unknowns: bool) -> TuitionFeeLoan:
-    """A tuition fee loan paid to the provider (Task 12c) in any of its statuses: approved, not
-    yet applied for or applied for, refused, with any eligibility; now and then no amount."""
+    """A fee loan paid to the provider (Task 12c), a tuition fee loan or an Advanced Learner
+    Loan, in any of its statuses: approved, not yet applied for or applied for, refused, with
+    any eligibility; now and then no amount."""
     approved = draw(st.booleans())
     return tuition_loan(
         None if unknowns and odds(draw, 4) else draw(BIG_FEE),
+        kind=draw(st.sampled_from(["tuition_fee_loan", "advanced_learner_loan"])),
         application=AwardState.APPROVED
         if approved
         else draw(
@@ -412,6 +414,8 @@ def test_the_oracle_reads_a_tuition_fee_loan_in_every_state() -> None:
     assert alone("ineligible") == ("not_feasible", 900_000, 0)
     # No amount: unresolved, never £0.
     assert alone("no-amount") == ("unresolved", None, None)
+    # An Advanced Learner Loan paid to the college, applied for: the same.
+    assert alone("learner-loan") == ("feasible", 0, 900_000)
     # A £1,000 grant first, then a £7,500 loan: £500 is the student's, in March.
     assert alone("part-loan") == ("feasible", 50_000, 750_000)
     assert oracle.solve().outcome == "routes_found"

@@ -317,8 +317,18 @@ class Support(StrictModel):
         )
 
 
+class FeeLoanKind(StrEnum):
+    """The two loans paid straight to the provider that are a loan to repay in L0: a tuition
+    fee loan (spec section 22, 2026-11-01) and, by the product owner's provisional yes of the
+    same day, an Advanced Learner Loan. One rule for both; the kind only says which."""
+
+    TUITION_FEE_LOAN = "tuition_fee_loan"
+    ADVANCED_LEARNER_LOAN = "advanced_learner_loan"
+
+
 class TuitionFeeLoan(StrictModel):
-    """A tuition fee loan paid straight to the provider, as the person states it for one
+    """A fee loan paid straight to the provider (a tuition fee loan, or an Advanced Learner
+    Loan: `kind`), as the person states it for one
     variant (spec section 22, 2026-11-01; FUNDING-06). It pays the variant's fees (never its
     extra costs), after any support paid to the provider, up to its amount: what it pays is not
     the person's payment, cash or direct spending, and the route carries it as a loan to repay
@@ -330,6 +340,10 @@ class TuitionFeeLoan(StrictModel):
     be eligible, makes the route conditional on it, beside the route where they pay the fee
     (the no-award scenario). An unknown amount leaves the route unresolved, never £0."""
 
+    kind: FeeLoanKind = Field(
+        default=FeeLoanKind.TUITION_FEE_LOAN,
+        description="Which loan: a tuition fee loan unless the person says otherwise.",
+    )
     amount: Money | None = Field(description="Null: not known, never £0.")
     eligibility: EligibilityStatus
     application: AwardState

@@ -418,5 +418,14 @@ Requirements: FUNDING-06, FUNDING-04 (its L0 change), FIN1-02, FIN1-10. Rulings 
    state, and `loan_amount_unknown` is a variant's own finding for pruning rule 2.
 
 Known limit: the loan is the person's statement of an amount; Careerwright does not compute a
-student's entitlement, a fee cap or a maintenance loan, and the Advanced Learner Loan is still
-refused as support (a question for the product owner, in Task 12c's report).
+student's entitlement, a fee cap or a maintenance loan.
+
+**The Advanced Learner Loan follows the same rule** (the product owner's provisional yes, "I
+think so", 1 November 2026, to be asked again plainly at session W2). Ruling: it is the other
+kind of the same statement, not a second rule: `TuitionFeeLoan.kind` (and the input's) is
+`tuition_fee_loan` (the default, so every stored document keeps its meaning) or
+`advanced_learner_loan`, and everything above (what it pays, its statuses, an unknown amount,
+the economic cost, the search, the oracle) is shared. The loan to repay names its kind, and
+so does a family's financing (`advanced_learner_loan:<application>`). Migration 0043's CHECK
+allows only the two kinds. The pruning rules are unchanged (`sound-pruning-5`). A maintenance
+loan and every other loan stay refused as support.

@@ -405,14 +405,19 @@ def tuition_loan(
     *,
     application: AwardState = AwardState.APPROVED,
     eligibility: EligibilityStatus = EligibilityStatus.CONFIRMED,
+    kind: str = "tuition_fee_loan",
 ) -> TuitionFeeLoan:
-    """A tuition fee loan paid straight to the provider, as a person states it (synthetic)."""
-    return TuitionFeeLoan(
-        amount=gbp(amount) if amount is not None else None,
-        eligibility=eligibility,
-        application=application,
-        review_state=RecordState.ACCEPTED_ASSUMPTION,
-        cited=CONSTRUCTED,
+    """A fee loan paid straight to the provider (a tuition fee loan, or with `kind` an Advanced
+    Learner Loan), as a person states it (synthetic)."""
+    return TuitionFeeLoan.model_validate(
+        {
+            "kind": kind,
+            "amount": gbp(amount) if amount is not None else None,
+            "eligibility": eligibility,
+            "application": application,
+            "review_state": RecordState.ACCEPTED_ASSUMPTION,
+            "cited": CONSTRUCTED,
+        }
     )
 
 
@@ -528,6 +533,10 @@ def loan_statuses() -> MonthlyInput:
             fee, application=AwardState.APPLIED, eligibility=EligibilityStatus.INELIGIBLE
         ),
         "no-amount": tuition_loan(None),
+        # The product owner's provisional yes (2026-11-01): an Advanced Learner Loan alike.
+        "learner-loan": tuition_loan(
+            fee, application=AwardState.APPLIED, kind="advanced_learner_loan"
+        ),
     }
     options = [
         option(name, finish=month_end(START, 3), payments=((0, fee),), tuition_fee_loan=loan)

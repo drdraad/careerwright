@@ -38,6 +38,7 @@ from careerwright.planning.inputs import SupportInput, TuitionFeeLoanInput
 from careerwright.planning.ledgers import LoanToRepay
 from careerwright.planning.search import PRUNING_VERSION, Outcome, SearchResult, search_routes
 from tests.support.planning import (
+    CONSTRUCTED,
     ROW,
     START,
     catalogue_of,
@@ -420,3 +421,62 @@ def test_the_search_archives_the_loan_funded_degree_and_sets_an_unknown_amount_a
     assert (aside.variant_id, aside.codes) == ("degree", [FindingCode.LOAN_AMOUNT_UNKNOWN])
     # Paying the fee itself, the student has no route within their limits.
     assert self_paid.outcome is Outcome.NO_ROUTE_IN_BOUNDED_MODEL
+
+
+# The Advanced Learner Loan (the product owner's provisional yes, 1 November 2026): the same
+# rule as a tuition fee loan, stated as the other kind of fee loan paid to the provider.
+
+
+@pytest.mark.req("FUNDING-06", "FUNDING-05")
+def test_an_advanced_learner_loan_paid_to_the_college_is_a_loan_to_repay_too() -> None:
+    approved = tuition_loan(FEE, kind="advanced_learner_loan")
+    hoped = tuition_loan(FEE, application=AwardState.APPLIED, kind="advanced_learner_loan")
+
+    funded = check(student(), degree(tuition_fee_loan=approved))
+    evaluation = evaluate_route(
+        compile_input(student(), catalogue_of(degree(tuition_fee_loan=hoped))), ["degree"]
+    )
+    conditional = evaluation.scenario(Scenario.BASE)
+    unfunded = evaluation.scenario(Scenario.NO_AWARD)
+    unpriced = check(
+        student(), degree(tuition_fee_loan=tuition_loan(None, kind="advanced_learner_loan"))
+    )
+
+    assert funded.feasibility is Feasibility.FEASIBLE
+    assert column(funded, "direct", "payments_minor") == [0, 0, 0]
+    assert column(funded, "liquidity", "later_receipts_minor") == [0, 0, 0]
+    assert funded.loans_to_repay == [
+        LoanToRepay(
+            variant_id="degree",
+            kind="advanced_learner_loan",
+            due=JAN,
+            amount=gbp(FEE),
+            conditional=False,
+        )
+    ]
+    assert [c.verification for c in conditional.conditions] == ["confirm_loan_approved"]
+    assert unfunded.feasibility is Feasibility.NOT_FEASIBLE_IN_MODEL
+    assert [f.code for f in unpriced.findings] == [FindingCode.LOAN_AMOUNT_UNKNOWN]
+    # The family says which loan it rests on.
+    [action] = family_key(
+        compile_input(student(), catalogue_of(degree(tuition_fee_loan=approved))).variants
+    ).actions
+    assert action.financing == ["advanced_learner_loan:approved"]
+
+
+@pytest.mark.req("FUNDING-06", "FUNDING-04")
+def test_the_person_states_which_fee_loan_and_any_other_kind_is_refused() -> None:
+    stated = TuitionFeeLoanInput.model_validate(
+        {"kind": "advanced_learner_loan", "eligibility": "confirmed", "application": "applied"}
+    )
+    plain = TuitionFeeLoanInput(
+        eligibility=EligibilityStatus.CONFIRMED, application=AwardState.APPLIED
+    )
+
+    assert stated.kind == "advanced_learner_loan"
+    assert stated.loan(CONSTRUCTED).kind == "advanced_learner_loan"  # reaches the variant
+    assert plain.kind == "tuition_fee_loan"  # a document stored before keeps its meaning
+    with pytest.raises(ValidationError):
+        TuitionFeeLoanInput.model_validate(
+            {"kind": "maintenance_loan", "eligibility": "confirmed", "application": "applied"}
+        )

@@ -2553,6 +2553,24 @@ export type FamilyAction = {
 };
 
 /**
+ * FeeLoanKind
+ *
+ * The two loans paid straight to the provider that are a loan to repay in L0: a tuition
+ * fee loan (spec section 22, 2026-11-01) and, by the product owner's provisional yes of the
+ * same day, an Advanced Learner Loan. One rule for both; the kind only says which.
+ */
+export const FeeLoanKind = { TUITION_FEE_LOAN: 'tuition_fee_loan', ADVANCED_LEARNER_LOAN: 'advanced_learner_loan' } as const;
+
+/**
+ * FeeLoanKind
+ *
+ * The two loans paid straight to the provider that are a loan to repay in L0: a tuition
+ * fee loan (spec section 22, 2026-11-01) and, by the product owner's provisional yes of the
+ * same day, an Advanced Learner Loan. One rule for both; the kind only says which.
+ */
+export type FeeLoanKind = typeof FeeLoanKind[keyof typeof FeeLoanKind];
+
+/**
  * FewMatched
  *
  * Only these matched closely enough to suggest; weaker matches don't fill the rest.
@@ -3440,15 +3458,16 @@ export type LabelMatchOut = {
 /**
  * LoanToRepay
  *
- * What a tuition fee loan paid straight to the provider pays for a route (spec section
- * 22): a loan the person repays later, never their payment, cash, support or a receipt. Facts
- * only; the web words them (R11).
+ * What a fee loan paid straight to the provider (a tuition fee loan or an Advanced Learner
+ * Loan) pays for a route (spec section 22): a loan the person repays later, never their
+ * payment, cash, support or a receipt. Facts only; the web words them (R11).
  */
 export type LoanToRepay = {
     /**
      * Variant Id
      */
     variant_id: string;
+    kind?: FeeLoanKind;
     /**
      * Due
      */
@@ -10317,7 +10336,8 @@ export type TrendState = typeof TrendState[keyof typeof TrendState];
 /**
  * TuitionFeeLoan
  *
- * A tuition fee loan paid straight to the provider, as the person states it for one
+ * A fee loan paid straight to the provider (a tuition fee loan, or an Advanced Learner
+ * Loan: `kind`), as the person states it for one
  * variant (spec section 22, 2026-11-01; FUNDING-06). It pays the variant's fees (never its
  * extra costs), after any support paid to the provider, up to its amount: what it pays is not
  * the person's payment, cash or direct spending, and the route carries it as a loan to repay
@@ -10331,6 +10351,10 @@ export type TrendState = typeof TrendState[keyof typeof TrendState];
  */
 export type TuitionFeeLoan = {
     /**
+     * Which loan: a tuition fee loan unless the person says otherwise.
+     */
+    kind?: FeeLoanKind;
+    /**
      * Null: not known, never £0.
      */
     amount: Money | null;
@@ -10343,12 +10367,17 @@ export type TuitionFeeLoan = {
 /**
  * TuitionFeeLoanInput
  *
- * A tuition fee loan paid straight to the provider, as the person states it for one option
- * (spec section 22, 2026-11-01): its amount and its funding statuses (ADR 0013 decision 5).
- * The rules of `planning.catalogue.TuitionFeeLoan`: an approval needs confirmed eligibility.
- * Never support: a maintenance loan or any other loan stated as a support is refused.
+ * A fee loan paid straight to the provider, as the person states it for one option (spec
+ * section 22, 2026-11-01): which loan (a tuition fee loan, or an Advanced Learner Loan by the
+ * product owner's provisional yes), its amount and its funding statuses (ADR 0013 decision
+ * 5). The rules of `planning.catalogue.TuitionFeeLoan`: an approval needs confirmed
+ * eligibility. Never support: a maintenance loan or any other loan is refused.
  */
 export type TuitionFeeLoanInput = {
+    /**
+     * Which loan: a tuition fee loan unless the person says otherwise.
+     */
+    kind?: FeeLoanKind;
     /**
      * Null: not known, never £0.
      */

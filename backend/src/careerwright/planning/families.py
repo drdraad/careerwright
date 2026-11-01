@@ -41,7 +41,7 @@ class FamilyAction(StrictModel):
     concept_id: str
     way: str | None  # the offering, when it is one way of taking an intake
     work_pattern: WorkPatternKind | None
-    # "instrument:award" for each support it rests on, and "tuition_fee_loan:application"
+    # "instrument:award" for each support it rests on, and "<fee loan kind>:application"
     financing: list[str]
     conditional_offer: bool
 
@@ -131,7 +131,10 @@ def _action(variant: CompiledVariant) -> FamilyAction:
             [
                 *(f"{s.instrument_id}:{s.award.value}" for s in variant.supports),
                 *(
-                    [f"tuition_fee_loan:{variant.tuition_fee_loan.application.value}"]
+                    [
+                        f"{variant.tuition_fee_loan.kind.value}:"
+                        f"{variant.tuition_fee_loan.application.value}"
+                    ]
                     if variant.tuition_fee_loan is not None
                     else []
                 ),

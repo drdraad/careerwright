@@ -26,6 +26,7 @@ only make worse.
 from pydantic import BaseModel, ConfigDict
 
 from careerwright.money import Minor, Money
+from careerwright.planning.catalogue import FeeLoanKind
 
 BASIS_POINTS = 10_000
 
@@ -56,11 +57,13 @@ class Liability(StrictModel):
 
 
 class LoanToRepay(StrictModel):
-    """What a tuition fee loan paid straight to the provider pays for a route (spec section
-    22): a loan the person repays later, never their payment, cash, support or a receipt. Facts
-    only; the web words them (R11)."""
+    """What a fee loan paid straight to the provider (a tuition fee loan or an Advanced Learner
+    Loan) pays for a route (spec section 22): a loan the person repays later, never their
+    payment, cash, support or a receipt. Facts only; the web words them (R11)."""
 
     variant_id: str
+    # Which loan; the default reads a result stored before the Advanced Learner Loan joined.
+    kind: FeeLoanKind = FeeLoanKind.TUITION_FEE_LOAN
     # The month the fee it pays falls due (beyond the horizon too); None: not known, because
     # the loan's amount or the fee's month is not.
     due: str | None
