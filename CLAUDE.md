@@ -204,7 +204,12 @@ Run from the repository root (details: `docs/runbook.md`).
     only a preference), and a violation is "not feasible in this monthly model", never
     "cannot afford". Unknown dates, cost, timetable or a hard limit leave a route
     unresolved, never passed. Every readiness qualification qualifies the route. Only an
-    approved award counts unconditionally; a loan is never support. Readiness milestones
+    approved award counts unconditionally; a loan is never support. One L0 exception (spec
+    section 22): a tuition fee loan or an Advanced Learner Loan paid straight to the
+    provider, as the person states it, is a loan to repay: what it pays is in neither their
+    cash, direct spending nor payment cap; the route lists it with its repayment unknown,
+    never 0; the economic cost counts the fee once; not yet approved, the route is
+    conditional beside the self-paid one. Every other loan stays information. Readiness milestones
     come from `careerwright.capability.readiness.assess`, never from planning code, and Task 13a's
     oracle shares no code with `careerwright.planning.checker`.
   - Pareto layers are computed over the full archive, dominated schedules included.
