@@ -4,13 +4,22 @@ no list holds is found in independent sources. Pure: no database, no network, no
 A page counts only where the title is verified, word for word, as a span of its visible text
 (`span_offsets`: case, spacing and apostrophe forms aside, whole words at both ends). The
 role is found when the title is verified on pages from at least two independent sources, or
-on one page of an official class. Independent means distinct hosts or distinct employers;
+on one page of an official class. Independent means distinct sites or distinct employers;
 copies of one advert fold into one source first, and never count twice (ADR 0009 decision 6):
 two pages are copies when a posting of one is the same job as a posting of the other
-(`jobs.same_job`), or when the title and the words after it are the same on both
-(`PASSAGE_WORDS`). Two pages on one host are one source, unless each names an employer and
-they name different ones. Otherwise the role stays "not yet found in independent sources":
-visible, never hidden, never a suggestion.
+(`jobs.same_job`), or when they share a passage around the title (`passages`): at any of the
+title's places on each page (up to `MAX_PLACES`), the title with the `PASSAGE_WORDS` words
+after it, or the `PASSAGE_WORDS` words before it with the title. So a page's own `<title>`,
+navigation or footer, which name the title too, never make two copies of one advert differ:
+the advert's body still shares its passage. Two pages of one site (`site`: the registrable
+domain, so `www.` and `careers.` of one domain are one) are one source, unless each names an
+employer and they name different ones. Otherwise the role stays "not yet found in
+independent sources": visible, never hidden, never a suggestion.
+
+Folding errs towards one source: two pages that share 24 words around the title (a common
+template's words included) count once, and so do two sites under one two-level suffix this
+module doesn't list (`_TWO_LEVEL_SUFFIXES`, the UK's): "not yet found" is said, never a
+false "found".
 
 Nothing a page says about itself, or asks a model to do, reaches this: a page's class comes
 from the source manifest, and a span is checked by code. No model reads a role page.
@@ -31,11 +40,51 @@ from careerwright.profile.slate_explanation import span_offsets
 OFFICIAL_CLASSES = frozenset(
     {RightsClass.GOVUK, RightsClass.PUBLIC_SECTOR, RightsClass.PROFESSIONAL_BODY}
 )
-# The words after the title that two copies of one advert share: the title's own words, then
-# this many more, compared as lower-case words.
+# The words beside the title that two copies of one advert share: the title's own words with
+# this many more after it, or this many before it, compared as lower-case words.
 PASSAGE_WORDS = 24
+# Fewer words on one side, where the text ends first: that side is too short to tell one page
+# from another (a page that merely starts or ends with the title, or "<title> jobs"), so it
+# isn't fingerprinted.
+EDGE_WORDS = 8
+# The title's places on one page whose passages are kept (a page names it in its <title>,
+# navigation, heading, body and footer): so at most twice this many fingerprints a page.
+MAX_PLACES = 16
 INDEPENDENT_SOURCES = 2
 _WORD = re.compile(r"\w+")
+# Public suffixes of two labels under which each name is its own site (the UK's; ".gov.uk"'s
+# "service.gov.uk" is three). Elsewhere a site is the host's last two labels.
+_TWO_LEVEL_SUFFIXES = frozenset(
+    {
+        "ac.uk",
+        "co.uk",
+        "gov.uk",
+        "ltd.uk",
+        "me.uk",
+        "mod.uk",
+        "net.uk",
+        "nhs.uk",
+        "org.uk",
+        "plc.uk",
+        "police.uk",
+        "sch.uk",
+    }
+)
+_THREE_LEVEL_SUFFIXES = frozenset({"service.gov.uk"})
+
+
+def site(host: str) -> str:
+    """The site a host belongs to, its registrable domain: `careers.northwind.co.uk` and
+    `www.northwind.co.uk` are both `northwind.co.uk`. Case and a final dot aside; an address
+    is its own site."""
+    name = host.casefold().rstrip(".")
+    labels = name.split(".")
+    if ":" in name or all(label.isdigit() for label in labels):
+        return name
+    for size, suffixes in ((3, _THREE_LEVEL_SUFFIXES), (2, _TWO_LEVEL_SUFFIXES)):
+        if len(labels) > size and ".".join(labels[-size:]) in suffixes:
+            return ".".join(labels[-size - 1 :])
+    return ".".join(labels[-2:])
 
 
 @dataclass(frozen=True)
@@ -45,7 +94,9 @@ class TitleCheck:
     text_sha256: str  # of the visible text the span indexes into
     span: tuple[int, int] | None  # where the title is, in that text; None: not verified
     excerpt: str | None  # the page's own characters around the span, at most 200
-    passage_sha256: str | None  # the title and the words after it, for copies of one advert
+    # Fingerprints of the passages around the title's places (`passages`), for copies of one
+    # advert; none where the title is not verified.
+    passages: tuple[str, ...]
     postings: tuple[CanonicalFacts, ...] = ()  # the page's structured postings, if any
 
     @property
@@ -77,6 +128,33 @@ def excerpt_around(text: str, start: int, end: int) -> str:
     return text[left:right].strip()
 
 
+def passages(title: str, text: str) -> tuple[str, ...]:
+    """Fingerprints of the passages around the title's places in the text, as lower-case words:
+    at each of its first `MAX_PLACES` places, the title with the `PASSAGE_WORDS` words after it
+    and the `PASSAGE_WORDS` words before it with the title (fewer where the text ends first),
+    each side only where it holds at least `EDGE_WORDS` words (so a page that merely starts or
+    ends with the title shares nothing with another that does); a place with neither side
+    stands for the whole text, so two copies of one short page still match."""
+    wanted = _WORD.findall(title.casefold())
+    words = _WORD.findall(text.casefold())
+    size = len(wanted)
+    if not size:
+        return ()
+    places = [i for i in range(len(words) - size + 1) if words[i : i + size] == wanted]
+    found: set[str] = set()
+    for i in places[:MAX_PLACES]:
+        after = words[i + size : i + size + PASSAGE_WORDS]
+        before = words[max(0, i - PASSAGE_WORDS) : i]
+        sides = [
+            passage
+            for side, passage in ((after, wanted + after), (before, before + wanted))
+            if len(side) >= EDGE_WORDS
+        ]
+        for passage in sides or [words]:
+            found.add(_sha256(" ".join(passage)))
+    return tuple(sorted(found))
+
+
 def check_title(
     title: str, text: str, copies: Sequence[JobCopy] = (), *, provider: str
 ) -> TitleCheck:
@@ -86,15 +164,13 @@ def check_title(
     )
     found = span_offsets(title, text)
     if found is None:
-        return TitleCheck(_sha256(text), None, None, None, postings)
+        return TitleCheck(_sha256(text), None, None, (), postings)
     start, end = found
-    words = _WORD.findall(text[start:].casefold())
-    passage = words[: len(_WORD.findall(title)) + PASSAGE_WORDS]
     return TitleCheck(
         text_sha256=_sha256(text),
         span=found,
         excerpt=excerpt_around(text, start, end),
-        passage_sha256=_sha256(" ".join(passage)),
+        passages=passages(title, text) or (_sha256(" ".join(_WORD.findall(text.casefold()))),),
         postings=postings,
     )
 
@@ -129,12 +205,12 @@ class Corroboration:
     sources: int  # independent sources showing the title (copies counted once)
     official: bool  # an official page shows it
     # The pages showing the title, grouped by source: copies of one advert, and pages of one
-    # host, share a group.
+    # site, share a group.
     groups: list[list[str]] = field(default_factory=list)
 
 
 def _copies(a: TitleCheck, b: TitleCheck) -> bool:
-    if a.passage_sha256 is not None and a.passage_sha256 == b.passage_sha256:
+    if set(a.passages) & set(b.passages):
         return True
     return any(same_job(x, y) for x in a.postings for y in b.postings)
 
@@ -142,7 +218,7 @@ def _copies(a: TitleCheck, b: TitleCheck) -> bool:
 def _one_source(a: PageEvidence, b: PageEvidence) -> bool:
     if _copies(a.check, b.check):
         return True
-    if a.host != b.host:
+    if site(a.host) != site(b.host):
         return False
     employers_a, employers_b = a.check.employers, b.check.employers
     return not (employers_a and employers_b and not employers_a & employers_b)

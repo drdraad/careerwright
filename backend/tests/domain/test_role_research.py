@@ -41,6 +41,7 @@ from tests.support.source_server import SYNTHETIC_MARKER, Scripted, source_serve
 TITLE = "Orbital hydroponics technician"  # synthetic: a title no list holds
 ROLE = RoleSearchInput(title=TITLE)
 NOW = datetime(2026, 11, 1, tzinfo=UTC)
+CURLY = "\N{RIGHT SINGLE QUOTATION MARK}"
 
 
 def page_text(*paragraphs: str) -> str:
@@ -141,7 +142,86 @@ def test_the_restricted_worker_returns_a_pages_text_only_when_asked_for_role_res
     assert FetchRequest(url=url).read_text is False  # the job path is unchanged
 
 
+@pytest.mark.req("DIV1-15")
+@pytest.mark.parametrize(
+    "hidden",
+    [
+        f'<div style="display:none">{TITLE}</div>',
+        f'<div style="color: red; DISPLAY : None !important">{TITLE}</div>',
+        f'<span style="visibility:hidden">{TITLE}</span>',
+        f"<p hidden>{TITLE}</p>",
+        f"<section hidden><p>Our <b>{TITLE}</b></p></section>",
+        f"<noscript>{TITLE}</noscript>",
+        f"<template><p>{TITLE}</p></template>",
+    ],
+)
+def test_hidden_text_is_never_visible_text(hidden: str) -> None:
+    html = f"<html><body>{SYNTHETIC_MARKER}<p>Before</p>{hidden}<p>After</p></body></html>"
+
+    text = role_text(html)
+
+    assert TITLE not in text
+    assert "Before" in text
+    assert "After" in text  # what follows a hidden element is still read
+    assert not check_title(TITLE, text, provider="a.example").verified
+
+
+def test_text_after_a_hidden_element_inside_one_paragraph_is_still_read() -> None:
+    html = f"<html><body><p>Our <span hidden>secret</span>{TITLE} grows food.</p></body></html>"
+
+    assert f"Our {TITLE} grows food." in role_text(html)
+
+
 # --- the title, word for word --------------------------------------------------------------
+
+
+@pytest.mark.req("DIV1-15")
+@pytest.mark.parametrize(
+    "shown",
+    [
+        f"Sub{TITLE.casefold()} wanted.",  # the title at the end of a longer word
+        f"Our {TITLE}s are busy.",  # at the start of one
+        f"Our x{TITLE} role.",
+        "Orbital hydroponics-technician wanted.",
+        # The quotation check's whole words (`span_offsets`): an apostrophe inside a word is
+        # part of it, so a possessive is another word, never the title (it errs towards "not
+        # yet found", never a false "found").
+        f"Our {TITLE}'s duties.",
+        f"Our {TITLE}{CURLY}s duties.",
+    ],
+)
+def test_the_title_is_never_verified_inside_a_longer_word(shown: str) -> None:
+    assert not check_title(TITLE, page_text(shown), provider="a.example").verified
+
+
+@pytest.mark.req("DIV1-15")
+@pytest.mark.parametrize(
+    "shown",
+    [
+        f"({TITLE})",
+        f"“{TITLE}”, Leeds.",
+        f"Wanted: {TITLE}!",
+        f"Role/{TITLE}/Leeds",
+        f"'{TITLE}' wanted.",  # a quotation mark's apostrophe is no part of a word
+    ],
+)
+def test_the_title_is_verified_beside_punctuation(shown: str) -> None:
+    check = check_title(TITLE, page_text(shown), provider="a.example")
+
+    assert check.verified
+    assert check.span is not None
+    assert page_text(shown)[check.span[0] : check.span[1]] == TITLE
+
+
+@pytest.mark.req("DIV1-15")
+def test_an_apostrophe_in_the_title_matches_either_form() -> None:
+    title = "Children's play ranger"  # synthetic
+    straight = check_title(title, page_text("A Children's play ranger post."), provider="a")
+    curly = check_title(title, page_text(f"A Children{CURLY}s play ranger post."), provider="a")
+
+    assert straight.verified
+    assert curly.verified
+    assert curly.passages == straight.passages  # copies fold whichever apostrophe they use
 
 
 @pytest.mark.req("DIV1-15")
@@ -163,7 +243,8 @@ def test_the_title_is_verified_only_as_whole_words_of_the_page() -> None:
     assert not inside.verified
     assert not apart.verified
     assert inside.excerpt is None
-    assert inside.passage_sha256 is None
+    assert inside.passages == ()
+    assert found.passages  # a verified title always has a passage to fold copies by
 
 
 @pytest.mark.req("DIV1-15")
@@ -222,6 +303,123 @@ def test_two_copies_of_one_advert_on_two_hosts_count_once() -> None:
     assert result.verdict is RoleVerdict.NOT_YET_FOUND
     assert result.reason is NotYetFoundReason.ONE_SOURCE_ONLY
     assert result.groups == [["p1", "p2"]]
+
+
+def board_page(board: str, body: str) -> str:
+    """One board's page around an advert: its own `<title>` and navigation, both naming the
+    title before the advert does, and its own footer after it (synthetic)."""
+    return (
+        f"<html><head><title>{TITLE} | {board}</title></head><body>{SYNTHETIC_MARKER}"
+        f"<nav><a href='/'>{board} home</a> <a href='/jobs'>Jobs</a> &gt; {TITLE}</nav>"
+        f"<p>{board} lists thousands of roles. Sign in to save this one.</p>"
+        f"<main>{body}</main><footer>{board} Ltd. Cookies and privacy.</footer></body></html>"
+    )
+
+
+def board_evidence(ref: str, host: str, board: str, body: str) -> PageEvidence:
+    return PageEvidence(
+        ref,
+        host,
+        RightsClass.OTHER,
+        check_title(TITLE, role_text(board_page(board, body)), (), provider=host),
+    )
+
+
+@pytest.mark.req("DIV1-15", "DIV1-04", "JOB-02")
+def test_one_advert_on_two_boards_counts_once_whatever_each_board_puts_around_it() -> None:
+    # The review's probe: an identical advert body on two boards, each page naming the title
+    # first in its own <title> and navigation, with its own words after those.
+    body = f"<h1>{TITLE}</h1><p>{ADVERT}</p>"
+    result = corroborate(
+        [
+            board_evidence("p1", "www.jobs-today.example", "Jobs Today", body),
+            board_evidence("p2", "www.roles-direct.example", "Roles Direct", body),
+        ]
+    )
+
+    assert result.verdict is RoleVerdict.NOT_YET_FOUND
+    assert result.reason is NotYetFoundReason.ONE_SOURCE_ONLY
+    assert result.groups == [["p1", "p2"]]
+
+
+@pytest.mark.req("DIV1-15", "DIV1-04", "JOB-02")
+def test_an_advert_that_names_the_title_only_at_its_end_counts_once_on_two_boards() -> None:
+    # The words before the advert's own mention are the advert's; each board's footer follows.
+    body = (
+        "<p>You will tend the racks, log the nutrient readings and train two apprentices each "
+        "season at our Leeds growing hub, with a pension and a four day week. "
+        f"Apply today to join us as our next {TITLE}</p>"
+    )
+    result = corroborate(
+        [
+            board_evidence("p1", "www.jobs-today.example", "Jobs Today", body),
+            board_evidence("p2", "www.roles-direct.example", "Roles Direct", body),
+        ]
+    )
+
+    assert result.verdict is RoleVerdict.NOT_YET_FOUND
+    assert result.groups == [["p1", "p2"]]
+
+
+@pytest.mark.req("DIV1-15", "DIV1-04")
+def test_two_boards_with_their_own_adverts_are_two_sources_whatever_their_chrome() -> None:
+    result = corroborate(
+        [
+            board_evidence("p1", "www.jobs-today.example", "Jobs Today", f"<p>{ADVERT}</p>"),
+            board_evidence(
+                "p2",
+                "www.roles-direct.example",
+                "Roles Direct",
+                f"<p>What does an {TITLE} do? They keep crops alive in orbit, night and day, "
+                "with a crew of six and a greenhouse the size of a bus.</p>",
+            ),
+        ]
+    )
+
+    assert result.verdict is RoleVerdict.FOUND
+    assert result.sources == 2
+
+
+@pytest.mark.req("DIV1-15", "DIV1-04")
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ("www.northwind.example", "careers.northwind.example"),
+        ("northwind.example", "jobs.eu.northwind.example"),
+        ("www.northwind.co.uk", "careers.northwind.co.uk"),
+        ("WWW.Northwind.Example.", "careers.northwind.example"),
+    ],
+)
+def test_two_subdomains_of_one_site_are_one_source(first: str, second: str) -> None:
+    result = corroborate(
+        [
+            evidence("p1", first, page_text(f"{TITLE} at Northwind: racks and readings.")),
+            evidence("p2", second, page_text(f"What does an {TITLE} do? They grow food.")),
+        ]
+    )
+
+    assert result.verdict is RoleVerdict.NOT_YET_FOUND
+    assert result.groups == [["p1", "p2"]]
+
+
+@pytest.mark.req("DIV1-15", "DIV1-04")
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ("www.northwind.co.uk", "www.southwind.co.uk"),
+        ("leeds.gov.uk", "york.gov.uk"),
+        ("northwind.example", "southwind.example"),
+    ],
+)
+def test_two_sites_under_one_public_suffix_are_two_sources(first: str, second: str) -> None:
+    result = corroborate(
+        [
+            evidence("p1", first, page_text(f"{TITLE} at Northwind: racks and readings.")),
+            evidence("p2", second, page_text(f"What does an {TITLE} do? They grow food.")),
+        ]
+    )
+
+    assert result.verdict is RoleVerdict.FOUND
 
 
 def posting(employer: str, source_id: str) -> JobCopy:
@@ -319,6 +517,6 @@ def test_a_title_check_keeps_no_page_text() -> None:
         "text_sha256",
         "span",
         "excerpt",
-        "passage_sha256",
+        "passages",
         "postings",
     }

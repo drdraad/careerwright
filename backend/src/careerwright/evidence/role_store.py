@@ -1,4 +1,4 @@
-"""SQL for role research's records (adapter; Task 6e, migration 0042): the research itself
+"""SQL for role research's records (adapter; Task 6e, migrations 0042 and 0043): the research itself
 (the title, its search and the acquisition that read its pages) and what code found of the
 title on each page read.
 
@@ -113,8 +113,8 @@ def insert_page_check(
     tx.execute(
         sa.text(
             "INSERT INTO careerwright.role_page_checks (attempt_id, workspace_id, text_sha256, "
-            "span_start, span_end, excerpt, passage_sha256, postings) VALUES (:attempt, :ws, "
-            ":sha, :start, :end, :excerpt, :passage, CAST(:postings AS jsonb)) "
+            "span_start, span_end, excerpt, passages, postings) VALUES (:attempt, :ws, "
+            ":sha, :start, :end, :excerpt, CAST(:passages AS text[]), CAST(:postings AS jsonb)) "
             "ON CONFLICT (attempt_id) DO NOTHING"
         ),
         {
@@ -124,7 +124,7 @@ def insert_page_check(
             "start": start,
             "end": end,
             "excerpt": check.excerpt,
-            "passage": check.passage_sha256,
+            "passages": list(check.passages),
             "postings": json.dumps([facts_json(p) for p in check.postings]),
         },
     )
@@ -135,7 +135,7 @@ def page_checks(tx: Tx, attempt_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, Tit
         return {}
     rows = tx.execute(
         sa.text(
-            "SELECT attempt_id, text_sha256, span_start, span_end, excerpt, passage_sha256, "
+            "SELECT attempt_id, text_sha256, span_start, span_end, excerpt, passages, "
             "postings FROM careerwright.role_page_checks WHERE attempt_id = ANY(:ids)"
         ),
         {"ids": list(attempt_ids)},
@@ -145,7 +145,7 @@ def page_checks(tx: Tx, attempt_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, Tit
             text_sha256=r["text_sha256"],
             span=(r["span_start"], r["span_end"]) if r["span_start"] is not None else None,
             excerpt=r["excerpt"],
-            passage_sha256=r["passage_sha256"],
+            passages=tuple(r["passages"]),
             postings=tuple(facts_from_json(p) for p in r["postings"]),
         )
         for r in rows
