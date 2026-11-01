@@ -42,6 +42,7 @@ from careerwright.profile.document import (
     FieldState,
     PayPeriod,
     ProfileDocument,
+    QualificationAnswer,
     SalaryFloor,
     checked_input,
     input_type,
@@ -56,8 +57,10 @@ from careerwright.profile.safety import (
 
 # Version 2 (Task 6): the person's entry and conversation mode, the work-style field, and
 # the support and inference rules. Version 3: one question, in next_question only. Version 4:
-# the smaller-step instruction for a turn whose message triggers the support screen.
-PROMPT_VERSION = "interview-turn-4"
+# the smaller-step instruction for a turn whose message triggers the support screen. Version 5
+# (Task 6f): someone may not have had a job yet (the `no_job_yet` answer), what the person is
+# doing now and their qualifications, and "their next step" for "the change".
+PROMPT_VERSION = "interview-turn-5"
 INPUT_FORMAT: Literal["careerwright.interview-turn-input"] = "careerwright.interview-turn-input"
 MAX_MESSAGE = 2_000
 MAX_REPLY = 1_200
@@ -104,6 +107,8 @@ class ProfileField(StrEnum):
     EVIDENCED_TASKS = "evidenced_tasks"
     WORK_STYLE = "work_style"
     MINIMUM_SALARY = "minimum_salary"
+    WORK_STATUS = "work_status"
+    QUALIFICATIONS = "qualifications"
 
 
 class AnsweredState(StrEnum):
@@ -113,6 +118,7 @@ class AnsweredState(StrEnum):
     UNKNOWN = "unknown"
     SKIPPED = "skipped"
     PREFER_NOT_TO_SAY = "prefer_not_to_say"
+    NO_JOB_YET = "no_job_yet"  # the current role only (`document.checked_input`)
 
 
 class ModelUpdate(BaseModel):
@@ -182,7 +188,7 @@ class ProposedChange(BaseModel):
     change_id: str
     field: ProfileField
     state: AnsweredState
-    value: SalaryFloor | Money | list[str] | float | str | None
+    value: SalaryFloor | Money | list[QualificationAnswer] | list[str] | float | str | None
     basis: Basis
     message_ids: list[uuid.UUID]
     reason: str
@@ -215,7 +221,11 @@ class InterviewProposal(BaseModel):
 
 
 def _plain(value: object) -> object:
-    return value.model_dump() if isinstance(value, BaseModel) else value
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json")
+    if isinstance(value, list):
+        return [_plain(item) for item in value]
+    return value.value if isinstance(value, StrEnum) else value
 
 
 def _bounded(text: str, limit: int) -> bool:
@@ -245,10 +255,12 @@ def _value(update: ModelUpdate, problems: list[str]) -> object:
         if update.text is not None or update.items is not None:
             problems.append(f"{name}: a {update.state.value} answer has no text or items")
         return None
-    if spec.kind is FieldKind.LIST:
+    if spec.kind in (FieldKind.LIST, FieldKind.QUALIFICATIONS):
         if update.text is not None or not update.items:
             problems.append(f"{name}: a list field needs items and no text")
             return None
+        if spec.kind is FieldKind.QUALIFICATIONS:
+            return _qualifications(update.items, name, problems)
         return [item.strip() for item in update.items]
     if update.items is not None or update.text is None:
         problems.append(f"{name}: this field needs text and no items")
@@ -275,6 +287,24 @@ def _value(update: ModelUpdate, problems: list[str]) -> object:
     return text
 
 
+_QUALIFICATION_ITEM = re.compile(r"^(achieved|expected):\s*(\S.*)$", re.IGNORECASE)
+
+
+def _qualification_parts(item: str) -> tuple[str, str] | None:
+    """A qualification as the model writes it, "achieved: GCSE maths" or "expected: A-level
+    biology": its status and its name, or None for any other shape."""
+    match = _QUALIFICATION_ITEM.match(item.strip())
+    return None if match is None else (match.group(1).casefold(), match.group(2).strip())
+
+
+def _qualifications(items: list[str], name: str, problems: list[str]) -> object:
+    parts = [_qualification_parts(item) for item in items]
+    if any(part is None for part in parts):
+        problems.append(f'{name}: give each as "achieved: name" or "expected: name"')
+        return None
+    return [{"name": text, "status": status} for status, text in filter(None, parts)]
+
+
 def _salary(text: str) -> SalaryFloor | None:
     """Gross pounds and the period as given; a year unless the person said otherwise."""
     match = SALARY_PATTERN.match(text)
@@ -298,13 +328,25 @@ def _quoted(value: str, texts: list[str]) -> bool:
     return bool(needle) and any(pattern.search(_quotable(text)) for text in texts)
 
 
+def _held_name(item: object) -> str:
+    """A held qualification's name, as the profile or a sealed turn input holds it."""
+    if isinstance(item, QualificationAnswer):
+        return item.name
+    return str(item.get("name", "")) if isinstance(item, dict) else str(item)
+
+
 def _basis(update: ModelUpdate, cited: list[str], held: object) -> Basis:
     """`stated` only when the model claims it and every new value the update proposes
     appears in the messages it cites (items the profile already holds need no quote);
     anything else, including an answer with no value to quote, is shown as `inferred`."""
     if update.basis is not Basis.STATED or update.state is not AnsweredState.PROVIDED:
         return Basis.INFERRED
-    if update.items is not None:
+    if FIELD_SPECS[update.field.value].kind is FieldKind.QUALIFICATIONS:
+        # Each new qualification's name is quoted; its status is a reading of their words.
+        kept = {_quotable(_held_name(item)) for item in held} if isinstance(held, list) else set()
+        named = [part[1] for part in map(_qualification_parts, update.items or []) if part]
+        values = [text for text in named if _quotable(text) not in kept]
+    elif update.items is not None:
         kept = {_quotable(str(item)) for item in held} if isinstance(held, list) else set()
         values = [item for item in update.items if _quotable(item) not in kept]
     elif FIELD_SPECS[update.field.value].kind is FieldKind.SALARY:
@@ -450,12 +492,13 @@ again for something the profile already holds.
 From the person's messages, propose updates to their profile fields. Propose only what a
 message states, or clearly implies; mark implications as "inferred". Every update cites the
 refs of the messages that support it (such as "m2"). Leave out fields the messages do not
-address. Use "unknown", "skipped" or "prefer_not_to_say" when the person says so.
+address. Use "unknown", "skipped" or "prefer_not_to_say" when the person says so, and for
+current_role only, "no_job_yet" when they say they haven't had a job yet (never a job title).
 
 Field formats: text fields take "text"; list fields take "items", the complete list after
-the change (keep the items the profile already holds that still apply); weekly_study_hours is a
+the update (keep the items the profile already holds that still apply); weekly_study_hours is a
 number of hours per week as text, such as "6"; money is pounds as digits, such as "1500"
-(direct_spend_cap: the most they would spend on the change in total; monthly_payment_cap:
+(direct_spend_cap: the most they would spend on their next step in total; monthly_payment_cap:
 the most in any one month). minimum_salary: the lowest gross pay they would accept, as
 pounds and the period they gave, such as "28000 per year" or "12.50 per hour" (a year
 unless they say otherwise; never convert it). cities: only names from this list:
@@ -463,6 +506,12 @@ unless they say otherwise; never convert it). cities: only names from this list:
 enjoyed_tasks: what they enjoy; confident_tasks: what they believe they can do;
 evidenced_tasks: what they have done and can show. Keep these three apart. work_style:
 how they say they like to work (optional; never ask for it twice, accept a skip).
+work_status: what they are doing now, as text, one of working, in_education_or_training,
+looking_for_work, caring, other. qualifications: items such as "achieved: GCSE maths" or
+"expected: A-level biology" (expected while they are taking it or awaiting the result). Both
+are optional: ask for each at most once and accept a skip. Never ask their age.
+Someone may not have had a job yet: ask about school or college, volunteering, caring,
+clubs and hobbies; never treat no job as a gap.
 
 "entry" is how the person chose to start. "sure": they know their direction; confirm the
 target role and the level they aim for, then the practical limits, and do not explore

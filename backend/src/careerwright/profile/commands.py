@@ -12,6 +12,7 @@ import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -27,6 +28,7 @@ from careerwright.profile.document import (
     FieldInput,
     ProfileDocument,
     ProfileInput,
+    QualificationAnswer,
     apply_updates,
     empty_profile,
     input_type,
@@ -222,11 +224,19 @@ def entered_words(
     for name, answer in answers.items():
         given = answer.value
         held = None if base is None else getattr(base.document, name).value
+        if isinstance(given, StrEnum):
+            continue  # a choice from a fixed list (what they are doing now): no words typed
         if isinstance(given, str) and given != held:
             words.append(given)
         elif isinstance(given, list):
-            words += [item for item in given if not (isinstance(held, list) and item in held)]
+            kept = [_words(item) for item in held] if isinstance(held, list) else []
+            words += [_words(item) for item in given if _words(item) not in kept]
     return words
+
+
+def _words(item: object) -> str:
+    """A list item's words: a qualification's name, or the item itself."""
+    return item.name if isinstance(item, QualificationAnswer) else str(item)
 
 
 def revert_profile(

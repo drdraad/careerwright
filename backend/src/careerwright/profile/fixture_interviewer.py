@@ -25,7 +25,13 @@ import re
 from dataclasses import dataclass
 
 from careerwright.catalogue.places import ENGLISH_CITIES
-from careerwright.profile.document import MAX_CITIES, MAX_TARGETS, MAX_TASKS, FieldState
+from careerwright.profile.document import (
+    MAX_CITIES,
+    MAX_TARGETS,
+    MAX_TASKS,
+    FieldState,
+    WorkStatus,
+)
 from careerwright.profile.interview import (
     AnsweredState,
     InterviewTurnOutput,
@@ -46,19 +52,24 @@ CRITICAL = (
     ProfileField.WEEKLY_STUDY_HOURS,
     ProfileField.DIRECT_SPEND_CAP,
 )
+SURE_QUESTION = "Which role are you aiming for, and at what level?"
+# The explore opening asks for no job (Task 6f, the product owner's decision 4; its final words
+# are theirs, at session W2). The web's `OPENING_QUESTION.unsure` is the same sentence.
+UNSURE_QUESTION = "What would you like your working life to be like?"
+# Asked of an unsure person straight after the opening (Task 6f): what they enjoy, wherever.
+ENJOY_QUESTION = "What do you enjoy doing, at school, at work or in your own time?"
 QUESTIONS = {
     ProfileField.CURRENT_ROLE: "What do you do now, or what did you do most recently?",
     ProfileField.CITIES: "Which English cities could you work in? Name up to three.",
     ProfileField.WEEKLY_STUDY_HOURS: "About how many hours a week could you give to learning?",
     ProfileField.DIRECT_SPEND_CAP: (
-        "What is the most you would spend on this change in total? You can say you'd rather "
+        "What is the most you would spend on your next step in total? You can say you'd rather "
         "not say."
     ),
     ProfileField.TARGET_TITLES: "Do you have a role in mind, or would you like to explore?",
+    ProfileField.ENJOYED_TASKS: ENJOY_QUESTION,
 }
 ROLE_QUESTION = QUESTIONS[ProfileField.TARGET_TITLES]
-SURE_QUESTION = "Which role are you aiming for, and at what level?"
-UNSURE_QUESTION = "What would you most like to be different about your working life?"
 _HOURS = re.compile(r"\b([0-9]{1,3}(?:\.[0-9]{1,2})?)\s*(?:hours?|hrs?)\b", re.IGNORECASE)
 # At most nine whole-pound digits, the bound `interview.MONEY_PATTERN` accepts; a longer
 # amount matches nothing, so the fixture never proposes a value the check would refuse.
@@ -80,6 +91,35 @@ _TARGET = re.compile(
     r"\bI want to be (?:a|an) ([A-Za-z][A-Za-z -]{2,60}?)(?=[.,;!?]| in | at | and |$)",
     re.IGNORECASE,
 )
+# Task 6f: no job yet, what the person is doing now, a qualification, and something they do.
+_NO_JOB = re.compile(
+    r"\bI(?:'ve| have) never (?:had a job|worked)\b|\bI (?:haven't|have not) had a job\b",
+    re.IGNORECASE,
+)
+_STUDYING = re.compile(
+    r"\bI(?:'m| am) (?:a |an )?(?:[A-Za-z-]+ )?(?:student|pupil)\b"
+    r"|\bI(?:'m| am) (?:at|in) (?:school|college|sixth form|university|uni)\b"
+    r"|\bI(?:'m| am) in Year 1[0-3]\b",
+    re.IGNORECASE,
+)
+_LOOKING = re.compile(r"\blooking for (?:work|a job)\b|\bunemployed\b", re.IGNORECASE)
+_CARING = re.compile(r"\bI(?:'m| am) (?:a )?(?:full-time )?carer\b|\bI care for\b", re.I)
+_QUALIFICATION_WORD = (
+    r"(?:A[- ]levels?|GCSEs?|BTECs?|T[- ]Levels?|NVQs?|diploma|degree|apprenticeship)"
+)
+_EXPECTED = re.compile(
+    rf"\b(?:doing|taking|studying(?: for)?) ([^.,;!?]{{0,60}}?\b{_QUALIFICATION_WORD}\b"
+    r"[^.,;!?]{0,40})",
+    re.IGNORECASE,
+)
+_ACHIEVED = re.compile(
+    rf"\bI(?:'ve| have)? (?:got|passed|have) ([^.,;!?]{{0,60}}?\b{_QUALIFICATION_WORD}\b"
+    r"[^.,;!?]{0,40})",
+    re.IGNORECASE,
+)
+_DONE = re.compile(r"\bI ((?:help|volunteer)\b[^.,;!?]{3,80})", re.IGNORECASE)
+# What someone is, read by `_ROLE`, that is what they are doing now, never a job title.
+_NOT_A_JOB = re.compile(r"\b(?:student|pupil|carer)$", re.IGNORECASE)
 _DECLINE = re.compile(r"\b(?:rather not say|prefer not to say)\b", re.IGNORECASE)
 _MONEY_WORDS = re.compile(r"\b(?:budget|spend|money|afford|pay)\b", re.IGNORECASE)
 # The whole message is one of the answers the opening hint names (STATE-08).
@@ -125,12 +165,17 @@ def asked_field(question: str | None) -> ProfileField | None:
 
 def _order(entry: EntryMode | None) -> list[_Ask]:
     """The questions in the order the entry the person chose leads with: a sure person
-    confirms the target first; anyone else answers the practical questions, then is asked
-    whether they have a role in mind."""
+    confirms the target first; an unsure person is asked what they enjoy (Task 6f); anyone but
+    a sure person answers the practical questions, then is asked whether they have a role in
+    mind. The role question is asked only while the role is not asked: "I haven't had a job
+    yet" answers it."""
     practical = [_Ask(field, QUESTIONS[field]) for field in CRITICAL]
     if entry is EntryMode.SURE:
         return [_SURE_TARGET, *practical]
-    return [*practical, _Ask(ProfileField.TARGET_TITLES, QUESTIONS[ProfileField.TARGET_TITLES])]
+    role_or_explore = _Ask(ProfileField.TARGET_TITLES, QUESTIONS[ProfileField.TARGET_TITLES])
+    if entry is EntryMode.UNSURE:
+        return [_Ask(ProfileField.ENJOYED_TASKS, ENJOY_QUESTION), *practical, role_or_explore]
+    return [*practical, role_or_explore]
 
 
 def _first_unanswered(context: PromptContext, answered: set[ProfileField]) -> _Ask | None:
@@ -265,10 +310,42 @@ def _proposals(context: PromptContext, ref: str, text: str) -> list[ModelUpdate]
                 state=AnsweredState.PREFER_NOT_TO_SAY,
             )
         )
-    if role := _ROLE.search(text):
+    if _NO_JOB.search(text):
+        updates.append(
+            _update(
+                ProfileField.CURRENT_ROLE,
+                ref,
+                "You said you haven't had a job yet.",
+                state=AnsweredState.NO_JOB_YET,
+                basis=Basis.INFERRED,
+            )
+        )
+    elif (role := _ROLE.search(text)) and not _NOT_A_JOB.search(role.group(1)):
         updates.append(
             _update(ProfileField.CURRENT_ROLE, ref, "You said what you do.", text=role.group(1))
         )
+    if status := _status(text):
+        updates.append(
+            _update(
+                ProfileField.WORK_STATUS,
+                ref,
+                "You said what you are doing now.",
+                text=status.value,
+                basis=Basis.INFERRED,
+            )
+        )
+    if qualification := _qualification(text):
+        held = [f"{q['status']}: {q['name']}" for q in _held_qualifications(context)]
+        items = list(dict.fromkeys([*held, qualification]))
+        if len(items) <= MAX_TASKS:
+            updates.append(
+                _update(
+                    ProfileField.QUALIFICATIONS,
+                    ref,
+                    "You named a qualification.",
+                    items=items,
+                )
+            )
     if target := _TARGET.search(text):
         targets = list(dict.fromkeys([*_listed(context, ProfileField.TARGET_TITLES), target[1]]))
         if len(targets) <= MAX_TARGETS:
@@ -291,7 +368,47 @@ def _proposals(context: PromptContext, ref: str, text: str) -> list[ModelUpdate]
                     items=[task.strip() for task in tasks],
                 )
             )
+    if done := _DONE.search(text):
+        tasks = list(dict.fromkeys([*_listed(context, ProfileField.EVIDENCED_TASKS), done[1]]))
+        if len(tasks) <= MAX_TASKS:
+            updates.append(
+                _update(
+                    ProfileField.EVIDENCED_TASKS,
+                    ref,
+                    "You said you do this.",
+                    items=[task.strip() for task in tasks],
+                )
+            )
     return updates
+
+
+def _status(text: str) -> WorkStatus | None:
+    """What the person said they are doing now, from a few fixed phrases; None otherwise."""
+    for pattern, status in (
+        (_STUDYING, WorkStatus.IN_EDUCATION_OR_TRAINING),
+        (_LOOKING, WorkStatus.LOOKING_FOR_WORK),
+        (_CARING, WorkStatus.CARING),
+    ):
+        if pattern.search(text):
+            return status
+    return None
+
+
+def _qualification(text: str) -> str | None:
+    """One qualification in the model's item form: "expected: …" for one being taken,
+    "achieved: …" for one they have; None when the message names neither."""
+    if expected := _EXPECTED.search(text):
+        return f"expected: {expected.group(1).strip()}"
+    if achieved := _ACHIEVED.search(text):
+        return f"achieved: {achieved.group(1).strip()}"
+    return None
+
+
+def _held_qualifications(context: PromptContext) -> list[dict[str, str]]:
+    current = context.profile[ProfileField.QUALIFICATIONS]
+    if current.state is not FieldState.PROVIDED or not isinstance(current.value, list):
+        return []
+    return [item for item in current.value if isinstance(item, dict)]
 
 
 def fixture_turn(context: PromptContext, *, smaller_step: bool = False) -> InterviewTurnOutput:

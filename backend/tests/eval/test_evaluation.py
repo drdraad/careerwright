@@ -16,6 +16,7 @@ from tools.evaluation import (
     failures_by_type,
     load_cases,
     observe_guard,
+    observe_interview_demo,
     observe_support,
 )
 
@@ -54,6 +55,26 @@ def test_every_support_case_passes(case: Case) -> None:
 @pytest.mark.parametrize("case", [c for c in CASES if c.kind is CaseKind.GUARD], ids=str)
 def test_every_guard_case_passes(case: Case) -> None:
     assert evaluate(case, observe_guard(case), {}) == []
+
+
+@pytest.mark.req("STATE-11", "PROF-13", "PROF-14")
+@pytest.mark.parametrize("case", [c for c in CASES if c.demo], ids=str)
+def test_every_demo_interview_case_passes_on_the_demo_interviewer(case: Case) -> None:
+    # Task 6f: offline, the demo interviewer's fixed patterns through the same check; the live
+    # model's run of the same case is Task 6e's (R5).
+    assert case.kind is CaseKind.INTERVIEW
+    assert evaluate(case, observe_interview_demo(case), {}) == []
+
+
+def test_state_is_fails_a_job_title_or_a_skip_for_no_job_yet() -> None:
+    case = BY_ID["INT-15"]
+    [expectation] = [e for e in case.expect if e.check == "state_is"]
+    as_title = turn([change("current_role", "student")])
+    as_skip = turn([change("current_role", None, state="skipped")])
+    field = expectation.field or ""
+    for observed in (as_title, as_skip, turn([])):
+        failures = [f for f in evaluate(case, observed, {}) if field in f.detail]
+        assert [f.type for f in failures][:1] == [FailureType.MISSED_FACT]
 
 
 def turn(

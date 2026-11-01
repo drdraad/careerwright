@@ -485,7 +485,8 @@ export const AnsweredState = {
     PROVIDED: 'provided',
     UNKNOWN: 'unknown',
     SKIPPED: 'skipped',
-    PREFER_NOT_TO_SAY: 'prefer_not_to_say'
+    PREFER_NOT_TO_SAY: 'prefer_not_to_say',
+    NO_JOB_YET: 'no_job_yet'
 } as const;
 
 /**
@@ -2577,7 +2578,7 @@ export type FieldEdit = {
     /**
      * Answer
      */
-    answer: TextInput | TextListInput | HoursInput | MoneyInput | SalaryInput;
+    answer: TextInput | TextListInput | HoursInput | MoneyInput | SalaryInput | WorkStatusInput | QualificationListInput;
 };
 
 /**
@@ -2588,7 +2589,8 @@ export const FieldState = {
     PROVIDED: 'provided',
     UNKNOWN: 'unknown',
     SKIPPED: 'skipped',
-    PREFER_NOT_TO_SAY: 'prefer_not_to_say'
+    PREFER_NOT_TO_SAY: 'prefer_not_to_say',
+    NO_JOB_YET: 'no_job_yet'
 } as const;
 
 /**
@@ -4082,6 +4084,18 @@ export const NeededInput = {
 export type NeededInput = typeof NeededInput[keyof typeof NeededInput];
 
 /**
+ * NoJobYet
+ *
+ * The first answer "I haven't had a job yet" (Task 6f; the product owner's words).
+ */
+export type NoJobYet = {
+    /**
+     * Expected Version
+     */
+    expected_version: number;
+};
+
+/**
  * NoSharedOccupation
  *
  * The role's join found no other occupation sharing enough essential skills.
@@ -5447,7 +5461,7 @@ export type ProfileDocument = {
     /**
      * Schema Version
      */
-    schema_version?: '3';
+    schema_version?: '4';
     preferred_name: TextField;
     current_role: TextField;
     cities: TextListField;
@@ -5460,6 +5474,8 @@ export type ProfileDocument = {
     evidenced_tasks: TextListField;
     work_style: TextListField;
     minimum_salary: SalaryField;
+    work_status: WorkStatusField;
+    qualifications: QualificationListField;
 };
 
 /**
@@ -5479,7 +5495,9 @@ export const ProfileField = {
     CONFIDENT_TASKS: 'confident_tasks',
     EVIDENCED_TASKS: 'evidenced_tasks',
     WORK_STYLE: 'work_style',
-    MINIMUM_SALARY: 'minimum_salary'
+    MINIMUM_SALARY: 'minimum_salary',
+    WORK_STATUS: 'work_status',
+    QUALIFICATIONS: 'qualifications'
 } as const;
 
 /**
@@ -5528,6 +5546,14 @@ export type ProfileInput = {
      * The lowest gross pay the person will accept, with its period: a hard limit, set only by their confirmation. Applied as a hard filter, with counts: a suggestion or a vacancy is left out only when the highest pay it states in this period is below it; unknown, predicted or other-period pay is never below it.
      */
     minimum_salary: SalaryInput;
+    /**
+     * What the person is doing now (optional): working, in education or training, looking for work, caring, or other.
+     */
+    work_status: WorkStatusInput;
+    /**
+     * Qualifications the person has or is taking (optional), at most 8, each achieved or expected. An expected one is never counted as achieved.
+     */
+    qualifications: QualificationListInput;
 };
 
 /**
@@ -5783,9 +5809,9 @@ export type ProposedChangeOut = {
     /**
      * Value
      *
-     * The proposed answer, typed as the field's input; null unless provided. A list is the complete list after the change: accepting it replaces the field's list.
+     * The proposed answer, typed as the field's input; null unless provided (Unknown, Skipped, Prefer not to say, or for the current role, `no_job_yet`). A list is the complete list after the change: accepting it replaces the field's list. What the person is doing now is one of `WorkStatus`'s codes.
      */
-    value: SalaryFloor | Money | Array<string> | number | string | null;
+    value: SalaryFloor | Money | Array<QualificationAnswer> | Array<string> | number | string | null;
     /**
      * stated: the value appears in the cited messages (checked by the server); inferred: implied, or not found in them.
      */
@@ -5950,6 +5976,55 @@ export const Qualification = {
  * Why a result is not unqualified. M0 matrices are always provisional.
  */
 export type Qualification = typeof Qualification[keyof typeof Qualification];
+
+/**
+ * QualificationAnswer
+ *
+ * A qualification in the person's words, achieved or expected.
+ */
+export type QualificationAnswer = {
+    /**
+     * Name
+     */
+    name: string;
+    status: QualificationStatus;
+};
+
+/**
+ * QualificationListField
+ */
+export type QualificationListField = {
+    state: FieldState;
+    /**
+     * Value
+     */
+    value?: Array<QualificationAnswer> | null;
+    /**
+     * Source Ref Id
+     */
+    source_ref_id?: string | null;
+};
+
+/**
+ * QualificationListInput
+ */
+export type QualificationListInput = {
+    state: FieldState;
+    /**
+     * Value
+     */
+    value?: Array<QualificationAnswer> | null;
+};
+
+/**
+ * QualificationStatus
+ */
+export const QualificationStatus = { ACHIEVED: 'achieved', EXPECTED: 'expected' } as const;
+
+/**
+ * QualificationStatus
+ */
+export type QualificationStatus = typeof QualificationStatus[keyof typeof QualificationStatus];
 
 /**
  * QueryChannel
@@ -9856,7 +9931,7 @@ export type TitleMatchesOut = {
     /**
      * Partial
      *
-     * True: neither ESCO nor the UK job-title index lists a title with every word typed, and these ESCO occupations hold the most of them, rarer words first. Ask "Careerwright couldn't match that title in ESCO. Is it one of these?", with "None of these is my job", which keeps the person's own words: the person chooses one or none, and nothing is joined to the typed words.
+     * True: neither ESCO nor the UK job-title index lists a title with every word typed, and these ESCO occupations hold the most of them, rarer words first. Ask whether it is one of these, naming ESCO plainly, with "None of these is my job", which keeps the person's own words: the person chooses one or none, and nothing is joined to the typed words.
      */
     partial: boolean;
     /**
@@ -10597,6 +10672,46 @@ export const WorkState = {
  * One state vocabulary (spec section 3, STATE-01). A failure is never an empty success.
  */
 export type WorkState = typeof WorkState[keyof typeof WorkState];
+
+/**
+ * WorkStatus
+ *
+ * What the person is doing now (spec section 3's work status), in their own choice.
+ */
+export const WorkStatus = {
+    WORKING: 'working',
+    IN_EDUCATION_OR_TRAINING: 'in_education_or_training',
+    LOOKING_FOR_WORK: 'looking_for_work',
+    CARING: 'caring',
+    OTHER: 'other'
+} as const;
+
+/**
+ * WorkStatus
+ *
+ * What the person is doing now (spec section 3's work status), in their own choice.
+ */
+export type WorkStatus = typeof WorkStatus[keyof typeof WorkStatus];
+
+/**
+ * WorkStatusField
+ */
+export type WorkStatusField = {
+    state: FieldState;
+    value?: WorkStatus | null;
+    /**
+     * Source Ref Id
+     */
+    source_ref_id?: string | null;
+};
+
+/**
+ * WorkStatusInput
+ */
+export type WorkStatusInput = {
+    state: FieldState;
+    value?: WorkStatus | null;
+};
 
 /**
  * WorkspaceExport
@@ -12829,6 +12944,52 @@ export type NameRoleResponses = {
 };
 
 export type NameRoleResponse = NameRoleResponses[keyof NameRoleResponses];
+
+export type NoJobYetData = {
+    body: NoJobYet;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/origin/role/no-job-yet';
+};
+
+export type NoJobYetErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type NoJobYetError = NoJobYetErrors[keyof NoJobYetErrors];
+
+export type NoJobYetResponses = {
+    /**
+     * Already the answer; nothing changed.
+     */
+    200: ProfileOut;
+    /**
+     * Successful Response
+     */
+    201: ProfileOut;
+};
+
+export type NoJobYetResponse = NoJobYetResponses[keyof NoJobYetResponses];
 
 export type ChooseClosestData = {
     body: ChooseClosest;

@@ -12,7 +12,7 @@ from careerwright.identity.records import PartialCompleteness, PartialReply
 from careerwright.money import Money
 from careerwright.profile import safety
 from careerwright.profile.conversation import TurnView
-from careerwright.profile.document import SalaryFloor
+from careerwright.profile.document import QualificationAnswer, SalaryFloor
 from careerwright.profile.fixture_interviewer import asked_field
 from careerwright.profile.interview import (
     AnsweredState,
@@ -31,15 +31,19 @@ from careerwright.profile.records import (
 )
 from careerwright.profile.title_details import TitleDetailsView
 
+ProposedValue = SalaryFloor | Money | list[QualificationAnswer] | list[str] | float | str | None
+
 
 class ProposedChangeOut(ResponseModel):
     change_id: str
     field: ProfileField
     state: AnsweredState
-    value: SalaryFloor | Money | list[str] | float | str | None = Field(
+    value: ProposedValue = Field(
         description=(
-            "The proposed answer, typed as the field's input; null unless provided. A list is "
-            "the complete list after the change: accepting it replaces the field's list."
+            "The proposed answer, typed as the field's input; null unless provided (Unknown, "
+            "Skipped, Prefer not to say, or for the current role, `no_job_yet`). A list is the "
+            "complete list after the change: accepting it replaces the field's list. What the "
+            "person is doing now is one of `WorkStatus`'s codes."
         )
     )
     basis: Basis = Field(

@@ -1458,6 +1458,41 @@ def name_role(
     return view, bool(changed)
 
 
+class NoJobYet(BaseModel):
+    """The first answer "I haven't had a job yet" (Task 6f; the product owner's words)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    expected_version: int = Field(ge=0)
+
+
+def no_job_yet(
+    tx: Tx,
+    actor: Actor,
+    workspace_id: uuid.UUID,
+    command: NoJobYet,
+    now: datetime,
+    pack: PackTargets,
+) -> tuple[ProfileView, bool]:
+    """Answer "What do you do now, or what did you do last?" with "I haven't had a job yet",
+    through the one profile write path: the current role's answer becomes `no_job_yet`,
+    citing the person's direct entry. It is an answer, never a job title, Skipped or Unknown,
+    so the person's light comes on and nothing asks for a job again. The same answer again
+    changes nothing. Returns the profile and whether it changed."""
+    source = NewSource(
+        source_ref_id=uuid.uuid4(),
+        kind=SourceKind.DIRECT_ENTRY,
+        label=DIRECT_ENTRY_LABEL,
+        observed_at=now,
+        recorded_by=actor.actor_id,
+    )
+    update = FieldUpdate(TextInput(state=FieldState.NO_JOB_YET), source)
+    view, changed = commit_profile_version(
+        tx, actor, workspace_id, command.expected_version, {"current_role": update}, pack=pack
+    )
+    return view, bool(changed)
+
+
 @dataclass(frozen=True)
 class ClosestGroup:
     """One ISCO-08 group the UK job-title index codes the role's title to, with the ESCO

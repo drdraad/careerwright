@@ -42,11 +42,13 @@ from careerwright.profile.exploration import (
     ChooseClosest,
     ChooseRole,
     NameRole,
+    NoJobYet,
     choose_closest,
     choose_role,
     first_slate,
     hard_filters,
     name_role,
+    no_job_yet,
 )
 from careerwright.profile.safety import has_risk_stem
 from careerwright.profile.title_details import role_marks
@@ -161,6 +163,44 @@ def post_role_title(
             support_note=SupportNoteOut.beside_a_title(),
         )
         return JSONResponse(refused.model_dump(mode="json"), status_code=error_status(error))
+    return JSONResponse(response, status_code=status)
+
+
+@router.post(
+    "/origin/role/no-job-yet",
+    response_model=ProfileOut,
+    status_code=201,
+    responses={200: {"model": ProfileOut, "description": "Already the answer; nothing changed."}},
+    operation_id="no_job_yet",
+)
+def post_no_job_yet(
+    workspace_id: uuid.UUID,
+    body: NoJobYet,
+    caller: CallerDep,
+    deps: Deps,
+    key: IdempotencyKey,
+) -> JSONResponse:
+    """The first answer "I haven't had a job yet": the current role answered `no_job_yet`
+    through the one profile write path, never a job title, Skipped or Unknown. No words are
+    typed, so nothing goes through the support screen; no model is called."""
+
+    def execute(tx: Tx) -> CommandResult:
+        view, changed = no_job_yet(
+            tx, caller.actor, workspace_id, body, deps.clock(), deps.pack_targets
+        )
+        return CommandResult(
+            201 if changed else 200, ProfileOut.of(view).model_dump(mode="json"), workspace_id
+        )
+
+    request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
+    status, response = run_idempotent(
+        deps.engine,
+        caller.actor.actor_id,
+        key,
+        "no_job_yet",
+        fingerprint("no_job_yet", request),
+        execute,
+    )
     return JSONResponse(response, status_code=status)
 
 

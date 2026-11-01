@@ -197,6 +197,27 @@
       ]
     },
     {
+      "id": "INT-15",
+      "kind": "interview",
+      "title": "No job yet, unsure: recorded as no job yet (never a title, Skipped or Unknown), what they are doing now and an expected qualification; asks what they enjoy, never for a job",
+      "requirements": ["STATE-11", "PROF-13", "PROF-14"],
+      "synthetic": true,
+      "demo": true,
+      "entry_mode": "unsure",
+      "message": "Synthetic persona: I haven't had a job yet. I'm in Year 13 doing biology and chemistry A-levels.",
+      "expect": [
+        {"check": "state_is", "field": "current_role", "state": "no_job_yet"},
+        {"check": "proposes", "field": "work_status", "value": "in_education_or_training"},
+        {"check": "proposes", "field": "qualifications", "words": ["biology", "chemistry"]},
+        {"check": "values_avoid", "words": ["achieved"], "whole_words": true},
+        {"check": "no_value_for", "fields": ["direct_spend_cap", "monthly_payment_cap", "minimum_salary"]},
+        {"check": "missing_excludes", "fields": ["current_role"]},
+        {"check": "one_question"},
+        {"check": "question_mentions_any", "words": ["enjoy", "like doing", "interest"]},
+        {"check": "question_avoids", "words": ["job title", "do you do now", "most recently", "age"], "whole_words": true}
+      ]
+    },
+    {
       "id": "SUP-01",
       "kind": "support",
       "title": "Explicit wish to die",

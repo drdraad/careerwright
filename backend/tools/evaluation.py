@@ -28,6 +28,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from careerwright.api.discovery_schemas import SlateOut, WrittenExplanationOut
+from careerwright.api.interview_schemas import ProposalOut
 from careerwright.capability.commands import committed_data, pack_targets
 from careerwright.catalogue import taxonomy_store
 from careerwright.catalogue.ai_resilience import committed_packs
@@ -58,15 +59,18 @@ from careerwright.profile.exploration import (
 from careerwright.profile.fixture_discovery import fixture_queries, prompt_context
 from careerwright.profile.fixture_explainer import fixture_explanation
 from careerwright.profile.fixture_explainer import prompt_context as explainer_context
+from careerwright.profile.fixture_interviewer import fixture_turn
 from careerwright.profile.interview import (
     ContextMessage,
     InterviewTurnOutput,
+    PromptContext,
     ProposalOrigin,
     TurnInput,
     check_turn,
     context_profile,
 )
-from careerwright.profile.records import TargetRecord
+from careerwright.profile.interview import render_prompt as render_interview_prompt
+from careerwright.profile.records import EntryMode, TargetRecord
 from careerwright.profile.safety import has_risk_stem
 from careerwright.profile.slate import MIN_SHARED_SKILLS, Emphasis, SlateControls
 from careerwright.profile.slate_explanation import RECORD_STEPS, build_input, check_explanation
@@ -170,6 +174,9 @@ class Case(BaseModel):
     requirements: list[str]
     synthetic: Literal[True]
     live: bool = False  # one of the representative cases the live run may take
+    # An interview case the demo interviewer also answers offline (Task 6f): its fixed
+    # patterns, through the same check, so the demo's expectations are checked without a model.
+    demo: bool = False
     entry_mode: str | None = None
     conversation_mode: str | None = None
     profile: Json = Field(default_factory=dict)  # field -> value (provided) or {"state": ...}
@@ -252,6 +259,11 @@ def _interview(observed: Json, e: Expectation) -> Failure | None:
     if e.check == "no_value_for":
         given = [f for f in e.fields if f in changes and changes[f]["value"] is not None]
         return Failure(FailureType.INVENTED_VALUE, f"values for {given}") if given else None
+    if e.check == "state_is":
+        change = changes.get(e.field or "")
+        if change is None or change["state"] != e.state or change["value"] is not None:
+            return Failure(FailureType.MISSED_FACT, f"{e.field}: {change and change['state']}")
+        return None
     if e.check == "state_if_proposed":
         change = changes.get(e.field or "")
         if change is not None and (change["state"] != e.state or change["value"] is not None):
@@ -654,6 +666,27 @@ def observe_guard(case: Case) -> Json:
     )
     changes = [] if proposal is None else [c.model_dump(mode="json") for c in proposal.changes]
     return {"problems": problems, "changes": changes}
+
+
+def observe_interview_demo(case: Case) -> Json:
+    """An interview case's turn as the demo interviewer answers it offline: its fixed patterns
+    over the same prompt a model reads, through the same check, shaped as the API's turn."""
+    turn = TurnInput(
+        profile_version=1,
+        profile=context_profile(document_of(case)),
+        messages=[
+            ContextMessage(ref="m1", message_id=_SOURCE, text=case.message or "", sent_at=_AT)
+        ],
+        replies={},
+        entry_mode=EntryMode(case.entry_mode) if case.entry_mode else None,
+    )
+    _, _, body = render_interview_prompt(turn).partition("\n")
+    output = fixture_turn(PromptContext.model_validate_json(body))
+    proposal, problems = check_turn(output, turn, ProposalOrigin.FIXTURE)
+    if proposal is None:
+        return {"proposal": None, "run": {"status": f"failed: {problems}"}}
+    observed = ProposalOut.of(proposal).model_dump(mode="json")
+    return {"proposal": observed, "run": {"status": "complete"}}
 
 
 def observe_discovery_offline(tx: Tx, case: Case, *, release: str | None = None) -> Json:
