@@ -1060,3 +1060,8 @@ space; this ADR changes as follows.
     (`DecisionSavedOut`, `TitleDetailsSavedOut`) or beside its refusal; derived from the request
     every time and never stored, not even in the receipt. The panel's words, lists and windows
     are unchanged; both new uses are not yet reviewed as built (`REVIEW_STATUS`; session W2).
+  - *Decision 7, fix round 1* (`support-policy-11`, the same direction). A workspace's name,
+    as it is created or renamed, goes through the same screen: the whole name, since it is all
+    the person's words; saved as usual with the same panel (`WorkspaceSavedOut`) or beside its
+    refusal (`WorkspaceRefusedOut`), never stored. On creating, the web shows the panel before
+    anything opens, and the person opens the new workspace from it. Not yet reviewed as built.

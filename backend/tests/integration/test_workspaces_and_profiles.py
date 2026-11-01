@@ -221,6 +221,45 @@ def test_a_direct_entry_with_a_risk_word_is_saved_with_the_calm_panel_and_nothin
     assert all("support_note" not in r["response"] for r in receipts)
 
 
+@pytest.mark.req("PROF-09")
+def test_a_workspace_name_with_a_risk_word_is_saved_with_the_calm_panel_and_nothing_kept(
+    api: ApiClient, ada: str, infra: Infra
+) -> None:
+    # Task 6d slice C fix round 1: the workspace's name is typed too (the product owner's
+    # "every place a person types", 31 October 2026). The words are the support tests' own.
+    body = {"name": DISTRESS, "data_mode": "live_assisted", "synthetic": True}
+    key = uuid.uuid4()
+    created = api.write("POST", "/v1/workspaces", ada, body, key=key)
+    replayed = api.write("POST", "/v1/workspaces", ada, body, key=key)
+    plain = api.write("POST", "/v1/workspaces", ada, {**body, "name": "Plain name (synthetic)"})
+    workspace_id = created.json()["workspace_id"]
+    path = f"/v1/workspaces/{workspace_id}"
+    renamed = api.write("PATCH", path, ada, {"expected_version": 1, "name": "Calm name"})
+    refused = api.write("PATCH", path, ada, {"expected_version": 1, "name": DISTRESS})
+
+    # Saved as usual, as typed, with the calm panel beside it; a replay derives it again.
+    assert created.status_code == 201, created.text
+    assert created.json()["name"] == DISTRESS
+    note = created.json()["support_note"]
+    assert note["message"] == safety.SUPPORT_NOTE_ENTRY
+    assert note["policy_version"] == safety.POLICY_VERSION
+    assert {r["name"] for r in note["resources"]} == SERVICES
+    assert (replayed.status_code, replayed.json()) == (201, created.json())
+    assert (plain.status_code, plain.json()["support_note"]) == (201, None)
+    assert (renamed.status_code, renamed.json()["support_note"]) == (200, None)
+    # A refused rename shows the panel too, saying nothing was saved.
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["error"]["code"] == "STALE_INPUT_VERSION"
+    assert refused.json()["support_note"]["message"] == safety.SUPPORT_NOTE_ENTRY_NOT_SAVED
+    # Nothing about the panel is stored, and nothing reads it for suitability.
+    receipts = infra.query(
+        "SELECT response FROM careerwright.command_receipts WHERE workspace_id = %s",
+        (workspace_id,),
+    )
+    assert receipts
+    assert all("support" not in str(r["response"]) for r in receipts)
+
+
 def test_an_unchanged_profile_write_creates_no_version(api: ApiClient, ada: str) -> None:
     workspace_id = api.create_workspace(ada)["workspace_id"]
     put_profile(api, ada, workspace_id, 0, profile_with(cities=["Leeds"]))

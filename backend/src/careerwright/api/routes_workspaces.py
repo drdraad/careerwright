@@ -1,16 +1,24 @@
-"""Identity and workspace endpoints. Writes are idempotent, versioned commands."""
+"""Identity and workspace endpoints. Writes are idempotent, versioned commands. A workspace's
+name is typed by the person, so it goes through the support screen."""
 
 import uuid
-from typing import Annotated
+from collections.abc import Callable
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 
 from careerwright.api.deps import CallerDep, Deps, IdempotencyKey
-from careerwright.api.envelope import ERROR_RESPONSES
+from careerwright.api.envelope import ERROR_RESPONSES, correlation_id, error_body, error_status
+from careerwright.api.interview_schemas import (
+    SupportNoteOut,
+    WorkspaceRefusedOut,
+    WorkspaceSavedOut,
+)
 from careerwright.api.pagination import DEFAULT_LIMIT, MAX_LIMIT, decode_timestamped, encode
 from careerwright.api.schemas import ActorOut, RenameWorkspaceIn, WorkspaceOut, WorkspacePage
 from careerwright.db import Tx, actor_transaction
+from careerwright.errors import CareerwrightError
 from careerwright.identity import store
 from careerwright.identity.receipts import CommandResult, fingerprint, run_idempotent
 from careerwright.identity.workspaces import (
@@ -19,6 +27,7 @@ from careerwright.identity.workspaces import (
     rename_workspace,
     visible_workspace,
 )
+from careerwright.profile.safety import has_risk_stem
 
 router = APIRouter(prefix="/v1", responses=ERROR_RESPONSES)
 Limit = Annotated[int, Query(ge=1, le=MAX_LIMIT)]
@@ -45,15 +54,43 @@ def list_workspaces(
     )
 
 
+def _screened(
+    support: bool, http: Request, command: Callable[[], tuple[int, dict[str, Any]]]
+) -> JSONResponse:
+    """Runs a create or rename whose name went through the support screen (the product
+    owner's "every place a person types"; `careerwright.profile.safety`): saved as usual, with
+    the calm panel beside the answer or its refusal. The panel is derived from the request,
+    never stored: the receipt stays the plain `WorkspaceOut`."""
+    try:
+        status, response = command()
+    except CareerwrightError as error:
+        if not support:
+            raise
+        refused = WorkspaceRefusedOut(
+            error=error_body(error, correlation_id(http)),
+            support_note=SupportNoteOut.beside_an_entry(saved=False),
+        )
+        return JSONResponse(refused.model_dump(mode="json"), status_code=error_status(error))
+    saved = WorkspaceSavedOut.saved(WorkspaceOut.model_validate(response), support=support)
+    return JSONResponse(saved.model_dump(mode="json"), status_code=status)
+
+
+_SCREENED_RESPONSES: dict[int | str, dict[str, Any]] = {
+    "4XX": {"model": WorkspaceRefusedOut, "description": "Typed error envelope"},
+    "5XX": {"model": WorkspaceRefusedOut, "description": "Typed error envelope"},
+}
+
+
 @router.post(
     "/workspaces",
     status_code=201,
-    response_model=WorkspaceOut,
+    response_model=WorkspaceSavedOut,
+    responses=_SCREENED_RESPONSES,
     tags=["workspaces"],
     operation_id="create_workspace",
 )
 def create(
-    body: CreateWorkspace, caller: CallerDep, deps: Deps, key: IdempotencyKey
+    body: CreateWorkspace, caller: CallerDep, deps: Deps, key: IdempotencyKey, http: Request
 ) -> JSONResponse:
     def execute(tx: Tx) -> CommandResult:
         workspace = create_workspace(
@@ -63,15 +100,18 @@ def create(
             201, WorkspaceOut.of(workspace).model_dump(mode="json"), workspace.workspace_id
         )
 
-    status, response = run_idempotent(
-        deps.engine,
-        caller.actor.actor_id,
-        key,
-        "create_workspace",
-        fingerprint("create_workspace", body.model_dump(mode="json")),
-        execute,
+    return _screened(
+        has_risk_stem(body.name),
+        http,
+        lambda: run_idempotent(
+            deps.engine,
+            caller.actor.actor_id,
+            key,
+            "create_workspace",
+            fingerprint("create_workspace", body.model_dump(mode="json")),
+            execute,
+        ),
     )
-    return JSONResponse(response, status_code=status)
 
 
 @router.get(
@@ -87,7 +127,8 @@ def get(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> WorkspaceOut:
 
 @router.patch(
     "/workspaces/{workspace_id}",
-    response_model=WorkspaceOut,
+    response_model=WorkspaceSavedOut,
+    responses=_SCREENED_RESPONSES,
     tags=["workspaces"],
     operation_id="rename_workspace",
 )
@@ -97,18 +138,22 @@ def rename(
     caller: CallerDep,
     deps: Deps,
     key: IdempotencyKey,
+    http: Request,
 ) -> JSONResponse:
     def execute(tx: Tx) -> CommandResult:
         workspace = rename_workspace(tx, workspace_id, body.expected_version, body.name)
         return CommandResult(200, WorkspaceOut.of(workspace).model_dump(mode="json"), workspace_id)
 
     request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
-    status, response = run_idempotent(
-        deps.engine,
-        caller.actor.actor_id,
-        key,
-        "rename_workspace",
-        fingerprint("rename_workspace", request),
-        execute,
+    return _screened(
+        has_risk_stem(body.name),
+        http,
+        lambda: run_idempotent(
+            deps.engine,
+            caller.actor.actor_id,
+            key,
+            "rename_workspace",
+            fingerprint("rename_workspace", request),
+            execute,
+        ),
     )
-    return JSONResponse(response, status_code=status)

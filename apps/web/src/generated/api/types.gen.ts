@@ -10719,6 +10719,66 @@ export type WorkspacePage = {
 };
 
 /**
+ * WorkspaceRefusedOut
+ *
+ * A refused create or rename, with the support panel when its name triggers the support
+ * screen.
+ */
+export type WorkspaceRefusedOut = {
+    error: ErrorBody;
+    support_note?: SupportNoteOut | null;
+};
+
+/**
+ * WorkspaceSavedOut
+ *
+ * A workspace as created or renamed, with the support panel when its name triggers the
+ * support screen: saved as usual, like What we know's direct entries.
+ */
+export type WorkspaceSavedOut = {
+    /**
+     * Workspace Id
+     */
+    workspace_id: string;
+    /**
+     * Name
+     */
+    name: string;
+    data_mode: DataMode;
+    /**
+     * Synthetic
+     *
+     * Persistent synthetic-data label; never changes.
+     */
+    synthetic: boolean;
+    /**
+     * Fixture
+     *
+     * The named fixture workspace that `make reset-demo` resets.
+     */
+    fixture: boolean;
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Last Event Seq
+     *
+     * The workspace's latest status-event sequence number when read: pass it as Last-Event-ID to receive only what happens after this read.
+     */
+    last_event_seq: number;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+    support_note: SupportNoteOut | null;
+};
+
+/**
  * WriteInputs
  *
  * Replace the whole document: every input left out is not stated.
@@ -11052,11 +11112,11 @@ export type CreateWorkspaceErrors = {
     /**
      * Typed error envelope
      */
-    '4XX': ErrorEnvelope;
+    '4XX': WorkspaceRefusedOut;
     /**
      * Typed error envelope
      */
-    '5XX': ErrorEnvelope;
+    '5XX': WorkspaceRefusedOut;
 };
 
 export type CreateWorkspaceError = CreateWorkspaceErrors[keyof CreateWorkspaceErrors];
@@ -11065,7 +11125,7 @@ export type CreateWorkspaceResponses = {
     /**
      * Successful Response
      */
-    201: WorkspaceOut;
+    201: WorkspaceSavedOut;
 };
 
 export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
@@ -11128,11 +11188,11 @@ export type RenameWorkspaceErrors = {
     /**
      * Typed error envelope
      */
-    '4XX': ErrorEnvelope;
+    '4XX': WorkspaceRefusedOut;
     /**
      * Typed error envelope
      */
-    '5XX': ErrorEnvelope;
+    '5XX': WorkspaceRefusedOut;
 };
 
 export type RenameWorkspaceError = RenameWorkspaceErrors[keyof RenameWorkspaceErrors];
@@ -11141,7 +11201,7 @@ export type RenameWorkspaceResponses = {
     /**
      * Successful Response
      */
-    200: WorkspaceOut;
+    200: WorkspaceSavedOut;
 };
 
 export type RenameWorkspaceResponse = RenameWorkspaceResponses[keyof RenameWorkspaceResponses];

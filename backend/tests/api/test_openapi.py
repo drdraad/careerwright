@@ -80,3 +80,18 @@ def test_the_profile_input_publishes_every_list_bound_the_server_checks() -> Non
     assert published == {
         name: spec.max_items for name, spec in FIELD_SPECS.items() if spec.kind is FieldKind.LIST
     }
+
+
+@pytest.mark.req("PROF-09")
+def test_a_workspace_s_name_is_answered_with_the_support_panel_beside_it() -> None:
+    # Task 6d slice C fix round 1: the name is typed, so it is screened as What we know's
+    # entries are; the panel comes with the saved workspace and with a refusal.
+    document = openapi_document()
+    schemas = document["components"]["schemas"]
+    for path, method in (("/v1/workspaces", "post"), ("/v1/workspaces/{workspace_id}", "patch")):
+        responses = document["paths"][path][method]["responses"]
+        saved = next(r for code, r in responses.items() if code in {"200", "201"})
+        refused = responses["4XX"]
+        for answer in (saved, refused):
+            name = answer["content"]["application/json"]["schema"]["$ref"].rsplit("/", 1)[-1]
+            assert "support_note" in schemas[name]["properties"], (path, name)
