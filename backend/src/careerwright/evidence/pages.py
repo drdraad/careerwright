@@ -619,17 +619,39 @@ def visible_text(text: str) -> str:
 
 
 def role_text(text: str) -> str:
-    """What role research checks a title against (Task 6e; ADR 0015 decision 2): the same
-    visible text as `visible_text`, normalised and without personal details, cut only at
-    `ROLE_TEXT_BYTES`, since a title can be anywhere on the page. No model reads it, and it
-    is never kept: only its hash, the span and the excerpt around it."""
-    return _shown(text, ROLE_TEXT_BYTES)
+    """What role research checks a title against (Task 6e; ADR 0015 decision 2): the page's
+    visible text, normalised and without personal details as `visible_text` is, cut only at
+    `ROLE_TEXT_BYTES`, since a title can be anywhere on the page. Text a reader never sees is
+    left out (fix round 1, review M1): inside `<script>`, `<style>`, `<noscript>` or
+    `<template>`, or an element marked `hidden` or styled `display: none` or `visibility:
+    hidden` in its own `style` attribute (a style sheet's rules are not read). No model reads
+    it, and it is never kept: only its hash, the span and the excerpt around it."""
+    return _cut(redact_shown(normalised_text(_seen(text))), ROLE_TEXT_BYTES)
+
+
+# Every text node without an ancestor a reader never sees (`role_text`). A `style` attribute is
+# compared lower-cased and without spaces; `!important` and other declarations change nothing.
+_STYLE = "translate(@style, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ \t\r\n', 'abcdefghijklmnopqrstuvwxyz')"
+_SEEN_TEXT = (
+    "//text()[not(ancestor::script or ancestor::style or ancestor::noscript "
+    "or ancestor::template or ancestor::*[@hidden] "
+    f"or ancestor::*[contains({_STYLE}, 'display:none')] "
+    f"or ancestor::*[contains({_STYLE}, 'visibility:hidden')])]"
+)
+
+
+def _seen(html: str) -> str:
+    """The page's text a reader sees, each text node apart, as `_plain` joins them."""
+    nodes = (str(node) for node in Selector(content=html).xpath(_SEEN_TEXT))
+    return " ".join(node for node in nodes if node.strip())
 
 
 def _shown(text: str, limit: int) -> str:
-    redacted = redact_shown(normalised_text(_plain(text)))
-    cut = redacted.encode()[:limit]
-    return cut.decode(errors="ignore").rstrip()
+    return _cut(redact_shown(normalised_text(_plain(text))), limit)
+
+
+def _cut(text: str, limit: int) -> str:
+    return text.encode()[:limit].decode(errors="ignore").rstrip()
 
 
 def _extraction(postings: list[JobCopy], *, blocks: int, unreadable: int) -> Extraction | None:
