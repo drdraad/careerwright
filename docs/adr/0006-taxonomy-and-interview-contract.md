@@ -343,3 +343,35 @@ holds). ADR 0015 records the role space; this ADR changes as follows.
   them. The profile schema change is Task 6d's.
 - **Open from this ADR's consequences:** residence and work-rights fields (BND1-04) move to
   Task 12a, with remote working (BND1-05).
+
+## Amendment, 2026-11-01 (the product owner's school-leaver decisions 2, 3 and 4; Task 6f)
+
+The product owner, 2026-11-01: "Many users will be final year school students who have never
+had a job before." No separate student mode: the same answers serve everyone, and nothing
+asks for or infers age.
+
+- **"I haven't had a job yet" is an answer about the current role** (field state
+  `no_job_yet`, the role's only), never a job title, Skipped or Unknown. It lights the
+  person's light, and neither the demo nor the live interviewer asks the job question again.
+  The first question saves it through the one write path (`POST .../origin/role/no-job-yet`,
+  an expected version and an Idempotency-Key); What we know and a confirmed proposal save it
+  through the same command as any answer. It names no occupation, so nothing is joined to it.
+- **Two optional answers** (spec section 3's work status and qualifications): `work_status`,
+  one of working, in education or training, looking for work, caring, other; and
+  `qualifications`, each in the person's words and marked achieved or expected (at most 8).
+  Both take Skip, Unknown and Prefer not to say, are never limits, and go through the one
+  write path and the interview contract (the model proposes, the person confirms). The model
+  writes a qualification as "achieved: …" or "expected: …"; its name is "stated" only when it
+  appears in the cited messages, and a work status is always shown as a reading. An expected
+  qualification is shown as expected everywhere and never read as achieved; Skills (Task 10)
+  and Options (Task 12b) read both as entry facts later. Saved answers schema version 4;
+  migration 0040 rewrites every stored document with both not yet asked (each answer it held
+  keeps its state, value and source), and an older document still reads that way.
+- **The interview works without a job** (`interview-turn-5`): the instructions say "Someone
+  may not have had a job yet: ask about school or college, volunteering, caring, clubs and
+  hobbies; never treat no job as a gap", name the new answers (each asked at most once, a
+  skip accepted, never the person's age) and say "their next step" for "the change". The
+  explore opening is "What would you like your working life to be like?" (a proposal: the
+  product owner settles the words at session W2), and the demo interviewer asks an unsure
+  person next "What do you enjoy doing, at school, at work or in your own time?". No live
+  call was made for this version: Task 6e runs the capped live check (R5).

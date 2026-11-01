@@ -1065,3 +1065,19 @@ space; this ADR changes as follows.
     the person's words; saved as usual with the same panel (`WorkspaceSavedOut`) or beside its
     refusal (`WorkspaceRefusedOut`), never stored. On creating, the web shows the panel before
     anything opens, and the person opens the new workspace from it. Not yet reviewed as built.
+
+## Amendment, 2026-11-01 (the product owner's school-leaver decisions 2 and 4; Task 6f)
+
+- **Suggestions with no work known.** Careerwright knows the person's work only from a role
+  they gave. Without one, no group is headed "Close to what you do now" (the close group,
+  which only roles they named can then make, is "Close to the roles you named"), and "Closer
+  to what I do" is not offered. The note for unknown work loses its "yet" and is never shown to
+  someone who said they haven't had a job (ADR 0006's `no_job_yet`). These are the web's words
+  over the slate's existing facts; the slate's rules are unchanged (R11).
+- **"Show me suggestions" never waits for a current role.** In a live interview it is offered
+  once the work areas, weekly hours and spending limit are answered and no target is, with or
+  without a role.
+- **The support screen** reads a qualification's name as typed words, as it reads every other
+  answer a person types in What we know or the review step; what they are doing now is a
+  choice from a fixed list, with no words typed. That is the same place and screen as before,
+  so the policy's version is unchanged (`support-policy-11`).
