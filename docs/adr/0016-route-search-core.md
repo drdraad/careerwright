@@ -1,8 +1,9 @@
 # ADR 0016: The route search core: the declared tree, sound pruning, the archive, layers and families
 
 - Status: Accepted for Task 13a (Sprint 6a: S6.1, S6.2, S6.5, S6.6, S6.7), and amended for
-  Task 13b (Sprint 6b: S6.3, S6.4, S6.8, as the L0 deferrals size them; the amendment at the
-  end).
+  Task 13b (Sprint 6b: S6.3, S6.4, S6.8, as the L0 deferrals size them; its amendment near the
+  end) and for Task 12c (a tuition fee loan paid to the provider, 2026-11-01; the amendment at
+  the end).
   - **Rulings (not R6; each costs little if wrong):** decisions 2 (one bridge role means one
     `work` action), 3 (the search reads the base scenario only), 7 (a payment plan is a
     schedule variant, not a family) and 10 (proposed records are searched and qualified, not
@@ -390,3 +391,38 @@ decisions 8, 14, 15, 19 and 20 and added 21 (the narrowings) and 22 (one solve a
   identifiers (the gate a prerequisite needs, which limit is unknown, a scheme's ID); the
   served result no longer has them, so if the Routes chapter needs one it becomes a typed
   field of its own.
+
+## Amendment, 2026-11-01 (Task 12c): a tuition fee loan paid to the provider, classed
+
+ADR 0013's Task 12c amendment adds a tuition fee loan the person states on an option: the fee
+it pays is in neither the cash ledger, nor direct spending, nor the monthly payment cap's
+payments, and the route carries it as a loan to repay. `PRUNING_VERSION` is now
+`sound-pruning-5` (rule 2 gains a finding). Requirements: FUNDING-06, OPT1-07, OPT1-08.
+
+- **Rule 2** (a variant's own, set aside): `loan_amount_unknown`. Whether the loan counts in
+  the base scenario, and its amount, come from the variant alone, so every route containing it
+  repeats the finding.
+- **Rule 3** (spend caps) still holds: a loan pays only its own option's fees, after that
+  option's own support, so a route's direct spending and each month's payments are still the
+  sums of each option's own, checked alone, and adding an option never lowers them. The fee a
+  loan pays is in neither sum.
+- **Never pruned:** a route that rests on a loan not yet approved is a condition
+  (`confirm_loan_approved`, qualification `conditional_loan`), carried on its schedule like an
+  award's; the search reads the base scenario only (decision 3), so the self-paid route beside
+  it is `evaluate_route`'s `no_award` scenario. The economic cost counts the fee the loan pays
+  (ADR 0013, Task 12c, ruling 6); the objectives are never pruned on, so nothing changes there.
+- **Families:** the loan and its application state are material financing in a family's
+  actions (decision 7).
+- **What a schedule carries:** `loans_to_repay` (each option's amount by the month its fee
+  falls due, conditional or not, its repayment `null`), stored in the sealed result and served
+  with it; a result stored before this amendment reads with none.
+- **The oracle** writes the rule again from the specification's section 22 row and section
+  12's FIN-1, reading only the loan's raw fields, sharing no code with the checker. Its
+  generated instances carry the loan in every state (approved, applied for, not applied for,
+  refused, each eligibility status, and, with unknowns, no amount), each with a fee for it to
+  pay, and a fixed instance (`loan_statuses`) holds every state at once. The search must give
+  exactly the oracle's archive, objectives, layers, outcome and what each archived route's
+  loans pay; the independent checker must agree with `check_route` on every candidate,
+  what the loans pay included.
+- The solve workflow's step sequence is unchanged, so the DBOS `application_version` stays
+  `careerwright-l0-1`.
